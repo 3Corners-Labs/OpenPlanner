@@ -77,12 +77,12 @@ confirmation email and on the change deadline (the group's dispatch lead).
 
 | Action | Condition |
 |---|---|
-| View available times (`citizen.availability_view`) | Anyone |
-| Book an appointment (`citizen.book`) | Anyone |
-| View own appointment (`citizen.booking_view`) | With the management link from the confirmation |
-| Move own appointment (`citizen.booking_change`) | With the management link, until the task goes to the queue |
-| Cancel own appointment (`citizen.booking_cancel`) | With the management link, until the task goes to the queue |
-| Move or cancel an appointment on hold (`citizen.suspended_booking_change`) | with the management link, while the appointment is on hold |
+| View available times (`participant.availability_view`) | Anyone |
+| Book an appointment (`participant.book`) | Anyone |
+| View own appointment (`participant.booking_view`) | With the management link from the confirmation |
+| Move own appointment (`participant.booking_change`) | With the management link, until the task goes to the queue |
+| Cancel own appointment (`participant.booking_cancel`) | With the management link, until the task goes to the queue |
+| Move or cancel an appointment on hold (`participant.suspended_booking_change`) | with the management link, while the appointment is on hold |
 
 ## Machines (API clients)
 

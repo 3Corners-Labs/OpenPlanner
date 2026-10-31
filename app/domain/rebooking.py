@@ -15,7 +15,7 @@ proposals; the service around it loads, locks, holds and sends.
                         first within a slot; each proposal takes a place, so no slot is ever
                         proposed beyond its room; no candidate → ask to rebook (ADR 0044)
 
-Times of day are compared in the group's time zone, so a proposal keeps the citizen's local
+Times of day are compared in the group's time zone, so a proposal keeps the participant's local
 time across a daylight-saving change.
 """
 
@@ -71,7 +71,7 @@ def may_take(group: Group, start: datetime, now: datetime) -> bool:
     """Return whether a planner may still put a booking into the slot at ``start``.
 
     The slot must lie beyond the planner lead and the dispatch lead, as for any planner change,
-    and beyond the group's change deadline (the citizen's change lead, ADR 0069), so the citizen
+    and beyond the group's change deadline (the participant's change lead, ADR 0069), so the participant
     can still confirm or change the proposal.
     """
     lead = max(group.planner_lead, group.dispatch_lead)

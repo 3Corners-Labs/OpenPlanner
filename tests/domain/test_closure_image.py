@@ -32,7 +32,7 @@ async def _close(closures: ClosureService, *, hours: int | None = None) -> None:
     await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, ends, NOTICES))
 
 
-async def test_group_admin_sets_an_image_that_citizens_then_get(
+async def test_group_admin_sets_an_image_that_participants_then_get(
     closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     await _close(closures)

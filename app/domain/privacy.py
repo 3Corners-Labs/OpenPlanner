@@ -7,8 +7,8 @@ stays a constant on purpose (CLAUDE.md, ADR 0042).
 
 Personal data (PII) lives only on ``Booking``:
 
-- *direct* fields identify the citizen on their own: first and last name, email, phone;
-- *sensitive* fields hold what the citizen told us or give access to the conversation: a
+- *direct* fields identify the participant on their own: first and last name, email, phone;
+- *sensitive* fields hold what the participant told us or give access to the conversation: a
   note, the answers to the group's custom form fields (ADR 0055) and the join links (the
   call's own and the trial call's, ADR 0071).
 
@@ -27,10 +27,10 @@ class Classification(StrEnum):
     """How sensitive a personal-data field is (ADR 0063 §1)."""
 
     DIRECT = "direct"
-    """Identifies the citizen on its own: name, email address, phone number."""
+    """Identifies the participant on its own: name, email address, phone number."""
 
     SENSITIVE = "sensitive"
-    """What the citizen told us, or a link that gives access to their conversation."""
+    """What the participant told us, or a link that gives access to their conversation."""
 
 
 @dataclass(frozen=True)

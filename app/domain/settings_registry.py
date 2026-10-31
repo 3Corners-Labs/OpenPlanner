@@ -550,7 +550,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         300,
         _C,
         T.OPERATIONS,
-        "Retry-After of the 503 that citizens and the machine API get during maintenance "
+        "Retry-After of the 503 that participants and the machine API get during maintenance "
         "(ADR 0038).",
         minimum=30,
         maximum=3600,
@@ -1115,7 +1115,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         10,
         _C,
         T.PLANNER,
-        "Seconds between two refreshes of the own queue, a claimed booking and the citizen's "
+        "Seconds between two refreshes of the own queue, a claimed booking and the participant's "
         "waiting page (ADR 0072).",
         minimum=5,
         maximum=60,
@@ -1177,7 +1177,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         24,
         _D,
         T.CONFIRMATION,
-        "Hours after booking within which the citizen confirms by email link (ADR 0056).",
+        "Hours after booking within which the participant confirms by email link (ADR 0056).",
         minimum=1,
         maximum=72,
     ),
@@ -1187,7 +1187,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         2,
         _D,
         T.CONFIRMATION,
-        "Hours before the start by which the citizen confirms at the latest (ADR 0056).",
+        "Hours before the start by which the participant confirms at the latest (ADR 0056).",
         minimum=0,
         maximum=24,
     ),

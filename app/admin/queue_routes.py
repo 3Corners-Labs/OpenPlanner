@@ -30,7 +30,7 @@ from app.admin.live import Seen, fragment, key
 from app.admin.pages import Locale, SameOrigin
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.own_queue import CitizenState, VideoState
+from app.domain.own_queue import ParticipantState, VideoState
 from app.domain.queue_service import ClaimedBooking, QueueRow, QueueService, QueueView
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock
@@ -66,11 +66,11 @@ VIDEO_LABELS: dict[VideoState, tuple[str | None, str]] = {
 }
 """Catalogue key and chip tone per video state; a ready link needs no chip."""
 
-CITIZEN_LABELS: dict[CitizenState, tuple[str, str]] = {
-    CitizenState.NOT_YET: ("admin.queue.citizen.not_yet", ""),
-    CitizenState.IN_LOBBY: ("admin.queue.citizen.in_lobby", "warning"),
-    CitizenState.IN_CALL: ("admin.queue.citizen.in_call", "success"),
-    CitizenState.ENDED: ("admin.queue.citizen.ended", ""),
+PARTICIPANT_LABELS: dict[ParticipantState, tuple[str, str]] = {
+    ParticipantState.NOT_YET: ("admin.queue.citizen.not_yet", ""),
+    ParticipantState.IN_LOBBY: ("admin.queue.citizen.in_lobby", "warning"),
+    ParticipantState.IN_CALL: ("admin.queue.citizen.in_call", "success"),
+    ParticipantState.ENDED: ("admin.queue.citizen.ended", ""),
 }
 """Catalogue key and chip tone per citizen state on the claimed booking's page."""
 
@@ -242,7 +242,7 @@ async def _claimed(
 
 def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) -> ClaimedView:
     """Write the claimed booking out; polling stops once nothing can change any more."""
-    citizen_key, citizen_tone = CITIZEN_LABELS[booking.citizen]
+    citizen_key, citizen_tone = PARTICIPANT_LABELS[booking.citizen]
     video_key, _tone = VIDEO_LABELS[booking.video]
     return ClaimedView(
         booking=booking,
@@ -252,7 +252,7 @@ def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) ->
         video=locale.gettext(video_key) if video_key else None,
         key=key(booking.video, booking.citizen, booking.join_url is not None),
         polling=booking.video is not VideoState.FAILED
-        and booking.citizen is not CitizenState.ENDED,
+        and booking.citizen is not ParticipantState.ENDED,
     )
 
 

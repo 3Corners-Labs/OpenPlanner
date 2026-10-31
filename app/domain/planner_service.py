@@ -3,13 +3,13 @@
 Everything needs ``bookings.manage`` on the group (the matrix, ADR 0014; a custom "Planner"
 role per ADR 0039 can hold it). Each action runs in one locked transaction with its audit
 event, which names the action, the booking id and the reason code, never personal data. The
-citizen is always told (a protection, not a setting): by email, and by SMS as well when they
+participant is always told (a protection, not a setting): by email, and by SMS as well when they
 agreed to it (ADR 0022).
 
     move    another free slot of the same group; a move that would cause a shortfall
             needs the planner's explicit confirmation
     cancel  with one of the fixed reasons (``ChangeReason``)
-    rebook  ask the citizen to choose a new time, with a fixed reason: the place is freed,
+    rebook  ask the participant to choose a new time, with a fixed reason: the place is freed,
             one reminder follows, an unanswered request lapses (``booking_changes``)
     rebook a slot  the same for the last-made bookings of a short slot, as many as the
             shortfall, after the planner confirmed exactly that list
@@ -54,7 +54,7 @@ class PlannerService:
         uow: Opens database transactions.
         clock: Current time.
         admin: Authorises every operation and audits refusals.
-        bookings: Places the moved booking (shared with the citizen's reschedule).
+        bookings: Places the moved booking (shared with the participant's reschedule).
         alert_per_hour: ``planner_changes_alert_per_hour`` (class C).
         rebook_days: ``planner_rebook_days`` (class D): a request lapses this long after the
             booking's start.
@@ -113,7 +113,7 @@ class PlannerService:
     ) -> Booking:
         """Move a booking to another slot of its group; return the new booking.
 
-        The citizen gets the change message with the new time and a new management link.
+        The participant gets the change message with the new time and a new management link.
 
         Raises:
             DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active``,
@@ -134,7 +134,7 @@ class PlannerService:
     async def cancel(
         self, principal: Principal, slug: str, booking_id: int, reason: ChangeReason
     ) -> None:
-        """Cancel a booking with a fixed reason; the citizen gets the cancellation message.
+        """Cancel a booking with a fixed reason; the participant gets the cancellation message.
 
         Raises:
             DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active`` or
@@ -154,7 +154,7 @@ class PlannerService:
     async def request_rebook(
         self, principal: Principal, slug: str, booking_id: int, reason: ChangeReason
     ) -> Booking:
-        """Ask the citizen to choose a new time; the booking frees its place at once.
+        """Ask the participant to choose a new time; the booking frees its place at once.
 
         Raises:
             DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active`` or
@@ -194,7 +194,7 @@ class PlannerService:
         reason: ChangeReason,
         confirmed: frozenset[int],
     ) -> list[Booking]:
-        """Ask the citizens of the slot's last-made bookings to choose a new time.
+        """Ask the participants of the slot's last-made bookings to choose a new time.
 
         ``confirmed`` holds the ids the planner saw on the confirmation page; when the slot
         changed since, nothing happens and ``slot_changed`` asks to confirm again.
@@ -217,7 +217,7 @@ class PlannerService:
         return waiting
 
     async def waiting(self, principal: Principal, slug: str) -> list[Booking]:
-        """Return the group's bookings awaiting a new time from the citizen, earliest first.
+        """Return the group's bookings awaiting a new time from the participant, earliest first.
 
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.

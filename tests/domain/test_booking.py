@@ -203,7 +203,7 @@ def test_a_confirmed_booking_cannot_expire() -> None:
     assert excinfo.value.code is ErrorCode.BOOKING_NOT_PENDING
 
 
-def test_a_pending_booking_can_be_cancelled_by_the_citizen() -> None:
+def test_a_pending_booking_can_be_cancelled_by_the_participant() -> None:
     cancelled = make_booking(BookingStatus.PENDING_CONFIRMATION).cancel(NOW)
 
     assert cancelled.status is BookingStatus.CANCELLED

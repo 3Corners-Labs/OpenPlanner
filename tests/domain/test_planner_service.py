@@ -25,7 +25,7 @@ from tests.support.domain import (
     SLOT_0900,
     SLOT_0930,
     book_confirmed,
-    citizen,
+    participant,
     window,
     with_team_invite,
 )
@@ -38,8 +38,8 @@ def planner(uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
     return PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=50)
 
 
-_CITIZENS = itertools.count(1)
-"""Each booking of ``_book`` is another citizen, so the address limit (ADR 0066) stays out."""
+_PARTICIPANTS = itertools.count(1)
+"""Each booking of ``_book`` is another participant, so the address limit (ADR 0066) stays out."""
 
 
 async def _book(
@@ -49,7 +49,7 @@ async def _book(
         bookings,
         group_slug=slug,
         start=start,
-        contact=citizen(next(_CITIZENS)),
+        contact=participant(next(_PARTICIPANTS)),
         locale="nl",
         consents=consents,
     )
@@ -67,7 +67,7 @@ def _messages(uow: InMemoryUnitOfWork, booking_id: int) -> set[tuple[JobType, Ch
 # --- move ---------------------------------------------------------------------------------
 
 
-async def test_a_move_places_a_new_booking_and_tells_the_citizen(
+async def test_a_move_places_a_new_booking_and_tells_the_participant(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     old_id = await _book(bookings, consents=SMS)
@@ -136,7 +136,7 @@ async def test_a_full_slot_stays_full(planner: PlannerService, bookings: Booking
 # --- cancel -------------------------------------------------------------------------------
 
 
-async def test_a_cancellation_carries_the_reason_to_the_citizen(
+async def test_a_cancellation_carries_the_reason_to_the_participant(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     booking_id = await _book(bookings, consents=SMS)
@@ -272,7 +272,7 @@ async def test_many_changes_by_one_planner_raise_one_system_event(
 # --- ask to rebook ------------------------------------------------------------------------
 
 
-async def test_asking_to_rebook_frees_the_place_and_tells_the_citizen(
+async def test_asking_to_rebook_frees_the_place_and_tells_the_participant(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     booking_id = await _book(bookings, consents=SMS)

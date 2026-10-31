@@ -60,7 +60,7 @@ def with_team_invite(group: Group) -> Group:
 
 
 async def book_confirmed(service: BookingService, **arguments: Any) -> BookingReceipt:
-    """Book with ``service.book(**arguments)`` and confirm it, as the citizen would by link."""
+    """Book with ``service.book(**arguments)`` and confirm it, as the participant would by link."""
     receipt = await service.book(**arguments)
     confirmed = await service.confirm(receipt.management_token)
     return BookingReceipt(confirmed, receipt.management_token)
@@ -76,9 +76,9 @@ async def book_pending(
     return await service.book(group_slug=slug, start=start, contact=contact, locale="nl")
 
 
-def citizen(number: int) -> ContactInput:
-    """Return Ada's details under address ``number``: another citizen for the address limit."""
-    return replace(ADA, email=f"citizen{number}@example.org")
+def participant(number: int) -> ContactInput:
+    """Return Ada's details under address ``number``: another participant for the address limit."""
+    return replace(ADA, email=f"participant{number}@example.org")
 
 
 async def book(

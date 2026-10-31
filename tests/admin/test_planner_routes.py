@@ -14,7 +14,7 @@ from app.domain.services import BookingService
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_agenda_routes import FRIDAY
 from tests.admin.test_call_routes import FRIDAY_0900
-from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed, citizen
+from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed, participant
 
 FRIDAY_0930 = datetime(2026, 1, 2, 8, 30, tzinfo=UTC)
 AGENDA = "/admin/groups/demo/agenda"
@@ -25,8 +25,8 @@ def _uow(site: Site) -> SqlUnitOfWork:
     return SqlUnitOfWork(app.state.engine)
 
 
-_CITIZENS = itertools.count(1)
-"""Each booking of ``_book`` is another citizen, so the address limit (ADR 0066) stays out."""
+_PARTICIPANTS = itertools.count(1)
+"""Each booking of ``_book`` is another participant, so the address limit (ADR 0066) stays out."""
 
 
 async def _book(site: Site, start: datetime = FRIDAY_0900) -> int:
@@ -34,7 +34,7 @@ async def _book(site: Site, start: datetime = FRIDAY_0900) -> int:
         BookingService(_uow(site), site.clock, TEST_TOKEN_KEY),
         group_slug="demo",
         start=start,
-        contact=citizen(next(_CITIZENS)),
+        contact=participant(next(_PARTICIPANTS)),
         locale="nl",
     )
     return receipt.booking.id or 0
@@ -210,7 +210,7 @@ async def test_an_accept_in_local_time_lands_on_the_same_slot(site: Site) -> Non
 # --- ask to rebook ------------------------------------------------------------------------
 
 
-async def test_a_planner_asks_a_citizen_to_choose_a_new_time(site: Site) -> None:
+async def test_a_planner_asks_a_participant_to_choose_a_new_time(site: Site) -> None:
     booking_id = await _book(site)
     await site.login_as(GROUP_ADMIN)
     path = f"{AGENDA}/bookings/{booking_id}/rebook"

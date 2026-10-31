@@ -187,10 +187,10 @@ async def test_other_groups_admin_cannot_close_or_touch_bookings(
     assert len(denied) == 2
 
 
-# --- the citizen --------------------------------------------------------------------------
+# --- the participant --------------------------------------------------------------------------
 
 
-async def test_citizen_can_reschedule_a_suspended_booking_after_the_deadline(
+async def test_participant_can_reschedule_a_suspended_booking_after_the_deadline(
     closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
     receipt = await book_confirmed(
@@ -210,7 +210,7 @@ async def test_citizen_can_reschedule_a_suspended_booking_after_the_deadline(
     assert _status(uow, receipt.booking.id or 0) is BookingStatus.CANCELLED
 
 
-async def test_citizen_can_cancel_a_suspended_booking(
+async def test_participant_can_cancel_a_suspended_booking(
     closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     receipt = await book_confirmed(

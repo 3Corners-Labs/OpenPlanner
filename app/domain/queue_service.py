@@ -14,7 +14,7 @@ exactly one wins; the other gets ``already_claimed`` (a chosen row) or the next 
 
 The meeting link is shown only after a claim, so two agents cannot both start the same
 meeting unannounced. The agent is recorded as a pseudonym (``tokens.agent_pseudonym``).
-Every row and the claimed booking carry the video link's state and the citizen's state
+Every row and the claimed booking carry the video link's state and the participant's state
 (ADR 0072), so the page can say what is going on instead of showing "no meeting".
 """
 
@@ -35,12 +35,12 @@ from app.domain.form_fields import (
     labelled_answers,
 )
 from app.domain.own_queue import (
-    CitizenState,
+    ParticipantState,
     QueueEntry,
     VideoState,
-    citizen_state,
     next_up,
     not_claimed_in_time,
+    participant_state,
     summarise,
     video_state,
     visible,
@@ -64,8 +64,8 @@ class QueueRow:
         booking_id: The booking.
         reference: Its reference, e.g. ``OP-000123``.
         start: Its start (UTC); shown in the group's time zone.
-        first_name: The citizen's first name; empty after the purge.
-        in_lobby: The citizen joined and waits for an agent.
+        first_name: The participant's first name; empty after the purge.
+        in_lobby: The participant joined and waits for an agent.
         claimed: An agent picked it up.
         mine: The viewing agent picked it up.
         direct: A direct call (ADR 0019) rather than a scheduled appointment.
@@ -102,7 +102,7 @@ class GroupQueueSummary:
 
     Attributes:
         summary: The group with its organisation.
-        waiting: Citizens in the lobby nobody picked up yet.
+        waiting: Participants in the lobby nobody picked up yet.
         longest_wait: How long the first of them has waited.
         staff_available: Staff who may work this queue and are signed in now.
     """
@@ -126,8 +126,8 @@ class ClaimedBooking:
     """Answers to the group's custom fields an agent may see: never PII (ADR 0055)."""
     video: VideoState = VideoState.PENDING
     """Whether the meeting is ready, pending or failed (ADR 0072)."""
-    citizen: CitizenState = CitizenState.NOT_YET
-    """Where the citizen is: not yet joined, in the lobby, in the call, or gone."""
+    participant: ParticipantState = ParticipantState.NOT_YET
+    """Where the participant is: not yet joined, in the lobby, in the call, or gone."""
 
 
 class QueueService:
@@ -401,7 +401,7 @@ def _claimed(
             locale,
         ),
         video=video_state(booking, status),
-        citizen=citizen_state(status),
+        participant=participant_state(status),
     )
 
 

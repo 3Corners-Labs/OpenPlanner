@@ -1,4 +1,4 @@
-"""A citizen leaves a direct call from the waiting page (ADR 0019 point 4, ADR 0021)."""
+"""A participant leaves a direct call from the waiting page (ADR 0019 point 4, ADR 0021)."""
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -71,7 +71,7 @@ async def test_leaving_frees_the_place_under_the_cap() -> None:
 
 @pytest.mark.parametrize("how", ["task", "claim", "host"])
 async def test_leaving_after_an_agent_came_keeps_the_meeting_for_the_agent(how: str) -> None:
-    """ADR 0019 point 4: the citizen leaves; the agent is not cut off, the work item ends."""
+    """ADR 0019 point 4: the participant leaves; the agent is not cut off, the work item ends."""
     service, uow, token, booking_id = await _started()
     if how == "task":
         uow.state.call_status[booking_id] = CallStatus(booking_id, task=TaskState.CONNECTED)

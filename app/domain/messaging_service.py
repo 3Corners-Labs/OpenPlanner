@@ -8,7 +8,7 @@ never the text itself.
     texts / save_texts                           texts.manage       group level
 
 New and removed rules apply to bookings made afterwards; planned reminders of existing
-bookings are kept, so a citizen never misses a reminder they were promised.
+bookings are kept, so a participant never misses a reminder they were promised.
 """
 
 from dataclasses import dataclass

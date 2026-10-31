@@ -77,7 +77,7 @@ async def test_a_day_kept_open_follows_the_weekly_rules(uow: InMemoryUnitOfWork)
     assert await _closed_days(uow, MONDAY, TUESDAY) == []
 
 
-async def test_holidays_close_citizen_availability(uow: InMemoryUnitOfWork) -> None:
+async def test_holidays_close_participant_availability(uow: InMemoryUnitOfWork) -> None:
     service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
 
     slots = await service.availability("demo", MONDAY, TUESDAY)

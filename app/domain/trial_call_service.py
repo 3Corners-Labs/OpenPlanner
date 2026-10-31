@@ -8,7 +8,7 @@
 The meeting is scheduled outside the write lock (a slow Webex must not hold the database). If
 two requests race, the second finds the first one stored and deletes its own meeting again. A
 failure at Webex is recorded on the booking's timeline with Webex's reason and shown to the
-citizen as "not possible now"; it does not count as a trial call.
+participant as "not possible now"; it does not count as a trial call.
 """
 
 from dataclasses import dataclass
@@ -43,7 +43,7 @@ class TrialView:
 
 
 class TrialCallService:
-    """Opens trial calls for citizens.
+    """Opens trial calls for participants.
 
     Args:
         uow: Reads and writes bookings and jobs.
@@ -120,7 +120,7 @@ class TrialCallService:
     async def join_link(self, management_token: str) -> str | None:
         """Return the link into the open trial call and record that it was followed.
 
-        ``None`` when there is no open trial call (the caller sends the citizen back).
+        ``None`` when there is no open trial call (the caller sends the participant back).
 
         Raises:
             DomainError: ``booking_not_found``.

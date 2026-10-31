@@ -11,16 +11,16 @@ booking and its jobs commit together or not at all (CLAUDE.md architecture rules
                                                     else ─► lapses (ADR 0056)
     reschedule ─► locked tx ─► cancel old (jobs: purge only) ─► _place new in the SAME group
 
-A citizen's new booking awaits confirmation by email link (ADR 0056): it holds its place but
+A participant's new booking awaits confirmation by email link (ADR 0056): it holds its place but
 gets no meeting, reminders or task until confirmed; its deadline ``confirm_by`` follows the
 organisation's ``ConfirmPolicy``. A booking that is moved or rescheduled keeps the
 confirmation it had (the address was already verified), so it is placed confirmed.
 
-A citizen can move a booking until its change deadline (``Group.change_deadline``: the group's
+A participant can move a booking until its change deadline (``Group.change_deadline``: the group's
 ``citizen_change_lead_minutes`` before the start, 60 by default) and cancel it until its start
 (``Group.cancel_deadline``, ADR 0069); after that, reschedule and cancel raise
 ``booking_locked``. A booking suspended by an emergency closure (ADR 0024) has no deadline:
-the citizen can move or cancel it until it is resolved. No slot inside a closure is offered
+the participant can move or cancel it until it is resolved. No slot inside a closure is offered
 or booked (``group_closed``), and no direct call starts while one is active. A direct call
 also needs room under the group's cap of open direct calls (``direct_call_full``, ADR 0026).
 """
@@ -103,7 +103,7 @@ class ContactInput:
 class BookingDetails:
     """What the management page needs: the booking, its group and what it may still do.
 
-    ``changeable`` says whether the citizen may move it, ``cancellable`` whether they may
+    ``changeable`` says whether the participant may move it, ``cancellable`` whether they may
     cancel it (ADR 0069). ``cancellable`` is also true for a booking that awaits confirmation
     ("this was not me", ADR 0056), which cannot be rescheduled. ``closure`` is the closure that
     suspended the booking, for its notice.
@@ -126,7 +126,7 @@ class BookingReceipt:
 
 
 class BookingService:
-    """Application service for citizens' bookings.
+    """Application service for participants' bookings.
 
     Args:
         uow: Opens database transactions.
@@ -175,13 +175,13 @@ class BookingService:
             return await self._group(tx, group_slug)
 
     async def closure_notice(self, group: Group) -> Closure | None:
-        """Return the closure citizens of ``group`` must see now (active or upcoming)."""
+        """Return the closure participants of ``group`` must see now (active or upcoming)."""
         async with self._uow.read() as tx:
             closures = await tx.get_closures(group.id, self._clock.now())
         return closures[0] if closures else None
 
     async def closure_image(self, group: Group) -> ImageFile | None:
-        """Return the image of the closure citizens of ``group`` see now, if it has one.
+        """Return the image of the closure participants of ``group`` see now, if it has one.
 
         Only a visible (active or upcoming) closure's image is public (ADR 0037 §3).
         """
@@ -229,7 +229,7 @@ class BookingService:
         locale: str,
         consents: frozenset[ChannelKind] = frozenset(),
     ) -> BookingReceipt:
-        """Book the slot at ``start`` for a citizen; it awaits confirmation (ADR 0056).
+        """Book the slot at ``start`` for a participant; it awaits confirmation (ADR 0056).
 
         Raises:
             DomainError: ``group_not_found``, ``invalid_contact``, ``outside_booking_window``,
@@ -428,9 +428,9 @@ class BookingService:
     ) -> BookingReceipt:
         """Move ``old`` to ``new_start`` inside the caller's locked transaction.
 
-        Shared by the citizen's reschedule, an admin moving a suspended booking
+        Shared by the participant's reschedule, an admin moving a suspended booking
         (``ClosureService.move``) and a planner (``PlannerService.move``, which passes
-        ``sms`` so the change also goes out as an SMS where the citizen agreed to it); the
+        ``sms`` so the change also goes out as an SMS where the participant agreed to it); the
         caller checks who may do it.
 
         Raises:
@@ -542,7 +542,7 @@ class BookingService:
     ) -> BookingReceipt:
         """Reserve a place at ``start`` and store the booking with its jobs.
 
-        ``pending`` places it awaiting confirmation with its own ``confirm_by`` (a citizen's
+        ``pending`` places it awaiting confirmation with its own ``confirm_by`` (a participant's
         new booking, or a moved one that was still pending, ADR 0056); otherwise it is placed
         confirmed and keeps ``confirmed_at`` of the booking it replaces.
         """

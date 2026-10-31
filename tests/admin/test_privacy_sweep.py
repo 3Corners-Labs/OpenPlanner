@@ -71,8 +71,8 @@ MARKERS = {
 """Marker per personal-data field (one join link: the adapter stores it under both)."""
 
 
-def citizen(number: int) -> ContactInput:
-    """The marker citizen; a different address per booking, each holding the marker."""
+def participant(number: int) -> ContactInput:
+    """The marker participant; a different address per booking, each holding the marker."""
     return ContactInput(
         first_name=MARKERS["first_name"],
         last_name=MARKERS["last_name"],
@@ -332,7 +332,7 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
 
     async def book(number: int, start: datetime) -> int:
         receipt = await book_confirmed(
-            service, group_slug="demo", start=start, contact=citizen(number), locale="nl"
+            service, group_slug="demo", start=start, contact=participant(number), locale="nl"
         )
         return receipt.booking.id or 0
 

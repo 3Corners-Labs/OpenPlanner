@@ -1,4 +1,4 @@
-"""The editable text blocks of citizen messages, per group and locale (ADR 0009, ADR 0022).
+"""The editable text blocks of participant messages, per group and locale (ADR 0009, ADR 0022).
 
 A message keeps its fixed, accessible layout; admins change only text blocks. A group text
 replaces the catalogue text of one block in one locale; removing it brings the default back.
@@ -80,7 +80,7 @@ MESSAGE_BLOCKS: tuple[TextBlock, ...] = (
     _email("confirmation", "intro"),
     _email("change", "subject", subject=True),
     _email("change", "intro"),
-    # ADR 0044: a planner's move also goes out as an SMS where the citizen can get one.
+    # ADR 0044: a planner's move also goes out as an SMS where the participant can get one.
     TextBlock(
         "message.change.sms", "change", ChannelKind.SMS, "body", SMS_PLACEHOLDERS, MAX_SMS_LENGTH
     ),

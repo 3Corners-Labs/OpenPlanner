@@ -1,8 +1,8 @@
 """Changes staff make to existing bookings, shared by the closure and the planner (ADR 0044).
 
-The emergency closure (ADR 0024) and the planner both cancel bookings on the citizen's
-behalf; the citizen is always told. Moving is ``BookingService.relocate``, shared with the
-citizen's own reschedule. This module holds the steps both callers run inside their own
+The emergency closure (ADR 0024) and the planner both cancel bookings on the participant's
+behalf; the participant is always told. Moving is ``BookingService.relocate``, shared with the
+participant's own reschedule. This module holds the steps both callers run inside their own
 locked transaction, and the planner's limits:
 
     planner may change?  confirmed, scheduled, not dispatched, starts after the lead
@@ -13,7 +13,7 @@ locked transaction, and the planner's limits:
                          rebook_by, purge 24 h later (ADR 0044)
     lapse                still awaiting at rebook_by ─► cancelled, lapse message
     lapse unconfirmed    still pending at confirm_by ─► cancelled at confirm_by, lapse
-                         message (ADR 0056; the citizen's own lapse, kept beside the other)
+                         message (ADR 0056; the participant's own lapse, kept beside the other)
 """
 
 from datetime import datetime, timedelta
@@ -63,7 +63,7 @@ def planner_may_change(booking: Booking, group: Group, now: datetime) -> bool:
 
 
 def sms_reachable(booking: Booking) -> bool:
-    """Return whether the citizen can get an SMS, as for reminders (ADR 0022)."""
+    """Return whether the participant can get an SMS, as for reminders (ADR 0022)."""
     contact = booking.contact
     return contact is not None and reachable(ChannelKind.SMS, contact, booking.consents)
 
@@ -84,7 +84,7 @@ async def cancel(
         booking: A confirmed or suspended booking.
         now: Current time.
         reason: The planner's fixed reason, shown in the message.
-        sms: Also send the cancellation as an SMS when the citizen is reachable there.
+        sms: Also send the cancellation as an SMS when the participant is reachable there.
         team_invite: Withdraw the calendar invite of the group's team (ADR 0043).
 
     Raises:
@@ -109,7 +109,7 @@ async def request_rebook(
     reminder_days: int,
     team_invite: bool = False,
 ) -> Booking:
-    """Ask the citizen to choose a new time for ``booking``; return it (ADR 0044).
+    """Ask the participant to choose a new time for ``booking``; return it (ADR 0044).
 
     Args:
         tx: The caller's locked transaction.
@@ -141,7 +141,7 @@ async def request_rebook(
 async def lapse(tx: Transaction, booking: Booking, now: datetime) -> bool:
     """Cancel ``booking`` if it still awaits a new time; return whether it lapsed.
 
-    The citizen gets the lapse message; the purge planned with the request stays.
+    The participant gets the lapse message; the purge planned with the request stays.
     """
     if not booking.awaits_rebook:
         return False
@@ -154,7 +154,7 @@ async def lapse_unconfirmed(tx: Transaction, booking: Booking, now: datetime) ->
     """Cancel ``booking`` if it still awaits confirmation; return whether it lapsed (ADR 0056).
 
     Run by ``expire_unconfirmed`` at ``confirm_by``, and by a confirmation that comes too
-    late. The place is freed and the citizen gets the short lapse message; the purge planned
+    late. The place is freed and the participant gets the short lapse message; the purge planned
     with the request to confirm stays.
     """
     if not booking.awaits_confirmation:

@@ -11,7 +11,7 @@ from app.domain.job_plan import PURGE_AFTER, JobType, PlannedJob, is_stale
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, book, book_confirmed, citizen
+from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, book, book_confirmed, participant
 
 REASON = ChangeReason.STAFFING
 
@@ -58,8 +58,8 @@ async def test_a_request_to_rebook_frees_the_place_and_plans_its_messages(
         PlannedJob(JobType.PURGE_PII, rebook_by + PURGE_AFTER, None),
     ]
     # The freed place can be booked again at once.
-    await book(bookings, SLOT_0900, "demo", citizen(2))
-    await book(bookings, SLOT_0900, "demo", citizen(3))
+    await book(bookings, SLOT_0900, "demo", participant(2))
+    await book(bookings, SLOT_0900, "demo", participant(3))
 
 
 async def test_without_a_phone_number_the_request_goes_by_email_only(
@@ -84,7 +84,7 @@ async def test_only_a_confirmed_booking_can_be_asked_to_rebook(
         await _request(uow, receipt.booking.id or 0)
 
 
-async def test_the_citizen_chooses_a_new_time_without_a_deadline(
+async def test_the_participant_chooses_a_new_time_without_a_deadline(
     uow: InMemoryUnitOfWork, bookings: BookingService, clock: FixedClock
 ) -> None:
     receipt = await book(bookings, SLOT_0900, "demo")
@@ -101,7 +101,7 @@ async def test_the_citizen_chooses_a_new_time_without_a_deadline(
     assert not any(j.type is JobType.LAPSE_REBOOK for j in uow.state.jobs[old.id or 0])
 
 
-async def test_the_citizen_can_cancel_a_request_to_rebook(
+async def test_the_participant_can_cancel_a_request_to_rebook(
     uow: InMemoryUnitOfWork, bookings: BookingService
 ) -> None:
     receipt = await book(bookings, SLOT_0900, "demo")
@@ -133,7 +133,7 @@ async def test_an_unanswered_request_lapses_with_a_message(
     assert (JobType.SEND_REBOOK_LAPSED, ChannelKind.SMS) in messages
 
 
-async def test_a_lapse_after_the_citizen_acted_does_nothing(
+async def test_a_lapse_after_the_participant_acted_does_nothing(
     uow: InMemoryUnitOfWork, bookings: BookingService
 ) -> None:
     receipt = await book(bookings, SLOT_0900, "demo")

@@ -1,6 +1,6 @@
 """Group configuration and opening hours.
 
-A ``Group`` is a team (a WxCC queue) citizens book with. Its staffing comes from weekly
+A ``Group`` is a team (a WxCC queue) participants book with. Its staffing comes from weekly
 ``ScheduleRule``s; a ``ScheduleOverride`` replaces all rules on one date (holiday, illness,
 extra session). Every window (a staffing block, ADR 0027) carries a capacity: the number of
 agents, and so how many appointments may start at the same time. That is a single number
@@ -57,10 +57,10 @@ MAX_DIRECT_CALLS = MAX_CAPACITY
 DEFAULT_DISPATCH_LEAD_MINUTES = 5
 MAX_DISPATCH_LEAD_MINUTES = 60
 DEFAULT_CITIZEN_CHANGE_LEAD_MINUTES = 60
-"""ADR 0069: a citizen can move a booking until this long before the start."""
+"""ADR 0069: a participant can move a booking until this long before the start."""
 MAX_CITIZEN_CHANGE_LEAD_MINUTES = 1440
 DEFAULT_TRIAL_CALL_MINUTES = 30
-"""ADR 0071: how long a trial call stays open, from the moment the citizen starts it."""
+"""ADR 0071: how long a trial call stays open, from the moment the participant starts it."""
 MIN_TRIAL_CALL_MINUTES = 10
 MAX_TRIAL_CALL_MINUTES = 60
 DEFAULT_TRIAL_CALLS_PER_BOOKING = 3
@@ -142,7 +142,7 @@ class JoinClient(StrEnum):
 
 
 class Offer(StrEnum):
-    """What a staffing block offers citizens (ADR 0072): slots, direct calls, or both."""
+    """What a staffing block offers participants (ADR 0072): slots, direct calls, or both."""
 
     SCHEDULED = "scheduled"
     """Appointments in the slot grid; the default."""
@@ -157,7 +157,7 @@ class Offer(StrEnum):
 
     @property
     def direct(self) -> bool:
-        """Whether a citizen can start a direct call during the block."""
+        """Whether a participant can start a direct call during the block."""
         return self is not Offer.SCHEDULED
 
 
@@ -197,7 +197,7 @@ class Group:
         timezone: IANA zone in which opening hours are expressed.
         slot_minutes: Length of one appointment.
         min_notice_minutes: How long before the start booking closes.
-        horizon_days: How far ahead citizens can book.
+        horizon_days: How far ahead participants can book.
         phone_mode: Whether the form hides, offers or requires a phone number.
         video_host_email: Licensed Webex host on whose behalf meetings are scheduled
             (ADR 0017); without it the group has no video meetings.
@@ -214,14 +214,14 @@ class Group:
             never dispatched the moment it is made. Used only with
             ``DispatchKind.CONTACT_CENTER``.
         dispatch_kind: Contact center or OpenPlanner's own queue (ADR 0043).
-        citizen_change_lead_minutes: How long before the start the citizen may still move
+        citizen_change_lead_minutes: How long before the start the participant may still move
             the booking (ADR 0069, class D per group); cancelling is possible until the start.
             Never below ``dispatch_lead_minutes``. A booking made later than that cannot be
-            moved by the citizen, only cancelled.
+            moved by the participant, only cancelled.
         planner_change_min_lead_minutes: How long before the start a planner may still move
             or cancel a booking (ADR 0044, class D per group). Never below
             ``dispatch_lead_minutes``: a dispatched booking needs a phone call, not a mail.
-        trial_call_enabled: Whether the citizen can open a trial call on Webex ahead of the
+        trial_call_enabled: Whether the participant can open a trial call on Webex ahead of the
             appointment (ADR 0071); needs video. On by default.
         trial_call_minutes: How long one trial call stays open, 10 to 60 minutes.
         trial_calls_per_booking: How many trial calls one booking may open, 1 to 5, so the page
@@ -236,7 +236,7 @@ class Group:
             next one (a working agreement against cherry picking, not a protection).
         max_bookings_per_email: How many future bookings that hold a place one email address
             may have in this group, 1 to ``MAX_BOOKINGS_PER_EMAIL`` (ADR 0066). Above 1 so
-            citizens can book on behalf of others; the same address twice in one slot is
+            participants can book on behalf of others; the same address twice in one slot is
             always refused.
         calendar_invite_address: Own queue: the team's shared mailbox or list that gets an
             iCalendar invite per booking (ADR 0043 point 9); ``None`` sends none.
@@ -371,7 +371,7 @@ class Group:
         return self.has_own_queue and self.calendar_invite_address is not None
 
     def change_deadline(self, start: datetime) -> datetime:
-        """Return the moment the citizen can no longer move a booking starting at ``start``.
+        """Return the moment the participant can no longer move a booking starting at ``start``.
 
         ``citizen_change_lead_minutes`` before the start, for both dispatch kinds (ADR 0069).
         A booking already dispatched to the contact center is moved with its task ended
@@ -380,7 +380,7 @@ class Group:
         return start - timedelta(minutes=self.citizen_change_lead_minutes)
 
     def cancel_deadline(self, start: datetime) -> datetime:
-        """Return the moment the citizen can no longer cancel: the start itself (ADR 0069).
+        """Return the moment the participant can no longer cancel: the start itself (ADR 0069).
 
         A late cancellation beats a no-show; after dispatch the task is marked cancelled
         (ADR 0021) and the team's invite withdrawn (ADR 0043).
@@ -404,7 +404,7 @@ class TimeWindow:
     Attributes:
         capacity: Number of agents, 0 to ``MAX_CAPACITY``; 0 offers no slots (lunch).
         label: Optional admin note such as "Lunch"; admin content only, never shown to
-            citizens or logged, and no part of equality or ordering.
+            participants or logged, and no part of equality or ordering.
         offer: Slots, direct calls or both (ADR 0072); ``scheduled`` by default.
     """
 
@@ -440,7 +440,7 @@ class TimeWindow:
 
     @property
     def offers_direct(self) -> bool:
-        """Whether a citizen can start a direct call during the block (ADR 0072)."""
+        """Whether a participant can start a direct call during the block (ADR 0072)."""
         return self.staffed and self.offer.direct
 
     def overlaps(self, other: "TimeWindow") -> bool:
