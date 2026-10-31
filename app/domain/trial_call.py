@@ -1,10 +1,10 @@
-"""The trial call: a real Webex meeting the citizen opens ahead of the appointment (ADR 0071).
+"""The trial call: a real Webex meeting the participant opens ahead of the appointment (ADR 0071).
 
 A first-time caller wants to know that camera, microphone, speakers and browser work, on the
 same Webex site and with the same client as the appointment, not in a lookalike. So the trial
 call is a meeting scheduled by the group's host exactly as a booking's meeting is
-(``MeetingRequest``), with one difference: the citizen can enter alone, without the lobby, and
-nobody is waiting for them. It opens when the citizen asks for it, closes after the group's
+(``MeetingRequest``), with one difference: the participant can enter alone, without the lobby, and
+nobody is waiting for them. It opens when the participant asks for it, closes after the group's
 ``trial_call_minutes`` and is deleted by a job. This module holds the rules; the service
 (``app.domain.trial_call_service``) does the work.
 
@@ -21,7 +21,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Group
 
 TRIAL_TITLE_PREFIX = "Proefgesprek"
-"""Title prefix of a trial meeting, followed by the group's name (no citizen data)."""
+"""Title prefix of a trial meeting, followed by the group's name (no participant data)."""
 CLEANUP_DELAY = timedelta(minutes=5)
 """The delete job runs this long after a trial call closes, so nobody is cut off."""
 
@@ -38,7 +38,7 @@ class TrialState(StrEnum):
 
 
 def trial_state(booking: Booking, group: Group, now: datetime) -> TrialState:
-    """Return what a citizen can do with the trial call of ``booking`` at ``now``.
+    """Return what a participant can do with the trial call of ``booking`` at ``now``.
 
     Only a confirmed booking in a group with video and the trial call switched on gets one, and
     only before the appointment starts (from then on the real call is what counts).

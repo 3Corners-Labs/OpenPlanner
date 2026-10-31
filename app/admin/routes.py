@@ -96,7 +96,7 @@ from app.domain.admin import ANONYMOUS, LOGIN_EVENT
 from app.domain.audit import AuditEntry
 from app.domain.authorization import (
     API_SCOPES,
-    CITIZEN_ACTIONS,
+    PARTICIPANT_ACTIONS,
     Permission,
     Principal,
     Role,
@@ -115,9 +115,9 @@ from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.settings_service import SettingsService
 from app.web.authz_labels import (
     API_SCOPE_LABELS,
-    CITIZEN_LABELS,
     CONDITION_LABELS,
     LEVEL_LABELS,
+    PARTICIPANT_LABELS,
     PERMISSION_LABELS,
     ROLE_LABELS,
 )
@@ -410,8 +410,8 @@ async def matrix(
         for row in matrix_rows()
     ]
     citizen = [
-        (_(CITIZEN_LABELS[action.key]), _(CONDITION_LABELS[action.condition]))
-        for action in CITIZEN_ACTIONS
+        (_(PARTICIPANT_LABELS[action.key]), _(CONDITION_LABELS[action.condition]))
+        for action in PARTICIPANT_ACTIONS
     ]
     names = {c.key: c.name(locale.code) for c in custom}
     return _page(

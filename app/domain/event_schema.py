@@ -4,7 +4,7 @@
 a log platform needs no mapping: dotted field names (``event.action``, ``trace.id``), an
 ``@timestamp`` in RFC 3339 UTC with milliseconds, and ``log.level``. Our own ``outcome`` keeps
 the five outcomes of the audit log; ``event.outcome`` is ECS's coarser success / failure /
-unknown. A record holds ids, slugs and codes only; never personal data of citizens and never
+unknown. A record holds ids, slugs and codes only; never personal data of participants and never
 an admin's display name (``actor`` is the identity provider's subject). Version 2 adds
 ``message``: the provider's own reason for a failed job (ADR 0065), masked and capped.
 

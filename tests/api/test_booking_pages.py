@@ -19,8 +19,8 @@ from app.config import Settings
 from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
-from tests.support.citizen import confirm_by_link, confirm_newest, emailed_token
 from tests.support.domain import NOW
+from tests.support.participant import confirm_by_link, confirm_newest, emailed_token
 
 FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam
 FRIDAY_0930 = "2026-01-02T08:30:00Z"

@@ -1,7 +1,7 @@
 """Simulated platform events for trying OpenPlanner without Webex agents (never in production).
 
 The simulator on an admin booking page plays the events Webex and WxCC would send: an agent
-accepts the work item, host and citizen join, the meeting ends. The admin portal signs them
+accepts the work item, host and participant join, the meeting ends. The admin portal signs them
 and posts them to OpenPlanner's own webhook endpoints, so they take the real path. This
 service holds the rules around it:
 

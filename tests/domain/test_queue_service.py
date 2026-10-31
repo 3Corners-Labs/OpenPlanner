@@ -90,7 +90,7 @@ async def test_agents_see_the_visible_bookings_with_first_names_only(
     assert not hasattr(view.rows[0], "email")
 
 
-async def test_pick_up_next_claims_the_citizen_waiting_in_the_lobby(
+async def test_pick_up_next_claims_the_participant_waiting_in_the_lobby(
     queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
     first = await _book(uow, clock)

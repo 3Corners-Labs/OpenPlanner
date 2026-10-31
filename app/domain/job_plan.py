@@ -7,7 +7,7 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
 
     pending ──► send_confirm_request (now) ──► send_confirm_reminder × n ──► expire_unconfirmed
                (confirm_by) ──► purge_pii (confirm_by + 24 h)            (ADR 0056)
-    confirmed (citizen clicked) ──► as booked below
+    confirmed (participant clicked) ──► as booked below
     lapsed ──► send_unconfirmed_lapsed (now); the purge planned while pending stays
     booked ──► create_video_room (now) ─► send_confirmation | send_change (now)
            ──► send_reminder × rules (start − offset, if still ahead and reachable)
@@ -38,7 +38,7 @@ def dispatch_moment(start: datetime, dispatch_lead: timedelta) -> datetime:
     """Return the moment a booking's WxCC task is dispatched.
 
     From then on an agent may pick up the task and join the meeting. A booking cancelled or
-    moved after it gets its task marked cancelled (ADR 0021); the citizen's own change lead
+    moved after it gets its task marked cancelled (ADR 0021); the participant's own change lead
     (``Group.change_deadline``, ADR 0069) is never shorter than the dispatch lead.
     """
     return start - dispatch_lead
@@ -136,7 +136,7 @@ class JobCounts:
 
 RETRYABLE_JOBS = frozenset({JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_WXCC_TASK})
 """Jobs an admin may plan again from the booking page (ADR 0068): the ones that create
-something at a platform. Messages are not among them: the citizen must not be mailed twice."""
+something at a platform. Messages are not among them: the participant must not be mailed twice."""
 
 
 def plan_for_booking(
@@ -156,7 +156,7 @@ def plan_for_booking(
 
     ``message`` is the first email: the confirmation, ``send_change`` after a reschedule or
     ``send_reinstatement`` when a suspended booking goes ahead after all. ``sms`` sends it as
-    an SMS as well when the citizen is reachable there (a planner's move, ADR 0044). Reminders
+    an SMS as well when the participant is reachable there (a planner's move, ADR 0044). Reminders
     are skipped
     when disabled, duplicated, not strictly in the future, or when the booking is not reachable
     on the channel. ``team_invite`` adds the invite to the team's address (ADR 0043).
@@ -217,9 +217,9 @@ def plan_for_cancellation(
 ) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a cancelled booking.
 
-    ``notify=False`` for the old booking of a reschedule: the citizen gets a change message
+    ``notify=False`` for the old booking of a reschedule: the participant gets a change message
     for the new booking instead of a cancellation. ``sms`` adds the SMS form of the
-    cancellation (a planner's change, ADR 0044; the caller checks the citizen is reachable).
+    cancellation (a planner's change, ADR 0044; the caller checks the participant is reachable).
     The work item is ended and the meeting removed first (ADR 0021); those jobs do nothing
     when the booking never got them.
     ``team_invite`` withdraws the team's calendar invite, also on a reschedule (ADR 0043).
@@ -258,12 +258,12 @@ def plan_for_rebook(
 ) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a booking awaiting a new time.
 
-    A planner asked the citizen to choose a new time (ADR 0044). The meeting goes (the
+    A planner asked the participant to choose a new time (ADR 0044). The meeting goes (the
     booking never goes ahead at this time) and so do the reminders and the planned task. The
-    citizen gets the request now and one reminder at ``reminder_at`` if that lies ahead; at
+    participant gets the request now and one reminder at ``reminder_at`` if that lies ahead; at
     ``rebook_by`` an unanswered request lapses (``LAPSE_REBOOK`` cancels the booking and
     sends the lapse message) and the personal data is purged ``PURGE_AFTER`` later. ``sms``
-    adds the SMS forms (the caller checks the citizen is reachable). Choosing a new time or
+    adds the SMS forms (the caller checks the participant is reachable). Choosing a new time or
     cancelling replaces all of these jobs. ``team_invite`` withdraws the team's calendar
     invite (ADR 0043).
     """
@@ -294,7 +294,7 @@ def plan_for_lapse(*, now: datetime, sms: bool) -> list[PlannedJob]:
 
 
 def plan_for_pending(*, now: datetime, window: ConfirmWindow) -> list[PlannedJob]:
-    """Return the jobs of a booking that awaits the citizen's confirmation (ADR 0056).
+    """Return the jobs of a booking that awaits the participant's confirmation (ADR 0056).
 
     The request to confirm goes now, the reminders at ``window.reminders``, all by email (the
     point is to verify that address). At ``window.confirm_by`` ``EXPIRE_UNCONFIRMED`` cancels

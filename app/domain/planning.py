@@ -102,7 +102,7 @@ class Schedule:
 
 @dataclass(frozen=True)
 class PreviewDay:
-    """The slots citizens are offered on one day (before bookings and notice)."""
+    """The slots participants are offered on one day (before bookings and notice)."""
 
     day: date
     slots: list[SlotTime]

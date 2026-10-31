@@ -65,13 +65,13 @@ API_SCOPE_LABELS: dict[ApiScope, str] = {
     ApiScope.AVAILABILITY_READ: "authz.api_scope.availability_read",
 }
 
-CITIZEN_LABELS: dict[str, str] = {
-    "citizen.availability_view": "authz.citizen.availability_view",
-    "citizen.book": "authz.citizen.book",
-    "citizen.booking_view": "authz.citizen.booking_view",
-    "citizen.booking_change": "authz.citizen.booking_change",
-    "citizen.booking_cancel": "authz.citizen.booking_cancel",
-    "citizen.suspended_booking_change": "authz.citizen.suspended_booking_change",
+PARTICIPANT_LABELS: dict[str, str] = {
+    "participant.availability_view": "authz.citizen.availability_view",
+    "participant.book": "authz.citizen.book",
+    "participant.booking_view": "authz.citizen.booking_view",
+    "participant.booking_change": "authz.citizen.booking_change",
+    "participant.booking_cancel": "authz.citizen.booking_cancel",
+    "participant.suspended_booking_change": "authz.citizen.suspended_booking_change",
 }
 
 CONDITION_LABELS: dict[str, str] = {

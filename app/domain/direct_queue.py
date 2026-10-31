@@ -1,7 +1,7 @@
 """The group's own queue of direct calls (ADR 0026): agents taken, places in line, usual wait.
 
 A group can cap how many direct calls are open at once, so the WxCC queue does not fill up with
-calls nobody can take; a waiting citizen sees their place in line and how long a pickup usually
+calls nobody can take; a waiting participant sees their place in line and how long a pickup usually
 takes. Both come only from what OpenPlanner already knows (its own direct calls and their
 ``CallStatus``), not from WxCC's live statistics. Scheduled calls in the same WxCC queue are
 not counted.
@@ -9,11 +9,11 @@ not counted.
     WAITING   ─ task none or queued, no host yet, at most not_picked_up_minutes after the start
     CONNECTED ─ task connected, booking claimed (own queue, ADR 0043) or host joined, until the
                 meeting or task ends, at most JOIN_CLOSES_AFTER after the end; a host in a
-                running meeting counts even if the citizen left or the task ended, so the
+                running meeting counts even if the participant left or the task ended, so the
                 agent's place frees when Webex reports the meeting's end (ADR 0019 point 4)
     DONE      ─ anything else: ended, failed, cancelled, or stale (a lost webhook frees the place)
 
-``wait_state`` is what the citizen's waiting page tells them (ADR 0072), for both dispatch
+``wait_state`` is what the participant's waiting page tells them (ADR 0072), for both dispatch
 kinds: a claim in the own queue counts as accepted, a failed meeting is said so.
 
 Pure Python, no I/O; ``BookingService`` loads the calls and applies the cap in its locked
@@ -39,7 +39,7 @@ ESTIMATE_WINDOW = timedelta(days=7)
 
 
 class DirectAvailability(StrEnum):
-    """Whether a citizen can start a direct call now, and if not, why."""
+    """Whether a participant can start a direct call now, and if not, why."""
 
     AVAILABLE = "available"
     FULL = "full"
@@ -62,7 +62,7 @@ class DirectCall:
 
     Attributes:
         booking_id: The direct booking.
-        start: When the citizen started the call.
+        start: When the participant started the call.
         end: The end of the booking (start plus the group's slot length).
         active: Whether the booking is still confirmed (not cancelled).
         status: The aggregated call status (ADR 0010).
@@ -78,10 +78,10 @@ class DirectCall:
 
 
 class WaitState(StrEnum):
-    """What the citizen's waiting page says about a direct call (ADR 0072)."""
+    """What the participant's waiting page says about a direct call (ADR 0072)."""
 
     SEARCHING = "searching"
-    """No agent yet; the citizen may wait in the lobby once the meeting is ready."""
+    """No agent yet; the participant may wait in the lobby once the meeting is ready."""
     ACCEPTED = "accepted"
     """The task is connected, or an agent of the own queue claimed the booking."""
     IN_CALL = "in_call"
@@ -89,18 +89,18 @@ class WaitState(StrEnum):
     UNAVAILABLE = "unavailable"
     """The task failed, or nobody accepted within ``not_picked_up_minutes``."""
     FAILED = "failed"
-    """The meeting could not be created; nobody can join, so the citizen is told."""
+    """The meeting could not be created; nobody can join, so the participant is told."""
     INACTIVE = "inactive"
     """The booking is no longer confirmed."""
 
 
 @dataclass(frozen=True)
 class QueueInfo:
-    """What a citizen is told about the group's queue of direct calls.
+    """What a participant is told about the group's queue of direct calls.
 
     Attributes:
         waiting: Direct calls waiting for an agent now.
-        position: The citizen's place in line (1 is next), if their call is waiting.
+        position: The participant's place in line (1 is next), if their call is waiting.
         typical_wait_minutes: The usual time to a pickup, if there are enough recent pickups.
     """
 
@@ -115,7 +115,7 @@ def phase(call: DirectCall, group: Group, now: datetime) -> QueuePhase:
     meeting_over = status.call in (CallState.ENDED, CallState.FAILED)
     if status.host_joined and not meeting_over:
         # The meeting itself decides (ADR 0019 point 4): while the agent is in it the place is
-        # taken, also after the citizen left or the task ended. Webex reports its end.
+        # taken, also after the participant left or the task ended. Webex reports its end.
         return QueuePhase.CONNECTED if now <= call.end + JOIN_CLOSES_AFTER else QueuePhase.DONE
     finished = status.task in (TaskState.ENDED, TaskState.FAILED, TaskState.CANCELLED)
     if not call.active or finished or meeting_over:
@@ -128,7 +128,7 @@ def phase(call: DirectCall, group: Group, now: datetime) -> QueuePhase:
 
 
 def wait_state(booking: Booking, status: CallStatus, group: Group, now: datetime) -> WaitState:
-    """Return what the waiting page tells the citizen about their direct ``booking`` at ``now``.
+    """Return what the waiting page tells the participant about their direct ``booking`` at ``now``.
 
     The same rule serves both dispatch kinds (ADR 0043): a WxCC task that connected and a
     claim in the own queue both mean an agent accepted. A meeting that failed is said so, and
@@ -191,7 +191,7 @@ def typical_wait(calls: Iterable[DirectCall]) -> int | None:
 def queue_info(
     calls: Sequence[DirectCall], group: Group, now: datetime, booking_id: int | None = None
 ) -> QueueInfo:
-    """Return the queue as a citizen sees it, with the place of ``booking_id`` if it waits.
+    """Return the queue as a participant sees it, with the place of ``booking_id`` if it waits.
 
     Calls that started at the same moment are ordered by booking id.
     """

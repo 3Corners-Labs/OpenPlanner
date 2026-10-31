@@ -16,8 +16,8 @@ from app.domain.scheduling import JoinClient
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
-from tests.support.citizen import confirm_newest, emailed_token
 from tests.support.domain import NOW
+from tests.support.participant import confirm_newest, emailed_token
 
 FRIDAY_0900 = "2026-01-02T08:00:00Z"
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}

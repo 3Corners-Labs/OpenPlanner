@@ -1,4 +1,4 @@
-"""BookingService and the citizen's confirmation by email link (ADR 0056 step 2).
+"""BookingService and the participant's confirmation by email link (ADR 0056 step 2).
 
 Calendar: "now" is Thursday 1 January 2026 08:00 UTC; the group has one place on Monday
 09:00 Amsterdam. With the default policy a new booking must be confirmed within 24 hours,
@@ -158,7 +158,7 @@ async def test_a_moved_booking_keeps_its_confirmation(
     assert JobType.SEND_CHANGE in _types(uow, new.booking.id)
 
 
-async def test_an_unconfirmed_booking_cannot_be_moved_by_the_citizen(
+async def test_an_unconfirmed_booking_cannot_be_moved_by_the_participant(
     service: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     uow.state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=2))]

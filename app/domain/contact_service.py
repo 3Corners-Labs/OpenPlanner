@@ -7,7 +7,7 @@ may override it with its own block (another desk, another number), changed with
 audited in the same transaction with the number of options per kind, never numbers, addresses
 or texts.
 
-    public       citizen pages (closure, maintenance), no authorisation: the block is public
+    public       participant pages (closure, maintenance), no authorisation: the block is public
     view         organisation.closure, organisation level
     save         organisation.closure, organisation level; an empty block removes it
     view_group   closure.manage, group level; also shows the organisation default
@@ -72,12 +72,12 @@ class ContactService:
         self._admin = admin
 
     async def public(self, organisation_id: int) -> ContactBlock | None:
-        """Return the organisation's contact block for citizens, if it has one."""
+        """Return the organisation's contact block for participants, if it has one."""
         async with self._uow.read() as tx:
             return await tx.get_contact_block(organisation_id)
 
     async def public_for_group(self, group: Group) -> ContactBlock | None:
-        """Return the contact block that applies to ``group`` for citizens (ADR 0038 §4)."""
+        """Return the contact block that applies to ``group`` for participants (ADR 0038 §4)."""
         async with self._uow.read() as tx:
             return await effective_block(tx, group)
 

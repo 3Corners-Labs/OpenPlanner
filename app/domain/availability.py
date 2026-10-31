@@ -147,7 +147,7 @@ def offered_slot(
 
 
 def booking_window(group: Group, now: datetime) -> tuple[datetime, datetime]:
-    """Return the earliest and latest start a citizen may book at ``now``."""
+    """Return the earliest and latest start a participant may book at ``now``."""
     return (
         now + timedelta(minutes=group.min_notice_minutes),
         now + timedelta(days=group.horizon_days),
@@ -186,7 +186,7 @@ def available_slots(
     booked: Mapping[datetime, int],
     snapshots: Mapping[datetime, int],
 ) -> list[AvailableSlot]:
-    """Return the slots citizens can book between two local dates (inclusive).
+    """Return the slots participants can book between two local dates (inclusive).
 
     Args:
         group: The group, for time zone, slot length, notice and horizon.

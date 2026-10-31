@@ -405,18 +405,18 @@ def test_principal_repr_hides_the_display_name() -> None:
     assert "Super" not in repr(SUPER)
 
 
-def test_citizen_actions_are_part_of_the_matrix() -> None:
-    from app.domain.authorization import CITIZEN_ACTIONS
+def test_participant_actions_are_part_of_the_matrix() -> None:
+    from app.domain.authorization import PARTICIPANT_ACTIONS
 
-    conditions = {action.key: action.condition for action in CITIZEN_ACTIONS}
+    conditions = {action.key: action.condition for action in PARTICIPANT_ACTIONS}
 
     assert conditions == {
-        "citizen.availability_view": "public",
-        "citizen.book": "public",
-        "citizen.booking_view": "management_link",
-        "citizen.booking_change": "management_link_before_deadline",
-        "citizen.booking_cancel": "management_link_before_deadline",
-        "citizen.suspended_booking_change": "management_link_while_suspended",
+        "participant.availability_view": "public",
+        "participant.book": "public",
+        "participant.booking_view": "management_link",
+        "participant.booking_change": "management_link_before_deadline",
+        "participant.booking_cancel": "management_link_before_deadline",
+        "participant.suspended_booking_change": "management_link_while_suspended",
     }
 
 
