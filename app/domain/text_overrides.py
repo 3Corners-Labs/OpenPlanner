@@ -4,9 +4,9 @@ An organisation override replaces the shipped catalogue text of one key in one l
 group of the organisation; a group's own text (``app.domain.message_texts``) still wins over it.
 Only keys on the allow-list below are editable: the message blocks of ADR 0009 and a few
 participant-page texts. Each key states the ``{placeholders}`` its text may use and a length,
-checked here so no stored text can ask a page or message for a value it does not have, or carry markup
-or Jinja: texts are plain text and escaped on output (ADR 0004 §8, ADR 0009). The domain may not
-import ``app.i18n``; ``tests/i18n`` checks that each page text's allow-list matches the
+checked here so no stored text can ask a page or message for a value it does not have, or carry
+markup or Jinja: texts are plain text and escaped on output (ADR 0004 §8, ADR 0009). The domain
+may not import ``app.i18n``; ``tests/i18n`` checks that each page text's allow-list matches the
 placeholders of the shipped nl and en texts.
 """
 
