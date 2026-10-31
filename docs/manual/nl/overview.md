@@ -8,7 +8,7 @@ staan de groepen waar u rechten op heeft, met hun tekorten aan medewerkers.
 De pagina werkt zonder JavaScript. Wat u ziet is de stand van het moment van laden; met
 **Vernieuwen** laadt u de pagina opnieuw. Een latere versie ververst de widgets vanzelf.
 
-Het overzicht toont nooit persoonsgegevens van burgers: alleen aantallen, groepsnamen en
+Het overzicht toont nooit persoonsgegevens van deelnemers: alleen aantallen, groepsnamen en
 tijden.
 
 ## Widgets
@@ -21,7 +21,7 @@ tijden.
   uw bereik, met wie, wanneer en waar. Een regel opent de hele keten in het auditlog;
   **Alles bekijken** opent het auditlog zelf.
 
-- **Wachtrij in mijn groepen**: per groep met een eigen wachtrij in uw bereik hoeveel burgers
+- **Wachtrij in mijn groepen**: per groep met een eigen wachtrij in uw bereik hoeveel deelnemers
   er wachten, hoe lang de langste wacht al duurt en hoeveel medewerkers die de wachtrij mogen
   bedienen nu zijn aangemeld. De groepsnaam opent de wachtrij. Alleen aantallen en minuten,
   nooit namen. Kleuren bij een te lange wachttijd volgen met de wachttijdgrenzen.

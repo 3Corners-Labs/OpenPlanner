@@ -16,13 +16,13 @@ sets on **Advanced settings**. The **Source** column says which one applies:
 - **Admin portal time zone**: the time zone of times on the admin pages, for example
   `Europe/Amsterdam`. Each group keeps its own time zone for its appointments.
 - **Show "Appointments via OpenPlanner" at the bottom**: whether the booking pages and the
-  emails to citizens end with the product mark and the line "Appointments via OpenPlanner".
+  emails to participants end with the product mark and the line "Appointments via OpenPlanner".
   The organisation's own logo and name stay in the header; the plain-text part of an email
   never carries the line. `true` or `false`.
 - **Staff member dormant after**: days without a login after which someone is marked dormant
   on the **Staff** screen.
 - **Shortfall look-ahead**: how many days ahead the shortfall notice on group pages looks.
-- **Request to rebook lapses after** and **Rebook reminder**: when a planner asks citizens to
+- **Request to rebook lapses after** and **Rebook reminder**: when a planner asks participants to
   choose a new time, how long the request stays open and when the one reminder goes. The
   reminder must come before the request lapses.
 

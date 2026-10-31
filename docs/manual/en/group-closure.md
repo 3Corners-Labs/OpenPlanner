@@ -8,18 +8,18 @@ organisation at once, use the organisation's closure screen.
 ## Closing
 
 Under **Close the team in an emergency**, enter from when until when the team is closed, and a notice for
-citizens in Dutch and English. A heading is optional; without one the citizen sees
+participants in Dutch and English. A heading is optional; without one the participant sees
 "Temporarily closed". Leave the end empty to keep the team closed until you lift the closure.
 
 As soon as the closure starts:
 
-- citizens see the closure page instead of the calendar on the team's page: the heading, the
+- participants see the closure page instead of the calendar on the team's page: the heading, the
   notice, the image and the alternative contact options, in that order;
-- confirmed appointments inside the closure are **put on hold**, not cancelled. The citizen
+- confirmed appointments inside the closure are **put on hold**, not cancelled. The participant
   gets an email with the heading and notice, the closure's contact options and a link to the
   closure page, and can choose a new time or cancel. The image is not included in the email.
 
-A closure that starts later is shown to citizens beforehand as a notice above the calendar.
+A closure that starts later is shown to participants beforehand as a notice above the calendar.
 
 ### Starting from a scenario
 
@@ -31,7 +31,7 @@ the scenario's contact options and image. See
 ## Image
 
 A running or planned closure can have one image, such as a pictogram for "closed" or
-"outage". Citizens see it on the closure page, below the notice. Never put information in the
+"outage". Participants see it on the closure page, below the notice. Never put information in the
 image only: whoever cannot see it reads just the text.
 
 <!-- field: image -->
@@ -45,7 +45,7 @@ description, leave this field empty.
 <!-- field: alt_nl -->
 ### Description (Dutch)
 
-What the image shows, in one sentence of at most 250 characters, for citizens who use a screen
+What the image shows, in one sentence of at most 250 characters, for participants who use a screen
 reader. For example: "Pictogram van een gesloten deur".
 
 <!-- field: alt_en -->
@@ -63,16 +63,16 @@ takes it away at once. The image is not included in emails.
 ## Updating and lifting
 
 Under **Change the emergency closure** you change the end, the notice and the heading. Tick whether
-citizens with an appointment on hold get the new notice by email; that email also carries the
+participants with an appointment on hold get the new notice by email; that email also carries the
 closure's contact options. When a later end brings more
 appointments inside the closure, those are put on hold too.
 
 **Lift the emergency closure** opens the team again at once. Tick whether appointments on hold that can
-still go ahead are confirmed again; the citizen then gets an email.
+still go ahead are confirmed again; the participant then gets an email.
 
 ## Appointments on hold
 
-The list shows each appointment's reference and original time, never the citizen's details.
+The list shows each appointment's reference and original time, never the participant's details.
 Per appointment you can move it to a free time, confirm it again or cancel it, or all at once.
 The personal data of an appointment that stays on hold is removed 30 days after the closure
 ends.

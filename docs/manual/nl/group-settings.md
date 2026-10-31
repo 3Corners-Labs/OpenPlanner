@@ -1,6 +1,6 @@
 # Groepsinstellingen
 
-Een groep is één team dat videogesprekken met burgers voert, met een eigen afsprakenpagina
+Een groep is één team dat videogesprekken met deelnemers voert, met een eigen afsprakenpagina
 op `/g/<webadres>`. Op dit scherm stelt u in hoe die afspraken eruitzien en waar ze terechtkomen.
 U opent het via **Overzicht → groep → Instellingen**. Alleen een organisatiebeheerder of
 superuser kan instellingen wijzigen; voor het opslaan vraagt het portaal soms opnieuw om in te
@@ -24,9 +24,9 @@ een nieuwe groep aan.
 <!-- field: name -->
 ### Naam
 
-De naam van de groep zoals burgers en medewerkers hem zien: op de afsprakenpagina, in
+De naam van de groep zoals deelnemers en medewerkers hem zien: op de afsprakenpagina, in
 bevestigingen en herinneringen, en in de taak bij het contactcenter. Kies een naam die een
-burger herkent, bijvoorbeeld "Vergunningen" in plaats van een interne teamcode.
+deelnemer herkent, bijvoorbeeld "Vergunningen" in plaats van een interne teamcode.
 
 <!-- field: timezone -->
 ### Tijdzone
@@ -38,7 +38,7 @@ wintertijd gaan automatisch. Voor Nederland is dat `Europe/Amsterdam`.
 ### Duur van een gesprek
 
 Hoe lang één afspraak duurt, in minuten: een veelvoud van 5, van 5 tot 480. De tijdblokken van
-de groep worden in stukken van deze lengte verdeeld; elk stuk is een tijdslot dat een burger
+de groep worden in stukken van deze lengte verdeeld; elk stuk is een tijdslot dat een deelnemer
 kan kiezen.
 
 Zolang er afspraken in de toekomst staan, kunt u de duur niet wijzigen. Anders zouden die
@@ -47,7 +47,7 @@ afspraken niet meer op een tijdslot passen. Wacht tot ze voorbij zijn, of verzet
 <!-- field: min_notice_minutes -->
 ### Minimale aanlooptijd
 
-Hoe lang van tevoren een tijdslot dichtgaat voor nieuwe boekingen. Bij 60 kan een burger om
+Hoe lang van tevoren een tijdslot dichtgaat voor nieuwe boekingen. Bij 60 kan een deelnemer om
 10:00 niet meer boeken voor 10:30, wel voor 11:00.
 
 Deze waarde moet minstens zo groot zijn als **Doorzetten naar de wachtrij**. Een afspraak moet
@@ -56,7 +56,7 @@ geboekt zijn voordat hij naar het contactcenter gaat.
 <!-- field: horizon_days -->
 ### Vooruit boeken
 
-Hoeveel dagen vooruit burgers kunnen kiezen, van 1 tot 366. Houd dit in lijn met hoe ver het
+Hoeveel dagen vooruit deelnemers kunnen kiezen, van 1 tot 366. Houd dit in lijn met hoe ver het
 rooster van het team vaststaat: een tijdslot dat te boeken is, moet ook bemand zijn.
 
 <!-- field: max_bookings_per_email -->
@@ -66,7 +66,7 @@ Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben
 Standaard 3. Mensen boeken vaak voor een ander, bijvoorbeeld een ouder voor een kind of een
 mantelzorger voor een naaste; zet het getal daarom niet te laag. Een afspraak die is geannuleerd
 of voorbij is, telt niet mee. Hetzelfde e-mailadres twee keer op hetzelfde moment kan nooit:
-dat is bijna altijd een dubbele klik. De burger krijgt bij een weigering een algemene melding,
+dat is bijna altijd een dubbele klik. De deelnemer krijgt bij een weigering een algemene melding,
 zonder dat de pagina zegt dat er al een afspraak is.
 
 <!-- field: dispatch_kind -->
@@ -76,7 +76,7 @@ zonder dat de pagina zegt dat er al een afspraak is.
   als taak in de wachtrij van het team in het contactcenter. De eerste vrije medewerker pakt hem
   op. Dit is de standaard.
 - **Eigen wachtrij van OpenPlanner**: voor teams zonder contactcenter. Medewerkers loggen in op
-  OpenPlanner en pakken een wachtende afspraak op. De burger krijgt altijd de eerste vrije
+  OpenPlanner en pakken een wachtende afspraak op. De deelnemer krijgt altijd de eerste vrije
   medewerker. Er gaat geen taak naar het contactcenter, ook niet als de velden hieronder zijn
   ingevuld.
 
@@ -85,13 +85,13 @@ het contactcenter staat, blijft daar. Lukt het contactcenter niet (storing van W
 Webex Contact Center), dan kunt u de groep tijdelijk op de eigen wachtrij zetten.
 
 <!-- field: citizen_change_lead_minutes -->
-### Verplaatsen door de burger tot (minuten vooraf)
+### Verplaatsen door de deelnemer tot (minuten vooraf)
 
-Tot hoeveel minuten voor de start de burger de afspraak kan verplaatsen, standaard 60. Het
+Tot hoeveel minuten voor de start de deelnemer de afspraak kan verplaatsen, standaard 60. Het
 getal is nooit kleiner dan **Doorzetten naar de wachtrij** en hoogstens 1440 (een dag).
 Annuleren kan altijd tot het gesprek begint; dat is vast en niet instelbaar. Het geldt voor
 contactcenter en eigen wachtrij. Een afspraak die later wordt geboekt dan dit getal, kan de
-burger alleen nog annuleren.
+deelnemer alleen nog annuleren.
 
 <!-- field: queue_visible_from_minutes -->
 ### Zichtbaar in de wachtrij (minuten vooraf, eigen wachtrij)
@@ -125,18 +125,18 @@ overzichtspagina van de groep en in het auditlog.
 ### Doorzetten naar de wachtrij
 
 Hoeveel minuten voor de start de afspraak als taak naar Webex Contact Center gaat, van 0 tot 60.
-De burger kan de afspraak daarna nog annuleren via de link in de bevestiging; verplaatsen kan
-tot **Verplaatsen door de burger tot**.
+De deelnemer kan de afspraak daarna nog annuleren via de link in de bevestiging; verplaatsen kan
+tot **Verplaatsen door de deelnemer tot**.
 
-Kies dit ruim genoeg dat een medewerker de taak kan oppakken voordat de burger in het
+Kies dit ruim genoeg dat een medewerker de taak kan oppakken voordat de deelnemer in het
 videogesprek wacht, bijvoorbeeld 5 minuten.
 
 <!-- field: planner_change_min_lead_minutes -->
 ### Wijzigen door een planner
 
 Tot hoeveel minuten voor de start een planner een afspraak vanuit de [agenda](group-agenda.md)
-mag verplaatsen of annuleren, standaard 60. Daarna krijgt de burger geen bericht meer op tijd:
-bel de burger dan. Het getal is nooit kleiner dan **Doorzetten naar de wachtrij** en hoogstens
+mag verplaatsen of annuleren, standaard 60. Daarna krijgt de deelnemer geen bericht meer op tijd:
+bel de deelnemer dan. Het getal is nooit kleiner dan **Doorzetten naar de wachtrij** en hoogstens
 1440 (een dag).
 
 <!-- field: phone_mode -->
@@ -147,8 +147,8 @@ Of het boekingsformulier om een telefoonnummer vraagt:
 | Keuze | Betekenis |
 |---|---|
 | Niet gevraagd | Het formulier heeft geen telefoonveld. |
-| Optioneel | De burger mag een nummer opgeven, bijvoorbeeld voor een sms-herinnering. |
-| Verplicht | Zonder nummer kan de burger niet boeken. |
+| Optioneel | De deelnemer mag een nummer opgeven, bijvoorbeeld voor een sms-herinnering. |
+| Verplicht | Zonder nummer kan de deelnemer niet boeken. |
 
 Vraag alleen om een nummer als het team het echt gebruikt. Het nummer wordt, net als naam en
 e-mailadres, 24 uur na de afspraak gewist.
@@ -176,7 +176,7 @@ controleert het platform elke groep met een host vanzelf, standaard eens per dag
 iets mis (geen licentie, verkeerd account, ontbrekende rechten), dan staat dat als
 systeemmelding *Koppeling gecontroleerd* in het logboek van de groep, met het antwoord van
 Webex eronder; die melding herhaalt zich tot het is opgelost en meldt één keer dat het weer
-goed is. Zo hoort u het voordat een burger een afspraak zonder videogesprek krijgt.
+goed is. Zo hoort u het voordat een deelnemer een afspraak zonder videogesprek krijgt.
 
 De controle kijkt ook naar de **achtergrondtaken (worker)**: het onderdeel van OpenPlanner dat
 de videomeetings echt aanmaakt. De proefmeeting draait in de beheeromgeving, de afspraken in de
@@ -207,12 +207,12 @@ veld leeg, dan stuurt het portaal het webadres van de groep mee. Vul alleen iets
 de flow een andere waarde verwacht.
 
 <!-- field: trial_call_enabled -->
-### Proefgesprek voor de burger
+### Proefgesprek voor de deelnemer
 
-Met **Ja** kan de burger vóór de afspraak in een echte Webex-meeting uitproberen of camera,
+Met **Ja** kan de deelnemer vóór de afspraak in een echte Webex-meeting uitproberen of camera,
 microfoon, luidsprekers en browser werken. Dat is geen aparte test op onze pagina: het is
 dezelfde Webex-site en dezelfde Webex-omgeving als het gesprek zelf, zodat een probleem nu al
-zichtbaar wordt. De burger zit er alleen in; er komt niemand van het team in en er wordt geen
+zichtbaar wordt. De deelnemer zit er alleen in; er komt niemand van het team in en er wordt geen
 taak aangemaakt. De link staat in de bevestiging, de herinnering, op de afspraakpagina en op de
 pagina voor het gesprek. Het werkt alleen met een **Webex-host**. Het proefgesprek gebruikt de
 Webex-site van de host: die moet toestaan dat deelnemers vóór de host binnenkomen. Of dat zo is,
@@ -222,7 +222,7 @@ ziet u bij **Koppeling controleren**.
 ### Proefgesprek blijft open (minuten)
 
 Hoe lang één proefgesprek openstaat, van 10 tot 60 minuten. Standaard 30. Daarna wordt de
-Webex-meeting verwijderd; de burger kan een nieuw proefgesprek openen.
+Webex-meeting verwijderd; de deelnemer kan een nieuw proefgesprek openen.
 
 <!-- field: trial_calls_per_booking -->
 ### Proefgesprekken per afspraak
@@ -231,22 +231,22 @@ Hoe vaak één afspraak een proefgesprek mag openen, van 1 tot 5. Standaard 3. E
 een meeting in Webex; met dit getal kan één afspraak er niet onbeperkt aanmaken.
 
 <!-- field: join_client -->
-### Webex-pagina voor de burger
+### Webex-pagina voor de deelnemer
 
-Bepaalt welke pagina van Webex de burger krijgt als hij vanaf onze pagina naar het gesprek gaat,
+Bepaalt welke pagina van Webex de deelnemer krijgt als hij vanaf onze pagina naar het gesprek gaat,
 bij de afspraak en bij het proefgesprek. **Direct in de browser** (standaard) opent meteen de
-webversie van Webex: op een computer hoeft de burger niets te installeren en ziet hij de vraag
-"app of browser" niet. **Webex laat de burger kiezen** geeft Webex' eigen pagina, met de keuze
-tussen de app en de browser; kies dit als uw burgers de Webex-app gebruiken of als uw organisatie
+webversie van Webex: op een computer hoeft de deelnemer niets te installeren en ziet hij de vraag
+"app of browser" niet. **Webex laat de deelnemer kiezen** geeft Webex' eigen pagina, met de keuze
+tussen de app en de browser; kies dit als uw deelnemers de Webex-app gebruiken of als uw organisatie
 dat zo wil. Op een telefoon of tablet vraagt Webex in beide gevallen om de Webex-app: een
 webversie is daar niet beschikbaar. De teksten in de bevestiging, op de pagina voor het gesprek
 en op de proefgesprekpagina volgen deze keuze. Webex kan dit gedrag zelf wijzigen; ziet de
-burger toch de keuze tussen app en browser, zet het dan op **Webex laat de burger kiezen**.
+deelnemer toch de keuze tussen app en browser, zet het dan op **Webex laat de deelnemer kiezen**.
 
 <!-- field: offer -->
 ### Aanbod per tijdblok
 
-Bij elk tijdblok van de bezetting kiest u wat burgers in dat blok kunnen: **Afspraken** (de
+Bij elk tijdblok van de bezetting kiest u wat deelnemers in dat blok kunnen: **Afspraken** (de
 tijdslots van het blok, de standaard), **Direct gesprek** (meteen een videogesprek starten,
 zonder afspraak; het blok levert dan geen tijdslots) of **Afspraken en direct gesprek**. Een
 afwijkende bezetting voor één dag heeft dezelfde keuze.
@@ -269,7 +269,7 @@ mee voor het maximum hieronder.
 
 Hoeveel directe gesprekken tegelijk open mogen staan: wachtend of in gesprek met een
 medewerker. Meestal is dat het aantal medewerkers dat directe gesprekken aanneemt. Is het
-maximum bereikt, dan ziet de burger dat alle medewerkers bezet zijn, met de keuze het later
+maximum bereikt, dan ziet de deelnemer dat alle medewerkers bezet zijn, met de keuze het later
 opnieuw te proberen of een afspraak te maken.
 
 Leeg betekent geen grens: Webex Contact Center verdeelt dan alle gesprekken. Geplande afspraken

@@ -54,7 +54,7 @@ Op de detailpagina van een afspraak (**Details**) staat alles wat nodig is als e
 videogesprek of contactcentertaak niet goed gaat:
 
 - **Meeting-ID**: het eigen ID van de Webex-meeting, om aan Webex-support door te geven. Het
-  blijft staan als een burger stopt met wachten op een direct gesprek: OpenPlanner blijft de
+  blijft staan als een deelnemer stopt met wachten op een direct gesprek: OpenPlanner blijft de
   meeting volgen zolang de medewerker erin zit, en de plaats van dat gesprek blijft bezet tot
   Webex het einde van de meeting meldt.
 - **Verloop**: wat er met de meeting en de taak gebeurde. Achter elke gebeurtenis staat de
@@ -98,16 +98,16 @@ Een tekort lost u op door de bezetting weer te verhogen, of door afspraken te wi
 
 Met het recht **Boekingen wijzigen** (groepsbeheerders, organisatiebeheerders en een eigen
 rol Planner) staan in het dagoverzicht bij elke afspraak die nog kan worden gewijzigd de links
-**Verplaatsen** en **Annuleren**. De burger krijgt van elke wijziging altijd bericht: per
-e-mail, en per sms als de burger een telefoonnummer opgaf. U logt daarvoor soms opnieuw in.
+**Verplaatsen** en **Annuleren**. De deelnemer krijgt van elke wijziging altijd bericht: per
+e-mail, en per sms als de deelnemer een telefoonnummer opgaf. U logt daarvoor soms opnieuw in.
 
 Een afspraak kan niet meer worden gewijzigd als die binnen de tijd van **Wijzigen door een
 planner** begint (instelling van de groep, standaard 60 minuten), als die al naar het
-contactcenter is gegaan, of als die al is geannuleerd. Bel de burger dan.
+contactcenter is gegaan, of als die al is geannuleerd. Bel de deelnemer dan.
 
 ### Verplaatsen
 
-Kies een vrij tijdslot van hetzelfde team in de komende 28 dagen. De burger krijgt een bericht
+Kies een vrij tijdslot van hetzelfde team in de komende 28 dagen. De deelnemer krijgt een bericht
 met de nieuwe tijd en een nieuwe link om zelf nog te wijzigen. Heeft het gekozen tijdslot
 daarna meer afspraken dan medewerkers, dan vraagt OpenPlanner u dat eerst te bevestigen met
 het vinkje **Ik accepteer dat het nieuwe tijdslot dan meer afspraken dan medewerkers heeft**.
@@ -115,22 +115,22 @@ het vinkje **Ik accepteer dat het nieuwe tijdslot dan meer afspraken dan medewer
 ### Annuleren
 
 Kies een van de vaste redenen: **Te weinig medewerkers**, **Technische storing** of
-**Onvoorziene omstandigheden**. De burger leest de bijbehorende tekst in het bericht. U kunt
+**Onvoorziene omstandigheden**. De deelnemer leest de bijbehorende tekst in het bericht. U kunt
 zelf geen tekst typen; de organisatie past de woorden aan bij **Berichtteksten**, onder
 **Redenen bij wijzigingen door een planner**.
 
 ### Om een nieuwe tijd vragen
 
-Met **Om nieuwe tijd vragen** bij een afspraak kiest de burger zelf een nieuwe tijd. De plek in
-het tijdslot komt meteen vrij, dus het tekort verdwijnt direct. De burger krijgt een bericht
+Met **Om nieuwe tijd vragen** bij een afspraak kiest de deelnemer zelf een nieuwe tijd. De plek in
+het tijdslot komt meteen vrij, dus het tekort verdwijnt direct. De deelnemer krijgt een bericht
 met de reden en een link om een nieuwe tijd te kiezen, zonder de gegevens opnieuw in te
-vullen. Drie dagen voor het verlopen volgt één herinnering. Kiest de burger binnen 14 dagen na
-de oorspronkelijke tijd niets, dan vervalt de afspraak; de burger krijgt daarvan een kort
+vullen. Drie dagen voor het verlopen volgt één herinnering. Kiest de deelnemer binnen 14 dagen na
+de oorspronkelijke tijd niets, dan vervalt de afspraak; de deelnemer krijgt daarvan een kort
 bericht en de persoonsgegevens worden een dag later verwijderd.
 
-Bij een tijdslot met een tekort staat ook **Burgers om een nieuwe tijd vragen**. U ziet dan
+Bij een tijdslot met een tekort staat ook **Deelnemers om een nieuwe tijd vragen**. U ziet dan
 eerst welke afspraken het betreft: de laatst gemaakte, zoveel als het tekort. Na uw
-bevestiging krijgen precies die burgers de vraag. Is het tijdslot intussen veranderd, dan
+bevestiging krijgen precies die deelnemers de vraag. Is het tijdslot intussen veranderd, dan
 toont OpenPlanner de nieuwe lijst en vraagt het u opnieuw te bevestigen.
 
 De afspraken die op een nieuwe tijd wachten, staan in de lijst **Wacht op nieuwe tijd** bij de

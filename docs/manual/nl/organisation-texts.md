@@ -1,6 +1,6 @@
-# Teksten voor burgers
+# Teksten voor deelnemers
 
-Een organisatie kan de teksten aanpassen die burgers zien op de pagina's van haar groepen en in
+Een organisatie kan de teksten aanpassen die deelnemers zien op de pagina's van haar groepen en in
 de mails en sms'jes. U opent het scherm via **Organisatie-instellingen** in het menu: kies de
 organisatie en dan **Teksten aanpassen**. Organisatiebeheerders passen de teksten van hun eigen
 organisaties aan; de superuser die van elke organisatie.
@@ -16,7 +16,7 @@ Een tekst die u hier aanpast geldt voor alle groepen van de organisatie. De volg
 - **Berichten**: het onderwerp en de inleiding van elke mail (bevestiging, wijziging,
   herinnering, annulering, verzoek om opnieuw te boeken), de sms-teksten, de redenen die een
   planner kan kiezen en de afsluitende regel. Dit zijn dezelfde teksten als bij een groep.
-- **Pagina's voor burgers**: de inleiding op de pagina van de groep, de kaart voor een direct
+- **Pagina's voor deelnemers**: de inleiding op de pagina van de groep, de kaart voor een direct
   gesprek, de uitleg na het boeken en op de pagina om een afspraak te bevestigen.
 
 Andere teksten, zoals knoppen, formulierlabels en foutmeldingen, kunt u niet aanpassen.
@@ -34,7 +34,7 @@ geen andere gebruiken. Een tekst heeft een maximale lengte; een onderwerp of tit
 regeleinden.
 
 Teksten zijn gewone tekst. Opmaak zoals `<b>` of code wordt niet uitgevoerd maar letterlijk
-getoond. Zet geen persoonsgegevens in een tekst: alle burgers zien dezelfde tekst.
+getoond. Zet geen persoonsgegevens in een tekst: alle deelnemers zien dezelfde tekst.
 
 Voor een wijziging moet u kort geleden zijn ingelogd. Elke wijziging staat in het auditlog met
 de taal en de namen van de aangepaste teksten, niet met de teksten zelf.

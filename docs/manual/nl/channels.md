@@ -1,6 +1,6 @@
 # Kanalen
 
-Op dit scherm legt de superuser per organisatie vast hoe berichten aan burgers de deur uit
+Op dit scherm legt de superuser per organisatie vast hoe berichten aan deelnemers de deur uit
 gaan: de mailserver (SMTP) voor e-mail en de sms-gateway voor sms. U opent het via
 **Integraties → organisatie → Kanalen**. Wachtwoorden en API-sleutels zijn alleen te schrijven:
 het veld is altijd leeg, en een leeg veld laat het opgeslagen geheim staan (ADR 0022).
@@ -11,9 +11,9 @@ Vul de mailserver van de organisatie in: host, poort, beveiliging (STARTTLS op 5
 en, als de server dat vraagt, een gebruikersnaam met wachtwoord. Een login zonder STARTTLS of
 TLS weigert het portaal: het wachtwoord zou dan leesbaar over de lijn gaan.
 
-Het **afzenderadres** is wat burgers in hun postvak zien. Gebruik een adres van het domein van
+Het **afzenderadres** is wat deelnemers in hun postvak zien. Gebruik een adres van het domein van
 de organisatie, bijvoorbeeld `afspraken@gemeente.nl`, met een **afzendernaam** zoals
-"Gemeente Demo, afspraken". Het **antwoordadres** is waar een antwoord van een burger
+"Gemeente Demo, afspraken". Het **antwoordadres** is waar een antwoord van een deelnemer
 terechtkomt; laat het leeg als het afzenderadres zelf bemenst is. De **DKIM-selector** is
 alleen nodig voor de controle hieronder; vraag hem aan uw mailbeheerder.
 
@@ -23,7 +23,7 @@ installatie, als de serverbeheerder die heeft ingesteld.
 ## Testmail
 
 Een testmail gaat door precies de server die het systeem voor deze organisatie gebruikt. Slaagt
-hij, dan accepteert de server de mail; dat zegt nog niets over het postvak van de burger. Mislukt
+hij, dan accepteert de server de mail; dat zegt nog niets over het postvak van de deelnemer. Mislukt
 hij, dan staat erbij waarom, in eigen woorden en zonder het antwoord van de server.
 
 ## Afzenderdomein
@@ -67,7 +67,7 @@ onderwerpregels, en bij problemen de DMARC-rapporten laten uitlezen door de mail
 
 ## Sms
 
-Kies de provider, vul de API-host en de API-sleutel in, en de afzender die burgers zien: een
+Kies de provider, vul de API-host en de API-sleutel in, en de afzender die deelnemers zien: een
 naam van ten hoogste elf tekens of een geregistreerd nummer. De landcode geldt voor nummers die
 zonder landcode zijn ingevuld.
 

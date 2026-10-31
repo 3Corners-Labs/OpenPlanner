@@ -18,7 +18,7 @@ portal checks.
 <!-- field: display_name -->
 ### Name in the header
 
-The name citizens see at the top of every page. Leave it empty to show the organisation's
+The name participants see at the top of every page. Leave it empty to show the organisation's
 name.
 
 <!-- field: header_style -->
@@ -52,7 +52,7 @@ contrast. Only the accent colour stays.
 <!-- field: font_size -->
 ### Text size
 
-In pixels, from 16 to 20. Smaller than the browser default is not possible; citizens who make
+In pixels, from 16 to 20. Smaller than the browser default is not possible; participants who make
 their browser text larger still get larger text.
 
 <!-- field: radius -->
@@ -77,7 +77,7 @@ most 250 kB per file. Without a bold font the browser makes the regular font bol
 without a heading font, headings use the text font.
 
 Fonts are loaded from this service, never from another website such as Google Fonts, so a
-citizen's computer does not contact other parties. Make sure the font's licence allows using
+participant's computer does not contact other parties. Make sure the font's licence allows using
 it on your own server.
 
 ## Theme file

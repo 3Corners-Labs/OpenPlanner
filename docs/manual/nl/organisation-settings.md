@@ -17,7 +17,7 @@ die van het platform (standaardwaarde, beheerportaal of omgeving).
 - **Tijdzone beheerportaal**: de tijdzone van tijden op de beheerpagina's, bijvoorbeeld
   `Europe/Amsterdam`. Elke groep houdt voor haar afspraken haar eigen tijdzone.
 - **Toon "Afspraken via OpenPlanner" onderaan**: of de boekingspagina's en de e-mails aan
-  burgers eindigen met het beeldmerk en de regel "Afspraken via OpenPlanner". Het eigen logo
+  deelnemers eindigen met het beeldmerk en de regel "Afspraken via OpenPlanner". Het eigen logo
   en de naam van de organisatie blijven in de kop staan; de platte-tekstversie van een e-mail
   krijgt de regel nooit. `true` of `false`.
 - **Medewerker inactief na**: dagen zonder inlog waarna iemand op het scherm **Medewerkers** als
@@ -25,7 +25,7 @@ die van het platform (standaardwaarde, beheerportaal of omgeving).
 - **Tekorten vooruitkijken**: hoeveel dagen vooruit de melding over tekorten op groepspagina's
   kijkt.
 - **Verzoek om opnieuw te boeken vervalt na** en **Herinnering om opnieuw te boeken**: als een
-  planner burgers vraagt een nieuwe tijd te kiezen, hoe lang het verzoek openstaat en wanneer de
+  planner deelnemers vraagt een nieuwe tijd te kiezen, hoe lang het verzoek openstaat en wanneer de
   ene herinnering gaat. De herinnering moet vóór het vervallen komen.
 
 ## Een instelling wijzigen

@@ -1,11 +1,11 @@
 # OpenPlanner manual / handleiding
 
 What the admin portal can do, screen by screen. The same text appears in the portal under
-**Handleiding** and behind the (i) of each input (ADR 0033). Citizens never need this manual:
+**Handleiding** and behind the (i) of each input (ADR 0033). Participants never need this manual:
 their pages explain themselves.
 
 Wat het beheerportaal kan, per scherm. Dezelfde tekst staat in het portaal onder
-**Handleiding** en achter de (i) bij elk invoerveld (ADR 0033). Burgers hebben deze
+**Handleiding** en achter de (i) bij elk invoerveld (ADR 0033). Deelnemers hebben deze
 handleiding niet nodig: hun pagina's leggen zichzelf uit.
 
 | Screen / scherm | Nederlands | English |
@@ -31,7 +31,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Advanced settings / geavanceerde instellingen | [Geavanceerde instellingen](nl/advanced-settings.md) | [Advanced settings](en/advanced-settings.md) |
 | Data fields and personal data / gegevensvelden en persoonsgegevens | [Gegevensvelden en persoonsgegevens](nl/data-fields.md) | [Data fields and personal data](en/data-fields.md) |
 | Organisation settings / organisatie-instellingen | [Organisatie-instellingen](nl/organisation-settings.md) | [Organisation settings](en/organisation-settings.md) |
-| Texts for citizens / teksten voor burgers | [Teksten voor burgers](nl/organisation-texts.md) | [Texts for citizens](en/organisation-texts.md) |
+| Texts for participants / teksten voor deelnemers | [Teksten voor deelnemers](nl/organisation-texts.md) | [Texts for participants](en/organisation-texts.md) |
 
 ## Writing a topic
 
