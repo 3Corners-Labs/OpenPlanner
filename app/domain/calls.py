@@ -41,12 +41,12 @@ class EventKind(StrEnum):
     MEETING_DELETED = "meeting_deleted"
     JOIN_PAGE_OPENED = "join_page_opened"
     JOIN_CLICKED = "join_clicked"
-    """The citizen pressed the button on the join page (detail: the page they were sent to,
+    """The participant pressed the button on the join page (detail: the page they were sent to,
     ``browser`` or ``choice``, ADR 0075)."""
     TRIAL_CREATED = "trial_created"
     """The citizen opened a trial call on Webex (ADR 0071)."""
     TRIAL_JOINED = "trial_joined"
-    """The citizen followed the link into the trial call (detail: the page they were sent to,
+    """The participant followed the link into the trial call (detail: the page they were sent to,
     ``browser`` or ``choice``, ADR 0075)."""
     TRIAL_ENTERED = "trial_entered"
     """Webex reports that someone joined the trial meeting (detail ``host`` when a host did,
@@ -76,7 +76,7 @@ class EventKind(StrEnum):
 
 
 def join_link(link: str | None, client: JoinClient) -> str | None:
-    """Return the link to send the citizen to for ``client``, or ``None`` when there is none.
+    """Return the link to send the participant to for ``client``, or ``None`` when there is none.
 
     The stored link comes from Webex and is personal data, so it is never altered in storage;
     this builds the redirect target. A link that is not ``https`` is refused, so a poisoned
