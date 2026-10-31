@@ -1,27 +1,62 @@
-{#- The change form of one setting row (ADR 0042 steps 4 and 5): new value, optional expiry, reset. -#}
-{% macro setting_form(row, action, reset_label, max_hours=24, trace_max_hours=4) -%}
-{% if row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
-<form method="post" action="{{ action }}" novalidate class="setting-form">
-  <label for="value-{{ row.key }}">{{ _("admin.settings.new_value") }}</label>
-  {% if row.choices %}
-  <select id="value-{{ row.key }}" name="value"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
-    {% for choice in row.choices %}<option value="{{ choice }}"{% if choice == row.input %} selected{% endif %}>{{ choice }}</option>{% endfor %}
-  </select>
-  {% elif row.secret %}
-  <input id="value-{{ row.key }}" name="value" type="password" autocomplete="new-password" value="" size="16" aria-describedby="hint-{{ row.key }}{% if row.error %} error-{{ row.key }}{% endif %}"{% if row.error %} aria-invalid="true"{% endif %}>
-  <span class="muted" id="hint-{{ row.key }}">{{ _("admin.settings.secret_hint") }}</span>
-  {% else %}
-  <input id="value-{{ row.key }}" name="value" type="text" value="{{ row.input }}" size="16"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
-  {% endif %}
-  {% if row.expires %}
-  <label for="hours-{{ row.key }}">{{ _("admin.settings.hours", max=max_hours, trace_max=trace_max_hours) }}</label>
-  <input id="hours-{{ row.key }}" name="hours" type="text" inputmode="numeric" value="1" size="3">
-  {% endif %}
-  <button type="submit" class="button button--small">{{ _("admin.settings.save") }}</button>
-</form>
-{% if row.from_portal %}
-<form method="post" action="{{ action }}/reset" class="setting-form">
-  <button type="submit" class="button button--secondary button--small">{{ reset_label }}</button>
-</form>
-{% endif %}
+{#- One setting row inside a topic's form (ADR 0042 steps 4 and 5): name, value or field, source
+    and notes. The form around the rows carries the topic's one Save button; Reset and Take over
+    post to their own route through formaction, so a row needs no form of its own. -#}
+{% macro setting_row(row, action, reset_label, max_hours=24, trace_max_hours=4) -%}
+<div class="setting{% if row.error %} setting--error{% endif %}" id="setting-{{ row.key }}">
+  <div class="setting__name">
+    {% if row.editable %}<label for="value-{{ row.key }}">{{ row.label }}</label>{% else %}<span>{{ row.label }}</span>{% endif %}
+    <code>{{ row.variable }}</code>
+  </div>
+  <div class="setting__value field{% if row.error %} field--error{% endif %}">
+    {% if row.editable %}
+    {% set described = (("hint-" ~ row.key) if row.secret else "") ~ ((" error-" ~ row.key) if row.error else "") %}
+    {% if row.choices %}
+    <select id="value-{{ row.key }}" name="{{ row.key }}"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
+      {% for choice in row.choices %}<option value="{{ choice }}"{% if choice == row.input %} selected{% endif %}>{{ choice }}</option>{% endfor %}
+    </select>
+    {% elif row.boolean %}
+    <select id="value-{{ row.key }}" name="{{ row.key }}"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
+      <option value="true"{% if row.input == "true" %} selected{% endif %}>{{ _("admin.settings.value.on") }}</option>
+      <option value="false"{% if row.input == "false" %} selected{% endif %}>{{ _("admin.settings.value.off") }}</option>
+    </select>
+    {% elif row.secret %}
+    <input id="value-{{ row.key }}" name="{{ row.key }}" type="password" autocomplete="new-password" value="" aria-describedby="{{ described | trim }}"{% if row.error %} aria-invalid="true"{% endif %}>
+    <p class="hint" id="hint-{{ row.key }}">{{ row.value }}. {{ _("admin.settings.secret_hint") }}</p>
+    {% else %}
+    <input id="value-{{ row.key }}" name="{{ row.key }}" type="text" value="{{ row.input }}"{% if row.error %} aria-invalid="true" aria-describedby="error-{{ row.key }}"{% endif %}>
+    {% endif %}
+    {% if row.expires %}
+    <div class="setting__pair">
+      <label for="hours-{{ row.key }}" class="field__sublabel">{{ _("admin.settings.hours", max=max_hours, trace_max=trace_max_hours) }}</label>
+      <input id="hours-{{ row.key }}" name="hours" type="text" inputmode="numeric" value="1" class="input--clock">
+    </div>
+    {% endif %}
+    {% else %}
+    <span class="setting__current">{{ row.value }}</span>
+    {% endif %}
+    {% if row.error %}<p class="error-message" id="error-{{ row.key }}">{{ row.error }}</p>{% endif %}
+  </div>
+  <div class="setting__state">
+    <span class="setting__source">{{ row.source }}</span>
+    {% if row.locked %}<span class="muted">{{ _("admin.settings.locked") }}: <code>{{ row.variable }}</code></span>{% endif %}
+    {% if row.outside_bounds %}<span class="chip chip--warning">{{ _("admin.settings.outside_bounds") }}</span>{% endif %}
+    {% if row.portal_ignored %}<span class="chip chip--warning">{{ _("admin.settings.portal_ignored") }}</span>{% endif %}
+    {% if row.editable and row.from_portal %}
+    <button type="submit" formaction="{{ action }}/reset" formnovalidate class="button button--secondary button--small">{{ reset_label }}</button>
+    {% endif %}
+    {% if row.adoptable %}
+    <button type="submit" formaction="{{ action }}/adopt" formnovalidate class="button button--secondary button--small">{{ _("admin.settings.adopt") }}</button>
+    {% endif %}
+    {% if row.adopted %}<span class="muted">{{ _("admin.settings.adopted_note") }} <code>{{ row.variable }}</code></span>{% endif %}
+  </div>
+</div>
+{%- endmacro %}
+
+{#- The column names above a list of setting rows. -#}
+{% macro setting_head() -%}
+<div class="settings-list__head" aria-hidden="true">
+  <span>{{ _("admin.settings.setting") }}</span>
+  <span>{{ _("admin.settings.value") }}</span>
+  <span>{{ _("admin.settings.source") }}</span>
+</div>
 {%- endmacro %}

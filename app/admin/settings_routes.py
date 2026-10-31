@@ -15,7 +15,9 @@ With ``settings.platform.manage`` (superuser, recent login) the settings that bu
 covers get a form: a new value within the portal bounds, or *Use the default* when the portal
 holds one. ``LOG_LEVEL`` also takes the hours after which it falls back (at most 24). A
 refusal is shown at the row, linked to its field; the submitted text is never echoed into
-the audit log.
+the audit log. The page shows one form per topic with one *Save*: it saves every value of the
+topic that differs from the current one (an empty secret keeps the current one) and stops at
+the first refusal; *Use the default* and *Manage this here* post to their own route.
 
 The page reloads the portal values first, so it always shows what the processes now apply.
 
@@ -28,6 +30,7 @@ removed there, and *Check now* runs the worker's probe at once. The private key 
 through a response. Without the bundled proxy the block says the source does not apply.
 
     GET  /admin/settings                          settings.platform.view
+    POST /admin/settings/topic/{topic}            settings.platform.manage (recent login)
     POST /admin/settings/{key}                    settings.platform.manage (recent login)
     POST /admin/settings/{key}/reset              settings.platform.manage (recent login)
     POST /admin/settings/{key}/adopt              settings.platform.manage (recent login)
@@ -65,7 +68,13 @@ from app.domain.own_certificate import (
     SourceStatus,
 )
 from app.domain.privacy import DATA_FIELDS, ENTITY, Classification
-from app.domain.settings_registry import BY_KEY, LOG_LEVEL_MAX_EXPIRY_HOURS, SettingClass, Topic
+from app.domain.settings_registry import (
+    BY_KEY,
+    LOG_LEVEL_MAX_EXPIRY_HOURS,
+    Kind,
+    SettingClass,
+    Topic,
+)
 from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
 from app.domain.tls import Finding
 from app.domain.tls_check import CertificateStatus
@@ -124,6 +133,7 @@ class SettingRow:
     secret: bool = False
     adoptable: bool = False
     adopted: bool = False
+    boolean: bool = False
 
 
 @dataclass(frozen=True)
@@ -289,6 +299,33 @@ async def try_login_mapping(
     return RedirectResponse("/admin/login?next=/admin/settings&fresh=1", status_code=303)
 
 
+@router.post("/settings/topic/{topic}", response_class=HTMLResponse)
+async def change_topic(
+    request: Request, topic: str, locale: Locale, _: SameOrigin, context: Change
+) -> Response:
+    """Save every changed setting of one topic; the first refusal stops and shows at its row."""
+    form = await read_form(request, locale)
+    live: LiveSettings = request.app.state.live_settings
+    await live.refresh()
+    changed = 0
+    for state in live.states():
+        spec = state.spec
+        if spec.topic.value != topic or spec.key not in form.values or spec.key == SOURCE_KEY:
+            continue
+        raw = form.text(spec.key)
+        if (spec.secret and not raw) or (not spec.secret and raw == _input(state)):
+            continue
+        hours = _hours(form.text("hours")) if spec.key == LOG_LEVEL else None
+        try:
+            await _service(request).change(context.principal, spec.key, raw, hours=hours)
+        except DomainError as error:
+            raise_refusal(error)
+            return await _overview(request, locale, context, (spec.key, error), 422)
+        changed += 1
+    anchor = f"topic-{topic}" if topic in {t.value for t in Topic} else ""
+    return redirect_done(URL, "saved" if changed else "unchanged", anchor=anchor)
+
+
 @router.post("/settings/{key}", response_class=HTMLResponse)
 async def change_setting(
     request: Request, key: str, locale: Locale, _: SameOrigin, context: Change
@@ -298,8 +335,7 @@ async def change_setting(
     spec = BY_KEY.get(key)
     if spec is not None and spec.secret and not form.text("value").strip():
         return redirect_done(URL, "unchanged", anchor=_anchor(key))  # write-only: empty keeps it
-    raw_hours = form.text("hours")
-    hours = int(raw_hours) if raw_hours.isdigit() and len(raw_hours) <= 3 else None
+    hours = _hours(form.text("hours"))
     try:
         if key == SOURCE_KEY:  # ADR 0070: `own` needs an upload, and the proxy is told at once
             await (await _source(request)).choose(context.principal, form.text("value"))
@@ -405,6 +441,11 @@ async def adopt_setting(
         raise_refusal(error)
         return await _overview(request, locale, context, (key, error), 409)
     return redirect_done(URL, "adopted", anchor=_anchor(key))
+
+
+def _hours(raw: str) -> int | None:
+    """Return the submitted expiry in hours, or ``None`` when it is not a small whole number."""
+    return int(raw) if raw.isdigit() and len(raw) <= 3 else None
 
 
 def _service(request: Request) -> SettingsService:
@@ -598,6 +639,7 @@ def _sections(
                 and state.locked
                 and state.spec.key not in stored,
                 adopted=state.locked and state.spec.key in stored,
+                boolean=state.spec.kind is Kind.BOOL,
             )
         )
     return [
