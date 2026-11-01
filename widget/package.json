@@ -7,6 +7,6 @@
     "build": "esbuild src/gov-booking.js --bundle --format=esm --target=es2022 --minify --legal-comments=none --loader:.css=text --outfile=dist/gov-booking.js"
   },
   "devDependencies": {
-    "esbuild": "0.25.12"
+    "esbuild": "0.28.2"
   }
 }
