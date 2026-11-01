@@ -72,8 +72,9 @@ Adding a trace point is a change to the registry, this table and the PII test to
   oldest line, a failing platform is retried with backoff, and a batch the platform will never
   accept is dropped instead of blocking the rest. A destination narrows the process's own
   level and never widens it: it sees trace lines only while `LOG_LEVEL` is `TRACE` too. The
-  screen to manage them is built in step 4 of the ADR; until then the rows can only be seen in
-  the database.
+  superuser manages them under Platform → Log destinations (`docs/manual/en/logging.md`):
+  add, send a test line, switch on, change and delete; the auditor sees the list and the
+  status of each process.
 
 ## Settings
 
