@@ -1,10 +1,11 @@
 /**
  * Captions for the recorded walkthrough (ADR 0087 step 3): reads the chapter marks the spec
  * wrote (tour-output/tour.marks.json) and the texts of chapters.json, and writes
- * tour-output/tour.nl.vtt, tour.en.vtt and tour.json (when, which version, how long).
+ * tour-output/tour.nl.vtt, tour.en.vtt and tour.json (when, which version, how long, and which
+ * chapters have a still, tour-<chapter>.jpg, in the order of the story).
  * Usage: node tour/captions.mjs [version]
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 const out = new URL('../tour-output/', import.meta.url);
 const { chapters } = JSON.parse(readFileSync(new URL('./chapters.json', import.meta.url), 'utf8'));
@@ -30,6 +31,15 @@ export function vtt(locale) {
 for (const locale of ['nl', 'en']) writeFileSync(new URL(`tour.${locale}.vtt`, out), vtt(locale));
 writeFileSync(
   new URL('tour.json', out),
-  `${JSON.stringify({ version: process.argv[2] ?? '', recorded: new Date().toISOString().slice(0, 10), seconds: Math.round(end) }, null, 2)}\n`,
+  `${JSON.stringify(
+    {
+      version: process.argv[2] ?? '',
+      recorded: new Date().toISOString().slice(0, 10),
+      seconds: Math.round(end),
+      screens: chapters.map((c) => c.key).filter((key) => existsSync(new URL(`tour-${key}.jpg`, out))),
+    },
+    null,
+    2,
+  )}\n`,
 );
 console.log(`captions for ${marks.length} chapters, ${Math.round(end)} s`);

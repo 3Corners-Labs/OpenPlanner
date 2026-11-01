@@ -6,6 +6,7 @@
  * simulator panel, ADR 0076) is pressed in a second context that does not record, so the video
  * shows the product, never test scaffolding. Every chapter's start is marked against the start
  * of the video; captions.mjs turns the marks and chapters.json into captions in nl and en.
+ * A still of the main chapters (tour-<chapter>.jpg) feeds the gallery of screens on the site.
  *
  * Needs the demo seed and the seeded journey (seed-demo, seed-closures > e2e/fixtures.json),
  * the simulator (SIMULATOR_ENABLED) and Keycloak, as in the accessibility job of ci.yml.
@@ -93,6 +94,8 @@ test('the walkthrough, recorded', async ({ browser }) => {
     if (!chapters.some((chapter) => chapter.key === key)) throw new Error(`chapter ${key} not in chapters.json`);
     marks.push({ key, at: (Date.now() - start) / 1000 });
   };
+  /** A still of the screen as it is now, for the gallery on the site (tour-<chapter>.jpg). */
+  const shot = (key: string) => page.screenshot({ path: `${OUT}tour-${key}.jpg`, type: 'jpeg', quality: 80 });
 
   // The participant: pick a day and a time.
   await page.goto('/g/demo');
@@ -102,6 +105,7 @@ test('the walkthrough, recorded', async ({ browser }) => {
   await page.locator('a.calendar__day').last().click();
   await show(page, page.locator('#times .time-button'));
   await page.screenshot({ path: `${OUT}tour.jpg`, type: 'jpeg', quality: 85 });
+  await shot('book');
   await page.locator('#times .time-button').first().click();
 
   // The form.
@@ -112,6 +116,7 @@ test('the walkthrough, recorded', async ({ browser }) => {
   await page.getByLabel('E-mailadres').pressSequentially(EMAIL, { delay: 40 });
   await page.getByRole('radio', { name: 'Toeslagen' }).check();
   await show(page, page.getByRole('button', { name: 'Afspraak maken' }), PACE / 2);
+  await shot('form');
   await page.getByRole('button', { name: 'Afspraak maken' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bevestig uw afspraak');
   mark('check_email');
@@ -122,6 +127,7 @@ test('the walkthrough, recorded', async ({ browser }) => {
   await page.getByRole('button', { name: 'Afspraak bevestigen' }).click();
   await expect(page.getByRole('status')).toContainText('Uw afspraak is bevestigd');
   mark('confirmed');
+  await shot('confirmed');
   await page.waitForTimeout(PACE);
 
   await page.getByRole('link', { name: 'Afspraak verplaatsen' }).click();
@@ -138,20 +144,24 @@ test('the walkthrough, recorded', async ({ browser }) => {
   await page.goto(paths.trial_page);
   await expect(page.getByRole('status')).toContainText('Uw proefgesprek staat open tot');
   mark('trial');
+  await shot('trial');
   await page.waitForTimeout(PACE * 1.5);
   await page.goto(paths.call_page);
   await expect(page.getByRole('link', { name: 'Deelnemen aan het videogesprek' })).toBeVisible();
   mark('join');
+  await shot('join');
   await page.waitForTimeout(PACE * 1.5);
 
   // The team: sign in through the identity provider.
   mark('login');
   await loginAs(page, 'orgadmin', '/admin/groups');
   mark('groups');
+  await shot('groups');
   await page.waitForTimeout(PACE * 1.5);
 
   await page.goto('/admin/groups/demo/staffing');
   mark('staffing');
+  await shot('staffing');
   await page.waitForTimeout(PACE);
   await page.mouse.wheel(0, 400);
   await page.waitForTimeout(PACE);
@@ -171,6 +181,7 @@ test('the walkthrough, recorded', async ({ browser }) => {
   await simulate(backstage, 'Deelnemer komt binnen', /afgeleverd/);
   await page.goto(`${JOURNEY_GROUP}/agenda`);
   mark('agenda');
+  await shot('agenda');
   await page.waitForTimeout(PACE * 2);
 
   await page.goto(`${JOURNEY_GROUP}/queue`);
@@ -179,6 +190,7 @@ test('the walkthrough, recorded', async ({ browser }) => {
   await page.getByRole('button', { name: 'Volgende oppakken' }).click();
   await expect(page.locator('#claimed-heading')).toContainText('opgepakt');
   mark('claimed');
+  await shot('claimed');
   await page.waitForTimeout(PACE * 2);
 
   const end = (Date.now() - start) / 1000;

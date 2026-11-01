@@ -1030,7 +1030,8 @@ clones that repository, replaces the site files with the build, commits `site: <
 |---|---|---|
 | Merge to `main` | `site`, after the candidate job: build with the releases and the roadmap from GitHub, upload the artifact, push | the site on TransIP, with the candidate that merge made on it |
 | Tag `vX.Y.Z` | the same after `publish`, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page, and the site on TransIP with the new release on it |
-| Tag `vX.Y.Z` (also) | `tour` (`.github/workflows/tour.yml`): the e2e stack, `e2e/tour/tour.spec.ts`, the captions | `tour.webm`, `tour.jpg`, `tour.nl.vtt`, `tour.en.vtt`, `tour.json` on the release; the `site` job puts the newest one on the page |
+| Tag `vX.Y.Z` (also) | `tour` (`.github/workflows/tour.yml`): the e2e stack, `e2e/tour/tour.spec.ts`, the captions | `tour.webm`, `tour.jpg`, `tour.nl.vtt`, `tour.en.vtt`, `tour.json` and a still per main chapter (`tour-<chapter>.jpg`) on the release; the `site` job puts the newest one on the page, the stills as a gallery |
+| Release candidate (by hand) | *Actions → tour → Run workflow* with the `vX.Y.Z-rc.N` tag: candidates are tagged by `GITHUB_TOKEN` and start no workflow, so they are recorded only on request | the recording on that candidate; the next merge to `main` puts it on the page |
 | Pull request, fork | nothing (`main.yml` only) | a local `make site` is the preview |
 
 ### Once: the deploy settings
