@@ -86,7 +86,7 @@ CREATABLES: dict[str, Creatable] = {
     ),
     "/admin/api/clients": Creatable(
         change="/admin/api/clients/{client_id}",
-        delete=Gap("ADR 0084 step 6: delete a disabled API client"),
+        delete="/admin/api/clients/{client_id}/delete",
     ),
     # ADR 0083 step 2: an organisation's identity provider, changed and removed on its page.
     "/admin/organisations/{org}/login": Creatable(
@@ -151,8 +151,9 @@ def test_a_gap_names_the_decision_that_allows_it() -> None:
     ]
 
     assert all(gap.decision.startswith("ADR ") for gap in gaps)
-    # ADR 0084 step 6 closes one of these; three are the decision's own exceptions.
-    assert len(gaps) == 4
+    # What is left is the decision's own: a holiday date is its identity, the Dutch holidays
+    # are dates, each removed alone.
+    assert len(gaps) == 3
 
 
 def test_the_heuristic_finds_the_known_creators() -> None:

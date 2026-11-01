@@ -268,6 +268,23 @@ class ApiAccessService:
             detail = "client.enable" if enabled else "client.disable"
             await self._audit_change(tx, principal, client, detail)
 
+    async def delete_client(self, principal: Principal, client_id: str) -> None:
+        """Delete a client that was disabled first (ADR 0084 point 7).
+
+        The row, its tokens and its group grants go; the audit event keeps the client id, so
+        the log can still be followed. Two deliberate steps: disable, then delete.
+
+        Raises:
+            DomainError: ``not_permitted``, ``api_client_not_found`` or ``api_client_enabled``.
+        """
+        await self._authorize(principal)
+        async with self._uow.locked() as tx:
+            client = await _client(tx, client_id)
+            if client.enabled:
+                raise DomainError(ErrorCode.API_CLIENT_ENABLED)
+            await self._audit_change(tx, principal, client, "client.delete")
+            await tx.delete_api_client(client_id)
+
     async def revoke_tokens(self, principal: Principal, client_id: str) -> int:
         """Revoke every live token of a client; return how many there were.
 

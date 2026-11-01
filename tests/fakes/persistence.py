@@ -1031,6 +1031,12 @@ class InMemoryTransaction:
     async def save_api_client(self, client: ApiClient) -> None:
         self.state.api_clients[client.client_id] = client
 
+    async def delete_api_client(self, client_id: str) -> None:
+        del self.state.api_clients[client_id]
+        self.state.access_tokens = {
+            h: t for h, t in self.state.access_tokens.items() if t.client_id != client_id
+        }
+
     async def list_identity_providers(self, scope: Scope) -> list[OrganisationProvider]:
         found = [
             p
