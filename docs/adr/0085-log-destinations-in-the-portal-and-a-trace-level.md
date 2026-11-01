@@ -155,7 +155,7 @@ oldest on a full queue (a request is never blocked by logging).
 | 1 | `TRACE` level, `tracer.trace()`, the trace points, `TRACE_LEVEL_MAX_HOURS`, `SQL_SLOW_MS`, `docs/logging.md` | #266 | merged |
 | 2 | Domain: `LogDestinationSender` Protocol, destination model and validation, service, queue and sender with drop and backoff, counters, system event; `logging.manage` and `logging.view` in the matrix; migration 0080; the line tap. Not yet started in web or worker: step 3 wires it with the adapters | #295 | in PR |
 | 3 | Adapters: `syslog` (TLS, TCP, UDP), `splunk_hec`, `elastic`, `http`; the shipper and the line tap run in web and worker; contract tests against recorded shapes and local receivers (TCP, TLS with its own authority, UDP) | #296 | in PR |
-| 4 | Admin: *Log destinations* list and page (`/admin/logging`), *Send test line*, a row on *System status*; manual topic (nl, en); `docs/admin-map.md` regenerated | #NNN | in PR |
+| 4 | Admin: *Log destinations* list and page (`/admin/logging`), *Send test line*, a row on *System status*; manual topic (nl, en); `docs/admin-map.md` regenerated | #297 | in PR |
 | 5 | `LOG_SHIPPING_ENABLED`; runbook section rewritten (portal route first, host route kept); `docs/dataflow.md` and `docs/threat-model.md` (log platform as recipient, abuse cases: address pointing at an internal service, credential in an error page, trace left on) | | planned |
 
 ## Consequences
