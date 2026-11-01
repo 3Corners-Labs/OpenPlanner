@@ -166,16 +166,6 @@ SECTIONS = (
         "manage",
         "admin.nav.section.manage",
         (
-            # ADR 0047 §2 and step 5: the groups as a list; the group's pages live under it.
-            Screen(
-                "manage.groups",
-                "admin.nav.groups",
-                "/admin/groups",
-                Permission.GROUP_VIEW,
-                "users",
-                ("/admin/groups/new",),
-                width=Width.WIDE,
-            ),
             # ADR 0047 step 3: the organisation as an object page; its tabs are in OBJECTS.
             Screen(
                 "manage.organisations",
@@ -184,6 +174,16 @@ SECTIONS = (
                 Permission.ORGANISATION_VIEW,
                 "organisation",
                 ("/admin/organisations/new",),
+                width=Width.WIDE,
+            ),
+            # ADR 0047 §2 and step 5: the groups as a list; the group's pages live under it.
+            Screen(
+                "manage.groups",
+                "admin.nav.groups",
+                "/admin/groups",
+                Permission.GROUP_VIEW,
+                "users",
+                ("/admin/groups/new",),
                 width=Width.WIDE,
             ),
             Screen(
