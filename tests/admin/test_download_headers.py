@@ -47,14 +47,7 @@ def test_only_the_known_modules_set_a_content_disposition() -> None:
 @pytest.mark.parametrize(
     "download",
     [
-        pytest.param(
-            "/admin/audit/export.csv",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="Finding T8-2: the audit export is named audit-YYYYMMDDTHHMMSSZ.csv; "
-                "the upper-case T and Z break ^[a-z0-9.-]+$ (harmless, but not the rule).",
-            ),
-        ),
+        "/admin/audit/export.csv",
         "/admin/organisations/demo/branding/theme.css",
         "/admin/idp-mapping/export.txt",
     ],
@@ -86,15 +79,10 @@ def test_the_package_filename_is_safe_for_the_default_installation() -> None:
     assert SAFE_FILENAME.fullmatch(package_filename("docker01", EXPORTED))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Finding T8-1: INSTALLATION_NAME allows upper case and underscores "
-    "(^[A-Za-z0-9_.-]{0,64}$), so the package filename can break ^[a-z0-9.-]+$.",
-)
 @pytest.mark.parametrize("installation", ["Prod", "test_host", "ACC-1.Nl"])
 def test_the_package_filename_is_safe_for_every_allowed_installation_name(
-    installation: str,
+    installation: str, settings: Settings
 ) -> None:
-    allowed = Settings(installation_name=installation).installation_name
+    allowed = settings.model_copy(update={"installation_name": installation}).installation_name
 
     assert SAFE_FILENAME.fullmatch(package_filename(allowed, EXPORTED))
