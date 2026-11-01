@@ -3,6 +3,8 @@
 Status: accepted (2026-10-26) by the product owner, who chose labels per block, the terms
 *bezetting / tijdblok / aantal medewerkers* and the full rename (phase C). Builds on HANDOVER
 B5 ("capacity is a counter") and ADR 0025; related to ADR 0026 (direct-call cap). Partly built; see `docs/adr-status.md` for what is built.
+Note (2026-11-01 review): the UI term for staff is configurable per organisation and group
+(ADR 0077 point 8, `{agent}`).
 
 ## Context
 

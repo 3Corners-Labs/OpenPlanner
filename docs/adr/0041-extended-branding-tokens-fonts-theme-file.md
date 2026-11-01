@@ -2,6 +2,7 @@
 
 Status: accepted (2026-10-27), requested by the product owner. Extends ADR 0020 §4–5 (open
 point O5).
+Uploads amended by ADR 0092.
 
 ## Context
 
