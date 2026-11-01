@@ -37,6 +37,8 @@ When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
     ``python -m app.cli oidc-check``  check the login configuration and print the claim mapping
     ``python -m app.cli tls-check [--host H] [--port P]``  the certificate of the public address
         (ADR 0064): stored for System status; with ``--host`` another server, stored nowhere
+    ``python -m app.cli purge-overdue [--dry-run]``  purge the personal data past its purge
+        moment now (the nightly sweep does this too); ``--dry-run`` only counts per group
     ``python -m app.cli closure start (--group SLUG | --organisation SLUG) --notice-nl TEXT
     --notice-en TEXT [--end ISO]``  emergency closure (ADR 0024), audited as ``system:cli``
     ``python -m app.cli closure lift (--group SLUG | --organisation SLUG)``  end it now
@@ -120,6 +122,7 @@ from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
 from app.domain.ports import CertificateProbe, IdentityError, IntegrationError
+from app.domain.retention_sweep import RetentionSweep
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.settings_registry import lookup
@@ -393,6 +396,27 @@ async def _maintenance(settings: Settings, action: str, reason: str, actor: str)
         return _maintenance_line(await service.stored())
     finally:
         await engine.dispose()
+
+
+async def _purge_overdue(settings: Settings, dry_run: bool = False) -> tuple[str, bool]:
+    """Run the retention sweep once and report counts (WP-A1); the second item is success.
+
+    Only counts and group slugs are printed. It fails when a booking could not be purged.
+    """
+    engine = create_engine(settings.database_url)
+    try:
+        result = await RetentionSweep(SqlUnitOfWork(engine), SystemClock()).run(dry_run=dry_run)
+    finally:
+        await engine.dispose()
+    lines = [f"{slug}: {count} overdue\n" for slug, count in sorted(result.per_group.items())]
+    if dry_run:
+        lines.append(f"{result.overdue} bookings overdue ({result.backlog} for over 48 hours)\n")
+    else:
+        lines.append(
+            f"purged {result.purged} of {result.overdue} overdue bookings "
+            f"({result.failed} failed, {result.backlog} were over 48 hours)\n"
+        )
+    return "".join(lines), result.failed == 0
 
 
 async def _tls_check(
@@ -1008,6 +1032,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
+    purge_cmd = commands.add_parser(
+        "purge-overdue", help="purge personal data past its purge moment (nightly sweep, now)"
+    )
+    purge_cmd.add_argument("--dry-run", action="store_true", help="only count, per group")
     commands.add_parser("version", help="print the release and commit of this image")
     commands.add_parser("update-claim", help="claim the waiting update request (host updater)")
     progress_cmd = commands.add_parser("update-progress", help="record the step an update starts")
@@ -1089,6 +1117,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             sample = _read_claims(Path(args.claims))
             return _write(asyncio.run(_oidc_claims(Settings(), sample)))
         return _write(asyncio.run(_oidc_check(Settings())))
+    if args.command == "purge-overdue":
+        return _write(asyncio.run(_purge_overdue(Settings(), args.dry_run)))
     if args.command == "tls-check":
         return _write(asyncio.run(_tls_check(Settings(), args.host, args.port)))
     if args.command == "closure":
