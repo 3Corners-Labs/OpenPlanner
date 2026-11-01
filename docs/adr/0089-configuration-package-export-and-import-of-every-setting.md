@@ -2,7 +2,8 @@
 
 Status: proposed (2026-11-01), requested by the product owner. Extends ADR 0008 (secrets at
 rest), ADR 0042 (settings classes) and ADR 0050 (host installer). Partly built; see *Build
-status*.
+status*. Points 1 and 5 are superseded by ADR 0099 (a JSON document with plan and apply)
+once its step 4 is built.
 
 ## Context
 
@@ -131,7 +132,7 @@ to its record). The classification of tables is code, checked by a test, not a s
 | 2 | The block *Configuration package* on *Advanced settings*: export with a passphrase, import with a passphrase and a confirmation; manual topic | #298 | merged |
 | 3 | Machine API: scope `configuration:transfer`, `GET`/`PUT /api/agent/v1/configuration`, `docs/agent-api.md` | #301 | merged |
 | 4 | Installer: `--configuration FILE --passphrase-file PATH`, `secrets/config.env` in `docker-compose.yml`, `docs/install.md` | #302 | in PR |
-| 5 | A package of an older schema revision is migrated forward on import | | planned |
+| 5 | A package of an older schema revision is migrated forward on import | | follow-up: dropped, replaced by ADR 0099 |
 
 ## Consequences
 

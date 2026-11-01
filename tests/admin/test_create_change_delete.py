@@ -93,6 +93,11 @@ CREATABLES: dict[str, Creatable] = {
         change="/admin/organisations/{org}/login/{idp_key}",
         delete="/admin/organisations/{org}/login/{idp_key}/delete",
     ),
+    # ADR 0085 step 4: a log destination, changed and removed on its page.
+    "/admin/logging": Creatable(
+        change="/admin/logging/{destination_id}",
+        delete="/admin/logging/{destination_id}/delete",
+    ),
     "/admin/organisations/{org}/closure/scenarios": Creatable(
         change="/admin/organisations/{org}/closure/scenarios/{scenario_id}",
         delete="/admin/organisations/{org}/closure/scenarios/{scenario_id}/delete",

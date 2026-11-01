@@ -1,6 +1,7 @@
 {#- Slot picker (ADR 0020): month calendar of links plus the times of the chosen day.
     Works without JavaScript; static/calendar.js adds the ARIA grid and arrow keys.
     Expects: picker (PickerView), action and method (where a time button submits to). -#}
+{% from "_error_message.html" import error_message %}
 {% set f = picker.filter %}
 <details class="filter"{% if f.active or f.invalid_range %} open{% endif %}>
   <summary>{{ _("picker.filter.title") }}</summary>
@@ -23,7 +24,7 @@
       </div>
       <div class="field{% if f.invalid_range %} field--error{% endif %}">
         <label for="filter-until">{{ _("picker.filter.until") }}</label>
-        {% if f.invalid_range %}<p class="error-message" id="filter-until-error">{{ _("picker.filter.error_range") }}</p>{% endif %}
+        {% if f.invalid_range %}{{ error_message(_("picker.filter.error_range"), "filter-until-error") }}{% endif %}
         <select id="filter-until" name="until"{% if f.invalid_range %} aria-invalid="true" aria-describedby="filter-until-error"{% endif %}>
           <option value="">{{ _("picker.filter.any") }}</option>
           {% for option in f.ends %}<option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}

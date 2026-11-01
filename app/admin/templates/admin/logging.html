@@ -1,0 +1,57 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% block title %}{{ _("admin.logging.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ _("admin.logging.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.logging.lead") }}</p>
+  </div>
+  {% if can("logging.manage") %}
+  <div class="page-header__actions">
+    <a class="button" href="/admin/logging/new">{{ icon("plus") }}<span>{{ _("admin.logging.add") }}</span></a>
+  </div>
+  {% endif %}
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+<section class="card" aria-labelledby="destinations-heading">
+  <h2 id="destinations-heading">{{ _("admin.logging.destinations") }}</h2>
+  {% if destinations %}
+  <div class="table-scroll" role="region" aria-labelledby="destinations-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.logging.destinations") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.logging.name") }}</th>
+        <th scope="col">{{ _("admin.logging.kind") }}</th>
+        <th scope="col">{{ _("admin.logging.address") }}</th>
+        <th scope="col">{{ _("admin.logging.state") }}</th>
+        <th scope="col">{{ _("admin.logging.health") }}</th>
+        <th scope="col">{{ _("admin.logging.tested") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for view in destinations %}
+      <tr>
+        <th scope="row"><a href="/admin/logging/{{ view.destination.id }}">{{ view.destination.name }}</a></th>
+        <td>{{ view.kind_label }}</td>
+        <td><code>{{ view.destination.address }}</code></td>
+        <td>{% if view.destination.enabled %}<span class="chip chip--success">{{ _("admin.logging.on") }}</span>{% else %}<span class="chip">{{ _("admin.logging.off") }}</span>{% endif %}</td>
+        <td>
+          {%- if not view.destination.enabled %}–
+          {%- elif view.health.value == "failing" %}<span class="chip chip--danger">{{ _("admin.logging.health_failing") }}</span>
+          {%- elif view.health.value == "ok" %}<span class="chip chip--success">{{ _("admin.logging.health_ok") }}</span>
+          {%- else %}<span class="chip">{{ _("admin.logging.health_idle") }}</span>{% endif -%}
+        </td>
+        <td>{{ view.tested or _("admin.logging.untested") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>{{ _("admin.logging.none") }}</p>
+  {% endif %}
+  <p class="hint">{{ _("admin.logging.copy_hint") }}</p>
+</section>
+{% endblock %}
