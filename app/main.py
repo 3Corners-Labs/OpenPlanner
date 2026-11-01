@@ -322,6 +322,7 @@ def create_app(
             clock,
             "web",
             lambda: ship_settings(live()),
+            enabled=lambda: live().log_shipping_enabled,
             window=lambda: timedelta(minutes=live().security_event_window_minutes),
         )
         shipping_stop = asyncio.Event()
@@ -346,6 +347,7 @@ def create_app(
             clock,
             app.state.admin_service,
             production=settings.environment == "prod",
+            shipping_enabled=lambda: live().log_shipping_enabled,
             tester=LogTester(
                 LogDestinationCredentialStore(app.state.engine, secret_box(settings)),
                 log_sender_factory or build_sender,

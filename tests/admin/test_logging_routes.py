@@ -5,12 +5,14 @@ test line, the closed list of reasons the page may show, and what each role sees
 """
 
 import re
+from collections.abc import AsyncIterator
 
 import pytest
 
+from app.config import Settings
 from app.domain.audit import Outcome
 from app.domain.log_destinations import Reason
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
 from tests.admin.test_admin_flow import audit_events
 
 LOGGING = "/admin/logging"
@@ -262,3 +264,37 @@ async def test_system_status_summarises_the_destinations_for_those_who_may_see_t
 
     await site.login_as(AUDITOR)
     assert "1 ingesteld, 1 aan." in (await site.client.get("/admin/settings")).text
+
+
+# ADR 0085 point 7: the host's kill switch.
+
+
+@pytest.fixture
+async def switched_off(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
+    async with _running_site(
+        settings.model_copy(update={"log_shipping_enabled": False}), admin_db
+    ) as s:
+        yield s
+
+
+async def test_the_kill_switch_stops_test_lines_and_the_screen_says_so(switched_off: Site) -> None:
+    await switched_off.login_as(SUPER)
+    url = await create(switched_off)
+
+    listing = await switched_off.client.get(LOGGING)
+    page = await switched_off.client.get(url)
+    test = await switched_off.client.post(f"{url}/test", headers=SAME_ORIGIN)
+
+    assert "staat uit op de host" in listing.text
+    assert "staat uit op de host" in page.text
+    assert test.status_code == 409
+    assert "staat uit op de host" in test.text
+    assert not switched_off.log_senders.built  # nothing was built, nothing was sent
+    # The configuration stays: the destination can still be changed and switched on.
+    assert (await switched_off.client.get(url)).status_code == 200
+
+
+async def test_with_the_switch_on_the_screen_has_no_such_notice(superuser: Site) -> None:
+    await create(superuser)
+
+    assert "staat uit op de host" not in (await superuser.client.get(LOGGING)).text

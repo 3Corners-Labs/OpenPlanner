@@ -92,6 +92,7 @@ class ErrorCode(StrEnum):
     LOG_DESTINATION_INSECURE = "log_destination_insecure"
     LOG_DESTINATION_NOT_FOUND = "log_destination_not_found"
     LOG_DESTINATION_NAME_TAKEN = "log_destination_name_taken"
+    LOG_SHIPPING_OFF = "log_shipping_off"
     DISCOVERY_REFUSED = "discovery_refused"
     TLS_CERTIFICATE_UNREADABLE = "tls_certificate_unreadable"
     TLS_KEY_MISMATCH = "tls_key_mismatch"

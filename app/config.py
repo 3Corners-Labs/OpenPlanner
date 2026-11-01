@@ -341,6 +341,10 @@ class Settings(BaseSettings):
     # Rate limits on public endpoints (CLAUDE.md security baseline).
     rate_limit_enabled: bool = True
 
+    # ADR 0085 point 7 (class B, kill switch): off stops every log destination without deleting
+    # its configuration, for an incident in which the platform's own traffic is the problem.
+    log_shipping_enabled: bool = True
+
     # Simulator for platform events on admin booking pages; off unless switched on, refused in
     # production (docs/runbook.md, section 10).
     simulator_enabled: bool = False

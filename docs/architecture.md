@@ -206,7 +206,7 @@ import-linter enforces these arrows in CI (ADR 0005):
 flowchart LR
     subgraph domain [app.domain]
         service[BookingService · AdminService · ApiAccessService · UpdateService]
-        ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider ·<br/>ReleaseSource"}}
+        ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider ·<br/>ReleaseSource · LogDestinationSender"}}
         service --> ports
     end
 
@@ -218,6 +218,7 @@ flowchart LR
     wxccad[adapters.wxcc<br/>WxccTasks]
     idpad[adapters.oidc<br/>OidcIdentityProvider]
     releasead[adapters.releases<br/>GitHubReleases]
+    logad[adapters.log_senders<br/>Syslog · Splunk · Elastic · Http]
 
     clock -.implements.-> ports
     uow -.implements.-> ports
@@ -227,6 +228,7 @@ flowchart LR
     wxccad -.implements.-> ports
     idpad -.implements.-> ports
     releasead -.implements.-> ports
+    logad -.implements.-> ports
 
 ```
 
@@ -570,6 +572,28 @@ sequenceDiagram
 Every arrow back into OpenPlanner becomes a timeline event and updates the booking's call
 status; the agenda in the admin portal shows it per day.
 
+### Log destinations (ADR 0085)
+
+```mermaid
+flowchart LR
+    line["log line (JSON, masked)<br/>structlog or stdlib"] --> tap{"line tap"}
+    event["audit / system / security event<br/>after commit (EventSink)"] --> tap
+    diag["diagnostic event<br/>(never to stdout)"] --> tap
+    line --> stdout["stdout (always)<br/>json-file, rotated"]
+    event --> stdout
+    tap --> filter{"accepts(destination)?<br/>level · category · opt-ins"}
+    filter --> queue["bounded queue per destination<br/>and process, drop oldest"]
+    queue --> sender["sender task: batch, timeout,<br/>backoff, drop hopeless batch"]
+    sender -->|"syslog TLS/TCP/UDP · Splunk HEC ·<br/>Elastic _bulk · HTTP NDJSON"| platform[(log platform)]
+    sender --> status["counters and reason<br/>log_destination_status"]
+    status --> screen["Platform → Log destinations"]
+    kill["LOG_SHIPPING_ENABLED=false<br/>(host)"] -.stops.-> sender
+```
+
+Web and worker each run one shipper. It reads the enabled destinations (with their opened
+credentials) every 15 seconds, so a change in the portal reaches both without a restart, and
+reports its counters every 30 seconds. Delivery never runs in a request or a job.
+
 ### Maintenance mode (ADR 0038)
 
 ```mermaid
@@ -748,6 +772,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0032 | Provider-neutral contact-center integration (proposed; renumbered from 0021) |
 | 0033 | Context-sensitive help: one Markdown manual, shown on GitHub and in the portal, (i) per field |
 | 0034 | Audit events also on the log stream for an external log platform such as Splunk |
+| 0085 | Log destinations in the portal (syslog, Splunk, Elastic, HTTP), a trace level, a host kill switch |
 | 0035 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes |
 | 0036 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond |
 | 0037 | Closure page: prepared scenarios, structured alternative contact options, an image with alt text |

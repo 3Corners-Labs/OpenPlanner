@@ -54,6 +54,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `SIMULATOR_ENABLED` | bool | `false` | Platform-event simulator on admin booking pages; refused in production. |
 | `AGENT_API_ENABLED` | bool | `false` | Machine API for contact-center bots; off means the routes do not exist (ADR 0023). |
 | `RATE_LIMIT_ENABLED` | bool | `true` | Off switch for every rate limit; never in the portal. |
+| `LOG_SHIPPING_ENABLED` | bool | `true` | Kill switch of the log destinations (ADR 0085); off stops every one, never in the portal. |
 | `MAINTENANCE_MODE` | bool | `false` | Maintenance mode from the host, also while the database is unavailable (ADR 0038); the portal cannot switch it off. |
 | `DEV_TOKEN_KEY_PATH` | path | `data/dev-token.key` | Development management-token key file. |
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |

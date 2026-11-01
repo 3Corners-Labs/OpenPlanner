@@ -492,6 +492,14 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Off switch for every rate limit; never in the portal.",
     ),
     S(
+        "log_shipping_enabled",
+        K.BOOL,
+        True,
+        _B,
+        T.SWITCHES,
+        "Kill switch of the log destinations (ADR 0085); off stops every one, never in the portal.",
+    ),
+    S(
         "maintenance_mode",
         K.BOOL,
         False,

@@ -107,6 +107,11 @@ def service(request: Request) -> LogDestinationService:
     return found
 
 
+def _shipping_on(request: Request) -> bool:
+    """Return whether the host's kill switch ``LOG_SHIPPING_ENABLED`` leaves shipping on."""
+    return bool(request.app.state.settings.log_shipping_enabled)
+
+
 def _url(destination_id: int | None = None) -> str:
     """Return the list, or the page of one destination."""
     return f"{BASE}/{destination_id}" if destination_id is not None else BASE
@@ -383,7 +388,7 @@ async def _form_page(
             "done": done_message(request, locale.gettext),
             "tested": tested,
             "test_failed": test_failed,
-            "kinds_with_secret": [k.value for k in DestinationKind if k.has_credential],
+            "shipping_off": not _shipping_on(request),
         },
     )
     response.status_code = status
@@ -405,6 +410,7 @@ async def destinations(request: Request, locale: Locale, context: View) -> HTMLR
                 for d in overview.destinations
             ],
             "done": done_message(request, locale.gettext),
+            "shipping_off": not _shipping_on(request),
         },
     )
 

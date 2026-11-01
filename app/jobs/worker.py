@@ -111,6 +111,7 @@ async def run_worker(
         clock,
         "worker",
         lambda: ship_settings(live.settings),
+        enabled=lambda: live.settings.log_shipping_enabled,
         window=lambda: timedelta(minutes=live.settings.security_event_window_minutes),
     )
     shipping_stop = asyncio.Event()

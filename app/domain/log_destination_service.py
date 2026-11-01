@@ -87,6 +87,8 @@ class LogDestinationService:
         tester: Sends one test line to a stored destination and raises ``DeliveryError``;
             ``None`` when the process cannot deliver, which refuses every test.
         on_change: Called after every change, so the senders reload at once.
+        shipping_enabled: Whether the host's kill switch ``LOG_SHIPPING_ENABLED`` leaves
+            shipping on; a test line is traffic too, so it is refused while it is off.
     """
 
     def __init__(  # noqa: PLR0913
@@ -98,6 +100,7 @@ class LogDestinationService:
         production: bool,
         tester: Callable[[int], Awaitable[None]] | None = None,
         on_change: Callable[[], None] = lambda: None,
+        shipping_enabled: Callable[[], bool] = lambda: True,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -106,6 +109,7 @@ class LogDestinationService:
         self._production = production
         self._tester = tester
         self._on_change = on_change
+        self._shipping_enabled = shipping_enabled
 
     # --- reading -------------------------------------------------------------------------
 
@@ -271,9 +275,11 @@ class LogDestinationService:
 
         Raises:
             DomainError: ``not_permitted``, ``log_destination_not_found`` or
-                ``integration_not_ready`` (this process cannot deliver).
+                ``integration_not_ready`` (this process cannot deliver) or ``log_shipping_off``.
         """
         require(await self._admin.authorize(principal, _MANAGE))
+        if not self._shipping_enabled():
+            raise DomainError(ErrorCode.LOG_SHIPPING_OFF)
         if self._tester is None:
             raise DomainError(ErrorCode.INTEGRATION_NOT_READY)
         async with self._uow.read() as tx:

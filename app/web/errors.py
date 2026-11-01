@@ -52,6 +52,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.LOG_DESTINATION_INSECURE: "admin.form.error.log_destination_insecure",
     ErrorCode.LOG_DESTINATION_NOT_FOUND: "error.not_found.text",
     ErrorCode.LOG_DESTINATION_NAME_TAKEN: "admin.form.error.log_destination_name_taken",
+    ErrorCode.LOG_SHIPPING_OFF: "admin.form.error.log_shipping_off",
     ErrorCode.DISCOVERY_REFUSED: "admin.form.error.discovery_refused",
     ErrorCode.CHANNEL_NOT_CONFIGURED: "error.invalid_request",
     ErrorCode.REMINDER_EXISTS: "admin.form.error.reminder_exists",

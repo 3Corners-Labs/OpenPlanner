@@ -1662,13 +1662,55 @@ and the group's admins see these with the kind *Diagnose*. It ends by itself aft
 worker ends every mode (`diagnostics.braked` in the log, *Diagnosemodus gestopt* in the
 superuser's audit log). Debug events never go to the log platform.
 
-## Shipping audit events to a log platform (ADR 0034)
+## Shipping the log to a log platform (ADR 0034, ADR 0085)
 
-After each commit, every audit, system and security event is written once more to stdout as
-one JSON line with `"log_type": "audit"` and the fields of `docs/audit-events.md`. Diagnostic
-events never are. The line ignores `LOG_LEVEL`. OpenPlanner holds no credential for the
-platform: the host ships the container log. Route `log_type = audit` to its own index and
-alert on `event.category = security` and on `outcome = denied`.
+Two routes lead to the same place. Both ship copies of the same masked lines.
+
+**1. In the portal (ADR 0085).** The superuser connects a platform under **Platform → Log
+destinations** (`docs/manual/en/logging.md`): syslog over TLS (RFC 5424), Splunk HTTP Event
+Collector, Elastic or OpenSearch (`_bulk` into a data stream), or any HTTP endpoint that takes
+JSON lines. Add the destination, choose **Send test line** (one real line, with the platform's
+status code on the page), then **Switch on**. Each destination has a lowest level, the audit
+categories it takes, and opt-ins for trace lines and diagnostic events. The token or key is
+stored encrypted and never shown again. Web and worker pick a change up within about 15
+seconds and deliver in the background, so a slow or down platform never slows a booking page
+or a job. The stored token needs `SETTINGS_ENCRYPTION_KEY`; without it the page says the token
+cannot be opened.
+
+What to do when a destination fails (the page shows the reason; the first failure and the
+recovery are system events in the audit log):
+
+| Reason | Meaning | What to do |
+|---|---|---|
+| `unreachable` | no connection: DNS, port, firewall or time-out | check the address and the route from the container (`docker compose exec web python -c ...` or `curl`); `LOG_SHIP_TIMEOUT_SECONDS` raises the time-out |
+| `refused` (401, 403) | the platform did not accept the token | enter the token or key again |
+| `refused` (400, 413, 422) | the platform will never accept that batch (malformed for it): it is dropped and counted | check the index or data stream and the platform's mapping; lower `LOG_SHIP_BATCH_SIZE` for 413 |
+| `tls` | the certificate is not trusted | use the platform's real name in the address, or add its certificate authority (public PEM) on the destination |
+| `server` | the platform reported an error (5xx, 429) | wait: it is retried with a growing pause up to `LOG_SHIP_BACKOFF_MAX_SECONDS` (300) |
+| `not_ready` | the stored token cannot be opened | `SETTINGS_ENCRYPTION_KEY` is missing or was changed; enter the token again |
+
+Each process keeps its own queue of at most `LOG_SHIP_QUEUE_SIZE` lines (default 10 000) per
+destination, in memory only; a restart loses what was still queued, and a platform that stays
+away longer than the queue holds loses the oldest lines (the page counts them as dropped).
+For a guarantee of delivery use route 2, which reads the rotated files on the host.
+
+**Kill switch.** `LOG_SHIPPING_ENABLED=false` in `.env` and `docker compose up -d` stops every
+destination and every test line within about 15 seconds and keeps the configuration. Use it when
+the platform's own traffic is the problem during an incident; the screen then says so.
+`docker compose logs` is unaffected.
+
+**Trace logging off the platform.** `settings set LOG_LEVEL TRACE --hours 1` writes the trace
+lines (every request by route template, job step, outgoing call by host, slow statement and
+page render; no personal data; `docs/logging.md`) to stdout, and a destination with the lowest
+level `trace` and *Trace lines* ticked receives them. `TRACE` falls back by itself after at
+most `TRACE_LEVEL_MAX_HOURS` (4). A destination can only narrow what the platform logs, never
+widen it.
+
+**2. On the host (ADR 0034).** After each commit, every audit, system and security event is
+written once more to stdout as one JSON line with `"log_type": "audit"` and the fields of
+`docs/audit-events.md`; the line ignores `LOG_LEVEL`. Diagnostic events are not written there.
+The host ships the container log. Route `log_type = audit` to its own index and alert on
+`event.category = security` and on `outcome = denied`.
 
 Docker's `splunk` driver, in `docker-compose.override.yml` (token from the host's secret
 store, never committed):

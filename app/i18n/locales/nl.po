@@ -8625,3 +8625,9 @@ msgstr "{count} mislukt"
 
 msgid "admin.settings.logging.open"
 msgstr "Logbestemmingen openen"
+
+msgid "admin.logging.shipping_off"
+msgstr "Het versturen van logs staat uit op de host (LOG_SHIPPING_ENABLED). Geen enkele bestemming ontvangt iets en er kan geen testregel worden gestuurd; de instellingen blijven bewaard."
+
+msgid "admin.form.error.log_shipping_off"
+msgstr "Het versturen van logs staat uit op de host, dus er kan geen testregel worden gestuurd."
