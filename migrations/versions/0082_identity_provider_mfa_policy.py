@@ -8,7 +8,7 @@ Revises 0081 (admin sessions, ADR 0098). Open PRs also claim numbers, so recheck
 the head before merging.
 
 Revision ID: 0082
-Revises: 0080
+Revises: 0081
 Create Date: 2026-11-01 23:00:00.000000
 """
 
