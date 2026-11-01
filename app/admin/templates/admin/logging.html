@@ -13,6 +13,7 @@
   </div>
   {% endif %}
 </div>
+{% if shipping_off %}<div class="alert alert--info" role="status"><p>{{ _("admin.logging.shipping_off") }}</p></div>{% endif %}
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 <section class="card" aria-labelledby="destinations-heading">
   <h2 id="destinations-heading">{{ _("admin.logging.destinations") }}</h2>

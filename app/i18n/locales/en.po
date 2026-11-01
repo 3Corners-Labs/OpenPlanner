@@ -9173,3 +9173,9 @@ msgstr "End all sessions"
 
 msgid "admin.rights.sections"
 msgstr "Parts of My rights"
+
+msgid "admin.logging.shipping_off"
+msgstr "Log shipping is switched off on the host (LOG_SHIPPING_ENABLED). No destination receives anything and no test line can be sent; the configuration is kept."
+
+msgid "admin.form.error.log_shipping_off"
+msgstr "Log shipping is switched off on the host, so no test line can be sent."
