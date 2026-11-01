@@ -24,18 +24,29 @@ version: only MFA, configured at the IdP, requested and checked by OpenPlanner.
    empty. An IdP that does not know the value ignores it (it is voluntary, Core §3.1.2.1).
 3. **Verify.** `finish_login` (and the trial and test logins, which share the token check)
    refuses an ID token that shows no second factor with `IdentityError("mfa_required")`. The
-   proof is `amr` containing one of `mfa`, `otp`, `hwk`, `swk` (a fixed rule in
-   `app/domain/mfa.py`), or an `acr` equal to one of the values asked for. Any other `acr`,
-   and any `amr` of another type, is no proof. Fails closed: a missing claim is a refusal.
+   proof is an `amr` containing one of `OIDC_MFA_AMR_VALUES` (default the RFC 8176 values
+   `mfa`, `otp`, `hwk`, `swk`), or an `acr` equal to one of `OIDC_MFA_ACR_VALUES` (empty: the
+   values asked for in `OIDC_ACR_VALUES`). Any other `acr`/`amr` is no proof. Fails closed: a
+   missing claim is a refusal. The accepted values are configurable because the `acr` of
+   PingFederate is not yet known (tracker S-WP7).
 4. **Refusal.** The login callback answers 401 with a clear text (`admin.login_refused.mfa_required`,
    nl and en), records the security event `admin.login` with reason `mfa_required` for
    `anonymous`, and logs `oidc.mfa_missing` with the provider key only. No claim value, name or
    address reaches a log or event.
-5. **Scope.** The switch applies to the platform provider. An organisation provider
-   (ADR 0083) is the organisation's own; whether to require MFA of it is a later decision.
-6. **The switch.** `ADMIN_MFA_REQUIRED` (class B, default `true`). Production refuses to start
-   with `false` (a `production_problems` entry); `dev`, `test` and `lab` may set it, and the
-   dev Keycloak and the e2e stack do. A protection is never switched off from the portal.
+5. **Scope.** The switch applies to the platform provider. For an organisation provider
+   (ADR 0083) the product owner wants to enforce MFA, or at least to recognise when a login
+   came without it, per provider. Step 2 adds a policy on the registered provider: `off`,
+   `record` (the login succeeds; a security event `admin.login` with reason `mfa_missing`
+   and the provider key, no PII, and a mark on the provider's page) or `require` (as point 3),
+   with the accepted `amr`/`acr` values per provider. Whether OpenPlanner then adds an MFA step
+   of its own where a provider gives none (TOTP held in OpenPlanner) is a separate decision:
+   it makes OpenPlanner hold authentication secrets and needs its own ADR.
+6. **The switch.** `ADMIN_MFA_REQUIRED` (class B, default `false`). It is set to `true` for the
+   bundled Keycloak (ADR 0090; by hand in `.env` until its installer step), whose realm
+   enforces MFA. For another provider it stays off until the IdP team names its `amr`/`acr`
+   values; then the operator sets them and turns the switch on. Why not on by default: an
+   unknown policy would lock every admin out. A protection is never switched off from the
+   portal (class B).
 7. **Self-service at the bundled Keycloak.** The realm sets `resetPasswordAllowed`, so the
    login prompt offers *Forgot password*, and a user changes the password and registers the
    authenticator app again (delete the old OTP, add a new one) under *Signing in* in the
@@ -54,23 +65,25 @@ version: only MFA, configured at the IdP, requested and checked by OpenPlanner.
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `ADMIN_MFA_REQUIRED` | B deployment | `true` | bool; production refuses `false` | environment | A protection: switching it off is never C or D. Not A: the login works without it. |
+| `ADMIN_MFA_REQUIRED` | B deployment | `false` (`true` for the bundled Keycloak) | bool | environment | A protection: switching it off is never C or D. Not A: the login works without it. |
+| `OIDC_MFA_AMR_VALUES` | B deployment | `hwk mfa otp swk` | space separated | environment | Which `amr` values show a second factor; the IdP's policy names them. |
+| `OIDC_MFA_ACR_VALUES` | B deployment | empty (the values asked for) | space separated | environment | Which `acr` values show a second factor; PingFederate's is not yet known. |
 | `OIDC_ACR_VALUES` | B deployment | `mfa` | space separated; empty asks for nothing | environment | Tied to what the IdP's policy is called; wrong values lock the login, so not in the portal. |
 
-**Fixed on purpose:** the accepted `amr` values (`mfa`, `otp`, `hwk`, `swk`) are the standard
-of RFC 8176, not a tunable.
+**Fixed on purpose:** the refusal itself (fail closed on a missing claim) is not a setting.
 
 ## Build status
 
 | Step | What | PR | State |
 |---|---|---|---|
+| 3 | Per-provider MFA policy `off`/`record`/`require` for organisation providers (point 5): migration, Login sub-tab, registry | | follow-up |
 | 2 | Self-service reset limited to the active domain suffix; realm SMTP | | follow-up |
 | 1 | `app/domain/mfa.py`, `acr_values` and the check in `app/adapters/oidc.py`, the two settings, login message, Keycloak realm flow, runbook, threat model, manual | #357 | in PR |
 
 ## Consequences
 
-An installation whose IdP does not emit `amr`/`acr` stops logging in until the IdP team maps
-its MFA policy or `ADMIN_MFA_REQUIRED=false` is set (not in production). The Keycloak flow in the
+An installation that turns the switch on while its IdP does not emit `amr`/`acr` stops logging
+in until the IdP team maps its MFA policy or the switch is turned off again. The Keycloak flow in the
 realm template is checked by a structure test; a live run on the bundled `idp` belongs to
 the next host test. `docs/settings.md`, `.env.example`, `docs/runbook.md`,
 `docs/threat-model.md` and `docs/manual/{nl,en}/staff.md` are updated.

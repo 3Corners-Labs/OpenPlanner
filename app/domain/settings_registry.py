@@ -350,10 +350,10 @@ REGISTRY: tuple[SettingSpec, ...] = (
     S(
         "admin_mfa_required",
         K.BOOL,
-        True,
+        False,
         _B,
         T.LOGIN,
-        "Refuse an admin login whose ID token shows no second factor (ADR 0100); on in production.",
+        "Refuse an admin login whose ID token shows no second factor (ADR 0100); on for the bundled Keycloak.",
     ),
     S(
         "oidc_acr_values",
@@ -362,6 +362,22 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _B,
         T.LOGIN,
         "acr_values requested at login; an acr from this list counts as proof of MFA (ADR 0100).",
+    ),
+    S(
+        "oidc_mfa_amr_values",
+        K.STRING,
+        "hwk mfa otp swk",
+        _B,
+        T.LOGIN,
+        "amr values that count as proof of MFA (RFC 8176), space separated (ADR 0100).",
+    ),
+    S(
+        "oidc_mfa_acr_values",
+        K.STRING,
+        "",
+        _B,
+        T.LOGIN,
+        "acr values that count as proof of MFA; empty: the values asked for (ADR 0100).",
     ),
     # B. Deployment: tied to the host, DNS, proxy, image or healthcheck; kill switches.
     S(

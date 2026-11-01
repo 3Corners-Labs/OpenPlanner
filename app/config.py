@@ -310,11 +310,16 @@ class Settings(BaseSettings):
     oidc_client_id: str = "openplanner-admin"
     oidc_client_secret: SecretStr | None = None
     oidc_scopes: str = "openid profile email"
-    # ADR 0100: the admin must show a second factor (amr/acr in the ID token). Class B, a
-    # protection that production never starts without; the IdP owns the MFA itself.
-    admin_mfa_required: bool = True
-    # ``acr_values`` asked for at login (space separated); an ``acr`` in this list is proof.
+    # ADR 0100: the admin must show a second factor (amr/acr in the ID token). Class B. Off by
+    # default: the bundled Keycloak sets it on; another provider turns it on once the IdP team
+    # has named its amr/acr values. The IdP owns the MFA itself.
+    admin_mfa_required: bool = False
+    # ``acr_values`` asked for at login (space separated).
     oidc_acr_values: str = "mfa"
+    # Values that count as proof (space separated). amr: RFC 8176. acr: empty means the values
+    # asked for above.
+    oidc_mfa_amr_values: str = "hwk mfa otp swk"
+    oidc_mfa_acr_values: str = ""
     oidc_role_claim: str = "roles"
     oidc_organisation_claim: str = "organisations"
     oidc_group_claim: str = "groups"
@@ -494,12 +499,6 @@ class Settings(BaseSettings):
             "public_base_url",
             "PUBLIC_BASE_URL",
             "PUBLIC_BASE_URL must use https in production",
-        )
-        check(
-            not self.admin_mfa_required,
-            "admin_mfa_required",
-            "ADMIN_MFA_REQUIRED",
-            "ADMIN_MFA_REQUIRED is not allowed to be false in production (ADR 0100)",
         )
         check(
             self.session_secret is None,

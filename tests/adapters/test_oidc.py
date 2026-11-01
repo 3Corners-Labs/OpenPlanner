@@ -872,3 +872,15 @@ async def test_the_refusal_logs_no_claim_values(provider: FakeProvider) -> None:
 
     assert [e["event"] for e in events if e["event"].startswith("oidc.mfa")] == ["oidc.mfa_missing"]
     assert "Ada" not in str(events)
+
+
+async def test_the_accepted_amr_and_acr_values_are_configurable(provider: FakeProvider) -> None:
+    provider.claims = {"amr": ["x-strong"]}
+    await _mfa_login(provider, _mfa_config(mfa_amr_values="x-strong"))
+
+    provider.claims = {"acr": "urn:strong"}
+    await _mfa_login(provider, _mfa_config(mfa_acr_values="urn:strong"))
+
+    provider.claims = {"amr": ["otp"]}
+    with pytest.raises(IdentityError):
+        await _mfa_login(provider, _mfa_config(mfa_amr_values="x-strong"))

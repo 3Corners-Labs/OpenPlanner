@@ -36,7 +36,7 @@ from app.domain.authorization import Role
 from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM, SubjectRefusedError, qualify
 from app.domain.identity_providers import ASYMMETRIC_ALGORITHMS, ClientAuth, issuer_of
-from app.domain.mfa import MFA_REQUIRED, shows_mfa
+from app.domain.mfa import MFA_AMR_VALUES, MFA_REQUIRED, shows_mfa
 from app.domain.ports import IdentityError, LoginStart, LoginTestReport
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 from app.domain.tunable import value_of
@@ -104,7 +104,8 @@ class OidcConfig:
     ``discovery_url`` (``issuer_of``). A registered provider passes the issuer stored at
     registration, so a later change of its discovery document cannot move it.
     ``acr_values`` are requested at login when not empty; with ``require_mfa`` an ID token
-    that shows no second factor (``amr``, or an ``acr`` out of ``acr_values``) is refused
+    that shows no second factor (an ``amr`` out of ``mfa_amr_values``, or an ``acr`` out of
+    ``mfa_acr_values``, which is ``acr_values`` when empty) is refused
     with ``mfa_required`` (ADR 0100). MFA itself is the provider's.
     """
 
@@ -121,6 +122,8 @@ class OidcConfig:
     expected_issuer: str | None = None
     require_mfa: bool = False
     acr_values: str = ""
+    mfa_amr_values: str = " ".join(sorted(MFA_AMR_VALUES))
+    mfa_acr_values: str = ""
 
     @property
     def issuer(self) -> str:
@@ -402,7 +405,10 @@ class OidcIdentityProvider:
         if not hmac.compare_digest(str(claims.get("nonce", "")), nonce):
             raise IdentityError("nonce_mismatch")
         if self._config.require_mfa and not shows_mfa(
-            claims.get("amr"), claims.get("acr"), self._config.acr_values.split()
+            claims.get("amr"),
+            claims.get("acr"),
+            (self._config.mfa_acr_values or self._config.acr_values).split(),
+            self._config.mfa_amr_values.split(),
         ):
             log.warning("oidc.mfa_missing", provider=self._config.provider_key or PLATFORM)
             raise IdentityError(MFA_REQUIRED)

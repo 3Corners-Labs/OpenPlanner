@@ -35,3 +35,9 @@ def test_an_acr_that_was_not_asked_for_shows_nothing() -> None:
 def test_garbage_types_show_nothing() -> None:
     assert not shows_mfa({"otp": 1}, 5, frozenset({"5"}))
     assert not shows_mfa([1, None], None, frozenset())
+
+
+def test_the_accepted_values_are_the_callers_to_choose() -> None:
+    assert shows_mfa(["pwd", "x-strong"], None, [], ["x-strong"])
+    assert not shows_mfa(["otp"], None, [], ["x-strong"])
+    assert shows_mfa(None, "urn:strong", ["urn:strong"])

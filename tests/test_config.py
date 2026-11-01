@@ -252,22 +252,10 @@ def test_production_refuses_with_the_first_problem_in_the_same_words() -> None:
         Settings(environment="prod")
 
 
-def test_admin_mfa_is_required_by_default() -> None:
+def test_admin_mfa_is_off_until_the_installation_turns_it_on() -> None:
     settings = Settings(environment="dev")
 
-    assert settings.admin_mfa_required is True
+    assert settings.admin_mfa_required is False
     assert settings.oidc_acr_values == "mfa"
-
-
-def test_production_refuses_to_switch_admin_mfa_off() -> None:
-    off = Settings(environment="dev", admin_mfa_required=False)
-
-    assert "admin_mfa_required" in [p.code for p in off.production_problems()]
-    with pytest.raises(ValueError, match="ADMIN_MFA_REQUIRED is not allowed to be false"):
-        Settings(
-            environment="prod",
-            admin_mfa_required=False,
-            management_token_key="k" * 32,  # type: ignore[arg-type]
-            public_base_url="https://afspraak.example.nl",
-            session_secret="s" * 32,  # type: ignore[arg-type]
-        )
+    assert set(settings.oidc_mfa_amr_values.split()) == {"mfa", "otp", "hwk", "swk"}
+    assert settings.oidc_mfa_acr_values == ""
