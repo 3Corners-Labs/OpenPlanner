@@ -65,6 +65,23 @@ async def reclaim_free_pages(engine: AsyncEngine) -> int:
         return int(before) - int(after)
 
 
+async def checkpoint_wal(engine: AsyncEngine) -> None:
+    """Fold the write-ahead log into the database file and empty it (``TRUNCATE``).
+
+    Called after a purge batch and after the retention sweep (WP-A3): with ``secure_delete`` the
+    purged values are overwritten in the pages, and this makes sure no older copy of those pages
+    stays in the ``-wal`` file. When a reader holds the log open the checkpoint is partial;
+    the next call finishes it. Blocks on disk and snapshots are the host's concern
+    (``docs/dataflow.md``).
+    """
+    async with engine.connect() as conn:
+        raw = await conn.get_raw_connection()
+        driver = raw.driver_connection
+        if driver is None:  # pragma: no cover - only for an invalidated connection
+            return
+        await driver.execute_fetchall("PRAGMA wal_checkpoint(TRUNCATE)")
+
+
 def storage_limits(settings: Settings) -> StorageLimits:
     """Return the storage grade boundaries configured in ``settings``."""
     return StorageLimits(

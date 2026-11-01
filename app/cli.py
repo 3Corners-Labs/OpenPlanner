@@ -80,6 +80,7 @@ from app.adapters.db.configuration_package import (
     portable_environment,
 )
 from app.adapters.db.engine import create_engine
+from app.adapters.db.maintenance import checkpoint_wal
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
@@ -406,6 +407,8 @@ async def _purge_overdue(settings: Settings, dry_run: bool = False) -> tuple[str
     engine = create_engine(settings.database_url)
     try:
         result = await RetentionSweep(SqlUnitOfWork(engine), SystemClock()).run(dry_run=dry_run)
+        if result.purged:
+            await checkpoint_wal(engine)  # WP-A3: no older copy of the data stays in the WAL
     finally:
         await engine.dispose()
     lines = [f"{slug}: {count} overdue\n" for slug, count in sorted(result.per_group.items())]
