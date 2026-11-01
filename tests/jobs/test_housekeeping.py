@@ -290,3 +290,35 @@ async def test_a_failing_sweep_is_logged_and_never_stops_housekeeping(
     sweeper.fail = True
 
     assert await _sweep_logs(_sweeping(engine, sweeper)) == ["error:retention.sweep_failed"]
+
+
+async def test_a_sweep_that_purged_empties_the_wal_and_a_quiet_one_does_not(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checkpoints: list[AsyncEngine] = []
+
+    async def record(target: AsyncEngine) -> None:
+        checkpoints.append(target)
+
+    monkeypatch.setattr("app.jobs.housekeeping.checkpoint_wal", record)
+
+    await _sweep_logs(_sweeping(engine, Sweeper(SweepResult())))
+    assert checkpoints == []
+
+    await _sweep_logs(_sweeping(engine, Sweeper(SweepResult(overdue=1, purged=1))))
+    assert checkpoints == [engine]
+
+
+async def test_a_failing_checkpoint_is_logged_and_never_stops_housekeeping(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def fail(_engine: AsyncEngine) -> None:
+        raise RuntimeError("database locked")
+
+    monkeypatch.setattr("app.jobs.housekeeping.checkpoint_wal", fail)
+    setup = _sweeping(engine, Sweeper(SweepResult(overdue=1, purged=1)))
+
+    with capture_logs() as logs:
+        await setup.housekeeping.run()
+
+    assert "retention.checkpoint_failed" in [e["event"] for e in logs]
