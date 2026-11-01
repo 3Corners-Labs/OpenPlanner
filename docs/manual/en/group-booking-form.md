@@ -3,7 +3,7 @@
 The form always asks a participant for first name, last name and email address. Whether it also
 asks for a phone number is set in the [team's settings](group-settings.md). Does the team need
 more, such as a customer number or the subject of the conversation? Then add custom fields
-here. You open the screen with **team → Settings → Manage the booking form**. Organisation
+here. You open the screen with **team → Settings → Booking form → Manage questions**. Organisation
 admins and the superuser can change it.
 
 Ask only what the team really needs for the conversation. Every extra field is data we must

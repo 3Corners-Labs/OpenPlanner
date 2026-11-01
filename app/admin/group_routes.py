@@ -43,6 +43,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.check_routes import check_service, check_view
+from app.admin.form_summary import form_summary
 from app.admin.forms import (
     Field,
     FormData,
@@ -703,6 +704,7 @@ async def _settings_response(
             "integration_fields": with_manual(request, locale, integrations),
             "errors": form.errors + (idp_form.errors if idp_form else []),
             "check": await check_view(request, locale, context),
+            "form_summary": await form_summary(request, locale, context),
             "idp": _with_manual_field(
                 request, locale, await group_idp_view(request, locale, context, idp_form)
             ),

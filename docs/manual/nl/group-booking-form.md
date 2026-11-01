@@ -3,8 +3,7 @@
 Het formulier vraagt een inwoner altijd om voornaam, achternaam en e-mailadres. Of het ook een
 telefoonnummer vraagt, stelt u in bij de [instellingen van het team](group-settings.md). Heeft
 het team meer nodig, bijvoorbeeld een klantnummer of het onderwerp van het gesprek? Dan voegt u
-hier eigen velden toe. U opent het scherm via **team → Instellingen → Boekingsformulier
-beheren**. Een organisatiebeheerder of superuser kan het wijzigen.
+hier eigen velden toe. U opent het scherm via **team → Instellingen → Boekingsformulier → Vragen beheren**. Een organisatiebeheerder of superuser kan het wijzigen.
 
 Vraag alleen wat het team echt nodig heeft voor het gesprek. Elk extra veld is een gegeven dat
 we moeten beschermen.

@@ -6401,8 +6401,17 @@ msgstr "Extra questions participants answer when they book. Ask only what the te
 msgid "admin.form_fields.settings_lead"
 msgstr "Extra questions on the form, with checks and a personal data tag."
 
+msgid "admin.form_fields.summary"
+msgstr "Own questions on the form ({count} of at most {limit}):"
+
+msgid "admin.form_fields.summary_more"
+msgstr "and {count} more"
+
+msgid "admin.form_fields.summary_none"
+msgstr "No own questions yet (at most {limit}). You could ask for a customer number or the subject of the appointment."
+
 msgid "admin.form_fields.open"
-msgstr "Manage the booking form"
+msgstr "Manage questions"
 
 msgid "admin.form_fields.back"
 msgstr "Back to the settings"
