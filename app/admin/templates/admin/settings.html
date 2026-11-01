@@ -1,19 +1,8 @@
 {% extends "admin/layout.html" %}
 {% from "_error_message.html" import error_message %}
-{% from "admin/_setting_form.html" import setting_row, setting_head with context %}
-{% block title %}{{ _("admin.settings.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block title %}{{ _("admin.settings.tab.status") }} – {{ _("admin.settings.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <div>
-    <h1 id="page-title">{{ _("admin.settings.title") }}</h1>
-    <p class="page-header__lead">{{ _("admin.settings.intro") }}</p>
-  </div>
-</div>
-{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
-{% if unknown_error %}<div class="alert alert--error" role="alert"><p>{{ unknown_error }}</p></div>{% endif %}
-{% if refused %}
-<div class="alert alert--error"><p>{{ _("admin.settings.refused") }}</p></div>
-{% endif %}
+{% include "admin/_settings_header.html" %}
 <section class="card" aria-labelledby="status-heading">
   <h2 id="status-heading">{{ _("admin.settings.status.title") }}</h2>
   <p>{{ _("admin.settings.status.intro") }}</p>
@@ -177,78 +166,4 @@
   </div>
   <p>{{ _("admin.settings.data_fields.fixed") }} <a href="/admin/help/data-fields">{{ _("admin.settings.data_fields.manual") }}</a></p>
 </section>
-{% if login_form %}
-<form class="card" method="post" action="/admin/settings/login/test" novalidate aria-labelledby="login-heading">
-  <h2 id="login-heading">{{ _("admin.settings.login.title") }}</h2>
-  <p>{{ _("admin.settings.login.intro") }}</p>
-  {% for field in login_form %}
-  <div class="field{% if field.error %} field--error{% endif %}">
-    <label for="login-{{ field.key }}">{{ field.label }}</label>
-    {{ error_message(field.error, "error-login-" ~ field.key) }}
-    <input id="login-{{ field.key }}" name="{{ field.key }}" type="text" value="{{ field.value }}" autocomplete="off"{% if field.error %} aria-invalid="true" aria-describedby="error-login-{{ field.key }}"{% endif %}>
-  </div>
-  {% endfor %}
-  <button type="submit" class="button">{{ _("admin.settings.login.test") }}</button>
-</form>
-{% endif %}
-{% if manage %}
-<section class="card" id="package" aria-labelledby="package-heading">
-  <h2 id="package-heading">{{ _("admin.settings.package.title") }}</h2>
-  <p>{{ _("admin.settings.package.intro") }}</p>
-  <p class="hint">{{ _("admin.settings.package.warning") }}</p>
-  {{ error_message(package.error, "error-package") }}
-  <h3 id="package-export-heading">{{ _("admin.settings.package.export.title") }}</h3>
-  <form method="post" action="/admin/settings/package/export" novalidate aria-labelledby="package-export-heading">
-    <p class="hint" id="package-passphrase-hint">{{ _("admin.settings.package.passphrase_hint", length=package.min_length) }}</p>
-    <div class="field">
-      <label for="package-passphrase">{{ _("admin.settings.package.passphrase") }}</label>
-      <input id="package-passphrase" name="passphrase" type="password" autocomplete="new-password" aria-describedby="package-passphrase-hint{% if package.error %} error-package{% endif %}"{% if package.error %} aria-invalid="true"{% endif %}>
-    </div>
-    <div class="field">
-      <label for="package-passphrase-repeat">{{ _("admin.settings.package.passphrase_repeat") }}</label>
-      <input id="package-passphrase-repeat" name="passphrase_repeat" type="password" autocomplete="new-password">
-    </div>
-    <button type="submit" class="button">{{ _("admin.settings.package.export.button") }}</button>
-  </form>
-  <h3 id="package-import-heading">{{ _("admin.settings.package.import.title") }}</h3>
-  <p>{{ _("admin.settings.package.import.intro", max_mb=package.max_mb) }}</p>
-  <form method="post" action="/admin/settings/package/import" enctype="multipart/form-data" novalidate aria-labelledby="package-import-heading">
-    <div class="field">
-      <label for="package-file">{{ _("admin.settings.package.import.file") }}</label>
-      <input id="package-file" name="package" type="file" accept=".sqlite,application/vnd.sqlite3">
-    </div>
-    <div class="field">
-      <label for="package-import-passphrase">{{ _("admin.settings.package.passphrase") }}</label>
-      <input id="package-import-passphrase" name="passphrase" type="password" autocomplete="off">
-    </div>
-    <div class="field field--checkbox">
-      <input id="package-confirm" name="confirm" type="checkbox" value="yes">
-      <label for="package-confirm">{{ _("admin.settings.package.import.confirm") }}</label>
-    </div>
-    <button type="submit" class="button button--danger">{{ _("admin.settings.package.import.button") }}</button>
-  </form>
-</section>
-{% endif %}
-{% for section in sections %}
-{#- With the manage permission each topic is one form with one Save; Reset and Take over post
-    through formaction. Without it the topic is a read-only section. -#}
-{% if manage %}
-<form method="post" action="/admin/settings/topic/{{ section.key }}" novalidate class="card settings-group" aria-labelledby="topic-{{ section.key }}">
-{% else %}
-<section class="card settings-group" aria-labelledby="topic-{{ section.key }}">
-{% endif %}
-  <h2 id="topic-{{ section.key }}">{{ section.heading }}</h2>
-  <div class="settings-list">
-    {{ setting_head() }}
-    {% for row in section.rows %}
-    {{ setting_row(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours, trace_max_hours) }}
-    {% endfor %}
-  </div>
-  {% if manage and section.rows | selectattr("editable") | list %}
-  <div class="form-actions">
-    <button type="submit" class="button">{{ _("admin.settings.save") }}</button>
-  </div>
-  {% endif %}
-{% if manage %}</form>{% else %}</section>{% endif %}
-{% endfor %}
 {% endblock %}

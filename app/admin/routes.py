@@ -336,8 +336,10 @@ async def _finish_login_trial(
     try:
         await service.change_login_mapping(principal, values, trial=tried)
     except DomainError:
-        return RedirectResponse("/admin/settings?done=login_mapping_refused", status_code=303)
-    return RedirectResponse("/admin/settings?done=login_mapping_saved", status_code=303)
+        return RedirectResponse(
+            "/admin/settings/values?done=login_mapping_refused", status_code=303
+        )
+    return RedirectResponse("/admin/settings/values?done=login_mapping_saved", status_code=303)
 
 
 @router.post("/logout", response_class=HTMLResponse)

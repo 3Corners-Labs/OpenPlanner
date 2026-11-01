@@ -1,0 +1,16 @@
+{#- Header of the Advanced settings sub-tabs (ADR 0099): title, the sub-tab row and the outcome
+    of the last change. Expects ``entry_tabs`` (from ``page``), ``done``, ``refused`` and
+    ``unknown_error``. -#}
+{% from "admin/_subtabs.html" import subtab_row %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.settings.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.settings.intro") }}</p>
+  </div>
+</div>
+{{ subtab_row(entry_tabs, _("admin.settings.sections")) }}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if unknown_error %}<div class="alert alert--error" role="alert"><p>{{ unknown_error }}</p></div>{% endif %}
+{% if refused %}
+<div class="alert alert--error"><p>{{ _("admin.settings.refused") }}</p></div>
+{% endif %}

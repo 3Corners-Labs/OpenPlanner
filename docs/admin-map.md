@@ -37,6 +37,8 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 | Updates | `/admin/updates` | `system.update` | standard | – |
 | Maintenance | `/admin/maintenance` | `system.maintenance` | standard | – |
 | Advanced settings | `/admin/settings` | `settings.platform.view` | standard | – |
+| Advanced settings › Settings | `/admin/settings/values` | `settings.platform.view` | standard | – |
+| Advanced settings › Configuration package | `/admin/settings/package` | `settings.platform.manage` | standard | – |
 
 ## Top bar
 

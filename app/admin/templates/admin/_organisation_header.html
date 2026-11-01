@@ -1,5 +1,6 @@
 {#- Header of every organisation page (ADR 0047 step 3): breadcrumbs, name, the tabs the matrix allows and the current tab's second row. Expects ``org_header`` (ObjectHeader). -#}
 {% from "admin/_icons.html" import icon %}
+{% from "admin/_subtabs.html" import subtab_row %}
 <nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
   <ol>
     <li><a href="/admin/organisations">{{ _("admin.nav.organisations") }}</a></li>
@@ -21,12 +22,4 @@
   </ul>
 </nav>
 {% endif %}
-{% if org_header.subtabs %}
-<nav class="tabs tabs--sub" aria-label="{{ _("admin.organisation.subsections") }}">
-  <ul>
-    {% for tab in org_header.subtabs %}
-    <li><a href="{{ tab.href }}"{% if tab.current %} aria-current="page"{% endif %}><span>{{ tab.label }}</span></a></li>
-    {% endfor %}
-  </ul>
-</nav>
-{% endif %}
+{{ subtab_row(org_header.subtabs, _("admin.organisation.subsections")) }}

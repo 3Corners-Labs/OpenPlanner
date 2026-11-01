@@ -96,13 +96,34 @@ def test_tabs_live_under_their_object() -> None:
                 assert all(path.startswith(obj.path) for path in subtab.routes), subtab.key
 
 
-def test_only_tabs_have_sub_tabs() -> None:
-    tabs = {tab.key for obj in OBJECTS for tab in obj.tabs}
+def test_only_tabs_and_entries_have_sub_tabs() -> None:
+    """ADR 0099: a tab or a side-navigation entry has sub-tabs; a sub-tab or shortcut never."""
+    owners = {tab.key for obj in OBJECTS for tab in obj.tabs}
+    owners |= {entry.key for section in SECTIONS for entry in section.entries}
 
     for entry, screen in screens():
-        if screen.key not in tabs:
+        if screen.key not in owners:
             assert screen.subtabs == (), screen.key
         assert entry
+
+
+def test_sub_tabs_of_an_entry_live_under_its_path() -> None:
+    for section in SECTIONS:
+        for entry in section.entries:
+            for sub in entry.subtabs:
+                assert all(path.startswith(entry.path + "/") for path in sub.routes), sub.key
+
+
+def test_advanced_settings_has_three_sub_tabs() -> None:
+    """ADR 0099 point 2: System status (the entry's own page), Settings, Configuration package."""
+    settings = next(e for s in SECTIONS for e in s.entries if e.key == "platform.settings")
+
+    assert [sub.key for sub in settings.subtabs] == ["platform.settings.values", "platform.package"]
+    assert home_of("/admin/settings") == Home("platform.settings", None, None)
+    assert home_of("/admin/settings/values") == Home(
+        "platform.settings", None, "platform.settings.values"
+    )
+    assert home_of("/admin/settings/package") == Home("platform.settings", None, "platform.package")
 
 
 def test_the_organisation_is_an_object_page_with_six_tabs() -> None:
