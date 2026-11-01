@@ -30,6 +30,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
+from app.adapters.db.admin_sessions import AdminSessionQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
@@ -420,6 +421,7 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 
 
 class SqlTransaction(
+    AdminSessionQueries,
     ApiClientQueries,
     IdentityProviderQueries,
     LogDestinationQueries,
@@ -445,7 +447,8 @@ class SqlTransaction(
     ``ScenarioQueries`` (ADR 0037), portal settings from ``PlatformSettingsQueries``
     (ADR 0042), the certificate check from ``CertificateQueries`` (ADR 0064), the organisation
     identity providers from ``IdentityProviderQueries`` (ADR 0083), the log destinations from
-    ``LogDestinationQueries`` (ADR 0085).
+    ``LogDestinationQueries`` (ADR 0085), the admin sessions from ``AdminSessionQueries``
+    (ADR 0098).
 
     Args:
         session: The open session.

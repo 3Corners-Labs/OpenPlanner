@@ -28,8 +28,10 @@ from typing import Annotated
 import structlog
 from fastapi import Depends, Request
 
-from app.admin.session import activity_due, current_login, login_age
+from app.admin.session import current_login, load_login, login_age
 from app.domain.admin import AdminService, Authorization
+from app.domain.admin_session_service import AdminSessionService
+from app.domain.admin_sessions import SessionPolicy
 from app.domain.authorization import (
     LEVELS,
     Level,
@@ -40,7 +42,6 @@ from app.domain.authorization import (
     decide_in_maintenance,
     scope_for,
 )
-from app.domain.entitlements import LoginClaims
 from app.domain.event_context import bind_level
 from app.domain.login_service import LoginService
 from app.domain.maintenance_service import MaintenanceService
@@ -139,16 +140,33 @@ def maintenance_service(request: Request) -> MaintenanceService:
     return service
 
 
-def _cookie_claims(request: Request) -> LoginClaims | None:
-    """Return the login's claims stored in the session, honouring the absolute lifetime."""
-    clock: Clock = request.app.state.clock
-    hours: int = request.app.state.settings.admin_session_hours
-    return current_login(request, clock.now(), timedelta(hours=hours))
+def session_service(request: Request) -> AdminSessionService:
+    """Return the application's admin session register (ADR 0098)."""
+    service: AdminSessionService = request.app.state.admin_session_service
+    return service
+
+
+def session_policy(request: Request) -> SessionPolicy:
+    """Return the session settings now in force (class C, so read per request)."""
+    settings = request.app.state.settings
+    return SessionPolicy(
+        lifetime=timedelta(hours=settings.admin_session_hours),
+        idle=timedelta(minutes=settings.admin_idle_minutes),
+        seen_interval=timedelta(seconds=settings.staff_last_seen_interval_seconds),
+        max_sessions=settings.admin_max_sessions_per_person,
+    )
 
 
 async def load_principal(request: Request) -> None:
-    """Resolve the logged-in principal with its grants once, for the whole request."""
-    claims = _cookie_claims(request)
+    """Resolve the logged-in principal with its grants once, for the whole request.
+
+    The session is looked up in the register first (ADR 0098); a reference that is ended,
+    idle or past its lifetime gives no principal.
+    """
+    request.state.admin_activity_written = await load_login(
+        request, session_service(request), session_policy(request)
+    )
+    claims = current_login(request)
     principal = None
     if claims is not None:
         principal = await login_service(request).principal_for(claims)
@@ -160,23 +178,23 @@ async def load_principal(request: Request) -> None:
 
 
 def session_principal(request: Request) -> Principal | None:
-    """Return the logged-in principal of ``request``, honouring the absolute lifetime.
+    """Return the logged-in principal of ``request``.
 
-    Outside an admin router (where ``load_principal`` did not run) the grants are left out:
-    the principal is known by name and holds nothing, so it can only hold less.
+    Outside an admin router (where ``load_principal`` did not run) there is none: the
+    register is only looked up there, so nothing else may count as logged in.
     """
     loaded: Principal | None | bool = getattr(request.state, "admin_principal", False)
-    if loaded is not False:
-        return loaded if isinstance(loaded, Principal) else None
-    claims = _cookie_claims(request)
-    return Principal(claims.subject, claims.display_name) if claims is not None else None
+    return loaded if isinstance(loaded, Principal) else None
 
 
 async def _note_activity(request: Request, principal: Principal) -> None:
-    """Write the admin's "last seen" to the staff record, at most once per interval."""
-    clock: Clock = request.app.state.clock
-    seconds: int = request.app.state.settings.staff_last_seen_interval_seconds
-    if activity_due(request, clock.now(), timedelta(seconds=seconds)):
+    """Write the admin's "last seen" to the staff record when the session's was just written.
+
+    ``last_seen_at`` of the session is written at most once per interval (ADR 0098 point 4);
+    the staff record follows it, so both use the one setting.
+    """
+    if getattr(request.state, "admin_activity_written", False):
+        request.state.admin_activity_written = False
         await admin_service(request).record_seen(principal)
 
 

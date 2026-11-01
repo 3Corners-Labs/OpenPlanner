@@ -381,7 +381,9 @@ manage (directory groups or attributes users cannot edit themselves); a self-edi
 would let anyone grant themselves the superuser role.
 
 Roles are read at login and kept in the session for its lifetime (`ADMIN_SESSION_HOURS`,
-default 8). Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
+default 8). The session lives on the server (table `admin_sessions`, ADR 0098): logging out,
+a new login and `admin_idle_minutes` (default 60) end it at once, whatever copy of the cookie
+someone holds. After the release that introduced it everyone logs in once more. Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
 older sessions pass through PingFederate first, which refreshes the roles. A revoked role
 therefore stops granting changes within an hour; reading continues until the session ends.
 For an urgent revocation, rotate `SESSION_SECRET` (logs everyone out).

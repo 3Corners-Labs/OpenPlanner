@@ -66,6 +66,7 @@ from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
+from app.domain.admin_session_service import AdminSessionService
 from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
@@ -361,6 +362,7 @@ def create_app(
                 lambda: ship_settings(live()),
             ),
         )
+        app.state.admin_session_service = AdminSessionService(uow, clock)
         # ADR 0049: claims become grants per request; the mode is class B, the prefix C.
         app.state.login_service = LoginService(
             uow,
