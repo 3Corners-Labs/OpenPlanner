@@ -1,0 +1,7 @@
+{#- One error message next to what it is about. It takes focus on load (the first autofocus
+    in the page wins, so a page's error summary still comes first): after a refused form the
+    browser opens the page at the error instead of at the top, and a screen reader reads it.
+    Every error message uses this macro; tests/web/test_error_messages.py enforces it. -#}
+{% macro error_message(message, id="") -%}
+{%- if message %}<p class="error-message"{% if id %} id="{{ id }}"{% endif %} tabindex="-1" autofocus>{{ message }}</p>{% endif -%}
+{%- endmacro %}

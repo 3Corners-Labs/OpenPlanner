@@ -1,4 +1,5 @@
 {#- The inputs of an exception (add and change): the date, closed or own hours, the hours. -#}
+{% from "_error_message.html" import error_message %}
 {% from "admin/_fields.html" import field with context %}
 <div class="form-grid">
   {{ field(fields[0]) }}
@@ -6,7 +7,7 @@
     <legend>{{ _("admin.exceptions.kind") }}</legend>
     <div class="choice__option"><input type="radio" id="kind-closed" name="kind" value="closed"{% if kind == "closed" %} checked{% endif %}><label for="kind-closed">{{ _("admin.exceptions.kind_closed") }}</label></div>
     <div class="choice__option"><input type="radio" id="kind-hours" name="kind" value="hours"{% if kind == "hours" %} checked{% endif %}><label for="kind-hours">{{ _("admin.exceptions.kind_hours") }}</label></div>
-    {% if kind_error %}<p class="error-message">{{ kind_error }}</p>{% endif %}
+    {{ error_message(kind_error) }}
   </fieldset>
   {% for f in fields[1:] %}{{ field(f) }}{% endfor %}
 </div>

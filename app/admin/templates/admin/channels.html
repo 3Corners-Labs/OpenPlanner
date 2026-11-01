@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "_error_message.html" import error_message %}
 {% from "admin/_fields.html" import field, form_body with context %}
 {% block title %}{{ _("admin.channels.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
@@ -48,7 +49,7 @@
   </div>
   <p class="hint">{{ _("admin.channels.domain_hint") }}</p>
   {% endif %}
-  {% if domain_error %}<p class="error-message" id="domain_check-error">{{ domain_error }}</p>{% endif %}
+  {{ error_message(domain_error, "domain_check-error") }}
   <div class="form-actions">
     <button type="submit" class="button button--secondary" id="domain_check"{% if domain_error %} aria-describedby="domain_check-error"{% endif %}>{{ _("admin.channels.domain_check") }}</button>
   </div>

@@ -592,7 +592,7 @@ async def test_a_mismatched_or_short_passphrase_refuses_the_export(site: Site) -
 
     assert mismatch.status_code == 422
     assert short.status_code == 422
-    assert 'id="error-package"' in short.text
+    assert 'id="error-package" tabindex="-1" autofocus' in short.text  # opens at the error
     assert "minstens 16 tekens" in short.text
 
 
