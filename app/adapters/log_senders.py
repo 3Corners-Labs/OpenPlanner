@@ -333,14 +333,14 @@ class SyslogSender:
         datagrams = self._datagrams
         if datagrams is None:
             loop = asyncio.get_running_loop()
-            datagrams, _ = await asyncio.wait_for(
+            opened, _ = await asyncio.wait_for(
                 loop.create_datagram_endpoint(
                     asyncio.DatagramProtocol,
                     remote_addr=(self._address.host, self._address.port or 514),
                 ),
                 self._timeout(),
             )
-            self._datagrams = datagrams
+            datagrams = self._datagrams = opened
         for message in messages:
             datagrams.sendto(message)
 
