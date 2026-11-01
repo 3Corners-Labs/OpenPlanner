@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "_error_message.html" import error_message %}
 {% from "admin/_setting_form.html" import setting_row, setting_head with context %}
 {% block title %}{{ _("admin.settings.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
@@ -61,7 +62,7 @@
   <p>{{ _("admin.settings.tls.source.none_uploaded") }}</p>
   {% endif %}
   {% if source.editable %}
-  {% if source.errors.get("tls_certificate_source") %}<p class="error-message" id="error-tls_certificate_source">{{ source.errors.get("tls_certificate_source") }}</p>{% endif %}
+  {{ error_message(source.errors.get("tls_certificate_source"), "error-tls_certificate_source") }}
   <form method="post" action="/admin/settings/tls_certificate_source" novalidate class="setting-form" id="setting-tls_certificate_source">
     <label for="value-tls_certificate_source">{{ _("admin.settings.tls.source.choose") }}</label>
     <select id="value-tls_certificate_source" name="value"{% if source.errors.get("tls_certificate_source") %} aria-invalid="true" aria-describedby="error-tls_certificate_source"{% endif %}>
@@ -80,7 +81,7 @@
   <p><a href="/admin/settings/tls/csr.pem" download="openplanner.csr">{{ _("admin.settings.tls.source.csr_download") }}</a></p>
   {% endif %}
   <form method="post" action="/admin/settings/tls/csr" class="setting-form">
-    {% if source.errors.get("tls_csr") %}<p class="error-message" id="error-tls_csr">{{ source.errors.get("tls_csr") }}</p>{% endif %}
+    {{ error_message(source.errors.get("tls_csr"), "error-tls_csr") }}
     <button type="submit" class="button button--secondary button--small">{{ _("admin.settings.tls.source.csr_generate") }}</button>
   </form>
   <form method="post" action="/admin/settings/tls/certificate" enctype="multipart/form-data" novalidate aria-labelledby="tls-upload-heading">
@@ -88,13 +89,13 @@
     <p class="hint" id="tls-upload-hint">{{ _("admin.settings.tls.source.upload_hint") }}</p>
     <div class="field{% if source.errors.get("chain") %} field--error{% endif %}">
       <label for="tls-chain">{{ _("admin.settings.tls.source.chain_file") }}</label>
-      {% if source.errors.get("chain") %}<p class="error-message" id="error-tls-chain">{{ source.errors.get("chain") }}</p>{% endif %}
+      {{ error_message(source.errors.get("chain"), "error-tls-chain") }}
       <input id="tls-chain" name="chain" type="file" accept=".pem,.crt,.cer,application/x-pem-file" required aria-describedby="tls-upload-hint{% if source.errors.get("chain") %} error-tls-chain{% endif %}"{% if source.errors.get("chain") %} aria-invalid="true"{% endif %}>
     </div>
     <div class="field{% if source.errors.get("key") %} field--error{% endif %}">
       <label for="tls-key">{{ _("admin.settings.tls.source.key_file") }}</label>
       <p class="hint" id="tls-key-hint">{{ _("admin.settings.tls.source.key_hint") }}</p>
-      {% if source.errors.get("key") %}<p class="error-message" id="error-tls-key">{{ source.errors.get("key") }}</p>{% endif %}
+      {{ error_message(source.errors.get("key"), "error-tls-key") }}
       <input id="tls-key" name="key" type="file" accept=".pem,.key,application/x-pem-file" aria-describedby="tls-key-hint{% if source.errors.get("key") %} error-tls-key{% endif %}"{% if source.errors.get("key") %} aria-invalid="true"{% endif %}>
     </div>
     <div class="form-actions">
@@ -103,7 +104,7 @@
   </form>
   {% if source.uploaded %}
   <form method="post" action="/admin/settings/tls/certificate/remove" class="setting-form">
-    {% if source.errors.get("tls_certificate") %}<p class="error-message" id="error-tls_certificate">{{ source.errors.get("tls_certificate") }}</p>{% endif %}
+    {{ error_message(source.errors.get("tls_certificate"), "error-tls_certificate") }}
     {% if source.removable %}
     <button type="submit" class="button button--secondary button--small">{{ _("admin.settings.tls.source.remove") }}</button>
     {% else %}
@@ -183,7 +184,7 @@
   {% for field in login_form %}
   <div class="field{% if field.error %} field--error{% endif %}">
     <label for="login-{{ field.key }}">{{ field.label }}</label>
-    {% if field.error %}<p class="error-message" id="error-login-{{ field.key }}">{{ field.error }}</p>{% endif %}
+    {{ error_message(field.error, "error-login-" ~ field.key) }}
     <input id="login-{{ field.key }}" name="{{ field.key }}" type="text" value="{{ field.value }}" autocomplete="off"{% if field.error %} aria-invalid="true" aria-describedby="error-login-{{ field.key }}"{% endif %}>
   </div>
   {% endfor %}
@@ -195,7 +196,7 @@
   <h2 id="package-heading">{{ _("admin.settings.package.title") }}</h2>
   <p>{{ _("admin.settings.package.intro") }}</p>
   <p class="hint">{{ _("admin.settings.package.warning") }}</p>
-  {% if package.error %}<p class="error-message" id="error-package" role="alert">{{ package.error }}</p>{% endif %}
+  {{ error_message(package.error, "error-package") }}
   <h3 id="package-export-heading">{{ _("admin.settings.package.export.title") }}</h3>
   <form method="post" action="/admin/settings/package/export" novalidate aria-labelledby="package-export-heading">
     <p class="hint" id="package-passphrase-hint">{{ _("admin.settings.package.passphrase_hint", length=package.min_length) }}</p>
