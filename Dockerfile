@@ -5,7 +5,7 @@ FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
 
 # The <gov-booking> Web Component (ADR 0035): bundled by esbuild here, never committed. Only
 # the bundle reaches the runtime image; node and node_modules stay in this stage.
-FROM node:22.20.0-bookworm-slim AS widget
+FROM node:26.13.0-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9 AS widget
 WORKDIR /widget
 COPY widget/package.json widget/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
