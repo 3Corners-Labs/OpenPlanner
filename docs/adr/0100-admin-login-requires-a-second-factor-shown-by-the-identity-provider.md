@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-01), requested by the product owner after the question about MFA,
 step-up and four-eyes during ADR 0095. Refines ADR 0013 (OIDC) and ADR 0090 (bundled identity
-provider). Built in PR #TBD; see *Build status*.
+provider). Built in PR #357; see *Build status*.
 
 ## Context
 
@@ -64,8 +64,8 @@ of RFC 8176, not a tunable.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 2 | Self-service reset and re-onboarding limited to the active domain suffix; realm SMTP | | follow-up |
-| 1 | `app/domain/mfa.py`, `acr_values` and the check in `app/adapters/oidc.py`, the two settings, login message, Keycloak realm flow, runbook, threat model, manual | #TBD | in PR |
+| 2 | Self-service reset limited to the active domain suffix; realm SMTP | | follow-up |
+| 1 | `app/domain/mfa.py`, `acr_values` and the check in `app/adapters/oidc.py`, the two settings, login message, Keycloak realm flow, runbook, threat model, manual | #357 | in PR |
 
 ## Consequences
 
