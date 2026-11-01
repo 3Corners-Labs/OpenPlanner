@@ -479,3 +479,30 @@ async def test_tls_check_of_another_host_reports_the_certificate_and_stores_noth
         assert await CertificateStatus(SqlUnitOfWork(engine)).latest() is None
     finally:
         await engine.dispose()
+
+
+async def test_purge_overdue_counts_per_group_and_purges(migrated: Settings) -> None:
+    from app.cli import _purge_overdue
+    from app.domain.services import BookingService
+    from tests.adapters.db.conftest import seed_group
+    from tests.fakes.clock import FixedClock
+    from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book
+
+    engine = create_engine(migrated.database_url)
+    try:
+        await seed_group(engine, slug="aangifte")
+        await book(
+            BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900
+        )
+    finally:
+        await engine.dispose()
+
+    dry, dry_ok = await _purge_overdue(migrated, dry_run=True)
+    real, real_ok = await _purge_overdue(migrated)
+    again, _ = await _purge_overdue(migrated)
+
+    assert dry_ok
+    assert dry == "aangifte: 1 overdue\n1 bookings overdue (1 for over 48 hours)\n"
+    assert real_ok
+    assert real.endswith("purged 1 of 1 overdue bookings (0 failed, 1 were over 48 hours)\n")
+    assert again.startswith("purged 0 of 0")
