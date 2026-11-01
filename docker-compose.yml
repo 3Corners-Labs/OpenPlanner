@@ -156,6 +156,36 @@ services:
       - "127.0.0.1:8080:8080"
     logging: *logging
 
+  # The bundled identity provider of a test or lab installation (ADR 0090,
+  # `docker compose --profile idp up -d`): the same Keycloak as `dev`, with a realm rendered by
+  # scripts/render-keycloak-realm.sh from deploy/keycloak/realm.template.json with generated
+  # secrets (secrets/keycloak.env: the admin console password, the client secret and the first
+  # password of `super`). Bound to the host's loopback: the admin console is reached on the host
+  # only; making the login reachable from elsewhere is the proxy's work (ADR 0090 step 2).
+  idp:
+    image: quay.io/keycloak/keycloak:26.8.1
+    profiles: [idp]
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    env_file:
+      # KC_BOOTSTRAP_ADMIN_PASSWORD, KC_HOSTNAME and the values the realm was rendered with.
+      - path: secrets/keycloak.env
+        required: false
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      # Browsers use KC_HOSTNAME (secrets/keycloak.env); the web container reaches it as idp:8080.
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./secrets/keycloak-realm.json:/opt/keycloak/data/import/openplanner-realm.json:ro
+      # Staff accounts and their passwords live here (the DPIA input, docs/dataflow.md): back it
+      # up with the database volume, never copy it off the host. The whole data directory, not
+      # its h2 subdirectory: the image owns this one, so the volume starts with its ownership.
+      - idp-data:/opt/keycloak/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    logging: *logging
+
 networks:
   # Between the TLS proxy and web. Fixed so web can trust exactly the proxy's address.
   edge:
@@ -169,3 +199,4 @@ volumes:
   data:
   proxy-data:
   portal-certs:
+  idp-data:

@@ -161,7 +161,7 @@ def test_an_asset_on_another_channel_fails() -> None:
 
 
 def test_queue_naming_rule_matches_name_parts() -> None:
-    assert names_match("aangifte", "FIN-BLD_videoafspraak_aangifte_01")
+    assert names_match("aangifte", "ORG_videoafspraak_aangifte_01")
     assert names_match("video-afspraak", "Video_Afspraak")
     assert not names_match("aangifte", "aangiftes_video")
     assert not names_match("", "anything")
