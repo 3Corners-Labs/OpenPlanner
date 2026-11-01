@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import MeetingRef
 from app.domain.calls import BookingEvent, CallState, EventKind, TaskState, apply_event, new_status
+from app.domain.job_plan import JobType
 from app.domain.scheduling import Offer
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
@@ -179,3 +180,19 @@ async def test_direct_calls_are_listed_with_their_status_and_cap(engine: AsyncEn
     assert later == []
     assert stored is not None
     assert stored.direct_call_max_concurrent == 3
+
+
+async def test_a_booking_job_is_claimed_once_and_settled(engine: AsyncEngine) -> None:
+    booking_id = await _booking_id(engine)
+    uow = SqlUnitOfWork(engine)
+    job_type = JobType.SEND_CONFIRMATION  # planned by the booking itself
+
+    async with uow.locked() as tx:
+        first = await tx.claim_booking_job(booking_id, job_type, NOW)
+        second = await tx.claim_booking_job(booking_id, job_type, NOW)
+        await tx.finish_booking_job(booking_id, job_type, done=False)
+        again = await tx.claim_booking_job(booking_id, job_type, NOW)
+        await tx.finish_booking_job(booking_id, job_type, done=True)
+        after = await tx.claim_booking_job(booking_id, job_type, NOW)
+
+    assert (first, second, again, after) == (True, False, True, False)
