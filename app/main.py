@@ -23,6 +23,7 @@ from app.adapters.db.configuration_package import (
 )
 from app.adapters.db.engine import create_engine, set_slow_query_ms
 from app.adapters.db.identity_providers import ProviderCredentialStore
+from app.adapters.db.log_destinations import LogDestinationCredentialStore
 from app.adapters.db.probes import ProbeReports
 from app.adapters.db.reports import ReportStore
 from app.adapters.db.text_overrides import CachedTextOverrides
@@ -38,6 +39,8 @@ from app.adapters.integrations import (
     webex_fingerprint,
 )
 from app.adapters.live_settings import LiveSettings, keep_current
+from app.adapters.log_senders import build_sender
+from app.adapters.log_shipping import LogShipper, ship_settings
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
@@ -122,7 +125,7 @@ from app.keys import (
     management_token_key,
     session_secret,
 )
-from app.logging import configure_logging, set_log_level, warn_loose_secret_files
+from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
@@ -313,6 +316,19 @@ def create_app(
         )
         await app.state.live_settings.refresh()
         reloader = asyncio.create_task(keep_current(app.state.live_settings))
+        # ADR 0085: copies of the log lines go to the destinations the superuser configured.
+        shipper = LogShipper(
+            LogDestinationCredentialStore(app.state.engine, secret_box(settings)),
+            build_sender,
+            uow,
+            clock,
+            "web",
+            lambda: ship_settings(live()),
+            window=lambda: timedelta(minutes=live().security_event_window_minutes),
+        )
+        shipping_stop = asyncio.Event()
+        shipping = asyncio.create_task(shipper.run(shipping_stop))
+        set_line_tap(shipper.offer)
         app.state.security_log = SecurityLog(
             uow,
             clock,
@@ -567,6 +583,9 @@ def create_app(
         try:
             yield
         finally:
+            set_line_tap(None)
+            shipping_stop.set()
+            await shipping
             reloader.cancel()
             with suppress(asyncio.CancelledError):
                 await reloader
