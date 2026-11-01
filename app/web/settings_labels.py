@@ -60,6 +60,8 @@ SETTING_LABELS: dict[str, str] = {
     "rate_limit_agent_calls": "settings.field.rate_limit_agent_calls.label",
     "admin_session_hours": "settings.field.admin_session_hours.label",
     "admin_reauth_minutes": "settings.field.admin_reauth_minutes.label",
+    "admin_idle_minutes": "settings.field.admin_idle_minutes.label",
+    "admin_max_sessions_per_person": "settings.field.admin_max_sessions_per_person.label",
     "oidc_role_claim": "settings.field.oidc_role_claim.label",
     "oidc_organisation_claim": "settings.field.oidc_organisation_claim.label",
     "oidc_group_claim": "settings.field.oidc_group_claim.label",

@@ -1,6 +1,9 @@
 # 0002. Runtime layout of the skeleton
 
 Status: accepted (2026-10-23) Partly built, checked on 2026-10-30; see `docs/adr-status.md` for what is built.
+Note (2026-11-01 review): §6: the Referrer-Policy is `same-origin`, not `no-referrer` (reason in
+`app/api/security_headers.py`; ADR 0093). §7 (actions pinned by tag) superseded by ADR 0051
+(`<sha> # vX.Y.Z`).
 
 ## Context
 

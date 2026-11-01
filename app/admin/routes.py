@@ -49,6 +49,7 @@ from app.admin import (
     holiday_routes,
     idp_mapping_routes,
     idp_routes,
+    logging_routes,
     maintenance_routes,
     message_routes,
     organisation_routes,
@@ -78,7 +79,9 @@ from app.admin.authz import (
     load_principal,
     login_service,
     role_service,
+    session_policy,
     session_principal,
+    session_service,
 )
 from app.admin.forms import safe_next
 from app.admin.idp_mapping_routes import reason_label
@@ -267,7 +270,9 @@ async def callback(
         text = LOGIN_REFUSED_TEXTS.get(refused.reason, "admin.login_failed.text")
         return _message(request, locale, 403, "admin.login_failed.title", text)
     principal = outcome.principal
-    start_session(request, outcome.session_claims, _clock(request).now())
+    await start_session(
+        request, session_service(request), outcome.session_claims, key, session_policy(request)
+    )
     log.info("admin.login", actor=principal.subject, roles=role_keys(principal))
     if trial is not None and tried is not None:
         prefix = trial[1].get("oidc_entitlement_prefix", "")
@@ -346,7 +351,7 @@ async def _finish_login_trial(
 async def logout(request: Request, locale: Locale, _: SameOrigin) -> Response:
     """End the admin session here and at the identity provider (no silent re-login)."""
     principal = session_principal(request)
-    end_session(request)
+    await end_session(request, session_service(request))
     if principal is not None:
         await admin_service(request).record_logout(principal)
     logged_out = f"{request.app.state.settings.public_base_url.rstrip('/')}/admin/logged-out"
@@ -647,6 +652,7 @@ def register_admin(app: FastAPI) -> None:
         holiday_routes.router,
         idp_mapping_routes.router,
         idp_routes.router,
+        logging_routes.router,
         channel_routes.router,
         message_routes.router,
         organisation_routes.router,

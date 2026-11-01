@@ -1,6 +1,10 @@
 # 0030. HTTPS with free, automatically renewed certificates from a public CA
 
 Status: accepted (2026-10-26), requested by the product owner.
+§7 (opt-in profile) superseded by ADR 0064 §1 (HTTPS is the standard shape); the per-host Caddy
+build of §3 replaced by the signed proxy image of ADR 0064 §5; the expiry monitoring of the
+Consequences by the worker probe of ADR 0064 §3. Certificate source extended by ADR 0070;
+standards in ADR 0086; amended by ADR 0091 (encrypted hops).
 
 ## Context
 

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Protocol
 
+from app.domain.admin_sessions import AdminSession, EndReason
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
@@ -679,6 +680,26 @@ class Transaction(Protocol):
 
     async def save_staff(self, member: StaffMember) -> None:
         """Create or replace the staff record of ``member.subject`` and its memberships."""
+        ...
+
+    async def add_admin_session(self, session: AdminSession) -> None:
+        """Store a new admin session (ADR 0098); only the hash of its reference is kept."""
+        ...
+
+    async def get_admin_session(self, id_hash: str) -> AdminSession | None:
+        """Return the session with this reference hash, ended or not, or ``None``."""
+        ...
+
+    async def active_admin_sessions_of(self, subject: str) -> list[AdminSession]:
+        """Return the sessions of ``subject`` that have not ended, oldest ``last_seen_at`` first."""
+        ...
+
+    async def end_admin_session(self, id_hash: str, reason: EndReason, at: datetime) -> bool:
+        """End a live session; return whether one was ended (unknown or ended: ``False``)."""
+        ...
+
+    async def touch_admin_session(self, id_hash: str, at: datetime) -> None:
+        """Write the latest activity of a live session."""
         ...
 
     async def set_staff_seen(self, subject: str, at: datetime) -> None:

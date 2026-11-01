@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "_error_message.html" import error_message %}
 {% from "admin/_filters.html" import filter_select with context %}
 {% block title %}{{ _("admin.audit.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
@@ -74,7 +75,7 @@
   </div>
   {% if can("audit.export") %}<p><a href="/admin/audit/export.csv{% if filters.query %}?{{ filters.query }}{% endif %}" download>{{ _("admin.audit.export") }}</a></p>{% endif %}
 </form>
-{% if export_error %}<p class="error-message" role="alert">{{ export_error }}</p>{% endif %}
+{{ error_message(export_error) }}
 {% if events %}
 {% set caption = _("admin.audit.title") %}{% include "admin/_audit_table.html" %}
 {% else %}

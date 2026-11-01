@@ -19,6 +19,7 @@ from tests.fakes.dns import FakeTxtResolver
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.identity_providers import FakeDiscoveryFetcher, FakeSigningKeys
 from tests.fakes.integrations import FakeVideo
+from tests.fakes.log_destinations import FakeFactory
 from tests.fakes.staff_directory import FakeStaffDirectory
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
@@ -71,6 +72,7 @@ class Site:
         discovery: FakeDiscoveryFetcher | None = None,
         providers: FakeOrganisationProviders | None = None,
         directory: FakeStaffDirectory | None = None,
+        log_senders: FakeFactory | None = None,
     ):
         self.client = client
         self.idp = idp
@@ -82,6 +84,8 @@ class Site:
         """The adapters of the registered organisation providers, for the test login."""
         self.directory = directory
         """The staff directory of the bundled provider, when the test has one (ADR 0095)."""
+        self.log_senders = log_senders or FakeFactory()
+        """The senders the log destinations deliver through (ADR 0085): fakes, no network."""
 
     async def login_as(self, principal: Principal) -> httpx.Response:
         """Log in as ``principal`` through the legacy claims that resolve to it."""
@@ -113,6 +117,7 @@ async def _running_site(
     await engine.dispose()
     idp, clock, dns = FakeIdentityProvider(), FixedClock(NOW), FakeTxtResolver()
     discovery, providers = FakeDiscoveryFetcher(), FakeOrganisationProviders()
+    log_senders = FakeFactory()
     app = create_app(
         settings.model_copy(update={"database_url": admin_db}),
         clock,
@@ -123,6 +128,7 @@ async def _running_site(
         signing_keys=FakeSigningKeys(),
         organisation_providers=providers,  # type: ignore[arg-type]
         staff_directory=directory,
+        log_sender_factory=log_senders,
     )
     async with (
         app.router.lifespan_context(app),
@@ -130,7 +136,7 @@ async def _running_site(
             transport=httpx.ASGITransport(app=app), base_url="http://testserver"
         ) as client,
     ):
-        yield Site(client, idp, clock, dns, discovery, providers, directory)
+        yield Site(client, idp, clock, dns, discovery, providers, directory, log_senders)
 
 
 @pytest.fixture

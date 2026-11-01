@@ -76,4 +76,5 @@ logins, logouts and changes, within your own organisations or groups.
 - **Last active**: the last time the person opened a page. Updated at most once every five
   minutes.
 - **Last logout**: the last time the person clicked **Log out**. A session that expires on
-  its own (after 8 hours) does not count as a logout.
+  its own (after 8 hours) does not count as a logout. The same goes for a session that ends because it was idle
+  for too long (60 minutes by default) or because a newer login replaced it.

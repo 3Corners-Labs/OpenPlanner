@@ -114,6 +114,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `RATE_LIMIT_AGENT_CALLS` | rate | `120/minute` | 10–600 per minute | `settings.platform.manage` | Machine API calls per client. |
 | `ADMIN_SESSION_HOURS` | int | `8` | 1–8 | `settings.platform.manage` | Lifetime of an admin session. |
 | `ADMIN_REAUTH_MINUTES` | int | `60` | 5–60 | `settings.platform.manage` | Maximum login age for a change (ADR 0015). |
+| `ADMIN_IDLE_MINUTES` | int | `60` | 15–120 | `settings.platform.manage` | Idle time after which an admin session ends (ADR 0098). |
+| `ADMIN_MAX_SESSIONS_PER_PERSON` | int | `5` | 1–20 | `settings.platform.manage` | Admin sessions one person may hold at once; the one idle longest lapses (ADR 0098). |
 | `OIDC_ROLE_CLAIM` | string | `roles` | — | `settings.login.manage` | Claim holding the roles. |
 | `OIDC_ORGANISATION_CLAIM` | string | `organisations` | — | `settings.login.manage` | Claim holding the organisations. |
 | `OIDC_GROUP_CLAIM` | string | `groups` | — | `settings.login.manage` | Claim holding the groups. |

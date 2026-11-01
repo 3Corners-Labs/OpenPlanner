@@ -41,7 +41,7 @@ from app.adapters.integrations import (
 from app.adapters.keycloak_directory import KeycloakDirectory
 from app.adapters.live_settings import LiveSettings, keep_current
 from app.adapters.log_senders import build_sender
-from app.adapters.log_shipping import LogShipper, ship_settings
+from app.adapters.log_shipping import LogShipper, LogTester, SenderFactory, ship_settings
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
@@ -67,6 +67,7 @@ from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
+from app.domain.admin_session_service import AdminSessionService
 from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
@@ -88,6 +89,7 @@ from app.domain.identity_provider_service import IdentityProviderService
 from app.domain.idp_mapping import IdpMappingService, MappingSettings
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
+from app.domain.log_destination_service import LogDestinationService
 from app.domain.login_service import ClaimSettings, LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.meeting_status_service import MeetingStatusService
@@ -203,6 +205,7 @@ def create_app(
     signing_keys: SigningKeys | None = None,
     organisation_providers: OrganisationProviders | None = None,
     staff_directory: StaffDirectory | None = None,
+    log_sender_factory: SenderFactory | None = None,
 ) -> FastAPI:
     """Build the application.
 
@@ -224,6 +227,8 @@ def create_app(
             defaults to one built from the database.
         staff_directory: Explicit staff directory (tests); defaults to the bundled Keycloak's
             admin API when ``KEYCLOAK_ADMIN_URL`` is set, else none (ADR 0095).
+        log_sender_factory: Explicit builder of the log destination senders (tests); defaults
+            to the real syslog, Splunk, Elastic and HTTP adapters.
 
     Returns:
         The FastAPI app with translator, booking service, rate limits and error pages. Its
@@ -338,7 +343,7 @@ def create_app(
         # ADR 0085: copies of the log lines go to the destinations the superuser configured.
         shipper = LogShipper(
             LogDestinationCredentialStore(app.state.engine, secret_box(settings)),
-            build_sender,
+            log_sender_factory or build_sender,
             uow,
             clock,
             "web",
@@ -362,6 +367,20 @@ def create_app(
             confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
         )
         app.state.admin_service = AdminService(uow, clock)
+        app.state.log_destination_service = LogDestinationService(
+            uow,
+            clock,
+            app.state.admin_service,
+            production=settings.environment == "prod",
+            tester=LogTester(
+                LogDestinationCredentialStore(app.state.engine, secret_box(settings)),
+                log_sender_factory or build_sender,
+                clock,
+                "web",
+                lambda: ship_settings(live()),
+            ),
+        )
+        app.state.admin_session_service = AdminSessionService(uow, clock)
         # ADR 0049: claims become grants per request; the mode is class B, the prefix C.
         app.state.login_service = LoginService(
             uow,

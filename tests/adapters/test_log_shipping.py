@@ -274,7 +274,7 @@ async def test_delivery_runs_in_the_background_and_a_failure_is_one_event_then_o
     sender.failures = [Reason.TLS, Reason.TLS]
 
     env.shipper.offer(line("a", "error"))
-    # The recovery event follows the delivery: wait for both, not only for the line.
+    # The recovery event is recorded just after the line is delivered: wait for both.
     for _ in range(300):
         await asyncio.sleep(0.01)
         if sender.lines and len(env.events()) >= 2:

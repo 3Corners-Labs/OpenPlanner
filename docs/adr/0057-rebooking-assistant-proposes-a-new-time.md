@@ -3,6 +3,8 @@
 Status: accepted (2026-10-30), requested by the product owner, with the choices recorded under *Choices
 made on acceptance*. Extends ADR 0044 (planner agenda, shortfalls, actions on bookings) and
 reuses the pending-confirmation mechanism of ADR 0056. Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
+Note (2026-11-01 review): §8 sends SMS "when the citizen consented", but there is no SMS
+consent: SMS goes when a phone number is known (ADR 0009, `app/domain/channels.py`).
 
 ## Context
 

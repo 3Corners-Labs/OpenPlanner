@@ -4,6 +4,7 @@ Status: accepted (2026-10-30), requested by the product owner; step 1 (decisions
 step 2 (decision 5) built 2026-10-30. Extends ADR 0030 (HTTPS with ACME certificates) and
 ADR 0050 (host installer); builds on ADR 0038 (system events from the worker), ADR 0042 §11
 (System status), ADR 0006 (signed images) and ADR 0029 (host updater). Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
+Amended by ADR 0092 (uploads) and ADR 0091 (encrypted hops); extended by ADR 0070 and ADR 0086.
 
 ## Context
 

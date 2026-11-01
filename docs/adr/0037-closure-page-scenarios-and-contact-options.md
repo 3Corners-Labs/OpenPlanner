@@ -2,6 +2,7 @@
 
 Status: accepted (2026-10-27), decided by the product owner. Extends ADR 0024 (emergency
 closure); everything there that this record does not change still holds.
+Uploads amended by ADR 0092.
 
 ## Context
 

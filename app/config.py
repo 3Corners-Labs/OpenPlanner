@@ -296,6 +296,10 @@ class Settings(BaseSettings):
     # A change needs a login of at most this age; older sessions are sent to the IdP first,
     # which refreshes the roles (invisible with an active SSO session).
     admin_reauth_minutes: int = 60
+    # ADR 0098: the server-side session ends after this many idle minutes, and a person holds at
+    # most this many sessions at once (the one idle longest lapses). Class C, platform.
+    admin_idle_minutes: int = Field(default=60, ge=15, le=120)
+    admin_max_sessions_per_person: int = Field(default=5, ge=1, le=20)
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)

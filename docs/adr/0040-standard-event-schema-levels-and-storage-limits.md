@@ -4,8 +4,11 @@ Status: accepted (2026-10-27), requested by the product owner. Part 1 (storage l
 implemented with this ADR; parts 2 (one event schema), 3 (filters and CSV export) and 4
 (diagnostic mode and retention per category) on 2026-10-28 and 29. The product owner set the
 admin-action term to 2 years and made diagnostic mode the superuser's on 2026-10-29.
-Extends ADR 0031 (audit log per level) and replaces the field list of ADR 0034 (still proposed)
-before it is built.
+Extends ADR 0031 (audit log per level) and replaces the field list of ADR 0034 (proposed at the
+time, since accepted) before it is built.
+§7 extended by ADR 0085 §8 (`TRACE` below `debug`). Schema bumped to `openplanner.event/2` by
+ADR 0065. Part 4 is the single home for retention per category: it supersedes ADR 0031 §5 for
+admin actions, and ADR 0068 §2 adds a separate retention for request events.
 
 ## Context
 

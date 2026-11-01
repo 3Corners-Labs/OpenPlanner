@@ -1,6 +1,8 @@
 # 0020. Citizen calendar as progressive enhancement; branding through tokens
 
 Status: accepted (2026-10-25)
+§4–5 extended by ADR 0041 (contrast rules across tokens in ADR 0041 §3). Uploads amended by
+ADR 0092.
 
 ## Context
 

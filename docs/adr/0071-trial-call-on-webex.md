@@ -2,7 +2,10 @@
 
 Status: accepted (2026-10-30), requested by the product owner. Extends ADR 0017 (video through
 the Webex Meetings API). Settings per ADR 0042. Touches open point O8 (accessibility of the
-video call).
+video call). Note (2026-11-01 review): the test site ignores `TRIAL_OPTIONS` (ADR 0075 finding
+5), so there the citizen waits in the lobby and nobody comes; the group check warns
+`webex.trial_lobby` (ADR 0075 §5, #171). Whether the production site allows entry before the
+host is open on the go-live checklist.
 
 ## Context
 
