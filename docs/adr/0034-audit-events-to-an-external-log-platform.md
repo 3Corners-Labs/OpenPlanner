@@ -4,9 +4,9 @@ Status: accepted (2026-10-28) by the product owner, with the choices recorded un
 *Acceptance* below. Extends ADR 0031 (audit log per level, with system events). The field list
 of point 2 is replaced by `openplanner.event/1` of ADR 0040, part 2.
 Point 4 (shipping is the host's job only) amended by ADR 0085 part 1 (log destinations in the
-portal). The event schema is `openplanner.event/2` since ADR 0065. ADR 0085 §10 lets diagnostic
-events leave per destination that opts in; that is an assumption awaiting the product owner's
-confirmation.
+portal). The event schema is `openplanner.event/2` since ADR 0065. Acceptance ("diagnostic events never
+leave the installation") amended by ADR 0085 §10, confirmed by the product owner on 2026-11-01:
+never, unless the superuser switches it on per destination, audited.
 
 ## Context
 
