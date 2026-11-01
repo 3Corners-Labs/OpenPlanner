@@ -3179,6 +3179,9 @@ msgstr "API-koppelingen beheren"
 msgid "authz.api_scope.availability_read"
 msgstr "Vrije tijden lezen"
 
+msgid "authz.api_scope.configuration_transfer"
+msgstr "Configuratiepakket exporteren en importeren (hele installatie)"
+
 msgid "admin.nav.api"
 msgstr "API-koppelingen"
 
@@ -6100,6 +6103,21 @@ msgstr "Logniveau TRACE valt terug na hooguit (uren)"
 msgid "settings.field.sql_slow_ms.label"
 msgstr "Traceer een databaseopdracht trager dan (milliseconden)"
 
+msgid "settings.field.log_ship_batch_size.label"
+msgstr "Regels per levering aan een logbestemming (hooguit)"
+
+msgid "settings.field.log_ship_flush_seconds.label"
+msgstr "Seconden dat een logbestemming wacht om een levering te vullen"
+
+msgid "settings.field.log_ship_timeout_seconds.label"
+msgstr "Seconden die een levering aan een logbestemming mag duren"
+
+msgid "settings.field.log_ship_queue_size.label"
+msgstr "Regels per logbestemming en proces in de wachtrij"
+
+msgid "settings.field.log_ship_backoff_max_seconds.label"
+msgstr "Langste wachttijd tussen pogingen bij een falende logbestemming (seconden)"
+
 msgid "settings.field.security_event_window_minutes.label"
 msgstr "Venster voor beveiligingsgebeurtenissen (minuten)"
 
@@ -8035,6 +8053,12 @@ msgstr "Identity providers van de organisatie bekijken"
 msgid "authz.permission.identity_providers_manage"
 msgstr "Identity providers registreren en wijzigen"
 
+msgid "authz.permission.logging_view"
+msgstr "De logbestemmingen en hun status bekijken"
+
+msgid "authz.permission.logging_manage"
+msgstr "Logbestemmingen maken, wijzigen, testen en verwijderen"
+
 msgid "settings.field.idp_max_per_organisation.label"
 msgstr "Identity providers per organisatie (maximum)"
 
@@ -8064,6 +8088,15 @@ msgstr "Vul een claimnaam in: letters, cijfers, punt, streepje of laag streepje,
 
 msgid "admin.form.error.entitlement_prefix"
 msgstr "Vul een prefix in van 2 tot 31 kleine letters, cijfers of streepjes, beginnend met een letter."
+
+msgid "admin.form.error.log_destination_invalid"
+msgstr "Controleer dit veld: de waarde is niet toegestaan voor dit soort logbestemming."
+
+msgid "admin.form.error.log_destination_insecure"
+msgstr "Deze installatie draait in productie: gebruik https of syslog over TLS."
+
+msgid "admin.form.error.log_destination_name_taken"
+msgstr "Een andere logbestemming heeft deze naam al."
 
 msgid "admin.form.error.identity_provider_limit"
 msgstr "Deze organisatie heeft het maximum aantal identity providers bereikt. Verwijder er eerst een, of verhoog het maximum bij Geavanceerde instellingen."

@@ -34,6 +34,8 @@ stays open to every role as usual.
 | Change platform settings (`settings.platform.manage`) | Portal | locked | yes | – | – | – | – |
 | Change the login mapping (claims and roles) (`settings.login.manage`) | Portal | locked | yes | – | – | – | – |
 | Register and change identity providers (`identity_providers.manage`) | Portal | locked | yes | – | – | – | – |
+| See the log destinations and their status (`logging.view`) | Portal | – | yes | – | – | yes | – |
+| Create, change, test and delete log destinations (`logging.manage`) | Portal | locked | yes | – | – | – | – |
 | View an organisation (`organisation.view`) | Organisation | – | yes | yes | – | yes | – |
 | Manage integrations and secrets (`integrations.manage`) | Organisation | locked, maintenance | yes | – | – | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | – | yes | – | – | – | – |
@@ -73,9 +75,9 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 
 | Template | Reach | Delegable permissions |
 |---|---|---|
-| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.delete`, `group.edit`, `group.view`, `holidays.assign`, `identity_providers.view`, `idp_mapping.manage`, `idp_mapping.view`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
-| Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `matrix.view`, `queue.work`, `reminders.manage`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
-| Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `identity_providers.view`, `idp_mapping.view`, `matrix.view`, `organisation.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.delete`, `group.edit`, `group.view`, `holidays.assign`, `identity_providers.view`, `idp_mapping.manage`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
+| Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `logging.view`, `matrix.view`, `queue.work`, `reminders.manage`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
+| Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `identity_providers.view`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
 
 ## Participants
 
@@ -100,3 +102,4 @@ the scopes below. There is no superuser equivalent for machines.
 | Scope | Level |
 |---|---|
 | Read free times (`availability:read`) | Group |
+| Export and import the configuration package (whole installation) (`configuration:transfer`) | Portal |

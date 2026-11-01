@@ -81,6 +81,22 @@ def test_every_table_of_the_model_is_configuration_or_state() -> None:
     assert VERSION_TABLE not in tables
 
 
+def test_every_sealed_column_of_a_configuration_table_is_resealed() -> None:
+    from app.adapters.db.configuration_package import _SEALED
+
+    sealed = {
+        (table.name, column.name)
+        for table in Base.metadata.sorted_tables
+        if table.name in CONFIGURATION_TABLES
+        for column in table.columns
+        if column.name.endswith("ciphertext")
+    }
+
+    assert sealed == {(table, cipher) for table, _, cipher, _ in _SEALED}, (
+        "a sealed column needs an entry in _SEALED, or its secret is unreadable after an import"
+    )
+
+
 async def test_export_keeps_configuration_and_drops_state(
     engine: AsyncEngine, database_url: str, tmp_path: Path
 ) -> None:

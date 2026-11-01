@@ -22,6 +22,17 @@ MIN_PASSPHRASE_LENGTH = 16
 MEDIA_TYPE = "application/vnd.sqlite3"
 """The media type of a package: a SQLite file."""
 
+PACKAGE_FILENAME = "openplanner-configuration-{installation}-{date}.sqlite"
+"""The download name of an exported package, in the portal and over the API."""
+
+
+def package_filename(installation: str, exported_at: datetime) -> str:
+    """Return the download name of a package exported on ``exported_at``."""
+    return PACKAGE_FILENAME.format(
+        installation=installation or "openplanner", date=exported_at.strftime("%Y%m%d")
+    )
+
+
 VERSION_TABLE = "alembic_version"
 """The schema revision, kept in the package so it can be checked (and later migrated)."""
 
@@ -44,6 +55,7 @@ CONFIGURATION_TABLES = frozenset(
         "identity_provider_keys",
         "identity_providers",
         "integration_credentials",
+        "log_destinations",
         "organisation_contacts",
         "organisation_fonts",
         "organisation_holiday_calendars",
@@ -75,6 +87,7 @@ STATE_TABLES = frozenset(
         "diagnostic_modes",
         "integration_reports",
         "jobs",
+        "log_destination_status",
         "maintenance_state",
         "own_certificates",
         "release_checks",

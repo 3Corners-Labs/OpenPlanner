@@ -395,6 +395,30 @@ async def test_calls_stay_inside_the_grant(
     assert missing.value.code is ErrorCode.GROUP_NOT_FOUND
 
 
+async def test_a_global_scope_is_decided_on_the_whole_installation(
+    service: ApiAccessService, uow: InMemoryUnitOfWork
+) -> None:
+    # ADR 0089 point 7: `configuration:transfer` has no group; the matrix decides it on
+    # everything, and a client without it is refused and audited under its own organisation.
+    transfer = ApiScope.CONFIGURATION_TRANSFER
+    allowed = await caller_for(service, scopes=["configuration:transfer"], groups=["demo"])
+    reader = await caller_for(service)
+
+    await service.require_scope(allowed, transfer)
+
+    with pytest.raises(DomainError) as caught:
+        await service.require_scope(reader, transfer)
+    assert caught.value.code is ErrorCode.NOT_PERMITTED
+    event = uow.state.audit[-1]
+    assert (event.actor, event.action, event.outcome, event.reason, event.organisation) == (
+        reader.client.client_id,
+        "configuration:transfer",
+        Outcome.DENIED,
+        "not_permitted",
+        "demo",
+    )
+
+
 async def test_a_token_without_the_scope_reaches_nothing(
     service: ApiAccessService, uow: InMemoryUnitOfWork
 ) -> None:
