@@ -67,6 +67,9 @@ _CHANGEABLE = (
     "scopes",
     "entitlement_claim",
     "entitlement_prefix",
+    "mfa_policy",
+    "mfa_amr_values",
+    "mfa_acr_values",
 )
 """The fields of a draft an update may change; the key is fixed after creation."""
 
@@ -216,6 +219,9 @@ class IdentityProviderService:
                     scopes=draft.scopes,
                     entitlement_claim=draft.entitlement_claim,
                     entitlement_prefix=draft.entitlement_prefix,
+                    mfa_policy=draft.mfa_policy,
+                    mfa_amr_values=draft.mfa_amr_values,
+                    mfa_acr_values=draft.mfa_acr_values,
                     enabled=False,
                     secret_set=secret is not None,
                     created_at=now,
@@ -283,6 +289,9 @@ class IdentityProviderService:
                 scopes=draft.scopes,
                 entitlement_claim=draft.entitlement_claim,
                 entitlement_prefix=draft.entitlement_prefix,
+                mfa_policy=draft.mfa_policy,
+                mfa_amr_values=draft.mfa_amr_values,
+                mfa_acr_values=draft.mfa_acr_values,
                 secret_set=stored.secret_set or secret is not None,
                 updated_at=now,
                 checked_at=now if rechecked else stored.checked_at,

@@ -373,6 +373,7 @@ In PingFederate, create an OIDC client:
 | ID token signing | RS256, PS256 or ES256 (symmetric algorithms are refused) |
 | Scopes | `openid profile email` |
 | Claims in the ID token | `roles`, `organisations`, `groups` (multi-valued; names configurable with `OIDC_ROLE_CLAIM`, `OIDC_ORGANISATION_CLAIM`, `OIDC_GROUP_CLAIM`) |
+| Second factor (ADR 0100) | optional until the IdP team names its values: the ID token must carry an `amr` out of `OIDC_MFA_AMR_VALUES` (default `mfa otp hwk swk`) or an `acr` out of `OIDC_MFA_ACR_VALUES` (empty: `OIDC_ACR_VALUES`, default `mfa`, which OpenPlanner also sends as `acr_values`). Then set `ADMIN_MFA_REQUIRED=true` |
 | Role values | `openplanner-superuser`, `openplanner-org-admin`, `openplanner-group-admin`, `openplanner-auditor`, `openplanner-agent` (ADR 0043; configurable with `OIDC_ROLE_*`) |
 
 Organisation and group claims carry the slugs shown in the portal (`/g/<group-slug>`). A claim
@@ -443,6 +444,24 @@ The prefix (`OIDC_ENTITLEMENT_PREFIX`, default `openplanner`) separates installa
 share one PingFederate: give acceptance `openplanner-acc`, and production values never work
 there. The claim name and the prefix are class C settings with the dry run of §8; the host
 resets them like the other login settings.
+
+### Second factor required (ADR 0100)
+
+`ADMIN_MFA_REQUIRED` (class B, default `false`) makes `web` refuse
+a login whose ID token shows no second factor. MFA itself is the identity provider's: with
+the bundled Keycloak the realm asks for an authenticator app or a security key (`acr` `mfa`,
+level 2) and `super` must register one at the first login (set `ADMIN_MFA_REQUIRED=true` in `.env` for the
+bundled Keycloak; the installer does it in step 2 of ADR 0090); with PingFederate the IdP team's
+policy must set `amr` or `acr` (see the table above). The web log has `oidc.mfa_missing` and
+the security log `admin.login` with reason `mfa_required`; neither holds a claim value.
+
+**MFA locks the superuser out** (lost phone, a policy that does not emit `amr`). There is no
+break-glass login. Fix it at the identity provider: with the bundled Keycloak open the admin
+console (realm `openplanner` → *Users* → `super` → *Credentials*, delete the OTP credential;
+the next login asks to register a new one). If the IdP cannot be fixed in time, use the host
+CLI of the next section (closure, `oidc-check`); lowering the requirement is a deployment
+change in `.env` (`ADMIN_MFA_REQUIRED=false` and a restart of `web`), a decision for the
+product owner.
 
 ### Nobody can log in (ADR 0042 §8)
 

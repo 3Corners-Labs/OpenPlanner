@@ -250,3 +250,12 @@ def test_a_development_installation_lists_what_production_would_refuse() -> None
 def test_production_refuses_with_the_first_problem_in_the_same_words() -> None:
     with pytest.raises(ValueError, match="MANAGEMENT_TOKEN_KEY is required in production"):
         Settings(environment="prod")
+
+
+def test_admin_mfa_is_off_until_the_installation_turns_it_on() -> None:
+    settings = Settings(environment="dev")
+
+    assert settings.admin_mfa_required is False
+    assert settings.oidc_acr_values == "mfa"
+    assert set(settings.oidc_mfa_amr_values.split()) == {"mfa", "otp", "hwk", "swk"}
+    assert settings.oidc_mfa_acr_values == ""
