@@ -8691,3 +8691,33 @@ msgstr "Configuration package exported"
 
 msgid "admin.audit.detail.configuration_import"
 msgstr "Configuration package imported"
+
+msgid "admin.idp.mfa_policy"
+msgstr "MFA policy"
+
+msgid "admin.idp.mfa_policy_hint"
+msgstr "What happens when the ID token shows no second factor. With Record the login goes on and a security event is written."
+
+msgid "admin.idp.mfa.off"
+msgstr "Off"
+
+msgid "admin.idp.mfa.record"
+msgstr "Record"
+
+msgid "admin.idp.mfa.require"
+msgstr "Require"
+
+msgid "admin.idp.mfa_amr_values"
+msgstr "Accepted amr values"
+
+msgid "admin.idp.mfa_acr_values"
+msgstr "Accepted acr values"
+
+msgid "admin.idp.mfa_values_hint"
+msgstr "Values separated by spaces; empty: the default (amr: mfa otp hwk swk, acr: none)."
+
+msgid "admin.form.error.mfa_values"
+msgstr "Use at most 10 values of plain characters, separated by spaces."
+
+msgid "admin.idp.test_result.mfa"
+msgstr "Second factor shown"

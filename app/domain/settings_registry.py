@@ -353,7 +353,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         False,
         _B,
         T.LOGIN,
-        "Refuse an admin login whose ID token shows no second factor (ADR 0100); on for the bundled Keycloak.",
+        "Refuse an admin login without a second factor (ADR 0100); on for the bundled Keycloak.",
     ),
     S(
         "oidc_acr_values",

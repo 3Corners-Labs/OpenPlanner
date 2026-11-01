@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -14,6 +15,7 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
+from tests.support.principals import legacy_claims
 
 
 async def audit_events(site: Site) -> list[tuple[str, str, Outcome, str]]:
@@ -98,6 +100,17 @@ async def test_a_login_without_a_second_factor_is_refused_with_a_clear_text(site
     assert response.status_code == 401
     assert "tweede factor" in response.text
     assert ("anonymous", "admin.login", Outcome.DENIED, "mfa_required") in await audit_events(site)
+
+
+async def test_a_login_without_a_second_factor_under_record_goes_on_and_is_recorded(
+    site: Site,
+) -> None:
+    response = await site.login_with(replace(legacy_claims(GROUP_ADMIN), mfa_missing=True))
+
+    assert response.status_code == 303  # signed in
+    events = await audit_events(site)
+    assert ("sub-group", "admin.login.mfa_missing", Outcome.DENIED, "mfa_missing") in events
+    assert not any("Gina" in str(e) for e in events)
 
 
 @pytest.mark.parametrize(

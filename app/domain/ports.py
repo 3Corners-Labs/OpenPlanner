@@ -184,12 +184,15 @@ class LoginTestReport:
         claim_names: The names of the claims in the ID token, sorted and bounded.
         email_verified: The ``email_verified`` claim, ``None`` when absent.
         email_domain: The part after ``@`` of the ``email`` claim, ``None`` when absent.
+        mfa_shown: Whether the token showed a second factor under the provider's accepted
+            ``amr``/``acr`` values (ADR 0100).
     """
 
     claims: LoginClaims
     claim_names: tuple[str, ...]
     email_verified: bool | None
     email_domain: str | None
+    mfa_shown: bool = False
 
 
 class DiscoveryFetcher(Protocol):

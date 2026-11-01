@@ -23,7 +23,7 @@ import hmac
 import secrets
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import quote_plus, urlencode
 
@@ -36,7 +36,7 @@ from app.domain.authorization import Role
 from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM, SubjectRefusedError, qualify
 from app.domain.identity_providers import ASYMMETRIC_ALGORITHMS, ClientAuth, issuer_of
-from app.domain.mfa import MFA_AMR_VALUES, MFA_REQUIRED, shows_mfa
+from app.domain.mfa import MFA_AMR_VALUES, MFA_REQUIRED, MfaPolicy, shows_mfa
 from app.domain.ports import IdentityError, LoginStart, LoginTestReport
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 from app.domain.tunable import value_of
@@ -103,10 +103,11 @@ class OidcConfig:
     compared exactly (OIDC Discovery §4.3, Core §3.1.3.7); ``None`` derives it from
     ``discovery_url`` (``issuer_of``). A registered provider passes the issuer stored at
     registration, so a later change of its discovery document cannot move it.
-    ``acr_values`` are requested at login when not empty; with ``require_mfa`` an ID token
-    that shows no second factor (an ``amr`` out of ``mfa_amr_values``, or an ``acr`` out of
-    ``mfa_acr_values``, which is ``acr_values`` when empty) is refused
-    with ``mfa_required`` (ADR 0100). MFA itself is the provider's.
+    ``acr_values`` are requested at login when not empty. An ID token shows a second factor
+    when it has an ``amr`` out of ``mfa_amr_values`` or an ``acr`` out of ``mfa_acr_values``
+    (``acr_values`` when empty). Without one, ``mfa_policy`` decides (ADR 0100): ``off``
+    ignores it, ``record`` lets the login through with ``LoginClaims.mfa_missing`` set,
+    ``require`` refuses it with ``mfa_required``. MFA itself is the provider's.
     """
 
     discovery_url: str
@@ -120,7 +121,7 @@ class OidcConfig:
     signing_key: tuple[str, str] | None = field(default=None, repr=False)
     guard: Guard | None = None
     expected_issuer: str | None = None
-    require_mfa: bool = False
+    mfa_policy: MfaPolicy = MfaPolicy.OFF
     acr_values: str = ""
     mfa_amr_values: str = " ".join(sorted(MFA_AMR_VALUES))
     mfa_acr_values: str = ""
@@ -320,9 +321,10 @@ class OidcIdentityProvider:
                 ``mfa_required`` or ``too_many_entitlements``.
         """
         claims = await self._claims(code, redirect_uri, code_verifier, nonce)
-        return login_claims(
+        found = login_claims(
             claims, value_of(self._config.mapping), provider=self._config.provider_key
         )
+        return self._with_mfa(claims, found)
 
     async def finish_test_login(
         self, *, code: str, redirect_uri: str, code_verifier: str, nonce: str
@@ -349,6 +351,7 @@ class OidcIdentityProvider:
             tuple(_claim_names(claims)),
             verified if isinstance(verified, bool) else None,
             domain or None,
+            self._shows_mfa(claims),
         )
 
     async def finish_trial_login(
@@ -368,7 +371,7 @@ class OidcIdentityProvider:
         claims = await self._claims(code, redirect_uri, code_verifier, nonce)
         mapping = value_of(self._config.mapping)
         provider = self._config.provider_key
-        current = login_claims(claims, mapping, provider=provider)
+        current = self._with_mfa(claims, login_claims(claims, mapping, provider=provider))
         tried = claim_mapping(trial, mapping.max_entitlements)
         return current, login_claims(claims, tried, log_lockout=False, provider=provider)
 
@@ -404,15 +407,29 @@ class OidcIdentityProvider:
         claims = await self._verify(id_token, metadata)
         if not hmac.compare_digest(str(claims.get("nonce", "")), nonce):
             raise IdentityError("nonce_mismatch")
-        if self._config.require_mfa and not shows_mfa(
+        return claims
+
+    def _shows_mfa(self, claims: Mapping[str, Any]) -> bool:
+        """Return whether the verified claims show a second factor (ADR 0100 point 3)."""
+        return shows_mfa(
             claims.get("amr"),
             claims.get("acr"),
             (self._config.mfa_acr_values or self._config.acr_values).split(),
             self._config.mfa_amr_values.split(),
-        ):
-            log.warning("oidc.mfa_missing", provider=self._config.provider_key or PLATFORM)
+        )
+
+    def _with_mfa(self, claims: Mapping[str, Any], found: LoginClaims) -> LoginClaims:
+        """Apply the provider's MFA policy to a login that has verified claims.
+
+        Raises:
+            IdentityError: ``mfa_required`` under ``require`` when no second factor shows.
+        """
+        if self._config.mfa_policy is MfaPolicy.OFF or self._shows_mfa(claims):
+            return found
+        log.warning("oidc.mfa_missing", provider=self._config.provider_key or PLATFORM)
+        if self._config.mfa_policy is MfaPolicy.REQUIRE:
             raise IdentityError(MFA_REQUIRED)
-        return claims
+        return replace(found, mfa_missing=True)
 
     def _client_assertion(self, token_endpoint: str) -> str:
         """Return the signed client assertion of RFC 7523 / OIDC Core §9.

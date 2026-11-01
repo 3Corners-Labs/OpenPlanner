@@ -35,7 +35,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | Variable | Kind | Default | Note |
 |---|---|---|---|
 | `OIDC_ISSUER` | url | — | Issuer the IdP announces, when it differs from the discovery URL without its suffix. |
-| `ADMIN_MFA_REQUIRED` | bool | `false` | Refuse an admin login whose ID token shows no second factor (ADR 0100); on for the bundled Keycloak. |
+| `ADMIN_MFA_REQUIRED` | bool | `false` | Refuse an admin login without a second factor (ADR 0100); on for the bundled Keycloak. |
 | `OIDC_ACR_VALUES` | string | `mfa` | acr_values requested at login; an acr from this list counts as proof of MFA (ADR 0100). |
 | `OIDC_MFA_AMR_VALUES` | string | `hwk mfa otp swk` | amr values that count as proof of MFA (RFC 8176), space separated (ADR 0100). |
 | `OIDC_MFA_ACR_VALUES` | string | `""` | acr values that count as proof of MFA; empty: the values asked for (ADR 0100). |

@@ -41,3 +41,20 @@ def test_the_accepted_values_are_the_callers_to_choose() -> None:
     assert shows_mfa(["pwd", "x-strong"], None, [], ["x-strong"])
     assert not shows_mfa(["otp"], None, [], ["x-strong"])
     assert shows_mfa(None, "urn:strong", ["urn:strong"])
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("", ""),
+        ("  otp   mfa otp ", "otp mfa"),
+        ("urn:oasis:names:tc:SAML:2.0:ac:classes:X", "urn:oasis:names:tc:SAML:2.0:ac:classes:X"),
+        ("a<b", None),
+        ("x" * 101, None),
+        (" ".join(f"v{i}" for i in range(11)), None),
+    ],
+)
+def test_mfa_values_are_plain_tokens_within_bounds(text: str, expected: str | None) -> None:
+    from app.domain.mfa import parse_mfa_values
+
+    assert parse_mfa_values(text) == expected

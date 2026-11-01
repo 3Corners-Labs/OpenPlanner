@@ -27,6 +27,7 @@ from app.adapters.oidc import (
 from app.adapters.signing_keys import EcSigningKeys
 from app.domain.authorization import Role
 from app.domain.identity_providers import ClientAuth
+from app.domain.mfa import MfaPolicy
 from app.domain.ports import IdentityError
 from app.domain.settings_registry import lookup
 
@@ -808,7 +809,7 @@ def _mfa_config(**overrides: Any) -> OidcConfig:
         client_secret="s3cret",
         scopes="openid profile",
         mapping=MAPPING,
-        **{"require_mfa": True, "acr_values": "mfa", **overrides},
+        **{"mfa_policy": MfaPolicy.REQUIRE, "acr_values": "mfa", **overrides},
     )
 
 
@@ -861,7 +862,7 @@ async def test_an_acr_that_was_not_requested_is_no_proof(provider: FakeProvider)
 
 
 async def test_without_the_switch_no_proof_is_needed(provider: FakeProvider) -> None:
-    await _mfa_login(provider, _mfa_config(require_mfa=False))
+    await _mfa_login(provider, _mfa_config(mfa_policy=MfaPolicy.OFF))
 
 
 async def test_the_refusal_logs_no_claim_values(provider: FakeProvider) -> None:
@@ -884,3 +885,43 @@ async def test_the_accepted_amr_and_acr_values_are_configurable(provider: FakePr
     provider.claims = {"amr": ["otp"]}
     with pytest.raises(IdentityError):
         await _mfa_login(provider, _mfa_config(mfa_amr_values="x-strong"))
+
+
+async def test_the_record_policy_lets_the_login_through_and_marks_it(
+    provider: FakeProvider,
+) -> None:
+    provider.claims = {"amr": ["pwd"]}
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        _, found = await login(
+            OidcIdentityProvider(_mfa_config(mfa_policy=MfaPolicy.RECORD), http), provider
+        )
+    provider.claims = {"amr": ["otp"]}
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        _, shown = await login(
+            OidcIdentityProvider(_mfa_config(mfa_policy=MfaPolicy.RECORD), http), provider
+        )
+
+    assert found.mfa_missing is True
+    assert shown.mfa_missing is False
+
+
+async def test_a_test_login_reports_whether_a_second_factor_showed_and_never_refuses(
+    provider: FakeProvider,
+) -> None:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        oidc = OidcIdentityProvider(_mfa_config(), http)  # policy: require
+        reports = []
+        for claims in ({"amr": ["pwd"]}, {"amr": ["hwk"]}):
+            provider.claims = claims
+            start = await oidc.start_login(REDIRECT)
+            provider.nonce = start.nonce
+            reports.append(
+                await oidc.finish_test_login(
+                    code="abc",
+                    redirect_uri=REDIRECT,
+                    code_verifier=start.code_verifier,
+                    nonce=start.nonce,
+                )
+            )
+
+    assert [r.mfa_shown for r in reports] == [False, True]

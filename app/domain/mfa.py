@@ -5,11 +5,16 @@ in the ID token: the ``amr`` claim (RFC 8176) or the ``acr`` claim (OIDC Core §
 answers the ``acr_values`` OpenPlanner asked for. Pure Python; the adapter passes the claims.
 """
 
+import re
 from collections.abc import Collection
+from enum import StrEnum
 from typing import Any
 
 MFA_REQUIRED = "mfa_required"
 """The reason code of a login whose ID token shows no second factor (``IdentityError.code``)."""
+
+MFA_MISSING_EVENT = "admin.login.mfa_missing"
+"""The security event of a login that went on without a second factor (policy ``record``)."""
 
 MFA_AMR_VALUES = frozenset({"mfa", "otp", "hwk", "swk"})
 """The ``amr`` values (RFC 8176) that show a second factor: multiple-factor, one-time
@@ -42,3 +47,35 @@ def shows_mfa(
     if _amr_values(amr) & set(accepted_amr):
         return True
     return isinstance(acr, str) and acr in accepted_acr
+
+
+class MfaPolicy(StrEnum):
+    """What a provider's login does when the ID token shows no second factor (ADR 0100).
+
+    ``off`` ignores it, ``record`` lets the login through and records a security event,
+    ``require`` refuses it with ``mfa_required``.
+    """
+
+    OFF = "off"
+    RECORD = "record"
+    REQUIRE = "require"
+
+
+MAX_MFA_VALUES = 10
+MAX_MFA_VALUE_LENGTH = 100
+_MFA_VALUE = re.compile(r"[A-Za-z0-9][A-Za-z0-9:._/+-]*")
+
+
+def parse_mfa_values(text: str) -> str | None:
+    """Return ``text`` as space-separated ``amr``/``acr`` values, or ``None`` if invalid.
+
+    The values are the provider's own names (``otp``, ``urn:...:MultiFactor``); at most
+    ``MAX_MFA_VALUES`` of ``MAX_MFA_VALUE_LENGTH`` characters, plain token characters only.
+    An empty text is valid and means "the default".
+    """
+    values = text.split()
+    if len(values) > MAX_MFA_VALUES:
+        return None
+    if any(len(v) > MAX_MFA_VALUE_LENGTH or _MFA_VALUE.fullmatch(v) is None for v in values):
+        return None
+    return " ".join(dict.fromkeys(values))

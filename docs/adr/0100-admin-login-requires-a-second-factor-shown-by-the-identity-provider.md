@@ -33,14 +33,18 @@ version: only MFA, configured at the IdP, requested and checked by OpenPlanner.
    nl and en), records the security event `admin.login` with reason `mfa_required` for
    `anonymous`, and logs `oidc.mfa_missing` with the provider key only. No claim value, name or
    address reaches a log or event.
-5. **Scope.** The switch applies to the platform provider. For an organisation provider
-   (ADR 0083) the product owner wants to enforce MFA, or at least to recognise when a login
-   came without it, per provider. Step 2 adds a policy on the registered provider: `off`,
-   `record` (the login succeeds; a security event `admin.login` with reason `mfa_missing`
-   and the provider key, no PII, and a mark on the provider's page) or `require` (as point 3),
-   with the accepted `amr`/`acr` values per provider. Whether OpenPlanner then adds an MFA step
-   of its own where a provider gives none (TOTP held in OpenPlanner) is a separate decision:
-   it makes OpenPlanner hold authentication secrets and needs its own ADR.
+5. **Organisation providers (step 3).** Each registered provider (ADR 0083) has an MFA
+   policy: `off`, `record` or `require`, and the `amr`/`acr` values that count as proof (empty:
+   `amr` `mfa otp hwk swk`, no `acr`). `record` is the default: the login goes on, the
+   adapter marks the claims (`LoginClaims.mfa_missing`) and the callback writes the security
+   event `admin.login.mfa_missing` with `provider:<key>`, no personal data. `require` refuses
+   as point 3. The test login reports whether a second factor showed, so the superuser can
+   verify the values before choosing `require`. The platform provider keeps the switch of
+   point 6. These are columns of the registration (migration 0082), set by the superuser on
+   the Login sub-tab: a protection that can only be lowered by someone who may register the
+   provider, audited as `idp.updated`, never a class C/D setting. Whether OpenPlanner adds an
+   MFA step of its own where a provider gives none (TOTP held in OpenPlanner) is a separate
+   decision: it makes OpenPlanner hold authentication secrets and needs its own ADR.
 6. **The switch.** `ADMIN_MFA_REQUIRED` (class B, default `false`). It is set to `true` for the
    bundled Keycloak (ADR 0090; by hand in `.env` until its installer step), whose realm
    enforces MFA. For another provider it stays off until the IdP team names its `amr`/`acr`
@@ -76,7 +80,7 @@ version: only MFA, configured at the IdP, requested and checked by OpenPlanner.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 3 | Per-provider MFA policy `off`/`record`/`require` for organisation providers (point 5): migration, Login sub-tab, registry | | follow-up |
+| 3 | Per-provider MFA policy `off`/`record`/`require` and accepted values for organisation providers (point 5): migration 0082, Login sub-tab, security event, test login | #357 | in PR |
 | 2 | Self-service reset limited to the active domain suffix; realm SMTP | | follow-up |
 | 1 | `app/domain/mfa.py`, `acr_values` and the check in `app/adapters/oidc.py`, the two settings, login message, Keycloak realm flow, runbook, threat model, manual | #357 | in PR |
 
@@ -86,4 +90,4 @@ An installation that turns the switch on while its IdP does not emit `amr`/`acr`
 in until the IdP team maps its MFA policy or the switch is turned off again. The Keycloak flow in the
 realm template is checked by a structure test; a live run on the bundled `idp` belongs to
 the next host test. `docs/settings.md`, `.env.example`, `docs/runbook.md`,
-`docs/threat-model.md` and `docs/manual/{nl,en}/staff.md` are updated.
+`docs/threat-model.md`, `docs/manual/{nl,en}/staff.md` and `organisation-login.md` are updated.

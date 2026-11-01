@@ -8703,3 +8703,33 @@ msgstr "Configuratiepakket geëxporteerd"
 
 msgid "admin.audit.detail.configuration_import"
 msgstr "Configuratiepakket geïmporteerd"
+
+msgid "admin.idp.mfa_policy"
+msgstr "MFA-beleid"
+
+msgid "admin.idp.mfa_policy_hint"
+msgstr "Wat er gebeurt als het ID-token geen tweede factor toont. Bij Vastleggen gaat het inloggen door en komt er een beveiligingsgebeurtenis."
+
+msgid "admin.idp.mfa.off"
+msgstr "Uit"
+
+msgid "admin.idp.mfa.record"
+msgstr "Vastleggen"
+
+msgid "admin.idp.mfa.require"
+msgstr "Afdwingen"
+
+msgid "admin.idp.mfa_amr_values"
+msgstr "Geaccepteerde amr-waarden"
+
+msgid "admin.idp.mfa_acr_values"
+msgstr "Geaccepteerde acr-waarden"
+
+msgid "admin.idp.mfa_values_hint"
+msgstr "Waarden gescheiden door spaties; leeg: de standaard (amr: mfa otp hwk swk, acr: geen)."
+
+msgid "admin.form.error.mfa_values"
+msgstr "Gebruik hoogstens 10 waarden van gewone tekens, gescheiden door spaties."
+
+msgid "admin.idp.test_result.mfa"
+msgstr "Tweede factor getoond"

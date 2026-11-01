@@ -250,6 +250,8 @@ class LoginClaims:
         groups: Group slugs from the legacy group claim.
         role_claims: Other values of the legacy role claim (custom roles link to them).
         entitlements: Values of the entitlement claim that carry the prefix.
+        mfa_missing: The provider's policy is ``record`` and the ID token showed no second
+            factor (ADR 0100); the login goes on and the route records a security event.
     """
 
     subject: str
@@ -259,6 +261,7 @@ class LoginClaims:
     groups: frozenset[str] = frozenset()
     role_claims: frozenset[str] = frozenset()
     entitlements: frozenset[str] = frozenset()
+    mfa_missing: bool = False
 
 
 def _legacy_roles(claims: LoginClaims, catalogue: RoleCatalogue) -> list[tuple[str, Reach]]:
