@@ -36,6 +36,7 @@ Public: ports 80 and 443 of the `proxy` service (`--profile tls`, the installer'
 | Spoofing | Client forges `X-Forwarded-For` to dodge or exhaust per-IP rate limits | Caddy sets the header itself (no `trusted_proxies`); `web` trusts it only from the proxy's fixed address on the `edge` network | — (configuration in `docker-compose.yml`) |
 | Denial of service | Oversized bodies on public forms | 64 KB on `/g/*` and `/b/*`, 1 MB elsewhere (HTTP 413) | `scripts/check-proxy.sh` |
 | Denial of service | Slow-loris clients hold connections open | Header 10 s, body 30 s, write 60 s, idle 2 min in the Caddyfile | — |
+| Information disclosure | A bot, Webex Connect or WxCC flow configured with `http://` sends its client secret or webhook body in clear text because port 80 redirects `/api/*` and `/webhooks/*` with a 308 that repeats the POST | The bundled proxy answers machine paths on port 80 with 403 and no `Location`; browser paths keep the redirect; a proxy of your own must do the same (runbook) | `scripts/check-proxy.sh` (`machine_paths_check`, run in CI with `ci:full`) |
 | Information disclosure | Booking paths with tokens in proxy logs | No access log in the Caddyfile | — |
 | Elevation | Compromised proxy gains host rights | uid 10001, read-only filesystem, `cap_drop: ALL`, `no-new-privileges`, unprivileged ports | `trivy` misconfiguration scan |
 

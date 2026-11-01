@@ -115,6 +115,13 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   for everyone.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 - No access log on the proxy: paths carry management tokens.
+- Answer plain `http://` requests for `/api/*` and `/webhooks/*` with `403` and no `Location`
+  header, and redirect only the browser paths. A redirect makes a bot or Webex Connect flow that
+  was configured with `http://` repeat its POST, with the client secret or webhook body, in
+  clear text and still succeed, so nobody notices. The bundled proxy does this; in Caddy:
+  `@machine path /api/* /webhooks/*`, `handle @machine { respond "HTTPS required" 403 }`, then
+  `handle { redir https://{host}{uri} 308 }`. Also let `TRACE` reach the app (it answers 405) and
+  do not serve `/static/` from the proxy itself. `scripts/check-proxy.sh` shows what to expect.
 
 **What is configured, and from where?** Every setting and its class (ADR 0042) is listed in
 `docs/settings.md`. On the host, without sending anyone the `.env`:
