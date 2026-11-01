@@ -34,6 +34,7 @@ from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
 from app.domain.entitlements import Directory, GroupRef, OrganisationRef
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import Answers, FormDefinition, raise_to_pii
 from app.domain.identity_providers import (
     KEY_OVERLAP,
@@ -43,6 +44,7 @@ from app.domain.identity_providers import (
 )
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, PlannedJob
+from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import OwnCertificate
@@ -107,6 +109,9 @@ class State:
     api_clients: dict[str, ApiClient] = field(default_factory=dict)
     identity_providers: dict[str, OrganisationProvider] = field(default_factory=dict)
     provider_secrets: dict[str, str] = field(default_factory=dict)
+    log_destinations: dict[int, LogDestination] = field(default_factory=dict)
+    log_secrets: dict[int, str] = field(default_factory=dict)
+    log_status: dict[tuple[int, str], DestinationStatus] = field(default_factory=dict)
     signing_keys: dict[str, list[SigningKey]] = field(default_factory=dict)
     private_keys: dict[str, str] = field(default_factory=dict)
     access_tokens: dict[str, AccessToken] = field(default_factory=dict)
@@ -1071,6 +1076,54 @@ class InMemoryTransaction:
         for stored in self.state.signing_keys.pop(key, []):
             self.state.private_keys.pop(stored.kid, None)
         return self.state.identity_providers.pop(key, None) is not None
+
+    async def list_log_destinations(self, scope: Scope) -> list[LogDestination]:
+        if not scope.everything:
+            return []
+        return sorted(self.state.log_destinations.values(), key=lambda d: d.name)
+
+    async def get_log_destination(self, destination_id: int) -> LogDestination | None:
+        return self.state.log_destinations.get(destination_id)
+
+    async def add_log_destination(
+        self, destination: LogDestination, secret: str | None
+    ) -> LogDestination:
+        if any(d.name == destination.name for d in self.state.log_destinations.values()):
+            raise DomainError(ErrorCode.LOG_DESTINATION_NAME_TAKEN, "name")
+        stored = replace(destination, id=self._new_id())
+        self.state.log_destinations[stored.id or 0] = stored
+        if secret is not None:
+            self.state.log_secrets[stored.id or 0] = secret
+        return stored
+
+    async def save_log_destination(self, destination: LogDestination, secret: str | None) -> None:
+        if destination.id not in self.state.log_destinations:
+            raise DomainError(ErrorCode.LOG_DESTINATION_NOT_FOUND)
+        if any(
+            d.name == destination.name and d.id != destination.id
+            for d in self.state.log_destinations.values()
+        ):
+            raise DomainError(ErrorCode.LOG_DESTINATION_NAME_TAKEN, "name")
+        self.state.log_destinations[destination.id or 0] = destination
+        if secret is not None:
+            self.state.log_secrets[destination.id or 0] = secret
+
+    async def delete_log_destination(self, destination_id: int) -> bool:
+        self.state.log_secrets.pop(destination_id, None)
+        for key in [k for k in self.state.log_status if k[0] == destination_id]:
+            del self.state.log_status[key]
+        return self.state.log_destinations.pop(destination_id, None) is not None
+
+    async def save_log_destination_status(self, status: DestinationStatus, at: datetime) -> None:
+        if status.destination_id in self.state.log_destinations:
+            self.state.log_status[(status.destination_id, status.service)] = replace(
+                status, updated_at=at
+            )
+
+    async def list_log_destination_status(self, scope: Scope) -> list[DestinationStatus]:
+        if not scope.everything:
+            return []
+        return [self.state.log_status[k] for k in sorted(self.state.log_status)]
 
     async def get_signing_keys(self, provider_key: str) -> list[SigningKey]:
         keys = self.state.signing_keys.get(provider_key, [])

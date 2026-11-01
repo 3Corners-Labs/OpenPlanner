@@ -1,6 +1,6 @@
 # 0085. Log destinations in the portal (syslog, Splunk, Elastic) and a trace level
 
-Status: accepted (2026-10-31) by the product owner; partly built: step 1 (the `TRACE` level and the trace points) is merged, steps 2–5 are planned. Amends ADR 0034
+Status: accepted (2026-10-31) by the product owner; partly built: step 1 (the `TRACE` level and the trace points) is merged, step 2 (the destination model, the service, the queue and sender, the rights and the migration) is in PR, steps 3–5 are planned. Amends ADR 0034
 point 4 (shipping is the host's job only) and extends ADR 0040 (levels) and ADR 0042 (`LOG_LEVEL`
 with expiry). ADR 0008 (encrypted integration secrets) and ADR 0047 (one home per screen)
 apply.
@@ -153,7 +153,7 @@ oldest on a full queue (a request is never blocked by logging).
 |---|---|---|---|
 | 0 | ADR proposed | #263, landed through #266 | merged |
 | 1 | `TRACE` level, `tracer.trace()`, the trace points, `TRACE_LEVEL_MAX_HOURS`, `SQL_SLOW_MS`, `docs/logging.md` | #266 | merged |
-| 2 | Domain: `LogDestination` Protocol, destination model and validation, queue and sender with drop and backoff, counters, system event; `logging.manage` and `logging.view` in the matrix; migration | | planned |
+| 2 | Domain: `LogDestinationSender` Protocol, destination model and validation, service, queue and sender with drop and backoff, counters, system event; `logging.manage` and `logging.view` in the matrix; migration 0080; the line tap. Not yet started in web or worker: step 3 wires it with the adapters | NNN | in PR |
 | 3 | Adapters: `syslog` (TLS, TCP, UDP), `splunk_hec`, `elastic`, `http`; contract tests against recorded fixtures and a local receiver in the test suite | | planned |
 | 4 | Admin: *Log destinations* list, sub-page, *Send test line*, status on *System status*; manual topic (nl, en); `docs/admin-map.md`, `docs/authorization.md`, `docs/settings.md` regenerated | | planned |
 | 5 | `LOG_SHIPPING_ENABLED`; runbook section rewritten (portal route first, host route kept); `docs/dataflow.md` and `docs/threat-model.md` (log platform as recipient, abuse cases: address pointing at an internal service, credential in an error page, trace left on) | | planned |

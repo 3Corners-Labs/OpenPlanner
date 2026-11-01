@@ -127,6 +127,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042: system status, read-only
         Permission.IDP_MAPPING_VIEW,  # ADR 0049
         Permission.IDENTITY_PROVIDERS_VIEW,  # ADR 0083
+        Permission.LOGGING_VIEW,  # ADR 0085: where the log goes, no credential
     }
 
 
@@ -144,6 +145,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042
         Permission.IDP_MAPPING_VIEW,  # ADR 0049
         Permission.IDENTITY_PROVIDERS_VIEW,  # ADR 0083
+        Permission.LOGGING_VIEW,  # ADR 0085: where the log goes, no credential
     }
 
     assert not MATRIX[Role.AUDITOR] & PII_PERMISSIONS
@@ -164,6 +166,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.SETTINGS_PLATFORM_MANAGE,  # ADR 0042 §5
         Permission.SETTINGS_LOGIN_MANAGE,  # ADR 0042 §5: never grantable to another role
         Permission.IDENTITY_PROVIDERS_MANAGE,  # ADR 0083 point 4
+        Permission.LOGGING_MANAGE,  # ADR 0085: credentials of a log platform
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]

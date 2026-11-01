@@ -18,7 +18,7 @@ keeps it in step with the registry.
 
 import logging
 import sys
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Callable, Mapping, MutableMapping
 from datetime import UTC, datetime
 from typing import Any, TextIO
 
@@ -170,6 +170,58 @@ _TRACE_RECORD_ATTRS = frozenset({"taskName"})
 """Attributes Python adds to a record that are noise on a trace line."""
 
 
+LineTap = Callable[[str], None]
+"""Receives every finished log line (JSON, masked) as it is written (ADR 0085 point 3)."""
+
+_TAPS: list[LineTap] = []
+
+
+def set_line_tap(tap: LineTap | None) -> None:
+    """Install the one tap that copies every line to the log destinations; ``None`` removes it.
+
+    The tap runs inside the logging call: it must be quick, must not raise and must never log.
+    """
+    _TAPS[:] = [tap] if tap is not None else []
+
+
+def tap_line(line: str) -> None:
+    """Offer one finished line to the tap; a failing tap is ignored, never raised."""
+    for tap in _TAPS:
+        try:
+            tap(line)
+        except Exception:  # noqa: S110 - logging about a failing log tap would recurse
+            pass
+
+
+class _TapStream:
+    """A stream that offers every line written to it to the tap, besides writing it.
+
+    Both the structlog logger and the stdlib handler write to this stream, so the tap sees
+    exactly what stdout sees: the same masked line, after the level filter.
+    """
+
+    def __init__(self, inner: TextIO) -> None:
+        """Wrap ``inner``."""
+        self._inner = inner
+
+    def write(self, text: str) -> int:
+        """Write ``text`` and offer each non-empty line in it to the tap."""
+        written = self._inner.write(text)
+        if _TAPS:
+            for line in text.splitlines():
+                if line:
+                    tap_line(line)
+        return written
+
+    def flush(self) -> None:
+        """Flush the inner stream."""
+        self._inner.flush()
+
+    def __getattr__(self, name: str) -> object:
+        """Delegate everything else (``isatty``, ``fileno``...) to the inner stream."""
+        return getattr(self._inner, name)
+
+
 _CONFIGURED: list[tuple[TextIO, Envelope | None]] = []
 """The stream and envelope of the last ``configure_logging``, for ``set_log_level``."""
 
@@ -196,8 +248,9 @@ def configure_logging(
         stream: Output stream; defaults to stdout. Tests pass a ``StringIO``.
         envelope: Release and installation name added to every line.
     """
-    out = stream or sys.stdout
-    _CONFIGURED[:] = [(out, envelope)]
+    chosen = stream or sys.stdout
+    _CONFIGURED[:] = [(chosen, envelope)]
+    out: TextIO = _TapStream(chosen)  # type: ignore[assignment]
     shared: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
