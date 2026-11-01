@@ -1,4 +1,4 @@
-# 0091. Staff and roles of the bundled identity provider, managed in the portal
+# 0095. Staff and roles of the bundled identity provider, managed in the portal
 
 Status: proposed (2026-11-01), requested by the product owner. Extends ADR 0090 (bundled
 identity provider), ADR 0013 (OIDC admin login), ADR 0049 (entitlements) and ADR 0083

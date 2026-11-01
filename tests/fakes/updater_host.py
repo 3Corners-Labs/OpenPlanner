@@ -18,6 +18,9 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``cosign-version``: the installed cosign (default v3.1.4, the latest the fake GitHub offers).
 - ``installed``: Debian packages ``dpkg -s`` finds; ``upgradable``: ``apt list --upgradable``.
 - ``docker-key``: the fingerprint of Docker's release key (default the real one).
+- ``config-env``: what ``app.cli config env --out -`` prints (default: a login of four
+  variables); ``fail`` may list ``config-env`` (a wrong passphrase) and ``config-import`` (an
+  installation in use), which exit 2 with the CLI's ``Refused (...)`` line (ADR 0089).
 
 ``apt-get``, ``usermod`` and ``systemctl`` only record their call; ``curl -o`` writes a small
 stand-in for the downloaded file, with a matching checksum unless ``fail`` lists ``checksum``.
@@ -31,6 +34,13 @@ import time
 from pathlib import Path
 
 WORKER = "worker-container-id"
+CONFIG_ENV = (
+    "OIDC_DISCOVERY_URL=https://idp.example.nl/.well-known/openid-configuration\n"
+    "OIDC_CLIENT_ID=openplanner-admin\n"
+    "OIDC_CLIENT_SECRET=secret-from-the-package\n"
+    "OIDC_SCOPES=openid profile email\n"
+)
+CONFIG_SUMMARY = "configuration imported\norganisations       2\ngroups              3\n"
 PROXY = "proxy-container-id"
 COSIGN = "3.1.4"
 # The releases the fake registry knows, so an image's digest can be mapped back to the version
@@ -87,13 +97,29 @@ def _failing(operation: str) -> int:
     return 1 if operation in _lines("fail") else 0
 
 
+def _config(args: list[str]) -> int:
+    """Handle ``app.cli config env|import`` as the host's one-off container would."""
+    if args[0] == "env":
+        if _failing("config-env"):
+            print("Refused (configuration_passphrase_wrong).")
+            return 2
+        path = _host() / "config-env"
+        sys.stdout.write(path.read_text() if path.exists() else CONFIG_ENV)
+    elif args[0] == "import":
+        if _failing("config-import"):
+            print("Refused (configuration_installation_in_use).")
+            return 2
+        sys.stdout.write(CONFIG_SUMMARY)
+    return 0
+
+
 def _compose(args: list[str]) -> int:
     """Handle ``docker compose --project-directory D --env-file F <command>``."""
     command = args[5:]
     if command[:3] == ["exec", "-T", "web"]:
         command = command[3:]
-    elif command[:5] == ["run", "--rm", "--no-deps", "-T", "web"]:
-        command = command[5:]
+    elif command[:1] == ["run"] and "web" in command:
+        command = command[command.index("web") + 1 :]  # the options before the service
     if command == ["ps", "-q", "worker"]:
         print(WORKER)
     elif command == ["ps", "-q", "proxy"]:
@@ -109,6 +135,8 @@ def _compose(args: list[str]) -> int:
             return _failing("backup-db")
         elif command[3] in ("restore-db", "update-progress", "maintenance"):
             return _failing(command[3])
+        elif command[3] == "config":
+            return _config(command[4:])
     return 0
 
 

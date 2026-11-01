@@ -16,6 +16,7 @@ wherever the checkout is, and writes that path into the updater's configuration.
 | `~/openplanner/` | `git clone`, at a release tag | `docker-compose.yml`, `deploy/proxy/`, `scripts/` | |
 | `~/openplanner/.env` | installer, then you | the application's settings and integration secrets (`.env.example` lists every one) | 600 |
 | `~/openplanner/secrets/secrets.env` | installer (or `app.cli init`) | the bootstrap keys `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`, `SESSION_SECRET` (ADR 0042 §9); back it up apart from the database | 600, directory 700 |
+| `~/openplanner/secrets/config.env` | installer, with `--configuration` | the login (`OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_SCOPES`) from a configuration package (ADR 0089); Compose reads it before `.env`, so a value in `.env` wins | 600 |
 | `~/openplanner/proxy.env` | installer (with the HTTPS proxy) | `TLS_DOMAIN`, `ACME_EMAIL` (or the own certificate's files) for the HTTPS proxy, no secrets | 600 |
 | `~/openplanner/.env.update` | installer, host updater | `OPENPLANNER_IMAGE` and, with the HTTPS proxy, `OPENPLANNER_PROXY_IMAGE` (pinned digests), `COMPOSE_PROFILES`, `OPENPLANNER_TLS`, `OPENPLANNER_MODE` | 644 |
 | `~/openplanner/.env.bak.<time>` | installer, when it repaired `.env` | the `.env` as it was before | 600 |
@@ -145,6 +146,58 @@ UPDATE_CHECK_TOKEN=... ./scripts/install.sh --mode production --version 0.3.0 --
 Webex and Webex Contact Center are configured afterwards: `docs/runbook.md`, *Webex meetings and
 Webex Contact Center*.
 
+## Installing from a configuration package
+
+A configuration package (ADR 0089) is every setting of another installation, with its
+secrets sealed under a passphrase: organisations, groups, texts, channels, identity providers,
+API clients, platform settings and the login. The superuser exports one on *Advanced settings*
+(or the host does, runbook *Configuration package*). With it a new installation is complete
+after one command:
+
+```sh
+cd ~/openplanner
+printf '%s\n' 'the passphrase the package was exported with' > ~/package.passphrase
+chmod 600 ~/package.passphrase
+./scripts/install.sh --mode production --configuration ~/openplanner-configuration-x.sqlite --passphrase-file ~/package.passphrase
+```
+
+Both options go together. The passphrase is read from the file's first line and never travels
+on a command line or appears in the script's output; delete the file and the package when the
+script is done, together they are every secret of the platform. The script then:
+
+1. pins and verifies the release first (step 4), because the package is read by the
+   application itself: a one-off container of the pinned image writes the package's login to
+   `secrets/config.env` (mode 600). A wrong passphrase stops the script here, before anything
+   is written.
+2. asks the usual questions except the identity provider's: the login is in `config.env`.
+   `.env` is written without `OIDC_*`. (A package exported from an installation without a
+   login has none to give; the questions are then asked as usual.)
+3. starts web and worker, waits until both are healthy, copies the package into the web
+   container and imports it. The summary (organisations, groups, channels, secrets) is
+   printed; the copy in the container is removed, whatever the outcome.
+
+The import goes into a new installation only. It is refused, and the script stops after the
+start, when the installation already has a booking, a slot or an active closure
+(`configuration_installation_in_use`), or when the package was exported from another
+version of OpenPlanner (`configuration_package_version`: export it again from an installation
+on this version). Web and worker are running by then; fix the cause and run the script again
+with the same two options, or import later as the runbook says.
+
+Without a terminal, the two paths come from `OPENPLANNER_CONFIGURATION` and
+`OPENPLANNER_PASSPHRASE_FILE`, next to the other answers:
+
+```sh
+TLS_DOMAIN=afspraak.example.nl ACME_EMAIL=ops@example.nl \
+OPENPLANNER_CONFIGURATION=/home/operator/openplanner-configuration-x.sqlite \
+OPENPLANNER_PASSPHRASE_FILE=/home/operator/package.passphrase \
+./scripts/install.sh --mode production --version 0.3.0 --non-interactive
+```
+
+A later run without the options leaves `secrets/config.env` alone; a run with them writes it
+again from the package and imports again (refused once the installation is in use). To change
+the login by hand afterwards, set the `OIDC_*` values in `.env`: Compose reads `config.env`
+before `.env`, so `.env` wins; or remove `config.env` and answer the questions on the next run.
+
 ## Options
 
 | Option | Effect |
@@ -160,6 +213,7 @@ Webex Contact Center*.
 | `--upgrade-docker` | also upgrade Docker Engine (restarts every container on the host) |
 | `--no-packages` | leave the host's packages alone; only check them |
 | `--no-updater` | do not install the host updater (portal update requests then wait) |
+| `--configuration FILE --passphrase-file PATH` | install from a configuration package (ADR 0089): the login into `secrets/config.env`, the package imported once web is healthy (*Installing from a configuration package*); both or neither; `OPENPLANNER_CONFIGURATION` and `OPENPLANNER_PASSPHRASE_FILE` without a terminal |
 
 ## What a second run repairs, and what it reports
 
@@ -175,7 +229,7 @@ Webex Contact Center*.
 | updater, units, drop-in or `updater.env` missing or changed | installs them again from the checkout |
 | an HTTPS proxy running where `--no-tls` was chosen (restarts for ever without `proxy.env`) | removes it |
 | the HTTPS proxy runs but its image is not pinned (installed before ADR 0064 step 2, when the host built it) | pulls and verifies the proxy image at the version of the pinned application image and pins it; the proxy restarts on the released image |
-| `PUBLIC_BASE_URL` or the OIDC URL on `http` in production, a missing OIDC client secret, `ENVIRONMENT` not matching the mode | stops with the list; nothing is pulled or started |
+| `PUBLIC_BASE_URL` or the OIDC URL on `http` in production, a missing OIDC client secret, `ENVIRONMENT` not matching the mode | stops with the list; nothing is pulled or started. The login is checked as Compose sees it: `.env`, else `secrets/config.env`, so a `.env` without `OIDC_*` is in order when `config.env` holds them |
 | a release that does not pass `cosign verify` (either image) | stops; the running version stays |
 
 ## Update channel (ADR 0059, 0065)
@@ -234,6 +288,10 @@ git fetch --depth 1 origin tag v0.3.0 && git checkout -f v0.3.0
 | `Docker's release key has fingerprint ...` | the download was not Docker's key; check the network path (proxy, DNS) before trying again |
 | `checksum of cosign_... does not match` | the download is damaged or not the release; run it again later |
 | `.env needs changes:` | fix the listed settings in `.env`, run it again |
+| `--configuration and --passphrase-file go together` | pass both (or set `OPENPLANNER_CONFIGURATION` and `OPENPLANNER_PASSPHRASE_FILE`) |
+| `cannot read the configuration package:` ... `configuration_passphrase_wrong` | the passphrase file's first line is not the passphrase the package was exported with; nothing was written |
+| `the configuration package was refused: this installation is in use` | a package goes into a new installation only; web and worker are running without it |
+| `the configuration package was refused: ... another version` | export the package again from an installation on this version, run it again with the two options |
 | `not healthy within 300s` | `docker compose --env-file .env.update logs web worker`; fix, run it again |
 
 The updater's own log: `sudo journalctl -u openplanner-updater`.
