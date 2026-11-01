@@ -116,6 +116,7 @@ from the rows below.
 | 0093 | The management link is exchanged for a participant cookie | NOT BUILT | ADR (#309) | Steps 1–4 (`public_ref` and participant link sessions; booking pages, then direct call, trial and join on `/b/m/{ref}`; docs) |
 | 0094 | A cryptographic inventory, and key rotation without loss | NOT BUILT | ADR (#309); runbook warning on `MANAGEMENT_TOKEN_KEY` corrected | Steps 1–3 (`docs/cryptography.md`; links under the previous token key; key id, previous settings key and `rekey`) |
 | 0095 | Staff and roles of the bundled identity provider, managed in the portal | NOT BUILT | ADR only (proposed 2026-11-01) | Everything: `StaffDirectory` port and Keycloak adapter, permissions, Staff screen actions, threat model |
+| 0098 | Admin sessions held on the server | NOT BUILT | ADR only (proposed 2026-11-01); supersedes ADR 0013 §5 | Steps 1–4 (register, logout revokes, rotation and idle; clean-up and restore; own and administrator session views with a new permission; cookie `__Host-op_admin`) |
 | 0096 | Overview widgets chosen by the admin | NOT BUILT | ADR only (proposed 2026-11-01); step 1 (no *New group* on the overview) comes with this PR | Layout storage, *Add widget* and *Edit overview* screens |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)

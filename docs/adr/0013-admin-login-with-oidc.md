@@ -1,6 +1,6 @@
 # 0013. Admin login with OIDC: PingFederate in production, Keycloak in development
 
-Status: accepted (2026-10-23). Resolves open point O3 in part; refines "OIDC: authlib" in
+Status: accepted (2026-10-23); §5 superseded by 0098. Resolves open point O3 in part; refines "OIDC: authlib" in
 CLAUDE.md.
 
 ## Context
