@@ -54,7 +54,7 @@ from app.domain.job_plan import JobCounts, JobSummary, JobType, PlannedJob
 from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
-from app.domain.retention import RetentionFacts
+from app.domain.retention import DueBooking, RetentionFacts
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
     Group,
@@ -1075,6 +1075,13 @@ class Transaction(Protocol):
 
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         """Return the booking whose management token hashes to ``token_hash``."""
+        ...
+
+    async def due_for_purge(self, candidates_before: datetime) -> list[DueBooking]:
+        """Return the bookings of every group that may be overdue for a purge, with their ids.
+
+        For the nightly sweep (system, no scope). Same selection as ``list_retention``.
+        """
         ...
 
     async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:

@@ -1623,18 +1623,40 @@ is not judged: it is the operator's own doing.
 **Retention** in the admin portal (organisation admins, the compliance role and the superuser)
 shows per group how many bookings still hold personal data past their purge moment and how
 many `purge_pii` jobs failed. Both should be 0. A booking counts as overdue one hour after its
-purge moment (slot end + 24 h, cancellation + 24 h, or closure end + 30 days), which leaves
+purge moment (slot end + 24 h, cancellation + 24 h, deadline to confirm or choose a new time
++ 24 h, or closure end + 30 days), which leaves
 room for the worker and its retries.
 
 | Shown | Likely cause | What to do |
 |---|---|---|
 | Overdue > 0, failed 0, "last removed" long ago | the `worker` container is not running or not claiming jobs | `docker compose ps worker`, then `docker compose logs worker`; restart it; the backlog clears on its own |
 | Failed > 0 | the purge itself failed (database locked or full) | look up the code at **Remove personal data** in the audit log (Problems only); fix the cause and report the code to the developers (below) |
-| Overdue > 0 for a suspended booking | the closure was lifted, but no purge job was planned | report it to the developers as a bug (below) |
+| Overdue > 0 for a suspended booking | the closure was lifted, but no purge job was planned | none: the nightly sweep purges it (below); report it to the developers as a bug |
 
-There is no command yet to re-plan a failed or missing purge; until there is, report it to the
-developers with the error code. The nightly sweep from the privacy rules, which would catch such
-stragglers by itself, is not built yet either.
+**The nightly sweep.** Once a day the `worker` purges, directly and without a new job, every
+booking that still holds personal data more than one hour past its purge moment, whether its
+`purge_pii` job failed, ran out of retries, was never planned or came back with a restored
+backup. It is idempotent and needs no action. What it leaves behind is visible three ways:
+
+- the system event **retention.sweep** (audit log, global, superuser) with the counts
+  `overdue`, `purged`, `failed` and `backlog`; no event on a night with nothing overdue;
+- the log line `retention.sweep` (warning) with the same counts;
+- the log line `retention.backlog` (error) when a booking still held personal data more than
+  48 hours after its retention began, or a purge failed. **Alert on this event in monitoring.**
+  `retention.sweep_failed` means the sweep itself could not run (database locked or full).
+
+To run it by hand (for example after a restore from a backup, with maintenance mode on),
+inside the `web` container:
+
+```bash
+docker compose exec web python -m app.cli purge-overdue --dry-run
+docker compose exec web python -m app.cli purge-overdue
+```
+
+`--dry-run` prints the overdue bookings per group and changes nothing. The second prints how many
+were purged and exits non-zero if any could not be purged. Only counts and group slugs are
+printed. A booking that is suspended by a closure without an end date is left alone: its
+personal data goes when the closure is lifted or ends, plus 30 days.
 
 ## Widget on a host website (ADR 0035)
 
