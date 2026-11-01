@@ -1476,11 +1476,20 @@ docker compose --env-file .env.update exec web python -m app.cli config import /
 ```
 
 `config env PACKAGE --passphrase-file PATH --out FILE` writes the package's `OIDC_*` variables
-(the login) as an env file, for a `.env` that is not yet filled in. An import is refused on an
-installation with bookings, slots or an active closure, and on another version of OpenPlanner
-(export again from an installation on this version). Delete the package and the passphrase
-file when done: together they are every secret of the platform. Both commands are audited as
-`system:cli`.
+(the login) as an env file, for a `.env` that is not yet filled in (`--out -` prints them,
+for the installer's one-off container). An import is refused on an installation with
+bookings, slots or an active closure, and on another version of OpenPlanner (export again
+from an installation on this version). Delete the package and the passphrase file when done:
+together they are every secret of the platform. Both commands are audited as `system:cli`.
+
+A new host does all of this in one go: `./scripts/install.sh --mode production
+--configuration PACKAGE --passphrase-file PATH` (ADR 0089 point 8; `docs/install.md`,
+*Installing from a configuration package*). It writes the login to `secrets/config.env`, which
+Compose reads before `.env` (a value in `.env` wins), leaves the identity provider's questions
+out, and imports the package once web is healthy. Running it again with the two options writes
+`config.env` again and imports again, which is refused once the installation is in use; a run
+without them leaves `config.env` as it is. Removing `config.env` and running the installer
+again asks the login questions as before.
 
 ## Rotating secrets
 
