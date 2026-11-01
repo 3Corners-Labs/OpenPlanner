@@ -156,6 +156,7 @@ def oidc_provider(
     secret = settings.oidc_client_secret.get_secret_value() if settings.oidc_client_secret else ""
     config = OidcConfig(
         discovery_url=settings.oidc_discovery_url,
+        expected_issuer=settings.oidc_issuer,
         client_id=settings.oidc_client_id,
         client_secret=secret,
         scopes=settings.oidc_scopes,

@@ -35,7 +35,7 @@ from app.adapters.outbound import OutboundRefusedError, Resolver, guarded_reques
 from app.domain.authorization import Role
 from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM, SubjectRefusedError, qualify
-from app.domain.identity_providers import ASYMMETRIC_ALGORITHMS, ClientAuth
+from app.domain.identity_providers import ASYMMETRIC_ALGORITHMS, ClientAuth, issuer_of
 from app.domain.ports import IdentityError, LoginStart, LoginTestReport
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 from app.domain.tunable import value_of
@@ -98,6 +98,10 @@ class OidcConfig:
     ``client_auth`` picks the token-endpoint authentication: ``client_secret_basic`` with
     ``client_secret``, or ``private_key_jwt`` with ``signing_key`` (key id and private PEM).
     ``guard`` is set for a registered provider, whose addresses came from the portal.
+    ``expected_issuer`` is the issuer the discovery document and every ID token must carry,
+    compared exactly (OIDC Discovery §4.3, Core §3.1.3.7); ``None`` derives it from
+    ``discovery_url`` (``issuer_of``). A registered provider passes the issuer stored at
+    registration, so a later change of its discovery document cannot move it.
     """
 
     discovery_url: str
@@ -110,6 +114,12 @@ class OidcConfig:
     client_auth: ClientAuth = ClientAuth.CLIENT_SECRET_BASIC
     signing_key: tuple[str, str] | None = field(default=None, repr=False)
     guard: Guard | None = None
+    expected_issuer: str | None = None
+
+    @property
+    def issuer(self) -> str:
+        """Return the issuer to pin: the configured one, else the one the discovery URL names."""
+        return self.expected_issuer or issuer_of(self.discovery_url)
 
 
 def _values(claim: object) -> frozenset[str]:
@@ -453,7 +463,7 @@ class OidcIdentityProvider:
                 key=key,
                 algorithms=list(ALLOWED_ALGORITHMS),
                 audience=self._config.client_id,
-                issuer=metadata["issuer"],
+                issuer=self._config.issuer,
                 leeway=self._config.leeway_seconds,
                 options={"require": ["exp", "iat", "iss", "aud", "sub"]},
             )
@@ -483,7 +493,8 @@ class OidcIdentityProvider:
         """Return the provider metadata (cached for an hour).
 
         Raises:
-            IdentityError: ``discovery_failed`` if the document cannot be fetched.
+            IdentityError: ``discovery_failed`` if the document cannot be fetched or announces
+                another issuer than the pinned one.
         """
         if (
             self._metadata is not None
@@ -500,5 +511,8 @@ class OidcIdentityProvider:
         except (httpx.HTTPError, ValueError, OutboundRefusedError) as exc:
             log.warning("oidc.discovery_failed", error=type(exc).__name__)
             raise IdentityError("discovery_failed") from exc
+        if metadata["issuer"] != self._config.issuer:  # exact: no trailing-slash tolerance
+            log.warning("oidc.issuer_mismatch")
+            raise IdentityError("discovery_failed")
         self._metadata, self._metadata_at = metadata, time.monotonic()
         return metadata
