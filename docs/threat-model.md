@@ -65,6 +65,106 @@ cookie poisoning and user-controllable attributes (only validated values are ref
 absent anti-CSRF tokens (Fetch Metadata is the CSRF defence, see above). Any other warning
 fails the build.
 
+## Browser model (ASVS V3.2.1, V3.4.3, V3.5.1-3.5.4, V3.7.2)
+
+What the browser is allowed to do with OpenPlanner and why. Authentication paths are in
+`docs/authentication.md`.
+
+### CSRF in three layers
+
+No form carries a CSRF token. Three independent layers stand in the way of a cross-site request:
+
+1. **`SameSite=Lax` on the cookie.** The admin cookie `op_admin` is not sent on a cross-site
+   `POST`, `fetch` or subresource request, only on top-level `GET` navigations. This is the
+   layer that protects a browser that sends neither header below.
+2. **Fetch Metadata** (`require_same_origin`, `app/web/protection.py`). Every state-changing
+   route, admin and public, depends on it (`SameOrigin`). `Sec-Fetch-Site` is sent by every
+   current browser and cannot be set by a page; only `same-origin` and `none` pass, anything
+   else is a `403` and a security event (ADR 0053).
+3. **`Origin` comparison.** Only when `Sec-Fetch-Site` is absent, the `Origin` header is
+   compared with this site. It is not trusted when `Sec-Fetch-Site` is present, because the
+   referrer policy of some pages makes browsers send `Origin: null` for same-origin posts.
+
+**The exception, on purpose.** A request with neither `Sec-Fetch-Site` nor `Origin` passes
+layer 2 and 3. Browsers send at least one of them on every `POST` (`Origin` on every
+cross-origin and every `POST` request in current browsers), so such a request is not a browser form post: it comes from a
+script, `curl` or a very old client. It can reach the admin portal only with the admin
+cookie, which it has only when the caller already holds it, and a browser that does hold it
+withholds it from cross-site requests (layer 1). Refusing these requests would break health
+probes and tests without closing a path. The behaviour is pinned by
+`tests/admin/test_admin_flow.py::test_a_post_without_fetch_metadata_and_without_origin_is_let_through`.
+Where `SameSite` is not enough because the cookie is not involved, there is nothing to
+forge: the public forms act on a link or on a booking the caller creates, and the bot API
+uses a bearer token that a page cannot attach (no CORS headers).
+
+The widget's cross-origin `POST` (ADR 0035) is a different case: it is allowed only from the
+origins an organisation configured, answered with an exact `Access-Control-Allow-Origin`, and
+carries no cookie.
+
+### `GET` routes with an effect (V3.5.3)
+
+No `GET` changes a booking, a setting or a right. The routes below do something besides
+returning a page; each is deliberate.
+
+| Route | Effect | Why it is acceptable |
+|---|---|---|
+| `GET /b/{token}/confirm`, `/cancel`, `/wait/leave` | None; shows a button. The `POST` confirms, cancels or leaves (ADR 0056). | Mail scanners and link previewers that follow the link change nothing. |
+| `GET /b/{token}/join`, `/join/go` | Writes a join-page or join-click event on the booking's timeline (ADR 0072). | Evidence for troubleshooting, no change to the booking. |
+| `GET /b/{token}/test/go`, `/wait/status` | Redirect into the open trial meeting; status poll. | Read-only. |
+| `GET /admin/login`, `/admin/callback` | Start and finish an OIDC login. | The callback is a `GET` by the protocol; `state` and `nonce` bind it to the browser that started it. |
+| `GET /admin/preferences` | Stores theme, menu width and alert choices in the caller's own session cookie, then redirects to `next`. | Only own presentation preferences; `next` is checked (see below); a third-party link can at worst change a theme. |
+| `GET /admin/updates/progress`, `/…/live` fragments | Poll status. | Read-only. |
+
+### Redirects (V3.7.2)
+
+Who decides the target of every redirect the application issues. No redirect target is taken
+from a request without a check.
+
+| Redirect | Target decided by | Control |
+|---|---|---|
+| After admin login or re-login, update snooze, preferences (`next`) | The request (`next` parameter) | `safe_next`: must start with `/admin`, no `//`, no `\`, no `://`; else `/admin/`. `test_next_cannot_leave_the_admin_portal` |
+| `GET /admin/login` to the IdP | The IdP's `authorization_endpoint` from the pinned discovery document (ADR 0097); organisation providers: the endpoint stored at registration | Issuer compared exactly; only `https` (or `http` in development) |
+| Logout to the IdP's `end_session_endpoint` | Same discovery document | `post_logout_redirect_uri` is built by us; interstitial page keeps CSP `form-action 'self'` |
+| `GET /b/{token}/join/go`, `/test/go` | The join link of the Webex meeting, kept on the booking | `join_link` refuses anything but `https` and applies the group's client setting (ADR 0075); the value is written by the Webex adapter, never by a request |
+| After a form post (`/g/{slug}/book`, `/b/{token}/…`, direct call) | The application: path built from the slug or the token that was just validated | Relative paths only; tokens and slugs come from the database |
+| After an admin form post | The application: the route's own URL plus `?done=`, optionally an anchor | Relative; `done` values come from a closed list |
+| Moved screens (`/admin/groups/{slug}/hours`, old organisation paths) | The application | Fixed relative `301`/`308` |
+| `GET /b/{token}/wait/status` for an unknown booking | The application | Relative |
+
+### Header policy per response type (V3.2.1, V3.4.3)
+
+`SecurityHeadersMiddleware` (`app/api/security_headers.py`) puts deny-by-default headers on
+every response and never overrides one a route set. HTML goes through `app.web.templates.render`,
+which sets its own CSP and `no-store`.
+
+| Response type | Content-Security-Policy | Other headers |
+|---|---|---|
+| JSON, plain text, CSV, errors, anything without its own policy | `default-src 'none'; base-uri 'none'; frame-ancestors 'none'` | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, HSTS, `Referrer-Policy: same-origin`, `Permissions-Policy` off for camera, microphone, geolocation and more, COOP `same-origin`, COEP `require-corp`, CORP `same-origin` |
+| Admin and public HTML | `HTML_CSP`: `default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` | `Cache-Control: no-store`, plus all of the above |
+| HTML with own scripts (participant pages with polling, update progress, agenda) | `SCRIPT_CSP`: as `HTML_CSP` plus `script-src 'self'; connect-src 'self'` | Same; no inline script or style anywhere |
+| Widget script (`/widget/v1/gov-booking.js`) | The default (the file is not a document) | `Access-Control-Allow-Origin: *`, `Cross-Origin-Resource-Policy: cross-origin` so any host site can load it; no cookie |
+| Widget API | The default | `Access-Control-Allow-Origin` echoes an allowed origin with `Vary: Origin`; the public availability read uses `*` and `public, max-age=300` |
+| Brand assets, theme CSS, fonts | The default | `public, max-age=3600` (static files: versioned URL through `static_url`); same-origin only, uploaded images and fonts served with their validated media type |
+| Machine API | The default | `Cache-Control: no-store` on the token and errors; no CORS |
+
+A browser honours `base-uri` and `form-action` only in a document, which is why they matter
+for HTML and cost nothing to state on everything else; they close the case of a response that
+is sniffed or rendered as a document by mistake. `frame-ancestors 'none'` and `X-Frame-Options:
+DENY` hold everywhere: the widget is a Web Component loaded as a script, never an iframe.
+
+### One origin for all organisations (V3.5.4)
+
+All organisations, groups, the admin portal and the participant pages share one origin per
+installation. This is a **deliberate limitation**: OpenPlanner is one application that
+separates organisations by scope (ADR 0014, SQL filters on every query), not a set of
+independent applications. The consequences are known: a script injection on any page would
+reach every page of the origin, so the rest of the model compensates (no inline script,
+no `unsafe-eval`, a CSP without third parties, `HttpOnly` cookies, output escaping by
+Jinja2 autoescape, an organisation's uploads limited to validated images and fonts and served
+with their own media type and `nosniff`). The admin cookie is scoped to `/admin`; participant
+pages never read the session. A separate hostname per organisation is possible behind the
+proxy and is only built when a client requires it.
+
 ## Cross-cutting
 
 | Threat | Mitigation | Test |
@@ -242,7 +342,9 @@ other `/admin` route declares one permission of the matrix (ADR 0014). Inputs fr
 | Elevation | A claim grants rights it should not (organisation claim without the org-admin role, unknown group) | Rights come only from `decide()` on role × permission × scope; claims without the matching role or for unknown groups grant nothing | `tests/domain/test_authorization.py::test_decide`, `tests/domain/test_admin_service.py::test_claims_without_the_matching_role_give_no_context` |
 | Elevation | An admin route without an authorisation check | Every admin route depends on exactly one `RequirePermission`; a test walks the router and the role × route × own/other-group table | `tests/admin/test_authorization_matrix.py::test_every_admin_route_declares_one_permission_and_is_in_the_table`, `test_matrix` |
 | Elevation / information disclosure | A listing shows data of another organisation | Listing queries take a mandatory `Scope`, filtered in SQL; the scope and the per-object decision come from the same matrix | `tests/adapters/db/test_admin_queries.py::test_every_listing_query_requires_a_scope`, `tests/domain/test_authorization.py::test_database_scope_and_decision_never_disagree` |
-| Spoofing | Session fixation or a stolen, long-lived session | Session cleared before login; signed cookie `HttpOnly; SameSite=Lax; Path=/admin` (`Secure` in production); absolute lifetime of 8 h enforced server-side; tampered cookie means logged out | `test_successful_login_starts_a_fresh_session_and_is_audited`, `test_session_has_an_absolute_lifetime`, `test_tampered_cookie_means_logged_out` |
+| Spoofing | Session fixation or a stolen, long-lived session | Session cleared before login; signed cookie `HttpOnly; SameSite=Lax; Path=/admin` (`Secure` in production); the session lives in the register `admin_sessions` (ADR 0098): absolute lifetime of 8 h and idle limit enforced server-side on every request; tampered cookie means logged out | `test_successful_login_starts_a_fresh_session_and_is_audited`, `tests/admin/test_admin_sessions.py::test_the_absolute_lifetime_still_ends_the_session`, `test_idle_ends_the_session_and_is_audited`, `test_tampered_cookie_means_logged_out` |
+| Spoofing | Replay of a copied admin cookie after logout, after a new login, or after the idle time (ASVS V7.4.1, V7.2.4, V7.3.1) | The cookie is only a reference; logout ends the session in the register before the cookie is cleared; every login ends the session the browser brought (`replaced`) and takes a new reference; a session idle longer than `admin_idle_minutes` ends with `idle` and an audit event; a register that cannot be read gives no access | `tests/admin/test_admin_sessions.py::test_a_copied_cookie_is_dead_after_logout`, `test_a_new_login_ends_the_previous_cookie`, `test_idle_ends_the_session_and_is_audited`, `test_an_unreadable_register_gives_no_access` |
+| Information disclosure | The session reference or the login's claims leak through the cookie, a log or an audit event | The cookie holds the reference only (no name, organisation or role); only `sha256` of the reference is stored; the reference never reaches a log line or audit event; more than `admin_max_sessions_per_person` sessions end the one idle longest | `tests/admin/test_admin_sessions.py::test_the_cookie_holds_a_reference_and_no_claims`, `test_the_reference_is_never_logged_or_audited`, `test_more_sessions_than_the_limit_end_the_one_idle_longest`, `tests/adapters/db/test_admin_session_queries.py::test_the_table_holds_hashes_never_a_reference` |
 | Spoofing | A discovery document or ID token with another issuer than expected (hostile or changed discovery endpoint) is trusted, because the issuer was taken from the document itself | The issuer is pinned (`OidcConfig.expected_issuer`: `OIDC_ISSUER`, else the discovery URL without its suffix; for an organisation provider the issuer stored at registration) and compared exactly in `_discover` and in the token check (`iss`); registration compares without trailing-slash tolerance; the log carries `oidc.issuer_mismatch` without values (ADR 0097) | `tests/adapters/test_oidc.py::test_a_discovery_document_with_another_issuer_is_refused`, `test_a_trailing_slash_is_another_issuer`, `test_a_token_with_another_iss_than_the_pinned_one_is_refused`, `test_an_organisation_provider_keeps_its_stored_issuer_when_discovery_changes`, `tests/domain/test_identity_providers.py::test_a_trailing_slash_on_the_issuer_is_a_mismatch`; `oidc-check` shows the same comparison on the host before a login fails (`tests/adapters/test_oidc_check.py::test_the_issuer_is_compared_exactly_with_the_one_the_login_pins`) |
 | Spoofing | An admin logs in with a stolen password alone, or a hostile IdP policy silently drops the second factor | `ADMIN_MFA_REQUIRED` (class B, on for the bundled Keycloak, off for another provider until the IdP names its values): the login asks `acr_values` and the ID token must carry an `amr` out of `OIDC_MFA_AMR_VALUES` or an `acr` out of `OIDC_MFA_ACR_VALUES`, else `mfa_required` (401, security event without claim values, log `oidc.mfa_missing`); MFA itself stays at the IdP; no step-up per action and no four-eyes yet (ADR 0100) | `tests/domain/test_mfa.py`, `tests/adapters/test_oidc.py::test_a_token_without_proof_of_mfa_refuses_the_login`, `test_an_acr_that_was_not_requested_is_no_proof`, `test_the_refusal_logs_no_claim_values`, `tests/admin/test_admin_flow.py::test_a_login_without_a_second_factor_is_refused_with_a_clear_text`, `tests/adapters/test_oidc.py::test_the_accepted_amr_and_acr_values_are_configurable`, `tests/scripts/test_render_keycloak_realm.py::test_the_realm_asks_for_a_second_factor_and_says_so_in_the_token` |
 | Spoofing | An organisation provider logs an admin in without a second factor and nobody notices | Per provider policy `record` (default) writes the security event `admin.login.mfa_missing` with `provider:<key>`, no personal data; `require` refuses with `mfa_required`; the test login shows whether a second factor showed (ADR 0100 point 5) | `tests/adapters/test_oidc.py::test_the_record_policy_lets_the_login_through_and_marks_it`, `test_a_test_login_reports_whether_a_second_factor_showed_and_never_refuses`, `tests/admin/test_admin_flow.py::test_a_login_without_a_second_factor_under_record_goes_on_and_is_recorded`, `tests/admin/test_idp_routes.py::test_the_mfa_policy_is_registered_shown_and_validated` |

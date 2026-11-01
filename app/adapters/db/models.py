@@ -1224,3 +1224,24 @@ class OwnCertificateRow(Base):
     uploaded_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class AdminSessionRow(Base):
+    """One admin session on the server (ADR 0098).
+
+    ``id_hash`` is the ``sha256`` of the random reference the cookie holds; the reference
+    itself is never stored. ``claims`` is the JSON of what the ID token said. Staff data, not
+    participant PII.
+    """
+
+    __tablename__ = "admin_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    subject: Mapped[str] = mapped_column(String(255), index=True)
+    provider: Mapped[str] = mapped_column(String(64))
+    claims: Mapped[str] = mapped_column(Text)
+    login_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    end_reason: Mapped[str | None] = mapped_column(String(16))
