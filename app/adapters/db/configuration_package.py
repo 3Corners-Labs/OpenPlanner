@@ -75,6 +75,13 @@ _SEALED: tuple[tuple[str, str, str, str], ...] = (
         "FROM identity_providers WHERE secret_ciphertext IS NOT NULL",
     ),
     (
+        "log_destinations",
+        "secret_nonce",
+        "secret_ciphertext",
+        "SELECT rowid, 'logdest:' || id || ':secret', secret_nonce, secret_ciphertext "
+        "FROM log_destinations WHERE secret_ciphertext IS NOT NULL",
+    ),
+    (
         "identity_provider_keys",
         "key_nonce",
         "key_ciphertext",
