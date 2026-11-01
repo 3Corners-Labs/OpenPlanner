@@ -1,6 +1,9 @@
 # 0021. Ending the work item of a cancelled booking
 
 Status: accepted (2026-10-25). Supersedes ADR 0018 point 5.
+Note (2026-11-01 review): ADR 0069 says it amends "the read-only rule of ADR 0017 and 0021";
+this ADR states no such rule (the lock is `Group.change_deadline`). The confirmation with the
+Cisco beta team named in the Consequences is not recorded; ADR 0082 §2 relies on End Task.
 
 ## Context
 

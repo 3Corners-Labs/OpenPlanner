@@ -32,8 +32,8 @@ None. The two widths and the 66 rem threshold are design-system values like the 
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR accepted | #215 | in PR |
-| 1 | `Width` in the register and `Home`, `data-width` on `<main>`, tokens and rules in `admin.css`, the week frame, `docs/admin-map.md`, the guarding tests | #215 | in PR |
+| 0 | ADR accepted | #215 | merged |
+| 1 | `Width` in the register and `Home`, `data-width` on `<main>`, tokens and rules in `admin.css`, the week frame, `docs/admin-map.md`, the guarding tests | #215 | merged |
 | 2 | Move further list screens to wide when the test host shows a table that needs the room | | follow-up |
 
 ## Consequences

@@ -1,7 +1,10 @@
 # 0088. The decision gate judges the merge group too
 
 Status: proposed (2026-10-31), requested by the product owner. Amends ADR 0078 (point 3: where
-the check *decision gate* runs and what it reads). Partly built; see *Build status*.
+the check *decision gate* runs and what it reads). Partly built; see *Build status*. Merged in
+#284 on 2026-10-31 without `po:approved` before the merge; awaiting the product owner's
+acceptance. Step 1 is merged (#284) but has no effect until *decision gate* is a required check
+of `main` (step 2).
 
 ## Context
 
@@ -83,8 +86,8 @@ else rather than guessing.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #284 | in PR |
-| 1 | `--list-pull-requests` and `--merge-group` in `scripts/decision_gate.py`, the `merge_group` job in `decision-gate.yml` with `pull-requests: read`, `edited` on `pull_request_target`, tests, ADR 0078's table, CONTRIBUTING.md and the runbook | #284 | in PR |
+| 0 | ADR proposed | #284 | merged 2026-10-31 |
+| 1 | `--list-pull-requests` and `--merge-group` in `scripts/decision_gate.py`, the `merge_group` job in `decision-gate.yml` with `pull-requests: read`, `edited` on `pull_request_target`, tests, ADR 0078's table, CONTRIBUTING.md and the runbook | #284 | merged 2026-10-31 |
 | 2 | The product owner adds *decision gate* to the required checks of `main` (ADR 0078 step 3; without it neither run stops a merge) | | planned |
 
 ## Consequences

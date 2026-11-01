@@ -4,6 +4,8 @@ Status: accepted (2026-10-23). Settles open point O9. Amended by ADR 0026 (cap o
 calls per group, queue feedback) and by ADR 0072 (the switch moves from the group to the
 staffing block; the waiting page refreshes itself through a polled fragment). Built; point 4's
 leave/cancel control was the last gap and is built too (AG-2, 2026-10-30); see `docs/adr-status.md`.
+Point 4's "How leaving works" was added on 2026-10-30 with a decision marked as an assumption
+to be confirmed by the product owner; it amends ADR 0026's definition of connected.
 
 ## Context
 
@@ -56,7 +58,7 @@ None. Leaving uses the existing booking rate limit (`RATE_LIMIT_BOOKINGS`, ADR 0
 |---|---|---|---|
 | 1 | Points 1 to 3 and 5: switch, direct booking with meeting and work item, waiting page, limits | #10, #24, #155 | merged |
 | 2 | Point 4: "no agent" text and the link to schedule instead | #10 | merged |
-| 3 | Point 4: leave or cancel from the waiting page ends the work item (AG-2) | #164 | in PR |
+| 3 | Point 4: leave or cancel from the waiting page ends the work item (AG-2) | #164 | merged |
 
 ## Consequences
 

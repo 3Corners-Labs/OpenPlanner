@@ -2,6 +2,8 @@
 
 Status: proposed (2026-10-27). Confirms the decision of 2026-10-23 (SQLite, no Postgres) for
 now and states when and how it would be revisited. Not built yet; see `docs/adr-status.md` for what is built.
+Note (2026-11-01 review): §1 restates the decision in force (ADR 0002, CLAUDE.md: SQLite, no
+Postgres) and §2 only names triggers; §3–4 are not built.
 
 ## Context
 

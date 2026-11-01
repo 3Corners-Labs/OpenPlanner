@@ -1,6 +1,10 @@
 # 0011. Management tokens derived from a per-booking salt and a server key
 
-Status: accepted (2026-10-23). Refines the management-token rule in CLAUDE.md.
+Status: accepted (2026-10-23). Refines the management-token rule in CLAUDE.md. How the token
+is used is refined by ADR 0093; rotation is amended by ADR 0094. Note (2026-11-01 review): the
+consequence that rotating `MANAGEMENT_TOKEN_KEY` invalidates all outstanding links is
+incorrect: links already sent keep working (lookup by the stored hash), but every message sent
+after the rotation carries a dead link until ADR 0094 §4 is built.
 
 ## Context
 

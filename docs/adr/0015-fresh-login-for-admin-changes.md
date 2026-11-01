@@ -1,6 +1,8 @@
 # 0015. Admin changes need a recent login
 
-Status: accepted (2026-10-23)
+Status: accepted (2026-10-23). Setting bounds per ADR 0042 §7. The consequence "without
+server-side sessions; emergency revocation by rotating `SESSION_SECRET`" is to be replaced by
+ADR 0098 (proposed).
 
 ## Context
 

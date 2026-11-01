@@ -3,6 +3,8 @@
 Status: accepted (2026-10-30), built (step 1). Builds the organisation layer promised by ADR 0004
 §4 and §7, ADR 0009 and ADR 0022 (which deferred the editor). The global (superuser) layer of
 ADR 0004 and the `.po` export and import stay unbuilt.
+Note (2026-11-01 review): §8's assumption is settled: the editor is at organisation → Overview
+→ Texts (`app/web/navigation.py`).
 
 ## Context
 

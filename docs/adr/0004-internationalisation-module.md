@@ -1,6 +1,9 @@
 # 0004. Internationalisation as a self-contained module
 
 Status: accepted (2026-10-23). Supersedes the `*_nl` / `*_en` columns in HANDOVER §3. Partly built, checked on 2026-10-31: the module, catalogues, negotiation and organisation overrides (ADR 0074) run; the global override layer and `.po` export and import are not built (`docs/adr-status.md`).
+Note (2026-11-01 review): the §4 lookup chain as built is ADR 0074 §4 (group text →
+organisation override → catalogue); the global layer is not built. §9's revision counter is
+replaced by the 5-second re-read of ADR 0074 §5.
 
 ## Context
 

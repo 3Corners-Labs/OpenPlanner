@@ -3,6 +3,10 @@
 Status: proposed (2026-10-28), requested by the product owner. Extends ADR 0017 (video through
 the Webex Meetings API) and ADR 0019 (direct video call). Settings per ADR 0042. Touches open
 point O8 (accessibility of the video call). Not built yet; see `docs/adr-status.md` for what is built.
+Note (2026-11-01 review): the fixed meeting rules (no join before the host, lobby) conflict
+with the trial meeting of ADR 0071 (`TRIAL_OPTIONS`); ADR 0075 finding 5 shows a site with
+such rules keeps the trial participant in the lobby. The settings registry of ADR 0042 now
+exists (`app/domain/settings_registry.py`). To be resolved before acceptance.
 
 ## Context
 

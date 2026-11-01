@@ -2,6 +2,8 @@
 
 Status: accepted (2026-10-26). Supersedes point 1 (the SMS half) and point 3 of ADR 0022 in
 part: Webex Connect stays the only adapter, but it is no longer the definition of SMS.
+Note (2026-11-01 review): where this ADR cites ADR 0021 for the provider-neutral contact
+center, read ADR 0032 (renumbered on 2026-10-27); ADR 0032 is proposed, with nothing built yet.
 
 ## Context
 

@@ -2,6 +2,10 @@
 
 Status: accepted (2026-10-26), requested by the product owner. Amends ADR 0014 (level of
 `audit.view`, roles that hold it).
+§5 (admin actions kept as before) superseded by ADR 0040 part 4 (2 years,
+`AUDIT_RETENTION_DAYS`); request events have their own retention (ADR 0068 §2). Extended by ADR
+0034 (security events, which closes "webhook rejections" of the Consequences), ADR 0053 (failed
+logins move to the `security` category) and ADR 0068 §4 (skip reasons).
 
 ## Context
 
