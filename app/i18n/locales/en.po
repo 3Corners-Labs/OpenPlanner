@@ -6163,6 +6163,12 @@ msgstr "Admin session lifetime (hours)"
 msgid "settings.field.admin_reauth_minutes.label"
 msgstr "Log in again for a change after (minutes)"
 
+msgid "settings.field.admin_idle_minutes.label"
+msgstr "Idle time before the admin portal logs out (minutes)"
+
+msgid "settings.field.admin_max_sessions_per_person.label"
+msgstr "Simultaneous sessions per person"
+
 msgid "settings.field.oidc_role_claim.label"
 msgstr "Claim with the roles"
 

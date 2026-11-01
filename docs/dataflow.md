@@ -176,7 +176,8 @@ not personal data; no purge job; kept until changed. The audit event holds count
 ```
 admin ──browser──> web /admin/login ──redirect──> identity provider (PingFederate; Keycloak in dev; the bundled Keycloak of a test or lab installation, ADR 0090, on the host's loopback with its accounts in the volume idp-data)
 identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
-web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
+web ──signed session cookie op_admin (a random session reference and the admin's UI choices, no name or role; ADR 0098)──> admin browser
+web ──SQL──> admin_sessions (sha256 of the reference, sub, provider, claims, login, last seen, end and reason; ADR 0098)
 web ──SQL──> audit_events (sub, action, outcome, organisation, group)
 worker ──SQL──> audit_events (source=system: job type, outcome, error code, booking id; ADR 0031)
 web ──SQL──> staff, staff_memberships (sub, display name, roles, organisation and group slugs,
@@ -189,10 +190,11 @@ anyone ──GET /admin/jwks.json──> web (public keys of every organisation 
 
 | Data item | Table.column / place | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| Admin subject identifier | `audit_events.actor`, `staff.subject`, session cookie | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
-| Admin display name | `staff.display_name`, session cookie | identity provider | replaced at every login; to be erased for admins inactive longer than `staff_retention_days` (ADR 0046, step 2) | no |
+| Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject` | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
+| Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; to be erased for admins inactive longer than `staff_retention_days` (ADR 0046, step 2) | no |
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed` | no |
-| Entitlement values (ADR 0049) | session cookie (the recognised values), `staff_refused_entitlements` (value, reason code, organisation), `audit_events` (`auth.entitlement_refused`, `auth.entitlement_mismatch`, `auth.ambiguous_claims`) | identity provider claim `openplanner_entitlements` | session: its lifetime; refusals: replaced at every login; events: as admin actions | no; the values hold the prefix, a role key and the IdP values of organisations and groups, linked to the employee's subject |
+| Entitlement values (ADR 0049) | `admin_sessions.claims` (the recognised values), `staff_refused_entitlements` (value, reason code, organisation), `audit_events` (`auth.entitlement_refused`, `auth.entitlement_mismatch`, `auth.ambiguous_claims`) | identity provider claim `openplanner_entitlements` | session: until it ends and is cleaned up (ADR 0098); refusals: replaced at every login; events: as admin actions | no; the values hold the prefix, a role key and the IdP values of organisations and groups, linked to the employee's subject |
+| Admin session (ADR 0098) | `admin_sessions` (`id_hash` = sha256 of 32 random bytes, subject, provider, login claims as JSON, `login_at`, `last_seen_at`, `ended_at`, `end_reason`); the cookie holds the reference only | the login; the requests | ends at logout, idle (`admin_idle_minutes`), absolute end (`admin_session_hours`), a newer login or the limit per person; rows are removed by the worker's clean-up (ADR 0098 step 2) | no; staff data, never the reference itself in a log, audit event or URL |
 | Organisation provider registration (ADR 0083 step 2) | `identity_providers` (key, name, discovery URL, issuer, client id, method, scopes, claim and prefix, on/off; client secret sealed AES-256-GCM), `identity_provider_keys` (public JWK; private key sealed) | the superuser's form; the provider's discovery document | until the superuser removes the provider; a retired key stays published 24 h | public keys at `/admin/jwks.json`; the client assertion to the provider's token endpoint; no personal data in any of it |
 | IdP values of organisations and groups | `organisations.idp_key`, `groups.idp_key` | superuser and org admins in the portal | as the organisation or group; changes audited with old and new value | no (they are what PingFederate sends) |
 | Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
@@ -210,7 +212,7 @@ The auditor role (ADR 0039) is read-only and holds no permission that shows part
 does see admin names in the audit log, which is the accountability it exists for.
 
 Custom roles (ADR 0039 step 3) live in `roles`: template, names, the role claim value and the
-permission codes, no personal data. The session cookie keeps, next to the built-in roles, at
+permission codes, no personal data. The admin session (`admin_sessions.claims`) keeps, next to the built-in roles, at
 most 20 other role claim values (group or role names from the IdP, no personal data); the
 custom roles they grant are looked up per request. Changes are audited as `role.*` events
 with codes only and shown on the matrix page with the actor's display name.

@@ -1,13 +1,13 @@
-"""The admin session: who is logged in, and the OIDC login in progress (ADR 0013).
+"""The admin session: a reference in the cookie, the session itself on the server (ADR 0098).
 
-Stored in Starlette's signed session cookie (``op_admin``, path ``/admin``). Holds what the
-ID token said (``LoginClaims``: subject, display name, the legacy roles, organisations and
-groups, the other role claim values and the recognised entitlement values of ADR 0049), the
-login time, when activity was last written to the staff record (ADR 0046), the chosen theme,
-the menu width, the alert preferences and the scope filter. The grants themselves are resolved
-from those claims on every request (``app.domain.login_service``), never stored. The absolute
-lifetime is enforced here; the cookie's own expiry slides with every response. The theme, the
-menu width, the preferences and the filter live here so that they need no cookie of their own.
+The signed cookie (``op_admin``) holds ``sid``, a random reference, next to what exists before
+a session does: the OIDC login in progress, the test login, the update snooze, and the chosen
+theme, menu width, alert preferences and scope filter. Who is logged in (``LoginClaims``:
+subject, display name, roles, organisations, groups, entitlements), when, and until when lives
+in the register (``app.domain.admin_session_service``) and is looked up on every request, so
+logging out, a new login, the idle limit and the absolute lifetime all take effect on the
+server, whatever copy of the cookie someone holds. The grants themselves are resolved from the
+claims on every request (``app.domain.login_service``), never stored.
 """
 
 from dataclasses import dataclass
@@ -16,15 +16,13 @@ from typing import Any
 
 from fastapi import Request
 
-from app.domain.authorization import Role
-from app.domain.entitlements import MAX_SESSION_GRANTS, LoginClaims
+from app.domain.admin_session_service import AdminSessionService
+from app.domain.admin_sessions import AdminSession, EndReason, SessionPolicy
+from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM
 from app.domain.ports import LoginStart
-from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 
-_PRINCIPAL = "principal"
-_LOGIN_AT = "login_at"
-_SEEN_AT = "seen_at"
+_SID = "sid"
 _OIDC = "oidc"
 _TRIAL = "login_trial"
 _THEME = "theme"
@@ -163,17 +161,26 @@ def pop_login_start(request: Request) -> dict[str, str] | None:
     return value if isinstance(value, dict) else None
 
 
-def start_session(request: Request, claims: LoginClaims, now: datetime) -> None:
+async def start_session(
+    request: Request,
+    service: AdminSessionService,
+    claims: LoginClaims,
+    provider: str,
+    policy: SessionPolicy,
+) -> None:
     """Replace the whole session with a fresh one for ``claims`` (no session fixation).
 
-    Only the theme, the menu width and the alert preferences carry over, so a fresh login
-    (ADR 0015) keeps the admin's choices. ``claims.entitlements`` should hold the recognised
-    values only (the login service sees to that), so the cookie stays within its 4 kB.
+    The session the browser brought is ended (``replaced``), so a copy of the old cookie is
+    dead after this login (ADR 0098 point 6). Only the theme, the menu width and the alert
+    preferences carry over, so a fresh login (ADR 0015) keeps the admin's choices. The new
+    cookie holds the new reference and nothing about the person.
     """
+    old = _sid(request)
     theme = session_theme(request)
     nav = session_nav(request)
     prefs = session_alert_prefs(request)
     request.session.clear()
+    request.state.admin_login = None
     if theme != THEMES[0]:
         request.session[_THEME] = theme
     if nav is not None:
@@ -181,79 +188,57 @@ def start_session(request: Request, claims: LoginClaims, now: datetime) -> None:
     if prefs != AlertPrefs(True, DEFAULT_ALERT_POPUPS):
         request.session[_ALERT_BANNER] = prefs.banner
         request.session[_ALERT_POPUPS] = prefs.popups
-    request.session[_PRINCIPAL] = {
-        "subject": claims.subject,
-        "name": claims.display_name,
-        "roles": sorted(claims.roles),
-        "organisations": sorted(claims.organisations),
-        "groups": sorted(claims.groups),
-        "claims": sorted(claims.role_claims),
-        "entitlements": sorted(claims.entitlements)[:MAX_SESSION_GRANTS],
-    }
-    request.session[_LOGIN_AT] = now.isoformat()
-    request.session[_SEEN_AT] = now.isoformat()
+    request.session[_SID] = await service.start(claims, provider, policy, replaces=old)
 
 
-def current_login(request: Request, now: datetime, lifetime: timedelta) -> LoginClaims | None:
-    """Return the logged-in admin's claims, or ``None`` (not logged in, expired or tampered)."""
-    data: Any = request.session.get(_PRINCIPAL)
-    login_at: Any = request.session.get(_LOGIN_AT)
-    if not isinstance(data, dict) or not isinstance(login_at, str):
-        return None
-    try:
-        started = datetime.fromisoformat(login_at)
-        claims = LoginClaims(
-            subject=str(data["subject"]),
-            display_name=str(data["name"]),
-            roles=frozenset(Role(r) for r in data["roles"]),
-            organisations=frozenset(str(o) for o in data["organisations"]),
-            groups=frozenset(str(g) for g in data["groups"]),
-            role_claims=frozenset(
-                str(c) for c in data.get("claims", [])[:MAX_ROLE_CLAIMS] if is_claim_value(str(c))
-            ),
-            entitlements=frozenset(
-                str(e) for e in data.get("entitlements", [])[:MAX_SESSION_GRANTS]
-            ),
-        )
-    except (KeyError, TypeError, ValueError):
-        request.session.clear()
-        return None
-    if now - started > lifetime:
-        request.session.clear()
-        return None
-    return claims
+def _sid(request: Request) -> str | None:
+    """Return the session reference of the cookie, if it holds a plausible one."""
+    value: Any = request.session.get(_SID)
+    return value if isinstance(value, str) and 0 < len(value) <= 128 else None
+
+
+async def load_login(request: Request, service: AdminSessionService, policy: SessionPolicy) -> bool:
+    """Look the session up once for this request; return whether activity was just written.
+
+    Sets ``request.state.admin_login`` to the live session or ``None``. A reference that no
+    longer opens a session is dropped from the cookie. A failing register raises, so there is
+    no access (ADR 0098 point 14).
+    """
+    found, written = await service.resolve(_sid(request), policy)
+    request.state.admin_login = found
+    if found is None:
+        request.session.pop(_SID, None)
+    return written
+
+
+def current_session(request: Request) -> AdminSession | None:
+    """Return the live session of this request, or ``None`` before ``load_login`` or without."""
+    found: AdminSession | None = getattr(request.state, "admin_login", None)
+    return found
+
+
+def current_login(request: Request) -> LoginClaims | None:
+    """Return the logged-in admin's claims, or ``None`` (not logged in, ended or expired)."""
+    found = current_session(request)
+    return found.claims if found is not None else None
 
 
 def login_age(request: Request, now: datetime) -> timedelta | None:
-    """Return how long ago the admin logged in, or ``None`` without a (valid) login time."""
-    login_at: Any = request.session.get(_LOGIN_AT)
-    if not isinstance(login_at, str):
-        return None
+    """Return how long ago the admin logged in, or ``None`` without a session."""
+    found = current_session(request)
+    return now - found.login_at if found is not None else None
+
+
+async def end_session(
+    request: Request, service: AdminSessionService, reason: EndReason = EndReason.LOGOUT
+) -> None:
+    """End the session on the server first, then forget everything in the cookie."""
+    sid = _sid(request)
+    request.state.admin_login = None
     try:
-        return now - datetime.fromisoformat(login_at)
-    except ValueError:
-        return None
-
-
-def activity_due(request: Request, now: datetime, interval: timedelta) -> bool:
-    """Return whether activity is due to be written, and if so remember ``now`` as written.
-
-    Keeps the write to the staff record at most once per ``interval`` without a database
-    read on every request.
-    """
-    seen_at: Any = request.session.get(_SEEN_AT)
-    try:
-        due = not isinstance(seen_at, str) or now - datetime.fromisoformat(seen_at) >= interval
-    except ValueError:
-        due = True
-    if due:
-        request.session[_SEEN_AT] = now.isoformat()
-    return due
-
-
-def end_session(request: Request) -> None:
-    """Forget everything about the admin."""
-    request.session.clear()
+        await service.end(sid, reason)
+    finally:
+        request.session.clear()
 
 
 def session_theme(request: Request) -> str:

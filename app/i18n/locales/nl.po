@@ -6163,6 +6163,12 @@ msgstr "Sessieduur beheerportaal (uren)"
 msgid "settings.field.admin_reauth_minutes.label"
 msgstr "Opnieuw inloggen voor een wijziging na (minuten)"
 
+msgid "settings.field.admin_idle_minutes.label"
+msgstr "Inactiviteit voor het beheerportaal uitlogt (minuten)"
+
+msgid "settings.field.admin_max_sessions_per_person.label"
+msgstr "Gelijktijdige sessies per persoon"
+
 msgid "settings.field.oidc_role_claim.label"
 msgstr "Claim met de rollen"
 

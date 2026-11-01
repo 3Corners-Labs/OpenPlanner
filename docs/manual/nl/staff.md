@@ -50,4 +50,5 @@ logins, afmeldingen en wijzigingen, binnen uw eigen organisaties of groepen.
 - **Laatst actief**: de laatste keer dat de persoon een pagina opende. Dit wordt hooguit
   eens per vijf minuten bijgewerkt.
 - **Laatst afgemeld**: de laatste keer dat de persoon op **Afmelden** klikte. Een sessie die
-  vanzelf verloopt (na 8 uur) telt niet als afmelding.
+  vanzelf verloopt (na 8 uur) telt niet als afmelding. Hetzelfde geldt voor een sessie die eindigt na te lang
+  stilzitten (standaard 60 minuten) of omdat een nieuwere inlog haar vervangt.
