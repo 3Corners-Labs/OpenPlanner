@@ -329,6 +329,14 @@ REGISTRY: tuple[SettingSpec, ...] = (
         T.LOGIN,
         "IdP discovery document; without it the admin portal is disabled.",
     ),
+    S(
+        "oidc_issuer",
+        K.URL,
+        None,
+        _B,
+        T.LOGIN,
+        "Issuer the IdP announces, when it differs from the discovery URL without its suffix.",
+    ),
     S("oidc_client_id", K.STRING, "openplanner-admin", _A, T.LOGIN, "OIDC client of the portal."),
     S("oidc_client_secret", K.SECRET, None, _A, T.LOGIN, "OIDC client secret."),
     S(

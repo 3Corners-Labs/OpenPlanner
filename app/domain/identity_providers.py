@@ -309,7 +309,7 @@ def check_discovery(
         if not isinstance(document.get(name), str) or not document[name]:
             raise DiscoveryRefusedError(f"missing_{name}")
     issuer = str(document["issuer"])
-    if issuer.rstrip("/") != issuer_of(discovery_url).rstrip("/"):
+    if issuer != issuer_of(discovery_url):
         raise DiscoveryRefusedError("issuer_mismatch")
     if "code" not in _strings(document.get("response_types_supported")):
         raise DiscoveryRefusedError("no_code_flow")
