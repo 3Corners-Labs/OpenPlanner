@@ -5752,8 +5752,11 @@ msgstr "Naam"
 msgid "admin.staff.roles"
 msgstr "Rollen"
 
-msgid "admin.staff.places"
-msgstr "Organisaties en groepen"
+msgid "admin.staff.organisations"
+msgstr "Organisaties"
+
+msgid "admin.staff.groups"
+msgstr "Groepen"
 
 msgid "admin.staff.first_seen"
 msgstr "Eerste keer ingelogd"

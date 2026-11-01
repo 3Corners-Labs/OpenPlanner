@@ -116,6 +116,7 @@ test('organisation admin creates a group and gives it staffing blocks', async ({
   const slug = `e2e-${testInfo.project.name}-${Date.now().toString(36)}`;
   await loginAs(page, 'orgadmin');
 
+  await page.goto('/admin/groups');
   await page.getByRole('link', { name: 'Nieuwe groep' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nieuwe groep');
   await expectNoAxeViolations(page);
