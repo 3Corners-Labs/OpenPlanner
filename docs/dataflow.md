@@ -380,6 +380,20 @@ leaves through this flow. The proxy keeps no access log, so booking paths with m
 written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
 name only).
 
+## Configuration package (ADR 0089)
+
+```
+superuser ──POST /admin/settings/package/export (passphrase)──> web ──SQLite backup API──> temporary copy (data/transfer, mode 600)
+web ──DELETE state tables, VACUUM; secrets opened with SETTINGS_ENCRYPTION_KEY, sealed under scrypt(passphrase)──> package file ──download──> superuser
+superuser ──POST /admin/settings/package/import (file, passphrase)──> web ──verify, re-seal under SETTINGS_ENCRYPTION_KEY──> temporary copy ──ATTACH, one transaction──> configuration tables
+host ──python -m app.cli config export|show|import|env──> the same, actor system:cli; `env` writes OIDC_* to a file (mode 600)
+```
+
+A package holds no participant data: the state tables (`bookings` with every PII field,
+`slots`, `jobs`, `booking_events`, `call_status`, `audit_events`, `staff`, …) are emptied and
+the file is vacuumed. It holds every integration secret of the platform, sealed under the
+passphrase only. The temporary copies never outlive the request.
+
 ## Planned flows
 
 Subjects and routing attributes (ADR 0081, not built): the participant's chosen subject and the
