@@ -187,6 +187,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes
 
+  # ADR 0087 step 3: the recorded walkthrough, attached to every release.
+  tour:
+    name: recorded walkthrough
+    if: github.ref_type == 'tag'
+    needs: [publish]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/tour.yml
+    with:
+      tag: ${{ github.ref_name }}
+
   # ADR 0087: the public website, openplanner.nl. Built from site/ on every merge to main and
   # on every release tag, with the releases and the roadmap baked in; the tarball goes on the
   # release the tag made; the deploy is a git push to the web host's repository and runs only
@@ -197,7 +208,9 @@ jobs:
     # On a merge to main it waits for `candidate`, so the release candidate that merge made is
     # on the page. On a tag it waits for `publish`, whose first step refuses a tag that is not
     # on main or that was made by hand (ADR 0052, ADR 0059): such a tag then deploys nothing.
-    needs: [candidate, publish]
+    # On a tag it also waits for the recording, so the new walkthrough is on the page; a failed
+    # recording does not hold the site back (the previous one stays).
+    needs: [candidate, publish, tour]
     if: >-
       ${{ !cancelled() && (
         (github.ref_type == 'branch' && needs.candidate.result == 'success') ||
@@ -226,12 +239,21 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases/latest" > "$RUNNER_TEMP/latest.json" || echo '{}' > "$RUNNER_TEMP/latest.json"
           jq -s '.[0] + (if .[1].tag_name then [.[1]] else [] end)' "$RUNNER_TEMP/all.json" "$RUNNER_TEMP/latest.json" > "$RUNNER_TEMP/releases.json"
           gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" --paginate --slurp | jq 'add' > "$RUNNER_TEMP/issues.json"
+      # The newest release that carries the recorded walkthrough (tour.yml).
+      - name: the recorded walkthrough, for the page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(jq -r '[.[] | select(any(.assets[]; .name == "tour.webm"))][0].tag_name // empty' "$RUNNER_TEMP/releases.json")"
+          if [ -n "$tag" ]; then
+            gh release download "$tag" --dir site/static/media --pattern 'tour.*'
+          else
+            echo "::notice::no release carries a recording yet; the page says it is coming"
+          fi
       - name: build
         run: |
-          video=""
-          [ -f site/static/media/tour.webm ] && video="--tour-video"
           uv run python -m scripts.build_site --out site/dist --releases "$RUNNER_TEMP/releases.json" \
-            --issues "$RUNNER_TEMP/issues.json" --commit "$GITHUB_SHA" $video
+            --issues "$RUNNER_TEMP/issues.json" --commit "$GITHUB_SHA"
           tar -C site/dist -czf "site-${GITHUB_REF_NAME#v}.tar.gz" .
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
@@ -255,7 +277,7 @@ jobs:
   # ADR 0051: same gate as in ci.yml, for the jobs that run only on main.
   deprecations:
     name: no deprecation warnings
-    needs: [zap-baseline, mutation, candidate, publish, site]
+    needs: [zap-baseline, mutation, candidate, publish, tour, site]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

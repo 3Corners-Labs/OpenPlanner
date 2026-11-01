@@ -295,25 +295,7 @@ jobs:
       PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.64.1-noble
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: build and start the app with the development identity provider
-        run: |
-          docker build -t openplanner:e2e .
-          # Keycloak with one test user per role (dev/keycloak/), for the admin role specs.
-          network="$(scripts/run-keycloak-container.sh)"
-          # Three browsers each book, move and cancel from one IP: raise the write limit.
-          # The journey spec (tests/video-journey.spec.ts) plays Webex and WxCC events with the
-          # simulator (docs/runbook.md, section 10); the secrets sign them for the endpoints.
-          scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour \
-            --network "$network" \
-            -e OIDC_DISCOVERY_URL=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration \
-            -e OIDC_CLIENT_SECRET=dev-only-openplanner-admin-secret \
-            -e SIMULATOR_ENABLED=true \
-            -e WEBEX_WEBHOOK_SECRET=dev-only-webex-webhook-secret \
-            -e WXCC_WEBHOOK_SECRET=dev-only-wxcc-webhook-secret
-          docker exec app alembic upgrade head
-          docker exec app python -m app.cli seed-demo
-          # Closure examples (ADR 0037); the booking on hold's link exists only in this output.
-          docker exec app python -m app.cli seed-closures > e2e/fixtures.json
+      - uses: ./.github/actions/e2e-stack
       - name: install e2e tooling
         timeout-minutes: 10
         run: |

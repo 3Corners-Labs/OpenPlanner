@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "test": "playwright test --pass-with-no-tests",
-    "lighthouse": "node --experimental-strip-types scripts/lighthouse.mjs"
+    "lighthouse": "node --experimental-strip-types scripts/lighthouse.mjs",
+    "tour": "playwright test -c tour/playwright.config.ts",
+    "tour:captions": "node tour/captions.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
