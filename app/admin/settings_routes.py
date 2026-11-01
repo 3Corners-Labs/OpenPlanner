@@ -1,6 +1,10 @@
 """System status and Advanced settings (ADR 0042 §11, build steps 3 and 4).
 
-One page for ``settings.platform.view`` (superuser and auditor):
+Three sub-tabs of one side-navigation entry (ADR 0101), for ``settings.platform.view``
+(superuser and auditor) unless said otherwise: *System status* (the entry's own page),
+*Settings* (the topics, with "On this page" and the login test) and *Configuration package*
+(``settings.platform.manage``). A refusal is shown on the sub-tab its form lives on, and a
+confirmation redirects there. What they hold:
 
 - *System status*: every class A and B variable with whether it is set and where from, never
   its value; the latest check of the public address's certificate (ADR 0064); for a
@@ -29,7 +33,9 @@ the CA issued is uploaded (with its key only to import an existing certificate),
 removed there, and *Check now* runs the worker's probe at once. The private key never passes
 through a response. Without the bundled proxy the block says the source does not apply.
 
-    GET  /admin/settings                          settings.platform.view
+    GET  /admin/settings                          settings.platform.view: System status
+    GET  /admin/settings/values                   settings.platform.view: Settings
+    GET  /admin/settings/package                  settings.platform.manage: Configuration package
     POST /admin/settings/topic/{topic}            settings.platform.manage (recent login)
     POST /admin/settings/{key}                    settings.platform.manage (recent login)
     POST /admin/settings/{key}/reset              settings.platform.manage (recent login)
@@ -49,6 +55,7 @@ not in use. The passphrase is read from the form and never echoed, logged or sto
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -107,6 +114,18 @@ from app.web.settings_labels import (
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
 URL = "/admin/settings"
+VALUES_URL = f"{URL}/values"
+PACKAGE_URL = f"{URL}/package"
+
+
+class Tab(StrEnum):
+    """The sub-tabs of Advanced settings (ADR 0101); the value names the template."""
+
+    STATUS = "admin/settings.html"
+    VALUES = "admin/settings_values.html"
+    PACKAGE = "admin/settings_package.html"
+
+
 View = Annotated[AdminContext, Depends(RequirePermission(Permission.SETTINGS_PLATFORM_VIEW))]
 Manage = Annotated[AdminContext, Depends(RequirePermission(Permission.SETTINGS_PLATFORM_MANAGE))]
 Change = Annotated[
@@ -290,8 +309,20 @@ def data_field_rows(locale: RequestLocale) -> list[DataFieldRow]:
 
 @router.get("/settings", response_class=HTMLResponse)
 async def advanced_settings(request: Request, locale: Locale, context: View) -> HTMLResponse:
-    """Show System status and every portal setting with its value and source."""
-    return await _overview(request, locale, context)
+    """Show System status: the environment, the certificate and the data fields."""
+    return await _overview(request, locale, context, Tab.STATUS)
+
+
+@router.get("/settings/values", response_class=HTMLResponse)
+async def setting_values(request: Request, locale: Locale, context: View) -> HTMLResponse:
+    """Show every portal setting by topic with its value and source."""
+    return await _overview(request, locale, context, Tab.VALUES)
+
+
+@router.get("/settings/package", response_class=HTMLResponse)
+async def configuration_package(request: Request, locale: Locale, context: Manage) -> HTMLResponse:
+    """Show the export and import of the configuration package (ADR 0089)."""
+    return await _overview(request, locale, context, Tab.PACKAGE)
 
 
 LoginChange = Annotated[
@@ -312,9 +343,11 @@ async def try_login_mapping(
     try:
         values = validate_mapping({key: form.text(key) for key in LOGIN_KEYS})
     except DomainError as error:
-        return await _overview(request, locale, context, (error.field or "", error), 422)
+        return await _overview(
+            request, locale, context, Tab.VALUES, (error.field or "", error), 422
+        )
     save_login_trial(request, context.principal.subject, values, request.app.state.clock.now())
-    return RedirectResponse("/admin/login?next=/admin/settings&fresh=1", status_code=303)
+    return RedirectResponse(f"/admin/login?next={VALUES_URL}&fresh=1", status_code=303)
 
 
 @router.post("/settings/topic/{topic}", response_class=HTMLResponse)
@@ -338,10 +371,10 @@ async def change_topic(
             await _service(request).change(context.principal, spec.key, raw, hours=hours)
         except DomainError as error:
             raise_refusal(error)
-            return await _overview(request, locale, context, (spec.key, error), 422)
+            return await _overview(request, locale, context, Tab.VALUES, (spec.key, error), 422)
         changed += 1
     anchor = f"topic-{topic}" if topic in {t.value for t in Topic} else ""
-    return redirect_done(URL, "saved" if changed else "unchanged", anchor=anchor)
+    return redirect_done(VALUES_URL, "saved" if changed else "unchanged", anchor=anchor)
 
 
 @router.post("/settings/{key}", response_class=HTMLResponse)
@@ -352,7 +385,7 @@ async def change_setting(
     form = await read_form(request, locale)
     spec = BY_KEY.get(key)
     if spec is not None and spec.secret and not form.text("value").strip():
-        return redirect_done(URL, "unchanged", anchor=_anchor(key))  # write-only: empty keeps it
+        return redirect_done(_home(key), "unchanged", anchor=_anchor(key))  # write-only: kept
     hours = _hours(form.text("hours"))
     try:
         if key == SOURCE_KEY:  # ADR 0070: `own` needs an upload, and the proxy is told at once
@@ -361,8 +394,8 @@ async def change_setting(
             await _service(request).change(context.principal, key, form.text("value"), hours=hours)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, (key, error), 422)
-    return redirect_done(URL, "saved", anchor=_anchor(key))
+        return await _overview(request, locale, context, _tab(key), (key, error), 422)
+    return redirect_done(_home(key), "saved", anchor=_anchor(key))
 
 
 @router.post("/settings/{key}/reset", response_class=HTMLResponse)
@@ -374,10 +407,10 @@ async def reset_setting(
         await _service(request).reset(context.principal, key)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, (key, error), 409)
+        return await _overview(request, locale, context, _tab(key), (key, error), 409)
     if key == SOURCE_KEY:
         await (await _source(request)).sync(SOURCES[0])  # back to the default: ACME
-    return redirect_done(URL, "saved", anchor=_anchor(key))
+    return redirect_done(_home(key), "saved", anchor=_anchor(key))
 
 
 @router.post("/settings/tls/csr", response_class=HTMLResponse)
@@ -389,7 +422,7 @@ async def request_certificate(
         await (await _source(request)).generate_csr(context.principal)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, (CSR_KEY, error), 422)
+        return await _overview(request, locale, context, Tab.STATUS, (CSR_KEY, error), 422)
     return redirect_done(URL, "csr_generated", anchor="tls-heading")
 
 
@@ -418,7 +451,8 @@ async def upload_certificate(
         )
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, (error.field or "chain", error), 422)
+        refusal = (error.field or "chain", error)
+        return await _overview(request, locale, context, Tab.STATUS, refusal, 422)
     return redirect_done(URL, "certificate_uploaded", anchor="tls-heading")
 
 
@@ -431,7 +465,7 @@ async def remove_certificate(
         removed = await (await _source(request)).remove(context.principal)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, (REMOVE_KEY, error), 409)
+        return await _overview(request, locale, context, Tab.STATUS, (REMOVE_KEY, error), 409)
     return redirect_done(
         URL, "certificate_removed" if removed else "unchanged", anchor="tls-heading"
     )
@@ -457,8 +491,8 @@ async def adopt_setting(
         await _service(request).adopt(context.principal, key)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, (key, error), 409)
-    return redirect_done(URL, "adopted", anchor=_anchor(key))
+        return await _overview(request, locale, context, _tab(key), (key, error), 409)
+    return redirect_done(_home(key), "adopted", anchor=_anchor(key))
 
 
 @router.post("/settings/package/export")
@@ -474,7 +508,7 @@ async def export_package(
         package = await _packages(request).export(context.principal.subject, passphrase)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, (PACKAGE_KEY, error), 422)
+        return await _overview(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
     current: Settings = request.app.state.settings
     name = package_filename(current.installation_name, request.app.state.clock.now())
     return Response(
@@ -503,9 +537,12 @@ async def import_package(
         )
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, (PACKAGE_KEY, error), 422)
+        return await _overview(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
     return redirect_done(
-        URL, "package_imported", summary.counts.get("organisations", 0), anchor="package-heading"
+        PACKAGE_URL,
+        "package_imported",
+        summary.counts.get("organisations", 0),
+        anchor="package-heading",
     )
 
 
@@ -538,6 +575,16 @@ async def _source(request: Request) -> CertificateSourceService:
     return service
 
 
+def _tab(key: str) -> Tab:
+    """Return the sub-tab a setting's form lives on: the certificate source is on the status."""
+    return Tab.STATUS if key == SOURCE_KEY else Tab.VALUES
+
+
+def _home(key: str) -> str:
+    """Return the path of the sub-tab a setting's form lives on."""
+    return URL if key == SOURCE_KEY else VALUES_URL
+
+
 def _anchor(key: str) -> str:
     """Return the row anchor of a registered key (anything else scrolls nowhere)."""
     return f"setting-{key}" if key in BY_KEY else ""
@@ -547,62 +594,66 @@ async def _overview(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
+    tab: Tab,
     refusal: tuple[str, DomainError] | None = None,
     status: int = 200,
 ) -> HTMLResponse:
-    """Render the page, with a refusal shown at its row."""
+    """Render one sub-tab (ADR 0101), with a refusal shown at its row."""
     _ = locale.gettext
     live: LiveSettings = request.app.state.live_settings
     await live.refresh()
     states = live.states()
     current: Settings = request.app.state.settings
-    status_rows = [
-        StatusRow(s.spec.env, _(CLASS_LABELS[s.spec.class_]), _(SOURCE_LABELS[s.source]), s.is_set)
-        for s in states
-        if s.spec.class_ in _ENVIRONMENT_ONLY
-    ]
-    problems = (
-        []
-        if current.environment == "prod"
-        else [Problem(p.variable, _(PROBLEM_LABELS[p.code])) for p in current.production_problems()]
-    )
     manage = can_function(context.principal)(Permission.SETTINGS_PLATFORM_MANAGE)
     errors = {}
     if refusal is not None:
         key, error = refusal
         errors[key] = _(CODE_MESSAGES.get(error.code, "error.invalid_request"))
-    response = _page(
-        request,
-        locale,
-        "admin/settings.html",
-        context.principal,
-        {
+    values: dict[str, object] = {
+        "refused": live.refused,
+        "done": done_message(request, locale.gettext),
+        "manage": manage,
+        "unknown_error": next(
+            (m for k, m in errors.items() if k not in BY_KEY and k != PACKAGE_KEY), None
+        ),
+    }
+    if tab is Tab.STATUS:
+        values |= {
             "environment": current.environment,
             "certificate": await _certificate(request, locale),
             "log_summary": await _log_summary(request, context),
             "source": await _source_view(request, locale, states, manage=manage, errors=errors),
-            "refused": live.refused,
-            "status": status_rows,
-            "problems": problems,
+            "status": [
+                StatusRow(
+                    s.spec.env, _(CLASS_LABELS[s.spec.class_]), _(SOURCE_LABELS[s.source]), s.is_set
+                )
+                for s in states
+                if s.spec.class_ in _ENVIRONMENT_ONLY
+            ],
+            "problems": []
+            if current.environment == "prod"
+            else [
+                Problem(p.variable, _(PROBLEM_LABELS[p.code]))
+                for p in current.production_problems()
+            ],
             "data_fields": data_field_rows(locale),
+        }
+    elif tab is Tab.VALUES:
+        values |= {
             "sections": _sections(
                 states, locale, manage=manage, errors=errors, stored=_stored(live)
             ),
-            "done": done_message(request, locale.gettext),
             "max_hours": LOG_LEVEL_MAX_EXPIRY_HOURS,
             "trace_max_hours": current.trace_level_max_hours,
             "login_form": _login_form(context, current, live, errors, locale),
-            "package": {
-                "error": errors.get(PACKAGE_KEY),
-                "min_length": MIN_PASSPHRASE_LENGTH,
-                "max_mb": current.configuration_package_max_mb,
-            },
-            "manage": manage,
-            "unknown_error": next(
-                (m for k, m in errors.items() if k not in BY_KEY and k != PACKAGE_KEY), None
-            ),
-        },
-    )
+        }
+    else:
+        values["package"] = {
+            "error": errors.get(PACKAGE_KEY),
+            "min_length": MIN_PASSPHRASE_LENGTH,
+            "max_mb": current.configuration_package_max_mb,
+        }
+    response = _page(request, locale, tab.value, context.principal, values)
     response.status_code = status
     return response
 

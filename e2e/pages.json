@@ -166,6 +166,22 @@
       ]
     },
     {
+      "name": "advanced settings: settings",
+      "path": "/admin/settings/values",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "advanced settings: configuration package",
+      "path": "/admin/settings/package",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
       "name": "overview as group admin",
       "path": "/admin/",
       "user": "groupadmin",

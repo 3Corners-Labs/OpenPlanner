@@ -6,6 +6,15 @@ view it. The superuser can change some of the settings; the auditor only reads.
 
 Secret values, such as passwords and keys, are never shown: only whether they are set.
 
+The screen has three tabs under its title:
+
+- **System status**: the environment, the certificate and the data fields;
+- **Settings**: every platform setting by topic, with *On this page* at the top, a list of links
+  to each topic, and the trial of the login mapping;
+- **Configuration package** (the superuser only): export and import.
+
+A change or an error shows on the tab of the form you used.
+
 ## System status
 
 The settings that only the server operator sets, in the server's environment or in a file.
