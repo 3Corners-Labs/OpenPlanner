@@ -395,6 +395,36 @@ A package holds no participant data: the state tables (`bookings` with every PII
 the file is vacuumed. It holds every integration secret of the platform, sealed under the
 passphrase only. The temporary copies never outlive the request.
 
+## Residual data after a purge (WP-A3, PI-08)
+
+A purge sets the personal columns of a booking to NULL. SQLite would leave the old values in the
+freed space of the page and in older frames of the write-ahead log (`-wal`), so two fixed rules
+(constants, not settings; they are privacy rules like the list of personal fields) close that:
+
+- `PRAGMA secure_delete=ON` on every connection (`app/adapters/db/engine.py`): content that is
+  deleted or overwritten is zeroed in the page, not just marked free.
+- `PRAGMA wal_checkpoint(TRUNCATE)` after a round of the worker that ran `purge_pii` jobs, after
+  a retention sweep that purged something, and after `python -m app.cli purge-overdue`
+  (`checkpoint_wal` in `app/adapters/db/maintenance.py`): the log is folded into the database
+  file and emptied. A reader that holds the log open makes the checkpoint partial; the next one
+  finishes it. A failing checkpoint is logged (type only) and never fails the purge.
+
+The test `tests/adapters/db/test_secure_delete.py` books with a marker in every personal field,
+purges, checkpoints and asserts that the marker is in neither the database file nor the `-wal`.
+
+What remains is outside the application and is the hosting party's responsibility (O7):
+
+- **Blocks on the volume.** `incremental_vacuum` returns freed pages to the file system; the
+  file system and the storage underneath (SSD wear levelling, copy-on-write, journals) may keep
+  the old blocks until they are reused. The mitigation is encryption of the data volume at rest
+  with a key that is destroyed with the volume.
+- **Snapshots and backups.** A volume snapshot, a hypervisor snapshot or a back-up copy taken
+  before the purge still holds the data until it expires. The update back-up (24 h, ADR 0029)
+  holds purge jobs that were still pending, and the purge runs again after a restore; a
+  disaster-recovery copy is outside the application (WP-A4). The hosting checklist names the
+  snapshot and back-up retention, which must not exceed the retention promised in the DPIA.
+- **Memory and swap** of the running processes are not scrubbed.
+
 ## Planned flows
 
 Subjects and routing attributes (ADR 0081, not built): the participant's chosen subject and the
