@@ -59,6 +59,8 @@ from app.admin.uploads import read_uploads
 from app.config import Settings
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
+from app.domain.log_destination_service import LogDestinationService
+from app.domain.log_destinations import State
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
 from app.domain.own_certificate import (
     MAX_PEM_BYTES,
@@ -507,6 +509,7 @@ async def _overview(
         {
             "environment": current.environment,
             "certificate": await _certificate(request, locale),
+            "log_summary": await _log_summary(request, context),
             "source": await _source_view(request, locale, states, manage=manage, errors=errors),
             "refused": live.refused,
             "status": status_rows,
@@ -525,6 +528,38 @@ async def _overview(
     )
     response.status_code = status
     return response
+
+
+@dataclass(frozen=True)
+class LogSummary:
+    """How many log destinations there are, are on and are failing (ADR 0085)."""
+
+    total: int
+    enabled: int
+    failing: int
+
+
+async def _log_summary(request: Request, context: AdminContext) -> LogSummary | None:
+    """Return the log destinations' summary for System status, or ``None`` without the right.
+
+    The summary needs ``logging.view``; an admin without it sees no row, and nothing is asked
+    of the service, so no denial is written for a screen the admin never opened.
+    """
+    if not can_function(context.principal)(Permission.LOGGING_VIEW):
+        return None
+    service: LogDestinationService = request.app.state.log_destination_service
+    try:
+        overview = await service.overview(context.principal)
+    except DomainError:
+        return None
+    failing = sum(
+        any(s.state is State.FAILING for s in overview.status.get(d.id or 0, []))
+        for d in overview.destinations
+        if d.enabled
+    )
+    return LogSummary(
+        len(overview.destinations), sum(d.enabled for d in overview.destinations), failing
+    )
 
 
 async def _certificate(request: Request, locale: RequestLocale) -> CertificateView | None:

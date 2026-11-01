@@ -233,6 +233,15 @@ SECTIONS = (
                 Permission.INTEGRATIONS_MANAGE,
                 "settings",
             ),
+            # ADR 0085: where copies of the log go; one setting for the whole installation.
+            Screen(
+                "platform.logging",
+                "admin.nav.logging",
+                "/admin/logging",
+                Permission.LOGGING_VIEW,
+                "reports",
+                ("/admin/logging/new", "/admin/logging/{destination_id}"),
+            ),
             Screen(
                 "platform.api",
                 "admin.nav.api",

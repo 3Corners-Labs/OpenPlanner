@@ -19,6 +19,10 @@
   <dl class="facts">
     <div><dt>{{ _("admin.settings.status.environment") }}</dt><dd><code>{{ environment }}</code></dd></div>
   </dl>
+  {% if log_summary %}
+  <h3 id="logging-heading">{{ _("admin.settings.logging.title") }}</h3>
+  <p>{% if log_summary.total == 0 %}{{ _("admin.settings.logging.none") }}{% else %}{{ _("admin.settings.logging.summary", total=log_summary.total, enabled=log_summary.enabled) }}{% if log_summary.failing %} <span class="chip chip--danger">{{ _("admin.settings.logging.failing", count=log_summary.failing) }}</span>{% endif %}{% endif %} <a href="/admin/logging">{{ _("admin.settings.logging.open") }}</a></p>
+  {% endif %}
   <h3 id="tls-heading">{{ _("admin.settings.tls.title") }}</h3>
   {% if certificate %}
   <dl class="facts" aria-labelledby="tls-heading">
