@@ -47,3 +47,4 @@ certs/
 portal-certs/
 site/dist/
 .claude/launch.json
+site/static/media/
