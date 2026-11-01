@@ -425,6 +425,39 @@ What remains is outside the application and is the hosting party's responsibilit
   snapshot and back-up retention, which must not exceed the retention promised in the DPIA.
 - **Memory and swap** of the running processes are not scrubbed.
 
+## Shared by all organisations of an installation (TEN-06, BP-4)
+
+For the DPIA: the processing of every organisation of one installation passes through the same
+components, so these are common to all of them. One installation serves **one data controller**
+(BP-4); organisations of different controllers get their own installation.
+
+```mermaid
+flowchart LR
+    pA([Participants of org A]) --> web
+    pB([Participants of org B]) --> web
+    web --> db[(One database<br/>one volume, one backup)]
+    worker --> db
+    worker -- own SMTP of the organisation<br/>or the env fallback --> mail[Mail server]
+    worker -- first name, host join URL,<br/>routing codes --> cisco[One Webex Service App<br/>One WxCC org]
+    keys[Keys in .env:<br/>MANAGEMENT_TOKEN_KEY<br/>SETTINGS_ENCRYPTION_KEY] --> web
+    keys --> worker
+    web --> logs[One log platform<br/>ids, slugs, codes; no PII]
+    su([Superuser and host team]) --> web
+    su --> db
+```
+
+| Shared item | Personal data it can reach | Retention | Owner |
+|---|---|---|---|
+| Database and volume | Bookings of all organisations until the purge (`slot.end + 24h`), then overwritten | As the retention matrix; backups must not exceed the promised retention | Controller / hosting party |
+| Keys in `.env` | None by themselves; with the database they open tokens and integration secrets | Until rotation (ADR 0094) | Host team |
+| Cisco tenant | First name, join URL and routing codes of all organisations' calls | Cisco's own retention; see the processor questionnaire (WP-C1) | Controller (Cisco contract) |
+| Platform SMTP (fallback) | Name, email address and message content of organisations without their own SMTP | Mail provider's retention | Controller / mail provider |
+| Log platform | No personal data; ids, slugs, codes | Log platform's retention | Controller |
+| Superuser and host team | Everything above, by role | While they hold the role; audited | Controller |
+
+The reasoning and the criteria for an installation of its own are in `docs/threat-model.md`,
+section *Shared trust boundaries*.
+
 ## Planned flows
 
 Subjects and routing attributes (ADR 0081, not built): the participant's chosen subject and the
