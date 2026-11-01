@@ -675,6 +675,34 @@ flowchart LR
 | Machine API: off by default (environment and superuser switch), OAuth client credentials, hashed secrets and 10-minute opaque tokens, one `RequireScope` per route, per-client grant and network allow-list, no personal data | `app/api/agent/`, `app/domain/api_access.py` | ADR 0023 |
 | Signed images, SBOM, image and dependency scanning | CI | ADR 0006 |
 
+### Shared trust boundaries
+
+One installation serves one data controller (BP-4) and, inside it, any number of organisations.
+These items are shared by all organisations of an installation; the separation between
+organisations is application logic (scope in SQL), not physical:
+
+```mermaid
+flowchart LR
+    subgraph shared [Shared by every organisation of one installation]
+        su[Superuser]
+        host[Host: Docker, volume, .env]
+        keys[MANAGEMENT_TOKEN_KEY<br/>SETTINGS_ENCRYPTION_KEY]
+        dbs[(One database)]
+        cisco[One Webex Service App<br/>One WxCC org]
+        smtpfb[SMTP fallback from env]
+    end
+    subgraph own [Per organisation, in the shared database]
+        cfg[Settings, texts, branding, IdPs]
+        sec[Own SMTP and SMS secrets]
+        data[Groups, slots, bookings]
+    end
+    shared --> own
+    ctrl[A second data controller] -. needs its own installation .-> shared
+```
+
+When an organisation needs an installation of its own is in `docs/threat-model.md`, section
+*Shared trust boundaries*.
+
 The STRIDE analysis per flow, with a test for every abuse case, is in
 `docs/threat-model.md`.
 
