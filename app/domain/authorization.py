@@ -519,12 +519,19 @@ class ApiScope(StrEnum):
     """OAuth scopes of the machine API (ADR 0023), granted per API client by the superuser."""
 
     AVAILABILITY_READ = "availability:read"
+    # ADR 0089 point 7: export and import the configuration package of the whole installation.
+    CONFIGURATION_TRANSFER = "configuration:transfer"
 
 
 API_SCOPES: dict[ApiScope, Level] = {
     ApiScope.AVAILABILITY_READ: Level.GROUP,
+    ApiScope.CONFIGURATION_TRANSFER: Level.GLOBAL,
 }
-"""Every API scope with the level it applies to; documented next to the admin matrix."""
+"""Every API scope with the level it applies to; documented next to the admin matrix.
+
+A global scope acts on the installation as a whole, whatever organisation registered the
+client (ADR 0089 point 7); a group scope stays inside the client's organisation and groups.
+"""
 
 
 class Reason(StrEnum):
@@ -806,7 +813,9 @@ def decide_client(grant: ClientGrant, api_scope: ApiScope, target: Target) -> De
     """Decide whether an API client may use ``api_scope`` on ``target``.
 
     The organisation must match; a group must also be one of the client's groups when it is
-    narrowed to some. There is no superuser equivalent for machines.
+    narrowed to some. A global scope (ADR 0089 point 7) is the whole installation: the
+    client's organisation and groups play no part. There is no superuser equivalent for
+    machines.
 
     Raises:
         ValueError: If the target's level does not match the scope (a programming error).
@@ -815,6 +824,8 @@ def decide_client(grant: ClientGrant, api_scope: ApiScope, target: Target) -> De
         raise ValueError(f"{api_scope} needs a {API_SCOPES[api_scope]} level target")
     if api_scope not in grant.scopes:
         return Decision(False, Reason.NOT_PERMITTED)
+    if target.level is Level.GLOBAL:
+        return Decision(True, Reason.ROLE)
     if target.organisation != grant.organisation:
         return Decision(False, Reason.OUT_OF_SCOPE)
     if not grant.groups:

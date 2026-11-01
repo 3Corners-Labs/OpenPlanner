@@ -207,6 +207,9 @@ class Settings(BaseSettings):
     # days; a larger one is refused, never cut short.
     audit_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
     audit_export_max_days: int = Field(default=366, ge=1, le=3660)
+    # ADR 0089 (class C, platform): the largest configuration package the portal and the API
+    # accept for import, in MB; fonts and closure images make up most of a package.
+    configuration_package_max_mb: int = Field(default=64, ge=1, le=512)
     # ADR 0040, part 4 (class C, platform; env until the settings registry of ADR 0042): how
     # long each category of audit event is kept. Admin actions 2 years (product owner,
     # 2026-10-29), security 1 year, debug events 7 days; system events above. Diagnostic mode

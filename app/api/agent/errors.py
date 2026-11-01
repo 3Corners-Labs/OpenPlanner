@@ -39,6 +39,11 @@ _DOMAIN_STATUS: dict[ErrorCode, int] = {
     ErrorCode.NOT_PERMITTED: 403,
     ErrorCode.INVALID_RANGE: 422,
     ErrorCode.DATABASE_BUSY: 503,
+    # ADR 0089 point 7: the configuration package over the API.
+    ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: 409,
+    ErrorCode.CONFIGURATION_PACKAGE_VERSION: 409,
+    ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: 413,
+    ErrorCode.INTEGRATION_NOT_READY: 503,
 }
 
 
