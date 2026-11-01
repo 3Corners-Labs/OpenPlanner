@@ -51,3 +51,14 @@ logins, afmeldingen en wijzigingen, binnen uw eigen organisaties of groepen.
   eens per vijf minuten bijgewerkt.
 - **Laatst afgemeld**: de laatste keer dat de persoon op **Afmelden** klikte. Een sessie die
   vanzelf verloopt (na 8 uur) telt niet als afmelding.
+
+## Tweede factor (MFA)
+
+Medewerkers loggen in met een tweede factor naast het wachtwoord: een code uit een
+authenticator-app of een beveiligingssleutel. OpenPlanner richt dit niet in en bewaart het
+niet; dat doet de identiteitsprovider (ADR 0100). Bij het inloggen vraagt OpenPlanner erom en
+controleert dat de provider zegt dat het gebruikt is. Is dat niet zo, dan wordt het inloggen
+geweigerd met de melding *uw account laat geen tweede factor zien*. Stel meervoudige
+authenticatie in bij uw identiteitsprovider (bij de meegeleverde Keycloak vraagt de eerste
+login om een authenticator-app) en log opnieuw in. Blijft het mislukken, vraag dan het
+IdP-team; de weigering staat in het auditlog als `mfa_required`, zonder persoonsgegevens.

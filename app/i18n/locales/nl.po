@@ -7570,6 +7570,9 @@ msgstr "Uw account heeft meer dan één rol voor meer dan één organisatie of g
 msgid "admin.login_refused.too_many_entitlements"
 msgstr "Uw account stuurt meer rechten mee dan OpenPlanner kan verwerken. Vraag het IdP-team om alleen de rechten voor OpenPlanner mee te sturen."
 
+msgid "admin.login_refused.mfa_required"
+msgstr "Inloggen is geweigerd: uw account laat geen tweede factor (MFA) zien. Stel meervoudige authenticatie in bij uw identiteitsprovider en log opnieuw in; blijft het mislukken, neem dan contact op met het IdP-team."
+
 msgid "admin.rights_not_recognised.text"
 msgstr "Uw account heeft rechten voor OpenPlanner die deze installatie niet herkent. Neem contact op met uw beheerder; die ziet op uw pagina bij Medewerkers welke waarden niet herkend zijn."
 

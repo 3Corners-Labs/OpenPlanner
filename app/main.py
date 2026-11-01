@@ -161,6 +161,8 @@ def oidc_provider(
         client_id=settings.oidc_client_id,
         client_secret=secret,
         scopes=settings.oidc_scopes,
+        require_mfa=settings.admin_mfa_required,
+        acr_values=settings.oidc_acr_values,
         mapping=lambda: claim_mapping(
             current().login_values, current().oidc_entitlements_max_values
         ),

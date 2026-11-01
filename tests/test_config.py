@@ -250,3 +250,24 @@ def test_a_development_installation_lists_what_production_would_refuse() -> None
 def test_production_refuses_with_the_first_problem_in_the_same_words() -> None:
     with pytest.raises(ValueError, match="MANAGEMENT_TOKEN_KEY is required in production"):
         Settings(environment="prod")
+
+
+def test_admin_mfa_is_required_by_default() -> None:
+    settings = Settings(environment="dev")
+
+    assert settings.admin_mfa_required is True
+    assert settings.oidc_acr_values == "mfa"
+
+
+def test_production_refuses_to_switch_admin_mfa_off() -> None:
+    off = Settings(environment="dev", admin_mfa_required=False)
+
+    assert "admin_mfa_required" in [p.code for p in off.production_problems()]
+    with pytest.raises(ValueError, match="ADMIN_MFA_REQUIRED is not allowed to be false"):
+        Settings(
+            environment="prod",
+            admin_mfa_required=False,
+            management_token_key="k" * 32,  # type: ignore[arg-type]
+            public_base_url="https://afspraak.example.nl",
+            session_secret="s" * 32,  # type: ignore[arg-type]
+        )

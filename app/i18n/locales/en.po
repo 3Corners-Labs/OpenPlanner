@@ -7558,6 +7558,9 @@ msgstr "Your account holds more than one role for more than one organisation or 
 msgid "admin.login_refused.too_many_entitlements"
 msgstr "Your account sends more rights than OpenPlanner can handle. Ask the IdP team to send only the rights for OpenPlanner."
 
+msgid "admin.login_refused.mfa_required"
+msgstr "Sign-in was refused: your account shows no second factor (MFA). Set up multi-factor authentication at your identity provider and sign in again; if it keeps failing, contact the IdP team."
+
 msgid "admin.rights_not_recognised.text"
 msgstr "Your account has rights for OpenPlanner that this installation does not recognise. Contact your administrator; your page under Staff shows which values were not recognised."
 

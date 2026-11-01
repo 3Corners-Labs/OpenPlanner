@@ -89,6 +89,17 @@ async def test_identity_errors_are_audited(site: Site) -> None:
     assert ("anonymous", "admin.login", Outcome.DENIED, "invalid_token") in await audit_events(site)
 
 
+async def test_a_login_without_a_second_factor_is_refused_with_a_clear_text(site: Site) -> None:
+    await site.client.get("/admin/login")
+    site.idp.fail = "mfa_required"
+
+    response = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+
+    assert response.status_code == 401
+    assert "tweede factor" in response.text
+    assert ("anonymous", "admin.login", Outcome.DENIED, "mfa_required") in await audit_events(site)
+
+
 @pytest.mark.parametrize(
     "next_url",
     ["https://evil.example/", "//evil.example/admin", "/g/demo", "/admin\\@evil", "javascript:x"],

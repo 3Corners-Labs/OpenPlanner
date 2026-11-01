@@ -35,6 +35,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | Variable | Kind | Default | Note |
 |---|---|---|---|
 | `OIDC_ISSUER` | url | — | Issuer the IdP announces, when it differs from the discovery URL without its suffix. |
+| `ADMIN_MFA_REQUIRED` | bool | `true` | Refuse an admin login whose ID token shows no second factor (ADR 0100); on in production. |
+| `OIDC_ACR_VALUES` | string | `mfa` | acr_values requested at login; an acr from this list counts as proof of MFA (ADR 0100). |
 | `PUBLIC_BASE_URL` | url | `http://127.0.0.1:8000` | Base of every link and of the OIDC redirect; https in production. |
 | `WEBHOOK_BASE_URL` | url | — | Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL. |
 | `FORWARDED_ALLOW_IPS` | string | — | Address of the reverse proxy (read by uvicorn). |

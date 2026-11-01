@@ -347,6 +347,22 @@ REGISTRY: tuple[SettingSpec, ...] = (
         T.LOGIN,
         "Scopes requested at login; wrong scopes break login.",
     ),
+    S(
+        "admin_mfa_required",
+        K.BOOL,
+        True,
+        _B,
+        T.LOGIN,
+        "Refuse an admin login whose ID token shows no second factor (ADR 0100); on in production.",
+    ),
+    S(
+        "oidc_acr_values",
+        K.STRING,
+        "mfa",
+        _B,
+        T.LOGIN,
+        "acr_values requested at login; an acr from this list counts as proof of MFA (ADR 0100).",
+    ),
     # B. Deployment: tied to the host, DNS, proxy, image or healthcheck; kill switches.
     S(
         "public_base_url",

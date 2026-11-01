@@ -310,6 +310,11 @@ class Settings(BaseSettings):
     oidc_client_id: str = "openplanner-admin"
     oidc_client_secret: SecretStr | None = None
     oidc_scopes: str = "openid profile email"
+    # ADR 0100: the admin must show a second factor (amr/acr in the ID token). Class B, a
+    # protection that production never starts without; the IdP owns the MFA itself.
+    admin_mfa_required: bool = True
+    # ``acr_values`` asked for at login (space separated); an ``acr`` in this list is proof.
+    oidc_acr_values: str = "mfa"
     oidc_role_claim: str = "roles"
     oidc_organisation_claim: str = "organisations"
     oidc_group_claim: str = "groups"
@@ -489,6 +494,12 @@ class Settings(BaseSettings):
             "public_base_url",
             "PUBLIC_BASE_URL",
             "PUBLIC_BASE_URL must use https in production",
+        )
+        check(
+            not self.admin_mfa_required,
+            "admin_mfa_required",
+            "ADMIN_MFA_REQUIRED",
+            "ADMIN_MFA_REQUIRED is not allowed to be false in production (ADR 0100)",
         )
         check(
             self.session_secret is None,

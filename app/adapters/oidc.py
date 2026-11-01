@@ -36,6 +36,7 @@ from app.domain.authorization import Role
 from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM, SubjectRefusedError, qualify
 from app.domain.identity_providers import ASYMMETRIC_ALGORITHMS, ClientAuth, issuer_of
+from app.domain.mfa import MFA_REQUIRED, shows_mfa
 from app.domain.ports import IdentityError, LoginStart, LoginTestReport
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 from app.domain.tunable import value_of
@@ -102,6 +103,9 @@ class OidcConfig:
     compared exactly (OIDC Discovery §4.3, Core §3.1.3.7); ``None`` derives it from
     ``discovery_url`` (``issuer_of``). A registered provider passes the issuer stored at
     registration, so a later change of its discovery document cannot move it.
+    ``acr_values`` are requested at login when not empty; with ``require_mfa`` an ID token
+    that shows no second factor (``amr``, or an ``acr`` out of ``acr_values``) is refused
+    with ``mfa_required`` (ADR 0100). MFA itself is the provider's.
     """
 
     discovery_url: str
@@ -115,6 +119,8 @@ class OidcConfig:
     signing_key: tuple[str, str] | None = field(default=None, repr=False)
     guard: Guard | None = None
     expected_issuer: str | None = None
+    require_mfa: bool = False
+    acr_values: str = ""
 
     @property
     def issuer(self) -> str:
@@ -294,6 +300,8 @@ class OidcIdentityProvider:
             "code_challenge": _code_challenge(verifier),
             "code_challenge_method": "S256",
         }
+        if self._config.acr_values:
+            params["acr_values"] = self._config.acr_values
         if fresh:
             params |= {"prompt": "login", "max_age": "0"}
         query = urlencode(params)
@@ -305,8 +313,8 @@ class OidcIdentityProvider:
         """Exchange the code, verify the ID token and return what it says about the admin.
 
         Raises:
-            IdentityError: ``token_exchange_failed``, ``invalid_token``, ``nonce_mismatch``
-                or ``too_many_entitlements``.
+            IdentityError: ``token_exchange_failed``, ``invalid_token``, ``nonce_mismatch``,
+                ``mfa_required`` or ``too_many_entitlements``.
         """
         claims = await self._claims(code, redirect_uri, code_verifier, nonce)
         return login_claims(
@@ -393,6 +401,11 @@ class OidcIdentityProvider:
         claims = await self._verify(id_token, metadata)
         if not hmac.compare_digest(str(claims.get("nonce", "")), nonce):
             raise IdentityError("nonce_mismatch")
+        if self._config.require_mfa and not shows_mfa(
+            claims.get("amr"), claims.get("acr"), self._config.acr_values.split()
+        ):
+            log.warning("oidc.mfa_missing", provider=self._config.provider_key or PLATFORM)
+            raise IdentityError(MFA_REQUIRED)
         return claims
 
     def _client_assertion(self, token_endpoint: str) -> str:
