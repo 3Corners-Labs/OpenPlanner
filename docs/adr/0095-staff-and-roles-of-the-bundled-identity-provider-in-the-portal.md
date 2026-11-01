@@ -61,10 +61,10 @@ portal and, where it is OpenPlanner's own, integrated.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #310 | in PR |
-| 1 | `StaffDirectory` port, fake, Keycloak adapter, service account in the realm template | | in PR |
-| 2 | Permissions `staff.manage`, `staff.reset_password`; matrix, `docs/authorization.md` | | in PR |
-| 3 | Staff screen actions (invite, add and remove a role, disable, password reset), manual topic nl/en, audit events | | in PR |
-| 4 | Threat model (service-account secret, privilege escalation by claims) | | in PR |
+| 1 | `StaffDirectory` port, fake, Keycloak adapter, service account in the realm template | #361 | in PR |
+| 2 | Permissions `staff.manage`, `staff.reset_password`; matrix, `docs/authorization.md` | #361 | in PR |
+| 3 | Staff screen actions (invite, add and remove a role, disable, password reset), manual topic nl/en, audit events | #361 | in PR |
+| 4 | Threat model (service-account secret, privilege escalation by claims) | #361 | in PR |
 | 5 | System status shows the platform's provider and the directory state (point 6); the console link for the superuser (point 4); data flow; e2e against the template realm | | planned |
 
 ## Consequences
