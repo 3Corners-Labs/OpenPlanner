@@ -380,6 +380,8 @@ def test_lab_mode_runs_the_dev_services_and_removes_a_stray_proxy(host: Host) ->
 
     assert result.returncode == 0, result.stderr
     assert host.settings(".env")["ENVIRONMENT"] == "test"
+    # Keycloak announces KC_HOSTNAME, not the address the web container fetches it on (ADR 0097).
+    assert host.settings(".env")["OIDC_ISSUER"] == "http://127.0.0.1:8080/realms/openplanner"
     assert host.settings(".env.update")["COMPOSE_PROFILES"] == "dev"
     assert not host.file("proxy.env").exists()
     assert host.ran("--profile tls rm --stop --force proxy")
