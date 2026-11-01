@@ -93,6 +93,7 @@ from app.domain.login_service import ClaimSettings, LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.meeting_status_service import MeetingStatusService
 from app.domain.messaging_service import MessagingService
+from app.domain.mfa import MfaPolicy
 from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
@@ -162,6 +163,10 @@ def oidc_provider(
         client_id=settings.oidc_client_id,
         client_secret=secret,
         scopes=settings.oidc_scopes,
+        mfa_policy=MfaPolicy.REQUIRE if settings.admin_mfa_required else MfaPolicy.OFF,
+        acr_values=settings.oidc_acr_values,
+        mfa_amr_values=settings.oidc_mfa_amr_values,
+        mfa_acr_values=settings.oidc_mfa_acr_values,
         mapping=lambda: claim_mapping(
             current().login_values, current().oidc_entitlements_max_values
         ),

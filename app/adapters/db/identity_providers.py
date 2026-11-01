@@ -27,6 +27,7 @@ from app.domain.identity_providers import (
     OrganisationProvider,
     SigningKey,
 )
+from app.domain.mfa import MfaPolicy
 
 
 def _secret_name(key: str) -> str:
@@ -58,6 +59,9 @@ def _provider(row: IdentityProviderRow, organisation: str) -> OrganisationProvid
         created_at=row.created_at,
         updated_at=row.updated_at,
         checked_at=row.checked_at,
+        mfa_policy=MfaPolicy(row.mfa_policy),
+        mfa_amr_values=row.mfa_amr_values,
+        mfa_acr_values=row.mfa_acr_values,
     )
 
 
@@ -233,6 +237,9 @@ class IdentityProviderQueries:
         row.enabled = provider.enabled
         row.updated_at = provider.updated_at
         row.checked_at = provider.checked_at
+        row.mfa_policy = provider.mfa_policy.value
+        row.mfa_amr_values = provider.mfa_amr_values
+        row.mfa_acr_values = provider.mfa_acr_values
 
     def _seal_secret(self, row: IdentityProviderRow, key: str, secret: str | None) -> None:
         """Seal ``secret`` onto the row, or clear it when ``None`` on a new row."""

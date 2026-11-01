@@ -905,11 +905,15 @@ class IdentityProviderRow(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
     checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    mfa_policy: Mapped[str] = mapped_column(String(16), server_default="record")
+    mfa_amr_values: Mapped[str] = mapped_column(String(1100), server_default="")
+    mfa_acr_values: Mapped[str] = mapped_column(String(1100), server_default="")
 
     __table_args__ = (
         CheckConstraint(
             "client_auth IN ('private_key_jwt', 'client_secret_basic')", name="client_auth"
         ),
+        CheckConstraint("mfa_policy IN ('off', 'record', 'require')", name="mfa_policy"),
     )
 
 

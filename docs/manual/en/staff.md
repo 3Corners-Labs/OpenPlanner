@@ -51,3 +51,14 @@ logins, logouts and changes, within your own organisations or groups.
 - **Last logout**: the last time the person clicked **Log out**. A session that expires on
   its own (after 8 hours) does not count as a logout. The same goes for a session that ends because it was idle
   for too long (60 minutes by default) or because a newer login replaced it.
+
+## Second factor (MFA)
+
+Staff log in with a second factor besides their password: a code from an authenticator app
+or a security key. OpenPlanner does not set this up and does not store it; the identity
+provider does (ADR 0100). At login OpenPlanner asks the provider for it and checks that the
+provider says it was used. If it was not, the login is refused with the message *your
+account shows no second factor*. Set up multi-factor authentication at your identity provider
+(with the bundled Keycloak: the first login asks for an authenticator app) and sign in again.
+Still refused? Ask the IdP team; the refusal is in the audit log as `mfa_required`, without
+any personal data.

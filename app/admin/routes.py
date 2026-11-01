@@ -126,6 +126,7 @@ from app.domain.login_service import (
     TOO_MANY_ENTITLEMENTS,
     LoginRefusedError,
 )
+from app.domain.mfa import MFA_MISSING_EVENT, MFA_REQUIRED
 from app.domain.ports import Clock, IdentityError, IdentityProvider
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.settings_service import SettingsService
@@ -148,6 +149,7 @@ log = structlog.get_logger()
 LOGIN_REFUSED_TEXTS: dict[str, str] = {
     AMBIGUOUS_CLAIMS: "admin.login_refused.ambiguous_claims",
     TOO_MANY_ENTITLEMENTS: "admin.login_refused.too_many_entitlements",
+    MFA_REQUIRED: "admin.login_refused.mfa_required",
 }
 """What the error page says per refusal reason of the login service (ADR 0049)."""
 
@@ -259,7 +261,16 @@ async def callback(
             )
     except IdentityError as error:
         await report(request, LOGIN_EVENT, error.code, actor=ANONYMOUS)
-        return _message(request, locale, 401, "admin.login_failed.title", "admin.login_failed.text")
+        text = LOGIN_REFUSED_TEXTS.get(error.code, "admin.login_failed.text")
+        return _message(request, locale, 401, "admin.login_failed.title", text)
+    if claims.mfa_missing:  # ADR 0100: the provider's policy is "record"; the login goes on
+        await report(
+            request,
+            MFA_MISSING_EVENT,
+            "mfa_missing",
+            detail=f"provider:{key}",
+            actor=claims.subject,
+        )
     logins = login_service(request)
     try:
         outcome = await logins.complete_login(claims)

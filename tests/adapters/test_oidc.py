@@ -27,6 +27,7 @@ from app.adapters.oidc import (
 from app.adapters.signing_keys import EcSigningKeys
 from app.domain.authorization import Role
 from app.domain.identity_providers import ClientAuth
+from app.domain.mfa import MfaPolicy
 from app.domain.ports import IdentityError
 from app.domain.settings_registry import lookup
 
@@ -799,3 +800,128 @@ def test_client_secret_basic_encodes_each_credential_before_joining(
     raw_id, raw_secret = base64.b64decode(encoded).decode().split(":")
     assert scheme == "Basic"
     assert (unquote_plus(raw_id), unquote_plus(raw_secret)) == (client_id, secret)
+
+
+def _mfa_config(**overrides: Any) -> OidcConfig:
+    return OidcConfig(
+        discovery_url=f"{ISSUER}/.well-known/openid-configuration",
+        client_id=CLIENT,
+        client_secret="s3cret",
+        scopes="openid profile",
+        mapping=MAPPING,
+        **{"mfa_policy": MfaPolicy.REQUIRE, "acr_values": "mfa", **overrides},
+    )
+
+
+async def _mfa_login(provider: FakeProvider, config: OidcConfig) -> None:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        await login(OidcIdentityProvider(config, http), provider)
+
+
+async def test_acr_values_are_requested_at_login_when_configured(provider: FakeProvider) -> None:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        start = await OidcIdentityProvider(_mfa_config(acr_values="mfa loa2"), http).start_login(
+            REDIRECT
+        )
+        plain = await OidcIdentityProvider(_mfa_config(acr_values=""), http).start_login(REDIRECT)
+
+    assert parse_qs(urlsplit(start.url).query)["acr_values"] == ["mfa loa2"]
+    assert "acr_values" not in parse_qs(urlsplit(plain.url).query)
+
+
+@pytest.mark.parametrize(
+    "claims", [{"amr": ["pwd", "otp"]}, {"amr": ["mfa"]}, {"amr": ["hwk"]}, {"acr": "mfa"}]
+)
+async def test_a_token_that_shows_mfa_is_accepted(
+    provider: FakeProvider, claims: dict[str, Any]
+) -> None:
+    provider.claims = claims
+
+    await _mfa_login(provider, _mfa_config())
+
+
+@pytest.mark.parametrize("claims", [{}, {"amr": ["pwd"]}, {"acr": "0"}, {"amr": "pwd"}])
+async def test_a_token_without_proof_of_mfa_refuses_the_login(
+    provider: FakeProvider, claims: dict[str, Any]
+) -> None:
+    provider.claims = claims
+
+    with pytest.raises(IdentityError) as refused:
+        await _mfa_login(provider, _mfa_config())
+
+    assert refused.value.code == "mfa_required"
+
+
+async def test_an_acr_that_was_not_requested_is_no_proof(provider: FakeProvider) -> None:
+    provider.claims = {"acr": "mfa"}
+
+    with pytest.raises(IdentityError) as refused:
+        await _mfa_login(provider, _mfa_config(acr_values=""))
+
+    assert refused.value.code == "mfa_required"
+
+
+async def test_without_the_switch_no_proof_is_needed(provider: FakeProvider) -> None:
+    await _mfa_login(provider, _mfa_config(mfa_policy=MfaPolicy.OFF))
+
+
+async def test_the_refusal_logs_no_claim_values(provider: FakeProvider) -> None:
+    provider.claims = {"amr": ["pwd"], "name": "Ada Admin"}
+    with structlog.testing.capture_logs() as events:
+        with pytest.raises(IdentityError):
+            await _mfa_login(provider, _mfa_config())
+
+    assert [e["event"] for e in events if e["event"].startswith("oidc.mfa")] == ["oidc.mfa_missing"]
+    assert "Ada" not in str(events)
+
+
+async def test_the_accepted_amr_and_acr_values_are_configurable(provider: FakeProvider) -> None:
+    provider.claims = {"amr": ["x-strong"]}
+    await _mfa_login(provider, _mfa_config(mfa_amr_values="x-strong"))
+
+    provider.claims = {"acr": "urn:strong"}
+    await _mfa_login(provider, _mfa_config(mfa_acr_values="urn:strong"))
+
+    provider.claims = {"amr": ["otp"]}
+    with pytest.raises(IdentityError):
+        await _mfa_login(provider, _mfa_config(mfa_amr_values="x-strong"))
+
+
+async def test_the_record_policy_lets_the_login_through_and_marks_it(
+    provider: FakeProvider,
+) -> None:
+    provider.claims = {"amr": ["pwd"]}
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        _, found = await login(
+            OidcIdentityProvider(_mfa_config(mfa_policy=MfaPolicy.RECORD), http), provider
+        )
+    provider.claims = {"amr": ["otp"]}
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        _, shown = await login(
+            OidcIdentityProvider(_mfa_config(mfa_policy=MfaPolicy.RECORD), http), provider
+        )
+
+    assert found.mfa_missing is True
+    assert shown.mfa_missing is False
+
+
+async def test_a_test_login_reports_whether_a_second_factor_showed_and_never_refuses(
+    provider: FakeProvider,
+) -> None:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        oidc = OidcIdentityProvider(_mfa_config(), http)  # policy: require
+        reports = []
+        for claims in ({"amr": ["pwd"]}, {"amr": ["hwk"]}):
+            provider.claims = claims
+            start = await oidc.start_login(REDIRECT)
+            provider.nonce = start.nonce
+            reports.append(
+                await oidc.finish_test_login(
+                    code="abc",
+                    redirect_uri=REDIRECT,
+                    code_verifier=start.code_verifier,
+                    nonce=start.nonce,
+                )
+            )
+
+    assert [r.mfa_shown for r in reports] == [False, True]

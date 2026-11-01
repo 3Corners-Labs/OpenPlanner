@@ -16,6 +16,7 @@ import httpx
 
 from app.adapters.db.identity_providers import ProviderCredentialStore
 from app.adapters.oidc import ClaimMapping, Guard, OidcConfig, OidcIdentityProvider
+from app.domain.mfa import MFA_AMR_VALUES
 
 
 class OrganisationProviders:
@@ -72,6 +73,9 @@ class OrganisationProviders:
             signing_key=(found.kid, found.private_pem) if found.kid and found.private_pem else None,
             guard=self._guard,
             expected_issuer=registration.issuer,
+            mfa_policy=registration.mfa_policy,
+            mfa_amr_values=registration.mfa_amr_values or " ".join(sorted(MFA_AMR_VALUES)),
+            mfa_acr_values=registration.mfa_acr_values,
         )
         adapter = OidcIdentityProvider(config, self._http)
         self._built[key] = (registration.updated_at, adapter)
