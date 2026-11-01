@@ -2,7 +2,9 @@
 
 Status: accepted (2026-10-26), requested by the product owner. Builds on ADR 0006 (signed
 images) and ADR 0014 (authorisation matrix). Amended by ADR 0059 (§1: an installation on the
-`rc` channel is also offered release candidates; `UPDATE_AUTO_APPLY`).
+`rc` channel is also offered release candidates; `UPDATE_AUTO_APPLY`). §2 and §5 amended by ADR
+0067 (a chosen version instead of the latest; check interval `update_check_minutes`, class C).
+Extended by ADR 0048 and ADR 0050.
 
 ## Context
 

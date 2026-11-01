@@ -2,6 +2,9 @@
 
 Status: accepted (2026-10-29), requested by the product owner. Extends ADR 0029 (host updater)
 and ADR 0030 (HTTPS proxy). Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
+Note (2026-11-01 review): the signing identity per installer mode (*Settings*: release tags of
+the `main` workflow) is amended by ADR 0059 (the `rc` channel also accepts images signed on
+`main`) and ADR 0067 §2 (`test` and `lab` also accept images signed on `main`).
 
 ## Context
 

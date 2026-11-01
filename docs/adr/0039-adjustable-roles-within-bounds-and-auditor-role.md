@@ -3,6 +3,8 @@
 Status: accepted (2026-10-27), requested by the product owner. Amends ADR 0014 (where role
 definitions live, how a role's reach is derived) and ADR 0031 (who holds `audit.view`). The
 product owner settled decision points B1 to B8 on 2026-10-27 by taking every recommendation.
+Point 6 superseded by ADR 0049 for the `entitlements` claim mode (the separate claim value is
+used only in `legacy` and `shadow` mode).
 
 ## Context
 

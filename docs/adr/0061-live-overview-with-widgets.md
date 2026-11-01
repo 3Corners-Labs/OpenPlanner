@@ -1,6 +1,10 @@
 # 0061. Live overview with widgets
 
 Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0016 (admin pages without JavaScript) for the overview page only, following the pattern of ADR 0048. Builds on ADR 0047 §5 (overview as status and to-dos), ADR 0014 (matrix) and ADR 0043 (own queue). Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
+Note (2026-11-01 review): §4's "every other admin page stays without scripts" no longer holds:
+the updates page (ADR 0048), the queue (ADR 0072) and the agenda day view (ADR 0010) load own
+scripts, the last two through the generic `live-region.js` (ADR 0072 §6). `overview-live.js` is
+not built.
 
 ## Context
 
@@ -50,7 +54,7 @@ The overview (`/admin/`, `dashboard.view`) lists groups as cards. Admins asked f
 | 2b | OV-4: server-rendered SVG charts (bar, line, pie) with text summary and table | #153 | merged |
 | 3 | OV-5: `overview-live.js`, live endpoint, CSP on this page only, "poll flood" abuse case | | planned |
 | 4 | OV-6, OV-7: alerts, banner, pop-ups, level filter; `QUEUE_WAIT_*` settings | | planned |
-| 5 | SH-3: organisation › group filter in the top bar (overview; other lists keep their own filters) | #161 | in PR |
+| 5 | SH-3: organisation › group filter in the top bar (overview; other lists keep their own filters) | #161 | merged |
 
 ## Consequences
 

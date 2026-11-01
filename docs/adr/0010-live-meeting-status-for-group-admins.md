@@ -1,6 +1,8 @@
 # 0010. Live meeting status for group admins
 
 Status: accepted (2026-10-23), built. Webhooks and the agenda columns came with work packages 5 and 7; the polling fallback and the self-refreshing agenda came on 2026-10-30 (see *Build status*). Amended by *Amendments* below.
+The Context's "read-only from the dispatch lead" is replaced by ADR 0069 (cancel until the
+start, move until a lead; `Group.change_deadline`).
 
 ## Context
 

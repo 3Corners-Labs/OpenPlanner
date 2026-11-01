@@ -2,6 +2,7 @@
 
 Status: accepted (2026-10-29), requested by the product owner. Extends ADR 0034 (security
 events, AU-4) and ADR 0040 (event schema); the schema stays `openplanner.event/1`. Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
+The schema is `openplanner.event/2` since ADR 0065.
 
 ## Context
 

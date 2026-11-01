@@ -2,6 +2,9 @@
 
 Status: accepted (2026-10-29), requested by the product owner. Amends ADR 0006 (supply chain:
 how updates arrive) and the "Weekly: Renovate" line of CLAUDE.md. Built in the repository, checked on 2026-10-30; the Renovate app and the branch protection are settings outside the code (status was *proposed*; `docs/adr-status.md`).
+§7 (no automerge) amended by ADR 0078 (§1–2: Renovate updates are build work and merge on
+green). Note (2026-11-01 review): §3: `no deprecation warnings` is not a required check of
+`main` as of 2026-11-01.
 
 ## Context
 

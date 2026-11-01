@@ -4,6 +4,10 @@ Status: proposed (2026-10-25). Renumbered from 0021 on 2026-10-27: two ADRs were
 0021 in parallel; ADR 0021 is "Ending the work item of a cancelled booking". The content is
 unchanged. Extends ADR 0007 and ADR 0018; once accepted, it replaces
 their per-group mapping (ADR 0018 point 1) with the model below. Not built yet; see `docs/adr-status.md` for what is built.
+Note (2026-11-01 review): point 8 (first name and host join URL only) contradicts point 5 and
+ADR 0018 §2, whose payload is what is sent (`app/adapters/wxcc.py`: booking reference, first
+name, start label, group name, meeting link, kind). Point 8 amended by ADR 0081 §6. ADR 0043
+was built without this ADR. ADR 0028 cites this ADR as ADR 0021 (its number before renumbering).
 
 ## Context
 
