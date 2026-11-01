@@ -402,5 +402,12 @@ switched-on attributes (preferred language, channel preference) are stored on th
 from a closed list and leave the system only as routing variables in the contact-center task,
 next to the first name and the host join URL; purged with the booking.
 
-To be added per work package: purge sweep and backups (WP8). Each flow lists: data items, source, destination, legal
+Purge sweep (retention): the worker's daily housekeeping reads the bookings that still hold
+personal data past their purge moment (times and status only), sets the PII columns of each to NULL
+in its own transaction, deletes its pending jobs and writes the system event `retention.sweep`
+(counts only) and the log lines `retention.sweep` and `retention.backlog` (counts only). No personal
+data leaves the database; the host command `python -m app.cli purge-overdue [--dry-run]` does the
+same and prints counts per group.
+
+To be added per work package: backups (WP8). Each flow lists: data items, source, destination, legal
 basis owner, retention.

@@ -48,7 +48,12 @@ from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import OwnCertificate
-from app.domain.retention import GroupRetentionCounts, PurgeCandidate, RetentionFacts
+from app.domain.retention import (
+    DueBooking,
+    GroupRetentionCounts,
+    PurgeCandidate,
+    RetentionFacts,
+)
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
     Group,
@@ -818,6 +823,38 @@ class InMemoryTransaction:
             self.state.bookings[booking_id], contact=None, claim=None, trial=None
         )
         self.state.purged_at[booking_id] = now
+
+    async def due_for_purge(self, candidates_before: datetime) -> list[DueBooking]:
+        due = []
+        for booking_id, b in sorted(self.state.bookings.items()):
+            closure = self.state.closures.get(b.closure_id) if b.closure_id else None
+            if b.contact is not None and (
+                b.end < candidates_before
+                or (b.cancelled_at is not None and b.cancelled_at < candidates_before)
+                or b.status is BookingStatus.SUSPENDED
+                or (b.rebook_by is not None and b.rebook_by < candidates_before)
+                or (
+                    b.status is BookingStatus.PENDING_CONFIRMATION
+                    and b.confirm_by is not None
+                    and b.confirm_by < candidates_before
+                )
+            ):
+                ends = closure.ends_at if closure else None
+                due.append(
+                    DueBooking(
+                        booking_id,
+                        PurgeCandidate(
+                            b.group_id,
+                            b.status,
+                            b.end,
+                            b.cancelled_at,
+                            ends,
+                            b.rebook_by,
+                            b.confirm_by,
+                        ),
+                    )
+                )
+        return due
 
     async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:
         groups = await self.list_groups(scope)

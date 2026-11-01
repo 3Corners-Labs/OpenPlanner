@@ -9,14 +9,19 @@ decided in ``app.domain.retention``; the SQL only narrows the candidates.
 from datetime import datetime
 from typing import Protocol
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import BookingRow, ClosureRow, JobRow, SlotRow
 from app.domain.authorization import Scope
 from app.domain.booking import BookingStatus
 from app.domain.job_plan import JobType
-from app.domain.retention import GroupRetentionCounts, PurgeCandidate, RetentionFacts
+from app.domain.retention import (
+    DueBooking,
+    GroupRetentionCounts,
+    PurgeCandidate,
+    RetentionFacts,
+)
 from app.domain.scheduling import GroupSummary
 
 
@@ -32,6 +37,14 @@ class _Transaction(Protocol):
 
 class RetentionQueries:
     """The retention overview's part of ``SqlTransaction``."""
+
+    async def due_for_purge(self: _Transaction, candidates_before: datetime) -> list[DueBooking]:
+        """Return the bookings of every group that hold personal data and may be overdue.
+
+        The nightly sweep's selection, with ids and without a scope: the same rows as
+        ``list_retention`` shows as candidates, for all groups.
+        """
+        return await _candidates(self._session, candidates_before, None)
 
     async def list_retention(
         self: _Transaction, scope: Scope, candidates_before: datetime
@@ -68,28 +81,7 @@ class RetentionQueries:
             .group_by(BookingRow.group_id)
         )
         failures = {group_id: int(count) for group_id, count in failed}
-        rows = await self._session.execute(
-            select(
-                BookingRow.group_id,
-                BookingRow.status,
-                SlotRow.end,
-                BookingRow.cancelled_at,
-                ClosureRow.ends_at,
-                BookingRow.rebook_by,
-            )
-            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
-            .outerjoin(ClosureRow, ClosureRow.id == BookingRow.closure_id)
-            .where(
-                BookingRow.group_id.in_(ids),
-                holding,
-                or_(
-                    SlotRow.end < candidates_before,
-                    BookingRow.cancelled_at < candidates_before,
-                    BookingRow.status == BookingStatus.SUSPENDED.value,
-                    BookingRow.rebook_by < candidates_before,
-                ),
-            )
-        )
+        due = await _candidates(self._session, candidates_before, ids)
         return RetentionFacts(
             [
                 GroupRetentionCounts(
@@ -100,10 +92,72 @@ class RetentionQueries:
                 )
                 for g in groups
             ],
-            [
-                PurgeCandidate(
-                    group_id, BookingStatus(status), end, cancelled_at, closure_end, rebook_by
-                )
-                for group_id, status, end, cancelled_at, closure_end, rebook_by in rows
-            ],
+            [d.candidate for d in due],
         )
+
+
+async def _candidates(
+    session: AsyncSession, candidates_before: datetime, group_ids: list[int] | None
+) -> list[DueBooking]:
+    """Return the bookings that still hold personal data and may be past their purge moment.
+
+    Args:
+        session: The caller's session.
+        candidates_before: See ``app.domain.retention.candidates_before``.
+        group_ids: Restrict to these groups; ``None`` for all.
+    """
+    where = [
+        BookingRow.pii_purged_at.is_(None),
+        or_(
+            SlotRow.end < candidates_before,
+            BookingRow.cancelled_at < candidates_before,
+            BookingRow.status == BookingStatus.SUSPENDED.value,
+            BookingRow.rebook_by < candidates_before,
+            and_(
+                BookingRow.status == BookingStatus.PENDING_CONFIRMATION.value,
+                BookingRow.confirm_by < candidates_before,
+            ),
+        ),
+    ]
+    if group_ids is not None:
+        where.append(BookingRow.group_id.in_(group_ids))
+    rows = await session.execute(
+        select(
+            BookingRow.id,
+            BookingRow.group_id,
+            BookingRow.status,
+            SlotRow.end,
+            BookingRow.cancelled_at,
+            ClosureRow.ends_at,
+            BookingRow.rebook_by,
+            BookingRow.confirm_by,
+        )
+        .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+        .outerjoin(ClosureRow, ClosureRow.id == BookingRow.closure_id)
+        .where(*where)
+        .order_by(BookingRow.id)
+    )
+    return [
+        DueBooking(
+            booking_id,
+            PurgeCandidate(
+                group_id,
+                BookingStatus(status),
+                end,
+                cancelled_at,
+                closure_end,
+                rebook_by,
+                confirm_by,
+            ),
+        )
+        for (
+            booking_id,
+            group_id,
+            status,
+            end,
+            cancelled_at,
+            closure_end,
+            rebook_by,
+            confirm_by,
+        ) in rows
+    ]
