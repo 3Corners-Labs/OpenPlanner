@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "_error_message.html" import error_message %}
 {% block title %}{{ _("admin.tab.holidays") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
@@ -53,7 +54,7 @@
     <div class="choice__option"><input type="radio" id="source-inherit" name="source" value="inherit"{% if source == "inherit" %} checked{% endif %} aria-describedby="source-inherit-hint"><label for="source-inherit">{{ _("admin.holidays.source_inherit") }}</label></div>
     <p class="hint" id="source-inherit-hint">{% if inherited %}{{ _("admin.holidays.inherited", calendars=inherited|join(", ")) }}{% else %}{{ _("admin.holidays.inherited_none") }}{% endif %}</p>
     <div class="choice__option"><input type="radio" id="source-own" name="source" value="own"{% if source == "own" %} checked{% endif %}><label for="source-own">{{ _("admin.holidays.source_own") }}</label></div>
-    {% if source_error %}<p class="error-message">{{ source_error }}</p>{% endif %}
+    {{ error_message(source_error) }}
   </fieldset>
   <fieldset class="field choice" id="calendars">
     <legend>{{ _("admin.holidays.own_calendars") }}</legend>

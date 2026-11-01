@@ -1,7 +1,8 @@
 {% extends "admin/layout.html" %}
+{% from "_error_message.html" import error_message %}
 {% from "admin/_icons.html" import icon %}
 {% block title %}{% if role %}{{ role.name(locale) }}{% else %}{{ _("admin.roles.new") }}{% endif %} – {{ _("admin.roles.title") }} – {{ _("admin.title") }}{% endblock %}
-{% macro error_text(name) -%}{% set message = error_for(name) %}{% if message %}<p class="error-message" id="{{ name }}-error">{{ message }}</p>{% endif %}{%- endmacro %}
+{% macro error_text(name) -%}{% set message = error_for(name) %}{{ error_message(message, name ~ "-error") }}{%- endmacro %}
 {% macro described(name) -%}{{ name }}-hint{% if error_for(name) %} {{ name }}-error{% endif %}{%- endmacro %}
 {% block content %}
 <div class="page-header">

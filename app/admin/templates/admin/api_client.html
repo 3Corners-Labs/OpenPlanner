@@ -1,6 +1,7 @@
 {% extends "admin/layout.html" %}
+{% from "_error_message.html" import error_message %}
 {% block title %}{% if client %}{{ client.client.name }}{% else %}{{ _("admin.api.new_client") }}{% endif %} – {{ _("admin.api.title") }} – {{ _("admin.title") }}{% endblock %}
-{% macro error_text(name) -%}{% set message = error_for(name) %}{% if message %}<p class="error-message" id="{{ name }}-error">{{ message }}</p>{% endif %}{%- endmacro %}
+{% macro error_text(name) -%}{% set message = error_for(name) %}{{ error_message(message, name ~ "-error") }}{%- endmacro %}
 {% block content %}
 <div class="page-header">
   <div>
