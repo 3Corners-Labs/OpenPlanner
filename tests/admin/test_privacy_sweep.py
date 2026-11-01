@@ -349,13 +349,13 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     directory = FakeStaffDirectory(
         [
             DirectoryUser(
-                "sub-super",
-                "s",
-                "s@example.test",
-                "S",
-                "S",
+                "sub-group",
+                "g",
+                "g@example.test",
+                "G",
+                "G",
                 True,
-                frozenset({"openplanner:superuser"}),
+                frozenset({"openplanner:group_admin:demo/demo"}),
             )
         ]
     )
