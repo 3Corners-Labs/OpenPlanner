@@ -32,6 +32,33 @@ not recognised**, with the reason and the moment. The filter **Only with unrecog
 finds these people. The right values are on **Identity provider mapping**; pass the difference
 on to the IdP team.
 
+## Managing staff in the bundled identity provider
+
+If this platform uses the bundled Keycloak (test and lab installations) you manage staff here.
+With an identity provider of your own, such as PingFederate, you do not see these buttons: the
+IdP team changes rights there.
+
+- **Invite staff member** (button above the list): enter email address, first and last name
+  and choose the first role and place. The staff member receives an email with a link to choose
+  a password. The link is valid for 7 days by default (the superuser can change this).
+- **Invited, not logged in yet**: people you created who have not logged in. You can resend the
+  invitation.
+- On a person's page, under **Managed at the identity provider**: remove a role, add a role
+  with a place, disable or enable the person, and send a password reset. A change takes effect at
+  the next login.
+
+What you may do:
+
+- An **organisation admin** works only inside their own organisations and never grants more
+  than their own rights: only the superuser can grant the superuser role.
+- For a person who also works outside your organisations, roles elsewhere are left alone and
+  only the superuser can disable them.
+- You cannot change or disable yourself.
+
+Every change is in the audit log, with role names and places and without names or email
+addresses. When the identity provider cannot be reached the screen says so, without repeating
+the provider's own message.
+
 ## Filters
 
 - **Organisation**, **Group** and **Role**: only staff who belong to it.

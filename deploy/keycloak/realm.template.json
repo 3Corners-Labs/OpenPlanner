@@ -105,6 +105,19 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "openplanner-directory",
+      "name": "OpenPlanner staff management (ADR 0095)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KC_DIRECTORY_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true
     }
   ],
   "users": [
@@ -143,6 +156,17 @@
       "requiredActions": [
         "UPDATE_PASSWORD"
       ]
+    },
+    {
+      "username": "service-account-openplanner-directory",
+      "enabled": true,
+      "serviceAccountClientId": "openplanner-directory",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-realm"
+        ]
+      }
     }
   ]
 }

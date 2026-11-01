@@ -1,0 +1,7 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.staff.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<p><a href="{{ back }}">{{ _("admin.staff.back") }}</a></p>
+<h1 id="page-title">{{ _("admin.staff.title") }}</h1>
+{% include "_error_summary.html" %}
+{% endblock %}

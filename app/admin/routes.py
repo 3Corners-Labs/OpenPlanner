@@ -63,6 +63,7 @@ from app.admin import (
     scenario_routes,
     settings_routes,
     simulator_routes,
+    staff_directory_routes,
     staff_routes,
     update_routes,
 )
@@ -634,6 +635,7 @@ def register_admin(app: FastAPI) -> None:
         settings_routes.router,
         organisation_settings_routes.router,
         role_routes.router,
+        staff_directory_routes.router,
         staff_routes.router,
         group_routes.router,
         call_routes.router,

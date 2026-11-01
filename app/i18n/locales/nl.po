@@ -5689,6 +5689,12 @@ msgstr "{count} uur"
 msgid "authz.permission.staff_view"
 msgstr "Medewerkers bekijken"
 
+msgid "authz.permission.staff_manage"
+msgstr "Medewerkers beheren"
+
+msgid "authz.permission.staff_reset_password"
+msgstr "Wachtwoordreset of uitnodiging sturen"
+
 msgid "admin.nav.staff"
 msgstr "Medewerkers"
 
@@ -6081,6 +6087,12 @@ msgstr "Onderhoudsstand onthouden (seconden)"
 
 msgid "settings.field.maintenance_retry_after_seconds.label"
 msgstr "Opnieuw proberen na onderhoud (seconden)"
+
+msgid "settings.field.staff_invite_expiry_days.label"
+msgstr "Geldigheid uitnodiging of wachtwoordreset (dagen)"
+
+msgid "settings.field.staff_directory_enabled.label"
+msgstr "Medewerkers beheren in het portaal"
 
 msgid "settings.field.staff_last_seen_interval_seconds.label"
 msgstr "Laatst gezien bijwerken (seconden)"
@@ -8424,3 +8436,150 @@ msgstr "Configuratiepakket geëxporteerd"
 
 msgid "admin.audit.detail.configuration_import"
 msgstr "Configuratiepakket geïmporteerd"
+
+msgid "admin.staff.invite.link"
+msgstr "Medewerker uitnodigen"
+
+msgid "admin.staff.invite.title"
+msgstr "Medewerker uitnodigen"
+
+msgid "admin.staff.invite.intro"
+msgstr "De medewerker krijgt een e-mail met een link om een wachtwoord te kiezen. De link is {days} dagen geldig."
+
+msgid "admin.staff.invite.email"
+msgstr "E-mailadres"
+
+msgid "admin.staff.invite.first_name"
+msgstr "Voornaam"
+
+msgid "admin.staff.invite.last_name"
+msgstr "Achternaam"
+
+msgid "admin.staff.invite.submit"
+msgstr "Uitnodiging versturen"
+
+msgid "admin.staff.invite.error.email"
+msgstr "Vul een geldig e-mailadres in."
+
+msgid "admin.staff.invite.error.first_name"
+msgstr "Vul een voornaam in."
+
+msgid "admin.staff.invite.error.last_name"
+msgstr "Vul een achternaam in."
+
+msgid "admin.staff.invite.error.role"
+msgstr "Kies een rol."
+
+msgid "admin.staff.pending.title"
+msgstr "Uitgenodigd, nog niet ingelogd"
+
+msgid "admin.staff.pending.intro"
+msgstr "Deze mensen zijn aangemaakt bij de identiteitsprovider maar hebben nog niet ingelogd."
+
+msgid "admin.staff.pending.resend"
+msgstr "Uitnodiging opnieuw sturen"
+
+msgid "admin.staff.manage.title"
+msgstr "Beheer bij de identiteitsprovider"
+
+msgid "admin.staff.manage.intro"
+msgstr "Deze persoon staat in de identiteitsprovider van het platform. U wijzigt hier alleen wat binnen uw eigen organisaties valt; de wijziging werkt bij de eerstvolgende login."
+
+msgid "admin.staff.manage.grants"
+msgstr "Rollen en plaatsen binnen uw bereik"
+
+msgid "admin.staff.manage.role"
+msgstr "Rol"
+
+msgid "admin.staff.manage.place"
+msgstr "Plaats"
+
+msgid "admin.staff.manage.place_hint"
+msgstr "Een organisatie of een groep. Alleen de rol superuser geldt voor het hele platform."
+
+msgid "admin.staff.manage.whole_platform"
+msgstr "Hele platform"
+
+msgid "admin.staff.manage.actions"
+msgstr "Acties"
+
+msgid "admin.staff.manage.remove"
+msgstr "Verwijderen"
+
+msgid "admin.staff.manage.add"
+msgstr "Rol toevoegen"
+
+msgid "admin.staff.manage.add_submit"
+msgstr "Rol toevoegen"
+
+msgid "admin.staff.manage.disable"
+msgstr "Uitschakelen"
+
+msgid "admin.staff.manage.enable"
+msgstr "Weer inschakelen"
+
+msgid "admin.staff.manage.reset"
+msgstr "Wachtwoordreset sturen"
+
+msgid "admin.staff.manage.disabled"
+msgstr "Uitgeschakeld"
+
+msgid "admin.staff.manage.elsewhere"
+msgstr "Deze persoon werkt ook buiten uw organisaties. Rollen elders blijven ongemoeid; uitschakelen kan alleen de superuser."
+
+msgid "admin.done.staff_invited"
+msgstr "De uitnodiging is verstuurd."
+
+msgid "admin.done.staff_grants_saved"
+msgstr "De rollen zijn bijgewerkt."
+
+msgid "admin.done.staff_enabled"
+msgstr "De medewerker kan weer inloggen."
+
+msgid "admin.done.staff_disabled"
+msgstr "De medewerker kan niet meer inloggen."
+
+msgid "admin.done.staff_reset_sent"
+msgstr "De e-mail met de link is verstuurd."
+
+msgid "admin.form.error.staff_directory_unavailable"
+msgstr "De identiteitsprovider is niet beschikbaar of medewerkers beheren staat uit. Probeer het later opnieuw."
+
+msgid "admin.form.error.staff_address_in_use"
+msgstr "Dit e-mailadres is al in gebruik."
+
+msgid "admin.form.error.staff_grant_refused"
+msgstr "Deze rol of plaats mag u niet toekennen."
+
+msgid "admin.form.error.staff_not_found"
+msgstr "Deze persoon is niet gevonden binnen uw bereik."
+
+msgid "admin.form.error.staff_mail_failed"
+msgstr "De e-mail kon niet worden verstuurd. Controleer de e-mailinstellingen van de identiteitsprovider."
+
+msgid "admin.idp_mapping.provider"
+msgstr "Identiteitsprovider"
+
+msgid "admin.idp_mapping.issuer"
+msgstr "Adres (issuer)"
+
+msgid "admin.idp_mapping.staff"
+msgstr "Medewerkers beheren"
+
+msgid "admin.idp_mapping.staff_link"
+msgstr "Naar medewerkers"
+
+msgid "admin.idp_mapping.provider.own"
+msgstr "Eigen identiteitsprovider van de organisatie"
+
+msgid "admin.idp_mapping.provider.bundled"
+msgstr "Meegeleverde Keycloak van dit platform"
+
+msgid "admin.idp_mapping.staff.at_provider"
+msgstr "Bij de identiteitsprovider zelf; het portaal toont ze alleen."
+
+msgid "admin.idp_mapping.staff.in_portal"
+msgstr "In het portaal: uitnodigen, rollen wijzigen, uitschakelen."
+
+msgid "admin.idp_mapping.staff.off"
+msgstr "Staat uit (instelling Medewerkers beheren in het portaal); beheer in de Keycloak-console."

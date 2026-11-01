@@ -38,6 +38,7 @@ from app.adapters.integrations import (
     secret_box,
     webex_fingerprint,
 )
+from app.adapters.keycloak_directory import KeycloakDirectory
 from app.adapters.live_settings import LiveSettings, keep_current
 from app.adapters.log_senders import build_sender
 from app.adapters.log_shipping import LogShipper, ship_settings
@@ -103,6 +104,7 @@ from app.domain.ports import (
     IdentityProvider,
     MailDomainResolver,
     SigningKeys,
+    StaffDirectory,
 )
 from app.domain.queue_service import QueueService
 from app.domain.request_log import RequestEvents
@@ -112,6 +114,7 @@ from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
+from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
 from app.domain.system_log import SystemLog
 from app.domain.tls import public_address
 from app.domain.tls_check import CertificateStatus, TlsWatch
@@ -177,6 +180,18 @@ def _confirm_policy(settings: Settings) -> ConfirmPolicy:
     )
 
 
+def _keycloak_directory(settings: Settings) -> StaffDirectory | None:
+    """Return the staff directory of the bundled Keycloak, or ``None`` without its settings."""
+    secret = settings.keycloak_directory_client_secret
+    if not settings.keycloak_admin_url or secret is None:
+        return None
+    return KeycloakDirectory(
+        settings.keycloak_admin_url,
+        settings.keycloak_directory_client_id,
+        secret.get_secret_value(),
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     clock: Clock | None = None,
@@ -187,6 +202,7 @@ def create_app(
     discovery_fetcher: DiscoveryFetcher | None = None,
     signing_keys: SigningKeys | None = None,
     organisation_providers: OrganisationProviders | None = None,
+    staff_directory: StaffDirectory | None = None,
 ) -> FastAPI:
     """Build the application.
 
@@ -206,6 +222,8 @@ def create_app(
         signing_keys: Explicit key generator (tests); defaults to EC P-256 pairs.
         organisation_providers: Explicit registry of organisation provider adapters (tests);
             defaults to one built from the database.
+        staff_directory: Explicit staff directory (tests); defaults to the bundled Keycloak's
+            admin API when ``KEYCLOAK_ADMIN_URL`` is set, else none (ADR 0095).
 
     Returns:
         The FastAPI app with translator, booking service, rate limits and error pages. Its
@@ -380,6 +398,17 @@ def create_app(
                 live().oidc_entitlement_claim,
                 live().oidc_entitlement_prefix,
                 live().idp_mapping_refused_window_days,
+            ),
+        )
+        app.state.staff_directory_service = StaffDirectoryService(
+            uow,
+            clock,
+            app.state.admin_service,
+            staff_directory if staff_directory is not None else _keycloak_directory(settings),
+            lambda: DirectorySettings(
+                live().staff_directory_enabled,
+                live().oidc_entitlement_prefix,
+                live().staff_invite_expiry_days,
             ),
         )
         app.state.form_service = FormService(

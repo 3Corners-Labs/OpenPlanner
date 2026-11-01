@@ -64,6 +64,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.staff import GrantHolders, RefusedEntitlement, StaffFilter, StaffMember
+from app.domain.staff_directory import DirectoryUser, NewStaffMember, StaffAction
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
@@ -558,6 +559,50 @@ class IdentityProvider(Protocol):
 
         Without this, the provider's single sign-on would log the admin straight back in.
         """
+        ...
+
+
+class StaffDirectory(Protocol):
+    """An identity provider that also keeps the admin staff, which the portal may manage.
+
+    Optional capability of the provider the platform owns (ADR 0095): only the bundled
+    Keycloak implements it, through its admin REST API. A provider without it keeps the
+    read-only Staff screen. Every method raises ``DirectoryError`` with a code; the code
+    carries no personal data and nothing the provider said.
+    """
+
+    async def reachable(self) -> bool:
+        """Return whether the directory answers with the service account's credentials."""
+        ...
+
+    async def list_users(self) -> list[DirectoryUser]:
+        """Return every person the provider holds."""
+        ...
+
+    async def get_user(self, user_id: str) -> DirectoryUser | None:
+        """Return one person by the provider's id, or ``None``."""
+        ...
+
+    async def create_user(self, new: NewStaffMember) -> DirectoryUser:
+        """Create a person without a password; the invitation link sets it.
+
+        Raises:
+            DirectoryError: With code ``conflict`` when the address is already in use.
+        """
+        ...
+
+    async def set_entitlements(self, user_id: str, values: Collection[str]) -> None:
+        """Replace the person's entitlement claim values (ADR 0049)."""
+        ...
+
+    async def set_enabled(self, user_id: str, enabled: bool) -> None:
+        """Enable or disable the person; a disabled person cannot log in."""
+        ...
+
+    async def send_actions_email(
+        self, user_id: str, actions: Collection[StaffAction], lifespan_seconds: int
+    ) -> None:
+        """Mail the person a link that asks for ``actions``, valid for ``lifespan_seconds``."""
         ...
 
 
