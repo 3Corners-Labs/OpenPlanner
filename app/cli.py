@@ -672,6 +672,7 @@ async def _oidc_check(
         redirect_uri=f"{settings.public_base_url.rstrip('/')}/admin/callback",
         require_https=settings.environment == "prod",
         client_secret_set=settings.oidc_client_secret is not None,
+        expected_issuer=settings.oidc_issuer,
     )
     async with httpx.AsyncClient(timeout=15.0, transport=transport) as http:
         results = await check_oidc(http, target)
