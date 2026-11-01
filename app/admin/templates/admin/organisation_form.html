@@ -39,4 +39,13 @@
     <a href="/admin/organisations{% if organisation %}/{{ organisation.slug }}{% endif %}">{{ _("admin.cancel") }}</a>
   </div>
 </form>
+{% if organisation and can("organisation.delete") %}
+<section class="card" id="delete" aria-labelledby="delete-heading">
+  <div class="card__header">
+    <h2 id="delete-heading">{{ _("admin.organisation.delete.title") }}</h2>
+    <p class="card__lead">{{ _("admin.organisation.delete.form_lead") }}</p>
+  </div>
+  <p><a class="button button--secondary" href="/admin/organisations/{{ organisation.slug }}/delete">{{ _("admin.organisation.delete.open") }}</a></p>
+</section>
+{% endif %}
 {% endblock %}
