@@ -53,7 +53,16 @@
     <h2 id="booking-form-heading">{{ _("admin.form_fields.title") }}</h2>
     <p class="card__lead">{{ _("admin.form_fields.settings_lead") }}</p>
   </div>
-  <p><a href="/admin/groups/{{ summary.group.slug }}/settings/form">{{ _("admin.form_fields.open") }}</a></p>
+  {% if form_summary.count %}
+  <p>{{ _("admin.form_fields.summary", count=form_summary.count, limit=form_summary.limit) }}</p>
+  <ul>
+    {% for label in form_summary.labels %}<li>{{ label }}</li>{% endfor %}
+    {% if form_summary.more %}<li>{{ _("admin.form_fields.summary_more", count=form_summary.more) }}</li>{% endif %}
+  </ul>
+  {% else %}
+  <p>{{ _("admin.form_fields.summary_none", limit=form_summary.limit) }}</p>
+  {% endif %}
+  <p><a class="button button--secondary" href="/admin/groups/{{ summary.group.slug }}/settings/form">{{ _("admin.form_fields.open") }}</a></p>
 </section>
 <section class="card" id="check" aria-labelledby="check-heading">
   <div class="card__header">

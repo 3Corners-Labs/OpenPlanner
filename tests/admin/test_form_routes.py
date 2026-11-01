@@ -55,6 +55,20 @@ async def test_the_settings_link_to_the_booking_form(site: Site) -> None:
     assert 'aria-current="page"' in page  # the Settings tab stays selected
 
 
+async def test_the_settings_card_summarises_the_booking_form(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    card = (await site.client.get("/admin/groups/demo/settings")).text
+    await _post(site, PAGE, CUSTOMER)
+    after = (await site.client.get("/admin/groups/demo/settings")).text
+
+    assert "Waar gaat uw vraag over?" in card  # the questions are named on the card
+    assert "van maximaal 5" in card
+    assert "Klantnummer" in after
+    assert 'class="button button--secondary"' in after
+    assert f'href="{PAGE}"' in after
+
+
 async def test_fields_are_added_listed_and_audited_by_key(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
