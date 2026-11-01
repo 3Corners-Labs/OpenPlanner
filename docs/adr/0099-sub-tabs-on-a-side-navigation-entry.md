@@ -1,8 +1,8 @@
 # 0099. Sub-tabs on a side-navigation entry, and Advanced settings in three
 
 Status: accepted (2026-11-01), requested by the product owner. Extends ADR 0047 (admin
-structure, §3 and §7) and ADR 0042 §11 (System status and Advanced settings). Built in this
-PR; see *Build status*.
+structure, §3 and §7) and ADR 0042 §11 (System status and Advanced settings). Built in
+PR #347; see *Build status*.
 
 ## Context
 
@@ -54,8 +54,8 @@ None. The sub-tabs and the list of links are structure, not tunable values.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | this PR | in PR |
-| 1 | Sub-tabs on an entry in the register, Advanced settings in three, "On this page" on *Settings*, manual | this PR | in PR |
+| 0 | ADR | #347 | in PR #347 |
+| 1 | Sub-tabs on an entry in the register, Advanced settings in three, "On this page" on *Settings*, manual | #347 | in PR #347 |
 
 ## Consequences
 
