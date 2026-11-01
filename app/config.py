@@ -303,6 +303,10 @@ class Settings(BaseSettings):
     staff_dormant_after_days: int = Field(default=90, ge=14, le=365)
     admin_timezone: str = "Europe/Amsterdam"
     oidc_discovery_url: str | None = None
+    # The issuer the discovery document and every ID token must carry, compared exactly. Empty:
+    # the discovery URL without its /.well-known/openid-configuration suffix. Needed when the
+    # web container reaches the IdP on another address than the one the IdP announces.
+    oidc_issuer: str | None = None
     oidc_client_id: str = "openplanner-admin"
     oidc_client_secret: SecretStr | None = None
     oidc_scopes: str = "openid profile email"

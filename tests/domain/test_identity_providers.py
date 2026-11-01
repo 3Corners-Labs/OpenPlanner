@@ -100,12 +100,14 @@ def test_a_sound_discovery_document_returns_its_issuer() -> None:
     assert (
         check_discovery(discovery_document(), DISCOVERY_URL, ClientAuth.PRIVATE_KEY_JWT) == ISSUER
     )
-    assert (
+
+
+def test_a_trailing_slash_on_the_issuer_is_a_mismatch() -> None:
+    with pytest.raises(DiscoveryRefusedError) as caught:
         check_discovery(
             discovery_document(issuer=f"{ISSUER}/"), DISCOVERY_URL, ClientAuth.PRIVATE_KEY_JWT
         )
-        == f"{ISSUER}/"
-    )
+    assert caught.value.reason == "issuer_mismatch"
 
 
 @pytest.mark.parametrize(
