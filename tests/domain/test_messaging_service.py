@@ -172,3 +172,56 @@ async def test_texts_of_another_organisation_are_out_of_reach(
     with pytest.raises(DomainError):
         await service.texts(OTHER_ORG, "team")
     assert uow.state.group_texts == {}
+
+
+# --- changing a rule in place (ADR 0084 step 5) ------------------------------------------------
+
+
+async def test_a_reminder_is_changed_in_place_and_audited(
+    service: MessagingService, uow: InMemoryUnitOfWork
+) -> None:
+    changed = ReminderRule(ChannelKind.EMAIL, 2 * 24 * 60)
+
+    assert await service.update_reminder(ORG_ADMIN, "team", ChannelKind.EMAIL, 24 * 60, changed)
+    assert not await service.update_reminder(
+        ORG_ADMIN, "team", ChannelKind.EMAIL, 2 * 24 * 60, changed
+    )
+
+    assert changed in uow.state.reminder_rules[1]
+    assert ReminderRule(ChannelKind.EMAIL, 24 * 60) not in uow.state.reminder_rules[1]
+    assert uow.state.audit[-1].detail == "reminder.edit:email:2880"
+    assert await service.reminder(ORG_ADMIN, "team", ChannelKind.EMAIL, 2 * 24 * 60) == changed
+
+
+async def test_a_changed_reminder_may_not_become_another_rule_or_a_bad_channel(
+    service: MessagingService,
+) -> None:
+    await service.add_reminder(ORG_ADMIN, "team", SMS_RULE)
+
+    with pytest.raises(DomainError) as same:
+        await service.update_reminder(
+            ORG_ADMIN, "team", ChannelKind.SMS, 120, ReminderRule(ChannelKind.EMAIL, 24 * 60)
+        )
+    with pytest.raises(DomainError) as channel:
+        await service.update_reminder(
+            ORG_ADMIN, "team", ChannelKind.SMS, 120, ReminderRule(ChannelKind.WHATSAPP, 120)
+        )
+    with pytest.raises(DomainError) as unknown:
+        await service.update_reminder(
+            ORG_ADMIN, "team", ChannelKind.SMS, 999, ReminderRule(ChannelKind.SMS, 60)
+        )
+
+    assert same.value.code is ErrorCode.REMINDER_EXISTS
+    assert (channel.value.code, channel.value.field) == (ErrorCode.INVALID_CONFIGURATION, "channel")
+    assert unknown.value.code is ErrorCode.REMINDER_NOT_FOUND
+
+
+async def test_changing_a_reminder_needs_reminders_manage_on_the_group(
+    service: MessagingService,
+) -> None:
+    for who in (GROUP_ADMIN, OTHER_ORG):
+        with pytest.raises(DomainError) as caught:
+            await service.update_reminder(
+                who, "team", ChannelKind.EMAIL, 24 * 60, ReminderRule(ChannelKind.EMAIL, 60)
+            )
+        assert caught.value.code is ErrorCode.NOT_PERMITTED

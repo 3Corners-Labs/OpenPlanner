@@ -499,6 +499,16 @@ class InMemoryTransaction:
         self.state.overrides.setdefault(group_id, []).append(stored)
         return stored.id or 0
 
+    async def update_schedule_override(
+        self, group_id: int, override_id: int, override: ScheduleOverride
+    ) -> bool:
+        overrides = self.state.overrides.get(group_id, [])
+        found = any(o.id == override_id for o in overrides)
+        self.state.overrides[group_id] = [
+            replace(override, id=override_id) if o.id == override_id else o for o in overrides
+        ]
+        return found
+
     async def delete_schedule_override(self, group_id: int, override_id: int) -> bool:
         overrides = self.state.overrides.get(group_id, [])
         kept = [o for o in overrides if o.id != override_id]
@@ -517,6 +527,9 @@ class InMemoryTransaction:
         stored = replace(calendar, id=self._new_id())
         self.state.holiday_calendars[stored.id] = stored
         return stored
+
+    async def save_holiday_calendar(self, calendar: holiday_model.HolidayCalendar) -> None:
+        self.state.holiday_calendars[calendar.id] = calendar
 
     async def delete_holiday_calendar(self, calendar_id: int) -> None:
         del self.state.holiday_calendars[calendar_id]
@@ -668,6 +681,16 @@ class InMemoryTransaction:
 
     async def get_reminder_rules(self, group_id: int) -> list[ReminderRule]:
         return list(self.state.reminder_rules.get(group_id, []))
+
+    async def update_reminder_rule(
+        self, group_id: int, channel: ChannelKind, minutes_before: int, rule: ReminderRule
+    ) -> bool:
+        rules = self.state.reminder_rules.get(group_id, [])
+        found = any((r.channel, r.minutes_before) == (channel, minutes_before) for r in rules)
+        self.state.reminder_rules[group_id] = [
+            rule if (r.channel, r.minutes_before) == (channel, minutes_before) else r for r in rules
+        ]
+        return found
 
     async def add_reminder_rule(self, group_id: int, rule: ReminderRule) -> None:
         self.state.reminder_rules.setdefault(group_id, []).append(rule)

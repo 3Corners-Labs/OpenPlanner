@@ -12,7 +12,7 @@ bookings are kept, so a participant never misses a reminder they were promised.
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.agent_term import TERM_KEYS, check_term_pair, clean_term
@@ -22,7 +22,7 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.message_texts import GroupTexts, clean_text
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.scheduling import GroupSummary, PhoneMode
+from app.domain.scheduling import Group, GroupSummary, PhoneMode
 
 MAX_REMINDER_RULES = 5
 """Per group; more reminders than this would read as spam."""
@@ -94,15 +94,10 @@ class MessagingService:
                 with ``reminders`` above ``MAX_REMINDER_RULES``; ``reminder_exists``.
         """
         group = await self._group(principal, Permission.REMINDERS_MANAGE, slug)
-        if rule.channel not in CONFIGURABLE_CHANNELS or (
-            rule.channel is ChannelKind.SMS and group.group.phone_mode is PhoneMode.HIDDEN
-        ):
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "channel")
+        _check_channel(group.group, rule)
         async with self._uow.locked() as tx:
             rules = await tx.get_reminder_rules(group.group.id)
-            if any(
-                (r.channel, r.minutes_before) == (rule.channel, rule.minutes_before) for r in rules
-            ):
+            if _find(rules, rule.channel, rule.minutes_before) is not None:
                 raise DomainError(ErrorCode.REMINDER_EXISTS)
             if len(rules) >= MAX_REMINDER_RULES:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "reminders")
@@ -110,6 +105,54 @@ class MessagingService:
             await self._audit(
                 tx, principal, Permission.REMINDERS_MANAGE, group, _reminder_detail("add", rule)
             )
+
+    async def reminder(
+        self, principal: Principal, slug: str, channel: ChannelKind, minutes_before: int
+    ) -> ReminderRule:
+        """Return the group's rule with this channel and offset, to change it.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``reminder_not_found``.
+        """
+        group = await self._group(principal, Permission.REMINDERS_MANAGE, slug)
+        async with self._uow.read() as tx:
+            rules = await tx.get_reminder_rules(group.group.id)
+        return _existing(rules, channel, minutes_before)
+
+    async def update_reminder(
+        self,
+        principal: Principal,
+        slug: str,
+        channel: ChannelKind,
+        minutes_before: int,
+        rule: ReminderRule,
+    ) -> bool:
+        """Change the channel or offset of a rule; ``False`` if nothing changed (ADR 0084 step 5).
+
+        Like adding and removing, a change applies to new bookings: the reminders already
+        planned for existing bookings stay, so nobody loses a reminder they were promised
+        (ADR 0022 point 5).
+
+        Raises:
+            DomainError: ``not_permitted``, ``reminder_not_found``, ``reminder_exists`` (the new
+                channel and offset are another rule) or ``invalid_configuration`` with
+                ``channel``.
+        """
+        group = await self._group(principal, Permission.REMINDERS_MANAGE, slug)
+        _check_channel(group.group, rule)
+        async with self._uow.locked() as tx:
+            rules = await tx.get_reminder_rules(group.group.id)
+            current = _existing(rules, channel, minutes_before)
+            rule = replace(rule, enabled=current.enabled)
+            if rule == current:
+                return False
+            if _find(rules, rule.channel, rule.minutes_before) not in (None, current):
+                raise DomainError(ErrorCode.REMINDER_EXISTS)
+            await tx.update_reminder_rule(group.group.id, channel, minutes_before, rule)
+            await self._audit(
+                tx, principal, Permission.REMINDERS_MANAGE, group, _reminder_detail("edit", rule)
+            )
+        return True
 
     async def remove_reminder(
         self, principal: Principal, slug: str, channel: ChannelKind, minutes_before: int
@@ -200,6 +243,39 @@ class MessagingService:
             group.group.slug,
             detail,
         )
+
+
+def _check_channel(group: Group, rule: ReminderRule) -> None:
+    """Refuse a channel that cannot be configured, or SMS in a group without a phone field.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with ``channel``.
+    """
+    if rule.channel not in CONFIGURABLE_CHANNELS or (
+        rule.channel is ChannelKind.SMS and group.phone_mode is PhoneMode.HIDDEN
+    ):
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "channel")
+
+
+def _find(
+    rules: list[ReminderRule], channel: ChannelKind, minutes_before: int
+) -> ReminderRule | None:
+    """Return the rule with this channel and offset, if the group has one."""
+    return next(
+        (r for r in rules if (r.channel, r.minutes_before) == (channel, minutes_before)), None
+    )
+
+
+def _existing(rules: list[ReminderRule], channel: ChannelKind, minutes_before: int) -> ReminderRule:
+    """Return the rule with this channel and offset.
+
+    Raises:
+        DomainError: ``reminder_not_found``.
+    """
+    found = _find(rules, channel, minutes_before)
+    if found is None:
+        raise DomainError(ErrorCode.REMINDER_NOT_FOUND)
+    return found
 
 
 def _reminder_detail(action: str, rule: ReminderRule) -> str:

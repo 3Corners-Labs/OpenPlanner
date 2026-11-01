@@ -351,3 +351,25 @@ async def test_group_admin_cannot_touch_another_group(holidays: HolidayService) 
         )
 
     assert caught.value.code is ErrorCode.NOT_PERMITTED
+
+
+async def test_a_calendar_is_renamed_and_keeps_its_web_address(
+    holidays: HolidayService, uow: InMemoryUnitOfWork
+) -> None:
+    assert await holidays.rename_calendar(SUPER, "zuid", "Zuid-Nederland")
+    assert not await holidays.rename_calendar(SUPER, "zuid", "Zuid-Nederland")
+
+    renamed = next(c for c in uow.state.holiday_calendars.values() if c.slug == "zuid")
+    assert (renamed.slug, renamed.name) == ("zuid", "Zuid-Nederland")
+    assert uow.state.audit[-1].detail == "zuid:calendar.rename"
+
+
+async def test_renaming_needs_a_valid_name_the_superuser_and_a_calendar(
+    holidays: HolidayService,
+) -> None:
+    with pytest.raises(DomainError, match="invalid_configuration: name"):
+        await holidays.rename_calendar(SUPER, "zuid", "  ")
+    with pytest.raises(DomainError, match="not_permitted"):
+        await holidays.rename_calendar(ORG_ADMIN, "zuid", "Anders")
+    with pytest.raises(DomainError, match="holiday_calendar_not_found"):
+        await holidays.rename_calendar(SUPER, "nope", "Anders")

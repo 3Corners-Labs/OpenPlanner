@@ -1,5 +1,6 @@
 """Group and planning screens (WP7b): forms, confirmations, errors and fresh login."""
 
+import re
 from datetime import timedelta
 
 import pytest
@@ -948,3 +949,52 @@ async def test_archiving_is_refused_while_bookings_lie_ahead(site: Site) -> None
     assert "afspraken in de toekomst" in page
     assert refused.status_code == 422  # type: ignore[attr-defined]
     assert (await site.client.get("/g/demo")).status_code == 200
+
+
+# --- changing an exception in place (ADR 0084 step 5) -----------------------------------------
+
+
+async def test_an_exception_is_changed_from_its_own_page(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    day = (site.clock.now() + timedelta(days=3)).date().isoformat()
+    await _post(site, f"{GROUP}/exceptions", {"day": day, "kind": "closed"})
+    listing = (await site.client.get(f"{GROUP}/exceptions")).text
+    link = re.search(rf'href="({GROUP}/exceptions/\d+)"', listing)
+    assert link, "the list links each exception to its change page"
+
+    form = (await site.client.get(link.group(1))).text
+    assert 'id="kind-closed" name="kind" value="closed" checked' in form
+    changed = await _post(
+        site,
+        link.group(1),
+        {"day": day, "kind": "hours", "opens": "13:00", "closes": "14:00", "capacity": "2"},
+    )
+    again = await _post(
+        site,
+        link.group(1),
+        {"day": day, "kind": "hours", "opens": "13:00", "closes": "14:00", "capacity": "2"},
+    )
+
+    assert changed.headers["location"] == f"{GROUP}/exceptions?done=saved"  # type: ignore[attr-defined]
+    assert again.headers["location"] == f"{GROUP}/exceptions?done=unchanged"  # type: ignore[attr-defined]
+    assert "13:00–14:00" in (await site.client.get(f"{GROUP}/exceptions")).text
+    assert "13:00" in (await site.client.get(link.group(1))).text  # pre-filled with the new hours
+    assert any(e[1] == "schedule.manage" for e in await audit_events(site))
+
+
+async def test_a_changed_exception_in_the_past_or_of_another_group_is_refused(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    day = (site.clock.now() + timedelta(days=3)).date().isoformat()
+    yesterday = (site.clock.now() - timedelta(days=1)).date().isoformat()
+    await _post(site, f"{GROUP}/exceptions", {"day": day, "kind": "closed"})
+    link = re.search(
+        rf'href="({GROUP}/exceptions/\d+)"', (await site.client.get(f"{GROUP}/exceptions")).text
+    )
+    assert link
+
+    past = await _post(site, link.group(1), {"day": yesterday, "kind": "closed"})
+    elsewhere = await site.client.get("/admin/groups/andere-team/exceptions/1")
+
+    assert past.status_code == 422  # type: ignore[attr-defined]
+    assert '<a href="#day">Kies een datum vanaf vandaag' in past.text  # type: ignore[attr-defined]
+    assert elsewhere.status_code == 403
