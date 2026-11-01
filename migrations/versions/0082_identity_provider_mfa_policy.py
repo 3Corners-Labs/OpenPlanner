@@ -4,7 +4,7 @@
 providers become ``record``, which only records a login without a second factor), and the
 ``amr`` and ``acr`` values that count as proof. No personal data.
 
-Revises 0080 (log destinations). Open PRs also claim numbers (0081 is ADR 0098), so recheck
+Revises 0081 (admin sessions, ADR 0098). Open PRs also claim numbers, so recheck
 the head before merging.
 
 Revision ID: 0082
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0082"
-down_revision: str | None = "0080"
+down_revision: str | None = "0081"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
