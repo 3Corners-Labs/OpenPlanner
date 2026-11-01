@@ -219,6 +219,13 @@ class Settings(BaseSettings):
     # a statement slower than this many milliseconds leaves a ``sql.slow`` trace line.
     trace_level_max_hours: int = Field(default=4, ge=1, le=24)
     sql_slow_ms: int = Field(default=200, ge=10, le=10_000)
+    # ADR 0085 point 4 (class C): how the senders of the log destinations batch, wait and back
+    # off. Every process keeps one bounded queue per destination.
+    log_ship_batch_size: int = Field(default=100, ge=1, le=1000)
+    log_ship_flush_seconds: int = Field(default=2, ge=1, le=60)
+    log_ship_timeout_seconds: int = Field(default=5, ge=1, le=30)
+    log_ship_queue_size: int = Field(default=10_000, ge=1_000, le=100_000)
+    log_ship_backoff_max_seconds: int = Field(default=300, ge=10, le=3600)
 
     # ADR 0044: how many days ahead the shortfall summary (group page, dashboard) looks.
     # Class D organisation (ADR 0042, settings registry).

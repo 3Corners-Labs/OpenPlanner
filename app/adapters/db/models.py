@@ -913,6 +913,61 @@ class IdentityProviderRow(Base):
     )
 
 
+class LogDestinationRow(Base):
+    """A log destination: where copies of the log lines go (ADR 0085).
+
+    The credential (HEC token, API key, bearer token) is sealed with AES-256-GCM under
+    ``logdest:<id>:secret`` (ADR 0008); every other column is public configuration.
+    """
+
+    __tablename__ = "log_destinations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    address: Mapped[str] = mapped_column(String(500))
+    index_name: Mapped[str] = mapped_column(String(120), server_default="")
+    source: Mapped[str] = mapped_column(String(120), server_default="")
+    min_level: Mapped[str] = mapped_column(String(16))
+    categories: Mapped[str] = mapped_column(String(64))
+    include_diagnostic: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    include_trace: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    ca_pem: Mapped[str] = mapped_column(Text, server_default="")
+    secret_nonce: Mapped[bytes | None] = mapped_column(LargeBinary)
+    secret_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    tested_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('syslog', 'splunk_hec', 'elastic', 'http')", name="kind"),
+    )
+
+
+class LogDestinationStatusRow(Base):
+    """What one process (``web`` or ``worker``) reports about one destination (ADR 0085).
+
+    Counters and a machine reason only: no line, address or platform answer.
+    """
+
+    __tablename__ = "log_destination_status"
+
+    destination_id: Mapped[int] = mapped_column(
+        ForeignKey("log_destinations.id", ondelete="CASCADE"), primary_key=True
+    )
+    service: Mapped[str] = mapped_column(String(16), primary_key=True)
+    state: Mapped[str] = mapped_column(String(8))
+    sent: Mapped[int] = mapped_column(Integer, server_default="0")
+    dropped: Mapped[int] = mapped_column(Integer, server_default="0")
+    failed: Mapped[int] = mapped_column(Integer, server_default="0")
+    queued: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_ok_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    last_error_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    last_error: Mapped[str] = mapped_column(String(16), server_default="")
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
 class IdentityProviderKeyRow(Base):
     """A signing key pair of a provider (``private_key_jwt``, ADR 0083 point 6).
 

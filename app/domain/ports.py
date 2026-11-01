@@ -50,6 +50,7 @@ from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.identity_providers import GeneratedKey, OrganisationProvider, SigningKey
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobCounts, JobSummary, JobType, PlannedJob
+from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.retention import RetentionFacts
@@ -76,6 +77,25 @@ class EventSink(Protocol):
 
     def emit(self, events: Sequence[AuditEvent]) -> None:
         """Hand the events on; must not raise, a failure is only logged."""
+        ...
+
+
+class LogDestinationSender(Protocol):
+    """Delivers batches of log lines to one log destination (ADR 0085).
+
+    One adapter per ``DestinationKind``, built from a destination and its opened credential.
+    """
+
+    async def send(self, lines: Sequence[str]) -> None:
+        """Deliver the lines in order, each one JSON object, already masked.
+
+        Raises:
+            DeliveryError: With a machine reason; the caller keeps the batch and retries.
+        """
+        ...
+
+    async def aclose(self) -> None:
+        """Release the connection."""
         ...
 
 
@@ -1417,6 +1437,49 @@ class Transaction(Protocol):
 
     async def delete_organisation_setting(self, organisation_id: int, key: str) -> bool:
         """Remove one organisation's value of ``key``; return whether there was one."""
+        ...
+
+    async def list_log_destinations(self, scope: Scope) -> list[LogDestination]:
+        """Return the log destinations inside ``scope``, ordered by name (ADR 0085).
+
+        They belong to the installation, so only a scope that matches everything sees them.
+        """
+        ...
+
+    async def get_log_destination(self, destination_id: int) -> LogDestination | None:
+        """Return the destination with ``destination_id``."""
+        ...
+
+    async def add_log_destination(
+        self, destination: LogDestination, secret: str | None
+    ) -> LogDestination:
+        """Store a new destination and return it with its id.
+
+        ``secret`` is sealed by the adapter (ADR 0008) and never read back into the domain.
+
+        Raises:
+            DomainError: ``log_destination_name_taken``.
+        """
+        ...
+
+    async def save_log_destination(self, destination: LogDestination, secret: str | None) -> None:
+        """Store the changes of a destination; ``secret=None`` keeps the stored credential.
+
+        Raises:
+            DomainError: ``log_destination_not_found`` or ``log_destination_name_taken``.
+        """
+        ...
+
+    async def delete_log_destination(self, destination_id: int) -> bool:
+        """Remove the destination, its credential and its status; ``False`` if there was none."""
+        ...
+
+    async def save_log_destination_status(self, status: DestinationStatus, at: datetime) -> None:
+        """Store what one process reports about a destination (counters and a reason)."""
+        ...
+
+    async def list_log_destination_status(self, scope: Scope) -> list[DestinationStatus]:
+        """Return the status every process reported, for a scope that matches everything."""
         ...
 
 
