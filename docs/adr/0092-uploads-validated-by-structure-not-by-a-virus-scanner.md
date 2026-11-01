@@ -74,7 +74,7 @@ they are in this ADR.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR accepted | | in PR |
+| 0 | ADR accepted | #309 | in PR |
 | 1 | WOFF2 structural validation and `max_font_unpacked_bytes`, tests with malformed fonts | | planned |
 | 2 | Test on every download route: server-chosen file name, fixed pattern | | planned |
 | 3 | Deviation and compensating controls in `docs/threat-model.md` | | planned |

@@ -86,7 +86,7 @@ are crypto parameters; they change only through this inventory and a new label.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR accepted | | in PR |
+| 0 | ADR accepted | #309 | in PR |
 | 1 | `docs/cryptography.md`; runbook *Rotating secrets* written for the new procedure (the wrong statement about `MANAGEMENT_TOKEN_KEY` is corrected in the PR of this ADR) | | planned |
 | 2 | Management links under the previous key (point 4), with a test that a reminder after rotation carries a working link | | planned |
 | 3 | Key id on sealed records (migration), `SETTINGS_ENCRYPTION_KEY_PREVIOUS`, `rekey`, shared re-sealing with the configuration package, System status count | | planned |
