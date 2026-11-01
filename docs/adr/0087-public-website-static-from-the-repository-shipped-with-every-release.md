@@ -123,7 +123,7 @@ accessibility targets of point 9.
 | 1 | `site/` (content nl/en, templates, stylesheet, script, animated tour in two tracks of six scenes, interactive demo, integrations, standards, roadmap from the ADR issues), `scripts/build_site.py`, `make site`, structural test, the `site` job with artifact and a git-push deploy to TransIP | #271, #285 | merged |
 | 2 | The site's pages in the Playwright lane (keyboard, axe, Lighthouse) | | planned |
 | 3 | Recorded walkthrough of the real interface at release time (`e2e/tour/`, `.github/workflows/tour.yml`, `.github/actions/e2e-stack`, `tour.webm`, poster, captions nl/en, the newest recording on the page) | #289 | merged; first recording on `v0.4.0-rc.86` (dispatched) |
-| 3a | Stills of the main chapters as a gallery of the real screens, and the architecture plate (who uses it, the server, the systems around it, what goes where) in the enterprise section | this PR | in PR |
+| 3a | Stills of the main chapters as a gallery of the real screens, and the architecture plate (who uses it, the server, the systems around it, what goes where) in the enterprise section | #313 | in PR |
 | 4 | TransIP: deploy key on the package, environment `website` with the remote, DNS for `openplanner.nl` and `www`, HTTPS and the response headers (HSTS, CSP, Referrer-Policy) in `.htaccess` (host work) | | planned |
 
 ## Consequences
