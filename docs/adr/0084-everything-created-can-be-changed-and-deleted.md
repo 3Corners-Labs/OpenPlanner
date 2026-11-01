@@ -134,7 +134,7 @@ groups exist (data integrity, not a threshold).
 | 4 | Organisation delete: domain rule, route, confirmation page, cascades checked up and down in the migration test, manual topic | #287 | merged |
 | 5 | Change in place: staffing exception, reminder rule, holiday calendar rename. A changed reminder rule applies to new bookings; reminders already planned stay (ADR 0022 point 5), so point 6's "moves its pending jobs" is not built | #288 | in PR |
 | 6 | API client delete after disable | #293 | in PR |
-| 7 | Guard test loses its exception list entries one by one as steps land; `docs/threat-model.md` abuse case "delete another organisation's group" with its matrix test | #PR7 | in PR |
+| 7 | Guard test loses its exception list entries one by one as steps land; `docs/threat-model.md` abuse case "delete another organisation's group" with its matrix test | #294 | in PR |
 
 ## Consequences
 
