@@ -239,7 +239,7 @@ def test_the_dev_and_idp_services_pin_the_same_image() -> None:
 def test_the_realm_asks_for_a_second_factor_and_says_so_in_the_token() -> None:
     """ADR 0100: acr ``mfa`` is level 2, the flow asks for OTP or WebAuthn at that level."""
     realm = json.loads(TEMPLATE.read_text(encoding="utf-8"))
-    (client,) = realm["clients"]
+    (client,) = [c for c in realm["clients"] if c["clientId"] == "openplanner-admin"]
     flows = {f["alias"]: f for f in realm["authenticationFlows"]}
     second = flows["openplanner second factor"]["authenticationExecutions"]
     (config,) = realm["authenticatorConfig"]
