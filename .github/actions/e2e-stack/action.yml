@@ -21,6 +21,7 @@ runs:
         scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour \
           --network "$network" \
           -e OIDC_DISCOVERY_URL=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration \
+          -e OIDC_ISSUER=http://127.0.0.1:8080/realms/openplanner \
           -e OIDC_CLIENT_SECRET=dev-only-openplanner-admin-secret \
           -e SIMULATOR_ENABLED=true \
           -e WEBEX_WEBHOOK_SECRET=dev-only-webex-webhook-secret \
