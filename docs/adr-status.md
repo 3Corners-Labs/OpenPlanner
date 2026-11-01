@@ -81,7 +81,7 @@ from the rows below.
 | 0059 | Release candidates, update channels | BUILT | #131, #132, #140 | Points 4 and 6 amended by ADR 0067 |
 | 0060 | Product logo | PARTIAL | #135 (LG-1 to LG-3) | LG-4 optional motion |
 | 0061 | Live overview with widgets | PARTIAL | #141, #150, #153 | `overview-live.js`, alerts and pop-ups, `QUEUE_WAIT_*`, SH-3 |
-| 0062 | Personal overview layout | NOT BUILT | none | Everything (needs ADR 0046 step 2) |
+| 0062 | Personal overview layout | NOT BUILT | none; superseded by ADR 0096 (2026-11-01) | Nothing to build here: the per-admin layout is ADR 0096 |
 | 0063 | Personal data in the portal | BUILT | #143 | – |
 | 0064 | HTTPS by default, certificate status | BUILT | #139, #144; step 3 is ADR 0070 | – |
 | 0065 | Webex reason, probe meeting | BUILT | #138, #142; migration 0056 | – |
@@ -115,9 +115,9 @@ from the rows below.
 | 0092 | Uploads are validated by structure, not by a virus scanner | NOT BUILT | ADR (#309) | Steps 1–3 (WOFF2 structural validation and `max_font_unpacked_bytes`; download file-name test; deviation in the threat model) |
 | 0093 | The management link is exchanged for a participant cookie | NOT BUILT | ADR (#309) | Steps 1–4 (`public_ref` and participant link sessions; booking pages, then direct call, trial and join on `/b/m/{ref}`; docs) |
 | 0094 | A cryptographic inventory, and key rotation without loss | NOT BUILT | ADR (#309); runbook warning on `MANAGEMENT_TOKEN_KEY` corrected | Steps 1–3 (`docs/cryptography.md`; links under the previous token key; key id, previous settings key and `rekey`) |
-| 0095 | Staff and roles of the bundled identity provider, managed in the portal | NOT BUILT | ADR only (proposed 2026-11-01) | Everything: `StaffDirectory` port and Keycloak adapter, permissions, Staff screen actions, threat model |
+| 0095 | Staff and roles of the bundled identity provider, managed in the portal | NOT BUILT | ADR (#310, accepted 2026-11-01) | Everything: `StaffDirectory` port and Keycloak adapter, permissions, Staff screen actions, threat model |
 | 0098 | Admin sessions held on the server | NOT BUILT | ADR only (proposed 2026-11-01); supersedes ADR 0013 §5 | Steps 1–4 (register, logout revokes, rotation and idle; clean-up and restore; own and administrator session views with a new permission; cookie `__Host-op_admin`) |
-| 0096 | Overview widgets chosen by the admin | NOT BUILT | ADR only (proposed 2026-11-01); step 1 (no *New group* on the overview) comes with this PR | Layout storage, *Add widget* and *Edit overview* screens |
+| 0096 | Overview widgets chosen by the admin | PARTIAL | #310 (ADR and step 1: no *New group* on the overview) | Layout storage, *Add widget* and *Edit overview* screens |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 

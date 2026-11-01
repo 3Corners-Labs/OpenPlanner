@@ -3,7 +3,7 @@
 This file is read by Claude Code at the start of every session. It states how we work, not what we build; the what is in `docs/HANDOVER.md` and `docs/adr/`.
 
 ## Project in one line
-Lightweight group-booking platform: organisations offer sessions to groups of participants, who book on a standalone page or an embeddable widget and join by video. Admin UI with IdP roles, Webex video links, Webex Contact Center task dispatch via Webex Connect, strict PII retention. The first client is a government contact center.
+Lightweight group-booking platform: organisations offer sessions to groups of participants, who book on a standalone page or an embeddable widget and join by video. Admin UI with IdP roles, Webex video links, Webex Contact Center task dispatch through the WxCC Tasks API (ADR 0018), strict PII retention. The first client is a government contact center.
 
 ## Language
 - Code, identifiers, comments, commit messages, ADRs, README: **English**.
@@ -14,9 +14,9 @@ Lightweight group-booking platform: organisations offer sessions to groups of pa
 - Python 3.12, FastAPI, SQLAlchemy 2.x (async), Alembic, Pydantic v2.
 - Database: SQLite in WAL mode (`DATABASE_URL=sqlite+aiosqlite:///data/booking.db`). Postgres is not a target (decided 2026-10-23); changing that needs an ADR. No raw SQL outside `app/adapters/db/`.
 - Jobs: own `jobs` table + worker loop in `app/jobs/`. No Celery, Redis, APScheduler.
-- Admin UI: Jinja2, server-rendered HTML forms without JavaScript; HTMX only per ADR 0016. No SPA framework.
+- Admin UI: Jinja2, server-rendered HTML forms that work without JavaScript (ADR 0016). A live part of a page (queue, agenda, update progress) uses the shared small scripts under `app/web/static/` (`live-region.js`, ADR 0072 §6) with the script CSP on that page only; never a second polling mechanism, never HTMX, no SPA framework.
 - Widget: one Web Component in vanilla JS under `widget/`, bundled with esbuild in CI only. No React/Vue. Shadow DOM; all colours, spacing, radius and font read from `--booking-*` CSS custom properties with NL Design System defaults; `font-family: inherit`; interactive elements exposed via `part="..."`. The host site styles the widget only through those tokens and parts; document them in `docs/widget.md`. No inline styles, no `!important`.
-- HTTP client: `httpx`. Logging: `structlog` (JSON). Settings: `pydantic-settings` from env only, or `X_FILE` for the bootstrap secrets (ADR 0042 §9); no config files with secrets in the repository.
+- HTTP client: `httpx`. Logging: `structlog` (JSON). Settings: classes A and B from env through `pydantic-settings`, or `X_FILE` for the bootstrap secrets (ADR 0042 §9); classes C and D in the database, edited in the portal and lockable from env (ADR 0042); no config files with secrets in the repository.
 - Containers: `web`, `worker`. One `docker-compose.yml` for dev and prod shape.
 
 ## Architecture rules
@@ -25,12 +25,12 @@ Lightweight group-booking platform: organisations offer sessions to groups of pa
 - Admin structure (ADR 0047): every admin screen has one home, scope (platform, organisation, group) → object → tab, declared once in the navigation register `app/web/navigation.py`. Menu, tabs, breadcrumbs and redirects render from it; it never grants rights (the matrix does). Before adding a screen or setting, place it in an existing object, tab or sub-tab and topic; group settings of the same kind together; never add a second home that asks "which organisation?". Cross-object pages are lists that link to the object's tab, never edit forms. Page width (ADR 0080): every screen is `standard` (forms, text; default) or `wide` (overviews, lists, schedules, agenda), declared in the same register and rendered as `<main data-width>`; never set a page width in CSS or a template, and a grid with a fixed number of items (a week) is that many columns or stacked, never `auto-fit`.
 - Modular by design (ADR 0005): one home per concern; extract shared behaviour at its second use. Every module, class and public function in `app/`, `migrations/` and `scripts/` has a Google-style docstring stating its responsibility.
 - Configurable by default (ADR 0042): every new threshold, limit, period, interval, toggle or external address is a setting with a class, not a constant: A bootstrap (env), B deployment (env), C platform (superuser), D organisation (org admin). Default to C or D with a default and bounds; A or B needs a reason (needed before login or the database works, tied to the host, or a kill switch). Switching a protection off is never C or D. List the new settings in the ADR's *Settings* section and the PR's review question 6, without being asked. Every `Settings` field in `app/config.py` has an entry in `app/domain/settings_registry.py` (class, default, portal bounds); a test fails otherwise, and `docs/settings.md` is generated from it by `python -m app.cli settings-doc`. Fixed rules (WCAG targets, PII fields, crypto parameters) stay constants, and the PR says so.
-- Every external system is an adapter behind a Protocol in `app/domain/ports.py`: `VideoProvider`, `ContactCenterDispatcher` (WxCC Tasks API, ADR 0007), `MessageSender` (one adapter per `ChannelKind`: email, sms, later whatsapp; ADR 0009), `IdentityProvider`, `Clock`. Persistence goes through the `Transaction` Protocol in the same file; its adapter lives in `app/adapters/db/`. Tests use fakes; contract tests use recorded fixtures.
+- Every external system is an adapter behind a Protocol in `app/domain/ports.py`: `VideoProvider`, `ContactCenterDispatcher` (WxCC Tasks API, ADR 0018, 0021, 0082), `MessageSender` (one adapter per `ChannelKind`: email, sms, later whatsapp; ADR 0009), `IdentityProvider`, `Clock`. Persistence goes through the `Transaction` Protocol in the same file; its adapter lives in `app/adapters/db/`. Tests use fakes; contract tests use recorded fixtures.
 - Message templates are fixed layouts with editable text blocks from `app/i18n` (catalogue → organisation override → `group_text`), `{placeholder}`s from an allow-list only. Never let admins edit Jinja or HTML (ADR 0009).
 - Authorisation is the core of the design (ADR 0014): one matrix in `app/domain/authorization.py` (role × permission × level) is the only source of rights. Every admin route declares one permission via `require_permission(...)` (the `require_scope` of earlier docs); every admin query takes the `Scope` derived from that permission and the SQL adapter filters by it; every decision is logged and denials, logins and changes go to `audit_events`; navigation and buttons come from the same matrix; `docs/authorization.md` is generated from it. Never bypass it "for superuser"; superuser is a scope that matches everything.
 - All time stored as UTC `datetime` with tzinfo; conversion to the group's timezone happens only at the edges (rendering, parsing).
 - A time-based job stores `pinned_start`; on run it re-reads the booking and exits silently if status != confirmed or start != pinned_start. Cancelling or rescheduling a booking deletes its pending jobs in the same transaction.
-- Slot creation and booking happen in one transaction with a write lock (`BEGIN IMMEDIATE` on SQLite, `SELECT ... FOR UPDATE` on Postgres). Capacity is snapshotted on the slot at creation.
+- Slot creation and booking happen in one transaction with a write lock (`BEGIN IMMEDIATE` on SQLite). Capacity is snapshotted on the slot at creation.
 - No PII in logs, exceptions, job payloads, audit events, or URLs. The structlog processor in `app/logging.py` masks `name`, `email`, `phone`, `note`; a test asserts this on a fake log stream.
 - Management tokens (ADR 0011): HMAC-SHA256 of a 32-byte random per-booking salt under `MANAGEMENT_TOKEN_KEY` (env only); store the salt and `sha256(token)`, never the token. Compare with `hmac.compare_digest`. Never put a token in a job payload or log.
 
@@ -47,7 +47,7 @@ Per PR (ADR 0058: all of these run in the merge queue before anything reaches `m
 - `import-linter`: `app/domain` imports nothing from `app/adapters`, `app/api`, `app/admin`, `app/jobs`, nor any framework.
 - `pytest` with coverage ≥ 90% on `app/domain/` and `app/i18n/`, ≥ 75% overall. Tests mirror the source tree. Includes the authorisation matrix (every role × every admin endpoint × own/other group) and the abuse cases from `docs/threat-model.md`.
 - `bandit -r app/`; `semgrep` with `p/python`, `p/owasp-top-ten`, `p/secrets` and the repo rules in `.semgrep/` (no `print`, no PII field names inside log calls).
-- `pip-audit`, `uv lock --check`, `pip-licenses --allow-only` against the allowed list (exceptions by ADR; certifi: ADR 0003); `npm audit` for the `e2e/` tooling.
+- `pip-audit`, `uv lock --check`, `pip-licenses --allow-only` against the allowed list (exceptions by ADR; certifi: ADR 0003; dnspython, ISC: ADR 0073); `npm audit` for the `e2e/` tooling.
 - `gitleaks`.
 - `hadolint` on the Dockerfile; `trivy` on the built image (CVE + misconfiguration); image runs as non-root with a read-only filesystem.
 - `schemathesis` against the generated OpenAPI spec.
@@ -75,18 +75,18 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 
 ## Security baseline
 - Rate limiting on public endpoints (`slowapi`): by default 10 bookings/IP/hour, 60 availability reads/IP/minute; the superuser may change them within the ceilings of ADR 0042 §7 (1–30 per hour, 10–300 per minute), and the off switch `RATE_LIMIT_ENABLED` stays in the environment. Honeypot field on the booking form. Optional Cloudflare Turnstile behind a feature flag; never Google reCAPTCHA.
-- CSP, HSTS, `X-Frame-Options` (admin), CORS allow-list from settings. Widget endpoints allow only configured origins.
+- CSP, HSTS, `X-Frame-Options: DENY` on every response, CORS allow-list from settings. Widget endpoints allow only configured origins.
 - Calls to WxCC use OAuth tokens of a service app (ADR 0007). Every inbound webhook from WxCC is verified (signature or token, per WxCC's mechanism); reject if |now − ts| > 300 s.
 - Bootstrap secrets (settings encryption key, management token key, OIDC client secret, session secret) via env/secret store only; `.env.example` has placeholders. Integration secrets (SMTP, WxCC, messaging) are entered in the admin UI, stored AES-256-GCM encrypted, write-only, audited (ADR 0008). `gitleaks` blocks commits.
-- OIDC (admin portal only; participants never log in; PingFederate in production, Keycloak in development, ADR 0013): `httpx` + `PyJWT`, PKCE, `state` and `nonce` checked, only asymmetric algorithms, session cookie `Secure; HttpOnly; SameSite=Lax`, 8 h lifetime. No login bypass or role switcher, ever.
+- OIDC (admin portal only; participants never log in; ADR 0013; PingFederate for the first client, a provider per organisation chosen by email domain per ADR 0083, Keycloak in development and the bundled Keycloak for test and lab per ADR 0090): `httpx` + `PyJWT`, PKCE, `state` and `nonce` checked, only asymmetric algorithms, session cookie `Secure; HttpOnly; SameSite=Lax`, 8 h lifetime. No login bypass or role switcher, ever.
 - Dependencies: only packages that are actively maintained **and** the de-facto standard in their field, with a license in {MIT, BSD, Apache-2.0, PSF}. AGPL/GPL packages need an ADR. Record the review in `docs/dependencies.md`.
 - Threat model lives in `docs/threat-model.md` (STRIDE per flow) together with an abuse-case list per public endpoint (slot exhaustion by bots, token guessing, rescheduling into another group's slot, PII through error messages). Every abuse case has a test. Update both when a flow changes.
 - External penetration test before go-live and yearly; `SECURITY.md` and `/.well-known/security.txt` describe responsible disclosure.
 
 ## Privacy rules
 - PII fields: `first_name, last_name, email, phone, note, form_answers, guest_join_url, host_join_url, trial_join_url`. Only on `Booking`. Nowhere else. Answers to a group's custom form fields (ADR 0055) are read only through `Answers.visible(purpose)`; never read a field's PII tag yourself.
-- `purge_pii` job runs at `slot.end + 24h` or `cancelled_at + 24h`; sets fields to NULL and `pii_purged_at`. A nightly sweep re-checks for stragglers and alerts if any booking older than 48 h still has PII.
-- Outbound payloads to any contact-center provider (Webex Contact Center today, ADR 0032) contain only first name, the host join URL and the routing variables of ADR 0081 (subject and attribute codes from a closed list, never free text or a PII field).
+- `purge_pii` job runs at `slot.end + 24h` or `cancelled_at + 24h`; sets fields to NULL and `pii_purged_at`. Three holds are deliberate (`app/domain/retention.py`): a booking suspended by an emergency closure is purged 30 days after the closure ends (ADR 0024; no maximum yet for an open-ended closure), one awaiting a new time at `rebook_by + 24h` (ADR 0044), one awaiting confirmation at `confirm_by + 24h` (ADR 0056). A nightly sweep re-checks for stragglers and alerts if any booking still has PII 48 h after the moment that started its retention.
+- Outbound payloads to any contact-center provider (Webex Contact Center today, ADR 0018) contain only the booking reference, first name, start label, group name, the host join URL, the kind of call and the routing variables of ADR 0081 (subject and attribute codes from a closed list, never free text or another PII field); `app/adapters/wxcc.py` is the one place that builds it.
 - Data flow diagram in `docs/dataflow.md` is the input for the DPIA; keep it current.
 
 ## Git and process
@@ -119,9 +119,9 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 - `docs/settings.md` — every setting with its class (ADR 0042), generated by `python -m app.cli settings-doc`; CI fails if it differs from the code.
 - `docs/admin-map.md` — the admin structure (sections, objects, tabs), generated by `python -m app.cli admin-map` (ADR 0047, from its build step 2); CI fails if it differs from the code.
 - `docs/dependencies.md` — every dependency with purpose, license and maintenance check.
-- `docs/runbook.md` — deploy, rollback, backup/restore, rotating secrets, what to do when Connect is down.
+- `docs/runbook.md` — deploy, rollback, backup/restore, rotating secrets, what to do when Webex Contact Center or the SMS gateway (Webex Connect) is down.
 - `docs/dataflow.md`, `docs/threat-model.md` — privacy and security inputs.
-- `docs/api.md` — generated from OpenAPI; `docs/webhooks.md` — payloads to/from Webex Connect.
+- `docs/api.md` — generated from OpenAPI; `docs/webhooks.md` — payloads to/from Webex Meetings and Webex Contact Center.
 - `docs/widget.md` — how a website embeds the widget, CSP requirements, attributes.
 - `docs/agent-api.md` — how a contact-center bot connects to the machine API (ADR 0023).
 - `docs/manual/{nl,en}/` — admin manual, one topic per screen, shown in the portal and behind each field's (i) (ADR 0033). A PR that adds or changes an admin screen updates its topic; participants get help in the page itself, never a link out.

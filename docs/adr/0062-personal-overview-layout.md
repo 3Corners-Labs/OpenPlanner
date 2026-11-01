@@ -1,6 +1,10 @@
 # 0062. Personal overview layout
 
-Status: proposed (2026-10-30), requested by the product owner. Builds on ADR 0061 (widgets) and ADR 0046 (staff records). Needs ADR 0046 to be built first. Not built yet; see `docs/adr-status.md` for what is built.
+Status: superseded by ADR 0096 (2026-11-01, re-evaluation); not built. Proposed on 2026-10-30, requested by the product owner;
+never accepted. ADR 0096, accepted on 2026-11-01, decides the same per-admin layout as an
+ordered list of widget keys. The richer parts of this ADR (columns, sizes, heights, auto-scroll,
+widgets locked by the organisation) are not adopted; each would come back as an amendment to
+ADR 0096. Builds on ADR 0061 (widgets) and ADR 0046 (staff records); see `docs/adr-status.md` for what is built.
 
 ## Context
 

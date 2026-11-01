@@ -2,7 +2,13 @@
 
 Status: proposed (2026-11-01), requested by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (V7, V3.3). Supersedes ADR 0013 §5 (Session); the rest of ADR 0013 stands.
-Nothing is built yet; see *Build status*.
+Nothing is built yet; see *Build status*. Merged in #337 on 2026-11-01 without `po:approved`
+before the merge (the label followed seven minutes later); awaiting the product owner's
+acceptance. Amended on 2026-11-01 (re-evaluation): this ADR is the single home for ending admin
+sessions; ADR 0046 §8 and §10 point here. §9b uses ADR 0046's `staff.manage` at organisation
+level instead of a new permission. Step 1 also decides the algorithm and the rotation of
+`SESSION_SECRET`, which ADR 0094 §7 defers to this ADR. Until §5 of ADR 0013 is replaced, step
+4 (`Secure` on every https installation) may be built first: CLAUDE.md requires it today.
 
 ## Context
 
@@ -142,7 +148,7 @@ the register, the idle check or the revocation at logout.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #337 | in PR #337 |
+| 0 | ADR proposed | #337 | merged |
 | 1 | Register, logout revokes, rotation at login, idle and absolute check, settings, data-flow entry (WP3) | | planned |
 | 2 | Worker clean-up, `sessions end-all`, restore and rollback call it, runbook (WP4) | | planned |
 | 3 | Sessions viewable and endable: own list, administrator action, new permission, matrix, manual (WP5; a decision PR because it changes `authorization.py`) | | planned |
