@@ -1105,9 +1105,12 @@ sets no cookie; the host's access log is TransIP's and is not shipped anywhere b
 
 ## Management token key
 
-`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Rotating it invalidates every
-link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
-contact center that participants may call about broken links.
+`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Until ADR 0094 step 2 is built,
+rotating it does not break the links in mails already sent (they are found by their stored
+hash), but every message sent afterwards to an open booking (reminder, change, confirmation)
+carries a link that no longer works. Rotate only after an incident, tell the contact center
+that participants may call about broken links, and expect that agents no longer see their
+earlier claims as their own (ADR 0043 pseudonyms).
 
 ## Releasing a version (ADR 0052, ADR 0079)
 
