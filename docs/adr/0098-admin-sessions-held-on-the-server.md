@@ -143,7 +143,7 @@ the register, the idle check or the revocation at logout.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #337 | in PR #337 |
-| 1 | Register, logout revokes, rotation at login, idle and absolute check, settings, data-flow entry (WP3) | #345 | in PR #345 |
+| 1 | Register, logout revokes, rotation at login, idle and absolute check, settings, data-flow entry (WP3) | #350 | in PR #350 |
 | 2 | Worker clean-up, `sessions end-all`, restore and rollback call it, runbook (WP4) | | planned |
 | 3 | Sessions viewable and endable: own list, administrator action, new permission, matrix, manual (WP5; a decision PR because it changes `authorization.py`) | | planned |
 | 4 | Cookie `__Host-op_admin`, `Path=/`, `Secure` on https (WP6) | | planned |
