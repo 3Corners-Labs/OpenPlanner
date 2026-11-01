@@ -7588,6 +7588,9 @@ msgstr "Your account holds more than one role for more than one organisation or 
 msgid "admin.login_refused.too_many_entitlements"
 msgstr "Your account sends more rights than OpenPlanner can handle. Ask the IdP team to send only the rights for OpenPlanner."
 
+msgid "admin.login_refused.mfa_required"
+msgstr "Sign-in was refused: your account shows no second factor (MFA). Set up multi-factor authentication at your identity provider and sign in again; if it keeps failing, contact the IdP team."
+
 msgid "admin.rights_not_recognised.text"
 msgstr "Your account has rights for OpenPlanner that this installation does not recognise. Contact your administrator; your page under Staff shows which values were not recognised."
 
@@ -8718,3 +8721,33 @@ msgstr "Configuration package exported"
 
 msgid "admin.audit.detail.configuration_import"
 msgstr "Configuration package imported"
+
+msgid "admin.idp.mfa_policy"
+msgstr "MFA policy"
+
+msgid "admin.idp.mfa_policy_hint"
+msgstr "What happens when the ID token shows no second factor. With Record the login goes on and a security event is written."
+
+msgid "admin.idp.mfa.off"
+msgstr "Off"
+
+msgid "admin.idp.mfa.record"
+msgstr "Record"
+
+msgid "admin.idp.mfa.require"
+msgstr "Require"
+
+msgid "admin.idp.mfa_amr_values"
+msgstr "Accepted amr values"
+
+msgid "admin.idp.mfa_acr_values"
+msgstr "Accepted acr values"
+
+msgid "admin.idp.mfa_values_hint"
+msgstr "Values separated by spaces; empty: the default (amr: mfa otp hwk swk, acr: none)."
+
+msgid "admin.form.error.mfa_values"
+msgstr "Use at most 10 values of plain characters, separated by spaces."
+
+msgid "admin.idp.test_result.mfa"
+msgstr "Second factor shown"

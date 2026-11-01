@@ -63,9 +63,7 @@ async def site(
     )
     async with (
         app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as c,
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=f"https://{HOST}") as c,
     ):
         yield Site(c, idp, clock)
 

@@ -61,6 +61,7 @@ from app.domain.identity_providers import (
     OrganisationProvider,
     ProviderDraft,
 )
+from app.domain.mfa import MfaPolicy
 from app.domain.ports import IdentityError, LoginTestReport
 from app.web.locale import RequestLocale
 from app.web.protection import limiter, read_limit
@@ -78,6 +79,13 @@ Manage = Annotated[
 
 JWKS_PATH = "/admin/jwks.json"
 """Where the public keys of every provider are published (ADR 0083 point 6)."""
+
+MFA_LABELS: dict[MfaPolicy, str] = {
+    MfaPolicy.OFF: "admin.idp.mfa.off",
+    MfaPolicy.RECORD: "admin.idp.mfa.record",
+    MfaPolicy.REQUIRE: "admin.idp.mfa.require",
+}
+"""Label per MFA policy of a provider (ADR 0100); a test checks every policy has one."""
 
 AUTH_LABELS: dict[ClientAuth, str] = {
     ClientAuth.PRIVATE_KEY_JWT: "admin.idp.auth.private_key_jwt",
@@ -124,6 +132,7 @@ class ProviderView:
 
     provider: OrganisationProvider
     auth_label: str
+    mfa_label: str
     checked: str | None
     updated: str
 
@@ -133,6 +142,7 @@ def _view(request: Request, locale: RequestLocale, provider: OrganisationProvide
     return ProviderView(
         provider,
         locale.gettext(AUTH_LABELS[provider.client_auth]),
+        locale.gettext(MFA_LABELS[provider.mfa_policy]),
         admin_moment(request, locale, provider.checked_at) if provider.checked_at else None,
         admin_moment(request, locale, provider.updated_at),
     )
@@ -223,6 +233,30 @@ def _fields(
             hint=_("admin.idp.entitlement_prefix_hint"),
             attributes={"maxlength": "32"},
         ),
+        Field(
+            "mfa_policy",
+            _("admin.idp.mfa_policy"),
+            kind="select",
+            value=value("mfa_policy", current.mfa_policy.value if current else "record"),
+            hint=_("admin.idp.mfa_policy_hint"),
+            options=options((m.value, _(MFA_LABELS[m])) for m in MfaPolicy),
+        ),
+        Field(
+            "mfa_amr_values",
+            _("admin.idp.mfa_amr_values"),
+            value=value("mfa_amr_values", current.mfa_amr_values if current else ""),
+            hint=_("admin.idp.mfa_values_hint"),
+            required=False,
+            attributes={"maxlength": "1100", "autocomplete": "off"},
+        ),
+        Field(
+            "mfa_acr_values",
+            _("admin.idp.mfa_acr_values"),
+            value=value("mfa_acr_values", current.mfa_acr_values if current else ""),
+            hint=_("admin.idp.mfa_values_hint"),
+            required=False,
+            attributes={"maxlength": "1100", "autocomplete": "off"},
+        ),
     ]
     filled = [
         Field(**{**f.__dict__, "error": form.error_for(f.name)}) if form.errors else f
@@ -242,6 +276,9 @@ def _draft(form: FormData, key: str | None = None) -> ProviderDraft:
         scopes=form.text("scopes"),
         entitlement_claim=form.text("entitlement_claim"),
         entitlement_prefix=form.text("entitlement_prefix"),
+        mfa_policy=form.text("mfa_policy") or MfaPolicy.RECORD.value,
+        mfa_amr_values=form.text("mfa_amr_values"),
+        mfa_acr_values=form.text("mfa_acr_values"),
     )
 
 

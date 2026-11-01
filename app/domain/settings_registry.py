@@ -347,6 +347,38 @@ REGISTRY: tuple[SettingSpec, ...] = (
         T.LOGIN,
         "Scopes requested at login; wrong scopes break login.",
     ),
+    S(
+        "admin_mfa_required",
+        K.BOOL,
+        False,
+        _B,
+        T.LOGIN,
+        "Refuse an admin login without a second factor (ADR 0100); on for the bundled Keycloak.",
+    ),
+    S(
+        "oidc_acr_values",
+        K.STRING,
+        "mfa",
+        _B,
+        T.LOGIN,
+        "acr_values requested at login; an acr from this list counts as proof of MFA (ADR 0100).",
+    ),
+    S(
+        "oidc_mfa_amr_values",
+        K.STRING,
+        "hwk mfa otp swk",
+        _B,
+        T.LOGIN,
+        "amr values that count as proof of MFA (RFC 8176), space separated (ADR 0100).",
+    ),
+    S(
+        "oidc_mfa_acr_values",
+        K.STRING,
+        "",
+        _B,
+        T.LOGIN,
+        "acr values that count as proof of MFA; empty: the values asked for (ADR 0100).",
+    ),
     # B. Deployment: tied to the host, DNS, proxy, image or healthcheck; kill switches.
     S(
         "public_base_url",

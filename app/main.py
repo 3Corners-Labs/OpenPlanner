@@ -48,6 +48,7 @@ from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.tls_probe import SslCertificateProbe
 from app.admin.routes import register_admin
+from app.admin.session import session_cookie_for
 from app.api import (
     booking_pages,
     brand_assets,
@@ -93,6 +94,7 @@ from app.domain.login_service import ClaimSettings, LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.meeting_status_service import MeetingStatusService
 from app.domain.messaging_service import MessagingService
+from app.domain.mfa import MfaPolicy
 from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
 from app.domain.planner_service import PlannerService
@@ -162,6 +164,10 @@ def oidc_provider(
         client_id=settings.oidc_client_id,
         client_secret=secret,
         scopes=settings.oidc_scopes,
+        mfa_policy=MfaPolicy.REQUIRE if settings.admin_mfa_required else MfaPolicy.OFF,
+        acr_values=settings.oidc_acr_values,
+        mfa_amr_values=settings.oidc_mfa_amr_values,
+        mfa_acr_values=settings.oidc_mfa_acr_values,
         mapping=lambda: claim_mapping(
             current().login_values, current().oidc_entitlements_max_values
         ),
@@ -626,15 +632,17 @@ def create_app(
     # has opened it (until then, and in tools without one, the shipped texts apply).
     text_overrides = CachedTextOverrides()
     app.state.translator = Translator(load_catalogues(), text_overrides)
-    # Admin session (ADR 0013): only sent to /admin, signed, HttpOnly, SameSite=Lax.
+    # Admin session (ADR 0098 point 12): signed, HttpOnly, SameSite=Lax; `__Host-op_admin`,
+    # `Path=/` and `Secure` when PUBLIC_BASE_URL is https, whatever ENVIRONMENT says.
+    cookie = session_cookie_for(settings.public_base_url)
     app.add_middleware(
         SessionMiddleware,
         secret_key=session_secret(settings),
-        session_cookie="op_admin",
-        path="/admin",
+        session_cookie=cookie.name,
+        path=cookie.path,
         max_age=settings.admin_session_hours * 3600,
         same_site="lax",
-        https_only=settings.environment == "prod",
+        https_only=cookie.secure,
     )
     app.add_middleware(SecurityHeadersMiddleware)
     # Outermost: every request, its log lines and its audit events share one trace (ADR 0040).

@@ -373,6 +373,7 @@ In PingFederate, create an OIDC client:
 | ID token signing | RS256, PS256 or ES256 (symmetric algorithms are refused) |
 | Scopes | `openid profile email` |
 | Claims in the ID token | `roles`, `organisations`, `groups` (multi-valued; names configurable with `OIDC_ROLE_CLAIM`, `OIDC_ORGANISATION_CLAIM`, `OIDC_GROUP_CLAIM`) |
+| Second factor (ADR 0100) | optional until the IdP team names its values: the ID token must carry an `amr` out of `OIDC_MFA_AMR_VALUES` (default `mfa otp hwk swk`) or an `acr` out of `OIDC_MFA_ACR_VALUES` (empty: `OIDC_ACR_VALUES`, default `mfa`, which OpenPlanner also sends as `acr_values`). Then set `ADMIN_MFA_REQUIRED=true` |
 | Role values | `openplanner-superuser`, `openplanner-org-admin`, `openplanner-group-admin`, `openplanner-auditor`, `openplanner-agent` (ADR 0043; configurable with `OIDC_ROLE_*`) |
 
 Organisation and group claims carry the slugs shown in the portal (`/g/<group-slug>`). A claim
@@ -383,10 +384,20 @@ would let anyone grant themselves the superuser role.
 Roles are read at login and kept in the session for its lifetime (`ADMIN_SESSION_HOURS`,
 default 8). The session lives on the server (table `admin_sessions`, ADR 0098): logging out,
 a new login and `admin_idle_minutes` (default 60) end it at once, whatever copy of the cookie
-someone holds. After the release that introduced it everyone logs in once more. Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
+someone holds. After the release that introduced it everyone logs in once more, and once more
+after the release that renamed the cookie (below). Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
 older sessions pass through PingFederate first, which refreshes the roles. A revoked role
 therefore stops granting changes within an hour; reading continues until the session ends.
 For an urgent revocation, rotate `SESSION_SECRET` (logs everyone out).
+
+The cookie name follows `PUBLIC_BASE_URL` (ADR 0098 step 4), not `ENVIRONMENT`. On an `https://`
+address the cookie is `__Host-op_admin` with `Path=/`, `Secure`, `HttpOnly`, `SameSite=Lax` and
+no `Domain`; this also holds on a test host (`ENVIRONMENT=test`). On an `http://` address
+(development, or a host that has not moved to HTTPS yet) it stays `op_admin` with
+`Path=/admin` and no `Secure`, because browsers refuse a prefixed cookie without it. After
+the update that introduced the new name, every administrator on an https host has to log in once
+more: the old `op_admin` cookie is no longer read. Setting `PUBLIC_BASE_URL` to the `https://`
+address (ADR 0064, ADR 0086) is what switches a host to the new cookie.
 
 Logout sends `client_id` and `post_logout_redirect_uri` to the `end_session_endpoint`, without
 `id_token_hint`. Check during set-up that PingFederate accepts this and ends the SSO session;
@@ -443,6 +454,24 @@ The prefix (`OIDC_ENTITLEMENT_PREFIX`, default `openplanner`) separates installa
 share one PingFederate: give acceptance `openplanner-acc`, and production values never work
 there. The claim name and the prefix are class C settings with the dry run of §8; the host
 resets them like the other login settings.
+
+### Second factor required (ADR 0100)
+
+`ADMIN_MFA_REQUIRED` (class B, default `false`) makes `web` refuse
+a login whose ID token shows no second factor. MFA itself is the identity provider's: with
+the bundled Keycloak the realm asks for an authenticator app or a security key (`acr` `mfa`,
+level 2) and `super` must register one at the first login (set `ADMIN_MFA_REQUIRED=true` in `.env` for the
+bundled Keycloak; the installer does it in step 2 of ADR 0090); with PingFederate the IdP team's
+policy must set `amr` or `acr` (see the table above). The web log has `oidc.mfa_missing` and
+the security log `admin.login` with reason `mfa_required`; neither holds a claim value.
+
+**MFA locks the superuser out** (lost phone, a policy that does not emit `amr`). There is no
+break-glass login. Fix it at the identity provider: with the bundled Keycloak open the admin
+console (realm `openplanner` → *Users* → `super` → *Credentials*, delete the OTP credential;
+the next login asks to register a new one). If the IdP cannot be fixed in time, use the host
+CLI of the next section (closure, `oidc-check`); lowering the requirement is a deployment
+change in `.env` (`ADMIN_MFA_REQUIRED=false` and a restart of `web`), a decision for the
+product owner.
 
 ### Nobody can log in (ADR 0042 §8)
 
