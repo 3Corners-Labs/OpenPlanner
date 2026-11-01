@@ -1,8 +1,8 @@
 # 0098. Admin sessions held on the server
 
-Status: proposed (2026-11-01), requested by the product owner after the ASVS 5.0.0 L2 audit of
+Status: proposed (2026-11-01); partly built: step 1 (register, logout revokes, rotation, idle and absolute check) is in PR, steps 2 to 4 are planned. Requested by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (V7, V3.3). Supersedes ADR 0013 §5 (Session); the rest of ADR 0013 stands.
-Nothing is built yet; see *Build status*.
+See *Build status*.
 
 ## Context
 
@@ -143,7 +143,7 @@ the register, the idle check or the revocation at logout.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #337 | in PR #337 |
-| 1 | Register, logout revokes, rotation at login, idle and absolute check, settings, data-flow entry (WP3) | | planned |
+| 1 | Register, logout revokes, rotation at login, idle and absolute check, settings, data-flow entry (WP3) | #345 | in PR #345 |
 | 2 | Worker clean-up, `sessions end-all`, restore and rollback call it, runbook (WP4) | | planned |
 | 3 | Sessions viewable and endable: own list, administrator action, new permission, matrix, manual (WP5; a decision PR because it changes `authorization.py`) | | planned |
 | 4 | Cookie `__Host-op_admin`, `Path=/`, `Secure` on https (WP6) | | planned |

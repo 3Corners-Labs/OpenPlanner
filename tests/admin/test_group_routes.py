@@ -547,9 +547,16 @@ async def test_exception_in_the_past_is_refused(site: Site) -> None:
     assert '<a href="#day">Kies een datum vanaf vandaag' in response.text  # type: ignore[attr-defined]
 
 
+async def _stay_active_for_an_hour(site: Site) -> None:
+    """Pass the re-login limit (60 minutes) without ever being idle for the idle limit."""
+    site.clock.advance(timedelta(minutes=30))
+    await site.client.get(GROUP)
+    site.clock.advance(timedelta(minutes=31))
+
+
 async def test_changes_need_a_recent_login(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    site.clock.advance(timedelta(minutes=61))
+    await _stay_active_for_an_hour(site)
 
     form = await site.client.get(f"{GROUP}/staffing")
     post = await site.client.post(
@@ -568,7 +575,7 @@ async def test_changes_need_a_recent_login(site: Site) -> None:
 
 async def test_forged_referer_cannot_leave_the_portal(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    site.clock.advance(timedelta(minutes=61))
+    await _stay_active_for_an_hour(site)
 
     post = await site.client.post(
         f"{GROUP}/staffing",
