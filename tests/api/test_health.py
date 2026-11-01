@@ -13,6 +13,18 @@ async def test_liveness_is_ok(client: httpx.AsyncClient) -> None:
     assert response.json() == {"status": "ok"}
 
 
+async def test_a_json_route_has_the_strict_policy_including_base_uri(
+    client: httpx.AsyncClient,
+) -> None:
+    # ASVS V3.4.3 / V3.2.1: a response that is not HTML gets a policy that allows nothing.
+    response = await client.get("/healthz")
+
+    assert response.headers["content-security-policy"] == (
+        "default-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    )
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
 async def test_readiness_checks_database(client: httpx.AsyncClient) -> None:
     response = await client.get("/readyz")
 

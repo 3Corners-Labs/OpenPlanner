@@ -118,6 +118,7 @@ make check
 - `docs/widget.md` — embedding the calendar on your website, and its styling tokens.
 - `docs/logging.md` — log levels, the record, the trace points and where the lines go.
 - `docs/agent-api.md` — connecting a contact-center bot to the machine API.
+- `docs/authentication.md` — how admins, bots and participants prove who they are, and how that is withdrawn.
 - `docs/install.md` — installing and repairing a host with `scripts/install.sh`.
 - `site/` — the public website, openplanner.nl, built from the repository (ADR 0087).
 - `docs/runbook.md` — operating the service.
