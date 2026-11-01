@@ -16,6 +16,10 @@ x-app: &app
   build: .
   image: ${OPENPLANNER_IMAGE:-openplanner:local}
   env_file:
+    # The login (OIDC_*) from a configuration package, written by the installer (ADR 0089
+    # point 8). Before .env, so a value set in .env by hand wins.
+    - path: secrets/config.env
+      required: false
     - path: .env
       required: false
     # Bootstrap keys from `python -m app.cli init` (ADR 0042 §9).

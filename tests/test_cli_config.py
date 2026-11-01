@@ -68,6 +68,9 @@ def test_export_show_env_and_import_round_trip(
     assert "OIDC_CLIENT_SECRET=dev-only-secret-value\n" in env_file.read_text()
     assert stat.S_IMODE(env_file.stat().st_mode) == 0o600
     assert "dev-only-secret-value" not in capsys.readouterr().out
+    # The installer reads the login through a one-off container with a read-only filesystem.
+    assert main(["config", "env", str(package), *args, "--out", "-"]) == 0
+    assert "OIDC_CLIENT_SECRET=dev-only-secret-value\n" in capsys.readouterr().out
 
     target = migrated_database(tmp_path, monkeypatch, "cli-target")
     assert main(["config", "import", str(package), *args]) == 0
