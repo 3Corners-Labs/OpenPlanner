@@ -37,8 +37,9 @@ provider the issuer stored at registration. A discovery document or token that n
 issuer refuses the login (`oidc.issuer_mismatch`, no values logged). The provider's
 document therefore cannot move the issuer after the fact.
 
-**Session.** Today (ADR 0013 §5) the session is the signed cookie `op_admin`: `HttpOnly`,
-`SameSite=Lax`, `Path=/admin`, `Secure` when `ENVIRONMENT=prod`, absolute lifetime
+**Session.** Today (ADR 0013 §5) the session is the signed cookie, `__Host-op_admin` (`Path=/`,
+`Secure`, no `Domain`) when `PUBLIC_BASE_URL` is https and `op_admin` (`Path=/admin`) over http
+(ADR 0098 step 4), `HttpOnly`, `SameSite=Lax`, absolute lifetime
 `admin_session_hours` (8 h) enforced on the server from the login time in the cookie.
 Changes need a login younger than `admin_reauth_minutes` (60 min, ADR 0015). ADR 0098
 (proposed, not built) replaces this with a server-side register: the cookie holds
