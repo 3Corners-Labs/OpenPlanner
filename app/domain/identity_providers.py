@@ -24,6 +24,7 @@ from typing import Any
 
 from app.domain.entitlements import IDP_KEY_PATTERN, PREFIX_PATTERN
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.mfa import MfaPolicy, parse_mfa_values
 
 DISCOVERY_SUFFIX = "/.well-known/openid-configuration"
 """Where OIDC Discovery 1.0 §4 publishes the provider metadata, under the issuer."""
@@ -129,6 +130,9 @@ class ProviderDraft:
         scopes: Space-separated, always with ``openid``.
         entitlement_claim: The claim that carries the entitlement values (ADR 0049).
         entitlement_prefix: The prefix of every entitlement value.
+        mfa_policy: What a login without a second factor does (ADR 0100): off, record, require.
+        mfa_amr_values: The ``amr`` values that count as proof; empty: the platform's.
+        mfa_acr_values: The ``acr`` values that count as proof; empty: none.
     """
 
     key: str
@@ -139,6 +143,9 @@ class ProviderDraft:
     scopes: str
     entitlement_claim: str
     entitlement_prefix: str
+    mfa_policy: MfaPolicy = MfaPolicy.RECORD
+    mfa_amr_values: str = ""
+    mfa_acr_values: str = ""
 
     @classmethod
     def create(  # noqa: PLR0913
@@ -152,6 +159,9 @@ class ProviderDraft:
         scopes: str,
         entitlement_claim: str,
         entitlement_prefix: str,
+        mfa_policy: str = MfaPolicy.RECORD.value,
+        mfa_amr_values: str = "",
+        mfa_acr_values: str = "",
     ) -> "ProviderDraft":
         """Validate the submitted values.
 
@@ -170,6 +180,15 @@ class ProviderDraft:
             raise _invalid("entitlement_claim")
         if _PREFIX.fullmatch(entitlement_prefix) is None:
             raise _invalid("entitlement_prefix")
+        try:
+            policy = MfaPolicy(mfa_policy)
+        except ValueError as error:
+            raise _invalid("mfa_policy") from error
+        amr, acr = parse_mfa_values(mfa_amr_values), parse_mfa_values(mfa_acr_values)
+        if amr is None:
+            raise _invalid("mfa_amr_values")
+        if acr is None:
+            raise _invalid("mfa_acr_values")
         return cls(
             key=key,
             name=_check_text(name, "name", MAX_NAME_LENGTH),
@@ -179,6 +198,9 @@ class ProviderDraft:
             scopes=validate_scopes(scopes),
             entitlement_claim=entitlement_claim,
             entitlement_prefix=entitlement_prefix,
+            mfa_policy=policy,
+            mfa_amr_values=amr,
+            mfa_acr_values=acr,
         )
 
 
@@ -204,6 +226,9 @@ class OrganisationProvider:
         created_at: When it was registered.
         updated_at: When it last changed; adapters use it to notice a change.
         checked_at: When discovery was last checked successfully.
+        mfa_policy: What a login without a second factor does (ADR 0100).
+        mfa_amr_values: The ``amr`` values that count as proof; empty: the platform's.
+        mfa_acr_values: The ``acr`` values that count as proof; empty: none.
     """
 
     id: int | None
@@ -222,6 +247,9 @@ class OrganisationProvider:
     created_at: datetime
     updated_at: datetime
     checked_at: datetime | None = None
+    mfa_policy: MfaPolicy = MfaPolicy.RECORD
+    mfa_amr_values: str = ""
+    mfa_acr_values: str = ""
 
     @property
     def needs_secret(self) -> bool:

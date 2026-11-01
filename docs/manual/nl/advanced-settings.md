@@ -8,6 +8,15 @@ alleen.
 Geheime waarden, zoals wachtwoorden en sleutels, worden nooit getoond: alleen of ze zijn
 ingesteld.
 
+Het scherm heeft drie tabbladen onder de titel:
+
+- **Systeemstatus**: de omgeving, het certificaat en de gegevensvelden;
+- **Instellingen**: alle platforminstellingen per onderwerp, met bovenaan *Op deze pagina*, een
+  lijst met links naar elk onderwerp, en de proef van de inlogkoppeling;
+- **Configuratiepakket** (alleen de superuser): exporteren en importeren.
+
+Een wijziging of een foutmelding verschijnt op het tabblad van het formulier dat u gebruikte.
+
 ## Systeemstatus
 
 De instellingen die alleen de beheerder van de server zet, in de omgeving van de server of in

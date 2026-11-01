@@ -5902,6 +5902,21 @@ msgstr "Geavanceerde instellingen"
 msgid "admin.settings.title"
 msgstr "Geavanceerde instellingen"
 
+msgid "admin.settings.tab.status"
+msgstr "Systeemstatus"
+
+msgid "admin.settings.tab.values"
+msgstr "Instellingen"
+
+msgid "admin.settings.tab.package"
+msgstr "Configuratiepakket"
+
+msgid "admin.settings.sections"
+msgstr "Onderdelen van Geavanceerde instellingen"
+
+msgid "admin.page_toc"
+msgstr "Op deze pagina"
+
 msgid "admin.settings.intro"
 msgstr "Hoe deze installatie is ingesteld en waar elke waarde vandaan komt. Geheime waarden worden nooit getoond. De superuser wijzigt hier bedrijfsvoering, bewaartermijnen, opslag, snelheidslimieten en sessies; een wijziging geldt binnen tien seconden."
 
@@ -6398,8 +6413,17 @@ msgstr "Extra vragen die inwoners beantwoorden als ze een afspraak maken. Vraag 
 msgid "admin.form_fields.settings_lead"
 msgstr "Extra vragen op het formulier, met controles en een markering voor persoonsgegevens."
 
+msgid "admin.form_fields.summary"
+msgstr "Eigen vragen op het formulier ({count} van maximaal {limit}):"
+
+msgid "admin.form_fields.summary_more"
+msgstr "en {count} meer"
+
+msgid "admin.form_fields.summary_none"
+msgstr "Nog geen eigen vragen (maximaal {limit}). U kunt bijvoorbeeld een klantnummer of het onderwerp van de afspraak vragen."
+
 msgid "admin.form_fields.open"
-msgstr "Boekingsformulier beheren"
+msgstr "Vragen beheren"
 
 msgid "admin.form_fields.back"
 msgstr "Terug naar de instellingen"
@@ -7587,6 +7611,9 @@ msgstr "Uw account heeft meer dan één rol voor meer dan één organisatie of g
 
 msgid "admin.login_refused.too_many_entitlements"
 msgstr "Uw account stuurt meer rechten mee dan OpenPlanner kan verwerken. Vraag het IdP-team om alleen de rechten voor OpenPlanner mee te sturen."
+
+msgid "admin.login_refused.mfa_required"
+msgstr "Inloggen is geweigerd: uw account laat geen tweede factor (MFA) zien. Stel meervoudige authenticatie in bij uw identiteitsprovider en log opnieuw in; blijft het mislukken, neem dan contact op met het IdP-team."
 
 msgid "admin.rights_not_recognised.text"
 msgstr "Uw account heeft rechten voor OpenPlanner die deze installatie niet herkent. Neem contact op met uw beheerder; die ziet op uw pagina bij Medewerkers welke waarden niet herkend zijn."
@@ -8865,3 +8892,32 @@ msgstr "In het portaal: uitnodigen, rollen wijzigen, uitschakelen."
 
 msgid "admin.idp_mapping.staff.off"
 msgstr "Staat uit (instelling Medewerkers beheren in het portaal); beheer in de Keycloak-console."
+msgid "admin.idp.mfa_policy"
+msgstr "MFA-beleid"
+
+msgid "admin.idp.mfa_policy_hint"
+msgstr "Wat er gebeurt als het ID-token geen tweede factor toont. Bij Vastleggen gaat het inloggen door en komt er een beveiligingsgebeurtenis."
+
+msgid "admin.idp.mfa.off"
+msgstr "Uit"
+
+msgid "admin.idp.mfa.record"
+msgstr "Vastleggen"
+
+msgid "admin.idp.mfa.require"
+msgstr "Afdwingen"
+
+msgid "admin.idp.mfa_amr_values"
+msgstr "Geaccepteerde amr-waarden"
+
+msgid "admin.idp.mfa_acr_values"
+msgstr "Geaccepteerde acr-waarden"
+
+msgid "admin.idp.mfa_values_hint"
+msgstr "Waarden gescheiden door spaties; leeg: de standaard (amr: mfa otp hwk swk, acr: geen)."
+
+msgid "admin.form.error.mfa_values"
+msgstr "Gebruik hoogstens 10 waarden van gewone tekens, gescheiden door spaties."
+
+msgid "admin.idp.test_result.mfa"
+msgstr "Tweede factor getoond"

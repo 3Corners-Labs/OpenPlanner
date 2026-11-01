@@ -5902,6 +5902,21 @@ msgstr "Advanced settings"
 msgid "admin.settings.title"
 msgstr "Advanced settings"
 
+msgid "admin.settings.tab.status"
+msgstr "System status"
+
+msgid "admin.settings.tab.values"
+msgstr "Settings"
+
+msgid "admin.settings.tab.package"
+msgstr "Configuration package"
+
+msgid "admin.settings.sections"
+msgstr "Parts of Advanced settings"
+
+msgid "admin.page_toc"
+msgstr "On this page"
+
 msgid "admin.settings.intro"
 msgstr "How this installation is configured and where each value comes from. Secret values are never shown. The superuser changes operations, retention, storage, rate limits and sessions here; a change applies within ten seconds."
 
@@ -6398,8 +6413,17 @@ msgstr "Extra questions participants answer when they book. Ask only what the te
 msgid "admin.form_fields.settings_lead"
 msgstr "Extra questions on the form, with checks and a personal data tag."
 
+msgid "admin.form_fields.summary"
+msgstr "Own questions on the form ({count} of at most {limit}):"
+
+msgid "admin.form_fields.summary_more"
+msgstr "and {count} more"
+
+msgid "admin.form_fields.summary_none"
+msgstr "No own questions yet (at most {limit}). You could ask for a customer number or the subject of the appointment."
+
 msgid "admin.form_fields.open"
-msgstr "Manage the booking form"
+msgstr "Manage questions"
 
 msgid "admin.form_fields.back"
 msgstr "Back to the settings"
@@ -7575,6 +7599,9 @@ msgstr "Your account holds more than one role for more than one organisation or 
 
 msgid "admin.login_refused.too_many_entitlements"
 msgstr "Your account sends more rights than OpenPlanner can handle. Ask the IdP team to send only the rights for OpenPlanner."
+
+msgid "admin.login_refused.mfa_required"
+msgstr "Sign-in was refused: your account shows no second factor (MFA). Set up multi-factor authentication at your identity provider and sign in again; if it keeps failing, contact the IdP team."
 
 msgid "admin.rights_not_recognised.text"
 msgstr "Your account has rights for OpenPlanner that this installation does not recognise. Contact your administrator; your page under Staff shows which values were not recognised."
@@ -8853,3 +8880,32 @@ msgstr "In the portal: invite, change roles, disable."
 
 msgid "admin.idp_mapping.staff.off"
 msgstr "Switched off (setting Manage staff in the portal); manage in the Keycloak console."
+msgid "admin.idp.mfa_policy"
+msgstr "MFA policy"
+
+msgid "admin.idp.mfa_policy_hint"
+msgstr "What happens when the ID token shows no second factor. With Record the login goes on and a security event is written."
+
+msgid "admin.idp.mfa.off"
+msgstr "Off"
+
+msgid "admin.idp.mfa.record"
+msgstr "Record"
+
+msgid "admin.idp.mfa.require"
+msgstr "Require"
+
+msgid "admin.idp.mfa_amr_values"
+msgstr "Accepted amr values"
+
+msgid "admin.idp.mfa_acr_values"
+msgstr "Accepted acr values"
+
+msgid "admin.idp.mfa_values_hint"
+msgstr "Values separated by spaces; empty: the default (amr: mfa otp hwk swk, acr: none)."
+
+msgid "admin.form.error.mfa_values"
+msgstr "Use at most 10 values of plain characters, separated by spaces."
+
+msgid "admin.idp.test_result.mfa"
+msgstr "Second factor shown"

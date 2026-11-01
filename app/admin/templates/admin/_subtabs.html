@@ -1,0 +1,13 @@
+{#- The second row of tabs under a page header: the sub-tabs of an object tab (ADR 0047 §3)
+    or of a side-navigation entry (ADR 0101). Expects a list of NavView and the row's label. -#}
+{% macro subtab_row(items, label) -%}
+{% if items %}
+<nav class="tabs tabs--sub" aria-label="{{ label }}">
+  <ul>
+    {% for tab in items %}
+    <li><a href="{{ tab.href }}"{% if tab.current %} aria-current="page"{% endif %}><span>{{ tab.label }}</span></a></li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+{%- endmacro %}

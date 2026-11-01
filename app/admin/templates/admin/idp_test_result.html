@@ -14,6 +14,7 @@
     <div><dt>{{ _("admin.idp.test_result.claims") }}</dt><dd>{% for name in report.claim_names %}<code>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</dd></div>
     <div><dt>{{ _("admin.idp.test_result.email_verified") }}</dt><dd>{% if report.email_verified is true %}<span class="chip chip--success">{{ _("admin.idp.test_result.yes") }}</span>{% elif report.email_verified is false %}<span class="chip chip--danger">{{ _("admin.idp.test_result.no") }}</span>{% else %}<span class="chip chip--warning">{{ _("admin.idp.test_result.absent") }}</span>{% endif %}</dd></div>
     <div><dt>{{ _("admin.idp.test_result.email_domain") }}</dt><dd>{% if report.email_domain %}<code>{{ report.email_domain }}</code>{% else %}<span class="chip chip--warning">{{ _("admin.idp.test_result.absent") }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.idp.test_result.mfa") }}</dt><dd>{% if report.mfa_shown %}<span class="chip chip--success">{{ _("admin.idp.test_result.yes") }}</span>{% else %}<span class="chip chip--warning">{{ _("admin.idp.test_result.no") }}</span>{% endif %}</dd></div>
     <div><dt>{{ _("admin.idp.test_result.entitlements") }}</dt><dd>{{ report.claims.entitlements|length }}</dd></div>
   </dl>
   <p class="hint">{{ _("admin.idp.test_result.hint") }}</p>

@@ -74,7 +74,7 @@ What the browser is allowed to do with OpenPlanner and why. Authentication paths
 
 No form carries a CSRF token. Three independent layers stand in the way of a cross-site request:
 
-1. **`SameSite=Lax` on the cookie.** The admin cookie `op_admin` is not sent on a cross-site
+1. **`SameSite=Lax` on the cookie.** The admin cookie (`__Host-op_admin` on https, `op_admin` over http) is not sent on a cross-site
    `POST`, `fetch` or subresource request, only on top-level `GET` navigations. This is the
    layer that protects a browser that sends neither header below.
 2. **Fetch Metadata** (`require_same_origin`, `app/web/protection.py`). Every state-changing
@@ -164,6 +164,95 @@ Jinja2 autoescape, an organisation's uploads limited to validated images and fon
 with their own media type and `nosniff`). The admin cookie is scoped to `/admin`; participant
 pages never read the session. A separate hostname per organisation is possible behind the
 proxy and is only built when a client requires it.
+
+## Shared trust boundaries (TEN-06, BP-4)
+
+One installation serves every organisation in it. The separation between organisations is a
+rule of the application (ADR 0014 scope on every query, per-organisation settings, markers
+tested in the isolation sweeps), not a physical one. Everything below is shared by all
+organisations of one installation. This section names each shared item, what a compromise of it
+gives, what compensates, and what stays open. It is the input for the decision on when an
+organisation needs an installation of its own.
+
+**Decision (BP-4, product owner, 1 November 2026).** For the first government client there is
+**one installation per data controller** (verwerkingsverantwoordelijke). Several organisations
+inside one controller on one installation stay allowed. Organisations of different controllers
+never share an installation. The shared items below are therefore accepted as shared **within one
+controller**, and are not accepted across controllers.
+
+```mermaid
+flowchart TB
+    subgraph install [One installation = one data controller]
+        su([Superuser<br/>scope matches everything])
+        subgraph host [Host: Docker, volume, .env]
+            envkeys[".env / secret files<br/>MANAGEMENT_TOKEN_KEY<br/>SETTINGS_ENCRYPTION_KEY<br/>SESSION_SECRET"]
+            subgraph procs [web and worker]
+                web[web]
+                worker[worker]
+            end
+            db[(One SQLite database<br/>all organisations)]
+        end
+        orgA[Organisation A]
+        orgB[Organisation B]
+    end
+    subgraph cisco [One Cisco tenant]
+        svc[One Webex Service App]
+        wxcc[One WxCC org]
+    end
+    smtp[Platform SMTP from env<br/>fallback for every organisation<br/>without its own SMTP]
+    orgA --> web
+    orgB --> web
+    su --> web
+    web --> db
+    worker --> db
+    envkeys --> web
+    envkeys --> worker
+    worker --> svc --> wxcc
+    worker --> smtp
+```
+
+| Shared item | What it means | Compromise gives | Compensation in place | Open or accepted |
+|---|---|---|---|---|
+| **Superuser** | The platform role. Its scope matches every organisation and group (ADR 0014); it sets platform settings (class C), sees System status, runs updates, switches diagnostic mode and the machine API. Nothing in the matrix limits it per organisation. | Read and change of every organisation's configuration and, through the booking views its permissions allow, of personal data of every organisation. | Entitlements come from the IdP (ADR 0049), there is no local account and no break-glass login; every decision and change is an audit event, shipped after commit to the log platform outside the installation (ADR 0034), so the superuser cannot erase the trail; the role is held by few named people. | Accepted within one controller. Not acceptable across controllers: it is the main reason for BP-4. |
+| **Host administration** (Docker, volume, `.env`) | Whoever can run `docker`, read the data volume or the environment of the containers. | Everything: the database file, the keys in `.env`, the decrypted secrets in process memory, the log lines. Also the host command `python -m app.cli` (closure, `oidc-check`, `purge-overdue`). | Non-root uid, read-only root filesystem, `cap_drop: ALL`, `no-new-privileges`; bootstrap secrets via env or `X_FILE` only, never in the repository; SQLite secure delete and WAL truncation after a purge (WP-A3); signed images, verified at deployment (ADR 0006). The host's access control is the hosting party's (external evidence, WP-C1). | Accepted: host administration is above the application in the trust order. The host team must not be a party of another controller. |
+| **One database** | A single SQLite file in WAL mode holds all organisations. Isolation is `WHERE organisation_id` / `group_id` in the SQL adapter, derived from the permission's `Scope`. | A SQL injection or a missed filter reads across organisations; a stolen file or snapshot holds every organisation's bookings. | The authorisation sweep covers every role against every admin route, own and other group (CI); the concurrent A/B isolation test and the export marker sweep (WP-B1, WP-B2); no raw SQL outside `app/adapters/db/`; PII purged at `slot.end + 24h` and overwritten (WP-A3), so the file holds little personal data at rest. | Accepted within one controller. A database per organisation is not built and not planned. |
+| **One `MANAGEMENT_TOKEN_KEY`** | Management tokens (ADR 0011) are HMAC-SHA256 of a per-booking salt under this one key. | Database plus key is enough to compute the token of any booking of any organisation; the key alone gives nothing. | Key in env only, never in a job payload or log; the salt is per booking and only `sha256(token)` is stored; rotation with a grace period without loss (ADR 0094). | Accepted. Rotation changes the key for all organisations at once. |
+| **One `SETTINGS_ENCRYPTION_KEY`** | Every integration secret (Webex, SMTP and SMS passwords per organisation, log destinations, IdP client secrets) is AES-256-GCM under a key derived from this one value (ADR 0008). | Decrypts the secrets of all organisations in one database copy. | Secrets are write-only in the UI; the key lives outside the database and outside the backup; rotation re-encrypts everything (ADR 0094); the TLS private key is never in the database (ADR 0070). | Accepted. A key per organisation would not help: the process holds the derived key in memory for all organisations. |
+| **One Webex Service App and one WxCC org** | `integration_credentials` is keyed by name, not by organisation (`app/adapters/integrations.py`); video meetings (Webex) and tasks (WxCC) of all organisations go through one app, one token store and one WxCC org in one Cisco tenant. | The Cisco tenant's administrators and the app's tokens can see meetings, tasks and statistics of every organisation. One organisation's misconfiguration (queue, entry point) or quota use affects the others; a Webex or WxCC outage hits all. | Outbound payloads carry only first name, host join URL and routing codes (ADR 0081); webhooks are verified; queue and entry point are mapped per group. | Accepted within one controller that owns the Cisco tenant. **Not acceptable** across controllers: they would share a processor tenant and its administrators. |
+| **SMTP fallback through the environment** | An organisation without its own SMTP settings sends through `SMTP_HOST` of the platform (ADR 0022; `fallback_mail` in `app/adapters/senders.py`). | Mail of those organisations leaves from one sender identity and one mail account; the platform mail provider sees their message content and recipients. SPF, DKIM and DMARC are of the platform domain, so a reputation problem of one organisation affects the others. | The organisation's own SMTP wins when stored; the Channels screen shows the path in use; deliverability check (ADR 0073); no PII in the logs of a send. | Accepted within one controller. For a second controller the fallback must be off (leave `SMTP_HOST` unset) and each organisation brings its own SMTP, or it gets its own installation. |
+| **Process memory, one origin, one log stream** | web and worker hold all organisations in one process; one origin serves all (see *One origin for all organisations*); one log platform receives every organisation's events. | A script injection or memory-sharing bug reaches all organisations. The log platform operator sees all organisations' event metadata (ids, slugs, codes, no PII). | Per-organisation caches keyed by organisation and group; request-scoped context variables; strict CSP; masking processor. Parallel isolation proof: WP-B1. | Accepted within one controller. |
+
+### When an organisation needs its own installation
+
+An organisation needs an installation of its own, not a place in a shared one, when **any** of
+these holds:
+
+1. **A different data controller.** Two controllers never share an installation (BP-4): they
+   would share the superuser, the host administration, the keys, the database and the Cisco
+   tenant, and the controller of the installation would become a processor for the other
+   without an agreement.
+2. **A separate Cisco tenant is required**, for instance because the organisation's WxCC org or
+   Webex organisation is another legal entity, or its Cisco administrators may not see other
+   organisations' tasks and meetings.
+3. **Physical or logical separation is a stated requirement** (contract, accreditation, a
+   classification of the data above what the shared host is approved for, a rule that data lie
+   in a separate database or on a separate volume).
+4. **A different trust domain for the people with full access**: the superuser or host team of
+   the shared installation may not be able to see this organisation's participants, for example
+   because they belong to another employer, ministry or group of companies.
+5. **A different retention or log regime** that the platform settings (class C) cannot meet, for
+   instance a log platform that another controller may not share.
+6. **An availability or change regime of its own**: an update window, a maintenance window or an
+   incident that must not affect the others (updates and maintenance mode are per installation,
+   ADR 0029, ADR 0038).
+
+None of these holds for several organisations of **one** controller, one Cisco tenant and one
+operating team. Those stay on one installation. A new organisation is checked against this list
+before it is created; a "yes" to any point means a new installation, not a new organisation.
+
+An installation of its own costs little by design: the same images, its own `.env` keys,
+database and volume, its own IdP registration and its own Cisco Service App. The configuration
+package (ADR 0089) moves settings between installations.
 
 ## Cross-cutting
 
@@ -346,6 +435,8 @@ other `/admin` route declares one permission of the matrix (ADR 0014). Inputs fr
 | Spoofing | Replay of a copied admin cookie after logout, after a new login, or after the idle time (ASVS V7.4.1, V7.2.4, V7.3.1) | The cookie is only a reference; logout ends the session in the register before the cookie is cleared; every login ends the session the browser brought (`replaced`) and takes a new reference; a session idle longer than `admin_idle_minutes` ends with `idle` and an audit event; a register that cannot be read gives no access | `tests/admin/test_admin_sessions.py::test_a_copied_cookie_is_dead_after_logout`, `test_a_new_login_ends_the_previous_cookie`, `test_idle_ends_the_session_and_is_audited`, `test_an_unreadable_register_gives_no_access` |
 | Information disclosure | The session reference or the login's claims leak through the cookie, a log or an audit event | The cookie holds the reference only (no name, organisation or role); only `sha256` of the reference is stored; the reference never reaches a log line or audit event; more than `admin_max_sessions_per_person` sessions end the one idle longest | `tests/admin/test_admin_sessions.py::test_the_cookie_holds_a_reference_and_no_claims`, `test_the_reference_is_never_logged_or_audited`, `test_more_sessions_than_the_limit_end_the_one_idle_longest`, `tests/adapters/db/test_admin_session_queries.py::test_the_table_holds_hashes_never_a_reference` |
 | Spoofing | A discovery document or ID token with another issuer than expected (hostile or changed discovery endpoint) is trusted, because the issuer was taken from the document itself | The issuer is pinned (`OidcConfig.expected_issuer`: `OIDC_ISSUER`, else the discovery URL without its suffix; for an organisation provider the issuer stored at registration) and compared exactly in `_discover` and in the token check (`iss`); registration compares without trailing-slash tolerance; the log carries `oidc.issuer_mismatch` without values (ADR 0097) | `tests/adapters/test_oidc.py::test_a_discovery_document_with_another_issuer_is_refused`, `test_a_trailing_slash_is_another_issuer`, `test_a_token_with_another_iss_than_the_pinned_one_is_refused`, `test_an_organisation_provider_keeps_its_stored_issuer_when_discovery_changes`, `tests/domain/test_identity_providers.py::test_a_trailing_slash_on_the_issuer_is_a_mismatch`; `oidc-check` shows the same comparison on the host before a login fails (`tests/adapters/test_oidc_check.py::test_the_issuer_is_compared_exactly_with_the_one_the_login_pins`) |
+| Spoofing | An admin logs in with a stolen password alone, or a hostile IdP policy silently drops the second factor | `ADMIN_MFA_REQUIRED` (class B, on for the bundled Keycloak, off for another provider until the IdP names its values): the login asks `acr_values` and the ID token must carry an `amr` out of `OIDC_MFA_AMR_VALUES` or an `acr` out of `OIDC_MFA_ACR_VALUES`, else `mfa_required` (401, security event without claim values, log `oidc.mfa_missing`); MFA itself stays at the IdP; no step-up per action and no four-eyes yet (ADR 0100) | `tests/domain/test_mfa.py`, `tests/adapters/test_oidc.py::test_a_token_without_proof_of_mfa_refuses_the_login`, `test_an_acr_that_was_not_requested_is_no_proof`, `test_the_refusal_logs_no_claim_values`, `tests/admin/test_admin_flow.py::test_a_login_without_a_second_factor_is_refused_with_a_clear_text`, `tests/adapters/test_oidc.py::test_the_accepted_amr_and_acr_values_are_configurable`, `tests/scripts/test_render_keycloak_realm.py::test_the_realm_asks_for_a_second_factor_and_says_so_in_the_token` |
+| Spoofing | An organisation provider logs an admin in without a second factor and nobody notices | Per provider policy `record` (default) writes the security event `admin.login.mfa_missing` with `provider:<key>`, no personal data; `require` refuses with `mfa_required`; the test login shows whether a second factor showed (ADR 0100 point 5) | `tests/adapters/test_oidc.py::test_the_record_policy_lets_the_login_through_and_marks_it`, `test_a_test_login_reports_whether_a_second_factor_showed_and_never_refuses`, `tests/admin/test_admin_flow.py::test_a_login_without_a_second_factor_under_record_goes_on_and_is_recorded`, `tests/admin/test_idp_routes.py::test_the_mfa_policy_is_registered_shown_and_validated` |
 | Spoofing | Silent re-login after logout through the identity provider's SSO session | RP-initiated logout at the provider's `end_session_endpoint`; an interstitial page keeps CSP `form-action 'self'` | `test_logout`, `tests/adapters/test_oidc.py::test_logout_url_uses_the_end_session_endpoint`, `e2e/tests/admin-roles.spec.ts` (outsider logs out, super must log in afresh) |
 | Tampering (CSRF) | A third-party site logs an admin out | Logout is a POST with the Fetch Metadata check | `test_logout` |
 | Spoofing (open redirect) | `next` sends the admin to another site after login | `next` must be a path under `/admin/` | `test_next_cannot_leave_the_admin_portal` |

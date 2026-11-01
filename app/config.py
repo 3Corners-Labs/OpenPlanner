@@ -323,6 +323,16 @@ class Settings(BaseSettings):
     # ADR 0095: validity of the invitation and reset link, and the switch of the actions.
     staff_invite_expiry_days: int = Field(default=7, ge=1, le=30)
     staff_directory_enabled: bool = True
+    # ADR 0100: the admin must show a second factor (amr/acr in the ID token). Class B. Off by
+    # default: the bundled Keycloak sets it on; another provider turns it on once the IdP team
+    # has named its amr/acr values. The IdP owns the MFA itself.
+    admin_mfa_required: bool = False
+    # ``acr_values`` asked for at login (space separated).
+    oidc_acr_values: str = "mfa"
+    # Values that count as proof (space separated). amr: RFC 8176. acr: empty means the values
+    # asked for above.
+    oidc_mfa_amr_values: str = "hwk mfa otp swk"
+    oidc_mfa_acr_values: str = ""
     oidc_role_claim: str = "roles"
     oidc_organisation_claim: str = "organisations"
     oidc_group_claim: str = "groups"

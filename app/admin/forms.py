@@ -226,6 +226,9 @@ FIELD_MESSAGES: dict[str, str] = {
     "client_secret": "admin.form.error.client_secret",  # noqa: S105  # nosec B105 - a key
     "entitlement_claim": "admin.form.error.entitlement_claim",
     "entitlement_prefix": "admin.form.error.entitlement_prefix",
+    "mfa_policy": "admin.form.error.choice",
+    "mfa_amr_values": "admin.form.error.mfa_values",
+    "mfa_acr_values": "admin.form.error.mfa_values",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 

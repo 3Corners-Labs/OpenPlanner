@@ -71,6 +71,17 @@ de namen), of `email_verified` waar was, het domein van het e-mailadres en welke
 entitlement-waarden opleveren. Er wordt geen sessie gestart; uw eigen sessie blijft zoals
 hij was. De uitslag staat in het auditlog als `idp.test_login`.
 
+## Tweede factor (MFA-beleid)
+
+Elke provider heeft een **MFA-beleid** (ADR 0100). De provider zelf vraagt om de tweede factor;
+OpenPlanner controleert alleen dat het ID-token zegt dat die is gebruikt, met een `amr`- of
+`acr`-waarde die u accepteert (leeg: `amr` `mfa otp hwk swk`, geen `acr`). **Uit** negeert het.
+**Vastleggen** (de standaard) laat het inloggen doorgaan en schrijft een beveiligingsgebeurtenis,
+`admin.login.mfa_missing`, met de sleutel van de provider en zonder persoonsgegevens.
+**Afdwingen** weigert het inloggen met de melding dat het account geen tweede factor laat zien.
+De proeflogin toont of een tweede factor zichtbaar was; kies **Afdwingen** pas na een proeflogin
+met MFA die *ja* zegt, anders sluit u alle beheerders van de organisatie buiten.
+
 ## Sleutel roteren, aan- en uitzetten, verwijderen
 
 **Sleutel roteren** maakt een nieuw sleutelpaar; de oude publieke sleutel blijft 24 uur in
