@@ -583,3 +583,40 @@ async def test_a_message_job_leaves_its_run_and_steps_as_trace_lines(
     assert run[0].fields["attempt"] == 1
     assert isinstance(run[0].fields["ms"], int)
     assert "ada@example.org" not in repr(lines)
+
+
+async def test_a_round_with_a_purge_empties_the_wal_once(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    calls: list[int] = []
+
+    async def after_purge() -> None:
+        calls.append(1)
+
+    jobs = [job(bid, JobType.PURGE_PII, pinned=None), job(bid, JobType.PURGE_PII, pinned=None)]
+    runner = JobRunner(
+        FakeQueue(jobs), uow, FixedClock(NOW), None, composer, after_purge=after_purge
+    )
+    await runner.run_due()
+    assert calls == [1]
+
+    await JobRunner(
+        FakeQueue([]), uow, FixedClock(NOW), None, composer, after_purge=after_purge
+    ).run_due()
+    assert calls == [1]
+
+
+async def test_a_failing_checkpoint_does_not_fail_the_round(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+
+    async def after_purge() -> None:
+        raise RuntimeError("database locked")
+
+    queue = FakeQueue([job(bid, JobType.PURGE_PII, pinned=None)])
+    runner = JobRunner(queue, uow, FixedClock(NOW), None, composer, after_purge=after_purge)
+
+    assert await runner.run_due() == 1
+    assert queue.done == [1]

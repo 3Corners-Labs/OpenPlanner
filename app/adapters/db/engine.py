@@ -5,7 +5,9 @@ transaction handling is switched off so that we emit ``BEGIN`` ourselves: a plai
 for reads and ``BEGIN IMMEDIATE`` for booking transactions, selected per connection with the
 ``sqlite_begin`` execution option (see ``app.adapters.db.uow``). A new database is created in
 incremental auto-vacuum mode, so pages freed by pruning can go back to the disk (ADR 0040,
-``app.adapters.db.maintenance``). A statement slower than ``set_slow_query_ms`` leaves a
+``app.adapters.db.maintenance``). ``secure_delete`` is on for every connection, so purged
+personal data is overwritten in the database file and not merely marked free.
+A statement slower than ``set_slow_query_ms`` leaves a
 ``sql.slow`` trace line with its kind and first table, never its text (ADR 0085 point 9).
 """
 
@@ -90,6 +92,9 @@ def _sqlite_connect(busy_timeout_ms: int, dbapi_connection: Any, _record: Any) -
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.execute("PRAGMA foreign_keys=ON")
+    # Fixed privacy rule (WP-A3): deleted and purged content is overwritten with zeros, not left
+    # in freed page space. Not a setting: switching it off would defeat the retention rules.
+    cursor.execute("PRAGMA secure_delete=ON")
     cursor.execute(f"PRAGMA busy_timeout={int(busy_timeout_ms)}")
     cursor.close()
 
