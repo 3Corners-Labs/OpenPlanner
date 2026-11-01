@@ -51,12 +51,13 @@ installation can be provisioned by a pipeline, not only by a person.
    overrides, reminder rules, texts, form fields, contacts, holiday calendars and their
    assignments, closure scenarios and images, branding, channel settings, platform and
    organisation settings, integration credentials, identity providers and their keys, API
-   clients and their groups, custom roles, the API switch, `settings_version`) and *state*
+   clients and their groups, log destinations (ADR 0085), custom roles, the API switch,
+   `settings_version`) and *state*
    (bookings, slots, jobs, booking events and call status, audit events, staff and their
    memberships and refusals, active closures and their notices, shortfall acceptances, API
    access tokens, webhook events, integration reports, diagnostic modes, maintenance state,
-   update requests, release checks and listing, running versions, certificate checks and the
-   own certificate). The PII fields of CLAUDE.md are all on `bookings`, a state table; the
+   update requests, release checks and listing, running versions, certificate checks, the own
+   certificate and the status counters of the log destinations). The PII fields of CLAUDE.md are all on `bookings`, a state table; the
    configuration tables name staff only as a video host address of a group.
 3. **Secrets travel sealed under a passphrase, never under the installation's key.** The
    four sealed columns (`integration_credentials`, `channel_settings`, `identity_providers`,
