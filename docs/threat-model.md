@@ -165,6 +165,95 @@ with their own media type and `nosniff`). The admin cookie is scoped to `/admin`
 pages never read the session. A separate hostname per organisation is possible behind the
 proxy and is only built when a client requires it.
 
+## Shared trust boundaries (TEN-06, BP-4)
+
+One installation serves every organisation in it. The separation between organisations is a
+rule of the application (ADR 0014 scope on every query, per-organisation settings, markers
+tested in the isolation sweeps), not a physical one. Everything below is shared by all
+organisations of one installation. This section names each shared item, what a compromise of it
+gives, what compensates, and what stays open. It is the input for the decision on when an
+organisation needs an installation of its own.
+
+**Decision (BP-4, product owner, 1 November 2026).** For the first government client there is
+**one installation per data controller** (verwerkingsverantwoordelijke). Several organisations
+inside one controller on one installation stay allowed. Organisations of different controllers
+never share an installation. The shared items below are therefore accepted as shared **within one
+controller**, and are not accepted across controllers.
+
+```mermaid
+flowchart TB
+    subgraph install [One installation = one data controller]
+        su([Superuser<br/>scope matches everything])
+        subgraph host [Host: Docker, volume, .env]
+            envkeys[".env / secret files<br/>MANAGEMENT_TOKEN_KEY<br/>SETTINGS_ENCRYPTION_KEY<br/>SESSION_SECRET"]
+            subgraph procs [web and worker]
+                web[web]
+                worker[worker]
+            end
+            db[(One SQLite database<br/>all organisations)]
+        end
+        orgA[Organisation A]
+        orgB[Organisation B]
+    end
+    subgraph cisco [One Cisco tenant]
+        svc[One Webex Service App]
+        wxcc[One WxCC org]
+    end
+    smtp[Platform SMTP from env<br/>fallback for every organisation<br/>without its own SMTP]
+    orgA --> web
+    orgB --> web
+    su --> web
+    web --> db
+    worker --> db
+    envkeys --> web
+    envkeys --> worker
+    worker --> svc --> wxcc
+    worker --> smtp
+```
+
+| Shared item | What it means | Compromise gives | Compensation in place | Open or accepted |
+|---|---|---|---|---|
+| **Superuser** | The platform role. Its scope matches every organisation and group (ADR 0014); it sets platform settings (class C), sees System status, runs updates, switches diagnostic mode and the machine API. Nothing in the matrix limits it per organisation. | Read and change of every organisation's configuration and, through the booking views its permissions allow, of personal data of every organisation. | Entitlements come from the IdP (ADR 0049), there is no local account and no break-glass login; every decision and change is an audit event, shipped after commit to the log platform outside the installation (ADR 0034), so the superuser cannot erase the trail; the role is held by few named people. | Accepted within one controller. Not acceptable across controllers: it is the main reason for BP-4. |
+| **Host administration** (Docker, volume, `.env`) | Whoever can run `docker`, read the data volume or the environment of the containers. | Everything: the database file, the keys in `.env`, the decrypted secrets in process memory, the log lines. Also the host command `python -m app.cli` (closure, `oidc-check`, `purge-overdue`). | Non-root uid, read-only root filesystem, `cap_drop: ALL`, `no-new-privileges`; bootstrap secrets via env or `X_FILE` only, never in the repository; SQLite secure delete and WAL truncation after a purge (WP-A3); signed images, verified at deployment (ADR 0006). The host's access control is the hosting party's (external evidence, WP-C1). | Accepted: host administration is above the application in the trust order. The host team must not be a party of another controller. |
+| **One database** | A single SQLite file in WAL mode holds all organisations. Isolation is `WHERE organisation_id` / `group_id` in the SQL adapter, derived from the permission's `Scope`. | A SQL injection or a missed filter reads across organisations; a stolen file or snapshot holds every organisation's bookings. | The authorisation sweep covers every role against every admin route, own and other group (CI); the concurrent A/B isolation test and the export marker sweep (WP-B1, WP-B2); no raw SQL outside `app/adapters/db/`; PII purged at `slot.end + 24h` and overwritten (WP-A3), so the file holds little personal data at rest. | Accepted within one controller. A database per organisation is not built and not planned. |
+| **One `MANAGEMENT_TOKEN_KEY`** | Management tokens (ADR 0011) are HMAC-SHA256 of a per-booking salt under this one key. | Database plus key is enough to compute the token of any booking of any organisation; the key alone gives nothing. | Key in env only, never in a job payload or log; the salt is per booking and only `sha256(token)` is stored; rotation with a grace period without loss (ADR 0094). | Accepted. Rotation changes the key for all organisations at once. |
+| **One `SETTINGS_ENCRYPTION_KEY`** | Every integration secret (Webex, SMTP and SMS passwords per organisation, log destinations, IdP client secrets) is AES-256-GCM under a key derived from this one value (ADR 0008). | Decrypts the secrets of all organisations in one database copy. | Secrets are write-only in the UI; the key lives outside the database and outside the backup; rotation re-encrypts everything (ADR 0094); the TLS private key is never in the database (ADR 0070). | Accepted. A key per organisation would not help: the process holds the derived key in memory for all organisations. |
+| **One Webex Service App and one WxCC org** | `integration_credentials` is keyed by name, not by organisation (`app/adapters/integrations.py`); video meetings (Webex) and tasks (WxCC) of all organisations go through one app, one token store and one WxCC org in one Cisco tenant. | The Cisco tenant's administrators and the app's tokens can see meetings, tasks and statistics of every organisation. One organisation's misconfiguration (queue, entry point) or quota use affects the others; a Webex or WxCC outage hits all. | Outbound payloads carry only first name, host join URL and routing codes (ADR 0081); webhooks are verified; queue and entry point are mapped per group. | Accepted within one controller that owns the Cisco tenant. **Not acceptable** across controllers: they would share a processor tenant and its administrators. |
+| **SMTP fallback through the environment** | An organisation without its own SMTP settings sends through `SMTP_HOST` of the platform (ADR 0022; `fallback_mail` in `app/adapters/senders.py`). | Mail of those organisations leaves from one sender identity and one mail account; the platform mail provider sees their message content and recipients. SPF, DKIM and DMARC are of the platform domain, so a reputation problem of one organisation affects the others. | The organisation's own SMTP wins when stored; the Channels screen shows the path in use; deliverability check (ADR 0073); no PII in the logs of a send. | Accepted within one controller. For a second controller the fallback must be off (leave `SMTP_HOST` unset) and each organisation brings its own SMTP, or it gets its own installation. |
+| **Process memory, one origin, one log stream** | web and worker hold all organisations in one process; one origin serves all (see *One origin for all organisations*); one log platform receives every organisation's events. | A script injection or memory-sharing bug reaches all organisations. The log platform operator sees all organisations' event metadata (ids, slugs, codes, no PII). | Per-organisation caches keyed by organisation and group; request-scoped context variables; strict CSP; masking processor. Parallel isolation proof: WP-B1. | Accepted within one controller. |
+
+### When an organisation needs its own installation
+
+An organisation needs an installation of its own, not a place in a shared one, when **any** of
+these holds:
+
+1. **A different data controller.** Two controllers never share an installation (BP-4): they
+   would share the superuser, the host administration, the keys, the database and the Cisco
+   tenant, and the controller of the installation would become a processor for the other
+   without an agreement.
+2. **A separate Cisco tenant is required**, for instance because the organisation's WxCC org or
+   Webex organisation is another legal entity, or its Cisco administrators may not see other
+   organisations' tasks and meetings.
+3. **Physical or logical separation is a stated requirement** (contract, accreditation, a
+   classification of the data above what the shared host is approved for, a rule that data lie
+   in a separate database or on a separate volume).
+4. **A different trust domain for the people with full access**: the superuser or host team of
+   the shared installation may not be able to see this organisation's participants, for example
+   because they belong to another employer, ministry or group of companies.
+5. **A different retention or log regime** that the platform settings (class C) cannot meet, for
+   instance a log platform that another controller may not share.
+6. **An availability or change regime of its own**: an update window, a maintenance window or an
+   incident that must not affect the others (updates and maintenance mode are per installation,
+   ADR 0029, ADR 0038).
+
+None of these holds for several organisations of **one** controller, one Cisco tenant and one
+operating team. Those stay on one installation. A new organisation is checked against this list
+before it is created; a "yes" to any point means a new installation, not a new organisation.
+
+An installation of its own costs little by design: the same images, its own `.env` keys,
+database and volume, its own IdP registration and its own Cisco Service App. The configuration
+package (ADR 0089) moves settings between installations.
+
 ## Cross-cutting
 
 | Threat | Mitigation | Test |
