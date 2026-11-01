@@ -34,6 +34,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 
 | Variable | Kind | Default | Note |
 |---|---|---|---|
+| `OIDC_ISSUER` | url | — | Issuer the IdP announces, when it differs from the discovery URL without its suffix. |
 | `PUBLIC_BASE_URL` | url | `http://127.0.0.1:8000` | Base of every link and of the OIDC redirect; https in production. |
 | `WEBHOOK_BASE_URL` | url | — | Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL. |
 | `FORWARDED_ALLOW_IPS` | string | — | Address of the reverse proxy (read by uvicorn). |
@@ -95,6 +96,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `SECURITY_EVENT_WINDOW_MINUTES` | int | `15` | 1–1440 | `settings.platform.manage` | One security event per source and reason per window; repeats are counted (ADR 0034). |
 | `SECURITY_EVENT_MAX_SOURCES` | int | `1000` | 10–100000 | `settings.platform.manage` | Windows (kind of event × caller) a process keeps; beyond that, callers count as many (ADR 0053). |
 | `AUDIT_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of the audit log may hold; more is refused (ADR 0040). |
+| `CONFIGURATION_PACKAGE_MAX_MB` | int | `64` | 1–512 | `settings.platform.manage` | Largest configuration package (MB) the portal and the API accept for import (ADR 0089). |
 | `AUDIT_EXPORT_MAX_DAYS` | int | `366` | 1–3660 | `settings.platform.manage` | Most days one CSV export of the audit log may cover (ADR 0040). |
 | `EMBEDDING_MAX_ORIGINS` | int | `20` | 1–100 | `settings.platform.manage` | Most host websites one organisation may allow for the embedded widget (ADR 0035). |
 | `STORAGE_LOW_FREE_PERCENT` | float | `15.0` | 1–50 | `settings.platform.manage` | Free space below which storage is low (ADR 0040). |

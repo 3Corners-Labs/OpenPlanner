@@ -3179,6 +3179,9 @@ msgstr "Manage API clients"
 msgid "authz.api_scope.availability_read"
 msgstr "Read free times"
 
+msgid "authz.api_scope.configuration_transfer"
+msgstr "Export and import the configuration package (whole installation)"
+
 msgid "admin.nav.api"
 msgstr "API clients"
 
@@ -5749,8 +5752,11 @@ msgstr "Name"
 msgid "admin.staff.roles"
 msgstr "Roles"
 
-msgid "admin.staff.places"
-msgstr "Organisations and groups"
+msgid "admin.staff.organisations"
+msgstr "Organisations"
+
+msgid "admin.staff.groups"
+msgstr "Groups"
 
 msgid "admin.staff.first_seen"
 msgstr "First login"
@@ -8613,3 +8619,72 @@ msgstr "{count} failing"
 
 msgid "admin.settings.logging.open"
 msgstr "Open Log destinations"
+
+msgid "settings.field.configuration_package_max_mb.label"
+msgstr "Largest configuration package (MB)"
+
+msgid "admin.done.package_imported"
+msgstr "The configuration package has been imported: {count} organisation(s). The processes pick up the new settings within ten seconds."
+
+msgid "admin.form.error.configuration_passphrase_short"
+msgstr "The passphrase is too short, or the repetition differs. Use at least 16 characters."
+
+msgid "admin.form.error.configuration_passphrase_wrong"
+msgstr "The passphrase does not fit this package."
+
+msgid "admin.form.error.configuration_package_invalid"
+msgstr "This file is not an OpenPlanner configuration package, or it is damaged."
+
+msgid "admin.form.error.configuration_package_version"
+msgstr "This package was made with another version of OpenPlanner. Export it again from an installation on this version."
+
+msgid "admin.form.error.configuration_package_too_large"
+msgstr "The package is larger than the largest configuration package allowed."
+
+msgid "admin.form.error.configuration_installation_in_use"
+msgstr "This installation is in use: it has bookings, slots or an active closure. A package can only be imported into a new installation."
+
+msgid "admin.settings.package.title"
+msgstr "Configuration package"
+
+msgid "admin.settings.package.intro"
+msgstr "A configuration package holds every setting of this installation: organisations, teams, opening hours, texts, channels, identity providers, API clients and platform settings, with their secrets. Bookings, the audit log and staff stay behind. It sets up a new installation (test or production) in one go."
+
+msgid "admin.settings.package.warning"
+msgstr "With the passphrase the package holds every secret of the platform. Keep the file and the passphrase apart and only as long as you need them. Every export and import is in the audit log."
+
+msgid "admin.settings.package.export.title"
+msgstr "Export"
+
+msgid "admin.settings.package.passphrase_hint"
+msgstr "Choose a passphrase of at least {length} characters. It is stored nowhere: without it the package cannot be imported."
+
+msgid "admin.settings.package.passphrase"
+msgstr "Passphrase"
+
+msgid "admin.settings.package.passphrase_repeat"
+msgstr "Passphrase (repeat)"
+
+msgid "admin.settings.package.export.button"
+msgstr "Download package"
+
+msgid "admin.settings.package.import.title"
+msgstr "Import"
+
+msgid "admin.settings.package.import.intro"
+msgstr "Only into an installation without bookings, slots or an active closure. Every current setting is replaced by the package's; staff and the audit log stay. At most {max_mb} MB; the package must be from this version of OpenPlanner."
+
+msgid "admin.settings.package.import.file"
+msgstr "Package file (.sqlite)"
+
+msgid "admin.settings.package.import.confirm"
+msgstr "I understand that every setting of this installation will be replaced."
+
+msgid "admin.settings.package.import.button"
+msgstr "Import package"
+
+msgid "admin.audit.detail.configuration_export"
+msgstr "Configuration package exported"
+
+msgid "admin.audit.detail.configuration_import"
+msgstr "Configuration package imported"

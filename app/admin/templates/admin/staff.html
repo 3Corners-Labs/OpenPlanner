@@ -38,7 +38,8 @@
     <tr>
       <th scope="col">{{ _("admin.staff.name") }}</th>
       <th scope="col">{{ _("admin.staff.roles") }}</th>
-      <th scope="col">{{ _("admin.staff.places") }}</th>
+      <th scope="col">{{ _("admin.staff.organisations") }}</th>
+      <th scope="col">{{ _("admin.staff.groups") }}</th>
       <th scope="col">{{ _("admin.staff.last_login") }}</th>
       <th scope="col">{{ _("admin.staff.last_seen") }}</th>
       <th scope="col">{{ _("admin.staff.last_logout") }}</th>
@@ -50,7 +51,8 @@
       <th scope="row"><a href="/admin/staff/{{ person.id }}">{{ person.name }}</a>
         {%- if person.dormant %}<br><span class="chip chip--warning">{{ _("admin.staff.dormant") }}</span>{% endif %}</th>
       <td>{{ person.roles | join(", ") if person.roles else _("admin.staff.no_role") }}</td>
-      <td>{% for place in person.places %}{{ place.organisation }}{% if place.groups %}: {{ place.groups | join(", ") }}{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}</td>
+      <td>{% for place in person.places %}{{ place.organisation }}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}</td>
+      <td>{% for place in person.places %}{{ place.groups | join(", ") if place.groups else _("admin.staff.whole_organisation") }}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}</td>
       <td class="nowrap">{{ person.last_login }}</td>
       <td class="nowrap">{{ person.last_seen }}</td>
       <td class="nowrap">{{ person.last_logout }}</td>

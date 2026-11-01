@@ -27,7 +27,18 @@
 }
 
 http://{$TLS_DOMAIN}:8080 {
-	redir https://{host}{uri} 308
+	# Machine clients (bots, Webex Connect, WxCC) send secrets and bodies. A 308 would make
+	# a client that was configured with http:// repeat the POST in clear and succeed without
+	# anyone noticing, so these paths are refused outright, without a Location header (ASVS
+	# V4.1.2). Browser paths keep their redirect. ACME HTTP-01 challenges are answered by
+	# Caddy before this block is reached.
+	@machine path /api/* /webhooks/*
+	handle @machine {
+		respond "HTTPS required" 403
+	}
+	handle {
+		redir https://{host}{uri} 308
+	}
 }
 
 {$TLS_DOMAIN}:8443 {

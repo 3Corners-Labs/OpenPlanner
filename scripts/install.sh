@@ -6,6 +6,7 @@
 #   ./scripts/install.sh --mode production|test|lab [--version X.Y.Z] [--repository owner/name]
 #                        [--non-interactive] [--no-tls | --tls-domain HOST] [--own-certificate]
 #                        [--acme-staging] [--no-updater] [--upgrade-docker] [--no-packages]
+#                        [--configuration FILE --passphrase-file PATH]
 #
 #   0. host packages   Ubuntu/Debian: curl, flock, Compose plugin and cosign at their newest
 #                      version on every run; Docker Engine from Docker's own repository when
@@ -18,6 +19,10 @@
 #                      backup first), then checked; the rest is reported
 #      secrets/        secrets.env: the bootstrap keys, apart from .env (ADR 0042 §9); moved
 #                      there from .env once, generated when missing, never overwritten
+#                      config.env: with --configuration (ADR 0089 point 8) the login of the
+#                      package (OIDC_*), read by a one-off container of the pinned image before
+#                      .env is asked for; so step 4 then runs first, and the login questions
+#                      are left out. Compose reads it before .env, so .env wins.
 #   3. proxy.env       with the HTTPS proxy (production and test by default, a lab with
 #                      --tls-domain; ADR 0064): TLS_DOMAIN and ACME_EMAIL, or with
 #                      --own-certificate the files in certs/; same rules
@@ -26,12 +31,16 @@
 #                      (ADR 0064 step 2: no host builds Caddy); without --version existing
 #                      pins stay
 #   5. start           docker compose --env-file .env.update up -d, wait for health
+#                      with --configuration: then the package is copied into web and imported
+#                      (every organisation, group, channel, provider and integration); a refusal
+#                      (installation in use, another revision) stops the script
 #   6. host updater    /usr/local/sbin, systemd units, /etc/openplanner/updater.env pointing at
 #                      this directory, a drop-in that opens only this directory under /home
 #
 # Running it again is safe: it repairs what is missing and changes nothing that is in order.
 # Non-interactive runs take every answer from environment variables of the same name as the
-# setting (PUBLIC_BASE_URL, TLS_DOMAIN, OIDC_CLIENT_SECRET, ...).
+# setting (PUBLIC_BASE_URL, TLS_DOMAIN, OIDC_CLIENT_SECRET, ...), and the package's two paths
+# from OPENPLANNER_CONFIGURATION and OPENPLANNER_PASSPHRASE_FILE.
 set -Eeuo pipefail
 
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -41,6 +50,10 @@ ENV_FILE=$DIR/.env
 PROXY_ENV=$DIR/proxy.env
 PIN_FILE=$DIR/.env.update
 SECRETS_FILE=$DIR/secrets/secrets.env
+# The login from a configuration package (ADR 0089 point 8); Compose reads it before .env.
+CONFIG_ENV=$DIR/secrets/config.env
+# Where the package is copied for the web container, and its name inside the container.
+PACKAGE_IN_WEB=/srv/data/configuration-package.sqlite
 # The keys `python -m app.cli init` generates (app/adapters/bootstrap.py); a test keeps them equal.
 BOOTSTRAP_KEYS=(SETTINGS_ENCRYPTION_KEY MANAGEMENT_TOKEN_KEY SESSION_SECRET)
 UPDATER_STATE=/var/lib/openplanner-updater
@@ -63,6 +76,9 @@ MODE='' VERSION='' REPOSITORY='' INTERACTIVE=1 ACME_STAGING=0 UPDATER=1 PACKAGES
 # TLS: '' decides by the pin file, then the mode; 1 runs the HTTPS proxy, 0 leaves TLS to your own.
 TLS='' OWN_CERT=0
 CERTS_DIR=$DIR/certs
+# --configuration FILE --passphrase-file PATH (ADR 0089 point 8); PACKAGE_DIR is the readable
+# copy made for the containers, removed on exit.
+CONFIGURATION=${OPENPLANNER_CONFIGURATION:-} PASSPHRASE_FILE=${OPENPLANNER_PASSPHRASE_FILE:-} PACKAGE_DIR=''
 OWN_CERT_FILE=/certs/fullchain.pem OWN_KEY_FILE=/certs/privkey.pem
 
 log() { printf '==> %s\n' "$*"; }
@@ -97,6 +113,8 @@ parse_args() {
       --no-updater) UPDATER=0 ;;
       --no-packages) PACKAGES=0 ;;
       --upgrade-docker) UPGRADE_DOCKER=1 ;;
+      --configuration) CONFIGURATION=${2:?--configuration needs a file} && shift ;;
+      --passphrase-file) PASSPHRASE_FILE=${2:?--passphrase-file needs a path} && shift ;;
       -h | --help) usage && exit 0 ;;
       *) usage >&2 && die "unknown option: $1" ;;
     esac
@@ -123,6 +141,14 @@ parse_args() {
   REPOSITORY=${REPOSITORY:-$(value "$ENV_FILE" UPDATE_REPOSITORY)}
   REPOSITORY=${REPOSITORY:-3Corners-Labs/OpenPlanner}
   [[ $REPOSITORY =~ $REPOSITORY_RE ]] || die "--repository must be owner/name"
+  # ADR 0089 point 8: a package is read with its passphrase, which never travels on a command
+  # line (ps, shell history) or in this script's output; it comes from a file, like the CLI's.
+  [[ -z $CONFIGURATION && -z $PASSPHRASE_FILE || -n $CONFIGURATION && -n $PASSPHRASE_FILE ]] \
+    || die "--configuration and --passphrase-file go together (or OPENPLANNER_CONFIGURATION and OPENPLANNER_PASSPHRASE_FILE)"
+  [[ -z $CONFIGURATION ]] || [[ -f $CONFIGURATION && -r $CONFIGURATION ]] \
+    || die "cannot read the configuration package $CONFIGURATION"
+  [[ -z $PASSPHRASE_FILE ]] || [[ -f $PASSPHRASE_FILE && -r $PASSPHRASE_FILE ]] \
+    || die "cannot read the passphrase file $PASSPHRASE_FILE (its first line is the passphrase)"
 }
 
 # 0. Host packages ------------------------------------------------------------------------------
@@ -312,6 +338,8 @@ new_env() {
       public_address "" "http://127.0.0.1:8000"
       smtp_default=mailpit
       oidc_default=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration
+      # Keycloak announces KC_HOSTNAME, not the keycloak:8080 it is fetched on (ADR 0097).
+      IDP_ISSUER=${IDP_ISSUER:-http://127.0.0.1:8080/realms/openplanner}
       OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-dev-only-openplanner-admin-secret}
       SMTP_PORT=${SMTP_PORT:-1025} SMTP_STARTTLS=${SMTP_STARTTLS:-false}
       ;;
@@ -319,10 +347,16 @@ new_env() {
   # Behind a proxy of your own, rate limits must see the visitor's address (ADR 0030 §6).
   ((TLS)) || [[ $MODE == lab ]] \
     || ask FORWARDED_ALLOW_IPS "Address of your reverse proxy, for X-Forwarded-For (empty: none)" '' optional
-  ask OIDC_DISCOVERY_URL "OIDC discovery URL of the identity provider (empty: no admin portal)" "$oidc_default" optional
-  if [[ -n $OIDC_DISCOVERY_URL ]]; then
-    ask OIDC_CLIENT_ID "OIDC client ID" openplanner-admin
-    ask OIDC_CLIENT_SECRET "OIDC client secret" '' secret
+  # The login: from the package's file when it holds one (ADR 0089 point 8), else asked.
+  if [[ -n $(value "$CONFIG_ENV" OIDC_DISCOVERY_URL) ]]; then
+    log "the login (OIDC_*) comes from the configuration package; not asked"
+    OIDC_DISCOVERY_URL='' OIDC_CLIENT_ID='' OIDC_CLIENT_SECRET=''
+  else
+    ask OIDC_DISCOVERY_URL "OIDC discovery URL of the identity provider (empty: no admin portal)" "$oidc_default" optional
+    if [[ -n $OIDC_DISCOVERY_URL ]]; then
+      ask OIDC_CLIENT_ID "OIDC client ID" openplanner-admin
+      ask OIDC_CLIENT_SECRET "OIDC client secret" '' secret
+    fi
   fi
   ask SMTP_HOST "SMTP server for outgoing mail (empty: organisations set their own in the portal)" "$smtp_default" optional
   if [[ -n $SMTP_HOST ]]; then
@@ -339,7 +373,9 @@ new_env() {
     put ENVIRONMENT "$environment"
     put PUBLIC_BASE_URL "$PUBLIC_BASE_URL"
     put FORWARDED_ALLOW_IPS "${FORWARDED_ALLOW_IPS:-}"
+    [[ -z $OIDC_DISCOVERY_URL ]] && [[ -f $CONFIG_ENV ]] && printf '# The login (OIDC_*): secrets/config.env, from the configuration package; a value here wins.\n'
     put OIDC_DISCOVERY_URL "$OIDC_DISCOVERY_URL"
+    [[ -z ${IDP_ISSUER:-} ]] || put OIDC_ISSUER "$IDP_ISSUER"
     put OIDC_CLIENT_ID "${OIDC_CLIENT_ID:-}"
     put OIDC_CLIENT_SECRET "${OIDC_CLIENT_SECRET:-}"
     put SMTP_HOST "$SMTP_HOST"
@@ -355,6 +391,13 @@ new_env() {
 }
 
 env_keys() { sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$1"; }
+# login_value KEY: as Compose sees it, .env over secrets/config.env (ADR 0089 point 8).
+login_value() {
+  local found
+  found=$(value "$ENV_FILE" "$1")
+  [[ -n $found ]] || found=$(value "$CONFIG_ENV" "$1")
+  printf '%s' "$found"
+}
 
 # Rewrite .env through awk, after a private backup; prints the backup's name.
 rewrite_env() {
@@ -446,10 +489,10 @@ check_env() {
     [[ $(value "$ENV_FILE" SIMULATOR_ENABLED) != true ]] || problems+=("SIMULATOR_ENABLED=true is refused in production")
     [[ $(value "$ENV_FILE" UPDATE_CHANNEL) != rc ]] || problems+=("UPDATE_CHANNEL=rc is refused in production (ADR 0067)")
     [[ $(value "$ENV_FILE" UPDATE_AUTO_APPLY) != true ]] || problems+=("UPDATE_AUTO_APPLY=true is refused in production (ADR 0067)")
-    case $(value "$ENV_FILE" OIDC_DISCOVERY_URL) in
+    case $(login_value OIDC_DISCOVERY_URL) in
       '') ;;
       https://*)
-        [[ -n $(value "$ENV_FILE" OIDC_CLIENT_SECRET) ]] || problems+=("OIDC_CLIENT_SECRET is missing")
+        [[ -n $(login_value OIDC_CLIENT_SECRET) ]] || problems+=("OIDC_CLIENT_SECRET is missing")
         ;;
       *) problems+=("OIDC_DISCOVERY_URL must start with https://") ;;
     esac
@@ -461,6 +504,69 @@ check_env() {
   if ((${#problems[@]})); then
     die "$ENV_FILE needs changes:" "${problems[@]/#/  - }"
   fi
+}
+
+# 2a. The configuration package (ADR 0089 point 8) ----------------------------------------------
+
+# The package is read by the application itself (the pinned image, so step 4 has run). The web
+# container runs as uid 10001 with a read-only filesystem, so it gets a copy it can read in a
+# directory of its own (a package without its passphrase holds no secret in clear text, ADR
+# 0089 point 3) and prints the login to standard output; the passphrase goes in on standard
+# input, never on the command line.
+package_copy() {
+  PACKAGE_DIR=$(mktemp -d "$DIR/.package.XXXXXX")
+  chmod 755 "$PACKAGE_DIR"
+  install -m 644 "$CONFIGURATION" "$PACKAGE_DIR/package.sqlite"
+  trap 'rm -rf "$PACKAGE_DIR"' EXIT
+}
+
+package_env() {
+  local lines line key val
+  log "reading the login from the configuration package $CONFIGURATION"
+  if ! lines=$(compose run --rm --no-deps -T -v "$PACKAGE_DIR:/package:ro" web \
+    python -m app.cli config env /package/package.sqlite --passphrase-file /dev/stdin --out - \
+    <"$PASSPHRASE_FILE"); then
+    die "cannot read the configuration package:" "${lines:-  (no output; see docker compose logs)}"
+  fi
+  # Quoted as .env is (put), so Compose takes the values literally; checked before writing.
+  local content=''
+  while IFS= read -r line; do
+    [[ $line == *=* ]] || continue
+    key=${line%%=*} val=${line#*=}
+    [[ $val != *"'"* ]] || die "the package's $key contains a quote, which .env files cannot hold"
+    content+=$(put "$key" "$val")$'\n'
+  done <<<"$lines"
+  install -d -m 700 "$(dirname "$CONFIG_ENV")"
+  {
+    printf '# Written by scripts/install.sh from a configuration package (ADR 0089). Holds the\n'
+    printf '# login (OIDC_*): mode 600. Compose reads it before .env, so a value in .env wins.\n'
+    printf '%s' "$content"
+  } | write_private "$CONFIG_ENV"
+  if [[ -n $(value "$CONFIG_ENV" OIDC_DISCOVERY_URL) ]]; then
+    log "login written to $CONFIG_ENV"
+  else
+    log "the package holds no login; the identity provider is asked for (or taken from the environment)"
+  fi
+}
+
+# 5a. After health: the package into web, imported, the copy removed whatever the outcome.
+import_package() {
+  local report code=0
+  log "importing the configuration package"
+  compose cp "$PACKAGE_DIR/package.sqlite" "web:$PACKAGE_IN_WEB"
+  report=$(compose exec -T web python -m app.cli config import "$PACKAGE_IN_WEB" \
+    --passphrase-file /dev/stdin <"$PASSPHRASE_FILE") || code=$?
+  compose exec -T web rm -f "$PACKAGE_IN_WEB" || warn "could not remove $PACKAGE_IN_WEB from the web container"
+  if ((code)); then
+    case $report in
+      *configuration_installation_in_use*) die "the configuration package was refused: this installation is in use (bookings, slots or an active closure); a package goes into a new installation only" "  $report" ;;
+      *configuration_package_version*) die "the configuration package was refused: it was exported from another version of OpenPlanner; export it again from an installation on this version" "  $report" ;;
+      *configuration_passphrase_wrong*) die "the configuration package was refused: wrong passphrase" ;;
+      *) die "the configuration package was refused (exit $code)" "${report:+  $report}" ;;
+    esac
+  fi
+  printf '%s\n' "$report" | sed 's/^/    /'
+  log "configuration imported; web and worker reload the settings within ten seconds"
 }
 
 settings() {
@@ -551,6 +657,7 @@ identity_regexp() {
 latest_version() {
   local token tag url="https://api.github.com/repos/$REPOSITORY/releases/latest"
   token=$(value "$ENV_FILE" UPDATE_CHECK_TOKEN)
+  token=${token:-${UPDATE_CHECK_TOKEN:-}} # with a package, step 4 runs before .env exists
   # The token goes in through a file descriptor, never on the command line (visible in ps).
   tag=$(curl -fsS -H "Accept: application/vnd.github+json" -H @<(printf 'Authorization: Bearer %s\n' "$token") \
     "$url" 2>/dev/null \
@@ -704,9 +811,18 @@ main() {
   parse_args "$@"
   ensure_packages
   preflight
-  settings
-  pin_release
+  if [[ -n $CONFIGURATION ]]; then
+    # The package is read by the pinned image, so the release comes first (ADR 0089 point 8).
+    pin_release
+    package_copy
+    package_env
+    settings
+  else
+    settings
+    pin_release
+  fi
   start
+  [[ -z $CONFIGURATION ]] || import_package
   if ((UPDATER)); then
     install_updater
   else

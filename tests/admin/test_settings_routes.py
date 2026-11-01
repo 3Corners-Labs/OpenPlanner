@@ -3,9 +3,10 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import PlatformSettingRow, SettingsVersionRow
+from app.adapters.db.models import AuditEventRow, PlatformSettingRow, SettingsVersionRow
 from app.admin.settings_routes import _FIELD_LABELS
 from app.domain.authorization import Principal
 from app.domain.privacy import PII_FIELDS
@@ -526,3 +527,101 @@ async def test_the_topic_form_sets_a_boolean_and_an_empty_secret_keeps_the_curre
     assert response.headers["location"] == "/admin/settings?done=saved#topic-mail"
     assert app.state.settings.smtp_tls is True
     assert app.state.settings.smtp_password.get_secret_value() == SECRET
+
+
+# ADR 0089: the configuration package block.
+PACKAGE_PASSPHRASE = "a passphrase of sixteen chars"  # noqa: S105 - a test passphrase
+
+
+async def _export(site: Site) -> bytes:
+    response = await site.client.post(
+        "/admin/settings/package/export",
+        data={"passphrase": PACKAGE_PASSPHRASE, "passphrase_repeat": PACKAGE_PASSPHRASE},
+        headers=SAME_ORIGIN,
+    )
+    assert response.status_code == 200, response.text
+    return response.content
+
+
+async def test_the_superuser_exports_a_package_and_imports_it_again(site: Site) -> None:
+    await site.login_as(SUPER)
+    page = (await site.client.get("/admin/settings")).text
+    assert 'id="package-heading"' in page
+
+    package = await _export(site)
+
+    assert package.startswith(b"SQLite format 3\x00")
+    response = await site.client.post(
+        "/admin/settings/package/import",
+        data={"passphrase": PACKAGE_PASSPHRASE, "confirm": "yes"},
+        files={"package": ("config.sqlite", package, "application/vnd.sqlite3")},
+        headers=SAME_ORIGIN,
+    )
+    assert response.status_code == 303, response.text
+    assert (
+        response.headers["location"]
+        == "/admin/settings?done=package_imported&count=2#package-heading"
+    )
+    page = (await site.client.get(response.headers["location"])).text
+    assert "Het configuratiepakket is geïmporteerd: 2 organisatie(s)." in page
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with AsyncSession(app.state.engine) as session:
+        rows = list(await session.scalars(select(AuditEventRow).order_by(AuditEventRow.id)))
+    details = [row.detail for row in rows if row.detail.startswith("configuration.")]
+    assert details == [
+        "configuration.export",
+        "configuration.import,organisations:2,groups:2,identity_providers:0,api_clients:0,"
+        "secrets:0",
+    ]
+    assert all(PACKAGE_PASSPHRASE not in row.detail + row.reason for row in rows)
+
+
+async def test_a_mismatched_or_short_passphrase_refuses_the_export(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    mismatch = await site.client.post(
+        "/admin/settings/package/export",
+        data={"passphrase": PACKAGE_PASSPHRASE, "passphrase_repeat": "something else"},
+        headers=SAME_ORIGIN,
+    )
+    short = await site.client.post(
+        "/admin/settings/package/export",
+        data={"passphrase": "short", "passphrase_repeat": "short"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert mismatch.status_code == 422
+    assert short.status_code == 422
+    assert 'id="error-package"' in short.text
+    assert "minstens 16 tekens" in short.text
+
+
+async def test_an_import_without_the_confirmation_or_with_rubbish_is_refused(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    unconfirmed = await site.client.post(
+        "/admin/settings/package/import",
+        data={"passphrase": PACKAGE_PASSPHRASE},
+        files={
+            "package": ("config.sqlite", b"SQLite format 3\x00rubbish", "application/octet-stream")
+        },
+        headers=SAME_ORIGIN,
+    )
+    rubbish = await site.client.post(
+        "/admin/settings/package/import",
+        data={"passphrase": PACKAGE_PASSPHRASE, "confirm": "yes"},
+        files={"package": ("config.sqlite", b"not a database", "application/octet-stream")},
+        headers=SAME_ORIGIN,
+    )
+
+    assert unconfirmed.status_code == 422
+    assert rubbish.status_code == 422
+    assert "geen configuratiepakket van OpenPlanner" in rubbish.text
+
+
+async def test_the_auditor_sees_no_package_block(site: Site) -> None:
+    await site.login_as(AUDITOR)
+
+    page = (await site.client.get("/admin/settings")).text
+
+    assert 'id="package-heading"' not in page

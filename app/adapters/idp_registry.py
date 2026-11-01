@@ -71,6 +71,7 @@ class OrganisationProviders:
             client_auth=registration.client_auth,
             signing_key=(found.kid, found.private_pem) if found.kid and found.private_pem else None,
             guard=self._guard,
+            expected_issuer=registration.issuer,
         )
         adapter = OidcIdentityProvider(config, self._http)
         self._built[key] = (registration.updated_at, adapter)

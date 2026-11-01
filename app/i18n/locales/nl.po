@@ -3179,6 +3179,9 @@ msgstr "API-koppelingen beheren"
 msgid "authz.api_scope.availability_read"
 msgstr "Vrije tijden lezen"
 
+msgid "authz.api_scope.configuration_transfer"
+msgstr "Configuratiepakket exporteren en importeren (hele installatie)"
+
 msgid "admin.nav.api"
 msgstr "API-koppelingen"
 
@@ -5749,8 +5752,11 @@ msgstr "Naam"
 msgid "admin.staff.roles"
 msgstr "Rollen"
 
-msgid "admin.staff.places"
-msgstr "Organisaties en groepen"
+msgid "admin.staff.organisations"
+msgstr "Organisaties"
+
+msgid "admin.staff.groups"
+msgstr "Groepen"
 
 msgid "admin.staff.first_seen"
 msgstr "Eerste keer ingelogd"
@@ -8625,3 +8631,72 @@ msgstr "{count} mislukt"
 
 msgid "admin.settings.logging.open"
 msgstr "Logbestemmingen openen"
+
+msgid "settings.field.configuration_package_max_mb.label"
+msgstr "Maximale grootte van een configuratiepakket (MB)"
+
+msgid "admin.done.package_imported"
+msgstr "Het configuratiepakket is geïmporteerd: {count} organisatie(s). De processen nemen de nieuwe instellingen binnen tien seconden over."
+
+msgid "admin.form.error.configuration_passphrase_short"
+msgstr "De wachtwoordzin is te kort, of de herhaling verschilt. Gebruik minstens 16 tekens."
+
+msgid "admin.form.error.configuration_passphrase_wrong"
+msgstr "De wachtwoordzin past niet bij dit pakket."
+
+msgid "admin.form.error.configuration_package_invalid"
+msgstr "Dit bestand is geen configuratiepakket van OpenPlanner, of het is beschadigd."
+
+msgid "admin.form.error.configuration_package_version"
+msgstr "Dit pakket is gemaakt met een andere versie van OpenPlanner. Exporteer het opnieuw vanaf een installatie met deze versie."
+
+msgid "admin.form.error.configuration_package_too_large"
+msgstr "Het pakket is groter dan de maximale grootte van een configuratiepakket."
+
+msgid "admin.form.error.configuration_installation_in_use"
+msgstr "Deze installatie is in gebruik: er zijn afspraken, tijdsloten of een actieve sluiting. Een pakket kan alleen in een nieuwe installatie worden geïmporteerd."
+
+msgid "admin.settings.package.title"
+msgstr "Configuratiepakket"
+
+msgid "admin.settings.package.intro"
+msgstr "Een configuratiepakket bevat alle instellingen van deze installatie: organisaties, teams, openingstijden, teksten, kanalen, identity providers, API-clients en platforminstellingen, met hun geheimen. Afspraken, het auditlog en medewerkers gaan niet mee. Zo zet u een nieuwe installatie (test of productie) in één keer op."
+
+msgid "admin.settings.package.warning"
+msgstr "Met de wachtwoordzin bevat het pakket elk geheim van het platform. Bewaar het bestand en de wachtwoordzin gescheiden en alleen zolang u ze nodig heeft. Elke export en import staat in het auditlog."
+
+msgid "admin.settings.package.export.title"
+msgstr "Exporteren"
+
+msgid "admin.settings.package.passphrase_hint"
+msgstr "Kies een wachtwoordzin van minstens {length} tekens. Die wordt nergens bewaard: zonder de wachtwoordzin is het pakket niet te importeren."
+
+msgid "admin.settings.package.passphrase"
+msgstr "Wachtwoordzin"
+
+msgid "admin.settings.package.passphrase_repeat"
+msgstr "Wachtwoordzin (herhaling)"
+
+msgid "admin.settings.package.export.button"
+msgstr "Pakket downloaden"
+
+msgid "admin.settings.package.import.title"
+msgstr "Importeren"
+
+msgid "admin.settings.package.import.intro"
+msgstr "Alleen in een installatie zonder afspraken, tijdsloten of actieve sluiting. Alle huidige configuratie wordt vervangen door die uit het pakket; medewerkers en het auditlog blijven. Maximaal {max_mb} MB; het pakket moet van deze versie van OpenPlanner zijn."
+
+msgid "admin.settings.package.import.file"
+msgstr "Pakketbestand (.sqlite)"
+
+msgid "admin.settings.package.import.confirm"
+msgstr "Ik begrijp dat alle configuratie van deze installatie wordt vervangen."
+
+msgid "admin.settings.package.import.button"
+msgstr "Pakket importeren"
+
+msgid "admin.audit.detail.configuration_export"
+msgstr "Configuratiepakket geëxporteerd"
+
+msgid "admin.audit.detail.configuration_import"
+msgstr "Configuratiepakket geïmporteerd"

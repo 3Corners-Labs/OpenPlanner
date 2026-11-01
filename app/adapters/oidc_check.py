@@ -6,8 +6,12 @@ Only two reads are made (the discovery document and the key set); no login is st
 token is requested. The report names settings and states ``set``/``not set``; it never prints
 a secret or a key.
 
-    GET discovery ─► algorithms, PKCE ─► GET jwks_uri ─► usable asymmetric keys
+    GET discovery ─► issuer as pinned, back-channel https ─► algorithms, PKCE
+                  ─► GET jwks_uri ─► usable asymmetric keys
     local: redirect URL (https in production), client secret set
+
+The issuer is compared exactly with the one the login pins (ADR 0097), so a mismatch shows here
+before anybody's login fails on it.
 """
 
 from dataclasses import dataclass
@@ -18,6 +22,7 @@ import jwt
 
 from app.adapters.diagnostics import CheckResult
 from app.adapters.oidc import ALLOWED_ALGORITHMS
+from app.domain.identity_providers import issuer_of
 
 REQUIRED_METADATA = ("issuer", "authorization_endpoint", "token_endpoint", "jwks_uri")
 
@@ -31,12 +36,20 @@ class OidcTarget:
         redirect_uri: The callback the provider must have registered.
         require_https: Production: the redirect URL must be https and a secret is required.
         client_secret_set: Whether ``OIDC_CLIENT_SECRET`` is set (never its value).
+        expected_issuer: ``OIDC_ISSUER``; ``None`` derives it from the discovery URL, as the
+            login does (ADR 0097).
     """
 
     discovery_url: str
     redirect_uri: str
     require_https: bool
     client_secret_set: bool
+    expected_issuer: str | None = None
+
+    @property
+    def issuer(self) -> str:
+        """Return the issuer the login pins: the configured one, else the discovery URL's."""
+        return self.expected_issuer or issuer_of(self.discovery_url)
 
 
 async def check_oidc(http: httpx.AsyncClient, target: OidcTarget) -> list[CheckResult]:
@@ -51,7 +64,8 @@ async def check_oidc(http: httpx.AsyncClient, target: OidcTarget) -> list[CheckR
         hint = f"no usable discovery document ({', '.join(REQUIRED_METADATA)} required)"
         return [CheckResult("discovery", response.status_code, False, hint), *results]
     return [
-        CheckResult("discovery", response.status_code, True, f"issuer {metadata['issuer']}"),
+        _issuer(response.status_code, str(metadata["issuer"]), target.issuer),
+        _endpoints(metadata, target.require_https),
         _algorithms(metadata),
         _pkce(metadata),
         await _signing_keys(http, str(metadata["jwks_uri"])),
@@ -72,6 +86,31 @@ def _metadata(response: httpx.Response) -> dict[str, Any] | None:
     ):
         return None
     return body
+
+
+def _issuer(status: int, announced: str, pinned: str) -> CheckResult:
+    """Check that the provider announces exactly the issuer the login pins (ADR 0097)."""
+    if announced == pinned:
+        return CheckResult("discovery", status, True, f"issuer {announced}")
+    hint = f"issuer {announced}, but the login pins {pinned}; set OIDC_ISSUER to the announced one"
+    return CheckResult("discovery", status, False, hint)
+
+
+BACK_CHANNEL = ("token_endpoint", "jwks_uri")
+"""Endpoints OpenPlanner calls itself, with the client secret and for the signing keys."""
+
+
+def _endpoints(metadata: dict[str, Any], require_https: bool) -> CheckResult:
+    """Check that the endpoints OpenPlanner calls itself are https in production.
+
+    A provider behind a TLS proxy that does not trust the proxy's ``X-Forwarded-Proto``
+    announces them as ``http://`` (Keycloak: ``KC_PROXY_HEADERS``).
+    """
+    plain = [key for key in BACK_CHANNEL if not str(metadata[key]).startswith("https://")]
+    if not plain:
+        return CheckResult("provider endpoints", None, True, "https")
+    hint = f"{', '.join(plain)} over http; the provider does not trust its proxy's headers"
+    return CheckResult("provider endpoints", None, not require_https, hint)
 
 
 def _algorithms(metadata: dict[str, Any]) -> CheckResult:

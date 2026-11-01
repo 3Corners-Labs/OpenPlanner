@@ -7,7 +7,7 @@ import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote_plus, urlsplit
 
 import httpx
 import jwt
@@ -21,6 +21,7 @@ from app.adapters.oidc import (
     OidcConfig,
     OidcIdentityProvider,
     claim_mapping,
+    client_secret_basic,
     login_claims,
 )
 from app.adapters.signing_keys import EcSigningKeys
@@ -56,6 +57,7 @@ class FakeProvider:
         self.received: dict[str, Any] = {}
         self.jwks_calls = 0
         self.extra_metadata: dict[str, Any] = {}
+        self.metadata_issuer = ISSUER
 
     def jwk(self) -> dict[str, Any]:
         public = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(self.key.public_key()))
@@ -84,7 +86,7 @@ class FakeProvider:
             return httpx.Response(
                 200,
                 json={
-                    "issuer": ISSUER,
+                    "issuer": self.metadata_issuer,
                     "authorization_endpoint": f"{ISSUER}/authorize",
                     "token_endpoint": f"{ISSUER}/token",
                     "jwks_uri": f"{ISSUER}/jwks",
@@ -713,3 +715,87 @@ async def test_a_test_login_without_email_claims_reports_them_absent(
         )
 
     assert (report.email_verified, report.email_domain) == (None, None)
+
+
+# --- the issuer is pinned (ASVS V10.5.3; OIDC Discovery §4.3, Core §3.1.3.7) ------------------
+
+
+async def test_a_discovery_document_with_another_issuer_is_refused(
+    oidc: OidcIdentityProvider, provider: FakeProvider
+) -> None:
+    provider.metadata_issuer = "https://evil.example"
+    with structlog.testing.capture_logs() as events:
+        with pytest.raises(IdentityError, match="discovery_failed"):
+            await oidc.start_login(REDIRECT)
+    assert "oidc.issuer_mismatch" in [e["event"] for e in events]
+    assert "evil.example" not in str(events)
+
+
+async def test_a_trailing_slash_is_another_issuer(
+    oidc: OidcIdentityProvider, provider: FakeProvider
+) -> None:
+    provider.metadata_issuer = f"{ISSUER}/"
+    with pytest.raises(IdentityError, match="discovery_failed"):
+        await oidc.start_login(REDIRECT)
+
+
+async def test_metadata_and_token_agreeing_on_a_forged_issuer_are_refused(
+    oidc: OidcIdentityProvider, provider: FakeProvider
+) -> None:
+    """Metadata and token agree on a forged issuer, and the signature is good: still refused."""
+    provider.metadata_issuer = "https://evil.example"
+    provider.claims = {"iss": "https://evil.example"}
+    with pytest.raises(IdentityError, match="discovery_failed"):
+        await login(oidc, provider)
+
+
+async def test_the_pinned_issuer_decides_not_the_discovery_address(
+    provider: FakeProvider,
+) -> None:
+    """An explicit ``expected_issuer`` (the internal discovery address differs) is what counts."""
+    public = "https://login.example.nl/realms/x"
+    provider.metadata_issuer = public
+    provider.claims = {"iss": public}
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        config = OidcConfig(
+            f"{ISSUER}/.well-known/openid-configuration",
+            CLIENT,
+            "s",
+            "openid",
+            MAPPING,
+            expected_issuer=public,
+        )
+        _, principal = await login(OidcIdentityProvider(config, http), provider)
+    assert principal.groups == {"demo"}
+
+
+async def test_an_organisation_provider_keeps_its_stored_issuer_when_discovery_changes(
+    provider: FakeProvider,
+) -> None:
+    provider.metadata_issuer = "https://elsewhere.example"
+    async with httpx.AsyncClient(transport=httpx.MockTransport(provider.handler)) as http:
+        adapter = OidcIdentityProvider(_organisation_config(expected_issuer=ISSUER), http)
+        with pytest.raises(IdentityError, match="discovery_failed"):
+            await adapter.start_login(REDIRECT)
+
+
+async def test_a_token_with_another_iss_than_the_pinned_one_is_refused(
+    oidc: OidcIdentityProvider, provider: FakeProvider
+) -> None:
+    provider.claims = {"iss": "https://evil.example"}
+    with pytest.raises(IdentityError, match="invalid_token"):
+        await login(oidc, provider)
+
+
+@pytest.mark.parametrize(
+    ("client_id", "secret"),
+    [("client:dept", "s+%"), ("plain", "a b"), ("é", "p:w")],
+)
+def test_client_secret_basic_encodes_each_credential_before_joining(
+    client_id: str, secret: str
+) -> None:
+    scheme, encoded = client_secret_basic(client_id, secret).split(" ")
+
+    raw_id, raw_secret = base64.b64decode(encoded).decode().split(":")
+    assert scheme == "Basic"
+    assert (unquote_plus(raw_id), unquote_plus(raw_secret)) == (client_id, secret)
