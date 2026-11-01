@@ -32,7 +32,7 @@ class EndReason(StrEnum):
     ENDED_BY_SELF = "ended_by_self"
     ENDED_BY_ADMIN = "ended_by_admin"
     RESTORE = "restore"
-    SECRET_ROTATED = "secret_rotated"  # noqa: S105 - a reason name, not a secret
+    SECRET_ROTATED = "secret_rotated"  # noqa: S105  # nosec B105 - a reason name, not a secret
     CLI = "cli"
 
 
