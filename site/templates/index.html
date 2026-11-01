@@ -258,12 +258,13 @@
     </div>
     <div class="video">
       <h3>{{ c.tour.video_title }}</h3>
-      <p>{{ c.tour.video_text }}</p>
-      {%- if tour_video %}
-      <video controls preload="metadata" playsinline poster="{{ base }}static/media/tour.jpg" width="1280" height="720">
+      {%- if tour %}
+      <p>{{ c.tour.video_text.replace("{version}", tour.version).replace("{date}", tour.recorded) }}</p>
+      <video controls preload="none" playsinline poster="{{ base }}static/media/tour.jpg" width="1280" height="720" aria-describedby="tour-video-help">
         <source src="{{ base }}static/media/tour.webm" type="video/webm">
-        <track kind="captions" src="{{ base }}static/media/tour.{{ c.lang }}.vtt" srclang="{{ c.lang }}" label="{{ c.lang | upper }}" default>
+        <track kind="captions" src="{{ base }}static/media/tour.{{ c.lang }}.vtt" srclang="{{ c.lang }}" label="{{ c.tour.video_captions }}" default>
       </video>
+      <p class="small" id="tour-video-help">{{ c.tour.video_help }}</p>
       {%- else %}
       <p class="video__placeholder"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>{{ c.tour.video_soon }}</p>
       {%- endif %}

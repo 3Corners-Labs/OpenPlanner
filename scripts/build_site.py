@@ -84,6 +84,32 @@ def parse_releases(raw: list[dict[str, Any]]) -> Releases:
 
 
 @dataclass(frozen=True)
+class Recording:
+    """The recorded walkthrough on the page (ADR 0087 step 3), from ``static/media/tour.json``."""
+
+    version: str
+    recorded: str
+    seconds: int
+
+
+def recording(media: Path) -> Recording | None:
+    """Return the recording in ``media`` when video, poster, captions and metadata are all there.
+
+    The ``site`` job downloads them from the newest release that carries them (tour.yml); a
+    local build has none, and the page then says the recording is still to come.
+    """
+    needed = ("tour.webm", "tour.jpg", "tour.nl.vtt", "tour.en.vtt", "tour.json")
+    if not all((media / name).is_file() for name in needed):
+        return None
+    meta = json.loads((media / "tour.json").read_text(encoding="utf-8"))
+    return Recording(
+        version=str(meta.get("version", "")),
+        recorded=str(meta.get("recorded", "")),
+        seconds=int(meta.get("seconds", 0)),
+    )
+
+
+@dataclass(frozen=True)
 class RoadmapItem:
     """One decision with open build steps, from the issues labelled ``adr:NNNN`` (ADR 0078)."""
 
@@ -315,7 +341,6 @@ def build(
     out: Path,
     releases: Releases | None,
     commit: str,
-    tour_video: bool,
     base: str = "/",
     roadmap: list[RoadmapItem] | None = None,
 ) -> list[Path]:
@@ -338,6 +363,8 @@ def build(
         shutil.rmtree(out)
     shutil.copytree(SITE / "static", out / "static")
     shutil.copytree(BRAND, out / "static" / "brand")
+    # Files for the web root itself (.htaccess): the host's configuration, not page content.
+    shutil.copytree(SITE / "root", out, dirs_exist_ok=True)
     written: list[Path] = []
     contents = {locale: load_content(locale) for locale in LOCALES}
     for content in contents.values():
@@ -355,7 +382,7 @@ def build(
                 mark=brand_mark(),
                 commit=commit,
                 base=page_base,
-                tour_video=tour_video,
+                tour=recording(SITE / "static" / "media"),
                 structured_data=structured_data(content, releases),
                 built=built.strftime("%Y-%m-%d"),
             ),
@@ -373,7 +400,7 @@ def build(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line: ``--out``, ``--releases`` and ``--issues`` (GitHub JSON), ``--commit``."""
+    """Command line: output folder, GitHub releases and issues JSON, commit and asset root."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=SITE / "dist")
     parser.add_argument(
@@ -386,9 +413,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--base", default="/", help="asset root: '/' on the server, './' for a preview"
     )
-    parser.add_argument(
-        "--tour-video", action="store_true", help="static/media/tour.webm is present"
-    )
     args = parser.parse_args(argv)
     releases = None
     if args.releases:
@@ -398,7 +422,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.issues:
         with args.issues.open(encoding="utf-8") as handle:
             roadmap = parse_roadmap(json.load(handle), ADR_DIR)
-    written = build(args.out, releases, args.commit, args.tour_video, args.base, roadmap)
+    written = build(args.out, releases, args.commit, args.base, roadmap)
     sys.stdout.write(f"built {len(written)} files into {args.out}\n")
     return 0
 

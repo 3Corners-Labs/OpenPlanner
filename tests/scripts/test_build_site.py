@@ -17,6 +17,7 @@ from scripts.build_site import (
     load_content,
     parse_releases,
     parse_roadmap,
+    recording,
 )
 
 RAW_RELEASES = [
@@ -71,7 +72,7 @@ class _Page(HTMLParser):
 @pytest.fixture(scope="module")
 def dist(tmp_path_factory: pytest.TempPathFactory) -> Path:
     out = tmp_path_factory.mktemp("site")
-    build(out, parse_releases(RAW_RELEASES), "0123456789abcdef", tour_video=False)
+    build(out, parse_releases(RAW_RELEASES), "0123456789abcdef")
     return out
 
 
@@ -194,7 +195,7 @@ def test_build_writes_the_files_for_crawlers(dist: Path) -> None:
 
 
 def test_build_without_release_data_links_to_github(tmp_path: Path) -> None:
-    build(tmp_path, None, "", tour_video=False)
+    build(tmp_path, None, "")
     html = (tmp_path / "index.html").read_text(encoding="utf-8")
     assert "github.com/3Corners-Labs/OpenPlanner/releases" in html
     assert "gebouwd uit commit" not in html
@@ -265,7 +266,7 @@ def test_roadmap_is_on_the_page_and_in_llms_txt(tmp_path: Path) -> None:
     (tmp_path / "adr" / "0085-x.md").write_text("# 0085. Log destinations\n")
     roadmap = parse_roadmap([{"labels": [{"name": "adr:0085"}], "state": "open"}], tmp_path / "adr")
     out = tmp_path / "out"
-    build(out, None, "", tour_video=False, roadmap=roadmap)
+    build(out, None, "", roadmap=roadmap)
     assert "Log destinations" in (out / "index.html").read_text(encoding="utf-8")
     assert "ADR 0085 Log destinations: 1 open steps" in (out / "llms.txt").read_text()
 
@@ -291,3 +292,31 @@ def test_the_site_shows_the_applications_own_mark(dist: Path) -> None:
     html = (dist / "index.html").read_text(encoding="utf-8")
     # Header, hero, integration hub and footer: the same drawing as the admin portal.
     assert html.count(slot.group(1)) == 4
+
+
+def test_the_web_root_gets_its_server_configuration(dist: Path) -> None:
+    htaccess = (dist / ".htaccess").read_text()
+    assert "Content-Security-Policy" in htaccess
+    assert "Strict-Transport-Security" not in htaccess, (
+        "HSTS only once HTTPS works (ADR 0087 step 4)"
+    )
+
+
+def test_a_recording_counts_only_when_all_its_files_are_there(tmp_path: Path) -> None:
+    assert recording(tmp_path) is None
+    for name in ("tour.webm", "tour.jpg", "tour.nl.vtt", "tour.en.vtt"):
+        (tmp_path / name).write_text("x")
+    assert recording(tmp_path) is None, "no metadata yet"
+    (tmp_path / "tour.json").write_text(
+        '{"version": "v0.4.0", "recorded": "2026-11-02", "seconds": 47}'
+    )
+    found = recording(tmp_path)
+    assert found is not None
+    assert (found.version, found.recorded, found.seconds) == ("v0.4.0", "2026-11-02", 47)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_without_a_recording_the_page_says_it_is_coming(dist: Path, locale: str) -> None:
+    html, page = _page(dist, locale)
+    assert not page.find("video")
+    assert load_content(locale)["tour"]["video_soon"] in html
