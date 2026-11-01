@@ -181,6 +181,16 @@ def _compose_config() -> dict[str, Any]:
     return config
 
 
+def _service_text(name: str) -> str:
+    """The lines of one service in ``docker-compose.yml`` as written (not resolved)."""
+    text = (REPO / "docker-compose.yml").read_text()
+    start = text.index(f"\n  {name}:\n")
+    end = text.find("\n  ", start + 1)
+    while end != -1 and text[end + 3 : end + 4] in (" ", "#", "\n"):
+        end = text.find("\n  ", end + 1)
+    return text[start : end if end != -1 else len(text)]
+
+
 def test_the_compose_profile_idp_mounts_the_rendered_realm() -> None:
     compose = _compose_config()
     service = compose["services"]["idp"]
@@ -188,13 +198,15 @@ def test_the_compose_profile_idp_mounts_the_rendered_realm() -> None:
     assert service["profiles"] == ["idp"]
     assert service["image"] == "quay.io/keycloak/keycloak:26.8.1"
     assert "keycloak" not in compose["services"], "the dev profile is not active under idp"
-    assert "KC_BOOTSTRAP_ADMIN_PASSWORD" not in service.get("environment", {})
+    assert "KC_BOOTSTRAP_ADMIN_PASSWORD:" not in _service_text("idp"), (
+        "the password comes from the file"
+    )
     assert all(port["host_ip"] == "127.0.0.1" for port in service["ports"])
     mounts = {volume["source"]: volume["target"] for volume in service["volumes"]}
     assert mounts[str(REPO / "secrets/keycloak-realm.json")] == (
         "/opt/keycloak/data/import/openplanner-realm.json"
     )
-    assert mounts["idp-data"] == "/opt/keycloak/data/h2"
+    assert mounts["idp-data"] == "/opt/keycloak/data"
     assert "idp-data" in compose["volumes"]
 
 

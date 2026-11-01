@@ -174,7 +174,7 @@ not personal data; no purge job; kept until changed. The audit event holds count
 ## Admin login and audit (WP7a)
 
 ```
-admin ──browser──> web /admin/login ──redirect──> identity provider (PingFederate; Keycloak in dev)
+admin ──browser──> web /admin/login ──redirect──> identity provider (PingFederate; Keycloak in dev; the bundled Keycloak of a test or lab installation, ADR 0090, on the host's loopback with its accounts in the volume idp-data)
 identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
 web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
 web ──SQL──> audit_events (sub, action, outcome, organisation, group)
