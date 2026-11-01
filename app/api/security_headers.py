@@ -3,7 +3,7 @@
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 SECURITY_HEADERS: dict[bytes, bytes] = {
-    b"content-security-policy": b"default-src 'none'; frame-ancestors 'none'",
+    b"content-security-policy": b"default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
     b"strict-transport-security": b"max-age=63072000; includeSubDomains",
     b"x-content-type-options": b"nosniff",
     b"x-frame-options": b"DENY",
