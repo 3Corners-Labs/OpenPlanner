@@ -51,12 +51,13 @@ installation can be provisioned by a pipeline, not only by a person.
    overrides, reminder rules, texts, form fields, contacts, holiday calendars and their
    assignments, closure scenarios and images, branding, channel settings, platform and
    organisation settings, integration credentials, identity providers and their keys, API
-   clients and their groups, custom roles, the API switch, `settings_version`) and *state*
+   clients and their groups, log destinations (ADR 0085), custom roles, the API switch,
+   `settings_version`) and *state*
    (bookings, slots, jobs, booking events and call status, audit events, staff and their
    memberships and refusals, active closures and their notices, shortfall acceptances, API
    access tokens, webhook events, integration reports, diagnostic modes, maintenance state,
-   update requests, release checks and listing, running versions, certificate checks and the
-   own certificate). The PII fields of CLAUDE.md are all on `bookings`, a state table; the
+   update requests, release checks and listing, running versions, certificate checks, the own
+   certificate and the status counters of the log destinations). The PII fields of CLAUDE.md are all on `bookings`, a state table; the
    configuration tables name staff only as a video host address of a group.
 3. **Secrets travel sealed under a passphrase, never under the installation's key.** The
    four sealed columns (`integration_credentials`, `channel_settings`, `identity_providers`,
@@ -128,7 +129,7 @@ to its record). The classification of tables is code, checked by a test, not a s
 | 0 | ADR proposed | #298 | in PR |
 | 1 | The package: table registry, export and import adapter, `config export\|show\|import\|env` on the host, the setting | #298 | in PR |
 | 2 | The block *Configuration package* on *Advanced settings*: export with a passphrase, import with a passphrase and a confirmation; manual topic | #298 | in PR |
-| 3 | Machine API: scope `configuration:transfer`, `GET`/`PUT /api/agent/v1/configuration`, `docs/agent-api.md` | | planned |
+| 3 | Machine API: scope `configuration:transfer`, `GET`/`PUT /api/agent/v1/configuration`, `docs/agent-api.md` | #301 | in PR |
 | 4 | Installer: `--configuration FILE --passphrase-file PATH`, `secrets/config.env` in `docker-compose.yml`, `docs/install.md` | #302 | in PR |
 | 5 | A package of an older schema revision is migrated forward on import | | planned |
 

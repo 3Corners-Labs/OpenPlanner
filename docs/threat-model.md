@@ -639,10 +639,12 @@ writes a heartbeat row that the group check reads.
 ## Flow: machine API for contact-center bots (ADR 0023)
 
 Machine: `POST /api/agent/v1/oauth/token` (client credentials), `GET /api/agent/v1/me`,
-`/groups`, `/groups/{slug}/availability`, `/openapi.json`, `/docs`. Admin (superuser):
-`/admin/api` and `/admin/api/clients/...`. Inputs from outside: the `Authorization` header
-(Basic or Bearer), the token form, path slugs, query dates and language, the caller's IP
-address; in the admin portal the client form.
+`/groups`, `/groups/{slug}/availability`, `GET` and `PUT /configuration` (ADR 0089 point 7,
+scope `configuration:transfer`; see the flow *configuration package*), `/openapi.json`,
+`/docs`. Admin (superuser): `/admin/api` and `/admin/api/clients/...`. Inputs from outside:
+the `Authorization` header (Basic or Bearer), the token form, path slugs, query dates and
+language, the `X-Passphrase` header and the package body, the caller's IP address; in the
+admin portal the client form.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
@@ -653,6 +655,7 @@ address; in the admin portal the client form.
 | Spoofing | A stolen secret or token used from elsewhere | Optional network allow-list per client, checked at token issue and on every call; tokens live 10 minutes; secrets expire (90–365 days) | `test_a_stolen_token_from_another_network_is_refused_and_audited`, `test_tokens_expire` |
 | Elevation | A revoked or disabled client keeps working | Opaque tokens checked against the database on every call; disabling, rotating or changing the grant revokes tokens in the same transaction; emergency stop | `test_disabling_rotating_and_revoking_end_every_token`, `test_changing_the_grant_revokes_tokens_but_renaming_does_not`, `test_the_emergency_stop_refuses_tokens_and_calls` |
 | Elevation | Scope escalation or another organisation's group | Requested scopes must be granted; `decide_client` checks organisation and the client's groups; every route declares one `RequireScope`; removing a group cannot widen a narrowed client (`RESTRICT`) | `test_scope_escalation_is_refused`, `test_calls_stay_inside_the_grant`, `test_another_organisations_group_is_insufficient_scope`, `test_every_route_declares_one_scope_except_token_and_docs`, `tests/adapters/db/test_api_client_queries.py::test_a_group_with_clients_cannot_be_removed` |
+| Elevation (ADR 0089) | A bot's client, registered for free times, reads or replaces every secret of the platform through the configuration routes; or a global scope is narrowed by mistake to a client's organisation and refused for the wrong reason | `configuration:transfer` is a separate scope at level *global*, granted by the superuser only; `decide_client` decides a global scope on `Target.everything()` without the client's organisation or groups; a token without the scope is `403 insufficient_scope` and audited under the client | `tests/domain/test_authorization.py::test_a_global_scope_acts_on_the_whole_installation`, `tests/domain/test_api_access.py::test_a_global_scope_is_decided_on_the_whole_installation`, `tests/api/test_agent_api.py::test_the_configuration_routes_need_the_transfer_scope` |
 | Information disclosure | Secrets in the database, logs, URLs or caches | Only SHA-256 stored; the secret is shown once in the POST response (`no-store`), never in a URL; every API response `no-store`; no secret or token in logs or audit | `tests/admin/test_api_routes.py::test_register_shows_the_secret_once_and_stores_only_its_hash`, `test_client_credentials_flow_end_to_end` |
 | Information disclosure | Personal data echoed in validation errors | The API's own handler answers `invalid_request` with no input; only parameter names are logged | `test_invalid_input_is_refused_without_echoing_it` |
 | Denial of service | A bot floods the API or piles up tokens | Rate limit per client; at most 5 live tokens per client; range of at most 62 days per availability call | `tests/domain/test_api_access.py::test_tokens_do_not_pile_up`, `test_invalid_input_is_refused_without_echoing_it` |
@@ -771,8 +774,11 @@ setting) and `settings_version`; written by `POST /admin/settings/{key}` and
 
 Admin (superuser, recent login): `POST /admin/settings/package/export` (a passphrase, twice)
 returns a SQLite file; `POST /admin/settings/package/import` (the file, the passphrase, a
-confirmation) replaces every configuration table. Host: `python -m app.cli config
-export|show|import|env --passphrase-file PATH`; a new host: `scripts/install.sh
+confirmation) replaces every configuration table. Machine (ADR 0089 point 7, step 3): `GET`
+and `PUT /api/agent/v1/configuration` with the scope `configuration:transfer`, the passphrase
+in the `X-Passphrase` header, the package as the body; the same
+`ConfigurationPackageService` as the portal, the client id as actor. Host: `python -m app.cli
+config export|show|import|env --passphrase-file PATH`; a new host: `scripts/install.sh
 --configuration FILE --passphrase-file PATH` (ADR 0089 point 8), which writes the login to
 `secrets/config.env` and imports the package once web is healthy. Storage: the configuration tables of
 `app/domain/configuration_package.py`; the package carries `configuration_package` (format,
@@ -792,6 +798,8 @@ vacuumed away.
 | Denial of service | A huge upload fills the disk or memory | The declared body is refused above `CONFIGURATION_PACKAGE_MAX_MB` (class C, 1–512) before it is read; the temporary copy is written with mode 600 next to the database and removed again | `tests/domain/test_configuration_service.py::test_import_refuses_an_empty_or_oversized_package`, `tests/adapters/db/test_configuration_package.py::test_the_transfer_adapter_round_trips` |
 | Tampering (CSRF) | A third-party site triggers an export or import in the superuser's browser | Fetch Metadata check (`SameOrigin`) and a recent login on both routes | `tests/admin/test_authorization_matrix.py` (POST rows) |
 | Repudiation | Who exported or imported what is lost | Both are audited as `settings.platform.manage` with the detail `configuration.export` or `configuration.import,<counts>`; a refusal with its code | `tests/domain/test_configuration_service.py::test_import_is_audited_with_the_counts`, `test_a_refused_export_is_audited_with_its_code` |
+| Elevation / information disclosure (ADR 0089 point 7) | A machine client reads every secret of the platform or replaces its configuration without the right, or the passphrase ends up in a URL, a log or an error | One `RequireScope(configuration:transfer)` on both routes, a global scope the superuser grants on purpose; the passphrase is a header, never a query parameter; a missing header is `invalid_request` without input, a short or wrong one is reported by code; every API response is `no-store`; the audit actor is the client id, the detail the same codes and counts as the portal's | `tests/api/test_agent_api.py::test_the_configuration_routes_need_the_transfer_scope`, `test_the_configuration_package_round_trips_over_the_api`, `test_an_export_without_a_usable_passphrase_is_refused_by_code` |
+| Tampering / denial of service (ADR 0089 point 7) | A pipeline imports a package into a running installation, a package of another revision, rubbish, or a body that fills memory | The service's rules are the portal's: `409 configuration_installation_in_use`, `409 configuration_package_version`, `422 configuration_package_invalid`; the body is refused with `413` from the declared length, or as soon as the read passes `CONFIGURATION_PACKAGE_MAX_MB`, before all of it is held; `PUT` is a write and is refused during maintenance (ADR 0038); after an import every access token is gone (tokens are state), so a client must authenticate again | `tests/api/test_agent_api.py::test_an_import_into_an_installation_in_use_is_a_conflict`, `test_an_import_is_refused_by_code_never_echoing_the_file`, `test_the_configuration_package_round_trips_over_the_api` |
 | Information disclosure | On a new host the installer shows the passphrase in `ps`, the shell history or its output, or leaves the login or the package readable | The installer takes the passphrase from a file and feeds it to the containers on standard input only; the login goes to `secrets/config.env` (mode 600, directory 700) and is never printed; the copy of the package the container reads (mode 644, no secret in clear text without the passphrase) is removed on exit, and the copy inside the web container after the import, whatever the outcome; a wrong passphrase stops the script before `.env` is written | `tests/scripts/test_install.py::test_the_package_answers_the_login_questions_and_is_imported_once_healthy`, `test_a_wrong_passphrase_stops_before_anything_is_written` |
 | Tampering | A rerun of the installer with a package wipes the configuration of an installation in use | The same refusal (`configuration_installation_in_use`) stops the script after the start; the running installation keeps its configuration | `tests/scripts/test_install.py::test_a_refused_import_stops_the_installation_with_a_clear_error` |
 

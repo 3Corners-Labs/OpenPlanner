@@ -3179,6 +3179,9 @@ msgstr "Manage API clients"
 msgid "authz.api_scope.availability_read"
 msgstr "Read free times"
 
+msgid "authz.api_scope.configuration_transfer"
+msgstr "Export and import the configuration package (whole installation)"
+
 msgid "admin.nav.api"
 msgstr "API clients"
 
@@ -6100,6 +6103,21 @@ msgstr "Log level TRACE falls back after at most (hours)"
 msgid "settings.field.sql_slow_ms.label"
 msgstr "Trace a database statement slower than (milliseconds)"
 
+msgid "settings.field.log_ship_batch_size.label"
+msgstr "Lines per delivery to a log destination (at most)"
+
+msgid "settings.field.log_ship_flush_seconds.label"
+msgstr "Seconds a log destination waits to fill a delivery"
+
+msgid "settings.field.log_ship_timeout_seconds.label"
+msgstr "Seconds a delivery to a log destination may take"
+
+msgid "settings.field.log_ship_queue_size.label"
+msgstr "Lines kept per log destination and process"
+
+msgid "settings.field.log_ship_backoff_max_seconds.label"
+msgstr "Longest wait between attempts at a failing log destination (seconds)"
+
 msgid "settings.field.security_event_window_minutes.label"
 msgstr "Security event window (minutes)"
 
@@ -8023,6 +8041,12 @@ msgstr "See the organisation's identity providers"
 msgid "authz.permission.identity_providers_manage"
 msgstr "Register and change identity providers"
 
+msgid "authz.permission.logging_view"
+msgstr "See the log destinations and their status"
+
+msgid "authz.permission.logging_manage"
+msgstr "Create, change, test and delete log destinations"
+
 msgid "settings.field.idp_max_per_organisation.label"
 msgstr "Identity providers per organisation (maximum)"
 
@@ -8052,6 +8076,15 @@ msgstr "Enter a claim name: letters, digits, dot, hyphen or underscore, at most 
 
 msgid "admin.form.error.entitlement_prefix"
 msgstr "Enter a prefix of 2 to 31 lowercase letters, digits or hyphens, starting with a letter."
+
+msgid "admin.form.error.log_destination_invalid"
+msgstr "Check this field: the value is not accepted for this kind of log destination."
+
+msgid "admin.form.error.log_destination_insecure"
+msgstr "This installation runs in production: use https or syslog over TLS."
+
+msgid "admin.form.error.log_destination_name_taken"
+msgstr "Another log destination already has this name."
 
 msgid "admin.form.error.identity_provider_limit"
 msgstr "This organisation has reached its maximum number of identity providers. Remove one first, or raise the maximum under Advanced settings."

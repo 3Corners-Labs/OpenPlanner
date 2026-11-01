@@ -127,6 +127,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042: system status, read-only
         Permission.IDP_MAPPING_VIEW,  # ADR 0049
         Permission.IDENTITY_PROVIDERS_VIEW,  # ADR 0083
+        Permission.LOGGING_VIEW,  # ADR 0085: where the log goes, no credential
     }
 
 
@@ -144,6 +145,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042
         Permission.IDP_MAPPING_VIEW,  # ADR 0049
         Permission.IDENTITY_PROVIDERS_VIEW,  # ADR 0083
+        Permission.LOGGING_VIEW,  # ADR 0085: where the log goes, no credential
     }
 
     assert not MATRIX[Role.AUDITOR] & PII_PERMISSIONS
@@ -164,6 +166,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.SETTINGS_PLATFORM_MANAGE,  # ADR 0042 §5
         Permission.SETTINGS_LOGIN_MANAGE,  # ADR 0042 §5: never grantable to another role
         Permission.IDENTITY_PROVIDERS_MANAGE,  # ADR 0083 point 4
+        Permission.LOGGING_MANAGE,  # ADR 0085: credentials of a log platform
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
@@ -464,6 +467,23 @@ def test_decide_client(grant: ClientGrant, target: Target, expected: Decision) -
 def test_decide_client_refuses_a_target_of_the_wrong_level() -> None:
     with pytest.raises(ValueError, match="group level target"):
         decide_client(WHOLE_ORG, READ, OWN_ORG)
+
+
+TRANSFER = ApiScope.CONFIGURATION_TRANSFER
+TRANSFER_CLIENT = ClientGrant("opc_d", "andere", frozenset({"andere-team"}), frozenset({TRANSFER}))
+
+
+def test_a_global_scope_acts_on_the_whole_installation() -> None:
+    # ADR 0089 point 7: the organisation that registered the client and its groups play no part.
+    assert API_SCOPES[TRANSFER] is Level.GLOBAL
+    assert decide_client(TRANSFER_CLIENT, TRANSFER, Target.everything()) == Decision(
+        True, Reason.ROLE
+    )
+    assert decide_client(WHOLE_ORG, TRANSFER, Target.everything()) == Decision(
+        False, Reason.NOT_PERMITTED
+    )
+    with pytest.raises(ValueError, match="global level target"):
+        decide_client(TRANSFER_CLIENT, TRANSFER, OWN_GROUP)
 
 
 def test_maintenance_writable_is_the_adr_list() -> None:

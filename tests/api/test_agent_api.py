@@ -8,8 +8,11 @@ from urllib.parse import quote
 import httpx
 import pytest
 from fastapi import FastAPI
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.engine import create_engine
+from app.adapters.db.models import AuditEventRow, GroupRow, SlotRow
 from app.adapters.db.seed import seed_demo
 from app.api.agent.auth import RequireScope
 from app.config import Settings
@@ -305,7 +308,13 @@ async def test_docs_exist_only_while_published(agent: Agent) -> None:
     page = await agent.client.get(f"{BASE}/docs", params={"lang": "nl"})
     assert spec.status_code == 200
     paths = set(spec.json()["paths"])
-    assert paths == {"/oauth/token", "/me", "/groups", "/groups/{slug}/availability"}
+    assert paths == {
+        "/oauth/token",
+        "/me",
+        "/groups",
+        "/groups/{slug}/availability",
+        "/configuration",
+    }
     assert spec.json()["servers"] == [{"url": BASE}]
     schemes = spec.json()["components"]["securitySchemes"]
     assert "clientCredentials" in schemes["clientCredentials"]["flows"]
@@ -351,3 +360,159 @@ async def test_booking_service_is_shared(agent: Agent) -> None:
     mounted = next(r for r in agent.app.routes if getattr(r, "path", None) == BASE)
     assert isinstance(mounted.app.state.booking_service, BookingService)  # type: ignore[attr-defined]
     assert mounted.app.state.booking_service is agent.app.state.booking_service  # type: ignore[attr-defined]
+
+
+# --- configuration package (ADR 0089 point 7) ---------------------------------------------
+
+PASSPHRASE = "correct horse battery staple"  # noqa: S105 - a test passphrase
+TRANSFER = {"scopes": ["configuration:transfer"]}
+
+
+async def _audit(agent: Agent) -> list[AuditEventRow]:
+    async with AsyncSession(agent.app.state.engine) as session:
+        return list(await session.scalars(select(AuditEventRow).order_by(AuditEventRow.id)))
+
+
+async def test_the_configuration_routes_need_the_transfer_scope(agent: Agent) -> None:
+    reader = await agent.bearer(await agent.register())
+
+    exported = await agent.client.get(
+        f"{BASE}/configuration", headers={**reader, "x-passphrase": PASSPHRASE}
+    )
+    imported = await agent.client.put(
+        f"{BASE}/configuration", headers={**reader, "x-passphrase": PASSPHRASE}, content=b"x"
+    )
+
+    for response in (exported, imported):
+        assert (response.status_code, response.json()) == (403, {"error": "insufficient_scope"})
+        assert 'error="insufficient_scope"' in response.headers["www-authenticate"]
+    events = [e for e in await _audit(agent) if e.action == "configuration:transfer"]
+    assert [(e.outcome, e.reason) for e in events] == [(Outcome.DENIED, "not_permitted")] * 2
+
+
+async def test_the_configuration_package_round_trips_over_the_api(agent: Agent) -> None:
+    # A client of another organisation, narrowed to one of its groups, still acts on the
+    # whole installation: the scope is global (ADR 0089 point 7).
+    issued = await agent.register(organisation="andere", groups=["andere-team"], **TRANSFER)
+    headers = {**await agent.bearer(issued), "x-passphrase": PASSPHRASE}
+
+    exported = await agent.client.get(f"{BASE}/configuration", headers=headers)
+
+    assert exported.status_code == 200, exported.text
+    assert exported.headers["content-type"] == "application/vnd.sqlite3"
+    assert exported.headers["content-disposition"].startswith(
+        'attachment; filename="openplanner-configuration-'
+    )
+    assert exported.headers["cache-control"] == "no-store"
+    assert exported.content.startswith(b"SQLite format 3\x00")
+
+    imported = await agent.client.put(
+        f"{BASE}/configuration", headers=headers, content=exported.content
+    )
+
+    assert imported.status_code == 200, imported.text
+    body = imported.json()
+    assert body["counts"] == {
+        "organisations": 2,
+        "groups": 2,
+        "identity_providers": 0,
+        "api_clients": 1,
+    }
+    assert set(body) == {
+        "installation",
+        "app_version",
+        "created_at",
+        "revision",
+        "counts",
+        "secrets",
+    }
+    rows = await _audit(agent)
+    events = [e for e in rows if e.detail.startswith("configuration.")]
+    assert [(e.actor, e.action, e.outcome) for e in events] == [
+        (issued.client.client_id, "settings.platform.manage", Outcome.SUCCESS)
+    ] * 2
+    assert events[1].detail.startswith("configuration.import,organisations:2,")
+    assert all(PASSPHRASE not in e.detail + e.reason for e in rows)
+    # Tokens are state and go with the import; the client itself travels in the package, so
+    # the same secret gets a new token.
+    assert (await agent.client.get(f"{BASE}/me", headers=headers)).status_code == 401
+    renewed = await agent.bearer(issued)
+    assert (await agent.client.get(f"{BASE}/me", headers=renewed)).status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("headers", "body", "expected"),
+    [
+        ({}, b"", (422, "invalid_request")),  # no passphrase header
+        ({"x-passphrase": "tooshort9"}, b"", (422, "configuration_passphrase_short")),
+    ],
+)
+async def test_an_export_without_a_usable_passphrase_is_refused_by_code(
+    agent: Agent, headers: dict[str, str], body: bytes, expected: tuple[int, str]
+) -> None:
+    token = await agent.bearer(await agent.register(**TRANSFER))
+
+    response = await agent.client.get(f"{BASE}/configuration", headers={**token, **headers})
+
+    assert (response.status_code, response.json()["error"]) == expected
+    assert "tooshort9" not in response.text
+
+
+async def test_an_import_is_refused_by_code_never_echoing_the_file(agent: Agent) -> None:
+    token = await agent.bearer(await agent.register(**TRANSFER))
+    headers = {**token, "x-passphrase": PASSPHRASE}
+    package = (await agent.client.get(f"{BASE}/configuration", headers=headers)).content
+    limit = agent.app.state.settings.configuration_package_max_mb * 1024 * 1024
+
+    rubbish = await agent.client.put(f"{BASE}/configuration", headers=headers, content=b"nope")
+    wrong = await agent.client.put(
+        f"{BASE}/configuration",
+        headers={**token, "x-passphrase": "not the passphrase"},
+        content=package,
+    )
+    empty = await agent.client.put(f"{BASE}/configuration", headers=headers, content=b"")
+    huge = await agent.client.put(
+        f"{BASE}/configuration", headers=headers, content=b"\0" * (limit + 1)
+    )
+    declared = await agent.client.put(
+        f"{BASE}/configuration",
+        headers={**headers, "content-length": str(limit + 1)},
+        content=b"",
+    )
+
+    assert (rubbish.status_code, rubbish.json()) == (
+        422,
+        {"error": "configuration_package_invalid"},
+    )
+    assert (wrong.status_code, wrong.json()) == (422, {"error": "configuration_passphrase_wrong"})
+    assert (empty.status_code, empty.json()) == (422, {"error": "configuration_package_invalid"})
+    assert (huge.status_code, huge.json()) == (413, {"error": "configuration_package_too_large"})
+    assert (declared.status_code, declared.json()) == (
+        413,
+        {"error": "configuration_package_too_large"},
+    )
+    assert "nope" not in rubbish.text
+
+
+async def test_an_import_into_an_installation_in_use_is_a_conflict(agent: Agent) -> None:
+    token = await agent.bearer(await agent.register(**TRANSFER))
+    headers = {**token, "x-passphrase": PASSPHRASE}
+    package = (await agent.client.get(f"{BASE}/configuration", headers=headers)).content
+    async with AsyncSession(agent.app.state.engine) as session, session.begin():
+        group = await session.scalar(select(GroupRow.id).where(GroupRow.slug == "demo"))
+        session.add(
+            SlotRow(group_id=group, start=NOW, end=NOW, capacity_snapshot=1, kind="scheduled")
+        )
+
+    response = await agent.client.put(f"{BASE}/configuration", headers=headers, content=package)
+
+    assert (response.status_code, response.json()) == (
+        409,
+        {"error": "configuration_installation_in_use"},
+    )
+    event = (await _audit(agent))[-1]
+    assert (event.outcome, event.reason, event.detail) == (
+        Outcome.DENIED,
+        "configuration_installation_in_use",
+        "configuration.import",
+    )
