@@ -59,7 +59,7 @@ portal and, where it is OpenPlanner's own, integrated.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | | planned |
+| 0 | ADR proposed | #310 | in PR |
 | 1 | `StaffDirectory` port, fake, Keycloak adapter, service account in the realm template | | planned |
 | 2 | Permissions `staff.manage`, `staff.reset_password`; matrix, `docs/authorization.md` | | planned |
 | 3 | Staff screen actions, manual topic nl/en, audit events | | planned |

@@ -42,8 +42,8 @@ permission.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | | planned |
-| 1 | Remove *New group* from the overview | | planned |
+| 0 | ADR proposed | #310 | in PR |
+| 1 | Remove *New group* from the overview | #310 | in PR |
 | 2 | Layout storage (migration, reversible), service in `app/domain/`, tests | | planned |
 | 3 | *Add widget* / *Edit overview* screens, manual topic nl/en, e2e | | planned |
 
