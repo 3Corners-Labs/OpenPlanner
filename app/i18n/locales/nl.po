@@ -6401,8 +6401,17 @@ msgstr "Extra vragen die inwoners beantwoorden als ze een afspraak maken. Vraag 
 msgid "admin.form_fields.settings_lead"
 msgstr "Extra vragen op het formulier, met controles en een markering voor persoonsgegevens."
 
+msgid "admin.form_fields.summary"
+msgstr "Eigen vragen op het formulier ({count} van maximaal {limit}):"
+
+msgid "admin.form_fields.summary_more"
+msgstr "en {count} meer"
+
+msgid "admin.form_fields.summary_none"
+msgstr "Nog geen eigen vragen (maximaal {limit}). U kunt bijvoorbeeld een klantnummer of het onderwerp van de afspraak vragen."
+
 msgid "admin.form_fields.open"
-msgstr "Boekingsformulier beheren"
+msgstr "Vragen beheren"
 
 msgid "admin.form_fields.back"
 msgstr "Terug naar de instellingen"
