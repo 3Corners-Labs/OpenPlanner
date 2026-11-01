@@ -19,6 +19,7 @@ keeps it in step with the registry.
 import logging
 import sys
 from collections.abc import Callable, Mapping, MutableMapping
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any, TextIO
 
@@ -187,10 +188,9 @@ def set_line_tap(tap: LineTap | None) -> None:
 def tap_line(line: str) -> None:
     """Offer one finished line to the tap; a failing tap is ignored, never raised."""
     for tap in _TAPS:
-        try:
+        # Logging about a failing tap would recurse into the tap.
+        with suppress(Exception):
             tap(line)
-        except Exception:  # noqa: S110 - logging about a failing log tap would recurse
-            pass
 
 
 class _TapStream:

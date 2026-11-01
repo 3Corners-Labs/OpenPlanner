@@ -19,6 +19,7 @@ import asyncio
 import json
 import ssl
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
@@ -329,28 +330,26 @@ class SyslogSender:
 
     async def _send_udp(self, messages: Sequence[bytes]) -> None:
         """Send one datagram per message; UDP says nothing about delivery."""
-        if self._datagrams is None:
+        datagrams = self._datagrams
+        if datagrams is None:
             loop = asyncio.get_running_loop()
-            transport, _ = await asyncio.wait_for(
+            opened, _ = await asyncio.wait_for(
                 loop.create_datagram_endpoint(
                     asyncio.DatagramProtocol,
                     remote_addr=(self._address.host, self._address.port or 514),
                 ),
                 self._timeout(),
             )
-            self._datagrams = transport
-        assert self._datagrams is not None  # noqa: S101 - narrowed above
+            datagrams = self._datagrams = opened
         for message in messages:
-            self._datagrams.sendto(message)
+            datagrams.sendto(message)
 
     async def aclose(self) -> None:
         """Close the connection."""
         if self._writer is not None:
             self._writer.close()
-            try:
+            with suppress(OSError, ssl.SSLError):  # closing a connection that is already gone
                 await self._writer.wait_closed()
-            except (OSError, ssl.SSLError):
-                pass
             self._writer = None
         if self._datagrams is not None:
             self._datagrams.close()
