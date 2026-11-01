@@ -131,6 +131,65 @@ async def test_an_http_redirect_fails_in_production_but_not_in_development() -> 
     assert passed(await _check(_transport([]), dev))
 
 
+@pytest.mark.parametrize(
+    ("expected", "ok"),
+    [
+        (None, True),
+        ("https://idp.example.nl", True),
+        ("https://idp.example.nl/", False),
+        ("https://other.example.nl", False),
+    ],
+)
+async def test_the_issuer_is_compared_exactly_with_the_one_the_login_pins(
+    expected: str | None, ok: bool
+) -> None:
+    target = OidcTarget(
+        DISCOVERY,
+        TARGET.redirect_uri,
+        require_https=True,
+        client_secret_set=True,
+        expected_issuer=expected,
+    )
+
+    results = await _check(_transport([]), target)
+
+    (discovery,) = [r for r in results if r.name == "discovery"]
+    assert discovery.ok is ok
+    assert passed(results) is ok
+    if not ok:
+        assert "OIDC_ISSUER" in discovery.hint
+
+
+async def test_an_issuer_announced_elsewhere_than_the_discovery_url_names_fails_without_pin() -> (
+    None
+):
+    metadata = _metadata(issuer="https://login.example.nl/realms/openplanner")
+
+    results = await _check(_transport([], metadata))
+
+    (discovery,) = [r for r in results if r.name == "discovery"]
+    assert not discovery.ok
+    assert "https://login.example.nl/realms/openplanner" in discovery.hint
+
+
+async def test_plain_http_back_channel_endpoints_fail_in_production_only() -> None:
+    metadata = _metadata(
+        token_endpoint="http://idp.example.nl/token", jwks_uri="http://idp.example.nl/jwks"
+    )
+
+    results = await _check(_transport([], metadata))
+
+    (endpoints,) = [r for r in results if r.name == "provider endpoints"]
+    assert not endpoints.ok
+    assert "token_endpoint" in endpoints.hint
+    assert "jwks_uri" in endpoints.hint
+    dev = OidcTarget(DISCOVERY, TARGET.redirect_uri, require_https=False, client_secret_set=True)
+    (dev_endpoints,) = [
+        r for r in await _check(_transport([], metadata), dev) if r.name == "provider endpoints"
+    ]
+    assert dev_endpoints.ok
+
+
 async def test_a_missing_client_secret_fails_in_production() -> None:
     target = OidcTarget(DISCOVERY, TARGET.redirect_uri, require_https=True, client_secret_set=False)
 

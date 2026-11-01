@@ -112,7 +112,14 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
 
 - `FORWARDED_ALLOW_IPS=<proxy address>` (read by uvicorn), so rate limits see the visitor's IP
   instead of one shared proxy address. Without it, a single bot can exhaust the booking limit
-  for everyone.
+  for everyone. It is also what makes the app trust the proxy's `X-Forwarded-Proto`: without
+  it the app thinks it is reached over `http` and its own redirects (for example `/admin` to
+  `/admin/`) send the browser to `http://`. Use the address the `web` container sees the proxy
+  connect from, not the proxy's own: a proxy on the same host that connects to the published
+  port arrives from the gateway of the compose network
+  (`docker network inspect openplanner_default --format '{{(index .IPAM.Config 0).Gateway}}'`).
+  Check it from outside: `curl -sI https://<host name>/admin` must answer with a
+  `Location: https://…`.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 - No access log on the proxy: paths carry management tokens.
 - Answer plain `http://` requests for `/api/*` and `/webhooks/*` with `403` and no `Location`
@@ -501,7 +508,11 @@ portal's address from `PUBLIC_BASE_URL` in `.env` (the redirect URIs), and print
 `OIDC_DISCOVERY_URL` points at `http://idp:8080/realms/openplanner/.well-known/openid-configuration`;
 the installer does both in step 2 of ADR 0090 (until then, by hand). Also set
 `OIDC_ISSUER` to `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public address, not
-the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097). Keycloak's own address
+the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097).
+`python -m app.cli oidc-check` compares the two and names the issuer to set when they differ.
+When Keycloak itself sits behind a TLS proxy, set `KC_PROXY_HEADERS=xforwarded` (and let the
+proxy send `X-Forwarded-Proto`): otherwise Keycloak announces its token endpoint and key set as
+`http://`, and `oidc-check` fails on *provider endpoints* in production. Keycloak's own address
 for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`): a lab on the
 host itself needs nothing more; reaching the login from another machine goes through the proxy
 and is step 2. The admin console is bound to the host's loopback and is never published.
