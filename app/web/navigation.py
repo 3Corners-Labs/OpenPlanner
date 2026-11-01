@@ -65,8 +65,11 @@ class Screen:
             that is read or filled in, so it keeps the standard width unless it is listed in
             ``wide_subpages``.
         wide_subpages: The sub-pages that are data views too (for example the week agenda).
-        subtabs: For a tab: related screens shown as a second row under it (ADR 0047 §3).
-            The tab's own page is the first item of that row.
+        subtabs: For a tab or a side-navigation entry: related screens shown as a second
+            row under it (ADR 0047 §3, ADR 0101). The screen's own page is the first item of
+            that row.
+        own_label_key: For a screen with sub-tabs: the label of its own page in that row,
+            when it differs from the screen's label (an entry's name is not its first part).
     """
 
     key: str
@@ -80,6 +83,7 @@ class Screen:
     width: Width = Width.STANDARD
     wide_subpages: tuple[str, ...] = ()
     subtabs: tuple["Screen", ...] = ()
+    own_label_key: str = ""
 
     @property
     def routes(self) -> tuple[str, ...]:
@@ -275,12 +279,30 @@ SECTIONS = (
                 "lock",
             ),
             # ADR 0042 §11: System status and Advanced settings; the auditor reads them too.
+            # ADR 0101: one sub-tab per task, System status being the entry's own page.
             Screen(
                 "platform.settings",
                 "admin.nav.settings",
                 "/admin/settings",
                 Permission.SETTINGS_PLATFORM_VIEW,
                 "sliders",
+                own_label_key="admin.settings.tab.status",
+                subtabs=(
+                    Screen(
+                        "platform.settings.values",
+                        "admin.settings.tab.values",
+                        "/admin/settings/values",
+                        Permission.SETTINGS_PLATFORM_VIEW,
+                        "sliders",
+                    ),
+                    Screen(
+                        "platform.package",
+                        "admin.settings.tab.package",
+                        "/admin/settings/package",
+                        Permission.SETTINGS_PLATFORM_MANAGE,
+                        "export",
+                    ),
+                ),
             ),
         ),
     ),
@@ -551,6 +573,8 @@ def screens() -> Iterator[tuple[str, Screen]]:
     for section in SECTIONS:
         for entry in section.entries:
             yield entry.key, entry
+            for subtab in entry.subtabs:
+                yield entry.key, subtab
     for link in TOP_BAR:
         yield link.key, link
     for obj in OBJECTS:
@@ -572,6 +596,10 @@ def _homes() -> dict[str, Home]:
     for section in SECTIONS:
         for entry in section.entries:
             homes.update({path: _home(entry.key, None, None, entry, path) for path in entry.routes})
+            for sub in entry.subtabs:
+                homes.update(
+                    {path: _home(entry.key, None, sub.key, sub, path) for path in sub.routes}
+                )
     for link in TOP_BAR:
         homes.update({path: _home(link.key, None, None, link, path) for path in link.routes})
     for obj in OBJECTS:
@@ -590,6 +618,11 @@ _HOMES = _homes()
 def home_of(route_path: str) -> Home | None:
     """Return where the route template ``route_path`` lives, or ``None`` if it has no home."""
     return _HOMES.get(route_path)
+
+
+def entry(key: str) -> Screen | None:
+    """Return the side-navigation entry called ``key``, if any."""
+    return next((e for section in SECTIONS for e in section.entries if e.key == key), None)
 
 
 def object_page(key: str) -> ObjectPage:

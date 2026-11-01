@@ -5896,6 +5896,21 @@ msgstr "Advanced settings"
 msgid "admin.settings.title"
 msgstr "Advanced settings"
 
+msgid "admin.settings.tab.status"
+msgstr "System status"
+
+msgid "admin.settings.tab.values"
+msgstr "Settings"
+
+msgid "admin.settings.tab.package"
+msgstr "Configuration package"
+
+msgid "admin.settings.sections"
+msgstr "Parts of Advanced settings"
+
+msgid "admin.page_toc"
+msgstr "On this page"
+
 msgid "admin.settings.intro"
 msgstr "How this installation is configured and where each value comes from. Secret values are never shown. The superuser changes operations, retention, storage, rate limits and sessions here; a change applies within ten seconds."
 
