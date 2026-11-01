@@ -51,6 +51,13 @@
     <button type="submit" class="button">{{ _("admin.holidays.national_button", year=year) }}</button>
   </div>
 </form>
+<form class="card" method="post" action="/admin/holidays/{{ calendar.slug }}" novalidate aria-labelledby="rename-heading">
+  <div class="card__header">
+    <h2 id="rename-heading">{{ _("admin.holidays.rename") }}</h2>
+    <p class="card__lead">{{ _("admin.holidays.rename_lead") }}</p>
+  </div>
+  {{ form_body([rename], _("admin.save")) }}
+</form>
 <form class="card" method="post" action="/admin/holidays/{{ calendar.slug }}/days" novalidate aria-labelledby="add-heading">
   <div class="card__header">
     <h2 id="add-heading">{{ _("admin.holidays.add") }}</h2>

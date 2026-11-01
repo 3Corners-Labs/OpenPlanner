@@ -188,6 +188,7 @@ DETAIL_LABELS: dict[str, str] = {
     "rule.split": "admin.audit.detail.rule_split",
     "override.add": "admin.audit.detail.override_add",
     "override.remove": "admin.audit.detail.override_remove",
+    "override.edit": "admin.audit.detail.override_edit",
     "name": "admin.field.name",
     "timezone": "admin.field.timezone",
     "slot_minutes": "admin.field.slot_minutes",

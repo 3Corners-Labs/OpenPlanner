@@ -388,6 +388,44 @@ class PlanningService:
             await self._schedule_audit(tx, principal, authorization, slug, "override.add")
         return override_id
 
+    async def override(self, principal: Principal, slug: str, override_id: int) -> ScheduleOverride:
+        """Return the group's exception ``override_id``, to change it (ADR 0084 step 5).
+
+        Raises:
+            DomainError: ``not_permitted`` or ``schedule_item_not_found``.
+        """
+        await self._manage(principal, slug)
+        async with self._uow.read() as tx:
+            group = await group_by_slug(tx, slug)
+            _, overrides = await tx.get_schedule_items(group.id)
+        return _override_by_id(overrides, override_id)
+
+    async def update_override(
+        self, principal: Principal, slug: str, override_id: int, override: ScheduleOverride
+    ) -> bool:
+        """Replace exception ``override_id``; ``False`` if nothing changed (ADR 0084 step 5).
+
+        The new exception is validated against the other exceptions and the weekly blocks, and
+        its date may not lie in the past, like a new one.
+
+        Raises:
+            DomainError: ``not_permitted``, ``schedule_item_not_found`` or
+                ``invalid_configuration`` (``day`` or ``schedule_overrides``).
+        """
+        authorization = await self._manage(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            if override.day < group.today(self._clock.now()):
+                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "day")
+            rules, overrides = await tx.get_schedule_items(group.id)
+            if _override_by_id(overrides, override_id) == override:
+                return False
+            others = [o for o in overrides if o.id != override_id]
+            validate_schedule(rules, [*others, override])
+            await tx.update_schedule_override(group.id, override_id, override)
+            await self._schedule_audit(tx, principal, authorization, slug, "override.edit")
+        return True
+
     async def remove_override(self, principal: Principal, slug: str, override_id: int) -> None:
         """Remove an exception of the group.
 
@@ -446,6 +484,18 @@ def _rule_by_id(rules: list[ScheduleRule], rule_id: int) -> ScheduleRule:
     for rule in rules:
         if rule.id == rule_id:
             return rule
+    raise DomainError(ErrorCode.SCHEDULE_ITEM_NOT_FOUND)
+
+
+def _override_by_id(overrides: list[ScheduleOverride], override_id: int) -> ScheduleOverride:
+    """Return the exception with ``override_id`` from the group's own exceptions.
+
+    Raises:
+        DomainError: ``schedule_item_not_found`` (also for another group's exception).
+    """
+    for override in overrides:
+        if override.id == override_id:
+            return override
     raise DomainError(ErrorCode.SCHEDULE_ITEM_NOT_FOUND)
 
 

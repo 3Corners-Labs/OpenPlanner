@@ -90,3 +90,48 @@ async def test_an_unknown_placeholder_is_refused_and_kept_in_the_form(site: Site
     assert 'href="#message.reminder.sms"' in response.text
     assert "{manage_url}" in response.text  # the allowed placeholders are listed
     assert "uw BSN is {bsn}" in response.text
+
+
+async def test_a_reminder_is_changed_from_its_own_page(site: Site) -> None:
+    """ADR 0084 step 5: the channel and the offset change in place; a clash is refused."""
+    await site.login_as(ORG_ADMIN)
+    await site.client.post(
+        REMINDERS, data={"channel": "sms", "amount": "2", "unit": "hours"}, headers=SAME_ORIGIN
+    )
+    page = (await site.client.get(REMINDERS)).text
+    assert f'href="{REMINDERS}/sms/120"' in page
+
+    form = (await site.client.get(f"{REMINDERS}/sms/120")).text
+    assert '<option value="sms" selected>' in form
+    assert 'value="2"' in form
+    assert '<option value="hours" selected>' in form
+    clash = await site.client.post(
+        f"{REMINDERS}/sms/120",
+        data={"channel": "email", "amount": "24", "unit": "hours"},  # the seed's own rule
+        headers=SAME_ORIGIN,
+    )
+    changed = await site.client.post(
+        f"{REMINDERS}/sms/120",
+        data={"channel": "sms", "amount": "3", "unit": "hours"},
+        headers=SAME_ORIGIN,
+    )
+    again = await site.client.post(
+        f"{REMINDERS}/sms/180",
+        data={"channel": "sms", "amount": "3", "unit": "hours"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert clash.status_code == 422
+    assert "bestaat al" in clash.text
+    assert changed.headers["location"] == f"{REMINDERS}?done=saved"
+    assert again.headers["location"] == f"{REMINDERS}?done=unchanged"
+    listing = (await site.client.get(REMINDERS)).text
+    assert "3 uur vooraf" in listing
+    assert "2 uur vooraf" not in listing
+
+
+async def test_changing_an_unknown_reminder_is_not_found(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    assert (await site.client.get(f"{REMINDERS}/sms/999")).status_code == 404
+    assert (await site.client.get(f"{REMINDERS}/telex/120")).status_code == 404

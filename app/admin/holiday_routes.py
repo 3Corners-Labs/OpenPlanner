@@ -10,6 +10,7 @@ confirmation. ``HolidayService`` authorises again, validates and audits.
     POST /admin/holidays/{calendar}/days                holidays.manage  add one date
     POST /admin/holidays/{calendar}/national            holidays.manage  add the Dutch holidays
     POST /admin/holidays/{calendar}/days/{id}/delete    holidays.manage  remove a date
+    POST /admin/holidays/{calendar}                     holidays.manage  rename the calendar
     POST /admin/holidays/{calendar}/delete              holidays.manage  delete the calendar
     GET  /admin/organisations/{org}/holidays            holidays.assign  the organisation's choice
     POST /admin/organisations/{org}/holidays            holidays.assign  save it
@@ -28,7 +29,14 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission
-from app.admin.forms import Field, FormData, done_message, raise_refusal, read_form, redirect_done
+from app.admin.forms import (
+    Field,
+    FormData,
+    done_message,
+    raise_refusal,
+    read_form,
+    redirect_done,
+)
 from app.admin.group_routes import ManageGroup, group_page
 from app.admin.pages import Locale, SameOrigin, organisation_header, page
 from app.admin.shortfalls import group_shortfalls
@@ -44,9 +52,13 @@ from app.domain.holidays import (
 )
 from app.domain.ports import Clock
 from app.i18n.dates import format_day
+from app.web.errors import FormError
 from app.web.locale import RequestLocale
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
+
+RENAME_FIELD = "calendar_name"
+"""The input that renames a calendar; ``name`` is the add-date form's own."""
 
 Manage = Annotated[AdminContext, Depends(RequirePermission(Permission.HOLIDAYS_MANAGE, fresh=True))]
 """The permission of every calendar page and change (superuser)."""
@@ -220,6 +232,12 @@ async def _calendar_response(
             ],
             "users": detail.users,
             "fields": _holiday_fields(form, locale),
+            "rename": Field(
+                RENAME_FIELD,
+                locale.gettext("admin.holidays.calendar_name"),
+                value=form.text(RENAME_FIELD) or detail.calendar.name,
+                error=form.error_for(RENAME_FIELD),
+            ),
             "errors": form.errors,
             "done": done_message(request, locale.gettext),
         },
@@ -243,6 +261,28 @@ async def calendar_page(
     shown = _year(year, _this_year(request))
     form = FormData({}, locale.gettext)
     return await _calendar_response(request, locale, context, calendar, shown, form, 200)
+
+
+@router.post("/holidays/{calendar}", response_class=HTMLResponse)
+async def rename_calendar(
+    request: Request, locale: Locale, calendar: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Give the calendar a new name; its web address stays (ADR 0084 step 5)."""
+    form = await read_form(request, locale)
+    try:
+        changed = await holiday_service(request).rename_calendar(
+            context.principal, calendar, form.text(RENAME_FIELD)
+        )
+    except DomainError as error:
+        raise_refusal(error)
+        if error.code is ErrorCode.HOLIDAY_CALENDAR_NOT_FOUND:
+            raise
+        form.refusal(error)
+        form.errors = [FormError(RENAME_FIELD, e.message) for e in form.errors]
+        return await _calendar_response(
+            request, locale, context, calendar, _this_year(request), form, 422
+        )
+    return redirect_done(f"/admin/holidays/{calendar}", "saved" if changed else "unchanged")
 
 
 def _done(calendar: str, year: int, done: str) -> Response:
