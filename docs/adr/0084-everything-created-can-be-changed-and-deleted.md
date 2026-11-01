@@ -1,8 +1,10 @@
 # 0084. Everything an admin creates can be changed and deleted
 
-Status: accepted (2026-10-31, product owner), partly built: steps 1 to 5 and 7 built, step 6 in PR. Requested by the product owner. Extends ADR 0014 (one
+Status: accepted (2026-10-31, product owner), built: steps 1 to 7 merged (step 6 in #293 on 2026-11-01). Requested by the product owner. Extends ADR 0014 (one
 authorisation matrix), ADR 0024 (emergency closure), ADR 0047 (admin structure) and ADR 0025
 (holiday calendars).
+Note (2026-11-01 review): §3 names `POST /admin/groups/{slug}/delete`; the code uses
+`/admin/groups/{slug}/settings/archive` (`app/admin/group_routes.py`).
 
 ## Context
 
@@ -133,7 +135,7 @@ groups exist (data integrity, not a threshold).
 | 3 | Group erase in the nightly sweep, setting `group_erase_after_days`, threat model and data flow updated | #278 | merged |
 | 4 | Organisation delete: domain rule, route, confirmation page, cascades checked up and down in the migration test, manual topic | #287 | merged |
 | 5 | Change in place: staffing exception, reminder rule, holiday calendar rename. A changed reminder rule applies to new bookings; reminders already planned stay (ADR 0022 point 5), so point 6's "moves its pending jobs" is not built | #288 | merged |
-| 6 | API client delete after disable | #293 | in PR |
+| 6 | API client delete after disable | #293 | merged |
 | 7 | Guard test loses its exception list entries one by one as steps land; `docs/threat-model.md` abuse case "delete another organisation's group" with its matrix test | #294 | merged |
 
 ## Consequences

@@ -4,6 +4,8 @@ Status: accepted (2026-10-29) by the product owner, with the choices recorded un
 made on acceptance*. Requested by the product owner. Builds on ADR 0011 (management tokens),
 ADR 0022 (channels and consent), ADR 0042 (settings classes), ADR 0044 (planner, lapse of an
 unanswered request) and ADR 0055 (booking form fields). Partly built; see `docs/adr-status.md` for what is built.
+Note (2026-11-01 review): in §4, "the change deadline" means start − dispatch lead
+(`app/domain/confirmation.py`), not `Group.change_deadline` as ADR 0069 redefined it.
 
 ## Context
 
