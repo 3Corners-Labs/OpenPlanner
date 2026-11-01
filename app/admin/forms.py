@@ -77,6 +77,7 @@ DONE_MESSAGES: dict[str, str] = {
     "scenario_deleted": "admin.done.scenario_deleted",
     "checked": "admin.done.checked",
     "certificate_uploaded": "admin.done.certificate_uploaded",
+    "package_imported": "admin.done.package_imported",
     "certificate_removed": "admin.done.certificate_removed",
     "certificate_checked": "admin.done.certificate_checked",
     "csr_generated": "admin.done.csr_generated",
@@ -227,6 +228,14 @@ FIELD_TARGET: dict[str, str] = {
 """Schedule-level refusals are linked to the input the admin most likely needs to change."""
 
 CODE_MESSAGES: dict[ErrorCode, str] = {
+    ErrorCode.CONFIGURATION_PASSPHRASE_SHORT: "admin.form.error.configuration_passphrase_short",
+    ErrorCode.CONFIGURATION_PASSPHRASE_WRONG: "admin.form.error.configuration_passphrase_wrong",
+    ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
+    ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
+    ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",
+    ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: (
+        "admin.form.error.configuration_installation_in_use"
+    ),
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
     ErrorCode.GROUP_ARCHIVED: "admin.form.error.group_archived",
     ErrorCode.CONFIRMATION_MISMATCH: "admin.form.error.confirmation_mismatch",

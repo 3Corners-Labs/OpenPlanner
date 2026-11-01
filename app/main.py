@@ -16,8 +16,14 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
+from app.adapters.db.backup import database_path
+from app.adapters.db.configuration_package import (
+    SqliteConfigurationTransfer,
+    portable_environment,
+)
 from app.adapters.db.engine import create_engine, set_slow_query_ms
 from app.adapters.db.identity_providers import ProviderCredentialStore
+from app.adapters.db.log_destinations import LogDestinationCredentialStore
 from app.adapters.db.probes import ProbeReports
 from app.adapters.db.reports import ReportStore
 from app.adapters.db.text_overrides import CachedTextOverrides
@@ -33,6 +39,8 @@ from app.adapters.integrations import (
     webex_fingerprint,
 )
 from app.adapters.live_settings import LiveSettings, keep_current
+from app.adapters.log_senders import build_sender
+from app.adapters.log_shipping import LogShipper, ship_settings
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
@@ -66,6 +74,7 @@ from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
+from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
@@ -116,7 +125,7 @@ from app.keys import (
     management_token_key,
     session_secret,
 )
-from app.logging import configure_logging, set_log_level, warn_loose_secret_files
+from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
@@ -307,6 +316,19 @@ def create_app(
         )
         await app.state.live_settings.refresh()
         reloader = asyncio.create_task(keep_current(app.state.live_settings))
+        # ADR 0085: copies of the log lines go to the destinations the superuser configured.
+        shipper = LogShipper(
+            LogDestinationCredentialStore(app.state.engine, secret_box(settings)),
+            build_sender,
+            uow,
+            clock,
+            "web",
+            lambda: ship_settings(live()),
+            window=lambda: timedelta(minutes=live().security_event_window_minutes),
+        )
+        shipping_stop = asyncio.Event()
+        shipping = asyncio.create_task(shipper.run(shipping_stop))
+        set_line_tap(shipper.offer)
         app.state.security_log = SecurityLog(
             uow,
             clock,
@@ -371,6 +393,20 @@ def create_app(
             combination=app.state.live_settings.combination_problem,
             environment_value=app.state.live_settings.environment_value,
             production=settings.environment == "prod",
+        )
+        # ADR 0089: configuration packages, exported and imported on Advanced settings.
+        app.state.configuration_packages = ConfigurationPackageService(
+            SqliteConfigurationTransfer(
+                database_path(settings.database_url),
+                secret_box(settings),
+                installation=settings.installation_name or "",
+                app_version=settings.app_version or "",
+                environment=lambda: portable_environment(settings),
+                now=clock.now,
+            ),
+            clock,
+            app.state.admin_service,
+            max_bytes=lambda: live().configuration_package_max_mb * 1024 * 1024,
         )
         app.state.certificate_status = CertificateStatus(uow)
         # ADR 0070: the certificate source of the bundled proxy, with the pair handed to the
@@ -530,6 +566,7 @@ def create_app(
                 "maintenance_service",
                 "security_log",
                 "client_pseudonyms",
+                "configuration_packages",  # ADR 0089 point 7: the same service as the portal
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
             agent_api.state.settings = app.state.settings
@@ -546,6 +583,9 @@ def create_app(
         try:
             yield
         finally:
+            set_line_tap(None)
+            shipping_stop.set()
+            await shipping
             reloader.cancel()
             with suppress(asyncio.CancelledError):
                 await reloader

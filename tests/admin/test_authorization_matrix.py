@@ -184,6 +184,13 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/tls/check": {
         "/admin/settings/tls/check": statuses(303, 403, 403, 403, 403, 403, 403),
     },
+    # ADR 0089: the configuration package; an empty form is a short passphrase or no file.
+    "POST /admin/settings/package/export": {
+        "/admin/settings/package/export": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/package/import": {
+        "/admin/settings/package/import": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
     "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
     # ADR 0049 point 17: the mapping page is an input for the access review (organisation

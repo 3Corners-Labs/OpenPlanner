@@ -469,6 +469,54 @@ There is no login bypass, fallback IdP or local account. Diagnose and act from t
    reinstating and cancelling wait until someone can log in to the portal (*Noodsluiting*).
    The notices are shown to participants and mailed: plain text, no names or other personal data.
 
+## Bundled identity provider (ADR 0090)
+
+A `test` or `lab` installation can log in without an identity provider of the organisation's
+own: the compose profile `idp` runs Keycloak on the host with one client, `openplanner-admin`,
+and one user, `super`, who holds every built-in role. It is an identity provider like any other
+(ADR 0013 applies, no local account, no bypass); only its secrets are generated on the host.
+
+**Where the secrets are.** `secrets/keycloak.env` (mode 600, next to `secrets/secrets.env`,
+never copied off the host) holds the admin console password (`KC_BOOTSTRAP_ADMIN_PASSWORD`,
+user `admin`), the client secret (`KC_OPENPLANNER_CLIENT_SECRET`) and the first password of
+`super` (`KC_SUPER_PASSWORD`). The realm Keycloak imports is `secrets/keycloak-realm.json`,
+rendered from `deploy/keycloak/realm.template.json`:
+
+```sh
+cd ~/openplanner
+scripts/render-keycloak-realm.sh
+docker compose --profile idp up -d idp
+```
+
+The script generates every value that is missing, keeps the ones that exist, takes the
+portal's address from `PUBLIC_BASE_URL` in `.env` (the redirect URIs), and prints no value.
+`OIDC_CLIENT_SECRET` in `.env` must equal `KC_OPENPLANNER_CLIENT_SECRET`, and
+`OIDC_DISCOVERY_URL` points at `http://idp:8080/realms/openplanner/.well-known/openid-configuration`;
+the installer does both in step 2 of ADR 0090 (until then, by hand). Keycloak's own address
+for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`): a lab on the
+host itself needs nothing more; reaching the login from another machine goes through the proxy
+and is step 2. The admin console is bound to the host's loopback and is never published.
+
+**First login of `super`.** Read the first password on the host
+(`grep KC_SUPER_PASSWORD secrets/keycloak.env`), log in to the portal as `super`, and Keycloak
+asks for a new password before it returns to the portal (the required action
+`UPDATE_PASSWORD`). The first password is then spent; the file keeps it only as the value the
+realm was rendered with. Staff of organisations without a provider of their own are created
+in this Keycloak (admin console, realm `openplanner`, with the `roles`, `organisations`,
+`groups` or `entitlements` attributes the development realm's `README.md` describes).
+
+**Resetting the password of `super`.** On the host, open the admin console at
+http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` with
+`KC_BOOTSTRAP_ADMIN_PASSWORD`, open realm `openplanner` → *Users* → `super` →
+*Credentials* → *Reset password*, tick *Temporary* so the next login asks for a new one. The
+CLI of ADR 0042 §10 creates no user and starts no session; the admin console is the only way.
+
+**Data.** The named volume `idp-data` holds the staff accounts and their password hashes:
+back it up with the database volume, and treat it as personal data (`docs/dataflow.md`).
+Deleting it and starting again re-imports the rendered realm, so `super` gets the first
+password of `secrets/keycloak.env` back; a changed `KC_OPENPLANNER_CLIENT_SECRET` needs a new
+render and a restart of `idp` and `web`.
+
 ## Webex meetings and Webex Contact Center
 
 Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
@@ -754,7 +802,7 @@ is 1 while a `FAIL` remains.
 
 **Naming rule (advice).** Name each team's queue so that it contains the group's routing value
 as a name part; `-`, `_`, spaces and case count as the same. With routing value `aangifte`,
-`FIN-BLD_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
+`ORG_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
 per group which queue it will use, and a wrong Case branch stands out. Prefer routing values
 without spaces (the web address of the group is a good default).
 
@@ -1403,6 +1451,36 @@ the portal and place its chain, or import the pair again (*Own certificate from 
 until then the proxy serves Let's Encrypt. The same holds for `proxy-data` (the ACME key and
 account): keep it with the host, or let Caddy obtain a certificate again.
 
+
+## Configuration package (ADR 0089)
+
+A package is every setting of an installation (organisations, groups, texts, channels, identity
+providers, API clients, platform settings) with its secrets, and nothing that happened on it
+(no bookings, no log, no staff). It sets up a new test or production installation in one go.
+The superuser makes and imports one on *Advanced settings*; on the host the same runs as:
+
+```sh
+cd ~/openplanner
+printf '%s\n' 'a passphrase of at least sixteen characters' > secrets/package.passphrase
+chmod 600 secrets/package.passphrase
+docker compose --env-file .env.update exec web python -m app.cli config export /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
+docker compose --env-file .env.update cp web:/srv/data/config.sqlite ./config.sqlite
+```
+
+On the new installation, after `install.sh` and before anyone creates a group:
+
+```sh
+docker compose --env-file .env.update cp ./config.sqlite web:/srv/data/config.sqlite
+docker compose --env-file .env.update exec web python -m app.cli config show /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
+docker compose --env-file .env.update exec web python -m app.cli config import /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
+```
+
+`config env PACKAGE --passphrase-file PATH --out FILE` writes the package's `OIDC_*` variables
+(the login) as an env file, for a `.env` that is not yet filled in. An import is refused on an
+installation with bookings, slots or an active closure, and on another version of OpenPlanner
+(export again from an installation on this version). Delete the package and the passphrase
+file when done: together they are every secret of the platform. Both commands are audited as
+`system:cli`.
 
 ## Rotating secrets
 

@@ -174,7 +174,7 @@ not personal data; no purge job; kept until changed. The audit event holds count
 ## Admin login and audit (WP7a)
 
 ```
-admin ──browser──> web /admin/login ──redirect──> identity provider (PingFederate; Keycloak in dev)
+admin ──browser──> web /admin/login ──redirect──> identity provider (PingFederate; Keycloak in dev; the bundled Keycloak of a test or lab installation, ADR 0090, on the host's loopback with its accounts in the volume idp-data)
 identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
 web ──signed session cookie op_admin (sub, name, roles, scope; 8 h)──> admin browser
 web ──SQL──> audit_events (sub, action, outcome, organisation, group)
@@ -379,6 +379,21 @@ a page. It concerns the organisation's server identity, not a participant. The C
 leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
 written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
 name only).
+
+## Configuration package (ADR 0089)
+
+```
+superuser ──POST /admin/settings/package/export (passphrase)──> web ──SQLite backup API──> temporary copy (data/transfer, mode 600)
+web ──DELETE state tables, VACUUM; secrets opened with SETTINGS_ENCRYPTION_KEY, sealed under scrypt(passphrase)──> package file ──download──> superuser
+superuser ──POST /admin/settings/package/import (file, passphrase)──> web ──verify, re-seal under SETTINGS_ENCRYPTION_KEY──> temporary copy ──ATTACH, one transaction──> configuration tables
+host ──python -m app.cli config export|show|import|env──> the same, actor system:cli; `env` writes OIDC_* to a file (mode 600)
+API client (scope configuration:transfer) ──GET / PUT /api/agent/v1/configuration (X-Passphrase header, package body)──> the same service, actor the client id (ADR 0089 point 7)
+```
+
+A package holds no participant data: the state tables (`bookings` with every PII field,
+`slots`, `jobs`, `booking_events`, `call_status`, `audit_events`, `staff`, …) are emptied and
+the file is vacuumed. It holds every integration secret of the platform, sealed under the
+passphrase only. The temporary copies never outlive the request.
 
 ## Planned flows
 
