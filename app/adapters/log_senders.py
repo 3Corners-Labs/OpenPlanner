@@ -330,19 +330,19 @@ class SyslogSender:
 
     async def _send_udp(self, messages: Sequence[bytes]) -> None:
         """Send one datagram per message; UDP says nothing about delivery."""
-        if self._datagrams is None:
+        datagrams = self._datagrams
+        if datagrams is None:
             loop = asyncio.get_running_loop()
-            transport, _ = await asyncio.wait_for(
+            datagrams, _ = await asyncio.wait_for(
                 loop.create_datagram_endpoint(
                     asyncio.DatagramProtocol,
                     remote_addr=(self._address.host, self._address.port or 514),
                 ),
                 self._timeout(),
             )
-            self._datagrams = transport
-        assert self._datagrams is not None  # noqa: S101 - narrowed above
+            self._datagrams = datagrams
         for message in messages:
-            self._datagrams.sendto(message)
+            datagrams.sendto(message)
 
     async def aclose(self) -> None:
         """Close the connection."""
