@@ -1,0 +1,39 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.organisation.delete.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="delete-heading">
+  <div class="card__header">
+    <h2 id="delete-heading">{{ _("admin.organisation.delete.title") }}</h2>
+    <p class="card__lead">{{ _("admin.organisation.delete.lead") }}</p>
+  </div>
+  <h3>{{ _("admin.organisation.delete.what_happens") }}</h3>
+  <ul>
+    <li>{{ _("admin.organisation.delete.effect_data") }}</li>
+    <li>{{ _("admin.organisation.delete.effect_staff") }}</li>
+    <li>{{ _("admin.organisation.delete.effect_audit") }}</li>
+  </ul>
+  {% if not occupancy.empty %}
+  <div class="alert alert--info" role="status">
+    <p>{{ _("admin.organisation.delete.not_empty") }}</p>
+    <ul>
+      {% if occupancy.groups %}<li>{{ _("admin.organisation.delete.groups_left", count=occupancy.groups) }} <a href="/admin/groups?org={{ organisation.slug }}&amp;archived=1">{{ _("admin.organisation.delete.see_archived") }}</a></li>{% endif %}
+      {% if occupancy.api_clients %}<li>{{ _("admin.organisation.delete.api_clients_left", count=occupancy.api_clients) }} <a href="/admin/api">{{ _("admin.organisation.delete.see_api") }}</a></li>{% endif %}
+    </ul>
+  </div>
+  {% endif %}
+</section>
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/delete" novalidate aria-labelledby="confirm-heading">
+  <h2 id="confirm-heading">{{ _("admin.organisation.delete.confirm_heading") }}</h2>
+  <div class="form-grid">
+    {{ field(confirmation) }}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button button--danger"{% if not occupancy.empty %} aria-describedby="delete-blocked"{% endif %}>{{ _("admin.organisation.delete.button") }}</button>
+    <a href="/admin/organisations/{{ organisation.slug }}/edit">{{ _("admin.cancel") }}</a>
+    {% if not occupancy.empty %}<p class="hint" id="delete-blocked">{{ _("admin.organisation.delete.blocked_hint") }}</p>{% endif %}
+  </div>
+</form>
+{% endblock %}

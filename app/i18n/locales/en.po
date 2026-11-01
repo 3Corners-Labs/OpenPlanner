@@ -7918,6 +7918,72 @@ msgstr "Archived groups: read-only, without a participant page."
 msgid "admin.audit.detail.archived"
 msgstr "archived"
 
+msgid "admin.done.organisation_deleted"
+msgstr "The organisation has been deleted."
+
+msgid "admin.form.error.organisation_has_groups"
+msgstr "This organisation still has groups, archived ones included. Deleting is possible once they are gone."
+
+msgid "admin.form.error.organisation_has_api_clients"
+msgstr "This organisation still has API clients. Delete those first."
+
+msgid "admin.organisation.delete.title"
+msgstr "Delete organisation"
+
+msgid "admin.organisation.delete.form_lead"
+msgstr "An organisation without groups and API clients can be deleted, with everything that belongs to it."
+
+msgid "admin.organisation.delete.open"
+msgstr "Delete organisation…"
+
+msgid "admin.organisation.delete.lead"
+msgstr "Deleting cannot be undone. Read what happens, then type the organisation's name."
+
+msgid "admin.organisation.delete.what_happens"
+msgstr "What happens"
+
+msgid "admin.organisation.delete.effect_data"
+msgstr "The organisation's branding, channels and their secrets, widget websites, contact options, texts, settings, closure scenarios and identity providers are erased."
+
+msgid "admin.organisation.delete.effect_staff"
+msgstr "Staff keep their role at the identity provider, but a role that names this organisation grants nothing any more."
+
+msgid "admin.organisation.delete.effect_audit"
+msgstr "The log keeps the organisation's web address as text."
+
+msgid "admin.organisation.delete.not_empty"
+msgstr "The organisation is not empty yet:"
+
+msgid "admin.organisation.delete.groups_left"
+msgstr "{count} groups, archived ones included. An archived group goes by itself after the erase period."
+
+msgid "admin.organisation.delete.see_archived"
+msgstr "See the groups."
+
+msgid "admin.organisation.delete.api_clients_left"
+msgstr "{count} API clients."
+
+msgid "admin.organisation.delete.see_api"
+msgstr "See the API clients."
+
+msgid "admin.organisation.delete.confirm_heading"
+msgstr "Confirm"
+
+msgid "admin.organisation.delete.confirmation"
+msgstr "Name of the organisation"
+
+msgid "admin.organisation.delete.confirmation_hint"
+msgstr "Type “{name}” to confirm."
+
+msgid "admin.organisation.delete.button"
+msgstr "Delete organisation"
+
+msgid "admin.organisation.delete.blocked_hint"
+msgstr "The portal refuses while the organisation is not empty."
+
+msgid "admin.audit.detail.deleted"
+msgstr "deleted"
+
 msgid "admin.tab.login"
 msgstr "Login"
 

@@ -336,7 +336,8 @@ OBJECTS = (
                 _ORGANISATION,
                 Permission.ORGANISATION_VIEW,
                 "dashboard",
-                (f"{_ORGANISATION}/edit",),
+                # ADR 0084: deleting the organisation is a sub-page of its edit form.
+                (f"{_ORGANISATION}/edit", f"{_ORGANISATION}/delete"),
                 width=Width.WIDE,
                 subtabs=(
                     Screen(

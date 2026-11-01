@@ -37,3 +37,19 @@ Groups list narrowed to that organisation. Only the superuser can create an orga
 
 The path at the top of every page (**Organisations › organisation**) and on a group's page
 (**Groups › organisation › group**) shows where you are; every step is a link.
+
+## Deleting an organisation
+
+At the bottom of the edit form sits **Delete organisation…**, for the superuser only (the right
+`organisation.delete` is separate from managing organisations). The confirmation page says what
+happens and asks you to type the organisation's name; without a recent login the portal first
+asks you to log in again.
+
+Deleting is possible only when the organisation is empty: no groups (archived ones included;
+they go by themselves after the erase period) and no API clients. The page says what is still
+in the way and links to it.
+
+With the organisation go its branding, channels and their secrets, widget websites, contact
+options, texts, settings, closure scenarios and identity providers. Staff keep their role at the
+identity provider, but a role that names this organisation grants nothing any more. The log keeps
+the web address as text. Deleting cannot be undone.

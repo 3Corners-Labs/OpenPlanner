@@ -210,3 +210,57 @@ async def test_cross_site_posts_are_refused(site: Site) -> None:
     )
 
     assert response.status_code == 403
+
+
+# --- deleting (ADR 0084 point 4) -------------------------------------------------------------
+
+
+async def test_the_edit_form_offers_deleting_to_the_superuser_only(site: Site) -> None:
+    await site.login_as(SUPER)
+    form = (await site.client.get(f"{LIST}/demo/edit")).text
+    assert f"{LIST}/demo/delete" in form
+
+    page = await site.client.get(f"{LIST}/demo/delete")
+    assert page.status_code == 200
+    assert 'name="confirmation"' in page.text
+    assert "Typ “Demo-gemeente” over om te bevestigen." in page.text
+    assert "De organisatie is nog niet leeg" in page.text  # the seed has a group
+
+    await site.login_as(ORG_ADMIN)
+    assert (await site.client.get(f"{LIST}/demo/delete")).status_code == 403
+
+
+async def test_an_organisation_with_groups_or_a_wrong_name_stays(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    wrong = await site.client.post(
+        f"{LIST}/demo/delete", data={"confirmation": "Demo"}, headers=SAME_ORIGIN
+    )
+    full = await site.client.post(
+        f"{LIST}/demo/delete", data={"confirmation": "Demo-gemeente"}, headers=SAME_ORIGIN
+    )
+
+    assert wrong.status_code == 422
+    assert "Typ de naam precies zo over" in wrong.text
+    assert full.status_code == 422
+    assert "heeft nog groepen" in full.text
+    assert (await site.client.get(f"{LIST}/demo")).status_code == 200
+
+
+async def test_an_empty_organisation_is_deleted_and_audited(site: Site) -> None:
+    await site.login_as(SUPER)
+    created = await _create(site, name="Gemeente Noord", slug="noord", default_locale="nl")
+    assert created.status_code == 303
+
+    done = await site.client.post(
+        f"{LIST}/noord/delete", data={"confirmation": " gemeente noord "}, headers=SAME_ORIGIN
+    )
+
+    assert done.headers["location"] == f"{LIST}?done=organisation_deleted"
+    listing = (await site.client.get(f"{LIST}?done=organisation_deleted")).text
+    assert "De organisatie is verwijderd" in listing
+    assert f'href="{LIST}/noord"' not in listing
+    assert (await site.client.get(f"{LIST}/noord")).status_code == 404
+    assert ("sub-super", "organisation.delete", "success", "") in [
+        (a, b, str(c), d) for a, b, c, d in await audit_events(site)
+    ]

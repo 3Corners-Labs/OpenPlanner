@@ -181,6 +181,7 @@ DETAIL_LABELS: dict[str, str] = {
     "retry.dispatch_wxcc_task": "admin.audit.detail.retry_dispatch_wxcc_task",
     # ADR 0084: the group was archived (action group.delete).
     "archived": "admin.audit.detail.archived",
+    "deleted": "admin.audit.detail.deleted",
     "rule.add": "admin.audit.detail.rule_add",
     "rule.edit": "admin.audit.detail.rule_edit",
     "rule.remove": "admin.audit.detail.rule_remove",

@@ -242,6 +242,16 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations/demo": statuses(422, 403, 403, 403, 403, 403, 403),
         "/admin/organisations/nope": statuses(404, 403, 403, 403, 403, 403, 403),
     },
+    # ADR 0084: deleting is the superuser's own right (organisation.delete, locked); an empty
+    # confirmation is refused (422).
+    "GET /admin/organisations/{org}/delete": {
+        "/admin/organisations/demo/delete": statuses(200, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/nope/delete": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/delete": {
+        "/admin/organisations/demo/delete": statuses(422, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/nope/delete": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
     # Branding per organisation: superuser only (HANDOVER §6), also for the own organisation.
     # ADR 0047 §4: the old branding list redirects permanently to the organisations.
     "GET /admin/branding": {"/admin/branding": statuses(308, 403, 403, 403, 403, 403, 403)},
