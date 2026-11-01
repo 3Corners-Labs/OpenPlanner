@@ -75,7 +75,7 @@ value.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR accepted | | in PR |
+| 0 | ADR accepted | #309 | in PR |
 | 1 | `public_ref` (migration), participant link sessions (table, port, adapter, sweep), the exchange on `GET /b/{token}` | | planned |
 | 2 | Booking pages (confirm, cancel, move) on `/b/m/{ref}`; old subpaths redirect; e2e | | planned |
 | 3 | Direct call, waiting room (poll URL in `live-region.js`), trial and join on `/b/m/{ref}`; maintenance route list; e2e | | planned |
