@@ -469,6 +469,54 @@ There is no login bypass, fallback IdP or local account. Diagnose and act from t
    reinstating and cancelling wait until someone can log in to the portal (*Noodsluiting*).
    The notices are shown to participants and mailed: plain text, no names or other personal data.
 
+## Bundled identity provider (ADR 0090)
+
+A `test` or `lab` installation can log in without an identity provider of the organisation's
+own: the compose profile `idp` runs Keycloak on the host with one client, `openplanner-admin`,
+and one user, `super`, who holds every built-in role. It is an identity provider like any other
+(ADR 0013 applies, no local account, no bypass); only its secrets are generated on the host.
+
+**Where the secrets are.** `secrets/keycloak.env` (mode 600, next to `secrets/secrets.env`,
+never copied off the host) holds the admin console password (`KC_BOOTSTRAP_ADMIN_PASSWORD`,
+user `admin`), the client secret (`KC_OPENPLANNER_CLIENT_SECRET`) and the first password of
+`super` (`KC_SUPER_PASSWORD`). The realm Keycloak imports is `secrets/keycloak-realm.json`,
+rendered from `deploy/keycloak/realm.template.json`:
+
+```sh
+cd ~/openplanner
+scripts/render-keycloak-realm.sh
+docker compose --profile idp up -d idp
+```
+
+The script generates every value that is missing, keeps the ones that exist, takes the
+portal's address from `PUBLIC_BASE_URL` in `.env` (the redirect URIs), and prints no value.
+`OIDC_CLIENT_SECRET` in `.env` must equal `KC_OPENPLANNER_CLIENT_SECRET`, and
+`OIDC_DISCOVERY_URL` points at `http://idp:8080/realms/openplanner/.well-known/openid-configuration`;
+the installer does both in step 2 of ADR 0090 (until then, by hand). Keycloak's own address
+for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`): a lab on the
+host itself needs nothing more; reaching the login from another machine goes through the proxy
+and is step 2. The admin console is bound to the host's loopback and is never published.
+
+**First login of `super`.** Read the first password on the host
+(`grep KC_SUPER_PASSWORD secrets/keycloak.env`), log in to the portal as `super`, and Keycloak
+asks for a new password before it returns to the portal (the required action
+`UPDATE_PASSWORD`). The first password is then spent; the file keeps it only as the value the
+realm was rendered with. Staff of organisations without a provider of their own are created
+in this Keycloak (admin console, realm `openplanner`, with the `roles`, `organisations`,
+`groups` or `entitlements` attributes the development realm's `README.md` describes).
+
+**Resetting the password of `super`.** On the host, open the admin console at
+http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` with
+`KC_BOOTSTRAP_ADMIN_PASSWORD`, open realm `openplanner` → *Users* → `super` →
+*Credentials* → *Reset password*, tick *Temporary* so the next login asks for a new one. The
+CLI of ADR 0042 §10 creates no user and starts no session; the admin console is the only way.
+
+**Data.** The named volume `idp-data` holds the staff accounts and their password hashes:
+back it up with the database volume, and treat it as personal data (`docs/dataflow.md`).
+Deleting it and starting again re-imports the rendered realm, so `super` gets the first
+password of `secrets/keycloak.env` back; a changed `KC_OPENPLANNER_CLIENT_SECRET` needs a new
+render and a restart of `idp` and `web`.
+
 ## Webex meetings and Webex Contact Center
 
 Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
