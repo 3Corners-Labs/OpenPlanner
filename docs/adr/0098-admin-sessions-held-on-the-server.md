@@ -7,7 +7,7 @@ before the merge (the label followed seven minutes later); awaiting the product 
 acceptance. Amended on 2026-11-01 (re-evaluation): this ADR is the single home for ending admin
 sessions; ADR 0046 §8 and §10 point here. §9b uses ADR 0046's `staff.manage` at organisation
 level instead of a new permission. The algorithm and the rotation of `SESSION_SECRET`, which
-ADR 0094 §7 defers to this ADR, are not decided here yet (§3 keeps rotation as the last resort);
+ADR 0094 §7 defers to this ADR, are not decided here yet (point 9 keeps rotation as the last resort);
 a later step records them. Step 4 (`Secure` on every https installation) may come before steps
 2 and 3: CLAUDE.md requires it today.
 
