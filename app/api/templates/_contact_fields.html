@@ -1,4 +1,5 @@
 {#- Contact inputs and custom fields (ADR 0055) with linked hints and errors, plus the hidden honeypot (HANDOVER B15). -#}
+{% from "_error_message.html" import error_message %}
   {% for field in fields %}
   {%- set aria %}
     {%- if field.required %} required aria-required="true"{% endif %}
@@ -11,7 +12,7 @@
     <fieldset class="choices"{% if field.described_by %} aria-describedby="{{ field.described_by }}"{% endif %}>
       <legend>{{ field.label }}{% if not field.required %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</legend>
       {% if field.hint %}<p class="hint" id="{{ field.name }}-hint">{{ field.hint }}</p>{% endif %}
-      {% if field.error %}<p class="error-message" id="{{ field.name }}-error">{{ field.error }}</p>{% endif %}
+      {{ error_message(field.error, field.name ~ "-error") }}
       {% for value, label in field.options %}
       {%- set input_id = field.name if loop.first else field.name ~ "-" ~ loop.index %}
       <div class="choice">
@@ -21,14 +22,14 @@
       {% endfor %}
     </fieldset>
     {% elif field.kind == 'checkbox' %}
-    {% if field.error %}<p class="error-message" id="{{ field.name }}-error">{{ field.error }}</p>{% endif %}
+    {{ error_message(field.error, field.name ~ "-error") }}
     <input id="{{ field.name }}" name="{{ field.name }}" type="checkbox" value="on"{% if field.value %} checked{% endif %}{{ aria }}>
     <label for="{{ field.name }}">{{ field.label }}{% if not field.required %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
     {% if field.hint %}<p class="hint" id="{{ field.name }}-hint">{{ field.hint }}</p>{% endif %}
     {% else %}
     <label for="{{ field.name }}">{{ field.label }}{% if not field.required %} <span class="optional">{{ _("form.optional") }}</span>{% endif %}</label>
     {% if field.hint %}<p class="hint" id="{{ field.name }}-hint">{{ field.hint }}</p>{% endif %}
-    {% if field.error %}<p class="error-message" id="{{ field.name }}-error">{{ field.error }}</p>{% endif %}
+    {{ error_message(field.error, field.name ~ "-error") }}
     {% if field.kind == 'textarea' %}
     <textarea id="{{ field.name }}" name="{{ field.name }}" rows="5" autocomplete="{{ field.autocomplete }}"{{ aria }}>{{ field.value }}</textarea>
     {% else %}
