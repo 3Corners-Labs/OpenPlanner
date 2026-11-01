@@ -128,7 +128,7 @@ def test_the_organisation_is_an_object_page_with_six_tabs() -> None:
 def test_groups_and_organisations_are_entries_of_manage() -> None:
     manage = next(section for section in SECTIONS if section.key == "manage")
 
-    assert [entry.key for entry in manage.entries][:2] == ["manage.groups", "manage.organisations"]
+    assert [entry.key for entry in manage.entries][:2] == ["manage.organisations", "manage.groups"]
     assert object_page("group").entry == "manage.groups"
     # ADR 0047 §4: the per-organisation lists left the menu; the calendars went to Platform.
     keys = {entry.key for section in SECTIONS for entry in section.entries}

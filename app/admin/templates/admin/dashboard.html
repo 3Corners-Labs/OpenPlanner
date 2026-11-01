@@ -9,9 +9,6 @@
   </div>
   <div class="page-header__actions">
     <a class="button button--secondary" href="/admin/">{{ icon("refresh") }}<span>{{ _("admin.overview.refresh") }}</span></a>
-    {% if can("group.create") %}
-    <a class="button" href="/admin/groups/new">{{ icon("plus") }}<span>{{ _("admin.new_group.title") }}</span></a>
-    {% endif %}
   </div>
 </div>
 {% if views %}

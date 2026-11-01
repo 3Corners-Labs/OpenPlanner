@@ -108,6 +108,8 @@ from the rows below.
 | 0086 | The public address and the reverse proxy: visible, verified end to end, and by the standards | NOT BUILT | #265 | Steps 1–2 (*Address and proxy* on System status, `/api/v1/instance` round-trip probe, link-building test; standards asserted in `check-proxy.sh`, runbook, internet.nl checklist) |
 | 0087 | The public website: static, built from the repository, shipped with every release | PARTIAL | #285 (ADR and step 1, landed with #271's commits); `site/`, `scripts/build_site.py`, `scripts/deploy-site.sh`, the `site` job in `main.yml`; first deploy to TransIP 2026-11-01 | Step 3 (recorded walkthrough) in #289; step 2 (Playwright lane for the site); step 4 (TransIP host work: HTTPS, CI deploy key) |
 | 0088 | The decision gate judges the merge group too | PARTIAL | #284; step 1 in PR: `--list-pull-requests` and `--merge-group` in `scripts/decision_gate.py`, the `merge_group` job in `decision-gate.yml`, `tests/scripts/test_decision_gate.py` | Step 2: the product owner makes *decision gate* a required check of `main` (ADR 0078 step 3) |
+| 0091 | Staff and roles of the bundled identity provider, managed in the portal | NOT BUILT | ADR only (proposed 2026-11-01) | Everything: `StaffDirectory` port and Keycloak adapter, permissions, Staff screen actions, threat model |
+| 0092 | Overview widgets chosen by the admin | NOT BUILT | ADR only (proposed 2026-11-01); step 1 (no *New group* on the overview) comes with this PR | Layout storage, *Add widget* and *Edit overview* screens |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 

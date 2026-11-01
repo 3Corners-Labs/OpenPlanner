@@ -5749,8 +5749,11 @@ msgstr "Name"
 msgid "admin.staff.roles"
 msgstr "Roles"
 
-msgid "admin.staff.places"
-msgstr "Organisations and groups"
+msgid "admin.staff.organisations"
+msgstr "Organisations"
+
+msgid "admin.staff.groups"
+msgstr "Groups"
 
 msgid "admin.staff.first_seen"
 msgstr "First login"
