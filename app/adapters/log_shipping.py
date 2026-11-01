@@ -325,7 +325,7 @@ class LogShipper:
         """Write the system event of a change from working to failing, and back."""
         destination = pipeline.destination
         detail = f"{destination.kind}:{destination_id}"
-        try:
+        with suppress(Exception):  # an event that cannot be written must not stop delivery
             if state is State.FAILING and destination_id not in self._reported:
                 last = self._failure_event_at.get(destination_id)
                 now = self._clock.now()
@@ -341,8 +341,6 @@ class LogShipper:
             elif state is State.OK and destination_id in self._reported:
                 self._reported.discard(destination_id)
                 await self._system.record(HEALTH_EVENT, Outcome.SUCCESS, detail=detail)
-        except Exception:  # noqa: S110 - an event that cannot be written must not stop delivery
-            pass
 
     async def store_status(self) -> None:
         """Store the counters of the pipelines that changed, for the portal."""
@@ -353,7 +351,7 @@ class LogShipper:
             async with self._uow.locked() as tx:
                 for pipeline in changed:
                     await tx.save_log_destination_status(pipeline.status(), self._clock.now())
-        except Exception:  # noqa: S110 - the status is a convenience; the database may be away
+        except Exception:  # the status is a convenience; the database may be away
             return
         for pipeline in changed:
             pipeline.changed = False
