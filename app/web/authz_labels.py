@@ -63,6 +63,8 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.IDP_MAPPING_MANAGE: "authz.permission.idp_mapping_manage",
     Permission.IDENTITY_PROVIDERS_VIEW: "authz.permission.identity_providers_view",
     Permission.IDENTITY_PROVIDERS_MANAGE: "authz.permission.identity_providers_manage",
+    Permission.LOGGING_VIEW: "authz.permission.logging_view",
+    Permission.LOGGING_MANAGE: "authz.permission.logging_manage",
 }
 
 API_SCOPE_LABELS: dict[ApiScope, str] = {
