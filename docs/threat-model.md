@@ -771,7 +771,9 @@ setting) and `settings_version`; written by `POST /admin/settings/{key}` and
 Admin (superuser, recent login): `POST /admin/settings/package/export` (a passphrase, twice)
 returns a SQLite file; `POST /admin/settings/package/import` (the file, the passphrase, a
 confirmation) replaces every configuration table. Host: `python -m app.cli config
-export|show|import|env --passphrase-file PATH`. Storage: the configuration tables of
+export|show|import|env --passphrase-file PATH`; a new host: `scripts/install.sh
+--configuration FILE --passphrase-file PATH` (ADR 0089 point 8), which writes the login to
+`secrets/config.env` and imports the package once web is healthy. Storage: the configuration tables of
 `app/domain/configuration_package.py`; the package carries `configuration_package` (format,
 salt, verifier) and `configuration_environment` (the login variables, sealed). Input from
 outside: the uploaded file (a SQLite database the server opens read-only) and the passphrase.
@@ -789,6 +791,8 @@ vacuumed away.
 | Denial of service | A huge upload fills the disk or memory | The declared body is refused above `CONFIGURATION_PACKAGE_MAX_MB` (class C, 1–512) before it is read; the temporary copy is written with mode 600 next to the database and removed again | `tests/domain/test_configuration_service.py::test_import_refuses_an_empty_or_oversized_package`, `tests/adapters/db/test_configuration_package.py::test_the_transfer_adapter_round_trips` |
 | Tampering (CSRF) | A third-party site triggers an export or import in the superuser's browser | Fetch Metadata check (`SameOrigin`) and a recent login on both routes | `tests/admin/test_authorization_matrix.py` (POST rows) |
 | Repudiation | Who exported or imported what is lost | Both are audited as `settings.platform.manage` with the detail `configuration.export` or `configuration.import,<counts>`; a refusal with its code | `tests/domain/test_configuration_service.py::test_import_is_audited_with_the_counts`, `test_a_refused_export_is_audited_with_its_code` |
+| Information disclosure | On a new host the installer shows the passphrase in `ps`, the shell history or its output, or leaves the login or the package readable | The installer takes the passphrase from a file and feeds it to the containers on standard input only; the login goes to `secrets/config.env` (mode 600, directory 700) and is never printed; the copy of the package the container reads (mode 644, no secret in clear text without the passphrase) is removed on exit, and the copy inside the web container after the import, whatever the outcome; a wrong passphrase stops the script before `.env` is written | `tests/scripts/test_install.py::test_the_package_answers_the_login_questions_and_is_imported_once_healthy`, `test_a_wrong_passphrase_stops_before_anything_is_written` |
+| Tampering | A rerun of the installer with a package wipes the configuration of an installation in use | The same refusal (`configuration_installation_in_use`) stops the script after the start; the running installation keeps its configuration | `tests/scripts/test_install.py::test_a_refused_import_stops_the_installation_with_a_clear_error` |
 
 ## Flow: personal data in the admin portal (ADR 0063)
 
