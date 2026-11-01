@@ -17,7 +17,7 @@ from app.domain.admin import AdminService
 from app.domain.booking import Claim
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
-from app.domain.job_plan import JobType
+from app.domain.job_plan import JobStatus, JobType
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import DispatchKind, Offer
 from app.web.static_assets import ASSETS
@@ -324,6 +324,15 @@ async def _jobs(site: Site, booking_id: int) -> list[JobType]:
     return [job.type for job in jobs]
 
 
+async def _pending_jobs(site: Site, booking_id: int) -> list[JobType]:
+    """Return the types of the booking's jobs still waiting; a finished one is history."""
+    engine = create_engine(site.database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        jobs = await tx.get_booking_jobs(booking_id)
+    await engine.dispose()
+    return [job.type for job in jobs if job.status is JobStatus.PENDING]
+
+
 async def _events(site: Site, booking_id: int) -> list[EventKind]:
     """Return the kinds on the booking's timeline."""
     engine = create_engine(site.database_url)
@@ -364,7 +373,7 @@ async def test_leaving_a_waiting_call_ends_the_work_item_and_says_so(site: Site)
     assert response.status_code == 303
     assert response.headers["location"] == f"{wait}?status=left"
     assert JobType.END_WXCC_TASK in await _jobs(site, booking_id)
-    assert JobType.DISPATCH_WXCC_TASK not in await _jobs(site, booking_id)
+    assert JobType.DISPATCH_WXCC_TASK not in await _pending_jobs(site, booking_id)
     assert await _events(site, booking_id) == [
         EventKind.MEETING_CREATED,
         EventKind.TASK_CREATED,

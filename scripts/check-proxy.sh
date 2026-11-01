@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 # Start the compose stack with --profile tls against Pebble, Let's Encrypt's test ACME CA, and
 # check what ADR 0030, ADR 0064 and ADR 0070 promise: a certificate is obtained without manual
-# steps, port 80 only redirects, public form bodies are capped, the proxy runs as non-root; a
+# steps, port 80 redirects browser paths and refuses machine paths (/api, /webhooks) with 403,
+# the proxy passes only what the app should see (TRACE, /static/, no-store on HTML), public form bodies are capped, the proxy runs as non-root; a
 # pair handed over through the portal-certs volume is served within the poll interval and ACME
 # applies again when it is withdrawn; then the same proxy serves an own certificate from files,
 # and `tls-check` from the web container reads either certificate and judges it. Used by CI
@@ -61,9 +62,36 @@ oversized_post() { # oversized_post: the status of a 100 kB form post, 413 when 
   printf '%s' "$status"
 }
 
-edge_checks() { # redirect, body limit, non-root: the same in every pass
+status_of() { # status_of CURL_ARGS...: the HTTP status code of a request through the proxy
+  # shellcheck disable=SC2086
+  curl -sk $resolve -o /dev/null -w '%{http_code}' "$@"
+}
+
+machine_paths_check() { # port 80 refuses machine paths without a Location header (ASVS V4.1.2)
+  for path in /api/agent/v1/oauth/token /api/v1/widget/x /webhooks/x; do
+    for method in GET POST; do
+      head="$(curl -s -D - -o /dev/null -X "$method" -H 'Host: booking.test' "http://127.0.0.1:18080$path")"
+      echo "$head" | head -n 1 | grep -q ' 403' || fail "port 80 $method $path is not refused with 403"
+      ! echo "$head" | grep -qi '^location:' || fail "port 80 $method $path answers with a Location header"
+    done
+  done
+}
+
+https_edge_checks() { # what the proxy lets through on 443: TRACE, static directory, caching of HTML
+  [ "$(status_of -X TRACE https://booking.test:18443/g/x)" = "405" ] || fail "TRACE is not answered with 405"
+  [ "$(status_of https://booking.test:18443/static/)" = "404" ] || fail "/static/ lists or serves a directory"
+  for path in /b/x /admin/login; do # /admin itself only redirects; the login page is its HTML
+    # shellcheck disable=SC2086
+    curl -sk $resolve -D - -o /dev/null "https://booking.test:18443$path" | grep -qi '^cache-control:.*no-store' \
+      || fail "$path is not marked Cache-Control: no-store"
+  done
+}
+
+edge_checks() { # redirect, machine paths, body limit, non-root: the same in every pass
   redirect="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Host: booking.test' 'http://127.0.0.1:18080/g/x?a=1')"
   [ "$redirect" = "308 https://booking.test/g/x?a=1" ] || fail "port 80 does not redirect ($redirect)"
+  machine_paths_check
+  https_edge_checks
   status="$(oversized_post)"
   [ "$status" = "413" ] || fail "oversized form body not refused ($status)"
   [ "$(compose exec -T proxy id -u)" != "0" ] || fail "proxy runs as root"

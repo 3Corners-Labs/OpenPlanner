@@ -9,6 +9,7 @@ from app.domain.retention import (
     PurgeCandidate,
     RetentionFacts,
     candidates_before,
+    is_backlog,
     is_overdue,
     purge_moment,
     summarise,
@@ -118,3 +119,21 @@ def test_an_overview_without_problems_is_in_order() -> None:
 
     assert overview.in_order
     assert overview.last_purged_at is None
+
+
+def test_an_unconfirmed_booking_is_purged_a_day_after_its_confirm_deadline() -> None:
+    # The same moment ``plan_for_pending`` plans (ADR 0056): before the slot, not after it.
+    pending = PurgeCandidate(
+        1, BookingStatus.PENDING_CONFIRMATION, NOW + 7 * DAY, None, None, confirm_by=NOW - DAY
+    )
+
+    assert purge_moment(pending) == NOW
+
+
+def test_a_booking_is_backlog_once_it_held_data_two_days_after_it_started_to_count() -> None:
+    old = candidate(end_ago=2 * DAY + DAY)  # ended 3 days ago: purge moment was 2 days ago
+    fresh = candidate(end_ago=2 * DAY)  # ended 2 days ago: only 24 h overdue
+
+    assert is_backlog(old, NOW)
+    assert not is_backlog(fresh, NOW)
+    assert not is_backlog(candidate(BookingStatus.SUSPENDED, end_ago=90 * DAY), NOW)

@@ -7,11 +7,14 @@ from pathlib import Path
 
 import pytest
 
+import scripts.build_site as build_site
 from scripts.build_site import (
     LOCALES,
     ROOT,
     SITE,
+    Recording,
     Releases,
+    Screen,
     build,
     llms_text,
     load_content,
@@ -320,3 +323,59 @@ def test_without_a_recording_the_page_says_it_is_coming(dist: Path, locale: str)
     html, page = _page(dist, locale)
     assert not page.find("video")
     assert load_content(locale)["tour"]["video_soon"] in html
+
+
+def test_the_stills_of_a_recording_follow_the_story_and_skip_what_is_missing(
+    tmp_path: Path,
+) -> None:
+    for name in ("tour.webm", "tour.jpg", "tour.nl.vtt", "tour.en.vtt"):
+        (tmp_path / name).write_text("x")
+    for key in ("book", "agenda"):
+        (tmp_path / f"tour-{key}.jpg").write_text("x")
+    (tmp_path / "tour.json").write_text(
+        json.dumps({"version": "v0.4.0", "screens": ["book", "join", "agenda", "nonsense"]})
+    )
+    found = recording(tmp_path)
+    assert found is not None
+    assert [s.key for s in found.screens] == ["book", "agenda"], (
+        "join has no file, nonsense no chapter"
+    )
+    assert found.screens[0].caption["en"].startswith("The participant picks a day")
+
+
+def test_an_older_recording_without_stills_shows_the_video_alone(tmp_path: Path) -> None:
+    for name in ("tour.webm", "tour.jpg", "tour.nl.vtt", "tour.en.vtt"):
+        (tmp_path / name).write_text("x")
+    (tmp_path / "tour.json").write_text('{"version": "v0.4.0"}')
+    found = recording(tmp_path)
+    assert found is not None
+    assert found.screens == ()
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_real_screens_are_on_the_page_with_their_captions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, locale: str
+) -> None:
+    screens = (Screen("book", {"nl": "Kies een tijd.", "en": "Pick a time."}),)
+    monkeypatch.setattr(
+        build_site, "recording", lambda _media: Recording("v0.4.0", "2026-11-01", 60, screens)
+    )
+    build(tmp_path, None, "0123456789abcdef")
+    html, page = _page(tmp_path, locale)
+    images = [a for a in page.find("img") if (a.get("src") or "").endswith("tour-book.jpg")]
+    assert len(images) == 1
+    assert images[0].get("alt"), "every still has a text alternative"
+    assert {"nl": "Kies een tijd.", "en": "Pick a time."}[locale] in html
+    assert load_content(locale)["tour"]["screens_title"] in html
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_architecture_plate_names_every_part_and_flow(dist: Path, locale: str) -> None:
+    html, _ = _page(dist, locale)
+    plate = load_content(locale)["enterprise"]["plate"]
+    for node in plate["people"] + plate["host"] + plate["systems"]:
+        assert node["name"].replace("'", "&#39;") in html
+    for flow in plate["flows"]:
+        assert flow.replace("'", "&#39;") in html
+    planned = [n for n in plate["systems"] if n.get("planned")]
+    assert html.count(plate["planned"]) == len(planned), "what is not built says so (point 8)"

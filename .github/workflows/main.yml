@@ -246,7 +246,7 @@ jobs:
         run: |
           tag="$(jq -r '[.[] | select(any(.assets[]; .name == "tour.webm"))][0].tag_name // empty' "$RUNNER_TEMP/releases.json")"
           if [ -n "$tag" ]; then
-            gh release download "$tag" --dir site/static/media --pattern 'tour.*'
+            gh release download "$tag" --dir site/static/media --pattern 'tour*'
           else
             echo "::notice::no release carries a recording yet; the page says it is coming"
           fi

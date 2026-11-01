@@ -683,7 +683,8 @@ The STRIDE analysis per flow, with a test for every abuse case, is in
   `bookings`; jobs, slots and logs hold IDs.
 - **Purge:** the `purge_pii` job sets them to NULL at slot end + 24 h, or 24 h after a
   cancellation. A booking on hold by an emergency closure keeps them until it is resolved, at
-  most 30 days after the closure ends (ADR 0024). The nightly sweep and alert follow in WP8.
+  most 30 days after the closure ends (ADR 0024). The nightly sweep (`app.domain.retention_sweep`, run by worker housekeeping) purges what the job
+  missed and alerts on a backlog older than 48 h.
 - **What leaves the system:** mails carry the first name, date, team and the management link;
   the calendar file carries no personal data. WxCC will receive only the first name and the
   host link.
@@ -815,7 +816,7 @@ What is built of each decision is not kept here: it is in `docs/adr-status.md` (
 | ADR 0033 | Manual and context-sensitive help: 20 topics in Dutch and English; 28 admin routes still without a topic | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides (ADR 0074); global overrides and `.po` import/export | partly done |
-| WP8 | Purge sweep and alerting, audit retention | planned |
+| WP8 | Purge sweep and alerting (sweep and backlog alert done), audit retention | partly done |
 | WP9 | Hardening, pentest, accessibility audit (O10) | planned |
 | ADR 0034 | Audit events to an external log platform (backlog AU-1 to AU-4) | done (AU-3, the client's security review, is open) |
 | ADR 0036 | Scaling seams and measurements (backlog SC-1 to SC-5) | proposed; nothing built |

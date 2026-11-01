@@ -7,6 +7,7 @@ Called once per worker loop, after the due jobs:
     critical ─► brake: every diagnostic mode ends, so no debug events are written (part 4)
     hourly ─► PRAGMA incremental_vacuum ─► pages back to the file system
     daily ─► erase the archived groups nothing refers to any more (ADR 0084 step 3)
+    daily ─► retention sweep: purge personal data the purge job missed, alert on a backlog
 
 The stdout log does not depend on the database: when the disk is full, writing the system
 event may fail, and monitoring must still see the problem. Housekeeping never stops the loop;
@@ -21,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.maintenance import measure_storage, reclaim_free_pages
 from app.domain.ports import Clock, UnitOfWork
+from app.domain.retention_sweep import SweepResult
 from app.domain.storage import (
     MIB,
     StorageGrade,
@@ -40,6 +42,9 @@ REMIND_EVERY = timedelta(hours=1)
 RECLAIM_EVERY = timedelta(hours=1)
 """How often freed database pages are returned to the file system."""
 
+SWEEP_EVERY = timedelta(days=1)
+"""How often the retention sweep runs (fixed privacy rule, CLAUDE.md: nightly)."""
+
 ERASE_EVERY = timedelta(days=1)
 """How often archived groups are swept (ADR 0084 step 3); the delay itself is a setting."""
 
@@ -56,6 +61,8 @@ class Housekeeping:
         brake: Ends diagnostic mode, with the reason; called every loop at grade critical.
         erase: Erases the archived groups that qualify and returns the count; called once per
             ``ERASE_EVERY``.
+        sweep: Runs the retention sweep and returns what it found; called once per
+            ``SWEEP_EVERY``.
     """
 
     def __init__(
@@ -67,8 +74,11 @@ class Housekeeping:
         measure: Callable[[], StorageUsage | None],
         brake: Callable[[str], Awaitable[int]] | None = None,
         erase: Callable[[], Awaitable[int]] | None = None,
+        sweep: Callable[[], Awaitable[SweepResult]] | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
+        self._sweep = sweep
+        self._swept_at: datetime | None = None
         self._brake = brake
         self._erase = erase
         self._erased_at: datetime | None = None
@@ -90,9 +100,12 @@ class Housekeeping:
         database_url: str,
         brake: Callable[[str], Awaitable[int]] | None = None,
         erase: Callable[[], Awaitable[int]] | None = None,
+        sweep: Callable[[], Awaitable[SweepResult]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
-        return cls(engine, uow, clock, limits, lambda: measure_storage(database_url), brake, erase)
+        return cls(
+            engine, uow, clock, limits, lambda: measure_storage(database_url), brake, erase, sweep
+        )
 
     async def run(self) -> None:
         """Watch the storage, then reclaim pages and erase archived groups when due."""
@@ -100,6 +113,29 @@ class Housekeeping:
         await self._watch_storage(now)
         await self._reclaim(now)
         await self._erase_groups(now)
+        await self._sweep_retention(now)
+
+    async def _sweep_retention(self, now: datetime) -> None:
+        """Purge overdue personal data, at most once per ``SWEEP_EVERY``; alert on a backlog."""
+        if self._sweep is None:
+            return
+        if self._swept_at is not None and now - self._swept_at < SWEEP_EVERY:
+            return
+        self._swept_at = now
+        try:
+            result = await self._sweep()
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.error("retention.sweep_failed", error=type(exc).__name__)
+            return
+        if result.overdue:
+            log.warning(
+                "retention.sweep",
+                overdue=result.overdue,
+                purged=result.purged,
+                failed=result.failed,
+            )
+        if result.backlog or result.failed:
+            log.error("retention.backlog", bookings=result.backlog, failed=result.failed)
 
     async def _erase_groups(self, now: datetime) -> None:
         """Erase the archived groups that qualify, at most once per ``ERASE_EVERY``."""

@@ -11,9 +11,12 @@ A booking's purge moment follows the privacy rules (CLAUDE.md, ADR 0024):
     cancelled                                      ─► cancellation + 24 h
     suspended                                      ─► closure end + 30 days (none while open)
     awaiting a new time (ADR 0044)                 ─► rebook_by + 24 h (it lapses then)
+    awaiting confirmation (ADR 0056)               ─► confirm_by + 24 h (it lapses then)
 
 A booking counts as overdue once its purge moment lies more than ``PURGE_GRACE`` in the past,
-so a purge that is waiting for the worker or for a retry does not raise an alarm.
+so a purge that is waiting for the worker or for a retry does not raise an alarm. The nightly
+sweep (``app.domain.retention_sweep``) purges what is overdue; it alerts when a booking still held
+personal data ``BACKLOG_AGE`` after the event that started its retention (CLAUDE.md privacy rules).
 """
 
 from dataclasses import dataclass
@@ -26,6 +29,10 @@ from app.domain.scheduling import GroupSummary
 
 PURGE_GRACE = timedelta(hours=1)
 """How long after its purge moment a booking may still hold personal data (worker, retries)."""
+
+BACKLOG_AGE = timedelta(hours=48)
+"""A booking older than this, counted from the event that started its retention, still holding
+personal data is a backlog: the sweep alerts (fixed privacy rule, not a setting)."""
 
 
 @dataclass(frozen=True)
@@ -56,6 +63,7 @@ class PurgeCandidate:
         cancelled_at: When it was cancelled, if it was.
         closure_ends_at: For a suspended booking, the end of its closure (``None`` while open).
         rebook_by: For a booking awaiting a new time, when the request lapses (ADR 0044).
+        confirm_by: For a booking awaiting confirmation, when it lapses (ADR 0056).
     """
 
     group_id: int
@@ -64,6 +72,20 @@ class PurgeCandidate:
     cancelled_at: datetime | None
     closure_ends_at: datetime | None
     rebook_by: datetime | None = None
+    confirm_by: datetime | None = None
+
+
+@dataclass(frozen=True)
+class DueBooking:
+    """A purge candidate with its booking id, for the sweep (never for the overview).
+
+    Attributes:
+        booking_id: The booking that may be overdue.
+        candidate: Its times and status.
+    """
+
+    booking_id: int
+    candidate: PurgeCandidate
 
 
 @dataclass(frozen=True)
@@ -128,6 +150,8 @@ def purge_moment(candidate: PurgeCandidate) -> datetime | None:
         return candidate.closure_ends_at + RETENTION_AFTER_CLOSURE
     if candidate.status is BookingStatus.AWAITING_REBOOK and candidate.rebook_by is not None:
         return candidate.rebook_by + PURGE_AFTER
+    if candidate.status is BookingStatus.PENDING_CONFIRMATION and candidate.confirm_by is not None:
+        return candidate.confirm_by + PURGE_AFTER
     return candidate.end + PURGE_AFTER
 
 
@@ -145,6 +169,16 @@ def is_overdue(candidate: PurgeCandidate, now: datetime) -> bool:
     """Return whether the booking still holds personal data past its purge moment and grace."""
     moment = purge_moment(candidate)
     return moment is not None and moment + PURGE_GRACE < now
+
+
+def is_backlog(candidate: PurgeCandidate, now: datetime) -> bool:
+    """Return whether the booking held personal data ``BACKLOG_AGE`` after retention began.
+
+    Retention begins ``PURGE_AFTER`` before the purge moment (slot end, cancellation, lapse), so
+    this is the case once the purge moment lies ``BACKLOG_AGE - PURGE_AFTER`` in the past.
+    """
+    moment = purge_moment(candidate)
+    return moment is not None and moment + (BACKLOG_AGE - PURGE_AFTER) < now
 
 
 def summarise(facts: RetentionFacts, now: datetime) -> RetentionOverview:

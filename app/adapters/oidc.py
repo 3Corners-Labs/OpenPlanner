@@ -25,7 +25,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import quote_plus, urlencode
 
 import httpx
 import jwt
@@ -249,6 +249,16 @@ def _code_challenge(verifier: str) -> str:
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
 
+def client_secret_basic(client_id: str, client_secret: str) -> str:
+    """Return the ``Authorization`` value of OAuth ``client_secret_basic`` (RFC 6749 §2.3.1).
+
+    Each credential is form-urlencoded on its own before they are joined with a colon and
+    base64-encoded, so a colon, plus or percent sign in either survives the round trip.
+    """
+    pair = f"{quote_plus(client_id, safe='')}:{quote_plus(client_secret, safe='')}"
+    return f"Basic {base64.b64encode(pair.encode()).decode()}"
+
+
 class OidcIdentityProvider:
     """``IdentityProvider`` for any standards-compliant OIDC provider.
 
@@ -420,8 +430,10 @@ class OidcIdentityProvider:
         """
         auth: tuple[str, str] | None = kwargs.pop("auth", None)
         if auth is not None:
-            token = base64.b64encode(f"{auth[0]}:{auth[1]}".encode()).decode()
-            kwargs["headers"] = {**kwargs.get("headers", {}), "authorization": f"Basic {token}"}
+            kwargs["headers"] = {
+                **kwargs.get("headers", {}),
+                "authorization": client_secret_basic(*auth),
+            }
         guard = self._config.guard
         if guard is None:
             return await self._http.request(method, url, **kwargs)

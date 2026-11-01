@@ -192,8 +192,7 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
     calls: CallService = request.app.state.call_service
     bind_booking(receipt.booking.id)  # ADR 0068: the request events belong to this booking
     try:
-        booking = await calls.ensure_meeting(receipt.booking, group)
-        await calls.ensure_task(booking, group)
+        await calls.create_now(receipt.booking, group, request.app.state.clock.now())
     except (IntegrationError, DomainError) as exc:  # the worker's jobs will retry
         log.warning("direct.deferred", booking_id=receipt.booking.id, error=type(exc).__name__)
     return RedirectResponse(f"/b/{receipt.management_token}/wait", status_code=303)
