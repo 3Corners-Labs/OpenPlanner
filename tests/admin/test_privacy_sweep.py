@@ -222,6 +222,8 @@ PATHS: dict[str, str] = {
     "/admin/organisations/{org}/login": "/admin/organisations/demo/login",
     "/admin/organisations/{org}/login/new": "/admin/organisations/demo/login/new",
     "/admin/organisations/{org}/login/{idp_key}": "/admin/organisations/demo/login/gem-a",
+    # ADR 0085 step 4: the log destinations.
+    "/admin/logging/{destination_id}": "/admin/logging/1",
 }
 """Concrete path per parametrised admin GET route; the placeholders in braces are filled
 from ``Fixture``."""
@@ -275,6 +277,17 @@ def _uow(site: Site) -> SqlUnitOfWork:
 
 def _app(site: Site) -> object:
     return site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+
+
+LOG_DESTINATION = {
+    "name": "Splunk",
+    "kind": "splunk_hec",
+    "address": "https://splunk.example.org:8088",
+    "secret": "hec-token-0123456789",
+    "index": "openplanner",
+    "min_level": "info",
+    "category_audit": "on",
+}
 
 
 async def _post(site: Site, path: str, data: dict[str, str]) -> httpx.Response:
@@ -403,6 +416,11 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     assert verdict.status_code == 200, verdict.text
     for page in (interstitial, verdict):
         assert not _leaks(page.text, set()), "test login pages"
+
+    # ADR 0085 step 4: a log destination, which holds a write-only credential.
+    destination = await _post(site, "/admin/logging", LOG_DESTINATION)
+    assert destination.status_code == 303, destination.text
+    assert destination.headers["location"].startswith("/admin/logging/1?")
 
     site.clock.advance(TODAY_0900 - site.clock.now() - timedelta(minutes=5))
     await site.login_as(SUPER)  # the session of yesterday has expired

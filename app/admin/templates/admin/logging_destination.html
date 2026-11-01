@@ -1,0 +1,115 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import form_body, field with context %}
+{% block title %}{% if view %}{{ view.destination.name }}{% else %}{{ _("admin.logging.add") }}{% endif %} · {{ _("admin.logging.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{% if view %}{{ view.destination.name }}{% else %}{{ _("admin.logging.add") }}{% endif %}</h1>
+    <p class="page-header__lead"><a href="/admin/logging">{{ _("admin.logging.title") }}</a>{% if view %} · {{ view.kind_label }}{% endif %}</p>
+  </div>
+</div>
+{% if shipping_off %}<div class="alert alert--info" role="status"><p>{{ _("admin.logging.shipping_off") }}</p></div>{% endif %}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if tested %}<div class="alert alert--success" role="status"><p>{{ tested }}</p></div>{% endif %}
+{% if test_failed %}<div class="alert alert--error" role="alert"><p>{{ test_failed }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+{% if view %}
+<section class="card" aria-labelledby="state-heading">
+  <h2 id="state-heading">{{ _("admin.logging.state") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("admin.logging.state") }}</dt><dd>{% if view.destination.enabled %}<span class="chip chip--success">{{ _("admin.logging.on") }}</span>{% else %}<span class="chip">{{ _("admin.logging.off") }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.logging.tested") }}</dt><dd>{{ view.tested or _("admin.logging.untested") }}</dd></div>
+    <div><dt>{{ _("admin.logging.updated") }}</dt><dd>{{ view.updated }}</dd></div>
+    <div><dt>{{ _("admin.logging.receives") }}</dt><dd>{{ _("admin.logging.min_level_is", level=view.level_label) }}; {{ view.categories | join(", ") or _("admin.logging.no_categories") }}{% if view.destination.include_trace %}; {{ _("admin.logging.include_trace") }}{% endif %}{% if view.destination.include_diagnostic %}; {{ _("admin.logging.include_diagnostic") }}{% endif %}</dd></div>
+    {% if view.destination.kind.has_credential %}
+    <div><dt>{{ _("admin.logging.secret") }}</dt><dd>{% if view.destination.secret_set %}{{ _("admin.logging.secret_set") }}{% else %}{{ _("admin.logging.secret_missing") }}{% endif %}</dd></div>
+    {% endif %}
+  </dl>
+  {% if can("logging.manage") %}
+  <div class="inline-forms">
+    <form method="post" action="/admin/logging/{{ view.destination.id }}/test">
+      <button type="submit" class="button button--secondary">{{ _("admin.logging.test") }}</button>
+    </form>
+    <form method="post" action="/admin/logging/{{ view.destination.id }}/enable">
+      {% if view.destination.enabled %}
+      <button type="submit" class="button button--danger">{{ _("admin.logging.disable") }}</button>
+      {% else %}
+      <input type="hidden" name="enabled" value="on">
+      <button type="submit" class="button">{{ _("admin.logging.enable") }}</button>
+      {% endif %}
+    </form>
+    <form method="post" action="/admin/logging/{{ view.destination.id }}/delete">
+      <button type="submit" class="button button--danger">{{ _("admin.logging.delete") }}</button>
+    </form>
+  </div>
+  <p class="hint">{{ _("admin.logging.actions_hint") }}</p>
+  {% endif %}
+</section>
+<section class="card" aria-labelledby="status-heading">
+  <h2 id="status-heading">{{ _("admin.logging.status") }}</h2>
+  {% if view.status %}
+  <div class="table-scroll" role="region" aria-labelledby="status-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.logging.status") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.logging.process") }}</th>
+        <th scope="col">{{ _("admin.logging.health") }}</th>
+        <th scope="col">{{ _("admin.logging.sent") }}</th>
+        <th scope="col">{{ _("admin.logging.queued") }}</th>
+        <th scope="col">{{ _("admin.logging.dropped") }}</th>
+        <th scope="col">{{ _("admin.logging.failed") }}</th>
+        <th scope="col">{{ _("admin.logging.last_ok") }}</th>
+        <th scope="col">{{ _("admin.logging.last_error") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in view.status %}
+      <tr>
+        <th scope="row">{{ s.service }}</th>
+        <td>{% if s.state.value == "failing" %}<span class="chip chip--danger">{{ _("admin.logging.health_failing") }}</span>{% elif s.state.value == "ok" %}<span class="chip chip--success">{{ _("admin.logging.health_ok") }}</span>{% else %}<span class="chip">{{ _("admin.logging.health_idle") }}</span>{% endif %}</td>
+        <td>{{ s.sent }}</td>
+        <td>{{ s.queued }}</td>
+        <td>{{ s.dropped }}</td>
+        <td>{{ s.failed }}</td>
+        <td>{{ s.last_ok or "–" }}</td>
+        <td>{% if s.reason %}{{ s.reason }}{% if s.last_error %} · {{ s.last_error }}{% endif %}{% else %}–{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>{{ _("admin.logging.no_status") }}</p>
+  {% endif %}
+  <p class="hint">{{ _("admin.logging.status_hint") }}</p>
+</section>
+{% endif %}
+{% if can("logging.manage") %}
+<form class="card" method="post" action="/admin/logging{% if view %}/{{ view.destination.id }}{% endif %}" novalidate aria-labelledby="configuration-heading">
+  <div class="card__header">
+    <h2 id="configuration-heading">{{ _("admin.logging.configuration") }}</h2>
+    <p class="card__lead">{{ _("admin.logging.configuration_lead") }}</p>
+  </div>
+  {% for f in fields %}{{ field(f) }}{% endfor %}
+  <fieldset class="field choice">
+    <legend>{{ _("admin.logging.categories") }}</legend>
+    {% for c in choices.categories %}
+    <div class="choice__option"><input type="checkbox" id="{{ c.name }}" name="{{ c.name }}" value="on"{% if c.checked %} checked{% endif %}><label for="{{ c.name }}">{{ c.label }}</label></div>
+    {% endfor %}
+    <p class="hint">{{ _("admin.logging.categories_hint") }}</p>
+  </fieldset>
+  <fieldset class="field choice">
+    <legend>{{ _("admin.logging.opt_ins") }}</legend>
+    <div class="choice__option"><input type="checkbox" id="include_trace" name="include_trace" value="on"{% if choices.include_trace %} checked{% endif %} aria-describedby="include-trace-hint"><label for="include_trace">{{ _("admin.logging.include_trace") }}</label></div>
+    <p class="hint" id="include-trace-hint">{{ _("admin.logging.include_trace_hint") }}</p>
+    <div class="choice__option"><input type="checkbox" id="include_diagnostic" name="include_diagnostic" value="on"{% if choices.include_diagnostic %} checked{% endif %} aria-describedby="include-diagnostic-hint"><label for="include_diagnostic">{{ _("admin.logging.include_diagnostic") }}</label></div>
+    <p class="hint" id="include-diagnostic-hint">{{ _("admin.logging.include_diagnostic_hint") }}</p>
+  </fieldset>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") if view else _("admin.logging.create") }}</button>
+    <a class="button button--secondary" href="/admin/logging">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

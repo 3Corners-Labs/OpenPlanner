@@ -54,6 +54,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `SIMULATOR_ENABLED` | bool | `false` | Platform-event simulator on admin booking pages; refused in production. |
 | `AGENT_API_ENABLED` | bool | `false` | Machine API for contact-center bots; off means the routes do not exist (ADR 0023). |
 | `RATE_LIMIT_ENABLED` | bool | `true` | Off switch for every rate limit; never in the portal. |
+| `LOG_SHIPPING_ENABLED` | bool | `true` | Kill switch of the log destinations (ADR 0085); off stops every one, never in the portal. |
 | `MAINTENANCE_MODE` | bool | `false` | Maintenance mode from the host, also while the database is unavailable (ADR 0038); the portal cannot switch it off. |
 | `DEV_TOKEN_KEY_PATH` | path | `data/dev-token.key` | Development management-token key file. |
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
@@ -66,6 +67,11 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 |---|---|---|---|---|---|
 | `LOG_LEVEL` | enum | `INFO` | TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL | `settings.platform.manage` | Log level; set in the portal it expires after at most 24 hours (TRACE: after at most TRACE_LEVEL_MAX_HOURS). |
 | `TRACE_LEVEL_MAX_HOURS` | int | `4` | 1–24 | `settings.platform.manage` | Hours after which LOG_LEVEL=TRACE set in the portal falls back (ADR 0085). |
+| `LOG_SHIP_BATCH_SIZE` | int | `100` | 1–1000 | `settings.platform.manage` | Lines a log destination receives in one delivery at most (ADR 0085). |
+| `LOG_SHIP_FLUSH_SECONDS` | int | `2` | 1–60 | `settings.platform.manage` | Seconds a log destination waits to fill a delivery (ADR 0085). |
+| `LOG_SHIP_TIMEOUT_SECONDS` | int | `5` | 1–30 | `settings.platform.manage` | Seconds a delivery to a log destination may take to connect and send (ADR 0085). |
+| `LOG_SHIP_QUEUE_SIZE` | int | `10000` | 1000–100000 | `settings.platform.manage` | Lines each process keeps per log destination; the oldest go when full (ADR 0085). |
+| `LOG_SHIP_BACKOFF_MAX_SECONDS` | int | `300` | 10–3600 | `settings.platform.manage` | Longest wait between two attempts to reach a failing log destination (ADR 0085). |
 | `SQL_SLOW_MS` | int | `200` | 10–10000 | `settings.platform.manage` | A statement slower than this many milliseconds leaves a sql.slow trace line (ADR 0085). |
 | `WORKER_POLL_SECONDS` | float | `30.0` | 5–300 | `settings.platform.manage` | Interval of the worker loop. |
 | `MAINTENANCE_CACHE_SECONDS` | float | `5.0` | 0–5 | `settings.platform.manage` | How long the web process trusts its last read of the maintenance switch (ADR 0038). |

@@ -22,6 +22,7 @@ import structlog
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable, set_slow_query_ms
 from app.adapters.db.jobs import SqlJobQueue
+from app.adapters.db.log_destinations import LogDestinationCredentialStore
 from app.adapters.db.maintenance import storage_limits
 from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
@@ -34,6 +35,8 @@ from app.adapters.integrations import (
     webex_fingerprint,
 )
 from app.adapters.live_settings import LiveSettings
+from app.adapters.log_senders import build_sender
+from app.adapters.log_shipping import LogShipper, ship_settings
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.adapters.tls_probe import SslCertificateProbe
@@ -59,7 +62,7 @@ from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from app.keys import management_token_key
-from app.logging import configure_logging, set_log_level, warn_loose_secret_files
+from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 
 log = structlog.get_logger()
 
@@ -100,6 +103,20 @@ async def run_worker(
         clock,
         _apply,
     )
+    # ADR 0085: copies of the log lines go to the destinations the superuser configured.
+    shipper = LogShipper(
+        LogDestinationCredentialStore(engine, secret_box(settings)),
+        build_sender,
+        uow,
+        clock,
+        "worker",
+        lambda: ship_settings(live.settings),
+        enabled=lambda: live.settings.log_shipping_enabled,
+        window=lambda: timedelta(minutes=live.settings.security_event_window_minutes),
+    )
+    shipping_stop = asyncio.Event()
+    shipping = asyncio.create_task(shipper.run(shipping_stop))
+    set_line_tap(shipper.offer)
     security = SecurityLog(
         uow,
         clock,
@@ -236,6 +253,9 @@ async def run_worker(
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=live.settings.worker_poll_seconds)
     finally:
+        set_line_tap(None)
+        shipping_stop.set()
+        await shipping
         await http.aclose()
         await engine.dispose()
         log.info("worker.stopped")

@@ -928,6 +928,27 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations/demo/embedding": statuses(303, 303, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/embedding": statuses(303, 403, 403, 303, 403, 403, 403),
     },
+    # ADR 0085 step 4: the log destinations of the platform. The list and a destination are
+    # for the superuser and the auditor (logging.view); every change is the superuser's
+    # (logging.manage is locked). No destination exists, so an id answers 404 to whoever may look.
+    "GET /admin/logging": {"/admin/logging": statuses(200, 403, 403, 403, 200, 403, 403)},
+    "GET /admin/logging/new": {"/admin/logging/new": statuses(200, 403, 403, 403, 403, 403, 403)},
+    "POST /admin/logging": {"/admin/logging": statuses(422, 403, 403, 403, 403, 403, 403)},
+    "GET /admin/logging/{destination_id}": {
+        "/admin/logging/999": statuses(404, 403, 403, 403, 404, 403, 403)
+    },
+    "POST /admin/logging/{destination_id}": {
+        "/admin/logging/999": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
+    "POST /admin/logging/{destination_id}/enable": {
+        "/admin/logging/999/enable": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
+    "POST /admin/logging/{destination_id}/delete": {
+        "/admin/logging/999/delete": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
+    "POST /admin/logging/{destination_id}/test": {
+        "/admin/logging/999/test": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
     # ADR 0083 step 2: the Login sub-tab. The status is for the organisation's own admins
     # and auditors; registering and changing is the superuser's (identity_providers.manage is
     # locked). No provider is registered, so a key answers 404 to whoever may look.

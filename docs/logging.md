@@ -64,9 +64,17 @@ Adding a trace point is a change to the registry, this table and the PII test to
 - **The host route** (ADR 0034): Docker's `splunk` logging driver, a Splunk Universal
   Forwarder or Fluent Bit reading the rotated files; `docs/runbook.md`, *Shipping audit events
   to a log platform*. Route `log_type = audit` to its own index.
-- **Log destinations in the portal** (ADR 0085 part 1, not built yet): syslog, Splunk HEC,
-  Elastic and NDJSON over HTTP, each a copy of the same lines with its own minimum level and
-  an opt-in for trace lines and diagnostic events.
+- **Log destinations** (ADR 0085 part 1): syslog (RFC 5424 over TLS, TCP or UDP), Splunk HEC,
+  Elastic or OpenSearch (`_bulk` into a data stream) and NDJSON over HTTP, each a copy of the
+  masked lines stdout carries, with its own minimum level, the audit categories it takes and an
+  opt-in for trace lines and diagnostic events. Every process (web, worker) keeps one bounded
+  queue per destination and delivers in batches in the background; a full queue drops the
+  oldest line, a failing platform is retried with backoff, and a batch the platform will never
+  accept is dropped instead of blocking the rest. A destination narrows the process's own
+  level and never widens it: it sees trace lines only while `LOG_LEVEL` is `TRACE` too. The
+  superuser manages them under Platform → Log destinations (`docs/manual/en/logging.md`):
+  add, send a test line, switch on, change and delete; the auditor sees the list and the
+  status of each process.
 
 ## Settings
 

@@ -18,6 +18,7 @@ from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, set_slow_query_ms
 from app.adapters.db.identity_providers import ProviderCredentialStore
+from app.adapters.db.log_destinations import LogDestinationCredentialStore
 from app.adapters.db.probes import ProbeReports
 from app.adapters.db.reports import ReportStore
 from app.adapters.db.text_overrides import CachedTextOverrides
@@ -33,6 +34,8 @@ from app.adapters.integrations import (
     webex_fingerprint,
 )
 from app.adapters.live_settings import LiveSettings, keep_current
+from app.adapters.log_senders import build_sender
+from app.adapters.log_shipping import LogShipper, LogTester, SenderFactory, ship_settings
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
@@ -78,6 +81,7 @@ from app.domain.identity_provider_service import IdentityProviderService
 from app.domain.idp_mapping import IdpMappingService, MappingSettings
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
+from app.domain.log_destination_service import LogDestinationService
 from app.domain.login_service import ClaimSettings, LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.meeting_status_service import MeetingStatusService
@@ -116,7 +120,7 @@ from app.keys import (
     management_token_key,
     session_secret,
 )
-from app.logging import configure_logging, set_log_level, warn_loose_secret_files
+from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
@@ -177,6 +181,7 @@ def create_app(
     discovery_fetcher: DiscoveryFetcher | None = None,
     signing_keys: SigningKeys | None = None,
     organisation_providers: OrganisationProviders | None = None,
+    log_sender_factory: SenderFactory | None = None,
 ) -> FastAPI:
     """Build the application.
 
@@ -196,6 +201,8 @@ def create_app(
         signing_keys: Explicit key generator (tests); defaults to EC P-256 pairs.
         organisation_providers: Explicit registry of organisation provider adapters (tests);
             defaults to one built from the database.
+        log_sender_factory: Explicit builder of the log destination senders (tests); defaults
+            to the real syslog, Splunk, Elastic and HTTP adapters.
 
     Returns:
         The FastAPI app with translator, booking service, rate limits and error pages. Its
@@ -307,6 +314,20 @@ def create_app(
         )
         await app.state.live_settings.refresh()
         reloader = asyncio.create_task(keep_current(app.state.live_settings))
+        # ADR 0085: copies of the log lines go to the destinations the superuser configured.
+        shipper = LogShipper(
+            LogDestinationCredentialStore(app.state.engine, secret_box(settings)),
+            log_sender_factory or build_sender,
+            uow,
+            clock,
+            "web",
+            lambda: ship_settings(live()),
+            enabled=lambda: live().log_shipping_enabled,
+            window=lambda: timedelta(minutes=live().security_event_window_minutes),
+        )
+        shipping_stop = asyncio.Event()
+        shipping = asyncio.create_task(shipper.run(shipping_stop))
+        set_line_tap(shipper.offer)
         app.state.security_log = SecurityLog(
             uow,
             clock,
@@ -321,6 +342,20 @@ def create_app(
             confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
         )
         app.state.admin_service = AdminService(uow, clock)
+        app.state.log_destination_service = LogDestinationService(
+            uow,
+            clock,
+            app.state.admin_service,
+            production=settings.environment == "prod",
+            shipping_enabled=lambda: live().log_shipping_enabled,
+            tester=LogTester(
+                LogDestinationCredentialStore(app.state.engine, secret_box(settings)),
+                log_sender_factory or build_sender,
+                clock,
+                "web",
+                lambda: ship_settings(live()),
+            ),
+        )
         # ADR 0049: claims become grants per request; the mode is class B, the prefix C.
         app.state.login_service = LoginService(
             uow,
@@ -546,6 +581,9 @@ def create_app(
         try:
             yield
         finally:
+            set_line_tap(None)
+            shipping_stop.set()
+            await shipping
             reloader.cancel()
             with suppress(asyncio.CancelledError):
                 await reloader
