@@ -112,6 +112,10 @@ class ApiClientQueries:
         await self._session.flush()
         await self._save_groups(row.id, client.groups)
 
+    async def delete_api_client(self, client_id: str) -> None:
+        """Erase the client's row; the schema's cascades take its tokens and group grants."""
+        await self._session.execute(delete(ApiClientRow).where(ApiClientRow.client_id == client_id))
+
     async def add_access_token(self, token: AccessToken) -> None:
         """Store an issued access token (its hash only)."""
         row = await self._row(token.client_id)

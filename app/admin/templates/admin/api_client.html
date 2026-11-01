@@ -43,6 +43,22 @@
     </form>
   </div>
   <p class="hint">{{ _("admin.api.actions_hint") }}</p>
+  {% if archived_groups %}
+  <div class="alert alert--info" role="status"><p>{{ _("admin.api.archived_groups", groups=archived_groups | join(", ")) }}</p></div>
+  {% endif %}
+</section>
+<section class="card" id="delete" aria-labelledby="delete-heading">
+  <div class="card__header">
+    <h2 id="delete-heading">{{ _("admin.api.delete") }}</h2>
+    <p class="card__lead">{{ _("admin.api.delete_lead") }}</p>
+  </div>
+  {% if client.client.enabled %}
+  <p class="hint">{{ _("admin.api.delete_disable_first") }}</p>
+  {% else %}
+  <form method="post" action="/admin/api/clients/{{ client.client.client_id }}/delete" class="form-actions">
+    <button type="submit" class="button button--danger">{{ _("admin.api.delete_button", name=client.client.name) }}</button>
+  </form>
+  {% endif %}
 </section>
 {% endif %}
 <form class="card" method="post" action="{% if client %}/admin/api/clients/{{ client.client.client_id }}{% else %}/admin/api/clients{% endif %}" novalidate aria-labelledby="grant-heading">

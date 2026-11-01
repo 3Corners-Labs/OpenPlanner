@@ -153,3 +153,22 @@ async def test_cross_site_posts_are_refused(superuser: Site) -> None:
 
     assert response.status_code == 403
     assert not (await service(superuser).settings()).enabled
+
+
+async def test_a_client_is_deleted_only_when_it_is_switched_off(superuser: Site) -> None:
+    """ADR 0084 point 7: two deliberate steps, disable and then delete."""
+    client_id, _ = await register(superuser)
+    url = f"/admin/api/clients/{client_id}"
+    assert f"{url}/delete" not in (await superuser.client.get(url)).text  # still on
+
+    refused = await superuser.client.post(f"{url}/delete", headers=SAME_ORIGIN)
+    await superuser.client.post(f"{url}/enable", data={}, headers=SAME_ORIGIN)
+    offered = (await superuser.client.get(url)).text
+    deleted = await superuser.client.post(f"{url}/delete", headers=SAME_ORIGIN)
+
+    assert refused.status_code == 409
+    assert "Schakel de API-client eerst uit" in refused.text
+    assert f"{url}/delete" in offered
+    assert deleted.headers["location"] == "/admin/api?done=client_deleted"
+    assert (await superuser.client.get(url)).status_code == 404
+    assert client_id not in (await superuser.client.get("/admin/api")).text

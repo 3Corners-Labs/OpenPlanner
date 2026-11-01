@@ -14,6 +14,7 @@ is visible. ``ApiAccessService`` authorises again, validates and audits.
     POST /admin/api/clients/{client_id}/rotate new secret → secret page (revokes tokens)
     POST /admin/api/clients/{client_id}/enable switch the client on or off
     POST /admin/api/clients/{client_id}/revoke revoke every live token
+    POST /admin/api/clients/{client_id}/delete delete a client that is switched off
 """
 
 from dataclasses import dataclass
@@ -184,6 +185,9 @@ async def _form_page(
             "networks": form.values.get("networks", "\n".join(current.networks) if current else ""),
             "scopes": _scope_choices(locale, form, current),
             "groups": _group_choices(overview.groups, form, current),
+            "archived_groups": sorted(
+                set(current.groups) - {g.group.slug for g in overview.groups} if current else ()
+            ),
             "lifetime_days": SECRET_LIFETIME_DAYS,
             "default_days": DEFAULT_SECRET_DAYS,
             "errors": form.errors,
@@ -332,6 +336,23 @@ async def set_enabled(
     enabled = form.text("enabled") == "on"
     await api_access(request).set_enabled(context.principal, client_id, enabled)
     return redirect_done(_url(client_id), "client_enabled" if enabled else "client_disabled")
+
+
+@router.post("/api/clients/{client_id}/delete", response_class=HTMLResponse)
+async def delete_client(
+    request: Request, locale: Locale, client_id: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Delete a client that is switched off (ADR 0084 point 7); an enabled one is refused."""
+    service = api_access(request)
+    current = await service.client(context.principal, client_id)
+    try:
+        await service.delete_client(context.principal, client_id)
+    except DomainError as error:
+        raise_refusal(error)
+        form = FormData({}, locale.gettext)
+        form.refusal(error)
+        return await _form_page(request, locale, context, form, current, 409)
+    return redirect_done(_url(), "client_deleted")
 
 
 @router.post("/api/clients/{client_id}/revoke", response_class=HTMLResponse)

@@ -140,3 +140,25 @@ async def test_tokens_are_stored_found_pruned_and_revoked(uow: SqlUnitOfWork) ->
     async with uow.locked() as tx:
         assert await tx.revoke_access_tokens(bot.client_id) == 2
         assert await tx.revoke_access_tokens(bot.client_id) == 0
+
+
+async def test_a_deleted_client_takes_its_tokens_and_grants_and_frees_its_group(
+    uow: SqlUnitOfWork,
+) -> None:
+    """ADR 0084 point 7: the cascades remove tokens and group grants; the group is free again."""
+    async with uow.locked() as tx:
+        stored = await tx.add_api_client(client(groups=frozenset({"demo"})))
+        await tx.add_access_token(token(stored.client_id, 1))
+        before = await tx.get_group("demo")
+    assert before is not None
+
+    async with uow.locked() as tx:
+        await tx.delete_api_client(stored.client_id)
+    async with uow.read() as tx:
+        gone = await tx.get_api_client(stored.client_id)
+        left = await tx.get_access_token(credential_hash("opa_1"))
+        clients = await tx.count_api_clients((await tx.get_organisation("demo")).id)  # type: ignore[union-attr]
+
+    assert gone is None
+    assert left is None
+    assert clients == 0
