@@ -117,7 +117,7 @@ class Permission(StrEnum):
     STAFF_VIEW = "staff.view"
     STAFF_MANAGE = "staff.manage"
     """ADR 0095: create, change and disable staff in the platform's own identity provider."""
-    STAFF_RESET_PASSWORD = "staff.reset_password"  # noqa: S105 - a permission name
+    STAFF_RESET_PASSWORD = "staff.reset_password"  # noqa: S105  # nosec B105 - a permission name
     """ADR 0095: mail a staff member a password reset or invitation link."""
     EMBEDDING_MANAGE = "embedding.manage"
     QUEUE_WORK = "queue.work"

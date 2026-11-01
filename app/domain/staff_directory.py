@@ -30,7 +30,7 @@ ENTITLEMENTS_EVENT = "staff.directory.entitlements_set"
 ENABLED_EVENT = "staff.directory.enabled_set"
 """Audit event: a person was enabled or disabled."""
 
-PASSWORD_RESET_EVENT = "staff.directory.password_reset_sent"  # noqa: S105 - an event name
+PASSWORD_RESET_EVENT = "staff.directory.password_reset_sent"  # noqa: S105  # nosec B105 - an event name
 """Audit event: a password reset or invitation link was sent."""
 
 ADMIN_URL_PATTERN = re.compile(
@@ -45,7 +45,7 @@ _BUILT_IN = {role.value: role for role in Role}
 class StaffAction(StrEnum):
     """What a person is asked to do through an emailed link; fixed, never configurable."""
 
-    UPDATE_PASSWORD = "update_password"  # noqa: S105 - an action name
+    UPDATE_PASSWORD = "update_password"  # noqa: S105  # nosec B105 - an action name
     VERIFY_EMAIL = "verify_email"
 
 
