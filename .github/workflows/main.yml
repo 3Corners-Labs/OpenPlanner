@@ -21,7 +21,7 @@ env:
 jobs:
   zap-baseline:
     name: OWASP ZAP baseline
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,7 +41,7 @@ jobs:
 
   mutation:
     name: mutation score >= 80% on app/domain and app/i18n
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,7 +63,7 @@ jobs:
     concurrency:
       group: release-candidate
       cancel-in-progress: false
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30   # two images; the proxy build fetches Go modules
     permissions:
       contents: write   # the rc tag and its pre-release
@@ -127,7 +127,7 @@ jobs:
     name: build, push and sign the release (application and proxy images)
     if: github.ref_type == 'tag'
     needs: [zap-baseline, mutation]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: write   # attach the SBOM to a release
@@ -215,7 +215,7 @@ jobs:
       ${{ !cancelled() && (
         (github.ref_type == 'branch' && needs.candidate.result == 'success') ||
         (github.ref_type == 'tag' && needs.publish.result == 'success')) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     environment: website
     permissions:
@@ -279,7 +279,7 @@ jobs:
     name: no deprecation warnings
     needs: [zap-baseline, mutation, candidate, publish, tour, site]
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     # Job permissions replace the workflow's, so contents: read is repeated for the checkout.
     permissions:
