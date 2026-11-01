@@ -25,7 +25,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import quote_plus, urlencode
 
 import httpx
 import jwt
@@ -35,7 +35,7 @@ from app.adapters.outbound import OutboundRefusedError, Resolver, guarded_reques
 from app.domain.authorization import Role
 from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM, SubjectRefusedError, qualify
-from app.domain.identity_providers import ASYMMETRIC_ALGORITHMS, ClientAuth
+from app.domain.identity_providers import ASYMMETRIC_ALGORITHMS, ClientAuth, issuer_of
 from app.domain.ports import IdentityError, LoginStart, LoginTestReport
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 from app.domain.tunable import value_of
@@ -98,6 +98,10 @@ class OidcConfig:
     ``client_auth`` picks the token-endpoint authentication: ``client_secret_basic`` with
     ``client_secret``, or ``private_key_jwt`` with ``signing_key`` (key id and private PEM).
     ``guard`` is set for a registered provider, whose addresses came from the portal.
+    ``expected_issuer`` is the issuer the discovery document and every ID token must carry,
+    compared exactly (OIDC Discovery §4.3, Core §3.1.3.7); ``None`` derives it from
+    ``discovery_url`` (``issuer_of``). A registered provider passes the issuer stored at
+    registration, so a later change of its discovery document cannot move it.
     """
 
     discovery_url: str
@@ -110,6 +114,12 @@ class OidcConfig:
     client_auth: ClientAuth = ClientAuth.CLIENT_SECRET_BASIC
     signing_key: tuple[str, str] | None = field(default=None, repr=False)
     guard: Guard | None = None
+    expected_issuer: str | None = None
+
+    @property
+    def issuer(self) -> str:
+        """Return the issuer to pin: the configured one, else the one the discovery URL names."""
+        return self.expected_issuer or issuer_of(self.discovery_url)
 
 
 def _values(claim: object) -> frozenset[str]:
@@ -237,6 +247,16 @@ def _code_challenge(verifier: str) -> str:
     """Return the PKCE S256 challenge for ``verifier`` (RFC 7636)."""
     digest = hashlib.sha256(verifier.encode()).digest()
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
+
+def client_secret_basic(client_id: str, client_secret: str) -> str:
+    """Return the ``Authorization`` value of OAuth ``client_secret_basic`` (RFC 6749 §2.3.1).
+
+    Each credential is form-urlencoded on its own before they are joined with a colon and
+    base64-encoded, so a colon, plus or percent sign in either survives the round trip.
+    """
+    pair = f"{quote_plus(client_id, safe='')}:{quote_plus(client_secret, safe='')}"
+    return f"Basic {base64.b64encode(pair.encode()).decode()}"
 
 
 class OidcIdentityProvider:
@@ -410,8 +430,10 @@ class OidcIdentityProvider:
         """
         auth: tuple[str, str] | None = kwargs.pop("auth", None)
         if auth is not None:
-            token = base64.b64encode(f"{auth[0]}:{auth[1]}".encode()).decode()
-            kwargs["headers"] = {**kwargs.get("headers", {}), "authorization": f"Basic {token}"}
+            kwargs["headers"] = {
+                **kwargs.get("headers", {}),
+                "authorization": client_secret_basic(*auth),
+            }
         guard = self._config.guard
         if guard is None:
             return await self._http.request(method, url, **kwargs)
@@ -453,7 +475,7 @@ class OidcIdentityProvider:
                 key=key,
                 algorithms=list(ALLOWED_ALGORITHMS),
                 audience=self._config.client_id,
-                issuer=metadata["issuer"],
+                issuer=self._config.issuer,
                 leeway=self._config.leeway_seconds,
                 options={"require": ["exp", "iat", "iss", "aud", "sub"]},
             )
@@ -483,7 +505,8 @@ class OidcIdentityProvider:
         """Return the provider metadata (cached for an hour).
 
         Raises:
-            IdentityError: ``discovery_failed`` if the document cannot be fetched.
+            IdentityError: ``discovery_failed`` if the document cannot be fetched or announces
+                another issuer than the pinned one.
         """
         if (
             self._metadata is not None
@@ -500,5 +523,8 @@ class OidcIdentityProvider:
         except (httpx.HTTPError, ValueError, OutboundRefusedError) as exc:
             log.warning("oidc.discovery_failed", error=type(exc).__name__)
             raise IdentityError("discovery_failed") from exc
+        if metadata["issuer"] != self._config.issuer:  # exact: no trailing-slash tolerance
+            log.warning("oidc.issuer_mismatch")
+            raise IdentityError("discovery_failed")
         self._metadata, self._metadata_at = metadata, time.monotonic()
         return metadata

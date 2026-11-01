@@ -37,6 +37,8 @@ When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
     ``python -m app.cli oidc-check``  check the login configuration and print the claim mapping
     ``python -m app.cli tls-check [--host H] [--port P]``  the certificate of the public address
         (ADR 0064): stored for System status; with ``--host`` another server, stored nowhere
+    ``python -m app.cli purge-overdue [--dry-run]``  purge the personal data past its purge
+        moment now (the nightly sweep does this too); ``--dry-run`` only counts per group
     ``python -m app.cli closure start (--group SLUG | --organisation SLUG) --notice-nl TEXT
     --notice-en TEXT [--end ISO]``  emergency closure (ADR 0024), audited as ``system:cli``
     ``python -m app.cli closure lift (--group SLUG | --organisation SLUG)``  end it now
@@ -50,6 +52,7 @@ import argparse
 import asyncio
 import dataclasses
 import json
+import os
 import sys
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
@@ -70,6 +73,11 @@ from app.adapters.db.backup import (
     database_path,
     prune_backups,
     restore_database,
+)
+from app.adapters.db.configuration_package import (
+    SqliteConfigurationTransfer,
+    environment_values,
+    portable_environment,
 )
 from app.adapters.db.engine import create_engine
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
@@ -106,12 +114,15 @@ from app.domain.admin import AdminService
 from app.domain.authorization import Grant, Principal, Role, RoleCatalogue, Scope
 from app.domain.client_pseudonym import UNKNOWN_CLIENT, ClientPseudonyms
 from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcome
+from app.domain.configuration_package import COUNTED_TABLES, PackageSummary
+from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.entitlements import ClaimMode, resolve
 from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
 from app.domain.ports import CertificateProbe, IdentityError, IntegrationError
+from app.domain.retention_sweep import RetentionSweep
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.settings_registry import lookup
@@ -387,6 +398,27 @@ async def _maintenance(settings: Settings, action: str, reason: str, actor: str)
         await engine.dispose()
 
 
+async def _purge_overdue(settings: Settings, dry_run: bool = False) -> tuple[str, bool]:
+    """Run the retention sweep once and report counts (WP-A1); the second item is success.
+
+    Only counts and group slugs are printed. It fails when a booking could not be purged.
+    """
+    engine = create_engine(settings.database_url)
+    try:
+        result = await RetentionSweep(SqlUnitOfWork(engine), SystemClock()).run(dry_run=dry_run)
+    finally:
+        await engine.dispose()
+    lines = [f"{slug}: {count} overdue\n" for slug, count in sorted(result.per_group.items())]
+    if dry_run:
+        lines.append(f"{result.overdue} bookings overdue ({result.backlog} for over 48 hours)\n")
+    else:
+        lines.append(
+            f"purged {result.purged} of {result.overdue} overdue bookings "
+            f"({result.failed} failed, {result.backlog} were over 48 hours)\n"
+        )
+    return "".join(lines), result.failed == 0
+
+
 async def _tls_check(
     settings: Settings,
     host: str | None = None,
@@ -640,6 +672,7 @@ async def _oidc_check(
         redirect_uri=f"{settings.public_base_url.rstrip('/')}/admin/callback",
         require_https=settings.environment == "prod",
         client_secret_set=settings.oidc_client_secret is not None,
+        expected_issuer=settings.oidc_issuer,
     )
     async with httpx.AsyncClient(timeout=15.0, transport=transport) as http:
         results = await check_oidc(http, target)
@@ -772,6 +805,112 @@ def _moment(value: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
+CONFIG_ACTOR = "system:cli"
+"""The audit actor of the host's configuration commands (ADR 0042 §10, ADR 0089 point 6)."""
+
+
+def _config_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
+    """Add ``config export|show|import|env`` (ADR 0089): the configuration package on the host."""
+    config_cmd = commands.add_parser(
+        "config", help="export or import a configuration package (ADR 0089)"
+    )
+    actions = config_cmd.add_subparsers(dest="action", required=True)
+    export_cmd = actions.add_parser("export", help="write a package of this installation")
+    export_cmd.add_argument("path", type=Path, help="the package file to write (mode 600)")
+    show_cmd = actions.add_parser("show", help="what a package holds")
+    show_cmd.add_argument("path", type=Path, help="the package file")
+    import_cmd = actions.add_parser(
+        "import", help="replace this installation's configuration (not in use only)"
+    )
+    import_cmd.add_argument("path", type=Path, help="the package file")
+    env_cmd = actions.add_parser("env", help="write the package's login variables as an env file")
+    env_cmd.add_argument("path", type=Path, help="the package file")
+    env_cmd.add_argument(
+        "--out",
+        type=Path,
+        required=True,
+        help="the env file to write (600), or - for standard output (the installer's one-off "
+        "container, whose filesystem is read-only; ADR 0089 point 8)",
+    )
+    for sub in (export_cmd, show_cmd, import_cmd, env_cmd):
+        sub.add_argument(
+            "--passphrase-file",
+            type=Path,
+            required=True,
+            metavar="PATH",
+            help="a file whose first line is the passphrase (never on the command line)",
+        )
+
+
+def _passphrase(path: Path) -> str:
+    """Return the first line of ``path`` without its line ending."""
+    with path.open(encoding="utf-8") as handle:
+        return handle.readline().rstrip("\r\n")
+
+
+def _write_private(path: Path, data: bytes) -> None:
+    """Write ``data`` to ``path`` with mode 600, replacing an existing file."""
+    path.unlink(missing_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
+
+
+def _summary_lines(summary: PackageSummary) -> str:
+    """Return a package summary as the ``show`` and ``import`` commands print it."""
+    rows = [
+        ("exported", summary.created_at.isoformat()),
+        ("from", summary.installation or "(no installation name)"),
+        ("version", summary.app_version or "(development)"),
+        ("revision", summary.revision),
+        *((name, str(summary.counts.get(name, 0))) for name in COUNTED_TABLES),
+        ("secrets", str(summary.secrets)),
+        ("environment", ", ".join(summary.environment) or "(none)"),
+    ]
+    return "".join(f"{name:<20}{value}\n" for name, value in rows)
+
+
+async def _config(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
+    """Run a ``config`` command; return the report and exit code. Never prints a secret."""
+    passphrase = _passphrase(args.passphrase_file)
+    engine = create_engine(settings.database_url)
+    clock = SystemClock()
+    transfer = SqliteConfigurationTransfer(
+        database_path(settings.database_url),
+        secret_box(settings),
+        installation=settings.installation_name,
+        app_version=settings.app_version,
+        environment=lambda: portable_environment(settings),
+        now=clock.now,
+    )
+    service = ConfigurationPackageService(
+        transfer,
+        clock,
+        AdminService(SqlUnitOfWork(engine), clock),
+        max_bytes=lambda: settings.configuration_package_max_mb * 1024 * 1024,
+    )
+    try:
+        if args.action == "export":
+            _write_private(args.path, await service.export(CONFIG_ACTOR, passphrase))
+            return f"package written: {args.path}\n", 0
+        package = await asyncio.to_thread(Path(args.path).read_bytes)
+        if args.action == "show":
+            return _summary_lines(await service.inspect(package, passphrase)), 0
+        if args.action == "env":
+            values = environment_values(package, passphrase, transfer.work_dir)
+            lines = "".join(f"{key}={value}\n" for key, value in values.items())
+            if str(args.out) == "-":
+                return lines, 0
+            _write_private(args.out, lines.encode())
+            return f"env file written: {args.out} ({len(values)} variables)\n", 0
+        summary = await service.import_(CONFIG_ACTOR, package, passphrase)
+        return "configuration imported\n" + _summary_lines(summary), 0
+    except DomainError as error:
+        return f"Refused ({error.code.value}).\n", 2
+    finally:
+        await engine.dispose()
+
+
 def _closure_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
     """Add ``closure start`` and ``closure lift``, each for one group or one organisation."""
     closure = commands.add_parser("closure", help="emergency closure while nobody can log in")
@@ -902,6 +1041,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
+    purge_cmd = commands.add_parser(
+        "purge-overdue", help="purge personal data past its purge moment (nightly sweep, now)"
+    )
+    purge_cmd.add_argument("--dry-run", action="store_true", help="only count, per group")
     commands.add_parser("version", help="print the release and commit of this image")
     commands.add_parser("update-claim", help="claim the waiting update request (host updater)")
     progress_cmd = commands.add_parser("update-progress", help="record the step an update starts")
@@ -947,6 +1090,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     tls_cmd.add_argument("--host", help="probe another server instead (stored nowhere)")
     tls_cmd.add_argument("--port", type=int, help="its port (default 443)")
     _closure_parser(commands)
+    _config_parser(commands)
     settings_cmd = commands.add_parser("settings", help="show settings and their source")
     settings_actions = settings_cmd.add_subparsers(dest="action", required=True)
     settings_actions.add_parser("list", help="every setting: class, source, lock, value")
@@ -982,10 +1126,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             sample = _read_claims(Path(args.claims))
             return _write(asyncio.run(_oidc_claims(Settings(), sample)))
         return _write(asyncio.run(_oidc_check(Settings())))
+    if args.command == "purge-overdue":
+        return _write(asyncio.run(_purge_overdue(Settings(), args.dry_run)))
     if args.command == "tls-check":
         return _write(asyncio.run(_tls_check(Settings(), args.host, args.port)))
     if args.command == "closure":
         return _closure(Settings(), args)
+    if args.command == "config":
+        text, code = asyncio.run(_config(Settings(), args))
+        sys.stdout.write(text)
+        return code
     if args.command == "settings" and args.action in ("set", "reset"):
         text, code = asyncio.run(_change_setting(Settings(), args))
         sys.stdout.write(text)

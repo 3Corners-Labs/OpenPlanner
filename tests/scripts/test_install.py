@@ -380,6 +380,8 @@ def test_lab_mode_runs_the_dev_services_and_removes_a_stray_proxy(host: Host) ->
 
     assert result.returncode == 0, result.stderr
     assert host.settings(".env")["ENVIRONMENT"] == "test"
+    # Keycloak announces KC_HOSTNAME, not the address the web container fetches it on (ADR 0097).
+    assert host.settings(".env")["OIDC_ISSUER"] == "http://127.0.0.1:8080/realms/openplanner"
     assert host.settings(".env.update")["COMPOSE_PROFILES"] == "dev"
     assert not host.file("proxy.env").exists()
     assert host.ran("--profile tls rm --stop --force proxy")
@@ -658,3 +660,157 @@ def test_the_channel_flag_is_gone(host: Host) -> None:
     assert result.returncode != 0
     assert "/admin/updates" in result.stderr
     assert not host.file(".env").exists()
+
+
+# A configuration package (ADR 0089 step 4): the login comes from the package, the rest after
+# the web container is healthy.
+
+
+CONFIG_ENV = "secrets/config.env"
+
+
+def _package(host: Host) -> dict[str, str]:
+    package = host.root / "openplanner-configuration-test.sqlite"
+    package.write_bytes(b"SQLite format 3\0a package")
+    package.chmod(0o600)
+    passphrase = host.root / "passphrase"
+    passphrase.write_text("a passphrase of sixteen chars\n")
+    passphrase.chmod(0o600)
+    return {"--configuration": str(package), "--passphrase-file": str(passphrase)}
+
+
+def _with_package(host: Host, *args: str, **settings: str) -> subprocess.CompletedProcess[str]:
+    options = [item for pair in _package(host).items() for item in pair]
+    return host.run(*args, *options, "--non-interactive", **settings)
+
+
+HOST_SETTINGS = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
+
+
+def test_the_configuration_and_passphrase_options_go_together(host: Host) -> None:
+    options = _package(host)
+    for option, path in options.items():
+        result = host.run("--mode", "production", option, path, "--non-interactive", **PRODUCTION)
+
+        assert result.returncode == 1
+        assert "--configuration and --passphrase-file go together" in result.stderr
+        assert not host.file(".env").exists()
+
+    missing = host.run(
+        "--mode",
+        "production",
+        "--configuration",
+        options["--configuration"],
+        "--passphrase-file",
+        str(host.root / "nowhere"),
+        "--non-interactive",
+        **PRODUCTION,
+    )
+    assert missing.returncode == 1
+    assert "cannot read the passphrase file" in missing.stderr
+
+
+def test_the_package_answers_the_login_questions_and_is_imported_once_healthy(
+    host: Host,
+) -> None:
+    result = _with_package(host, "--mode", "production", **HOST_SETTINGS)
+
+    assert result.returncode == 0, result.stderr
+    # The login values from the package, in their own file, quoted as the installer quotes.
+    assert mode(host.file(CONFIG_ENV)) == 0o600
+    assert host.settings(CONFIG_ENV) == {
+        "OIDC_DISCOVERY_URL": "https://idp.example.nl/.well-known/openid-configuration",
+        "OIDC_CLIENT_ID": "openplanner-admin",
+        "OIDC_CLIENT_SECRET": "secret-from-the-package",
+        "OIDC_SCOPES": "openid profile email",
+    }
+    env = host.settings(".env")
+    assert not {key for key in env if key.startswith("OIDC_")}
+    assert env["PUBLIC_BASE_URL"] == "https://afspraak.example.nl"
+    commands = host.commands()
+    # The package is read by a one-off container before .env exists; the passphrase never on
+    # the command line, the package copy readable by the container's user and removed again.
+    env_read = next(c for c in commands if "app.cli config env" in c)
+    assert "run --rm --no-deps -T" in env_read
+    assert "--passphrase-file /dev/stdin" in env_read
+    assert "a passphrase of sixteen chars" not in " ".join(commands)
+    assert not list(host.checkout.glob(".package.*"))
+    # The import waits for health and uses a copy inside the container.
+    started = commands.index(next(c for c in commands if c.endswith(" up -d")))
+    imported = commands.index(next(c for c in commands if "app.cli config import" in c))
+    assert started < imported
+    assert any(c.endswith("web:/srv/data/configuration-package.sqlite") for c in commands)
+    assert host.ran("exec -T web rm -f /srv/data/configuration-package.sqlite")
+    assert "organisations       2" in result.stdout
+    assert "secret-from-the-package" not in result.stdout + result.stderr
+
+
+def test_a_refused_import_stops_the_installation_with_a_clear_error(host: Host) -> None:
+    host.given("fail", "config-import\n")
+
+    result = _with_package(host, "--mode", "production", **HOST_SETTINGS)
+
+    assert result.returncode == 1
+    assert "configuration_installation_in_use" in result.stderr
+    assert "in use" in result.stderr
+    assert host.ran("exec -T web rm -f /srv/data/configuration-package.sqlite")
+    assert not host.ran("openplanner-updater.timer")
+
+
+def test_a_package_without_a_login_leaves_the_questions_to_the_environment(host: Host) -> None:
+    host.given("config-env", "")
+
+    result = _with_package(host, "--mode", "production", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(CONFIG_ENV) == {}
+    assert host.settings(".env")["OIDC_CLIENT_SECRET"] == "client-secret-from-the-idp"
+
+
+def test_a_wrong_passphrase_stops_before_anything_is_written(host: Host) -> None:
+    host.given("fail", "config-env\n")
+
+    result = _with_package(host, "--mode", "production", **HOST_SETTINGS)
+
+    assert result.returncode == 1
+    assert "configuration_passphrase_wrong" in result.stderr
+    assert not host.file(CONFIG_ENV).exists()
+    assert not host.file(".env").exists()
+    assert not host.ran(" up -d")
+
+
+def test_non_interactive_runs_take_the_package_from_the_environment(host: Host) -> None:
+    options = _package(host)
+
+    result = host.run(
+        "--mode",
+        "production",
+        "--non-interactive",
+        OPENPLANNER_CONFIGURATION=options["--configuration"],
+        OPENPLANNER_PASSPHRASE_FILE=options["--passphrase-file"],
+        **HOST_SETTINGS,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(CONFIG_ENV)["OIDC_CLIENT_SECRET"] == "secret-from-the-package"
+    assert host.ran("app.cli config import")
+
+
+def test_the_login_in_config_env_satisfies_the_production_checks(host: Host) -> None:
+    # A rerun without the package: .env has no OIDC_*, config.env has them; nothing to report.
+    assert _with_package(host, "--mode", "production", **HOST_SETTINGS).returncode == 0
+    (host.fakes / "calls.jsonl").unlink()
+
+    result = host.run("--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    assert not host.ran("app.cli config")
+    assert host.settings(CONFIG_ENV)["OIDC_CLIENT_SECRET"] == "secret-from-the-package"
+
+    # An explicit .env still wins: the check follows it and reports what is missing there.
+    host.file(".env").write_text(
+        host.file(".env").read_text() + "OIDC_DISCOVERY_URL='http://idp.example.nl/.well-known'\n"
+    )
+    again = host.run("--non-interactive")
+    assert again.returncode == 1
+    assert "OIDC_DISCOVERY_URL must start with https://" in again.stderr

@@ -123,7 +123,7 @@ async def test_an_empty_web_address_is_made_from_the_name(site: Site) -> None:
         "/admin/groups",
         {
             "organisation": "demo",
-            "name": "FIN BLD Video groep 1",
+            "name": "Financiën Video groep 1",
             "slug": "",
             "timezone": "Europe/Amsterdam",
             "slot_minutes": "30",
@@ -131,7 +131,7 @@ async def test_an_empty_web_address_is_made_from_the_name(site: Site) -> None:
     )
 
     assert response.status_code == 303  # type: ignore[attr-defined]
-    assert response.headers["location"] == "/admin/groups/fin-bld-video-groep-1?done=created"  # type: ignore[attr-defined]
+    assert response.headers["location"] == "/admin/groups/financien-video-groep-1?done=created"  # type: ignore[attr-defined]
 
 
 async def test_a_typed_web_address_is_tidied_to_the_rules(site: Site) -> None:

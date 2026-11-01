@@ -14,7 +14,7 @@ string values, to find the routing variable, its branches and the queues used.
 
 The queue naming rule is advice, not a requirement (``WARN``): the queue a group lands in
 should contain the group's routing value as a name part, with ``-``, ``_``, spaces and case
-treated alike (``aangifte`` matches ``FIN-BLD_videoafspraak_aangifte_01``).
+treated alike (``aangifte`` matches ``ORG_videoafspraak_aangifte_01``).
 """
 
 import re

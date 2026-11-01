@@ -272,7 +272,10 @@
       "cohost": "cohost"
     },
     "video_captions": "Nederlands",
-    "video_help": "Zonder geluid; de ondertitels beschrijven wat er te zien is. De stappen staan ook als tekst in de tour hierboven."
+    "video_help": "Zonder geluid; de ondertitels beschrijven wat er te zien is. De stappen staan ook als tekst in de tour hierboven.",
+    "screens_title": "De echte schermen",
+    "screens_lead": "Stilstaande beelden uit dezelfde opname, in de volgorde van het verhaal. Klik op een scherm voor het volle formaat.",
+    "screens_alt": "Scherm {n} van de opname, op ware grootte"
   },
   "how": {
     "title": "Hoe het werkt",
@@ -407,6 +410,105 @@
   "enterprise": {
     "title": "Waarom we OpenPlanner enterprise-klaar noemen",
     "lead": "Niet door een lijst vinkjes, maar door de opbouw: een kern zonder framework, elke externe dienst achter een poort, en regels die de pipeline afdwingt in plaats van een reviewer.",
+    "plate": {
+      "title": "Architectuurplaat: wat er draait en wat waarheen gaat",
+      "lead": "Eén server in uw eigen beheer, twee containers en één database. Alles daarbuiten is een systeem dat u al hebt, aangesloten via een adapter.",
+      "people_title": "Wie het gebruikt",
+      "people": [
+        {
+          "name": "Deelnemer",
+          "sub": "browser of widget, geen account, geen app"
+        },
+        {
+          "name": "Beheerders en planners",
+          "sub": "beheerportaal, inloggen bij uw eigen IdP"
+        },
+        {
+          "name": "Medewerkers",
+          "sub": "werkitem in Webex Contact Center of de eigen wachtrij"
+        },
+        {
+          "name": "Bots",
+          "sub": "machine-API met OAuth client credentials"
+        }
+      ],
+      "host_title": "Uw server",
+      "host": [
+        {
+          "key": "proxy",
+          "name": "HTTPS-proxy",
+          "sub": "Caddy: Let's Encrypt of uw eigen certificaat"
+        },
+        {
+          "key": "web",
+          "name": "web",
+          "sub": "deelnemerspagina's, beheerportaal, API"
+        },
+        {
+          "key": "worker",
+          "name": "worker",
+          "sub": "geplande taken: meetings, berichten, werkitems, wissen"
+        },
+        {
+          "key": "db",
+          "name": "SQLite (WAL)",
+          "sub": "persoonsgegevens alleen bij de afspraak, 24 uur na het gesprek gewist"
+        },
+        {
+          "key": "updater",
+          "name": "host-updater",
+          "sub": "controleert de handtekening, maakt een back-up, rolt zelf terug"
+        }
+      ],
+      "host_note": "Containers draaien zonder rootrechten op een alleen-lezen bestandssysteem.",
+      "adapters": "adapters",
+      "systems_title": "Systemen die u al hebt",
+      "systems": [
+        {
+          "name": "Webex Meetings",
+          "sub": "een echte meeting per afspraak"
+        },
+        {
+          "name": "Webex Contact Center",
+          "sub": "werkitem met voornaam, join-link en routering"
+        },
+        {
+          "name": "Identity provider",
+          "sub": "OIDC: PingFederate, Keycloak, Entra ID"
+        },
+        {
+          "name": "E-mail en sms",
+          "sub": "SMTP en sms-gateway, per organisatie"
+        },
+        {
+          "name": "Logbestemmingen",
+          "sub": "syslog, Splunk, Elastic of HTTP"
+        },
+        {
+          "name": "GitHub-releases",
+          "sub": "ondertekende images met SBOM"
+        },
+        {
+          "name": "Webex Messaging",
+          "sub": "meldingen aan beheerders, zonder persoonsgegevens",
+          "planned": true
+        }
+      ],
+      "planned": "op de roadmap",
+      "flows_title": "Wat waarheen gaat",
+      "flows": [
+        "De deelnemer boekt via HTTPS; de gegevens blijven in de database op uw server.",
+        "De worker maakt de Webex-meeting en stuurt bevestiging en herinneringen per e-mail of sms.",
+        "Vijf minuten voor de start krijgt het contact center een werkitem met alleen voornaam, join-link en routeringskenmerken.",
+        "Beheerders loggen in bij uw eigen identity provider; elke beslissing komt in het auditlog, dat u naar uw eigen logsystemen kunt sturen.",
+        "Updates komen als ondertekende images; de host-updater controleert de handtekening voordat hij wisselt."
+      ],
+      "caption": "Vereenvoudigd. De volledige plaat, met elke stroom en het besluit erachter, staat in de repository.",
+      "link": {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/architecture.md#3-system-context",
+        "label": "Systeemcontext en containers"
+      }
+    },
     "arch_title": "Architectuur en bouwblokken",
     "arch_caption": "De pijlen lopen één kant op. import-linter weigert bij elke pull request een import die deze lagen doorbreekt.",
     "layers": [

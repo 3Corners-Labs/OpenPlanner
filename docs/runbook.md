@@ -112,9 +112,23 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
 
 - `FORWARDED_ALLOW_IPS=<proxy address>` (read by uvicorn), so rate limits see the visitor's IP
   instead of one shared proxy address. Without it, a single bot can exhaust the booking limit
-  for everyone.
+  for everyone. It is also what makes the app trust the proxy's `X-Forwarded-Proto`: without
+  it the app thinks it is reached over `http` and its own redirects (for example `/admin` to
+  `/admin/`) send the browser to `http://`. Use the address the `web` container sees the proxy
+  connect from, not the proxy's own: a proxy on the same host that connects to the published
+  port arrives from the gateway of the compose network
+  (`docker network inspect openplanner_default --format '{{(index .IPAM.Config 0).Gateway}}'`).
+  Check it from outside: `curl -sI https://<host name>/admin` must answer with a
+  `Location: https://…`.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 - No access log on the proxy: paths carry management tokens.
+- Answer plain `http://` requests for `/api/*` and `/webhooks/*` with `403` and no `Location`
+  header, and redirect only the browser paths. A redirect makes a bot or Webex Connect flow that
+  was configured with `http://` repeat its POST, with the client secret or webhook body, in
+  clear text and still succeed, so nobody notices. The bundled proxy does this; in Caddy:
+  `@machine path /api/* /webhooks/*`, `handle @machine { respond "HTTPS required" 403 }`, then
+  `handle { redir https://{host}{uri} 308 }`. Also let `TRACE` reach the app (it answers 405) and
+  do not serve `/static/` from the proxy itself. `scripts/check-proxy.sh` shows what to expect.
 
 **What is configured, and from where?** Every setting and its class (ADR 0042) is listed in
 `docs/settings.md`. On the host, without sending anyone the `.env`:
@@ -469,6 +483,60 @@ There is no login bypass, fallback IdP or local account. Diagnose and act from t
    reinstating and cancelling wait until someone can log in to the portal (*Noodsluiting*).
    The notices are shown to participants and mailed: plain text, no names or other personal data.
 
+## Bundled identity provider (ADR 0090)
+
+A `test` or `lab` installation can log in without an identity provider of the organisation's
+own: the compose profile `idp` runs Keycloak on the host with one client, `openplanner-admin`,
+and one user, `super`, who holds every built-in role. It is an identity provider like any other
+(ADR 0013 applies, no local account, no bypass); only its secrets are generated on the host.
+
+**Where the secrets are.** `secrets/keycloak.env` (mode 600, next to `secrets/secrets.env`,
+never copied off the host) holds the admin console password (`KC_BOOTSTRAP_ADMIN_PASSWORD`,
+user `admin`), the client secret (`KC_OPENPLANNER_CLIENT_SECRET`) and the first password of
+`super` (`KC_SUPER_PASSWORD`). The realm Keycloak imports is `secrets/keycloak-realm.json`,
+rendered from `deploy/keycloak/realm.template.json`:
+
+```sh
+cd ~/openplanner
+scripts/render-keycloak-realm.sh
+docker compose --profile idp up -d idp
+```
+
+The script generates every value that is missing, keeps the ones that exist, takes the
+portal's address from `PUBLIC_BASE_URL` in `.env` (the redirect URIs), and prints no value.
+`OIDC_CLIENT_SECRET` in `.env` must equal `KC_OPENPLANNER_CLIENT_SECRET`, and
+`OIDC_DISCOVERY_URL` points at `http://idp:8080/realms/openplanner/.well-known/openid-configuration`;
+the installer does both in step 2 of ADR 0090 (until then, by hand). Also set
+`OIDC_ISSUER` to `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public address, not
+the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097).
+`python -m app.cli oidc-check` compares the two and names the issuer to set when they differ.
+When Keycloak itself sits behind a TLS proxy, set `KC_PROXY_HEADERS=xforwarded` (and let the
+proxy send `X-Forwarded-Proto`): otherwise Keycloak announces its token endpoint and key set as
+`http://`, and `oidc-check` fails on *provider endpoints* in production. Keycloak's own address
+for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`): a lab on the
+host itself needs nothing more; reaching the login from another machine goes through the proxy
+and is step 2. The admin console is bound to the host's loopback and is never published.
+
+**First login of `super`.** Read the first password on the host
+(`grep KC_SUPER_PASSWORD secrets/keycloak.env`), log in to the portal as `super`, and Keycloak
+asks for a new password before it returns to the portal (the required action
+`UPDATE_PASSWORD`). The first password is then spent; the file keeps it only as the value the
+realm was rendered with. Staff of organisations without a provider of their own are created
+in this Keycloak (admin console, realm `openplanner`, with the `roles`, `organisations`,
+`groups` or `entitlements` attributes the development realm's `README.md` describes).
+
+**Resetting the password of `super`.** On the host, open the admin console at
+http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` with
+`KC_BOOTSTRAP_ADMIN_PASSWORD`, open realm `openplanner` → *Users* → `super` →
+*Credentials* → *Reset password*, tick *Temporary* so the next login asks for a new one. The
+CLI of ADR 0042 §10 creates no user and starts no session; the admin console is the only way.
+
+**Data.** The named volume `idp-data` holds the staff accounts and their password hashes:
+back it up with the database volume, and treat it as personal data (`docs/dataflow.md`).
+Deleting it and starting again re-imports the rendered realm, so `super` gets the first
+password of `secrets/keycloak.env` back; a changed `KC_OPENPLANNER_CLIENT_SECRET` needs a new
+render and a restart of `idp` and `web`.
+
 ## Webex meetings and Webex Contact Center
 
 Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
@@ -754,7 +822,7 @@ is 1 while a `FAIL` remains.
 
 **Naming rule (advice).** Name each team's queue so that it contains the group's routing value
 as a name part; `-`, `_`, spaces and case count as the same. With routing value `aangifte`,
-`FIN-BLD_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
+`ORG_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
 per group which queue it will use, and a wrong Case branch stands out. Prefer routing values
 without spaces (the web address of the group is a good default).
 
@@ -975,7 +1043,8 @@ clones that repository, replaces the site files with the build, commits `site: <
 |---|---|---|
 | Merge to `main` | `site`, after the candidate job: build with the releases and the roadmap from GitHub, upload the artifact, push | the site on TransIP, with the candidate that merge made on it |
 | Tag `vX.Y.Z` | the same after `publish`, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page, and the site on TransIP with the new release on it |
-| Tag `vX.Y.Z` (also) | `tour` (`.github/workflows/tour.yml`): the e2e stack, `e2e/tour/tour.spec.ts`, the captions | `tour.webm`, `tour.jpg`, `tour.nl.vtt`, `tour.en.vtt`, `tour.json` on the release; the `site` job puts the newest one on the page |
+| Tag `vX.Y.Z` (also) | `tour` (`.github/workflows/tour.yml`): the e2e stack, `e2e/tour/tour.spec.ts`, the captions | `tour.webm`, `tour.jpg`, `tour.nl.vtt`, `tour.en.vtt`, `tour.json` and a still per main chapter (`tour-<chapter>.jpg`) on the release; the `site` job puts the newest one on the page, the stills as a gallery |
+| Release candidate (by hand) | *Actions → tour → Run workflow* with the `vX.Y.Z-rc.N` tag: candidates are tagged by `GITHUB_TOKEN` and start no workflow, so they are recorded only on request | the recording on that candidate; the next merge to `main` puts it on the page |
 | Pull request, fork | nothing (`main.yml` only) | a local `make site` is the preview |
 
 ### Once: the deploy settings
@@ -1057,9 +1126,12 @@ sets no cookie; the host's access log is TransIP's and is not shipped anywhere b
 
 ## Management token key
 
-`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Rotating it invalidates every
-link in mails already sent; bookings are unaffected. Rotate only after an incident, and tell the
-contact center that participants may call about broken links.
+`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Until ADR 0094 step 2 is built,
+rotating it does not break the links in mails already sent (they are found by their stored
+hash), but every message sent afterwards to an open booking (reminder, change, confirmation)
+carries a link that no longer works. Rotate only after an incident, tell the contact center
+that participants may call about broken links, and expect that agents no longer see their
+earlier claims as their own (ADR 0043 pseudonyms).
 
 ## Releasing a version (ADR 0052, ADR 0079)
 
@@ -1404,6 +1476,45 @@ until then the proxy serves Let's Encrypt. The same holds for `proxy-data` (the 
 account): keep it with the host, or let Caddy obtain a certificate again.
 
 
+## Configuration package (ADR 0089)
+
+A package is every setting of an installation (organisations, groups, texts, channels, identity
+providers, API clients, platform settings) with its secrets, and nothing that happened on it
+(no bookings, no log, no staff). It sets up a new test or production installation in one go.
+The superuser makes and imports one on *Advanced settings*; on the host the same runs as:
+
+```sh
+cd ~/openplanner
+printf '%s\n' 'a passphrase of at least sixteen characters' > secrets/package.passphrase
+chmod 600 secrets/package.passphrase
+docker compose --env-file .env.update exec web python -m app.cli config export /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
+docker compose --env-file .env.update cp web:/srv/data/config.sqlite ./config.sqlite
+```
+
+On the new installation, after `install.sh` and before anyone creates a group:
+
+```sh
+docker compose --env-file .env.update cp ./config.sqlite web:/srv/data/config.sqlite
+docker compose --env-file .env.update exec web python -m app.cli config show /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
+docker compose --env-file .env.update exec web python -m app.cli config import /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
+```
+
+`config env PACKAGE --passphrase-file PATH --out FILE` writes the package's `OIDC_*` variables
+(the login) as an env file, for a `.env` that is not yet filled in (`--out -` prints them,
+for the installer's one-off container). An import is refused on an installation with
+bookings, slots or an active closure, and on another version of OpenPlanner (export again
+from an installation on this version). Delete the package and the passphrase file when done:
+together they are every secret of the platform. Both commands are audited as `system:cli`.
+
+A new host does all of this in one go: `./scripts/install.sh --mode production
+--configuration PACKAGE --passphrase-file PATH` (ADR 0089 point 8; `docs/install.md`,
+*Installing from a configuration package*). It writes the login to `secrets/config.env`, which
+Compose reads before `.env` (a value in `.env` wins), leaves the identity provider's questions
+out, and imports the package once web is healthy. Running it again with the two options writes
+`config.env` again and imports again, which is refused once the installation is in use; a run
+without them leaves `config.env` as it is. Removing `config.env` and running the installer
+again asks the login questions as before.
+
 ## Rotating secrets
 
 Bootstrap secrets come from environment variables, `X_FILE` or `secrets/secrets.env`
@@ -1525,18 +1636,40 @@ is not judged: it is the operator's own doing.
 **Retention** in the admin portal (organisation admins, the compliance role and the superuser)
 shows per group how many bookings still hold personal data past their purge moment and how
 many `purge_pii` jobs failed. Both should be 0. A booking counts as overdue one hour after its
-purge moment (slot end + 24 h, cancellation + 24 h, or closure end + 30 days), which leaves
+purge moment (slot end + 24 h, cancellation + 24 h, deadline to confirm or choose a new time
++ 24 h, or closure end + 30 days), which leaves
 room for the worker and its retries.
 
 | Shown | Likely cause | What to do |
 |---|---|---|
 | Overdue > 0, failed 0, "last removed" long ago | the `worker` container is not running or not claiming jobs | `docker compose ps worker`, then `docker compose logs worker`; restart it; the backlog clears on its own |
 | Failed > 0 | the purge itself failed (database locked or full) | look up the code at **Remove personal data** in the audit log (Problems only); fix the cause and report the code to the developers (below) |
-| Overdue > 0 for a suspended booking | the closure was lifted, but no purge job was planned | report it to the developers as a bug (below) |
+| Overdue > 0 for a suspended booking | the closure was lifted, but no purge job was planned | none: the nightly sweep purges it (below); report it to the developers as a bug |
 
-There is no command yet to re-plan a failed or missing purge; until there is, report it to the
-developers with the error code. The nightly sweep from the privacy rules, which would catch such
-stragglers by itself, is not built yet either.
+**The nightly sweep.** Once a day the `worker` purges, directly and without a new job, every
+booking that still holds personal data more than one hour past its purge moment, whether its
+`purge_pii` job failed, ran out of retries, was never planned or came back with a restored
+backup. It is idempotent and needs no action. What it leaves behind is visible three ways:
+
+- the system event **retention.sweep** (audit log, global, superuser) with the counts
+  `overdue`, `purged`, `failed` and `backlog`; no event on a night with nothing overdue;
+- the log line `retention.sweep` (warning) with the same counts;
+- the log line `retention.backlog` (error) when a booking still held personal data more than
+  48 hours after its retention began, or a purge failed. **Alert on this event in monitoring.**
+  `retention.sweep_failed` means the sweep itself could not run (database locked or full).
+
+To run it by hand (for example after a restore from a backup, with maintenance mode on),
+inside the `web` container:
+
+```bash
+docker compose exec web python -m app.cli purge-overdue --dry-run
+docker compose exec web python -m app.cli purge-overdue
+```
+
+`--dry-run` prints the overdue bookings per group and changes nothing. The second prints how many
+were purged and exits non-zero if any could not be purged. Only counts and group slugs are
+printed. A booking that is suspended by a closure without an end date is left alone: its
+personal data goes when the closure is lifted or ends, plus 30 days.
 
 ## Widget on a host website (ADR 0035)
 

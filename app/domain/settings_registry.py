@@ -329,6 +329,14 @@ REGISTRY: tuple[SettingSpec, ...] = (
         T.LOGIN,
         "IdP discovery document; without it the admin portal is disabled.",
     ),
+    S(
+        "oidc_issuer",
+        K.URL,
+        None,
+        _B,
+        T.LOGIN,
+        "Issuer the IdP announces, when it differs from the discovery URL without its suffix.",
+    ),
     S("oidc_client_id", K.STRING, "openplanner-admin", _A, T.LOGIN, "OIDC client of the portal."),
     S("oidc_client_secret", K.SECRET, None, _A, T.LOGIN, "OIDC client secret."),
     S(
@@ -841,6 +849,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Most rows one CSV export of the audit log may hold; more is refused (ADR 0040).",
         minimum=1_000,
         maximum=1_000_000,
+    ),
+    S(
+        "configuration_package_max_mb",
+        K.INT,
+        64,
+        _C,
+        T.OPERATIONS,
+        "Largest configuration package (MB) the portal and the API accept for import (ADR 0089).",
+        minimum=1,
+        maximum=512,
     ),
     S(
         "audit_export_max_days",

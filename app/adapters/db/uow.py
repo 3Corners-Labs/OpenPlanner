@@ -156,6 +156,8 @@ from app.domain.theme import Theme
 from app.domain.worker_check import WorkerHeartbeat
 
 _PENDING = "pending"
+_RUNNING = "running"
+_DONE = "done"
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 
 
@@ -1775,17 +1777,42 @@ class SqlTransaction(
             )
         )
 
+    async def claim_booking_job(self, booking_id: int, job_type: JobType, now: datetime) -> bool:
+        """Mark the booking's pending job of ``job_type`` running, like ``claim_due`` does."""
+        result = await self._session.execute(
+            update(JobRow)
+            .where(
+                JobRow.booking_id == booking_id,
+                JobRow.type == job_type.value,
+                JobRow.status == _PENDING,
+            )
+            .values(status=_RUNNING, claimed_at=now, attempts=JobRow.attempts + 1)
+        )
+        return bool(result.rowcount)  # type: ignore[attr-defined]
+
+    async def finish_booking_job(self, booking_id: int, job_type: JobType, *, done: bool) -> None:
+        """Mark a job claimed with ``claim_booking_job`` done, or pending again."""
+        await self._session.execute(
+            update(JobRow)
+            .where(
+                JobRow.booking_id == booking_id,
+                JobRow.type == job_type.value,
+                JobRow.status == _RUNNING,
+            )
+            .values(status=_DONE if done else _PENDING, last_error=None)
+        )
+
     async def active_jobs(self, limit: int) -> ActiveJobs:
         """Return the first ``limit`` running or failed jobs and their count, no payload.
 
         Running jobs first (newest claim first), then failed ones (latest due first).
         """
-        states = [JobState.RUNNING.value, JobState.FAILED.value]
+        states = [_RUNNING, JobState.FAILED.value]
         since = func.coalesce(JobRow.claimed_at, JobRow.run_at)
         rows = await self._session.execute(
             select(JobRow.type, JobRow.status, JobRow.claimed_at, JobRow.run_at, JobRow.attempts)
             .where(JobRow.status.in_(states))
-            .order_by(case((JobRow.status == JobState.RUNNING.value, 0), else_=1), since.desc())
+            .order_by(case((JobRow.status == _RUNNING, 0), else_=1), since.desc())
             .limit(limit)
         )
         total = await self._session.scalar(

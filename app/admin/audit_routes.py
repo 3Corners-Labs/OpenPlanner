@@ -176,6 +176,9 @@ EVENT_LABELS: dict[str, str] = {
 """Readable label per event key that is not a permission."""
 
 DETAIL_LABELS: dict[str, str] = {
+    # ADR 0089: the configuration package, exported or imported.
+    "configuration.export": "admin.audit.detail.configuration_export",
+    "configuration.import": "admin.audit.detail.configuration_import",
     # ADR 0068: a meeting or work item job planned again from the booking page.
     "retry.create_video_room": "admin.audit.detail.retry_create_video_room",
     "retry.dispatch_wxcc_task": "admin.audit.detail.retry_dispatch_wxcc_task",
