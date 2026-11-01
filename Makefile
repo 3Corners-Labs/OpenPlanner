@@ -61,7 +61,7 @@ lock:
 
 # ADR 0051: every pinned version is one Renovate can update, and renovate.json is valid.
 # renovate: datasource=npm depName=renovate
-RENOVATE_VERSION := 44.193.0
+RENOVATE_VERSION := 44.198.0
 pins:
 	$(UV) python -m scripts.check_pins
 	npx --yes --package renovate@$(RENOVATE_VERSION) renovate-config-validator --strict renovate.json
