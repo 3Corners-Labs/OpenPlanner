@@ -3179,6 +3179,9 @@ msgstr "Manage API clients"
 msgid "authz.api_scope.availability_read"
 msgstr "Read free times"
 
+msgid "authz.api_scope.configuration_transfer"
+msgstr "Export and import the configuration package (whole installation)"
+
 msgid "admin.nav.api"
 msgstr "API clients"
 

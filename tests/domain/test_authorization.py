@@ -466,6 +466,23 @@ def test_decide_client_refuses_a_target_of_the_wrong_level() -> None:
         decide_client(WHOLE_ORG, READ, OWN_ORG)
 
 
+TRANSFER = ApiScope.CONFIGURATION_TRANSFER
+TRANSFER_CLIENT = ClientGrant("opc_d", "andere", frozenset({"andere-team"}), frozenset({TRANSFER}))
+
+
+def test_a_global_scope_acts_on_the_whole_installation() -> None:
+    # ADR 0089 point 7: the organisation that registered the client and its groups play no part.
+    assert API_SCOPES[TRANSFER] is Level.GLOBAL
+    assert decide_client(TRANSFER_CLIENT, TRANSFER, Target.everything()) == Decision(
+        True, Reason.ROLE
+    )
+    assert decide_client(WHOLE_ORG, TRANSFER, Target.everything()) == Decision(
+        False, Reason.NOT_PERMITTED
+    )
+    with pytest.raises(ValueError, match="global level target"):
+        decide_client(TRANSFER_CLIENT, TRANSFER, OWN_GROUP)
+
+
 def test_maintenance_writable_is_the_adr_list() -> None:
     # ADR 0038 §3, written out by hand: integrations, updates and the switch itself.
     assert {

@@ -64,7 +64,11 @@ from app.admin.session import save_login_trial
 from app.admin.uploads import read_uploads
 from app.config import Settings
 from app.domain.authorization import Permission
-from app.domain.configuration_package import MEDIA_TYPE, MIN_PASSPHRASE_LENGTH
+from app.domain.configuration_package import (
+    MEDIA_TYPE,
+    MIN_PASSPHRASE_LENGTH,
+    package_filename,
+)
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
@@ -161,12 +165,11 @@ _DANGER = (Finding.EXPIRED, Finding.NOT_YET_VALID)
 TLS_URL = f"{URL}#tls-heading"
 CERTIFICATE_FIELDS = ("chain", "key")
 REMOVE_KEY = "tls_certificate"
+"""The error key of the remove form (the upload's errors sit at ``chain`` or ``key``)."""
 PACKAGE_KEY = "package"
 """The error key of the configuration package block (ADR 0089)."""
 PACKAGE_FIELDS = ("passphrase", "confirm")
 """The text fields next to the uploaded package."""
-PACKAGE_FILENAME = "openplanner-configuration-{installation}-{date}.sqlite"
-"""The error key of the remove form (the upload's errors sit at ``chain`` or ``key``)."""
 CSR_KEY = "tls_csr"
 """The error key of the request form."""
 
@@ -471,10 +474,7 @@ async def export_package(
         raise_refusal(error)
         return await _overview(request, locale, context, (PACKAGE_KEY, error), 422)
     current: Settings = request.app.state.settings
-    name = PACKAGE_FILENAME.format(
-        installation=current.installation_name or "openplanner",
-        date=request.app.state.clock.now().strftime("%Y%m%d"),
-    )
+    name = package_filename(current.installation_name, request.app.state.clock.now())
     return Response(
         package,
         media_type=MEDIA_TYPE,

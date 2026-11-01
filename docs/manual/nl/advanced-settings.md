@@ -174,6 +174,14 @@ Elke export en import staat in het auditlog, zonder wachtwoordzin en zonder waar
 kort geleden zijn ingelogd. De grootste toegestane pakketgrootte is de platforminstelling
 *Maximale grootte van een configuratiepakket*.
 
+**Via de API.** Een pipeline kan hetzelfde doen zonder de portal: een API-client met het
+recht *Configuratiepakket exporteren en importeren* (`configuration:transfer`, te geven op
+**API-koppelingen**) haalt het pakket op en zet het neer met `GET` en `PUT
+/api/agent/v1/configuration`, de wachtwoordzin in een header. Dat recht geldt voor de hele
+installatie, ongeacht de organisatie en de teams van de client; geef het alleen aan een
+client voor het inrichten van installaties, nooit aan een bot. Dezelfde regels en hetzelfde
+auditlog gelden, met de client-id als actor.
+
 ## De inlogkoppeling wijzigen
 
 Alleen de superuser kan wijzigen welke claims van de identity provider de rollen, organisaties
