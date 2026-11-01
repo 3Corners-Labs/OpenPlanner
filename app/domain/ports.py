@@ -1109,6 +1109,18 @@ class Transaction(Protocol):
         """Delete the booking's pending jobs of the given types."""
         ...
 
+    async def claim_booking_job(self, booking_id: int, job_type: JobType, now: datetime) -> bool:
+        """Take the booking's pending job of ``job_type`` for the caller, as the worker would.
+
+        Returns whether it was taken; ``False`` when the job is gone, done, or already claimed
+        (by the worker), so only one side makes the external resource.
+        """
+        ...
+
+    async def finish_booking_job(self, booking_id: int, job_type: JobType, *, done: bool) -> None:
+        """Settle a job taken with ``claim_booking_job``: done, or back to pending for a retry."""
+        ...
+
     async def active_jobs(self, limit: int) -> ActiveJobs:
         """Return the first ``limit`` running or failed jobs and how many there are in all.
 

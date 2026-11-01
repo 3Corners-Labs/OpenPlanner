@@ -43,7 +43,7 @@ from app.domain.identity_providers import (
     SigningKey,
 )
 from app.domain.images import ImageFile, ImageText
-from app.domain.job_plan import JobCounts, JobStatus, JobSummary, PlannedJob
+from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
 from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
@@ -86,6 +86,7 @@ class State:
     slots: dict[int, Slot] = field(default_factory=dict)
     bookings: dict[int, Booking] = field(default_factory=dict)
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
+    claimed_jobs: dict[tuple[int, JobType], PlannedJob] = field(default_factory=dict)
     active_jobs: list[ActiveJob] = field(default_factory=list)
     organisation_slugs: dict[int, str] = field(default_factory=dict)
     organisations: dict[int, Organisation] = field(default_factory=dict)
@@ -895,6 +896,20 @@ class InMemoryTransaction:
     async def delete_pending_jobs(self, booking_id: int, types: Collection[object]) -> None:
         jobs = self.state.jobs.get(booking_id, [])
         self.state.jobs[booking_id] = [j for j in jobs if j.type not in types]
+
+    async def claim_booking_job(self, booking_id: int, job_type: JobType, now: datetime) -> bool:
+        jobs = self.state.jobs.get(booking_id, [])
+        taken = next((j for j in jobs if j.type is job_type), None)
+        if taken is None:
+            return False
+        jobs.remove(taken)
+        self.state.claimed_jobs[(booking_id, job_type)] = taken
+        return True
+
+    async def finish_booking_job(self, booking_id: int, job_type: JobType, *, done: bool) -> None:
+        job = self.state.claimed_jobs.pop((booking_id, job_type), None)
+        if job is not None and not done:
+            self.state.jobs.setdefault(booking_id, []).append(job)
 
     async def active_jobs(self, limit: int) -> ActiveJobs:
         return ActiveJobs(list(self.state.active_jobs[:limit]), len(self.state.active_jobs))

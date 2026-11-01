@@ -241,3 +241,15 @@ def test_httpx_request_lines_with_their_urls_are_not_logged(stream: io.StringIO)
     logging.getLogger("httpx").info('HTTP Request: GET https://h/x?token=secret-token "200"')
 
     assert stream.getvalue() == ""
+
+
+@pytest.mark.parametrize("level", ["INFO", "DEBUG"])
+def test_aiosqlite_parameter_lines_are_not_logged_at_any_level(level: str) -> None:
+    buffer = io.StringIO()
+    configure_logging(level, buffer)
+
+    logging.getLogger("aiosqlite").debug(
+        "operation %s parameters %s", "INSERT", ("marker-x@example.test",)
+    )
+
+    assert "marker-x" not in buffer.getvalue()
