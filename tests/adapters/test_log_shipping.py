@@ -260,7 +260,7 @@ async def test_delivery_runs_in_the_background_and_a_failure_is_one_event_then_o
     env.shipper.offer(line("a", "error"))
     for _ in range(300):
         await asyncio.sleep(0.01)
-        if sender.lines:
+        if sender.lines and len(env.events()) == 2:  # the recovery is recorded after delivery
             break
 
     assert [json.loads(x)["message"] for x in sender.lines] == ["a"]
