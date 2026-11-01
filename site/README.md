@@ -10,7 +10,8 @@ The public website (ADR 0087): one page per locale, static, built from this dire
   enhancement; the page is complete without it).
 - `static/og-nl.png`, `static/og-en.png`: Open Graph images, rasterised from `og/*.svg` with
   `rsvg-convert -w 1200 -h 630 og/og-nl.svg -o static/og-nl.png`.
-- `static/media/`: the recorded walkthrough of the real interface (ADR 0087 step 3), not yet.
+- `static/media/`: the recorded walkthrough of the real interface and its stills (ADR 0087 step 3),
+  downloaded from the newest release that carries them by the `site` job; not in git.
 
 Build locally with `make site` and open `site/dist/index.html` through any static server, for
 example `python3 -m http.server -d site/dist 8080`.

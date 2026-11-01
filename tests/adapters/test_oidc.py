@@ -7,7 +7,7 @@ import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote_plus, urlsplit
 
 import httpx
 import jwt
@@ -21,6 +21,7 @@ from app.adapters.oidc import (
     OidcConfig,
     OidcIdentityProvider,
     claim_mapping,
+    client_secret_basic,
     login_claims,
 )
 from app.adapters.signing_keys import EcSigningKeys
@@ -784,3 +785,17 @@ async def test_a_token_with_another_iss_than_the_pinned_one_is_refused(
     provider.claims = {"iss": "https://evil.example"}
     with pytest.raises(IdentityError, match="invalid_token"):
         await login(oidc, provider)
+
+
+@pytest.mark.parametrize(
+    ("client_id", "secret"),
+    [("client:dept", "s+%"), ("plain", "a b"), ("é", "p:w")],
+)
+def test_client_secret_basic_encodes_each_credential_before_joining(
+    client_id: str, secret: str
+) -> None:
+    scheme, encoded = client_secret_basic(client_id, secret).split(" ")
+
+    raw_id, raw_secret = base64.b64decode(encoded).decode().split(":")
+    assert scheme == "Basic"
+    assert (unquote_plus(raw_id), unquote_plus(raw_secret)) == (client_id, secret)

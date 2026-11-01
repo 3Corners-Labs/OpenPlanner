@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from structlog.testing import capture_logs
 
 from app.adapters.db.engine import create_engine
+from app.domain.retention_sweep import SweepResult
 from app.domain.storage import MIB, StorageLimits, StorageUsage
 from app.jobs.housekeeping import Housekeeping
 from tests.fakes.clock import FixedClock
@@ -218,3 +219,74 @@ async def test_a_failing_erase_never_stops_housekeeping(engine: AsyncEngine) -> 
 
     assert [e["event"] for e in logs if e["event"].startswith("group.")] == ["group.erase_failed"]
     assert eraser.calls == 1
+
+
+# --- retention sweep (WP-A1) ---------------------------------------------------------------
+
+
+class Sweeper:
+    """Counts how often housekeeping asked for a sweep and returns what the test sets."""
+
+    def __init__(self, result: SweepResult) -> None:
+        self.calls = 0
+        self.result = result
+        self.fail = False
+
+    async def __call__(self) -> SweepResult:
+        self.calls += 1
+        if self.fail:
+            raise RuntimeError("database locked")
+        return self.result
+
+
+def _sweeping(engine: AsyncEngine, sweeper: Sweeper) -> Setup:
+    setup = Setup(engine)
+    setup.housekeeping = Housekeeping(
+        engine, setup.uow, setup.clock, StorageLimits(), setup.disk, sweep=sweeper
+    )
+    return setup
+
+
+async def _sweep_logs(setup: Setup) -> list[str]:
+    with capture_logs() as logs:
+        await setup.housekeeping.run()
+    return [f"{e['log_level']}:{e['event']}" for e in logs if e["event"].startswith("retention")]
+
+
+async def test_the_retention_sweep_runs_once_a_day(engine: AsyncEngine) -> None:
+    sweeper = Sweeper(SweepResult())
+    setup = _sweeping(engine, sweeper)
+
+    await _sweep_logs(setup)
+    setup.clock.advance(timedelta(hours=23))
+    await _sweep_logs(setup)
+    assert sweeper.calls == 1
+    setup.clock.advance(timedelta(hours=1))
+    await _sweep_logs(setup)
+    assert sweeper.calls == 2
+
+
+async def test_a_quiet_sweep_logs_nothing(engine: AsyncEngine) -> None:
+    assert await _sweep_logs(_sweeping(engine, Sweeper(SweepResult()))) == []
+
+
+async def test_a_sweep_that_purged_logs_counts_and_a_backlog_raises_the_alert(
+    engine: AsyncEngine,
+) -> None:
+    recent = Sweeper(SweepResult(overdue=2, purged=2))
+    assert await _sweep_logs(_sweeping(engine, recent)) == ["warning:retention.sweep"]
+
+    old = Sweeper(SweepResult(overdue=2, purged=2, backlog=1))
+    assert await _sweep_logs(_sweeping(engine, old)) == [
+        "warning:retention.sweep",
+        "error:retention.backlog",
+    ]
+
+
+async def test_a_failing_sweep_is_logged_and_never_stops_housekeeping(
+    engine: AsyncEngine,
+) -> None:
+    sweeper = Sweeper(SweepResult())
+    sweeper.fail = True
+
+    assert await _sweep_logs(_sweeping(engine, sweeper)) == ["error:retention.sweep_failed"]

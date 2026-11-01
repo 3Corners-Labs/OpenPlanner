@@ -51,6 +51,7 @@ from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.request_log import RequestEvents
+from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
 from app.domain.system_log import SystemLog
 from app.domain.tls_check import TlsWatch
@@ -198,6 +199,7 @@ async def run_worker(
         settings.database_url,
         diagnostics.brake,
         eraser.run,
+        RetentionSweep(uow, clock).run,
     )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(

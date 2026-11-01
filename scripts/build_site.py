@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 BRAND = ROOT / "app" / "web" / "static" / "brand"
 ADR_DIR = ROOT / "docs" / "adr"
+CHAPTERS = ROOT / "e2e" / "tour" / "chapters.json"
 LOCALES = ("nl", "en")
 ORIGIN = "https://openplanner.nl"
 REPOSITORY = "https://github.com/3Corners-Labs/OpenPlanner"
@@ -84,28 +85,50 @@ def parse_releases(raw: list[dict[str, Any]]) -> Releases:
 
 
 @dataclass(frozen=True)
+class Screen:
+    """One still of the real interface from the recording, with its chapter's caption per locale."""
+
+    key: str
+    caption: dict[str, str]
+
+
+@dataclass(frozen=True)
 class Recording:
     """The recorded walkthrough on the page (ADR 0087 step 3), from ``static/media/tour.json``."""
 
     version: str
     recorded: str
     seconds: int
+    screens: tuple[Screen, ...] = ()
 
 
-def recording(media: Path) -> Recording | None:
+def recording(media: Path, chapters: Path = CHAPTERS) -> Recording | None:
     """Return the recording in ``media`` when video, poster, captions and metadata are all there.
 
     The ``site`` job downloads them from the newest release that carries them (tour.yml); a
-    local build has none, and the page then says the recording is still to come.
+    local build has none, and the page then says the recording is still to come. The stills
+    (``tour-<chapter>.jpg``) listed in ``tour.json`` become the gallery of screens, in the
+    order of the story and captioned with the chapter's text; a still whose file or chapter is
+    missing is left out, so an older recording without stills shows the video alone.
     """
     needed = ("tour.webm", "tour.jpg", "tour.nl.vtt", "tour.en.vtt", "tour.json")
     if not all((media / name).is_file() for name in needed):
         return None
     meta = json.loads((media / "tour.json").read_text(encoding="utf-8"))
+    texts = {
+        c["key"]: {locale: str(c[locale]) for locale in LOCALES}
+        for c in json.loads(chapters.read_text(encoding="utf-8"))["chapters"]
+    }
+    screens = tuple(
+        Screen(key=key, caption=texts[key])
+        for key in (str(k) for k in meta.get("screens", []))
+        if key in texts and (media / f"tour-{key}.jpg").is_file()
+    )
     return Recording(
         version=str(meta.get("version", "")),
         recorded=str(meta.get("recorded", "")),
         seconds=int(meta.get("seconds", 0)),
+        screens=screens,
     )
 
 

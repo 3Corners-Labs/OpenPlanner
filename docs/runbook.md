@@ -115,6 +115,13 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   for everyone.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 - No access log on the proxy: paths carry management tokens.
+- Answer plain `http://` requests for `/api/*` and `/webhooks/*` with `403` and no `Location`
+  header, and redirect only the browser paths. A redirect makes a bot or Webex Connect flow that
+  was configured with `http://` repeat its POST, with the client secret or webhook body, in
+  clear text and still succeed, so nobody notices. The bundled proxy does this; in Caddy:
+  `@machine path /api/* /webhooks/*`, `handle @machine { respond "HTTPS required" 403 }`, then
+  `handle { redir https://{host}{uri} 308 }`. Also let `TRACE` reach the app (it answers 405) and
+  do not serve `/static/` from the proxy itself. `scripts/check-proxy.sh` shows what to expect.
 
 **What is configured, and from where?** Every setting and its class (ADR 0042) is listed in
 `docs/settings.md`. On the host, without sending anyone the `.env`:
@@ -1025,7 +1032,8 @@ clones that repository, replaces the site files with the build, commits `site: <
 |---|---|---|
 | Merge to `main` | `site`, after the candidate job: build with the releases and the roadmap from GitHub, upload the artifact, push | the site on TransIP, with the candidate that merge made on it |
 | Tag `vX.Y.Z` | the same after `publish`, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page, and the site on TransIP with the new release on it |
-| Tag `vX.Y.Z` (also) | `tour` (`.github/workflows/tour.yml`): the e2e stack, `e2e/tour/tour.spec.ts`, the captions | `tour.webm`, `tour.jpg`, `tour.nl.vtt`, `tour.en.vtt`, `tour.json` on the release; the `site` job puts the newest one on the page |
+| Tag `vX.Y.Z` (also) | `tour` (`.github/workflows/tour.yml`): the e2e stack, `e2e/tour/tour.spec.ts`, the captions | `tour.webm`, `tour.jpg`, `tour.nl.vtt`, `tour.en.vtt`, `tour.json` and a still per main chapter (`tour-<chapter>.jpg`) on the release; the `site` job puts the newest one on the page, the stills as a gallery |
+| Release candidate (by hand) | *Actions → tour → Run workflow* with the `vX.Y.Z-rc.N` tag: candidates are tagged by `GITHUB_TOKEN` and start no workflow, so they are recorded only on request | the recording on that candidate; the next merge to `main` puts it on the page |
 | Pull request, fork | nothing (`main.yml` only) | a local `make site` is the preview |
 
 ### Once: the deploy settings
@@ -1617,18 +1625,40 @@ is not judged: it is the operator's own doing.
 **Retention** in the admin portal (organisation admins, the compliance role and the superuser)
 shows per group how many bookings still hold personal data past their purge moment and how
 many `purge_pii` jobs failed. Both should be 0. A booking counts as overdue one hour after its
-purge moment (slot end + 24 h, cancellation + 24 h, or closure end + 30 days), which leaves
+purge moment (slot end + 24 h, cancellation + 24 h, deadline to confirm or choose a new time
++ 24 h, or closure end + 30 days), which leaves
 room for the worker and its retries.
 
 | Shown | Likely cause | What to do |
 |---|---|---|
 | Overdue > 0, failed 0, "last removed" long ago | the `worker` container is not running or not claiming jobs | `docker compose ps worker`, then `docker compose logs worker`; restart it; the backlog clears on its own |
 | Failed > 0 | the purge itself failed (database locked or full) | look up the code at **Remove personal data** in the audit log (Problems only); fix the cause and report the code to the developers (below) |
-| Overdue > 0 for a suspended booking | the closure was lifted, but no purge job was planned | report it to the developers as a bug (below) |
+| Overdue > 0 for a suspended booking | the closure was lifted, but no purge job was planned | none: the nightly sweep purges it (below); report it to the developers as a bug |
 
-There is no command yet to re-plan a failed or missing purge; until there is, report it to the
-developers with the error code. The nightly sweep from the privacy rules, which would catch such
-stragglers by itself, is not built yet either.
+**The nightly sweep.** Once a day the `worker` purges, directly and without a new job, every
+booking that still holds personal data more than one hour past its purge moment, whether its
+`purge_pii` job failed, ran out of retries, was never planned or came back with a restored
+backup. It is idempotent and needs no action. What it leaves behind is visible three ways:
+
+- the system event **retention.sweep** (audit log, global, superuser) with the counts
+  `overdue`, `purged`, `failed` and `backlog`; no event on a night with nothing overdue;
+- the log line `retention.sweep` (warning) with the same counts;
+- the log line `retention.backlog` (error) when a booking still held personal data more than
+  48 hours after its retention began, or a purge failed. **Alert on this event in monitoring.**
+  `retention.sweep_failed` means the sweep itself could not run (database locked or full).
+
+To run it by hand (for example after a restore from a backup, with maintenance mode on),
+inside the `web` container:
+
+```bash
+docker compose exec web python -m app.cli purge-overdue --dry-run
+docker compose exec web python -m app.cli purge-overdue
+```
+
+`--dry-run` prints the overdue bookings per group and changes nothing. The second prints how many
+were purged and exits non-zero if any could not be purged. Only counts and group slugs are
+printed. A booking that is suspended by a closure without an end date is left alone: its
+personal data goes when the closure is lifted or ends, plus 30 days.
 
 ## Widget on a host website (ADR 0035)
 

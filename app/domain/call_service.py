@@ -10,12 +10,14 @@ Ending a cancelled booking's work item (ADR 0021), v2 first:
              ─► End Task v1     ─► task_end_requested      (refused: end_not_possible, code)
 """
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
+from datetime import datetime
 
 from app.domain.booking import Booking
 from app.domain.calls import EventKind, TaskState, meeting_request, work_item
 from app.domain.integration import IntegrationService
+from app.domain.job_plan import JobType
 from app.domain.ports import ContactCenterDispatcher, IntegrationError, UnitOfWork, VideoProvider
 from app.domain.scheduling import Group
 
@@ -87,6 +89,52 @@ class CallService:
             await tx.save_task_id(booking_id, task_id)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
         return _with(booking, wxcc_task_id=task_id)
+
+    async def create_now(self, booking: Booking, group: Group, now: datetime) -> None:
+        """Create the meeting and work item of a direct call in the request, not the worker.
+
+        Each step first takes the booking's pending job the way the worker claims it, so the
+        worker leaves it alone and only one side makes the external resource. A step the
+        worker holds is skipped; a failed step puts its job back for the worker to retry.
+
+        Raises:
+            IntegrationError: From the step that failed, after its job was put back.
+        """
+        booking_id = _id(booking)
+        booking = await self._claimed(
+            booking_id, JobType.CREATE_VIDEO_ROOM, now, lambda: self.ensure_meeting(booking, group)
+        )
+        await self._claimed(
+            booking_id, JobType.DISPATCH_WXCC_TASK, now, lambda: self.ensure_task(booking, group)
+        )
+
+    async def _claimed(
+        self,
+        booking_id: int,
+        job_type: JobType,
+        now: datetime,
+        step: Callable[[], Awaitable[Booking]],
+    ) -> Booking:
+        """Run ``step`` while holding the booking's ``job_type`` job; ``step``'s booking back."""
+        async with self._uow.locked() as tx:
+            if not await tx.claim_booking_job(booking_id, job_type, now):
+                return await self._reload(booking_id)
+        done = False
+        try:
+            result = await step()
+            done = True
+            return result
+        finally:
+            async with self._uow.locked() as tx:
+                await tx.finish_booking_job(booking_id, job_type, done=done)
+
+    async def _reload(self, booking_id: int) -> Booking:
+        """Return the stored booking when the worker holds the step, so the next sees its result."""
+        async with self._uow.read() as tx:
+            stored = await tx.get_booking(booking_id)
+        if stored is None:
+            raise IntegrationError("booking_missing", retryable=False)
+        return stored
 
     @property
     def end_available(self) -> bool:
