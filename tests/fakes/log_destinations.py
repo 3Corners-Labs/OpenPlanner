@@ -12,11 +12,12 @@ class FakeSender:
     def __init__(self) -> None:
         self.batches: list[list[str]] = []
         self.failures: list[Reason] = []
+        self.hopeless = False
         self.closed = False
 
     async def send(self, lines: Sequence[str]) -> None:
         if self.failures:
-            raise DeliveryError(self.failures.pop(0))
+            raise DeliveryError(self.failures.pop(0), drop=self.hopeless)
         self.batches.append(list(lines))
 
     async def aclose(self) -> None:
