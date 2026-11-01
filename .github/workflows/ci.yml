@@ -40,7 +40,7 @@ env:
 jobs:
   python:
     name: lint, types, tests, migrations
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Every test but the authorisation matrix sweeps, with the coverage gates (ADR 0058).
     timeout-minutes: 30
     steps:
@@ -73,7 +73,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,7 +87,7 @@ jobs:
 
   duplication:
     name: copy-paste detection
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -99,7 +99,7 @@ jobs:
 
   dependencies:
     name: lockfile, audit, licenses
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -127,7 +127,7 @@ jobs:
         run: npm ci --ignore-scripts && npm audit --audit-level=moderate && npm run build
 
   semgrep:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     container: semgrep/semgrep:1.182.1
     steps:
@@ -141,7 +141,7 @@ jobs:
           --config .semgrep/rules.yml app/
 
   gitleaks:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -155,7 +155,7 @@ jobs:
 
   licence:
     name: licence and contributor agreement
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -206,7 +206,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -285,7 +285,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     env:
       # Official image with browsers and their system packages preinstalled, so the job does not
@@ -330,7 +330,7 @@ jobs:
     name: no deprecation warnings
     needs: [python, matrix, duplication, dependencies, semgrep, gitleaks, container, e2e]
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     # Job permissions replace the workflow's, so contents: read is repeated for the checkout.
     permissions:
