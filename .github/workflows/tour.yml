@@ -2,8 +2,8 @@ name: tour
 
 # ADR 0087 step 3: the recorded walkthrough of the real interface. Records e2e/tour/tour.spec.ts
 # against the release's own code with the e2e stack (Keycloak, simulator, demo seeds), adds the
-# captions (nl, en) and attaches tour.webm, tour.jpg, tour.nl.vtt, tour.en.vtt and tour.json to
-# the release. The `site` job of main.yml puts the newest recording on openplanner.nl.
+# captions (nl, en) and attaches tour.webm, tour.jpg, tour.nl.vtt, tour.en.vtt, tour.json and a
+# still per main chapter (tour-<chapter>.jpg) to the release. The `site` job of main.yml puts the newest recording on openplanner.nl.
 #
 # Called by main.yml for every release tag; a dispatch records an existing release again (for
 # the first time, or after the script changed). A tag pushed with GITHUB_TOKEN starts no
@@ -67,7 +67,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd e2e/tour-output
-          gh release upload "$TAG" tour.webm tour.jpg tour.nl.vtt tour.en.vtt tour.json --clobber
+          gh release upload "$TAG" tour.webm tour.jpg tour.nl.vtt tour.en.vtt tour.json tour-*.jpg --clobber
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:

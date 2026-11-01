@@ -265,6 +265,20 @@
         <track kind="captions" src="{{ base }}static/media/tour.{{ c.lang }}.vtt" srclang="{{ c.lang }}" label="{{ c.tour.video_captions }}" default>
       </video>
       <p class="small" id="tour-video-help">{{ c.tour.video_help }}</p>
+      {%- if tour.screens %}
+      <h3 id="screens-title">{{ c.tour.screens_title }}</h3>
+      <p>{{ c.tour.screens_lead }}</p>
+      <ol class="screens" aria-labelledby="screens-title">
+        {%- for s in tour.screens %}
+        <li class="reveal">
+          <figure>
+            <a href="{{ base }}static/media/tour-{{ s.key }}.jpg"><img src="{{ base }}static/media/tour-{{ s.key }}.jpg" alt="{{ c.tour.screens_alt.replace('{n}', loop.index|string) }}" width="1280" height="720" loading="lazy" decoding="async"></a>
+            <figcaption><span class="screens__num" aria-hidden="true">{{ loop.index }}</span>{{ s.caption[c.lang] }}</figcaption>
+          </figure>
+        </li>
+        {%- endfor %}
+      </ol>
+      {%- endif %}
       {%- else %}
       <p class="video__placeholder"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>{{ c.tour.video_soon }}</p>
       {%- endif %}
@@ -328,6 +342,50 @@
   <div class="wrap">
     <h2 id="enterprise-title">{{ e.title }}</h2>
     <p class="lead">{{ e.lead }}</p>
+
+    {%- set pl = e.plate %}
+    <h3 class="sub" id="plate-title">{{ pl.title }}</h3>
+    <p>{{ pl.lead }}</p>
+    <figure class="plate" aria-labelledby="plate-title">
+      <div class="plate__grid">
+        <section class="plate__col plate__col--people" aria-labelledby="plate-people">
+          <h4 id="plate-people">{{ pl.people_title }}</h4>
+          <ul>
+            {%- for n in pl.people %}
+            <li class="plate__node"><strong>{{ n.name }}</strong><span>{{ n.sub }}</span></li>
+            {%- endfor %}
+          </ul>
+        </section>
+        <span class="plate__link plate__link--in" aria-hidden="true"><span>HTTPS</span></span>
+        <section class="plate__col plate__host" aria-labelledby="plate-host">
+          <h4 id="plate-host">{{ pl.host_title }}</h4>
+          <ul>
+            {%- for n in pl.host %}
+            <li class="plate__node plate__node--{{ n.key }}"><strong>{{ n.name }}</strong><span>{{ n.sub }}</span></li>
+            {%- endfor %}
+          </ul>
+          <p class="plate__note">{{ pl.host_note }}</p>
+        </section>
+        <span class="plate__link plate__link--out" aria-hidden="true"><span>{{ pl.adapters }}</span></span>
+        <section class="plate__col plate__col--systems" aria-labelledby="plate-systems">
+          <h4 id="plate-systems">{{ pl.systems_title }}</h4>
+          <ul>
+            {%- for n in pl.systems %}
+            <li class="plate__node{% if n.get('planned') %} plate__node--planned{% endif %}"><strong>{{ n.name }}</strong><span>{{ n.sub }}</span>{% if n.get('planned') %}<em class="plate__badge">{{ pl.planned }}</em>{% endif %}</li>
+            {%- endfor %}
+          </ul>
+        </section>
+      </div>
+      <figcaption>
+        <h4>{{ pl.flows_title }}</h4>
+        <ol class="plate__flows">
+          {%- for f in pl.flows %}
+          <li>{{ f }}</li>
+          {%- endfor %}
+        </ol>
+        <p>{{ pl.caption }} <a href="{{ pl.link.href }}">{{ pl.link.label }}</a></p>
+      </figcaption>
+    </figure>
 
     <h3 class="sub">{{ e.arch_title }}</h3>
     <figure class="arch">

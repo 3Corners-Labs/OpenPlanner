@@ -272,7 +272,10 @@
       "cohost": "cohost"
     },
     "video_captions": "English",
-    "video_help": "No sound; the captions describe what is shown. The steps are also in the tour above as text."
+    "video_help": "No sound; the captions describe what is shown. The steps are also in the tour above as text.",
+    "screens_title": "The real screens",
+    "screens_lead": "Stills from the same recording, in the order of the story. Select a screen to see it full size.",
+    "screens_alt": "Screen {n} of the recording, full size"
   },
   "how": {
     "title": "How it works",
@@ -407,6 +410,105 @@
   "enterprise": {
     "title": "Why we call OpenPlanner enterprise-ready",
     "lead": "Not because of a list of ticks, but because of how it is built: a core without a framework, every external service behind a port, and rules the pipeline enforces instead of a reviewer.",
+    "plate": {
+      "title": "Architecture plate: what runs and what goes where",
+      "lead": "One server you manage yourself, two containers and one database. Everything outside it is a system you already have, connected through an adapter.",
+      "people_title": "Who uses it",
+      "people": [
+        {
+          "name": "Participant",
+          "sub": "browser or widget, no account, no app"
+        },
+        {
+          "name": "Administrators and planners",
+          "sub": "admin portal, sign-in at your own IdP"
+        },
+        {
+          "name": "Agents",
+          "sub": "work item in Webex Contact Center or the own queue"
+        },
+        {
+          "name": "Bots",
+          "sub": "machine API with OAuth client credentials"
+        }
+      ],
+      "host_title": "Your server",
+      "host": [
+        {
+          "key": "proxy",
+          "name": "HTTPS proxy",
+          "sub": "Caddy: Let's Encrypt or your own certificate"
+        },
+        {
+          "key": "web",
+          "name": "web",
+          "sub": "participant pages, admin portal, API"
+        },
+        {
+          "key": "worker",
+          "name": "worker",
+          "sub": "scheduled jobs: meetings, messages, work items, purging"
+        },
+        {
+          "key": "db",
+          "name": "SQLite (WAL)",
+          "sub": "personal data only on the appointment, erased 24 hours after the call"
+        },
+        {
+          "key": "updater",
+          "name": "host updater",
+          "sub": "checks the signature, takes a backup, rolls back on its own"
+        }
+      ],
+      "host_note": "Containers run without root on a read-only filesystem.",
+      "adapters": "adapters",
+      "systems_title": "Systems you already have",
+      "systems": [
+        {
+          "name": "Webex Meetings",
+          "sub": "a real meeting per appointment"
+        },
+        {
+          "name": "Webex Contact Center",
+          "sub": "work item with first name, join link and routing"
+        },
+        {
+          "name": "Identity provider",
+          "sub": "OIDC: PingFederate, Keycloak, Entra ID"
+        },
+        {
+          "name": "Email and SMS",
+          "sub": "SMTP and SMS gateway, per organisation"
+        },
+        {
+          "name": "Log destinations",
+          "sub": "syslog, Splunk, Elastic or HTTP"
+        },
+        {
+          "name": "GitHub releases",
+          "sub": "signed images with an SBOM"
+        },
+        {
+          "name": "Webex Messaging",
+          "sub": "alerts to administrators, without personal data",
+          "planned": true
+        }
+      ],
+      "planned": "on the roadmap",
+      "flows_title": "What goes where",
+      "flows": [
+        "The participant books over HTTPS; the data stays in the database on your server.",
+        "The worker creates the Webex meeting and sends the confirmation and reminders by email or SMS.",
+        "Five minutes before the start the contact center gets a work item with only the first name, the join link and the routing attributes.",
+        "Administrators sign in at your own identity provider; every decision goes to the audit log, which you can ship to your own log systems.",
+        "Updates arrive as signed images; the host updater checks the signature before it switches."
+      ],
+      "caption": "Simplified. The full plate, with every flow and the decision behind it, is in the repository.",
+      "link": {
+        "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/architecture.md#3-system-context",
+        "label": "System context and containers"
+      }
+    },
     "arch_title": "Architecture and building blocks",
     "arch_caption": "The arrows point one way. On every pull request import-linter refuses an import that breaks these layers.",
     "layers": [
