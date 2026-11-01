@@ -20,7 +20,7 @@ import structlog
 
 from app.domain.audit import AuditEvent, Category
 from app.domain.event_schema import Envelope, to_record
-from app.logging import mask_record
+from app.logging import mask_record, tap_line
 
 log = structlog.get_logger()
 
@@ -29,6 +29,12 @@ LOG_TYPE = "audit"
 
 SHIPPED = frozenset({Category.AUDIT, Category.SYSTEM, Category.SECURITY})
 """Categories that leave the installation; diagnostic events never do (ADR 0034)."""
+
+
+def _line(event: AuditEvent, envelope: Envelope) -> str:
+    """Return the event as one masked JSON line, marked for the log platform."""
+    record = mask_record({**to_record(event, envelope), "log_type": LOG_TYPE})
+    return json.dumps(record, separators=(",", ":"))
 
 
 class StdoutEventSink:
@@ -50,8 +56,12 @@ class StdoutEventSink:
         try:
             for event in events:
                 if event.event_category in SHIPPED:
-                    record = mask_record({**to_record(event, self._envelope), "log_type": LOG_TYPE})
-                    out.write(json.dumps(record, separators=(",", ":")) + "\n")
+                    line = _line(event, self._envelope)
+                    out.write(line + "\n")
+                    tap_line(line)
+                elif event.event_category is Category.DIAGNOSTIC:
+                    # ADR 0085 point 3: only a destination that opts in receives it; never stdout.
+                    tap_line(_line(event, self._envelope))
             out.flush()
         except Exception as exc:  # after commit nothing may fail the request; the table has it
             log.error("audit.emit_failed", error=type(exc).__name__)

@@ -126,6 +126,10 @@ class Permission(StrEnum):
     IDP_MAPPING_MANAGE = "idp_mapping.manage"
     IDENTITY_PROVIDERS_VIEW = "identity_providers.view"
     IDENTITY_PROVIDERS_MANAGE = "identity_providers.manage"
+    LOGGING_VIEW = "logging.view"
+    """ADR 0085: the log destinations and their status, without a credential."""
+    LOGGING_MANAGE = "logging.manage"
+    """ADR 0085: create, change, test and delete log destinations; superuser only."""
 
 
 LEVELS: dict[Permission, Level] = {
@@ -190,6 +194,9 @@ LEVELS: dict[Permission, Level] = {
     # ADR 0083 point 4: the status of the own organisation's providers; registering is global.
     Permission.IDENTITY_PROVIDERS_VIEW: Level.ORGANISATION,
     Permission.IDENTITY_PROVIDERS_MANAGE: Level.GLOBAL,
+    # ADR 0085: where copies of the log go; one setting for the whole installation.
+    Permission.LOGGING_VIEW: Level.GLOBAL,
+    Permission.LOGGING_MANAGE: Level.GLOBAL,
 }
 
 LOCKED_PERMISSIONS = frozenset(
@@ -206,6 +213,7 @@ LOCKED_PERMISSIONS = frozenset(
         Permission.SETTINGS_PLATFORM_MANAGE,
         Permission.SETTINGS_LOGIN_MANAGE,
         Permission.IDENTITY_PROVIDERS_MANAGE,
+        Permission.LOGGING_MANAGE,
     }
 )
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
@@ -236,6 +244,7 @@ READ_PERMISSIONS = frozenset(
         Permission.SETTINGS_PLATFORM_VIEW,
         Permission.IDP_MAPPING_VIEW,
         Permission.IDENTITY_PROVIDERS_VIEW,
+        Permission.LOGGING_VIEW,
     }
 )
 """ADR 0039: permissions that only show; everything else changes something."""
@@ -259,9 +268,10 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
 EVERY_ADMIN = frozenset({Permission.DASHBOARD_VIEW, Permission.RIGHTS_VIEW, Permission.MATRIX_VIEW})
 """ADR 0039: what every admin holds, so every role (custom ones too) must hold it."""
 
-GLOBAL_FOR_ANY_REACH = EVERY_ADMIN | {Permission.SETTINGS_PLATFORM_VIEW}
+GLOBAL_FOR_ANY_REACH = EVERY_ADMIN | {Permission.SETTINGS_PLATFORM_VIEW, Permission.LOGGING_VIEW}
 """Global permissions a role without the superuser's reach may hold: the basics, and the
-read-only System status and Advanced settings (ADR 0042 §5, no secret values shown)."""
+read-only System status and Advanced settings (ADR 0042 §5, no secret values shown) and
+the log destinations (ADR 0085, no credential shown)."""
 
 MATRIX: dict[Role, frozenset[Permission]] = {
     # HANDOVER §6: everything, including organisations, IdP, SMTP and WxCC credentials.
@@ -342,6 +352,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.IDP_MAPPING_VIEW,
         # ADR 0083 point 4: which providers an organisation trusts, for the access review.
         Permission.IDENTITY_PROVIDERS_VIEW,
+        # ADR 0085: where the log goes, for the review of the monitoring; no credential shown.
+        Permission.LOGGING_VIEW,
     },
     # ADR 0043: picks up bookings in the own queue of its groups; sees first names only.
     Role.AGENT: EVERY_ADMIN | {Permission.GROUP_VIEW, Permission.QUEUE_WORK},
