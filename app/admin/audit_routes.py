@@ -762,7 +762,7 @@ async def export(
     except ExportRefused as refused:
         return await _audit_page(request, locale, context, query, refused.code)
     clock: Clock = request.app.state.clock
-    name = f"audit-{clock.now():%Y%m%dT%H%M%SZ}.csv"
+    name = f"audit-{clock.now():%Y%m%dt%H%M%S}z.csv"
     return Response(
         document.encode("utf-8"),
         media_type="text/csv; charset=utf-8",
