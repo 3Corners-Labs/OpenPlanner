@@ -16,6 +16,11 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
+from app.adapters.db.backup import database_path
+from app.adapters.db.configuration_package import (
+    SqliteConfigurationTransfer,
+    portable_environment,
+)
 from app.adapters.db.engine import create_engine, set_slow_query_ms
 from app.adapters.db.identity_providers import ProviderCredentialStore
 from app.adapters.db.probes import ProbeReports
@@ -66,6 +71,7 @@ from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
+from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
@@ -371,6 +377,20 @@ def create_app(
             combination=app.state.live_settings.combination_problem,
             environment_value=app.state.live_settings.environment_value,
             production=settings.environment == "prod",
+        )
+        # ADR 0089: configuration packages, exported and imported on Advanced settings.
+        app.state.configuration_packages = ConfigurationPackageService(
+            SqliteConfigurationTransfer(
+                database_path(settings.database_url),
+                secret_box(settings),
+                installation=settings.installation_name or "",
+                app_version=settings.app_version or "",
+                environment=lambda: portable_environment(settings),
+                now=clock.now,
+            ),
+            clock,
+            app.state.admin_service,
+            max_bytes=lambda: live().configuration_package_max_mb * 1024 * 1024,
         )
         app.state.certificate_status = CertificateStatus(uow)
         # ADR 0070: the certificate source of the bundled proxy, with the pair handed to the

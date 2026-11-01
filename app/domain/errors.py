@@ -99,6 +99,12 @@ class ErrorCode(StrEnum):
     TLS_SOURCE_NOT_APPLICABLE = "tls_source_not_applicable"
     TLS_KEY_MISSING = "tls_key_missing"
     TLS_VOLUME_UNWRITABLE = "tls_volume_unwritable"
+    CONFIGURATION_PASSPHRASE_SHORT = "configuration_passphrase_short"  # noqa: S105  # nosec B105 - a code
+    CONFIGURATION_PASSPHRASE_WRONG = "configuration_passphrase_wrong"  # noqa: S105  # nosec B105 - a code
+    CONFIGURATION_PACKAGE_INVALID = "configuration_package_invalid"
+    CONFIGURATION_PACKAGE_VERSION = "configuration_package_version"
+    CONFIGURATION_PACKAGE_TOO_LARGE = "configuration_package_too_large"
+    CONFIGURATION_INSTALLATION_IN_USE = "configuration_installation_in_use"
 
 
 class DomainError(Exception):

@@ -1404,6 +1404,36 @@ until then the proxy serves Let's Encrypt. The same holds for `proxy-data` (the 
 account): keep it with the host, or let Caddy obtain a certificate again.
 
 
+## Configuration package (ADR 0089)
+
+A package is every setting of an installation (organisations, groups, texts, channels, identity
+providers, API clients, platform settings) with its secrets, and nothing that happened on it
+(no bookings, no log, no staff). It sets up a new test or production installation in one go.
+The superuser makes and imports one on *Advanced settings*; on the host the same runs as:
+
+```sh
+cd ~/openplanner
+printf '%s\n' 'a passphrase of at least sixteen characters' > secrets/package.passphrase
+chmod 600 secrets/package.passphrase
+docker compose --env-file .env.update exec web python -m app.cli config export /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
+docker compose --env-file .env.update cp web:/srv/data/config.sqlite ./config.sqlite
+```
+
+On the new installation, after `install.sh` and before anyone creates a group:
+
+```sh
+docker compose --env-file .env.update cp ./config.sqlite web:/srv/data/config.sqlite
+docker compose --env-file .env.update exec web python -m app.cli config show /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
+docker compose --env-file .env.update exec web python -m app.cli config import /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
+```
+
+`config env PACKAGE --passphrase-file PATH --out FILE` writes the package's `OIDC_*` variables
+(the login) as an env file, for a `.env` that is not yet filled in. An import is refused on an
+installation with bookings, slots or an active closure, and on another version of OpenPlanner
+(export again from an installation on this version). Delete the package and the passphrase
+file when done: together they are every secret of the platform. Both commands are audited as
+`system:cli`.
+
 ## Rotating secrets
 
 Bootstrap secrets come from environment variables, `X_FILE` or `secrets/secrets.env`

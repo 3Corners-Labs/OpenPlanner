@@ -40,6 +40,7 @@ from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
+from app.domain.configuration_package import PackageSummary
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -437,6 +438,45 @@ class CertificateVolume(Protocol):
 
     def withdraw(self) -> None:
         """Remove the serial and the chain, so the proxy falls back to ACME; the key stays."""
+        ...
+
+
+class ConfigurationTransfer(Protocol):
+    """Reads and writes configuration packages (ADR 0089): SQLite files, secrets re-sealed.
+
+    The adapter opens the installation's sealed values with its own key and seals them under
+    the package's passphrase on export, and the other way round on import. It never logs or
+    returns a passphrase or an opened value.
+    """
+
+    async def export(self, passphrase: str) -> bytes:
+        """Return a package of this installation sealed under ``passphrase``.
+
+        Raises:
+            DomainError: ``integration_not_ready`` without a settings key.
+        """
+        ...
+
+    async def inspect(self, package: bytes, passphrase: str) -> PackageSummary:
+        """Return what ``package`` holds, once ``passphrase`` opens it.
+
+        Raises:
+            DomainError: ``configuration_package_invalid`` for anything that is not a package
+                of the known format; ``configuration_passphrase_wrong``.
+        """
+        ...
+
+    async def import_(self, package: bytes, passphrase: str) -> PackageSummary:
+        """Replace every configuration table with the package's; return its summary.
+
+        Raises:
+            DomainError: The codes of ``inspect``; ``configuration_package_version`` when the
+                schema revisions differ; ``integration_not_ready`` without a settings key.
+        """
+        ...
+
+    async def in_use(self) -> bool:
+        """Return whether the installation has bookings, slots or an active closure."""
         ...
 
 

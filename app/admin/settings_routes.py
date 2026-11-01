@@ -40,6 +40,12 @@ through a response. Without the bundled proxy the block says the source does not
     POST /admin/settings/tls/certificate          settings.platform.manage (recent login): upload
     POST /admin/settings/tls/certificate/remove   settings.platform.manage (recent login)
     POST /admin/settings/tls/check                settings.platform.manage (recent login)
+    POST /admin/settings/package/export           settings.platform.manage (recent login): a file
+    POST /admin/settings/package/import           settings.platform.manage (recent login): upload
+
+The block *Configuration package* (ADR 0089) exports every configuration table with the
+secrets sealed under a passphrase, and imports such a package into an installation that is
+not in use. The passphrase is read from the form and never echoed, logged or stored.
 """
 
 from dataclasses import dataclass
@@ -58,7 +64,9 @@ from app.admin.session import save_login_trial
 from app.admin.uploads import read_uploads
 from app.config import Settings
 from app.domain.authorization import Permission
-from app.domain.errors import DomainError
+from app.domain.configuration_package import MEDIA_TYPE, MIN_PASSPHRASE_LENGTH
+from app.domain.configuration_service import ConfigurationPackageService
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
 from app.domain.own_certificate import (
     MAX_PEM_BYTES,
@@ -153,6 +161,11 @@ _DANGER = (Finding.EXPIRED, Finding.NOT_YET_VALID)
 TLS_URL = f"{URL}#tls-heading"
 CERTIFICATE_FIELDS = ("chain", "key")
 REMOVE_KEY = "tls_certificate"
+PACKAGE_KEY = "package"
+"""The error key of the configuration package block (ADR 0089)."""
+PACKAGE_FIELDS = ("passphrase", "confirm")
+"""The text fields next to the uploaded package."""
+PACKAGE_FILENAME = "openplanner-configuration-{installation}-{date}.sqlite"
 """The error key of the remove form (the upload's errors sit at ``chain`` or ``key``)."""
 CSR_KEY = "tls_csr"
 """The error key of the request form."""
@@ -443,6 +456,63 @@ async def adopt_setting(
     return redirect_done(URL, "adopted", anchor=_anchor(key))
 
 
+@router.post("/settings/package/export")
+async def export_package(
+    request: Request, locale: Locale, _: SameOrigin, context: Change
+) -> Response:
+    """Return a configuration package sealed under the submitted passphrase (ADR 0089)."""
+    form = await read_form(request, locale)
+    passphrase = form.text("passphrase")
+    try:
+        if passphrase != form.text("passphrase_repeat"):
+            raise DomainError(ErrorCode.CONFIRMATION_MISMATCH, PACKAGE_KEY)
+        package = await _packages(request).export(context.principal.subject, passphrase)
+    except DomainError as error:
+        raise_refusal(error)
+        return await _overview(request, locale, context, (PACKAGE_KEY, error), 422)
+    current: Settings = request.app.state.settings
+    name = PACKAGE_FILENAME.format(
+        installation=current.installation_name or "openplanner",
+        date=request.app.state.clock.now().strftime("%Y%m%d"),
+    )
+    return Response(
+        package,
+        media_type=MEDIA_TYPE,
+        headers={"content-disposition": f'attachment; filename="{name}"'},
+    )
+
+
+@router.post("/settings/package/import", response_class=HTMLResponse)
+async def import_package(
+    request: Request, locale: Locale, _: SameOrigin, context: Change
+) -> Response:
+    """Replace the configuration with an uploaded package (ADR 0089 point 5)."""
+    current: Settings = request.app.state.settings
+    uploads = await read_uploads(
+        request, (PACKAGE_KEY,), current.configuration_package_max_mb * 1024 * 1024, PACKAGE_FIELDS
+    )
+    try:
+        if uploads.values.get("confirm") != "yes":
+            raise DomainError(ErrorCode.CONFIRMATION_MISMATCH, PACKAGE_KEY)
+        summary = await _packages(request).import_(
+            context.principal.subject,
+            uploads.files[PACKAGE_KEY],
+            uploads.values.get("passphrase", "").strip(),
+        )
+    except DomainError as error:
+        raise_refusal(error)
+        return await _overview(request, locale, context, (PACKAGE_KEY, error), 422)
+    return redirect_done(
+        URL, "package_imported", summary.counts.get("organisations", 0), anchor="package-heading"
+    )
+
+
+def _packages(request: Request) -> ConfigurationPackageService:
+    """Return the application's configuration package service."""
+    service: ConfigurationPackageService = request.app.state.configuration_packages
+    return service
+
+
 def _hours(raw: str) -> int | None:
     """Return the submitted expiry in hours, or ``None`` when it is not a small whole number."""
     return int(raw) if raw.isdigit() and len(raw) <= 3 else None
@@ -519,8 +589,15 @@ async def _overview(
             "max_hours": LOG_LEVEL_MAX_EXPIRY_HOURS,
             "trace_max_hours": current.trace_level_max_hours,
             "login_form": _login_form(context, current, live, errors, locale),
+            "package": {
+                "error": errors.get(PACKAGE_KEY),
+                "min_length": MIN_PASSPHRASE_LENGTH,
+                "max_mb": current.configuration_package_max_mb,
+            },
             "manage": manage,
-            "unknown_error": next((m for k, m in errors.items() if k not in BY_KEY), None),
+            "unknown_error": next(
+                (m for k, m in errors.items() if k not in BY_KEY and k != PACKAGE_KEY), None
+            ),
         },
     )
     response.status_code = status

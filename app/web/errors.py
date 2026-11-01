@@ -93,6 +93,15 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.TLS_SOURCE_NOT_APPLICABLE: "admin.form.error.tls_source_not_applicable",
     ErrorCode.TLS_KEY_MISSING: "admin.form.error.tls_key_missing",
     ErrorCode.TLS_VOLUME_UNWRITABLE: "admin.form.error.tls_volume_unwritable",
+    # ADR 0089: the configuration package.
+    ErrorCode.CONFIGURATION_PASSPHRASE_SHORT: "admin.form.error.configuration_passphrase_short",
+    ErrorCode.CONFIGURATION_PASSPHRASE_WRONG: "admin.form.error.configuration_passphrase_wrong",
+    ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
+    ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
+    ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",
+    ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: (
+        "admin.form.error.configuration_installation_in_use"
+    ),
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {

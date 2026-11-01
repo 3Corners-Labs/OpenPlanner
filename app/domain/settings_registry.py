@@ -793,6 +793,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1_000_000,
     ),
     S(
+        "configuration_package_max_mb",
+        K.INT,
+        64,
+        _C,
+        T.OPERATIONS,
+        "Largest configuration package (MB) the portal and the API accept for import (ADR 0089).",
+        minimum=1,
+        maximum=512,
+    ),
+    S(
         "audit_export_max_days",
         K.INT,
         366,
