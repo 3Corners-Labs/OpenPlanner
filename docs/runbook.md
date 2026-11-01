@@ -754,7 +754,7 @@ is 1 while a `FAIL` remains.
 
 **Naming rule (advice).** Name each team's queue so that it contains the group's routing value
 as a name part; `-`, `_`, spaces and case count as the same. With routing value `aangifte`,
-`FIN-BLD_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
+`ORG_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
 per group which queue it will use, and a wrong Case branch stands out. Prefer routing values
 without spaces (the web address of the group is a good default).
 
