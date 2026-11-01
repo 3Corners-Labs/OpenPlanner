@@ -499,7 +499,9 @@ The script generates every value that is missing, keeps the ones that exist, tak
 portal's address from `PUBLIC_BASE_URL` in `.env` (the redirect URIs), and prints no value.
 `OIDC_CLIENT_SECRET` in `.env` must equal `KC_OPENPLANNER_CLIENT_SECRET`, and
 `OIDC_DISCOVERY_URL` points at `http://idp:8080/realms/openplanner/.well-known/openid-configuration`;
-the installer does both in step 2 of ADR 0090 (until then, by hand). Keycloak's own address
+the installer does both in step 2 of ADR 0090 (until then, by hand). Also set
+`OIDC_ISSUER` to `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public address, not
+the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097). Keycloak's own address
 for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`): a lab on the
 host itself needs nothing more; reaching the login from another machine goes through the proxy
 and is step 2. The admin console is bound to the host's loopback and is never published.

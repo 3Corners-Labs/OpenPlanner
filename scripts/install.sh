@@ -338,6 +338,8 @@ new_env() {
       public_address "" "http://127.0.0.1:8000"
       smtp_default=mailpit
       oidc_default=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration
+      # Keycloak announces KC_HOSTNAME, not the keycloak:8080 it is fetched on (ADR 0097).
+      IDP_ISSUER=${IDP_ISSUER:-http://127.0.0.1:8080/realms/openplanner}
       OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-dev-only-openplanner-admin-secret}
       SMTP_PORT=${SMTP_PORT:-1025} SMTP_STARTTLS=${SMTP_STARTTLS:-false}
       ;;
@@ -373,6 +375,7 @@ new_env() {
     put FORWARDED_ALLOW_IPS "${FORWARDED_ALLOW_IPS:-}"
     [[ -z $OIDC_DISCOVERY_URL ]] && [[ -f $CONFIG_ENV ]] && printf '# The login (OIDC_*): secrets/config.env, from the configuration package; a value here wins.\n'
     put OIDC_DISCOVERY_URL "$OIDC_DISCOVERY_URL"
+    [[ -z ${IDP_ISSUER:-} ]] || put OIDC_ISSUER "$IDP_ISSUER"
     put OIDC_CLIENT_ID "${OIDC_CLIENT_ID:-}"
     put OIDC_CLIENT_SECRET "${OIDC_CLIENT_SECRET:-}"
     put SMTP_HOST "$SMTP_HOST"
