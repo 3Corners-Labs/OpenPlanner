@@ -1199,6 +1199,10 @@ class Transaction(Protocol):
         """Store the changed fields of an existing API client (its organisation never changes)."""
         ...
 
+    async def delete_api_client(self, client_id: str) -> None:
+        """Erase the client's row; its access tokens and group grants go with it."""
+        ...
+
     async def add_access_token(self, token: AccessToken) -> None:
         """Store an issued access token (its hash only)."""
         ...

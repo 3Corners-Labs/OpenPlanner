@@ -8295,3 +8295,27 @@ msgstr "De proeflogin is mislukt: deze provider heeft geen sleutel. Roteer de sl
 
 msgid "admin.idp.test_failed.too_many_entitlements"
 msgstr "De proeflogin is mislukt: het token bevat meer entitlement-waarden dan toegestaan."
+
+msgid "admin.done.client_deleted"
+msgstr "De API-client is verwijderd."
+
+msgid "admin.form.error.api_client_enabled"
+msgstr "Schakel de API-client eerst uit; pas dan kan hij worden verwijderd."
+
+msgid "admin.audit.detail.client_delete"
+msgstr "API-client verwijderd"
+
+msgid "admin.api.delete"
+msgstr "API-client verwijderen"
+
+msgid "admin.api.delete_lead"
+msgstr "Verwijderen wist de client met zijn tokens en groepskoppelingen. Het logboek houdt zijn id. Een client moet eerst zijn uitgeschakeld."
+
+msgid "admin.api.delete_disable_first"
+msgstr "Schakel de client eerst uit om hem te kunnen verwijderen."
+
+msgid "admin.api.delete_button"
+msgstr "{name} verwijderen"
+
+msgid "admin.api.archived_groups"
+msgstr "De toegang van deze client noemt gearchiveerde groepen: {groups}. Zolang de koppeling blijft staan, wordt de groep niet gewist. Sla het formulier hieronder op of verwijder de client om de koppeling te laten vervallen."
