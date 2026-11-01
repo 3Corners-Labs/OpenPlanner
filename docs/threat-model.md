@@ -74,7 +74,7 @@ What the browser is allowed to do with OpenPlanner and why. Authentication paths
 
 No form carries a CSRF token. Three independent layers stand in the way of a cross-site request:
 
-1. **`SameSite=Lax` on the cookie.** The admin cookie `op_admin` is not sent on a cross-site
+1. **`SameSite=Lax` on the cookie.** The admin cookie (`__Host-op_admin` on https, `op_admin` over http) is not sent on a cross-site
    `POST`, `fetch` or subresource request, only on top-level `GET` navigations. This is the
    layer that protects a browser that sends neither header below.
 2. **Fetch Metadata** (`require_same_origin`, `app/web/protection.py`). Every state-changing

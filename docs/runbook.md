@@ -383,10 +383,20 @@ would let anyone grant themselves the superuser role.
 Roles are read at login and kept in the session for its lifetime (`ADMIN_SESSION_HOURS`,
 default 8). The session lives on the server (table `admin_sessions`, ADR 0098): logging out,
 a new login and `admin_idle_minutes` (default 60) end it at once, whatever copy of the cookie
-someone holds. After the release that introduced it everyone logs in once more. Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
+someone holds. After the release that introduced it everyone logs in once more, and once more
+after the release that renamed the cookie (below). Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
 older sessions pass through PingFederate first, which refreshes the roles. A revoked role
 therefore stops granting changes within an hour; reading continues until the session ends.
 For an urgent revocation, rotate `SESSION_SECRET` (logs everyone out).
+
+The cookie name follows `PUBLIC_BASE_URL` (ADR 0098 step 4), not `ENVIRONMENT`. On an `https://`
+address the cookie is `__Host-op_admin` with `Path=/`, `Secure`, `HttpOnly`, `SameSite=Lax` and
+no `Domain`; this also holds on a test host (`ENVIRONMENT=test`). On an `http://` address
+(development, or a host that has not moved to HTTPS yet) it stays `op_admin` with
+`Path=/admin` and no `Secure`, because browsers refuse a prefixed cookie without it. After
+the update that introduced the new name, every administrator on an https host has to log in once
+more: the old `op_admin` cookie is no longer read. Setting `PUBLIC_BASE_URL` to the `https://`
+address (ADR 0064, ADR 0086) is what switches a host to the new cookie.
 
 Logout sends `client_id` and `post_logout_redirect_uri` to the `end_session_endpoint`, without
 `id_token_hint`. Check during set-up that PingFederate accepts this and ends the SSO session;
