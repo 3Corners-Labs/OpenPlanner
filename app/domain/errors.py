@@ -34,6 +34,8 @@ class ErrorCode(StrEnum):
     CONFIRMATION_MISMATCH = "confirmation_mismatch"
     ORGANISATION_HAS_GROUPS = "organisation_has_groups"
     """ADR 0084 point 4: deleting needs an organisation without groups, archived ones too."""
+    API_CLIENT_ENABLED = "api_client_enabled"
+    """ADR 0084 point 7: an API client is deleted only after it was disabled."""
     ORGANISATION_HAS_API_CLIENTS = "organisation_has_api_clients"
     """ADR 0084 point 4: an API client still belongs to the organisation."""
     """ADR 0084 point 5: the name typed back on a confirmation page is not the object's."""

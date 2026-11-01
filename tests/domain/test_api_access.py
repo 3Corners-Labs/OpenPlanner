@@ -416,3 +416,42 @@ async def test_a_token_without_the_scope_reaches_nothing(
         "demo",
         None,
     )
+
+
+# --- deleting (ADR 0084 point 7) -------------------------------------------------------------
+
+
+async def test_a_client_is_deleted_only_after_it_was_switched_off(
+    service: ApiAccessService, uow: InMemoryUnitOfWork
+) -> None:
+    issued = await register(service)
+    client_id = issued.client.client_id
+    await service.issue_token(client_id, issued.secret, None, INSIDE)
+
+    with pytest.raises(DomainError) as enabled:
+        await service.delete_client(SUPER, client_id)
+    assert enabled.value.code is ErrorCode.API_CLIENT_ENABLED
+    assert client_id in uow.state.api_clients
+
+    await service.set_enabled(SUPER, client_id, False)
+    await service.delete_client(SUPER, client_id)
+
+    assert client_id not in uow.state.api_clients
+    assert not uow.state.access_tokens
+    assert uow.state.audit[-1].detail == f"client.delete,{client_id}"
+    with pytest.raises(DomainError) as gone:
+        await service.delete_client(SUPER, client_id)
+    assert gone.value.code is ErrorCode.API_CLIENT_NOT_FOUND
+
+
+async def test_only_the_superuser_deletes_a_client(
+    service: ApiAccessService, uow: InMemoryUnitOfWork
+) -> None:
+    issued = await register(service)
+    await service.set_enabled(SUPER, issued.client.client_id, False)
+
+    with pytest.raises(DomainError) as caught:
+        await service.delete_client(ORG_ADMIN, issued.client.client_id)
+
+    assert caught.value.code is ErrorCode.NOT_PERMITTED
+    assert issued.client.client_id in uow.state.api_clients

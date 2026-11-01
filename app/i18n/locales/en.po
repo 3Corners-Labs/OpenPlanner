@@ -8283,3 +8283,27 @@ msgstr "The test login failed: this provider has no key. Rotate the key to gener
 
 msgid "admin.idp.test_failed.too_many_entitlements"
 msgstr "The test login failed: the token holds more entitlement values than allowed."
+
+msgid "admin.done.client_deleted"
+msgstr "The API client has been deleted."
+
+msgid "admin.form.error.api_client_enabled"
+msgstr "Switch the API client off first; only then can it be deleted."
+
+msgid "admin.audit.detail.client_delete"
+msgstr "API client deleted"
+
+msgid "admin.api.delete"
+msgstr "Delete API client"
+
+msgid "admin.api.delete_lead"
+msgstr "Deleting erases the client with its tokens and group links. The log keeps its id. A client must be switched off first."
+
+msgid "admin.api.delete_disable_first"
+msgstr "Switch the client off first to be able to delete it."
+
+msgid "admin.api.delete_button"
+msgstr "Delete {name}"
+
+msgid "admin.api.archived_groups"
+msgstr "This client's access names archived groups: {groups}. While the link stays, the group is not erased. Save the form below or delete the client to let the link lapse."

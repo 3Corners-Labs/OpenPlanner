@@ -370,6 +370,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             404, 403, 403, 403, 403, 403, 403
         ),
     },
+    "POST /admin/api/clients/{client_id}/delete": {
+        "/admin/api/clients/opc_unknown-client-0000/delete": statuses(
+            404, 403, 403, 403, 403, 403, 403
+        ),
+    },
     "POST /admin/api/clients/{client_id}/revoke": {
         "/admin/api/clients/opc_unknown-client-0000/revoke": statuses(
             404, 403, 403, 403, 403, 403, 403

@@ -256,6 +256,7 @@ DETAIL_LABELS: dict[str, str] = {
     "client.enable": "admin.audit.detail.client_enable",
     "client.disable": "admin.audit.detail.client_disable",
     "client.revoke_tokens": "admin.audit.detail.client_revoke_tokens",
+    "client.delete": "admin.audit.detail.client_delete",
     "groups": "admin.api.groups",
     "scopes": "admin.api.scopes",
     "networks": "admin.api.networks",
