@@ -662,7 +662,8 @@ flowchart LR
 | Control | Where | Reference |
 |---|---|---|
 | Strict response headers: CSP without scripts, HSTS, frame denial, COOP/COEP/CORP, Permissions-Policy | `app/api/security_headers.py`, `app/web/templates.py` | threat model |
-| CSRF through Fetch Metadata (`Sec-Fetch-Site`), with an Origin fallback | `app/web/protection.py` | threat model |
+| CSRF through Fetch Metadata (`Sec-Fetch-Site`), with an Origin fallback, behind `SameSite=Lax` | `app/web/protection.py` | threat model, *Browser model* |
+| Authentication paths (admin OIDC, bot `client_credentials`, participant link): strength, withdrawal, what lies with the IdP | `app/admin/`, `app/api/agent/` | `docs/authentication.md` |
 | Rate limits (10 writes/hour, 60 reads/minute) and a honeypot field | `app/web/protection.py`, `booking_pages.py` | CLAUDE.md |
 | Management tokens: 256 bits, HMAC-derived, only the salt and hash stored | `app/domain/tokens.py` | ADR 0011 |
 | No PII in logs (masking processor and semgrep rule), errors, URLs or jobs | `app/logging.py`, `.semgrep/` | CLAUDE.md |
