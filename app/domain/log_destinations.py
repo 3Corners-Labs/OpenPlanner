@@ -113,14 +113,17 @@ class DeliveryError(Exception):
 
     Args:
         reason: Why it failed.
-        code: The platform's status code or the syslog error class, for the page; no body.
+        code: The platform's status code, for the page; never a body.
+        drop: The platform will never accept this batch (it is malformed for it), so the
+            sender discards it instead of retrying it forever and blocking every later line.
     """
 
-    def __init__(self, reason: Reason, code: int | None = None) -> None:
-        """Store the reason and the optional code."""
+    def __init__(self, reason: Reason, code: int | None = None, *, drop: bool = False) -> None:
+        """Store the reason, the optional code and whether the batch is hopeless."""
         super().__init__(reason.value)
         self.reason = reason
         self.code = code
+        self.drop = drop
 
 
 @dataclass(frozen=True)

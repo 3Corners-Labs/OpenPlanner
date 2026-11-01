@@ -33,6 +33,7 @@ from hashlib import sha256
 from typing import Protocol
 
 from app.adapters.db.log_destinations import LogTarget
+from app.config import Settings
 from app.domain.audit import Outcome
 from app.domain.event_schema import rfc3339
 from app.domain.log_destinations import (
@@ -67,6 +68,17 @@ class ShipSettings:
     timeout_seconds: float = 5
     queue_size: int = 10_000
     backoff_max_seconds: float = 300
+
+
+def ship_settings(current: Settings) -> ShipSettings:
+    """Return the shipping settings out of the effective ``Settings``."""
+    return ShipSettings(
+        batch_size=current.log_ship_batch_size,
+        flush_seconds=current.log_ship_flush_seconds,
+        timeout_seconds=current.log_ship_timeout_seconds,
+        queue_size=current.log_ship_queue_size,
+        backoff_max_seconds=current.log_ship_backoff_max_seconds,
+    )
 
 
 class TargetSource(Protocol):
@@ -180,6 +192,11 @@ class Pipeline:
         try:
             await self._sender.send(self._inflight)
         except DeliveryError as failed:
+            if failed.drop:  # the platform will never accept this batch: do not block the rest
+                self._status = replace(
+                    self._status, dropped=self._status.dropped + len(self._inflight)
+                )
+                self._inflight = []
             self._wait = min(
                 max(1.0, self._wait * 2 if self._wait else 1.0),
                 self._settings().backoff_max_seconds,
@@ -400,3 +417,57 @@ def _fingerprint(target: LogTarget) -> str:
         target.unreadable,
     )
     return sha256(repr(parts).encode()).hexdigest()
+
+
+class LogTester:
+    """Sends one test line to a stored destination (ADR 0085 point 5).
+
+    The line goes straight to the platform with the destination's own sender, not through the
+    queue, so the answer is the platform's and the page can show it at once.
+
+    Args:
+        source: Opens one destination with its credential, enabled or not.
+        factory: Builds the sender.
+        clock: Current time, for the line.
+        service: ``web`` or ``worker``.
+        settings: Returns the current ``ShipSettings`` (the timeout).
+    """
+
+    def __init__(
+        self,
+        source: "OneTarget",
+        factory: SenderFactory,
+        clock: Clock,
+        service: str,
+        settings: Callable[[], ShipSettings] = ShipSettings,
+    ) -> None:
+        """Store the collaborators."""
+        self._source = source
+        self._factory = factory
+        self._clock = clock
+        self._service = service
+        self._settings = settings
+
+    async def __call__(self, destination_id: int) -> None:
+        """Deliver the test line.
+
+        Raises:
+            DeliveryError: ``not_ready`` when the credential cannot be opened or the
+                destination is gone, otherwise the reason of the failed delivery.
+        """
+        target = await self._source.one(destination_id)
+        if target is None or target.unreadable:
+            raise DeliveryError(Reason.NOT_READY)
+        sender = self._factory(target, lambda: self._settings().timeout_seconds)
+        try:
+            await sender.send([probe_line(self._clock, self._service, target.destination)])
+        finally:
+            await sender.aclose()
+
+
+class OneTarget(Protocol):
+    """Where one destination with its opened credential comes from."""
+
+    async def one(self, destination_id: int) -> LogTarget | None:
+        """Return the destination, enabled or not."""
+        ...

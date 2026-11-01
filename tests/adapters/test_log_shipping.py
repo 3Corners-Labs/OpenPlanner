@@ -127,6 +127,22 @@ async def test_the_wait_doubles_up_to_the_maximum_and_resets_on_success() -> Non
     assert p.delay() == SETTINGS.flush_seconds
 
 
+async def test_a_batch_the_platform_will_never_accept_is_dropped_not_retried_forever() -> None:
+    sender = FakeSender()
+    sender.failures = [Reason.REFUSED]
+    sender.hopeless = True
+    p = pipeline(sender)
+    for n in range(4):
+        offer(p, line(f"m{n}"))
+
+    assert await p.flush_once() is State.FAILING
+    assert await p.flush_once() is State.OK
+
+    assert [json.loads(x)["message"] for x in sender.lines] == ["m3"]  # the poisoned batch is gone
+    status = p.status()
+    assert (status.dropped, status.failed, status.sent) == (3, 1, 1)
+
+
 def test_a_full_batch_is_sent_without_waiting() -> None:
     p = pipeline(FakeSender())
     for n in range(3):
