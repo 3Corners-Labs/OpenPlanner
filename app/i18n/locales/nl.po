@@ -3179,6 +3179,9 @@ msgstr "API-koppelingen beheren"
 msgid "authz.api_scope.availability_read"
 msgstr "Vrije tijden lezen"
 
+msgid "authz.api_scope.configuration_transfer"
+msgstr "Configuratiepakket exporteren en importeren (hele installatie)"
+
 msgid "admin.nav.api"
 msgstr "API-koppelingen"
 

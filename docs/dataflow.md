@@ -387,6 +387,7 @@ superuser ──POST /admin/settings/package/export (passphrase)──> web ─�
 web ──DELETE state tables, VACUUM; secrets opened with SETTINGS_ENCRYPTION_KEY, sealed under scrypt(passphrase)──> package file ──download──> superuser
 superuser ──POST /admin/settings/package/import (file, passphrase)──> web ──verify, re-seal under SETTINGS_ENCRYPTION_KEY──> temporary copy ──ATTACH, one transaction──> configuration tables
 host ──python -m app.cli config export|show|import|env──> the same, actor system:cli; `env` writes OIDC_* to a file (mode 600)
+API client (scope configuration:transfer) ──GET / PUT /api/agent/v1/configuration (X-Passphrase header, package body)──> the same service, actor the client id (ADR 0089 point 7)
 ```
 
 A package holds no participant data: the state tables (`bookings` with every PII field,

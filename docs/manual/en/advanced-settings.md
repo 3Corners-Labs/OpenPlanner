@@ -164,6 +164,14 @@ Every export and import is in the audit log, without the passphrase and without 
 must have logged in recently. The largest package allowed is the platform setting *Largest
 configuration package*.
 
+**Through the API.** A pipeline can do the same without the portal: an API client with the
+scope *Export and import the configuration package* (`configuration:transfer`, granted on
+**API clients**) fetches and places the package with `GET` and `PUT
+/api/agent/v1/configuration`, the passphrase in a header. That scope covers the whole
+installation, whatever organisation and teams the client has; grant it only to a client that
+provisions installations, never to a bot. The same rules and the same audit log apply, with
+the client id as actor.
+
 ## Changing the login mapping
 
 Only the superuser can change which claims of the identity provider carry the roles,
