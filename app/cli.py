@@ -800,7 +800,13 @@ def _config_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser
     import_cmd.add_argument("path", type=Path, help="the package file")
     env_cmd = actions.add_parser("env", help="write the package's login variables as an env file")
     env_cmd.add_argument("path", type=Path, help="the package file")
-    env_cmd.add_argument("--out", type=Path, required=True, help="the env file to write (600)")
+    env_cmd.add_argument(
+        "--out",
+        type=Path,
+        required=True,
+        help="the env file to write (600), or - for standard output (the installer's one-off "
+        "container, whose filesystem is read-only; ADR 0089 point 8)",
+    )
     for sub in (export_cmd, show_cmd, import_cmd, env_cmd):
         sub.add_argument(
             "--passphrase-file",
@@ -868,6 +874,8 @@ async def _config(settings: Settings, args: argparse.Namespace) -> tuple[str, in
         if args.action == "env":
             values = environment_values(package, passphrase, transfer.work_dir)
             lines = "".join(f"{key}={value}\n" for key, value in values.items())
+            if str(args.out) == "-":
+                return lines, 0
             _write_private(args.out, lines.encode())
             return f"env file written: {args.out} ({len(values)} variables)\n", 0
         summary = await service.import_(CONFIG_ACTOR, package, passphrase)

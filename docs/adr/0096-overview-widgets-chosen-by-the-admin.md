@@ -1,4 +1,4 @@
-# 0092. Overview widgets chosen by the admin
+# 0096. Overview widgets chosen by the admin
 
 Status: proposed (2026-11-01), requested by the product owner. Extends ADR 0047 (admin
 structure) and the overview of ADR 0044. Not built; see *Build status*.
