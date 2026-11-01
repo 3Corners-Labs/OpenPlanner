@@ -30,6 +30,9 @@ TOKEN_PATH = f"{AGENT_API_PREFIX}/oauth/token"
 
 SCOPE_DESCRIPTIONS: dict[ApiScope, str] = {
     ApiScope.AVAILABILITY_READ: "Read groups and their free appointment times (no personal data).",
+    ApiScope.CONFIGURATION_TRANSFER: (
+        "Export and import the configuration package of the whole installation (ADR 0089)."
+    ),
 }
 """Shown in the OpenAPI spec; the admin portal has its own translated labels."""
 
