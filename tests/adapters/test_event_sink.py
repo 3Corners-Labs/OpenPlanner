@@ -53,3 +53,23 @@ def test_a_broken_stream_is_logged_not_raised() -> None:
     out.close()
 
     StdoutEventSink(ENVELOPE, out).emit([_event()])  # must not raise
+
+
+# ADR 0085 point 3: the log destinations get the audit line, and diagnostic events if they opt in.
+
+
+def test_the_tap_gets_the_audit_line_and_diagnostic_events_only_the_tap() -> None:
+    from app.logging import set_line_tap  # noqa: PLC0415
+
+    tapped: list[str] = []
+    out = io.StringIO()
+    set_line_tap(tapped.append)
+    try:
+        StdoutEventSink(ENVELOPE, out).emit(
+            [_event("admin.login"), _event("job.run", category=Category.DIAGNOSTIC)]
+        )
+    finally:
+        set_line_tap(None)
+
+    assert [json.loads(line)["event.category"] for line in tapped] == ["audit", "diagnostic"]
+    assert [line["event.category"] for line in _lines(out)] == ["audit"]  # stdout: no diagnostic
