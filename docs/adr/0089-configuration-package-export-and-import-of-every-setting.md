@@ -129,7 +129,7 @@ to its record). The classification of tables is code, checked by a test, not a s
 | 1 | The package: table registry, export and import adapter, `config export\|show\|import\|env` on the host, the setting | #298 | in PR |
 | 2 | The block *Configuration package* on *Advanced settings*: export with a passphrase, import with a passphrase and a confirmation; manual topic | #298 | in PR |
 | 3 | Machine API: scope `configuration:transfer`, `GET`/`PUT /api/agent/v1/configuration`, `docs/agent-api.md` | | planned |
-| 4 | Installer: `--configuration FILE --passphrase-file PATH`, `secrets/config.env` in `docker-compose.yml`, `docs/install.md` | #299 | in PR |
+| 4 | Installer: `--configuration FILE --passphrase-file PATH`, `secrets/config.env` in `docker-compose.yml`, `docs/install.md` | #302 | in PR |
 | 5 | A package of an older schema revision is migrated forward on import | | planned |
 
 ## Consequences
