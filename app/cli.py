@@ -39,6 +39,9 @@ When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
         (ADR 0064): stored for System status; with ``--host`` another server, stored nowhere
     ``python -m app.cli purge-overdue [--dry-run]``  purge the personal data past its purge
         moment now (the nightly sweep does this too); ``--dry-run`` only counts per group
+    ``python -m app.cli sessions end-all --reason restore|secret_rotated|cli``  end every admin
+        session now (ADR 0098), one audit event as ``system:cli``; the updater runs it after a
+        restore
     ``python -m app.cli closure start (--group SLUG | --organisation SLUG) --notice-nl TEXT
     --notice-en TEXT [--end ISO]``  emergency closure (ADR 0024), audited as ``system:cli``
     ``python -m app.cli closure lift (--group SLUG | --organisation SLUG)``  end it now
@@ -112,6 +115,8 @@ from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks,
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.config import Settings, environment
 from app.domain.admin import AdminService
+from app.domain.admin_session_service import AdminSessionService
+from app.domain.admin_sessions import EndReason
 from app.domain.authorization import Grant, Principal, Role, RoleCatalogue, Scope
 from app.domain.client_pseudonym import UNKNOWN_CLIENT, ClientPseudonyms
 from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcome
@@ -397,6 +402,22 @@ async def _maintenance(settings: Settings, action: str, reason: str, actor: str)
         return _maintenance_line(await service.stored())
     finally:
         await engine.dispose()
+
+
+SESSION_REASONS = (EndReason.RESTORE, EndReason.SECRET_ROTATED, EndReason.CLI)
+"""Reasons the host may give when it ends all admin sessions; a closed list, never free text."""
+
+
+async def _sessions_end_all(settings: Settings, reason: EndReason) -> str:
+    """End every live admin session (ADR 0098 point 9c); return one line with the count."""
+    engine = create_engine(settings.database_url)
+    try:
+        count = await AdminSessionService(SqlUnitOfWork(engine), SystemClock()).end_all(
+            reason, CONFIG_ACTOR
+        )
+    finally:
+        await engine.dispose()
+    return f"ended {count} sessions ({reason.value})\n"
 
 
 async def _purge_overdue(settings: Settings, dry_run: bool = False) -> tuple[str, bool]:
@@ -1048,6 +1069,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "purge-overdue", help="purge personal data past its purge moment (nightly sweep, now)"
     )
     purge_cmd.add_argument("--dry-run", action="store_true", help="only count, per group")
+    sessions_cmd = commands.add_parser("sessions", help="admin sessions (ADR 0098)")
+    sessions_actions = sessions_cmd.add_subparsers(dest="sessions_action", required=True)
+    end_all_cmd = sessions_actions.add_parser("end-all", help="end every admin session now")
+    end_all_cmd.add_argument(
+        "--reason", required=True, choices=[r.value for r in SESSION_REASONS], help="why"
+    )
     commands.add_parser("version", help="print the release and commit of this image")
     commands.add_parser("update-claim", help="claim the waiting update request (host updater)")
     progress_cmd = commands.add_parser("update-progress", help="record the step an update starts")
@@ -1131,6 +1158,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _write(asyncio.run(_oidc_check(Settings())))
     if args.command == "purge-overdue":
         return _write(asyncio.run(_purge_overdue(Settings(), args.dry_run)))
+    if args.command == "sessions":
+        sys.stdout.write(asyncio.run(_sessions_end_all(Settings(), EndReason(args.reason))))
+        return 0
     if args.command == "tls-check":
         return _write(asyncio.run(_tls_check(Settings(), args.host, args.port)))
     if args.command == "closure":

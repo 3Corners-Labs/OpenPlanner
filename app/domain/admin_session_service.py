@@ -4,13 +4,15 @@
     resolve(sid)       ── judge(): ended / expired / idle? ── end with reason ──► None
                        └─ valid ──► session (``last_seen_at`` written at most every interval)
     end(sid, reason)   ── logout and the like
+    end_all(reason)    ── every live session, one audit event (CLI, restore)
+    clean(lifetime)    ── delete ended and past-lifetime rows (worker housekeeping)
 
 The rules are in ``app.domain.admin_sessions``. When the register cannot be read the error
 propagates: no session means no access (fail closed, ADR 0098 point 14).
 """
 
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.domain.admin_sessions import (
     AUDITED_REASONS,
@@ -26,6 +28,9 @@ from app.domain.admin_sessions import (
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.entitlements import LoginClaims
 from app.domain.ports import Clock, Transaction, UnitOfWork
+
+SESSIONS_ENDED_ALL_EVENT = "admin.sessions_ended_all"
+"""Audit action for ending every session at once; the detail holds only the count."""
 
 SESSION_ENDED_EVENT = "admin.session_ended"
 """Audit action for a session that ended without the person asking (idle, expired, limit)."""
@@ -102,6 +107,35 @@ class AdminSessionService:
             return
         async with self._uow.locked() as tx:
             await tx.end_admin_session(hash_sid(sid), reason, self._clock.now())
+
+    async def end_all(self, reason: EndReason, actor: str) -> int:
+        """End every live session with ``reason`` and audit it once; return how many ended.
+
+        One audit event whatever the count (also zero): actor, reason and the number, never an
+        identifier or a subject (ADR 0098 point 9).
+        """
+        now = self._clock.now()
+        async with self._uow.locked() as tx:
+            count = await tx.end_all_admin_sessions(reason, now)
+            await tx.add_audit_event(
+                AuditEvent(
+                    now,
+                    actor,
+                    SESSIONS_ENDED_ALL_EVENT,
+                    Outcome.SUCCESS,
+                    reason.value,
+                    detail=f"sessions={count}",
+                )
+            )
+        return count
+
+    async def clean(self, lifetime: timedelta) -> int:
+        """Delete the ended rows and those past their absolute end; return how many went.
+
+        History stays in ``audit_events``. A live session within ``lifetime`` is never touched.
+        """
+        async with self._uow.locked() as tx:
+            return await tx.delete_admin_sessions(self._clock.now() - lifetime)
 
     @staticmethod
     async def _end(

@@ -322,3 +322,59 @@ async def test_a_failing_checkpoint_is_logged_and_never_stops_housekeeping(
         await setup.housekeeping.run()
 
     assert "retention.checkpoint_failed" in [e["event"] for e in logs]
+
+
+# --- admin sessions (ADR 0098 step 2) --------------------------------------------------------
+
+
+class SessionCleaner:
+    """Counts how often housekeeping asked to delete sessions; fails on demand."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self.fail = False
+
+    async def __call__(self) -> int:
+        self.calls += 1
+        if self.fail:
+            raise RuntimeError("database locked")
+        return 3
+
+
+def _with_cleaner(setup: Setup, engine: AsyncEngine, cleaner: SessionCleaner) -> None:
+    setup.housekeeping = Housekeeping(
+        engine, setup.uow, setup.clock, StorageLimits(), setup.disk, clean_sessions=cleaner
+    )
+
+
+async def test_ended_and_expired_sessions_are_cleaned_once_an_hour(engine: AsyncEngine) -> None:
+    setup = Setup(engine)
+    cleaner = SessionCleaner()
+    _with_cleaner(setup, engine, cleaner)
+
+    with capture_logs() as logs:
+        await setup.housekeeping.run()
+        setup.clock.advance(timedelta(minutes=59))
+        await setup.housekeeping.run()
+        setup.clock.advance(timedelta(minutes=1))
+        await setup.housekeeping.run()
+
+    assert cleaner.calls == 2
+    assert [(e["event"], e["sessions"]) for e in logs if e["event"].startswith("sessions.")] == [
+        ("sessions.cleaned", 3),
+        ("sessions.cleaned", 3),
+    ]
+
+
+async def test_a_failing_session_clean_never_stops_housekeeping(engine: AsyncEngine) -> None:
+    setup = Setup(engine)
+    cleaner = SessionCleaner()
+    cleaner.fail = True
+    _with_cleaner(setup, engine, cleaner)
+
+    with capture_logs() as logs:
+        await setup.housekeeping.run()
+
+    assert [e["event"] for e in logs if e["event"].startswith("sessions.")] == [
+        "sessions.clean_failed"
+    ]

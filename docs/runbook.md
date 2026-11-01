@@ -388,7 +388,34 @@ someone holds. After the release that introduced it everyone logs in once more, 
 after the release that renamed the cookie (below). Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
 older sessions pass through PingFederate first, which refreshes the roles. A revoked role
 therefore stops granting changes within an hour; reading continues until the session ends.
-For an urgent revocation, rotate `SESSION_SECRET` (logs everyone out).
+For an urgent revocation, end every session on the host (below) or, as the last resort,
+rotate `SESSION_SECRET`.
+
+**Ending all admin sessions (ADR 0098).** On the host, in the `web` container:
+
+```sh
+docker compose --env-file .env.update exec web python -m app.cli sessions end-all --reason cli
+```
+
+`--reason` is one of `cli` (an operator's choice), `restore` (after a database restore) and
+`secret_rotated` (with a `SESSION_SECRET` rotation). The command ends every live session, so
+everyone logs in again, and writes one audit event (`admin.sessions_ended_all`, actor
+`system:cli`) with the reason and the number of sessions, never an identifier. The worker
+deletes ended rows and rows past `ADMIN_SESSION_HOURS` once an hour; the history stays in the
+audit log.
+
+**Offboarding a person (ASVS V7.4.2).** Switching a person off at the identity provider does
+not end the session OpenPlanner already holds. Until the administrator's *End all sessions*
+button exists (ADR 0098 step 3), the route is:
+
+1. Switch the person off at the identity provider (or remove their groups and claims there).
+2. Their open session then lapses at the idle limit (`admin_idle_minutes`, default 60) at the
+   latest, and in any case at its absolute end (`ADMIN_SESSION_HOURS`, default 8). Every new
+   login needs the identity provider, which now refuses it.
+3. When that is too slow, end all sessions on the host (above). It also logs out everyone
+   else, who log in again; there is no per-person command before step 3 of the ADR.
+4. Remove the person's roles in the portal (*Staff*) so a login by another route grants
+   nothing, and note the date for the audit trail.
 
 The cookie name follows `PUBLIC_BASE_URL` (ADR 0098 step 4), not `ENVIRONMENT`. On an `https://`
 address the cookie is `__Host-op_admin` with `Path=/`, `Secure`, `HttpOnly`, `SameSite=Lax` and
@@ -1447,6 +1474,12 @@ verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the 
 does not stop the updater. The updater's own log is in the journal:
 `journalctl -u openplanner-updater`.
 
+Every time the updater puts a backup back (a rollback after an unhealthy update or restore) it
+runs `sessions end-all --reason restore` before the old version starts (ADR 0098 point 10),
+because the restored database may hold sessions that were ended after the backup. If that
+command fails (a version from before ADR 0098), the journal says `sessions could not be
+ended` and the rollback goes on; run the command by hand afterwards.
+
 A request that stays at "Waiting for the updater" is not picked up: check
 `systemctl list-timers openplanner-updater.timer` and the journal.
 
@@ -1459,6 +1492,7 @@ the image from `previous.env`:
 ```sh
 docker compose --env-file .env.update stop web worker
 docker compose --env-file .env.update run --rm --no-deps web python -m app.cli restore-db request-<id>
+docker compose --env-file .env.update run --rm --no-deps web python -m app.cli sessions end-all --reason restore
 sed -i 's|^OPENPLANNER_IMAGE=.*|OPENPLANNER_IMAGE=<PREVIOUS_IMAGE>|; s|^OPENPLANNER_PROXY_IMAGE=.*|OPENPLANNER_PROXY_IMAGE=<PREVIOUS_PROXY_IMAGE>|' .env.update
 docker compose --env-file .env.update up -d
 ```
@@ -1498,6 +1532,24 @@ deploy the old images. Every migration is reversible (enforced in CI).
 
 *TBD (O7).* Planned: Litestream or a daily `sqlite3 .backup`, encrypted, retention = PII term
 + 7 days (HANDOVER §7).
+
+### Restoring a copy by hand (ADR 0102 point 9, ADR 0098 point 10)
+
+The updater does the session step itself for its rollbacks (*Updates*). For a restore by hand
+(a copy from the host's backup, moving the volume) the order is fixed:
+
+1. `maintenance on`: set `MAINTENANCE_MODE=true` for `web` and restart it when the database is
+   unavailable (*Maintenance mode*), otherwise `python -m app.cli maintenance on --reason incident`.
+2. Stop `web` and `worker`, restore the copy (`python -m app.cli restore-db NAME`), start them.
+3. `python -m app.cli purge-overdue`: a copy is older than the live data and can hold personal
+   data that was already deleted (*Retention*). Check that the retention overview shows 0
+   bookings holding data past their moment.
+4. `python -m app.cli sessions end-all --reason restore`: the copy can bring back sessions
+   that were ended after it was made (logout, replaced, idle). Everyone logs in again.
+5. `maintenance off`.
+
+Skipping step 4 leaves a window of at most `ADMIN_SESSION_HOURS` in which a session that had
+been ended, for example after someone was switched off, works again.
 
 The `portal-certs` volume (ADR 0070: the private key of an own certificate, its signing
 request and the served pair) is **not** part of the database backup, on purpose: the database
@@ -1551,7 +1603,19 @@ again asks the login questions as before.
 Bootstrap secrets come from environment variables, `X_FILE` or `secrets/secrets.env`
 (`app.cli init`); none are baked into the image. To rotate `MANAGEMENT_TOKEN_KEY` or
 `SESSION_SECRET`, replace the value in that file or the secret store and restart `web` and
-`worker`; `init` never overwrites the file, so edit it or move it away first. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
+`worker`; `init` never overwrites the file, so edit it or move it away first.
+
+**Rotating `SESSION_SECRET`** logs every admin out and, in addition, drops the signed login
+state (a login in progress, the update snooze, interface choices). In this order, so the
+register agrees with the cookies:
+
+1. `docker compose --env-file .env.update exec web python -m app.cli sessions end-all --reason secret_rotated`
+2. Replace `SESSION_SECRET` (at least 32 random bytes) in `secrets/secrets.env` or the secret
+   store.
+3. Restart `web` and `worker`.
+
+A cookie signed with the old secret is invalid from step 3 on; step 1 makes sure no session
+stays in the register for a reference that nobody can present any more. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
 value on the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` makes every
 stored channel secret and Webex token unreadable: re-enter the channel secrets afterwards
 (ADR 0008).

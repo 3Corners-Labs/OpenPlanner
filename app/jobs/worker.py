@@ -42,6 +42,7 @@ from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.adapters.tls_probe import SslCertificateProbe
 from app.config import Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
+from app.domain.admin_session_service import AdminSessionService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.group_erase import GroupEraser
@@ -192,6 +193,7 @@ async def run_worker(
         lambda: timedelta(hours=live.settings.diagnostic_mode_hours),
     )
     eraser = GroupEraser(uow, clock, lambda: timedelta(days=live.settings.group_erase_after_days))
+    sessions = AdminSessionService(uow, clock)
     housekeeping = Housekeeping.for_database(
         engine,
         uow,
@@ -201,6 +203,7 @@ async def run_worker(
         diagnostics.brake,
         eraser.run,
         RetentionSweep(uow, clock).run,
+        lambda: sessions.clean(timedelta(hours=live.settings.admin_session_hours)),
     )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
