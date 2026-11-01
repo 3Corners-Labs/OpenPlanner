@@ -147,6 +147,41 @@ worden videogesprekken en werkitems binnen ongeveer tien seconden opnieuw gekopp
 Voor een wijziging moet u kort geleden zijn ingelogd. Elke wijziging staat in het auditlog met
 de oude en de nieuwe waarde; een geweigerde wijziging ook.
 
+## Configuratiepakket
+
+Een configuratiepakket bevat alle instellingen van deze installatie: organisaties, teams,
+openingstijden en uitzonderingen, herinneringen, teksten, formuliervelden, contactopties,
+feestdagkalenders, scenario's voor sluiting, huisstijl, mail- en sms-kanalen, identity
+providers, API-clients, rollen en de platforminstellingen, met hun geheimen. Afspraken,
+tijdsloten, het auditlog en medewerkers gaan niet mee. Zo zet u een nieuwe installatie (test
+of productie) in één keer op, zonder elk wachtwoord en elke sleutel opnieuw in te voeren.
+
+**Exporteren.** Kies een wachtwoordzin van minstens 16 tekens en herhaal die. U krijgt een
+bestand `openplanner-configuratie-….sqlite`. De geheimen in het bestand zijn versleuteld met
+de wachtwoordzin; die wordt nergens bewaard. Zonder de wachtwoordzin is het pakket waardeloos,
+met de wachtwoordzin bevat het elk geheim van het platform. Bewaar bestand en wachtwoordzin
+dus gescheiden, en niet langer dan nodig.
+
+**Importeren.** Kies het bestand, vul de wachtwoordzin in en vink aan dat alle configuratie
+van deze installatie wordt vervangen. Dat kan alleen in een installatie zonder afspraken,
+tijdsloten of actieve sluiting: een nieuwe installatie dus. Medewerkers en het auditlog
+blijven. Het pakket moet van dezelfde versie van OpenPlanner zijn; is dat niet zo, exporteer
+dan opnieuw vanaf een installatie met deze versie. Na de import gelden de instellingen binnen
+tien seconden. De bootstrap-sleutels van de server (`SETTINGS_ENCRYPTION_KEY` en de andere
+twee) gaan nooit mee: elke installatie houdt haar eigen sleutels.
+
+Elke export en import staat in het auditlog, zonder wachtwoordzin en zonder waarden. U moet
+kort geleden zijn ingelogd. De grootste toegestane pakketgrootte is de platforminstelling
+*Maximale grootte van een configuratiepakket*.
+
+**Via de API.** Een pipeline kan hetzelfde doen zonder de portal: een API-client met het
+recht *Configuratiepakket exporteren en importeren* (`configuration:transfer`, te geven op
+**API-koppelingen**) haalt het pakket op en zet het neer met `GET` en `PUT
+/api/agent/v1/configuration`, de wachtwoordzin in een header. Dat recht geldt voor de hele
+installatie, ongeacht de organisatie en de teams van de client; geef het alleen aan een
+client voor het inrichten van installaties, nooit aan een bot. Dezelfde regels en hetzelfde
+auditlog gelden, met de client-id als actor.
+
 ## De inlogkoppeling wijzigen
 
 Alleen de superuser kan wijzigen welke claims van de identity provider de rollen, organisaties

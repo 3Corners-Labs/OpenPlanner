@@ -11,7 +11,7 @@ Changes apply to new appointments. Existing appointments stay as they were booke
 
 When you create a group you may leave the web address empty: the portal then makes it from
 the name. What you type yourself is converted to the rules: lower-case letters, digits and
-hyphens, no accents, at most 64 characters (`FIN BLD Video group` becomes `fin-bld-video-group`).
+hyphens, no accents, at most 64 characters (`Finance Video group` becomes `finance-video-group`).
 If that address is taken, you see the proposed address again and choose another.
 
 The web address (the *slug*) is fixed once the group exists. The organisation's websites link

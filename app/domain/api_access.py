@@ -44,7 +44,9 @@ from app.domain.api_clients import (
 )
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import (
+    API_SCOPES,
     ApiScope,
+    Level,
     Permission,
     Principal,
     Reason,
@@ -392,8 +394,16 @@ class ApiAccessService:
     async def require_scope(self, caller: ApiCaller, api_scope: ApiScope) -> None:
         """Raise ``not_permitted`` unless the caller's token holds ``api_scope``; audit a denial.
 
-        For calls without a group (listings); calls on one group use ``authorize``.
+        For calls without a group: listings, and the global scopes that act on the whole
+        installation (ADR 0089 point 7), which the matrix decides on ``Target.everything()``.
+        Calls on one group use ``authorize``.
         """
+        if API_SCOPES[api_scope] is Level.GLOBAL:
+            decision = decide_client(caller.grant, api_scope, Target.everything())
+            if decision.allowed:
+                return
+            await self._audit_denied_call(caller, api_scope, decision.reason.value, None)
+            raise DomainError(ErrorCode.NOT_PERMITTED)
         if api_scope in caller.grant.scopes:
             return
         await self._audit_denied_call(caller, api_scope, Reason.NOT_PERMITTED.value, None)
