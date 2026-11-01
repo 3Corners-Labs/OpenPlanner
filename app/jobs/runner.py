@@ -131,6 +131,8 @@ class JobRunner:
             write times in their group's organisation's format.
         product_footer: Whether an organisation (by id) keeps "Appointments via OpenPlanner"
             in its emails (ADR 0060 §6); ``None`` keeps it.
+        after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
+            the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
 
     def __init__(
@@ -147,9 +149,11 @@ class JobRunner:
         retention: EventRetention | Callable[[], EventRetention] | None = None,
         clock_style: Callable[[int], str] | None = None,
         product_footer: Callable[[int], bool] | None = None,
+        after_purge: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
+        self._after_purge = after_purge
         self._system_log = SystemLog(uow, clock)
         self._retention = retention or EventRetention()
         self._clock_style = clock_style
@@ -176,6 +180,16 @@ class JobRunner:
         now = self._clock.now()
         await self._prune(now)
         jobs = await self._queue.claim_due(now, self._types, MESSAGE_CHANNELS)
+        await self._run_jobs(jobs, now)
+        if self._after_purge is not None and any(j.type is JobType.PURGE_PII for j in jobs):
+            try:
+                await self._after_purge()
+            except Exception as exc:  # the data is purged; the next checkpoint finishes the job
+                log.warning("job.checkpoint_failed", error=type(exc).__name__)
+        return len(jobs)
+
+    async def _run_jobs(self, jobs: list[ClaimedJob], now: datetime) -> None:
+        """Run the claimed jobs one by one, each in its own trace."""
         for job in jobs:
             with trace_scope():
                 await self._bind(job)
@@ -189,7 +203,6 @@ class JobRunner:
                     ms=int((perf_counter() - ticks) * 1000),
                 )
                 await self._debug(job, self._clock.now() - started)
-        return len(jobs)
 
     async def _debug(self, job: ClaimedJob, took: timedelta) -> None:
         """Write a debug event for the job when its group is in diagnostic mode (ADR 0040)."""

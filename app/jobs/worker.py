@@ -23,7 +23,7 @@ from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable, set_slow_query_ms
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.log_destinations import LogDestinationCredentialStore
-from app.adapters.db.maintenance import storage_limits
+from app.adapters.db.maintenance import checkpoint_wal, storage_limits
 from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
@@ -177,6 +177,7 @@ async def run_worker(
                 product_footer=lambda organisation: (
                     live.for_organisation(organisation).product_footer
                 ),
+                after_purge=lambda: checkpoint_wal(engine),
             ),
             watch,
         )
