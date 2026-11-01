@@ -65,6 +65,106 @@ cookie poisoning and user-controllable attributes (only validated values are ref
 absent anti-CSRF tokens (Fetch Metadata is the CSRF defence, see above). Any other warning
 fails the build.
 
+## Browser model (ASVS V3.2.1, V3.4.3, V3.5.1-3.5.4, V3.7.2)
+
+What the browser is allowed to do with OpenPlanner and why. Authentication paths are in
+`docs/authentication.md`.
+
+### CSRF in three layers
+
+No form carries a CSRF token. Three independent layers stand in the way of a cross-site request:
+
+1. **`SameSite=Lax` on the cookie.** The admin cookie `op_admin` is not sent on a cross-site
+   `POST`, `fetch` or subresource request, only on top-level `GET` navigations. This is the
+   layer that protects a browser that sends neither header below.
+2. **Fetch Metadata** (`require_same_origin`, `app/web/protection.py`). Every state-changing
+   route, admin and public, depends on it (`SameOrigin`). `Sec-Fetch-Site` is sent by every
+   current browser and cannot be set by a page; only `same-origin` and `none` pass, anything
+   else is a `403` and a security event (ADR 0053).
+3. **`Origin` comparison.** Only when `Sec-Fetch-Site` is absent, the `Origin` header is
+   compared with this site. It is not trusted when `Sec-Fetch-Site` is present, because the
+   referrer policy of some pages makes browsers send `Origin: null` for same-origin posts.
+
+**The exception, on purpose.** A request with neither `Sec-Fetch-Site` nor `Origin` passes
+layer 2 and 3. Browsers send at least one of them on every `POST` (`Origin` on every
+cross-origin and every `POST` request in current browsers), so such a request is not a browser form post: it comes from a
+script, `curl` or a very old client. It can reach the admin portal only with the admin
+cookie, which it has only when the caller already holds it, and a browser that does hold it
+withholds it from cross-site requests (layer 1). Refusing these requests would break health
+probes and tests without closing a path. The behaviour is pinned by
+`tests/admin/test_admin_flow.py::test_a_post_without_fetch_metadata_and_without_origin_is_let_through`.
+Where `SameSite` is not enough because the cookie is not involved, there is nothing to
+forge: the public forms act on a link or on a booking the caller creates, and the bot API
+uses a bearer token that a page cannot attach (no CORS headers).
+
+The widget's cross-origin `POST` (ADR 0035) is a different case: it is allowed only from the
+origins an organisation configured, answered with an exact `Access-Control-Allow-Origin`, and
+carries no cookie.
+
+### `GET` routes with an effect (V3.5.3)
+
+No `GET` changes a booking, a setting or a right. The routes below do something besides
+returning a page; each is deliberate.
+
+| Route | Effect | Why it is acceptable |
+|---|---|---|
+| `GET /b/{token}/confirm`, `/cancel`, `/wait/leave` | None; shows a button. The `POST` confirms, cancels or leaves (ADR 0056). | Mail scanners and link previewers that follow the link change nothing. |
+| `GET /b/{token}/join`, `/join/go` | Writes a join-page or join-click event on the booking's timeline (ADR 0072). | Evidence for troubleshooting, no change to the booking. |
+| `GET /b/{token}/test/go`, `/wait/status` | Redirect into the open trial meeting; status poll. | Read-only. |
+| `GET /admin/login`, `/admin/callback` | Start and finish an OIDC login. | The callback is a `GET` by the protocol; `state` and `nonce` bind it to the browser that started it. |
+| `GET /admin/preferences` | Stores theme, menu width and alert choices in the caller's own session cookie, then redirects to `next`. | Only own presentation preferences; `next` is checked (see below); a third-party link can at worst change a theme. |
+| `GET /admin/updates/progress`, `/…/live` fragments | Poll status. | Read-only. |
+
+### Redirects (V3.7.2)
+
+Who decides the target of every redirect the application issues. No redirect target is taken
+from a request without a check.
+
+| Redirect | Target decided by | Control |
+|---|---|---|
+| After admin login or re-login, update snooze, preferences (`next`) | The request (`next` parameter) | `safe_next`: must start with `/admin`, no `//`, no `\`, no `://`; else `/admin/`. `test_next_cannot_leave_the_admin_portal` |
+| `GET /admin/login` to the IdP | The IdP's `authorization_endpoint` from the pinned discovery document (ADR 0097); organisation providers: the endpoint stored at registration | Issuer compared exactly; only `https` (or `http` in development) |
+| Logout to the IdP's `end_session_endpoint` | Same discovery document | `post_logout_redirect_uri` is built by us; interstitial page keeps CSP `form-action 'self'` |
+| `GET /b/{token}/join/go`, `/test/go` | The join link of the Webex meeting, kept on the booking | `join_link` refuses anything but `https` and applies the group's client setting (ADR 0075); the value is written by the Webex adapter, never by a request |
+| After a form post (`/g/{slug}/book`, `/b/{token}/…`, direct call) | The application: path built from the slug or the token that was just validated | Relative paths only; tokens and slugs come from the database |
+| After an admin form post | The application: the route's own URL plus `?done=`, optionally an anchor | Relative; `done` values come from a closed list |
+| Moved screens (`/admin/groups/{slug}/hours`, old organisation paths) | The application | Fixed relative `301`/`308` |
+| `GET /b/{token}/wait/status` for an unknown booking | The application | Relative |
+
+### Header policy per response type (V3.2.1, V3.4.3)
+
+`SecurityHeadersMiddleware` (`app/api/security_headers.py`) puts deny-by-default headers on
+every response and never overrides one a route set. HTML goes through `app.web.templates.render`,
+which sets its own CSP and `no-store`.
+
+| Response type | Content-Security-Policy | Other headers |
+|---|---|---|
+| JSON, plain text, CSV, errors, anything without its own policy | `default-src 'none'; base-uri 'none'; frame-ancestors 'none'` | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, HSTS, `Referrer-Policy: same-origin`, `Permissions-Policy` off for camera, microphone, geolocation and more, COOP `same-origin`, COEP `require-corp`, CORP `same-origin` |
+| Admin and public HTML | `HTML_CSP`: `default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` | `Cache-Control: no-store`, plus all of the above |
+| HTML with own scripts (participant pages with polling, update progress, agenda) | `SCRIPT_CSP`: as `HTML_CSP` plus `script-src 'self'; connect-src 'self'` | Same; no inline script or style anywhere |
+| Widget script (`/widget/v1/gov-booking.js`) | The default (the file is not a document) | `Access-Control-Allow-Origin: *`, `Cross-Origin-Resource-Policy: cross-origin` so any host site can load it; no cookie |
+| Widget API | The default | `Access-Control-Allow-Origin` echoes an allowed origin with `Vary: Origin`; the public availability read uses `*` and `public, max-age=300` |
+| Brand assets, theme CSS, fonts | The default | `public, max-age=3600` (static files: versioned URL through `static_url`); same-origin only, uploaded images and fonts served with their validated media type |
+| Machine API | The default | `Cache-Control: no-store` on the token and errors; no CORS |
+
+A browser honours `base-uri` and `form-action` only in a document, which is why they matter
+for HTML and cost nothing to state on everything else; they close the case of a response that
+is sniffed or rendered as a document by mistake. `frame-ancestors 'none'` and `X-Frame-Options:
+DENY` hold everywhere: the widget is a Web Component loaded as a script, never an iframe.
+
+### One origin for all organisations (V3.5.4)
+
+All organisations, groups, the admin portal and the participant pages share one origin per
+installation. This is a **deliberate limitation**: OpenPlanner is one application that
+separates organisations by scope (ADR 0014, SQL filters on every query), not a set of
+independent applications. The consequences are known: a script injection on any page would
+reach every page of the origin, so the rest of the model compensates (no inline script,
+no `unsafe-eval`, a CSP without third parties, `HttpOnly` cookies, output escaping by
+Jinja2 autoescape, an organisation's uploads limited to validated images and fonts and served
+with their own media type and `nosniff`). The admin cookie is scoped to `/admin`; participant
+pages never read the session. A separate hostname per organisation is possible behind the
+proxy and is only built when a client requires it.
+
 ## Cross-cutting
 
 | Threat | Mitigation | Test |

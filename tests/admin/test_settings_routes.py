@@ -632,12 +632,12 @@ async def test_the_auditor_sees_no_package_block(site: Site) -> None:
     page = (await site.client.get("/admin/settings")).text
 
     assert 'id="package-heading"' not in page
-    assert 'href="/admin/settings/package"' not in page  # ADR 0099: no sub-tab without the right
+    assert 'href="/admin/settings/package"' not in page  # ADR 0101: no sub-tab without the right
     assert (await site.client.get("/admin/settings/package")).status_code == 403
 
 
 async def test_advanced_settings_shows_its_sub_tabs_and_a_table_of_contents(site: Site) -> None:
-    """ADR 0099: three sub-tabs, the current one marked; "On this page" lists every topic."""
+    """ADR 0101: three sub-tabs, the current one marked; "On this page" lists every topic."""
     await site.login_as(SUPER)
 
     status = (await site.client.get("/admin/settings")).text

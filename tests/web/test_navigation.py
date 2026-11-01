@@ -97,7 +97,7 @@ def test_tabs_live_under_their_object() -> None:
 
 
 def test_only_tabs_and_entries_have_sub_tabs() -> None:
-    """ADR 0099: a tab or a side-navigation entry has sub-tabs; a sub-tab or shortcut never."""
+    """ADR 0101: a tab or a side-navigation entry has sub-tabs; a sub-tab or shortcut never."""
     owners = {tab.key for obj in OBJECTS for tab in obj.tabs}
     owners |= {entry.key for section in SECTIONS for entry in section.entries}
 
@@ -115,7 +115,7 @@ def test_sub_tabs_of_an_entry_live_under_its_path() -> None:
 
 
 def test_advanced_settings_has_three_sub_tabs() -> None:
-    """ADR 0099 point 2: System status (the entry's own page), Settings, Configuration package."""
+    """ADR 0101 point 2: System status (the entry's own page), Settings, Configuration package."""
     settings = next(e for s in SECTIONS for e in s.entries if e.key == "platform.settings")
 
     assert [sub.key for sub in settings.subtabs] == ["platform.settings.values", "platform.package"]

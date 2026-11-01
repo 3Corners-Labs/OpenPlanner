@@ -8,6 +8,7 @@ Called once per worker loop, after the due jobs:
     hourly ─► PRAGMA incremental_vacuum ─► pages back to the file system
     daily ─► erase the archived groups nothing refers to any more (ADR 0084 step 3)
     daily ─► retention sweep: purge personal data the purge job missed, alert on a backlog
+             ─► purged something? ─► PRAGMA wal_checkpoint(TRUNCATE) (WP-A3)
 
 The stdout log does not depend on the database: when the disk is full, writing the system
 event may fail, and monitoring must still see the problem. Housekeeping never stops the loop;
@@ -20,7 +21,7 @@ from datetime import datetime, timedelta
 import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.maintenance import measure_storage, reclaim_free_pages
+from app.adapters.db.maintenance import checkpoint_wal, measure_storage, reclaim_free_pages
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.retention_sweep import SweepResult
 from app.domain.storage import (
@@ -127,6 +128,8 @@ class Housekeeping:
         except Exception as exc:  # never stop the loop over housekeeping
             log.error("retention.sweep_failed", error=type(exc).__name__)
             return
+        if result.purged:
+            await self._checkpoint()
         if result.overdue:
             log.warning(
                 "retention.sweep",
@@ -136,6 +139,13 @@ class Housekeeping:
             )
         if result.backlog or result.failed:
             log.error("retention.backlog", bookings=result.backlog, failed=result.failed)
+
+    async def _checkpoint(self) -> None:
+        """Empty the WAL after a sweep that purged, so no older copy of the data stays (WP-A3)."""
+        try:
+            await checkpoint_wal(self._engine)
+        except Exception as exc:  # the purge itself succeeded; the next checkpoint finishes it
+            log.warning("retention.checkpoint_failed", error=type(exc).__name__)
 
     async def _erase_groups(self, now: datetime) -> None:
         """Erase the archived groups that qualify, at most once per ``ERASE_EVERY``."""

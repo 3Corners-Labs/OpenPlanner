@@ -66,7 +66,7 @@ class Screen:
             ``wide_subpages``.
         wide_subpages: The sub-pages that are data views too (for example the week agenda).
         subtabs: For a tab or a side-navigation entry: related screens shown as a second
-            row under it (ADR 0047 §3, ADR 0099). The screen's own page is the first item of
+            row under it (ADR 0047 §3, ADR 0101). The screen's own page is the first item of
             that row.
         own_label_key: For a screen with sub-tabs: the label of its own page in that row,
             when it differs from the screen's label (an entry's name is not its first part).
@@ -237,6 +237,15 @@ SECTIONS = (
                 Permission.INTEGRATIONS_MANAGE,
                 "settings",
             ),
+            # ADR 0085: where copies of the log go; one setting for the whole installation.
+            Screen(
+                "platform.logging",
+                "admin.nav.logging",
+                "/admin/logging",
+                Permission.LOGGING_VIEW,
+                "reports",
+                ("/admin/logging/new", "/admin/logging/{destination_id}"),
+            ),
             Screen(
                 "platform.api",
                 "admin.nav.api",
@@ -270,7 +279,7 @@ SECTIONS = (
                 "lock",
             ),
             # ADR 0042 §11: System status and Advanced settings; the auditor reads them too.
-            # ADR 0099: one sub-tab per task, System status being the entry's own page.
+            # ADR 0101: one sub-tab per task, System status being the entry's own page.
             Screen(
                 "platform.settings",
                 "admin.nav.settings",

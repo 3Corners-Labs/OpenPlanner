@@ -1,6 +1,6 @@
 """System status and Advanced settings (ADR 0042 §11, build steps 3 and 4).
 
-Three sub-tabs of one side-navigation entry (ADR 0099), for ``settings.platform.view``
+Three sub-tabs of one side-navigation entry (ADR 0101), for ``settings.platform.view``
 (superuser and auditor) unless said otherwise: *System status* (the entry's own page),
 *Settings* (the topics, with "On this page" and the login test) and *Configuration package*
 (``settings.platform.manage``). A refusal is shown on the sub-tab its form lives on, and a
@@ -78,6 +78,8 @@ from app.domain.configuration_package import (
 )
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.log_destination_service import LogDestinationService
+from app.domain.log_destinations import State
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
 from app.domain.own_certificate import (
     MAX_PEM_BYTES,
@@ -117,7 +119,7 @@ PACKAGE_URL = f"{URL}/package"
 
 
 class Tab(StrEnum):
-    """The sub-tabs of Advanced settings (ADR 0099); the value names the template."""
+    """The sub-tabs of Advanced settings (ADR 0101); the value names the template."""
 
     STATUS = "admin/settings.html"
     VALUES = "admin/settings_values.html"
@@ -596,7 +598,7 @@ async def _overview(
     refusal: tuple[str, DomainError] | None = None,
     status: int = 200,
 ) -> HTMLResponse:
-    """Render one sub-tab (ADR 0099), with a refusal shown at its row."""
+    """Render one sub-tab (ADR 0101), with a refusal shown at its row."""
     _ = locale.gettext
     live: LiveSettings = request.app.state.live_settings
     await live.refresh()
@@ -619,6 +621,7 @@ async def _overview(
         values |= {
             "environment": current.environment,
             "certificate": await _certificate(request, locale),
+            "log_summary": await _log_summary(request, context),
             "source": await _source_view(request, locale, states, manage=manage, errors=errors),
             "status": [
                 StatusRow(
@@ -653,6 +656,38 @@ async def _overview(
     response = _page(request, locale, tab.value, context.principal, values)
     response.status_code = status
     return response
+
+
+@dataclass(frozen=True)
+class LogSummary:
+    """How many log destinations there are, are on and are failing (ADR 0085)."""
+
+    total: int
+    enabled: int
+    failing: int
+
+
+async def _log_summary(request: Request, context: AdminContext) -> LogSummary | None:
+    """Return the log destinations' summary for System status, or ``None`` without the right.
+
+    The summary needs ``logging.view``; an admin without it sees no row, and nothing is asked
+    of the service, so no denial is written for a screen the admin never opened.
+    """
+    if not can_function(context.principal)(Permission.LOGGING_VIEW):
+        return None
+    service: LogDestinationService = request.app.state.log_destination_service
+    try:
+        overview = await service.overview(context.principal)
+    except DomainError:
+        return None
+    failing = sum(
+        any(s.state is State.FAILING for s in overview.status.get(d.id or 0, []))
+        for d in overview.destinations
+        if d.enabled
+    )
+    return LogSummary(
+        len(overview.destinations), sum(d.enabled for d in overview.destinations), failing
+    )
 
 
 async def _certificate(request: Request, locale: RequestLocale) -> CertificateView | None:

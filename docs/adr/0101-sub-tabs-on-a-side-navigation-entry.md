@@ -1,4 +1,4 @@
-# 0099. Sub-tabs on a side-navigation entry, and Advanced settings in three
+# 0101. Sub-tabs on a side-navigation entry, and Advanced settings in three
 
 Status: accepted (2026-11-01), requested by the product owner. Extends ADR 0047 (admin
 structure, §3 and §7) and ADR 0042 §11 (System status and Advanced settings). Built in
@@ -65,3 +65,5 @@ None. The sub-tabs and the list of links are structure, not tunable values.
 - Pages are shorter, so a refused form re-renders close to the form, and the error summary
   pattern stays usable.
 - Other long entries (for example *Integrations*) can get sub-tabs later under question 7.
+- ADR 0099 (configuration as a JSON document) renames the block *Configuration package* to
+  *Configuration* when its step 3 is built; that step renames this sub-tab with it.

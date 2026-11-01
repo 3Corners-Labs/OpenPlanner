@@ -8359,6 +8359,282 @@ msgstr "Delete {name}"
 msgid "admin.api.archived_groups"
 msgstr "This client's access names archived groups: {groups}. While the link stays, the group is not erased. Save the form below or delete the client to let the link lapse."
 
+msgid "admin.nav.logging"
+msgstr "Log destinations"
+
+msgid "admin.done.logging_created"
+msgstr "The log destination is added and still off. Send a test line first, then switch it on."
+
+msgid "admin.done.logging_enabled"
+msgstr "The log destination is on. It receives lines within about 15 seconds."
+
+msgid "admin.done.logging_disabled"
+msgstr "The log destination is off."
+
+msgid "admin.logging.title"
+msgstr "Log destinations"
+
+msgid "admin.logging.lead"
+msgstr "Where copies of the platform's log go: a syslog server, Splunk, Elastic or any HTTP endpoint that takes JSON lines."
+
+msgid "admin.logging.add"
+msgstr "Add a log destination"
+
+msgid "admin.logging.create"
+msgstr "Add"
+
+msgid "admin.logging.destinations"
+msgstr "Destinations"
+
+msgid "admin.logging.none"
+msgstr "No log destination yet. The log goes to the container's standard output only."
+
+msgid "admin.logging.copy_hint"
+msgstr "A destination is a copy: the standard output of the containers keeps working as before. A change reaches the web and the worker within about 15 seconds."
+
+msgid "admin.logging.name"
+msgstr "Name"
+
+msgid "admin.logging.name_hint"
+msgstr "A short name for the list, for example Splunk production."
+
+msgid "admin.logging.kind"
+msgstr "Kind"
+
+msgid "admin.logging.kind_hint"
+msgstr "Syslog uses RFC 5424 over TLS (recommended), TCP or UDP. The others deliver over HTTPS."
+
+msgid "admin.logging.kind.syslog"
+msgstr "Syslog"
+
+msgid "admin.logging.kind.splunk_hec"
+msgstr "Splunk (HTTP Event Collector)"
+
+msgid "admin.logging.kind.elastic"
+msgstr "Elastic or OpenSearch"
+
+msgid "admin.logging.kind.http"
+msgstr "HTTP (JSON lines)"
+
+msgid "admin.logging.address"
+msgstr "Address"
+
+msgid "admin.logging.address_hint"
+msgstr "https://host/path, or syslog+tls://host:6514 (also syslog+tcp:// and syslog+udp://, for development). No user name, password or query in it."
+
+msgid "admin.logging.secret"
+msgstr "Token or key"
+
+msgid "admin.logging.secret_hint"
+msgstr "Splunk HEC token, Elastic API key or bearer token. Write-only: the field stays empty, and an empty field keeps the stored one. Syslog takes none."
+
+msgid "admin.logging.secret_set"
+msgstr "Stored (not shown)"
+
+msgid "admin.logging.secret_missing"
+msgstr "None"
+
+msgid "admin.logging.index"
+msgstr "Index or data stream"
+
+msgid "admin.logging.index_hint"
+msgstr "Splunk index, or Elastic data stream (default logs-openplanner-default). Leave empty for the others."
+
+msgid "admin.logging.source"
+msgstr "Source or host name"
+
+msgid "admin.logging.source_hint"
+msgstr "Splunk source, or the host name in syslog messages. Leave empty to omit."
+
+msgid "admin.logging.min_level"
+msgstr "Lowest level"
+
+msgid "admin.logging.min_level_hint"
+msgstr "Ordinary log lines at this level and above. It narrows what the platform logs; it never widens it: trace lines need the log level TRACE under Advanced settings as well."
+
+msgid "admin.logging.min_level_is"
+msgstr "from {level}"
+
+msgid "admin.logging.level.trace"
+msgstr "Trace"
+
+msgid "admin.logging.level.debug"
+msgstr "Debug"
+
+msgid "admin.logging.level.info"
+msgstr "Info"
+
+msgid "admin.logging.level.warning"
+msgstr "Warning"
+
+msgid "admin.logging.level.error"
+msgstr "Error"
+
+msgid "admin.logging.level.critical"
+msgstr "Critical"
+
+msgid "admin.logging.ca_pem"
+msgstr "Extra certificate authority"
+
+msgid "admin.logging.ca_pem_hint"
+msgstr "Only for a platform with its own certificate authority: paste the public certificate (PEM). Never a private key."
+
+msgid "admin.logging.categories"
+msgstr "Audit events to send"
+
+msgid "admin.logging.categories_hint"
+msgstr "Admin actions, what the platform does on its own, and security events. The level does not apply to them."
+
+msgid "admin.logging.category.audit"
+msgstr "Admin actions"
+
+msgid "admin.logging.category.system"
+msgstr "System events"
+
+msgid "admin.logging.category.security"
+msgstr "Security events"
+
+msgid "admin.logging.no_categories"
+msgstr "no audit events"
+
+msgid "admin.logging.opt_ins"
+msgstr "Only on request"
+
+msgid "admin.logging.include_trace"
+msgstr "Trace lines"
+
+msgid "admin.logging.include_trace_hint"
+msgstr "Many lines: every request, job step, outgoing call, slow statement and page render. They carry no personal data."
+
+msgid "admin.logging.include_diagnostic"
+msgstr "Diagnostic events"
+
+msgid "admin.logging.include_diagnostic_hint"
+msgstr "Debug detail that is only written while diagnostic mode is on for a group. They leave the installation only to a destination that asks for them."
+
+msgid "admin.logging.state"
+msgstr "State"
+
+msgid "admin.logging.on"
+msgstr "On"
+
+msgid "admin.logging.off"
+msgstr "Off"
+
+msgid "admin.logging.health"
+msgstr "Delivery"
+
+msgid "admin.logging.health_ok"
+msgstr "Working"
+
+msgid "admin.logging.health_failing"
+msgstr "Failing"
+
+msgid "admin.logging.health_idle"
+msgstr "No report yet"
+
+msgid "admin.logging.tested"
+msgstr "Last test"
+
+msgid "admin.logging.untested"
+msgstr "Not tested"
+
+msgid "admin.logging.updated"
+msgstr "Changed"
+
+msgid "admin.logging.receives"
+msgstr "Receives"
+
+msgid "admin.logging.test"
+msgstr "Send test line"
+
+msgid "admin.logging.enable"
+msgstr "Switch on"
+
+msgid "admin.logging.disable"
+msgstr "Switch off"
+
+msgid "admin.logging.delete"
+msgstr "Delete"
+
+msgid "admin.logging.actions_hint"
+msgstr "The test line is delivered at once, also while the destination is off. Deleting removes the stored token or key."
+
+msgid "admin.logging.test_ok"
+msgstr "The test line arrived: the platform accepted it."
+
+msgid "admin.logging.test_failed"
+msgstr "The test line did not arrive."
+
+msgid "admin.logging.test_code"
+msgstr "(answer {code})"
+
+msgid "admin.logging.status"
+msgstr "Delivery per process"
+
+msgid "admin.logging.no_status"
+msgstr "No process has reported yet. Switch the destination on; the web and the worker report within a minute."
+
+msgid "admin.logging.status_hint"
+msgstr "Each process keeps its own queue. Dropped lines were lost because the queue was full or the platform refused them for good."
+
+msgid "admin.logging.process"
+msgstr "Process"
+
+msgid "admin.logging.sent"
+msgstr "Sent"
+
+msgid "admin.logging.queued"
+msgstr "Queued"
+
+msgid "admin.logging.dropped"
+msgstr "Dropped"
+
+msgid "admin.logging.failed"
+msgstr "Failed"
+
+msgid "admin.logging.last_ok"
+msgstr "Last delivery"
+
+msgid "admin.logging.last_error"
+msgstr "Last error"
+
+msgid "admin.logging.reason.unreachable"
+msgstr "The platform could not be reached (address, port, firewall or timeout)."
+
+msgid "admin.logging.reason.refused"
+msgstr "The platform refused the lines (check the token or key)."
+
+msgid "admin.logging.reason.tls"
+msgstr "The certificate was not trusted (check the address or add the certificate authority)."
+
+msgid "admin.logging.reason.server"
+msgstr "The platform reported an error of its own."
+
+msgid "admin.logging.reason.not_ready"
+msgstr "The stored token or key cannot be opened (check the settings encryption key)."
+
+msgid "admin.logging.configuration"
+msgstr "Configuration"
+
+msgid "admin.logging.configuration_lead"
+msgstr "Saving a new kind, address, certificate authority or token makes the destination untested again."
+
+msgid "admin.settings.logging.title"
+msgstr "Log destinations"
+
+msgid "admin.settings.logging.none"
+msgstr "No log destination: the log goes to standard output only."
+
+msgid "admin.settings.logging.summary"
+msgstr "{total} configured, {enabled} on."
+
+msgid "admin.settings.logging.failing"
+msgstr "{count} failing"
+
+msgid "admin.settings.logging.open"
+msgstr "Open Log destinations"
+
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Largest configuration package (MB)"
 

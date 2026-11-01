@@ -8371,6 +8371,282 @@ msgstr "{name} verwijderen"
 msgid "admin.api.archived_groups"
 msgstr "De toegang van deze client noemt gearchiveerde groepen: {groups}. Zolang de koppeling blijft staan, wordt de groep niet gewist. Sla het formulier hieronder op of verwijder de client om de koppeling te laten vervallen."
 
+msgid "admin.nav.logging"
+msgstr "Logbestemmingen"
+
+msgid "admin.done.logging_created"
+msgstr "De logbestemming is toegevoegd en staat nog uit. Stuur eerst een testregel en zet hem daarna aan."
+
+msgid "admin.done.logging_enabled"
+msgstr "De logbestemming staat aan. Hij ontvangt regels binnen ongeveer 15 seconden."
+
+msgid "admin.done.logging_disabled"
+msgstr "De logbestemming staat uit."
+
+msgid "admin.logging.title"
+msgstr "Logbestemmingen"
+
+msgid "admin.logging.lead"
+msgstr "Waar kopieën van het log van het platform naartoe gaan: een syslogserver, Splunk, Elastic of een HTTP-adres dat JSON-regels aanneemt."
+
+msgid "admin.logging.add"
+msgstr "Logbestemming toevoegen"
+
+msgid "admin.logging.create"
+msgstr "Toevoegen"
+
+msgid "admin.logging.destinations"
+msgstr "Bestemmingen"
+
+msgid "admin.logging.none"
+msgstr "Nog geen logbestemming. Het log gaat alleen naar de standaarduitvoer van de containers."
+
+msgid "admin.logging.copy_hint"
+msgstr "Een bestemming is een kopie: de standaarduitvoer van de containers werkt door zoals voorheen. Een wijziging bereikt de web en de worker binnen ongeveer 15 seconden."
+
+msgid "admin.logging.name"
+msgstr "Naam"
+
+msgid "admin.logging.name_hint"
+msgstr "Een korte naam voor de lijst, bijvoorbeeld Splunk productie."
+
+msgid "admin.logging.kind"
+msgstr "Soort"
+
+msgid "admin.logging.kind_hint"
+msgstr "Syslog gebruikt RFC 5424 over TLS (aanbevolen), TCP of UDP. De andere leveren over HTTPS."
+
+msgid "admin.logging.kind.syslog"
+msgstr "Syslog"
+
+msgid "admin.logging.kind.splunk_hec"
+msgstr "Splunk (HTTP Event Collector)"
+
+msgid "admin.logging.kind.elastic"
+msgstr "Elastic of OpenSearch"
+
+msgid "admin.logging.kind.http"
+msgstr "HTTP (JSON-regels)"
+
+msgid "admin.logging.address"
+msgstr "Adres"
+
+msgid "admin.logging.address_hint"
+msgstr "https://host/pad, of syslog+tls://host:6514 (ook syslog+tcp:// en syslog+udp://, voor ontwikkeling). Zonder gebruikersnaam, wachtwoord of query."
+
+msgid "admin.logging.secret"
+msgstr "Token of sleutel"
+
+msgid "admin.logging.secret_hint"
+msgstr "Splunk HEC-token, Elastic API-sleutel of bearer-token. Alleen schrijven: het veld blijft leeg en een leeg veld behoudt de opgeslagen waarde. Syslog heeft er geen."
+
+msgid "admin.logging.secret_set"
+msgstr "Opgeslagen (niet getoond)"
+
+msgid "admin.logging.secret_missing"
+msgstr "Geen"
+
+msgid "admin.logging.index"
+msgstr "Index of datastream"
+
+msgid "admin.logging.index_hint"
+msgstr "Splunk-index, of Elastic-datastream (standaard logs-openplanner-default). Laat leeg voor de andere soorten."
+
+msgid "admin.logging.source"
+msgstr "Bron of hostnaam"
+
+msgid "admin.logging.source_hint"
+msgstr "Splunk-bron, of de hostnaam in syslogberichten. Laat leeg om weg te laten."
+
+msgid "admin.logging.min_level"
+msgstr "Laagste niveau"
+
+msgid "admin.logging.min_level_hint"
+msgstr "Gewone logregels op dit niveau en hoger. Dit beperkt wat het platform logt; het verruimt nooit: voor tracerregels moet ook het logniveau TRACE onder Geavanceerde instellingen aan staan."
+
+msgid "admin.logging.min_level_is"
+msgstr "vanaf {level}"
+
+msgid "admin.logging.level.trace"
+msgstr "Trace"
+
+msgid "admin.logging.level.debug"
+msgstr "Debug"
+
+msgid "admin.logging.level.info"
+msgstr "Info"
+
+msgid "admin.logging.level.warning"
+msgstr "Waarschuwing"
+
+msgid "admin.logging.level.error"
+msgstr "Fout"
+
+msgid "admin.logging.level.critical"
+msgstr "Kritiek"
+
+msgid "admin.logging.ca_pem"
+msgstr "Extra certificaatautoriteit"
+
+msgid "admin.logging.ca_pem_hint"
+msgstr "Alleen voor een platform met een eigen certificaatautoriteit: plak het publieke certificaat (PEM). Nooit een privésleutel."
+
+msgid "admin.logging.categories"
+msgstr "Te sturen auditgebeurtenissen"
+
+msgid "admin.logging.categories_hint"
+msgstr "Beheeracties, wat het platform zelf doet en beveiligingsgebeurtenissen. Het niveau geldt hier niet voor."
+
+msgid "admin.logging.category.audit"
+msgstr "Beheeracties"
+
+msgid "admin.logging.category.system"
+msgstr "Systeemgebeurtenissen"
+
+msgid "admin.logging.category.security"
+msgstr "Beveiligingsgebeurtenissen"
+
+msgid "admin.logging.no_categories"
+msgstr "geen auditgebeurtenissen"
+
+msgid "admin.logging.opt_ins"
+msgstr "Alleen op verzoek"
+
+msgid "admin.logging.include_trace"
+msgstr "Tracerregels"
+
+msgid "admin.logging.include_trace_hint"
+msgstr "Veel regels: elk verzoek, elke stap van een taak, elke uitgaande aanroep, trage opdracht en paginaopbouw. Ze bevatten geen persoonsgegevens."
+
+msgid "admin.logging.include_diagnostic"
+msgstr "Diagnosegebeurtenissen"
+
+msgid "admin.logging.include_diagnostic_hint"
+msgstr "Foutopsporingsdetail dat alleen wordt vastgelegd zolang de diagnosemodus voor een groep aan staat. Ze verlaten de installatie alleen naar een bestemming die erom vraagt."
+
+msgid "admin.logging.state"
+msgstr "Stand"
+
+msgid "admin.logging.on"
+msgstr "Aan"
+
+msgid "admin.logging.off"
+msgstr "Uit"
+
+msgid "admin.logging.health"
+msgstr "Aflevering"
+
+msgid "admin.logging.health_ok"
+msgstr "Werkt"
+
+msgid "admin.logging.health_failing"
+msgstr "Mislukt"
+
+msgid "admin.logging.health_idle"
+msgstr "Nog geen melding"
+
+msgid "admin.logging.tested"
+msgstr "Laatste test"
+
+msgid "admin.logging.untested"
+msgstr "Niet getest"
+
+msgid "admin.logging.updated"
+msgstr "Gewijzigd"
+
+msgid "admin.logging.receives"
+msgstr "Ontvangt"
+
+msgid "admin.logging.test"
+msgstr "Testregel sturen"
+
+msgid "admin.logging.enable"
+msgstr "Aanzetten"
+
+msgid "admin.logging.disable"
+msgstr "Uitzetten"
+
+msgid "admin.logging.delete"
+msgstr "Verwijderen"
+
+msgid "admin.logging.actions_hint"
+msgstr "De testregel wordt direct afgeleverd, ook als de bestemming uit staat. Verwijderen haalt het opgeslagen token of de sleutel weg."
+
+msgid "admin.logging.test_ok"
+msgstr "De testregel is aangekomen: het platform heeft hem geaccepteerd."
+
+msgid "admin.logging.test_failed"
+msgstr "De testregel is niet aangekomen."
+
+msgid "admin.logging.test_code"
+msgstr "(antwoord {code})"
+
+msgid "admin.logging.status"
+msgstr "Aflevering per proces"
+
+msgid "admin.logging.no_status"
+msgstr "Nog geen proces heeft gemeld. Zet de bestemming aan; de web en de worker melden binnen een minuut."
+
+msgid "admin.logging.status_hint"
+msgstr "Elk proces heeft een eigen wachtrij. Weggevallen regels zijn verloren omdat de wachtrij vol was of het platform ze definitief weigerde."
+
+msgid "admin.logging.process"
+msgstr "Proces"
+
+msgid "admin.logging.sent"
+msgstr "Verstuurd"
+
+msgid "admin.logging.queued"
+msgstr "In wachtrij"
+
+msgid "admin.logging.dropped"
+msgstr "Weggevallen"
+
+msgid "admin.logging.failed"
+msgstr "Mislukt"
+
+msgid "admin.logging.last_ok"
+msgstr "Laatste aflevering"
+
+msgid "admin.logging.last_error"
+msgstr "Laatste fout"
+
+msgid "admin.logging.reason.unreachable"
+msgstr "Het platform was niet te bereiken (adres, poort, firewall of time-out)."
+
+msgid "admin.logging.reason.refused"
+msgstr "Het platform weigerde de regels (controleer het token of de sleutel)."
+
+msgid "admin.logging.reason.tls"
+msgstr "Het certificaat werd niet vertrouwd (controleer het adres of voeg de certificaatautoriteit toe)."
+
+msgid "admin.logging.reason.server"
+msgstr "Het platform meldde een eigen fout."
+
+msgid "admin.logging.reason.not_ready"
+msgstr "Het opgeslagen token of de sleutel kan niet worden geopend (controleer de instellingensleutel)."
+
+msgid "admin.logging.configuration"
+msgstr "Instellingen"
+
+msgid "admin.logging.configuration_lead"
+msgstr "Een nieuwe soort, nieuw adres, nieuwe certificaatautoriteit of nieuw token maakt de bestemming weer ongetest."
+
+msgid "admin.settings.logging.title"
+msgstr "Logbestemmingen"
+
+msgid "admin.settings.logging.none"
+msgstr "Geen logbestemming: het log gaat alleen naar de standaarduitvoer."
+
+msgid "admin.settings.logging.summary"
+msgstr "{total} ingesteld, {enabled} aan."
+
+msgid "admin.settings.logging.failing"
+msgstr "{count} mislukt"
+
+msgid "admin.settings.logging.open"
+msgstr "Logbestemmingen openen"
+
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Maximale grootte van een configuratiepakket (MB)"
 
