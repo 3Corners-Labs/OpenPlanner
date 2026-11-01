@@ -119,6 +119,7 @@ from the rows below.
 | 0098 | Admin sessions held on the server | PARTIAL | Step 1 merged (#350): `admin_sessions` register (`app/domain/admin_sessions.py`, `app/admin/session.py`), logout revokes, rotation at login, idle and absolute check, `admin_idle_minutes`, `admin_max_sessions_per_person`; supersedes ADR 0013 §5 | Steps 2–4 (clean-up and restore; own and administrator session views with a new permission; cookie `__Host-op_admin`) |
 | 0096 | Overview widgets chosen by the admin | PARTIAL | #310 (ADR and step 1: no *New group* on the overview) | Layout storage, *Add widget* and *Edit overview* screens |
 | 0099 | Configuration as a JSON document, with a plan and per-object actions | NOT BUILT | ADR only (proposed 2026-11-01, PR #345); supersedes ADR 0089 points 1 and 5 once step 4 is built | Steps 1–5 (domain planner and natural keys; adapter, CLI and schema; portal plan/apply on platform and organisation; API and installer, SQLite export removed; SQLite import removed) |
+| 0101 | Sub-tabs on a side-navigation entry, and Advanced settings in three | BUILT | PR #347; `Screen.subtabs` on entries and `entry_subtabs` in `app/admin/pages.py`, `admin/_subtabs.html`, `/admin/settings`, `/admin/settings/values`, `/admin/settings/package`, "On this page" on *Settings*; tests in `tests/web/test_navigation.py`, `tests/admin/test_settings_routes.py` | – |
 
 ## Corrected on 2026-10-30 (second pass: ADR 0001 to 0023)
 

@@ -1,0 +1,54 @@
+{% extends "admin/layout.html" %}
+{% from "_error_message.html" import error_message %}
+{% from "admin/_setting_form.html" import setting_row, setting_head with context %}
+{% block title %}{{ _("admin.settings.tab.values") }} – {{ _("admin.settings.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_settings_header.html" %}
+{% if sections %}
+<nav class="card page-toc" aria-labelledby="toc-heading">
+  <h2 id="toc-heading">{{ _("admin.page_toc") }}</h2>
+  <ul>
+    {% if login_form %}<li><a href="#login-heading">{{ _("admin.settings.login.title") }}</a></li>{% endif %}
+    {% for section in sections %}
+    <li><a href="#topic-{{ section.key }}">{{ section.heading }}</a></li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+{% if login_form %}
+<form class="card" method="post" action="/admin/settings/login/test" novalidate aria-labelledby="login-heading">
+  <h2 id="login-heading">{{ _("admin.settings.login.title") }}</h2>
+  <p>{{ _("admin.settings.login.intro") }}</p>
+  {% for field in login_form %}
+  <div class="field{% if field.error %} field--error{% endif %}">
+    <label for="login-{{ field.key }}">{{ field.label }}</label>
+    {{ error_message(field.error, "error-login-" ~ field.key) }}
+    <input id="login-{{ field.key }}" name="{{ field.key }}" type="text" value="{{ field.value }}" autocomplete="off"{% if field.error %} aria-invalid="true" aria-describedby="error-login-{{ field.key }}"{% endif %}>
+  </div>
+  {% endfor %}
+  <button type="submit" class="button">{{ _("admin.settings.login.test") }}</button>
+</form>
+{% endif %}
+{% for section in sections %}
+{#- With the manage permission each topic is one form with one Save; Reset and Take over post
+    through formaction. Without it the topic is a read-only section. -#}
+{% if manage %}
+<form method="post" action="/admin/settings/topic/{{ section.key }}" novalidate class="card settings-group" aria-labelledby="topic-{{ section.key }}">
+{% else %}
+<section class="card settings-group" aria-labelledby="topic-{{ section.key }}">
+{% endif %}
+  <h2 id="topic-{{ section.key }}">{{ section.heading }}</h2>
+  <div class="settings-list">
+    {{ setting_head() }}
+    {% for row in section.rows %}
+    {{ setting_row(row, "/admin/settings/" ~ row.key, _("admin.settings.reset"), max_hours, trace_max_hours) }}
+    {% endfor %}
+  </div>
+  {% if manage and section.rows | selectattr("editable") | list %}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.settings.save") }}</button>
+  </div>
+  {% endif %}
+{% if manage %}</form>{% else %}</section>{% endif %}
+{% endfor %}
+{% endblock %}
