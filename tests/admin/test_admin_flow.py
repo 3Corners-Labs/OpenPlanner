@@ -141,6 +141,26 @@ async def test_logout(site: Site) -> None:
     assert ("sub-org", "admin.logout", Outcome.SUCCESS, "org_admin") in await audit_events(site)
 
 
+async def test_a_post_without_fetch_metadata_and_without_origin_is_let_through(
+    site: Site,
+) -> None:
+    # Intended behaviour (docs/threat-model.md, "Browser model", layer 2): a request that
+    # carries neither ``Sec-Fetch-Site`` nor ``Origin`` is not a browser form post (every
+    # browser that can use the portal sends one of them), so the check lets it through. What
+    # keeps a cross-site page from sending it with the admin's cookie is ``SameSite=Lax``
+    # (layer 1), which a test client cannot show; the other two layers are shown here.
+    await site.login_as(ORG_ADMIN)
+
+    foreign_origin = await site.client.post(
+        "/admin/logout", headers={"origin": "https://evil.test"}
+    )
+    bare = await site.client.post("/admin/logout")
+
+    assert foreign_origin.status_code == 403
+    assert bare.status_code == 200
+    assert (await site.client.get("/admin/")).status_code == 303
+
+
 async def test_audit_log_shows_names_and_logins_within_the_organisation(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
     await site.login_as(OUTSIDER)
