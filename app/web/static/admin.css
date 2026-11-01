@@ -1054,6 +1054,26 @@ fieldset.card {
   margin: 0;
 }
 
+/* "On this page" (ADR 0101): links to the headings of one long page, in columns as room allows. */
+.page-toc h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.page-toc ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  columns: 16rem;
+  column-gap: 2rem;
+}
+
+.page-toc a {
+  display: inline-block;
+  min-height: 24px;
+  padding: 0.15rem 0;
+}
+
 .card__header {
   display: flex;
   flex-wrap: wrap;

@@ -34,6 +34,7 @@ from app.web.navigation import (
     ObjectPage,
     Screen,
     Width,
+    entry,
     home_of,
     object_page,
 )
@@ -127,6 +128,33 @@ def object_tabs(
     if not row:
         return tabs, []
     return tabs, [view(current, home is not None and home.subtab is None), *row]
+
+
+def entry_subtabs(
+    locale: RequestLocale, can: Callable[[Permission], bool], home: Home | None
+) -> list[NavView]:
+    """Return the second row of the current side-navigation entry (ADR 0101), or empty.
+
+    Like the row of an object tab: the entry's own page first, then the sub-tabs the matrix
+    allows; empty when the entry has no visible sub-tab, or the page lives on an object tab.
+    """
+    screen = entry(home.entry) if home is not None and home.tab is None else None
+    if home is None or screen is None:
+        return []
+    row = [
+        NavView(locale.gettext(sub.label_key), sub.path, home.subtab == sub.key, sub.icon)
+        for sub in screen.subtabs
+        if can(sub.permission)
+    ]
+    if not row:
+        return []
+    own = NavView(
+        locale.gettext(screen.own_label_key or screen.label_key),
+        screen.path,
+        home.subtab is None,
+        screen.icon,
+    )
+    return [own, *row]
 
 
 def organisation_header(
@@ -338,6 +366,8 @@ def page(
             "principal": principal,
             # The page width from the register (ADR 0080); ``admin.css`` keys on it.
             "content_width": (home.width if home else Width.STANDARD).value,
+            # The second row of an entry with sub-tabs (ADR 0101); ``_subtabs.html`` shows it.
+            "entry_tabs": entry_subtabs(locale, can, home),
             "nav": nav,
             "top_links": top_links(request, locale.gettext, can, on_overview, home, help_topic),
             "bottom_bar": bar,
