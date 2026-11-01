@@ -68,3 +68,17 @@ class AvailabilityResponse(BaseModel):
     group: str
     timezone: str
     slots: list[SlotInfo]
+
+
+class ConfigurationSummary(BaseModel):
+    """What an imported configuration package held (ADR 0089): counts, never a value."""
+
+    installation: str = Field(description="`INSTALLATION_NAME` of the source, or empty.")
+    app_version: str = Field(description="Release of the source, or empty in development.")
+    created_at: datetime = Field(description="When the package was exported.")
+    revision: str = Field(description="Schema revision of the package.")
+    counts: dict[str, int] = Field(
+        description="Rows per table: `organisations`, `groups`, `identity_providers`, "
+        "`api_clients`."
+    )
+    secrets: int = Field(description="How many sealed values the package carried.")
