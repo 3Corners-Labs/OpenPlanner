@@ -19,6 +19,7 @@ import asyncio
 import json
 import ssl
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
@@ -347,10 +348,8 @@ class SyslogSender:
         """Close the connection."""
         if self._writer is not None:
             self._writer.close()
-            try:
+            with suppress(OSError, ssl.SSLError):  # closing a connection that is already gone
                 await self._writer.wait_closed()
-            except (OSError, ssl.SSLError):
-                pass
             self._writer = None
         if self._datagrams is not None:
             self._datagrams.close()
