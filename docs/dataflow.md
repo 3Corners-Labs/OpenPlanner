@@ -86,6 +86,16 @@ Archiving moves no personal data: the bookings of the group keep their own `purg
 and leave on their own schedule, and the row is erased only after the last of them is gone.
 The audit log keeps the slug as text; nothing of a participant is in it.
 
+**Deleting an organisation and an API client (ADR 0084).** The superuser can delete an
+organisation that has no group (archived ones included) and no API client, and an API client
+that was switched off. Neither holds personal data of participants: an organisation row holds
+its name, language and identity-provider value, and its branding, channels (secrets sealed),
+texts and settings go with it by the schema's cascades; a client row holds its name, networks
+and the SHA-256 of its secret, and its access tokens and group links go with it. The audit
+log keeps the organisation's slug and the client's id as text (`organisation.delete`,
+`client.delete`) and nothing else; no booking can be affected, because bookings hang under
+groups, and a group blocks the delete until the erase sweep above has removed it.
+
 ## Stored personal data (WP2 schema)
 
 The fields below are the fixed list of `app/domain/privacy.py` (ADR 0063): personal data is
