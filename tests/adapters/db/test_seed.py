@@ -1,6 +1,6 @@
 """Closure examples of the demo seed (ADR 0037): fixtures of the participant pages and e2e."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -122,3 +122,14 @@ async def test_the_journey_has_two_confirmed_bookings_per_browser(engine: AsyncE
             assert join_state(call, NOW) is JoinState.NO_MEETING
     assert all(b.status is BookingStatus.CONFIRMED and b.group_id == group.id for b in bookings)
     assert len({b.contact.email for b in bookings if b.contact}) == len(bookings)
+
+
+async def test_the_journey_agenda_is_the_day_the_call_starts(engine: AsyncEngine) -> None:
+    """Seeded just before midnight, the call falls on tomorrow's agenda, not on today's."""
+    await seed_demo(engine)
+    late = datetime(2026, 11, 1, 22, 55, tzinfo=UTC)  # 23:55 in Amsterdam, call at 00:05
+
+    examples = await seed_closure_examples(engine, late, KEY)
+
+    journey = examples.journeys["chromium"]
+    assert journey.call_agenda == f"/admin/groups/{JOURNEY_GROUP_SLUG}/agenda?day=2026-11-02"
