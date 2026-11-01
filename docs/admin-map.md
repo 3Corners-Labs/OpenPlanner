@@ -32,6 +32,7 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
 | Integrations | `/admin/integrations` | `integrations.manage` | standard | – |
+| Log destinations | `/admin/logging` | `logging.view` | standard | `/admin/logging/new`, `/admin/logging/{destination_id}` |
 | API clients | `/admin/api` | `api_clients.manage` | standard | `/admin/api/clients/new`, `/admin/api/clients/{client_id}` |
 | Holiday calendars | `/admin/holidays` | `holidays.manage` | standard | `/admin/holidays/{calendar}` |
 | Updates | `/admin/updates` | `system.update` | standard | – |

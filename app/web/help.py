@@ -143,6 +143,12 @@ TOPICS = (
     HelpTopic("maintenance", ("/admin/maintenance",), Permission.SYSTEM_MAINTENANCE),
     # ADR 0073: the channels of an organisation, with the sender domain check.
     HelpTopic("channels", ("/admin/organisations/{org}/channels",), Permission.INTEGRATIONS_MANAGE),
+    # ADR 0085: the log destinations of the platform.
+    HelpTopic(
+        "logging",
+        ("/admin/logging", "/admin/logging/new", "/admin/logging/{destination_id}"),
+        Permission.LOGGING_VIEW,
+    ),
     HelpTopic("advanced-settings", ("/admin/settings",), Permission.SETTINGS_PLATFORM_VIEW),
     # ADR 0063: the Data fields card on Advanced settings; no route of its own.
     HelpTopic("data-fields", (), Permission.SETTINGS_PLATFORM_VIEW),
