@@ -296,6 +296,9 @@ def configure_logging(
     # httpx logs every outgoing request at INFO with its full URL, query string included; the
     # ``outbound.request`` trace point (ADR 0085) carries method, host and status instead.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    # aiosqlite logs each statement with its bound parameters at DEBUG, which holds PII; the
+    # ``sql.slow`` trace point carries statement type and table only.
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 
 
 def warn_loose_secret_files(variables: list[str]) -> None:

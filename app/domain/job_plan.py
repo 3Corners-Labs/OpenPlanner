@@ -237,8 +237,9 @@ def plan_for_cancellation(
 def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
     """Return the jobs of a direct call: meeting, confirmation and work item now, then the purge.
 
-    The web request usually creates the meeting and the work item itself (ADR 0019); these
-    jobs are the fallback and do nothing once that has happened (they are idempotent).
+    The web request usually creates the meeting and the work item itself (ADR 0019), but only
+    after claiming these jobs (``CallService.create_now``), so the worker never repeats it;
+    the jobs are the fallback when the request fails or never ran.
     """
     return [
         PlannedJob(JobType.CREATE_VIDEO_ROOM, start, start),
