@@ -1,3 +1,7 @@
+import asyncio
+from dataclasses import dataclass
+
+from app.adapters.smtp import SmtpConfig
 from app.domain.channels import ChannelKind
 from app.domain.ports import IntegrationError, OutboundMessage
 
@@ -40,3 +44,37 @@ class RefusingSender:
 
     async def send(self, message: OutboundMessage) -> None:
         raise IntegrationError(self.code, retryable=self.retryable)
+
+
+@dataclass(frozen=True)
+class Delivery:
+    """One message and the SMTP server the sender chose for it."""
+
+    config: SmtpConfig
+    message: OutboundMessage
+
+
+class SmtpRecorder:
+    """Stands in for ``SmtpMailSender``: records which server each message would go through.
+
+    Patch it over ``app.adapters.senders.SmtpMailSender`` so the real ``ConfiguredSenders``
+    chooses between an organisation's own server and the environment fallback.
+    """
+
+    def __init__(self) -> None:
+        self.deliveries: list[Delivery] = []
+
+    def __call__(self, config: SmtpConfig) -> "RecordedSmtp":
+        return RecordedSmtp(config, self.deliveries)
+
+
+class RecordedSmtp:
+    """The ``MessageSender`` that ``SmtpRecorder`` hands out for one server configuration."""
+
+    def __init__(self, config: SmtpConfig, deliveries: list[Delivery]) -> None:
+        self.config = config
+        self.deliveries = deliveries
+
+    async def send(self, message: OutboundMessage) -> None:
+        await asyncio.sleep(0)  # yield, as a real send does, so concurrent messages interleave
+        self.deliveries.append(Delivery(self.config, message))
