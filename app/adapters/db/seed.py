@@ -114,12 +114,16 @@ class JourneyExample:
         call_page: The join page of a booking that starts in ``JOURNEY_CALL_IN``, so the join
             page is open for the whole run.
         call_booking: The admin booking page of that booking.
+        call_agenda: The group's agenda on the day the call starts in the group's time zone.
+            Not "today": seeded in the last ten minutes of the day, the call is on tomorrow's
+            agenda, and a run that crosses midnight would otherwise look at the wrong day.
     """
 
     trial_page: str
     trial_booking: str
     call_page: str
     call_booking: str
+    call_agenda: str
 
 
 @dataclass(frozen=True)
@@ -363,6 +367,9 @@ async def _journey(
         trial_booking=f"{admin}/{trial.id}",
         call_page=f"/b/{call_token}/join",
         call_booking=f"{admin}/{call.id}",
+        call_agenda=(
+            f"/admin/groups/{group.slug}/agenda?day={call.start.astimezone(group.tz).date()}"
+        ),
     )
 
 
