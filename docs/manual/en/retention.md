@@ -19,6 +19,11 @@ Removal deletes the personal fields from the booking, the links to its meeting a
 at the providers, and the reason texts of its timeline. The booking itself stays with its
 reference and times; together with data held elsewhere these could still point to a person.
 
+The booking itself goes later too: the platform administrator sets how many days after the details
+were deleted that happens (730 by default). What stays is a count per group, day and final status,
+with no personal data and no reference. The figures on this screen do not change because of it, and
+**Last removed** stays correct.
+
 ## What the columns mean
 
 - **With personal data**: bookings whose data is still there. That is normal for bookings

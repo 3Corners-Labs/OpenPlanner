@@ -37,6 +37,16 @@ anders staat er wat u eerst doet (`rekey` op de host uitvoeren, of wachten tot d
 voorbij zijn). Zonder vorige sleutel verschijnt het blok niet. De werkwijze staat in het
 draaiboek, *Rotating secrets*, en de inventaris van alle sleutels in `docs/cryptography.md`.
 
+### Back-ups van updates
+
+Vóór elke update kopieert de updater de database om te kunnen terugdraaien. Die kopie bevat
+persoonsgegevens en wordt daarom na 24 uur verwijderd, door de updater en als tweede vangnet
+door de worker, ook als de updater of zijn timer niet draait. Het blok toont hoeveel kopieën er
+zijn en hoe oud de oudste is. Is de oudste meer dan twee uur over zijn 24 uur, dan staat er een
+waarschuwing: geen van beide verwijdert nog, dus controleer of de worker draait en of het
+datavolume schrijfbaar is. Bestandsnamen worden nooit getoond. Back-ups voor disaster recovery
+zijn een zaak van de hostingpartij, niet van dit scherm (draaiboek, *Backup and restore*).
+
 ### Adres en proxy
 
 Boven het certificaat staat wat de installatie over haar eigen adres weet. Elke link in een

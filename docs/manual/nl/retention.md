@@ -19,6 +19,11 @@ Bij het verwijderen gaan de persoonsvelden van de boeking weg, samen met de kopp
 vergadering en het werkitem bij de aanbieders en de redentekst op de tijdlijn. De afspraak zelf
 blijft bestaan met zijn referentie en tijden; samen met gegevens elders kunnen die nog naar een persoon wijzen.
 
+De afspraak zelf verdwijnt later ook: de beheerder van het platform stelt in hoeveel dagen na het
+verwijderen van de gegevens dat gebeurt (standaard 730). Van de afspraken blijft dan alleen een telling per
+groep, dag en eindstatus over, zonder persoonsgegevens of referentie. De cijfers op dit scherm
+veranderen daardoor niet; ook **Laatst verwijderd** blijft kloppen.
+
 ## Wat de kolommen betekenen
 
 - **Met persoonsgegevens**: afspraken waarvan de gegevens er nog zijn. Dat is normaal voor
