@@ -61,11 +61,11 @@ Side navigation: *Organisations*. A row *Tab › Sub-tab* is a sub-tab of that t
 |---|---|---|---|---|
 | Overview | `/admin/organisations/{org}` | `organisation.view` | wide | `/admin/organisations/{org}/edit`, `/admin/organisations/{org}/delete` |
 | Overview › Settings | `/admin/organisations/{org}/settings` | `settings.organisation.manage` | standard | – |
-| Overview › Texts | `/admin/organisations/{org}/texts` | `texts.organisation.manage` | standard | `/admin/organisations/{org}/texts/{text_locale}` |
 | Overview › Embedding | `/admin/organisations/{org}/embedding` | `embedding.manage` | standard | – |
 | Overview › Login | `/admin/organisations/{org}/login` | `identity_providers.view` | standard | `/admin/organisations/{org}/login/new`, `/admin/organisations/{org}/login/{idp_key}` |
-| Branding | `/admin/organisations/{org}/branding` | `branding.manage` | standard | – |
-| Channels | `/admin/organisations/{org}/channels` | `integrations.manage` | standard | – |
+| Participants | `/admin/organisations/{org}/branding` | `branding.manage` | standard | – |
+| Participants › Channels | `/admin/organisations/{org}/channels` | `integrations.manage` | standard | – |
+| Participants › Texts | `/admin/organisations/{org}/texts` | `texts.organisation.manage` | standard | `/admin/organisations/{org}/texts/{text_locale}` |
 | Contact | `/admin/organisations/{org}/contacts` | `organisation.closure` | standard | – |
 | Holidays | `/admin/organisations/{org}/holidays` | `holidays.assign` | standard | – |
 | Emergency closure | `/admin/organisations/{org}/closure` | `organisation.closure` | standard | `/admin/organisations/{org}/closure/scenarios`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts` |

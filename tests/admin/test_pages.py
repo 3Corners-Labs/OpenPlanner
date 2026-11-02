@@ -126,12 +126,14 @@ async def test_an_organisation_page_marks_its_entry_its_tab_and_its_sub_tab(site
     settings = (await site.client.get("/admin/organisations/demo/settings")).text
     overview = (await site.client.get("/admin/organisations/demo")).text
 
+    # ADR 0105: Branding is the own page of the Participants tab, Channels one of its sub-tabs.
     assert _current_links(branding) == [
         "/admin/organisations",
-        "/admin/organisations/demo/branding",
+        "/admin/organisations/demo/branding",  # the tab and its own page, listed once
     ]
     assert _current_links(channels) == [
         "/admin/organisations",
+        "/admin/organisations/demo/branding",
         "/admin/organisations/demo/channels",
     ]
     # ADR 0047 §3: a sub-tab keeps its tab current and marks itself in the second row.
@@ -142,7 +144,7 @@ async def test_an_organisation_page_marks_its_entry_its_tab_and_its_sub_tab(site
     ]
     assert 'class="tabs tabs--sub"' in settings
     assert 'class="tabs tabs--sub"' in overview
-    assert 'class="tabs tabs--sub"' not in branding
+    assert 'class="tabs tabs--sub"' in branding
 
 
 async def test_a_group_page_shows_the_path_groups_organisation_group(site: Site) -> None:
