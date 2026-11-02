@@ -12,8 +12,8 @@ organisation, a message text or a log line.
 
 - **Direct** fields identify the participant on their own: first name, last name, email address
   and phone number.
-- **Sensitive** fields hold what the participant told us, or give access to the conversation: a
-  note, the answers to the team's own questions on the booking form, and the links to join the
+- **Sensitive** fields hold what the participant told us, or give access to the conversation: the
+  answers to the team's own questions on the booking form, and the links to join the
   video call and the trial call (a link for the call itself, one for the host, and one for the
   trial call before it).
 
@@ -36,4 +36,6 @@ Compliance and privacy role never sees personal data at all.
 ## Retention
 
 Personal data is removed 24 hours after the appointment ended or was cancelled; see
-[Retention](retention.md). A removed appointment keeps only its reference and times.
+[Retention](retention.md). The removal deletes the fields above from the appointment, together with the
+links to the meeting and the work item at the video and contact-center providers. The reference and
+the times stay; with data held elsewhere they could still point to a person.

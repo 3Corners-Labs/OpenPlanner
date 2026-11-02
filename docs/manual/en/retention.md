@@ -15,7 +15,9 @@ numbers here, nor which booking it is.
   the latest the organisation's maximum after the original appointment (90 days by default),
   also while the closure has no end.
 
-After removal the booking stays, without personal data, for statistics.
+Removal deletes the personal fields from the booking, the links to its meeting and work item
+at the providers, and the reason texts of its timeline. The booking itself stays with its
+reference and times; together with data held elsewhere these could still point to a person.
 
 ## What the columns mean
 

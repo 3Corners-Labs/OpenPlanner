@@ -8,9 +8,9 @@ stays a constant on purpose (CLAUDE.md, ADR 0042).
 Personal data (PII) lives only on ``Booking``:
 
 - *direct* fields identify the participant on their own: first and last name, email, phone;
-- *sensitive* fields hold what the participant told us or give access to the conversation: a
-  note, the answers to the group's custom form fields (ADR 0055) and the join links (the
-  call's own and the trial call's, ADR 0071).
+- *sensitive* fields hold what the participant told us or give access to the conversation: the
+  answers to the group's custom form fields (ADR 0055) and the join links (the call's own and
+  the trial call's, ADR 0071).
 
 Where it may appear: the booking detail page and the queue item, for a role holding a
 ``PII_PERMISSIONS`` permission (ADR 0039, 0063 §4), and the group's own agenda and queue show
@@ -51,7 +51,6 @@ DATA_FIELDS: tuple[DataField, ...] = (
     DataField("last_name", Classification.DIRECT),
     DataField("email", Classification.DIRECT),
     DataField("phone", Classification.DIRECT),
-    DataField("note", Classification.SENSITIVE),
     DataField("form_answers", Classification.SENSITIVE),
     DataField("guest_join_url", Classification.SENSITIVE),
     DataField("host_join_url", Classification.SENSITIVE),
@@ -63,9 +62,23 @@ of CLAUDE.md's privacy rules; a field that is not here is not personal data."""
 PII_FIELDS: frozenset[str] = frozenset(f.name for f in DATA_FIELDS)
 """The names of ``DATA_FIELDS``, for membership tests."""
 
-ALIASES: frozenset[str] = frozenset({"name", "answers"})
-"""Other names the same data travels by: ``name`` (one field before ADR 0055 split it) and
-``answers`` (the form answers on ``Contact``). The log mask covers these too."""
+ALIASES: frozenset[str] = frozenset({"name", "answers", "note"})
+"""Other names the same data travels by: ``name`` (one field before ADR 0055 split it),
+``answers`` (the form answers on ``Contact``) and ``note`` (a column that no longer exists,
+ADR 0102 point 13, kept so a log line that still uses the word is masked). The log mask covers
+these too."""
+
+DERIVED_FIELDS: tuple[str, ...] = ("video_room_id", "trial_room_id", "wxcc_task_id", "claimed_by")
+"""Columns of ``Booking`` that are no personal data on their own but find it again: the
+ids of the meeting, the trial meeting and the work item (the key to a record at Cisco that
+holds the participant's name and email address) and the agent who claimed the booking
+(ADR 0102 point 11). The purge empties them with the personal fields; they are not shown on
+the *Data fields* card and not masked in logs."""
+
+PURGED_FIELDS: tuple[str, ...] = (*(f.name for f in DATA_FIELDS), *DERIVED_FIELDS)
+"""Every column the purge sets to NULL: ``DATA_FIELDS`` and ``DERIVED_FIELDS``. The purge works
+from this list, so there is no second one to drift (ADR 0102 point 13). What the purge does is
+*delete fields from the appointment*; it does not make the booking anonymous."""
 
 ENTITY = "Booking"
 """The only entity that holds personal data (CLAUDE.md privacy rules)."""
