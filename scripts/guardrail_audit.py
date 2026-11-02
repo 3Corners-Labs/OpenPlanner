@@ -7,7 +7,8 @@ says how they should be; ``scripts/guardrail-fetch.sh`` reads how they are, one 
 section, and this script compares the two without any network call:
 
 - every value that differs from the baseline, by its path (``rulesets/main/enforcement``);
-- every section that could not be read (the audit fails closed);
+- every section that could not be read, and every value the token sees as null where the
+  baseline expects one (the audit fails closed, and says what it could not check);
 - every bypass of a ruleset in the last day that the baseline does not expect (the release
   app creating a ``v*`` tag is expected).
 
@@ -83,12 +84,15 @@ def normalise_rulesets(rulesets: Iterable[Mapping[str, Json]]) -> dict[str, Json
     """The rulesets by name, without ids, links and timestamps."""
     found = {}
     for ruleset in rulesets:
-        actors = ruleset.get("bypass_actors") or []
+        actors = ruleset.get("bypass_actors")
         found[str(ruleset["name"])] = {
             "target": ruleset.get("target"),
             "enforcement": ruleset.get("enforcement"),
             "conditions": ruleset.get("conditions"),
-            "bypass_actors": sorted(
+            # None: the token cannot see who may bypass; the audit reports that, not drift.
+            "bypass_actors": None
+            if actors is None
+            else sorted(
                 (
                     {
                         "actor_type": a.get("actor_type"),
@@ -196,6 +200,28 @@ def differences(expected: Json, found: Json, path: str) -> list[str]:
     return []
 
 
+def hidden(expected: Json, found: Json, path: str) -> list[str]:
+    """The paths the baseline sets but the live state shows as null: not seen, not changed."""
+    if isinstance(expected, dict) and isinstance(found, dict):
+        return [
+            where
+            for key in sorted(set(expected) & set(found), key=str)
+            for where in hidden(expected[key], found[key], f"{path}/{key}")
+        ]
+    return [path] if found is None and expected is not None else []
+
+
+def _blank(value: Json, paths: Iterable[str], root: str) -> Json:
+    """``value`` with every path in ``paths`` set to null, so it is not compared."""
+    for path in paths:
+        keys = path[len(root) + 1 :].split("/")
+        target = value
+        for key in keys[:-1]:
+            target = target[key]
+        target[keys[-1]] = None
+    return value
+
+
 def unexpected_bypasses(
     bypasses: Iterable[Mapping[str, Json]], expected: Iterable[Mapping[str, str]]
 ) -> list[Mapping[str, Json]]:
@@ -233,7 +259,10 @@ def audit(baseline: Mapping[str, Json], directory: Path) -> Findings:
         if section not in live:
             findings.unreadable.append(name)
         elif section in baseline:
-            findings.drift.extend(differences(baseline[section], live[section], section))
+            unseen = hidden(baseline[section], live[section], section)
+            findings.unreadable.extend(unseen)
+            expected = _blank(json.loads(json.dumps(baseline[section])), unseen, section)
+            findings.drift.extend(differences(expected, live[section], section))
     try:
         bypasses = read_live(directory, "bypasses")
         findings.bypasses = unexpected_bypasses(bypasses, baseline.get("expected_bypasses", []))
@@ -259,7 +288,7 @@ def render(findings: Findings, today: date) -> str:
         ]
         lines.append("")
     if findings.unreadable:
-        lines += ["## Sections that could not be read (the audit fails closed)", ""]
+        lines += ["## What could not be read or seen (the audit fails closed)", ""]
         lines += [f"- `{name}`" for name in findings.unreadable]
         lines.append("")
     lines += [
