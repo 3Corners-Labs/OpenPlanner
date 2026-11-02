@@ -30,16 +30,8 @@
       "label": "Enterprise"
     },
     {
-      "href": "#standards",
-      "label": "Standaarden"
-    },
-    {
       "href": "#open-source",
       "label": "Open source"
-    },
-    {
-      "href": "#roadmap",
-      "label": "Roadmap"
     },
     {
       "href": "#releases",
@@ -68,7 +60,9 @@
         "value": "2",
         "label": "containers en één SQLite-bestand, meer niet"
       }
-    ]
+    ],
+    "command": "git clone https://github.com/3Corners-Labs/OpenPlanner && cd OpenPlanner\ncp .env.example .env\ndocker compose --profile dev up --build -d\ndocker compose exec web python -m app.cli seed-demo",
+    "command_label": "Probeer het in vijf minuten op je laptop en open daarna http://127.0.0.1:8000/g/demo"
   },
   "demo": {
     "title": "Zo voelt boeken voor een deelnemer",
@@ -654,7 +648,8 @@
         "title": "Configureerbaar, niet hard-coded",
         "text": "Elke drempel, limiet en termijn is een instelling met een klasse, een default en grenzen. Wat een beveiliging is, zet je niet uit vanuit het portaal."
       }
-    ]
+    ],
+    "fold": "Architectuur, bouwblokken en schaalbaarheid in detail"
   },
   "opensource": {
     "title": "Open source, open besluiten",
@@ -694,12 +689,6 @@
     "no_data": "De releaselijst wordt bij elke bouw uit GitHub ingelezen; in deze lokale bouw is die er niet.",
     "fresh": "Zodra deze pagina laadt, vraagt je browser GitHub om de actuele releaselijst en om niets anders: geen cookie, geen account, geen opslag. De lijst die in de pagina is ingebouwd zie je als GitHub niet antwoordt."
   },
-  "cta": {
-    "title": "Zet 'm vanmiddag op een testserver",
-    "text": "Eén installatiescript, een Let's Encrypt-certificaat en een demo-groep. Of start lokaal met docker compose en loop als elke rol door het portaal.",
-    "primary": "Lees de installatiehandleiding",
-    "secondary": "Snelstart in de README"
-  },
   "footer": {
     "tagline": "Video-afspraken met je team, in seconden geboekt, privacy standaard.",
     "nocookies": "Deze website zet geen cookies, gebruikt geen trackers en laadt geen scripts, lettertypen of afbeeldingen van derden. Alleen de releaselijst wordt door je browser bij GitHub opgevraagd.",
@@ -728,6 +717,10 @@
       {
         "href": "https://3corners.nl",
         "label": "3Corners"
+      },
+      {
+        "label": "Voor AI-assistenten (llms.txt)",
+        "href": "https://openplanner.nl/llms.txt"
       }
     ],
     "disclaimer": "OpenPlanner wordt geleverd zoals het is, zonder enige garantie, zoals de EUPL-1.2 vastlegt (artikel 7 en 8). 3Corners en de bijdragers zijn niet aansprakelijk voor schade door het gebruik. Wie het installeert en draait, is zelf verantwoordelijk voor de inrichting, de hosting, het naleven van de wet (waaronder privacy-, toegankelijkheids- en bewaarregels) en het gebruik. Uitspraken op deze site beschrijven de software; het is geen juridisch of compliance-advies en geen garantie dat een installatie aan een norm voldoet."
@@ -847,7 +840,8 @@
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/threat-model.md",
         "link": "docs/threat-model.md"
       }
-    ]
+    ],
+    "fold": "Toon alle standaarden met bewijs"
   },
   "roadmap": {
     "title": "Roadmap",
@@ -890,5 +884,61 @@
       }
     ],
     "all": "Al het openstaande werk op GitHub"
+  },
+  "nav_start": "Aan de slag",
+  "involved": {
+    "title": "Gebruik het, draai het, of bouw mee",
+    "lead": "OpenPlanner wordt openlijk gebouwd door een klein team. Je bent welkom bij elke stap: rondkijken, op een server zetten, of een stuk werk oppakken.",
+    "paths": [
+      {
+        "key": "try",
+        "title": "Probeer het",
+        "text": "Vijf minuten op je laptop met docker compose. Een demo-groep, een mailbox die elke e-mail opvangt en een testgebruiker voor elke rol.",
+        "links": [
+          {
+            "label": "Snelstart",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner#quick-start-demo"
+          }
+        ]
+      },
+      {
+        "key": "run",
+        "title": "Draai het",
+        "text": "Eén installatiescript geeft een test- of productieserver HTTPS, ondertekende images en automatische updates. Begin met een release candidate en vertel ons wat je tegenkomt.",
+        "links": [
+          {
+            "label": "Installatiehandleiding",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md"
+          },
+          {
+            "label": "Laatste releases",
+            "href": "#releases"
+          }
+        ]
+      },
+      {
+        "key": "help",
+        "title": "Bouw mee",
+        "text": "Ontwikkelaars pakken een good first issue. Testers proberen een release candidate of lopen de boekingspagina door met een schermlezer. Vertalers voegen een taal toe. Beveiligingsonderzoekers melden verantwoord.",
+        "links": [
+          {
+            "label": "Good first issues",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22"
+          },
+          {
+            "label": "Hulp gezocht",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22"
+          },
+          {
+            "label": "Bijdragen",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/CONTRIBUTING.md"
+          },
+          {
+            "label": "Kwetsbaarheid melden",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md"
+          }
+        ]
+      }
+    ]
   }
 }

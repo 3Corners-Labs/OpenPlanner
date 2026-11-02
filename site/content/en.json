@@ -30,16 +30,8 @@
       "label": "Enterprise"
     },
     {
-      "href": "#standards",
-      "label": "Standards"
-    },
-    {
       "href": "#open-source",
       "label": "Open source"
-    },
-    {
-      "href": "#roadmap",
-      "label": "Roadmap"
     },
     {
       "href": "#releases",
@@ -68,7 +60,9 @@
         "value": "2",
         "label": "containers and one SQLite file, nothing more"
       }
-    ]
+    ],
+    "command": "git clone https://github.com/3Corners-Labs/OpenPlanner && cd OpenPlanner\ncp .env.example .env\ndocker compose --profile dev up --build -d\ndocker compose exec web python -m app.cli seed-demo",
+    "command_label": "Try it on your laptop in five minutes, then open http://127.0.0.1:8000/g/demo"
   },
   "demo": {
     "title": "What booking feels like for a participant",
@@ -654,7 +648,8 @@
         "title": "Configurable, not hard-coded",
         "text": "Every threshold, limit and period is a setting with a class, a default and bounds. What is a protection cannot be switched off from the portal."
       }
-    ]
+    ],
+    "fold": "Architecture, building blocks and scaling in detail"
   },
   "opensource": {
     "title": "Open source, open decisions",
@@ -694,12 +689,6 @@
     "no_data": "The release list is read from GitHub on every build; this local build has none.",
     "fresh": "When this page loads, your browser asks GitHub for the current release list and for nothing else: no cookie, no account, no storage. The list built into the page is what you see when GitHub does not answer."
   },
-  "cta": {
-    "title": "Put it on a test server this afternoon",
-    "text": "One install script, a Let's Encrypt certificate and a demo group. Or start locally with docker compose and walk the portal as every role.",
-    "primary": "Read the installation guide",
-    "secondary": "Quick start in the README"
-  },
   "footer": {
     "tagline": "Video appointments with your team, booked in seconds, privacy by default.",
     "nocookies": "This website sets no cookies, uses no trackers and loads no scripts, fonts or images from third parties. Only the release list is requested from GitHub by your browser.",
@@ -728,6 +717,10 @@
       {
         "href": "https://3corners.nl",
         "label": "3Corners"
+      },
+      {
+        "label": "For AI assistants (llms.txt)",
+        "href": "https://openplanner.nl/llms.txt"
       }
     ],
     "disclaimer": "OpenPlanner is provided as it is, without warranty of any kind, as the EUPL-1.2 sets out (sections 7 and 8). 3Corners and the contributors are not liable for damage from its use. Whoever installs and runs it is responsible for its configuration, its hosting, its compliance with the law (including privacy, accessibility and retention rules) and its use. Statements on this site describe the software, not a legal or compliance advice or a guarantee that an installation meets a standard."
@@ -847,7 +840,8 @@
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/threat-model.md",
         "link": "docs/threat-model.md"
       }
-    ]
+    ],
+    "fold": "Show all standards with their evidence"
   },
   "roadmap": {
     "title": "Roadmap",
@@ -890,5 +884,61 @@
       }
     ],
     "all": "All open work on GitHub"
+  },
+  "nav_start": "Get started",
+  "involved": {
+    "title": "Use it, run it, or help build it",
+    "lead": "OpenPlanner is built in the open by a small team. You are welcome at every step: look around, put it on a server, or take a piece of the work.",
+    "paths": [
+      {
+        "key": "try",
+        "title": "Try it",
+        "text": "Five minutes on your laptop with docker compose. A demo group, a mailbox that catches every email, and a test user for every role.",
+        "links": [
+          {
+            "label": "Quick start",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner#quick-start-demo"
+          }
+        ]
+      },
+      {
+        "key": "run",
+        "title": "Run it",
+        "text": "One install script gives a test or production server HTTPS, signed images and automatic updates. Start with a release candidate and tell us what you find.",
+        "links": [
+          {
+            "label": "Installation guide",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md"
+          },
+          {
+            "label": "Latest releases",
+            "href": "#releases"
+          }
+        ]
+      },
+      {
+        "key": "help",
+        "title": "Help build it",
+        "text": "Developers pick a good first issue. Testers try a release candidate or walk the booking page with a screen reader. Translators add a language. Security researchers report responsibly.",
+        "links": [
+          {
+            "label": "Good first issues",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22"
+          },
+          {
+            "label": "Help wanted",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22"
+          },
+          {
+            "label": "Contributing guide",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/CONTRIBUTING.md"
+          },
+          {
+            "label": "Report a vulnerability",
+            "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md"
+          }
+        ]
+      }
+    ]
   }
 }
