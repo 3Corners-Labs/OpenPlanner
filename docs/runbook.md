@@ -458,16 +458,19 @@ deletes ended rows and rows past `ADMIN_SESSION_HOURS` once an hour; the history
 audit log.
 
 **Offboarding a person (ASVS V7.4.2).** Switching a person off at the identity provider does
-not end the session OpenPlanner already holds. Until the administrator's *End all sessions*
-button exists (ADR 0098 step 3), the route is:
+not end the session OpenPlanner already holds. The route is:
 
 1. Switch the person off at the identity provider (or remove their groups and claims there).
-2. Their open session then lapses at the idle limit (`admin_idle_minutes`, default 60) at the
-   latest, and in any case at its absolute end (`ADMIN_SESSION_HOURS`, default 8). Every new
-   login needs the identity provider, which now refuses it.
-3. When that is too slow, end all sessions on the host (above). It also logs out everyone
-   else, who log in again; there is no per-person command before step 3 of the ADR.
-4. Remove the person's roles in the portal (*Staff*) so a login by another route grants
+2. End their sessions at once: an organisation admin or the superuser opens the person under
+   *Staff* and presses *End all sessions* (permission `staff.manage`, ADR 0098 step 3).
+   This ends every session of the person, also those for other organisations, and writes the
+   audit event `admin.sessions_ended_by_admin` with the administrator, the person and the number.
+3. Without that, their open session lapses at the idle limit (`admin_idle_minutes`, default 60)
+   at the latest, and in any case at its absolute end (`ADMIN_SESSION_HOURS`, default 8). Every
+   new login needs the identity provider, which now refuses it.
+4. Only when the whole installation is at risk, end all sessions on the host (above). It also
+   logs out everyone else, who log in again.
+5. Remove the person's roles in the portal (*Staff*) so a login by another route grants
    nothing, and note the date for the audit trail.
 
 The cookie name follows `PUBLIC_BASE_URL` (ADR 0098 step 4), not `ENVIRONMENT`. On an `https://`

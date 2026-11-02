@@ -710,6 +710,16 @@ class Transaction(Protocol):
         """End every live session with ``reason``; return how many (ADR 0098 point 9c)."""
         ...
 
+    async def end_admin_sessions_of(
+        self, subject: str, reason: EndReason, at: datetime, keep: str | None = None
+    ) -> int:
+        """End the live sessions of ``subject`` except the one with hash ``keep``; return how many.
+
+        For a person ending their other sessions and an administrator ending all of a
+        person's (ADR 0098 point 9a and 9b).
+        """
+        ...
+
     async def delete_admin_sessions(self, login_before: datetime) -> int:
         """Delete the sessions that ended or whose login lies before ``login_before``.
 

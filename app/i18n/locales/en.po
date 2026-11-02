@@ -8978,3 +8978,75 @@ msgstr "Use at most 10 values of plain characters, separated by spaces."
 
 msgid "admin.idp.test_result.mfa"
 msgstr "Second factor shown"
+
+msgid "admin.nav.my_sessions"
+msgstr "My sessions"
+
+msgid "audit.event.session_ended"
+msgstr "Session ended by the system"
+
+msgid "audit.event.sessions_ended_all"
+msgstr "All sessions ended"
+
+msgid "audit.event.sessions_ended_by_self"
+msgstr "Own other sessions ended"
+
+msgid "audit.event.sessions_ended_by_admin"
+msgstr "Sessions of a staff member ended"
+
+msgid "admin.audit.detail.sessions"
+msgstr "Sessions: {count}"
+
+msgid "admin.audit.detail.subject"
+msgstr "Staff member: {value}"
+
+msgid "admin.done.sessions_ended_others"
+msgstr "Your other sessions have been ended. Number: {count}."
+
+msgid "admin.done.sessions_ended_person"
+msgstr "The sessions of this staff member have been ended. Number: {count}. They have to log in again."
+
+msgid "admin.sessions.title"
+msgstr "My sessions"
+
+msgid "admin.sessions.intro"
+msgstr "This is where you are logged in to the admin portal right now. If you do not recognise a session, end the other sessions and, if needed, log in again at your identity provider."
+
+msgid "admin.sessions.caption"
+msgstr "Your sessions in the admin portal"
+
+msgid "admin.sessions.login"
+msgstr "Logged in"
+
+msgid "admin.sessions.last_seen"
+msgstr "Last active"
+
+msgid "admin.sessions.status"
+msgstr "Status"
+
+msgid "admin.sessions.current"
+msgstr "This session"
+
+msgid "admin.sessions.other"
+msgstr "Other session"
+
+msgid "admin.sessions.end_others"
+msgstr "End other sessions"
+
+msgid "admin.sessions.no_others"
+msgstr "You have no other sessions."
+
+msgid "admin.sessions.end_others_help"
+msgstr "The session you are using now stays. The other sessions can no longer be used afterwards."
+
+msgid "admin.staff.sessions.heading"
+msgstr "Sessions"
+
+msgid "admin.staff.sessions.intro"
+msgstr "Ends all sessions of this staff member in the admin portal, also those for other organisations: a session belongs to the person. They have to log in again afterwards. Use it, for example, when someone has been switched off at the identity provider."
+
+msgid "admin.staff.sessions.end_all"
+msgstr "End all sessions"
+
+msgid "admin.rights.sections"
+msgstr "Parts of My rights"
