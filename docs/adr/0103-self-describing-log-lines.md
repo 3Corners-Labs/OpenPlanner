@@ -151,8 +151,8 @@ closed list for the same reason.
 |---|---|---|---|
 | 0 | ADR accepted | #412 | merged |
 | 1 | The register (`app/domain/log_events.py`) with every current action and trace point, the scan test, `docs/logging.md` generated | #416 | in PR |
-| 2 | `openplanner.event/3`: envelope on every line, message from the template, `error.message`, `labels.*`, `actor.type` and `actor.role`, library lines; `docs/audit-events.md`, CSV export | this PR | in PR |
-| 3 | Category `authz` for destinations, syslog `MSGID` from the category, sentence in front of the syslog message | this PR | in PR |
+| 2 | `openplanner.event/3`: envelope on every line, message from the template, `error.message`, `labels.*`, `actor.type` and `actor.role`, library lines; `docs/audit-events.md`, CSV export | #431 | in PR |
+| 3 | Category `authz` for destinations, syslog `MSGID` from the category, sentence in front of the syslog message | #431 | in PR |
 | 4 | Installer writes `INSTALLATION_NAME`; warning on *System status* | | planned |
 | 5 | Portal event screens render the register through `app/i18n` (nl, en) | | planned |
 
