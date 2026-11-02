@@ -1,6 +1,8 @@
 # Threat model
 
 STRIDE per flow, plus abuse cases per public endpoint. Every abuse case has a test.
+Every key, algorithm and certificate, with its owner, storage, rotation and destruction, is in
+`docs/cryptography.md` (ADR 0094); a flow that adds one updates it.
 Status: work packages 5 and 6 (video, WxCC, direct call).
 
 ## Flow: health checks
