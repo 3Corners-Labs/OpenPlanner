@@ -53,7 +53,7 @@ a structural scan of every object page. Other screens (organisation, platform) a
 
 Built: the booking form card (S2, #360), "On this page" on the group settings (S1, #400), the add
 form with the question first and a derived technical name (B1, B3, B5, #403), the kind chosen first
-with a proposed classification (B2, B4, #407). Open: S4, S5, S6, B6, B7.
+with a proposed classification (B2, B4, #407), the organisation settings by topic (O2, O5, #415) and the *Participants* tab that gathers Huisstijl, Kanalen and Teksten (O1, O4, ADR 0105). Open: S4, S5, S6, B6, B7, O3, O6 to O9.
 
 ## Organisation screens (second pass)
 
