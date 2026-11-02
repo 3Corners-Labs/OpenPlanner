@@ -229,6 +229,9 @@ class Settings(BaseSettings):
     # 2026-10-29), security 1 year, debug events 7 days; system events above. Diagnostic mode
     # ends by itself after DIAGNOSTIC_MODE_HOURS.
     audit_retention_days: int = Field(default=730, ge=365, le=3650)
+    # ADR 0102 point 12 (class C, platform): days after pii_purged_at until a booking row is
+    # merged into a daily count per group and deleted.
+    booking_row_retention_days: int = Field(default=730, ge=365, le=3650)
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)

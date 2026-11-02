@@ -38,7 +38,8 @@ When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
     ``python -m app.cli tls-check [--host H] [--port P]``  the certificate of the public address
         (ADR 0064): stored for System status; with ``--host`` another server, stored nowhere
     ``python -m app.cli address-check``  the round trip to ``PUBLIC_BASE_URL`` through the proxy
-        (ADR 0086): stored for System status; exits 1 on a finding
+        (ADR 0086): stored for System status; exits 1 on a finding;
+        ``--ca-file`` trusts only that CA
     ``python -m app.cli evidence [--format markdown|json] [--out DIR]``  one report (WP-C2) of
         the version, ``oidc-check``, ``address-check``, ``tls-check``, the configured external
         hosts, the log destinations, the retention counts, the key rotation and every setting
@@ -64,6 +65,7 @@ import asyncio
 import dataclasses
 import json
 import os
+import ssl
 import sys
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
@@ -574,6 +576,18 @@ async def _tls_probe(
         return check, clock.now()
     finally:
         await engine.dispose()
+
+
+def _probe_trusting(ca_file: str | None) -> InstanceProbe | None:
+    """Return a probe that trusts only the CA bundle in ``ca_file``, or ``None`` for the default.
+
+    For a proxy whose certificate comes from an internal or test CA (``scripts/check-proxy.sh``);
+    the default probe uses the host's CA bundle like a participant's browser.
+    """
+    if ca_file is None:
+        return None
+    context = ssl.create_default_context(cafile=ca_file)
+    return HttpxInstanceProbe(transport=httpx.AsyncHTTPTransport(verify=context))
 
 
 async def _tls_check(
@@ -1409,7 +1423,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="a JSON file with sample ID-token claims: print the grants and refused values "
         "they resolve to under the current mode and directory (ADR 0049 point 16)",
     )
-    commands.add_parser("address-check", help="the round trip to the public address")
+    address_cmd = commands.add_parser("address-check", help="the round trip to the public address")
+    address_cmd.add_argument(
+        "--ca-file",
+        help="trust only this CA bundle (PEM) instead of the host's, e.g. an internal CA",
+    )
     evidence_cmd = commands.add_parser(
         "evidence", help="one report of what the application measures about itself (no secrets)"
     )
@@ -1471,7 +1489,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "tls-check":
         return _write(asyncio.run(_tls_check(Settings(), args.host, args.port)))
     if args.command == "address-check":
-        return _write(asyncio.run(_address_check(Settings())))
+        return _write(asyncio.run(_address_check(Settings(), _probe_trusting(args.ca_file))))
     if args.command == "closure":
         return _closure(Settings(), args)
     if args.command == "config":

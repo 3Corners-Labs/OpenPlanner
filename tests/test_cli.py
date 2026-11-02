@@ -464,6 +464,21 @@ async def test_address_check_stores_the_round_trip_and_fails_on_a_finding(
     assert stored[AddressKind.PUBLIC].url == "http://127.0.0.1:8000"
 
 
+async def test_address_check_trusts_the_ca_file_it_is_given(tmp_path: Path) -> None:
+    # ADR 0086 step 2: scripts/check-proxy.sh runs the round trip against its test CA.
+    from app.cli import _probe_trusting
+    from tests.adapters.test_tls_probe import self_signed
+
+    assert _probe_trusting(None) is None
+    certificate, _key = self_signed(tmp_path)
+    probe = _probe_trusting(str(certificate))
+
+    assert probe is not None
+    reply = await probe.probe("https://127.0.0.1:1", "nonce")  # nothing listens: not a TLS error
+    assert reply.answer is None
+    assert reply.error == "unreachable"
+
+
 async def test_address_check_reports_a_switched_off_probe_instead_of_ok(
     migrated: Settings,
 ) -> None:
