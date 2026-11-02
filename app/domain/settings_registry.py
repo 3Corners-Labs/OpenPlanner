@@ -1448,6 +1448,29 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=29,
     ),
     S(
+        "closure_max_retention_days",
+        K.INT,
+        90,
+        _D,
+        T.RETENTION,
+        "Days after the original appointment at the latest that the details of a booking on "
+        "hold by a closure are deleted, also while the closure has no end (ADR 0102). It cannot "
+        "be switched off.",
+        minimum=30,
+        maximum=180,
+    ),
+    S(
+        "closure_max_notice_days",
+        K.INT,
+        14,
+        _D,
+        T.RETENTION,
+        "Days before that maximum that the administrators are told a closure still holds "
+        "details, and on what date they are deleted (ADR 0102).",
+        minimum=3,
+        maximum=28,
+    ),
+    S(
         "booking_form_max_custom_fields",
         K.INT,
         5,

@@ -858,6 +858,8 @@ class InMemoryTransaction:
                             ends,
                             b.rebook_by,
                             b.confirm_by,
+                            self.state.groups[b.group_id].organisation_id,
+                            b.closure_id,
                         ),
                     )
                 )
@@ -883,7 +885,15 @@ class InMemoryTransaction:
                 ):
                     ends = closure.ends_at if closure else None
                     candidates.append(
-                        PurgeCandidate(b.group_id, b.status, b.end, b.cancelled_at, ends)
+                        PurgeCandidate(
+                            b.group_id,
+                            b.status,
+                            b.end,
+                            b.cancelled_at,
+                            ends,
+                            organisation_id=self.state.groups[b.group_id].organisation_id,
+                            closure_id=b.closure_id,
+                        )
                     )
         return RetentionFacts(counts, candidates)
 
@@ -1072,6 +1082,14 @@ class InMemoryTransaction:
             b for b in self.state.bookings.values() if b.group_id == group_id and b.status is status
         ]
         return sorted(found, key=lambda b: (b.start, b.id or 0))
+
+    async def latest_suspended_end(self, closure_id: int) -> datetime | None:
+        ends = [
+            b.end
+            for b in self.state.bookings.values()
+            if b.closure_id == closure_id and b.status is BookingStatus.SUSPENDED
+        ]
+        return max(ends, default=None)
 
     async def get_api_settings(self) -> ApiSettings:
         return self.state.api_settings

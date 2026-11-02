@@ -74,8 +74,12 @@ still go ahead are confirmed again; the participant then gets an email.
 
 The list shows each appointment's reference and original time, never the participant's details.
 Per appointment you can move it to a free time, confirm it again or cancel it, or all at once.
-The personal data of an appointment that stays on hold is removed 30 days after the closure
-ends.
+The personal data of an appointment that stays on hold is deleted 30 days after the closure
+ends, and in any case at the latest the organisation's maximum after the original appointment
+(90 days unless the organisation admin set another number between 30 and 180), also when the
+closure has no end. About 14 days before that the audit log of the team shows the system
+event `closure.retention_notice` with the date; lift the closure or move the appointments before
+then. The closure page tells participants the day their details are deleted by.
 
 ## What is recorded
 

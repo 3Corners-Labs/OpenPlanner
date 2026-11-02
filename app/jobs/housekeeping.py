@@ -168,6 +168,8 @@ class Housekeeping:
             return
         if result.purged:
             await self._checkpoint()
+        if result.notices:
+            log.warning("retention.closure_notice", closures=result.notices)
         if result.overdue:
             log.warning(
                 "retention.sweep",

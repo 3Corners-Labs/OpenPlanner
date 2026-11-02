@@ -1330,6 +1330,13 @@ class Transaction(Protocol):
         """
         ...
 
+    async def latest_suspended_end(self, closure_id: int) -> datetime | None:
+        """Return the latest slot end of the bookings still on hold in a closure, if any.
+
+        Times only: the closure page derives the date the data is deleted by (ADR 0102).
+        """
+        ...
+
     async def get_api_settings(self) -> ApiSettings:
         """Return the machine API's switches (both off when never saved, ADR 0023)."""
         ...
