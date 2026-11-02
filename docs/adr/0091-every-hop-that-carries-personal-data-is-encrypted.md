@@ -92,5 +92,5 @@ they follow from the routes and are not a tuning value.
 - An installation that relays mail in clear text has to choose: TLS on the relay, or the
   explicit host setting. Both are visible on System status.
 - The threat model gets rows for the port 80 refusal, the single-host exception and SMTP.
-- Step 3 touched `docker-compose.yml` after the open configuration-package PRs that change that
-  file had landed.
+- Step 3 touches `docker-compose.yml`; it waits until the open configuration-package PRs that
+  change that file have landed.
