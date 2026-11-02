@@ -23,9 +23,13 @@ of whoever ran it.
 | Deletion from SQLite pages and the write-ahead log | `PRAGMA secure_delete=ON`, WAL truncation after a purge, and the marker test | `docs/dataflow.md` *Residual data after a purge*; PR #339 |
 | Retention, restore and the update back-up | `docs/dataflow.md` *Retention matrix*; runbook *Backup and restore*; ADR 0102 points 7 to 10 | ADR 0102 |
 
-Not yet built, so not claimed: the one-command evidence report of the application (work package
-WP-C2) and the standards table with the assertions of TLS versions and HSTS in `check-proxy.sh`
-(ADR 0086 step 2). Until then the commands below are the evidence.
+The one-command evidence report of the application is built: `python -m app.cli evidence`
+(runbook *Evidence report for an audit*) bundles the rows above that the application measures
+itself (version and image digest, address and certificate checks, configured external hosts, log
+destinations and their status, retention counts, key rotation, settings with class and source).
+Not yet built, so not claimed: the standards table with the assertions of TLS versions and HSTS
+in `check-proxy.sh` (ADR 0086 step 2). For what happens outside the application (TLS versions at
+the edge, NTP, volume encryption, firewall) the commands below are the evidence.
 
 ## Transport security at the edge
 

@@ -47,6 +47,10 @@ file it concerns; nothing is claimed without a source.
 ## Not covered here
 
 The requirements the application can prove itself are in the audit evidence register and the
-tests, not in this folder. The one-command evidence report of the application (`evidence`,
-`oidc-check --evidence`) and the browser test that public pages call no third party are separate
-work packages; when they exist, the rows that cite them are updated in the same pull request.
+tests, not in this folder. The one-command evidence report of the application
+(`python -m app.cli evidence`, runbook *Evidence report for an audit*) bundles the version, the
+`oidc-check`, `address-check` and `tls-check` outcomes, the configured external hosts, the log
+destinations, the retention counts, the key rotation and a secret-free settings overview; attach
+its output to the dossier next to the checklists here. The browser test that public pages call
+no third party is a separate work package; when it exists, the rows that cite it are updated in
+the same pull request.

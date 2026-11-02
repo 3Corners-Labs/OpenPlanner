@@ -538,6 +538,14 @@ REGISTRY: tuple[SettingSpec, ...] = (
     S("app_version", K.STRING, "", _B, T.HOST, "Baked into release images (ADR 0029)."),
     S("app_commit", K.STRING, "", _B, T.HOST, "Git commit baked into every image (ADR 0052)."),
     S(
+        "app_image_digest",
+        K.STRING,
+        "",
+        _B,
+        T.HOST,
+        "Registry digest the host pinned this image at, for the evidence report (WP-C2).",
+    ),
+    S(
         "installation_name",
         K.STRING,
         "",
