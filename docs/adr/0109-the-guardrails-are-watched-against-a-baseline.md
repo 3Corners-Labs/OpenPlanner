@@ -1,6 +1,6 @@
 # 0109. The guardrails are watched against a baseline in the repository
 
-Status: accepted (2026-11-02, `po:approved` on #NNN), requested by the product owner. Builds on
+Status: accepted (2026-11-02, `po:approved` on #454), requested by the product owner. Builds on
 ADR 0078, ADR 0104 and ADR 0107: they set the guardrails, this ADR notices when one changes or
 is passed. Partly built; see *Build status*.
 
@@ -63,9 +63,9 @@ title and label, and the app's permissions. They are process constants of the fo
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; environment `audit` created with branch policy `main` (2026-11-02) | #NNN | in PR |
+| 0 | ADR proposed; environment `audit` created with branch policy `main` (2026-11-02) | #454 | in PR |
 | 1 | The product owner creates the audit app, installs it on this repository and stores its client ID and key in the environment `audit` | GitHub setting | planned |
-| 2 | `.github/guardrails.json`, `scripts/guardrail_audit.py`, `scripts/report_issue.py` (shared with `scripts/adr_issues.py`), `.github/workflows/guardrail-audit.yml`; tests; runbook, threat model | #NNN | in PR |
+| 2 | `.github/guardrails.json`, `scripts/guardrail_audit.py`, `scripts/report_issue.py` (shared with `scripts/adr_issues.py`), `.github/workflows/guardrail-audit.yml`; tests; runbook, threat model | #454 | in PR |
 | 3 | The first scheduled run after the merge reads every section; anything it cannot read is fixed in the workflow or the baseline | | planned |
 
 ## Consequences

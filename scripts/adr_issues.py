@@ -21,25 +21,28 @@ exit code is non-zero only when a table or the overview cannot be read.
 
 Everything that talks to GitHub goes through :class:`GitHub`, a thin layer over the ``gh``
 CLI, so the logic is pure and tested with a fake, and moving to another forge means replacing
-that one class (ADR 0078, portability).
+that one class (ADR 0078, portability). The plumbing it shares with the guardrail audit (the
+``gh`` runner, the issue calls, keeping one open report issue) lives in ``scripts/report_issue.py``
+(ADR 0109).
 """
 
 import argparse
 import json
 import re
-import subprocess  # noqa: S404 - runs gh with fixed arguments only
+import subprocess  # noqa: S404 - only to catch gh's own failure
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+from scripts.report_issue import IssueTracker, Runner, ensure_label, keep_report, run_gh, say
+
 ROOT = Path(__file__).resolve().parent.parent
 
 LABEL_PREFIX = "adr:"
 """The label of every issue this script owns: ``adr:NNNN`` for a build step."""
 
-LABEL_COLOUR = "5319e7"
 REPORT_TITLE = "ADR drift"
 REPORT_LABEL = "adr:drift"
 """The label of the one report issue, so it is never mistaken for a build step."""
@@ -383,31 +386,9 @@ def render(found: Drift, today: date) -> str:
 
 # --- the gh layer ------------------------------------------------------------
 
-Runner = Callable[[Sequence[str]], str]
-"""Runs ``gh`` with the given arguments and returns its standard output."""
 
-
-def run_gh(args: Sequence[str]) -> str:
-    """Run the ``gh`` CLI with fixed arguments; ``GH_TOKEN`` or ``gh auth`` provides the token."""
-    return subprocess.run(  # noqa: S603 - fixed argument list, no shell
-        ["gh", *args],  # noqa: S607 - gh from PATH, as CI and every developer run it
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
-
-
-class GitHub:
+class GitHub(IssueTracker):
     """The only place that talks to GitHub: reads and writes through ``gh``."""
-
-    def __init__(self, run: Runner = run_gh) -> None:
-        """Keep the runner; tests pass a fake."""
-        self._run = run
-
-    def labels(self) -> set[str]:
-        """Every label of the repository."""
-        rows = json.loads(self._run(["label", "list", "--json", "name", "--limit", "500"]))
-        return {str(row["name"]) for row in rows}
 
     def issues(self) -> list[Issue]:
         """Every issue of the repository, open and closed (pull requests are not issues here)."""
@@ -444,19 +425,6 @@ class GitHub:
         except (subprocess.CalledProcessError, KeyError, ValueError):
             return "UNKNOWN"
 
-    def create_label(self, name: str, description: str) -> None:
-        """Create a label."""
-        self._run(["label", "create", name, "--color", LABEL_COLOUR, "--description", description])
-
-    def create_issue(self, title: str, body: str, label: str) -> int:
-        """Create an issue and return its number (gh prints its URL)."""
-        url = self._run(["issue", "create", "--title", title, "--body", body, "--label", label])
-        return int(url.strip().rsplit("/", 1)[-1])
-
-    def close_issue(self, number: int, comment: str) -> None:
-        """Close an issue with a comment that says why."""
-        self._run(["issue", "close", str(number), "--comment", comment])
-
     def reopen_issue(self, number: int, comment: str) -> None:
         """Reopen an issue with a comment that says why."""
         self._run(["issue", "reopen", str(number), "--comment", comment])
@@ -465,25 +433,8 @@ class GitHub:
         """Give an issue a new title."""
         self._run(["issue", "edit", str(number), "--title", title])
 
-    def edit_issue(self, number: int, title: str, body: str) -> None:
-        """Replace an issue's title and body."""
-        self._run(["issue", "edit", str(number), "--title", title, "--body", body])
-
 
 # --- commands ----------------------------------------------------------------
-
-
-def _say(dry_run: bool, what: str) -> None:
-    print(f"would {what}" if dry_run else what)
-
-
-def _ensure_label(gh: GitHub, labels: set[str], name: str, description: str, dry_run: bool) -> None:
-    if name in labels:
-        return
-    _say(dry_run, f"create label {name}")
-    if not dry_run:
-        gh.create_label(name, description)
-    labels.add(name)
 
 
 def sync(gh: GitHub, steps: Sequence[Step], dry_run: bool) -> None:
@@ -497,8 +448,8 @@ def sync(gh: GitHub, steps: Sequence[Step], dry_run: bool) -> None:
         step, issue = action.step, action.issue
         assert step is not None  # noqa: S101 - plan() fills it
         if action.kind == "create":
-            _ensure_label(gh, labels, step.label, f"Build steps of ADR {step.adr}", dry_run)
-        _say(dry_run, str(action))
+            ensure_label(gh, labels, step.label, f"Build steps of ADR {step.adr}", dry_run)
+        say(dry_run, str(action))
         if dry_run:
             continue
         why = (
@@ -530,33 +481,18 @@ def report(
     print(text, end="")
     if not post:
         return
-    title = f"{REPORT_TITLE} {today.isoformat()}"
-    existing = next(
-        (
-            i
-            for i in sorted(issues, key=lambda i: i.number)
-            if i.state == "OPEN" and i.title.startswith(REPORT_TITLE)
-        ),
-        None,
+    open_issues = sorted((i.number, i.title) for i in issues if i.state == "OPEN")
+    keep_report(
+        gh,
+        open_issues,
+        REPORT_TITLE,
+        REPORT_LABEL,
+        "The weekly ADR drift report",
+        text,
+        not found.empty,
+        today,
+        dry_run,
     )
-    if found.empty:
-        if existing is not None:
-            _say(dry_run, f"close #{existing.number}: nothing drifts on {today.isoformat()}")
-            if not dry_run:
-                gh.close_issue(
-                    existing.number,
-                    f"Nothing drifts on {today.isoformat()}; closed by the drift check.",
-                )
-        return
-    if existing is not None:
-        _say(dry_run, f"update #{existing.number}: {title}")
-        if not dry_run:
-            gh.edit_issue(existing.number, title, text)
-        return
-    _ensure_label(gh, gh.labels(), REPORT_LABEL, "The weekly ADR drift report", dry_run)
-    _say(dry_run, f"create: {title}")
-    if not dry_run:
-        gh.create_issue(title, text, REPORT_LABEL)
 
 
 def main(argv: Sequence[str] | None = None, root: Path = ROOT, run: Runner = run_gh) -> int:

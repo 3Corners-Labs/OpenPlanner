@@ -1,0 +1,255 @@
+{
+  "_comment": [
+    "The expected state of the guardrails (ADR 0109). Every change here is a decision (ADR 0078).",
+    "scripts/guardrail_audit.py compares it hourly with the live state; python3 -m scripts.guardrail_audit --live DIR --snapshot prints the live state in this shape."
+  ],
+  "expected_bypasses": [
+    {
+      "actor": "3corners-openplanner-release[bot]",
+      "ref_prefix": "refs/tags/v",
+      "why": "the release app creates the release and candidate tags (ADR 0107)"
+    }
+  ],
+  "actions": {
+    "allowed_actions": "all",
+    "enabled": true,
+    "sha_pinning_required": false
+  },
+  "collaborators": {
+    "3c-unified-git": "write",
+    "cyberbeuk": "admin"
+  },
+  "environments": {
+    "audit": {
+      "branches": [
+        "branch:main"
+      ],
+      "deployment_branch_policy": {
+        "custom_branch_policies": true,
+        "protected_branches": false
+      }
+    },
+    "release": {
+      "branches": [
+        "branch:main"
+      ],
+      "deployment_branch_policy": {
+        "custom_branch_policies": true,
+        "protected_branches": false
+      }
+    },
+    "website": {
+      "branches": [
+        "branch:main",
+        "tag:v*.*.*"
+      ],
+      "deployment_branch_policy": {
+        "custom_branch_policies": true,
+        "protected_branches": false
+      }
+    }
+  },
+  "installations": {
+    "3corners-openplanner-release": {
+      "permissions": {
+        "contents": "write",
+        "metadata": "read",
+        "pull_requests": "write"
+      },
+      "repository_selection": "selected"
+    },
+    "claude": {
+      "permissions": {
+        "actions": "write",
+        "administration": "read",
+        "checks": "write",
+        "contents": "write",
+        "discussions": "write",
+        "issues": "write",
+        "members": "read",
+        "merge_queues": "read",
+        "metadata": "read",
+        "pull_requests": "write",
+        "repository_hooks": "write",
+        "statuses": "read",
+        "workflows": "write"
+      },
+      "repository_selection": "selected"
+    },
+    "claude-design-import": {
+      "permissions": {
+        "contents": "read",
+        "issues": "read",
+        "metadata": "read",
+        "pull_requests": "read"
+      },
+      "repository_selection": "selected"
+    },
+    "renovate": {
+      "permissions": {
+        "administration": "read",
+        "checks": "write",
+        "contents": "write",
+        "issues": "write",
+        "members": "read",
+        "metadata": "read",
+        "packages": "read",
+        "pull_requests": "write",
+        "statuses": "write",
+        "vulnerability_alerts": "read",
+        "workflows": "write"
+      },
+      "repository_selection": "selected"
+    }
+  },
+  "organisation": {
+    "default_repository_permission": "none",
+    "members_can_create_private_repositories": false,
+    "members_can_create_public_repositories": false,
+    "members_can_create_repositories": false,
+    "two_factor_requirement_enabled": true
+  },
+  "repository": {
+    "allow_auto_merge": true,
+    "allow_merge_commit": false,
+    "allow_rebase_merge": false,
+    "allow_squash_merge": true,
+    "delete_branch_on_merge": true,
+    "security": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "enabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "enabled"
+    },
+    "visibility": "public"
+  },
+  "rulesets": {
+    "main": {
+      "bypass_actors": [],
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ]
+        }
+      },
+      "enforcement": "active",
+      "rules": {
+        "deletion": {},
+        "merge_queue": {
+          "check_response_timeout_minutes": 60,
+          "grouping_strategy": "ALLGREEN",
+          "max_entries_to_build": 5,
+          "max_entries_to_merge": 5,
+          "merge_method": "SQUASH",
+          "min_entries_to_merge": 1,
+          "min_entries_to_merge_wait_minutes": 5
+        },
+        "non_fast_forward": {},
+        "pull_request": {
+          "allowed_merge_methods": [
+            "squash"
+          ],
+          "dismiss_stale_reviews_on_push": true,
+          "dismissal_restriction": {
+            "allowed_actors": [],
+            "enabled": false
+          },
+          "require_code_owner_review": false,
+          "require_extra_approval_for_unattributed_changes": true,
+          "require_last_push_approval": false,
+          "required_approving_review_count": 0,
+          "required_review_thread_resolution": false,
+          "required_reviewers": []
+        },
+        "required_linear_history": {},
+        "required_status_checks": {
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "accessibility (Playwright, axe-core, Lighthouse)",
+              "integration_id": 15368
+            },
+            {
+              "context": "authorisation matrix",
+              "integration_id": 15368
+            },
+            {
+              "context": "copy-paste detection",
+              "integration_id": 15368
+            },
+            {
+              "context": "decision gate",
+              "integration_id": 15368
+            },
+            {
+              "context": "gitleaks",
+              "integration_id": 15368
+            },
+            {
+              "context": "image build, scan, SBOM, API fuzzing",
+              "integration_id": 15368
+            },
+            {
+              "context": "licence and contributor agreement",
+              "integration_id": 15368
+            },
+            {
+              "context": "lint, types, tests, migrations",
+              "integration_id": 15368
+            },
+            {
+              "context": "lockfile, audit, licenses",
+              "integration_id": 15368
+            },
+            {
+              "context": "no deprecation warnings",
+              "integration_id": 15368
+            },
+            {
+              "context": "semgrep",
+              "integration_id": 15368
+            }
+          ],
+          "strict_required_status_checks_policy": false
+        }
+      },
+      "target": "branch"
+    },
+    "release tags": {
+      "bypass_actors": [
+        {
+          "actor_id": 5579411,
+          "actor_type": "Integration",
+          "bypass_mode": "always"
+        },
+        {
+          "actor_id": 5,
+          "actor_type": "RepositoryRole",
+          "bypass_mode": "always"
+        }
+      ],
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "refs/tags/v*"
+          ]
+        }
+      },
+      "enforcement": "active",
+      "rules": {
+        "creation": {},
+        "deletion": {},
+        "update": {}
+      },
+      "target": "tag"
+    }
+  },
+  "workflow_token": {
+    "can_approve_pull_request_reviews": false,
+    "default_workflow_permissions": "read"
+  }
+}

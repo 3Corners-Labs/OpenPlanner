@@ -1841,6 +1841,41 @@ out, and imports the package once web is healthy. Running it again with the two 
 without them leaves `config.env` as it is. Removing `config.env` and running the installer
 again asks the login questions as before.
 
+## Guardrail drift (ADR 0109)
+
+Every hour `.github/workflows/guardrail-audit.yml` compares GitHub's settings with
+`.github/guardrails.json`: the rulesets, the merge and security settings, the workflow token's
+defaults, the environments, who has more than read access, the organisation's two-factor
+requirement and the installed apps, and every ruleset bypass of the last day other than the
+release app's tags. A difference opens the issue **Guardrail drift <date>** (label
+`guardrail-drift`; GitHub mails it); it is updated in place and closes itself once nothing
+differs.
+
+When the issue opens:
+
+1. Read what differs. A bypass names the account and the ref; a setting names its path, for
+   example `rulesets/main/enforcement`.
+2. Not intended: put the setting back in GitHub, or for a bypass find out who did it and why
+   (the organisation's audit log under *Settings → Audit log*). The next hourly run closes the
+   issue.
+3. Intended: take a snapshot and change the baseline in a decision PR:
+
+   ```bash
+   scripts/guardrail-fetch.sh /tmp/live 3Corners-Labs/OpenPlanner
+   python3 -m scripts.guardrail_audit --live /tmp/live --snapshot
+   ```
+
+   Copy the changed section into `.github/guardrails.json`; it lives under `.github/`, so the
+   PR waits for `po:approved` (ADR 0078). Your own `gh` login reads everything the audit app
+   reads.
+
+**The audit app, once.** The same way as the release app (above), with the name
+`3corners-openplanner-audit`, *Repository permissions → Administration: Read-only* and
+*Organization permissions → Administration: Read-only*, nothing else, installed on this
+repository only. Its client ID goes into the variable `AUDIT_APP_CLIENT_ID` and a key from
+*Credentials → Key pairs* into the secret `AUDIT_APP_PRIVATE_KEY`, both in the environment
+`audit`. Without them every section reads as unreadable and the issue says so.
+
 ## Rotating secrets
 
 Which key protects what, who can read it and how it is destroyed is in
