@@ -82,7 +82,7 @@ def test_every_table_of_the_model_is_configuration_or_state() -> None:
 
 
 def test_every_sealed_column_of_a_configuration_table_is_resealed() -> None:
-    from app.adapters.db.configuration_package import _SEALED
+    from app.adapters.db.sealed import SEALED as _SEALED
 
     sealed = {
         (table.name, column.name)

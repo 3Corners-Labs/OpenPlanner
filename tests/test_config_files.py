@@ -110,7 +110,23 @@ def test_a_private_file_is_not_reported(tmp_path: Path) -> None:
 def test_files_are_only_for_bootstrap_secrets() -> None:
     assert set(FILE_SECRETS) == {
         "settings_encryption_key",
+        "settings_encryption_key_previous",
         "management_token_key",
+        "management_token_key_previous",
         "session_secret",
         "oidc_client_secret",
     }
+
+
+def test_the_previous_keys_come_from_files_and_an_empty_value_is_unset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR 0094: ``X_PREVIOUS`` follows ``X_FILE`` (ADR 0042 §9); empty means no rotation."""
+    monkeypatch.setenv("MANAGEMENT_TOKEN_KEY_PREVIOUS_FILE", str(_secret_file(tmp_path, KEY)))
+    monkeypatch.setenv("SETTINGS_ENCRYPTION_KEY_PREVIOUS", "")
+
+    settings = Settings()
+
+    assert settings.management_token_key_previous is not None
+    assert settings.management_token_key_previous.get_secret_value() == KEY
+    assert settings.settings_encryption_key_previous is None

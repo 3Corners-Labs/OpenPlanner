@@ -11,6 +11,7 @@ import base64
 import hashlib
 import hmac
 import secrets
+from collections.abc import Sequence
 
 SALT_BYTES = 32
 MIN_KEY_BYTES = 32
@@ -34,6 +35,23 @@ def derive_token(key: bytes, salt: str) -> str:
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
 
+def token_for_booking(keys: Sequence[bytes], salt: str, token_hash: str) -> str:
+    """Return the token of a booking: under the first key whose token matches ``token_hash``.
+
+    ``keys`` is the current key, then the previous one while a rotation runs (ADR 0094 point
+    4), so a message sent after the rotation still carries the link the booking was given.
+    A booking that matches no key gets the token under the first key (a dead link, as before).
+
+    Raises:
+        ValueError: If a key is shorter than ``MIN_KEY_BYTES``.
+    """
+    tokens = [derive_token(key, salt) for key in keys]
+    for token in tokens:
+        if token_matches(token, token_hash):
+            return token
+    return tokens[0]
+
+
 def hash_token(token: str) -> str:
     """Return the hex SHA-256 of ``token``, the form used for lookups."""
     return hashlib.sha256(token.encode()).hexdigest()
@@ -42,6 +60,11 @@ def hash_token(token: str) -> str:
 def token_matches(token: str, token_hash: str) -> bool:
     """Return whether ``token`` hashes to ``token_hash``, in constant time."""
     return hmac.compare_digest(hash_token(token), token_hash)
+
+
+def agent_pseudonyms(keys: Sequence[bytes], subject: str) -> tuple[str, ...]:
+    """Return the pseudonyms of ``subject`` under the current key and the previous one, if any."""
+    return tuple(agent_pseudonym(key, subject) for key in keys)
 
 
 def agent_pseudonym(key: bytes, subject: str) -> str:

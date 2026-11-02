@@ -1248,12 +1248,12 @@ sets no cookie; the host's access log is TransIP's and is not shipped anywhere b
 
 ## Management token key
 
-`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Until ADR 0094 step 2 is built,
-rotating it does not break the links in mails already sent (they are found by their stored
-hash), but every message sent afterwards to an open booking (reminder, change, confirmation)
-carries a link that no longer works. Rotate only after an incident, tell the contact center
-that participants may call about broken links, and expect that agents no longer see their
-earlier claims as their own (ADR 0043 pseudonyms).
+`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Rotate it with
+`MANAGEMENT_TOKEN_KEY_PREVIOUS` (next section, ADR 0094): links in mails already sent keep
+working, and so does the link in every message sent afterwards to a booking made under the
+old key. Without the previous key a message sent after the rotation to an open booking
+(reminder, change, confirmation) carries a link that no longer works, and agents no longer
+see their earlier claims as their own (ADR 0043 pseudonyms).
 
 ## Releasing a version (ADR 0052, ADR 0079)
 
@@ -1665,9 +1665,45 @@ again asks the login questions as before.
 ## Rotating secrets
 
 Bootstrap secrets come from environment variables, `X_FILE` or `secrets/secrets.env`
-(`app.cli init`); none are baked into the image. To rotate `MANAGEMENT_TOKEN_KEY` or
-`SESSION_SECRET`, replace the value in that file or the secret store and restart `web` and
-`worker`; `init` never overwrites the file, so edit it or move it away first.
+(`app.cli init`); none are baked into the image. To rotate one, replace the value in that file
+or the secret store and restart `web` and `worker`; `init` never overwrites the file, so edit
+it or move it away first.
+
+**Rotating `SETTINGS_ENCRYPTION_KEY`** loses nothing (ADR 0094). The key before the rotation
+stays readable as `SETTINGS_ENCRYPTION_KEY_PREVIOUS` until every stored secret is sealed
+again. Each sealed value carries the id of the key that sealed it. In this order:
+
+1. Make a backup of the database and keep the old key where you can find it.
+2. Put the old value in `SETTINGS_ENCRYPTION_KEY_PREVIOUS` (or `…_PREVIOUS_FILE`) and a new
+   random value of at least 32 bytes in `SETTINGS_ENCRYPTION_KEY`.
+3. Restart `web` and `worker`. Channel secrets, Webex tokens, identity provider secrets and
+   log destination secrets keep working; new values are sealed under the new key.
+4. `docker compose exec web python -m app.cli rekey`. It seals every stored secret again under
+   the current key, one transaction, and writes one audit event with counts only. It prints
+   no key or secret. Running it again changes nothing. If it reports that a secret opens
+   under no configured key, nothing was changed: the previous key is missing or wrong.
+5. Remove `SETTINGS_ENCRYPTION_KEY_PREVIOUS` and restart `web` and `worker`. Do not do this
+   before step 4 has reported success: a secret still under the old key becomes unreadable.
+
+A configuration package (ADR 0089) can be exported and imported during a rotation: the
+installation opens its secrets under either key.
+
+**Rotating `MANAGEMENT_TOKEN_KEY`** keeps every link working while the previous key is set
+(ADR 0094 point 4):
+
+1. Put the old value in `MANAGEMENT_TOKEN_KEY_PREVIOUS` (or `…_PREVIOUS_FILE`) and a new random
+   value of at least 32 bytes in `MANAGEMENT_TOKEN_KEY`.
+2. Restart `web` and `worker`. New bookings get their link under the new key; a message to a
+   booking made under the old key carries the link it was given; claims made by agents still
+   read as their own. Participants' security-event pseudonyms (ADR 0053) start anew.
+3. Wait until the bookings made before the rotation are over (the longest booking horizon plus
+   the purge period), then remove `MANAGEMENT_TOKEN_KEY_PREVIOUS` and restart. There is
+   nothing to run: links are derived when a message is built, so there is nothing to re-seal.
+
+Both previous keys are bootstrap secrets (class A): environment or `X_FILE` only, never the
+database, and empty outside a rotation.
+
+**Rotating `SESSION_SECRET`** is separate (below).
 
 **Rotating `SESSION_SECRET`** logs every admin out and, in addition, drops the signed login
 state (a login in progress, the update snooze, interface choices). In this order, so the
@@ -1679,10 +1715,11 @@ register agrees with the cookies:
 3. Restart `web` and `worker`.
 
 A cookie signed with the old secret is invalid from step 3 on; step 1 makes sure no session
-stays in the register for a reference that nobody can present any more. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
-value on the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` makes every
-stored channel secret and Webex token unreadable: re-enter the channel secrets afterwards
-(ADR 0008).
+stays in the register for a reference that nobody can present any more. 
+Channel secrets (SMTP password, Connect service key) are replaced by entering a new value on
+the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` without
+`SETTINGS_ENCRYPTION_KEY_PREVIOUS` makes every stored channel secret and Webex token
+unreadable (ADR 0008); use the procedure above.
 
 ### API clients of contact-center bots (ADR 0023)
 
@@ -1891,7 +1928,7 @@ caller by pseudonym (`client:<16 hex>`), never by IP address:
 To check whether an IP address from a firewall or proxy log is the caller in an event, run
 `docker compose exec web python -m app.cli client-pseudonym 203.0.113.7` and compare. There
 is no way from a pseudonym back to an address. Rotating `MANAGEMENT_TOKEN_KEY` changes every
-pseudonym (and every management link). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
+pseudonym (management links keep working with `MANAGEMENT_TOKEN_KEY_PREVIOUS`). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
 1000) are tracked per window and process; beyond that, events count under `client:many`.
 
 ### A booking without a video meeting (ADR 0068)
