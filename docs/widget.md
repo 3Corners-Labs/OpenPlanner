@@ -40,7 +40,7 @@ transitions.
 
 ## Organisation branding
 
-The superuser sets the branding per organisation (Admin → Huisstijl, ADR 0020 and 0041):
+The superuser sets the branding per organisation (Admin → Deelnemers → Huisstijl, ADR 0020 and 0041):
 
 - display name, logo (PNG, JPEG or WebP up to 200 kB) and a header style: `standard` (logo and
   name, accent line), `accent` (header filled with the accent) or `logo` (logo only, the name

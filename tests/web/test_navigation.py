@@ -126,23 +126,28 @@ def test_advanced_settings_has_three_sub_tabs() -> None:
     assert home_of("/admin/settings/package") == Home("platform.settings", None, "platform.package")
 
 
-def test_the_organisation_is_an_object_page_with_six_tabs() -> None:
+def test_the_organisation_is_an_object_page_with_five_tabs() -> None:
     organisation = object_page("organisation")
 
     assert organisation.entry == "manage.organisations"
     assert [tab.key for tab in organisation.tabs] == [
         "organisation.overview",
-        "organisation.branding",
-        "organisation.channels",
+        "organisation.participants",
         "organisation.contact",
         "organisation.holidays",
         "organisation.closure",
     ]
     assert [sub.key for sub in organisation.tabs[0].subtabs] == [
         "organisation.settings",
-        "organisation.texts",
         "organisation.embedding",
         "organisation.login",
+    ]
+    # ADR 0105: what participants see and receive, in one tab; the branding page is its own.
+    participants = organisation.tabs[1]
+    assert participants.path == "/admin/organisations/{org}/branding"
+    assert [sub.key for sub in participants.subtabs] == [
+        "organisation.channels",
+        "organisation.texts",
     ]
 
 
@@ -173,7 +178,10 @@ def test_home_of_finds_entries_tabs_and_sub_pages() -> None:
     assert staffing_rule.entry == "manage.groups"
     assert staffing_rule.tab == "group.staffing"
     assert staffing_rule.subtab is None
-    assert texts == Home("manage.organisations", "organisation.overview", "organisation.texts")
+    assert texts == Home("manage.organisations", "organisation.participants", "organisation.texts")
+    assert home_of("/admin/organisations/{org}/branding") == Home(
+        "manage.organisations", "organisation.participants", None
+    )
     assert edit == Home("manage.organisations", "organisation.overview", None)
     assert help_topic is not None
     assert help_topic.entry == "top.help"

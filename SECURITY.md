@@ -13,6 +13,10 @@ Only the latest released version receives security fixes until the first product
 Security fixes are released on the day they are merged (ADR 0052); `/admin/updates` shows the
 running version and commit, and `git tag --contains <commit>` tells which releases hold a fix.
 
+## Evidence for an audit
+
+Where each measure behind the ASVS 5.0.0 level 2 audit of 1 November 2026 sits, and what is still open, is in `docs/asvs.md`. The checklists for what only the client's identity provider, host, Cisco or data controller can show are in `docs/assurance/`. Neither is a certificate.
+
 ## What CI checks
 
 Every pull request: ruff (incl. bandit rules), mypy `--strict`, import-linter, bandit,
