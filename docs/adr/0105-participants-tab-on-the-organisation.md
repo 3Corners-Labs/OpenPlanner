@@ -48,8 +48,8 @@ setting.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR accepted | #417 | in PR |
-| 1 | `organisation.participants` in the register, `object_tabs` follows the matrix per page, `own_label_key` on tabs, the manual paths, `docs/admin-map.md`; tests in `tests/web/test_navigation.py` and `tests/admin/test_object_tabs.py` | #417 | in PR |
+| 0 | ADR accepted | #424 | in PR |
+| 1 | `organisation.participants` in the register, `object_tabs` follows the matrix per page, `own_label_key` on tabs, the manual paths, `docs/admin-map.md`; tests in `tests/web/test_navigation.py` and `tests/admin/test_object_tabs.py` | #424 | in PR |
 
 ## Consequences
 
