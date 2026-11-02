@@ -13,6 +13,10 @@ scope. Links use the record's number, never the identity-provider subject.
                                                                                staff.view
     GET /admin/staff/{member_id}                                               staff.view
 
+A suspended or erased person carries a chip in words (ADR 0046 steps 2); an erased one shows
+no name, only "Erased staff member". The actions on a person (suspend, reinstate, erase) are
+in ``app.admin.staff_status_routes``.
+
 A person's page also lists the entitlement values of their last login that this installation
 did not recognise, with the reason (ADR 0049 point 8), within the viewer's scope.
 """
@@ -38,7 +42,7 @@ from app.admin.staff_directory_routes import (
 from app.domain.audit import AuditFilter
 from app.domain.authorization import Permission, Role, scope_for
 from app.domain.scheduling import GroupSummary
-from app.domain.staff import StaffFilter, StaffMember
+from app.domain.staff import StaffFilter, StaffMember, StaffStatus
 from app.web.authz_labels import ROLE_LABELS
 from app.web.locale import RequestLocale
 from app.web.organisation_settings import settings_for
@@ -81,6 +85,8 @@ class StaffView:
     last_logout: str
     dormant: bool
     refused: tuple[RefusedView, ...] = ()
+    suspended: bool = False
+    erased: bool = False
 
 
 @dataclass(frozen=True)
@@ -121,9 +127,10 @@ def _view(
     _ = locale.gettext
     organisations, groups = names
     never = _("admin.staff.never")
+    erased = member.status is StaffStatus.ERASED
     return StaffView(
         id=member.id or 0,
-        name=member.display_name,
+        name=_("admin.staff.erased_name") if erased else member.display_name,
         roles=tuple(_(ROLE_LABELS[r]) for r in Role if r in member.roles),
         places=tuple(
             PlaceView(
@@ -138,7 +145,9 @@ def _view(
         last_logout=(
             admin_moment(request, locale, member.last_logout_at) if member.last_logout_at else never
         ),
-        dormant=member.is_dormant(now, _dormant_after(request)),
+        dormant=not erased and member.is_dormant(now, _dormant_after(request)),
+        suspended=member.status is StaffStatus.SUSPENDED,
+        erased=erased,
         refused=tuple(
             RefusedView(
                 r.value,

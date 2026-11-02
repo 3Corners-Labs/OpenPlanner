@@ -65,7 +65,7 @@ from the rows below.
 | 0043 | Own queue per group | PARTIAL | #88, #89, #90; refresh with ADR 0072 (#155) | System event "not picked up", lobby-join time, dashboard flag |
 | 0044 | Planner agenda | BUILT | #81, #92, #98; migrations 0045, 0046 | – |
 | 0045 | Dedicated Webex site, meeting policy | NOT BUILT | none | Everything |
-| 0046 | Staff directory, SCIM | PARTIAL | step 1 #61; migration 0026 | Step 2 (suspend, end sessions, erase, retention, CSV), step 3 (SCIM) |
+| 0046 | Staff directory, SCIM | PARTIAL | step 1 #61; migration 0026; end sessions via ADR 0098 (#350, #381, #399); step 2: suspend and reinstate, `staff.erase`, retention by the worker (`staff_retention_days`), `app/domain/staff_lifecycle.py`, `app/admin/staff_status_routes.py`, migration 0085 (#402) | CSV export (step 2d), step 3 (SCIM) |
 | 0047 | Admin information architecture | PARTIAL | steps 1–3 and the groups list of step 5 (#62, #80, #219): `web/navigation.py`, `docs/admin-map.md`, the organisation page with tabs and sub-tabs, `organisation.view`, `/admin/groups` | Step 4 (six group tabs), the readiness checklist, lists for API clients and the audit log, `return` keys, registry `topic` |
 | 0048 | Live update progress | BUILT | #63; migration 0027 | – |
 | 0049 | Role and scope in one claim | PARTIAL | steps 0–3 #179; `domain/entitlements.py`, `domain/login_service.py`, `domain/idp_mapping.py`, migration 0076, `admin/idp_mapping_routes.py`, `OIDC_CLAIM_MODE` | Step 4: mismatch count on System status, memberships by id, `entitlements` as default and removal of `legacy`/`shadow` (E4) |
