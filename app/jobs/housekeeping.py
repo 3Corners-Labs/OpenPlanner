@@ -8,6 +8,7 @@ Called once per worker loop, after the due jobs:
     hourly ─► PRAGMA incremental_vacuum ─► pages back to the file system
     daily ─► erase the archived groups nothing refers to any more (ADR 0084 step 3)
     hourly ─► delete ended and expired admin sessions (ADR 0098 step 2)
+    hourly ─► delete update back-ups older than a day, the second safety net (ADR 0102 point 10)
     daily ─► retention sweep: purge personal data the purge job missed, alert on a backlog
              ─► purged something? ─► PRAGMA wal_checkpoint(TRUNCATE) (WP-A3)
 
@@ -18,10 +19,12 @@ every failure is logged with its type only.
 
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.adapters.db.backup import backup_directory, prune_backups
 from app.adapters.db.maintenance import checkpoint_wal, measure_storage, reclaim_free_pages
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.retention_sweep import SweepResult
@@ -55,6 +58,10 @@ SESSIONS_EVERY = timedelta(hours=1)
 """How often ended and expired admin sessions are deleted; the lifetime is a setting."""
 
 
+BACKUPS_EVERY = timedelta(hours=1)
+"""How often update back-ups past their lifetime are deleted (the lifetime is fixed, ADR 0102)."""
+
+
 class Housekeeping:
     """Storage watch and page reclaim for the worker loop.
 
@@ -71,6 +78,8 @@ class Housekeeping:
             ``SWEEP_EVERY``.
         clean_sessions: Deletes the ended and expired admin sessions and returns the count;
             called once per ``SESSIONS_EVERY``.
+        backups: The directory of the update back-ups (``data/backups``), or ``None`` to leave
+            them to the updater; pruned once per ``BACKUPS_EVERY``.
     """
 
     def __init__(
@@ -84,9 +93,12 @@ class Housekeeping:
         erase: Callable[[], Awaitable[int]] | None = None,
         sweep: Callable[[], Awaitable[SweepResult]] | None = None,
         clean_sessions: Callable[[], Awaitable[int]] | None = None,
+        backups: Path | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
         self._clean_sessions = clean_sessions
+        self._backups = backups
+        self._backups_pruned_at: datetime | None = None
         self._sessions_cleaned_at: datetime | None = None
         self._sweep = sweep
         self._swept_at: datetime | None = None
@@ -125,6 +137,7 @@ class Housekeeping:
             erase,
             sweep,
             clean_sessions,
+            _backup_directory(database_url),
         )
 
     async def run(self) -> None:
@@ -135,6 +148,22 @@ class Housekeeping:
         await self._erase_groups(now)
         await self._sweep_retention(now)
         await self._clean_admin_sessions(now)
+        self._prune_backups(now)
+
+    def _prune_backups(self, now: datetime) -> None:
+        """Delete update back-ups past their lifetime, at most once per ``BACKUPS_EVERY``."""
+        if self._backups is None:
+            return
+        if self._backups_pruned_at is not None and now - self._backups_pruned_at < BACKUPS_EVERY:
+            return
+        self._backups_pruned_at = now
+        try:
+            deleted = prune_backups(self._backups, now)
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.warning("backups.prune_failed", error=type(exc).__name__)
+        else:
+            if deleted:
+                log.info("backups.pruned", backups=deleted)
 
     async def _clean_admin_sessions(self, now: datetime) -> None:
         """Delete ended and expired admin sessions, at most once per ``SESSIONS_EVERY``."""
@@ -255,3 +284,11 @@ class Housekeeping:
             return
         if pages:
             log.info("database.reclaimed", pages=pages)
+
+
+def _backup_directory(database_url: str) -> Path | None:
+    """Return the back-up directory next to the SQLite file, or ``None`` for another database."""
+    try:
+        return backup_directory(database_url)
+    except ValueError:
+        return None

@@ -349,7 +349,7 @@ host updater ──docker exec python -m app.cli (claim, progress, report)──
 Nothing about participants leaves the system: the release lookup sends no data. The database
 backups the updater takes before every change contain the PII of `bookings`; they stay in the
 data volume with mode 600 and are deleted after 24 hours (`backup-db --prune` on every updater
-run). A backup that is put back is minutes old: purge jobs that ran after it are still pending
+run and, as a second safety net, by the worker's hourly housekeeping). A backup that is put back is minutes old: purge jobs that ran after it are still pending
 in it and run again on the next worker cycle.
 
 ## Maintenance mode (ADR 0038)
@@ -498,6 +498,8 @@ step 4 and is not built yet.
 | `organisation_contacts`, `group_contacts` | phone numbers, email addresses and links of the organisation or the team: general contact points, not participants | until changed | an admin edits or removes them; deleted with the organisation or group (cascade) | as the live system |
 | `groups.video_host_email` | the address of the Webex host account of the group (a staff or functional address) | until changed | an admin; deleted with the group | as the live system |
 | `webhook_events` | none: provider, event key, time | 30 days (`WEBHOOK_MEMORY`) | the next webhook handled forgets the old keys | expires on its own |
+| `data/backups/*.db` (files, not a table) | a copy of the whole database, so every column above as it was at the update | 24 hours (`BACKUP_LIFETIME`, fixed); the volume must be encrypted (ADR 0102 point 7) | the updater (`backup-db --prune`) and, as a second safety net, the worker's hourly housekeeping; *System status* shows the oldest age and warns past 24 h plus 2 h | a copy that is put back is minutes old; `purge-overdue` still runs before the system is back |
+| Disaster-recovery copies of the host (outside the application) | the same, as of the moment of the copy | the maximum age in the hosting agreement, consistent with the DPIA (reference: PII term plus 7 days) | the hosting party, with a record of destruction (ADR 0102 point 8; open point O7) | older than the live data: `purge-overdue` is mandatory before the system is back (runbook, *Backup and restore*) |
 
 Tables not listed hold no personal data: the organisation's own texts, colours, logo and font,
 schedules, holidays, closure texts and images (stripped of metadata), settings, certificates

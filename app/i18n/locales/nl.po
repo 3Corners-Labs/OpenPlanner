@@ -9185,3 +9185,27 @@ msgstr "Alle sessies beëindigen"
 
 msgid "admin.rights.sections"
 msgstr "Onderdelen van Mijn rechten"
+
+msgid "admin.settings.backups.title"
+msgstr "Back-ups van updates"
+
+msgid "admin.settings.backups.intro"
+msgstr "Voor elke update maakt de updater een kopie van de database om terug te kunnen draaien. Die kopie bevat persoonsgegevens en wordt na 24 uur verwijderd, door de updater en als vangnet ook door de worker."
+
+msgid "admin.settings.backups.none"
+msgstr "Geen back-ups aanwezig."
+
+msgid "admin.settings.backups.count"
+msgstr "Aantal back-ups"
+
+msgid "admin.settings.backups.oldest"
+msgstr "Oudste back-up"
+
+msgid "admin.settings.backups.oldest.value"
+msgstr "{hours} uur oud (geschreven {since})"
+
+msgid "admin.settings.backups.chip"
+msgstr "Waarschuwing"
+
+msgid "admin.settings.backups.overdue"
+msgstr "De oudste back-up is ouder dan {hours} uur en is niet verwijderd. Controleer of de worker draait en of het volume schrijfbaar is: een back-up bevat persoonsgegevens."
