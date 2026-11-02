@@ -2487,6 +2487,9 @@ msgstr "More about the closure and other ways to reach us"
 msgid "closure.page.calendar"
 msgstr "To the calendar: you can still book an appointment until the closure"
 
+msgid "closure.page.delete_by"
+msgstr "Details of appointments on hold because of this closure are deleted by {date} at the latest."
+
 msgid "manage.status.suspended"
 msgstr "On hold"
 
@@ -6321,6 +6324,12 @@ msgstr "Request to rebook lapses after (days)"
 
 msgid "settings.field.planner_rebook_reminder_days.label"
 msgstr "Rebook reminder (days before the lapse)"
+
+msgid "settings.field.closure_max_retention_days.label"
+msgstr "Details held for a closure deleted at the latest after (days after the appointment)"
+
+msgid "settings.field.closure_max_notice_days.label"
+msgstr "Notice to administrators before that maximum (days)"
 
 msgid "settings.field.booking_confirm_min_minutes.label"
 msgstr "Minimum time to confirm (minutes)"

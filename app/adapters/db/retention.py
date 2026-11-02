@@ -12,7 +12,7 @@ from typing import Protocol
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import BookingRow, ClosureRow, JobRow, SlotRow
+from app.adapters.db.models import BookingRow, ClosureRow, GroupRow, JobRow, SlotRow
 from app.domain.authorization import Scope
 from app.domain.booking import BookingStatus
 from app.domain.job_plan import JobType
@@ -52,7 +52,7 @@ class RetentionQueries:
         """Return the counts per group in ``scope`` and the bookings that may be overdue.
 
         Candidates still hold personal data and either ended or were cancelled before
-        ``candidates_before``, or are suspended (their closure decides).
+        ``candidates_before``, or are suspended (their closure and the maximum decide).
         """
         groups = await self.list_groups(scope)
         ids = [g.group.id for g in groups if g.group.id is not None]
@@ -131,8 +131,11 @@ async def _candidates(
             ClosureRow.ends_at,
             BookingRow.rebook_by,
             BookingRow.confirm_by,
+            GroupRow.organisation_id,
+            BookingRow.closure_id,
         )
         .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+        .join(GroupRow, GroupRow.id == BookingRow.group_id)
         .outerjoin(ClosureRow, ClosureRow.id == BookingRow.closure_id)
         .where(*where)
         .order_by(BookingRow.id)
@@ -148,6 +151,8 @@ async def _candidates(
                 closure_end,
                 rebook_by,
                 confirm_by,
+                organisation_id,
+                closure_id,
             ),
         )
         for (
@@ -159,5 +164,7 @@ async def _candidates(
             closure_end,
             rebook_by,
             confirm_by,
+            organisation_id,
+            closure_id,
         ) in rows
     ]

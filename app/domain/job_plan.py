@@ -14,8 +14,8 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
            ──► dispatch_wxcc_task (start − dispatch lead) ──► purge_pii (end + 24 h)
     cancelled ──► end_wxcc_task, delete_video_room (now) ─► send_cancellation (now, unless
                   rescheduled) ──► purge_pii (now + 24 h)
-    suspended ──► end_wxcc_task (now) ─► send_suspension (now) ──► purge_pii (closure end
-                  + 30 days, once known)
+    suspended ──► end_wxcc_task (now) ─► send_suspension (now) ──► purge_pii (the earlier of
+                  closure end + 30 days and slot end + the maximum, ADR 0102)
               ──► send_closure_update (when an admin sends an update)
     reinstated ──► as booked, with send_reinstatement instead of the confirmation
 
@@ -323,15 +323,15 @@ def plan_for_unconfirmed_lapse(*, now: datetime) -> list[PlannedJob]:
 
 
 def plan_for_suspension(
-    *, now: datetime, purge_at: datetime | None, team_invite: bool = False
+    *, now: datetime, purge_at: datetime, team_invite: bool = False
 ) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a booking put on hold (ADR 0024).
 
     Reminders and the planned WxCC task go, and a work item that already exists is ended;
     the meeting stays, so a reinstated booking keeps its link. An open trial call is deleted
-    (ADR 0071): replacing the jobs would otherwise drop its pending clean-up. The purge waits
-    for the end of the closure (``Closure.purge_at``); while the closure is open-ended there is
-    none, and ``plan_purge`` adds it once the end is known.
+    (ADR 0071): replacing the jobs would otherwise drop its pending clean-up. The purge is at
+    ``Closure.purge_at``, which has a moment also while the closure is open-ended (ADR 0102);
+    ``plan_purge`` replaces it when the end is known.
     """
     jobs = [
         PlannedJob(JobType.END_WXCC_TASK, now, None),
@@ -348,9 +348,9 @@ def _team_cancel(now: datetime, team_invite: bool) -> list[PlannedJob]:
     )
 
 
-def plan_purge(purge_at: datetime | None) -> list[PlannedJob]:
-    """Return the purge of a suspended booking at ``purge_at`` (none while it is unknown)."""
-    return [PlannedJob(JobType.PURGE_PII, purge_at, None)] if purge_at else []
+def plan_purge(purge_at: datetime) -> list[PlannedJob]:
+    """Return the purge of a suspended booking at ``purge_at``."""
+    return [PlannedJob(JobType.PURGE_PII, purge_at, None)]
 
 
 def plan_closure_update(*, now: datetime) -> list[PlannedJob]:

@@ -2014,6 +2014,19 @@ class SqlTransaction(
         )
         return [_booking(booking, slot) for booking, slot in rows]
 
+    async def latest_suspended_end(self, closure_id: int) -> datetime | None:
+        """Return the latest slot end of the bookings still on hold in the closure."""
+        found = await self._session.scalar(
+            select(func.max(SlotRow.end))
+            .join(BookingRow, BookingRow.slot_id == SlotRow.id)
+            .where(
+                BookingRow.closure_id == closure_id,
+                BookingRow.status == BookingStatus.SUSPENDED.value,
+                BookingRow.pii_purged_at.is_(None),
+            )
+        )
+        return found
+
     async def _with_notices(self, row: ClosureRow) -> Closure:
         """Return the closure of ``row`` with its notices."""
         notices = await self._session.scalars(

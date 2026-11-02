@@ -13,6 +13,7 @@
   <p><strong>{{ closure.period }}</strong></p>
   {% for paragraph in closure.paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
 </div>
+{% if closure.delete_by %}<p id="closure-delete-by">{{ closure.delete_by }}</p>{% endif %}
 {% if closure.image %}<img class="closure-image" src="{{ closure.image.src }}" alt="{{ closure.image.alt }}">{% endif %}
 {{ contact_block(closure.contacts, id="closure-contacts") }}
 {% if not closure.active %}

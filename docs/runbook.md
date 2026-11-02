@@ -1771,8 +1771,13 @@ When a team cannot hold its appointments (outage, illness, closed building):
    once.
 5. **Reopen.** *Opheffen*, optionally confirming again every appointment that can still go
    ahead (before its dispatch lead and outside any closure).
-6. **Retention.** Appointments still on hold lose their personal data 30 days after the end of
-   the closure. An open-ended closure keeps it until it is lifted, so lift or end it promptly.
+6. **Retention.** Appointments still on hold lose their personal data at the earlier of 30 days
+   after the end of the closure and `closure_max_retention_days` (organisation setting, default
+   90, 30 to 180) after the original appointment, also while the closure has no end (ADR 0102).
+   `closure_max_notice_days` (default 14) before that, the worker records the system event
+   `closure.retention_notice` at the group, which the group's and the organisation's admins see
+   in the audit log: lift or end the closure, or move the appointments, before that date. The
+   closure page tells participants the date.
 
 ## Onderhoudsmodus (ADR 0038)
 
@@ -1838,7 +1843,8 @@ is not judged: it is the operator's own doing.
 shows per group how many bookings still hold personal data past their purge moment and how
 many `purge_pii` jobs failed. Both should be 0. A booking counts as overdue one hour after its
 purge moment (slot end + 24 h, cancellation + 24 h, deadline to confirm or choose a new time
-+ 24 h, or closure end + 30 days), which leaves
++ 24 h, or for a booking on hold the earlier of closure end + 30 days and the maximum after
+its slot, ADR 0102), which leaves
 room for the worker and its retries.
 
 | Shown | Likely cause | What to do |
@@ -1854,6 +1860,9 @@ backup. It is idempotent and needs no action. What it leaves behind is visible t
 
 - the system event **retention.sweep** (audit log, global, superuser) with the counts
   `overdue`, `purged`, `failed` and `backlog`; no event on a night with nothing overdue;
+- the system event **closure.retention_notice** (at the group, so its admins see it) once a day
+  while a closure's maximum is less than `closure_max_notice_days` away: closure id, number of
+  bookings and the date, nothing else;
 - the log line `retention.sweep` (warning) with the same counts;
 - the log line `retention.backlog` (error) when a booking still held personal data more than
   48 hours after its retention began, or a purge failed. **Alert on this event in monitoring.**
@@ -1869,8 +1878,10 @@ docker compose exec web python -m app.cli purge-overdue
 
 `--dry-run` prints the overdue bookings per group and changes nothing. The second prints how many
 were purged and exits non-zero if any could not be purged. Only counts and group slugs are
-printed. A booking that is suspended by a closure without an end date is left alone: its
-personal data goes when the closure is lifted or ends, plus 30 days.
+printed. A booking that is suspended by a closure without an end date is purged at the maximum
+after its original appointment (`closure_max_retention_days`, ADR 0102), like the worker does;
+the command reads the organisation's portal value, so it needs the same database as the
+worker.
 
 ## Widget on a host website (ADR 0035)
 

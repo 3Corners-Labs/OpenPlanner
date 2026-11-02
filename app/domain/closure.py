@@ -8,7 +8,9 @@ Confirmed bookings inside the closure are suspended, not cancelled: they keep th
 data and their place, the participant gets the notice with a link to choose a new time, and an
 admin can move, reinstate or cancel them. The personal data of a booking that is still
 suspended is purged ``RETENTION_AFTER_CLOSURE`` after the closure ends (decided by the product
-owner on 2026-10-25), instead of 24 hours after the slot.
+owner on 2026-10-25), instead of 24 hours after the slot, and at the latest
+``closure_max_retention_days`` after its original slot, also while the closure has no end
+(ADR 0102).
 
     visible ─┬─ upcoming  (now < starts_at)       banner, still bookable before starts_at
              └─ active    (starts_at <= now < end) banner, nothing bookable inside it
@@ -23,8 +25,9 @@ image with its text alternative (ADR 0037 §3), public only while the closure is
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 
+from app.domain.closure_retention import ClosureRetention, suspended_purge_moment
 from app.domain.contacts import ContactBlock
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.images import PageImage
@@ -37,9 +40,6 @@ MAX_HEADING_LENGTH = 120
 
 NOTICE_LOCALES = ("nl", "en")
 """Locales a notice must be given in: Dutch is the default, English is required (CLAUDE.md)."""
-
-RETENTION_AFTER_CLOSURE = timedelta(days=30)
-"""How long a still suspended booking keeps its personal data after the closure ends."""
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _LINE_BREAKS_OR_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
@@ -155,10 +155,13 @@ class Closure:
         """Return the heading in ``locale``, falling back to Dutch, or ``None``."""
         return self.headings.get(locale) or self.headings.get(NOTICE_LOCALES[0])
 
-    @property
-    def purge_at(self) -> datetime | None:
-        """When the personal data of still suspended bookings goes; ``None`` while open-ended."""
-        return self.ends_at + RETENTION_AFTER_CLOSURE if self.ends_at else None
+    def purge_at(self, slot_end: datetime, retention: ClosureRetention) -> datetime:
+        """When the personal data of a booking suspended by this closure goes (ADR 0102).
+
+        The earlier of ``RETENTION_AFTER_CLOSURE`` after the closure ends and the maximum after
+        the booking's original ``slot_end``; the maximum also applies while the closure is open.
+        """
+        return suspended_purge_moment(slot_end, self.ends_at, retention)
 
 
 def covering(closures: Iterable[Closure], start: datetime) -> Closure | None:
