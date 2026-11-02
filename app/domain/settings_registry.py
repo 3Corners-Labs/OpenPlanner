@@ -79,6 +79,7 @@ class Topic(StrEnum):
     PLANNER = "planner"
     BOOKING_FORM = "booking_form"
     CONFIRMATION = "confirmation"
+    PARTICIPANT_LINK = "participant_link"
 
 
 PLATFORM_VIEW = Permission.SETTINGS_PLATFORM_VIEW
@@ -1504,6 +1505,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Less time to confirm than this: confirm until the change deadline, no reminder.",
         minimum=5,
         maximum=120,
+    ),
+    S(
+        "participant_link_session_hours",
+        K.INT,
+        24,
+        _C,
+        T.PARTICIPANT_LINK,
+        "Hours after its last use that a participant's browser may still use a booking it "
+        "opened from the emailed link (ADR 0093); the email link always works again.",
+        minimum=20,
+        maximum=168,
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

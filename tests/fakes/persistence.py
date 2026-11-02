@@ -48,6 +48,7 @@ from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import OwnCertificate
+from app.domain.participant_links import new_public_ref
 from app.domain.retention import (
     DueBooking,
     GroupRetentionCounts,
@@ -812,9 +813,14 @@ class InMemoryTransaction:
         ]
 
     async def add_booking(self, booking: Booking) -> Booking:
-        stored = replace(booking, id=self._new_id())
+        stored = replace(
+            booking, id=self._new_id(), public_ref=booking.public_ref or new_public_ref()
+        )
         self.state.bookings[stored.id or 0] = stored
         return stored
+
+    async def get_booking_by_public_ref(self, public_ref: str) -> Booking | None:
+        return next((b for b in self.state.bookings.values() if b.public_ref == public_ref), None)
 
     async def get_booking(self, booking_id: int) -> Booking | None:
         return self.state.bookings.get(booking_id)

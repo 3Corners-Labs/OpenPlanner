@@ -106,6 +106,7 @@ SETTING_LABELS: dict[str, str] = {
     "booking_confirm_cutoff_hours": "settings.field.booking_confirm_cutoff_hours.label",
     "booking_confirm_reminders": "settings.field.booking_confirm_reminders.label",
     "booking_confirm_min_minutes": "settings.field.booking_confirm_min_minutes.label",
+    "participant_link_session_hours": "settings.field.participant_link_session_hours.label",
 }
 """The label of every class C and D setting, by key."""
 
@@ -129,6 +130,7 @@ TOPIC_LABELS: dict[Topic, str] = {
     Topic.PLANNER: "settings.topic.planner",
     Topic.BOOKING_FORM: "settings.topic.booking_form",
     Topic.CONFIRMATION: "settings.topic.confirmation",
+    Topic.PARTICIPANT_LINK: "settings.topic.participant_link",
 }
 """The heading of every topic."""
 

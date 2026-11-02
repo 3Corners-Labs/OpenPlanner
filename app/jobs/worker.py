@@ -49,6 +49,7 @@ from app.domain.group_erase import GroupEraser
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService, IntegrationWatch
 from app.domain.maintenance_service import MaintenanceWatch
+from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.request_log import RequestEvents
@@ -195,6 +196,13 @@ async def run_worker(
     )
     eraser = GroupEraser(uow, clock, lambda: timedelta(days=live.settings.group_erase_after_days))
     sessions = AdminSessionService(uow, clock)
+    links = ParticipantLinkService(uow, clock)
+
+    async def clean_sessions() -> int:
+        """Delete the ended admin sessions and the lapsed participant link sessions."""
+        admin = await sessions.clean(timedelta(hours=live.settings.admin_session_hours))
+        return admin + await links.clean()
+
     housekeeping = Housekeeping.for_database(
         engine,
         uow,
@@ -204,7 +212,7 @@ async def run_worker(
         diagnostics.brake,
         eraser.run,
         RetentionSweep(uow, clock).run,
-        lambda: sessions.clean(timedelta(hours=live.settings.admin_session_hours)),
+        clean_sessions,
     )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(

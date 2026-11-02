@@ -112,10 +112,11 @@ async def test_the_closure_page_of_an_open_team_goes_back_to_the_calendar(
 async def test_a_booking_on_hold_shows_the_contact_options_above_its_actions(
     site: httpx.AsyncClient, examples: ClosureExamples
 ) -> None:
-    page = (await site.get(examples.suspended_booking)).text
+    base = (await site.get(examples.suspended_booking)).headers["location"]  # the exchange
+    page = (await site.get(base)).text
 
     assert "Uw afspraak kan niet doorgaan op dit moment" in page
     assert "<p><strong>Storing bij het loket</strong></p>" in page
     assert PHONE_LINK in page
-    assert page.index(PHONE_LINK) < page.index(f'href="{examples.suspended_booking}/reschedule"')
+    assert page.index(PHONE_LINK) < page.index(f'href="{base}/reschedule"')
     assert "inwoner@example.org" not in page  # the page never shows contact details

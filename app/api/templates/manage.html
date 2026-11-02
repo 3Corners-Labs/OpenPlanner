@@ -13,10 +13,10 @@
   <dt>{{ _("manage.status") }}</dt><dd>{{ status_label }}</dd>
 </dl>
 {% if active and group.video_enabled %}
-<p><a class="button button--large" href="/b/{{ token }}/join">{{ _("join.from_manage") }}</a></p>
+<p><a class="button button--large" href="/b/m/{{ ref }}/join">{{ _("join.from_manage") }}</a></p>
 {% endif %}
 {% if active and trial_offered %}
-<p><a href="/b/{{ token }}/test">{{ _("trial.from_manage") }}</a></p>
+<p><a href="/b/m/{{ ref }}/test">{{ _("trial.from_manage") }}</a></p>
 {% endif %}
 {% if suspended %}
 <div class="notice notice--warning">
@@ -26,8 +26,8 @@
 {% include "_closure_notice.html" %}
 {% if closure %}{{ contact_block(closure.contacts, id="closure-contacts") }}{% endif %}
 <ul class="actions">
-  <li><a class="button" href="/b/{{ token }}/reschedule">{{ _("manage.suspended.reschedule") }}</a></li>
-  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+  <li><a class="button" href="/b/m/{{ ref }}/reschedule">{{ _("manage.suspended.reschedule") }}</a></li>
+  <li><a href="/b/m/{{ ref }}/cancel">{{ _("manage.cancel") }}</a></li>
 </ul>
 {% elif pending %}
 <div class="notice notice--warning">
@@ -35,8 +35,8 @@
   <p>{{ _("manage.pending.text", deadline=confirm_by) }}</p>
 </div>
 <ul class="actions">
-  <li><a class="button" href="/b/{{ token }}/confirm">{{ _("manage.pending.confirm") }}</a></li>
-  {% if cancellable %}<li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>{% endif %}
+  <li><a class="button" href="/b/m/{{ ref }}/confirm">{{ _("manage.pending.confirm") }}</a></li>
+  {% if cancellable %}<li><a href="/b/m/{{ ref }}/cancel">{{ _("manage.cancel") }}</a></li>{% endif %}
 </ul>
 {% elif awaiting_rebook %}
 <div class="notice notice--warning">
@@ -45,19 +45,19 @@
   <p>{{ _("manage.rebook_by", deadline=rebook_by) }}</p>
 </div>
 <ul class="actions">
-  <li><a class="button" href="/b/{{ token }}/reschedule">{{ _("manage.suspended.reschedule") }}</a></li>
-  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+  <li><a class="button" href="/b/m/{{ ref }}/reschedule">{{ _("manage.suspended.reschedule") }}</a></li>
+  <li><a href="/b/m/{{ ref }}/cancel">{{ _("manage.cancel") }}</a></li>
 </ul>
 {% elif changeable %}
 <p>{{ _("manage.deadline", deadline=deadline) }}</p>
 <ul class="actions">
-  <li><a class="button button--secondary" href="/b/{{ token }}/reschedule">{{ _("manage.reschedule") }}</a></li>
-  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+  <li><a class="button button--secondary" href="/b/m/{{ ref }}/reschedule">{{ _("manage.reschedule") }}</a></li>
+  <li><a href="/b/m/{{ ref }}/cancel">{{ _("manage.cancel") }}</a></li>
 </ul>
 {% elif cancellable %}
 <div class="notice"><p>{{ _("manage.locked") }}</p></div>
 <ul class="actions">
-  <li><a href="/b/{{ token }}/cancel">{{ _("manage.cancel") }}</a></li>
+  <li><a href="/b/m/{{ ref }}/cancel">{{ _("manage.cancel") }}</a></li>
 </ul>
 {% elif active %}
 <div class="notice"><p>{{ _("manage.started") }}</p></div>

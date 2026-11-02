@@ -69,6 +69,9 @@ UNKNOWN_TOKEN = "unknown_token"  # noqa: S105  # nosec B105 - a reason code
 UNKNOWN_MANAGEMENT_LINK = "unknown_management_link"
 """Reason of ``token.rejected``: a ``/b/{token}`` link that matches no booking."""
 
+LINK_REQUIRED = "link_required"
+"""Reason of ``token.rejected``: a ``/b/m/{ref}`` page without a link session that holds it."""
+
 
 @dataclass
 class _Window:

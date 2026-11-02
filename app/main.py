@@ -97,6 +97,7 @@ from app.domain.messaging_service import MessagingService
 from app.domain.mfa import MfaPolicy
 from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
+from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.platform_settings import PlatformSettingsStore
@@ -128,6 +129,7 @@ from app.keys import (
     agent_pseudonym_key_previous,
     client_pseudonym_key,
     management_token_key,
+    management_token_key_previous,
     session_secret,
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
@@ -354,7 +356,9 @@ def create_app(
             token_key,
             phone_region=lambda org: per_organisation(org).phone_default_region,
             confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
+            previous_token_key=management_token_key_previous(settings),
         )
+        app.state.participant_link_service = ParticipantLinkService(uow, clock)
         app.state.admin_service = AdminService(uow, clock)
         app.state.log_destination_service = LogDestinationService(
             uow,

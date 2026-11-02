@@ -55,6 +55,7 @@ from app.domain.job_plan import JobCounts, JobSummary, JobType, PlannedJob
 from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
+from app.domain.participant_links import LinkSession
 from app.domain.retention import DueBooking, RetentionFacts
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
@@ -671,6 +672,42 @@ class Transaction(Protocol):
         """
         ...
 
+    async def get_booking_id_by_public_ref(self, public_ref: str) -> int | None:
+        """Return the id of the booking named by ``public_ref`` (ADR 0093), or ``None``."""
+        ...
+
+    async def add_link_session(self, value_hash: str, now: datetime, expires_at: datetime) -> int:
+        """Store a new participant link session (only the hash of its value) and return its id."""
+        ...
+
+    async def get_link_session(self, value_hash: str) -> LinkSession | None:
+        """Return the session with this value hash, lapsed or not, with its bookings."""
+        ...
+
+    async def touch_link_session(
+        self, session_id: int, now: datetime, expires_at: datetime
+    ) -> None:
+        """Record a use of the session and push its end to ``expires_at``."""
+        ...
+
+    async def add_booking_to_link_session(
+        self, session_id: int, booking_id: int, now: datetime
+    ) -> None:
+        """Let the session hold the booking (no effect when it already does)."""
+        ...
+
+    async def remove_booking_from_link_session(self, session_id: int, booking_id: int) -> None:
+        """Take the booking out of the session."""
+        ...
+
+    async def delete_link_session(self, session_id: int) -> None:
+        """Delete one session and the list of its bookings."""
+        ...
+
+    async def delete_lapsed_link_sessions(self, now: datetime) -> int:
+        """Delete the sessions that lapsed before ``now``; return how many went."""
+        ...
+
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
         """Record the latest request of ``subject``; unknown subjects are ignored."""
         ...
@@ -1106,6 +1143,10 @@ class Transaction(Protocol):
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         """Set every PII column of the booking to NULL and record ``pii_purged_at``."""
+        ...
+
+    async def get_booking_by_public_ref(self, public_ref: str) -> Booking | None:
+        """Return the booking named by ``public_ref`` (ADR 0093), or ``None``."""
         ...
 
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:

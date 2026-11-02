@@ -10,7 +10,7 @@ import httpx
 
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
 from tests.admin.test_admin_flow import audit_events
-from tests.support.participant import confirm_newest
+from tests.support.participant import confirm_newest, open_link
 
 CLOSURE = "/admin/groups/demo/closure"
 FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam
@@ -24,7 +24,7 @@ UNTIL_SATURDAY = {"ends_at": "2026-01-03", "ends_at_time": "00:00", **NOTICES}
 
 
 async def _book(site: Site, start: str = FRIDAY_0900) -> str:
-    """Book as a participant and return the management path ``/b/{token}``."""
+    """Book as a participant and return the management path ``/b/m/{ref}`` (ADR 0093)."""
     response = await site.client.post(
         "/g/demo/book",
         data={
@@ -37,7 +37,7 @@ async def _book(site: Site, start: str = FRIDAY_0900) -> str:
         headers=PARTICIPANT,
     )
     assert response.status_code == 303
-    return f"/b/{await confirm_newest(site.client)}"
+    return await open_link(site.client, await confirm_newest(site.client))
 
 
 async def _post(site: Site, path: str, data: dict[str, str] | None = None) -> httpx.Response:

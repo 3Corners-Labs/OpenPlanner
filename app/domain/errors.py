@@ -20,6 +20,8 @@ class ErrorCode(StrEnum):
     BOOKING_LIMIT_REACHED = "booking_limit_reached"
     OUTSIDE_BOOKING_WINDOW = "outside_booking_window"
     BOOKING_NOT_FOUND = "booking_not_found"
+    LINK_REQUIRED = "link_required"
+    """ADR 0093: the browser holds no live link session for this booking; open the email link."""
     BOOKING_NOT_ACTIVE = "booking_not_active"
     BOOKING_NOT_PENDING = "booking_not_pending"
     BOOKING_LOCKED = "booking_locked"
