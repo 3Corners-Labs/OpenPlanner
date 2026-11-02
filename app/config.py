@@ -286,6 +286,9 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("smtp_password", "smtp_user_password")
     )
+    # Class B (ADR 0091): the host's recorded exception for a relay without TLS. In production
+    # mail without STARTTLS or TLS is refused unless this is true; never a portal setting.
+    smtp_plaintext_relay_allowed: bool = False
     mail_from: str = "OpenPlanner <noreply@openplanner.invalid>"
 
     # Admin portal (ADR 0013). Without OIDC_DISCOVERY_URL the admin portal is disabled.
@@ -569,6 +572,11 @@ class Settings(BaseSettings):
     def event_envelope(self) -> Envelope:
         """Release and installation name for every log line and event record (ADR 0040)."""
         return Envelope(self.app_version, self.installation_name)
+
+    @property
+    def smtp_fallback_plaintext(self) -> bool:
+        """Whether the mail fallback (``SMTP_HOST``) would send without TLS (ADR 0091)."""
+        return bool(self.smtp_host) and not (self.smtp_starttls or self.smtp_implicit_tls)
 
     @property
     def smtp_implicit_tls(self) -> bool:

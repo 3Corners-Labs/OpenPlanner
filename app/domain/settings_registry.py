@@ -1181,6 +1181,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         aliases=("smtp_user_password",),
     ),
     S(
+        "smtp_plaintext_relay_allowed",
+        K.BOOL,
+        False,
+        _B,
+        T.MAIL,
+        "Allow mail without TLS in production, for a relay on a trusted network (ADR 0091); "
+        "otherwise saving it is refused and System status reports it. Never in the portal.",
+    ),
+    S(
         "mail_from",
         K.STRING,
         "OpenPlanner <noreply@openplanner.invalid>",
