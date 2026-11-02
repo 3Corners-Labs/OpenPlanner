@@ -9608,3 +9608,36 @@ msgstr "User name"
 
 msgid "admin.staff.manage.user_name.hint"
 msgstr "The staff member logs in with the user name or with the e-mail address. Invitations, password resets and calendar invitations go to the e-mail address."
+
+msgid "admin.staff.provider"
+msgstr "Login service"
+
+msgid "admin.staff.platform_provider"
+msgstr "Platform"
+
+msgid "admin.settings.org_idps.title"
+msgstr "Identity providers of organisations"
+
+msgid "admin.settings.org_idps.on"
+msgstr "On on this host (ORGANISATION_IDPS_ENABLED): logins on a verified domain go to that organisation's provider."
+
+msgid "admin.settings.org_idps.off"
+msgstr "Off on this host (ORGANISATION_IDPS_ENABLED): everyone logs in at the platform provider."
+
+msgid "admin.settings.org_idps.provider"
+msgstr "Provider"
+
+msgid "admin.settings.org_idps.organisation"
+msgstr "Organisation"
+
+msgid "admin.settings.org_idps.state"
+msgstr "State"
+
+msgid "admin.settings.org_idps.domains"
+msgstr "Domains"
+
+msgid "admin.settings.org_idps.counts"
+msgstr "{routing} verified, {failing} record gone, {pending} waiting, {lapsed} lapsed"
+
+msgid "admin.settings.org_idps.none"
+msgstr "No organisation has an identity provider of its own."

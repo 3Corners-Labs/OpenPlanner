@@ -77,6 +77,9 @@ sees the state on **System status**, under *Staff management*.
 ## Filters
 
 - **Organisation**, **Group** and **Role**: only staff who belong to it.
+- **Login service**: only staff who log in through this identity provider (*Platform*, or the
+  key of an organisation's own provider). The column of the same name shows it per person; the
+  filter appears once there is more than one login service.
 - **Only people without a login**: staff without a login in the configured period (90 days by
   default). Use it for a periodic access review: does this person still need access?
 
