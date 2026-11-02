@@ -40,10 +40,13 @@ class Series:
     Attributes:
         column_key: The table column header, e.g. "Waiting".
         item_key: The sentence of one value in the summary, with ``{label}`` and ``{value}``.
+        label_key: The header of the label column; the group, unless the chart counts
+            something else per row (alerts per level).
     """
 
     column_key: str
     item_key: str
+    label_key: str = "admin.overview.chart.group"
 
 
 CHART_SERIES: dict[str, Series] = {
@@ -55,8 +58,13 @@ CHART_SERIES: dict[str, Series] = {
         "admin.overview.widget.queue.waiting",
         "admin.overview.widget.queue.chart_item",
     ),
+    "alerts": Series(
+        "admin.overview.widget.alerts.series",
+        "admin.overview.widget.alerts.chart_item",
+        "admin.overview.widget.alerts.level",
+    ),
 }
-"""The widgets that can draw a chart, and the one value each one counts per group."""
+"""The widgets that can draw a chart, and the one value each one counts per row."""
 
 
 @dataclass(frozen=True)
@@ -118,7 +126,7 @@ def chart_view(
         build(kind, data),
         kind_label,
         summary,
-        _("admin.overview.chart.group"),
+        _(series.label_key),
         _(series.column_key),
         tuple((d.label, str(d.value)) for d in data),
     )

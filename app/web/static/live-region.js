@@ -8,8 +8,12 @@
  *   - at every interval the fragment's URL is asked; the server answers 204 while nothing
  *     changed, so the fragment is only replaced when something did;
  *   - the new fragment's [data-live-status] sentence is announced in the region's
- *     [data-live-announce] element (one polite live region per page), and focus that was
- *     inside the replaced part moves to the heading the region names (data-heading);
+ *     [data-live-announce] element, or in the element whose id the region names in
+ *     data-announce when several regions share the page's one polite live region (the
+ *     overview, ADR 0061 §4); focus that was inside the replaced part moves to the heading
+ *     the region names (data-heading), so it is never lost;
+ *   - after a swap the region fires a "live:replaced" event (bubbling), for a page script
+ *     that reacts to new content (the overview's alert pop-ups, ADR 0061 §7);
  *   - a failed request is retried at the next interval; a redirect (session ended) or a
  *     fragment without poll URL (the call ended, the state is final) stops it.
  *
@@ -38,7 +42,9 @@
   }
 
   function announce(region, fragment) {
-    var target = region.querySelector("[data-live-announce]");
+    var target =
+      region.querySelector("[data-live-announce]") ||
+      document.getElementById(region.getAttribute("data-announce") || "");
     var status = fragment.querySelector("[data-live-status]");
     if (target && status) {
       target.textContent = status.textContent.trim();
@@ -56,6 +62,9 @@
     var fresh = document.importNode(incoming, true);
     outgoing.parentNode.replaceChild(fresh, outgoing);
     announce(region, fresh);
+    if (typeof window.CustomEvent === "function") {
+      region.dispatchEvent(new CustomEvent("live:replaced", { bubbles: true }));
+    }
     if (hadFocus) {
       var heading = document.getElementById(region.getAttribute("data-heading") || "");
       if (heading) {

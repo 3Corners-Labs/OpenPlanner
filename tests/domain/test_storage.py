@@ -124,3 +124,16 @@ async def test_a_failed_record_is_tried_again_next_time(uow: InMemoryUnitOfWork)
 
     assert check.changed
     assert [e.reason for e in uow.state.audit] == ["free_space_critical"]
+
+
+async def test_a_restarted_watch_continues_from_the_open_alert(uow: InMemoryUnitOfWork) -> None:
+    async def open_reason() -> str:
+        return "free_space_critical"
+
+    storage = StorageWatch(SystemLog(uow, FixedClock(NOW)), StorageLimits(), open_reason)
+
+    still = await storage.observe(usage(3))
+    freed = await storage.observe(usage(50))
+
+    assert (still.changed, freed.changed) == (False, True)
+    assert [(e.outcome, e.reason) for e in uow.state.audit] == [(Outcome.SUCCESS, "")]

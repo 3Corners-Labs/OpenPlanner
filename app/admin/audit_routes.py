@@ -52,6 +52,7 @@ from app.domain.admin_session_service import (
     SESSIONS_ENDED_BY_ADMIN_EVENT,
     SESSIONS_ENDED_BY_SELF_EVENT,
 )
+from app.domain.alerts import QUEUE_WAIT_EVENT, QUEUE_WAIT_OVER
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
 from app.domain.audit import (
     SUBJECT_ACTIONS,
@@ -174,6 +175,8 @@ EVENT_LABELS: dict[str, str] = {
     SESSIONS_ENDED_BY_ADMIN_EVENT: "audit.event.sessions_ended_by_admin",
     # ADR 0038: maintenance on longer than the alert threshold (global).
     OVERDUE_EVENT: "audit.event.maintenance_overdue",
+    # ADR 0061 OV-7: an own queue's longest wait crossed the warning threshold (at the group).
+    QUEUE_WAIT_EVENT: "audit.event.queue_wait",
     # ADR 0065: "Koppeling controleren", by hand or by the worker (at the group).
     CHECK_EVENT: "audit.event.integration_check",
     # ADR 0082: the Service App check from Koppelingen (global).
@@ -353,6 +356,7 @@ REASON_LABELS: dict[str, str] = {
     "channel_not_configured": "admin.audit.reason.channel_not_configured",
     FREE_SPACE_LOW: "admin.audit.reason.free_space_low",
     FREE_SPACE_CRITICAL: "admin.audit.reason.free_space_critical",
+    QUEUE_WAIT_OVER: "admin.audit.reason.wait_over_warning",
     DATABASE_TOO_LARGE: "admin.audit.reason.database_too_large",
     INVALID_SIGNATURE: "admin.audit.reason.invalid_signature",
     "unauthorized": "admin.audit.reason.unauthorized",

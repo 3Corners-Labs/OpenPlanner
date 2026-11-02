@@ -12,24 +12,34 @@ see is not rendered and its route refuses (the matrix, ADR 0014).
     GET  /admin/overview/w/changes         audit.view              recent configuration changes
     GET  /admin/overview/w/queue           queue.work              own queues: waiting, wait, staff
     GET  /admin/overview/w/tasks           dashboard.view          running and failed jobs
-    GET  /admin/overview/w/status          settings.platform.view  version, updates, maintenance
+    GET  /admin/overview/w/status          settings.platform.view  version, updates, storage
+    GET  /admin/overview/w/alerts          dashboard.view          open alerts in reach (OV-6)
+
+A widget that the register marks live refreshes itself (ADR 0061 §4, OV-5): its body is a
+``data-live-fragment`` that the shared ``static/live-region.js`` (ADR 0072 §6) asks for every
+``overview_poll_seconds`` with the key of what it shows; the fragment route answers ``204``
+while the key is current. ``static/alert-popups.js`` pops up the alerts that a refresh of
+*Alerts* brought, at the levels the admin chose (§7). Without script, or with
+``overview_live_enabled`` off, the page shows what it loaded with and a *Refresh* link.
 
 No PII in any fragment: counts, group names, times and admins' display names only (ADR 0061
-§8). The queue widget shows plain values; the on/over-target colouring waits for the
-``QUEUE_WAIT_*`` settings of OV-7. *Alerts* is declared in the register but not available: it
-needs the alert model of OV-6, so it has no route here.
+§8). The queue widget compares the longest wait with the organisation's ``QUEUE_WAIT_*``
+settings (OV-7) and says so in words, not only in colour.
 """
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Annotated
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Query, Request
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, Response
 
+from app.adapters.db.maintenance import measure_storage, storage_limits
 from app.adapters.heartbeat import read_heartbeat
 from app.admin.address_view import address_problem
+from app.admin.alerts import AlertView, alert_views, read_alerts
 from app.admin.audit_routes import audit_views
 from app.admin.authz import (
     AdminContext,
@@ -38,6 +48,7 @@ from app.admin.authz import (
     can_function,
     maintenance_service,
 )
+from app.admin.live import key
 from app.admin.overview_charts import (
     ChartView,
     ViewChoice,
@@ -47,10 +58,12 @@ from app.admin.overview_charts import (
 )
 from app.admin.pages import Locale, admin_moment, page, role_labels, scope_text, templates
 from app.admin.scope_choice import filter_view, scope_of
+from app.admin.session import session_alert_prefs
 from app.admin.shortfalls import agenda_service, shortfall_view
 from app.admin.update_routes import update_service
 from app.config import Settings
 from app.domain.admin import LOGIN_EVENT, LOGOUT_EVENT
+from app.domain.alerts import AlertLevel, at_least, lowest_popup
 from app.domain.audit import AuditEntry, AuditFilter, Category, Outcome, Source
 from app.domain.authorization import (
     READ_PERMISSIONS,
@@ -62,6 +75,7 @@ from app.domain.diagnostics import DiagnosticsService
 from app.domain.ports import Clock
 from app.domain.queue_service import QueueService
 from app.domain.staff import CREATED_EVENT
+from app.domain.storage import MIB, StorageGrade, assess
 from app.domain.tasks import JobState
 from app.domain.update_service import UpdateNotice
 from app.domain.updates import UpdateStatus
@@ -72,12 +86,39 @@ from app.web.job_labels import JOB_TYPE_LABELS
 from app.web.locale import RequestLocale
 from app.web.templates import FragmentResponse, render
 from app.web.update_labels import STATUS_LABELS
-from app.web.widgets import View, Widget, resolve_view, visible, widget
+from app.web.widgets import OVERVIEW_PATH, View, Widget, resolve_view, visible, widget
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
 ViewName = Annotated[str | None, Query(max_length=16)]
 """The ``view`` a chart-capable fragment is asked for; anything unsupported is the default."""
+
+Seen = Annotated[str | None, Query(max_length=64)]
+"""The key of the fragment the page shows; a live widget answers 204 while it is current."""
+
+LEVEL_PARAM = "alerts-level"
+"""The address parameter of the *Alerts* level filter, on the page and on its fragment."""
+
+LEVEL_FILTERS: dict[str, AlertLevel] = {
+    "": AlertLevel.INFO,
+    "warning": AlertLevel.WARNING,
+    "outage": AlertLevel.OUTAGE,
+}
+"""The level filter's choices: all, warnings and outages, outages only (ADR 0061 §7)."""
+
+LEVEL_FILTER_LABELS: dict[str, str] = {
+    "": "admin.overview.widget.alerts.filter.all",
+    "warning": "admin.overview.widget.alerts.filter.warning",
+    "outage": "admin.overview.widget.alerts.filter.outage",
+}
+"""The words of each choice of the level filter."""
+
+STORAGE_GRADES: dict[StorageGrade, tuple[str, str]] = {
+    StorageGrade.OK: ("admin.overview.widget.status.storage.ok", "success"),
+    StorageGrade.LOW: ("admin.overview.widget.status.storage.low", "warning"),
+    StorageGrade.CRITICAL: ("admin.overview.widget.status.storage.critical", "danger"),
+}
+"""The words and chip tone of each storage grade on *System status*."""
 
 FRAME = "admin/widgets/_frame.html"
 """The template that renders one widget: title, body, empty state and footer."""
@@ -103,6 +144,10 @@ class WidgetView:
         shown: The view the widget draws (ADR 0061 §5); its first view unless one is asked for.
         chart: The chart of a bar, line or pie view; ``None`` shows the list, table or empty state.
         choices: The links that switch the widget between its views; none for a single view.
+        poll: The address ``live-region.js`` asks, with the key of what is shown; ``None`` for
+            a widget that does not refresh itself.
+        poll_seconds: How often it asks (``overview_poll_seconds``).
+        key: The key of what is shown; the fragment route compares it with ``seen``.
     """
 
     widget: Widget
@@ -113,6 +158,9 @@ class WidgetView:
     shown: View = View.LIST
     chart: ChartView | None = None
     choices: tuple[ViewChoice, ...] = ()
+    poll: str | None = None
+    poll_seconds: int = 0
+    key: str = ""
 
 
 @dataclass(frozen=True)
@@ -138,7 +186,11 @@ class Change:
 
 @dataclass(frozen=True)
 class QueueRow:
-    """One own queue as the widget lists it (counts and a duration, ADR 0061 §8)."""
+    """One own queue as the widget lists it (counts and a duration, ADR 0061 §8).
+
+    ``wait_state`` says in words how the longest wait compares with the organisation's target
+    and warning threshold (OV-7); ``wait_tone`` repeats it in colour.
+    """
 
     name: str
     organisation: str
@@ -146,6 +198,17 @@ class QueueRow:
     waiting: int
     longest_wait_minutes: int
     staff_available: int
+    wait_state: str = ""
+    wait_tone: str = ""
+
+
+@dataclass(frozen=True)
+class LevelChoice:
+    """One link of the *Alerts* level filter."""
+
+    label: str
+    href: str
+    current: bool
 
 
 @dataclass(frozen=True)
@@ -248,25 +311,112 @@ def _settings(request: Request) -> Settings:
     return settings
 
 
+def _organisation_settings(request: Request, organisation: str) -> Settings:
+    """Return one organisation's settings (its class D values over the platform's)."""
+    live = getattr(request.app.state, "live_settings", None)
+    if live is None:
+        return _settings(request)
+    found: Settings = live.for_organisation(live.organisation_id(organisation))
+    return found
+
+
+def _wait_state(_: BoundGettext, minutes: int, settings: Settings) -> tuple[str, str]:
+    """Return how ``minutes`` of longest wait compares with the target and the warning (OV-7)."""
+    if minutes > settings.queue_wait_warning_minutes:
+        return (
+            _(
+                "admin.overview.widget.queue.over_warning",
+                minutes=settings.queue_wait_warning_minutes,
+            ),
+            "danger",
+        )
+    if minutes > settings.queue_wait_target_minutes:
+        return (
+            _(
+                "admin.overview.widget.queue.over_target",
+                minutes=settings.queue_wait_target_minutes,
+            ),
+            "warning",
+        )
+    return (
+        _("admin.overview.widget.queue.on_target", minutes=settings.queue_wait_target_minutes),
+        "success",
+    )
+
+
 async def _queue(request: Request, locale: RequestLocale, principal: Principal) -> WidgetView:
     """Queue across own groups: per own queue in reach, waiting, longest wait, staff signed in."""
     item = _declared("queue")
     service: QueueService = request.app.state.queue_service
     lifetime = timedelta(hours=_settings(request).admin_session_hours)
     choice = (await scope_of(request, principal))[0]
-    rows = [
-        QueueRow(
-            s.summary.group.name,
-            s.summary.organisation_name,
-            f"/admin/groups/{s.summary.group.slug}/queue",
-            s.waiting,
-            int(s.longest_wait.total_seconds() // 60),
-            s.staff_available,
+    rows = []
+    for s in await service.summaries(principal, lifetime):
+        if not choice.keeps(s.summary.organisation_slug, s.summary.group.slug):
+            continue
+        minutes = int(s.longest_wait.total_seconds() // 60)
+        state, tone = _wait_state(
+            locale.gettext, minutes, _organisation_settings(request, s.summary.organisation_slug)
         )
-        for s in await service.summaries(principal, lifetime)
-        if choice.keeps(s.summary.organisation_slug, s.summary.group.slug)
-    ]
+        rows.append(
+            QueueRow(
+                s.summary.group.name,
+                s.summary.organisation_name,
+                f"/admin/groups/{s.summary.group.slug}/queue",
+                s.waiting,
+                minutes,
+                s.staff_available,
+                state,
+                tone,
+            )
+        )
     return WidgetView(item, list(rows[: item.default_rows]), len(rows))
+
+
+def _level_filter(request: Request) -> str:
+    """Return the level filter the address asks for; anything unknown is *all*."""
+    asked = request.query_params.get(LEVEL_PARAM, "")
+    return asked if asked in LEVEL_FILTERS else ""
+
+
+async def _alerts(request: Request, locale: RequestLocale, principal: Principal) -> WidgetView:
+    """Alerts: the open alerts in reach, most urgent first, narrowed by the level filter."""
+    _ = locale.gettext
+    item = _declared("alerts")
+    chosen = _level_filter(request)
+    found = at_least(await read_alerts(request, principal), LEVEL_FILTERS[chosen])
+    rows = alert_views(request, locale, principal, found)
+    outages = sum(1 for a in found if a.level is AlertLevel.OUTAGE)
+    shown_view = request.query_params.get(item.key)
+    levels = [
+        LevelChoice(
+            _(label),
+            _with_query(
+                OVERVIEW_PATH,
+                {item.key: shown_view if shown_view in {v.value for v in item.views} else ""},
+                {LEVEL_PARAM: value},
+            )
+            + f"#widget-{item.key}",
+            value == chosen,
+        )
+        for value, label in LEVEL_FILTER_LABELS.items()
+    ]
+    extra: dict[str, object] = {
+        "levels": levels,
+        "status": _("admin.overview.widget.alerts.status", count=len(rows), outages=outages),
+    }
+    more = (
+        "/admin/audit?source=system&problems=1"
+        if can_function(principal)(Permission.AUDIT_VIEW)
+        else None
+    )
+    return WidgetView(item, list(rows), len(rows), more, extra)
+
+
+def _with_query(path: str, *parts: Mapping[str, str]) -> str:
+    """Return ``path`` with the non-empty values of ``parts`` as its query."""
+    query = {k: v for part in parts for k, v in part.items() if v}
+    return f"{path}?{urlencode(query)}" if query else path
 
 
 async def _tasks(request: Request, locale: RequestLocale, principal: Principal) -> WidgetView:
@@ -372,6 +522,7 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
         maintenance_row = StatusRow(
             maintenance_row.label, maintenance_row.value, maintenance_row.tone, "/admin/maintenance"
         )
+    storage = _storage_row(_, settings)
     beat = read_heartbeat(settings.worker_heartbeat_path)
     if beat is None:
         worker = StatusRow(
@@ -422,6 +573,9 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
             "/admin/settings",
         ),
     ]
+    if storage is not None:
+        # A low or full disk comes before the quiet rows, like the other problems below.
+        rows.insert(2 if storage.tone != "success" else len(rows), storage)
     if plaintext_mail:
         # An error is shown before the quiet rows, so the default row count never hides it.
         rows.insert(
@@ -448,7 +602,26 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
     return WidgetView(item, list(rows[: item.default_rows]), len(rows), "/admin/settings")
 
 
+def _storage_row(_: BoundGettext, settings: Settings) -> StatusRow | None:
+    """Return the storage line: free space and database size, graded (ADR 0040).
+
+    Measured here, on the volume the web process shares with the worker; ``None`` when the
+    database is not a file that can be measured.
+    """
+    usage = measure_storage(settings.database_url)
+    if usage is None:
+        return None
+    grade, _reason = assess(usage, storage_limits(settings))
+    text_key, tone = STORAGE_GRADES[grade]
+    return StatusRow(
+        _("admin.overview.widget.status.storage"),
+        _(text_key, free=int(usage.free_percent), size=usage.database_bytes // MIB),
+        tone,
+    )
+
+
 RENDERERS: dict[str, Renderer] = {
+    "alerts": _alerts,
     "rights": _rights,
     "bookings-today": _bookings_today,
     "changes": _changes,
@@ -477,31 +650,62 @@ def _queue_data(rows: list[object]) -> list[Datum]:
     return [Datum(r.name, r.waiting) for r in rows if isinstance(r, QueueRow)]
 
 
+def _alerts_data(rows: list[object]) -> list[Datum]:
+    """The alerts widget's chart data: open alerts per level, most urgent first."""
+    counts: dict[str, int] = {}
+    for row in rows:
+        if isinstance(row, AlertView):
+            counts[row.level_label] = counts.get(row.level_label, 0) + 1
+    return [Datum(label, count) for label, count in counts.items()]
+
+
 CHART_DATA: dict[str, Callable[[list[object]], list[Datum]]] = {
     "bookings-today": _bookings_data,
     "queue": _queue_data,
+    "alerts": _alerts_data,
 }
 """The widgets that can draw a chart, and the data of their one series; see ``CHART_SERIES``."""
 
 
 def _shaped(
+    request: Request,
     view: WidgetView,
     locale: RequestLocale,
     shown: View,
     selected: Mapping[str, View],
     on_page: Mapping[str, Widget],
 ) -> WidgetView:
-    """Give ``view`` the view to draw, its chart if that view is one, and its switcher links.
+    """Give ``view`` the view to draw, its chart, its switcher links and its poll address.
 
     ``selected`` are the views the address asks for, so a link switching one widget keeps the
-    others as they are; ``on_page`` are the widgets the address may name.
+    others as they are; ``on_page`` are the widgets the address may name. The poll address
+    carries the key of all of that, so the fragment route can answer 204 while it holds.
     """
     _ = locale.gettext
     item = view.widget
     data = CHART_DATA[item.key](view.rows) if item.key in CHART_DATA else []
     chart = chart_view(shown, item, data, _(item.title_key), _)
     choices = view_choices(item, shown, selected, on_page, _)
-    return replace(view, shown=shown, chart=chart, choices=choices)
+    level = _level_filter(request) if item.key == "alerts" else ""
+    if level:
+        choices = tuple(
+            replace(c, href=_with_query(c.href, {LEVEL_PARAM: level}))
+            if "?" not in c.href
+            else replace(c, href=f"{c.href}&{urlencode({LEVEL_PARAM: level})}")
+            for c in choices
+        )
+    shaped = replace(view, shown=shown, chart=chart, choices=choices)
+    settings = _settings(request)
+    if not (item.live and settings.overview_live_enabled):
+        return shaped
+    current = key(shaped.rows, shaped.total, shaped.more_href, shaped.extra, shown.value, chart)
+    poll = _with_query(
+        item.path,
+        {"view": shown.value if shown is not item.views[0] else ""},
+        {LEVEL_PARAM: level},
+        {"seen": current},
+    )
+    return replace(shaped, poll=poll, poll_seconds=settings.overview_poll_seconds, key=current)
 
 
 async def _views(request: Request, locale: RequestLocale, principal: Principal) -> list[WidgetView]:
@@ -516,6 +720,7 @@ async def _views(request: Request, locale: RequestLocale, principal: Principal) 
     selected = explicit_views(on_page, request.query_params)
     return [
         _shaped(
+            request,
             await RENDERERS[w.key](request, locale, principal),
             locale,
             selected.get(w.key, w.views[0]),
@@ -532,11 +737,18 @@ def _fragment(
     principal: Principal,
     view: WidgetView,
     requested: str | None = None,
-) -> HTMLResponse:
-    """Answer one widget without the shell, in the view ``requested`` if it supports it."""
+    seen: str | None = None,
+) -> Response:
+    """Answer one widget without the shell, in the view ``requested`` if it supports it.
+
+    A live widget answers ``204`` while ``seen`` is the key of what it would render, so a quiet
+    overview costs one empty response per widget and interval.
+    """
     item = view.widget
     shown = resolve_view(item, requested)
-    shaped = _shaped(view, locale, shown, {item.key: shown}, {item.key: item})
+    shaped = _shaped(request, view, locale, shown, {item.key: shown}, {item.key: item})
+    if seen and seen == shaped.key:
+        return Response(status_code=204, headers={"cache-control": "no-store"})
     return render(templates, request, FRAME, locale, {"view": shaped, "principal": principal})
 
 
@@ -557,12 +769,17 @@ async def overview(
         for g in groups
         if g.group.slug in summaries and summaries[g.group.slug].count
     }
+    live = _settings(request).overview_live_enabled
+    floor = lowest_popup(session_alert_prefs(request).popups)
     return page(
         request,
         locale,
         "admin/dashboard.html",
         principal,
         {
+            "live": live,
+            # The least urgent level that pops up for this admin; ``None``: no pop-ups (§7).
+            "popup_level": floor.value if floor else None,
             "views": views,
             "groups": groups,
             "shortfalls": shortfalls,
@@ -573,6 +790,7 @@ async def overview(
                 can_function(principal)(Permission.ORGANISATION_VIEW),
             ),
         },
+        scripts=live,
     )
 
 
@@ -581,7 +799,7 @@ async def rights_widget(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.RIGHTS_VIEW))],
-) -> HTMLResponse:
+) -> Response:
     """The fragment *My role and reach*."""
     principal = context.principal
     return _fragment(request, locale, principal, await _rights(request, locale, principal))
@@ -593,11 +811,12 @@ async def bookings_today_widget(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.BOOKINGS_VIEW))],
     view: ViewName = None,
-) -> HTMLResponse:
+    seen: Seen = None,
+) -> Response:
     """The fragment *Bookings today per group*, as list, bar or pie."""
     principal = context.principal
     shaped = await _bookings_today(request, locale, principal)
-    return _fragment(request, locale, principal, shaped, view)
+    return _fragment(request, locale, principal, shaped, view, seen)
 
 
 @router.get("/overview/w/changes", response_class=FragmentResponse)
@@ -605,7 +824,7 @@ async def changes_widget(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_VIEW))],
-) -> HTMLResponse:
+) -> Response:
     """The fragment *Recent configuration changes*."""
     principal = context.principal
     return _fragment(request, locale, principal, await _changes(request, locale, principal))
@@ -617,10 +836,12 @@ async def queue_widget(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.QUEUE_WORK))],
     view: ViewName = None,
-) -> HTMLResponse:
+    seen: Seen = None,
+) -> Response:
     """The fragment *Queue across own groups*, as table, bar or line."""
     principal = context.principal
-    return _fragment(request, locale, principal, await _queue(request, locale, principal), view)
+    shaped = await _queue(request, locale, principal)
+    return _fragment(request, locale, principal, shaped, view, seen)
 
 
 @router.get("/overview/w/tasks", response_class=FragmentResponse)
@@ -628,10 +849,12 @@ async def tasks_widget(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.DASHBOARD_VIEW))],
-) -> HTMLResponse:
+    seen: Seen = None,
+) -> Response:
     """The fragment *Running tasks*."""
     principal = context.principal
-    return _fragment(request, locale, principal, await _tasks(request, locale, principal))
+    shaped = await _tasks(request, locale, principal)
+    return _fragment(request, locale, principal, shaped, seen=seen)
 
 
 @router.get("/overview/w/status", response_class=FragmentResponse)
@@ -639,7 +862,28 @@ async def status_widget(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.SETTINGS_PLATFORM_VIEW))],
-) -> HTMLResponse:
+    seen: Seen = None,
+) -> Response:
     """The fragment *System status*."""
     principal = context.principal
-    return _fragment(request, locale, principal, await _status(request, locale, principal))
+    shaped = await _status(request, locale, principal)
+    return _fragment(request, locale, principal, shaped, seen=seen)
+
+
+@router.get("/overview/w/alerts", response_class=FragmentResponse)
+async def alerts_widget(
+    request: Request,
+    locale: Locale,
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.DASHBOARD_VIEW))],
+    view: ViewName = None,
+    seen: Seen = None,
+    level: Annotated[str | None, Query(alias=LEVEL_PARAM, max_length=16)] = None,
+) -> Response:
+    """The fragment *Alerts*, as list, bar or pie, narrowed by the level filter.
+
+    ``level`` is read from the address by the renderer (``LEVEL_PARAM``); it is declared here
+    so the bound on its length applies.
+    """
+    principal = context.principal
+    shaped = await _alerts(request, locale, principal)
+    return _fragment(request, locale, principal, shaped, view, seen)

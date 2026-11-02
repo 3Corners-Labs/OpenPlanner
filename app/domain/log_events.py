@@ -516,6 +516,35 @@ _OPERATIONS = (
         "destination.",
     ),
     _e(
+        "queue.wait_watch_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The queue wait check did not run: {error}.",
+        "The worker could not compare the own queues' waits with their threshold (ADR 0061 OV-7).",
+        _CHECK_HOST,
+    ),
+    _e(
+        "queue.wait_crossed",
+        _OPS,
+        "info",
+        "groups",
+        "{groups} own queues crossed their wait threshold.",
+        "The longest wait of these queues went above or back under `queue_wait_warning_minutes`; "
+        "each crossing is a `queue.wait` system event.",
+        "None; the alert is on the overview.",
+    ),
+    _e(
+        "alerts.read_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The open alerts could not be read: {error}.",
+        "An admin page showed without its alert banner, often because the database is full or "
+        "away (ADR 0061 §7).",
+        _CHECK_HOST,
+    ),
+    _e(
         "maintenance.watch_failed",
         _OPS,
         "warning",
@@ -1613,6 +1642,16 @@ _AUDIT = (
         "Storage check: {outcome} ({reason}); {free_percent}% free, database {database_mb} MB.",
         "The worker's disk check changed grade (ADR 0040 point 3).",
         "On failure: free disk space on the host.",
+    ),
+    _e(
+        "queue.wait",
+        _SYS,
+        "outcome",
+        "minutes",
+        "Queue wait: {outcome} ({reason}); longest wait {minutes} minutes.",
+        "An own queue's longest wait went above `queue_wait_warning_minutes` (failure, the alert) "
+        "or back under it (success) (ADR 0061 OV-7).",
+        "On failure: more staff on the group's queue, or look at why nobody picks up.",
     ),
     _e(
         "system.maintenance",

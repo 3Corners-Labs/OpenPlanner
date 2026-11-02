@@ -51,11 +51,11 @@ The register (`app/web/navigation.py`), the three sections, the `<details>` prof
 |---|---|---|---|---|
 | OV-1 | Widget register `app/web/widgets.py` and fragment routes, each with one permission | M | Matrix sweep covers every widget route; widget without permission or `nl`/`en` title fails a test | built (#141) |
 | OV-2 | Overview renders visible widgets without script; *Refresh* link; role defaults | M | Page works with JavaScript off; Lighthouse accessibility ≥ 95 | built (#141) |
-| OV-3 | Widgets: alerts, queue across own groups, bookings today (counts), recent changes, running tasks, system status, my role | L | No PII in any fragment (PI-2 covers them); empty states per widget | built (#150); alerts wait for OV-6 |
+| OV-3 | Widgets: alerts, queue across own groups, bookings today (counts), recent changes, running tasks, system status, my role | L | No PII in any fragment (PI-2 covers them); empty states per widget | built (#150); alerts with OV-6 (#449) |
 | OV-4 | Server-rendered SVG charts (bar, horizontal bar above 4 items, line, pie) with text summary and table in `<details>` | M | No chart dependency; values readable without colour | built (#153) |
-| OV-5 | `static/overview-live.js`: poll, `204` or fragments, one polite live region, no focus moves; CSP `script-src 'self'` on this page only | M | Under 150 lines, no dependency; abuse case "poll flood" against the rate limit | open |
-| OV-6 | Alerts: banner until resolved, close per alert, pop-ups ≥ 8 s with pause, level filter, click opens the log entry | M | WCAG 2.2.1 and 2.2.2 checked in the manual pass; settings of ADR 0061 in the registry and `docs/settings.md` | open |
-| OV-7 | Queue thresholds `QUEUE_WAIT_TARGET_MINUTES`, `QUEUE_WAIT_WARNING_MINUTES` (class D) | S | Warning alert raised once per crossing; test with the fake clock | open |
+| OV-5 | `static/overview-live.js`: poll, `204` or fragments, one polite live region, no focus moves; CSP `script-src 'self'` on this page only | M | Under 150 lines, no dependency; abuse case "poll flood" against the rate limit | built (#449) through `live-region.js` per widget, no second poller (ADR 0072 §6) |
+| OV-6 | Alerts: banner until resolved, close per alert, pop-ups ≥ 8 s with pause, level filter, click opens the log entry | M | WCAG 2.2.1 and 2.2.2 checked in the manual pass; settings of ADR 0061 in the registry and `docs/settings.md` | built (#449); manual pass open |
+| OV-7 | Queue thresholds `QUEUE_WAIT_TARGET_MINUTES`, `QUEUE_WAIT_WARNING_MINUTES` (class D) | S | Warning alert raised once per crossing; test with the fake clock | built (#449) |
 
 ## 6. Personal layout — ADR 0062 (after ADR 0046)
 

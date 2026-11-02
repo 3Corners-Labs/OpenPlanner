@@ -30,6 +30,7 @@ from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.discovery import GuardedDiscoveryFetcher
 from app.adapters.event_sink import StdoutEventSink
+from app.adapters.heartbeat import read_heartbeat
 from app.adapters.http_trace import traced_transport
 from app.adapters.idp_registry import OrganisationProviders
 from app.adapters.integrations import (
@@ -72,6 +73,7 @@ from app.domain.address_check import AddressStatus, InstanceService
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.agenda_service import AgendaService
+from app.domain.alerts import AlertService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
 from app.domain.call_retry import CallRetryService
@@ -592,6 +594,13 @@ def create_app(
             clock,
             app.state.admin_service,
             lambda org: per_organisation(org).shortfall_horizon_days,
+        )
+        # ADR 0061 §7: the open alerts of an admin, read for the banner on every admin page.
+        app.state.alert_service = AlertService(
+            uow,
+            clock,
+            lambda: read_heartbeat(live().worker_heartbeat_path),
+            lambda: timedelta(seconds=live().worker_heartbeat_max_age_seconds),
         )
         app.state.diagnostics_service = DiagnosticsService(
             uow,

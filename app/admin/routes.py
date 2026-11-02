@@ -32,6 +32,7 @@ from app.adapters.integrations import Integrations
 from app.adapters.service_app_check import SERVICE_APP_REPORT
 from app.admin import (
     agenda_routes,
+    alerts,
     api_routes,
     audit_routes,
     branding_routes,
@@ -802,13 +803,14 @@ def register_admin(app: FastAPI) -> None:
     for exc_type, handler in handlers.items():
         app.add_exception_handler(exc_type, handler)  # type: ignore[arg-type]
     # Custom roles (ADR 0039) are attached first; then the update banner (ADR 0029), the
-    # maintenance bar (ADR 0038) and the counts of the top bar (SH-2) are loaded for every
-    # admin page in one place.
+    # maintenance bar (ADR 0038), the counts of the top bar (SH-2) and the alert banner
+    # (ADR 0061 §7) are loaded for every admin page in one place.
     banner = [
         Depends(load_principal),
         Depends(update_routes.load_update_notice),
         Depends(maintenance_routes.load_maintenance_notice),
         Depends(load_top_counts),
+        Depends(alerts.load_alerts),
     ]
     for module_router in (
         router,
@@ -850,5 +852,6 @@ def register_admin(app: FastAPI) -> None:
         maintenance_routes.router,
         help_routes.router,
         preference_routes.router,
+        alerts.router,
     ):
         app.include_router(module_router, dependencies=banner)

@@ -2,9 +2,10 @@
 
 The links come from the navigation register (``app.web.navigation.TOP_BAR``) through the matrix:
 one is shown only to an admin who may open what it leads to. A count is read once per request
-(``load_top_counts``, a dependency of every admin page) and rendered on the server. A link
-without a count source shows none: *Status* has no number, *Alerts* wait for the alert model of
-ADR 0061 step 4. A count is a whole number and never a name or a booking.
+(``load_top_counts``, a dependency of every admin page) and rendered on the server; the number
+of open alerts is added by ``app.admin.alerts.load_alerts``, which reads them for the banner
+anyway (ADR 0061 §7). *Status* has no number. A count is a whole number and never a name or a
+booking.
 """
 
 from collections.abc import Callable
@@ -23,7 +24,10 @@ COUNTS_ATTRIBUTE = "top_counts"
 HELP_KEY = "top.help"
 """The register key of the manual link, which opens the page's own topic when it has one."""
 
-COUNT_LABELS = {"top.tasks": "admin.topbar.tasks.count"}
+COUNT_LABELS = {
+    "top.tasks": "admin.topbar.tasks.count",
+    "top.alerts": "admin.topbar.alerts.count",
+}
 """The words a screen reader gets for a link with a count; also the list of links that have one."""
 
 

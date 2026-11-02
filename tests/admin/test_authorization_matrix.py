@@ -75,6 +75,10 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/overview/w/tasks": {
         "/admin/overview/w/tasks": statuses(200, 200, 200, 200, 200, 200, 403)
     },
+    # ADR 0061 §7: every admin sees the alerts in their own reach.
+    "GET /admin/overview/w/alerts": {
+        "/admin/overview/w/alerts": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
     "GET /admin/overview/w/status": {
         "/admin/overview/w/status": statuses(200, 403, 403, 403, 200, 403, 403)
     },
@@ -261,6 +265,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     # ADR 0033: the manual is public, every admin may read every topic.
     # Step 2b: the profile menu's theme and alert choices, stored in the own session (303 back).
     "GET /admin/preferences": {"/admin/preferences": statuses(303, 303, 303, 303, 303, 303, 403)},
+    # ADR 0061 §7: closing a banner alert changes only the own session.
+    "GET /admin/alerts/close": {"/admin/alerts/close": statuses(303, 303, 303, 303, 303, 303, 403)},
     "GET /admin/help": {"/admin/help": statuses(200, 200, 200, 200, 200, 200, 403)},
     "GET /admin/help/{topic}": {
         "/admin/help/group-settings": statuses(200, 200, 200, 200, 200, 200, 403),
