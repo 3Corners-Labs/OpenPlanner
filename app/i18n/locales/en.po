@@ -7900,6 +7900,9 @@ msgstr "Embedding"
 msgid "admin.tab.branding"
 msgstr "Branding"
 
+msgid "admin.tab.participants"
+msgstr "Participants"
+
 msgid "admin.tab.channels"
 msgstr "Channels"
 

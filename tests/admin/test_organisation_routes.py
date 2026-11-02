@@ -69,20 +69,20 @@ async def test_tabs_follow_the_rights_of_the_role(site: Site) -> None:
 
     assert superuser == [
         "/admin/organisations/demo",
-        "/admin/organisations/demo/branding",
-        "/admin/organisations/demo/channels",
+        "/admin/organisations/demo/branding",  # the Participants tab leads with the branding
         "/admin/organisations/demo/contacts",
         "/admin/organisations/demo/holidays",
         "/admin/organisations/demo/closure",
         # The second row of the overview tab: its own page first, then the sub-tabs.
         "/admin/organisations/demo",
         "/admin/organisations/demo/settings",
-        "/admin/organisations/demo/texts",
         "/admin/organisations/demo/embedding",
         "/admin/organisations/demo/login",
     ]
     assert "/admin/organisations/demo/branding" not in org_admin
     assert "/admin/organisations/demo/channels" not in org_admin
+    # ADR 0105: the org admin may edit the texts, so the Participants tab stays and leads there.
+    assert "/admin/organisations/demo/texts" in org_admin
     assert "/admin/organisations/demo/settings" in org_admin
     # The auditor reads the overview only: one tab shows no tab row, and no edit link.
     assert '<nav class="tabs"' not in auditor

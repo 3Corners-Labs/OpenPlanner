@@ -98,36 +98,45 @@ def object_tabs(
 ) -> tuple[list[NavView], list[NavView]]:
     """Return the visible tabs of ``obj`` for the object ``slug``, and the current tab's row.
 
-    A tab or sub-tab shows only if the matrix grants its permission (``can``). The second row
-    holds the current tab's own page followed by its visible sub-tabs, and is empty when the
-    current tab has no visible sub-tab.
+    A tab or sub-tab shows only if the matrix grants its permission (``can``). A tab with
+    sub-tabs also shows when only one of its sub-tabs is granted (ADR 0105): it then leads to
+    the first page the admin may open, so nobody loses the way to a page they were allowed.
+    The second row holds the current tab's own page, when granted, followed by its visible
+    sub-tabs, and is empty when it would hold fewer than two.
     """
     placeholder = obj.path.rsplit("/", 1)[-1]
 
-    def view(screen: Screen, current: bool) -> NavView:
+    def view(
+        screen: Screen, current: bool, target: Screen | None = None, own: bool = False
+    ) -> NavView:
+        label = screen.own_label_key if own and screen.own_label_key else screen.label_key
         return NavView(
-            locale.gettext(screen.label_key),
-            screen.path.replace(placeholder, slug),
+            locale.gettext(label),
+            (target or screen).path.replace(placeholder, slug),
             current,
             screen.icon,
         )
 
+    def first_page(tab: Screen) -> Screen | None:
+        """Return the first page of ``tab`` the matrix grants, its own page first."""
+        return next((s for s in (tab, *tab.subtabs) if can(s.permission)), None)
+
     tabs = [
-        view(tab, home is not None and home.tab == tab.key)
+        view(tab, home is not None and home.tab == tab.key, first_page(tab))
         for tab in obj.tabs
-        if can(tab.permission)
+        if first_page(tab) is not None
     ]
     current = next((tab for tab in obj.tabs if home is not None and home.tab == tab.key), None)
-    if current is None or not can(current.permission):
+    if current is None or first_page(current) is None:
         return tabs, []
     row = [
         view(sub, home is not None and home.subtab == sub.key)
         for sub in current.subtabs
         if can(sub.permission)
     ]
-    if not row:
-        return tabs, []
-    return tabs, [view(current, home is not None and home.subtab is None), *row]
+    if can(current.permission):
+        row.insert(0, view(current, home is not None and home.subtab is None, own=True))
+    return tabs, row if len(row) > 1 else []
 
 
 def entry_subtabs(

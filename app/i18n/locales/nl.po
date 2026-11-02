@@ -7912,6 +7912,9 @@ msgstr "Inbedding"
 msgid "admin.tab.branding"
 msgstr "Huisstijl"
 
+msgid "admin.tab.participants"
+msgstr "Deelnemers"
+
 msgid "admin.tab.channels"
 msgstr "Kanalen"
 
