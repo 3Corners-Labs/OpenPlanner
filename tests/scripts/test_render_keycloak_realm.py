@@ -2,7 +2,8 @@
 
 ``scripts/render-keycloak-realm.sh`` generates the secrets of ``secrets/keycloak.env`` and
 renders ``deploy/keycloak/realm.template.json`` into ``secrets/keycloak-realm.json``. Both
-files must be mode 600, the script prints no value, and nothing ``dev-only-`` may remain.
+env files must be mode 600 and the realm 644 inside a 700 directory (Keycloak reads it as
+its own user), the script prints no value, and nothing ``dev-only-`` may remain.
 """
 
 import json
@@ -159,7 +160,8 @@ def test_missing_values_are_generated_and_kept_private(tmp_path: Path) -> None:
     assert set(FIXED) <= set(env)
     assert all(len(env[key]) >= 32 for key in FIXED)
     assert mode(tmp_path / "secrets/keycloak.env") == 0o600
-    assert mode(tmp_path / "secrets/keycloak-realm.json") == 0o600
+    assert mode(tmp_path / "secrets/keycloak-realm.json") == 0o644
+    assert mode(tmp_path / "secrets") == 0o700
     for value in (env[key] for key in FIXED):
         assert value not in result.stdout + result.stderr
     assert (
