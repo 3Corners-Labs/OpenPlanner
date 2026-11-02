@@ -1,10 +1,10 @@
 # 0088. The decision gate judges the merge group too
 
-Status: proposed (2026-10-31), requested by the product owner. Amends ADR 0078 (point 3: where
-the check *decision gate* runs and what it reads). Partly built; see *Build status*. Merged in
-#284 on 2026-10-31 without `po:approved` before the merge; awaiting the product owner's
-acceptance. Step 1 is merged (#284) but has no effect until *decision gate* is a required check
-of `main` (step 2).
+Status: accepted (2026-11-02, `po:approved` on #414), requested by the product owner. Amends
+ADR 0078 (point 3: where the check *decision gate* runs and what it reads); amended by ADR 0104
+(only an administrator's label counts). Built: step 1 merged in #284 on 2026-10-31 (without
+`po:approved` before the merge), step 2 done on 2026-11-02, when *decision gate* became a
+required check in the ruleset of `main`.
 
 ## Context
 
@@ -88,7 +88,7 @@ else rather than guessing.
 |---|---|---|---|
 | 0 | ADR proposed | #284 | merged 2026-10-31 |
 | 1 | `--list-pull-requests` and `--merge-group` in `scripts/decision_gate.py`, the `merge_group` job in `decision-gate.yml` with `pull-requests: read`, `edited` on `pull_request_target`, tests, ADR 0078's table, CONTRIBUTING.md and the runbook | #284 | merged 2026-10-31 |
-| 2 | The product owner adds *decision gate* to the required checks of `main` (ADR 0078 step 3; without it neither run stops a merge) | | planned |
+| 2 | The product owner adds *decision gate* to the required checks of `main` (ADR 0078 step 3; without it neither run stops a merge) | GitHub setting | built 2026-11-02 (ruleset `main`) |
 
 ## Consequences
 

@@ -1,7 +1,9 @@
 # 0104. The approval label counts only from an administrator, and a foreign push takes it back
 
-Status: proposed (2026-11-02), requested by the product owner. Amends ADR 0078 (point 3: what
-makes `po:approved` an approval) and ADR 0088 (the merge-group run reads the same evidence).
+Status: accepted (2026-11-02, `po:approved` on #414), requested by the product owner. Amends
+ADR 0078 (point 3: what makes `po:approved` an approval) and ADR 0088 (the merge-group run
+reads the same evidence). Built in #414; it takes effect for the pull requests that follow,
+because the gate runs from `main`'s copy of the workflow.
 
 ## Context
 
@@ -35,9 +37,13 @@ for good.
    the job's own token; `scripts/decision_gate.py` decides from those two files and runs no
    network call itself. A missing or unreadable file fails the check (fail closed).
 3. A push to a pull request (`synchronize`) by a user who is not an administrator takes the
-   label off, in the same run, and that run treats the pull request as not approved. A push by
-   an administrator, which includes Claude Code working under the product owner's account and
-   a merge of `main` into the branch, keeps the approval.
+   label off, and the gate of that run treats the pull request as not approved. A push by an
+   administrator, which includes Claude Code working under the product owner's account and a
+   merge of `main` into the branch, keeps the approval. The withdrawal is a job of its own
+   with no concurrency group and no checkout: a later event on the pull request (an edited
+   title) cancels a running gate, never a withdrawal. A withdrawal that fails counts as one.
+   A gate run that started before the label came off may still show green on the pull
+   request; the merge-queue run reads the events again and stops it (ADR 0088).
 4. The merge-queue run (ADR 0088) applies point 1 to every pull request in the group, with the
    events of that pull request.
 5. A label set right before the run may not yet appear in the events; on a `labeled` event for
@@ -58,8 +64,8 @@ listing to catch up, short enough that a real absence fails within the job's tim
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #NNN | in PR |
-| 1 | `approval()` and `--events`, `--admins`, `--withdrawn`, `--pull N=FILE` in `scripts/decision_gate.py`; the workflow reads events and administrators and takes the label off after a foreign push; tests; ADR 0078 and 0088 tables, CONTRIBUTING.md, threat model | #NNN | in PR |
+| 0 | ADR proposed and accepted | #414 | in PR |
+| 1 | `approval()` and `--events`, `--admins`, `--withdrawn`, `--pull N=FILE` in `scripts/decision_gate.py`; the workflow reads events and administrators and takes the label off after a foreign push; tests; ADR 0078 and 0088 tables, CONTRIBUTING.md, threat model | #414 | in PR |
 
 ## Consequences
 
@@ -67,8 +73,9 @@ listing to catch up, short enough that a real absence fails within the job's tim
 - The product owner approves again after someone else pushes to an approved decision; pushes
   by Claude Code under the product owner's account do not need a new approval, so the trust
   boundary is the account, not the person behind it.
-- The `decision gate` job needs `pull-requests: write` to take the label off. It still runs
-  only the base's code (`pull_request_target`), so a pull request cannot use that right.
+- The withdrawal job needs `pull-requests: write` to take the label off. It checks out
+  nothing and runs only the base's workflow (`pull_request_target`), so a pull request cannot
+  use that right; the gate job itself keeps read-only rights.
 - Residual risk: an administrator account remains a single point of trust; protecting it
   (two-factor authentication for every member, to be required at organisation level) is
   outside this ADR.
