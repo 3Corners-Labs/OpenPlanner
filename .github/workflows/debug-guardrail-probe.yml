@@ -1,0 +1,29 @@
+name: debug guardrail probe
+# Temporary: what GITHUB_TOKEN can read of the guardrails (step 5). Never merged.
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      R: ${{ github.repository }}
+    steps:
+      - run: |
+          p() { echo "--- $1"; gh api "$1" --jq "$2" 2>&1 | head -c 600; echo; }
+          p "repos/$R/rulesets" 'map({id,name,target,enforcement})'
+          p "repos/$R/rulesets/26354149" '{name,enforcement,bypass_actors,rules:[.rules[].type]}'
+          p "repos/$R/rulesets/rule-suites?per_page=2" 'map({actor_name,ref,result})'
+          p "repos/$R/rulesets/rule-suites?rule_suite_result=bypass&per_page=2" 'map({actor_name,ref,result})'
+          p "repos/$R/environments" '[.environments[].name]'
+          p "repos/$R/environments/release/deployment-branch-policies" '[.branch_policies[].name]'
+          p "repos/$R" '{allow_merge_commit,allow_rebase_merge,delete_branch_on_merge,security_and_analysis}'
+          p "repos/$R/branches/main/protection" '.url'
+          p "repos/$R/rules/branches/main" 'map(.type)'
+          p "repos/$R/collaborators/cyberbeuk/permission" '.permission'
+          p "repos/$R/actions/permissions" '.'
