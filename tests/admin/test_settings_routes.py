@@ -757,6 +757,7 @@ async def test_system_status_counts_open_bookings_on_the_previous_token_key(
                         locale="nl",
                         management_token_hash=hash_token(derive_token(key.encode(), salt)),
                         management_token_salt=salt,
+                        public_ref=f"ref-{salt}",
                         created_at=NOW,
                     )
                 )

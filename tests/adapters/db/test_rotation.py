@@ -59,6 +59,7 @@ async def test_only_open_bookings_report_their_link(engine: AsyncEngine) -> None
                     locale="nl",
                     management_token_hash=hash_token(derive_token(OLD, salt)),
                     management_token_salt=salt,
+                    public_ref=f"ref-{salt}",
                     created_at=NOW,
                 )
             )
