@@ -5,7 +5,9 @@ import re
 
 import pytest
 import structlog
+from sqlalchemy import text
 
+from app.adapters.db.engine import create_engine
 from app.domain.event_context import bind_level, set_service, trace_scope
 from app.domain.event_schema import Envelope
 from app.domain.privacy import ALIASES
@@ -16,6 +18,7 @@ from app.logging import (
     TRACE,
     TRACE_POINTS,
     configure_logging,
+    set_line_tap,
     set_log_level,
     tracer,
     warn_loose_secret_files,
@@ -243,16 +246,119 @@ def test_httpx_request_lines_with_their_urls_are_not_logged(stream: io.StringIO)
     assert stream.getvalue() == ""
 
 
-@pytest.mark.parametrize("level", ["INFO", "DEBUG"])
-def test_aiosqlite_parameter_lines_are_not_logged_at_any_level(level: str) -> None:
-    buffer = io.StringIO()
-    configure_logging(level, buffer)
+def _marker(field: str) -> str:
+    return f"marker-{field}-x@example.test"
 
-    logging.getLogger("aiosqlite").debug(
-        "operation %s parameters %s", "INSERT", ("marker-x@example.test",)
-    )
 
-    assert "marker-x" not in buffer.getvalue()
+def _foreign_noise() -> None:
+    """Lines as libraries write them at DEBUG, TRACE and INFO, holding a marker per PII field."""
+    for field in sorted(PII_FIELDS):
+        value = _marker(field)
+        logging.getLogger("aiosqlite").debug("operation %s parameters %s", "INSERT", (value,))
+        logging.getLogger("httpcore.http11").debug(
+            "receive_response_headers.complete return_value=%r", (200, [(b"x-" + b"a", value)])
+        )
+        logging.getLogger("httpcore.connection").log(TRACE, "connect %s", value)
+        logging.getLogger("some.future.library").info("payload %s", value)
+
+
+def _assert_no_marker(text: str) -> None:
+    assert "marker-" not in text
+
+
+@pytest.mark.parametrize("level", ["INFO", "DEBUG", "TRACE"])
+def test_a_foreign_logger_stays_at_warning_at_every_level(level: str) -> None:
+    """ASVS V16.2.5: only our own loggers follow ``LOG_LEVEL``; any other holds at WARNING."""
+    out = io.StringIO()
+    taps: list[str] = []
+    configure_logging(level, out)
+    set_line_tap(taps.append)
+    try:
+        _foreign_noise()
+        set_log_level(level)  # a live level change must not widen it
+        _foreign_noise()
+        # a library that sets its own level, or one that sets the root, does not widen it either
+        logging.getLogger("httpcore").setLevel(TRACE)
+        logging.getLogger("some.future.library").setLevel(logging.DEBUG)
+        _foreign_noise()
+        logging.getLogger("some.future.library").warning("kept %s", "visible")
+    finally:
+        set_line_tap(None)
+        logging.getLogger("httpcore").setLevel(logging.NOTSET)
+        logging.getLogger("some.future.library").setLevel(logging.NOTSET)
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    _assert_no_marker(out.getvalue())
+    _assert_no_marker("\n".join(taps))
+    assert "kept visible" in out.getvalue()  # a warning from a library is still shown
+    assert "kept visible" in "\n".join(taps)
+
+
+@pytest.mark.parametrize("level", ["INFO", "DEBUG", "TRACE"])
+async def test_the_real_engine_logs_no_bound_value_at_any_level(level: str) -> None:
+    """A real async engine, with the driver loggers asked for everything, shows no marker."""
+    out = io.StringIO()
+    taps: list[str] = []
+    configure_logging(level, out)
+    set_line_tap(taps.append)
+    for name in ("aiosqlite", "sqlalchemy.engine", "sqlalchemy.pool"):
+        logging.getLogger(name).setLevel(TRACE)
+    engine = create_engine("sqlite+aiosqlite://")
+    try:
+        async with engine.begin() as conn:
+            columns = ", ".join(f"{field} TEXT" for field in sorted(PII_COLUMNS))
+            await conn.execute(text(f"CREATE TABLE booking ({columns})"))
+            marks = {field: _marker(field) for field in sorted(PII_COLUMNS)}
+            names = ", ".join(marks)
+            binds = ", ".join(f":{field}" for field in marks)
+            insert = f"INSERT INTO booking ({names}) VALUES ({binds})"  # noqa: S608
+            await conn.execute(text(insert), marks)
+            await conn.execute(text("SELECT * FROM booking"))
+    finally:
+        await engine.dispose()
+        set_line_tap(None)
+        for name in ("aiosqlite", "sqlalchemy.engine", "sqlalchemy.pool"):
+            logging.getLogger(name).setLevel(logging.NOTSET)
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    _assert_no_marker(out.getvalue())
+    _assert_no_marker("\n".join(taps))
+
+
+def test_our_own_loggers_follow_the_level_and_the_trace_points_work() -> None:
+    out = io.StringIO()
+    taps: list[str] = []
+    configure_logging("TRACE", out)
+    set_line_tap(taps.append)
+    try:
+        logging.getLogger("openplanner.adapters.something").debug("own debug")
+        logging.getLogger("uvicorn.error").info("own uvicorn")
+        structlog.get_logger().debug("own structlog")
+        tracer.trace("outbound.request", method="GET", host="h.example", status=200, ms=2)
+        logging.getLogger("httpcore").debug("foreign debug")
+    finally:
+        set_line_tap(None)
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    messages = [record["message"] for record in _records(out)]
+    assert messages == ["own debug", "own uvicorn", "own structlog", "outbound.request"]
+    assert [json.loads(line)["message"] for line in taps] == messages
+
+
+def test_our_own_loggers_stay_quiet_below_the_level() -> None:
+    out = io.StringIO()
+    configure_logging("INFO", out)
+    try:
+        logging.getLogger("openplanner.x").debug("hidden")
+        logging.getLogger("openplanner.x").info("shown")
+    finally:
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    assert [record["message"] for record in _records(out)] == ["shown"]
 
 
 def test_a_rendered_parameter_list_is_cut_from_an_exception_text(stream: io.StringIO) -> None:
