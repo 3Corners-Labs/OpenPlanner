@@ -387,12 +387,17 @@ ON_RESTORE = cli("maintenance", "on", "--reason", "restore", "--by", "host-updat
 OFF = cli("maintenance", "off", "--reason", "update", "--by", "host-updater")
 
 
+def without_pruning(host: Host) -> list[str]:
+    """The calls, without the removal of old images that follows a success."""
+    return [c for c in host.commands() if not c.startswith(("docker image ls", "docker rmi"))]
+
+
 def test_maintenance_is_on_before_the_backup_and_off_after_success(host: Host) -> None:
     updated(host)
 
     assert host.index(ON) < host.index(cli("backup-db", "request-7"))
     assert host.index(cli("update-report", "7", "succeeded")) < host.index(OFF, pinned=NEW)
-    assert host.commands()[-1] == OFF
+    assert without_pruning(host)[-1] == OFF
 
 
 def test_maintenance_is_off_after_a_rollback(host: Host) -> None:
@@ -414,7 +419,7 @@ def test_maintenance_is_on_around_a_restore_and_off_after_it(host: Host) -> None
     host.run()
 
     assert host.index(ON_RESTORE) < host.index(cli("backup-db", "request-8-restore"))
-    assert host.commands()[-1] == OFF
+    assert without_pruning(host)[-1] == OFF
     assert host.index(OFF, pinned=OLD) > host.index(UP, pinned=OLD)
 
 
@@ -453,8 +458,7 @@ def test_an_old_version_without_maintenance_does_not_stop_the_update(host: Host)
 
     updated(host)
 
-    assert host.commands()[-1] == OFF
-    assert host.commands()[-2] == cli("update-report", "7", "succeeded")
+    assert without_pruning(host)[-2:] == [cli("update-report", "7", "succeeded"), OFF]
 
 
 def test_an_update_keeps_the_installers_settings_in_the_pin_file(host: Host) -> None:
@@ -621,3 +625,100 @@ def test_a_tampered_proxy_pin_is_never_executed(host: Host) -> None:
     assert not host.marker.exists()
     assert (host.pinned(), host.pinned_proxy()) == (NEW, NEW_PROXY)
     assert reports(host)[-1] == cli("update-report", "8", "failed", "updater_error")
+
+
+OTHER = "ghcr.io/acme/other:2.0.0"
+
+
+def removed(host: Host) -> list[str]:
+    """The image references the updater removed, in order."""
+    return [c.removeprefix("docker rmi ") for c in host.commands() if c.startswith("docker rmi ")]
+
+
+def test_a_successful_update_keeps_only_the_running_and_the_previous_release(host: Host) -> None:
+    # Every update pulls a release and the host fills up unless the old ones go (docker01,
+    # 2026-11-02: 62 releases, 97% full). A restore needs the previous release, so it stays.
+    host.given(
+        "images", f"{IMAGE}:1.3.0\n{IMAGE}:1.4.0\n{IMAGE}:1.2.0\n{IMAGE}:1.2.0-rc.4\n{OTHER}\n"
+    )
+
+    updated(host)
+
+    assert removed(host) == [f"{IMAGE}:1.2.0", f"{IMAGE}:1.2.0-rc.4"]
+    assert host.index(cli("update-report", "7", "succeeded")) < host.index(
+        f"docker rmi {IMAGE}:1.2.0"
+    )
+
+
+def test_an_untagged_release_is_removed_by_its_digest(host: Host) -> None:
+    old = digest(IMAGE, "1.1.0")
+    host.given("images", f"{IMAGE}:1.3.0\n{IMAGE}:1.4.0\n{old}\n")
+
+    updated(host)
+
+    assert removed(host) == [old]
+
+
+def test_a_successful_restore_keeps_only_the_release_it_returned_to(host: Host) -> None:
+    updated(host)
+    host.given("images", f"{IMAGE}:1.3.0\n{IMAGE}:1.4.0\n")
+    host.given("claim", "8 restore 1.3.0 1.4.0\n")
+
+    host.run()
+
+    assert removed(host) == [f"{IMAGE}:1.4.0"]
+
+
+def test_the_proxy_releases_are_pruned_the_same_way(host: Host) -> None:
+    host.with_proxy()
+    host.given(
+        "images",
+        f"{IMAGE}:1.3.0\n{IMAGE}:1.4.0\n{PROXY_IMAGE}:1.2.0\n{PROXY_IMAGE}:1.3.0\n"
+        f"{PROXY_IMAGE}:1.4.0\n",
+    )
+
+    updated(host)
+
+    assert removed(host) == [f"{PROXY_IMAGE}:1.2.0"]
+
+
+def test_an_update_that_rolls_back_removes_nothing(host: Host) -> None:
+    host.given("images", f"{IMAGE}:1.2.0\n{IMAGE}:1.3.0\n{IMAGE}:1.4.0\n")
+    host.given("unhealthy", f"{NEW}\n")
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+
+    host.run()
+
+    assert removed(host) == []
+
+
+def test_an_image_that_cannot_be_removed_does_not_fail_the_update(host: Host) -> None:
+    host.given("images", f"{IMAGE}:1.2.0\n{IMAGE}:1.3.0\n{IMAGE}:1.4.0\n")
+    host.given("fail", "rmi\n")
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+
+    result = host.run()
+
+    assert result.returncode == 0
+    assert reports(host) == [cli("update-report", "7", "succeeded")]
+    assert f"could not remove {IMAGE}:1.2.0" in result.stderr
+
+
+def test_images_that_cannot_be_listed_do_not_fail_the_update(host: Host) -> None:
+    host.given("fail", "image-ls\n")
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+
+    result = host.run()
+
+    assert result.returncode == 0
+    assert reports(host) == [cli("update-report", "7", "succeeded")]
+    assert f"could not list the images of {IMAGE}" in result.stderr
+
+
+def test_a_listed_image_name_is_never_executed(host: Host) -> None:
+    host.given("images", f"{IMAGE}:1.3.0\n{IMAGE}:1.4.0\n{IMAGE}:{INJECTION % host.marker}\n")
+
+    updated(host)
+
+    assert not host.marker.exists()
+    assert removed(host) == []
