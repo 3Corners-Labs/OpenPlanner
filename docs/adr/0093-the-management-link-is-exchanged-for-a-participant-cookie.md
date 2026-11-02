@@ -76,8 +76,8 @@ value.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR accepted | #309 | merged |
-| 1 | `public_ref` (migration 0083), participant link sessions (table, port, adapter, sweep), the exchange on `GET /b/{token}` | PRNUM | built |
-| 2 | Booking pages (confirm, cancel, move) on `/b/m/{ref}`; old subpaths redirect; e2e | PRNUM | built |
+| 1 | `public_ref` (migration 0083), participant link sessions (table, port, adapter, sweep), the exchange on `GET /b/{token}` | #391 | built |
+| 2 | Booking pages (confirm, cancel, move) on `/b/m/{ref}`; old subpaths redirect; e2e | #391 | built |
 | 3 | Direct call, waiting room (poll URL in `live-region.js`), trial and join on `/b/m/{ref}`; maintenance route list; e2e | | planned |
 | 4 | Threat model, data flow, `docs/widget.md` and the manual where they show `/b/{token}` | | planned |
 
