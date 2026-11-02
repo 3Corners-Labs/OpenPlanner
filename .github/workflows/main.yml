@@ -3,7 +3,7 @@ name: main
 on:
   push:
     branches: [main]
-    # ADR 0105: the release app pushes the candidate tag, and an app's push starts workflows;
+    # ADR 0107: the release app pushes the candidate tag, and an app's push starts workflows;
     # a candidate is built in the run that tags it, so only release tags start this workflow.
     tags: ["v*.*.*", "!v*.*.*-rc.*"]
 
@@ -62,7 +62,7 @@ jobs:
     name: release candidate from main
     if: github.ref_type == 'branch'
     needs: [zap-baseline]
-    # ADR 0105: the release app's key lives in this environment, which only `main` may use.
+    # ADR 0107: the release app's key lives in this environment, which only `main` may use.
     environment: release
     concurrency:
       group: release-candidate
@@ -113,7 +113,7 @@ jobs:
             type=raw,value=${{ steps.candidate.outputs.version }}
             type=sha,format=long
             type=ref,event=branch
-      # ADR 0105: only the release app may create a `v*` tag (tag ruleset); its token lives for
+      # ADR 0107: only the release app may create a `v*` tag (tag ruleset); its token lives for
       # this job only. The candidate's tag does not start main.yml again (see `on.push.tags`).
       - id: app
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0

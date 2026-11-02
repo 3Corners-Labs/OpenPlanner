@@ -18,7 +18,7 @@ name: release
 # file only wires them to git and GitHub.
 #
 # Secrets and variables (docs/runbook.md, Releasing a version):
-#   RELEASE_APP_CLIENT_ID, RELEASE_APP_PRIVATE_KEY   the release app (ADR 0105), in the
+#   RELEASE_APP_CLIENT_ID, RELEASE_APP_PRIVATE_KEY   the release app (ADR 0107), in the
 #                   environment `release`, which only `main` may use. Its short-lived token
 #                   pushes the branch, opens the PR and pushes the tag: a PR or tag made with
 #                   GITHUB_TOKEN starts no workflow, and only the app may create a `v*` tag.
@@ -85,7 +85,7 @@ jobs:
           echo "::error::dispatch the release on ${{ github.event.repository.default_branch }}, not on $REF (or tick dry_run)"
           exit 1
       - id: app
-        name: a short-lived token from the release app (ADR 0105)
+        name: a short-lived token from the release app (ADR 0107)
         if: ${{ !inputs.dry_run }}
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
@@ -233,7 +233,7 @@ jobs:
           echo "::error::dispatch the tag on ${{ github.event.repository.default_branch }}, not on $REF (or tick dry_run)"
           exit 1
       - id: app
-        name: a short-lived token from the release app (ADR 0105)
+        name: a short-lived token from the release app (ADR 0107)
         if: ${{ !inputs.dry_run }}
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:

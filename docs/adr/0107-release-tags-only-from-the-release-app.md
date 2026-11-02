@@ -1,4 +1,4 @@
-# 0105. Release tags come only from the release app
+# 0107. Release tags come only from the release app
 
 Status: accepted (2026-11-02, `po:approved` on #422), requested by the product owner. Amends
 ADR 0079 (point 7: the release identity is a GitHub App of the organisation, not a personal

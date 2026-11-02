@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Makes the release app the author of the commits and tags a release job creates (ADR 0105),
+# Makes the release app the author of the commits and tags a release job creates (ADR 0107),
 # so the history shows which identity made them. The bot user's id comes from the API, the
 # noreply address GitHub links to that bot.
 #

@@ -1392,7 +1392,7 @@ repository:
 
 | Name | Kind | What | Why |
 |---|---|---|---|
-| `RELEASE_APP_CLIENT_ID` | variable in the environment `release` | the client ID of the release app (ADR 0105) | the release jobs take a short-lived token from the app: a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow, and only the app may create a `v*` tag |
+| `RELEASE_APP_CLIENT_ID` | variable in the environment `release` | the client ID of the release app (ADR 0107) | the release jobs take a short-lived token from the app: a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow, and only the app may create a `v*` tag |
 | `RELEASE_APP_PRIVATE_KEY` | secret in the environment `release` | a private key of the release app (PEM) | as above; the environment `release` may only be used from `main` |
 | `OPENAI_API_KEY` | secret | an OpenAI API key | the audit job (`openai/codex-action`); the key stays in the action's proxy and never reaches the review process |
 | `RELEASE_RUNNER` | variable, optional | the label of a self-hosted runner | default `ubuntu-24.04`; see *Self-hosted runner* below |
@@ -1401,7 +1401,7 @@ A real run stops at the app-token step without the release app; a dry run needs 
 them. The release-candidate job of `main.yml` uses the same app, so without it no candidate
 is tagged after a merge.
 
-**The release app (ADR 0105), once.** Under *Organization settings → Developer settings →
+**The release app (ADR 0107), once.** Under *Organization settings → Developer settings →
 GitHub Apps → New GitHub App*: a name such as `openplanner-release`, the repository as
 homepage, webhook off, repository permissions *Contents* and *Pull requests* read and write
 and nothing else, installable on this account only. Generate a private key, install the app

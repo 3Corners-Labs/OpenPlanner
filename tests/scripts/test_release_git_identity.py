@@ -1,4 +1,4 @@
-"""Release tags and the release PR come from the release app, not a workflow token (ADR 0105).
+"""Release tags and the release PR come from the release app, not a workflow token (ADR 0107).
 
 ``scripts/release-git-identity.sh`` makes the app the author; the workflow checks below keep
 the three jobs that tag or open the release PR on the app's token inside the environment
