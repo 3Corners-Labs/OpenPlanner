@@ -5,11 +5,16 @@ services:
   web:
     environment:
       ENVIRONMENT: dev
+      FORWARDED_ALLOW_IPS: ${CHECK_FORWARDED_ALLOW_IPS:-}
     # `tls-check --host booking.test --port 8443` from web reaches the proxy on the edge network.
     extra_hosts:
       - "booking.test:172.31.240.2"
     ports: !override
       - "127.0.0.1:18000:8000"
+    # The round trip of ADR 0086: `address-check --ca-file` trusts the test CA from this directory;
+    # CHECK_FORWARDED_ALLOW_IPS lets the script name a wrong proxy address on purpose.
+    volumes:
+      - ${PEBBLE_CERTS:?set by scripts/check-proxy.sh}:/pebble:ro
   worker:
     environment:
       ENVIRONMENT: dev
