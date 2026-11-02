@@ -14,6 +14,7 @@ Usage:
     ``python -m app.cli settings list``  every setting with its class, source and lock (ADR 0042)
     ``python -m app.cli settings show KEY``  one setting in detail; secrets only set/not set
     ``python -m app.cli settings-doc``  print the settings reference (docs/settings.md)
+    ``python -m app.cli logging-doc``  print the logging reference (docs/logging.md, ADR 0103)
     ``python -m app.cli init [--out PATH]``  generate the bootstrap keys (secrets/secrets.env)
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
@@ -40,6 +41,10 @@ When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
     ``python -m app.cli address-check``  the round trip to ``PUBLIC_BASE_URL`` through the proxy
         (ADR 0086): stored for System status; exits 1 on a finding;
         ``--ca-file`` trusts only that CA
+    ``python -m app.cli evidence [--format markdown|json] [--out DIR]``  one report (WP-C2) of
+        the version, ``oidc-check``, ``address-check``, ``tls-check``, the configured external
+        hosts, the log destinations, the retention counts, the key rotation and every setting
+        with class and source; secrets only as set or not set. Exits 1 when a section failed
     ``python -m app.cli rekey``  seal every stored secret again under the current
         ``SETTINGS_ENCRYPTION_KEY`` after a rotation (ADR 0094); idempotent, one audit event
     ``python -m app.cli purge-overdue [--dry-run]``  purge the personal data past its purge
@@ -63,7 +68,7 @@ import json
 import os
 import ssl
 import sys
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -92,15 +97,28 @@ from app.adapters.db.configuration_package import (
 from app.adapters.db.engine import create_engine
 from app.adapters.db.maintenance import checkpoint_wal
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
+from app.adapters.db.rotation import rotation_status
 from app.adapters.db.sealed import rekey_database
 from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.diagnostics import CheckResult, format_report, passed, run_checks
+from app.adapters.evidence import (
+    address_section,
+    collector_failed,
+    hosts_section,
+    logs_section,
+    oidc_section,
+    retention_section,
+    rotation_section,
+    settings_section,
+    tls_section,
+    version_section,
+)
 from app.adapters.instance_probe import HttpxInstanceProbe
 from app.adapters.integrations import build_integrations, installation_box, secret_box
 from app.adapters.live_settings import LiveSettings
 from app.adapters.oidc import claim_mapping, login_claims
-from app.adapters.oidc_check import OidcTarget, check_oidc
+from app.adapters.oidc_check import OidcInspection, OidcTarget, inspect_oidc
 from app.adapters.registrations import (
     Expected,
     Listing,
@@ -114,6 +132,7 @@ from app.adapters.service_app_check import service_app_check
 from app.adapters.settings_report import (
     combination_problem,
     describe,
+    effective,
     format_list,
     format_one,
     locked_keys,
@@ -142,6 +161,8 @@ from app.domain.configuration_package import (
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.entitlements import ClaimMode, resolve
 from app.domain.errors import DomainError
+from app.domain.evidence import Report, Row, Section, render_json
+from app.domain.evidence import render_markdown as render_evidence
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
@@ -152,6 +173,8 @@ from app.domain.ports import (
     InstanceProbe,
     IntegrationError,
 )
+from app.domain.public_address import AddressCheck
+from app.domain.retention import candidates_before, summarise
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
@@ -166,6 +189,7 @@ from app.i18n import Translator, load_catalogues
 from app.keys import client_pseudonym_key, management_token_key
 from app.web import navigation
 from app.web.authz_report import render_markdown
+from app.web.logging_doc import render_markdown as render_logging_doc
 from app.web.settings_doc import render_markdown as render_settings_doc
 
 
@@ -523,16 +547,16 @@ async def _purge_overdue(settings: Settings, dry_run: bool = False) -> tuple[str
     return "".join(lines), result.failed == 0
 
 
-async def _tls_check(
+async def _tls_probe(
     settings: Settings,
     host: str | None = None,
     port: int | None = None,
     probe: CertificateProbe | None = None,
-) -> tuple[str, bool]:
+) -> tuple[CertificateCheck, datetime]:
     """Probe the certificate of the public address (stored) or of ``host`` (not stored).
 
-    Returns the report and whether the finding is ``ok``. The thresholds are the environment's
-    or the defaults; the worker applies the portal's.
+    Returns the check and the time it was made at. The thresholds are the environment's or the
+    defaults; the worker applies the portal's.
     """
     engine = create_engine(settings.database_url)
     try:
@@ -551,7 +575,7 @@ async def _tls_check(
             check = await watch.probe(Address(host, port or 443))
         else:
             check = await watch.check()
-        return _tls_lines(check, clock.now()), check.ok
+        return check, clock.now()
     finally:
         await engine.dispose()
 
@@ -568,16 +592,26 @@ def _probe_trusting(ca_file: str | None) -> InstanceProbe | None:
     return HttpxInstanceProbe(transport=httpx.AsyncHTTPTransport(verify=context))
 
 
-async def _address_check(
-    settings: Settings, probe: InstanceProbe | None = None
+async def _tls_check(
+    settings: Settings,
+    host: str | None = None,
+    port: int | None = None,
+    probe: CertificateProbe | None = None,
 ) -> tuple[str, bool]:
+    """Run ``tls-check``; return the report and whether the finding is ``ok``."""
+    check, now = await _tls_probe(settings, host, port, probe)
+    return _tls_lines(check, now), check.ok
+
+
+async def _address_checks(
+    settings: Settings, probe: InstanceProbe | None = None
+) -> list[AddressCheck] | None:
     """Run the round trip to the public address (and the webhook address) and store it.
 
-    Returns the report and whether every address is ``ok``. A switched-off probe is reported
-    as such and counts as a pass for the exit code only when asked for on purpose.
+    Returns ``None`` when the probe is switched off (``PUBLIC_ADDRESS_CHECK_ENABLED``).
     """
     if not settings.public_address_check_enabled:
-        return "not checked: PUBLIC_ADDRESS_CHECK_ENABLED is false on this server\n", True
+        return None
     engine = create_engine(settings.database_url)
     try:
         uow, clock = SqlUnitOfWork(engine), SystemClock()
@@ -591,9 +625,21 @@ async def _address_check(
             interval=timedelta(hours=settings.tls_check_interval_hours),
             repeat=timedelta(hours=settings.tls_alert_repeat_hours),
         )
-        checks = await watch.check()
+        return await watch.check()
     finally:
         await engine.dispose()
+
+
+async def _address_check(
+    settings: Settings, probe: InstanceProbe | None = None
+) -> tuple[str, bool]:
+    """Run ``address-check``; return the report and whether every address is ``ok``.
+
+    A switched-off probe is reported as such and counts as a pass for the exit code.
+    """
+    checks = await _address_checks(settings, probe)
+    if checks is None:
+        return "not checked: PUBLIC_ADDRESS_CHECK_ENABLED is false on this server\n", True
     lines = "".join(
         f"{c.kind.value:<9}{c.url}  {c.finding.value}"
         f"{f' ({c.error})' if c.error else ''}"
@@ -810,6 +856,27 @@ CLAIM_SETTINGS = (
 """The claim mapping ``oidc-check`` prints: claim names, role values and the mode, never secrets."""
 
 
+def _oidc_target(settings: Settings) -> OidcTarget | None:
+    """Return what the login is compared with; ``None`` when no discovery URL is set."""
+    if settings.oidc_discovery_url is None:
+        return None
+    return OidcTarget(
+        discovery_url=settings.oidc_discovery_url,
+        redirect_uri=f"{settings.public_base_url.rstrip('/')}/admin/callback",
+        require_https=settings.environment == "prod",
+        client_secret_set=settings.oidc_client_secret is not None,
+        expected_issuer=settings.oidc_issuer,
+    )
+
+
+async def _oidc_inspection(
+    target: OidcTarget, transport: httpx.AsyncBaseTransport | None = None
+) -> OidcInspection:
+    """Run ``oidc-check``: two reads only (discovery and key set), no login, no secret."""
+    async with httpx.AsyncClient(timeout=15.0, transport=transport) as http:
+        return await inspect_oidc(http, target)
+
+
 async def _oidc_check(
     settings: Settings, transport: httpx.AsyncBaseTransport | None = None
 ) -> tuple[str, bool]:
@@ -817,17 +884,10 @@ async def _oidc_check(
 
     Two reads only (discovery and key set): no login is started and no secret is printed.
     """
-    if settings.oidc_discovery_url is None:
+    target = _oidc_target(settings)
+    if target is None:
         return "OIDC_DISCOVERY_URL is not set: the admin portal is disabled.\n", False
-    target = OidcTarget(
-        discovery_url=settings.oidc_discovery_url,
-        redirect_uri=f"{settings.public_base_url.rstrip('/')}/admin/callback",
-        require_https=settings.environment == "prod",
-        client_secret_set=settings.oidc_client_secret is not None,
-        expected_issuer=settings.oidc_issuer,
-    )
-    async with httpx.AsyncClient(timeout=15.0, transport=transport) as http:
-        results = await check_oidc(http, target)
+    results = (await _oidc_inspection(target, transport)).results
     width = max(len(name) for name in CLAIM_SETTINGS) + 1
     mapping = "".join(
         f"  {name.upper():<{width}}{getattr(settings, name)}  "
@@ -1185,6 +1245,121 @@ async def _portal_values(settings: Settings) -> tuple[PortalValues, str]:
     return store.current, ""
 
 
+async def _guarded(key: str, title: str, make: Callable[[], Awaitable[Section]]) -> Section:
+    """Run one collector of the evidence report; a failure becomes a failed section.
+
+    Only the exception's class name is kept, never its message, which could carry an address
+    or a value. One broken collector therefore never costs the rest of the report.
+    """
+    try:
+        return await make()
+    except Exception as exc:  # any collector may fail on its own: the report says which
+        return collector_failed(key, title, exc)
+
+
+async def _evidence(
+    settings: Settings,
+    *,
+    oidc_transport: httpx.AsyncBaseTransport | None = None,
+    tls_probe: CertificateProbe | None = None,
+    address_probe: InstanceProbe | None = None,
+) -> Report:
+    """Collect the evidence report (WP-C2) from the checks and readers that already exist.
+
+    ``oidc-check``, ``tls-check`` and ``address-check`` run as they do on their own, so they
+    store their result for System status like them. Nothing here measures anything itself.
+    """
+    clock = SystemClock()
+    now = clock.now()
+    portal, note = await _portal_values(settings)
+    environ = environment()
+    live = effective(settings, environ, portal, now)
+    engine = create_engine(settings.database_url)
+    uow = SqlUnitOfWork(engine)
+    everything = Scope(everything=True)
+
+    async def oidc() -> Section:
+        target = _oidc_target(settings)
+        inspection = await _oidc_inspection(target, oidc_transport) if target else None
+        return oidc_section(inspection, settings, target.issuer if target else None)
+
+    async def address() -> Section:
+        return address_section(await _address_checks(settings, address_probe))
+
+    async def tls() -> Section:
+        check, made_at = await _tls_probe(settings, probe=tls_probe)
+        return tls_section(check, made_at)
+
+    async def hosts() -> Section:
+        async with uow.read() as tx:
+            organisations = await tx.list_organisations(everything)
+            channels = [
+                (organisation.slug, found)
+                for organisation in organisations
+                for found in await tx.get_channel_settings(organisation.id)
+            ]
+            slugs = {organisation.slug for organisation in organisations}
+            providers = [
+                (provider.organisation, provider.discovery_url)
+                for provider in await tx.list_identity_providers(everything)
+                if provider.organisation in slugs
+            ]
+            destinations = await tx.list_log_destinations(everything)
+        return hosts_section(live, destinations, providers, channels)
+
+    async def logs() -> Section:
+        async with uow.read() as tx:
+            destinations = await tx.list_log_destinations(everything)
+            status = await tx.list_log_destination_status(everything)
+        return logs_section(live, destinations, status)
+
+    async def retention() -> Section:
+        retention_of = (await _live_settings(settings, uow, clock)).closure_retention
+        async with uow.read() as tx:
+            facts = await tx.list_retention(everything, candidates_before(now))
+        return retention_section(summarise(facts, now, retention_of))
+
+    async def rotation() -> Section:
+        return rotation_section(await rotation_status(engine, settings, now))
+
+    async def overview() -> Section:
+        section = settings_section(describe(settings, environ, portal, now))
+        if not note:
+            return section
+        return dataclasses.replace(
+            section, rows=(Row("portal values", note.strip()), *section.rows)
+        )
+
+    try:
+        sections = [
+            version_section(settings),
+            await _guarded("oidc", "Identity provider (oidc-check)", oidc),
+            await _guarded("address", "Public address (address-check)", address),
+            await _guarded("tls", "Certificate (tls-check)", tls),
+            await _guarded("hosts", "Configured external hosts", hosts),
+            await _guarded("logs", "Log destinations", logs),
+            await _guarded("retention", "Retention", retention),
+            await _guarded("rotation", "Key rotation", rotation),
+            await _guarded("settings", "Settings (class, source, value)", overview),
+        ]
+    finally:
+        await engine.dispose()
+    return Report(now, tuple(sections))
+
+
+def _evidence_command(settings: Settings, args: argparse.Namespace) -> int:
+    """Run ``evidence``: print one format, or with ``--out`` write both files (mode 600)."""
+    report = asyncio.run(_evidence(settings))
+    if args.out is not None:
+        args.out.mkdir(parents=True, exist_ok=True)
+        _write_private(args.out / "evidence.md", render_evidence(report).encode())
+        _write_private(args.out / "evidence.json", render_json(report).encode())
+        sys.stdout.write(f"written {args.out / 'evidence.md'} and {args.out / 'evidence.json'}\n")
+    else:
+        sys.stdout.write(render_json(report) if args.format == "json" else render_evidence(report))
+    return 0 if report.ok else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse the command line and run the chosen command; return the exit code."""
     parser = argparse.ArgumentParser(prog="python -m app.cli")
@@ -1255,6 +1430,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--ca-file",
         help="trust only this CA bundle (PEM) instead of the host's, e.g. an internal CA",
     )
+    evidence_cmd = commands.add_parser(
+        "evidence", help="one report of what the application measures about itself (no secrets)"
+    )
+    evidence_cmd.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    evidence_cmd.add_argument(
+        "--out", type=Path, metavar="DIR", help="write evidence.md and evidence.json there instead"
+    )
     tls_cmd = commands.add_parser("tls-check", help="the certificate of the public address")
     tls_cmd.add_argument("--host", help="probe another server instead (stored nowhere)")
     tls_cmd.add_argument("--port", type=int, help="its port (default 443)")
@@ -1278,6 +1460,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     target.add_argument("key", nargs="?", help="variable name")
     target.add_argument("--all-class-c", action="store_true", help="every changeable value")
     commands.add_parser("settings-doc", help="print the settings reference as Markdown")
+    commands.add_parser("logging-doc", help="print the logging reference as Markdown")
     init_cmd = commands.add_parser("init", help="generate the bootstrap keys (first install)")
     init_cmd.add_argument("--out", type=Path, default=DEFAULT_PATH, metavar="PATH")
     args = parser.parse_args(argv)
@@ -1295,6 +1478,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             sample = _read_claims(Path(args.claims))
             return _write(asyncio.run(_oidc_claims(Settings(), sample)))
         return _write(asyncio.run(_oidc_check(Settings())))
+    if args.command == "evidence":
+        return _evidence_command(Settings(), args)
     if args.command == "purge-overdue":
         return _write(asyncio.run(_purge_overdue(Settings(), args.dry_run)))
     if args.command == "sessions":
@@ -1324,6 +1509,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return code
     if args.command == "settings-doc":
         sys.stdout.write(render_settings_doc())
+        return 0
+    if args.command == "logging-doc":
+        sys.stdout.write(render_logging_doc())
         return 0
     if args.command == "update-claim":
         sys.stdout.write(asyncio.run(_update_claim(Settings())))
