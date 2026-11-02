@@ -216,7 +216,7 @@ overlap after a key rotation.
 | 3a | Domain claims and TXT verification on the provider's page (migration 0088, `app/domain/login_domains.py`), `idp_domain_grace_days`, the reserved suffix of ADR 0106 point 9 | #443 | merged |
 | 3b | The re-check job of verified domains (`idp_domain_recheck_hours`), system events when a domain fails or lapses | #448 | merged |
 | 3c | The email-first login page (nl, en), routing with `login_hint`, RFC 9207 check, email-domain check at the callback, scope restriction in `resolve`, the session's provider checked per request, the kill switch | #453 | merged |
-| 4a | Logout and fresh login through the session's own provider (point 17); the provider pages say when the host switch is off | | planned |
+| 4a | Logout and fresh login through the session's own provider (point 17); the provider pages say when the host switch is off | #462 | in PR |
 | 4b | Host tools: `oidc-check --idp <key>`, `idp disable <key>` (point 19) | | planned |
 | 4c | The provider in the staff directory (column and filter, point 16) and the organisation providers on *System status* | | planned |
 | 5 | Docs and tests end to end: threat model rows B1–B15, `docs/dataflow.md`, `docs/architecture.md` diagram, runbook (registering an IdP, the TXT record, key rotation), manual topic for the superuser, e2e login through the second realm | | planned |
