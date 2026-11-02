@@ -4,9 +4,9 @@ from dataclasses import replace
 
 import pytest
 
-from app.domain.audit import Category
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.log_destinations import (
+    DEFAULT_CATEGORIES,
     DestinationDraft,
     DestinationKind,
     LogDestination,
@@ -17,6 +17,7 @@ from app.domain.log_destinations import (
     validate_draft,
     validate_secret,
 )
+from app.domain.log_events import LogCategory
 from tests.support.domain import NOW
 
 
@@ -29,7 +30,7 @@ def destination(**changes: object) -> LogDestination:
         "index": "openplanner",
         "source": "",
         "min_level": "warning",
-        "categories": frozenset({Category.AUDIT, Category.SECURITY}),
+        "categories": frozenset({LogCategory.AUDIT, LogCategory.SECURITY}),
         "include_diagnostic": False,
         "include_trace": False,
         "enabled": True,
@@ -92,12 +93,41 @@ def test_trace_and_diagnostic_are_opt_in() -> None:
     )
 
 
+AUTHZ_LINE = {"event.category": "authz", "event.action": "authz.decision", "log.level": "info"}
+
+
+def test_authorisation_decisions_need_their_category_and_the_level() -> None:
+    open_door = destination(min_level="info")
+    ticked = replace(open_door, categories=open_door.categories | {LogCategory.AUTHZ})
+
+    assert not accepts(open_door, AUTHZ_LINE)
+    assert accepts(ticked, AUTHZ_LINE)
+    assert not accepts(replace(ticked, min_level="warning"), AUTHZ_LINE)
+    assert accepts(replace(ticked, min_level="warning"), {**AUTHZ_LINE, "log.level": "warning"})
+
+
+def test_an_ordinary_line_with_a_category_still_follows_the_level_only() -> None:
+    sparse = destination(min_level="warning", categories=frozenset())
+    line = {"event.category": "operations", "event.action": "storage.degraded"}
+
+    assert accepts(sparse, {**line, "log.level": "warning"})
+    assert not accepts(sparse, {**line, "log.level": "info"})
+    assert accepts(sparse, {**line, "event.category": "security", "log.level": "error"})
+
+
+def test_a_new_destination_takes_the_audit_trail_but_not_the_decisions() -> None:
+    assert draft().categories == DEFAULT_CATEGORIES
+    assert LogCategory.AUTHZ not in DEFAULT_CATEGORIES
+    assert validate_draft(draft(categories=frozenset({LogCategory.AUTHZ})), production=True)
+
+
 def test_categories_round_trip_and_drop_unknown_names() -> None:
-    text = categories_text({Category.SYSTEM, Category.AUDIT})
+    text = categories_text({LogCategory.SYSTEM, LogCategory.AUDIT})
 
     assert text == "audit,system"
-    assert parse_categories(text) == {Category.AUDIT, Category.SYSTEM}
-    assert parse_categories("audit,diagnostic,nonsense") == {Category.AUDIT}
+    assert parse_categories(text) == {LogCategory.AUDIT, LogCategory.SYSTEM}
+    assert parse_categories("audit,diagnostic,nonsense") == {LogCategory.AUDIT}
+    assert parse_categories("audit,authz") == {LogCategory.AUDIT, LogCategory.AUTHZ}
 
 
 # --- addresses ---------------------------------------------------------------------------
@@ -167,7 +197,7 @@ def test_a_draft_is_cleaned() -> None:
 
     assert clean.name == "Splunk prod"
     assert clean.source == ""
-    assert clean.categories == {Category.AUDIT, Category.SYSTEM, Category.SECURITY}
+    assert clean.categories == {LogCategory.AUDIT, LogCategory.SYSTEM, LogCategory.SECURITY}
 
 
 def test_fields_a_kind_does_not_use_are_emptied() -> None:
@@ -190,7 +220,7 @@ def test_fields_a_kind_does_not_use_are_emptied() -> None:
         ({"name": "   "}, "name"),
         ({"name": "x" * 81}, "name"),
         ({"min_level": "loud"}, "min_level"),
-        ({"categories": frozenset({Category.DIAGNOSTIC})}, "categories"),
+        ({"categories": frozenset({LogCategory.DIAGNOSTIC})}, "categories"),
         ({"index": "has space"}, "index"),
         ({"index": "a/b"}, "index"),
         ({"ca_pem": "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----"}, "ca_pem"),

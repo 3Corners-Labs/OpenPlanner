@@ -17,6 +17,7 @@ follow no redirects and give up after the timeout.
 
 import asyncio
 import json
+import re
 import ssl
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
@@ -253,20 +254,33 @@ class HttpSender(HttpBase):
         return "".join(f"{line}\n" for line in lines).encode(), "application/x-ndjson"
 
 
-def syslog_message(line: str, hostname: str) -> bytes:
-    """Return the RFC 5424 message for one JSON line.
+_MSGID = re.compile(r"^[a-z_]{1,32}$")
+"""What may be a syslog ``MSGID``: RFC 5424 allows 1 to 32 printable characters; ours are the
+category names."""
 
-    ``<PRI>1 TIMESTAMP HOSTNAME openplanner - MSGID - MSG``: the structured JSON line is the
-    message, ``MSGID`` is ``audit`` for an audit line and ``log`` for the others.
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
+
+
+def syslog_message(line: str, hostname: str) -> bytes:
+    """Return the RFC 5424 message for one JSON line (ADR 0085 point 2, ADR 0103 point 10).
+
+    ``<PRI>1 TIMESTAMP HOSTNAME openplanner - MSGID - MSG``. ``MSGID`` is the line's
+    ``event.category`` (``audit``, ``system``, ``security``, ``authz``, ``operations``), so a
+    syslog viewer filters by kind without opening the line. ``MSG`` starts with the readable
+    sentence of ``message`` and ends with the whole JSON line, which a log platform parses from
+    its first ``{``: a person reading a syslog viewer sees what happened before the fields.
     """
     record = json.loads(line)
     severity = _SEVERITY.get(str(record.get("log.level")), 6)
     stamp = record.get("@timestamp")
     if not isinstance(stamp, str) or not stamp:
         stamp = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-    msgid = "audit" if record.get("log_type") == "audit" else "log"
+    category = str(record.get("event.category") or "")
+    msgid = category if _MSGID.fullmatch(category) else "operations"
+    sentence = _CONTROL.sub(" ", str(record.get("message") or "")).strip()
+    text = f"{sentence} {line}" if sentence else line
     priority = SYSLOG_FACILITY * 8 + severity
-    return f"<{priority}>1 {stamp} {hostname or '-'} {APP_NAME} - {msgid} - {line}".encode()
+    return f"<{priority}>1 {stamp} {hostname or '-'} {APP_NAME} - {msgid} - {text}".encode()
 
 
 class SyslogSender:

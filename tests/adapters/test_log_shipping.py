@@ -12,6 +12,7 @@ import structlog
 from app.adapters.db.log_destinations import LogTarget
 from app.adapters.log_shipping import LogShipper, Pipeline, ShipSettings, probe_line
 from app.domain.audit import Outcome
+from app.domain.event_schema import SCHEMA
 from app.domain.log_destinations import HEALTH_EVENT, Reason, State
 from app.logging import configure_logging, set_line_tap
 from tests.domain.test_log_destinations import destination
@@ -282,8 +283,8 @@ async def test_delivery_runs_in_the_background_and_a_failure_is_one_event_then_o
 
     assert [json.loads(x)["message"] for x in sender.lines] == ["a"]
     assert env.events() == [
-        (HEALTH_EVENT, Outcome.FAILURE, "tls", "splunk_hec:1"),
-        (HEALTH_EVENT, Outcome.SUCCESS, "", "splunk_hec:1"),
+        (HEALTH_EVENT, Outcome.FAILURE, "tls", "change:failing,kind:splunk_hec,destination:1"),
+        (HEALTH_EVENT, Outcome.SUCCESS, "", "change:recovered,kind:splunk_hec,destination:1"),
     ]
 
 
@@ -366,9 +367,11 @@ def test_the_test_line_names_the_destination_and_carries_no_address() -> None:
     text = probe_line(FixedClock(), "web", destination(id=4))
 
     record = json.loads(text)
-    assert (record["message"], record["destination"], record["service.name"]) == (
+    assert (record["event.action"], record["labels.destination"], record["service.name"]) == (
         "logging.test",
         4,
         "web",
     )
+    assert record["message"] == "Test line for log destination 4 (splunk_hec)."
+    assert (record["event.category"], record["schema"]) == ("operations", SCHEMA)
     assert "splunk.example.org" not in text

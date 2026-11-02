@@ -189,11 +189,17 @@ def test_every_outside_requirement_is_listed_under_its_checklist() -> None:
         assert by_checklist[checklist] == set(ids), checklist
 
 
-def test_audited_and_outside_requirements_do_not_overlap() -> None:
-    """A requirement is either in the rows above or in a checklist."""
-    outside = {requirement for ids in EXTERNAL.values() for requirement in ids}
+def test_audited_and_outside_requirements_overlap_only_where_the_proof_is_outside() -> None:
+    """A requirement is in the rows above or in a checklist; in both only while its row is Open.
 
-    assert outside & set(ROWS) == set()
+    V6.3.1 and V6.3.2 have a measure in the repository (the audit named it) and need the identity
+    provider's own evidence; their row stays Open until the checklist is filled in.
+    """
+    outside = {requirement for ids in EXTERNAL.values() for requirement in ids}
+    both = outside & set(ROWS)
+
+    assert sorted(both) == ["V6.3.1", "V6.3.2"]
+    assert all(ROWS[requirement][3] == "Open" for requirement in both)
 
 
 # V1.2.5, V1.2.9: facts about the code that the document states.

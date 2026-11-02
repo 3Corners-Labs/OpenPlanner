@@ -8,8 +8,8 @@ import structlog
 from sqlalchemy import text
 
 from app.adapters.db.engine import create_engine
-from app.domain.event_context import bind_level, set_service, trace_scope
-from app.domain.event_schema import Envelope
+from app.domain.event_context import bind_actor_role, bind_level, set_service, trace_scope
+from app.domain.event_schema import SCHEMA, Envelope
 from app.domain.privacy import ALIASES
 from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 from app.logging import (
@@ -152,8 +152,79 @@ def test_a_loose_secret_file_is_reported_by_variable_name_only(stream: io.String
     warn_loose_secret_files(["SESSION_SECRET_FILE"])
 
     (record,) = _records(stream)
-    assert record["message"] == "settings.secret_file_readable"
-    assert record["variable"] == "SESSION_SECRET_FILE"
+    assert record["event.action"] == "settings.secret_file_readable"
+    assert record["message"] == "The secret file of SESSION_SECRET_FILE can be read by others."
+    assert record["labels.variable"] == "SESSION_SECRET_FILE"
+
+
+# --- ADR 0103: the line explains itself ----------------------------------------------------
+
+
+def test_a_line_reads_as_a_sentence_with_its_action_category_and_labels(
+    stream: io.StringIO,
+) -> None:
+    structlog.get_logger().warning(
+        "storage.degraded", grade="low", free_percent=6, database_mb=1, reason="free_space_low"
+    )
+
+    (record,) = _records(stream)
+    assert list(record)[:5] == [
+        "@timestamp",
+        "log.level",
+        "event.category",
+        "event.action",
+        "message",
+    ]
+    assert record["message"] == "Disk space is low: 6% free, database 1 MB (free_space_low)."
+    assert (record["event.action"], record["event.category"]) == ("storage.degraded", "operations")
+    assert (record["labels.free_percent"], record["labels.database_mb"]) == (6, 1)
+    assert record["reason"] == "free_space_low"  # an envelope field stays where it is
+    assert record["schema"] == SCHEMA
+    assert "free_percent" not in record
+
+
+def test_an_authorisation_decision_is_its_own_category_with_the_actors_kind_and_role(
+    stream: io.StringIO,
+) -> None:
+    with trace_scope():
+        bind_actor_role("org_admin")
+        structlog.get_logger().info(
+            "authz.decision",
+            actor="8c1f",
+            permission="group.view",
+            target="gemeente/burgerzaken",
+            target_group="burgerzaken",
+            target_organisation="gemeente",
+            allowed=True,
+            reason="group",
+        )
+
+    (record,) = _records(stream)
+    assert record["event.category"] == "authz"
+    assert record["message"] == (
+        "Permission group.view on gemeente/burgerzaken: allowed yes (group)."
+    )
+    assert (record["actor.type"], record["actor.role"]) == ("user", "org_admin")
+    assert record["labels.allowed"] == "true"
+
+
+def test_a_library_line_names_its_logger_and_keeps_its_own_text(stream: io.StringIO) -> None:
+    logging.getLogger("uvicorn.error").warning("Waiting for application shutdown.")
+
+    (record,) = _records(stream)
+    assert record["event.action"] == "library.uvicorn.error"
+    assert record["event.category"] == "operations"
+    assert record["message"] == "Waiting for application shutdown."
+    assert record["log.logger"] == "uvicorn.error"
+
+
+def test_the_sentence_carries_a_masked_value_never_the_value(stream: io.StringIO) -> None:
+    structlog.get_logger().info("i18n.missing_key", key="booking.title", locale="nl", email="a@b.c")
+
+    (record,) = _records(stream)
+    assert "a@b.c" not in stream.getvalue()
+    assert record["labels.email"] == MASK
+    assert record["message"] == "Text booking.title is missing in nl."
 
 
 def test_the_level_can_change_while_running_and_masking_stays() -> None:
@@ -195,10 +266,11 @@ def test_trace_lines_appear_at_trace_level_only() -> None:
         loud = _trace_stream("TRACE")
         tracer.trace("http.request", method="GET", route="/g/{slug}", status=200, ms=3)
         record = _records(loud)[0]
-        assert record["message"] == "http.request"
+        assert record["event.action"] == "http.request"
+        assert record["message"] == "GET /g/{slug} answered 200 in 3 ms."
         assert record["log.level"] == "trace"
-        assert record["route"] == "/g/{slug}"
-        assert record["status"] == 200
+        assert record["labels.route"] == "/g/{slug}"
+        assert record["labels.status"] == 200
         assert "name" not in record  # the stdlib logger's name does not leak into the line
     finally:
         structlog.reset_defaults()
@@ -349,7 +421,12 @@ def test_our_own_loggers_follow_the_level_and_the_trace_points_work() -> None:
         logging.getLogger().handlers.clear()
 
     messages = [record["message"] for record in _records(out)]
-    assert messages == ["own debug", "own uvicorn", "own structlog", "outbound.request"]
+    assert messages == [
+        "own debug",
+        "own uvicorn",
+        "own structlog",
+        "GET to h.example answered 200 in 2 ms.",
+    ]
     assert [json.loads(line)["message"] for line in taps] == messages
 
 
