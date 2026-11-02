@@ -3,20 +3,20 @@
 The updater backs up the database before it changes anything, and puts the backup back when
 the new version does not become healthy. Backups hold personal data: they are written with
 mode 600 next to the database (``data/backups``), never leave the data volume, and are deleted
-after ``BACKUP_LIFETIME``. Both directions use SQLite's online backup API, so a copy is
+after ``BACKUP_LIFETIME`` by the updater and, as a second safety net, by the worker (ADR 0102).
+Both directions use SQLite's online backup API, so a copy is
 consistent even while the database is in WAL mode.
 """
 
 import re
 import sqlite3
 from contextlib import closing
-from datetime import datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.engine import make_url
 
-BACKUP_LIFETIME = timedelta(hours=24)
-"""How long a backup is kept: the restore window of an update (``RESTORE_WINDOW``)."""
+from app.domain.backup_age import BACKUP_LIFETIME, BackupAge
 
 _NAME = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _SUFFIX = ".db"
@@ -32,6 +32,15 @@ def database_path(database_url: str) -> Path:
     if url.get_backend_name() != "sqlite" or not url.database:
         raise ValueError("backups need a SQLite database file")
     return Path(url.database)
+
+
+def backup_directory(database_url: str) -> Path:
+    """Return ``data/backups`` next to the SQLite file of ``database_url``.
+
+    Raises:
+        ValueError: For any other database.
+    """
+    return database_path(database_url).parent / "backups"
 
 
 def _backup_file(directory: Path, name: str) -> Path:
@@ -86,3 +95,13 @@ def prune_backups(directory: Path, now: datetime) -> int:
             backup.unlink()
             deleted += 1
     return deleted
+
+
+def oldest_backup(directory: Path) -> BackupAge | None:
+    """Return how many backups there are and when the oldest was written, or ``None``."""
+    if not directory.is_dir():
+        return None
+    written = [b.stat().st_mtime for b in directory.glob(f"*{_SUFFIX}")]
+    if not written:
+        return None
+    return BackupAge(len(written), datetime.fromtimestamp(min(written), tz=UTC))

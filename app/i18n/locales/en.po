@@ -6506,8 +6506,41 @@ msgstr "Leave this empty: the name is made from the question. Only lower-case le
 msgid "admin.form_fields.type"
 msgstr "Type"
 
-msgid "admin.form_fields.type_hint"
-msgstr "What the participant fills in: a short or long text box, email address, phone number, number, date, postcode, choice list or checkbox. Decides how the answer is checked. Fixed once saved."
+msgid "admin.form_fields.type.short_text.help"
+msgstr "A short one-line answer, such as a customer number."
+
+msgid "admin.form_fields.type.long_text.help"
+msgstr "A longer answer in a large text box."
+
+msgid "admin.form_fields.type.email.help"
+msgstr "An email address, checked for its form."
+
+msgid "admin.form_fields.type.phone.help"
+msgstr "A phone number, checked and kept as an international number."
+
+msgid "admin.form_fields.type.number.help"
+msgstr "A whole number, optionally with a minimum and maximum."
+
+msgid "admin.form_fields.type.date.help"
+msgstr "A date, optionally within a number of days from today."
+
+msgid "admin.form_fields.type.postcode_nl.help"
+msgstr "A Dutch postcode, for example 1234 AB."
+
+msgid "admin.form_fields.type.choice.help"
+msgstr "One choice from a list you write yourself, for example the subject of the call."
+
+msgid "admin.form_fields.type.checkbox.help"
+msgstr "A box the participant ticks, for example a consent."
+
+msgid "admin.form_fields.choose_kind"
+msgstr "What kind of question do you want to ask?"
+
+msgid "admin.form_fields.other_kind"
+msgstr "Choose another kind"
+
+msgid "admin.form_fields.always_pii"
+msgstr "Answers of this kind always count as personal data."
 
 msgid "admin.form_fields.type.short_text"
 msgstr "Short text (up to 100 characters)"
@@ -9239,6 +9272,30 @@ msgstr "Erase data"
 
 msgid "admin.rights.sections"
 msgstr "Parts of My rights"
+
+msgid "admin.settings.backups.title"
+msgstr "Update back-ups"
+
+msgid "admin.settings.backups.intro"
+msgstr "Before every update the updater makes a copy of the database so it can roll back. The copy holds personal data and is deleted after 24 hours, by the updater and, as a safety net, by the worker."
+
+msgid "admin.settings.backups.none"
+msgstr "No back-ups present."
+
+msgid "admin.settings.backups.count"
+msgstr "Number of back-ups"
+
+msgid "admin.settings.backups.oldest"
+msgstr "Oldest back-up"
+
+msgid "admin.settings.backups.oldest.value"
+msgstr "{hours} h old (written {since})"
+
+msgid "admin.settings.backups.chip"
+msgstr "Warning"
+
+msgid "admin.settings.backups.overdue"
+msgstr "The oldest back-up is older than {hours} hours and has not been deleted. Check that the worker is running and that the volume is writable: a back-up holds personal data."
 
 msgid "admin.logging.shipping_off"
 msgstr "Log shipping is switched off on the host (LOG_SHIPPING_ENABLED). No destination receives anything and no test line can be sent; the configuration is kept."

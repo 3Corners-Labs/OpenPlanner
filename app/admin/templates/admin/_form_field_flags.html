@@ -6,7 +6,9 @@
     <label for="required">{{ _("admin.form_fields.required") }}</label>
   </div>
   <p id="required-hint" class="hint">{{ _("admin.form_fields.required_hint") }}</p>
-  {% if not always_pii %}
+  {% if always_pii %}
+  <p class="hint">{{ _("admin.form_fields.always_pii") }}</p>
+  {% else %}
   <div class="field{% if confirm_error %} field--error{% endif %}">
     {{ error_message(confirm_error, "confirm_not_pii-error") }}
     <div class="choice__option">

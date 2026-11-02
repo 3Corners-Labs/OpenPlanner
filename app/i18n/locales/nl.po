@@ -6506,8 +6506,41 @@ msgstr "Laat dit leeg: de naam wordt gemaakt uit de vraag. Alleen kleine letters
 msgid "admin.form_fields.type"
 msgstr "Soort"
 
-msgid "admin.form_fields.type_hint"
-msgstr "Wat de deelnemer invult: kort of lang tekstvak, e-mailadres, telefoonnummer, getal, datum, postcode, keuzelijst of aankruisvak. Bepaalt de controle op het antwoord. Ligt vast na opslaan."
+msgid "admin.form_fields.type.short_text.help"
+msgstr "Een kort antwoord van één regel, zoals een klantnummer."
+
+msgid "admin.form_fields.type.long_text.help"
+msgstr "Een langer antwoord in een groot tekstvak."
+
+msgid "admin.form_fields.type.email.help"
+msgstr "Een e-mailadres, gecontroleerd op de vorm."
+
+msgid "admin.form_fields.type.phone.help"
+msgstr "Een telefoonnummer, gecontroleerd en bewaard als internationaal nummer."
+
+msgid "admin.form_fields.type.number.help"
+msgstr "Een geheel getal, eventueel met een minimum en maximum."
+
+msgid "admin.form_fields.type.date.help"
+msgstr "Een datum, eventueel binnen een aantal dagen vanaf vandaag."
+
+msgid "admin.form_fields.type.postcode_nl.help"
+msgstr "Een Nederlandse postcode, bijvoorbeeld 1234 AB."
+
+msgid "admin.form_fields.type.choice.help"
+msgstr "Eén keuze uit een lijst die u zelf opstelt, bijvoorbeeld het onderwerp van het gesprek."
+
+msgid "admin.form_fields.type.checkbox.help"
+msgstr "Een vakje dat de deelnemer aankruist, bijvoorbeeld een toestemming."
+
+msgid "admin.form_fields.choose_kind"
+msgstr "Wat voor vraag wilt u stellen?"
+
+msgid "admin.form_fields.other_kind"
+msgstr "Andere soort kiezen"
+
+msgid "admin.form_fields.always_pii"
+msgstr "Antwoorden van deze soort tellen altijd als persoonsgegevens."
 
 msgid "admin.form_fields.type.short_text"
 msgstr "Korte tekst (tot 100 tekens)"
@@ -9251,6 +9284,30 @@ msgstr "Gegevens wissen"
 
 msgid "admin.rights.sections"
 msgstr "Onderdelen van Mijn rechten"
+
+msgid "admin.settings.backups.title"
+msgstr "Back-ups van updates"
+
+msgid "admin.settings.backups.intro"
+msgstr "Voor elke update maakt de updater een kopie van de database om terug te kunnen draaien. Die kopie bevat persoonsgegevens en wordt na 24 uur verwijderd, door de updater en als vangnet ook door de worker."
+
+msgid "admin.settings.backups.none"
+msgstr "Geen back-ups aanwezig."
+
+msgid "admin.settings.backups.count"
+msgstr "Aantal back-ups"
+
+msgid "admin.settings.backups.oldest"
+msgstr "Oudste back-up"
+
+msgid "admin.settings.backups.oldest.value"
+msgstr "{hours} uur oud (geschreven {since})"
+
+msgid "admin.settings.backups.chip"
+msgstr "Waarschuwing"
+
+msgid "admin.settings.backups.overdue"
+msgstr "De oudste back-up is ouder dan {hours} uur en is niet verwijderd. Controleer of de worker draait en of het volume schrijfbaar is: een back-up bevat persoonsgegevens."
 
 msgid "admin.logging.shipping_off"
 msgstr "Het versturen van logs staat uit op de host (LOG_SHIPPING_ENABLED). Geen enkele bestemming ontvangt iets en er kan geen testregel worden gestuurd; de instellingen blijven bewaard."

@@ -35,6 +35,16 @@ says what to do first (run `rekey` on the host, or wait until those bookings are
 a previous key the block does not appear. The procedure is in the runbook, *Rotating secrets*,
 and the inventory of all keys in `docs/cryptography.md`.
 
+### Update back-ups
+
+Before every update the updater copies the database so that it can roll back. That copy holds
+personal data, so it is deleted after 24 hours, by the updater and, as a second safety net, by
+the worker, also when the updater or its timer does not run. The block shows how many copies
+there are and how old the oldest is. When the oldest is more than two hours past its 24 hours,
+a warning appears: neither deleter has worked, so check that the worker runs and that the data
+volume is writable. File names are never shown. Back-ups for disaster recovery are a matter of
+the hosting party, not of this screen (runbook, *Backup and restore*).
+
 ### Address and proxy
 
 Above the certificate is what the installation knows about its own address. Every link in an

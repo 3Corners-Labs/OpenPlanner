@@ -99,16 +99,19 @@ Beheerscherm: eigen ingang (`/admin`), OIDC-login, server-rendered. Agenda-inzag
 
 ## 7. Privacy en retentie
 
-- Bewaartermijn PII: tot `slot.end + 24h`. Job `purge_pii` nult `name, email, phone, note, guest_join_url, host_join_url`, zet `pii_purged_at`. De rij blijft voor statistiek (groep, slot, status).
-- Geannuleerde boekingen: purge binnen 24 uur na annulering.
+- Bewaartermijn PII: tot `slot.end + 24h`. Job `purge_pii` verwijdert `first_name, last_name, email, phone, form_answers, guest_join_url, host_join_url, trial_join_url`, de koppelingen met de videovergadering en de WxCC-taak (`video_room_id, trial_room_id, wxcc_task_id`) en de providertekst in de gebeurtenissen, vervangt de hash van de beheerlink door een willekeurige waarde en zet `pii_purged_at`. Het woord is "verwijderd", nooit "geanonimiseerd": de rij blijft staan voor statistiek (groep, slot, status) en kan samen met andere gegevens nog naar een persoon wijzen (ADR 0102).
+- Geannuleerde boekingen: purge binnen 24 uur na annulering. Een geschorste boeking (sluiting) wordt uiterlijk verwijderd op het vroegste van: einde van de sluiting + 30 dagen, of `closure_max_retention_days` na het einde van het oorspronkelijke slot.
 - Logs: nooit PII; structlog met een processor die bekende velden maskeert; test die dit afdwingt.
-- Back-ups: SQLite via Litestream (continu) of dagelijkse `.backup`, versleuteld, retentie gelijk aan PII-termijn plus 7 dagen (vastleggen in DPIA). Een back-up bevat de PII van dat moment; dit is onderdeel van het retentiebeleid.
+- Back-ups (ADR 0102, twee soorten met elk een eigen doel; ze worden niet door elkaar gehaald):
+  - **Terugdraaikopie bij een update (rollback, gebouwd).** De updater maakt vóór elke update een kopie in `data/backups` (modus 600, map 700). De kopie leeft 24 uur (`BACKUP_LIFETIME`, vast: het is het herstelvenster van een update, geen bewaarbeleid) en wordt verwijderd door de updater en, als tweede vangnet, door de worker, ook zonder updater of timer. De applicatie versleutelt de kopie niet: het volume moet versleuteld zijn, dat is een eis aan de host (de go-live-checklist vraagt erom). Systeemstatus toont de leeftijd van de oudste kopie en waarschuwt als die ouder is dan 24 uur plus een korte respijtperiode.
+  - **Disaster recovery (niet gebouwd; verantwoordelijkheid van de hostingpartij, open punt O7).** Geen instelling van de applicatie. Het contract met de host moet vastleggen: *versleuteld* (opgeslagen en onderweg); *termijn* (een vaste maximale leeftijd, passend bij de DPIA; richtwaarde: de PII-termijn plus 7 dagen); *toegang* (alleen benoemde rollen, met een log van wie een kopie las of terugzette); *vernietiging* (kopieën worden aan het einde van de termijn vernietigd, met een bewijs daarvan); *herstelproef* (één per jaar, met datum en uitkomst). De opdrachtgever kan hiervan bewijs opvragen.
+  - **Herstelprocedure** (staat in `docs/runbook.md`, in deze volgorde): `maintenance on` → kopie terugzetten → `purge-overdue` → retentieoverzicht toont 0 boekingen met gegevens voorbij hun moment → `sessions end-all --reason restore` → `maintenance off`. De stap `purge-overdue` is nodig omdat een kopie ouder is dan de levende gegevens en dus persoonsgegevens kan bevatten die op het levende systeem al verwijderd waren.
 - Leveranciers: mail, sms (Connect), WxCC-taakcontext: retentie contractueel vastleggen; in WxCC alleen voornaam + URL meegeven.
 - DPIA en verwerkersovereenkomsten: eigenaar is de opdrachtgever; deze dienst levert het gegevensstroomdiagram.
 
 ## 8. Niet-functioneel
 
-- Volume: ~80 boekingen/werkdag, piek 20/min. Eén VM, 2 containers + Postgres volstaat.
+- Volume: ~80 boekingen/werkdag, piek 20/min. Eén VM, 2 containers (web, worker) met SQLite volstaat.
 - Beschikbaarheid: 99,5% kantoortijd; buiten kantoortijd mag de widget "gesloten" tonen.
 - Toegankelijkheid: WCAG 2.2 AA (Besluit digitale toegankelijkheid, EN 301 549). axe-core in CI vangt ~40%; daarnaast verplicht: toetsenbordbediening van het kalendergrid, focusbeheer per stap, `aria-live` voor statuswijzigingen, geen tijdslimiet (2.2.1), geen puzzel-captcha (3.3.8), geen dubbele invoer (3.3.7), doelgrootte 24 px (2.5.8), `prefers-reduced-motion`. Handmatige test met NVDA (Windows) en VoiceOver (macOS/iOS), gebruikerstest met mensen met een beperking, en een gepubliceerde toegankelijkheidsverklaring vóór livegang. Het videogesprek zelf: zie O8.
 - Beveiliging: zie CLAUDE.md §Security. Externe pentest vóór livegang (overheid: verplicht stellen in aanbesteding/contract).

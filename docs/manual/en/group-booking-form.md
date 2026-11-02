@@ -29,7 +29,9 @@ booking always means what the question meant at the time.
 <!-- field: type -->
 ## Type
 
-The type decides how the answer is checked. You cannot write a check of your own.
+You choose the type first; the portal then shows only the inputs that belong to it (the
+choices of a choice list, the limits of a number or date). The type decides how the answer is
+checked. You cannot write a check of your own.
 
 - **Short text**: up to 100 characters.
 - **Free text**: up to 1000 characters. This is always personal data, because a participant can
@@ -56,7 +58,10 @@ the question. The participant sees the language of the page, otherwise Dutch.
 <!-- field: classification -->
 ## Personal data
 
-Every new field is personal data. Answers to such a field never appear in logs, the audit log,
+The portal proposes a tag per type: a choice list and a tick box are proposed as *Not
+personal data*, every other type as personal data (also number, date and postcode: a date of
+birth is one). Email address, phone number and free text are always personal data and do not
+show this choice. It is a proposal: you see it and can change it. Answers to such a field never appear in logs, the audit log,
 exports, messages or the agents' queue. Only the booking's page in the agenda shows them, to
 those who may view bookings.
 

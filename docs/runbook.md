@@ -3,6 +3,11 @@
 Status: skeleton (work package 1). Hosting and backup ownership are open (HANDOVER O7);
 sections marked *TBD* are completed in work package 9.
 
+**Evidence for auditors and the client.** The checklists for the identity provider, the host,
+Cisco and the data controller, with the commands that show each requirement, are in
+`docs/assurance/` (start with its `README.md`). The host checklist there complements the
+sections *Production settings*, *Backup and restore* and *Verifying the image signature* below.
+
 ## Deploy
 
 A host is installed, and repaired, with `scripts/install.sh` from the checkout in
@@ -1622,7 +1627,7 @@ docker compose --env-file .env.update up -d
 locally built proxy: remove the `OPENPLANNER_PROXY_IMAGE` line then.)
 
 Backups hold personal data: they stay in the data volume (mode 600) and every updater run
-deletes those older than 24 hours (`backup-db --prune`). Never copy them off the host.
+deletes those older than 24 hours (`backup-db --prune`), and so does the worker once an hour (*Backup and restore*). Never copy them off the host.
 
 ### The browser shows old styling after an update (versioned static files)
 
@@ -1651,8 +1656,34 @@ deploy the old images. Every migration is reversible (enforced in CI).
 
 ## Backup and restore
 
-*TBD (O7).* Planned: Litestream or a daily `sqlite3 .backup`, encrypted, retention = PII term
-+ 7 days (HANDOVER §7).
+OpenPlanner has two kinds of copies of the database, with different purposes (ADR 0102,
+`docs/HANDOVER.md` §7). Do not mix them up.
+
+**Rollback copy of an update (built).** The updater copies the database to `data/backups` before
+each update (mode 600, directory mode 700). It is not encrypted by the application, so the data
+volume **must be encrypted** (a requirement on the host; the go-live checklist asks the host to
+confirm it). It lives 24 hours (`BACKUP_LIFETIME`, fixed: the restore window of an update) and
+is deleted by the updater (`backup-db --prune`) and, as a second safety net, by the worker's
+housekeeping once an hour, so an installation without the updater or its timer keeps no copy.
+*System status* (Advanced settings) shows how many copies there are and how old the oldest is,
+with a warning when it is more than two hours past 24 hours. If that warning stays: check
+`docker compose ps worker` and the log lines `backups.prune_failed` (volume read-only), then
+delete the file by hand and report it. Never copy these files off the host.
+
+**Disaster recovery (not built; the hosting party, open point O7).** It is not a setting of
+this application. The host's agreement must meet these requirements, and the controller can ask
+for proof of each:
+
+| Requirement | What it means |
+|---|---|
+| Encrypted | copies are encrypted at rest and in transit |
+| Term | a fixed maximum age in the agreement, consistent with the DPIA (reference: the PII term plus 7 days) |
+| Access | named roles only, with a log of who read or restored a copy |
+| Destruction | copies are destroyed at the end of the term, with a record of it |
+| Restore test | one per year, documented with its date and outcome |
+
+A restored copy is older than the live data, so it can hold personal data that was already
+deleted on the live system. The procedure below therefore always runs the sweep.
 
 ### Restoring a copy by hand (ADR 0102 point 9, ADR 0098 point 10)
 

@@ -2,9 +2,9 @@
 
 Status: accepted (2026-11-01), decided by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (privacy chain PI-01, PI-02, PI-04, PI-05; V14.2.4). Amends the retention rule
-of ADR 0024 (point 5); the rest of ADR 0024 stands. Partly built: steps 1 (the maximum for an
-open closure), 2 (what remains after a purge) and 4 (the row merged into a daily count) are
-built, step 3 is not; see *Build status*.
+of ADR 0024 (point 5); the rest of ADR 0024 stands. Built: steps 1 (the maximum for an
+open closure), 2 (what remains after a purge), 3 (back-ups) and 4 (the row merged into a daily
+count) are built; see *Build status*.
 
 ## Context
 
@@ -145,7 +145,7 @@ of this application.
 | 0 | ADR accepted (decision PR) | #362 | in PR |
 | 1 | P-A2: maximum for an open closure: `closure_max_retention_days`, `closure_max_notice_days`, planning, sweep, overview, notice, closure page text, manual | #394 | built; the participant's management page (`/b/m/{ref}`) names the same date for a booking on hold (key `manage.suspended.delete_by`, `BookingDetails.delete_by` from the same `suspended_purge_moment`), built by the PR that follows ADR 0093 (decision 4 is complete) |
 | 2 | P-A5: purge empties the provider links, event message and token hash; retention matrix in `docs/dataflow.md`; the PII line in CLAUDE.md; terminology in docs and manual | #395 | built: `privacy.PURGED_FIELDS` is the one list the purge works from; `booking_events.message` emptied; `management_token_hash` randomised; `public_ref` stays (random, names no one, and its participant sessions are deleted by the purge); `note` out of the PII list; retention matrix in `docs/dataflow.md`; "deleted, never anonymised" guarded by `tests/test_terminology.py` |
-| 3 | P-A4: worker prunes `data/backups`; *System status* shows the oldest back-up; restore procedure in the runbook and `docs/HANDOVER.md` §7 | | planned |
+| 3 | P-A4: worker prunes `data/backups`; *System status* shows the oldest back-up; restore procedure in the runbook and `docs/HANDOVER.md` §7 | #404 | built: the worker deletes copies older than `BACKUP_LIFETIME` once an hour (`Housekeeping`, `app/adapters/db/backup.py`); *System status* shows the count and the age of the oldest copy and warns past 24 h plus the fixed grace of 2 h (`app/domain/backup_age.py`); `docs/HANDOVER.md` §7 separates the rollback copy (built) from disaster recovery (hosting, with requirements); runbook and retention matrix name both |
 | 4 | Merge the booking row into a daily count and delete it after `booking_row_retention_days` | #401 | built: `booking_day_counts` (migration 0086; group, day, status, count, latest purge), `BookingRowRollup` in the worker's daily housekeeping, event `booking_rows.rollup` (counts only); `booking_row_retention_days` class C 730 (365–3650); the retention overview's *Last removed* reads the counts too; a row with personal data or an open job is never deleted |
 
 Step 4 is not in the product owner's list of steps; it is added because decision 12 would

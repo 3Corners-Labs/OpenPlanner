@@ -122,6 +122,7 @@ make check
 - `docs/install.md` — installing and repairing a host with `scripts/install.sh`.
 - `site/` — the public website, openplanner.nl, built from the repository (ADR 0087).
 - `docs/runbook.md` — operating the service.
+- `docs/assurance/` — checklists for the parties that must give evidence we cannot (identity provider, hosting, Cisco, data controller) and the scope for the penetration test.
 - `docs/adr/` — decisions.
 - `CONTRIBUTING.md` — dev setup, tests, PR checklist.
 - `CLAUDE.md` — working agreements, architecture rules, quality gates.
