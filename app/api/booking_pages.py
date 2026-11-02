@@ -51,7 +51,7 @@ from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService
 from app.i18n.dates import format_clock, format_day, local_day
-from app.web.closure_labels import closure_view
+from app.web.closure_labels import closure_view, delete_by_label
 from app.web.errors import FormError, form_errors, status_for
 from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow, follow_group_from_path
@@ -316,6 +316,7 @@ def _manage_context(
         "awaiting_rebook": booking.awaits_rebook,
         "rebook_by": _moment(booking.rebook_by, group, locale),
         "closure": closure_view(closure, group, locale, now) if closure else None,
+        "delete_by": delete_by_label(details.delete_by, group, locale),
         "group": group,
         "slot_label": slot_label(booking.start, booking.end, group, locale),
         "status_label": locale.gettext(STATUS_LABELS[booking.status]),

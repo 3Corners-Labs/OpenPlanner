@@ -1777,7 +1777,7 @@ When a team cannot hold its appointments (outage, illness, closed building):
    `closure_max_notice_days` (default 14) before that, the worker records the system event
    `closure.retention_notice` at the group, which the group's and the organisation's admins see
    in the audit log: lift or end the closure, or move the appointments, before that date. The
-   closure page tells participants the date.
+   closure page and the participant's appointment page tell participants the date.
 
 ## Onderhoudsmodus (ADR 0038)
 

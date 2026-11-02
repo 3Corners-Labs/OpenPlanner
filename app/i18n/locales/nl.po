@@ -2499,6 +2499,9 @@ msgstr "Uw afspraak kan niet doorgaan op dit moment"
 msgid "manage.suspended.text"
 msgstr "Kies hieronder een nieuwe tijd of annuleer de afspraak. Uw gegevens zijn bewaard, u hoeft niets opnieuw in te vullen."
 
+msgid "manage.suspended.delete_by"
+msgstr "Uw gegevens worden uiterlijk op {date} verwijderd."
+
 msgid "manage.suspended.reschedule"
 msgstr "Kies een nieuwe tijd"
 
