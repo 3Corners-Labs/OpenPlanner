@@ -63,7 +63,7 @@ widening it publishes images irreversibly and is a decision (a PR touching `.git
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | | in PR |
+| 0 | ADR proposed | #428 | in PR |
 | 1 | `public-image` input on `publish-image`; `main.yml` sets it for `vX.Y.0`; anonymous pull check; verify commands in the release notes | | planned |
 | 2 | Organisation administrator sets both public packages to Public (person) | | planned |
 | 3 | `SECURITY.md` and `docs/runbook.md`: how an outsider verifies a release | | planned |
