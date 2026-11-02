@@ -8,6 +8,7 @@
     <p class="page-header__lead"><a href="/admin/logging">{{ _("admin.logging.title") }}</a>{% if view %} · {{ view.kind_label }}{% endif %}</p>
   </div>
 </div>
+{% if shipping_off %}<div class="alert alert--info" role="status"><p>{{ _("admin.logging.shipping_off") }}</p></div>{% endif %}
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% if tested %}<div class="alert alert--success" role="status"><p>{{ tested }}</p></div>{% endif %}
 {% if test_failed %}<div class="alert alert--error" role="alert"><p>{{ test_failed }}</p></div>{% endif %}

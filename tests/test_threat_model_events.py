@@ -209,6 +209,7 @@ FLOWS: dict[str, Flow] = {
     "## Flow: organisation texts (ADR 0074)": Flow(ADMIN),
     "## Flow: secrets of class C and taking values over (ADR 0042 step 6, §12)": Flow(ADMIN),
     "## Flow: login mapping with a dry run (ADR 0042 step 7, §8)": Flow(ADMIN),
+    "## Flow: log destinations (ADR 0085)": Flow(ADMIN),
 }
 """Per flow heading of the threat model: the event classes an attack on it leaves."""
 
