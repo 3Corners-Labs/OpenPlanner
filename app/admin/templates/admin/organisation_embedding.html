@@ -46,7 +46,7 @@
     <tbody>
       {% for summary in groups %}
       <tr>
-        <th scope="row">{% if can("group.edit", summary) %}<a href="/admin/groups/{{ summary.group.slug }}/settings">{{ summary.group.name }}</a>{% else %}{{ summary.group.name }}{% endif %}</th>
+        <th scope="row">{% if can("group.edit", summary) %}<a href="/admin/groups/{{ summary.group.slug }}/settings#integrations">{{ summary.group.name }}</a>{% else %}{{ summary.group.name }}{% endif %}</th>
         <td>{% if summary.group.embedding_enabled %}<span class="chip chip--success">{{ _("admin.embedding.on") }}</span>{% else %}<span class="chip">{{ _("admin.embedding.off") }}</span>{% endif %}</td>
       </tr>
       {% endfor %}
