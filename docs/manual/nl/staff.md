@@ -59,6 +59,11 @@ Elke wijziging staat in de auditlog, met rolnamen en plaatsen en zonder namen of
 e-mailadressen. Staat de identiteitsprovider niet bereikbaar, dan meldt het scherm dat zonder
 de melding van de provider zelf.
 
+Ziet u een gele melding dat de meegeleverde identiteitsprovider **niet volledig gekoppeld** is,
+dan draait Keycloak wel maar mist de server een instelling; de melding noemt welke. Dat lost
+de serverbeheerder op (runbook, *Bundled identity provider*); tot dan ontbreken de knoppen. De
+superuser ziet de stand ook op **Systeemstatus**, onder *Medewerkerbeheer*.
+
 ## Filters
 
 - **Organisatie**, **Groep** en **Rol**: alleen medewerkers die daarbij horen.

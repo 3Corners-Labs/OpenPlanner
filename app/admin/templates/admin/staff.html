@@ -9,6 +9,9 @@
   </div>
   {% if can_invite %}<a class="button" href="/admin/staff/invite">{{ _("admin.staff.invite.link") }}</a>{% endif %}
 </div>
+{% if directory_notice %}
+<div class="alert alert--warning" role="status"><p>{{ directory_notice }}</p></div>
+{% endif %}
 {% if pending %}
 <section class="card" aria-labelledby="pending-heading">
   <h2 id="pending-heading">{{ _("admin.staff.pending.title") }}</h2>

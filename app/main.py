@@ -209,6 +209,25 @@ def _keycloak_directory(settings: Settings) -> StaffDirectory | None:
     )
 
 
+BUNDLED_REALM_PATH = "/realms/openplanner/"
+"""Where the bundled provider's realm sits in its discovery URL (ADR 0090, the realm template)."""
+
+
+def _directory_missing(settings: Settings) -> tuple[str, ...]:
+    """Name the directory settings an incomplete bundled provider lacks (ADR 0106 point 3).
+
+    The bundled provider is recognised by its realm in the discovery URL, or by one of the two
+    directory settings being set. Any other provider has no directory by design and lacks
+    nothing. Returns setting names only, never a value.
+    """
+    present = {
+        "KEYCLOAK_ADMIN_URL": bool(settings.keycloak_admin_url),
+        "KEYCLOAK_DIRECTORY_CLIENT_SECRET": settings.keycloak_directory_client_secret is not None,
+    }
+    bundled = BUNDLED_REALM_PATH in (settings.oidc_discovery_url or "") or any(present.values())
+    return tuple(name for name, ok in present.items() if bundled and not ok)
+
+
 def create_app(
     settings: Settings | None = None,
     clock: Clock | None = None,
@@ -452,6 +471,7 @@ def create_app(
                 live().oidc_entitlement_prefix,
                 live().staff_invite_expiry_days,
             ),
+            () if staff_directory is not None else _directory_missing(settings),
         )
         app.state.form_service = FormService(
             uow, clock, app.state.admin_service, lambda: live().booking_form_max_custom_fields

@@ -41,6 +41,7 @@ from app.admin.staff_directory_routes import (
 )
 from app.domain.audit import AuditFilter
 from app.domain.authorization import Permission, Role, scope_for
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import GroupSummary
 from app.domain.staff import StaffFilter, StaffMember, StaffStatus
 from app.web.authz_labels import ROLE_LABELS
@@ -180,6 +181,22 @@ def _narrow(
     )
 
 
+def _directory_notice(
+    locale: RequestLocale, missing: tuple[str, ...], unreachable: bool
+) -> str | None:
+    """Say why the bundled provider's actions are missing, naming settings, never values.
+
+    ADR 0106 point 3: a directory that is half configured or does not answer is shown, never
+    silent. A provider without a directory by design (ADR 0095 point 1) gets no notice.
+    """
+    _ = locale.gettext
+    if missing:
+        return _("admin.staff.directory.missing", names=", ".join(missing))
+    if unreachable:
+        return _("admin.staff.directory.unreachable")
+    return None
+
+
 @router.get("/staff", response_class=HTMLResponse)
 async def staff_list(
     request: Request,
@@ -212,6 +229,15 @@ async def staff_list(
         unrecognised=narrow.unrecognised,
         active=narrow != StaffFilter(),
     )
+    directory = directory_service(request)
+    manager = not scope_for(context.principal, Permission.STAFF_MANAGE).is_empty
+    try:
+        pending = await directory.pending(context.principal)
+        unreachable = False
+    except DomainError as error:
+        if error.code is not ErrorCode.STAFF_DIRECTORY_UNAVAILABLE:
+            raise
+        pending, unreachable = [], True
     return _page(
         request,
         locale,
@@ -219,12 +245,11 @@ async def staff_list(
         context.principal,
         {
             "people": [_view(request, locale, m, names, now) for m in members],
-            "can_invite": directory_service(request).available
-            and not scope_for(context.principal, Permission.STAFF_MANAGE).is_empty,
-            "pending": [
-                manage_view(request, locale, context, p, in_scope)
-                for p in await directory_service(request).pending(context.principal)
-            ],
+            "can_invite": directory.available and manager and not unreachable,
+            "directory_notice": _directory_notice(locale, directory.missing, unreachable)
+            if manager
+            else None,
+            "pending": [manage_view(request, locale, context, p, in_scope) for p in pending],
             "filters": filters,
             "dormant_days": settings_for(request).staff_dormant_after_days,
         },

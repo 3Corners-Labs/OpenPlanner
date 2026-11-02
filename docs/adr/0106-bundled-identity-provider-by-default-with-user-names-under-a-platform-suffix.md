@@ -1,9 +1,10 @@
 # 0106. The bundled identity provider by default, with user names under a platform suffix
 
-Status: proposed (2026-11-02, #425), requested by the product owner. Amends ADR 0090 point 1 (the
+Status: accepted (2026-11-02, `po:approved` on #425), requested by the product owner. Amends ADR 0090 point 1 (the
 bundled Keycloak becomes the default in every installer mode, production included), ADR 0095
 (the user name of a staff member it creates) and ADR 0083 points 11 and 13 (a reserved domain
-that always routes to the platform provider). Not built.
+that always routes to the platform provider). Partly built: step 1 merged (#425); steps 2 and 3
+in PR (#429, #430); steps 4 to 6 open.
 
 ## Context
 
@@ -135,8 +136,8 @@ identifiers and DNS labels, which is a format rule, not a preference.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #425 | in PR |
-| 1 | Render script writes the application's half; development realm gets `openplanner-directory`; compose `env_file` | #427, carried by #425 | in PR |
-| 2 | Staff screen notice and System status check for an unconnected directory (point 3) | – | planned |
+| 1 | Render script writes the application's half; development realm gets `openplanner-directory`; compose `env_file` | #427, merged with #425 | merged |
+| 2 | Staff screen notice and System status check for an unconnected directory (point 3) | #429 | in PR |
 | 3 | User names under the suffix: setting, invite form, adapter, scope check, `username` masked (points 5–8, 11) | – | planned |
 | 4 | Reserved suffix in the login routing and the provider registration; login label (points 9, 10) | – | planned |
 | 5 | Installer `--idp bundled\|own` default in every mode; production `start` with `idp-db`, proxy, backup and runbook (points 1, 4) | – | planned |
