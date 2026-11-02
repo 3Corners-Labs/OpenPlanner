@@ -80,7 +80,7 @@ from the rows below.
 | 0058 | Fast PR lane, full queue lane | PARTIAL | #122, #124 | Decision 6 (cheaper matrix sweep); unsure: GitHub required check and the `ci:full` label |
 | 0059 | Release candidates, update channels | BUILT | #131, #132, #140 | Points 4 and 6 amended by ADR 0067 |
 | 0060 | Product logo | PARTIAL | #135 (LG-1 to LG-3) | LG-4 optional motion |
-| 0061 | Live overview with widgets | BUILT | #141, #150, #153, #161; steps 3 and 4 (#TBD): `app/domain/alerts.py` (alert rules, open streaks, `AlertService`), `app/domain/queue_wait.py` (`queue.wait`), `app/admin/alerts.py` (banner on every admin page, close per streak), widget *Alerts* with level filter and chart, live widgets through `live-region.js`, `alert-popups.js`, `OVERVIEW_*` (C) and `QUEUE_WAIT_*` (D), migration 0088 | – (pop-ups only on the overview, the one page with the live script; the banner covers every other page) |
+| 0061 | Live overview with widgets | BUILT | #141, #150, #153, #161; steps 3 and 4 (#449): `app/domain/alerts.py` (alert rules, open streaks, `AlertService`), `app/domain/queue_wait.py` (`queue.wait`), `app/admin/alerts.py` (banner on every admin page, close per streak), widget *Alerts* with level filter and chart, live widgets through `live-region.js`, `alert-popups.js`, `OVERVIEW_*` (C) and `QUEUE_WAIT_*` (D), migration 0088 | – (pop-ups only on the overview, the one page with the live script; the banner covers every other page) |
 | 0062 | Personal overview layout | NOT BUILT | none; superseded by ADR 0096 (2026-11-01) | Nothing to build here: the per-admin layout is ADR 0096 |
 | 0063 | Personal data in the portal | BUILT | #143 | – |
 | 0064 | HTTPS by default, certificate status | BUILT | #139, #144; step 3 is ADR 0070 | – |
