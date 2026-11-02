@@ -8979,6 +8979,129 @@ msgstr "Use at most 10 values of plain characters, separated by spaces."
 msgid "admin.idp.test_result.mfa"
 msgstr "Second factor shown"
 
+msgid "admin.overview.widget.status.proxy.untrusted"
+msgstr "Requests arrive with forwarded headers from a proxy that FORWARDED_ALLOW_IPS does not name: every visitor looks like one address and links get http. Set FORWARDED_ALLOW_IPS to the address the web container sees the proxy connect from (details under Advanced settings, Address and proxy)"
+
+msgid "admin.overview.widget.status.proxy.finding"
+msgstr "Round trip to the public address: {finding} (details under Advanced settings, Address and proxy)"
+
+msgid "admin.settings.address.title"
+msgstr "Address and proxy"
+
+msgid "admin.settings.address.intro"
+msgstr "Every link in an email, the login redirect and the widget is built on the public address, never on the address of the request. These values are set on the server (class B) and need a restart to change; the worker checks that the address really reaches this installation."
+
+msgid "admin.settings.address.shape"
+msgstr "Installation"
+
+msgid "admin.settings.address.shape.bundled"
+msgstr "Bundled proxy (HTTPS by the proxy of this installation)"
+
+msgid "admin.settings.address.shape.own"
+msgstr "Own reverse proxy (trusted via FORWARDED_ALLOW_IPS)"
+
+msgid "admin.settings.address.shape.none"
+msgstr "No proxy (a lab: links and cookies are not protected by HTTPS)"
+
+msgid "admin.settings.address.public"
+msgstr "Public address"
+
+msgid "admin.settings.address.webhook"
+msgstr "Webhook address"
+
+msgid "admin.settings.address.proxy"
+msgstr "Trusted proxy address"
+
+msgid "admin.settings.address.proxy.none"
+msgstr "none"
+
+msgid "admin.settings.address.callback"
+msgstr "OIDC redirect URI (register this at the identity provider)"
+
+msgid "admin.settings.address.widget"
+msgstr "Widget loader (for the embedding site)"
+
+msgid "admin.settings.address.set_on_server"
+msgstr "Set on the server, in the environment. A change needs a restart (manual: Advanced settings)."
+
+msgid "admin.settings.address.round_trip"
+msgstr "Round trip"
+
+msgid "admin.settings.address.none"
+msgstr "Not checked yet. The worker checks every few hours; on the server, python -m app.cli address-check does it at once."
+
+msgid "admin.settings.address.off"
+msgstr "Not checked: switched off on the server (PUBLIC_ADDRESS_CHECK_ENABLED)."
+
+msgid "admin.settings.address.checked_at"
+msgstr "Last checked"
+
+msgid "admin.settings.address.reason"
+msgstr "Reason"
+
+msgid "admin.settings.address.seen"
+msgstr "The app saw scheme {scheme}, forwarded headers {forwarded}"
+
+msgid "admin.settings.address.kind.public"
+msgstr "Public address"
+
+msgid "admin.settings.address.kind.webhook"
+msgstr "Webhook address"
+
+msgid "admin.settings.address.finding.ok"
+msgstr "Fine: the address reaches this installation over https and the proxy is trusted."
+
+msgid "admin.settings.address.finding.unreachable"
+msgstr "Not reachable: the worker could not get an answer from this address."
+
+msgid "admin.settings.address.finding.other_instance"
+msgstr "Another installation answers: the name points elsewhere (DNS, a moved host or a copied .env). Links in emails lead to the wrong place."
+
+msgid "admin.settings.address.finding.not_https"
+msgstr "The app sees http: the proxy does not pass X-Forwarded-Proto, or PUBLIC_BASE_URL is not https. Session cookies will not travel."
+
+msgid "admin.settings.address.finding.proxy_not_trusted"
+msgstr "The proxy is not trusted: set FORWARDED_ALLOW_IPS to the address the web container sees the proxy connect from. Until then every visitor shares one address and redirects point to http."
+
+msgid "admin.settings.address.finding.no_proxy_headers"
+msgstr "No forwarded headers arrive: the proxy sets none, or web is published directly."
+
+msgid "admin.settings.address.finding.redirected"
+msgstr "The address redirects to another name (for example www for the apex): set PUBLIC_BASE_URL to the final address."
+
+msgid "admin.settings.address.error.timeout"
+msgstr "no answer in time"
+
+msgid "admin.settings.address.error.unreachable"
+msgstr "connection refused or name not found"
+
+msgid "admin.settings.address.error.tls"
+msgstr "TLS handshake or certificate refused"
+
+msgid "admin.settings.address.error.unreadable"
+msgstr "the answer was not from OpenPlanner"
+
+msgid "admin.settings.address.error.http"
+msgstr "answered with HTTP {status}"
+
+msgid "admin.settings.address.untrusted"
+msgstr "Since {since}, {count} request(s) carried X-Forwarded-For or X-Forwarded-Proto {where}, and the app ignored them. Set FORWARDED_ALLOW_IPS to the address the web container sees the proxy connect from."
+
+msgid "admin.settings.address.untrusted.from"
+msgstr "from {peer}"
+
+msgid "admin.settings.address.untrusted.class"
+msgstr "from a {peer} address"
+
+msgid "admin.settings.address.peer.loopback"
+msgstr "loopback"
+
+msgid "admin.settings.address.peer.private"
+msgstr "private"
+
+msgid "admin.settings.address.peer.public"
+msgstr "public"
+
 msgid "admin.nav.my_sessions"
 msgstr "My sessions"
 

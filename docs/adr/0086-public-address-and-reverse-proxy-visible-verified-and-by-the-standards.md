@@ -3,7 +3,9 @@
 Status: accepted (2026-10-31, `po:approved` on #265), requested by the product owner. Extends ADR
 0064 (HTTPS by default, the certificate watched on System status), ADR 0070 (certificate source
 in the portal), ADR 0030 (TLS proxy) and ADR 0042 §11 (System status); builds on ADR 0038 (system
-events from the worker). Not built.
+events from the worker). Partly built (step 1: *Address and proxy*, the instance endpoint, the
+round trip, the link-building test); step 2 (the standards in `check-proxy.sh`) not built; see
+*Build status*.
 Amended by ADR 0091 (own reverse proxy).
 
 ## Context
@@ -143,7 +145,7 @@ always told apart from one that reaches this one).
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #265 | merged |
-| 1 | Decisions 1–4: *Address and proxy* on System status, `instance_id` (migration), `/api/v1/instance`, the round-trip probe in the worker, `address-check` CLI, the link-building test, system event `public_address`, manual topic | | planned |
+| 1 | Decisions 1–4: *Address and proxy* on System status, `instance_id` (migration), `/api/v1/instance`, the round-trip probe in the worker, `address-check` CLI, the link-building test, system event `public_address`, manual topic | #397 | built: `app/domain/public_address.py`, `app/domain/address_check.py` (`AddressWatch`, `InstanceService`), `app/adapters/instance_probe.py`, `app/api/instance.py`, migration 0084 (`instance`, `public_address_checks`), `python -m app.cli address-check`, `PUBLIC_ADDRESS_CHECK_ENABLED`, *Address and proxy* on System status (`app/admin/address_view.py`; the *Proxy* row of ADR 0091 is folded in), `ProxyHeaderMiddleware` and `PublicRedirectMiddleware`, `tests/api/test_public_links.py`; runbook, manual and threat model updated; the `docs/dataflow.md` entry for the probe is left to step 2 |
 | 2 | Decision 5: the standards table in the runbook, `check-proxy.sh` asserts TLS versions, HSTS and the round trip, internet.nl in the go-live checklist, threat model and data flow | | planned |
 
 ## Consequences

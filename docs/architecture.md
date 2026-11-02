@@ -137,6 +137,7 @@ flowchart TB
     worker -- "TXT lookups" --> dns
     worker -- release check (interval setting) --> github
     worker -. "certificate probe, https :443" .-> proxy
+    worker -. "round trip: GET /api/v1/instance (ADR 0086)" .-> proxy
     web -- "own certificate (ADR 0070)" --> certs -. "watcher, caddy reload" .-> proxy
     updater -- "app.cli: claim, progress, report, backup" --> web
     updater -- "pull, verify, pin digest" --> github
@@ -150,7 +151,10 @@ flowchart TB
   uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
   fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
   The worker probes the public address every few hours and shows the certificate's issuer,
-  expiry and one finding on *System status*; a failing one is a system event. The superuser
+  expiry and one finding on *System status*; a failing one is a system event. On the same cycle
+  it asks the public address for `/api/v1/instance` with a nonce it stored first, and judges the
+  round trip (does the name reach this installation, over https, with the proxy trusted;
+  ADR 0086), shown in the *Address and proxy* part above the certificate. The superuser
   chooses the source there (ADR 0070): Let's Encrypt, or an own certificate whose key `web`
   makes in the `portal-certs` volume (a signing request for the CA; the chain comes back
   through the portal, the key never enters the database) and whose pair the entrypoint's

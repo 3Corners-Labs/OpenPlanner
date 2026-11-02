@@ -443,6 +443,43 @@ async def test_tls_check_stores_the_public_address_and_fails_on_a_finding(
     assert stored.host == "127.0.0.1"
 
 
+async def test_address_check_stores_the_round_trip_and_fails_on_a_finding(
+    migrated: Settings,
+) -> None:
+    # ADR 0086: the installer and the go-live checklist call this; exit 1 on a finding.
+    from app.cli import _address_check
+    from app.domain.address_check import AddressStatus
+    from app.domain.public_address import AddressKind
+    from tests.fakes.instance import FakeInstanceProbe
+
+    report, ok = await _address_check(migrated, FakeInstanceProbe())
+
+    assert not ok
+    assert report.startswith("public   http://127.0.0.1:8000  unreachable (unreachable)")
+    engine = create_engine(migrated.database_url)
+    try:
+        stored = await AddressStatus(SqlUnitOfWork(engine)).latest()
+    finally:
+        await engine.dispose()
+    assert stored[AddressKind.PUBLIC].url == "http://127.0.0.1:8000"
+
+
+async def test_address_check_reports_a_switched_off_probe_instead_of_ok(
+    migrated: Settings,
+) -> None:
+    from app.cli import _address_check
+    from tests.fakes.instance import FakeInstanceProbe
+
+    probe = FakeInstanceProbe()
+    off = migrated.model_copy(update={"public_address_check_enabled": False})
+
+    report, ok = await _address_check(off, probe)
+
+    assert report.startswith("not checked: PUBLIC_ADDRESS_CHECK_ENABLED is false")
+    assert ok
+    assert probe.asked == []
+
+
 async def test_tls_check_of_another_host_reports_the_certificate_and_stores_nothing(
     migrated: Settings,
 ) -> None:

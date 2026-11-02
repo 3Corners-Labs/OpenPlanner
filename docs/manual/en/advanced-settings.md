@@ -35,6 +35,39 @@ says what to do first (run `rekey` on the host, or wait until those bookings are
 a previous key the block does not appear. The procedure is in the runbook, *Rotating secrets*,
 and the inventory of all keys in `docs/cryptography.md`.
 
+### Address and proxy
+
+Above the certificate is what the installation knows about its own address. Every link in an
+email, the login redirect and the widget is built on the public address, never on the address of
+the request; that one address decides whether participants reach the installation. The block
+shows:
+
+- **Installation**: the bundled proxy, an own reverse proxy or no proxy (a lab);
+- **Public address** and, when it differs, the **Webhook address**;
+- the **trusted proxy address** (`FORWARDED_ALLOW_IPS`);
+- the **OIDC redirect URI**, to compare with what is registered at the identity provider, and the
+  **widget loader**, to compare with the site that embeds the widget.
+
+These values are set on the server, in the environment (class B): they cannot be changed here,
+because a wrong public address would lock every administrator out at the next login. A change
+needs a restart; the procedure is in the runbook, *Address and proxy*.
+
+Under **Round trip** is the outcome of the check the server makes every few hours: it asks the
+public address for `/api/v1/instance`, as a participant's browser does, and judges the answer
+with one finding and the time. The findings are **fine**, **not reachable** (with the reason of
+the network or the server), **another installation**, **not https**, **proxy not trusted**,
+**no forwarded headers** and **redirected**. With *proxy not trusted*, `FORWARDED_ALLOW_IPS` is
+not the address the web container sees the proxy connect from: every visitor then shares one
+address and the app's own redirects point to `http://`. When the check is switched off on the
+server (`PUBLIC_ADDRESS_CHECK_ENABLED`) the page says *not checked*, never *fine*.
+
+When the web server sees requests with `X-Forwarded-For` or `X-Forwarded-Proto` from a proxy it
+does not trust, that shows here too, with the count and the kind of sender (loopback, private or
+public). The address is shown only when it is a proxy in your own network, never that of a
+visitor. Every finding that is not *fine* is also a system event `public_address` in the audit
+log, repeated while it lasts (setting *Repeat the certificate report every*). In the Overview
+widget System status one row *Proxy* then points here.
+
 ### Certificate of the public address
 
 Below the environment is the certificate visitors reach the installation with: the address,
