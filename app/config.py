@@ -388,6 +388,8 @@ class Settings(BaseSettings):
     # ADR 0083: organisation identity providers per organisation (two: a migration from one
     # IdP to the next without a gap).
     idp_max_per_organisation: int = Field(default=2, ge=1, le=5)
+    # ADR 0083 point 12: a verified domain whose TXT record went missing keeps routing this long.
+    idp_domain_grace_days: int = Field(default=7, ge=0, le=30)
 
     # Integration secrets at rest (ADR 0008): AES-256-GCM under a key derived from this value.
     settings_encryption_key: SecretStr | None = None

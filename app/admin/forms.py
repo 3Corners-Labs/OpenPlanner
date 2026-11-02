@@ -72,6 +72,9 @@ DONE_MESSAGES: dict[str, str] = {
     "idp_enabled": "admin.done.idp_enabled",
     "idp_disabled": "admin.done.idp_disabled",
     "idp_key_rotated": "admin.done.idp_key_rotated",
+    "idp_domain_claimed": "admin.done.idp_domain_claimed",
+    "idp_domain_verified": "admin.done.idp_domain_verified",
+    "idp_domain_not_found_yet": "admin.done.idp_domain_not_found_yet",
     "logging_created": "admin.done.logging_created",
     "logging_enabled": "admin.done.logging_enabled",
     "logging_disabled": "admin.done.logging_disabled",
@@ -128,6 +131,8 @@ DONE_MESSAGES: dict[str, str] = {
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
 FIELD_MESSAGES: dict[str, str] = {
+    # ADR 0083 point 10: the domain claimed for an identity provider.
+    "domain": "admin.form.error.idp_domain_invalid",
     # ADR 0106 point 6: the user name typed on the staff invitation.
     "user_name": "admin.form.error.staff_user_name_invalid",
     # ADR 0084 point 5: the name typed back on a confirmation page.
@@ -264,6 +269,11 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
     ErrorCode.STAFF_DIRECTORY_UNAVAILABLE: "admin.form.error.staff_directory_unavailable",
     ErrorCode.STAFF_ADDRESS_IN_USE: "admin.form.error.staff_address_in_use",
+    ErrorCode.IDP_DOMAIN_INVALID: "admin.form.error.idp_domain_invalid",
+    ErrorCode.IDP_DOMAIN_RESERVED: "admin.form.error.idp_domain_reserved",
+    ErrorCode.IDP_DOMAIN_TAKEN: "admin.form.error.idp_domain_taken",
+    ErrorCode.IDP_DOMAIN_LIMIT: "admin.form.error.idp_domain_limit",
+    ErrorCode.IDP_DOMAIN_NOT_FOUND: "admin.form.error.idp_domain_not_found",
     ErrorCode.STAFF_USER_NAME_INVALID: "admin.form.error.staff_user_name_invalid",
     ErrorCode.STAFF_USER_NAME_IN_USE: "admin.form.error.staff_user_name_in_use",
     ErrorCode.STAFF_GRANT_REFUSED: "admin.form.error.staff_grant_refused",

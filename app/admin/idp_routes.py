@@ -61,6 +61,7 @@ from app.domain.identity_providers import (
     OrganisationProvider,
     ProviderDraft,
 )
+from app.domain.login_domains import DomainClaim, DomainState
 from app.domain.mfa import MfaPolicy
 from app.domain.ports import IdentityError, LoginTestReport
 from app.web.locale import RequestLocale
@@ -103,6 +104,16 @@ TEST_FAILURES: dict[str, str] = {
 }
 """Explanation per failure code of a test login; the guard's reasons are generic."""
 
+DOMAIN_REFUSALS = frozenset(
+    {
+        ErrorCode.IDP_DOMAIN_INVALID,
+        ErrorCode.IDP_DOMAIN_RESERVED,
+        ErrorCode.IDP_DOMAIN_TAKEN,
+        ErrorCode.IDP_DOMAIN_LIMIT,
+    }
+)
+"""Refusals of a domain claim shown at the field; anything else is an error page."""
+
 
 def service(request: Request) -> IdentityProviderService:
     """Return the application's identity provider service."""
@@ -135,6 +146,64 @@ class ProviderView:
     mfa_label: str
     checked: str | None
     updated: str
+
+
+DOMAIN_STATES: dict[DomainState, tuple[str, str]] = {
+    DomainState.PENDING: ("admin.idp.domains.pending", ""),
+    DomainState.VERIFIED: ("admin.idp.domains.verified", " chip--success"),
+    DomainState.FAILING: ("admin.idp.domains.failing", " chip--warning"),
+    DomainState.LAPSED: ("admin.idp.domains.lapsed", " chip--danger"),
+}
+"""Label and chip per domain state (ADR 0083 point 12); colour is never the only signal."""
+
+
+@dataclass(frozen=True)
+class DomainView:
+    """A claimed domain with the TXT record the organisation must publish."""
+
+    id: int
+    domain: str
+    state: str
+    chip: str
+    record_name: str
+    record_value: str
+    checked: str | None
+
+
+def _domain_views(
+    request: Request, locale: RequestLocale, claims: list[DomainClaim]
+) -> list[DomainView]:
+    """Translate the provider's domains for the page."""
+    views = []
+    for claim in claims:
+        label, chip = DOMAIN_STATES[claim.state]
+        checked = admin_moment(request, locale, claim.checked_at) if claim.checked_at else None
+        views.append(
+            DomainView(
+                claim.id or 0,
+                claim.domain,
+                locale.gettext(label),
+                chip,
+                claim.record_name,
+                claim.record_value,
+                locale.gettext("admin.idp.domains.checked", moment=checked) if checked else None,
+            )
+        )
+    return views
+
+
+def _domain_fields(locale: RequestLocale, form: FormData) -> list[Field]:
+    """The one input that claims a domain."""
+    return [
+        Field(
+            "domain",
+            locale.gettext("admin.idp.domains.new"),
+            value=form.text("domain"),
+            hint=locale.gettext("admin.idp.domains.new.hint"),
+            error=form.error_for("domain"),
+            attributes={"autocomplete": "off", "spellcheck": "false", "inputmode": "url"},
+        )
+    ]
 
 
 def _view(request: Request, locale: RequestLocale, provider: OrganisationProvider) -> ProviderView:
@@ -303,8 +372,10 @@ async def _form_page(
     form: FormData,
     detail: ProviderDetail | None = None,
     status: int = 200,
+    domain_form: FormData | None = None,
 ) -> HTMLResponse:
     """Render the registration form, alone (new) or under the provider's status (detail)."""
+    domain_form = domain_form or FormData({}, locale.gettext)
     organisation = (
         detail.organisation
         if detail
@@ -326,7 +397,9 @@ async def _form_page(
             "current_key": detail.current_key if detail else None,
             "retired_keys": [k for k in detail.keys if k.retired_at] if detail else [],
             "fields": _fields(request, locale, form, current, _defaults(request)),
-            "errors": form.errors,
+            "errors": form.errors + domain_form.errors,
+            "domains": _domain_views(request, locale, detail.domains) if detail else [],
+            "domain_fields": _domain_fields(locale, domain_form),
             "jwks_url": _jwks_url(request),
             "callback_url": _callback_url(request),
             "done": done_message(request, locale.gettext),
@@ -463,6 +536,68 @@ async def rotate_key(
             return redirect_done(_url(org, idp_key), "unchanged")
         raise
     return redirect_done(_url(org, idp_key), "idp_key_rotated")
+
+
+@router.post("/organisations/{org}/login/{idp_key}/domains", response_class=HTMLResponse)
+async def claim_domain(
+    request: Request, locale: Locale, org: str, idp_key: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Claim an e-mail domain for the provider; it routes once its TXT record is found."""
+    form = await read_form(request, locale)
+    try:
+        await service(request).claim_domain(context.principal, org, idp_key, form.text("domain"))
+    except DomainError as error:
+        raise_refusal(error)
+        if error.code not in DOMAIN_REFUSALS:
+            raise
+        form.refusal(error)
+        detail = await service(request).provider(context.principal, org, idp_key)
+        empty = FormData({}, locale.gettext)
+        return await _form_page(request, locale, context, org, empty, detail, 422, form)
+    return redirect_done(_url(org, idp_key), "idp_domain_claimed")
+
+
+@router.post(
+    "/organisations/{org}/login/{idp_key}/domains/{claim_id}/verify",
+    response_class=HTMLResponse,
+)
+async def verify_domain(
+    request: Request,
+    org: str,
+    idp_key: str,
+    claim_id: int,
+    _: SameOrigin,
+    context: Manage,
+) -> Response:
+    """Look up the domain's TXT record now."""
+    try:
+        after = await service(request).verify_domain(context.principal, org, idp_key, claim_id)
+    except DomainError as error:
+        raise_refusal(error)
+        raise
+    done = "idp_domain_verified" if after.state.routes else "idp_domain_not_found_yet"
+    return redirect_done(_url(org, idp_key), done)
+
+
+@router.post(
+    "/organisations/{org}/login/{idp_key}/domains/{claim_id}/remove",
+    response_class=HTMLResponse,
+)
+async def remove_domain(
+    request: Request,
+    org: str,
+    idp_key: str,
+    claim_id: int,
+    _: SameOrigin,
+    context: Manage,
+) -> Response:
+    """Release the domain; its logins go to the platform provider again."""
+    try:
+        await service(request).remove_domain(context.principal, org, idp_key, claim_id)
+    except DomainError as error:
+        raise_refusal(error)
+        raise
+    return redirect_done(_url(org, idp_key), "removed")
 
 
 @router.post("/organisations/{org}/login/{idp_key}/test", response_class=HTMLResponse)

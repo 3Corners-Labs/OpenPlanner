@@ -1287,6 +1287,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=5,
     ),
     S(
+        "idp_domain_grace_days",
+        K.INT,
+        7,
+        _C,
+        T.LOGIN_MAPPING,
+        "Days a verified login domain keeps routing after its TXT record went missing; then it "
+        "stops (ADR 0083 point 12).",
+        minimum=0,
+        maximum=30,
+    ),
+    S(
         "smtp_host",
         K.STRING,
         None,
