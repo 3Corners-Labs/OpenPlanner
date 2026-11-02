@@ -260,6 +260,11 @@ class Settings(BaseSettings):
     # settings registry).
     planner_rebook_days: int = Field(default=14, ge=1, le=30)
     planner_rebook_reminder_days: int = Field(default=3, ge=1, le=29)
+    # ADR 0102: the most personal data of a booking on hold is kept after the end of its original
+    # slot, also while the closure has no end, and how many days before it the administrators
+    # are told. Class D organisation (ADR 0042, settings registry); the maximum has no off value.
+    closure_max_retention_days: int = Field(default=90, ge=30, le=180)
+    closure_max_notice_days: int = Field(default=14, ge=3, le=28)
     # ADR 0055: custom fields per group's booking form at most (class C platform), and the
     # country of phone numbers typed without a country code (class D organisation).
     booking_form_max_custom_fields: int = Field(default=5, ge=0, le=15)

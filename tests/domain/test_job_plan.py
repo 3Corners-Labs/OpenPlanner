@@ -262,7 +262,7 @@ def test_team_invite_is_planned_now_and_cancelled_with_the_booking() -> None:
     invite = [j for j in booked if j.type is JobType.SEND_TEAM_INVITE]
     cancelled = plan_for_cancellation(cancelled_at=NOW, team_invite=True)
     moved = plan_for_cancellation(cancelled_at=NOW, notify=False, team_invite=True)
-    suspended = plan_for_suspension(now=NOW, purge_at=None, team_invite=True)
+    suspended = plan_for_suspension(now=NOW, purge_at=END, team_invite=True)
 
     assert [(j.run_at, j.pinned_start) for j in invite] == [(NOW, START)]
     for jobs in (cancelled, moved, suspended):
@@ -279,7 +279,7 @@ def test_every_plan_that_replaces_all_jobs_cleans_up_an_open_trial_call() -> Non
     plans = {
         "cancellation": plan_for_cancellation(cancelled_at=NOW),
         "reschedule": plan_for_cancellation(cancelled_at=NOW, notify=False),
-        "suspension": plan_for_suspension(now=NOW, purge_at=None),
+        "suspension": plan_for_suspension(now=NOW, purge_at=END),
         "rebook": plan_for_rebook(
             now=NOW, rebook_by=NOW + timedelta(days=7), reminder_at=None, sms=False
         ),

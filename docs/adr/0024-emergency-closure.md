@@ -3,8 +3,9 @@
 Status: accepted (2026-10-25), decided by the product owner. The retention exception needs
 confirmation by the privacy officer in the DPIA (open point O7). Retention amended by 0102.
 Extended by ADR 0037 (closure page with scenarios, contact options and an image).
-Note (2026-11-01 review): the maximum retention for an open-ended closure is still open
-(WP-A2); the retention sweep (`app/domain/retention_sweep.py`) leaves such bookings alone.
+Note (2026-11-01 review): the maximum retention for an open-ended closure was open (WP-A2);
+ADR 0102 step 1 builds it, and the retention sweep (`app/domain/retention_sweep.py`) purges
+such bookings at that maximum.
 
 ## Context
 

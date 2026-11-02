@@ -554,7 +554,7 @@ flowchart LR
     hold(["suspended<br/>(emergency closure)"]) --> hmail["notice mail<br/>now"]
     hmail --> resolve{"moved, reinstated<br/>or cancelled?"}
     resolve -->|yes| book
-    resolve -->|no| hpurge["closure end + 30 days<br/>purge PII"]
+    resolve -->|no| hpurge["earlier of closure end + 30 days<br/>and slot end + maximum (ADR 0102)<br/>purge PII"]
 
 ```
 
@@ -741,7 +741,7 @@ The STRIDE analysis per flow, with a test for every abuse case, is in
   `bookings`; jobs, slots and logs hold IDs.
 - **Purge:** the `purge_pii` job sets them to NULL at slot end + 24 h, or 24 h after a
   cancellation. A booking on hold by an emergency closure keeps them until it is resolved, at
-  most 30 days after the closure ends (ADR 0024). The nightly sweep (`app.domain.retention_sweep`, run by worker housekeeping) purges what the job
+  most the earlier of 30 days after the closure ends and `closure_max_retention_days` after its original slot, also under an open closure (ADR 0024, 0102). The nightly sweep (`app.domain.retention_sweep`, run by worker housekeeping) purges what the job
   missed and alerts on a backlog older than 48 h.
 - **What leaves the system:** mails carry the first name, date, team and the management link;
   the calendar file carries no personal data. WxCC will receive only the first name and the

@@ -211,7 +211,7 @@ async def run_worker(
         settings.database_url,
         diagnostics.brake,
         eraser.run,
-        RetentionSweep(uow, clock).run,
+        RetentionSweep(uow, clock, live.closure_retention).run,
         clean_sessions,
     )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)

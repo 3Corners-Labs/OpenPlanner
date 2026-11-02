@@ -36,6 +36,7 @@ from app.adapters.settings_report import (
     locked_keys,
 )
 from app.config import Settings
+from app.domain.closure_retention import ClosureRetention
 from app.domain.platform_settings import (
     RELOAD_SECONDS,
     PlatformSettingsStore,
@@ -136,6 +137,13 @@ class LiveSettings:
                 self.settings if combined.cross_field_problem() else combined
             )
         return self._by_organisation[key]
+
+    def closure_retention(self, organisation_id: int) -> ClosureRetention:
+        """Return one organisation's limits for bookings on hold (ADR 0102, class D)."""
+        own = self.for_organisation(organisation_id)
+        return ClosureRetention.from_days(
+            own.closure_max_retention_days, own.closure_max_notice_days
+        )
 
     def organisation_combination_problem(
         self, organisation_id: int, proposed: Mapping[str, object]

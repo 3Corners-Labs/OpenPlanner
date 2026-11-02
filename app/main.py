@@ -357,9 +357,12 @@ def create_app(
             phone_region=lambda org: per_organisation(org).phone_default_region,
             confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
             previous_token_key=management_token_key_previous(settings),
+            closure_retention=app.state.live_settings.closure_retention,
         )
         app.state.participant_link_service = ParticipantLinkService(uow, clock)
-        app.state.admin_service = AdminService(uow, clock)
+        app.state.admin_service = AdminService(
+            uow, clock, app.state.live_settings.closure_retention
+        )
         app.state.log_destination_service = LogDestinationService(
             uow,
             clock,
@@ -560,7 +563,11 @@ def create_app(
             uow, clock, app.state.admin_service, app.state.translator.locales
         )
         app.state.closure_service = ClosureService(
-            uow, clock, app.state.admin_service, app.state.booking_service
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.booking_service,
+            app.state.live_settings.closure_retention,
         )
         app.state.planner_service = PlannerService(
             uow,
