@@ -1729,6 +1729,14 @@ verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the 
 does not stop the updater. The updater's own log is in the journal:
 `journalctl -u openplanner-updater`.
 
+After an update or a restore that succeeded, the updater removes every other release of the
+application image (and, where the proxy runs, of the proxy image) from the host. It keeps the
+running release and, after an update, the previous one that *Restore previous version* needs.
+Each release is about 440 MB; on the `rc` channel with auto-apply a host otherwise fills up
+within days. Images of other repositories, build cache and stopped containers are left alone.
+An image it cannot remove (still used by a container) is logged as `could not remove ...` and
+the update stays `succeeded`. After a rollback nothing is removed.
+
 Every time the updater puts a backup back (a rollback after an unhealthy update or restore) it
 runs `sessions end-all --reason restore` before the old version starts (ADR 0098 point 10),
 because the restored database may hold sessions that were ended after the backup. If that
@@ -2443,9 +2451,16 @@ Three things keep the host from filling up:
 | `{"status":"degraded"}` | `GET /readyz` (still 200) | either grade; alert on it, it does not take the service out |
 
 What to do: `docker system df` and `du -sh /var/lib/docker/volumes/*` show what grows. Usual
-causes are old images (`docker image prune`), logs of containers outside this compose file,
+causes are old images, logs of containers outside this compose file,
 and backups. The database itself shrinks only by retention (`SYSTEM_EVENT_RETENTION_DAYS`) and
-the PII purge; never delete rows by hand. Below critical, SQLite writes start to fail and
+the PII purge; never delete rows by hand.
+
+Old OpenPlanner releases: the host updater removes them after every successful update (see
+*What the updater does*). A host that ran an updater from before that change, or that was
+updated by hand, may still hold them. Remove all but the pinned release and the one in
+`previous.env` (`docker image ls ghcr.io/<owner>/<repo>`, then `docker rmi <image>:<tag>`);
+`docker builder prune -af` clears build cache from local builds. Never use `docker rmi -f` or
+`docker system prune -a` on a host that runs other projects. Below critical, SQLite writes start to fail and
 bookings are refused with `database_busy` or an internal error.
 
 ## Webex or WxCC is down

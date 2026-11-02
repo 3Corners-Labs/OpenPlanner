@@ -8,12 +8,14 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 
 - ``claim``: what ``app.cli update-claim`` prints.
 - ``revision``: what ``alembic current`` prints as the revision.
-- ``fail``: one operation per line that exits 1 (``pull``, ``cosign``, ``backup-db``,
-  ``restore-db``, ``sessions``, ``downgrade``, ``docker-info``, ``update-progress``,
+- ``fail``: one operation per line that exits 1 (``pull``, ``cosign``, ``image-ls``, ``rmi``,
+  ``backup-db``, ``restore-db``, ``sessions``, ``downgrade``, ``docker-info``, ``update-progress``,
   ``maintenance``;
   ``pull-proxy`` and ``cosign-proxy`` fail only for the proxy image, ADR 0064).
 - ``compose-version``: what ``docker compose version --short`` prints (default 2.40.3).
 - ``latest``: the tag of the latest GitHub release (default none: the API call fails).
+- ``images``: the images on the host, one ``repository:tag`` per line, or ``repository@digest``
+  for one without a tag; ``docker image ls`` lists them, ``docker rmi`` only records the call.
 - ``unhealthy``: one image reference per line; the worker (or, for a proxy image, the proxy)
   reports ``unhealthy`` while it is pinned.
 - ``cosign-version``: the installed cosign (default v3.1.4, the latest the fake GitHub offers).
@@ -141,6 +143,19 @@ def _compose(args: list[str]) -> int:
     return 0
 
 
+def _images(repository: str) -> None:
+    """Print ``docker image ls`` for ``repository``: digest reference, then tag reference."""
+    for line in _lines("images"):
+        if "@" in line:
+            name, _, _ = line.partition("@")
+            if name == repository:
+                print(f"{line} {name}:<none>")
+            continue
+        name, _, tag = line.rpartition(":")
+        if name == repository:
+            print(f"{digest(name, tag)} {line}")
+
+
 def _docker(args: list[str]) -> int:
     if args[:2] == ["compose", "version"]:
         print(next(iter(_lines("compose-version")), "2.40.3"))
@@ -150,6 +165,12 @@ def _docker(args: list[str]) -> int:
         return _failing("docker-info")
     if args[0] == "pull":
         return _failing("pull") or (_is_proxy(args[-1]) and _failing("pull-proxy"))
+    if args[0] == "rmi":
+        return _failing("rmi")
+    if args[:2] == ["image", "ls"]:
+        if _failing("image-ls"):
+            return 1
+        _images(args[-1])
     if args[:2] == ["image", "inspect"] and any(".Config.Env" in arg for arg in args):
         print(f"APP_VERSION={_version_of(args[-1])}")
     elif args[:2] == ["image", "inspect"]:
