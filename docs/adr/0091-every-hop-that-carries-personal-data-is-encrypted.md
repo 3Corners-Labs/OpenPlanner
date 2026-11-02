@@ -2,8 +2,8 @@
 
 Status: accepted (2026-11-01), requested by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (V4.1.2, V12.3.1, V12.3.3, V1.3.6, V13.1.1). Amends ADR 0030 and ADR 0064
-(the bundled proxy), ADR 0022 (SMTP channel) and ADR 0086 (own reverse proxy). Not built; see
-*Build status*.
+(the bundled proxy), ADR 0022 (SMTP channel) and ADR 0086 (own reverse proxy). Partly built
+(step 2: SMTP without TLS refused when saving in production); see *Build status*.
 
 ## Context
 
@@ -80,7 +80,7 @@ they follow from the routes and are not a tuning value.
 |---|---|---|---|
 | 0 | ADR accepted | #309 | merged |
 | 1 | Port 80 refuses machine paths; edge checks in `check-proxy.sh` (also XFF spoofing, TRACE, `/static/` listing, `no-store`); runbook for an own proxy | | planned |
-| 2 | SMTP without TLS refused in production; `SMTP_PLAINTEXT_RELAY_ALLOWED`; System status error | | planned |
+| 2 | SMTP without TLS refused in production; `SMTP_PLAINTEXT_RELAY_ALLOWED`; System status error | #383 | built: saving refused, System status error; sending refuses from the next minor release |
 | 3 | TLS from an own proxy to web (`WEB_TLS_*`), System status error; the exception of point 2 in threat model and data flow | | planned |
 | 4 | The list of outbound connections in `docs/dataflow.md` | | planned |
 

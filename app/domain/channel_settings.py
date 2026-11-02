@@ -77,6 +77,22 @@ class SmtpSecurity(StrEnum):
     NONE = "none"
 
 
+def check_smtp_transport(
+    config: "SmtpSettings", *, production: bool, plaintext_allowed: bool
+) -> None:
+    """Refuse mail without TLS in production unless the host allows a plaintext relay.
+
+    Mail carries names, addresses and join links (ADR 0091 point 4). Outside production, and on
+    a host that sets ``SMTP_PLAINTEXT_RELAY_ALLOWED``, a relay on a trusted network may stay
+    unencrypted.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with field ``smtp_security``.
+    """
+    if production and config.plaintext and not plaintext_allowed:
+        raise _invalid("smtp_security")
+
+
 @dataclass(frozen=True)
 class SmtpSettings:
     """The organisation's mail server and sender.
@@ -126,6 +142,11 @@ class SmtpSettings:
             _check_email(self.reply_to_address, "reply_to_address")
         if self.dkim_selector is not None and not _HOST.fullmatch(self.dkim_selector):
             raise _invalid("dkim_selector")  # one or more DNS labels, like a host name
+
+    @property
+    def plaintext(self) -> bool:
+        """Whether the connection to the server is not encrypted (ADR 0091)."""
+        return self.security is SmtpSecurity.NONE
 
     @property
     def channel(self) -> ChannelKind:
