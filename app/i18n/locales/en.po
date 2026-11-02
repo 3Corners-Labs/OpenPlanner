@@ -7096,9 +7096,6 @@ msgstr "Email address"
 msgid "admin.settings.data_fields.field.phone"
 msgstr "Phone number"
 
-msgid "admin.settings.data_fields.field.note"
-msgstr "Note"
-
 msgid "admin.settings.data_fields.field.form_answers"
 msgstr "Answers to the team's own questions"
 

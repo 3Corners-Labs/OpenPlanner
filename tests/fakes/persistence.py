@@ -827,8 +827,16 @@ class InMemoryTransaction:
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(
-            self.state.bookings[booking_id], contact=None, claim=None, trial=None
+            self.state.bookings[booking_id],
+            contact=None,
+            claim=None,
+            trial=None,
+            meeting=None,
+            wxcc_task_id=None,
         )
+        self.state.booking_events[booking_id] = [
+            replace(e, message="") for e in self.state.booking_events.get(booking_id, [])
+        ]
         self.state.purged_at[booking_id] = now
 
     async def due_for_purge(self, candidates_before: datetime) -> list[DueBooking]:
