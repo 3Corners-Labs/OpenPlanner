@@ -9623,3 +9623,36 @@ msgstr "Inlognaam"
 
 msgid "admin.staff.manage.user_name.hint"
 msgstr "De medewerker logt in met de inlognaam of met het e-mailadres. Uitnodigingen, wachtwoordresets en agenda-uitnodigingen gaan naar het e-mailadres."
+
+msgid "admin.staff.provider"
+msgstr "Inlogdienst"
+
+msgid "admin.staff.platform_provider"
+msgstr "Platform"
+
+msgid "admin.settings.org_idps.title"
+msgstr "Identity providers van organisaties"
+
+msgid "admin.settings.org_idps.on"
+msgstr "Aan op deze host (ORGANISATION_IDPS_ENABLED): logins op een geverifieerd domein gaan naar de provider van die organisatie."
+
+msgid "admin.settings.org_idps.off"
+msgstr "Uit op deze host (ORGANISATION_IDPS_ENABLED): iedereen logt in bij de platformprovider."
+
+msgid "admin.settings.org_idps.provider"
+msgstr "Provider"
+
+msgid "admin.settings.org_idps.organisation"
+msgstr "Organisatie"
+
+msgid "admin.settings.org_idps.state"
+msgstr "Stand"
+
+msgid "admin.settings.org_idps.domains"
+msgstr "Domeinen"
+
+msgid "admin.settings.org_idps.counts"
+msgstr "{routing} geverifieerd, {failing} record verdwenen, {pending} wacht, {lapsed} vervallen"
+
+msgid "admin.settings.org_idps.none"
+msgstr "Geen organisatie heeft een eigen identity provider."

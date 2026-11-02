@@ -59,6 +59,9 @@ FILTERS = (
     StaffFilter(role=Role.GROUP_ADMIN),
     StaffFilter(role=Role.SUPERUSER),
     StaffFilter(dormant_before=NOW - timedelta(days=90)),
+    StaffFilter(provider=""),
+    StaffFilter(provider="org-a"),
+    StaffFilter(provider="gem_a"),
 )
 
 
@@ -193,3 +196,29 @@ async def test_a_carried_over_profile_is_not_recorded_yet(engine: AsyncEngine) -
     assert old is not None
     assert not old.recorded
     assert old.roles == frozenset()
+
+
+async def test_the_provider_filter_matches_the_key_exactly(engine: AsyncEngine) -> None:
+    """ADR 0083 point 16: a LIKE wildcard in the key must not match another provider."""
+    uow = SqlUnitOfWork(engine)
+    people = (
+        StaffMember(
+            "sub-p", "Petra", frozenset({Role.ORG_ADMIN}), frozenset({DEMO}), NOW, NOW, NOW
+        ),
+        StaffMember("idp:org-a:1", "Gerrit", frozenset(), frozenset({DEMO}), NOW, NOW, NOW),
+        StaffMember("idp:gemxa:2", "Gijs", frozenset(), frozenset({DEMO}), NOW, NOW, NOW),
+    )
+    async with uow.locked() as tx:
+        for person in people:
+            await tx.save_staff(person)
+
+    async with uow.read() as tx:
+        found = {
+            key: [
+                m.display_name
+                for m in await tx.list_staff(Scope(everything=True), StaffFilter(provider=key))
+            ]
+            for key in ("", "org-a", "gem_a")
+        }
+
+    assert found == {"": ["Petra"], "org-a": ["Gerrit"], "gem_a": []}

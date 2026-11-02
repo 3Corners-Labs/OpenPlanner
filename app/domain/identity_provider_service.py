@@ -549,6 +549,22 @@ class IdentityProviderService:
             claims = await tx.list_login_domains(_everything(), key)
         return refusal_of_identity(email, verified, key, claims)
 
+    async def platform_status(self) -> list[tuple[OrganisationProvider, list[DomainClaim]]]:
+        """Return every organisation provider with its domains, for *System status* (step 4).
+
+        Read-only and without a principal: the System status page is behind
+        ``settings.platform.view`` already. Never a secret or a key.
+        """
+        async with self._uow.read() as tx:
+            providers = await tx.list_identity_providers(_everything())
+            claims = await tx.list_login_domains(_everything())
+        return [(p, [c for c in claims if c.provider == p.key]) for p in providers]
+
+    @property
+    def routing(self) -> bool:
+        """Whether the host allows organisation providers (``ORGANISATION_IDPS_ENABLED``)."""
+        return self._routing()
+
     async def suffix_conflicts(self, suffix: str) -> bool:
         """Return whether a provider claims a domain overlapping ``suffix`` (ADR 0106 point 9)."""
         async with self._uow.read() as tx:
