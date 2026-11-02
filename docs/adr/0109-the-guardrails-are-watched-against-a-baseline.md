@@ -64,7 +64,7 @@ title and label, and the app's permissions. They are process constants of the fo
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed; environment `audit` created with branch policy `main` (2026-11-02) | #454 | in PR |
-| 1 | The product owner creates the audit app, installs it on this repository and stores its client ID and key in the environment `audit` | GitHub setting | planned |
+| 1 | The product owner creates the audit app, installs it on this repository and stores its client ID and key in the environment `audit` | GitHub setting | built 2026-11-02: app `3corners-openplanner-audit` (ID 5584789), administration read on the repository and the organisation, installed on this repository only |
 | 2 | `.github/guardrails.json`, `scripts/guardrail_audit.py`, `scripts/report_issue.py` (shared with `scripts/adr_issues.py`), `.github/workflows/guardrail-audit.yml`; tests; runbook, threat model | #454 | in PR |
 | 3 | The first scheduled run after the merge reads every section; anything it cannot read is fixed in the workflow or the baseline | | planned |
 
