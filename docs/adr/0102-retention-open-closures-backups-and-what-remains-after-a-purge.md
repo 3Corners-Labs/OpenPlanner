@@ -143,7 +143,7 @@ of this application.
 |---|---|---|---|
 | 0 | ADR accepted (decision PR) | #362 | in PR |
 | 1 | P-A2: maximum for an open closure: `closure_max_retention_days`, `closure_max_notice_days`, planning, sweep, overview, notice, closure page text, manual | #394 | built; the text on the participant's management page is left to the PR that moves that page to the participant cookie (ADR 0093) |
-| 2 | P-A5: purge empties the provider links, event message and token hash; retention matrix in `docs/dataflow.md`; the PII line in CLAUDE.md; terminology in docs and manual | #PRNUM | built: `privacy.PURGED_FIELDS` is the one list the purge works from; `booking_events.message` emptied; `management_token_hash` randomised; `public_ref` stays (random, names no one, and its participant sessions are deleted by the purge); `note` out of the PII list; retention matrix in `docs/dataflow.md`; "deleted, never anonymised" guarded by `tests/test_terminology.py` |
+| 2 | P-A5: purge empties the provider links, event message and token hash; retention matrix in `docs/dataflow.md`; the PII line in CLAUDE.md; terminology in docs and manual | #395 | built: `privacy.PURGED_FIELDS` is the one list the purge works from; `booking_events.message` emptied; `management_token_hash` randomised; `public_ref` stays (random, names no one, and its participant sessions are deleted by the purge); `note` out of the PII list; retention matrix in `docs/dataflow.md`; "deleted, never anonymised" guarded by `tests/test_terminology.py` |
 | 3 | P-A4: worker prunes `data/backups`; *System status* shows the oldest back-up; restore procedure in the runbook and `docs/HANDOVER.md` §7 | | planned |
 | 4 | Merge the booking row into a daily count and delete it after `booking_row_retention_days` | | planned |
 
