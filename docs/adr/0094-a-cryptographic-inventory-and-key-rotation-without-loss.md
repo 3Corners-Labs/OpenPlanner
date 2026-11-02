@@ -89,8 +89,8 @@ are crypto parameters; they change only through this inventory and a new label.
 |---|---|---|---|
 | 0 | ADR accepted | #309 | merged |
 | 1 | `docs/cryptography.md`; runbook *Rotating secrets* written for the new procedure (the wrong statement about `MANAGEMENT_TOKEN_KEY` is corrected in the PR of this ADR) | | planned |
-| 2 | Management links under the previous key (point 4), with a test that a reminder after rotation carries a working link | key rotation | planned |
-| 3 | Key id on sealed records, `SETTINGS_ENCRYPTION_KEY_PREVIOUS`, `rekey`, shared re-sealing with the configuration package. Built without a migration: the key id is appended to the stored nonce (12 bytes without an id, 20 with), so no column is added and old values stay readable. The System status count is not built yet | key rotation | planned |
+| 2 | Management links under the previous key (point 4), with a test that a reminder after rotation carries a working link | #388 | in PR #388 |
+| 3 | Key id on sealed records, `SETTINGS_ENCRYPTION_KEY_PREVIOUS`, `rekey`, shared re-sealing with the configuration package. Built without a migration: the key id is appended to the stored nonce (12 bytes without an id, 20 with), so no column is added and old values stay readable. The System status count is not built yet | #388 | in PR #388 |
 
 ## Consequences
 
