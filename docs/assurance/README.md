@@ -52,5 +52,6 @@ tests, not in this folder. The one-command evidence report of the application
 `oidc-check`, `address-check` and `tls-check` outcomes, the configured external hosts, the log
 destinations, the retention counts, the key rotation and a secret-free settings overview; attach
 its output to the dossier next to the checklists here. The browser test that public pages call
-no third party is a separate work package; when it exists, the rows that cite it are updated in
-the same pull request.
+no third party is built (`e2e/tests/no-third-parties.spec.ts`, PR #384); the row for V14.2.3
+cites it. What the application can prove about itself, requirement by requirement, with the
+source of each measure, is in `docs/asvs.md`.

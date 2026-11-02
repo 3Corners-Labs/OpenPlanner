@@ -37,34 +37,33 @@ provider the issuer stored at registration. A discovery document or token that n
 issuer refuses the login (`oidc.issuer_mismatch`, no values logged). The provider's
 document therefore cannot move the issuer after the fact.
 
-**Session.** Today (ADR 0013 §5) the session is the signed cookie, `__Host-op_admin` (`Path=/`,
-`Secure`, no `Domain`) when `PUBLIC_BASE_URL` is https and `op_admin` (`Path=/admin`) over http
-(ADR 0098 step 4), `HttpOnly`, `SameSite=Lax`, absolute lifetime
-`admin_session_hours` (8 h) enforced on the server from the login time in the cookie.
-Changes need a login younger than `admin_reauth_minutes` (60 min, ADR 0015). ADR 0098
-(proposed, not built) replaces this with a server-side register: the cookie holds
-only a random reference, every request looks the row up, logout and a new login end the old
-session, there is an idle limit and a limit on parallel sessions, and a person or an
-administrator can end sessions. Until it is built, a cookie copied before logout stays valid
-until its 8 h end; the mitigation is `HttpOnly`/`Secure` and rotating `SESSION_SECRET`, which
-ends everyone's session. This document describes the target state of ADR 0098 where it says
-*after ADR 0098*.
+**Session (ADR 0098, built).** The session is a row on the server (`admin_sessions`, the reference
+stored only as its SHA-256). The signed cookie `__Host-op_admin` (`Path=/`, `Secure`, no `Domain`) when
+`PUBLIC_BASE_URL` is https, `op_admin` (`Path=/admin`) over http, `HttpOnly`, `SameSite=Lax`, holds
+only a random reference next to the login in progress and preferences; claims, roles and entitlements
+live on the server. Every request looks the row up and accepts it while it is not ended, younger than
+`admin_session_hours` (8 h) and active within `admin_idle_minutes` (60 min). Every login, a re-login
+included, creates a new session and ends the one the browser brought; at most
+`admin_max_sessions_per_person` (5) run at once. Changes need a login younger than
+`admin_reauth_minutes` (60 min, ADR 0015).
 
-**How strong.** OpenPlanner does not see or enforce the authentication factor. The strength
-is that of the IdP's own policy; for PingFederate the required `acr` is an open decision and
-not yet checked by the platform (ASVS V6.8.4 is tracked outside this document). What
-OpenPlanner adds: a fresh login for changes (`admin_reauth_minutes`), `fresh=1` logins that
-force a new IdP login (`prompt=login`, `max_age=0`) for a mapping dry run, and rights derived only from claims through the matrix.
+**How strong.** OpenPlanner does not run the authentication factor; the strength is that of the
+IdP's own policy. It can require proof of a second factor: with the second-factor requirement on
+(ADR 0100, `ADMIN_MFA_REQUIRED`, or the policy of a registered provider) a login whose ID token shows
+no `amr` or `acr` from the configured lists is refused (`mfa_required`). For PingFederate the value to
+require is for the IdP team to name; the accepted values stay configurable. What OpenPlanner adds: a
+fresh login for changes (`admin_reauth_minutes`), `fresh=1` logins that force a new IdP login
+(`prompt=login`, `max_age=0`) for a mapping dry run, and rights derived only from claims through the matrix.
 
 **How it is withdrawn.**
 
-| Case | Today | After ADR 0098 |
-|---|---|---|
-| The admin logs out | `POST /admin/logout` clears the browser's cookie and ends the IdP session (RP-initiated logout). A copy of the cookie stays valid until its end. | The row is ended first; a copy is dead at once. |
-| A person leaves or is switched off at the IdP | Their session runs until its 8 h end; the next login fails. A superuser can rotate `SESSION_SECRET` to end all sessions. | A person's sessions are ended from the staff record; `sessions end-all` on the host ends all of them. Back-channel logout stays a later option. |
-| Role or membership changes at the IdP | Takes effect at the next login; the difference is audited (`staff.membership_changed`). | Same. |
-| Idle | No limit before the 8 h end. | `admin_idle_minutes` (class C, default 60). |
-| IdP outage | Admins cannot log in. There is no break-glass login; the host CLI offers closure and `oidc-check` only. | Same. |
+| Case | What happens |
+|---|---|
+| The admin logs out | `POST /admin/logout` ends the session on the server first, then clears the cookie and ends the IdP session (RP-initiated logout). A copy of the cookie is dead at once. |
+| A person leaves or is switched off at the IdP | Their sessions run until idle (60 min) or their 8 h end unless an administrator ends them (*End all sessions* under `staff.manage`, or suspending the person, ADR 0046 step 2); the next login fails. The person can end their own other sessions (*My sessions*). `sessions end-all` on the host ends everyone's. |
+| Role or membership changes at the IdP | Takes effect at the next login; the difference is audited (`staff.membership_changed`). |
+| Idle | `admin_idle_minutes` (class C, default 60, 15-120). |
+| IdP outage | Admins cannot log in. There is no break-glass login; the host CLI offers closure and `oidc-check` only. |
 
 **What lies with the IdP.** Password policy and storage, MFA and its enrolment, account
 lockout and recovery, the lifetime of the IdP's own SSO session, the mapping of people to
