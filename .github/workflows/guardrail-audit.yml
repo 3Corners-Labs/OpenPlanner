@@ -1,0 +1,61 @@
+name: guardrail audit
+
+# ADR 0109: the guardrails live in GitHub's settings, so a change or a bypass leaves no trace in
+# the code. Every hour this workflow reads the live state with the audit app (Administration:
+# read, nothing else; its key lives in the environment `audit`, which only `main` may use),
+# compares it with `.github/guardrails.json` and keeps the one open issue
+# `Guardrail drift <date>`, closed when nothing drifts. The reading is
+# `scripts/guardrail-fetch.sh`, the comparing `scripts/guardrail_audit.py`; this file only
+# wires them to the app token and the issue.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - ".github/guardrails.json"
+      - ".github/workflows/guardrail-audit.yml"
+      - "scripts/guardrail_audit.py"
+      - "scripts/guardrail-fetch.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write   # the report issue, with the workflow's own token
+
+concurrency:
+  group: guardrail-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: guardrails against the baseline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: audit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # A missing app or key leaves the token empty: every section is then unreadable and the
+      # report says so (fail closed), instead of the run passing quietly.
+      - id: app
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.AUDIT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUDIT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-administration: read
+          permission-organization-administration: read
+      - name: read the live guardrails (audit app)
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: scripts/guardrail-fetch.sh "$RUNNER_TEMP/live"
+      - name: compare and keep the report issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m scripts.guardrail_audit --live "$RUNNER_TEMP/live" --post | tee -a "$GITHUB_STEP_SUMMARY"
