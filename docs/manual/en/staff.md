@@ -59,6 +59,11 @@ Every change is in the audit log, with role names and places and without names o
 addresses. When the identity provider cannot be reached the screen says so, without repeating
 the provider's own message.
 
+A yellow notice that the bundled identity provider is **not fully connected** means Keycloak
+runs but the server lacks a setting; the notice names which. The server administrator fixes it
+(runbook, *Bundled identity provider*); until then the buttons are missing. The superuser also
+sees the state on **System status**, under *Staff management*.
+
 ## Filters
 
 - **Organisation**, **Group** and **Role**: only staff who belong to it.
