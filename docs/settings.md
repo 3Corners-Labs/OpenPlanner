@@ -67,6 +67,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `SIMULATOR_ENABLED` | bool | `false` | Platform-event simulator on admin booking pages; refused in production. |
 | `AGENT_API_ENABLED` | bool | `false` | Machine API for contact-center bots; off means the routes do not exist (ADR 0023). |
 | `RATE_LIMIT_ENABLED` | bool | `true` | Off switch for every rate limit; never in the portal. |
+| `LOG_SHIPPING_ENABLED` | bool | `true` | Kill switch of the log destinations (ADR 0085); off stops every one, never in the portal. |
 | `MAINTENANCE_MODE` | bool | `false` | Maintenance mode from the host, also while the database is unavailable (ADR 0038); the portal cannot switch it off. |
 | `DEV_TOKEN_KEY_PATH` | path | `data/dev-token.key` | Development management-token key file. |
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
@@ -101,6 +102,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `STAFF_INVITE_EXPIRY_DAYS` | int | `7` | 1–30 | `settings.platform.manage` | Days an invitation or password reset link of a staff member stays valid (ADR 0095). |
 | `STAFF_DIRECTORY_ENABLED` | bool | `true` | — | `settings.platform.manage` | Show the actions that create and change staff in the bundled identity provider; off hides them and leaves the provider's data untouched (ADR 0095). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
+| `STAFF_RETENTION_DAYS` | int | `365` | 90–1825 | `settings.platform.manage` | Days without a login after which a person's name, roles and memberships are erased from the staff list; the subject stays for the audit log (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |
 | `INTEGRATION_REQUEST_RETENTION_DAYS` | int | `30` | 1–365 | `settings.platform.manage` | Days after which request events (every call to Webex and WxCC for a booking) leave the audit log, apart from the other system events (ADR 0068). |
 | `GROUP_ERASE_AFTER_DAYS` | int | `30` | 1–365 | `settings.platform.manage` | Days after a group was archived before the worker erases its row, once nothing refers to it any more (ADR 0084); the audit log keeps the slug meanwhile. |

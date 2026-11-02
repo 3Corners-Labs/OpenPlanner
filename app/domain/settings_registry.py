@@ -578,6 +578,14 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Off switch for every rate limit; never in the portal.",
     ),
     S(
+        "log_shipping_enabled",
+        K.BOOL,
+        True,
+        _B,
+        T.SWITCHES,
+        "Kill switch of the log destinations (ADR 0085); off stops every one, never in the portal.",
+    ),
+    S(
         "maintenance_mode",
         K.BOOL,
         False,
@@ -868,6 +876,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "An admin's last-seen time is written at most once per this interval (ADR 0046).",
         minimum=60,
         maximum=3600,
+    ),
+    S(
+        "staff_retention_days",
+        K.INT,
+        365,
+        _C,
+        T.STAFF,
+        "Days without a login after which a person's name, roles and memberships are erased "
+        "from the staff list; the subject stays for the audit log (ADR 0046).",
+        minimum=90,
+        maximum=1825,
     ),
     S(
         "system_event_retention_days",

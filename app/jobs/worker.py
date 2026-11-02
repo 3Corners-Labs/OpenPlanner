@@ -57,6 +57,7 @@ from app.domain.ports import Clock, UnitOfWork
 from app.domain.request_log import RequestEvents
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
+from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.system_log import SystemLog
 from app.domain.tls_check import TlsWatch
 from app.domain.update_service import UpdateService
@@ -116,6 +117,7 @@ async def run_worker(
         clock,
         "worker",
         lambda: ship_settings(live.settings),
+        enabled=lambda: live.settings.log_shipping_enabled,
         window=lambda: timedelta(minutes=live.settings.security_event_window_minutes),
     )
     shipping_stop = asyncio.Event()
@@ -205,6 +207,14 @@ async def run_worker(
         admin = await sessions.clean(timedelta(hours=live.settings.admin_session_hours))
         return admin + await links.clean()
 
+    staff_lifecycle = StaffLifecycleService(uow, clock)
+
+    async def erase_staff() -> int:
+        """Erase the staff records without a login for ``staff_retention_days`` (ADR 0046)."""
+        return await staff_lifecycle.erase_inactive(
+            timedelta(days=live.settings.staff_retention_days)
+        )
+
     housekeeping = Housekeeping.for_database(
         engine,
         uow,
@@ -215,6 +225,7 @@ async def run_worker(
         eraser.run,
         RetentionSweep(uow, clock, live.closure_retention).run,
         clean_sessions,
+        erase_staff,
     )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(

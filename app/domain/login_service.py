@@ -30,12 +30,16 @@ from app.domain.entitlements import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import UnitOfWork
+from app.domain.staff import StaffStatus
 
 AMBIGUOUS_CLAIMS = "ambiguous_claims"
 """Refusal reason of ADR 0049 point 14: the legacy claims hand out a right nobody gave."""
 
 TOO_MANY_ENTITLEMENTS = "too_many_entitlements"
 """Refusal reason of ADR 0049 point 6: more recognised values than a session can hold."""
+
+SUSPENDED = "suspended"
+"""Refusal reason of ADR 0046 point 7: an administrator suspended the person (claims are moot)."""
 
 
 class LoginRefusedError(DomainError):
@@ -115,9 +119,14 @@ class LoginService:
 
         Raises:
             LoginRefusedError: ``ambiguous_claims`` (ADR 0049 point 14) or
-                ``too_many_entitlements`` (point 6); both are audited as a denied login.
+                ``too_many_entitlements`` (point 6), both audited as a denied login; or
+                ``suspended`` (ADR 0046 point 7), which the login route audits.
         """
         settings = self._settings()
+        async with self._uow.read() as tx:
+            known = await tx.get_staff(claims.subject)
+        if known is not None and known.status is StaffStatus.SUSPENDED:
+            raise LoginRefusedError(SUSPENDED)
         directory, catalogue = await self.directory()
         resolution = resolve(claims, settings.mode, settings.prefix, directory, catalogue)
         if resolution.ambiguous:

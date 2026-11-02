@@ -283,3 +283,22 @@ async def test_without_a_sender_a_test_is_not_ready() -> None:
     with pytest.raises(DomainError) as caught:
         await env.service.send_test(SUPER, created.id or 0)
     assert caught.value.code is ErrorCode.INTEGRATION_NOT_READY
+
+
+async def test_a_test_line_is_refused_while_the_host_switch_is_off() -> None:
+    env = Env()
+    env.service = LogDestinationService(
+        env.uow,
+        env.clock,
+        AdminService(env.uow, env.clock),
+        production=True,
+        tester=env._test,  # noqa: SLF001
+        shipping_enabled=lambda: False,
+    )
+    created = await env.service.create(SUPER, draft(), TOKEN)
+
+    with pytest.raises(DomainError) as caught:
+        await env.service.send_test(SUPER, created.id or 0)
+
+    assert caught.value.code is ErrorCode.LOG_SHIPPING_OFF
+    assert env.tested == []

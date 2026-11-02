@@ -330,6 +330,9 @@ class Settings(BaseSettings):
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
+    # ADR 0046 point 9: a person's name, roles and memberships are erased after this many days
+    # without a login (class C, platform). The subject stays, so the audit log still resolves.
+    staff_retention_days: int = Field(default=365, ge=90, le=1825)
     # Without a login for this many days, a person is marked dormant in the staff list
     # (class D, organisation; one value for every organisation until the portal stores it).
     staff_dormant_after_days: int = Field(default=90, ge=14, le=365)
@@ -400,6 +403,10 @@ class Settings(BaseSettings):
 
     # Rate limits on public endpoints (CLAUDE.md security baseline).
     rate_limit_enabled: bool = True
+
+    # ADR 0085 point 7 (class B, kill switch): off stops every log destination without deleting
+    # its configuration, for an incident in which the platform's own traffic is the problem.
+    log_shipping_enabled: bool = True
 
     # Simulator for platform events on admin booking pages; off unless switched on, refused in
     # production (docs/runbook.md, section 10).

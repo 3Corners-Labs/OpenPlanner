@@ -123,6 +123,7 @@ from app.domain.services import BookingService
 from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
 from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
+from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.system_log import SystemLog
 from app.domain.tls import public_address
 from app.domain.tls_check import CertificateStatus, TlsWatch
@@ -362,6 +363,7 @@ def create_app(
             clock,
             "web",
             lambda: ship_settings(live()),
+            enabled=lambda: live().log_shipping_enabled,
             window=lambda: timedelta(minutes=live().security_event_window_minutes),
         )
         shipping_stop = asyncio.Event()
@@ -391,6 +393,7 @@ def create_app(
             clock,
             app.state.admin_service,
             production=settings.environment == "prod",
+            shipping_enabled=lambda: live().log_shipping_enabled,
             tester=LogTester(
                 LogDestinationCredentialStore(app.state.engine, secret_box(settings)),
                 log_sender_factory or build_sender,
@@ -400,6 +403,7 @@ def create_app(
             ),
         )
         app.state.admin_session_service = AdminSessionService(uow, clock)
+        app.state.staff_lifecycle_service = StaffLifecycleService(uow, clock)
         # ADR 0049: claims become grants per request; the mode is class B, the prefix C.
         app.state.login_service = LoginService(
             uow,
