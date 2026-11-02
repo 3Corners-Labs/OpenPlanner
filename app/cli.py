@@ -365,24 +365,28 @@ async def _wxcc_config_check(
     return format_report(results), passed(results)
 
 
-async def _queue_ids(
-    settings: Settings, transport: httpx.AsyncBaseTransport | None
-) -> dict[str, str]:
-    """Return the id of every queue by name, or nothing when WxCC cannot be read (names only)."""
+async def _wxcc_names(
+    settings: Settings, channel: str, transport: httpx.AsyncBaseTransport | None
+) -> tuple[dict[str, str], tuple[str, str] | None]:
+    """Return every queue's id by name and the Work Item channel's (id, name), if WxCC answers.
+
+    Read only (``cjp:config_read``); nothing when WxCC cannot be read, so the flow keeps names.
+    """
     if not settings.dispatch_configured or not settings.wxcc_api_base_url:
-        return {}
+        return {}, None
     async with _service_app(settings, transport) as (http, tokens):
         if tokens is None:  # pragma: no cover - dispatch_configured implies tokens
-            return {}
+            return {}, None
         try:
             token = await tokens.access_token()
             _, host, org = await region_check(http, token, settings.wxcc_api_base_url)
             if not host or not org:
-                return {}
+                return {}, None
             config = await fetch_config(http, token, host, org)
         except IntegrationError:
-            return {}
-    return {q.name: q.id for q in config.queues}
+            return {}, None
+    found = next((c for c in config.channels if c.name == channel), None)
+    return {q.name: q.id for q in config.queues}, (found.id, found.name) if found else None
 
 
 async def _wxcc_sample_flow(
@@ -421,8 +425,10 @@ async def _wxcc_sample_flow(
     )
     routes = [Route(value, chosen.get(value, value)) for value in values]
     fallback = fallback or routes[0].queue
-    ids = await _queue_ids(settings, transport)
-    flow = sample_flow(f"openplanner_{group.slug}", routes, fallback, ids)
+    ids, found = await _wxcc_names(settings, group.wxcc_channel, transport)
+    if found is None:
+        sys.stderr.write("channel not found in WxCC: link the flow to it in Flow Designer\n")
+    flow = sample_flow(f"openplanner_{group.slug}", routes, fallback, ids, found)
     unknown = sorted(({r.queue for r in routes} | {fallback}) - ids.keys())
     if unknown:
         sys.stderr.write(f"queue not found in WxCC, choose it in Flow Designer: {unknown}\n")

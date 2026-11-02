@@ -119,3 +119,13 @@ def test_the_sample_flow_reads_routing_and_meeting_link_and_carries_no_participa
 def test_a_routing_value_twice_is_refused() -> None:
     with pytest.raises(ValueError, match="duplicate"):
         sample_flow("x", [Route("a", "q"), Route("a", "r")], "q")
+
+
+def test_the_flow_names_its_channel_and_a_valid_flow_name() -> None:
+    # Flow Designer refused the queues without the channel, and a name with a hyphen (2026-11-02).
+    flow = sample_flow("openplanner_fin-bld-groep1", ROUTES, "q", channel=("ch-9", "videoafspraak"))
+
+    assert flow["associatedChannels"] == [
+        {"channelType": "workItem", "id": "ch-9", "name": "videoafspraak"}
+    ]
+    assert flow["name"] == "openplanner_fin_bld_groep1"

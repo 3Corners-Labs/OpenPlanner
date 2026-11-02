@@ -17,6 +17,7 @@ Set Contact Priority for direct calls is left to the admin: no export holds that
 id. The flow carries routing values and queue names only, never participant data.
 """
 
+import re
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -310,6 +311,7 @@ def sample_flow(
     routes: Sequence[Route],
     fallback_queue: str,
     queue_ids: Mapping[str, str] | None = None,
+    channel: tuple[str, str] | None = None,
 ) -> dict[str, Any]:
     """Return the sample flow for ``routes``, with ``fallback_queue`` on the default branch.
 
@@ -319,6 +321,8 @@ def sample_flow(
         fallback_queue: Queue of the default branch (a routing value without a branch).
         queue_ids: Id of each queue by name, from the organisation's configuration; a queue
             without an id is still shown by name and chosen again in Flow Designer.
+        channel: Id and name of the Work Item channel; the flow must name it, or Flow Designer
+            refuses its queues ("the channel type does not match what triggers the flow").
 
     Raises:
         ValueError: when a routing value occurs twice.
@@ -409,7 +413,7 @@ def sample_flow(
     return {
         "version": 1,
         "flowType": "FLOW",
-        "name": name,
+        "name": re.sub(r"\W", "_", name),
         "description": "OpenPlanner work items: probe, Screen Pop, queue per group",
         "comment": "",
         "variables": [
@@ -451,6 +455,8 @@ def sample_flow(
             {"name": "audioFile", "value": "", "type": "STRING", "group": "activityWait"},
             {"name": "delayTime", "value": "2000", "type": "INTEGER", "group": "activityWait"},
         ],
-        "associatedChannels": [],
+        "associatedChannels": (
+            [{"channelType": "workItem", "id": channel[0], "name": channel[1]}] if channel else []
+        ),
         "flowOutcome": None,
     }
