@@ -1,6 +1,7 @@
 # 0087. The public website: static, built from the repository, shipped with every release
 
 Status: accepted (2026-10-31, `po:approved` on #271 and #285), requested by the product owner. Partly built: steps 1 and 3 are on `main` (#285, #289) and step 1 is live on TransIP (first deploy 2026-11-01 by hand; the CI deploy waits for step 4); the first recording is on `v0.4.0-rc.86`; see *Build status*.
+Points 4 and 9 superseded, points 3 and 5 amended, by ADR 0110 (2026-11-02): the release list is also read live from GitHub, the roadmap lists no ADRs, a missing deploy configuration fails.
 Step 3a is merged (#313). Note (2026-11-01 review): the *Settings* section's reference to
 "point 9" for the accessibility targets means point 11.
 

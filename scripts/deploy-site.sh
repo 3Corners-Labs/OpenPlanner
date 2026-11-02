@@ -21,6 +21,8 @@
 #                            panel, for openplanner.nl `main`); empty: the default branch
 # TransIP AutoGit needs `.autogit.yml` in the repository root; the script writes it from
 # site/deploy/autogit.yml next to the site folder.
+#   SITE_DEPLOY_REQUIRED     "true" in the real repository (ADR 0110): a missing remote or key
+#                            is then an error, so the run is red instead of quietly green
 # Without SITE_DEPLOY_REMOTE or SITE_DEPLOY_KEY it prints a notice and exits 0, so a fork, a
 # pull request or a local run builds and never deploys.
 set -euo pipefail
@@ -28,6 +30,10 @@ set -euo pipefail
 dist="${1:?usage: deploy-site.sh <dist directory> <version label>}"
 label="${2:?usage: deploy-site.sh <dist directory> <version label>}"
 if [ -z "${SITE_DEPLOY_REMOTE:-}" ] || [ -z "${SITE_DEPLOY_KEY:-}${SITE_DEPLOY_KEY_FILE:-}" ]; then
+  if [ "${SITE_DEPLOY_REQUIRED:-}" = "true" ]; then
+    echo "::error::no SITE_DEPLOY_REMOTE or SITE_DEPLOY_KEY in the environment 'website': the site is not deployed (ADR 0110)"
+    exit 1
+  fi
   echo "::notice::no SITE_DEPLOY_REMOTE or SITE_DEPLOY_KEY, the site is built but not deployed"
   exit 0
 fi

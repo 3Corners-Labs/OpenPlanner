@@ -1,6 +1,7 @@
 /* openplanner.nl (ADR 0087): progressive enhancement only. Without this file the page is
-   complete. It adds the interactive booking demo, the stepping of the animated tour and the
-   reveal of sections on scroll. It sets no cookie, uses no storage and sends nothing. */
+   complete. It adds the interactive booking demo, the stepping of the animated tour, the
+   reveal of sections on scroll, and the live release list. It sets no cookie and uses no
+   storage; its one request is the public release list from api.github.com (ADR 0110). */
 (function () {
   "use strict";
   var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -67,6 +68,83 @@
       }, { threshold: 0.4 });
       tio.observe(tour);
     }
+  }
+
+  /* ---- The live release list (ADR 0110) ----------------------------------- */
+  var releases = document.querySelector("[data-releases]");
+  if (releases && window.fetch) {
+    var API = "https://api.github.com/repos/3Corners-Labs/OpenPlanner/releases";
+    var PAGE = "https://github.com/3Corners-Labs/OpenPlanner/releases/";
+    var ask = function (path) {
+      var ctl = new AbortController();
+      var timer = setTimeout(function () { ctl.abort(); }, 8000);
+      return fetch(API + path, {
+        credentials: "omit", referrerPolicy: "no-referrer", signal: ctl.signal,
+        headers: { Accept: "application/vnd.github+json" }
+      }).then(function (r) { clearTimeout(timer); return r.ok ? r.json() : Promise.reject(); });
+    };
+    var pick = function (item) {
+      return item && !item.draft && item.published_at && typeof item.tag_name === "string" &&
+        typeof item.html_url === "string" && item.html_url.indexOf(PAGE) === 0;
+    };
+    var link = function (r) {
+      var a = document.createElement("a");
+      a.href = r.url;
+      a.textContent = r.tag;
+      return a;
+    };
+    var fill = function (box, r) {
+      if (!box || !r) { return; }
+      var tag = box.querySelector(".tag");
+      var keep = tag ? [tag] : [];
+      box.textContent = "";
+      keep.forEach(function (n) { box.appendChild(n); });
+      var v = document.createElement("p");
+      v.className = "release__version";
+      v.appendChild(link(r));
+      var d = document.createElement("p");
+      d.className = "release__date";
+      var t = document.createElement("time");
+      t.setAttribute("datetime", r.date);
+      t.textContent = r.date;
+      d.appendChild(t);
+      box.appendChild(v);
+      box.appendChild(d);
+    };
+    Promise.all([ask("?per_page=30"), ask("/latest").catch(function () { return null; })])
+      .then(function (got) {
+        var seen = {};
+        var all = (got[0] || []).concat(got[1] ? [got[1]] : []).filter(pick).map(function (i) {
+          return { tag: i.tag_name, date: String(i.published_at).slice(0, 10), url: i.html_url, pre: !!i.prerelease };
+        }).filter(function (r) { return seen[r.tag] ? false : (seen[r.tag] = true); });
+        all.sort(function (a, b) { return (b.date + b.tag).localeCompare(a.date + a.tag); });
+        if (!all.length) { return; }
+        fill(releases.querySelector('[data-release="latest"]'), all.filter(function (r) { return !r.pre; })[0]);
+        fill(releases.querySelector('[data-release="candidate"]'), all.filter(function (r) { return r.pre; })[0]);
+        var list = releases.querySelector("[data-release-list]");
+        if (list) {
+          var label = list.getAttribute("data-prerelease");
+          list.textContent = "";
+          all.slice(0, 5).forEach(function (r) {
+            var li = document.createElement("li");
+            var t = document.createElement("time");
+            t.setAttribute("datetime", r.date);
+            t.textContent = r.date;
+            li.appendChild(link(r));
+            li.appendChild(document.createTextNode(" "));
+            li.appendChild(t);
+            if (r.pre) {
+              var pre = document.createElement("span");
+              pre.className = "tag";
+              pre.textContent = label;
+              li.appendChild(document.createTextNode(" "));
+              li.appendChild(pre);
+            }
+            list.appendChild(li);
+          });
+        }
+      })
+      .catch(function () { /* the list built into the page stays */ });
   }
 
   /* ---- The interactive booking demo ------------------------------------- */
