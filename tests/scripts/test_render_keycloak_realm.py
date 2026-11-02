@@ -310,3 +310,22 @@ def test_the_realm_asks_for_a_second_factor_and_says_so_in_the_token() -> None:
     assert config["config"]["loa-condition-level"] == "2"
     assert "CONFIGURE_TOTP" in super_user["requiredActions"]
     assert realm["resetPasswordAllowed"] is True  # self-service reset at the login prompt
+
+
+def test_the_otp_policy_is_the_one_every_authenticator_app_reads() -> None:
+    """TOTP with SHA1, 6 digits and 30 seconds (RFC 6238 defaults).
+
+    Google and Microsoft Authenticator, Duo Mobile and FreeOTP all read it. An import that
+    names only the type sets the digits and the period to 0: the codes never match, and
+    Keycloak offers FreeOTP alone (docker01, 2026-11-02).
+    """
+    realm = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+
+    assert {k: v for k, v in realm.items() if k.startswith("otpPolicy")} == {
+        "otpPolicyType": "totp",
+        "otpPolicyAlgorithm": "HmacSHA1",
+        "otpPolicyDigits": 6,
+        "otpPolicyPeriod": 30,
+        "otpPolicyLookAheadWindow": 1,
+        "otpPolicyInitialCounter": 0,
+    }
