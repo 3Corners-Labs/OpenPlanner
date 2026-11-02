@@ -33,6 +33,7 @@ from app.domain.form_fields import (
     Classification,
     FieldDefinition,
     FieldType,
+    derive_key,
     format_options,
     parse_options,
 )
@@ -108,13 +109,19 @@ def _url(slug: str) -> str:
     return f"/admin/groups/{slug}/settings/form"
 
 
-def _refusal(form: FormData, error: DomainError) -> None:
-    """Add the message for a refused definition, linked to its input."""
+def _refusal(form: FormData, error: DomainError, key_input: str = "key") -> None:
+    """Add the message for a refused definition, linked to its input.
+
+    ``key_input`` is where a refused key points: the question's input when the key was derived
+    from it, as the administrator never typed one.
+    """
     if error.code is ErrorCode.FORM_FIELD_FORBIDDEN:
         target = FIELD_FOR.get(error.field or "", error.field or "label_nl")
+        target = key_input if target == "key" else target
         form.errors.append(FormError(target, form._("admin.form.error.form_field_forbidden")))
     elif error.code is ErrorCode.INVALID_FORM_FIELD and error.field in ERROR_KEYS:
         target = FIELD_FOR.get(error.field, error.field)
+        target = key_input if target == "key" else target
         form.errors.append(FormError(target, form._(ERROR_KEYS[error.field])))
     else:
         form.refusal(error)
@@ -131,7 +138,9 @@ def _bound(form: FormData, name: str) -> int | None:
     return None
 
 
-def _definition(form: FormData, key: str, kind: FieldType) -> FieldDefinition | None:
+def _definition(
+    form: FormData, key: str, kind: FieldType, key_input: str = "key"
+) -> FieldDefinition | None:
     """Return the definition the form describes, or ``None`` with the errors on ``form``."""
     minimum, maximum = _bound(form, "minimum"), _bound(form, "maximum")
     classification = form.text("classification")
@@ -156,7 +165,7 @@ def _definition(form: FormData, key: str, kind: FieldType) -> FieldDefinition | 
             maximum=maximum if kind in (FieldType.NUMBER, FieldType.DATE) else None,
         )
     except DomainError as error:
-        _refusal(form, error)
+        _refusal(form, error, key_input)
         return None
 
 
@@ -167,26 +176,6 @@ def _inputs(_: BoundGettext, form: FormData, current: FieldDefinition | None) ->
         return form.values.get(name, stored) if form.values else stored
 
     fields: list[Field] = []
-    if current is None:
-        fields += [
-            Field(
-                "key",
-                _("admin.form_fields.key"),
-                value=value("key", ""),
-                hint=_("admin.form_fields.key_hint"),
-                error=form.error_for("key"),
-                attributes={"maxlength": "40", "autocomplete": "off", "spellcheck": "false"},
-            ),
-            Field(
-                "type",
-                _("admin.form_fields.type"),
-                "select",
-                value("type", FieldType.SHORT_TEXT.value),
-                hint=_("admin.form_fields.type_hint"),
-                error=form.error_for("type"),
-                options=options((t.value, _(TYPE_LABELS[t])) for t in FieldType),
-            ),
-        ]
     for locale in REQUIRED_LOCALES:
         fields.append(
             Field(
@@ -195,6 +184,18 @@ def _inputs(_: BoundGettext, form: FormData, current: FieldDefinition | None) ->
                 value=value(f"label_{locale}", current.labels.get(locale, "") if current else ""),
                 error=form.error_for(f"label_{locale}"),
                 attributes={"maxlength": "200"},
+            )
+        )
+    if current is None:
+        fields.append(
+            Field(
+                "type",
+                _("admin.form_fields.type"),
+                "select",
+                value("type", FieldType.SHORT_TEXT.value),
+                hint=_("admin.form_fields.type_hint"),
+                error=form.error_for("type"),
+                options=options((t.value, _(TYPE_LABELS[t])) for t in FieldType),
             )
         )
     for locale in REQUIRED_LOCALES:
@@ -247,6 +248,18 @@ def _inputs(_: BoundGettext, form: FormData, current: FieldDefinition | None) ->
                     attributes={"inputmode": "numeric", "maxlength": "7"},
                 )
             )
+    if current is None:
+        fields.append(
+            Field(
+                "key",
+                _("admin.form_fields.key"),
+                value=value("key", ""),
+                hint=_("admin.form_fields.key_hint"),
+                error=form.error_for("key"),
+                required=False,
+                attributes={"maxlength": "40", "autocomplete": "off", "spellcheck": "false"},
+            )
+        )
     return fields
 
 
@@ -346,7 +359,14 @@ async def add_field(
     """Add a field at the end of the form."""
     form = await read_form(request, locale)
     kind = form.choice("type", {t.value for t in FieldType})
-    definition = _definition(form, form.text("key").strip(), FieldType(kind)) if kind else None
+    key = form.text("key").strip()
+    key_input = "key"
+    if kind and not key:
+        # The administrator asked a question and typed no key: make one from the question.
+        found = await form_service(request).view(context.principal, slug)
+        taken = {f.key for f in (*found.form.fields, *found.form.retired)}
+        key, key_input = derive_key(form.text("label_nl"), taken), "label_nl"
+    definition = _definition(form, key, FieldType(kind), key_input) if kind else None
     if definition is not None:
         try:
             await form_service(request).add(
@@ -354,7 +374,7 @@ async def add_field(
             )
         except DomainError as error:
             raise_refusal(error)
-            _refusal(form, error)
+            _refusal(form, error, key_input)
         else:
             return redirect_done(_url(slug), "created")
     return await _page(request, locale, context, slug, form, 422)

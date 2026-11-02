@@ -100,6 +100,41 @@ async def test_fields_are_added_listed_and_audited_by_key(site: Site) -> None:
     ]
 
 
+async def test_the_key_is_made_from_the_question_when_left_empty(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    without_key = {k: v for k, v in CUSTOMER.items() if k != "key"}
+
+    first = await _post(site, PAGE, without_key)
+    second = await _post(site, PAGE, without_key)
+
+    assert first.headers["location"] == f"{PAGE}?done=created"
+    assert second.headers["location"] == f"{PAGE}?done=created"
+    assert (await _details(site))[-2:] == [
+        "field.add,key:klantnummer,type:short_text",
+        "field.add,key:klantnummer_2,type:short_text",
+    ]
+
+
+async def test_a_forbidden_question_without_a_key_is_refused_at_the_question(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    refused = await _post(
+        site, PAGE, {**CUSTOMER, "key": "", "label_nl": "Social security number", "label_en": "SSN"}
+    )
+
+    assert refused.status_code == 422
+    assert '<a href="#label_nl">' in refused.text  # the administrator never typed a key
+
+
+async def test_the_add_form_asks_the_question_first_and_the_key_last(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    page = (await site.client.get(PAGE)).text
+
+    order = [page.index(f'id="{name}"') for name in ("label_nl", "type", "key")]
+    assert order == sorted(order)
+
+
 async def test_refusals_are_linked_to_their_inputs(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 

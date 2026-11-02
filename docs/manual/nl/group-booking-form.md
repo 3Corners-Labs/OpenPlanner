@@ -17,9 +17,11 @@ gegevens. Die controle is een vangnet, geen garantie: kies ook zelf geen vraag d
 neerkomt.
 
 <!-- field: key -->
-## Sleutel
+## Technische naam
 
-De sleutel is de vaste naam van het veld, bijvoorbeeld `klantnummer`. Hij bestaat uit kleine
+U hoeft deze niet in te vullen. Laat u hem leeg, dan maakt het portaal de naam uit de vraag in het
+Nederlands, bijvoorbeeld `klantnummer` bij de vraag *Klantnummer*; bestaat die naam al, dan wordt
+het `klantnummer_2`. De technische naam is de vaste naam van het veld. Hij bestaat uit kleine
 letters, cijfers en `_`, begint met een letter en is 2 tot 40 tekens lang. Na opslaan ligt hij
 vast, en een sleutel die het team eerder gebruikte kan niet opnieuw. Zo betekent een antwoord
 bij een afspraak altijd wat de vraag toen betekende.
