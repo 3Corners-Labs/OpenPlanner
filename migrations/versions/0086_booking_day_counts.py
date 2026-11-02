@@ -5,11 +5,11 @@ and when the latest of them was purged. The worker merges a booking row into it
 ``booking_row_retention_days`` after the purge and then deletes the row. No personal data, so
 the downgrade only drops the table (the counts are statistics and cannot be rebuilt).
 
-Revises 0084 (public address checks, ADR 0086). Open PRs also claim numbers, so recheck
+Revises 0085 (staff status, ADR 0046). Open PRs also claim numbers, so recheck
 the head before merging.
 
-Revision ID: 0085
-Revises: 0084
+Revision ID: 0086
+Revises: 0085
 Create Date: 2026-11-02 12:00:00.000000
 """
 
@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0085"
-down_revision: str | None = "0084"
+revision: str = "0086"
+down_revision: str | None = "0085"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

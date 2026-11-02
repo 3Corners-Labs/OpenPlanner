@@ -3773,6 +3773,9 @@ msgstr "De database is groter dan het ingestelde maximum."
 msgid "audit.actor.system"
 msgstr "Systeem"
 
+msgid "audit.actor.erased"
+msgstr "Gewiste medewerker"
+
 msgid "audit.outcome.retry"
 msgstr "Wordt opnieuw geprobeerd"
 
@@ -5716,6 +5719,9 @@ msgstr "Medewerkers beheren"
 msgid "authz.permission.staff_reset_password"
 msgstr "Wachtwoordreset of uitnodiging sturen"
 
+msgid "authz.permission.staff_erase"
+msgstr "Gegevens van een medewerker wissen"
+
 msgid "admin.nav.staff"
 msgstr "Medewerkers"
 
@@ -5724,6 +5730,15 @@ msgstr "Eerste keer ingelogd"
 
 msgid "audit.event.staff_changed"
 msgstr "Rollen of lidmaatschappen gewijzigd"
+
+msgid "audit.event.staff_suspended"
+msgstr "Medewerker geschorst"
+
+msgid "audit.event.staff_reinstated"
+msgstr "Schorsing opgeheven"
+
+msgid "audit.event.staff_erased"
+msgstr "Gegevens van medewerker gewist"
 
 msgid "admin.audit.detail.role_add"
 msgstr "rol erbij: {value}"
@@ -5938,6 +5953,9 @@ msgstr "Onderdelen van Geavanceerde instellingen"
 msgid "admin.page_toc"
 msgstr "Op deze pagina"
 
+msgid "admin.group.settings.general"
+msgstr "Algemeen"
+
 msgid "admin.settings.intro"
 msgstr "Hoe deze installatie is ingesteld en waar elke waarde vandaan komt. Geheime waarden worden nooit getoond. De superuser wijzigt hier bedrijfsvoering, bewaartermijnen, opslag, snelheidslimieten en sessies; een wijziging geldt binnen tien seconden."
 
@@ -6135,6 +6153,9 @@ msgstr "Medewerkers beheren in het portaal"
 
 msgid "settings.field.staff_last_seen_interval_seconds.label"
 msgstr "Laatst gezien bijwerken (seconden)"
+
+msgid "settings.field.staff_retention_days.label"
+msgstr "Medewerkergegevens wissen na (dagen zonder inlog)"
 
 msgid "settings.field.system_event_retention_days.label"
 msgstr "Systeemgebeurtenissen bewaren (dagen)"
@@ -7660,6 +7681,9 @@ msgstr "Uw account stuurt meer rechten mee dan OpenPlanner kan verwerken. Vraag 
 msgid "admin.login_refused.mfa_required"
 msgstr "Inloggen is geweigerd: uw account laat geen tweede factor (MFA) zien. Stel meervoudige authenticatie in bij uw identiteitsprovider en log opnieuw in; blijft het mislukken, neem dan contact op met het IdP-team."
 
+msgid "admin.login_refused.suspended"
+msgstr "Inloggen is geweigerd: uw toegang tot het beheerportaal is geschorst. Neem contact op met de beheerder van uw organisatie."
+
 msgid "admin.rights_not_recognised.text"
 msgstr "Uw account heeft rechten voor OpenPlanner die deze installatie niet herkent. Neem contact op met uw beheerder; die ziet op uw pagina bij Medewerkers welke waarden niet herkend zijn."
 
@@ -9144,6 +9168,15 @@ msgstr "Uw andere sessies zijn beëindigd. Aantal: {count}."
 msgid "admin.done.sessions_ended_person"
 msgstr "De sessies van deze medewerker zijn beëindigd. Aantal: {count}. De medewerker moet opnieuw inloggen."
 
+msgid "admin.done.staff_suspended"
+msgstr "De medewerker is geschorst en de sessies zijn beëindigd."
+
+msgid "admin.done.staff_reinstated"
+msgstr "De schorsing is opgeheven. De medewerker kan weer inloggen."
+
+msgid "admin.done.staff_erased"
+msgstr "De gegevens van de medewerker zijn gewist."
+
 msgid "admin.sessions.title"
 msgstr "Mijn sessies"
 
@@ -9185,6 +9218,36 @@ msgstr "Beëindigt alle sessies van deze medewerker in het beheerportaal, ook di
 
 msgid "admin.staff.sessions.end_all"
 msgstr "Alle sessies beëindigen"
+
+msgid "admin.staff.erased_name"
+msgstr "Gewiste medewerker"
+
+msgid "admin.staff.status.suspended"
+msgstr "Geschorst"
+
+msgid "admin.staff.status.erased"
+msgstr "Gewist"
+
+msgid "admin.staff.status.heading"
+msgstr "Toegang"
+
+msgid "admin.staff.status.suspend_intro"
+msgstr "Schorsen blokkeert de toegang tot het beheerportaal, ook als de identity provider de rechten nog toekent, en beëindigt alle sessies van deze medewerker. U kunt de schorsing later opheffen."
+
+msgid "admin.staff.status.suspend"
+msgstr "Medewerker schorsen"
+
+msgid "admin.staff.status.reinstate_intro"
+msgstr "Opheffen laat de medewerker weer inloggen; de rechten komen opnieuw uit de identity provider."
+
+msgid "admin.staff.status.reinstate"
+msgstr "Schorsing opheffen"
+
+msgid "admin.staff.status.erase_intro"
+msgstr "Wissen verwijdert de naam, rollen en lidmaatschappen van deze geschorste medewerker. Het auditlog blijft verwijzen naar een gewiste medewerker. Dit kan niet ongedaan worden gemaakt."
+
+msgid "admin.staff.status.erase"
+msgstr "Gegevens wissen"
 
 msgid "admin.rights.sections"
 msgstr "Onderdelen van Mijn rechten"

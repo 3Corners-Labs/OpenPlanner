@@ -9,6 +9,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
+from app.domain.admin_sessions import AdminSession, EndReason
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
@@ -72,6 +73,7 @@ from app.domain.staff import (
     RefusedEntitlement,
     StaffFilter,
     StaffMember,
+    StaffStatus,
     visible,
 )
 from app.domain.tasks import ActiveJob, ActiveJobs
@@ -100,6 +102,7 @@ class State:
     audit: list[AuditEvent] = field(default_factory=list)
     diagnostic_modes: list[DiagnosticMode] = field(default_factory=list)
     staff: dict[str, StaffMember] = field(default_factory=dict)
+    admin_sessions: list[AdminSession] = field(default_factory=list)
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
     contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
@@ -197,7 +200,11 @@ class InMemoryTransaction:
         ]
         staff = self.state.staff
         return [
-            AuditEntry(e, staff[e.actor].display_name if e.actor in staff else None)
+            AuditEntry(
+                e,
+                (staff[e.actor].display_name or None) if e.actor in staff else None,
+                e.actor in staff and staff[e.actor].status is StaffStatus.ERASED,
+            )
             for e in reversed(events)
         ][:limit]
 
@@ -248,6 +255,33 @@ class InMemoryTransaction:
         old = self.state.staff.get(member.subject)
         member_id = old.id if old and old.id is not None else self._new_id()
         self.state.staff[member.subject] = replace(member, id=member_id, recorded=True)
+
+    async def add_admin_session(self, session: AdminSession) -> None:
+        self.state.admin_sessions.append(session)
+
+    async def active_admin_sessions_of(self, subject: str) -> list[AdminSession]:
+        return [s for s in self.state.admin_sessions if s.subject == subject and s.ended_at is None]
+
+    async def end_admin_sessions_of(
+        self, subject: str, reason: EndReason, at: datetime, keep: str | None = None
+    ) -> int:
+        ended = 0
+        for i, session in enumerate(self.state.admin_sessions):
+            if session.subject == subject and session.ended_at is None and session.id_hash != keep:
+                self.state.admin_sessions[i] = replace(session, ended_at=at, end_reason=reason)
+                ended += 1
+        return ended
+
+    async def set_staff_status(self, subject: str, status: StaffStatus, at: datetime) -> None:
+        if subject in self.state.staff:
+            self.state.staff[subject] = replace(
+                self.state.staff[subject], status=status, status_at=at
+            )
+
+    async def erase_staff(self, subject: str, at: datetime) -> None:
+        member = self.state.staff.get(subject)
+        if member is not None and member.status is not StaffStatus.ERASED:
+            self.state.staff[subject] = member.erased(at)
 
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
         if subject in self.state.staff:
@@ -1400,7 +1434,11 @@ class InMemoryTransaction:
     async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
         staff = self.state.staff
         return [
-            AuditEntry(e, staff[e.actor].display_name if e.actor in staff else None)
+            AuditEntry(
+                e,
+                (staff[e.actor].display_name or None) if e.actor in staff else None,
+                e.actor in staff and staff[e.actor].status is StaffStatus.ERASED,
+            )
             for e in reversed(self.state.audit)
             if e.action in actions
         ][:limit]

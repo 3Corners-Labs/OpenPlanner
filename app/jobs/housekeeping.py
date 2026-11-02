@@ -8,6 +8,7 @@ Called once per worker loop, after the due jobs:
     hourly ─► PRAGMA incremental_vacuum ─► pages back to the file system
     daily ─► erase the archived groups nothing refers to any more (ADR 0084 step 3)
     hourly ─► delete ended and expired admin sessions (ADR 0098 step 2)
+    daily ─► erase staff records without a login for ``staff_retention_days`` (ADR 0046 step 2)
     daily ─► merge booking rows past booking_row_retention_days into daily counts and delete
              them (ADR 0102 step 4)
     daily ─► retention sweep: purge personal data the purge job missed, alert on a backlog
@@ -60,6 +61,9 @@ ROLLUP_EVERY = timedelta(days=1)
 SESSIONS_EVERY = timedelta(hours=1)
 """How often ended and expired admin sessions are deleted; the lifetime is a setting."""
 
+STAFF_EVERY = timedelta(days=1)
+"""How often staff records past their retention are erased; the period is a setting."""
+
 
 class Housekeeping:
     """Storage watch and page reclaim for the worker loop.
@@ -77,6 +81,8 @@ class Housekeeping:
             ``SWEEP_EVERY``.
         clean_sessions: Deletes the ended and expired admin sessions and returns the count;
             called once per ``SESSIONS_EVERY``.
+        erase_staff: Erases the staff records past ``staff_retention_days`` and returns the
+            count; called once per ``STAFF_EVERY``.
         rollup: Merges old booking rows into daily counts and deletes them (ADR 0102 step 4);
             called once per ``ROLLUP_EVERY``.
     """
@@ -92,11 +98,14 @@ class Housekeeping:
         erase: Callable[[], Awaitable[int]] | None = None,
         sweep: Callable[[], Awaitable[SweepResult]] | None = None,
         clean_sessions: Callable[[], Awaitable[int]] | None = None,
+        erase_staff: Callable[[], Awaitable[int]] | None = None,
         rollup: Callable[[], Awaitable[RollupResult]] | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
         self._rollup = rollup
         self._rolled_up_at: datetime | None = None
+        self._erase_staff = erase_staff
+        self._staff_erased_at: datetime | None = None
         self._clean_sessions = clean_sessions
         self._sessions_cleaned_at: datetime | None = None
         self._sweep = sweep
@@ -124,6 +133,7 @@ class Housekeeping:
         erase: Callable[[], Awaitable[int]] | None = None,
         sweep: Callable[[], Awaitable[SweepResult]] | None = None,
         clean_sessions: Callable[[], Awaitable[int]] | None = None,
+        erase_staff: Callable[[], Awaitable[int]] | None = None,
         rollup: Callable[[], Awaitable[RollupResult]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
@@ -137,6 +147,7 @@ class Housekeeping:
             erase,
             sweep,
             clean_sessions,
+            erase_staff,
             rollup,
         )
 
@@ -148,7 +159,23 @@ class Housekeeping:
         await self._erase_groups(now)
         await self._sweep_retention(now)
         await self._clean_admin_sessions(now)
+        await self._erase_staff_records(now)
         await self._roll_up_bookings(now)
+
+    async def _erase_staff_records(self, now: datetime) -> None:
+        """Erase staff records past their retention, at most once per ``STAFF_EVERY``."""
+        if self._erase_staff is None:
+            return
+        if self._staff_erased_at is not None and now - self._staff_erased_at < STAFF_EVERY:
+            return
+        self._staff_erased_at = now
+        try:
+            erased = await self._erase_staff()
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.warning("staff.erase_failed", error=type(exc).__name__)
+        else:
+            if erased:
+                log.info("staff.erased", staff=erased)
 
     async def _roll_up_bookings(self, now: datetime) -> None:
         """Merge old purged booking rows into daily counts, at most once per ``ROLLUP_EVERY``."""

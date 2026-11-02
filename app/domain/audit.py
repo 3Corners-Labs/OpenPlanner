@@ -244,8 +244,11 @@ class AuditEntry:
 
     Attributes:
         event: The stored event.
-        actor_name: The actor's latest known display name; ``None`` if unknown.
+        actor_name: The actor's latest known display name; ``None`` if unknown or erased.
+        actor_erased: Whether the actor's staff record was erased (ADR 0046 point 9), so the
+            log names "an erased person" and not the subject.
     """
 
     event: AuditEvent
     actor_name: str | None = None
+    actor_erased: bool = False

@@ -1,0 +1,14 @@
+{#- "On this page" (ADR 0101): links to the topics of one long page, no JavaScript.
+    Expects a list of (href, label) pairs; renders nothing for an empty list. -#}
+{% macro page_toc(items) -%}
+{% if items %}
+<nav class="card page-toc" aria-labelledby="toc-heading">
+  <h2 id="toc-heading">{{ _("admin.page_toc") }}</h2>
+  <ul>
+    {% for href, label in items %}
+    <li><a href="{{ href }}">{{ label }}</a></li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+{%- endmacro %}

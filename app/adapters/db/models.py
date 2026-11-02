@@ -733,6 +733,9 @@ class StaffRow(Base):
     last_login_at: Mapped[datetime] = mapped_column(UTCDateTime())
     last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
     last_logout_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0046 step 2: active, suspended or erased, and when it last changed.
+    status: Mapped[str] = mapped_column(String(16), server_default=text("'active'"), index=True)
+    status_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class StaffMembershipRow(Base):
