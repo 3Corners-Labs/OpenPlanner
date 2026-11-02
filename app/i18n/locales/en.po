@@ -9434,3 +9434,36 @@ msgstr "This domain does not (or no longer) belong to this identity provider."
 
 msgid "settings.field.idp_domain_recheck_hours.label"
 msgstr "Re-check of login domains (hours)"
+
+msgid "admin.idp_mapping.reason.outside_provider_scope"
+msgstr "Outside this identity provider's organisation (another organisation, or a role for the whole platform)"
+
+msgid "admin.login.title"
+msgstr "Log in"
+
+msgid "admin.login.intro"
+msgstr "Enter your work e-mail address or user name. You then go to your organisation's login service."
+
+msgid "admin.login.identifier.label"
+msgstr "Work e-mail address or user name"
+
+msgid "admin.login.identifier.hint"
+msgstr "For example j.jansen@acme.nl or jan.jansen@organisation.openplanner.internal. Only the part after the @ decides where you log in; the address is not stored."
+
+msgid "admin.login.identifier.error"
+msgstr "Enter your work e-mail address or user name (at most 254 characters)."
+
+msgid "admin.login.continue"
+msgstr "Continue"
+
+msgid "admin.login.platform"
+msgstr "Log in with a platform account"
+
+msgid "admin.login_refused.email_not_verified"
+msgstr "Your login service did not confirm that your e-mail address is right. Ask the administrator of your login service to sort this out."
+
+msgid "admin.login_refused.email_domain_mismatch"
+msgstr "Your e-mail address does not belong to a domain of this login service. Log in with your organisation's address, or choose Log in with a platform account."
+
+msgid "admin.login_refused.issuer_mismatch"
+msgstr "The answer did not come from the login service you started at. Please log in again."

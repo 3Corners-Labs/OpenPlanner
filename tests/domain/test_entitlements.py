@@ -417,3 +417,25 @@ def test_the_directory_knows_every_role_key_with_its_reach(reach: Reach) -> None
 
 def test_the_registry_offers_exactly_the_claim_modes() -> None:
     assert set(CLAIM_MODES) == {mode.value for mode in ClaimMode}
+
+
+def test_an_organisation_provider_grants_only_inside_its_organisation() -> None:
+    """ADR 0083 point 2, B1 and B2: superuser and another organisation are refused."""
+    values = {
+        f"{PREFIX}:org_admin:org-a",
+        f"{PREFIX}:org_admin:idp-b",
+        f"{PREFIX}:superuser",
+        f"{PREFIX}:agent:org-a/g1",
+    }
+    claims = LoginClaims(subject="idp:org-a:1", display_name="Jan", entitlements=frozenset(values))
+    found = resolve(claims, ClaimMode.LEGACY, PREFIX, DIRECTORY, CATALOGUE, confined_to="org-a")
+
+    assert {g.key for g in found.principal.grants} == {"org_admin:org-a", "agent:org-a/g1"}
+    assert {(r.value, r.reason) for r in found.refused} == {
+        (f"{PREFIX}:org_admin:idp-b", RefusalReason.OUTSIDE_PROVIDER_SCOPE),
+        (f"{PREFIX}:superuser", RefusalReason.OUTSIDE_PROVIDER_SCOPE),
+    }
+    assert recognised_values(claims, PREFIX, DIRECTORY, "org-a") == {
+        f"{PREFIX}:org_admin:org-a",
+        f"{PREFIX}:agent:org-a/g1",
+    }

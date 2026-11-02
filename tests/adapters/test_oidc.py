@@ -925,3 +925,58 @@ async def test_a_test_login_reports_whether_a_second_factor_showed_and_never_ref
             )
 
     assert [r.mfa_shown for r in reports] == [False, True]
+
+
+# --- ADR 0083 step 3c: a login routed to an organisation provider ----------------------------
+
+
+async def _organisation_login(
+    oidc: OidcIdentityProvider, provider: FakeProvider, response_issuer: str | None
+):  # type: ignore[no-untyped-def]
+    start = await oidc.start_login(REDIRECT, login_hint="jan@acme-a.nl")
+    provider.nonce = start.nonce
+    found = await oidc.finish_organisation_login(
+        code="abc",
+        redirect_uri=REDIRECT,
+        code_verifier=start.code_verifier,
+        nonce=start.nonce,
+        response_issuer=response_issuer,
+    )
+    return start, found
+
+
+async def test_the_login_hint_goes_along_and_the_address_comes_back(
+    oidc: OidcIdentityProvider, provider: FakeProvider
+) -> None:
+    provider.claims = {"email": "jan@acme-a.nl", "email_verified": True}
+
+    start, found = await _organisation_login(oidc, provider, ISSUER)
+
+    assert parse_qs(urlsplit(start.url).query)["login_hint"] == ["jan@acme-a.nl"]
+    assert (found.email, found.email_verified) == ("jan@acme-a.nl", True)
+    assert "jan@acme-a.nl" not in repr(found)
+
+
+@pytest.mark.parametrize(
+    ("announced", "sent"),
+    [(False, "https://evil.example"), (True, None), (True, "https://evil.example")],
+)
+async def test_rfc_9207_refuses_another_or_a_missing_issuer(
+    oidc: OidcIdentityProvider, provider: FakeProvider, announced: bool, sent: str | None
+) -> None:
+    """B5: the answer of one provider replayed into a login started at another."""
+    provider.extra_metadata = {"authorization_response_iss_parameter_supported": announced}
+
+    with pytest.raises(IdentityError) as refused:
+        await _organisation_login(oidc, provider, sent)
+
+    assert refused.value.code == "issuer_mismatch"
+
+
+async def test_without_the_announcement_a_missing_issuer_is_accepted(
+    oidc: OidcIdentityProvider, provider: FakeProvider
+) -> None:
+    _, found = await _organisation_login(oidc, provider, None)
+
+    assert found.email is None
+    assert found.email_verified is None

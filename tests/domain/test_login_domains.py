@@ -15,6 +15,7 @@ from app.domain.login_domains import (
     domain_of,
     normalise_domain,
     refusal_of_claim,
+    refusal_of_identity,
     reserved,
     route,
     suffix_conflicts,
@@ -146,3 +147,17 @@ def test_routing_prefers_the_reserved_suffix_then_the_longest_routing_claim() ->
     assert route("jan.jansen@demo.openplanner.internal", claims, SUFFIX) == PLATFORM
     assert route("jan@elders.nl", claims, SUFFIX) == PLATFORM
     assert route("super", claims, SUFFIX) == PLATFORM
+
+
+def test_an_organisation_provider_signs_in_only_its_own_verified_addresses() -> None:
+    """B3 and B4: point 15 of ADR 0083."""
+    claims = [claim("acme.nl", "org-a"), claim("andere.nl", "org-b")]
+
+    assert refusal_of_identity("jan@acme.nl", True, "org-a", claims) is None
+    assert refusal_of_identity("jan@team.acme.nl", True, "org-a", claims) is None
+    assert refusal_of_identity("jan@acme.nl", None, "org-a", claims) == "email_not_verified"
+    assert refusal_of_identity("jan@acme.nl", False, "org-a", claims) == "email_not_verified"
+    assert refusal_of_identity("jan@andere.nl", True, "org-a", claims) == "email_domain_mismatch"
+    assert refusal_of_identity(None, True, "org-a", claims) == "email_domain_mismatch"
+    lapsed = [claim("acme.nl", "org-a", DomainState.LAPSED)]
+    assert refusal_of_identity("jan@acme.nl", True, "org-a", lapsed) == "email_domain_mismatch"

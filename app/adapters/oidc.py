@@ -37,7 +37,7 @@ from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM, SubjectRefusedError, qualify
 from app.domain.identity_providers import ASYMMETRIC_ALGORITHMS, ClientAuth, issuer_of
 from app.domain.mfa import MFA_AMR_VALUES, MFA_REQUIRED, MfaPolicy, shows_mfa
-from app.domain.ports import IdentityError, LoginStart, LoginTestReport
+from app.domain.ports import IdentityError, LoginStart, LoginTestReport, OrganisationLogin
 from app.domain.roles import MAX_ROLE_CLAIMS, is_claim_value
 from app.domain.tunable import value_of
 
@@ -285,11 +285,14 @@ class OidcIdentityProvider:
         self._metadata_at = 0.0
         self._keys: jwt.PyJWKSet | None = None
 
-    async def start_login(self, redirect_uri: str, *, fresh: bool = False) -> LoginStart:
+    async def start_login(
+        self, redirect_uri: str, *, fresh: bool = False, login_hint: str | None = None
+    ) -> LoginStart:
         """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE.
 
         ``fresh`` adds ``prompt=login`` and ``max_age=0`` (OIDC Core §3.1.2.1), so the admin
-        authenticates again rather than through single sign-on.
+        authenticates again rather than through single sign-on. ``login_hint`` passes the
+        address or user name typed on the login page (OIDC Core §3.1.2.1, ADR 0083 point 13).
         """
         metadata = await self._discover()
         state, nonce = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
@@ -308,6 +311,8 @@ class OidcIdentityProvider:
             params["acr_values"] = self._config.acr_values
         if fresh:
             params |= {"prompt": "login", "max_age": "0"}
+        if login_hint:
+            params["login_hint"] = login_hint
         query = urlencode(params)
         return LoginStart(f"{metadata['authorization_endpoint']}?{query}", state, nonce, verifier)
 
@@ -352,6 +357,39 @@ class OidcIdentityProvider:
             verified if isinstance(verified, bool) else None,
             domain or None,
             self._shows_mfa(claims),
+        )
+
+    async def finish_organisation_login(
+        self,
+        *,
+        code: str,
+        redirect_uri: str,
+        code_verifier: str,
+        nonce: str,
+        response_issuer: str | None,
+    ) -> OrganisationLogin:
+        """Complete a login through this organisation provider (ADR 0083 points 14 and 15).
+
+        Raises:
+            IdentityError: ``issuer_mismatch`` (RFC 9207), and as ``finish_login``.
+        """
+        metadata = await self._discover()
+        announced = metadata.get("authorization_response_iss_parameter_supported") is True
+        if (response_issuer is None and announced) or (
+            response_issuer is not None
+            and not hmac.compare_digest(response_issuer, self._config.issuer)
+        ):
+            log.warning("oidc.response_issuer_mismatch", provider=self._config.provider_key)
+            raise IdentityError("issuer_mismatch")
+        claims = await self._claims(code, redirect_uri, code_verifier, nonce)
+        found = login_claims(
+            claims, value_of(self._config.mapping), provider=self._config.provider_key
+        )
+        email, verified = claims.get("email"), claims.get("email_verified")
+        return OrganisationLogin(
+            self._with_mfa(claims, found),
+            email if isinstance(email, str) else None,
+            verified if isinstance(verified, bool) else None,
         )
 
     async def finish_trial_login(

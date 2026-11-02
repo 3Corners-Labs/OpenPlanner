@@ -71,6 +71,9 @@ class RefusalReason(StrEnum):
     UNKNOWN_GROUP = "unknown_group"
     GROUP_NOT_IN_ORGANISATION = "group_not_in_organisation"
     SCOPE_NOT_ALLOWED_FOR_ROLE = "scope_not_allowed_for_role"
+    OUTSIDE_PROVIDER_SCOPE = "outside_provider_scope"
+    """An organisation provider named another organisation, or a role that reaches
+    everything (ADR 0083 point 2)."""
 
 
 def is_prefix(value: str) -> bool:
@@ -166,13 +169,17 @@ class ParsedEntitlements:
 
 
 def parse_entitlements(
-    values: Iterable[str], prefix: str, directory: Directory
+    values: Iterable[str], prefix: str, directory: Directory, confined_to: str | None = None
 ) -> ParsedEntitlements:
     """Return the grants and the refusals of entitlement ``values`` (ADR 0049 points 1–5).
 
     Exact match only: no case folding, no trimming, no wildcards. Each value is judged on its
     own; a refused value never affects another. The order of the refusals is that of the
     values, without duplicates.
+
+    ``confined_to`` is the organisation slug of an organisation provider (ADR 0083 point 2):
+    a grant elsewhere, or one without an organisation (a role that reaches everything, such
+    as ``superuser``), is refused as ``outside_provider_scope``.
     """
     head = f"{prefix}:"
     grants: set[Grant] = set()
@@ -187,6 +194,12 @@ def parse_entitlements(
             continue
         seen.add(value)
         outcome = _parse_one(value[len(head) :], directory)
+        if (
+            confined_to is not None
+            and isinstance(outcome, Grant)
+            and outcome.organisation != confined_to
+        ):
+            outcome = (RefusalReason.OUTSIDE_PROVIDER_SCOPE, outcome.organisation)
         if isinstance(outcome, Grant):
             grants.add(outcome)
         else:
@@ -355,20 +368,26 @@ class Resolution:
     too_many: bool = False
 
 
-def resolve(
+def resolve(  # noqa: PLR0913
     claims: LoginClaims,
     mode: ClaimMode,
     prefix: str,
     directory: Directory,
     catalogue: RoleCatalogue,
+    confined_to: str | None = None,
 ) -> Resolution:
     """Turn ``claims`` into a ``Principal`` for ``mode`` (ADR 0049 point 13).
 
     The same function serves the login (which refuses on ``ambiguous`` and ``too_many`` and
     records ``refused`` and ``mismatch``) and every request (which only needs the principal).
+    ``confined_to`` is the organisation of an organisation provider: the login then resolves
+    in ``entitlements`` mode only and only inside that organisation (ADR 0083 point 2), at
+    login and at every request alike.
     """
+    if confined_to is not None:
+        mode = ClaimMode.ENTITLEMENTS
     parsed = (
-        parse_entitlements(claims.entitlements, prefix, directory)
+        parse_entitlements(claims.entitlements, prefix, directory, confined_to)
         if mode is not ClaimMode.LEGACY
         else ParsedEntitlements()
     )
@@ -385,11 +404,12 @@ def resolve(
     )
 
 
-def recognised_values(claims: LoginClaims, prefix: str, directory: Directory) -> frozenset[str]:
+def recognised_values(
+    claims: LoginClaims, prefix: str, directory: Directory, confined_to: str | None = None
+) -> frozenset[str]:
     """Return the entitlement values that yield a grant, for the session to keep."""
-    head = f"{prefix}:"
     return frozenset(
         v
         for v in claims.entitlements
-        if v.startswith(head) and isinstance(_parse_one(v[len(head) :], directory), Grant)
+        if parse_entitlements([v], prefix, directory, confined_to).grants
     )
