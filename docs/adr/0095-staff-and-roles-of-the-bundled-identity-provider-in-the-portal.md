@@ -1,8 +1,15 @@
 # 0095. Staff and roles of the bundled identity provider, managed in the portal
 
-Status: proposed (2026-11-01), requested by the product owner. Extends ADR 0090 (bundled
-identity provider), ADR 0013 (OIDC admin login), ADR 0049 (entitlements) and ADR 0083
-(identity providers per organisation). Not built; see *Build status*.
+Status: accepted (2026-11-01, `po:approved` on #310), requested by the product owner. Extends
+ADR 0090 (bundled identity provider), ADR 0013 (OIDC admin login), ADR 0049 (entitlements) and
+ADR 0083 (identity providers per organisation). Not built; see *Build status*. Amended on
+2026-11-01 (re-evaluation): point 3's `staff.manage` is the permission ADR 0046 already defines
+(suspend, end sessions), extended here with create, change and disable for the bundled
+provider; it is not a second permission of the same name. This ADR amends ADR 0046 U1 for the
+bundled provider only. The claims written follow ADR 0049 E1 (role key and `idp_key`). Open
+before step 1: `KEYCLOAK_DIRECTORY_CLIENT_SECRET` is class A in *Settings*, but ADR 0042 §1
+reserves A for what is needed before login or the database works; either it becomes a sealed
+integration secret (ADR 0008) or step 1 records why it must stay on the host.
 
 ## Context
 
@@ -59,7 +66,7 @@ portal and, where it is OpenPlanner's own, integrated.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #310 | in PR |
+| 0 | ADR proposed | #310 | merged |
 | 1 | `StaffDirectory` port, fake, Keycloak adapter, service account in the realm template | | planned |
 | 2 | Permissions `staff.manage`, `staff.reset_password`; matrix, `docs/authorization.md` | | planned |
 | 3 | Staff screen actions, manual topic nl/en, audit events | | planned |

@@ -4,6 +4,9 @@ Status: accepted (2026-10-23). Supersedes the last sentence of HANDOVER B16 and 
 in CLAUDE.md ("Claude Code opens PRs and never merges them"). Amended by ADR 0058 (point 2:
 through the merge queue) and ADR 0078 (point 1: build work merges on green without an
 instruction; a decision waits for the label `po:approved`).
+Superseded by ADR 0078 and 0088 (decided in the re-evaluation of 2026-11-01): points 1 and 4
+(merge on an instruction recorded in the merge commit) no longer apply; points 2 and 3 hold
+through ADR 0078 point 7. Point 3's "five review questions" are seven (CLAUDE.md).
 
 ## Context
 

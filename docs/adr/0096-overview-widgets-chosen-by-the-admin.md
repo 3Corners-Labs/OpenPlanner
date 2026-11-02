@@ -1,7 +1,11 @@
 # 0096. Overview widgets chosen by the admin
 
-Status: proposed (2026-11-01), requested by the product owner. Extends ADR 0047 (admin
-structure) and the overview of ADR 0044. Not built; see *Build status*.
+Status: accepted (2026-11-01, `po:approved` on #310), requested by the product owner. Extends
+ADR 0047 (admin structure) and the overview of ADR 0061 ("ADR 0044" in the first version was
+a slip). Partly built: step 1 merged in #310. Amended on 2026-11-01 (re-evaluation): this ADR is
+the single home for the per-admin overview layout and supersedes ADR 0062, which decided the
+same. §5: the widgets are declared in `app/web/widgets.py` (ADR 0061 §2), not in
+`overview_routes.py`. §2: ADR 0016 as amended (own small scripts, never HTMX) applies.
 
 ## Context
 
@@ -42,8 +46,8 @@ permission.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #310 | in PR |
-| 1 | Remove *New group* from the overview | #310 | in PR |
+| 0 | ADR proposed | #310 | merged |
+| 1 | Remove *New group* from the overview | #310 | merged |
 | 2 | Layout storage (migration, reversible), service in `app/domain/`, tests | | planned |
 | 3 | *Add widget* / *Edit overview* screens, manual topic nl/en, e2e | | planned |
 
