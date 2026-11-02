@@ -210,9 +210,13 @@ def wish_of(form: FormData) -> Grant | None:
 
 
 def _invite_fields(
-    principal: Principal, locale: RequestLocale, groups: list[GroupSummary], form: FormData
+    principal: Principal,
+    locale: RequestLocale,
+    groups: list[GroupSummary],
+    form: FormData,
+    suffix: str,
 ) -> list[Field]:
-    """The invitation form: who, and the first role and place."""
+    """The invitation form: who, their user name under ``suffix``, the first role and place."""
     _ = locale.gettext
     return [
         Field(
@@ -236,6 +240,14 @@ def _invite_fields(
             error=form.error_for("last_name"),
             attributes={"autocomplete": "off"},
         ),
+        Field(
+            "user_name",
+            _("admin.staff.invite.user_name"),
+            value=form.text("user_name"),
+            hint=_("admin.staff.invite.user_name.hint", suffix=suffix),
+            error=form.error_for("user_name"),
+            attributes={"autocomplete": "off", "spellcheck": "false", "maxlength": "64"},
+        ),
         *add_fields(principal, locale, groups, form),
     ]
 
@@ -251,7 +263,9 @@ async def _invite_response(
         "admin/staff_invite.html",
         context.principal,
         {
-            "fields": _invite_fields(context.principal, locale, groups, form),
+            "fields": _invite_fields(
+                context.principal, locale, groups, form, directory_service(request).login_suffix
+            ),
             "errors": form.errors,
             "days": request.app.state.settings.staff_invite_expiry_days,
         },
@@ -280,8 +294,9 @@ async def invite(request: Request, locale: Locale, _: SameOrigin, context: _MANA
         form.errors.append(FormError("role", locale.gettext("admin.staff.invite.error.role")))
     if not form.errors and wish is not None:
         new = NewStaffMember(form.text("email"), form.text("first_name"), form.text("last_name"))
+        local_part = form.text("user_name").strip().lower()
         try:
-            await directory_service(request).invite(context.principal, new, [wish])
+            await directory_service(request).invite(context.principal, new, [wish], local_part)
         except DomainError as error:
             raise_refusal(error)
             form.refusal(error)

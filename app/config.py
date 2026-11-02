@@ -31,6 +31,7 @@ from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
 from app.domain.staff_directory import ADMIN_URL_PATTERN
 from app.domain.system_log import EventRetention
+from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -356,6 +357,8 @@ class Settings(BaseSettings):
     # ADR 0095: validity of the invitation and reset link, and the switch of the actions.
     staff_invite_expiry_days: int = Field(default=7, ge=1, le=30)
     staff_directory_enabled: bool = True
+    # ADR 0106: staff of the bundled Keycloak log in as <name>@<organisation>.<this suffix>.
+    bundled_idp_login_suffix: str = DEFAULT_SUFFIX
     # ADR 0100: the admin must show a second factor (amr/acr in the ID token). Class B. Off by
     # default: the bundled Keycloak sets it on; another provider turns it on once the IdP team
     # has named its amr/acr values. The IdP owns the MFA itself.
@@ -681,6 +684,14 @@ class Settings(BaseSettings):
         if value and not ADMIN_URL_PATTERN.match(value.rstrip("/")):
             raise ValueError("KEYCLOAK_ADMIN_URL must end in /admin/realms/<realm>")
         return value or None
+
+    @field_validator("bundled_idp_login_suffix")
+    @classmethod
+    def _suffix_is_a_domain(cls, value: str) -> str:
+        """Accept only a lower-case domain of two to ten labels (ADR 0106 point 5)."""
+        if not valid_suffix(value):
+            raise ValueError("BUNDLED_IDP_LOGIN_SUFFIX must be a lower-case domain name")
+        return value
 
     @field_validator(
         "management_token_key_previous", "settings_encryption_key_previous", mode="before"

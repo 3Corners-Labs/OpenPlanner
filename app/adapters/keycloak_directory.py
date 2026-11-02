@@ -140,6 +140,13 @@ class KeycloakDirectory:
             raise
         return _user(response.json())
 
+    async def user_name_taken(self, username: str) -> bool:
+        """Return whether the realm holds exactly this user name (``exact=true``)."""
+        response = await self._call(
+            "GET", "/users", params={"username": username, "exact": "true", "max": 1}
+        )
+        return bool(response.json())
+
     async def create_user(self, new: NewStaffMember) -> DirectoryUser:
         """Create a person who must set a password and confirm the address at first use."""
         response = await self._call(
@@ -147,7 +154,7 @@ class KeycloakDirectory:
             "/users",
             ok=(201,),
             json={
-                "username": new.email,
+                "username": new.username or new.email,
                 "email": new.email,
                 "firstName": new.first_name,
                 "lastName": new.last_name,

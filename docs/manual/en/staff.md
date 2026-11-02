@@ -41,6 +41,13 @@ IdP team changes rights there.
 - **Invite staff member** (button above the list): enter email address, first and last name
   and choose the first role and place. The staff member receives an email with a link to choose
   a password. The link is valid for 7 days by default (the superuser can change this).
+- **User name**: the staff member logs in as `firstname.lastname@organisation.openplanner.internal`
+  (a superuser as `name@openplanner.internal`). You may choose the part before the @ yourself:
+  lower-case letters, digits, dots and hyphens. When the proposed name is taken it gets `-2`,
+  `-3` and so on. The user name cannot be changed afterwards; the email address remains the
+  address for the invitation, the password reset and calendar invitations, and also works to
+  log in. The superuser sets the suffix (*User name suffix*); a change applies to new accounts
+  only.
 - **Invited, not logged in yet**: people you created who have not logged in. You can resend the
   invitation.
 - On a person's page, under **Managed at the identity provider**: remove a role, add a role

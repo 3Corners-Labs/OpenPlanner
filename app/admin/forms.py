@@ -128,6 +128,8 @@ DONE_MESSAGES: dict[str, str] = {
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
 FIELD_MESSAGES: dict[str, str] = {
+    # ADR 0106 point 6: the user name typed on the staff invitation.
+    "user_name": "admin.form.error.staff_user_name_invalid",
     # ADR 0084 point 5: the name typed back on a confirmation page.
     "confirmation": "admin.form.error.confirmation_mismatch",
     "name": "admin.form.error.name",
@@ -262,6 +264,8 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
     ErrorCode.STAFF_DIRECTORY_UNAVAILABLE: "admin.form.error.staff_directory_unavailable",
     ErrorCode.STAFF_ADDRESS_IN_USE: "admin.form.error.staff_address_in_use",
+    ErrorCode.STAFF_USER_NAME_INVALID: "admin.form.error.staff_user_name_invalid",
+    ErrorCode.STAFF_USER_NAME_IN_USE: "admin.form.error.staff_user_name_in_use",
     ErrorCode.STAFF_GRANT_REFUSED: "admin.form.error.staff_grant_refused",
     ErrorCode.STAFF_NOT_FOUND: "admin.form.error.staff_not_found",
     ErrorCode.STAFF_MAIL_FAILED: "admin.form.error.staff_mail_failed",
