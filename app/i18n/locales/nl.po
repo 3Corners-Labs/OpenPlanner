@@ -9581,3 +9581,36 @@ msgstr "Dit domein hoort niet (meer) bij deze identity provider."
 
 msgid "settings.field.idp_domain_recheck_hours.label"
 msgstr "Herhaalcontrole logindomeinen (uren)"
+
+msgid "admin.idp_mapping.reason.outside_provider_scope"
+msgstr "Buiten de organisatie van deze identity provider (een andere organisatie, of een rol voor het hele platform)"
+
+msgid "admin.login.title"
+msgstr "Inloggen"
+
+msgid "admin.login.intro"
+msgstr "Vul uw werk-e-mailadres of inlognaam in. U gaat dan naar de inlogdienst van uw organisatie."
+
+msgid "admin.login.identifier.label"
+msgstr "Werk-e-mailadres of inlognaam"
+
+msgid "admin.login.identifier.hint"
+msgstr "Bijvoorbeeld j.jansen@gemeente.nl of jan.jansen@organisatie.openplanner.internal. Alleen het deel na de @ bepaalt waar u inlogt; het adres wordt niet bewaard."
+
+msgid "admin.login.identifier.error"
+msgstr "Vul uw werk-e-mailadres of inlognaam in (hoogstens 254 tekens)."
+
+msgid "admin.login.continue"
+msgstr "Verder"
+
+msgid "admin.login.platform"
+msgstr "Inloggen met een platformaccount"
+
+msgid "admin.login_refused.email_not_verified"
+msgstr "Uw inlogdienst heeft niet bevestigd dat uw e-mailadres klopt. Vraag de beheerder van uw inlogdienst om dit te regelen."
+
+msgid "admin.login_refused.email_domain_mismatch"
+msgstr "Uw e-mailadres hoort niet bij een domein van deze inlogdienst. Log in met het adres van uw organisatie, of kies Inloggen met een platformaccount."
+
+msgid "admin.login_refused.issuer_mismatch"
+msgstr "Het antwoord kwam niet van de inlogdienst waar u begon. Probeer opnieuw in te loggen."

@@ -86,7 +86,7 @@ from app.admin.authz import (
     session_principal,
     session_service,
 )
-from app.admin.forms import safe_next
+from app.admin.forms import Field, read_form, safe_next
 from app.admin.idp_mapping_routes import reason_label
 from app.admin.idp_routes import JWKS_PATH
 from app.admin.integration_views import check_view
@@ -111,6 +111,7 @@ from app.admin.session import (
     pop_login_test,
     pop_login_trial,
     save_login_start,
+    session_theme,
     start_session,
 )
 from app.admin.top_bar import load_top_counts
@@ -128,6 +129,7 @@ from app.domain.authorization import (
 from app.domain.entitlements import ClaimMode, LoginClaims, resolve
 from app.domain.errors import DomainError
 from app.domain.identity import PLATFORM
+from app.domain.login_domains import EMAIL_DOMAIN_MISMATCH, EMAIL_NOT_VERIFIED
 from app.domain.login_service import (
     AMBIGUOUS_CLAIMS,
     SUSPENDED,
@@ -146,6 +148,7 @@ from app.web.authz_labels import (
     PERMISSION_LABELS,
 )
 from app.web.authz_report import matrix_rows
+from app.web.errors import FormError
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.protection import limiter, read_limit
 from app.web.security_events import report
@@ -159,6 +162,10 @@ LOGIN_REFUSED_TEXTS: dict[str, str] = {
     TOO_MANY_ENTITLEMENTS: "admin.login_refused.too_many_entitlements",
     MFA_REQUIRED: "admin.login_refused.mfa_required",
     SUSPENDED: "admin.login_refused.suspended",
+    # ADR 0083 points 14 and 15: an organisation provider's login that does not hold up.
+    EMAIL_NOT_VERIFIED: "admin.login_refused.email_not_verified",
+    EMAIL_DOMAIN_MISMATCH: "admin.login_refused.email_domain_mismatch",
+    "issuer_mismatch": "admin.login_refused.issuer_mismatch",
 }
 """What the error page says per refusal reason of the login service (ADR 0049)."""
 
@@ -180,13 +187,16 @@ async def _provider_for(
 ) -> IdentityProvider | None:
     """Return the provider a pending login started at, or ``None`` if it is not known.
 
-    The platform provider completes logins; an organisation provider (ADR 0083 step 2) only
-    completes the guided test login that started at it, until step 3 routes logins. Any
-    other key is refused like a forged ``state``.
+    The platform provider completes logins. An organisation provider completes the guided
+    test login that started at it (ADR 0083 step 2), and a login routed to it while it is
+    switched on and the host allows organisation providers (step 3). Any other key is refused
+    like a forged ``state``.
     """
     if key == PLATFORM:
         return _identity_provider(request)
-    if test is None or test[2] != key:
+    if test is None and await idp_routes.service(request).live_provider(key) is None:
+        return None
+    if test is not None and test[2] != key:
         return None
     found: IdentityProvider | None = await request.app.state.organisation_providers.provider(key)
     return found
@@ -203,6 +213,49 @@ def _callback_url(request: Request) -> str:
     return f"{request.app.state.settings.public_base_url.rstrip('/')}/admin/callback"
 
 
+IDENTIFIER_MAX_LENGTH = 254
+"""The longest e-mail address (RFC 5321 path limit); a longer identifier is refused."""
+
+
+def _identifier_page(
+    request: Request,
+    locale: Locale,
+    next_url: str,
+    value: str = "",
+    error: str | None = None,
+) -> HTMLResponse:
+    """Render the e-mail-first login page (ADR 0083 point 13, ADR 0106 point 9)."""
+    _ = locale.gettext
+    identifier = Field(
+        "identifier",
+        _("admin.login.identifier.label"),
+        value=value,
+        hint=_("admin.login.identifier.hint"),
+        error=error,
+        attributes={
+            "autocomplete": "username",
+            "spellcheck": "false",
+            "autocapitalize": "none",
+            "maxlength": str(IDENTIFIER_MAX_LENGTH),
+        },
+    )
+    errors = [FormError("identifier", error)] if error else []
+    response = render(
+        templates,
+        request,
+        "admin/login.html",
+        locale,
+        {
+            "identifier": identifier,
+            "errors": errors,
+            "next_url": next_url,
+            "theme": session_theme(request),
+        },
+    )
+    response.status_code = 422 if error else 200
+    return response
+
+
 @router.get("/login", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def login(
@@ -210,13 +263,20 @@ async def login(
     locale: Locale,
     next: str | None = None,  # noqa: A002
     fresh: bool = False,
+    platform: bool = False,
 ) -> Response:
-    """Send the admin to the identity provider; ``fresh`` for a mapping dry run (§8)."""
+    """Send the admin to the identity provider; ``fresh`` for a mapping dry run (§8).
+
+    When organisation providers route logins (ADR 0083), the page asks for the address first;
+    ``platform`` skips that question and goes to the platform provider.
+    """
     provider = _identity_provider(request)
     if provider is None:
         return _message(
             request, locale, 503, "admin.not_configured.title", "admin.not_configured.text"
         )
+    if not fresh and not platform and await idp_routes.service(request).offers_choice():
+        return _identifier_page(request, locale, safe_next(next))
     try:
         start = await provider.start_login(
             _callback_url(request), fresh=fresh and has_login_trial(request)
@@ -224,6 +284,43 @@ async def login(
     except IdentityError:
         return _message(request, locale, 503, "admin.login_failed.title", "admin.login_failed.text")
     save_login_start(request, start, safe_next(next))
+    return RedirectResponse(start.url, status_code=303)
+
+
+@router.post("/login", response_class=HTMLResponse)
+@limiter.limit(read_limit)
+async def login_identifier(request: Request, locale: Locale, _: SameOrigin) -> Response:
+    """Send the admin to the provider their address belongs to (ADR 0083 point 13).
+
+    Only the domain of the address counts; the address is neither stored nor logged (B12). It
+    goes to the chosen provider as ``login_hint``. The reserved suffix of the bundled provider
+    and every address without a routing domain go to the platform provider.
+    """
+    form = await read_form(request, locale)
+    identifier = form.text("identifier").strip()
+    next_url = safe_next(form.text("next"))
+    if not identifier or len(identifier) > IDENTIFIER_MAX_LENGTH:
+        error = locale.gettext("admin.login.identifier.error")
+        return _identifier_page(
+            request, locale, next_url, identifier[:IDENTIFIER_MAX_LENGTH], error
+        )
+    platform = _identity_provider(request)
+    organisation = await idp_routes.service(request).login_provider(identifier)
+    key = organisation.key if organisation is not None else PLATFORM
+    provider = (
+        await request.app.state.organisation_providers.provider(key)
+        if organisation is not None
+        else platform
+    )
+    if provider is None:
+        return _message(
+            request, locale, 503, "admin.not_configured.title", "admin.not_configured.text"
+        )
+    try:
+        start = await provider.start_login(_callback_url(request), login_hint=identifier)
+    except IdentityError:
+        return _message(request, locale, 503, "admin.login_failed.title", "admin.login_failed.text")
+    save_login_start(request, start, next_url, key)
     return RedirectResponse(start.url, status_code=303)
 
 
@@ -251,6 +348,8 @@ async def callback(
         return _message(request, locale, 400, "admin.login_failed.title", "admin.login_failed.text")
     if test is not None and key != PLATFORM:
         return await _finish_test_login(request, locale, provider, pending, test, code)
+    if key != PLATFORM:
+        return await _finish_organisation_login(request, locale, provider, pending, key, code)
     tried: LoginClaims | None = None
     try:
         if trial is None:
@@ -297,6 +396,61 @@ async def callback(
         prefix = trial[1].get("oidc_entitlement_prefix", "")
         tried_principal = (await logins.preview(tried, prefix)).principal
         return await _finish_login_trial(request, principal, trial, tried_principal)
+    return RedirectResponse(safe_next(pending.get("next")), status_code=303)
+
+
+async def _finish_organisation_login(  # noqa: PLR0913
+    request: Request,
+    locale: Locale,
+    provider: IdentityProvider,
+    pending: dict[str, str],
+    key: str,
+    code: str,
+) -> Response:
+    """Complete a login routed to organisation provider ``key`` (ADR 0083 points 14 to 17).
+
+    The answer must name the provider's issuer (RFC 9207), the ID token must carry a
+    verified address on one of the provider's own routing domains, and the entitlements
+    resolve only inside its organisation. The session records the provider.
+    """
+    providers = idp_routes.service(request)
+    registered = await providers.live_provider(key)
+    try:
+        if registered is None:
+            raise IdentityError("provider_unavailable")
+        found = await provider.finish_organisation_login(
+            code=code,
+            redirect_uri=_callback_url(request),
+            code_verifier=pending["verifier"],
+            nonce=pending["nonce"],
+            response_issuer=request.query_params.get("iss"),
+        )
+        refusal = await providers.identity_refusal(key, found.email, found.email_verified)
+        if refusal is not None:
+            raise IdentityError(refusal)
+    except IdentityError as error:
+        await report(request, LOGIN_EVENT, error.code, detail=f"provider:{key}", actor=ANONYMOUS)
+        text = LOGIN_REFUSED_TEXTS.get(error.code, "admin.login_failed.text")
+        return _message(request, locale, 401, "admin.login_failed.title", text)
+    claims = found.claims
+    if claims.mfa_missing:
+        await report(
+            request,
+            MFA_MISSING_EVENT,
+            "mfa_missing",
+            detail=f"provider:{key}",
+            actor=claims.subject,
+        )
+    try:
+        outcome = await login_service(request).complete_login(claims, registered)
+    except LoginRefusedError as refused:
+        await report(request, LOGIN_EVENT, refused.reason, actor=claims.subject)
+        text = LOGIN_REFUSED_TEXTS.get(refused.reason, "admin.login_failed.text")
+        return _message(request, locale, 403, "admin.login_failed.title", text)
+    await start_session(
+        request, session_service(request), outcome.session_claims, key, session_policy(request)
+    )
+    log.info("admin.login", actor=outcome.principal.subject, roles=role_keys(outcome.principal))
     return RedirectResponse(safe_next(pending.get("next")), status_code=303)
 
 

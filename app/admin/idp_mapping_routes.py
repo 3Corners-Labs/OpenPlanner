@@ -39,6 +39,7 @@ REASON_LABELS: dict[str, str] = {
     RefusalReason.UNKNOWN_GROUP: "admin.idp_mapping.reason.unknown_group",
     RefusalReason.GROUP_NOT_IN_ORGANISATION: "admin.idp_mapping.reason.group_not_in_organisation",
     RefusalReason.SCOPE_NOT_ALLOWED_FOR_ROLE: "admin.idp_mapping.reason.scope_not_allowed",
+    RefusalReason.OUTSIDE_PROVIDER_SCOPE: "admin.idp_mapping.reason.outside_provider_scope",
 }
 """Readable label per refusal reason code (ADR 0049 point 5)."""
 

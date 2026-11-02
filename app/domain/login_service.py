@@ -8,11 +8,16 @@ installation, through ``app.domain.entitlements.resolve``:
                                        └─ record the login, the refused values, a shadow
                                           mismatch ──► LoginOutcome (principal, session claims)
     every request ──principal_for(claims)──► Principal (grants resolved afresh, so a renamed
-                                              or deleted organisation or group takes effect)
+                                              or deleted organisation or group takes effect),
+                                              or None when the session's organisation
+                                              provider is off, deleted or switched off on
+                                              the host (ADR 0083 point 17)
     dry run ──preview(claims, prefix)──► Resolution under a proposed prefix (ADR 0042 §8)
 
 The mode (class B) and the prefix (class C) are read through ``settings`` on every call, so a
-prefix changed in the portal applies at once.
+prefix changed in the portal applies at once. A login through an organisation provider (ADR
+0083) resolves in ``entitlements`` mode with that provider's prefix, confined to its
+organisation (point 2), at login and on every request.
 """
 
 from collections.abc import Callable
@@ -29,6 +34,8 @@ from app.domain.entitlements import (
     resolve,
 )
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.identity import PLATFORM, provider_of
+from app.domain.identity_providers import OrganisationProvider
 from app.domain.ports import UnitOfWork
 from app.domain.staff import StaffStatus
 
@@ -92,12 +99,17 @@ class LoginService:
     """
 
     def __init__(
-        self, uow: UnitOfWork, admin: AdminService, settings: Callable[[], ClaimSettings]
+        self,
+        uow: UnitOfWork,
+        admin: AdminService,
+        settings: Callable[[], ClaimSettings],
+        organisation_idps: Callable[[], bool] = lambda: False,
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators; ``organisation_idps`` is the host's switch (ADR 0083)."""
         self._uow = uow
         self._admin = admin
         self._settings = settings
+        self._organisation_idps = organisation_idps
 
     async def directory(self) -> tuple[Directory, RoleCatalogue]:
         """Return the directory and the role catalogue, read in one transaction."""
@@ -106,16 +118,40 @@ class LoginService:
             directory = await tx.get_directory()
         return directory, catalogue
 
-    async def principal_for(self, claims: LoginClaims) -> Principal:
-        """Return the admin the session's claims amount to now (one call per request)."""
-        return (await self._resolve(claims, self._settings().prefix)).principal
+    async def principal_for(self, claims: LoginClaims) -> Principal | None:
+        """Return the admin the session's claims amount to now (one call per request).
+
+        ``None`` ends the session: its organisation provider is switched off, deleted, or
+        the host switched organisation providers off (ADR 0083 point 17, B14).
+        """
+        key = provider_of(claims.subject)
+        if key == PLATFORM:
+            return (await self._resolve(claims, self._settings().prefix)).principal
+        provider = await self._live_provider(key)
+        if provider is None:
+            return None
+        directory, catalogue = await self.directory()
+        return resolve(
+            claims,
+            ClaimMode.ENTITLEMENTS,
+            provider.entitlement_prefix,
+            directory,
+            catalogue,
+            provider.organisation,
+        ).principal
 
     async def preview(self, claims: LoginClaims, prefix: str) -> Resolution:
         """Return what ``claims`` resolve to under a proposed ``prefix`` (the dry run)."""
         return await self._resolve(claims, prefix)
 
-    async def complete_login(self, claims: LoginClaims) -> LoginOutcome:
+    async def complete_login(
+        self, claims: LoginClaims, provider: OrganisationProvider | None = None
+    ) -> LoginOutcome:
         """Resolve a fresh login, record it and return what the session should keep.
+
+        ``provider`` is the organisation provider the login came through, if any: the claims
+        then resolve in ``entitlements`` mode with its prefix, confined to its organisation
+        (ADR 0083 point 2); values outside it are refused and recorded like any other.
 
         Raises:
             LoginRefusedError: ``ambiguous_claims`` (ADR 0049 point 14) or
@@ -123,12 +159,17 @@ class LoginService:
                 ``suspended`` (ADR 0046 point 7), which the login route audits.
         """
         settings = self._settings()
+        mode, prefix = settings.mode, settings.prefix
+        confined_to = None
+        if provider is not None:
+            mode, prefix = ClaimMode.ENTITLEMENTS, provider.entitlement_prefix
+            confined_to = provider.organisation
         async with self._uow.read() as tx:
             known = await tx.get_staff(claims.subject)
         if known is not None and known.status is StaffStatus.SUSPENDED:
             raise LoginRefusedError(SUSPENDED)
         directory, catalogue = await self.directory()
-        resolution = resolve(claims, settings.mode, settings.prefix, directory, catalogue)
+        resolution = resolve(claims, mode, prefix, directory, catalogue, confined_to)
         if resolution.ambiguous:
             await self._admin.record_refused_login(claims.subject, AMBIGUOUS_CLAIMS)
             raise LoginRefusedError(AMBIGUOUS_CLAIMS)
@@ -145,9 +186,17 @@ class LoginService:
             organisations=claims.organisations,
             groups=claims.groups,
             role_claims=claims.role_claims,
-            entitlements=recognised_values(claims, settings.prefix, directory),
+            entitlements=recognised_values(claims, prefix, directory, confined_to),
         )
         return LoginOutcome(resolution, kept)
+
+    async def _live_provider(self, key: str) -> OrganisationProvider | None:
+        """Return the organisation provider ``key`` if it may carry sessions now."""
+        if not self._organisation_idps():
+            return None
+        async with self._uow.read() as tx:
+            provider = await tx.get_identity_provider(key)
+        return provider if provider is not None and provider.enabled else None
 
     async def _resolve(self, claims: LoginClaims, prefix: str) -> Resolution:
         """Resolve ``claims`` under the current mode and ``prefix``."""

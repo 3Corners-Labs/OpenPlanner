@@ -1086,6 +1086,16 @@ _SECURITY = (
         "Check the identity provider's subject format.",
     ),
     _e(
+        "oidc.response_issuer_mismatch",
+        _SEC,
+        "warning",
+        "provider",
+        "A login answer named another issuer than provider {provider} (RFC 9207).",
+        "The authorisation response's iss did not match, or was missing while the provider "
+        "announces it: a mix-up attempt or a misconfigured provider (ADR 0083 point 14).",
+        "Check the provider's issuer on its page; repeated events may be an attack.",
+    ),
+    _e(
         "oidc.token_exchange_failed",
         _SEC,
         "warning",
