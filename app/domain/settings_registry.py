@@ -876,6 +876,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "hides them and leaves the provider's data untouched (ADR 0095).",
     ),
     S(
+        "bundled_idp_login_suffix",
+        K.STRING,
+        "openplanner.internal",
+        _C,
+        T.STAFF,
+        "Domain under which staff of the bundled identity provider get their user name: "
+        "name@<organisation>.<suffix>; a change applies to new accounts only (ADR 0106).",
+    ),
+    S(
         "staff_last_seen_interval_seconds",
         K.INT,
         300,

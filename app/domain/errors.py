@@ -90,6 +90,8 @@ class ErrorCode(StrEnum):
     STAFF_DIRECTORY_UNAVAILABLE = "staff_directory_unavailable"
     """ADR 0095: the provider has no staff directory, it is switched off, or it did not answer."""
     STAFF_ADDRESS_IN_USE = "staff_address_in_use"
+    STAFF_USER_NAME_INVALID = "staff_user_name_invalid"
+    STAFF_USER_NAME_IN_USE = "staff_user_name_in_use"
     STAFF_GRANT_REFUSED = "staff_grant_refused"
     """ADR 0095: a role or place above the admin's own rights, or outside their scope."""
     STAFF_NOT_FOUND = "staff_not_found"

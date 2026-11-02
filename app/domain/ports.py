@@ -607,6 +607,10 @@ class StaffDirectory(Protocol):
         """Return one person by the provider's id, or ``None``."""
         ...
 
+    async def user_name_taken(self, username: str) -> bool:
+        """Return whether a person with exactly this user name exists (ADR 0106 point 6)."""
+        ...
+
     async def create_user(self, new: NewStaffMember) -> DirectoryUser:
         """Create a person without a password; the invitation link sets it.
 

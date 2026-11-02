@@ -71,6 +71,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
     ErrorCode.STAFF_DIRECTORY_UNAVAILABLE: "admin.form.error.staff_directory_unavailable",
     ErrorCode.STAFF_ADDRESS_IN_USE: "admin.form.error.staff_address_in_use",
+    ErrorCode.STAFF_USER_NAME_INVALID: "admin.form.error.staff_user_name_invalid",
+    ErrorCode.STAFF_USER_NAME_IN_USE: "admin.form.error.staff_user_name_in_use",
     ErrorCode.STAFF_GRANT_REFUSED: "admin.form.error.staff_grant_refused",
     ErrorCode.STAFF_NOT_FOUND: "error.not_found.text",
     ErrorCode.STAFF_MAIL_FAILED: "admin.form.error.staff_mail_failed",

@@ -170,3 +170,31 @@ async def test_a_refused_service_account_is_an_error() -> None:
     with pytest.raises(DirectoryError) as caught:
         await denied.list_users()
     assert caught.value.code == "refused"
+
+
+async def test_the_user_name_is_sent_apart_from_the_address() -> None:
+    """ADR 0106 point 7: log in by user name, mail to the own address."""
+    server = Server()
+    server.routes[("POST", "/users")] = httpx.Response(
+        201, headers={"Location": f"{ADMIN_URL}/users/u-9"}
+    )
+    server.routes[("GET", "/users/u-9")] = httpx.Response(200, json={**USER, "id": "u-9"})
+    new = NewStaffMember("olaf@example.test", "Olaf", "Org", "olaf.org@demo.openplanner.internal")
+
+    await directory(server).create_user(new)
+
+    post = next(r for r in server.requests if r.method == "POST" and r.url.path.endswith("/users"))
+    body = json.loads(post.content)
+    assert body["username"] == "olaf.org@demo.openplanner.internal"
+    assert body["email"] == "olaf@example.test"
+
+
+async def test_a_taken_user_name_is_asked_for_exactly() -> None:
+    server = Server()
+    server.routes[("GET", "/users")] = httpx.Response(200, json=[USER])
+
+    taken = await directory(server).user_name_taken("olaf@example.test")
+
+    query = server.requests[-1].url.params
+    assert taken is True
+    assert (query["username"], query["exact"]) == ("olaf@example.test", "true")

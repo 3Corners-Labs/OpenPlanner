@@ -27,13 +27,16 @@ class FakeStaffDirectory:
         self._check()
         return self.users.get(user_id)
 
+    async def user_name_taken(self, username: str) -> bool:
+        self._check()
+        return any(u.username == username for u in self.users.values())
+
     async def create_user(self, new: NewStaffMember) -> DirectoryUser:
         self._check()
-        if any(u.email == new.email for u in self.users.values()):
+        username = new.username or new.email
+        if any(u.email == new.email or u.username == username for u in self.users.values()):
             raise DirectoryError("conflict")
-        user = DirectoryUser(
-            f"kc-{self._next}", new.email, new.email, new.first_name, new.last_name
-        )
+        user = DirectoryUser(f"kc-{self._next}", username, new.email, new.first_name, new.last_name)
         self._next += 1
         self.users[user.id] = user
         return user

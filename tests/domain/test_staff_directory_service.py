@@ -301,3 +301,53 @@ def test_a_working_directory_lacks_nothing(
     )
 
     assert present.missing == ()
+
+
+def _created(directory: FakeStaffDirectory) -> DirectoryUser:
+    return next(u for u in directory.users.values() if u.email == NEW.email)
+
+
+async def test_the_user_name_is_first_last_under_the_organisation(
+    uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
+) -> None:
+    """ADR 0106 points 5 and 8: an organisation admin's invitation gets the own label."""
+    await service(uow, directory).invite(ORG_ADMIN, NEW, [Grant("agent", "demo", "demo")])
+
+    assert _created(directory).username == "nina.nieuw@demo.openplanner.internal"
+
+
+async def test_a_superuser_gets_a_name_directly_under_the_suffix(
+    uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
+) -> None:
+    suffix = DirectorySettings(True, P, 7, "staff.example.nl")
+
+    await service(uow, directory, suffix).invite(SUPER, NEW, [Grant("superuser")])
+
+    assert _created(directory).username == "nina.nieuw@staff.example.nl"
+
+
+async def test_a_typed_local_part_is_used_and_checked(
+    uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
+) -> None:
+    grants = [Grant("agent", "demo", "demo")]
+
+    invalid = await code_of(service(uow, directory).invite(ORG_ADMIN, NEW, grants, "Nina N"))
+    await service(uow, directory).invite(ORG_ADMIN, NEW, grants, "nnieuw")
+
+    assert invalid is ErrorCode.STAFF_USER_NAME_INVALID
+    assert _created(directory).username == "nnieuw@demo.openplanner.internal"
+
+
+async def test_a_taken_proposal_is_numbered_a_taken_typed_name_refused(
+    uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
+) -> None:
+    grants = [Grant("agent", "demo", "demo")]
+    directory.users["kc-x"] = DirectoryUser(
+        "kc-x", "nina.nieuw@demo.openplanner.internal", "x@example.test", "N", "N"
+    )
+
+    taken = await code_of(service(uow, directory).invite(ORG_ADMIN, NEW, grants, "nina.nieuw"))
+    await service(uow, directory).invite(ORG_ADMIN, NEW, grants)
+
+    assert taken is ErrorCode.STAFF_USER_NAME_IN_USE
+    assert _created(directory).username == "nina.nieuw-2@demo.openplanner.internal"
