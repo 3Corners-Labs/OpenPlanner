@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-01), requested by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (V14.2.1). Refines the use of the token of ADR 0011; the token itself, its
-derivation and its storage are unchanged. Not built; see *Build status*.
+derivation and its storage are unchanged. Partly built (steps 1 and 2); see *Build status*.
 
 ## Context
 
@@ -76,10 +76,12 @@ value.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR accepted | #309 | merged |
-| 1 | `public_ref` (migration), participant link sessions (table, port, adapter, sweep), the exchange on `GET /b/{token}` | | planned |
-| 2 | Booking pages (confirm, cancel, move) on `/b/m/{ref}`; old subpaths redirect; e2e | | planned |
+| 1 | `public_ref` (migration 0083), participant link sessions (table, port, adapter, sweep), the exchange on `GET /b/{token}` | PRNUM | built |
+| 2 | Booking pages (confirm, cancel, move) on `/b/m/{ref}`; old subpaths redirect; e2e | PRNUM | built |
 | 3 | Direct call, waiting room (poll URL in `live-region.js`), trial and join on `/b/m/{ref}`; maintenance route list; e2e | | planned |
 | 4 | Threat model, data flow, `docs/widget.md` and the manual where they show `/b/{token}` | | planned |
+
+**Built as** (steps 1 and 2): the cookie is `op_link` over plain http (`Path=/b`, because browsers refuse a prefixed cookie without `Secure`) and `__Host-op_link` over https; the shared name-and-path rule lives in `app/web/cookies.py` and is used by the admin cookie too. The cookie's `Max-Age` is set at the exchange; the server's expiry slides with use (written at most once a minute), so the lesser of the two ends a session. Until step 3 the booking page links to the join and trial pages through `/b/m/{ref}/join` and `/test`, which check the cookie and then redirect to the old token paths. An old form left open on `POST /b/{token}/confirm|cancel|reschedule` is not carried out; the browser is sent to the page whose button it would have pressed.
 
 ## Consequences
 

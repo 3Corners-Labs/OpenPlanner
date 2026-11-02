@@ -20,7 +20,7 @@ from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
-from tests.support.participant import confirm_by_link, confirm_newest, emailed_token
+from tests.support.participant import confirm_by_link, confirm_newest, emailed_token, open_link
 
 FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam
 FRIDAY_0930 = "2026-01-02T08:30:00Z"
@@ -47,8 +47,8 @@ async def booked(site: httpx.AsyncClient, start: str = FRIDAY_0900, **fields: st
     return await confirm_newest(site)
 
 
-def token_of(response: httpx.Response) -> str:
-    match = re.fullmatch(r"/b/([A-Za-z0-9_-]+)\?status=\w+", response.headers["location"])
+def page_of(response: httpx.Response) -> str:
+    match = re.fullmatch(r"(/b/m/[A-Za-z0-9_-]+)\?status=\w+", response.headers["location"])
     assert match
     return match.group(1)
 
@@ -170,19 +170,30 @@ async def test_full_booking_flow(site: httpx.AsyncClient) -> None:
     assert "vrijdag 2 januari 2026, 09:00–09:30" in check.text
     assert "/b/" not in check.text
     token = await emailed_token(site)
-    pending = await site.get(f"/b/{token}")
+    opened = await site.get(f"/b/{token}")
+    # ADR 0093: the link from the email is traded for a cookie; no token stays in the address.
+    assert opened.status_code == 303
+    base = opened.headers["location"]
+    assert base.startswith("/b/m/")
+    assert token not in base
+    cookie = opened.headers["set-cookie"]
+    assert cookie.startswith("op_link=")
+    assert "HttpOnly" in cookie
+    assert "SameSite=lax" in cookie
+    pending = await site.get(base)
     assert "Niet bevestigd" in pending.text
-    assert f'href="/b/{token}/confirm"' in pending.text
-    assert f'href="/b/{token}/reschedule"' not in pending.text
+    assert f'href="{base}/confirm"' in pending.text
+    assert f'href="{base}/reschedule"' not in pending.text
+    assert token not in pending.text
 
     confirmed = await confirm_by_link(site, token)
 
-    assert confirmed.headers["location"] == f"/b/{token}?status=confirmed"
+    assert confirmed.headers["location"] == f"{base}?status=confirmed"
     page = await site.get(confirmed.headers["location"])
     assert "Uw afspraak is bevestigd" in page.text
     assert "vrijdag 2 januari 2026, 09:00–09:30" in page.text
     assert "Bevestigd" in page.text
-    assert f'href="/b/{token}/reschedule"' in page.text
+    assert f'href="{base}/reschedule"' in page.text
     # The management page shows no contact details. Check the whole surname: a short
     # substring such as "Ada" can occur by chance in the random token in the page's links.
     assert "Lovelace" not in page.text
@@ -269,10 +280,10 @@ async def test_same_origin_posts_are_accepted(
 
 
 async def test_cancel_flow(site: httpx.AsyncClient) -> None:
-    token = await booked(site)
+    base = await open_link(site, await booked(site))
 
-    confirm = await site.get(f"/b/{token}/cancel")
-    response = await site.post(f"/b/{token}/cancel", headers=SAME_ORIGIN)
+    confirm = await site.get(f"{base}/cancel")
+    response = await site.post(f"{base}/cancel", headers=SAME_ORIGIN)
 
     assert "Weet u zeker" in confirm.text
     assert response.status_code == 303
@@ -280,37 +291,38 @@ async def test_cancel_flow(site: httpx.AsyncClient) -> None:
     assert "Uw afspraak is geannuleerd" in page.text
     assert "Geannuleerd" in page.text
     assert "/reschedule" not in page.text
-    assert (await site.get(f"/b/{token}/cancel")).status_code == 303
+    assert (await site.get(f"{base}/cancel")).status_code == 303
 
 
 async def test_reschedule_flow(site: httpx.AsyncClient) -> None:
-    old = await booked(site)
+    old = await open_link(site, await booked(site))
 
-    picker = await site.get(f"/b/{old}/reschedule", params={"day": "2026-01-02"})
-    confirm = await site.get(f"/b/{old}/reschedule", params={"start": FRIDAY_0930})
+    picker = await site.get(f"{old}/reschedule", params={"day": "2026-01-02"})
+    confirm = await site.get(f"{old}/reschedule", params={"start": FRIDAY_0930})
     response = await site.post(
-        f"/b/{old}/reschedule", data={"start": FRIDAY_0930}, headers=SAME_ORIGIN
+        f"{old}/reschedule", data={"start": FRIDAY_0930}, headers=SAME_ORIGIN
     )
 
     assert "Uw huidige afspraak: vrijdag 2 januari 2026, 09:00–09:30." in picker.text
     assert f'value="{FRIDAY_0900}"' not in picker.text  # the current slot is not offered
     assert f'value="{FRIDAY_0930}"' in picker.text
-    assert f'action="/b/{old}/reschedule"' in picker.text
+    assert f'action="{old}/reschedule"' in picker.text
     # A chosen time is confirmed first (from → to), so one click never moves a booking.
     assert "Nieuw moment bevestigen" in confirm.text
     assert "vrijdag 2 januari 2026, 09:30–10:00" in confirm.text
-    assert f'<form method="post" action="/b/{old}/reschedule">' in confirm.text
-    new = token_of(response)
+    assert f'<form method="post" action="{old}/reschedule">' in confirm.text
+    new = page_of(response)
     assert new != old
-    assert "09:30–10:00" in (await site.get(f"/b/{new}")).text
-    assert "Geannuleerd" in (await site.get(f"/b/{old}")).text
+    # The browser holds the new booking too (ADR 0093): no second trip through the email.
+    assert "09:30–10:00" in (await site.get(new)).text
+    assert "Geannuleerd" in (await site.get(old)).text
 
 
 async def test_reschedule_errors_are_shown_on_the_picker(site: httpx.AsyncClient) -> None:
-    token = await booked(site)
+    base = await open_link(site, await booked(site))
 
     response = await site.post(
-        f"/b/{token}/reschedule", data={"start": FRIDAY_0900}, headers=SAME_ORIGIN
+        f"{base}/reschedule", data={"start": FRIDAY_0900}, headers=SAME_ORIGIN
     )
 
     assert response.status_code == 409
@@ -318,10 +330,10 @@ async def test_reschedule_errors_are_shown_on_the_picker(site: httpx.AsyncClient
 
 
 async def test_reschedule_confirmation_needs_a_free_other_time(site: httpx.AsyncClient) -> None:
-    token = await booked(site)
+    base = await open_link(site, await booked(site))
 
-    same = await site.get(f"/b/{token}/reschedule", params={"start": FRIDAY_0900})
-    garbage = await site.get(f"/b/{token}/reschedule", params={"start": "2026-01-02T08:07:00Z"})
+    same = await site.get(f"{base}/reschedule", params={"start": FRIDAY_0900})
+    garbage = await site.get(f"{base}/reschedule", params={"start": "2026-01-02T08:07:00Z"})
 
     for response in (same, garbage):
         assert "Nieuw moment bevestigen" not in response.text
@@ -336,23 +348,24 @@ async def test_booking_cannot_be_moved_from_the_change_lead_but_can_be_cancelled
     late_clock = FixedClock(NOW + timedelta(days=1) - timedelta(minutes=5))  # Fri 07:55 UTC
 
     async with app_client(demo_settings, late_clock) as late:
-        page = await late.get(f"/b/{token}")
-        reschedule_page = await late.get(f"/b/{token}/reschedule")
-        cancel_page = await late.get(f"/b/{token}/cancel")
+        base = await open_link(late, token)
+        page = await late.get(base)
+        reschedule_page = await late.get(f"{base}/reschedule")
+        cancel_page = await late.get(f"{base}/cancel")
         move = await late.post(
-            f"/b/{token}/reschedule", data={"start": FRIDAY_0930}, headers=SAME_ORIGIN
+            f"{base}/reschedule", data={"start": FRIDAY_0930}, headers=SAME_ORIGIN
         )
-        cancel = await late.post(f"/b/{token}/cancel", headers=SAME_ORIGIN)
+        cancel = await late.post(f"{base}/cancel", headers=SAME_ORIGIN)
 
     assert "Verplaatsen kan niet meer" in page.text
-    assert f'href="/b/{token}/cancel"' in page.text
-    assert f'href="/b/{token}/reschedule"' not in page.text
+    assert f'href="{base}/cancel"' in page.text
+    assert f'href="{base}/reschedule"' not in page.text
     assert reschedule_page.status_code == 303
     assert cancel_page.status_code == 200
     assert move.status_code == 303  # back to the booking page, which says moving is closed
-    assert move.headers["location"] == f"/b/{token}"
+    assert move.headers["location"] == base
     assert cancel.status_code == 303
-    assert cancel.headers["location"] == f"/b/{token}?status=cancelled"
+    assert cancel.headers["location"] == f"{base}?status=cancelled"
 
 
 async def test_booking_cannot_be_changed_once_the_call_has_begun(demo_settings: Settings) -> None:
@@ -361,9 +374,10 @@ async def test_booking_cannot_be_changed_once_the_call_has_begun(demo_settings: 
     started = FixedClock(NOW + timedelta(days=1))  # Fri 08:00 UTC, the start
 
     async with app_client(demo_settings, started) as late:
-        page = await late.get(f"/b/{token}")
-        cancel_page = await late.get(f"/b/{token}/cancel")
-        cancel = await late.post(f"/b/{token}/cancel", headers=SAME_ORIGIN)
+        base = await open_link(late, token)
+        page = await late.get(base)
+        cancel_page = await late.get(f"{base}/cancel")
+        cancel = await late.post(f"{base}/cancel", headers=SAME_ORIGIN)
 
     assert "Het gesprek is begonnen" in page.text
     assert "/cancel" not in page.text
@@ -504,12 +518,13 @@ async def test_a_booking_awaiting_a_new_time_offers_the_choice_after_its_time(
     late_clock = FixedClock(NOW + timedelta(days=2))  # past the original time
 
     async with app_client(demo_settings, late_clock) as late:
-        page = (await late.get(f"/b/{token}")).text
-        picker = await late.get(f"/b/{token}/reschedule")
+        base = await open_link(late, token)
+        page = (await late.get(base)).text
+        picker = await late.get(f"{base}/reschedule")
 
     assert "Wacht op uw nieuwe tijd" in page
     assert "Kiest u voor vrijdag 16 januari 2026, 09:00 geen nieuwe tijd" in page
-    assert f'href="/b/{token}/reschedule"' in page
+    assert f'href="{base}/reschedule"' in page
     assert picker.status_code == 200
 
 
@@ -519,31 +534,33 @@ async def test_opening_the_confirm_link_never_confirms(site: httpx.AsyncClient) 
 
     # Mail scanners open links in advance (ADR 0056 §8): only the page's POST confirms.
     for _ in range(2):
-        page = await site.get(f"/b/{token}/confirm")
+        opened = await site.get(f"/b/{token}/confirm")
+        base = opened.headers["location"].removesuffix("/confirm")
+        page = await site.get(f"{base}/confirm")
         assert page.status_code == 200
-        assert f'<form method="post" action="/b/{token}/confirm">' in page.text
+        assert f'<form method="post" action="{base}/confirm">' in page.text
         assert "vrijdag 2 januari 2026, 09:00–09:30" in page.text
         assert "uiterlijk vrijdag 2 januari 2026, 07:00" in page.text
-    assert "Niet bevestigd" in (await site.get(f"/b/{token}")).text
+    assert "Niet bevestigd" in (await site.get(base)).text
 
 
 async def test_confirming_needs_a_same_origin_post(site: httpx.AsyncClient) -> None:
     await book(site)
-    token = await emailed_token(site)
+    base = await open_link(site, await emailed_token(site))
 
-    refused = await site.post(f"/b/{token}/confirm", headers={"sec-fetch-site": "cross-site"})
+    refused = await site.post(f"{base}/confirm", headers={"sec-fetch-site": "cross-site"})
 
     assert refused.status_code == 403
-    assert "Niet bevestigd" in (await site.get(f"/b/{token}")).text
+    assert "Niet bevestigd" in (await site.get(base)).text
 
 
 async def test_a_confirmed_link_shows_the_booking(site: httpx.AsyncClient) -> None:
-    token = await booked(site)
+    base = await open_link(site, await booked(site))
 
-    again = await site.get(f"/b/{token}/confirm")
+    again = await site.get(f"{base}/confirm")
 
     assert again.status_code == 303
-    assert again.headers["location"] == f"/b/{token}"
+    assert again.headers["location"] == base
 
 
 async def test_a_late_confirmation_lapses_and_offers_a_new_appointment(
@@ -558,22 +575,22 @@ async def test_a_late_confirmation_lapses_and_offers_a_new_appointment(
         response = await confirm_by_link(late, token)
         page = await late.get(response.headers["location"])
 
-    assert response.headers["location"] == f"/b/{token}?status=lapsed"
+    assert response.headers["location"].endswith("?status=lapsed")
     assert "niet op tijd bevestigd" in page.text
     assert 'href="/g/demo"' in page.text
 
 
 async def test_this_was_not_me_cancels_an_unconfirmed_booking(site: httpx.AsyncClient) -> None:
     await book(site)
-    token = await emailed_token(site)
+    base = await open_link(site, await emailed_token(site))
 
-    confirm = await site.get(f"/b/{token}/confirm")
-    assert f'href="/b/{token}/cancel"' in confirm.text
-    assert (await site.get(f"/b/{token}/cancel")).status_code == 200
-    assert (await site.get(f"/b/{token}/reschedule")).status_code == 303
-    cancelled = await site.post(f"/b/{token}/cancel", headers=SAME_ORIGIN)
+    confirm = await site.get(f"{base}/confirm")
+    assert f'href="{base}/cancel"' in confirm.text
+    assert (await site.get(f"{base}/cancel")).status_code == 200
+    assert (await site.get(f"{base}/reschedule")).status_code == 303
+    cancelled = await site.post(f"{base}/cancel", headers=SAME_ORIGIN)
 
-    assert cancelled.headers["location"] == f"/b/{token}?status=cancelled"
+    assert cancelled.headers["location"] == f"{base}?status=cancelled"
     friday = await site.get("/g/demo", params={"day": "2026-01-02"})
     assert friday.text.count(f'value="{FRIDAY_0900}"') == 1  # the place is free again
 

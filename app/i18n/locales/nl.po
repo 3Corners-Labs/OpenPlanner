@@ -403,6 +403,9 @@ msgstr "Pagina niet gevonden"
 msgid "error.not_found.text"
 msgstr "Deze link klopt niet of is niet meer geldig."
 
+msgid "error.link_required"
+msgstr "Open de link uit uw e-mail opnieuw om uw afspraak te bekijken of te wijzigen."
+
 msgid "manage.title"
 msgstr "Uw afspraak"
 
@@ -6097,6 +6100,9 @@ msgstr "Planner"
 msgid "settings.topic.confirmation"
 msgstr "Afspraken bevestigen"
 
+msgid "settings.topic.participant_link"
+msgstr "Link van de deelnemer"
+
 msgid "settings.field.log_level.label"
 msgstr "Logniveau"
 
@@ -6318,6 +6324,9 @@ msgstr "Herinnering om opnieuw te boeken (dagen voor het vervallen)"
 
 msgid "settings.field.booking_confirm_min_minutes.label"
 msgstr "Minimale tijd om te bevestigen (minuten)"
+
+msgid "settings.field.participant_link_session_hours.label"
+msgstr "Geldigheid van de deelnemerslink in de browser (uren)"
 
 msgid "settings.field.booking_confirm_reminders.label"
 msgstr "Aantal herinneringen om te bevestigen"

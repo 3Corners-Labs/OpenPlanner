@@ -318,6 +318,9 @@ class Settings(BaseSettings):
     # most this many sessions at once (the one idle longest lapses). Class C, platform.
     admin_idle_minutes: int = Field(default=60, ge=15, le=120)
     admin_max_sessions_per_person: int = Field(default=5, ge=1, le=20)
+    # ADR 0093: how long a participant's browser keeps the right to use a booking after it last
+    # did. At least 20 hours, so no form has a time limit in practice (WCAG 2.2.1). Class C.
+    participant_link_session_hours: int = Field(default=24, ge=20, le=168)
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)

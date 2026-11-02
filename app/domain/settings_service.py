@@ -56,6 +56,7 @@ EDITABLE_TOPICS = frozenset(
         Topic.UPDATES,
         Topic.WEBEX,
         Topic.CONFIRMATION,
+        Topic.PARTICIPANT_LINK,
     }
 )
 """The topics of class C settings the portal changes: step 4, and mail, updates and the Webex

@@ -19,6 +19,7 @@ const PAGES: [string, string][] = [
   ['without contact block', '/g/demo'],
   ['with contact block', '/g/andere-team'],
   ['under a management link', `/b/${'A'.repeat(43)}/cancel`],
+  ['under a booking reference', `/b/m/${'A'.repeat(22)}/cancel`],
 ];
 const TITLES: Record<string, string> = {
   nl: 'We voeren onderhoud uit',

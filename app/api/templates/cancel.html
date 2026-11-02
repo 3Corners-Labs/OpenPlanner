@@ -8,10 +8,10 @@
   <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
 </dl>
 <p>{{ _("cancel.question") }}</p>
-<form method="post" action="/b/{{ token }}/cancel">
+<form method="post" action="/b/m/{{ ref }}/cancel">
   <ul class="actions">
     <li><button type="submit" class="button button--danger">{{ _("cancel.confirm") }}</button></li>
-    <li><a href="/b/{{ token }}">{{ _("cancel.back") }}</a></li>
+    <li><a href="/b/m/{{ ref }}">{{ _("cancel.back") }}</a></li>
   </ul>
 </form>
 {% endblock %}

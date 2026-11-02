@@ -17,6 +17,7 @@ from tests.api.test_booking_pages import booked as book_and_confirm
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
+from tests.support.participant import open_link
 
 START = datetime.fromisoformat(FRIDAY_0900.replace("Z", "+00:00"))
 LINK = "https://site.webex.com/site/j.php?MTID=m123"
@@ -75,10 +76,11 @@ async def booked(demo_settings: Settings) -> tuple[str, int, Settings]:
 async def test_no_join_button_without_video(booked: tuple[str, int, Settings]) -> None:
     token, _, settings = booked
     async with app_client(settings, FixedClock(NOW)) as client:
-        manage = (await client.get(f"/b/{token}")).text
+        base = await open_link(client, token)
+        manage = (await client.get(base)).text
         join = (await client.get(f"/b/{token}/join")).text
 
-    assert f'href="/b/{token}/join"' not in manage
+    assert f'href="{base}/join"' not in manage
     assert "wordt klaargezet" in join  # no meeting yet
 
 
@@ -88,13 +90,14 @@ async def test_page_waits_until_fifteen_minutes_before(booked: tuple[str, int, S
 
     async with app_client(settings, FixedClock(START - timedelta(minutes=30))) as client:
         early = await client.get(f"/b/{token}/join")
-        manage = (await client.get(f"/b/{token}")).text
+        base = await open_link(client, token)
+        manage = (await client.get(base)).text
         go = await client.get(f"/b/{token}/join/go")
 
     assert "http-equiv" not in early.text  # no automatic reload (WCAG 2.2.1)
     assert f'href="/b/{token}/join">Status verversen' in early.text
     assert "U kunt deelnemen vanaf 08:45" in early.text
-    assert f'href="/b/{token}/join"' in manage
+    assert f'href="{base}/join"' in manage
     assert go.headers["location"] == f"/b/{token}/join"
     assert await _events(settings.database_url, booking_id) == []
 
