@@ -5,13 +5,27 @@ now, as a grid of **widgets**. Every widget has its own right: you only see the 
 belong to your role, and never more than your role may see. Below the grid are the groups you
 have rights on, with their staffing shortfalls.
 
-The page works without JavaScript. What you see is the state at the moment of loading;
-**Refresh** reloads the page. A later version refreshes the widgets by itself.
+The widgets refresh themselves: every few seconds the page asks whether anything changed and
+replaces only the widget in which something did. Focus stays where it is. What changes in
+*Alerts* is read out for screen reader users. Without JavaScript, or when the superuser switched
+refreshing off (*Overview refreshes itself*), you see the state at the moment of loading and
+**Refresh** reloads the page. How often the overview refreshes is set by the superuser
+(*Overview refresh*, 5 to 60 seconds).
 
 The overview never shows participants' personal data: only counts, group names and times.
 
 ## Widgets
 
+- **Alerts**: what needs attention now within your reach, the most urgent first. Each alert says
+  its level in words (*Outage*, *Warning*), what it is about, what is wrong and since when. An
+  alert stays until the problem is solved; then it goes by itself. The title opens where you can
+  act: the whole chain in the audit log, the group's queue or the system status. **All**,
+  **Warnings and outages** and **Outages only** filter by level; as bar or pie you see the count
+  per level. Alerts come from the storage check, the certificate, the public address, a log
+  destination, deleting data after its retention period, the automatic check of an integration,
+  a wait that is too long in an own queue and a worker that gives no heartbeat. You only see
+  alerts your role may see: platform alerts only with the right to the system status, a queue
+  alert only for those who work that queue.
 - **My role and reach**: your roles and the first rights with the reach where they apply.
   **Open the full list** opens the page *My rights*.
 - **Bookings today per group**: the number of confirmed bookings today per group within your
@@ -24,18 +38,36 @@ The overview never shows participants' personal data: only counts, group names a
   participants wait, how long the longest wait has been and how many staff who may work the queue
   are signed in now. A participant with an appointment counts once they are in the lobby; a
   direct call counts from the request, even before the link is opened. The group name opens
-  the queue. Counts and minutes only, never names. Colours for a wait that is too long follow
-  with the wait thresholds.
+  the queue. Counts and minutes only, never names. Under the longest wait it says whether it is
+  within the target, above it, or above the limit at which an alert is raised (*Target wait* and
+  *Alert when the wait exceeds*, organisation settings; 5 and 8 minutes by default). The colour
+  only repeats what is written. When the longest wait crosses the limit there is one alert; it
+  goes when the wait is back under the limit.
 - **Running tasks**: the background jobs that are running now and the jobs that failed after
   their last attempt, with type, state and time. Never the content of a job or the booking it
   belongs to. If something here says *Failed*, something is stuck: tell the installation's
   administrator.
 - **System status**: the running version and whether an update is available, whether
-  maintenance is on, whether the background worker gave a heartbeat recently, whether
-  diagnostic mode is on and which environment the installation runs in. The rows open the
+  maintenance is on, whether the background worker gave a heartbeat recently, how much disk space is free and
+  how large the database is, whether diagnostic mode is on and which environment the installation runs in. The rows open the
   pages that know more, as far as your role may open them.
 
-The widget *Alerts* follows in a later version.
+## The bar for outages
+
+An **outage** within your reach shows as a bar at the top of every admin page until it is
+solved: the disk is almost full, the certificate expired or is not trusted, or the worker gives no
+heartbeat. **View** opens where you can act; **Close** hides that one alert for the rest of your
+session. When the same problem comes back later, or a warning becomes an outage, the bar shows
+again. Closing solves nothing: the alert stays in the *Alerts* widget until the problem is gone.
+Warnings are not in the bar, only in the widget.
+
+## Pop-ups
+
+When a new alert arrives while the overview is open, it appears at the bottom right as a pop-up.
+Which alerts do so is your choice in the profile menu (warnings and outages by default). A pop-up
+stays at least 8 seconds; when you point at it or move focus onto it, it stays until you leave
+it. **Close** or Escape removes it at once. Pop-ups appear only on the overview; on other pages
+you see outages in the bar.
 
 ## Choosing a view
 
@@ -69,8 +101,7 @@ works without JavaScript. From top to bottom:
   back to System.
 - **Choose a language**: Nederlands or English. The browser remembers the choice.
 - **Alerts**: whether the bar for outages shows and which alerts pop up (all, warnings and
-  outages, outages only, none). **Save** keeps the choice for this session. The alerts themselves
-  follow in a later version (ADR 0061); the choice is ready by then.
+  outages, outages only, none). **Save** keeps the choice for this session.
 - **Sign out**.
 
 On a phone the bar keeps only its icons and your initials; your name is in the menu.
@@ -91,8 +122,8 @@ your role may open:
 - **Tasks** jumps to the widget *Running tasks* on this overview, with the number of running and
   failed tasks next to it. A number above zero means something is running or stuck. The shortcut
   is only there for admins who have that widget on their overview.
-- **Alerts** opens the audit log from level warning up. Once the alert model exists (ADR 0061)
-  the shortcut opens the list of alerts, and a number follows.
+- **Alerts** jumps to the *Alerts* widget on this overview, with the number of open alerts within
+  your reach next to it.
 - **Manual** opens the topic of the page you are on.
 
 On a phone the icons, the number and your initials stay; the words stay in the bar for screen

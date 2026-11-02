@@ -294,15 +294,8 @@ class QueueService:
     async def _entries(
         self, tx: Transaction, principal: Principal, group: Group, now: datetime
     ) -> list[QueueEntry]:
-        """Load the bookings around ``now`` with their call status and keep the visible ones.
-
-        A booking ends one slot length after its start, so earlier ones have ended.
-        """
-        lower = now - timedelta(minutes=group.slot_minutes)
-        upper = now + timedelta(minutes=group.queue_visible_from_minutes, seconds=1)
-        scope = scope_for(principal, Permission.QUEUE_WORK)
-        overviews = await tx.list_bookings(scope, group.id, lower, upper)
-        return visible((QueueEntry(o.booking, o.status) for o in overviews), group, now)
+        """Load the bookings around ``now`` with their call status and keep the visible ones."""
+        return await load_entries(tx, scope_for(principal, Permission.QUEUE_WORK), group, now)
 
     async def _claim(
         self,
@@ -347,6 +340,19 @@ class QueueService:
                 booking_id=booking_id,
             )
         )
+
+
+async def load_entries(
+    tx: Transaction, scope: Scope, group: Group, now: datetime
+) -> list[QueueEntry]:
+    """Load the group's queue entries at ``now`` inside ``scope`` (also the worker's wait watch).
+
+    A booking ends one slot length after its start, so earlier ones have ended.
+    """
+    lower = now - timedelta(minutes=group.slot_minutes)
+    upper = now + timedelta(minutes=group.queue_visible_from_minutes, seconds=1)
+    overviews = await tx.list_bookings(scope, group.id, lower, upper)
+    return visible((QueueEntry(o.booking, o.status) for o in overviews), group, now)
 
 
 def _signed_in_for(

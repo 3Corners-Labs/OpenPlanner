@@ -858,6 +858,24 @@ Inputs from outside: the slug and booking id in the path. Agents are portal user
 | Information disclosure | The team invite carries more than needed, or the meeting link | Fixed layout with i18n text blocks; first name (invite only), reference, time, queue link; the cancel carries no name | `tests/jobs/test_messages.py::test_team_invite_goes_to_the_team_with_first_name_reference_and_queue_link`, `test_team_cancel_withdraws_the_same_event_without_the_name` |
 | Information disclosure | An admin typo sends first names to an address outside the organisation | Email syntax checked; changing it needs `group.edit` with a fresh login and is audited; the address is shown on the group overview; invites stop at once when it is cleared or the group leaves the own queue | `tests/domain/test_dispatch_kind.py::test_the_invite_address_must_be_an_email_address`, `tests/jobs/test_runner.py::test_team_invite_goes_to_the_teams_address_only_while_the_group_sends_one`, `tests/admin/test_group_routes.py::test_group_switches_to_the_own_queue` |
 
+## Flow: overview and alerts (ADR 0061)
+
+Admin: `GET /admin/` (`dashboard.view`), the widget fragments `GET /admin/overview/w/{widget}`
+(each with its widget's permission; the live ones take `?seen=KEY`, `view` and for *Alerts*
+`alerts-level`), and `GET /admin/alerts/close?token=…&next=…` (`dashboard.view`). Every admin
+page also reads the open alerts in reach for the banner (`load_alerts`). Inputs from outside: the
+query parameters. An alert is an open streak of condition events (system events) or the
+worker's stale heartbeat; it carries codes, slugs and times only.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure (widget fragment outside scope) | An admin reads alerts, queues or bookings of a group outside their reach through a fragment or the banner | Each fragment carries its widget's permission (matrix); alerts are read per rule inside `scope_for` of the rule's permission, platform alerts only with a global permission; links to the log only where `audit.view` reaches | `tests/admin/test_authorization_matrix.py::test_matrix` (`overview/w/alerts`), `tests/domain/test_alerts.py::test_platform_alerts_reach_only_who_may_see_the_platform`, `test_an_agent_sees_the_wait_alerts_of_their_own_groups`, `tests/admin/test_alert_routes.py::test_a_platform_outage_is_not_shown_outside_the_platform_reach` |
+| Information disclosure | Personal data in an alert, a pop-up or a widget | Alerts hold action, reason code, slugs, counts and times; pop-ups copy the server-rendered widget text with `textContent` | `tests/admin/test_overview_routes.py::test_no_pii_in_any_fragment` (includes *Alerts*) |
+| Denial of service (poll flood) | Every open overview asks each live widget every few seconds | Interval `overview_poll_seconds` (5–60 s, platform) and an off switch `overview_live_enabled`; `204` while the key is current; the alert read uses the index `ix_audit_events_action_at` (migration 0088). No per-IP limit on these polls: a contact center's staff share one address, and a limit would blank their overview; the polls need a live admin session | `tests/admin/test_alert_routes.py::test_a_live_widget_answers_204_while_nothing_changed`, `test_with_live_off_the_overview_has_no_script`, `tests/test_settings_registry_config.py` (bounds) |
+| Denial of service | A full disk or a database error takes every admin page down with the banner | The banner read is wrapped: a failure is logged (`alerts.read_failed`) and the page shows without a banner | `tests/admin/test_alert_routes.py` (banner tests); `app/admin/alerts.py::load_alerts` |
+| Tampering (open redirect, injection) | `next` or `token` of the close link used to redirect elsewhere or to echo markup | `next` through `safe_next`; `token` stored only when it is 16 hex characters; `alerts-level` and `view` from a closed list, length-bounded. Closing is a GET like the preferences (maintenance must not refuse it): a link from another site can at most hide one banner alert in that session, never end the condition or remove it from the widget | `tests/admin/test_alert_routes.py::test_closing_ignores_a_malformed_token_and_a_foreign_next`, `test_the_widget_filters_by_level` |
+| Repudiation | An alert that was closed hides a problem from the record | Closing only hides the banner in that session; the condition events stay in the audit log and the widget keeps listing the alert until it ends | `tests/admin/test_alert_routes.py::test_closing_hides_this_streak_and_a_new_one_shows_again` |
+
 ## Flow: verify button and simulator (admin)
 
 `POST /admin/groups/{slug}/check` ("Koppeling controleren"),

@@ -257,6 +257,14 @@ class Settings(BaseSettings):
     # ADR 0072 (announced in ADR 0043): how often the own queue, a claimed booking and the
     # participant's waiting page ask the server for a change. Class C platform.
     queue_refresh_seconds: int = Field(default=10, ge=5, le=60)
+    # ADR 0061 §4 (OV-5): whether the overview's widgets refresh themselves, and how often.
+    # Class C platform.
+    overview_live_enabled: bool = True
+    overview_poll_seconds: int = Field(default=10, ge=5, le=60)
+    # ADR 0061 OV-7: the longest wait in an own queue above which a warning alert is raised,
+    # and the target the queue widget compares against. Class D organisation.
+    queue_wait_warning_minutes: int = Field(default=8, ge=1, le=120)
+    queue_wait_target_minutes: int = Field(default=5, ge=1, le=120)
     # ADR 0010: how old a meeting status may be before the agenda asks the video provider, and
     # how often the agenda's live region asks the server. Class C platform.
     meeting_status_refresh_seconds: int = Field(default=30, ge=10, le=300)
@@ -511,6 +519,8 @@ class Settings(BaseSettings):
             return "STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT"
         if self.planner_rebook_reminder_days >= self.planner_rebook_days:
             return "PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS"
+        if self.queue_wait_target_minutes > self.queue_wait_warning_minutes:
+            return "QUEUE_WAIT_TARGET_MINUTES must not be above QUEUE_WAIT_WARNING_MINUTES"
         if (self.web_tls_cert_file is None) != (self.web_tls_key_file is None):
             return "WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE must be set together"
         if (

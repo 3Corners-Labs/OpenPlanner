@@ -688,6 +688,8 @@ class AuditEventRow(Base):
         Index("ix_audit_events_event_id", "event_id", unique=True),
         Index("ix_audit_events_trace_id", "trace_id"),
         Index("ix_audit_events_category_at", "category", "at"),
+        # ADR 0061 §7: the open alerts are the newest condition events per action.
+        Index("ix_audit_events_action_at", "action", "at"),
         CheckConstraint(
             "outcome IN ('success', 'denied', 'failure', 'retry', 'skipped')", name="outcome"
         ),

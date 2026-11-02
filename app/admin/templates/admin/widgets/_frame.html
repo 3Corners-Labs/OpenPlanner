@@ -1,8 +1,8 @@
-{#- One widget of the overview (ADR 0061): expects ``view`` (WidgetView). The same fragment is rendered on the page and by the widget's own route. -#}
+{#- One widget of the overview (ADR 0061): expects ``view`` (WidgetView). The same fragment is rendered on the page and by the widget's own route. A live widget (OV-5) marks its section ``data-live`` and its body ``data-live-fragment`` with the poll address and interval, which the shared ``live-region.js`` (ADR 0072 §6) uses; the page's one polite live region is ``#overview-announce``. -#}
 {% set widget = view.widget %}
-<section class="widget" data-widget="{{ widget.key }}" id="widget-{{ widget.key }}" aria-labelledby="widget-{{ widget.key }}-title">
+<section class="widget" data-widget="{{ widget.key }}" id="widget-{{ widget.key }}" aria-labelledby="widget-{{ widget.key }}-title"{% if view.poll %} data-live data-heading="widget-{{ widget.key }}-title" data-announce="overview-announce"{% endif %}>
   <div class="widget__header">
-    <h2 class="widget__title" id="widget-{{ widget.key }}-title">{{ _(widget.title_key) }}</h2>
+    <h2 class="widget__title" id="widget-{{ widget.key }}-title" tabindex="-1">{{ _(widget.title_key) }}</h2>
     {% if view.choices %}
     <nav class="widget__views" aria-label="{{ _("admin.overview.view.label", title=_(widget.title_key)) }}">
       <ul role="list">
@@ -13,12 +13,14 @@
     </nav>
     {% endif %}
   </div>
-  <div class="widget__body">
-    {% include "admin/widgets/" ~ widget.key ~ ".html" %}
+  <div class="widget__live"{% if view.poll %} data-live-fragment data-poll="{{ view.poll }}" data-poll-seconds="{{ view.poll_seconds }}"{% endif %}>
+    <div class="widget__body">
+      {% include "admin/widgets/" ~ widget.key ~ ".html" %}
+    </div>
+    {% if view.more_href %}
+    <div class="widget__footer">
+      <a href="{{ view.more_href }}">{% if view.total > view.rows|length %}{{ _("admin.overview.widget.more", count=view.total - view.rows|length) }}{% else %}{{ _("admin.overview.widget.open") }}{% endif %}</a>
+    </div>
+    {% endif %}
   </div>
-  {% if view.more_href %}
-  <div class="widget__footer">
-    <a href="{{ view.more_href }}">{% if view.total > view.rows|length %}{{ _("admin.overview.widget.more", count=view.total - view.rows|length) }}{% else %}{{ _("admin.overview.widget.open") }}{% endif %}</a>
-  </div>
-  {% endif %}
 </section>

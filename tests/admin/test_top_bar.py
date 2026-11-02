@@ -83,7 +83,7 @@ async def test_the_links_come_before_help_in_a_fixed_order(site: Site) -> None:
     assert [(link.href, link.label) for link in links] == [
         ("/admin/settings", "Status"),
         ("/admin/#widget-tasks", "Tasks"),
-        ("/admin/audit?level=warning", "Alerts"),
+        ("/admin/#widget-alerts", "Alerts"),
         ("/admin/help/overview", "Help with this page"),
     ]
 
@@ -97,7 +97,7 @@ async def test_each_link_shows_only_to_who_may_open_what_it_leads_to(site: Site)
             ["Alerts", "Help with this page"],
         ),  # no tasks widget on this overview
         "auditor": (AUDITOR, ["Status", "Alerts", "Help with this page"]),  # no tasks widget either
-        "agent": (AGENT, ["Help with this page"]),
+        "agent": (AGENT, ["Alerts", "Help with this page"]),  # every overview has alerts
     }
     for who, (principal, labels) in expected.items():
         await site.login_as(principal)

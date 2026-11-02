@@ -9362,3 +9362,138 @@ msgstr "Gebruik voor de inlognaam alleen kleine letters, cijfers, punten en stre
 
 msgid "admin.form.error.staff_user_name_in_use"
 msgstr "Deze inlognaam is al in gebruik. Kies een andere."
+
+msgid "settings.field.overview_live_enabled.label"
+msgstr "Overzicht ververst zichzelf"
+
+msgid "settings.field.overview_poll_seconds.label"
+msgstr "Overzicht verversen (seconden)"
+
+msgid "settings.field.queue_wait_warning_minutes.label"
+msgstr "Melding bij wachttijd boven (minuten)"
+
+msgid "settings.field.queue_wait_target_minutes.label"
+msgstr "Doel voor de wachttijd (minuten)"
+
+msgid "admin.alerts.source.storage"
+msgstr "Opslag"
+
+msgid "admin.alerts.source.certificate"
+msgstr "Certificaat"
+
+msgid "admin.alerts.source.address"
+msgstr "Publiek adres"
+
+msgid "admin.alerts.source.log_destination"
+msgstr "Logbestemming"
+
+msgid "admin.alerts.source.retention"
+msgstr "Bewaartermijnen"
+
+msgid "admin.alerts.source.integration"
+msgstr "Koppeling van {group}"
+
+msgid "admin.alerts.source.queue_wait"
+msgstr "Wachtrij van {group}"
+
+msgid "admin.alerts.source.worker"
+msgstr "Worker"
+
+msgid "admin.alerts.level.info"
+msgstr "Ter info"
+
+msgid "admin.alerts.level.warning"
+msgstr "Waarschuwing"
+
+msgid "admin.alerts.level.outage"
+msgstr "Storing"
+
+msgid "admin.alerts.text.queue_wait"
+msgstr "Deelnemers wachten te lang op een medewerker: de langste wachttijd was {minutes} minuten bij de melding."
+
+msgid "admin.alerts.text.worker"
+msgstr "De worker gaf sinds {time} geen hartslag meer: berichten, vergaderingen en het verwijderen van gegevens staan stil."
+
+msgid "admin.alerts.text.log_destination"
+msgstr "Een logbestemming neemt geen regels meer aan."
+
+msgid "admin.alerts.text.retention"
+msgstr "Persoonsgegevens over hun bewaartermijn konden niet allemaal worden verwijderd."
+
+msgid "admin.alerts.text.other"
+msgstr "Er is een probleem gemeld ({code})."
+
+msgid "admin.alerts.since"
+msgstr "sinds {time}"
+
+msgid "admin.alerts.banner.title"
+msgstr "Storingen die nu aandacht vragen: {count}"
+
+msgid "admin.alerts.open"
+msgstr "Bekijken"
+
+msgid "admin.alerts.close"
+msgstr "Sluiten"
+
+msgid "admin.alerts.close.label"
+msgstr "Sluit de melding {title}"
+
+msgid "admin.alerts.popup.new"
+msgstr "Nieuwe melding:"
+
+msgid "admin.overview.widget.alerts.series"
+msgstr "Meldingen"
+
+msgid "admin.overview.widget.alerts.chart_item"
+msgstr "{label}: {value}"
+
+msgid "admin.overview.widget.alerts.level"
+msgstr "Niveau"
+
+msgid "admin.overview.widget.alerts.filter.label"
+msgstr "Meldingen filteren op niveau"
+
+msgid "admin.overview.widget.alerts.filter.all"
+msgstr "Alle"
+
+msgid "admin.overview.widget.alerts.filter.warning"
+msgstr "Waarschuwingen en storingen"
+
+msgid "admin.overview.widget.alerts.filter.outage"
+msgstr "Alleen storingen"
+
+msgid "admin.overview.widget.alerts.status"
+msgstr "{count} open meldingen, waarvan {outages} storingen."
+
+msgid "admin.overview.widget.alerts.empty"
+msgstr "Geen open meldingen."
+
+msgid "admin.overview.widget.queue.over_warning"
+msgstr "boven de grens van {minutes} min"
+
+msgid "admin.overview.widget.queue.over_target"
+msgstr "boven het doel van {minutes} min"
+
+msgid "admin.overview.widget.queue.on_target"
+msgstr "binnen het doel van {minutes} min"
+
+msgid "admin.overview.widget.status.storage"
+msgstr "Opslag"
+
+msgid "admin.overview.widget.status.storage.ok"
+msgstr "{free}% vrij, database {size} MB"
+
+msgid "admin.overview.widget.status.storage.low"
+msgstr "Weinig ruimte: {free}% vrij, database {size} MB"
+
+msgid "admin.overview.widget.status.storage.critical"
+msgstr "Bijna vol: {free}% vrij, database {size} MB"
+
+msgid "audit.event.queue_wait"
+msgstr "Wachttijd in de wachtrij"
+
+msgid "admin.audit.reason.wait_over_warning"
+msgstr "Deelnemers wachten langer dan de ingestelde grens."
+
+msgid "admin.topbar.alerts.count"
+msgstr "{label}, {count} open"

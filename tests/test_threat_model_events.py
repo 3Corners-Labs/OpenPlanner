@@ -199,6 +199,7 @@ FLOWS: dict[str, Flow] = {
         (PUBLIC, WEBHOOK, JOB, DENIED, CHANGE)
     ),
     "## Flow: own queue (ADR 0043)": Flow(ADMIN),
+    "## Flow: overview and alerts (ADR 0061)": Flow(ADMIN),
     "## Flow: verify button and simulator (admin)": Flow(ADMIN),
     "## Flow: troubleshooting per booking (ADR 0068)": Flow(ADMIN),
     "## Flow: machine API for contact-center bots (ADR 0023)": Flow((PUBLIC, CHANGE)),

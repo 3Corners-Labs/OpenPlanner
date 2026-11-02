@@ -15,6 +15,7 @@ import asyncio
 import signal
 from contextlib import suppress
 from datetime import datetime, timedelta
+from functools import partial
 
 import httpx
 import structlog
@@ -45,6 +46,7 @@ from app.config import Settings, environment, loose_secret_files
 from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
+from app.domain.alerts import QUEUE_WAIT_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
@@ -55,6 +57,7 @@ from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
+from app.domain.queue_wait import QueueWaitWatch
 from app.domain.request_log import RequestEvents
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
@@ -261,6 +264,18 @@ async def run_worker(
         repeat=lambda: timedelta(hours=live.settings.tls_alert_repeat_hours),
         enabled=settings.public_address_check_enabled,
     )
+    # ADR 0061 OV-7: a warning alert when an own queue waits longer than the organisation allows.
+    waits = QueueWaitWatch(
+        uow,
+        clock,
+        system_log,
+        threshold=lambda organisation: timedelta(
+            minutes=live.for_organisation(
+                live.organisation_id(organisation)
+            ).queue_wait_warning_minutes
+        ),
+        reported=partial(_open_waits, uow),
+    )
     log.info(
         "worker.started",
         poll_seconds=settings.worker_poll_seconds,
@@ -293,6 +308,7 @@ async def run_worker(
                     await _watch_certificate(tls)
                     await _watch_address(address)
                     await _check_integrations(watch)
+                    await _watch_waits(waits)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=live.settings.worker_poll_seconds)
@@ -382,6 +398,22 @@ async def _check_integrations(watch: IntegrationWatch) -> None:
         return
     if checked:
         log.info("integration.checked", groups=len(checked))
+
+
+async def _open_waits(uow: UnitOfWork) -> set[str]:
+    """Return the groups with an open wait alert, so a restarted watch continues from them."""
+    return {a.group for a in await open_conditions(uow, QUEUE_WAIT_EVENT) if a.group}
+
+
+async def _watch_waits(watch: QueueWaitWatch) -> None:
+    """Record the queues that crossed the wait threshold; a failure never stops the loop."""
+    try:
+        crossed = await watch.check()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("queue.wait_watch_failed", error=type(exc).__name__)
+        return
+    if crossed:
+        log.info("queue.wait_crossed", groups=len(crossed))
 
 
 async def _main() -> None:

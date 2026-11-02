@@ -48,7 +48,7 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 |---|---|---|---|---|
 | Status | `/admin/settings` | `settings.platform.view` | – | shortcut to `platform.settings` |
 | Tasks | `/admin/#widget-tasks` | `dashboard.view` | – | shortcut to `monitor.overview` |
-| Alerts | `/admin/audit?level=warning` | `audit.view` | – | shortcut to `monitor.audit` |
+| Alerts | `/admin/#widget-alerts` | `dashboard.view` | – | shortcut to `monitor.overview` |
 | Manual | `/admin/help` | `dashboard.view` | standard | `/admin/help/{topic}` |
 
 ## Object pages

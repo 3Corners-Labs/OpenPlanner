@@ -115,6 +115,7 @@
   {% endif %}
   <main id="content" tabindex="-1" class="admin-main" data-width="{{ content_width | default('standard') }}">
     {% if update_banner %}{% include "admin/_update_banner.html" %}{% endif %}
+    {% if alert_banner %}{% include "admin/_alert_banner.html" %}{% endif %}
     {% block content %}{% endblock %}
   </main>
 </div>

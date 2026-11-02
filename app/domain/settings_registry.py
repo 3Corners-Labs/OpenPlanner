@@ -1517,6 +1517,47 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=60,
     ),
     S(
+        "overview_live_enabled",
+        K.BOOL,
+        True,
+        _C,
+        T.DISPLAY,
+        "Lets the overview's widgets refresh themselves and pop up new alerts; off, the page "
+        "shows what it loaded with and a Refresh link (ADR 0061 §3, §4).",
+    ),
+    S(
+        "overview_poll_seconds",
+        K.INT,
+        10,
+        _C,
+        T.DISPLAY,
+        "Seconds between two refreshes of a live widget on the overview (ADR 0061 §4).",
+        minimum=5,
+        maximum=60,
+    ),
+    S(
+        "queue_wait_warning_minutes",
+        K.INT,
+        8,
+        _D,
+        T.PLANNER,
+        "Longest wait in an own queue, in minutes, above which a warning alert is raised; one "
+        "alert per crossing, ended when the wait is back under it (ADR 0061 OV-7).",
+        minimum=2,
+        maximum=60,
+    ),
+    S(
+        "queue_wait_target_minutes",
+        K.INT,
+        5,
+        _D,
+        T.PLANNER,
+        "Target for the longest wait, shown in the queue widget; not above the warning "
+        "threshold (ADR 0061 OV-7).",
+        minimum=1,
+        maximum=60,
+    ),
+    S(
         "meeting_status_refresh_seconds",
         K.INT,
         30,

@@ -206,21 +206,22 @@ async def test_a_widget_with_one_view_has_no_switcher(site: Site) -> None:
 async def test_unknown_or_unsupported_page_parameters_are_ignored(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     text = (
-        await site.client.get("/admin/?bookings-today=line&changes=pie&alerts=bar&queue=%3Cb%3E")
+        await site.client.get("/admin/?bookings-today=line&changes=pie&rights=bar&queue=%3Cb%3E")
     ).text
 
     assert 'role="img"' not in text
     assert "&lt;b&gt;" not in text
     assert "<b>" not in text
-    assert "alerts=" not in text
+    assert "rights=" not in text
 
 
-async def test_a_page_without_script_keeps_its_content_security_policy(site: Site) -> None:
+async def test_the_charts_need_no_inline_style_or_script(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     text = (await site.client.get("/admin/?bookings-today=pie&queue=bar")).text
+    grid = text.split('class="widget-grid"')[1].split('id="groups-heading"')[0]
 
-    assert "<script" not in text
-    assert "style=" not in text.split('class="widget-grid"')[1].split('id="groups-heading"')[0]
+    assert "<script" not in grid
+    assert "style=" not in grid
 
 
 # --- helpers --------------------------------------------------------------------------------

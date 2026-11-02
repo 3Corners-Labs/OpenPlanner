@@ -82,15 +82,8 @@ def test_the_adr_table_is_followed() -> None:
     assert all(by_key[k].live for k in ("alerts", "queue", "bookings-today", "tasks", "status"))
 
 
-def test_only_the_widgets_of_this_step_are_available() -> None:
-    assert {w.key for w in WIDGETS if w.available} == {
-        "queue",
-        "bookings-today",
-        "changes",
-        "tasks",
-        "status",
-        "rights",
-    }
+def test_every_widget_is_available_since_the_alerts_of_ov6() -> None:
+    assert all(w.available for w in WIDGETS)
 
 
 def test_every_role_has_a_default_layout_of_known_widgets() -> None:
@@ -163,10 +156,18 @@ def test_visible_widgets_follow_the_matrix() -> None:
     def shown(principal: Principal) -> list[str]:
         return [w.key for w in visible(principal, can_function(principal))]
 
-    assert shown(SUPER) == ["queue", "bookings-today", "changes", "tasks", "status", "rights"]
-    assert shown(AUDITOR) == ["changes", "status", "rights"]
-    assert shown(AGENT) == ["queue", "rights"]
-    assert shown(GROUP_ADMIN) == ["bookings-today", "queue", "changes", "rights"]
+    assert shown(SUPER) == [
+        "alerts",
+        "queue",
+        "bookings-today",
+        "changes",
+        "tasks",
+        "status",
+        "rights",
+    ]
+    assert shown(AUDITOR) == ["changes", "status", "alerts", "rights"]
+    assert shown(AGENT) == ["queue", "alerts", "rights"]
+    assert shown(GROUP_ADMIN) == ["alerts", "bookings-today", "queue", "changes", "rights"]
 
 
 def test_every_job_type_has_a_label_in_dutch_and_english() -> None:

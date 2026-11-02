@@ -188,6 +188,8 @@ async def test_the_organisation_states_show_the_source() -> None:
         "booking_confirm_reminders",
         "closure_max_retention_days",
         "closure_max_notice_days",
+        "queue_wait_warning_minutes",
+        "queue_wait_target_minutes",
     }
     assert (states["time_format"].source, states["time_format"].shown) == ("organisation", "12h")
     assert states["admin_timezone"].source == "default"

@@ -1,10 +1,10 @@
 # 0061. Live overview with widgets
 
-Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0016 (admin pages without JavaScript) for the overview page only, following the pattern of ADR 0048. Builds on ADR 0047 §5 (overview as status and to-dos), ADR 0014 (matrix) and ADR 0043 (own queue). Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
+Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0016 (admin pages without JavaScript) for the overview page only, following the pattern of ADR 0048. Builds on ADR 0047 §5 (overview as status and to-dos), ADR 0014 (matrix) and ADR 0043 (own queue). Built (2026-11-02, steps 3 and 4 in PR #TBD): the live widgets refresh through the shared `live-region.js` per widget fragment (ADR 0072 §6 and CLAUDE.md allow no second polling mechanism, so there is no `overview-live.js` and no single `/admin/overview/live`); alerts are open streaks of condition events (`app/domain/alerts.py`), the banner is on every admin page, pop-ups on the overview; see `docs/adr-status.md`.
 Note (2026-11-01 review): §4's "every other admin page stays without scripts" no longer holds:
 the updates page (ADR 0048), the queue (ADR 0072) and the agenda day view (ADR 0010) load own
-scripts, the last two through the generic `live-region.js` (ADR 0072 §6). `overview-live.js` is
-not built.
+scripts, the last two through the generic `live-region.js` (ADR 0072 §6). `overview-live.js` was
+replaced by `live-region.js` per widget (2026-11-02).
 
 ## Context
 
@@ -52,8 +52,8 @@ The overview (`/admin/`, `dashboard.view`) lists groups as cards. Admins asked f
 | 1 | OV-1, OV-2: widget register, fragment routes, overview without script, role defaults | #141 | merged |
 | 2a | OV-3: the queue, running tasks and system status widgets (alerts wait for OV-6) | #150 | merged |
 | 2b | OV-4: server-rendered SVG charts (bar, line, pie) with text summary and table | #153 | merged |
-| 3 | OV-5: `overview-live.js`, live endpoint, CSP on this page only, "poll flood" abuse case | | planned |
-| 4 | OV-6, OV-7: alerts, banner, pop-ups, level filter; `QUEUE_WAIT_*` settings | | planned |
+| 3 | OV-5: live widgets through `live-region.js` (per fragment, `204` while current), one polite live region, CSP on this page only, "poll flood" abuse case | #TBD | in PR |
+| 4 | OV-6, OV-7: alerts, banner, pop-ups, level filter; `QUEUE_WAIT_*` settings | #TBD | in PR |
 | 5 | SH-3: organisation › group filter in the top bar (overview; other lists keep their own filters) | #161 | merged |
 
 ## Consequences

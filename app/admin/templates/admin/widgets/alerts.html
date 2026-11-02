@@ -1,0 +1,27 @@
+{#- Alerts (ADR 0061 §7, OV-6): the open alerts in the admin's reach, most urgent first, with the level filter. The level is written out (colour repeats it); each links to where to act or to the chain of its log entry. ``data-alert-*`` lets ``alert-popups.js`` pop up the ones a refresh brought. No participant data. -#}
+<span data-live-status hidden>{{ view.extra.status }}</span>
+<nav class="widget__filter" aria-label="{{ _("admin.overview.widget.alerts.filter.label") }}">
+  <ul role="list">
+    {% for choice in view.extra.levels %}
+    <li>{% if choice.current %}<span class="widget__view widget__view--current" aria-current="true">{{ choice.label }}</span>{% else %}<a class="widget__view" href="{{ choice.href }}">{{ choice.label }}</a>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</nav>
+{% if view.chart %}
+{% include "admin/widgets/_chart.html" %}
+{% elif view.rows %}
+<ul class="widget-list" role="list">
+  {% for row in view.rows %}
+  <li class="widget-list__item widget-alert" data-alert-token="{{ row.token }}" data-alert-level="{{ row.level }}">
+    <span class="chip chip--{{ row.tone }} widget-list__state" data-alert-level-label>{{ row.level_label }}</span>
+    <span class="widget-alert__body">
+      <span class="widget-list__label" data-alert-title>{% if row.href %}<a href="{{ row.href }}" data-alert-link>{{ row.title }}</a>{% else %}{{ row.title }}{% endif %}</span>
+      <span data-alert-text>{{ row.text }}</span>
+      <span class="widget-list__meta">{{ row.since }}</span>
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="widget__empty">{{ _("admin.overview.widget.alerts.empty") }}</p>
+{% endif %}
