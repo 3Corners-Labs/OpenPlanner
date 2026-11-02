@@ -701,6 +701,9 @@ flowchart LR
 | Machine API: off by default (environment and superuser switch), OAuth client credentials, hashed secrets and 10-minute opaque tokens, one `RequireScope` per route, per-client grant and network allow-list, no personal data | `app/api/agent/`, `app/domain/api_access.py` | ADR 0023 |
 | Signed images, SBOM, image and dependency scanning | CI | ADR 0006 |
 
+Every key and algorithm, with where it lives, who can read it and how it is rotated and
+destroyed, is in [`docs/cryptography.md`](cryptography.md) (ADR 0094).
+
 ### Shared trust boundaries
 
 One installation serves one data controller (BP-4) and, inside it, any number of organisations.

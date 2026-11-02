@@ -8698,6 +8698,30 @@ msgstr "{count} mislukt"
 msgid "admin.settings.logging.open"
 msgstr "Logbestemmingen openen"
 
+msgid "admin.settings.keys.title"
+msgstr "Sleutelrotatie"
+
+msgid "admin.settings.keys.intro"
+msgstr "Alleen aantallen, nooit sleutels of inhoud. Ze tonen wanneer een vorige sleutel veilig kan worden verwijderd."
+
+msgid "admin.settings.keys.records"
+msgstr "Versleutelde geheimen onder de vorige sleutel"
+
+msgid "admin.settings.keys.bookings"
+msgstr "Lopende boekingen met een koppeling onder de vorige sleutel"
+
+msgid "admin.settings.keys.records_done"
+msgstr "Alle versleutelde geheimen staan onder de huidige sleutel. SETTINGS_ENCRYPTION_KEY_PREVIOUS kan worden verwijderd."
+
+msgid "admin.settings.keys.records_todo"
+msgstr "Voer op de host het commando rekey uit (python -m app.cli rekey) en verwijder SETTINGS_ENCRYPTION_KEY_PREVIOUS pas als dit aantal 0 is."
+
+msgid "admin.settings.keys.bookings_done"
+msgstr "Geen lopende boeking heeft nog een koppeling onder de vorige sleutel. MANAGEMENT_TOKEN_KEY_PREVIOUS kan worden verwijderd."
+
+msgid "admin.settings.keys.bookings_todo"
+msgstr "Wacht tot deze boekingen voorbij zijn en verwijder MANAGEMENT_TOKEN_KEY_PREVIOUS pas als dit aantal 0 is."
+
 msgid "settings.field.max_font_unpacked_bytes.label"
 msgstr "Grootste uitgepakte omvang van een geüpload lettertype (bytes)"
 

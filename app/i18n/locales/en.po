@@ -8686,6 +8686,30 @@ msgstr "{count} failing"
 msgid "admin.settings.logging.open"
 msgstr "Open Log destinations"
 
+msgid "admin.settings.keys.title"
+msgstr "Key rotation"
+
+msgid "admin.settings.keys.intro"
+msgstr "Counts only, never keys or contents. They show when a previous key can be removed safely."
+
+msgid "admin.settings.keys.records"
+msgstr "Encrypted secrets still under the previous key"
+
+msgid "admin.settings.keys.bookings"
+msgstr "Open bookings whose link is still under the previous key"
+
+msgid "admin.settings.keys.records_done"
+msgstr "Every encrypted secret is under the current key. SETTINGS_ENCRYPTION_KEY_PREVIOUS can be removed."
+
+msgid "admin.settings.keys.records_todo"
+msgstr "Run the rekey command on the host (python -m app.cli rekey) and remove SETTINGS_ENCRYPTION_KEY_PREVIOUS only when this number is 0."
+
+msgid "admin.settings.keys.bookings_done"
+msgstr "No open booking has a link under the previous key any more. MANAGEMENT_TOKEN_KEY_PREVIOUS can be removed."
+
+msgid "admin.settings.keys.bookings_todo"
+msgstr "Wait until these bookings are over and remove MANAGEMENT_TOKEN_KEY_PREVIOUS only when this number is 0."
+
 msgid "settings.field.max_font_unpacked_bytes.label"
 msgstr "Largest unpacked size of an uploaded font (bytes)"
 
