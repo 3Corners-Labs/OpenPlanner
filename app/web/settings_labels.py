@@ -80,6 +80,7 @@ SETTING_LABELS: dict[str, str] = {
     "idp_mapping_refused_window_days": "settings.field.idp_mapping_refused_window_days.label",
     "idp_max_per_organisation": "settings.field.idp_max_per_organisation.label",
     "idp_domain_grace_days": "settings.field.idp_domain_grace_days.label",
+    "idp_domain_recheck_hours": "settings.field.idp_domain_recheck_hours.label",
     "smtp_host": "settings.field.smtp_host.label",
     "smtp_port": "settings.field.smtp_port.label",
     "smtp_starttls": "settings.field.smtp_starttls.label",
