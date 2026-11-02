@@ -33,7 +33,17 @@ class InstanceBody(BaseModel):
     forwarded: str | None = None
 
 
-@router.get("/instance", response_model=InstanceBody, summary="Which installation answers")
+@router.get(
+    "/instance",
+    response_model=InstanceBody,
+    summary="Which installation answers",
+    responses={
+        429: {
+            "description": "Over the availability-read limit; the error page, `Retry-After` set.",
+            "content": {"text/html": {}},
+        }
+    },
+)
 @limiter.limit(read_limit)
 async def instance(
     request: Request, probe: Annotated[str | None, Query(max_length=MAX_NONCE_CHARS)] = None
