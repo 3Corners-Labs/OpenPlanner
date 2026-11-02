@@ -17,9 +17,11 @@ sexual orientation, political opinion, trade union membership or criminal record
 is a safety net, not a guarantee: do not choose a question that amounts to one either.
 
 <!-- field: key -->
-## Key
+## Technical name
 
-The key is the fixed name of the field, for example `customer_number`. It consists of
+You do not have to fill this in. If you leave it empty, the portal makes the name from the Dutch
+question, for example `klantnummer` for the question *Klantnummer*; if that name exists, it becomes
+`klantnummer_2`. The technical name is the fixed name of the field. It consists of
 lower-case letters, digits and `_`, starts with a letter and is 2 to 40 characters long. Once
 saved it is fixed, and a key the team used before cannot be used again. So an answer on a
 booking always means what the question meant at the time.
