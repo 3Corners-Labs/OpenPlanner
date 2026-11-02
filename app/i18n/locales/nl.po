@@ -9317,3 +9317,30 @@ msgstr "Het versturen van logs staat uit op de host (LOG_SHIPPING_ENABLED). Geen
 
 msgid "admin.form.error.log_shipping_off"
 msgstr "Het versturen van logs staat uit op de host, dus er kan geen testregel worden gestuurd."
+
+msgid "admin.staff.directory.missing"
+msgstr "Medewerkers toevoegen, wijzigen en rollen geven kan hier nog niet: de ingebouwde identiteitsprovider is niet volledig gekoppeld. Op de server ontbreekt: {names}. De serverbeheerder zet dit met scripts/render-keycloak-realm.sh (zie het runbook)."
+
+msgid "admin.staff.directory.unreachable"
+msgstr "De ingebouwde identiteitsprovider antwoordt niet. Medewerkers toevoegen en wijzigen kan pas weer als die bereikbaar is; de lijst hieronder blijft kloppen."
+
+msgid "admin.settings.directory.title"
+msgstr "Medewerkerbeheer"
+
+msgid "admin.settings.directory.chip"
+msgstr "Aandacht"
+
+msgid "admin.settings.directory.connected"
+msgstr "Gekoppeld: medewerkers worden in het portaal beheerd via de ingebouwde identiteitsprovider."
+
+msgid "admin.settings.directory.unreachable"
+msgstr "Ingesteld, maar de ingebouwde identiteitsprovider antwoordt niet. Controleer of de container idp draait en of het secret van openplanner-directory klopt."
+
+msgid "admin.settings.directory.switched_off"
+msgstr "Uitgezet met de instelling staff_directory_enabled: medewerkers worden bij de identiteitsprovider zelf beheerd."
+
+msgid "admin.settings.directory.incomplete"
+msgstr "Niet gekoppeld: de ingebouwde identiteitsprovider draait, maar op de server ontbreekt {names}. Draai scripts/render-keycloak-realm.sh en herstart web en worker."
+
+msgid "admin.settings.directory.absent"
+msgstr "Niet van toepassing: medewerkers worden bij de identiteitsprovider van de organisatie beheerd en hier alleen getoond."

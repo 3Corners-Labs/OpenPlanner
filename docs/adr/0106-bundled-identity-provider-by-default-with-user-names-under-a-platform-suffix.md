@@ -136,7 +136,7 @@ identifiers and DNS labels, which is a format rule, not a preference.
 |---|---|---|---|
 | 0 | ADR proposed | #425 | in PR |
 | 1 | Render script writes the application's half; development realm gets `openplanner-directory`; compose `env_file` | #427 | in PR |
-| 2 | Staff screen notice and System status check for an unconnected directory (point 3) | – | planned |
+| 2 | Staff screen notice and System status check for an unconnected directory (point 3) | follows #427 | in PR |
 | 3 | User names under the suffix: setting, invite form, adapter, scope check, `username` masked (points 5–8, 11) | – | planned |
 | 4 | Reserved suffix in the login routing and the provider registration; login label (points 9, 10) | – | planned |
 | 5 | Installer `--idp bundled\|own` default in every mode; production `start` with `idp-db`, proxy, backup and runbook (points 1, 4) | – | planned |

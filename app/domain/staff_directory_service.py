@@ -11,6 +11,7 @@ and places and never a name or an address. The provider's own message is never p
     set_enabled(principal, subject, on)  staff.manage, and the person works nowhere else
     send_reset(principal, subject)       staff.reset_password
     pending(principal)                   staff.view, invited people who never logged in
+    state()                              whether the directory works, for System status
 """
 
 from collections.abc import Awaitable, Callable, Collection
@@ -23,6 +24,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, StaffDirectory, UnitOfWork
 from app.domain.staff_directory import (
     DirectoryError,
+    DirectoryState,
     DirectoryUser,
     NewStaffMember,
     StaffAction,
@@ -82,13 +84,30 @@ class StaffDirectoryService:
         admin: AdminService,
         directory: StaffDirectory | None,
         settings: Callable[[], DirectorySettings],
+        missing: tuple[str, ...] = (),
     ) -> None:
-        """Store the collaborators; ``directory`` is ``None`` for a provider without one."""
+        """Store the collaborators.
+
+        Args:
+            uow: The unit of work.
+            clock: The clock.
+            admin: The admin service that asks the matrix.
+            directory: The provider's directory; ``None`` for a provider without one.
+            settings: The live directory settings.
+            missing: Names of the directory settings the bundled provider lacks (ADR 0106
+                point 3); empty when it is complete or when the provider is another one.
+        """
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._directory = directory
         self._settings = settings
+        self._missing = missing
+
+    @property
+    def missing(self) -> tuple[str, ...]:
+        """Names of the settings the bundled provider's directory lacks, never their values."""
+        return self._missing if self._directory is None else ()
 
     @property
     def available(self) -> bool:
@@ -98,6 +117,16 @@ class StaffDirectoryService:
     async def reachable(self) -> bool:
         """Return whether the directory answers (for System status)."""
         return self._directory is not None and await self._directory.reachable()
+
+    async def state(self) -> DirectoryState:
+        """Return whether staff can be managed here, asking the provider only when it could."""
+        if self._directory is None:
+            return DirectoryState.INCOMPLETE if self._missing else DirectoryState.ABSENT
+        if not self._settings().enabled:
+            return DirectoryState.SWITCHED_OFF
+        if not await self._directory.reachable():
+            return DirectoryState.UNREACHABLE
+        return DirectoryState.CONNECTED
 
     async def _ready(self, principal: Principal, permission: Permission) -> StaffDirectory:
         """Authorise, then return the directory, or refuse when there is none."""

@@ -9305,3 +9305,30 @@ msgstr "Log shipping is switched off on the host (LOG_SHIPPING_ENABLED). No dest
 
 msgid "admin.form.error.log_shipping_off"
 msgstr "Log shipping is switched off on the host, so no test line can be sent."
+
+msgid "admin.staff.directory.missing"
+msgstr "Adding, changing and assigning roles to staff is not possible here yet: the bundled identity provider is not fully connected. The server lacks: {names}. The server administrator sets this with scripts/render-keycloak-realm.sh (see the runbook)."
+
+msgid "admin.staff.directory.unreachable"
+msgstr "The bundled identity provider does not answer. Adding and changing staff works again once it is reachable; the list below stays correct."
+
+msgid "admin.settings.directory.title"
+msgstr "Staff management"
+
+msgid "admin.settings.directory.chip"
+msgstr "Attention"
+
+msgid "admin.settings.directory.connected"
+msgstr "Connected: staff are managed in the portal through the bundled identity provider."
+
+msgid "admin.settings.directory.unreachable"
+msgstr "Configured, but the bundled identity provider does not answer. Check that the idp container runs and that the secret of openplanner-directory is right."
+
+msgid "admin.settings.directory.switched_off"
+msgstr "Switched off with the setting staff_directory_enabled: staff are managed at the identity provider itself."
+
+msgid "admin.settings.directory.incomplete"
+msgstr "Not connected: the bundled identity provider runs, but the server lacks {names}. Run scripts/render-keycloak-realm.sh and restart web and worker."
+
+msgid "admin.settings.directory.absent"
+msgstr "Not applicable: staff are managed at the organisation's identity provider and only shown here."

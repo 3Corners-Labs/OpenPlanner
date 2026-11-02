@@ -5,7 +5,7 @@ import pytest
 from app.domain.admin import AdminService
 from app.domain.authorization import Grant
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.staff_directory import DirectoryUser, NewStaffMember, StaffAction
+from app.domain.staff_directory import DirectoryState, DirectoryUser, NewStaffMember, StaffAction
 from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -267,3 +267,37 @@ async def test_nobody_changes_themselves(
     assert await code_of(service(uow, directory).set_grants(ORG_ADMIN, "o-1", [])) is (
         ErrorCode.NOT_PERMITTED
     )
+
+
+async def test_the_state_says_why_staff_cannot_be_managed(
+    uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
+) -> None:
+    """ADR 0106 point 3: one state for the Staff screen and System status."""
+    off = DirectorySettings(enabled=False, prefix=P, invite_expiry_days=7)
+    incomplete = StaffDirectoryService(
+        uow,
+        FixedClock(NOW),
+        AdminService(uow, FixedClock(NOW)),
+        None,
+        lambda: SETTINGS,
+        ("KEYCLOAK_DIRECTORY_CLIENT_SECRET",),
+    )
+
+    assert await service(uow, None).state() is DirectoryState.ABSENT
+    assert await incomplete.state() is DirectoryState.INCOMPLETE
+    assert incomplete.missing == ("KEYCLOAK_DIRECTORY_CLIENT_SECRET",)
+    assert await service(uow, directory, off).state() is DirectoryState.SWITCHED_OFF
+    assert await service(uow, directory).state() is DirectoryState.CONNECTED
+    directory.fail = "failed"
+    assert await service(uow, directory).state() is DirectoryState.UNREACHABLE
+
+
+def test_a_working_directory_lacks_nothing(
+    uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
+) -> None:
+    clock = FixedClock(NOW)
+    present = StaffDirectoryService(
+        uow, clock, AdminService(uow, clock), directory, lambda: SETTINGS, ("KEYCLOAK_ADMIN_URL",)
+    )
+
+    assert present.missing == ()
