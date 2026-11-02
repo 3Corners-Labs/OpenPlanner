@@ -101,8 +101,11 @@ from app.admin.pages import (
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import (
+    LOGOUT_CLEAR_SITE_DATA,
     end_session,
     has_login_trial,
+    mark_logged_out,
+    pop_logged_out,
     pop_login_start,
     pop_login_test,
     pop_login_trial,
@@ -374,6 +377,7 @@ async def logout(request: Request, locale: Locale, _: SameOrigin) -> Response:
     logged_out = f"{request.app.state.settings.public_base_url.rstrip('/')}/admin/logged-out"
     provider = _identity_provider(request)
     provider_logout = await provider.logout_url(logged_out) if provider else None
+    mark_logged_out(request)
     if provider_logout is None:
         return RedirectResponse("/admin/logged-out", status_code=303)
     # A redirect from a form POST to the provider would be blocked by CSP form-action 'self';
@@ -385,8 +389,12 @@ async def logout(request: Request, locale: Locale, _: SameOrigin) -> Response:
 
 @router.get("/logged-out", response_class=HTMLResponse)
 async def logged_out(request: Request, locale: Locale) -> HTMLResponse:
-    """Confirm the logout."""
-    return _message(request, locale, 200, "admin.logged_out.title", "admin.logged_out.text")
+    """Confirm the logout; after a logout of this browser, also clear the site's data (V14.3.1)."""
+    cleared = pop_logged_out(request)
+    response = _message(request, locale, 200, "admin.logged_out.title", "admin.logged_out.text")
+    if cleared:
+        response.headers.update(LOGOUT_CLEAR_SITE_DATA)
+    return response
 
 
 @router.get("/rights", response_class=HTMLResponse)
