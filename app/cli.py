@@ -498,7 +498,7 @@ async def _rekey(settings: Settings) -> tuple[str, int]:
             CONFIG_ACTOR,
             PLATFORM_MANAGE.value,
             Outcome.SUCCESS,
-            detail=f"{REKEY_DETAIL} resealed={counts.resealed} current={counts.current}",
+            detail=f"{REKEY_DETAIL},resealed:{counts.resealed},current:{counts.current}",
         )
     finally:
         await engine.dispose()

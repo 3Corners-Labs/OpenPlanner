@@ -1,10 +1,13 @@
 """The audit log page (ADR 0031): exact per level, system events, filters, reasons."""
 
+import io
 import json
+import logging
 from dataclasses import replace
 from datetime import timedelta
 
 import pytest
+import structlog
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Level, Outcome, Source
@@ -12,6 +15,7 @@ from app.domain.authorization import Scope
 from app.domain.diagnostics import DiagnosticLog
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
+from app.logging import configure_logging
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
 from tests.support.domain import NOW
 
@@ -255,10 +259,32 @@ async def test_an_admin_action_is_shipped_once_as_an_audit_line(
     shipped = [line for line in lines if line.get("log_type") == "audit"]
     denied = [line for line in shipped if line["outcome"] == "denied"]
     assert len(denied) == 1
-    assert denied[0]["schema"] == "openplanner.event/2"
+    assert denied[0]["schema"] == "openplanner.event/3"
     assert denied[0]["service.name"] == "web"
     assert denied[0]["actor"] == GROUP_ADMIN.subject
     assert len({line["event_id"] for line in shipped}) == len(shipped)
+
+
+async def test_the_decision_line_says_under_which_role_the_admin_acted(site: Site) -> None:
+    # ADR 0103 points 7 and 9: kind and role of the actor, never a name; its own category.
+    await site.login_as(GROUP_ADMIN)
+    stream = io.StringIO()
+    configure_logging("INFO", stream=stream)
+    try:
+        await site.client.get("/admin/groups/demo")
+    finally:
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    out = stream.getvalue()
+    lines = [json.loads(line) for line in out.splitlines() if line.startswith("{")]
+    decisions = [line for line in lines if line.get("event.action") == "authz.decision"]
+    assert decisions
+    assert {(d["event.category"], d["actor.type"], d["actor.role"]) for d in decisions} == {
+        ("authz", "user", "group_admin")
+    }
+    assert all(d["message"].startswith("Permission ") for d in decisions)
+    assert GROUP_ADMIN.display_name not in out
 
 
 @pytest.mark.parametrize(

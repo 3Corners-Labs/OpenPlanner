@@ -24,10 +24,11 @@ admin could change would make the log unreliable as evidence, and an editable te
 pull in a field that carries personal data.
 """
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from string import Formatter
+from typing import Any
 
 from app.domain.authorization import ApiScope, Permission
 from app.domain.job_plan import JobType
@@ -504,6 +505,15 @@ _OPERATIONS = (
         "job_id reason",
         "Job {job_id} skipped: {reason}.",
         "A job found nothing to do: the booking moved, was cancelled, or has no recipient.",
+    ),
+    _e(
+        "logging.test",
+        _OPS,
+        "info",
+        "destination kind",
+        "Test line for log destination {destination} ({kind}).",
+        "*Send test line* on a log destination (ADR 0085 point 5); it reaches only that "
+        "destination.",
     ),
     _e(
         "maintenance.watch_failed",
@@ -1088,8 +1098,8 @@ _AUTHZ = (
         "authz.decision",
         _DECISION,
         "info",
-        "actor allowed permission reason target_group target_organisation",
-        "Permission {permission}: allowed {allowed} ({reason}).",
+        "actor allowed permission reason target target_group target_organisation",
+        "Permission {permission} on {target}: allowed {allowed} ({reason}).",
         "The decision on an admin request (ADR 0014); a denial is also an audit event.",
         "Nothing; a destination may leave the category `authz` out.",
     ),
@@ -1097,8 +1107,8 @@ _AUTHZ = (
         "authz.maintenance_refused",
         _DECISION,
         "info",
-        "actor permission target_group target_organisation",
-        "Permission {permission} refused during maintenance.",
+        "actor permission target target_group target_organisation",
+        "Permission {permission} on {target} refused: maintenance mode is on.",
         "A change was refused because maintenance mode is on (ADR 0084).",
     ),
 )
@@ -1351,8 +1361,8 @@ _AUDIT = (
         "integration.request",
         _SYS,
         "outcome",
-        "",
-        "A provider request for booking {booking_id}: {outcome}.",
+        "method path status ms tracking version",
+        "{method} {path} for booking {booking_id} answered {status} in {ms} ms: {outcome}.",
         "One request in a booking's chain to Webex or Contact Center (ADR 0065).",
         "On failure: the booking's timeline shows the provider's reason.",
     ),
@@ -1368,8 +1378,8 @@ _AUDIT = (
         "logging.destination",
         _AUD,
         "outcome",
-        "",
-        "Log destination {detail}: {outcome}.",
+        "change kind destination what",
+        "Log destination {destination} ({kind}) {change}: {outcome}.",
         "A log destination was created, changed, tested or deleted (audit), or started or "
         "stopped failing (system, ADR 0085).",
         "On failure: open *Log destinations*; it shows the last error.",
@@ -1422,8 +1432,8 @@ _AUDIT = (
         "request.rate_limited",
         _SEC,
         "outcome",
-        "",
-        "A caller went over a rate limit.",
+        "surface client",
+        "A caller went over a rate limit on {surface}.",
         "Too many requests from one address (ADR 0053); the caller is a pseudonym.",
         "Repeated: a bot or a misconfigured client.",
     ),
@@ -1511,7 +1521,7 @@ _AUDIT = (
         _AUD,
         "outcome",
         "",
-        "A staff member's roles or groups changed.",
+        "A staff member's roles or groups changed: {detail}.",
         "`detail` names the role or grant added or removed.",
         _ADMIN_SEEN,
     ),
@@ -1537,8 +1547,8 @@ _AUDIT = (
         "storage.check",
         _SYS,
         "outcome",
-        "",
-        "Storage check: {outcome} ({reason}).",
+        "free_percent database_mb",
+        "Storage check: {outcome} ({reason}); {free_percent}% free, database {database_mb} MB.",
         "The worker's disk check changed grade (ADR 0040 point 3).",
         "On failure: free disk space on the host.",
     ),
@@ -1546,8 +1556,8 @@ _AUDIT = (
         "system.maintenance",
         _AUD,
         "outcome",
-        "",
-        "Maintenance mode changed.",
+        "what hours",
+        "Maintenance mode: {what}.",
         "Maintenance mode was switched on or off, or a change was refused (ADR 0084).",
         _ADMIN_SEEN,
     ),
@@ -1555,8 +1565,8 @@ _AUDIT = (
         "system.update",
         _SYS,
         "outcome",
-        "",
-        "Update {detail}: {outcome}.",
+        "what from to",
+        "Update step {what} from {from} to {to}: {outcome}.",
         "A step of a requested update or restore (ADR 0059, 0067); `detail` holds the versions.",
         "On failure: open *Updates*; the runbook explains a rollback.",
     ),
@@ -1564,8 +1574,8 @@ _AUDIT = (
         "system.version",
         _SYS,
         "outcome",
-        "",
-        "The running version changed: {detail}.",
+        "what from to commit",
+        "The running version changed from {from} to {to} (commit {commit}).",
         "At start-up the web process saw another version or commit than last time.",
     ),
     _e(
@@ -1670,6 +1680,76 @@ def all_events() -> Iterator[LogEvent]:
     """Yield every entry, listed first and generated after."""
     yield from ENTRIES
     yield from (e for e in FAMILIES if e.action not in EVENTS)
+
+
+LIBRARY_PREFIX = "library."
+"""Action of a line from a library's own logger: ``library.<logger>`` (ADR 0103 point 8)."""
+
+MISSING = "-"
+"""What a message shows for a placeholder whose field the line does not carry."""
+
+
+class _Lenient(Formatter):
+    """Formats a template, writing ``MISSING`` for an absent or empty field instead of failing.
+
+    A message must never be the reason a line is lost; the scan test keeps the templates and
+    the fields in step, this only covers a field that a call left out.
+    """
+
+    def get_value(self, key: int | str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any:
+        """Return the field, or ``MISSING``."""
+        value = kwargs.get(str(key))
+        return MISSING if value is None or value == "" else value
+
+    def format_field(self, value: Any, format_spec: str) -> str:
+        """Write the value as text, a yes/no as ``yes`` or ``no``; templates use no spec."""
+        if isinstance(value, bool):
+            return "yes" if value else "no"
+        if value in ("true", "false"):
+            return "yes" if value == "true" else "no"
+        return str(value)
+
+
+def describe(action: str, values: Mapping[str, object]) -> str:
+    """Return the readable sentence of ``action`` with ``values`` filled in (ADR 0103 point 4).
+
+    The values are what the line carries, after the PII mask; an unregistered action is returned
+    as it is, so a library's own text stays its message.
+    """
+    entry = lookup(action)
+    if entry is None:
+        return action
+    return _Lenient().format(entry.message, **values)
+
+
+def describe_event(
+    action: str,
+    values: Mapping[str, object],
+    *,
+    outcome: str,
+    reason: str,
+    organisation: str | None,
+    group: str | None,
+) -> str:
+    """Return the sentence of an audit, system or security event (ADR 0103 point 4).
+
+    The register's sentence says what was done; an event also says how it ended and where.
+    When the template does not name them itself, an outcome other than success is added with
+    its reason ("An identity provider was changed. Outcome: denied (out_of_scope).": nothing
+    changed), and so is the organisation and group the event belongs to.
+    """
+    entry = lookup(action)
+    template = entry.message if entry is not None else ""
+    parts = [describe(action, values)]
+    why = f" ({reason})" if reason and "{reason}" not in template else ""
+    if outcome != "success" and "{outcome}" not in template:
+        parts.append(f"Outcome: {outcome}{why}.")
+    elif outcome != "success" and why:
+        parts.append(f"Reason: {reason}.")
+    if organisation and "{organisation}" not in template:
+        place = f", group {group}" if group and "{group}" not in template else ""
+        parts.append(f"Organisation {organisation}{place}.")
+    return " ".join(parts)
 
 
 def trace_points() -> dict[str, tuple[str, ...]]:

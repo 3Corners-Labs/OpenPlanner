@@ -2,7 +2,7 @@
 
 For the IdP administrator and the CISO of the client (PingFederate for the first client, ADR
 0013). OpenPlanner has no accounts, passwords or second factors of its own for staff (ADR 0013,
-ADR 0042 §8); the identity provider (IdP) does all of it. These 43 ASVS 5.0.0 requirements
+ADR 0042 §8); the identity provider (IdP) does all of it. These 45 ASVS 5.0.0 requirements
 therefore cannot be proven from this repository. They are proven by a configuration export or a
 screenshot from the IdP, signed by the owner named in each row. How to use this file:
 `docs/assurance/README.md`. The requirement texts are the OWASP ASVS 5.0.0 (CC BY-SA 4.0); this
@@ -51,6 +51,13 @@ rows itself and answers them from that console.
 | V6.2.10 | No forced periodic rotation | Policy export showing no expiry rule | Client IdP administrator | Not set by the template; do not add a password-age rule |
 | V6.2.11 | The context-word list of V6.1.2 is actually enforced | Test record: a password built from a listed word is refused | Client IdP administrator | Same policy as V6.1.2 |
 | V6.2.12 | New passwords are checked against a set of breached passwords | Policy export or product statement naming the source | Client IdP administrator | Not set by the template; blacklist policy or an external check |
+
+## Attacks on credentials and default accounts
+
+| ID | Asks for | How to show it | Owner | Keycloak reference |
+|---|---|---|---|---|
+| V6.3.1 | Credential stuffing and brute force are limited: attempts per account are throttled or locked, and the limit cannot be got round by changing the user name's spelling or the source address | Export of the lockout or throttling policy (number of failures, wait time, reset time), and a test record: repeated wrong passwords against a test user end in a lock or a growing wait. For the machine API, the rate limit on the token endpoint (OpenPlanner side, below) | Client IdP administrator, OpenPlanner supplier | `bruteForceProtected` is true in the template; the failure count, wait increments and quick-login check are not set by the template, so read them under *Realm settings → Security defenses → Brute force detection* and confirm them. OpenPlanner side: the bot token endpoint is rate limited (`app/api/agent/token.py`, `tests/api/test_agent_api.py`) and `docs/authentication.md` lists who owns which control |
+| V6.3.2 | No default accounts (such as `admin`, `root`, `sa`, `test`) with a known or guessable password stay enabled | The list of accounts of the production IdP and its admin console from the console itself, with the bootstrap administrator renamed or removed, or its password changed to a secret held in the password manager; the statement that no test user of a template or realm import remains | Client IdP administrator, hosting party | The template creates only `super`, with a generated first password that must be changed (ADR 0090 point 2); the bundled `idp` service starts the console administrator `admin` with the generated password in `secrets/keycloak.env`; the `dev` profile uses `admin` with the password `admin` and the realm of `dev/keycloak/`, which is for development only and never for an installation with real people. OpenPlanner has no accounts of its own and no break-glass login (`docs/authentication.md`) |
 
 ## Multi-factor authentication
 

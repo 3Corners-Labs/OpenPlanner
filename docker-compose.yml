@@ -22,6 +22,11 @@ x-app: &app
       required: false
     - path: .env
       required: false
+    # The staff directory of the bundled provider (ADR 0106), written by
+    # scripts/render-keycloak-realm.sh with the secret the realm was rendered with. After .env,
+    # so the rendered value wins: it must equal the realm's.
+    - path: secrets/keycloak-app.env
+      required: false
     # Bootstrap keys from `python -m app.cli init` (ADR 0042 §9).
     - path: secrets/secrets.env
       required: false

@@ -467,7 +467,7 @@ proxy-check`, CI step *proxy check*) runs against the bundled proxy in every cer
 | Private key of an own certificate | NCSC TLS guidelines (key types, sizes); PKIoverheid CPS: the subscriber makes the key | ECDSA P-256 made on the host, never transported, never in the database or a backup (ADR 0070) | `tests/domain/test_tls_source.py` |
 | TLS versions and cipher suites | NCSC-NL *ICT-beveiligingsrichtlijnen voor TLS* v2.1 (*Goed*, *Voldoende* at most), RFC 8446 | TLS 1.3 and 1.2 only, AEAD suites, OCSP stapling: Caddy's defaults, never weakened, no setting | `check-proxy.sh`: TLS 1.0 and 1.1 refused, 1.2 (with a GCM or ChaCha20 suite) and 1.3 accepted |
 | HTTPS and HSTS | Forum Standaardisatie *pas toe of leg uit* (HTTPS, HSTS); RFC 6797; `max-age` of at least one year | Port 80 redirects with 308 and otherwise answers only ACME; the app sends `Strict-Transport-Security: max-age=63072000; includeSubDomains` (two years), never on port 80 | `check-proxy.sh`: the redirect, the header on a proxied response (at least a year, `includeSubDomains`), none on port 80 |
-| Proxy headers | `X-Forwarded-For`, `-Proto`, `-Host` (de facto; RFC 7239 `Forwarded` is **not** read by uvicorn); OWASP: trust them from named proxy addresses only | Caddy sets them and drops what the client sent; uvicorn honours them from `FORWARDED_ALLOW_IPS` only, never `*` | `check-proxy.sh`: `address-check` through the proxy is `ok` (https seen, headers honoured), and `proxy_not_trusted` with a wrong `FORWARDED_ALLOW_IPS` |
+| Proxy headers | `X-Forwarded-For`, `-Proto`, `-Host` (de facto; RFC 7239 `Forwarded` is **not** read by uvicorn); OWASP: trust them from named proxy addresses only | Caddy sets them and drops what the client sent; uvicorn honours them from `FORWARDED_ALLOW_IPS` only, never `*` | `check-proxy.sh`: `address-check` through the proxy is `ok` (https seen, headers honoured), and `proxy_not_trusted` with a wrong `FORWARDED_ALLOW_IPS`; a forged `X-Forwarded-For`, `-Proto` and `-Host` from the visitor is replaced by the proxy (read from the wire between proxy and web, in every pass) |
 | HTTP security headers | OWASP ASVS 4.0 V14.4 | CSP, HSTS, `X-Frame-Options` on admin, `Referrer-Policy`, `X-Content-Type-Options` come from the app, not the proxy, so an own reverse proxy changes nothing | `tests/api/test_health.py` |
 | Responsible disclosure | RFC 9116 | `/.well-known/security.txt` (ADR 0003) | existing test |
 | External check of the public address | internet.nl *Website test* (Forum Standaardisatie, NCSC) | The go-live check and the yearly review below | a person |
@@ -717,8 +717,11 @@ and one user, `super`, who holds every built-in role. It is an identity provider
 **Where the secrets are.** `secrets/keycloak.env` (mode 600, next to `secrets/secrets.env`,
 never copied off the host) holds the admin console password (`KC_BOOTSTRAP_ADMIN_PASSWORD`,
 user `admin`), the client secret (`KC_OPENPLANNER_CLIENT_SECRET`) and the first password of
-`super` (`KC_SUPER_PASSWORD`). The realm Keycloak imports is `secrets/keycloak-realm.json`,
-rendered from `deploy/keycloak/realm.template.json`:
+`super` (`KC_SUPER_PASSWORD`), and the secret of the service account that manages staff
+(`KC_DIRECTORY_CLIENT_SECRET`). The script also writes `secrets/keycloak-app.env` (mode 600) with
+`KEYCLOAK_ADMIN_URL`, `KEYCLOAK_DIRECTORY_CLIENT_ID` and `KEYCLOAK_DIRECTORY_CLIENT_SECRET`,
+which `web` and `worker` read after `.env` (ADR 0106). The realm Keycloak imports is
+`secrets/keycloak-realm.json`, rendered from `deploy/keycloak/realm.template.json`:
 
 ```sh
 cd ~/openplanner
@@ -745,9 +748,28 @@ and is step 2. The admin console is bound to the host's loopback and is never pu
 (`grep KC_SUPER_PASSWORD secrets/keycloak.env`), log in to the portal as `super`, and Keycloak
 asks for a new password before it returns to the portal (the required action
 `UPDATE_PASSWORD`). The first password is then spent; the file keeps it only as the value the
-realm was rendered with. Staff of organisations without a provider of their own are created
-in this Keycloak (admin console, realm `openplanner`, with the `roles`, `organisations`,
-`groups` or `entitlements` attributes the development realm's `README.md` describes).
+realm was rendered with.
+
+**Staff.** Staff of organisations without a provider of their own are managed in the portal,
+Manage › Staff: invite, add or remove a role, disable, send a password reset (ADR 0095). The
+actions appear only when `web` has the three `KEYCLOAK_*` values above; restart `web` and
+`worker` after a render (`docker compose --profile idp up -d web worker`). A realm imported
+before ADR 0095 (such as an older lab realm) has no `openplanner-directory` client; add it with
+Keycloak's own CLI and put its secret in `secrets/keycloak-app.env` by hand:
+
+```sh
+docker compose exec idp /opt/keycloak/bin/kcadm.sh config credentials \
+  --server http://localhost:8080 --realm master --user admin   # asks for the admin password
+docker compose exec idp /opt/keycloak/bin/kcadm.sh create clients -r openplanner \
+  -s clientId=openplanner-directory -s serviceAccountsEnabled=true -s publicClient=false \
+  -s standardFlowEnabled=false -s directAccessGrantsEnabled=false
+docker compose exec idp /opt/keycloak/bin/kcadm.sh add-roles -r openplanner \
+  --uusername service-account-openplanner-directory --cclientid realm-management \
+  --rolename manage-users --rolename view-realm
+```
+
+Read the generated secret in the admin console (*Clients* → `openplanner-directory` →
+*Credentials*), never in a shell history.
 
 **Resetting the password of `super`.** On the host, open the admin console at
 http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` with
@@ -2155,21 +2177,27 @@ Open the booking from the group's agenda (**Details**). Three blocks tell the st
 
 ## Log lines and the event schema (ADR 0040)
 
-Every line on stdout is one JSON object in the field names of `openplanner.event/2`
-(`docs/audit-events.md`), so a log platform needs no mapping:
+Every line on stdout is one JSON object in the field names of `openplanner.event/3`
+(`docs/audit-events.md`, `docs/logging.md`), so a log platform needs no mapping:
 
 | Field | Meaning |
 |---|---|
 | `@timestamp` | RFC 3339 in UTC with milliseconds, e.g. `2026-10-27T14:03:12.345Z` |
-| `log.level` | `debug`, `info`, `warning`, `error`, `critical` |
-| `message` | the event key, e.g. `job.sent`, `storage.degraded` |
+| `log.level` | `trace`, `debug`, `info`, `warning`, `error`, `critical` |
+| `event.category` | `audit`, `system`, `security`, `authz`, `operations`, `diagnostic` |
+| `event.action` | the action, e.g. `job.sent`, `storage.degraded`; `docs/logging.md` says what each means and what to do |
+| `message` | a readable sentence, e.g. `Disk space is low: 6% free, database 1 MB (free_space_low).` |
+| `labels.<name>` | the action's own fields, e.g. `labels.free_percent` |
 | `service.name`, `service.version` | `web` or `worker`, and `APP_VERSION` |
 | `installation` | `INSTALLATION_NAME`, when set |
 | `trace.id` | one id per HTTP request or worker job; the audit events it writes carry the same id |
 | `organisation`, `group` | slugs of the tenant the request or job is about, once known |
 
-Lines before this release had `timestamp`, `level` and `event`: change saved searches and
-alerts on the log platform to `@timestamp`, `log.level` and `message`. To follow one request
+Since `openplanner.event/3` (ADR 0103) `message` is a sentence and the code is in
+`event.action`: change saved searches and alerts that match `message` against a code to
+`event.action`, and searches that parse `detail` to `labels.<name>`. Before that, lines had
+`timestamp`, `level` and `event`: change those to `@timestamp`, `log.level` and
+`event.action`. To follow one request
 or job, search for its `trace.id`; to see one tenant, filter on `organisation` or `group`.
 Public pages under `/g/{slug}` carry only `group`; admin routes carry what they act on.
 Timestamps are only as good as the host clock: keep NTP (`timedatectl` shows

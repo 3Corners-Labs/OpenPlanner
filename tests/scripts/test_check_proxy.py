@@ -57,3 +57,30 @@ def test_the_hsts_floor_in_the_script_is_met_by_what_the_app_sends() -> None:
     assert max_age >= FORUM_MINIMUM_HSTS_SECONDS
     assert "includeSubDomains" in sent
     assert "includeSubDomains" in body
+
+
+def test_every_pass_sends_a_forged_forwarded_header_and_looks_at_the_wire() -> None:
+    """V4.1.3, V15.3.4: what the visitor forges must not be what web receives from the proxy."""
+    assert "forged_header_check" in _body("edge_checks")
+    body = _body("forged_header_check")
+
+    assert "X-Forwarded-For: 203.0.113.7" in body  # a documentation address (RFC 5737)
+    assert "X-Forwarded-Proto: http" in body
+    assert "--network" in body  # the sniffer joins web's network namespace
+    assert "NET_RAW" in body
+    # A control first: no header on the wire would also pass a "not forged" test.
+    assert body.index("saw no proxied request") < body.index(
+        "receives the X-Forwarded-For the visitor forged"
+    )
+    assert "single address" in body  # Caddy replaces; it does not append a second hop
+
+
+def test_the_sniffer_prints_only_the_forwarded_headers() -> None:
+    """The wire is read for ``X-Forwarded-*`` lines and nothing else (no paths, no tokens)."""
+    match = re.search(r"^sniffer_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
+    assert match, "the sniffer program is not in the script"
+    code = match.group(1)
+
+    compile(code, "sniffer", "exec")
+    assert 'startswith(b"x-forwarded-")' in code
+    assert "print(line" in code

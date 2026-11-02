@@ -88,8 +88,8 @@ def test_rotation_loses_nothing_and_rekey_is_idempotent(
     assert _nonces(installation) == after  # idempotent: nothing is touched again
     events = _audit(installation)
     assert [(actor, detail) for actor, _, detail in events] == [
-        ("system:cli", "secrets.rekey resealed=1 current=0"),
-        ("system:cli", "secrets.rekey resealed=0 current=1"),
+        ("system:cli", "secrets.rekey,resealed:1,current:0"),
+        ("system:cli", "secrets.rekey,resealed:0,current:1"),
     ]
 
 

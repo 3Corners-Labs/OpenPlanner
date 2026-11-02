@@ -78,7 +78,7 @@ async def test_a_failed_lookup_is_none_and_logged_without_the_answer(failure: Ex
 
     structlog.reset_defaults()
     event = json.loads(stream.getvalue().strip().splitlines()[-1])
-    assert (event["message"], event["domain"], event["error"]) == (
+    assert (event["event.action"], event["labels.domain"], event["labels.error"]) == (
         "dns.lookup_failed",
         "demo.nl",
         type(failure).__name__,
