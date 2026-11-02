@@ -110,8 +110,9 @@ filter matches on it. The list and the rule are constants, not settings.
 | Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
-| Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the participant, host URL to WxCC |
-| Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
+| Video join URLs | `bookings.guest_join_url`, `host_join_url`, `trial_join_url` | video provider (WP5) | as above | guest URL to the participant, host URL to WxCC |
+| Provider links | `bookings.video_room_id`, `trial_room_id`, `wxcc_task_id` | video provider, WxCC | as above (deleted by the purge, ADR 0102 point 11) | no. Each is the key to a meeting or work item at Cisco that holds the participant's name and email address |
+| Management token | `bookings.management_token_hash` (SHA-256 only) | generated | replaced by a random value by the purge, so the link stops working; the salt stays and identifies nothing without the token | token itself only in the confirmation mail |
 
 Jobs, slots, schedules and audit events carry no personal data of participants. A failed meeting
 job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
@@ -469,6 +470,41 @@ What remains is outside the application and is the hosting party's responsibilit
   snapshot and back-up retention, which must not exceed the retention promised in the DPIA.
 - **Memory and swap** of the running processes are not scrubbed.
 
+## Retention matrix (ADR 0102 point 14, PI-01)
+
+One row per table of `app/adapters/db/models.py` that holds personal columns or identifiers that
+lead to a person. *Removed by* names who deletes it. *Restore* says what a restored back-up
+does with it (ADR 0102 point 9): the procedure always runs `purge-overdue` before the system
+goes back online, so booking data that was already deleted on the live system is deleted again.
+**The word is "deleted", never "anonymised":** what the purge does is delete fields from the
+appointment; the booking row stays, and its times and reference can identify a person together
+with data held elsewhere. Deleting the row itself after `booking_row_retention_days` is ADR 0102
+step 4 and is not built yet.
+
+| Table | Personal columns | Held for | Removed by | Restore |
+|---|---|---|---|---|
+| `bookings` | `first_name`, `last_name`, `email`, `phone`, `form_answers`, `guest_join_url`, `host_join_url`, `trial_join_url`; provider links `video_room_id`, `trial_room_id`, `wxcc_task_id`; `claimed_by` (the list `privacy.PURGED_FIELDS`) | slot end + 24 h, cancellation + 24 h; a suspended booking at most until the earlier of closure end + 30 days and `closure_max_retention_days` after the slot end | the `purge_pii` job, else the daily retention sweep, else `python -m app.cli purge-overdue`; `management_token_hash` is replaced by a random value, `booking_events.message` emptied | `purge-overdue` runs before the system is back |
+| `bookings` (what stays after the purge) | `management_token_salt`, `public_ref` (random, names no one), `locale`, `consents`, times, `closure_id`, `change_reason`, status | until the row is deleted (ADR 0102 step 4, not built: today the row is kept) | not yet; step 4 merges it into a daily count per group and deletes it | as the live system |
+| `booking_events` | `message` (provider reason, up to 300 characters, masked); kind, time and reason code carry no personal data | `message`: as the booking's purge; the rest with the booking row | the purge empties `message`; the row goes with the booking (cascade) | as `bookings` |
+| `call_status` | none: states and times of the meeting and the work item, by booking id | with the booking row | cascade with the booking | as `bookings` |
+| `jobs` | none: booking id, type, run time, status, last error as a reason code (no payload with personal data) | pending jobs until they run; the row with the booking | the purge job is the last job of every plan; cascade with the booking | restored jobs find their booking purged or stale and end silently |
+| `participant_link_sessions`, `participant_link_bookings` | none: hash of a random cookie value, booking ids | cookie lifetime (ADR 0093); a purged booking leaves every session at once | the purge; the worker's clean-up of lapsed sessions | sessions of the copy are lapsed or hold only purged bookings |
+| `staff` | `subject`, `display_name`, `roles`, first seen, last login, last seen, last logout | replaced at every login; erased after `staff_retention_days` when ADR 0046 step 2 is built (not built) | not yet | as the live system |
+| `staff_memberships` | role key, organisation and group slugs by staff id | replaced at every login | cascade with `staff` | as `staff` |
+| `staff_refused_entitlements` | `value` (prefix, role key, IdP values), reason code, organisation | replaced at every login | cascade with `staff` | as `staff` |
+| `audit_events` | `actor` (admin subject), `detail`, `message`; for security events `client:<16 hex>` (HMAC pseudonym of the caller's address, never the address) | admin actions `AUDIT_RETENTION_DAYS` (730); system 90 days; security 365 days; diagnostic 7 days (ADR 0040) | the worker's housekeeping by category | older rows return and are removed at the next housekeeping |
+| `admin_sessions` | `subject`, `provider`, `claims` (the login claims as JSON, with the display name), times | until the session ends (logout, idle, absolute end, newer login) and the worker's clean-up (ADR 0098) | `AdminSessionService.clean`; `sessions end-all --reason restore` after a restore | all sessions are ended by the restore procedure |
+| `diagnostic_modes` | `started_by` (admin subject) | until `until` (hours, `diagnostic_mode_hours`) | the mode ends by itself; the row is replaced by the next one | expires on its own |
+| `organisation_contacts`, `group_contacts` | phone numbers, email addresses and links of the organisation or the team: general contact points, not participants | until changed | an admin edits or removes them; deleted with the organisation or group (cascade) | as the live system |
+| `groups.video_host_email` | the address of the Webex host account of the group (a staff or functional address) | until changed | an admin; deleted with the group | as the live system |
+| `webhook_events` | none: provider, event key, time | 30 days (`WEBHOOK_MEMORY`) | the next webhook handled forgets the old keys | expires on its own |
+
+Tables not listed hold no personal data: the organisation's own texts, colours, logo and font,
+schedules, holidays, closure texts and images (stripped of metadata), settings, certificates
+(public part), integration credentials (sealed, no participant data), identity-provider
+registration, API clients, update and release records. A table that gets a personal column adds
+its row here in the same PR.
+
 ## Shared by all organisations of an installation (TEN-06, BP-4)
 
 For the DPIA: the processing of every organisation of one installation passes through the same
@@ -516,5 +552,7 @@ in its own transaction, deletes its pending jobs and writes the system event `re
 data leaves the database; the host command `python -m app.cli purge-overdue [--dry-run]` does the
 same and prints counts per group.
 
-To be added per work package: backups (WP8). Each flow lists: data items, source, destination, legal
-basis owner, retention.
+Back-ups: the updater's rollback copy lives 24 hours and the hosting party's disaster-recovery
+copies are outside the application (ADR 0102 points 7 to 10, step 3 not built); the restore
+procedure and the retention matrix above say what a restored copy does. Each flow lists: data
+items, source, destination, legal basis owner, retention.

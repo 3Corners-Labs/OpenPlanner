@@ -77,7 +77,13 @@ class CallRetryService:
 
 
 def _missing(booking: Booking, group: Group, job: JobType) -> bool:
-    """Whether the job's result is still missing while the group expects it."""
+    """Whether the job's result is still missing while the group expects it.
+
+    A purged booking (no contact left) never is: the purge empties the ids of the meeting and
+    the work item, and a retry must not create new ones for a deleted appointment (ADR 0102).
+    """
+    if booking.contact is None:
+        return False
     if job is JobType.CREATE_VIDEO_ROOM:
         return group.video_enabled and booking.meeting is None
     return group.dispatch_enabled and not booking.wxcc_task_id
