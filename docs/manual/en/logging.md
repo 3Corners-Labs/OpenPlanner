@@ -80,6 +80,9 @@ is refused.
 
 - **Audit events** (admin actions, system events, security events): those whose category is
   ticked. The level does not apply, as on standard output.
+- **Access decisions**: only with that category ticked, and at the lowest level and above.
+  Every admin page writes one or two: who was granted or refused which right. A new destination
+  has them off; a destination that already existed keeps them on.
 - **Diagnostic events**: only with the option ticked. They are debug detail written while
   diagnostic mode is on for a group, and leave the installation only to a destination that asks
   for them.
@@ -89,6 +92,18 @@ is refused.
 - **All other lines**: at the lowest level and above.
 
 Personal data is masked in every line, as on standard output.
+
+## What a line looks like
+
+Every line starts with a readable sentence and then carries the fields: when, how severe, the
+category, the action and the action's own fields separately (`labels.free_percent`). What each
+action means and what to do about it is in `docs/logging.md`. On a syslog server the *MSGID*
+is the category (`audit`, `system`, `security`, `authz`, `operations`), so you can filter on
+it, and the sentence comes before the JSON line:
+
+```
+openplanner - operations - Disk space is low: 6% free, database 1 MB (free_space_low). {"@timestamp":…}
+```
 
 ## Reading the status
 

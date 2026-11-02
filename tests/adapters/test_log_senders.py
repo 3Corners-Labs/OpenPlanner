@@ -22,15 +22,22 @@ from tests.domain.test_log_destinations import destination
 from tests.fakes.clock import FixedClock
 
 LINE = json.dumps(
-    {"@timestamp": "2026-11-01T09:00:00.123Z", "log.level": "error", "message": "job.failed"}
+    {
+        "@timestamp": "2026-11-01T09:00:00.123Z",
+        "log.level": "error",
+        "event.category": "operations",
+        "event.action": "job.failed",
+        "message": "Job 7 (send_reminder) failed for good: SMTPError.",
+    }
 )
 AUDIT = json.dumps(
     {
         "@timestamp": "2026-11-01T09:00:01.000Z",
         "log.level": "info",
-        "log_type": "audit",
         "event.category": "audit",
-        "message": "admin.login",
+        "event.action": "admin.login",
+        "message": "Admin 8c1f signed in.",
+        "log_type": "audit",
     }
 )
 
@@ -78,7 +85,7 @@ async def test_splunk_gets_one_event_per_line_with_time_index_and_token() -> Non
     assert str(request.url) == "https://splunk.example.org:8088/services/collector/event"
     assert request.headers["authorization"] == "Splunk secret-token"
     events = json.loads("[" + request.content.decode().replace("}{", "},{") + "]")
-    assert [e["event"]["message"] for e in events] == ["job.failed", "admin.login"]
+    assert [e["event"]["event.action"] for e in events] == ["job.failed", "admin.login"]
     assert events[0]["index"] == "openplanner"
     assert events[0]["source"] == "web-1"
     assert events[0]["sourcetype"] == "_json"
@@ -234,18 +241,40 @@ async def test_an_unreadable_extra_authority_is_a_tls_problem_not_a_crash() -> N
 # --- syslog messages ---------------------------------------------------------------------
 
 
-def test_a_syslog_message_is_rfc_5424_with_the_json_line_as_message() -> None:
+def test_a_syslog_message_starts_with_the_sentence_and_carries_the_json_line() -> None:
     message = syslog_message(LINE, "web-1").decode()
 
-    assert message == f"<131>1 2026-11-01T09:00:00.123Z web-1 openplanner - log - {LINE}"
+    assert message == (
+        "<131>1 2026-11-01T09:00:00.123Z web-1 openplanner - operations - "
+        f"Job 7 (send_reminder) failed for good: SMTPError. {LINE}"
+    )
+    assert json.loads(message[message.index("{") :]) == json.loads(LINE)
 
 
-def test_priority_follows_the_level_and_the_msgid_follows_the_line_type() -> None:
+def test_priority_follows_the_level_and_the_msgid_follows_the_category() -> None:
     audit = syslog_message(AUDIT, "").decode()
-    trace = syslog_message(json.dumps({"log.level": "trace", "@timestamp": "t"}), "h").decode()
+    trace = syslog_message(
+        json.dumps({"log.level": "trace", "@timestamp": "t", "event.category": "authz"}), "h"
+    ).decode()
 
-    assert audit.startswith("<134>1 2026-11-01T09:00:01.000Z - openplanner - audit - ")
-    assert trace.startswith("<135>1 t h openplanner - log - ")  # local0 * 8 + debug
+    assert audit.startswith("<134>1 2026-11-01T09:00:01.000Z - openplanner - audit - Admin ")
+    assert trace.startswith("<135>1 t h openplanner - authz - {")  # local0 * 8 + debug
+
+
+@pytest.mark.parametrize("category", [None, "", "not a msgid", "x" * 33])
+def test_a_line_without_a_usable_category_is_operations(category: object) -> None:
+    line = json.dumps({"log.level": "info", "@timestamp": "t", "event.category": category})
+
+    assert " openplanner - operations - {" in syslog_message(line, "h").decode()
+
+
+def test_a_newline_in_the_sentence_cannot_split_the_syslog_message() -> None:
+    line = json.dumps({"log.level": "info", "@timestamp": "t", "message": "one\ntwo\x00three"})
+
+    message = syslog_message(line, "h").decode()
+
+    assert message.count("\n") == 0
+    assert " - one two three {" in message
 
 
 # --- syslog on the wire ------------------------------------------------------------------
@@ -444,7 +473,8 @@ async def test_the_tester_sends_one_test_line_and_closes_the_sender() -> None:
     await LogTester(Source(target), factory, FixedClock(), "web")(3)
 
     record = json.loads(seen[0].content.decode().strip())
-    assert (record["message"], record["destination"]) == ("logging.test", 3)
+    assert (record["event.action"], record["labels.destination"]) == ("logging.test", 3)
+    assert record["message"] == "Test line for log destination 3 (http)."
     assert closed == [True]
 
 

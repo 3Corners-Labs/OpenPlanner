@@ -165,7 +165,7 @@ async def test_a9_a12_access_follows_the_idp_value_and_a_change_takes_effect_at_
         Outcome.FAILURE,
         "",
         "demo",
-        "openplanner:group_admin:demo/demo=unknown_group",
+        "unknown_group:openplanner:group_admin:demo/demo",
     ) in found
 
 
@@ -262,7 +262,7 @@ async def test_a13_shadow_mode_grants_the_legacy_claims_and_audits_the_mismatch(
         Outcome.FAILURE,
         "",
         None,
-        "legacy_only:auditor:demo;entitlements_only:org_admin:demo",
+        "legacy_only:auditor:demo,entitlements_only:org_admin:demo",
     ) in await events(shadow)
 
 

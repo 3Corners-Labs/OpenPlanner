@@ -4,10 +4,18 @@ Every log line, from structlog or the stdlib (uvicorn, SQLAlchemy, ...), passes 
 ``mask_pii`` before rendering. Masking is a safety net: code must still never pass PII
 to a logger (enforced by the semgrep rules in ``.semgrep/``).
 
-Lines use the envelope of ``openplanner.event/2`` (ADR 0040, part 2), so a log platform reads
-them without mapping: ``@timestamp`` (RFC 3339 UTC, milliseconds), ``log.level``, ``message``,
-``service.name``, ``service.version``, ``installation``, and, inside a request or job,
-``trace.id``, ``organisation`` and ``group`` from ``app.domain.event_context``.
+Lines use the envelope of ``openplanner.event/3`` (ADR 0040 part 2, ADR 0103), so a log
+platform reads them without mapping: ``schema``, ``@timestamp`` (RFC 3339 UTC, milliseconds),
+``log.level``, ``event.action``, ``event.category``, ``message``, ``service.name``,
+``service.version``, ``installation``, and, inside a request or job, ``trace.id``,
+``organisation``, ``group`` and ``actor.role`` from ``app.domain.event_context``.
+
+A log call names its action (``log.warning("storage.degraded", free_percent=6)``); ``describe``
+turns that into the line: the code goes to ``event.action``, the register's category to
+``event.category``, the call's own fields to ``labels.<name>``, and ``message`` becomes the
+register's sentence with those fields filled in ("Disk space is low: 6% free ..."). It runs after
+the PII mask, so the sentence carries only masked values. A line of a library's own logger is
+``library.<logger>`` in category ``operations`` and keeps its own text (ADR 0103 point 8).
 
 ``LOG_LEVEL`` governs our own loggers only (``OWN_LOGGERS``). Every other stdlib logger stays at
 WARNING at any level, TRACE included, so a library's DEBUG lines (bound SQL values, response
@@ -31,9 +39,17 @@ from typing import Any, TextIO
 import structlog
 from structlog.typing import EventDict, Processor, WrappedLogger
 
+from app.domain.audit import actor_type
 from app.domain.event_context import current
-from app.domain.event_schema import Envelope, rfc3339
-from app.domain.log_events import trace_points
+from app.domain.event_schema import LABELS, SCHEMA, Envelope, label_name, label_value, rfc3339
+from app.domain.log_events import (
+    COMMON_FIELDS,
+    LIBRARY_PREFIX,
+    LogCategory,
+    describe,
+    lookup,
+    trace_points,
+)
 from app.domain.privacy import ALIASES
 from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 
@@ -160,6 +176,7 @@ def _with_context(envelope: Envelope) -> Processor:
             "trace.id": context.trace_id,
             "organisation": context.organisation,
             "group": context.group,
+            "actor.role": context.actor_role,
         }
         for key, value in fields.items():
             if value:
@@ -179,6 +196,91 @@ def _schema_names(_logger: WrappedLogger, _method: str, event_dict: EventDict) -
     if "level" in event_dict:
         event_dict["log.level"] = event_dict.pop("level")
     return event_dict
+
+
+LOGGER = "log.logger"
+"""ECS field with the name of the stdlib logger a line came from."""
+
+_KEPT = frozenset(COMMON_FIELDS) | {"exception", "stack", LOGGER}
+"""Fields of a line that stay where they are: the envelope's own and an exception's text."""
+
+
+def _logger_name(
+    _logger: WrappedLogger, _method: str, event_dict: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
+    """Note the stdlib logger of a foreign record as ``log.logger``."""
+    record = event_dict.get("_record")
+    if record is not None:
+        event_dict.setdefault(LOGGER, record.name)
+    return event_dict
+
+
+def describe_line(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> EventDict:
+    """Structlog processor: give the line the action, category, labels and sentence (ADR 0103).
+
+    Runs after ``_schema_names``, so the call's action is in ``message``.
+    """
+    action = str(event_dict.get("message", ""))
+    entry = lookup(action)
+    logger = event_dict.get(LOGGER)
+    event_dict["schema"] = SCHEMA
+    if entry is None:
+        if logger is not None and logger != TRACE_LOGGER:
+            event_dict["event.action"] = f"{LIBRARY_PREFIX}{logger}"
+        else:
+            event_dict["event.action"] = action
+        event_dict["event.category"] = LogCategory.OPERATIONS.value
+        return _in_reading_order(event_dict)
+    event_dict["event.action"] = action
+    event_dict["event.category"] = entry.category.value
+    values: dict[str, object] = {}
+    for name in [k for k in event_dict if k not in _KEPT and not _is_envelope(k)]:
+        value = event_dict.pop(name)
+        values[name] = value
+        event_dict[f"{LABELS}{label_name(name)}"] = label_value(value)
+    values.update({k: event_dict[k] for k in COMMON_FIELDS if k in event_dict})
+    event_dict["message"] = describe(action, values)
+    if "actor" in event_dict:
+        event_dict["actor.type"] = actor_type(str(event_dict["actor"])).value
+    return _in_reading_order(event_dict)
+
+
+READING_ORDER = ("@timestamp", "log.level", "event.category", "event.action", "message")
+"""The fields a person reads first; a raw line starts with them, the rest follows."""
+
+
+def _in_reading_order(event_dict: EventDict) -> EventDict:
+    """Return the line with ``READING_ORDER`` first, then every other field as it came."""
+    ordered: EventDict = {k: event_dict[k] for k in READING_ORDER if k in event_dict}
+    ordered.update(event_dict)
+    return ordered
+
+
+_ENVELOPE = frozenset(
+    {
+        "schema",
+        "message",
+        "@timestamp",
+        "log.level",
+        "event.action",
+        "event.category",
+        "event.outcome",
+        "service.name",
+        "service.version",
+        "installation",
+        "trace.id",
+        "actor.role",
+        "actor.type",
+        "error.message",
+        "log_type",
+    }
+)
+"""The envelope's fields: never labels."""
+
+
+def _is_envelope(name: str) -> bool:
+    """Return whether ``name`` is an envelope field or already a label."""
+    return name in _ENVELOPE or name.startswith(LABELS)
 
 
 # Standard LogRecord attributes, plus uvicorn's ANSI-coloured duplicate of the message.
@@ -309,6 +411,7 @@ def configure_logging(
         structlog.processors.format_exc_info,
         hide_bound_parameters,
         _schema_names,
+        describe_line,
         structlog.processors.JSONRenderer(),
     ]
 
@@ -327,7 +430,7 @@ def configure_logging(
     handler.addFilter(_ForeignLevelFilter())
     handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
-            foreign_pre_chain=[*shared, _stdlib_extra],
+            foreign_pre_chain=[*shared, _logger_name, _stdlib_extra],
             processors=[structlog.stdlib.ProcessorFormatter.remove_processors_meta, *finalize],
         )
     )

@@ -68,7 +68,7 @@ async def test_a_login_resolves_records_and_narrows_the_session_claims(
             "sub-mira",
             ENTITLEMENT_REFUSED_EVENT,
             Outcome.FAILURE,
-            "openplanner:org_admin:org-x=unknown_organisation",
+            "unknown_organisation:openplanner:org_admin:org-x",
             None,
         )
     ]
@@ -143,7 +143,7 @@ async def test_a13_shadow_mode_grants_legacy_and_audits_the_difference(
     assert outcome.principal.grants == {Grant("auditor", "demo")}
     mismatch = [row for row in audit_rows(uow) if row[1] == ENTITLEMENT_MISMATCH_EVENT]
     assert [row[3] for row in mismatch] == [
-        "legacy_only:auditor:demo;entitlements_only:org_admin:demo"
+        "legacy_only:auditor:demo,entitlements_only:org_admin:demo"
     ]
 
 

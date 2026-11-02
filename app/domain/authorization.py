@@ -568,10 +568,20 @@ class Reason(StrEnum):
 
 @dataclass(frozen=True)
 class Decision:
-    """The outcome of ``decide``."""
+    """The outcome of ``decide``.
+
+    Attributes:
+        allowed: Whether the permission may be used.
+        reason: Why, or why not.
+        role: The role key of the grant that allowed it (``superuser``, ``org_admin``,
+            ``custom.3``), for ``actor.role`` on the log line (ADR 0103 point 7); empty when
+            denied or for a machine client. It describes the decision and is not part of it,
+            so two decisions with the same outcome and reason are equal.
+    """
 
     allowed: bool
     reason: Reason
+    role: str = field(default="", compare=False)
 
 
 @dataclass(frozen=True)
@@ -806,11 +816,38 @@ def decide(principal: Principal, permission: Permission, target: Target) -> Deci
     ]
     if not holding:
         return Decision(False, Reason.NOT_PERMITTED)
-    reasons = {_covers(reach, grant, target) for reach, grant in holding} - {None}
+    covering: dict[Reason, str] = {}
+    for reach, grant in holding:
+        reason = _covers(reach, grant, target)
+        if reason is not None:
+            covering.setdefault(reason, grant.role)
     for reason in (Reason.SUPERUSER, Reason.ROLE, Reason.ORGANISATION, Reason.GROUP):
-        if reason in reasons:
-            return Decision(True, reason)
+        if reason in covering:
+            return Decision(True, reason, covering[reason])
     return Decision(False, Reason.OUT_OF_SCOPE)
+
+
+def target_text(target: Target) -> str:
+    """Return ``target`` as a log line names it (ADR 0103).
+
+    ``acme/balie`` for a group, ``acme`` for an organisation, ``everything`` for
+    a global permission.
+    """
+    if target.organisation is None:
+        return "everything"
+    return f"{target.organisation}/{target.group}" if target.group else target.organisation
+
+
+def granting_role(principal: Principal, permission: Permission) -> str:
+    """Return the first role key, by grant, that holds ``permission``; empty when none does.
+
+    For a decision over every target at once (an overview page), where no single grant covers
+    one target; the role only describes the actor on the log line (ADR 0103 point 7).
+    """
+    return next(
+        (grant.role for permissions, _, grant in _grants(principal) if permission in permissions),
+        "",
+    )
 
 
 def decide_in_maintenance(
@@ -823,8 +860,10 @@ def decide_in_maintenance(
     reaches everything. The superuser is not an exception beyond that.
     """
     writable = permission in MAINTENANCE_WRITABLE or maintenance_safe
-    if writable and Reach.EVERYTHING in reaches(principal, permission):
-        return Decision(True, Reason.SUPERUSER)
+    if writable:
+        for permissions, reach, grant in _grants(principal):
+            if reach is Reach.EVERYTHING and permission in permissions:
+                return Decision(True, Reason.SUPERUSER, grant.role)
     return Decision(False, Reason.MAINTENANCE)
 
 

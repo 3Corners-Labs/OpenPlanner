@@ -1,9 +1,12 @@
 # 0103. Self-describing log lines: one shape, a readable message and a register of actions
 
 Status: accepted (2026-11-02) by the product owner (#412), requested after the first syslog test
-on docker01; not built yet: step 1 (the register) is in PR #416. Extends ADR 0040 (part 2, the
-event schema: `openplanner.event/2` becomes `openplanner.event/3`) and ADR 0085 (what a
-destination receives).
+on docker01; partly built: the register (step 1, #416), `openplanner.event/3` on every line
+(step 2) and the `authz` category with the syslog `MSGID` and the sentence in front (step 3)
+are built; the installer's `INSTALLATION_NAME` (step 4) and the portal rendering (step 5) are
+not. Extends ADR 0040 (part 2, the event schema: `openplanner.event/2` becomes
+`openplanner.event/3`) and ADR 0085 (what a destination receives). Points 4, 6, 7 and 10 were
+refined while building step 2 and 3 (2026-11-02, see *Refinements*).
 
 ## Context
 
@@ -102,6 +105,30 @@ it means, which fields it has, how severe it is, and what a person should do abo
     release notes say that searches on `message` for a code must use `event.action`. Version 2
     is not produced in parallel: the installations with a destination today are test and lab.
 
+### Refinements while building (2026-11-02)
+
+Asked by the product owner after the step 1 build, when the syslog lines still read as codes:
+
+- **Point 4.** The sentence of an audit, system or security event also says how it ended and
+  where, when its template does not: "An identity provider was changed. Outcome: denied
+  (out_of_scope). Organisation acme." Without that, a denied attempt read as a change that
+  happened. Every line starts with the fields a person reads first: `@timestamp`, `log.level`,
+  `event.category`, `event.action`, `message`.
+- **Point 6.** `detail` keeps its form instead of becoming `name=value; ...`: comma-separated
+  parts, each `name:value` or a bare flag. The portal's audit log reads that form, and every
+  stored row already has it, so changing it would make old and new rows read differently. The
+  line carries the parts as `labels.<name>` and the flags together as `labels.what`; a list is
+  written as repeated parts (`legacy_only:a,legacy_only:b` becomes `labels.legacy_only: "a,b"`).
+  The few writers that used another form (`=`, `;`, spaces, a list inside a value) now follow
+  it, and a test checks every detail the test suite writes.
+- **Point 7.** `actor.type` also has `anonymous`: someone who is not logged in (a participant's
+  link, a forged request). `actor.role` is stored with the event (`audit_events.actor_role`,
+  migration 0087), so the CSV export carries it too.
+- **Point 10.** Syslog `MSG` starts with the sentence and ends with the JSON line:
+  `<PRI>1 … openplanner - system - Disk space is low: 6% free, database 1 MB. {"@timestamp":…}`.
+  A syslog viewer shows what happened at a glance; a log platform parses the JSON from its
+  first `{`. The other destinations (Splunk, Elastic, HTTP) receive the JSON line as before.
+
 ## Settings
 
 None new. Checked:
@@ -124,8 +151,8 @@ closed list for the same reason.
 |---|---|---|---|
 | 0 | ADR accepted | #412 | merged |
 | 1 | The register (`app/domain/log_events.py`) with every current action and trace point, the scan test, `docs/logging.md` generated | #416 | in PR |
-| 2 | `openplanner.event/3`: envelope on every line, message from the template, `error.message`, `labels.*`, `actor.type` and `actor.role`, library lines; `docs/audit-events.md`, CSV export | | planned |
-| 3 | Category `authz` for destinations, syslog `MSGID` from the category | | planned |
+| 2 | `openplanner.event/3`: envelope on every line, message from the template, `error.message`, `labels.*`, `actor.type` and `actor.role`, library lines; `docs/audit-events.md`, CSV export | #431 | in PR |
+| 3 | Category `authz` for destinations, syslog `MSGID` from the category, sentence in front of the syslog message | #431 | in PR |
 | 4 | Installer writes `INSTALLATION_NAME`; warning on *System status* | | planned |
 | 5 | Portal event screens render the register through `app/i18n` (nl, en) | | planned |
 

@@ -524,6 +524,7 @@ class SqlTransaction(
                 trace_id=event.trace_id[:32],
                 service=event.service[:16],
                 message=event.message[:300],
+                actor_role=event.actor_role[:64],
             )
         )
         await self._session.flush()
@@ -608,6 +609,7 @@ class SqlTransaction(
                     service=row.service,
                     event_id=row.event_id,
                     message=row.message,
+                    actor_role=row.actor_role,
                 ),
                 name or None,
                 status == StaffStatus.ERASED.value,

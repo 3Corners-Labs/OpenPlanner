@@ -67,11 +67,13 @@ async def test_a_request_leaves_one_trace_line_with_its_route_template() -> None
         logging.getLogger().handlers.clear()
 
     lines = [json.loads(line) for line in out.getvalue().splitlines()]
-    traced = [line for line in lines if line["message"] == "http.request"]
-    assert [(t["method"], t["route"], t["status"]) for t in traced] == [
+    traced = [line for line in lines if line["event.action"] == "http.request"]
+    assert [(t["labels.method"], t["labels.route"], t["labels.status"]) for t in traced] == [
         ("GET", "/g/{slug}", 200),
         ("GET", "", 404),
     ]
-    assert all(isinstance(t["ms"], int) and TRACE_ID.fullmatch(t["trace.id"]) for t in traced)
-    assert all("balie" not in str(t["route"]) for t in traced)  # the group tag may
+    assert all(
+        isinstance(t["labels.ms"], int) and TRACE_ID.fullmatch(t["trace.id"]) for t in traced
+    )
+    assert all("balie" not in str(t["labels.route"]) for t in traced)  # the group tag may
     assert "secret-token" not in out.getvalue()

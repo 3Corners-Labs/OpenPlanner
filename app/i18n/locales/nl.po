@@ -8630,13 +8630,16 @@ msgid "admin.logging.categories"
 msgstr "Te sturen auditgebeurtenissen"
 
 msgid "admin.logging.categories_hint"
-msgstr "Beheeracties, wat het platform zelf doet en beveiligingsgebeurtenissen. Het niveau geldt hier niet voor."
+msgstr "Beheeracties, wat het platform zelf doet en beveiligingsgebeurtenissen: het niveau geldt hier niet voor. Toegangsbeslissingen zijn één of twee regels per beheerpagina; voor die regels geldt het niveau wel."
 
 msgid "admin.logging.category.audit"
 msgstr "Beheeracties"
 
 msgid "admin.logging.category.system"
 msgstr "Systeemgebeurtenissen"
+
+msgid "admin.logging.category.authz"
+msgstr "Toegangsbeslissingen"
 
 msgid "admin.logging.category.security"
 msgstr "Beveiligingsgebeurtenissen"
