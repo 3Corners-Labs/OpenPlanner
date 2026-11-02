@@ -266,3 +266,28 @@ async def test_system_status_shows_the_directory_state(managed: Site, half_conne
     assert "Medewerkerbeheer" in connected
     assert "Gekoppeld: medewerkers worden in het portaal beheerd" in connected
     assert "op de server ontbreekt KEYCLOAK_DIRECTORY_CLIENT_SECRET" in incomplete
+
+
+async def test_the_invitation_takes_a_typed_user_name_and_explains_a_wrong_one(
+    managed: Site,
+) -> None:
+    """ADR 0106 point 6: the form shows the format and links a refusal to the field."""
+    await managed.login_as(ORG_ADMIN)
+    form = (await managed.client.get("/admin/staff/invite")).text
+
+    wrong = await managed.client.post(
+        "/admin/staff/invite", data={**INVITE, "user_name": "nina nieuw"}, headers=SAME_ORIGIN
+    )
+    right = await managed.client.post(
+        "/admin/staff/invite", data={**INVITE, "user_name": "NNieuw"}, headers=SAME_ORIGIN
+    )
+
+    assert "naam@organisatie.openplanner.internal" in form
+    assert wrong.status_code == 422
+    assert 'id="user_name" name="user_name"' in wrong.text
+    assert 'aria-invalid="true"' in wrong.text.split('id="user_name"', 1)[1].split(">", 1)[0]
+    assert "alleen kleine letters" in wrong.text
+    assert right.status_code == 303
+    assert managed.directory is not None
+    created = next(u for u in managed.directory.users.values() if u.email == INVITE["email"])
+    assert created.username == "nnieuw@demo.openplanner.internal"

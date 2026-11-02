@@ -9344,3 +9344,18 @@ msgstr "Niet gekoppeld: de ingebouwde identiteitsprovider draait, maar op de ser
 
 msgid "admin.settings.directory.absent"
 msgstr "Niet van toepassing: medewerkers worden bij de identiteitsprovider van de organisatie beheerd en hier alleen getoond."
+
+msgid "settings.field.bundled_idp_login_suffix.label"
+msgstr "Achtervoegsel van de inlognaam (ingebouwde identiteitsprovider)"
+
+msgid "admin.staff.invite.user_name"
+msgstr "Inlognaam (optioneel)"
+
+msgid "admin.staff.invite.user_name.hint"
+msgstr "Alleen het deel vóór de @. Leeg laten: voornaam.achternaam. De medewerker logt in als naam@organisatie.{suffix}; een superuser als naam@{suffix}. De inlognaam is daarna niet meer te wijzigen."
+
+msgid "admin.form.error.staff_user_name_invalid"
+msgstr "Gebruik voor de inlognaam alleen kleine letters, cijfers, punten en streepjes, begin en eindig met een letter of cijfer, en hoogstens 64 tekens."
+
+msgid "admin.form.error.staff_user_name_in_use"
+msgstr "Deze inlognaam is al in gebruik. Kies een andere."

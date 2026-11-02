@@ -102,6 +102,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `JOB_OVERDUE_MINUTES` | int | `10` | 1–1440 | `settings.platform.manage` | A pending job this many minutes past its planned time counts as overdue in a group's integration check (ADR 0068). |
 | `STAFF_INVITE_EXPIRY_DAYS` | int | `7` | 1–30 | `settings.platform.manage` | Days an invitation or password reset link of a staff member stays valid (ADR 0095). |
 | `STAFF_DIRECTORY_ENABLED` | bool | `true` | — | `settings.platform.manage` | Show the actions that create and change staff in the bundled identity provider; off hides them and leaves the provider's data untouched (ADR 0095). |
+| `BUNDLED_IDP_LOGIN_SUFFIX` | string | `openplanner.internal` | — | `settings.platform.manage` | Domain under which staff of the bundled identity provider get their user name: name@<organisation>.<suffix>; a change applies to new accounts only (ADR 0106). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
 | `STAFF_RETENTION_DAYS` | int | `365` | 90–1825 | `settings.platform.manage` | Days without a login after which a person's name, roles and memberships are erased from the staff list; the subject stays for the audit log (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |

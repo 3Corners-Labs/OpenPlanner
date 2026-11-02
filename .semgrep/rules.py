@@ -26,5 +26,8 @@ def examples(booking, email):
     # ruleid: no-pii-in-log-call
     log.info("booking.created", form_answers=booking.form_answers)
 
+    # ruleid: no-pii-in-log-call
+    log.info("staff.invited", username=user.username)
+
     # ok: no-pii-in-log-call
     log.info("booking.created", booking_id=booking.id)

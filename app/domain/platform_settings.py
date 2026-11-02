@@ -23,6 +23,7 @@ from zoneinfo import available_timezones
 from app.domain.authorization import Scope
 from app.domain.ports import UnitOfWork
 from app.domain.settings_registry import Kind, SettingSpec, within_bounds
+from app.domain.user_names import valid_suffix
 
 RELOAD_SECONDS = 10
 """How stale the web process may be after a change: ADR 0042 §6 sets at most 10 seconds."""
@@ -112,6 +113,9 @@ _TYPES: dict[Kind, tuple[type, ...]] = {
 TIMEZONE_KEYS = frozenset({"admin_timezone"})
 """String settings whose value must be an IANA time zone known to this installation."""
 
+DOMAIN_KEYS = frozenset({"bundled_idp_login_suffix"})
+"""String settings whose value must be a lower-case domain name (ADR 0106 point 5)."""
+
 PRODUCTION_REFUSED: Mapping[str, frozenset[object]] = {
     "update_channel": frozenset({"rc"}),
     "update_auto_apply": frozenset({True}),
@@ -140,6 +144,8 @@ def usable(spec: SettingSpec, value: object, *, production: bool = False) -> boo
     if isinstance(value, bool) and spec.kind is not Kind.BOOL:
         return False
     if spec.key in TIMEZONE_KEYS and not (isinstance(value, str) and value in _zones()):
+        return False
+    if spec.key in DOMAIN_KEYS and not (isinstance(value, str) and valid_suffix(value)):
         return False
     return isinstance(value, types) and within_bounds(spec, value)
 

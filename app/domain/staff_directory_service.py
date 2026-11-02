@@ -15,7 +15,7 @@ and places and never a name or an address. The provider's own message is never p
 """
 
 from collections.abc import Awaitable, Callable, Collection
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Grant, Permission, Principal, Role, Scope, scope_for
@@ -31,6 +31,14 @@ from app.domain.staff_directory import (
     in_scope,
     plan_entitlements,
     refusal_of,
+)
+from app.domain.user_names import (
+    DEFAULT_SUFFIX,
+    candidates,
+    organisation_label,
+    propose_local_part,
+    user_name,
+    valid_local_part,
 )
 
 _SECONDS_PER_DAY = 86_400
@@ -51,11 +59,13 @@ class DirectorySettings:
         enabled: ``staff_directory_enabled``.
         prefix: The entitlement prefix (``oidc_entitlement_prefix``).
         invite_expiry_days: ``staff_invite_expiry_days``.
+        login_suffix: ``bundled_idp_login_suffix`` (ADR 0106).
     """
 
     enabled: bool
     prefix: str
     invite_expiry_days: int
+    login_suffix: str = DEFAULT_SUFFIX
 
 
 @dataclass(frozen=True)
@@ -103,6 +113,11 @@ class StaffDirectoryService:
         self._directory = directory
         self._settings = settings
         self._missing = missing
+
+    @property
+    def login_suffix(self) -> str:
+        """The suffix new user names get now (``bundled_idp_login_suffix``)."""
+        return self._settings().login_suffix
 
     @property
     def missing(self) -> tuple[str, ...]:
@@ -203,23 +218,42 @@ class StaffDirectoryService:
             return None
 
     async def invite(
-        self, principal: Principal, new: NewStaffMember, grants: Collection[Grant]
+        self,
+        principal: Principal,
+        new: NewStaffMember,
+        grants: Collection[Grant],
+        local_part: str = "",
     ) -> None:
         """Create a person with ``grants`` and mail them the link that sets their password.
+
+        The user name is ``local_part`` (or ``first.last`` when it is empty) under the first
+        grant's organisation and the platform suffix (ADR 0106 points 5 to 8).
 
         Raises:
             DomainError: ``not_permitted``, ``staff_directory_unavailable``,
                 ``invalid_configuration`` (no grant), ``staff_grant_refused``,
+                ``staff_user_name_invalid``, ``staff_user_name_in_use``,
                 ``staff_address_in_use`` or ``staff_mail_failed``.
         """
         directory = await self._ready(principal, Permission.STAFF_MANAGE)
         if not grants:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "grant")
+        if local_part and not valid_local_part(local_part):
+            raise DomainError(ErrorCode.STAFF_USER_NAME_INVALID, "user_name")
         scope = scope_for(principal, Permission.STAFF_MANAGE)
         self._refuse_wishes(principal, scope, grants)
         settings = self._settings()
-        values = _planned([], grants, scope, settings.prefix, await self._directory_of_places())
-        user = await _guard(directory.create_user(new))
+        places = await self._directory_of_places()
+        values = _planned([], grants, scope, settings.prefix, places)
+        label = organisation_label(grants, places)
+        username = await _free_user_name(
+            directory,
+            local_part or propose_local_part(new.first_name, new.last_name),
+            label,
+            settings.login_suffix,
+            numbered=not local_part,
+        )
+        user = await _guard(directory.create_user(replace(new, username=username)))
         await _guard(directory.set_entitlements(user.id, values))
         await self._change(principal, Permission.STAFF_MANAGE, grants, _created(grants))
         await _guard(
@@ -340,6 +374,26 @@ def _planned(
         return plan_entitlements(existing, grants, scope, prefix, places)
     except DirectoryError as error:
         raise DomainError(ErrorCode.STAFF_GRANT_REFUSED, "grant") from error
+
+
+async def _free_user_name(
+    directory: StaffDirectory, local_part: str, label: str | None, suffix: str, *, numbered: bool
+) -> str:
+    """Return the first free user name; a typed one is never numbered (ADR 0106 point 6).
+
+    Raises:
+        DomainError: ``staff_user_name_in_use`` when the typed name, or every numbered
+            alternative of the proposal, is taken.
+    """
+    names = (
+        candidates(local_part, label, suffix)
+        if numbered
+        else iter([user_name(local_part, label, suffix)])
+    )
+    for name in names:
+        if not await _guard(directory.user_name_taken(name)):
+            return name
+    raise DomainError(ErrorCode.STAFF_USER_NAME_IN_USE, "user_name")
 
 
 async def _guard[T](call: Awaitable[T]) -> T:

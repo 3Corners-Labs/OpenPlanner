@@ -41,6 +41,13 @@ knoppen niet: daar wijzigt het IdP-team rechten.
 - **Medewerker uitnodigen** (knop boven de lijst): vul e-mailadres, voor- en achternaam in en kies
   de eerste rol en plaats. De medewerker krijgt een e-mail met een link om een wachtwoord te
   kiezen. De link is standaard 7 dagen geldig (door de superuser in te stellen).
+- **Inlognaam**: de medewerker logt in als `voornaam.achternaam@organisatie.openplanner.internal`
+  (een superuser als `naam@openplanner.internal`). U mag het deel vóór de @ zelf kiezen: kleine
+  letters, cijfers, punten en streepjes. Is de voorgestelde naam bezet, dan krijgt hij `-2`,
+  `-3`, enzovoort. De inlognaam is daarna niet te wijzigen; het e-mailadres blijft het adres
+  voor de uitnodiging, de wachtwoordreset en agenda-uitnodigingen, en werkt ook om in te loggen.
+  Het achtervoegsel stelt de superuser in (*Achtervoegsel van de inlognaam*); een wijziging
+  geldt alleen voor nieuwe accounts.
 - **Uitgenodigd, nog niet ingelogd**: mensen die u heeft aangemaakt en die nog niet hebben
   ingelogd. U kunt de uitnodiging opnieuw sturen.
 - Op de pagina van een persoon, onder **Beheer bij de identiteitsprovider**: een rol
