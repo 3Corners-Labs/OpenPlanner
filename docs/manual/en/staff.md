@@ -32,6 +32,33 @@ not recognised**, with the reason and the moment. The filter **Only with unrecog
 finds these people. The right values are on **Identity provider mapping**; pass the difference
 on to the IdP team.
 
+## Managing staff in the bundled identity provider
+
+If this platform uses the bundled Keycloak (test and lab installations) you manage staff here.
+With an identity provider of your own, such as PingFederate, you do not see these buttons: the
+IdP team changes rights there.
+
+- **Invite staff member** (button above the list): enter email address, first and last name
+  and choose the first role and place. The staff member receives an email with a link to choose
+  a password. The link is valid for 7 days by default (the superuser can change this).
+- **Invited, not logged in yet**: people you created who have not logged in. You can resend the
+  invitation.
+- On a person's page, under **Managed at the identity provider**: remove a role, add a role
+  with a place, disable or enable the person, and send a password reset. A change takes effect at
+  the next login.
+
+What you may do:
+
+- An **organisation admin** works only inside their own organisations and never grants more
+  than their own rights: only the superuser can grant the superuser role.
+- For a person who also works outside your organisations, roles elsewhere are left alone and
+  only the superuser can disable them.
+- You cannot change or disable yourself.
+
+Every change is in the audit log, with role names and places and without names or email
+addresses. When the identity provider cannot be reached the screen says so, without repeating
+the provider's own message.
+
 ## Filters
 
 - **Organisation**, **Group** and **Role**: only staff who belong to it.
@@ -49,4 +76,30 @@ logins, logouts and changes, within your own organisations or groups.
 - **Last active**: the last time the person opened a page. Updated at most once every five
   minutes.
 - **Last logout**: the last time the person clicked **Log out**. A session that expires on
-  its own (after 8 hours) does not count as a logout.
+  its own (after 8 hours) does not count as a logout. The same goes for a session that ends because it was idle
+  for too long (60 minutes by default) or because a newer login replaced it.
+
+## End a staff member's sessions
+
+A staff member's page has the button **End all sessions**. Organisation admins and the
+superuser see it (permission `staff.manage`). It works for every staff member you see in
+the overview; for anyone outside it, it is refused and the attempt is in the audit log.
+
+A session belongs to the person, not to an organisation. If you end all sessions of someone who
+works for two organisations, what they use for the other organisation ends too. That is
+intended: ending protects and gives nobody more rights. The staff member has to log in again.
+Use it, for example, when someone has been switched off at the identity provider: otherwise
+their session keeps working until it goes idle (60 minutes by default). The audit log has an
+event with you, the staff member and the number of sessions. Everyone can see and end their own
+sessions on [My sessions](my-sessions.md).
+
+## Second factor (MFA)
+
+Staff log in with a second factor besides their password: a code from an authenticator app
+or a security key. OpenPlanner does not set this up and does not store it; the identity
+provider does (ADR 0100). At login OpenPlanner asks the provider for it and checks that the
+provider says it was used. If it was not, the login is refused with the message *your
+account shows no second factor*. Set up multi-factor authentication at your identity provider
+(with the bundled Keycloak: the first login asks for an authenticator app) and sign in again.
+Still refused? Ask the IdP team; the refusal is in the audit log as `mfa_required`, without
+any personal data.

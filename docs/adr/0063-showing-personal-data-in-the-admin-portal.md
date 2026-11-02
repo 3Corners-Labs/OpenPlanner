@@ -1,6 +1,8 @@
 # 0063. Showing personal data in the admin portal
 
 Status: accepted (2026-10-30), requested by the product owner. Builds on the privacy rules in CLAUDE.md and ADR 0039 (auditor never sees personal data). Does not change the list of PII fields. Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
+Note (2026-11-01 review): the PII field list in Context and §1 predates ADR 0055; the current
+list is in CLAUDE.md (Privacy rules) and `app/domain/privacy.py` (`DATA_FIELDS`).
 
 ## Context
 

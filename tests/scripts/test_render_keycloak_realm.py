@@ -22,6 +22,7 @@ BASH = shutil.which("bash") or "/bin/bash"
 FIXED = {
     "KC_BOOTSTRAP_ADMIN_PASSWORD": "fixed-admin-password-0123456789",
     "KC_OPENPLANNER_CLIENT_SECRET": "fixed-client-secret-0123456789",
+    "KC_DIRECTORY_CLIENT_SECRET": "fixed-directory-secret-0123456789",
     "KC_SUPER_PASSWORD": "fixed-super-password-0123456789",
 }
 
@@ -64,11 +65,30 @@ def test_the_template_holds_no_development_secret() -> None:
     assert "dev-only-" not in TEMPLATE.read_text()
 
 
-def test_the_template_has_only_the_client_and_super() -> None:
+def test_the_template_has_the_clients_super_and_the_directory_service_account() -> None:
     template = json.loads(TEMPLATE.read_text())
 
-    assert [client["clientId"] for client in template["clients"]] == ["openplanner-admin"]
-    assert [user["username"] for user in template["users"]] == ["super"]
+    assert [client["clientId"] for client in template["clients"]] == [
+        "openplanner-admin",
+        "openplanner-directory",
+    ]
+    assert [user["username"] for user in template["users"]] == [
+        "super",
+        "service-account-openplanner-directory",
+    ]
+
+
+def test_the_directory_service_account_may_only_manage_users() -> None:
+    """ADR 0095 point 1: ``manage-users`` and ``view-realm``, nothing else, no browser login."""
+    template = json.loads(TEMPLATE.read_text())
+    client = next(c for c in template["clients"] if c["clientId"] == "openplanner-directory")
+    account = next(u for u in template["users"] if u["username"].startswith("service-account"))
+
+    assert client["serviceAccountsEnabled"] is True
+    assert not client["standardFlowEnabled"]
+    assert not client["directAccessGrantsEnabled"]
+    assert account["clientRoles"] == {"realm-management": ["manage-users", "view-realm"]}
+    assert "realmRoles" not in account
 
 
 def test_the_template_keeps_the_development_realm_contract() -> None:
@@ -97,7 +117,7 @@ def test_super_must_change_the_password_at_first_login(rendered: dict[str, Any])
     super_user = rendered["users"][0]
 
     assert super_user["username"] == "super"
-    assert super_user["requiredActions"] == ["UPDATE_PASSWORD"]
+    assert super_user["requiredActions"] == ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
     assert super_user["credentials"][0]["temporary"] is True
 
 
@@ -214,3 +234,25 @@ def test_the_dev_and_idp_services_pin_the_same_image() -> None:
     text = (REPO / "docker-compose.yml").read_text()
 
     assert len({line.strip() for line in text.splitlines() if "quay.io/keycloak" in line}) == 1
+
+
+def test_the_realm_asks_for_a_second_factor_and_says_so_in_the_token() -> None:
+    """ADR 0100: acr ``mfa`` is level 2, the flow asks for OTP or WebAuthn at that level."""
+    realm = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+    (client,) = [c for c in realm["clients"] if c["clientId"] == "openplanner-admin"]
+    flows = {f["alias"]: f for f in realm["authenticationFlows"]}
+    second = flows["openplanner second factor"]["authenticationExecutions"]
+    (config,) = realm["authenticatorConfig"]
+    (super_user,) = [u for u in realm["users"] if u["username"] == "super"]
+
+    assert json.loads(client["attributes"]["acr.loa.map"]) == {"mfa": 2}
+    assert client["attributes"]["default.acr.values"] == "mfa"
+    assert realm["browserFlow"] == "openplanner browser"
+    assert {e["authenticator"] for e in second} == {
+        "conditional-level-of-authentication",
+        "auth-otp-form",
+        "webauthn-authenticator",
+    }
+    assert config["config"]["loa-condition-level"] == "2"
+    assert "CONFIGURE_TOTP" in super_user["requiredActions"]
+    assert realm["resetPasswordAllowed"] is True  # self-service reset at the login prompt

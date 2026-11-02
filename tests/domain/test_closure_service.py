@@ -3,10 +3,16 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Role
 from app.domain.booking import BookingStatus
-from app.domain.closure import RETENTION_AFTER_CLOSURE
+from app.domain.closure import Closure
+from app.domain.closure_retention import (
+    DEFAULT_CLOSURE_RETENTION,
+    RETENTION_AFTER_CLOSURE,
+    ClosureRetention,
+)
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.direct_queue import DirectAvailability
 from app.domain.errors import DomainError, ErrorCode
@@ -84,7 +90,7 @@ async def test_closing_suspends_covered_bookings_and_keeps_their_data(
     assert actions == [("closure.manage", "closure.start,bookings:1", "demo")]
 
 
-async def test_open_ended_closure_has_no_purge_until_it_ends(
+async def test_open_ended_closure_purges_at_the_maximum_and_sooner_once_it_ends(
     closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     booking_id = await _book(bookings, NEXT_MONDAY)
@@ -94,7 +100,12 @@ async def test_open_ended_closure_has_no_purge_until_it_ends(
         JobType.END_WXCC_TASK,
         JobType.DELETE_TRIAL_CALL,
         JobType.SEND_SUSPENSION,
+        JobType.PURGE_PII,
     ]
+    slot_end = uow.state.bookings[booking_id].end
+    assert (
+        uow.state.jobs[booking_id][-1].run_at == slot_end + DEFAULT_CLOSURE_RETENTION.max_retention
+    )
 
     await closures.lift(GROUP_ADMIN, "demo", reinstate=False)
     assert _jobs(uow, booking_id) == [
@@ -289,7 +300,12 @@ async def test_update_without_notify_sends_nothing_and_checks_the_end(
         JobType.END_WXCC_TASK,
         JobType.DELETE_TRIAL_CALL,
         JobType.SEND_SUSPENSION,
-    ]  # open-ended again: no purge yet
+        JobType.PURGE_PII,
+    ]
+    purge = [j for j in uow.state.jobs[first] if j.type is JobType.PURGE_PII]
+    assert [j.run_at for j in purge] == [
+        uow.state.bookings[first].end + DEFAULT_CLOSURE_RETENTION.max_retention
+    ]  # open-ended again: the purge moves to the maximum
     with pytest.raises(DomainError, match="ends_at"):
         await closures.update(GROUP_ADMIN, "demo", NOW, NOTICES, notify=False)
 
@@ -468,3 +484,64 @@ async def test_superuser_closes_any_organisation(
 
     assert [o.slug for o in outcomes] == ["andere-team"]
     assert datetime.now(UTC) > NOW  # sanity: tests use the fixed clock, not the wall clock
+
+
+async def test_the_organisations_own_maximum_decides_the_purge(
+    bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    short = ClosureService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        bookings,
+        lambda _organisation_id: ClosureRetention.from_days(30, 3),
+    )
+    booking_id = await _book(bookings, NEXT_MONDAY)
+    end = uow.state.bookings[booking_id].end
+
+    await short.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
+    assert uow.state.jobs[booking_id][-1].run_at == end + timedelta(days=30)
+
+    far = NEXT_MONDAY + timedelta(days=400)
+    await short.update(GROUP_ADMIN, "demo", far, NOTICES, notify=False)
+    assert uow.state.jobs[booking_id][-1].run_at == end + timedelta(days=30)  # not far + 30 d
+
+    soon = NEXT_MONDAY - timedelta(days=1)
+    await short.update(GROUP_ADMIN, "demo", soon, NOTICES, notify=False)
+    assert uow.state.jobs[booking_id][-1].run_at == soon + RETENTION_AFTER_CLOSURE
+
+
+async def test_the_closure_page_date_is_that_of_the_latest_booking_on_hold(
+    closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    await _book(bookings, SLOT_0900)
+    later = await _book(bookings, NEXT_MONDAY)
+    group = await bookings.get_group("demo")
+    unstored = Closure(None, group.id, NOW, None, NOTICES, NOW)
+    assert await bookings.closure_delete_by(group, unstored) is None
+
+    await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
+    closure = await bookings.closure_notice(group)
+    assert closure is not None
+
+    expected = uow.state.bookings[later].end + DEFAULT_CLOSURE_RETENTION.max_retention
+    assert await bookings.closure_delete_by(group, closure) == expected
+
+
+async def test_the_details_of_a_booking_on_hold_say_when_its_data_is_deleted_at_the_latest(
+    closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book_confirmed(
+        bookings, group_slug="demo", start=SLOT_0900, contact=ADA, locale="nl"
+    )
+    assert (await bookings.find(receipt.management_token)).delete_by is None  # not on hold
+
+    await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
+    details = await bookings.find(receipt.management_token)
+
+    end = uow.state.bookings[receipt.booking.id or 0].end
+    assert details.delete_by == end + DEFAULT_CLOSURE_RETENTION.max_retention  # open closure
+
+    await closures.update(GROUP_ADMIN, "demo", NEXT_MONDAY, NOTICES, notify=False)
+    soon = await bookings.find(receipt.management_token)
+    assert soon.delete_by == NEXT_MONDAY + RETENTION_AFTER_CLOSURE  # the earlier of the two

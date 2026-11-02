@@ -2,6 +2,9 @@
 
 Status: accepted (2026-10-27), decided by the product owner. Builds on ADR 0014 (authorisation
 matrix), ADR 0029 (updates from the portal) and ADR 0037 (contact block).
+The "read-only" wording of the group check (§3: "writes nothing but its report") is amended
+by ADR 0065 §4. §6's fixed 4-hour alert is now the settings `maintenance_alert_hours` (default 4) and
+`maintenance_alert_repeat_hours` (default 24) in `app/config.py`, read by `app/jobs/worker.py`.
 
 ## Context
 

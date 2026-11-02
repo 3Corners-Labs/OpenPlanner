@@ -22,9 +22,10 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 |---|---|---|---|---|
 | Organisations | `/admin/organisations` | `organisation.view` | wide | `/admin/organisations/new` |
 | Groups | `/admin/groups` | `group.view` | wide | `/admin/groups/new` |
-| Staff | `/admin/staff` | `staff.view` | wide | `/admin/staff/{member_id}` |
+| Staff | `/admin/staff` | `staff.view` | wide | `/admin/staff/invite`, `/admin/staff/{member_id}` |
 | Identity provider mapping | `/admin/idp-mapping` | `idp_mapping.view` | standard | – |
 | My rights | `/admin/rights` | `rights.view` | standard | – |
+| My rights › My sessions | `/admin/rights/sessions` | `rights.view` | standard | – |
 | Rights matrix | `/admin/matrix` | `matrix.view` | wide | `/admin/roles`, `/admin/roles/new`, `/admin/roles/{role_id}` |
 
 ### Platform
@@ -38,6 +39,8 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 | Updates | `/admin/updates` | `system.update` | standard | – |
 | Maintenance | `/admin/maintenance` | `system.maintenance` | standard | – |
 | Advanced settings | `/admin/settings` | `settings.platform.view` | standard | – |
+| Advanced settings › Settings | `/admin/settings/values` | `settings.platform.view` | standard | – |
+| Advanced settings › Configuration package | `/admin/settings/package` | `settings.platform.manage` | standard | – |
 
 ## Top bar
 

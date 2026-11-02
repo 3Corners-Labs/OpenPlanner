@@ -4,6 +4,10 @@ Status: accepted (2026-10-28) by the product owner, with the choices recorded un
 *Choices made on acceptance*. Requested by the product owner. Builds on ADR 0024 (emergency
 closure: suspend, move, cancel), ADR 0027 (staffing as a count of agents), ADR 0039 (adjustable
 roles) and ADR 0043 (dispatch kinds, own queue).
+§2 "no JavaScript" amended by ADR 0010 and 0072: the day view refreshes itself through
+`live-region.js`. Note (2026-11-01 review): §4 (and ADR 0057) send SMS "when the citizen consented";
+there is no SMS consent: SMS goes when a phone number is known (ADR 0009,
+`app/domain/channels.py`).
 
 ## Context
 

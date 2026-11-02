@@ -1,6 +1,10 @@
 # 0017. Video calls through the Webex Meetings API
 
 Status: accepted (2026-10-23). Settles open point O1 for now: Meetings API instead of Instant Connect.
+Point 3's join target amended by ADR 0075 (`webLink` with `launchApp=true` per group). Amended
+by ADR 0072 §7 (whole seconds; a start that has passed becomes the moment of the request).
+Note (2026-11-01 review): ADR 0069 says it amends "the read-only rule of ADR 0017 and 0021";
+this ADR states no such rule (the lock is `Group.change_deadline`, ADR 0043 and 0069).
 
 ## Context
 

@@ -1,6 +1,8 @@
 # 0014. The authorisation matrix is the single source of truth for every layer
 
-Status: accepted (2026-10-23)
+Status: accepted (2026-10-23). Amended by ADR 0031 (audit level), ADR 0039 (adjustable roles,
+auditor) and ADR 0049 (role and scope in one claim). §1 lists three roles; the matrix now has
+five (`auditor`, ADR 0039; `agent`, ADR 0043).
 
 ## Context
 

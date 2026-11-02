@@ -1,0 +1,52 @@
+{# Actions on one person of the bundled identity provider (ADR 0095). Needs: manage, back. #}
+<section class="card" aria-labelledby="manage-heading">
+  <h2 id="manage-heading">{{ _("admin.staff.manage.title") }}</h2>
+  <p class="muted">{{ _("admin.staff.manage.intro") }}</p>
+  {% if not manage.enabled %}<p><span class="chip chip--warning">{{ _("admin.staff.manage.disabled") }}</span></p>{% endif %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.staff.manage.grants") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.staff.manage.role") }}</th><th scope="col">{{ _("admin.staff.manage.place") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.staff.manage.actions") }}</span></th></tr></thead>
+    <tbody>
+      {% for g in manage.grants %}
+      <tr>
+        <td>{{ g.role }}</td><td>{{ g.place }}</td>
+        <td>
+          <form method="post" action="/admin/staff/directory/grants/remove">
+            <input type="hidden" name="subject" value="{{ manage.subject }}">
+            <input type="hidden" name="grant" value="{{ g.key }}">
+            <input type="hidden" name="back" value="{{ back }}">
+            <button type="submit" class="button button--secondary">{{ _("admin.staff.manage.remove") }}<span class="visually-hidden"> {{ g.role }}, {{ g.place }}</span></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if manage.works_elsewhere %}<p class="muted">{{ _("admin.staff.manage.elsewhere") }}</p>{% endif %}
+  <h3>{{ _("admin.staff.manage.add") }}</h3>
+  <form method="post" action="/admin/staff/directory/grants/add">
+    <input type="hidden" name="subject" value="{{ manage.subject }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <div class="form-grid">
+      {% for f in add_fields %}{{ field(f) }}{% endfor %}
+    </div>
+    <div class="form-actions"><button type="submit" class="button">{{ _("admin.staff.manage.add_submit") }}</button></div>
+  </form>
+  <div class="form-actions">
+    <form method="post" action="/admin/staff/directory/enabled">
+      <input type="hidden" name="subject" value="{{ manage.subject }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      <input type="hidden" name="enabled" value="{{ 'no' if manage.enabled else 'yes' }}">
+      <button type="submit" class="button button--secondary">{{ _("admin.staff.manage.disable") if manage.enabled else _("admin.staff.manage.enable") }}</button>
+    </form>
+    {% if can("staff.reset_password") %}
+    <form method="post" action="/admin/staff/directory/reset">
+      <input type="hidden" name="subject" value="{{ manage.subject }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      <button type="submit" class="button button--secondary">{{ _("admin.staff.manage.reset") }}</button>
+    </form>
+    {% endif %}
+  </div>
+</section>

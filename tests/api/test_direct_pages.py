@@ -25,7 +25,7 @@ from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
 from tests.support.domain import NOW
-from tests.support.participant import confirm_newest
+from tests.support.participant import confirm_newest, open_link
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
@@ -135,7 +135,7 @@ async def test_starting_creates_meeting_and_work_item_at_once(site: Site) -> Non
     response = await site.start()
 
     assert response.status_code == 303
-    assert re.fullmatch(r"/b/[A-Za-z0-9_-]+/wait", response.headers["location"])
+    assert re.fullmatch(r"/b/m/[A-Za-z0-9_-]{22}/wait", response.headers["location"])
     assert site.video.created[0].start == NOW
     item = site.dispatcher.items[0]
     assert (item.kind, item.first_name, item.meeting_link) == (
@@ -143,6 +143,7 @@ async def test_starting_creates_meeting_and_work_item_at_once(site: Site) -> Non
         "Ada",
         "https://site.webex.com/m/1",
     )
+    assert "op_link" in response.headers["set-cookie"]  # the call sets the cookie itself
     page = (await site.client.get(response.headers["location"])).text
     assert "We zoeken een medewerker" in page
     assert "http-equiv" not in page  # no automatic reload (WCAG 2.2.1)
@@ -479,16 +480,54 @@ async def test_a_wrong_token_leaves_nothing_and_says_nothing(site: Site) -> None
     assert "We zoeken een medewerker" in (await site.client.get(wait)).text
 
 
+async def test_the_poll_url_is_on_the_reference_and_works_for_as_long_as_the_cookie_lives(
+    site: Site,
+) -> None:
+    """ADR 0093: polling uses the cookie, and every poll extends the server side (idle time)."""
+    wait = (await site.start()).headers["location"]
+    page = (await site.client.get(wait)).text
+    match = re.search(r'data-poll="([^"]+)"', page)
+    assert match is not None
+    poll = match.group(1)
+    assert poll.startswith(f"{wait}/status?seen=")
+
+    statuses = []
+    for _ in range(3):  # 3 x 20 h: longer than the idle lifetime in all, shorter between polls
+        site.clock.advance(timedelta(hours=20))
+        statuses.append((await site.client.get(poll)).status_code)
+
+    assert set(statuses) <= {200, 204}  # a fragment or "unchanged", never a refusal
+    site.clock.advance(timedelta(hours=25))  # nobody polled for longer than the idle lifetime
+    assert (await site.client.get(poll)).status_code == 403
+
+
+async def test_a_reference_without_the_cookie_leaves_nothing_and_says_nothing(site: Site) -> None:
+    """ADR 0093: the cookie, not the reference, lets a browser into the waiting room."""
+    wait = (await site.start()).headers["location"]
+    booking_id = await site.latest_booking_id()
+    site.client.cookies.clear()  # another browser, or the cookie has lapsed
+
+    page = await site.client.get(wait)
+    poll = await site.client.get(f"{wait}/status")
+    post = await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
+    unknown = await site.client.get("/b/m/not-a-reference/wait")
+
+    assert {page.status_code, poll.status_code, post.status_code, unknown.status_code} == {403}
+    assert page.text == unknown.text  # it does not say whether the booking exists
+    assert JobType.END_WXCC_TASK not in await _jobs(site, booking_id)
+
+
 async def test_someone_elses_token_cannot_end_my_call(site: Site) -> None:
     """Abuse case: guessing or altering a token never reaches another participant's call."""
     await _configure(site.database_url, direct_call_max_concurrent=None)
     mine = (await site.start()).headers["location"]
     my_id = await site.latest_booking_id()
-    other_token = mine.split("/")[2][:-1] + ("A" if not mine.split("/")[2].endswith("A") else "B")
+    ref = mine.split("/")[3]
+    other_ref = ref[:-1] + ("A" if not ref.endswith("A") else "B")
 
-    forged = await site.client.post(f"/b/{other_token}/wait/leave", headers=SAME_ORIGIN)
+    forged = await site.client.post(f"/b/m/{other_ref}/wait/leave", headers=SAME_ORIGIN)
 
-    assert forged.status_code == 404
+    assert forged.status_code == 403
     assert JobType.END_WXCC_TASK not in await _jobs(site, my_id)
     assert EventKind.CITIZEN_LEFT not in await _events(site, my_id)
 
@@ -501,14 +540,16 @@ async def test_the_token_of_an_appointment_is_not_a_way_to_leave_it_as_a_call(si
     assert booked.status_code == 303
     token = await confirm_newest(site.client)
 
-    page = await site.client.get(f"/b/{token}/wait/leave")
-    post = await site.client.post(f"/b/{token}/wait/leave", headers=SAME_ORIGIN)
+    base = await open_link(site.client, token)
+
+    page = await site.client.get(f"{base}/wait/leave")
+    post = await site.client.post(f"{base}/wait/leave", headers=SAME_ORIGIN)
 
     assert page.status_code == 303
-    assert page.headers["location"] == f"/b/{token}"
+    assert page.headers["location"] == base
     assert post.status_code == 303
-    assert post.headers["location"] == f"/b/{token}"
-    assert "Geannuleerd" not in (await site.client.get(f"/b/{token}")).text
+    assert post.headers["location"] == base
+    assert "Geannuleerd" not in (await site.client.get(base)).text
 
 
 async def test_leaving_is_refused_across_sites(site: Site) -> None:
@@ -530,23 +571,25 @@ async def test_leaving_is_rate_limited_like_booking(demo_settings: Settings) -> 
     integrations = Integrations(None, FakeVideo(), FakeDispatcher())
     async with app_client(limited, FixedClock(NOW), integrations) as client:
         statuses = [
-            (await client.post("/b/guess/wait/leave", headers=SAME_ORIGIN)).status_code
+            (await client.post("/b/m/guess/wait/leave", headers=SAME_ORIGIN)).status_code
             for _ in range(3)
         ]
 
-    assert statuses == [404, 404, 429]
+    assert statuses == [403, 403, 429]
 
 
 async def test_leaving_logs_the_booking_and_meeting_ids_but_no_token(site: Site) -> None:
     wait = (await site.start()).headers["location"]
-    token = wait.split("/")[2]
+    ref = wait.split("/")[3]
+    cookie = next(iter(site.client.cookies.jar)).value
 
     with structlog.testing.capture_logs() as events:
         await site.client.post(_leave_url(wait), headers=SAME_ORIGIN)
 
     logged = [e for e in events if e["event"] == "direct.left"]
     assert [(e["meeting_id"], e["agent_present"]) for e in logged] == [("meeting-1", False)]
-    assert token not in repr(events)
+    assert ref not in repr(events)
+    assert cookie not in repr(events)
 
 
 async def test_the_direct_page_says_what_the_organisation_and_the_group_call_the_agent(

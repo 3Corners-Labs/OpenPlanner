@@ -7,6 +7,7 @@ the adapter's (``app/adapters/db/configuration_package``); the rules of an expor
 import are ``ConfigurationPackageService`` (``app.domain.configuration_service``).
 """
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -27,10 +28,13 @@ PACKAGE_FILENAME = "openplanner-configuration-{installation}-{date}.sqlite"
 
 
 def package_filename(installation: str, exported_at: datetime) -> str:
-    """Return the download name of a package exported on ``exported_at``."""
-    return PACKAGE_FILENAME.format(
-        installation=installation or "openplanner", date=exported_at.strftime("%Y%m%d")
-    )
+    """Return the download name of a package exported on ``exported_at``.
+
+    The installation name is turned into a slug (lower case, every character outside
+    ``[a-z0-9.-]`` becomes ``-``) so the name always passes the filename rule.
+    """
+    slug = re.sub(r"[^a-z0-9.-]", "-", (installation or "openplanner").lower())
+    return PACKAGE_FILENAME.format(installation=slug, date=exported_at.strftime("%Y%m%d"))
 
 
 VERSION_TABLE = "alembic_version"
@@ -76,6 +80,7 @@ CONFIGURATION_TABLES = frozenset(
 
 STATE_TABLES = frozenset(
     {
+        "admin_sessions",
         "api_access_tokens",
         "audit_events",
         "booking_events",
@@ -90,6 +95,8 @@ STATE_TABLES = frozenset(
         "log_destination_status",
         "maintenance_state",
         "own_certificates",
+        "participant_link_bookings",
+        "participant_link_sessions",
         "release_checks",
         "release_listing",
         "running_versions",

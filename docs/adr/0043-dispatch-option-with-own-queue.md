@@ -5,6 +5,10 @@ Status: accepted (2026-10-28), decided by the product owner with the amendments 
 live queue, the video link's state, and the claim on the citizen's waiting page). Extends ADR 0032 (provider-neutral
 contact center) and ADR 0039 (adjustable roles). Builds on ADR 0010 and 0017 (meeting status
 from Webex webhooks), ADR 0019 and 0026 (direct calls), and ADR 0042 (settings). Partly built; see `docs/adr-status.md` for what is built.
+The change deadline is superseded by ADR 0069. Point 2 (`BookingDispatcher` port), point 3
+(moving jobs on a change of kind) and the adapter files named in the Consequences were not
+built; the *Acceptance* section replaced them. A `contact_center` group without WxCC fields
+dispatches nothing (`Group.dispatch_enabled`, `app/domain/scheduling.py`).
 
 ## Context
 

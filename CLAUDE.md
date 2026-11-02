@@ -84,8 +84,8 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 - External penetration test before go-live and yearly; `SECURITY.md` and `/.well-known/security.txt` describe responsible disclosure.
 
 ## Privacy rules
-- PII fields: `first_name, last_name, email, phone, note, form_answers, guest_join_url, host_join_url, trial_join_url`. Only on `Booking`. Nowhere else. Answers to a group's custom form fields (ADR 0055) are read only through `Answers.visible(purpose)`; never read a field's PII tag yourself.
-- `purge_pii` job runs at `slot.end + 24h` or `cancelled_at + 24h`; sets fields to NULL and `pii_purged_at`. A nightly sweep re-checks for stragglers and alerts if any booking older than 48 h still has PII.
+- PII fields: `first_name, last_name, email, phone, form_answers, guest_join_url, host_join_url, trial_join_url`. Only on `Booking`. Nowhere else. The provider links `video_room_id, trial_room_id, wxcc_task_id` (and `claimed_by`) are no PII on their own but find it again at the provider, so the purge deletes them too; `app/domain/privacy.py` (`DATA_FIELDS`, `DERIVED_FIELDS`, `PURGED_FIELDS`) is the one list, `purge_personal_data` works from it, and a test checks that. A purge *deletes fields from the appointment*; it does not make the booking anonymous: write "deleted" in code, docs, manual and interface, never "anonymised" (ADR 0102). Answers to a group's custom form fields (ADR 0055) are read only through `Answers.visible(purpose)`; never read a field's PII tag yourself.
+- `purge_pii` job runs at `slot.end + 24h` or `cancelled_at + 24h`; sets those fields to NULL, empties `booking_events.message`, replaces `management_token_hash` by a random value and sets `pii_purged_at`. A nightly sweep re-checks for stragglers and alerts if any booking older than 48 h still has PII.
 - Outbound payloads to any contact-center provider (Webex Contact Center today, ADR 0032) contain only first name, the host join URL and the routing variables of ADR 0081 (subject and attribute codes from a closed list, never free text or a PII field).
 - Data flow diagram in `docs/dataflow.md` is the input for the DPIA; keep it current.
 

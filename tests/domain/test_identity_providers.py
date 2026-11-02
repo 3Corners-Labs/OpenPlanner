@@ -161,3 +161,14 @@ def test_the_jwks_is_stable_and_carries_the_key_ids() -> None:
     assert jwks(keys) == {
         "keys": [{"kty": "EC", "x": "a", "kid": "kid-a"}, {"kty": "EC", "x": "b", "kid": "kid-b"}]
     }
+
+
+def test_the_mfa_policy_defaults_to_record_and_is_validated() -> None:
+    from app.domain.mfa import MfaPolicy
+
+    assert draft().mfa_policy is MfaPolicy.RECORD
+    assert draft(mfa_policy="require", mfa_amr_values="otp  otp x").mfa_amr_values == "otp x"
+    for bad in ({"mfa_policy": "sometimes"}, {"mfa_amr_values": "a<b"}, {"mfa_acr_values": "<"}):
+        with pytest.raises(DomainError) as refused:
+            draft(**bad)
+        assert refused.value.code is ErrorCode.INVALID_CONFIGURATION

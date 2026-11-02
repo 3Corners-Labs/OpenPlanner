@@ -1,9 +1,9 @@
 # 0079. The release is a workflow: release PR, audit and tag by dispatch
 
-Status: proposed (2026-10-31), requested by the product owner. Amends ADR 0052 (point 3: the
-release PR and the tag come from the `release` workflow; the dispatch is the instruction) and
-ADR 0078 (point 4: the audit runs as a job, not on a laptop; its step 5 is prepared here).
-Partly built; see *Build status*.
+Status: accepted (2026-10-31, `po:approved` on #183), requested by the product owner. Amends
+ADR 0052 (point 3: the release PR and the tag come from the `release` workflow; the dispatch is
+the instruction) and ADR 0078 (point 4: the audit runs as a job, not on a laptop; its step 5 is
+prepared here). Partly built; see *Build status*.
 
 ## Context
 
@@ -101,9 +101,9 @@ They are process constants, not behaviour of the application.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #183 | in PR |
-| 1 | `scripts/release_pr.py` with `tests/scripts/test_release_pr.py`; `.github/workflows/release.yml` with the jobs `release-pr`, `audit` and `tag`; runbook, `docs/skills.md`, `docs/adr-status.md` | #183 | in PR |
-| 2 | Dry run of both dispatches on the PR branch, output in the PR description | #183 | in PR |
+| 0 | ADR proposed | #183 | merged 2026-10-31 |
+| 1 | `scripts/release_pr.py` with `tests/scripts/test_release_pr.py`; `.github/workflows/release.yml` with the jobs `release-pr`, `audit` and `tag`; runbook, `docs/skills.md`, `docs/adr-status.md` | #183 | merged 2026-10-31 |
+| 2 | Dry run of both dispatches on the PR branch, output in the PR description | #183 | merged 2026-10-31 |
 | 3 | The product owner creates the secrets `RELEASE_TOKEN` and `OPENAI_API_KEY` (and the variable `RELEASE_RUNNER` for a self-hosted runner) | | planned |
 | 4 | First release through the workflow, `v0.4.0`, with the first real audit (ADR 0078 step 5); the ADR's Status line becomes accepted | | planned |
 

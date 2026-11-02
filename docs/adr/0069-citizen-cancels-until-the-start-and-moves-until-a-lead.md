@@ -2,6 +2,8 @@
 
 Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0043 (change
 deadline per kind) and the read-only rule of ADR 0017 and 0021. Settings per ADR 0042.
+The column `citizen_change_lead_minutes` is renamed `participant_change_lead_minutes` by
+ADR 0077 point 3a.
 
 ## Context
 

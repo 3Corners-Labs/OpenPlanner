@@ -1,6 +1,8 @@
 # 0007. Contact-center dispatch through the WxCC Tasks API
 
 Status: accepted (2026-10-23); points 1–2 superseded by ADR 0018. Supersedes HANDOVER B6 in part.
+Point 3 (payload) and point 4 (webhook events) superseded by ADR 0018 §2 and §4; point 5 (SMS
+route) settled by ADR 0022 and ADR 0028.
 
 ## Context
 

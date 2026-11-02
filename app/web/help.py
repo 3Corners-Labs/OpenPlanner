@@ -81,7 +81,12 @@ TOPICS = (
         Permission.ROLES_MANAGE,
     ),
     HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
-    HelpTopic("staff", ("/admin/staff", "/admin/staff/{member_id}"), Permission.STAFF_VIEW),
+    HelpTopic(
+        "staff",
+        ("/admin/staff", "/admin/staff/invite", "/admin/staff/{member_id}"),
+        Permission.STAFF_VIEW,
+    ),
+    HelpTopic("my-sessions", ("/admin/rights/sessions",), Permission.RIGHTS_VIEW),
     HelpTopic("idp-mapping", ("/admin/idp-mapping",), Permission.IDP_MAPPING_VIEW),
     HelpTopic("audit", ("/admin/audit",), Permission.AUDIT_VIEW),
     HelpTopic(
@@ -149,7 +154,12 @@ TOPICS = (
         ("/admin/logging", "/admin/logging/new", "/admin/logging/{destination_id}"),
         Permission.LOGGING_VIEW,
     ),
-    HelpTopic("advanced-settings", ("/admin/settings",), Permission.SETTINGS_PLATFORM_VIEW),
+    # ADR 0101: one topic for the three sub-tabs of Advanced settings.
+    HelpTopic(
+        "advanced-settings",
+        ("/admin/settings", "/admin/settings/values", "/admin/settings/package"),
+        Permission.SETTINGS_PLATFORM_VIEW,
+    ),
     # ADR 0063: the Data fields card on Advanced settings; no route of its own.
     HelpTopic("data-fields", (), Permission.SETTINGS_PLATFORM_VIEW),
     HelpTopic(

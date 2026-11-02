@@ -1,17 +1,32 @@
 """System status and Advanced settings, read-only (ADR 0042 §11, build step 3)."""
 
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import AuditEventRow, PlatformSettingRow, SettingsVersionRow
+from app.adapters.crypto import SecretBox
+from app.adapters.db.credentials import CredentialStore
+from app.adapters.db.engine import create_engine
+from app.adapters.db.models import (
+    AuditEventRow,
+    BookingRow,
+    GroupRow,
+    PlatformSettingRow,
+    SettingsVersionRow,
+    SlotRow,
+)
+from app.adapters.integrations import installation_box
 from app.admin.settings_routes import _FIELD_LABELS
+from app.config import Settings
 from app.domain.authorization import Principal
 from app.domain.privacy import PII_FIELDS
+from app.domain.tokens import derive_token, hash_token
 from app.web.protection import booking_limit, unknown_link_limit
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
 from tests.support.principals import principal
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
@@ -30,7 +45,9 @@ async def _store(site: Site, **values: str) -> None:
 async def test_the_auditor_sees_the_status_and_every_portal_setting(site: Site) -> None:
     await site.login_as(AUDITOR)
 
-    text = (await site.client.get("/admin/settings")).text
+    text = (await site.client.get("/admin/settings")).text + (
+        await site.client.get("/admin/settings/values")
+    ).text
 
     assert '<h1 id="page-title">Geavanceerde instellingen</h1>' in text
     assert "Systeemstatus" in text
@@ -43,7 +60,9 @@ async def test_the_auditor_sees_the_status_and_every_portal_setting(site: Site) 
 async def test_secrets_and_bootstrap_values_are_never_shown(site: Site) -> None:
     await site.login_as(SUPER)
 
-    text = (await site.client.get("/admin/settings")).text
+    text = (await site.client.get("/admin/settings")).text + (
+        await site.client.get("/admin/settings/values")
+    ).text
 
     assert "x" * 32 not in text  # the session secret of the test settings
     assert "t" * 32 not in text  # the management token key
@@ -76,7 +95,7 @@ async def test_a_stored_portal_value_applies_without_a_restart(site: Site) -> No
     await _store(site, admin_session_hours="4", rate_limit_bookings='"99/hour"')
     await site.login_as(SUPER)
 
-    text = (await site.client.get("/admin/settings")).text
+    text = (await site.client.get("/admin/settings/values")).text
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
 
     assert "Beheerportaal" in text  # the portal as source
@@ -96,7 +115,7 @@ async def test_an_environment_lock_names_its_variable(site: Site) -> None:
     await _store(site, admin_session_hours="4")
     await site.login_as(SUPER)
 
-    text = (await site.client.get("/admin/settings")).text
+    text = (await site.client.get("/admin/settings/values")).text
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
 
     assert "Vastgezet door de beheerder van de server: <code>ADMIN_SESSION_HOURS</code>" in text
@@ -121,8 +140,8 @@ async def test_the_superuser_changes_a_setting_and_it_applies_at_once(site: Site
     )
 
     assert response.status_code == 303
-    assert response.headers["location"].startswith("/admin/settings?done=saved")
-    page = (await site.client.get("/admin/settings")).text
+    assert response.headers["location"].startswith("/admin/settings/values?done=saved")
+    page = (await site.client.get("/admin/settings/values")).text
     assert app.state.settings.admin_session_hours == 4
     assert 'action="/admin/settings/admin_session_hours/reset"' in page
 
@@ -183,7 +202,7 @@ async def test_the_unknown_link_bound_follows_a_change_and_keeps_its_bounds(site
 async def test_the_auditor_sees_no_forms_and_may_not_post(site: Site) -> None:
     await site.login_as(AUDITOR)
 
-    page = (await site.client.get("/admin/settings")).text
+    page = (await site.client.get("/admin/settings/values")).text
     response = await site.client.post(
         "/admin/settings/admin_session_hours", data={"value": "4"}, headers=SAME_ORIGIN
     )
@@ -196,7 +215,7 @@ async def test_the_auditor_sees_no_forms_and_may_not_post(site: Site) -> None:
 async def test_a_locked_setting_has_no_field(site: Site) -> None:
     await site.login_as(SUPER)
 
-    page = (await site.client.get("/admin/settings")).text
+    page = (await site.client.get("/admin/settings/values")).text
 
     assert 'name="admin_session_hours"' not in page
     assert 'name="admin_reauth_minutes"' in page
@@ -214,7 +233,7 @@ async def test_a_secret_is_written_but_never_shown(site: Site) -> None:
     response = await site.client.post(
         "/admin/settings/smtp_password", data={"value": SECRET}, headers=SAME_ORIGIN
     )
-    page = (await site.client.get("/admin/settings")).text
+    page = (await site.client.get("/admin/settings/values")).text
 
     assert response.status_code == 303
     assert SECRET not in page
@@ -244,11 +263,11 @@ async def test_a_locked_value_is_taken_over_and_names_the_variable_to_remove(
 ) -> None:
     await site.login_as(SUPER)
 
-    before = (await site.client.get("/admin/settings")).text
+    before = (await site.client.get("/admin/settings/values")).text
     response = await site.client.post(
         "/admin/settings/admin_session_hours/adopt", headers=SAME_ORIGIN
     )
-    after = (await site.client.get("/admin/settings")).text
+    after = (await site.client.get("/admin/settings/values")).text
 
     assert 'action="/admin/settings/admin_session_hours/adopt"' in before
     assert response.status_code == 303
@@ -278,7 +297,7 @@ async def _try(site: Site, trial: Principal) -> str:
         "/admin/settings/login/test", data=LOGIN_FORM, headers=SAME_ORIGIN
     )
     assert response.status_code == 303
-    assert response.headers["location"] == "/admin/login?next=/admin/settings&fresh=1"
+    assert response.headers["location"] == "/admin/login?next=/admin/settings/values&fresh=1"
     site.idp.trial_principal = trial
     start = await site.client.get(response.headers["location"])
     assert start.status_code == 303
@@ -294,7 +313,7 @@ async def test_a_mapping_that_keeps_the_superuser_is_saved_after_a_fresh_login(
 
     location = await _try(site, SUPER)
 
-    assert location == "/admin/settings?done=login_mapping_saved"
+    assert location == "/admin/settings/values?done=login_mapping_saved"
     assert site.idp.fresh[-1] is True
     await site.client.get("/admin/settings")
     assert app.state.settings.oidc_role_claim == "realm_roles"
@@ -307,7 +326,7 @@ async def test_a_mapping_that_would_lock_out_is_not_saved(site: Site) -> None:
 
     location = await _try(site, nobody)
 
-    assert location == "/admin/settings?done=login_mapping_refused"
+    assert location == "/admin/settings/values?done=login_mapping_refused"
     await site.client.get("/admin/settings")
     assert app.state.settings.oidc_role_claim == "roles"
 
@@ -328,7 +347,7 @@ async def test_an_invalid_mapping_is_refused_before_any_login(site: Site) -> Non
 async def test_only_the_superuser_sees_and_posts_the_login_mapping(site: Site) -> None:
     await site.login_as(AUDITOR)
 
-    page = (await site.client.get("/admin/settings")).text
+    page = (await site.client.get("/admin/settings/values")).text
     response = await site.client.post(
         "/admin/settings/login/test", data=LOGIN_FORM, headers=SAME_ORIGIN
     )
@@ -368,7 +387,7 @@ async def test_a_webex_service_app_set_in_the_portal_wires_the_integrations(site
             f"/admin/settings/{key}", data={"value": value}, headers=SAME_ORIGIN
         )
         assert response.status_code == 303, key
-    page = (await site.client.get("/admin/settings")).text
+    page = (await site.client.get("/admin/settings/values")).text
 
     assert app.state.integrations.video is not None
     assert app.state.call_service is not None
@@ -387,7 +406,7 @@ async def test_the_data_fields_card_is_read_only_and_links_to_the_manual(site: S
     for field in PII_FIELDS:
         assert f'<code class="muted">{field}</code>' in text
     assert text.count("Direct: identificeert de deelnemer op zichzelf") == 4
-    assert text.count("Gevoelig: wat de deelnemer ons vertelde") == 5
+    assert text.count("Gevoelig: wat de deelnemer ons vertelde") == 4
     assert "ligt vast in de software" in text
     assert 'href="/admin/help/data-fields"' in text
     card = text.split('id="data-fields"')[1].split("</section>")[0]
@@ -449,7 +468,7 @@ async def test_system_status_without_a_check_says_so(site: Site) -> None:
 async def test_each_topic_is_one_form_with_one_save(site: Site) -> None:
     await site.login_as(SUPER)
 
-    page = (await site.client.get("/admin/settings")).text
+    page = (await site.client.get("/admin/settings/values")).text
 
     assert 'action="/admin/settings/topic/admin_session"' in page
     assert 'formaction="/admin/settings/' not in page  # nothing stored yet: no reset buttons
@@ -471,10 +490,10 @@ async def test_the_topic_form_saves_only_what_differs(site: Site) -> None:
         },
         headers=SAME_ORIGIN,
     )
-    page = (await site.client.get("/admin/settings")).text
+    page = (await site.client.get("/admin/settings/values")).text
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/admin/settings?done=saved#topic-admin_session"
+    assert response.headers["location"] == "/admin/settings/values?done=saved#topic-admin_session"
     assert app.state.settings.admin_session_hours == 4
     assert 'formaction="/admin/settings/admin_session_hours/reset"' in page
     assert 'formaction="/admin/settings/admin_reauth_minutes/reset"' not in page
@@ -490,7 +509,9 @@ async def test_the_topic_form_with_nothing_new_changes_nothing(site: Site) -> No
         headers=SAME_ORIGIN,
     )
 
-    assert response.headers["location"] == "/admin/settings?done=unchanged#topic-admin_session"
+    assert (
+        response.headers["location"] == "/admin/settings/values?done=unchanged#topic-admin_session"
+    )
 
 
 async def test_the_topic_form_stops_at_the_first_refusal(site: Site) -> None:
@@ -524,7 +545,7 @@ async def test_the_topic_form_sets_a_boolean_and_an_empty_secret_keeps_the_curre
     )
     await site.client.get("/admin/settings")
 
-    assert response.headers["location"] == "/admin/settings?done=saved#topic-mail"
+    assert response.headers["location"] == "/admin/settings/values?done=saved#topic-mail"
     assert app.state.settings.smtp_tls is True
     assert app.state.settings.smtp_password.get_secret_value() == SECRET
 
@@ -545,7 +566,7 @@ async def _export(site: Site) -> bytes:
 
 async def test_the_superuser_exports_a_package_and_imports_it_again(site: Site) -> None:
     await site.login_as(SUPER)
-    page = (await site.client.get("/admin/settings")).text
+    page = (await site.client.get("/admin/settings/package")).text
     assert 'id="package-heading"' in page
 
     package = await _export(site)
@@ -560,7 +581,7 @@ async def test_the_superuser_exports_a_package_and_imports_it_again(site: Site) 
     assert response.status_code == 303, response.text
     assert (
         response.headers["location"]
-        == "/admin/settings?done=package_imported&count=2#package-heading"
+        == "/admin/settings/package?done=package_imported&count=2#package-heading"
     )
     page = (await site.client.get(response.headers["location"])).text
     assert "Het configuratiepakket is geïmporteerd: 2 organisatie(s)." in page
@@ -625,3 +646,125 @@ async def test_the_auditor_sees_no_package_block(site: Site) -> None:
     page = (await site.client.get("/admin/settings")).text
 
     assert 'id="package-heading"' not in page
+    assert 'href="/admin/settings/package"' not in page  # ADR 0101: no sub-tab without the right
+    assert (await site.client.get("/admin/settings/package")).status_code == 403
+
+
+async def test_advanced_settings_shows_its_sub_tabs_and_a_table_of_contents(site: Site) -> None:
+    """ADR 0101: three sub-tabs, the current one marked; "On this page" lists every topic."""
+    await site.login_as(SUPER)
+
+    status = (await site.client.get("/admin/settings")).text
+    values = (await site.client.get("/admin/settings/values")).text
+
+    assert '<a href="/admin/settings" aria-current="page"><span>Systeemstatus</span></a>' in status
+    assert '<a href="/admin/settings/values"><span>Instellingen</span></a>' in status
+    assert '<a href="/admin/settings/package"><span>Configuratiepakket</span></a>' in status
+    assert 'id="topic-' not in status
+    assert 'id="package-heading"' not in values
+    assert "Op deze pagina" in values
+    for topic in re.findall(r'<h2 id="(topic-[a-z_]+)">', values):
+        assert f'href="#{topic}"' in values, topic
+
+
+# --- Key rotation counters on System status (ADR 0094 points 3 and 4) ---
+
+OLD_SETTINGS_KEY = "o" * 40
+NEW_SETTINGS_KEY = "n" * 40
+
+
+async def test_without_a_previous_key_system_status_has_no_rotation_block(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    text = (await site.client.get("/admin/settings")).text
+
+    assert 'id="keys-heading"' not in text
+
+
+async def test_system_status_counts_what_is_still_under_the_previous_key(
+    settings: Settings, admin_db: str
+) -> None:
+    engine = create_engine(admin_db)
+    await CredentialStore(engine, SecretBox(OLD_SETTINGS_KEY.encode())).put(
+        "webex_service_app", {"access_token": "secret-value"}, NOW
+    )
+    await engine.dispose()
+    rotating = settings.model_copy(
+        update={
+            "settings_encryption_key": SecretStr(NEW_SETTINGS_KEY),
+            "settings_encryption_key_previous": SecretStr(OLD_SETTINGS_KEY),
+        }
+    )
+
+    async with _running_site(rotating, admin_db) as running:
+        await running.login_as(SUPER)
+        text = (await running.client.get("/admin/settings")).text
+
+        assert 'id="keys-heading"' in text
+        assert "<dt>Versleutelde geheimen onder de vorige sleutel</dt><dd>1</dd>" in text
+        assert "python -m app.cli rekey" in text
+        assert "PREVIOUS kan worden verwijderd" not in text
+        assert "secret-value" not in text
+        assert OLD_SETTINGS_KEY not in text
+        assert NEW_SETTINGS_KEY not in text
+
+        app = running.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        await CredentialStore(app.state.engine, installation_box(rotating)).put(
+            "webex_service_app", {"access_token": "secret-value"}, NOW
+        )
+        text = (await running.client.get("/admin/settings")).text
+
+        assert "<dt>Versleutelde geheimen onder de vorige sleutel</dt><dd>0</dd>" in text
+        assert "SETTINGS_ENCRYPTION_KEY_PREVIOUS kan worden verwijderd" in text
+
+
+async def test_system_status_counts_open_bookings_on_the_previous_token_key(
+    settings: Settings, admin_db: str
+) -> None:
+    previous = "p" * 40
+    current = "c" * 40
+    rotating = settings.model_copy(
+        update={
+            "management_token_key": SecretStr(current),
+            "management_token_key_previous": SecretStr(previous),
+        }
+    )
+
+    async with _running_site(rotating, admin_db) as running:
+        app = running.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        async with AsyncSession(app.state.engine) as session:
+            group = (await session.scalars(select(GroupRow.id).limit(1))).one()
+        # A separate write transaction: a read that turns into a write can be refused as busy.
+        async with AsyncSession(app.state.engine) as session, session.begin():
+            slot = SlotRow(
+                group_id=group,
+                start=NOW + timedelta(days=1),
+                end=NOW + timedelta(days=1, hours=1),
+                capacity_snapshot=1,
+            )
+            session.add(slot)
+            await session.flush()
+            for status, salt, key in (
+                ("confirmed", "one", previous),
+                ("confirmed", "two", current),
+                ("cancelled", "three", previous),
+            ):
+                session.add(
+                    BookingRow(
+                        slot_id=slot.id,
+                        group_id=group,
+                        status=status,
+                        locale="nl",
+                        management_token_hash=hash_token(derive_token(key.encode(), salt)),
+                        management_token_salt=salt,
+                        public_ref=f"ref-{salt}",
+                        created_at=NOW,
+                    )
+                )
+        await running.login_as(SUPER)
+
+        text = (await running.client.get("/admin/settings")).text
+
+        assert "Lopende boekingen met een koppeling onder de vorige sleutel</dt><dd>1</dd>" in text
+        assert "MANAGEMENT_TOKEN_KEY_PREVIOUS pas als dit aantal 0 is" in text
+        assert "Versleutelde geheimen onder de vorige sleutel" not in text

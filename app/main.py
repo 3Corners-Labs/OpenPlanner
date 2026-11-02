@@ -38,6 +38,7 @@ from app.adapters.integrations import (
     secret_box,
     webex_fingerprint,
 )
+from app.adapters.keycloak_directory import KeycloakDirectory
 from app.adapters.live_settings import LiveSettings, keep_current
 from app.adapters.log_senders import build_sender
 from app.adapters.log_shipping import LogShipper, LogTester, SenderFactory, ship_settings
@@ -48,6 +49,7 @@ from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.tls_probe import SslCertificateProbe
 from app.admin.routes import register_admin
+from app.admin.session import session_cookie_for
 from app.api import (
     booking_pages,
     brand_assets,
@@ -66,6 +68,7 @@ from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
+from app.domain.admin_session_service import AdminSessionService
 from app.domain.agenda_service import AgendaService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
@@ -92,8 +95,10 @@ from app.domain.login_service import ClaimSettings, LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.meeting_status_service import MeetingStatusService
 from app.domain.messaging_service import MessagingService
+from app.domain.mfa import MfaPolicy
 from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
+from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.platform_settings import PlatformSettingsStore
@@ -104,6 +109,7 @@ from app.domain.ports import (
     IdentityProvider,
     MailDomainResolver,
     SigningKeys,
+    StaffDirectory,
 )
 from app.domain.queue_service import QueueService
 from app.domain.request_log import RequestEvents
@@ -113,6 +119,7 @@ from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
 from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
+from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
 from app.domain.system_log import SystemLog
 from app.domain.tls import public_address
 from app.domain.tls_check import CertificateStatus, TlsWatch
@@ -122,8 +129,10 @@ from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
     agent_pseudonym_key,
+    agent_pseudonym_key_previous,
     client_pseudonym_key,
     management_token_key,
+    management_token_key_previous,
     session_secret,
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
@@ -161,6 +170,10 @@ def oidc_provider(
         client_id=settings.oidc_client_id,
         client_secret=secret,
         scopes=settings.oidc_scopes,
+        mfa_policy=MfaPolicy.REQUIRE if settings.admin_mfa_required else MfaPolicy.OFF,
+        acr_values=settings.oidc_acr_values,
+        mfa_amr_values=settings.oidc_mfa_amr_values,
+        mfa_acr_values=settings.oidc_mfa_acr_values,
         mapping=lambda: claim_mapping(
             current().login_values, current().oidc_entitlements_max_values
         ),
@@ -178,6 +191,18 @@ def _confirm_policy(settings: Settings) -> ConfirmPolicy:
     )
 
 
+def _keycloak_directory(settings: Settings) -> StaffDirectory | None:
+    """Return the staff directory of the bundled Keycloak, or ``None`` without its settings."""
+    secret = settings.keycloak_directory_client_secret
+    if not settings.keycloak_admin_url or secret is None:
+        return None
+    return KeycloakDirectory(
+        settings.keycloak_admin_url,
+        settings.keycloak_directory_client_id,
+        secret.get_secret_value(),
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     clock: Clock | None = None,
@@ -188,6 +213,7 @@ def create_app(
     discovery_fetcher: DiscoveryFetcher | None = None,
     signing_keys: SigningKeys | None = None,
     organisation_providers: OrganisationProviders | None = None,
+    staff_directory: StaffDirectory | None = None,
     log_sender_factory: SenderFactory | None = None,
 ) -> FastAPI:
     """Build the application.
@@ -208,6 +234,8 @@ def create_app(
         signing_keys: Explicit key generator (tests); defaults to EC P-256 pairs.
         organisation_providers: Explicit registry of organisation provider adapters (tests);
             defaults to one built from the database.
+        staff_directory: Explicit staff directory (tests); defaults to the bundled Keycloak's
+            admin API when ``KEYCLOAK_ADMIN_URL`` is set, else none (ADR 0095).
         log_sender_factory: Explicit builder of the log destination senders (tests); defaults
             to the real syslog, Splunk, Elastic and HTTP adapters.
 
@@ -346,8 +374,13 @@ def create_app(
             token_key,
             phone_region=lambda org: per_organisation(org).phone_default_region,
             confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
+            previous_token_key=management_token_key_previous(settings),
+            closure_retention=app.state.live_settings.closure_retention,
         )
-        app.state.admin_service = AdminService(uow, clock)
+        app.state.participant_link_service = ParticipantLinkService(uow, clock)
+        app.state.admin_service = AdminService(
+            uow, clock, app.state.live_settings.closure_retention
+        )
         app.state.log_destination_service = LogDestinationService(
             uow,
             clock,
@@ -361,6 +394,7 @@ def create_app(
                 lambda: ship_settings(live()),
             ),
         )
+        app.state.admin_session_service = AdminSessionService(uow, clock)
         # ADR 0049: claims become grants per request; the mode is class B, the prefix C.
         app.state.login_service = LoginService(
             uow,
@@ -397,6 +431,17 @@ def create_app(
                 live().oidc_entitlement_claim,
                 live().oidc_entitlement_prefix,
                 live().idp_mapping_refused_window_days,
+            ),
+        )
+        app.state.staff_directory_service = StaffDirectoryService(
+            uow,
+            clock,
+            app.state.admin_service,
+            staff_directory if staff_directory is not None else _keycloak_directory(settings),
+            lambda: DirectorySettings(
+                live().staff_directory_enabled,
+                live().oidc_entitlement_prefix,
+                live().staff_invite_expiry_days,
             ),
         )
         app.state.form_service = FormService(
@@ -461,7 +506,11 @@ def create_app(
         )
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         app.state.queue_service = QueueService(
-            uow, clock, app.state.admin_service, agent_pseudonym_key(settings)
+            uow,
+            clock,
+            app.state.admin_service,
+            agent_pseudonym_key(settings),
+            agent_pseudonym_key_previous(settings),
         )
         app.state.integration_service = IntegrationService(
             uow,
@@ -513,6 +562,8 @@ def create_app(
             senders,
             mail_domain_resolver or DnsTxtResolver(),
             lambda: live().mail_from if live().smtp_host else None,
+            production=settings.environment == "prod",
+            plaintext_relay_allowed=settings.smtp_plaintext_relay_allowed,
         )
         text_overrides.attach(uow)
         app.state.organisation_text_service = OrganisationTextService(
@@ -541,7 +592,11 @@ def create_app(
             uow, clock, app.state.admin_service, app.state.translator.locales
         )
         app.state.closure_service = ClosureService(
-            uow, clock, app.state.admin_service, app.state.booking_service
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.booking_service,
+            app.state.live_settings.closure_retention,
         )
         app.state.planner_service = PlannerService(
             uow,
@@ -624,15 +679,17 @@ def create_app(
     # has opened it (until then, and in tools without one, the shipped texts apply).
     text_overrides = CachedTextOverrides()
     app.state.translator = Translator(load_catalogues(), text_overrides)
-    # Admin session (ADR 0013): only sent to /admin, signed, HttpOnly, SameSite=Lax.
+    # Admin session (ADR 0098 point 12): signed, HttpOnly, SameSite=Lax; `__Host-op_admin`,
+    # `Path=/` and `Secure` when PUBLIC_BASE_URL is https, whatever ENVIRONMENT says.
+    cookie = session_cookie_for(settings.public_base_url)
     app.add_middleware(
         SessionMiddleware,
         secret_key=session_secret(settings),
-        session_cookie="op_admin",
-        path="/admin",
+        session_cookie=cookie.name,
+        path=cookie.path,
         max_age=settings.admin_session_hours * 3600,
         same_site="lax",
-        https_only=settings.environment == "prod",
+        https_only=cookie.secure,
     )
     app.add_middleware(SecurityHeadersMiddleware)
     # Outermost: every request, its log lines and its audit events share one trace (ADR 0040).

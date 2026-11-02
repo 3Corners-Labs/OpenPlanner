@@ -1,0 +1,41 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_subtabs.html" import subtab_row %}
+{% block title %}{{ _("admin.sessions.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.sessions.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.sessions.intro") }}</p>
+  </div>
+</div>
+{{ subtab_row(entry_tabs, _("admin.rights.sections")) }}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+<section class="card" aria-labelledby="sessions-heading">
+  <h2 id="sessions-heading">{{ _("admin.sessions.caption") }}</h2>
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.sessions.caption") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.sessions.login") }}</th><th scope="col">{{ _("admin.sessions.last_seen") }}</th><th scope="col">{{ _("admin.sessions.status") }}</th></tr>
+    </thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr>
+        <td class="nowrap">{{ s.login }}</td>
+        <td class="nowrap">{{ s.last_seen }}</td>
+        <td>{% if s.current %}<span class="chip chip--accent">{{ _("admin.sessions.current") }}</span>{% else %}{{ _("admin.sessions.other") }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if others %}
+  <form method="post" action="/admin/rights/sessions/end-others">
+    <p class="muted" id="end-others-help">{{ _("admin.sessions.end_others_help") }}</p>
+    <button type="submit" class="button button--secondary" aria-describedby="end-others-help">{{ _("admin.sessions.end_others") }}</button>
+  </form>
+  {% else %}
+  <p class="muted">{{ _("admin.sessions.no_others") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

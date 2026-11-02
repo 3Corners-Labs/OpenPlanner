@@ -9,10 +9,14 @@ from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
-from starlette.responses import Response
+from sqlalchemy.exc import DBAPIError
+from starlette.responses import JSONResponse, Response
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.security_log import (
+    DATABASE_ERROR,
+    DATABASE_FAILED,
+    LINK_REQUIRED,
     RATE_LIMITED,
     REQUEST_REJECTED,
     TOKEN_REJECTED,
@@ -22,7 +26,7 @@ from app.domain.security_log import (
 from app.web.errors import ERROR_KEYS, status_for
 from app.web.locale import resolve_locale
 from app.web.protection import RejectedRequest, count_unknown_link
-from app.web.security_events import report
+from app.web.security_events import report, report_failure
 from app.web.templates import create_templates, render
 
 templates = create_templates([])
@@ -31,6 +35,9 @@ MACHINE_PREFIXES = ("/api/", "/webhooks/")
 """Paths whose callers are programs: they keep FastAPI's JSON validation answer, which the
 OpenAPI spec documents (``HTTPValidationError``)."""
 """Path prefix of the participant's management link; a 404 under it matches no link."""
+
+_LINK_MISSES = {ErrorCode.BOOKING_NOT_FOUND, ErrorCode.LINK_REQUIRED}
+"""Errors under a management link that count against the budget for links that match nothing."""
 
 _NOT_FOUND = {
     ErrorCode.GROUP_NOT_FOUND,
@@ -74,12 +81,13 @@ async def domain_error_page(request: Request, exc: Exception) -> Response:
     """Render a domain error that a route did not handle itself."""
     if not isinstance(exc, DomainError):  # pragma: no cover - registered for DomainError only
         raise TypeError("expected a DomainError")
-    if exc.code is ErrorCode.BOOKING_NOT_FOUND and request.url.path.startswith(
-        MANAGEMENT_LINK_PREFIX
-    ):
+    if exc.code in _LINK_MISSES and request.url.path.startswith(MANAGEMENT_LINK_PREFIX):
         if count_unknown_link(request):
             return await _too_many_unknown_links(request)
-        await report(request, TOKEN_REJECTED, UNKNOWN_MANAGEMENT_LINK)
+        reason = (
+            UNKNOWN_MANAGEMENT_LINK if exc.code is ErrorCode.BOOKING_NOT_FOUND else LINK_REQUIRED
+        )
+        await report(request, TOKEN_REJECTED, reason)
     if exc.code in _NOT_FOUND:
         return _page(request, 404, "error.not_found.title", "error.not_found.text")
     return _page(request, status_for(exc), "error.title", ERROR_KEYS[exc.code])
@@ -113,9 +121,31 @@ async def rate_limited_page(request: Request, exc: Exception) -> Response:
     return _rate_limited_response(request)
 
 
+async def database_error_page(request: Request, exc: Exception) -> Response:
+    """Answer a database error with 503 and a catalogue text, after leaving a coded event.
+
+    The transaction has been rolled back by then. The exception is not logged with its text
+    (ASVS V16.2.5); the event carries the code ``database_error`` and the surface only.
+    """
+    machine = request.url.path.startswith(MACHINE_PREFIXES)
+    await report_failure(
+        request,
+        DATABASE_ERROR,
+        DATABASE_FAILED,
+        detail="surface:agent" if machine else "surface:web",
+    )
+    if machine:
+        response: Response = JSONResponse({"error": "database_unavailable"}, status_code=503)
+    else:
+        response = _page(request, 503, "error.title", "error.database_unavailable")
+    response.headers["retry-after"] = "60"
+    return response
+
+
 def register_error_pages(app: FastAPI) -> None:
     """Install the handlers on ``app``."""
     app.add_exception_handler(DomainError, domain_error_page)
     app.add_exception_handler(RejectedRequest, rejected_request_page)
     app.add_exception_handler(RateLimitExceeded, rate_limited_page)
     app.add_exception_handler(RequestValidationError, validation_error_page)
+    app.add_exception_handler(DBAPIError, database_error_page)

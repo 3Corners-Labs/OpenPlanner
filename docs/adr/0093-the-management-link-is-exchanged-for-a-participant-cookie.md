@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-01), requested by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (V14.2.1). Refines the use of the token of ADR 0011; the token itself, its
-derivation and its storage are unchanged. Not built; see *Build status*.
+derivation and its storage are unchanged. Built (steps 1 to 4); see *Build status*.
 
 ## Context
 
@@ -75,11 +75,15 @@ value.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR accepted | #309 | in PR |
-| 1 | `public_ref` (migration), participant link sessions (table, port, adapter, sweep), the exchange on `GET /b/{token}` | | planned |
-| 2 | Booking pages (confirm, cancel, move) on `/b/m/{ref}`; old subpaths redirect; e2e | | planned |
-| 3 | Direct call, waiting room (poll URL in `live-region.js`), trial and join on `/b/m/{ref}`; maintenance route list; e2e | | planned |
-| 4 | Threat model, data flow, `docs/widget.md` and the manual where they show `/b/{token}` | | planned |
+| 0 | ADR accepted | #309 | merged |
+| 1 | `public_ref` (migration 0083), participant link sessions (table, port, adapter, sweep), the exchange on `GET /b/{token}` | #391 | built |
+| 2 | Booking pages (confirm, cancel, move) on `/b/m/{ref}`; old subpaths redirect; e2e | #391 | built |
+| 3 | Direct call, waiting room (poll URL in `live-region.js`), trial and join on `/b/m/{ref}`; maintenance route list; e2e | #393 | built |
+| 4 | Threat model, data flow, `docs/widget.md` and the manual where they show `/b/{token}` | #393 | built |
+
+**Built as** (steps 1 and 2): the cookie is `op_link` over plain http (`Path=/b`, because browsers refuse a prefixed cookie without `Secure`) and `__Host-op_link` over https; the shared name-and-path rule lives in `app/web/cookies.py` and is used by the admin cookie too. The cookie's `Max-Age` is set at the exchange; the server's expiry slides with use (written at most once a minute), so the lesser of the two ends a session. An old form left open on `POST /b/{token}/confirm|cancel|reschedule` is not carried out; the browser is sent to the page whose button it would have pressed.
+
+**Built as** (steps 3 and 4): the join, trial, waiting and direct-call pages are served on `/b/m/{ref}/…` and all check the cookie (`authorise`). A direct call started on `/g/{slug}/direct` sets the cookie in its own response (`start`) and redirects to `/b/m/{ref}/wait`; its poll URL (`data-poll`, read by `live-region.js`, which needed no change) is `/b/m/{ref}/wait/status?seen=…`, so polling lasts as long as the session, which every poll extends. The intermediate step to the old token paths is gone (`management_token_of` is removed). One handler, `exchange_legacy_link`, answers every old `/b/{token}[/page]` path (`/confirm`, `/cancel`, `/reschedule`, `/wait`, `/wait/status`, `/wait/leave`, `/join`, `/join/go`, `/test`, `/test/go`): it checks the token as before, sets the cookie and answers `303` to the same page on the reference, keeping only a well-formed `?lang=`. A `POST` to an old path is not carried out. `docs/widget.md` and the manual name no `/b/` address, so they needed no change.
 
 ## Consequences
 

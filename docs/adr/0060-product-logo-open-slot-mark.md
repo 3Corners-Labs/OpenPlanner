@@ -1,6 +1,8 @@
 # 0060. Product logo: the open-slot mark
 
 Status: accepted (2026-10-30), requested by the product owner. Closes the open point *Logo* of ADR 0047. Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
+Note (2026-11-01 review): §7 cites ADR 0061 §6 for motion; that section is about auto-scroll.
+The reduced-motion rule is in CLAUDE.md (accessibility rules).
 
 ## Context
 

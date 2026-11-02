@@ -3,8 +3,9 @@
 The sweep (``RetentionSweep``) is the safety net under the ``purge_pii`` job. This test drives
 the services through their transitions and checks the contract between the two: a booking that
 holds personal data has one pending ``purge_pii`` job whose time is ``purge_moment`` (the same
-moment, so the sweep never purges earlier than planned and never later). The one exception is
-a suspended booking under an open-ended closure, which waits for a decision (WP-A2).
+moment, so the sweep never purges earlier than planned and never later). That holds for a
+suspended booking under an open-ended closure too: its moment is the maximum after the original
+slot (ADR 0102).
 """
 
 from datetime import datetime, timedelta
@@ -13,6 +14,7 @@ from app.domain.admin import AdminService
 from app.domain.authorization import Role
 from app.domain.booking import Booking, BookingStatus
 from app.domain.booking_changes import lapse, lapse_unconfirmed, request_rebook
+from app.domain.closure_retention import DEFAULT_CLOSURE_RETENTION
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.job_plan import JobType, plan_for_direct
 from app.domain.retention import PurgeCandidate, purge_moment
@@ -49,11 +51,8 @@ def assert_one_purge_at_the_retention_moment(uow: InMemoryUnitOfWork) -> set[Boo
             booking.confirm_by,
         )
         purges = [j for j in uow.state.jobs.get(booking_id, []) if j.type is JobType.PURGE_PII]
-        moment = purge_moment(candidate)
-        if moment is None:
-            assert purges == [], f"{booking.status}: open-ended closure plans no purge"
-        else:
-            assert [p.run_at for p in purges] == [moment], f"{booking.status}: purge mismatch"
+        moment = purge_moment(candidate, DEFAULT_CLOSURE_RETENTION)
+        assert [p.run_at for p in purges] == [moment], f"{booking.status}: purge mismatch"
     return seen
 
 
@@ -101,7 +100,9 @@ async def test_every_transition_leaves_one_purge_at_the_retention_moment(
     seen |= assert_one_purge_at_the_retention_moment(uow)  # suspended, closure with an end
     await closures.lift(GROUP_ADMIN, "demo", reinstate=False)
     await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
-    seen |= assert_one_purge_at_the_retention_moment(uow)  # suspended, open-ended: no purge
+    seen |= assert_one_purge_at_the_retention_moment(
+        uow
+    )  # suspended, open-ended: purge at the maximum (ADR 0102)
     await closures.lift(GROUP_ADMIN, "demo", reinstate=False)
     seen |= assert_one_purge_at_the_retention_moment(uow)  # the closure ended: purge planned
 
@@ -125,4 +126,6 @@ def test_a_direct_call_is_purged_a_day_after_its_slot() -> None:
         j for j in plan_for_direct(start=NEXT_MONDAY, end=end) if j.type is JobType.PURGE_PII
     ]
 
-    assert purge.run_at == purge_moment(PurgeCandidate(1, BookingStatus.CONFIRMED, end, None, None))
+    assert purge.run_at == purge_moment(
+        PurgeCandidate(1, BookingStatus.CONFIRMED, end, None, None), DEFAULT_CLOSURE_RETENTION
+    )

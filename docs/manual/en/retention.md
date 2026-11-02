@@ -11,10 +11,13 @@ numbers here, nor which booking it is.
 
 - **Appointment over**: 24 hours after the end of the appointment.
 - **Appointment cancelled**: 24 hours after the cancellation.
-- **Appointment suspended by an emergency closure**: at most 30 days after the closure ends.
-  While the closure has no end, the booking does not count yet.
+- **Appointment suspended by an emergency closure**: 30 days after the closure ends, and at
+  the latest the organisation's maximum after the original appointment (90 days by default),
+  also while the closure has no end.
 
-After removal the booking stays, without personal data, for statistics.
+Removal deletes the personal fields from the booking, the links to its meeting and work item
+at the providers, and the reason texts of its timeline. The booking itself stays with its
+reference and times; together with data held elsewhere these could still point to a person.
 
 ## What the columns mean
 

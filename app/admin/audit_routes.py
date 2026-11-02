@@ -46,6 +46,12 @@ from app.domain.admin import (
     LOGIN_EVENT,
     LOGOUT_EVENT,
 )
+from app.domain.admin_session_service import (
+    SESSION_ENDED_EVENT,
+    SESSIONS_ENDED_ALL_EVENT,
+    SESSIONS_ENDED_BY_ADMIN_EVENT,
+    SESSIONS_ENDED_BY_SELF_EVENT,
+)
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
 from app.domain.audit import (
     SUBJECT_ACTIONS,
@@ -85,6 +91,8 @@ from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.scheduling import GroupSummary
 from app.domain.security_log import (
     CROSS_SITE,
+    DATABASE_ERROR,
+    DATABASE_FAILED,
     HONEYPOT,
     INVALID_SIGNATURE,
     ORIGIN_MISMATCH,
@@ -154,6 +162,12 @@ EVENT_LABELS: dict[str, str] = {
     # Staff directory (ADR 0046): first login, and roles or memberships changed at login.
     staff.CREATED_EVENT: "audit.event.staff_created",
     staff.CHANGED_EVENT: "audit.event.staff_changed",
+    # Admin sessions (ADR 0098): the system ended one, a person ended theirs, an administrator
+    # ended a person's, or all were ended at once.
+    SESSION_ENDED_EVENT: "audit.event.session_ended",
+    SESSIONS_ENDED_ALL_EVENT: "audit.event.sessions_ended_all",
+    SESSIONS_ENDED_BY_SELF_EVENT: "audit.event.sessions_ended_by_self",
+    SESSIONS_ENDED_BY_ADMIN_EVENT: "audit.event.sessions_ended_by_admin",
     # ADR 0038: maintenance on longer than the alert threshold (global).
     OVERDUE_EVENT: "audit.event.maintenance_overdue",
     # ADR 0065: "Koppeling controleren", by hand or by the worker (at the group).
@@ -169,6 +183,7 @@ EVENT_LABELS: dict[str, str] = {
     RATE_LIMITED: "audit.event.rate_limited",
     REQUEST_REJECTED: "audit.event.request_rejected",
     TOKEN_REJECTED: "audit.event.token_rejected",
+    DATABASE_ERROR: "audit.event.database_error",
     # Diagnostic mode (ADR 0040, part 4).
     "job.run": "audit.event.job_run",
     BRAKE_EVENT: "audit.event.diagnostics_brake",
@@ -276,6 +291,7 @@ DETAIL_LABELS: dict[str, str] = {
     "surface:web": "admin.audit.detail.surface_web",
     "surface:agent": "admin.audit.detail.surface_agent",
     "surface:links": "admin.audit.detail.surface_links",
+    "surface:widget": "admin.audit.detail.surface_widget",
     "diagnostics.on": "admin.audit.detail.diagnostics_on",
     "diagnostics.off": "admin.audit.detail.diagnostics_off",
 }
@@ -293,6 +309,7 @@ COUNT_LABELS: dict[str, str] = {
     "changes": "admin.audit.detail.changes",
     "suppressed": "admin.audit.detail.suppressed",
     "modes": "admin.audit.detail.modes",
+    "sessions": "admin.audit.detail.sessions",
 }
 """Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0024)."""
 
@@ -309,6 +326,7 @@ VALUE_LABELS: dict[str, str] = {
     "client": "admin.audit.detail.client",
     "reason": "admin.audit.detail.reason",
     "actor": "admin.audit.detail.actor",
+    "subject": "admin.audit.detail.subject",
 }
 """Readable label per audit detail with a code or slug, e.g. ``role.add:org_admin`` (ADR 0046)."""
 
@@ -319,6 +337,7 @@ REASON_LABELS: dict[str, str] = {
     Reason.MAINTENANCE: "admin.audit.reason.maintenance",
     # ADR 0038: why maintenance was switched on (the reason codes of the switch).
     **{reason.value: f"admin.maintenance.reason.{reason.value}" for reason in MaintenanceReason},
+    DATABASE_FAILED: "admin.audit.reason.database_error",
     "stale": "admin.audit.reason.stale",
     "no_recipient": "admin.audit.reason.no_recipient",
     "no_booking": "admin.audit.reason.no_booking",
@@ -762,7 +781,7 @@ async def export(
     except ExportRefused as refused:
         return await _audit_page(request, locale, context, query, refused.code)
     clock: Clock = request.app.state.clock
-    name = f"audit-{clock.now():%Y%m%dT%H%M%SZ}.csv"
+    name = f"audit-{clock.now():%Y%m%dt%H%M%S}z.csv"
     return Response(
         document.encode("utf-8"),
         media_type="text/csv; charset=utf-8",

@@ -47,6 +47,7 @@ from app.domain.authorization import (
     role_keys,
     scope_for,
 )
+from app.domain.closure_retention import ClosureRetentionOf, default_closure_retention
 from app.domain.entitlements import Refusal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_schema import Envelope, to_record
@@ -95,12 +96,20 @@ class AdminService:
     Args:
         uow: Opens database transactions.
         clock: Current time, for audit events.
+        retention_of: The organisation's maximum for bookings on hold, for the retention
+            overview (ADR 0102, class D).
     """
 
-    def __init__(self, uow: UnitOfWork, clock: Clock) -> None:
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        retention_of: ClosureRetentionOf = default_closure_retention,
+    ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
+        self._retention_of = retention_of
 
     async def authorize(
         self,
@@ -427,7 +436,7 @@ class AdminService:
         scope = scope_for(principal, Permission.RETENTION_VIEW)
         async with self._uow.read() as tx:
             facts = await tx.list_retention(scope, candidates_before(now))
-        return summarise(facts, now)
+        return summarise(facts, now, self._retention_of)
 
 
 def memberships_of(principal: Principal) -> list[Membership]:

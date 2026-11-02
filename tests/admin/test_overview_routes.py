@@ -275,3 +275,43 @@ async def test_the_status_widget_shows_maintenance_and_a_fresh_worker_heartbeat(
 
     assert "Aan sinds" in text
     assert "Actief," in text
+
+
+async def test_the_status_widget_reports_mail_without_tls_in_production_adr_0091(
+    site: Site,
+) -> None:
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    current = app.state.settings
+    await site.login_as(SUPER)
+    plain = {"environment": "prod", "smtp_host": "relay.demo.nl", "smtp_starttls": False}
+    app.state.settings = current.model_copy(update=plain)
+    try:
+        text = (await site.client.get("/admin/overview/w/status")).text
+        assert "zonder TLS" in text
+        assert 'href="/admin/integrations"' in text
+        app.state.settings = current.model_copy(
+            update={**plain, "smtp_plaintext_relay_allowed": True}
+        )
+        assert "zonder TLS" not in (await site.client.get("/admin/overview/w/status")).text
+    finally:
+        app.state.settings = current
+
+
+async def test_the_status_widget_warns_about_a_proxy_hop_without_tls_adr_0091(
+    site: Site,
+) -> None:
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    current = app.state.settings
+    await site.login_as(SUPER)
+    warning = "zonder TLS naar web"
+    try:
+        app.state.settings = current.model_copy(update={"forwarded_allow_ips": "172.31.240.2"})
+        assert warning not in (await site.client.get("/admin/overview/w/status")).text
+        remote = {"forwarded_allow_ips": "10.0.0.5"}
+        app.state.settings = current.model_copy(update=remote)
+        assert warning in (await site.client.get("/admin/overview/w/status")).text
+        files = {"web_tls_cert_file": "/web-tls/c.pem", "web_tls_key_file": "/web-tls/k.pem"}
+        app.state.settings = current.model_copy(update={**remote, **files})
+        assert warning not in (await site.client.get("/admin/overview/w/status")).text
+    finally:
+        app.state.settings = current

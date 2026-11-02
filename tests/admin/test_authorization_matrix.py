@@ -27,7 +27,7 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
-from tests.support.routes import all_routes
+from tests.support.routes import all_routes, scoped_routes
 
 ROLES = {
     "superuser": SUPER,
@@ -110,6 +110,13 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/retention": {"/admin/retention": statuses(200, 200, 403, 200, 200, 403, 403)},
     # ADR 0042 §5, §11: System status and Advanced settings, read-only: superuser and auditor.
     "GET /admin/settings": {"/admin/settings": statuses(200, 403, 403, 403, 200, 403, 403)},
+    # ADR 0101: the Settings sub-tab is read like the status; the package is the superuser's.
+    "GET /admin/settings/values": {
+        "/admin/settings/values": statuses(200, 403, 403, 403, 200, 403, 403)
+    },
+    "GET /admin/settings/package": {
+        "/admin/settings/package": statuses(200, 403, 403, 403, 403, 403, 403)
+    },
     # ADR 0042 step 4: changing is the superuser's (settings.platform.manage is locked). An
     # empty value is outside the bounds (422); resetting what is not set returns to the page.
     "POST /admin/settings/{key}": {
@@ -204,8 +211,40 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/settings/idp-key": {
         "/admin/groups/demo/settings/idp-key": statuses(422, 422, 403, 403, 403, 403, 403),
     },
+    # ADR 0095: without a bundled provider the form sends the admin back to the list (303), a
+    # change finds no directory (an error page, 200) and an empty invitation is refused (422);
+    # the permission is the organisation admin's and the superuser's, no one else's.
+    "GET /admin/staff/invite": {"/admin/staff/invite": statuses(303, 303, 403, 303, 403, 403, 403)},
+    "POST /admin/staff/invite": {
+        "/admin/staff/invite": statuses(422, 422, 403, 422, 403, 403, 403)
+    },
+    "POST /admin/staff/directory/grants/add": {
+        "/admin/staff/directory/grants/add": statuses(303, 303, 403, 303, 403, 403, 403)
+    },
+    "POST /admin/staff/directory/grants/remove": {
+        "/admin/staff/directory/grants/remove": statuses(303, 303, 403, 303, 403, 403, 403)
+    },
+    "POST /admin/staff/directory/enabled": {
+        "/admin/staff/directory/enabled": statuses(200, 200, 403, 200, 403, 403, 403)
+    },
+    "POST /admin/staff/directory/reset": {
+        "/admin/staff/directory/reset": statuses(200, 200, 403, 200, 403, 403, 403)
+    },
     "GET /admin/staff/{member_id}": {
         "/admin/staff/999": statuses(404, 404, 404, 404, 404, 403, 403)
+    },
+    # ADR 0098 point 9a: every admin sees and ends their own sessions (rights.view).
+    "GET /admin/rights/sessions": {
+        "/admin/rights/sessions": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "POST /admin/rights/sessions/end-others": {
+        "/admin/rights/sessions/end-others": statuses(303, 303, 303, 303, 303, 303, 403)
+    },
+    # ADR 0098 point 9b: an organisation admin (and the superuser) ends a person's sessions.
+    # Outside the scope the answer is 403, an unknown number too; only the superuser, who sees
+    # everyone, gets a 404. The group admin, auditor and agent do not hold the permission.
+    "POST /admin/staff/{member_id}/sessions/end": {
+        "/admin/staff/999/sessions/end": statuses(404, 403, 403, 403, 403, 403, 403)
     },
     # ADR 0033: the manual is public, every admin may read every topic.
     # Step 2b: the profile menu's theme and alert choices, stored in the own session (303 back).
@@ -1200,3 +1239,68 @@ def test_expectations_cover_every_role(site: Site) -> None:
         for by_role in routes.values():
             assert set(by_role) == set(ROLES)
     assert all(isinstance(p, Principal) for p in ROLES.values())
+
+
+# WP-B2 (TEN-01): a route that addresses an organisation or a group is checked before release,
+# automatically. Admin routes sit in EXPECTED with a case that refuses an administrator of
+# the other organisation. The routes below it are open to participants by design: they answer
+# for the slug in the path and are proved tenant by tenant in test_tenant_isolation_concurrent.
+PUBLIC_SCOPED = frozenset(
+    {
+        "GET /api/v1/widget/{org}/{group}/",
+        "GET /api/v1/widget/{org}/{group}/availability",
+        "OPTIONS /api/v1/widget/{org}/{group}/bookings",
+        "POST /api/v1/widget/{org}/{group}/bookings",
+        "GET /g/{slug}",
+        "GET /g/{slug}/book",
+        "GET /g/{slug}/booked",
+        "GET /g/{slug}/closure",
+        "GET /g/{slug}/closure/image",
+        "GET /g/{slug}/direct",
+        "POST /g/{slug}/book",
+        "POST /g/{slug}/direct",
+        "GET /o/{slug}/font/{role}",
+        "GET /o/{slug}/logo",
+        "GET /o/{slug}/theme.css",
+    }
+)
+QUERY_SCOPED = frozenset({"GET /admin/audit", "GET /admin/audit/export.csv", "GET /admin/staff"})
+"""Admin lists whose scope comes from the principal; ``group`` or ``organisation`` in the query
+only narrows. ``test_privacy_sweep_exports`` proves a narrowing cannot widen."""
+
+
+def refuses_the_other_organisation(by_path: dict[str, dict[str, int]]) -> bool:
+    """Whether one case shows an administrator of the other organisation refused.
+
+    A path under ``andere`` is tried by the organisation admin of ``demo``, any other path by
+    the organisation admin of ``andere``; both must get 403 or 404.
+    """
+    for path, by_role in by_path.items():
+        if "andere" in path:
+            other = by_role["org_admin (demo)"]
+        elif "demo" in path:
+            other = by_role["org_admin (andere)"]
+        else:
+            continue
+        if other in {403, 404}:
+            return True
+    return False
+
+
+def test_every_route_with_an_organisation_or_group_is_in_the_matrix_sweep(site: Site) -> None:
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    scoped = scoped_routes(all_routes(app.routes))
+
+    admin = {k for k in scoped if k.split(" ", 1)[1].startswith("/admin")}
+    missing = sorted(admin - set(EXPECTED))
+    assert missing == [], f"add these to the matrix sweep (EXPECTED): {missing}"
+    unproved = sorted(
+        k for k in admin - QUERY_SCOPED if not refuses_the_other_organisation(EXPECTED[k])
+    )
+    assert unproved == [], f"no case refuses the other organisation for: {unproved}"
+    assert QUERY_SCOPED <= admin
+    outside = set(scoped) - admin
+    assert outside == PUBLIC_SCOPED, (
+        f"a route addressing an organisation or group: {sorted(outside ^ PUBLIC_SCOPED)}; "
+        "decide who may call it and add it to the sweep or to PUBLIC_SCOPED"
+    )

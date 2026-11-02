@@ -62,8 +62,10 @@ from app.admin import (
     retention_routes,
     role_routes,
     scenario_routes,
+    session_routes,
     settings_routes,
     simulator_routes,
+    staff_directory_routes,
     staff_routes,
     update_routes,
 )
@@ -78,7 +80,9 @@ from app.admin.authz import (
     load_principal,
     login_service,
     role_service,
+    session_policy,
     session_principal,
+    session_service,
 )
 from app.admin.forms import safe_next
 from app.admin.idp_mapping_routes import reason_label
@@ -124,6 +128,7 @@ from app.domain.login_service import (
     TOO_MANY_ENTITLEMENTS,
     LoginRefusedError,
 )
+from app.domain.mfa import MFA_MISSING_EVENT, MFA_REQUIRED
 from app.domain.ports import Clock, IdentityError, IdentityProvider
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.settings_service import SettingsService
@@ -146,6 +151,7 @@ log = structlog.get_logger()
 LOGIN_REFUSED_TEXTS: dict[str, str] = {
     AMBIGUOUS_CLAIMS: "admin.login_refused.ambiguous_claims",
     TOO_MANY_ENTITLEMENTS: "admin.login_refused.too_many_entitlements",
+    MFA_REQUIRED: "admin.login_refused.mfa_required",
 }
 """What the error page says per refusal reason of the login service (ADR 0049)."""
 
@@ -257,7 +263,16 @@ async def callback(
             )
     except IdentityError as error:
         await report(request, LOGIN_EVENT, error.code, actor=ANONYMOUS)
-        return _message(request, locale, 401, "admin.login_failed.title", "admin.login_failed.text")
+        text = LOGIN_REFUSED_TEXTS.get(error.code, "admin.login_failed.text")
+        return _message(request, locale, 401, "admin.login_failed.title", text)
+    if claims.mfa_missing:  # ADR 0100: the provider's policy is "record"; the login goes on
+        await report(
+            request,
+            MFA_MISSING_EVENT,
+            "mfa_missing",
+            detail=f"provider:{key}",
+            actor=claims.subject,
+        )
     logins = login_service(request)
     try:
         outcome = await logins.complete_login(claims)
@@ -267,7 +282,9 @@ async def callback(
         text = LOGIN_REFUSED_TEXTS.get(refused.reason, "admin.login_failed.text")
         return _message(request, locale, 403, "admin.login_failed.title", text)
     principal = outcome.principal
-    start_session(request, outcome.session_claims, _clock(request).now())
+    await start_session(
+        request, session_service(request), outcome.session_claims, key, session_policy(request)
+    )
     log.info("admin.login", actor=principal.subject, roles=role_keys(principal))
     if trial is not None and tried is not None:
         prefix = trial[1].get("oidc_entitlement_prefix", "")
@@ -337,8 +354,10 @@ async def _finish_login_trial(
     try:
         await service.change_login_mapping(principal, values, trial=tried)
     except DomainError:
-        return RedirectResponse("/admin/settings?done=login_mapping_refused", status_code=303)
-    return RedirectResponse("/admin/settings?done=login_mapping_saved", status_code=303)
+        return RedirectResponse(
+            "/admin/settings/values?done=login_mapping_refused", status_code=303
+        )
+    return RedirectResponse("/admin/settings/values?done=login_mapping_saved", status_code=303)
 
 
 @router.post("/logout", response_class=HTMLResponse)
@@ -346,7 +365,7 @@ async def _finish_login_trial(
 async def logout(request: Request, locale: Locale, _: SameOrigin) -> Response:
     """End the admin session here and at the identity provider (no silent re-login)."""
     principal = session_principal(request)
-    end_session(request)
+    await end_session(request, session_service(request))
     if principal is not None:
         await admin_service(request).record_logout(principal)
     logged_out = f"{request.app.state.settings.public_base_url.rstrip('/')}/admin/logged-out"
@@ -635,7 +654,9 @@ def register_admin(app: FastAPI) -> None:
         settings_routes.router,
         organisation_settings_routes.router,
         role_routes.router,
+        staff_directory_routes.router,
         staff_routes.router,
+        session_routes.router,
         group_routes.router,
         call_routes.router,
         agenda_routes.router,

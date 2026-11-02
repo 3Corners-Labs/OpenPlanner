@@ -25,6 +25,8 @@ SETTING_LABELS: dict[str, str] = {
     "integration_check_interval_hours": "settings.field.integration_check_interval_hours.label",
     "integration_probe_timeout_seconds": "settings.field.integration_probe_timeout_seconds.label",
     "job_overdue_minutes": "settings.field.job_overdue_minutes.label",
+    "staff_invite_expiry_days": "settings.field.staff_invite_expiry_days.label",
+    "staff_directory_enabled": "settings.field.staff_directory_enabled.label",
     "staff_last_seen_interval_seconds": "settings.field.staff_last_seen_interval_seconds.label",
     "system_event_retention_days": "settings.field.system_event_retention_days.label",
     "group_erase_after_days": "settings.field.group_erase_after_days.label",
@@ -46,6 +48,7 @@ SETTING_LABELS: dict[str, str] = {
     "security_event_max_sources": "settings.field.security_event_max_sources.label",
     "audit_export_max_rows": "settings.field.audit_export_max_rows.label",
     "audit_export_max_days": "settings.field.audit_export_max_days.label",
+    "max_font_unpacked_bytes": "settings.field.max_font_unpacked_bytes.label",
     "configuration_package_max_mb": "settings.field.configuration_package_max_mb.label",
     "embedding_max_origins": "settings.field.embedding_max_origins.label",
     "storage_low_free_percent": "settings.field.storage_low_free_percent.label",
@@ -58,6 +61,8 @@ SETTING_LABELS: dict[str, str] = {
     "rate_limit_agent_calls": "settings.field.rate_limit_agent_calls.label",
     "admin_session_hours": "settings.field.admin_session_hours.label",
     "admin_reauth_minutes": "settings.field.admin_reauth_minutes.label",
+    "admin_idle_minutes": "settings.field.admin_idle_minutes.label",
+    "admin_max_sessions_per_person": "settings.field.admin_max_sessions_per_person.label",
     "oidc_role_claim": "settings.field.oidc_role_claim.label",
     "oidc_organisation_claim": "settings.field.oidc_organisation_claim.label",
     "oidc_group_claim": "settings.field.oidc_group_claim.label",
@@ -97,12 +102,15 @@ SETTING_LABELS: dict[str, str] = {
     "planner_changes_alert_per_hour": "settings.field.planner_changes_alert_per_hour.label",
     "planner_rebook_days": "settings.field.planner_rebook_days.label",
     "planner_rebook_reminder_days": "settings.field.planner_rebook_reminder_days.label",
+    "closure_max_retention_days": "settings.field.closure_max_retention_days.label",
+    "closure_max_notice_days": "settings.field.closure_max_notice_days.label",
     "booking_form_max_custom_fields": "settings.field.booking_form_max_custom_fields.label",
     "phone_default_region": "settings.field.phone_default_region.label",
     "booking_confirm_window_hours": "settings.field.booking_confirm_window_hours.label",
     "booking_confirm_cutoff_hours": "settings.field.booking_confirm_cutoff_hours.label",
     "booking_confirm_reminders": "settings.field.booking_confirm_reminders.label",
     "booking_confirm_min_minutes": "settings.field.booking_confirm_min_minutes.label",
+    "participant_link_session_hours": "settings.field.participant_link_session_hours.label",
 }
 """The label of every class C and D setting, by key."""
 
@@ -126,6 +134,7 @@ TOPIC_LABELS: dict[Topic, str] = {
     Topic.PLANNER: "settings.topic.planner",
     Topic.BOOKING_FORM: "settings.topic.booking_form",
     Topic.CONFIRMATION: "settings.topic.confirmation",
+    Topic.PARTICIPANT_LINK: "settings.topic.participant_link",
 }
 """The heading of every topic."""
 

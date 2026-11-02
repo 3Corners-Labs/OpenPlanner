@@ -25,6 +25,11 @@ sets on **Advanced settings**. The **Source** column says which one applies:
 - **Request to rebook lapses after** and **Rebook reminder**: when a planner asks participants to
   choose a new time, how long the request stays open and when the one reminder goes. The
   reminder must come before the request lapses.
+- **Details held for a closure deleted at the latest after** (30 to 180 days, default 90) and
+  **Notice to administrators before that maximum** (3 to 28 days, default 14): the most days
+  after the original appointment that an appointment on hold by an emergency closure keeps the
+  participant's details, also while the closure has no end, and how many days before that the
+  team's audit log shows the notice. The maximum cannot be switched off.
 
 ## Changing a setting
 

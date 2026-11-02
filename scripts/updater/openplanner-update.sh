@@ -8,7 +8,8 @@
 #   update   pull <image>:<version> -> digest -> cosign verify -> record previous digest and
 #            Alembic revision -> maintenance on -> backup -> pin digest -> up -> healthy?
 #              yes: report succeeded, maintenance off
-#              no:  restore backup, pin previous digest, up -> report rolled_back, maintenance off
+#              no:  restore backup, end all admin sessions, pin previous digest, up ->
+#                   report rolled_back, maintenance off
 #   restore  (within 24 h of an update) maintenance on -> backup -> alembic downgrade
 #            <previous revision> -> pin previous digest -> up -> healthy?
 #              yes: report succeeded, maintenance off
@@ -113,11 +114,15 @@ container_healthy() { # container_healthy SERVICE: the service's container repor
   [[ -n $container && $(docker inspect -f '{{.State.Health.Status}}' "$container") == healthy ]]
 }
 
+# A READY_URL on https (web serves TLS to its proxy, ADR 0091) names the loopback, which the
+# certificate does not: check that web answers, not the certificate.
+ready() { if [[ $READY_URL == https://* ]]; then curl -fsSk -o /dev/null "$READY_URL"; else curl -fsS -o /dev/null "$READY_URL"; fi; }
+
 healthy() { # web answers /readyz; the worker, and the proxy where it runs, report healthy
   # Check before looking at the deadline: SECONDS may tick past it before the first check.
   local deadline=$((SECONDS + HEALTH_TIMEOUT))
   while true; do
-    if curl -fsS -o /dev/null "$READY_URL" && container_healthy worker \
+    if ready && container_healthy worker \
       && { ((!PROXY)) || container_healthy proxy; }; then
       return 0
     fi
@@ -131,6 +136,16 @@ switch_to() { # switch_to IMAGE [PROXY_IMAGE]: pin and (re)start web, worker and
   compose up -d "${SERVICES[@]}"
 }
 
+end_sessions() { # a restored database may bring back sessions that ended after the backup
+  # (ADR 0098 point 10). Never fails the script: a rollback must still bring the portal back,
+  # and a version before ADR 0098 step 2 lacks the command; the log says so.
+  if offline python -m app.cli sessions end-all --reason restore >/dev/null; then
+    log "sessions ended after the restore"
+  else
+    log "sessions could not be ended after the restore: run sessions end-all --reason restore"
+  fi
+}
+
 put_back() { # put_back BACKUP IMAGE [PROXY_IMAGE]: restore the backup, run the images again
   local backup=$1 image=$2 proxy_image=${3:-}
   compose stop web worker
@@ -140,6 +155,7 @@ put_back() { # put_back BACKUP IMAGE [PROXY_IMAGE]: restore the backup, run the 
     pin "$image" "$proxy_image"
     offline python -m app.cli restore-db "$backup" || return 1
   fi
+  end_sessions
   switch_to "$image" "$proxy_image"
   healthy
 }

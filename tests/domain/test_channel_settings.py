@@ -10,6 +10,7 @@ from app.domain.channel_settings import (
     SmsSettings,
     SmtpSecurity,
     SmtpSettings,
+    check_smtp_transport,
     e164,
     validate_secret,
 )
@@ -164,3 +165,30 @@ def test_valid_secret() -> None:
 )
 def test_e164(phone: str, expected: str) -> None:
     assert e164(phone, "31") == expected
+
+
+@pytest.mark.parametrize(
+    ("security", "production", "allowed", "refused"),
+    [
+        (SmtpSecurity.NONE, True, False, True),
+        (SmtpSecurity.NONE, True, True, False),
+        (SmtpSecurity.NONE, False, False, False),
+        (SmtpSecurity.STARTTLS, True, False, False),
+        (SmtpSecurity.TLS, True, False, False),
+    ],
+)
+def test_plaintext_smtp_is_refused_in_production_unless_the_host_allows_it(
+    security: SmtpSecurity, production: bool, allowed: bool, refused: bool
+) -> None:
+    config = smtp(security=security, username=None)
+    if refused:
+        with pytest.raises(DomainError) as error:
+            check_smtp_transport(config, production=production, plaintext_allowed=allowed)
+        assert field_of(error) == "smtp_security"
+    else:
+        check_smtp_transport(config, production=production, plaintext_allowed=allowed)
+
+
+def test_plaintext_relay_is_recognised_by_its_security() -> None:
+    assert smtp(security=SmtpSecurity.NONE, username=None).plaintext
+    assert not smtp().plaintext

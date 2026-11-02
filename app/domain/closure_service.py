@@ -6,8 +6,8 @@ transaction as the change. Bookings are never deleted and keep their personal da
 are on hold; an admin resolves them one by one or all at once.
 
     close_group / close_organisation
-        └─ closure ─► confirmed bookings inside it ─► suspended ─► notice mail (+ purge at
-                                                                    closure end + 30 days)
+        └─ closure ─► confirmed bookings inside it ─► suspended ─► notice mail (+ purge at the
+                  earlier of closure end + 30 days and slot end + the maximum, ADR 0102)
     update   end, notices and headings; newly covered bookings suspended; optional update
              mail to all; optionally take over the contact block that applies now
     lift     end now; optionally reinstate what can still go ahead
@@ -41,6 +41,7 @@ from app.domain.closure import (
     covering,
     notice_field,
 )
+from app.domain.closure_retention import ClosureRetentionOf, default_closure_retention
 from app.domain.contact_service import effective_block
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.images import ImageFile, ImageText
@@ -143,9 +144,19 @@ class ClosureService:
     """
 
     def __init__(
-        self, uow: UnitOfWork, clock: Clock, admin: AdminService, bookings: BookingService
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        admin: AdminService,
+        bookings: BookingService,
+        retention_of: ClosureRetentionOf = default_closure_retention,
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators.
+
+        ``retention_of`` gives the organisation's maximum for a booking on hold (ADR 0102,
+        class D settings, read live).
+        """
+        self._retention_of = retention_of
         self._uow = uow
         self._clock = clock
         self._admin = admin
@@ -225,7 +236,7 @@ class ClosureService:
             await tx.save_closure(updated)
             notified = 0
             for booking in await self._closure_bookings(tx, principal, group, updated):
-                await self._repurge(tx, booking, updated)
+                await self._repurge(tx, group, booking, updated)
                 if notify:
                     await tx.add_jobs(_id(booking), plan_closure_update(now=now))
                     notified += 1
@@ -502,7 +513,9 @@ class ClosureService:
         for booking in bookings:
             await tx.save_booking(booking.suspend(closure_id))
             jobs = plan_for_suspension(
-                now=now, purge_at=closure.purge_at, team_invite=group.sends_team_invite
+                now=now,
+                purge_at=closure.purge_at(booking.end, self._retention_of(group.organisation_id)),
+                team_invite=group.sends_team_invite,
             )
             await tx.replace_jobs(_id(booking), jobs)
         return len(bookings)
@@ -518,7 +531,7 @@ class ClosureService:
         ended = replace(current, starts_at=starts_at, ends_at=now)
         await tx.save_closure(ended)
         for booking in await self._closure_bookings(tx, principal, group, ended):
-            await self._repurge(tx, booking, ended)
+            await self._repurge(tx, group, booking, ended)
         if not reinstate:
             return BulkOutcome(0)
         return await self._reinstate_all(tx, principal, group)
@@ -575,10 +588,13 @@ class ClosureService:
             if b.closure_id == closure.id
         ]
 
-    async def _repurge(self, tx: Transaction, booking: Booking, closure: Closure) -> None:
-        """Move the booking's purge to the closure's end plus the retention period."""
+    async def _repurge(
+        self, tx: Transaction, group: Group, booking: Booking, closure: Closure
+    ) -> None:
+        """Move the booking's purge to the closure's end or the maximum, whichever is first."""
+        retention = self._retention_of(group.organisation_id)
         await tx.delete_pending_jobs(_id(booking), {JobType.PURGE_PII})
-        await tx.add_jobs(_id(booking), plan_purge(closure.purge_at))
+        await tx.add_jobs(_id(booking), plan_purge(closure.purge_at(booking.end, retention)))
 
     # --- helpers --------------------------------------------------------------------------
 

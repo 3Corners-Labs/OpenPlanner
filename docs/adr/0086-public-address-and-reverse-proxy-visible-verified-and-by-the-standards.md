@@ -1,9 +1,10 @@
 # 0086. The public address and the reverse proxy: visible, verified end to end, and by the standards
 
-Status: proposed (2026-10-31), requested by the product owner. Extends ADR 0064 (HTTPS by
-default, the certificate watched on System status), ADR 0070 (certificate source in the
-portal), ADR 0030 (TLS proxy) and ADR 0042 §11 (System status); builds on ADR 0038 (system
+Status: accepted (2026-10-31, `po:approved` on #265), requested by the product owner. Extends ADR
+0064 (HTTPS by default, the certificate watched on System status), ADR 0070 (certificate source
+in the portal), ADR 0030 (TLS proxy) and ADR 0042 §11 (System status); builds on ADR 0038 (system
 events from the worker). Not built.
+Amended by ADR 0091 (own reverse proxy).
 
 ## Context
 
@@ -141,7 +142,7 @@ always told apart from one that reaches this one).
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #265 | in PR |
+| 0 | ADR proposed | #265 | merged |
 | 1 | Decisions 1–4: *Address and proxy* on System status, `instance_id` (migration), `/api/v1/instance`, the round-trip probe in the worker, `address-check` CLI, the link-building test, system event `public_address`, manual topic | | planned |
 | 2 | Decision 5: the standards table in the runbook, `check-proxy.sh` asserts TLS versions, HSTS and the round trip, internet.nl in the go-live checklist, threat model and data flow | | planned |
 

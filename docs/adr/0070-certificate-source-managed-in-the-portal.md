@@ -4,6 +4,7 @@ Status: accepted (2026-10-30), requested by the product owner. Build step 3 of A
 by default); extends ADR 0030 (TLS proxy) and ADR 0042 (settings classes, environment lock).
 The private key is deliberately not an integration secret in the sense of ADR 0008: it never
 enters the database. Built, checked against the code on 2026-10-30 (status was *proposed*; `docs/adr-status.md`).
+Uploads amended by ADR 0092.
 
 ## Context
 

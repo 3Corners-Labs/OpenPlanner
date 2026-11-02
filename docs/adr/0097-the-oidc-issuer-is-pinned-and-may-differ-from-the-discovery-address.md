@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-01), requested by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (V10.5.3). Refines ADR 0013 (OIDC) and ADR 0083 (providers per organisation).
-Built in PR #329; see *Build status*.
+Built (merged in #329); see *Build status*.
 
 ## Context
 
@@ -47,7 +47,7 @@ switching a protection off is never C or D.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 1 | `expected_issuer`, `OIDC_ISSUER`, exact checks, abuse case in the threat model | #329 | in PR |
+| 1 | `expected_issuer`, `OIDC_ISSUER`, exact checks, abuse case in the threat model | #329 | merged |
 
 ## Consequences
 

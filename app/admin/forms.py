@@ -62,6 +62,12 @@ DONE_MESSAGES: dict[str, str] = {
     "field_retired": "admin.done.field_retired",
     "added": "admin.done.added",
     "removed": "admin.done.removed",
+    "staff_invited": "admin.done.staff_invited",
+    "staff_grants_saved": "admin.done.staff_grants_saved",
+    "staff_enabled": "admin.done.staff_enabled",
+    "staff_disabled": "admin.done.staff_disabled",
+    "staff_reset_sent": "admin.done.staff_reset_sent",
+    "staff_unchanged": "admin.done.unchanged",
     "idp_created": "admin.done.idp_created",
     "idp_enabled": "admin.done.idp_enabled",
     "idp_disabled": "admin.done.idp_disabled",
@@ -113,6 +119,8 @@ DONE_MESSAGES: dict[str, str] = {
     "request_cancelled": "admin.done.request_cancelled",
     "texts_saved": "admin.done.texts_saved",
     "test_sent": "admin.done.test_sent",
+    "sessions_ended_others": "admin.done.sessions_ended_others",
+    "sessions_ended_person": "admin.done.sessions_ended_person",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
@@ -220,6 +228,9 @@ FIELD_MESSAGES: dict[str, str] = {
     "client_secret": "admin.form.error.client_secret",  # noqa: S105  # nosec B105 - a key
     "entitlement_claim": "admin.form.error.entitlement_claim",
     "entitlement_prefix": "admin.form.error.entitlement_prefix",
+    "mfa_policy": "admin.form.error.choice",
+    "mfa_amr_values": "admin.form.error.mfa_values",
+    "mfa_acr_values": "admin.form.error.mfa_values",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -246,6 +257,11 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.ORGANISATION_HAS_GROUPS: "admin.form.error.organisation_has_groups",
     ErrorCode.ORGANISATION_HAS_API_CLIENTS: "admin.form.error.organisation_has_api_clients",
     ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
+    ErrorCode.STAFF_DIRECTORY_UNAVAILABLE: "admin.form.error.staff_directory_unavailable",
+    ErrorCode.STAFF_ADDRESS_IN_USE: "admin.form.error.staff_address_in_use",
+    ErrorCode.STAFF_GRANT_REFUSED: "admin.form.error.staff_grant_refused",
+    ErrorCode.STAFF_NOT_FOUND: "admin.form.error.staff_not_found",
+    ErrorCode.STAFF_MAIL_FAILED: "admin.form.error.staff_mail_failed",
     ErrorCode.IDENTITY_PROVIDER_LIMIT_REACHED: "admin.form.error.identity_provider_limit",
     ErrorCode.ISSUER_TAKEN: "admin.form.error.issuer_taken",
     ErrorCode.DISCOVERY_REFUSED: "admin.form.error.discovery_refused",

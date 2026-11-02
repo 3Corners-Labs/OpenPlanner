@@ -79,6 +79,7 @@ class Topic(StrEnum):
     PLANNER = "planner"
     BOOKING_FORM = "booking_form"
     CONFIRMATION = "confirmation"
+    PARTICIPANT_LINK = "participant_link"
 
 
 PLATFORM_VIEW = Permission.SETTINGS_PLATFORM_VIEW
@@ -314,6 +315,24 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Derives management tokens (ADR 0011); required in production.",
     ),
     S(
+        "settings_encryption_key_previous",
+        K.SECRET,
+        None,
+        _A,
+        T.BOOTSTRAP,
+        "The key before a rotation (at least 32 bytes); sealed values under it stay readable "
+        "until `rekey` has run. Empty outside a rotation (ADR 0094).",
+    ),
+    S(
+        "management_token_key_previous",
+        K.SECRET,
+        None,
+        _A,
+        T.BOOTSTRAP,
+        "The token key before a rotation (at least 32 bytes); links of bookings made under it "
+        "keep working. Empty outside a rotation (ADR 0094).",
+    ),
+    S(
         "session_secret",
         K.SECRET,
         None,
@@ -347,6 +366,38 @@ REGISTRY: tuple[SettingSpec, ...] = (
         T.LOGIN,
         "Scopes requested at login; wrong scopes break login.",
     ),
+    S(
+        "admin_mfa_required",
+        K.BOOL,
+        False,
+        _B,
+        T.LOGIN,
+        "Refuse an admin login without a second factor (ADR 0100); on for the bundled Keycloak.",
+    ),
+    S(
+        "oidc_acr_values",
+        K.STRING,
+        "mfa",
+        _B,
+        T.LOGIN,
+        "acr_values requested at login; an acr from this list counts as proof of MFA (ADR 0100).",
+    ),
+    S(
+        "oidc_mfa_amr_values",
+        K.STRING,
+        "hwk mfa otp swk",
+        _B,
+        T.LOGIN,
+        "amr values that count as proof of MFA (RFC 8176), space separated (ADR 0100).",
+    ),
+    S(
+        "oidc_mfa_acr_values",
+        K.STRING,
+        "",
+        _B,
+        T.LOGIN,
+        "acr values that count as proof of MFA; empty: the values asked for (ADR 0100).",
+    ),
     # B. Deployment: tied to the host, DNS, proxy, image or healthcheck; kill switches.
     S(
         "public_base_url",
@@ -370,8 +421,25 @@ REGISTRY: tuple[SettingSpec, ...] = (
         None,
         _B,
         T.HOST,
-        "Address of the reverse proxy (read by uvicorn).",
-        in_config=False,
+        "Address of the reverse proxy (read by uvicorn). Other than the bundled proxy's, "
+        "System status warns unless web serves TLS (ADR 0091).",
+    ),
+    S(
+        "web_tls_cert_file",
+        K.PATH,
+        None,
+        _B,
+        T.HOST,
+        "Certificate chain (PEM) for uvicorn, for an own reverse proxy on another machine; with "
+        "WEB_TLS_KEY_FILE web serves HTTPS (ADR 0091).",
+    ),
+    S(
+        "web_tls_key_file",
+        K.PATH,
+        None,
+        _B,
+        T.HOST,
+        "Private key (PEM) of WEB_TLS_CERT_FILE; readable by the web user only (ADR 0091).",
     ),
     S(
         "tls_domain",
@@ -738,6 +806,50 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1440,
     ),
     S(
+        "keycloak_admin_url",
+        K.URL,
+        None,
+        _A,
+        T.LOGIN,
+        "Admin API of the bundled Keycloak realm, ending in /admin/realms/<realm>; empty: staff "
+        "is not managed in the portal (ADR 0095).",
+    ),
+    S(
+        "keycloak_directory_client_id",
+        K.STRING,
+        "openplanner-directory",
+        _A,
+        T.LOGIN,
+        "Service account of the bundled Keycloak that creates and changes staff (ADR 0095).",
+    ),
+    S(
+        "keycloak_directory_client_secret",
+        K.SECRET,
+        None,
+        _A,
+        T.LOGIN,
+        "Secret of that service account (ADR 0095).",
+    ),
+    S(
+        "staff_invite_expiry_days",
+        K.INT,
+        7,
+        _C,
+        T.STAFF,
+        "Days an invitation or password reset link of a staff member stays valid (ADR 0095).",
+        minimum=1,
+        maximum=30,
+    ),
+    S(
+        "staff_directory_enabled",
+        K.BOOL,
+        True,
+        _C,
+        T.STAFF,
+        "Show the actions that create and change staff in the bundled identity provider; off "
+        "hides them and leaves the provider's data untouched (ADR 0095).",
+    ),
+    S(
         "staff_last_seen_interval_seconds",
         K.INT,
         300,
@@ -849,6 +961,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Most rows one CSV export of the audit log may hold; more is refused (ADR 0040).",
         minimum=1_000,
         maximum=1_000_000,
+    ),
+    S(
+        "max_font_unpacked_bytes",
+        K.INT,
+        2_000_000,
+        _C,
+        T.OPERATIONS,
+        "Largest unpacked size (WOFF2 totalSfntSize) of an uploaded font, in bytes (ADR 0092).",
+        minimum=256_000,
+        maximum=8_000_000,
     ),
     S(
         "configuration_package_max_mb",
@@ -979,6 +1101,26 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Maximum login age for a change (ADR 0015).",
         minimum=5,
         maximum=60,
+    ),
+    S(
+        "admin_idle_minutes",
+        K.INT,
+        60,
+        _C,
+        T.ADMIN_SESSION,
+        "Idle time after which an admin session ends (ADR 0098).",
+        minimum=15,
+        maximum=120,
+    ),
+    S(
+        "admin_max_sessions_per_person",
+        K.INT,
+        5,
+        _C,
+        T.ADMIN_SESSION,
+        "Admin sessions one person may hold at once; the one idle longest lapses (ADR 0098).",
+        minimum=1,
+        maximum=20,
     ),
     S("oidc_role_claim", K.STRING, "roles", _C, T.LOGIN_MAPPING, "Claim holding the roles."),
     S(
@@ -1127,6 +1269,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Password of the login; write-only.",
         optional=True,
         aliases=("smtp_user_password",),
+    ),
+    S(
+        "smtp_plaintext_relay_allowed",
+        K.BOOL,
+        False,
+        _B,
+        T.MAIL,
+        "Allow mail without TLS in production, for a relay on a trusted network (ADR 0091); "
+        "otherwise saving it is refused and System status reports it. Never in the portal.",
     ),
     S(
         "mail_from",
@@ -1341,6 +1492,29 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=29,
     ),
     S(
+        "closure_max_retention_days",
+        K.INT,
+        90,
+        _D,
+        T.RETENTION,
+        "Days after the original appointment at the latest that the details of a booking on "
+        "hold by a closure are deleted, also while the closure has no end (ADR 0102). It cannot "
+        "be switched off.",
+        minimum=30,
+        maximum=180,
+    ),
+    S(
+        "closure_max_notice_days",
+        K.INT,
+        14,
+        _D,
+        T.RETENTION,
+        "Days before that maximum that the administrators are told a closure still holds "
+        "details, and on what date they are deleted (ADR 0102).",
+        minimum=3,
+        maximum=28,
+    ),
+    S(
         "booking_form_max_custom_fields",
         K.INT,
         5,
@@ -1398,6 +1572,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Less time to confirm than this: confirm until the change deadline, no reminder.",
         minimum=5,
         maximum=120,
+    ),
+    S(
+        "participant_link_session_hours",
+        K.INT,
+        24,
+        _C,
+        T.PARTICIPANT_LINK,
+        "Hours after its last use that a participant's browser may still use a booking it "
+        "opened from the emailed link (ADR 0093); the email link always works again.",
+        minimum=20,
+        maximum=168,
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

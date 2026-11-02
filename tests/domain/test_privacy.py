@@ -7,8 +7,10 @@ import pytest
 from app.domain.privacy import (
     ALIASES,
     DATA_FIELDS,
+    DERIVED_FIELDS,
     ENTITY,
     PII_FIELDS,
+    PURGED_FIELDS,
     Classification,
     DataField,
     classification,
@@ -22,7 +24,6 @@ EXPECTED = {
     "last_name": "direct",
     "email": "direct",
     "phone": "direct",
-    "note": "sensitive",
     "form_answers": "sensitive",
     "guest_join_url": "sensitive",
     "host_join_url": "sensitive",
@@ -40,7 +41,6 @@ def test_the_list_keeps_the_card_order_direct_fields_first() -> None:
     assert [f.name for f in DATA_FIELDS] == list(EXPECTED)
     assert fields_of(Classification.DIRECT) == ("first_name", "last_name", "email", "phone")
     assert fields_of(Classification.SENSITIVE) == (
-        "note",
         "form_answers",
         "guest_join_url",
         "host_join_url",
@@ -62,7 +62,7 @@ def test_anything_else_is_not_pii_and_has_no_classification(field: str) -> None:
 
 
 def test_the_aliases_are_the_names_the_same_data_travels_by() -> None:
-    assert ALIASES == frozenset({"name", "answers"})
+    assert ALIASES == frozenset({"name", "answers", "note"})
     assert not ALIASES & PII_FIELDS
 
 
@@ -72,3 +72,16 @@ def test_the_list_cannot_be_changed_at_run_time() -> None:
     with pytest.raises(dataclasses.FrozenInstanceError):
         DATA_FIELDS[0].name = "other"  # type: ignore[misc]
     assert DataField("email", Classification.DIRECT) == DATA_FIELDS[2]
+
+
+def test_note_is_no_personal_data_field_but_stays_masked_in_logs() -> None:
+    """ADR 0102 point 13: the column is gone; the name stays an alias so a log line is masked."""
+    assert "note" not in PII_FIELDS
+    assert "note" in ALIASES
+
+
+def test_the_purge_clears_the_personal_fields_and_the_provider_links() -> None:
+    """ADR 0102 point 11: the one list the purge works from."""
+    assert DERIVED_FIELDS == ("video_room_id", "trial_room_id", "wxcc_task_id", "claimed_by")
+    assert set(PURGED_FIELDS) == PII_FIELDS | set(DERIVED_FIELDS)
+    assert len(PURGED_FIELDS) == len(set(PURGED_FIELDS))

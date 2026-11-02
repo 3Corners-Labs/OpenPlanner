@@ -3,7 +3,9 @@
 Status: accepted (2026-10-31) by the product owner; partly built: step 1 (the `TRACE` level and the trace points) is merged, step 2 (the destination model, the service, the queue and sender, the rights and the migration, #295) is merged, step 3 (the four adapters and the wiring in web and worker, #296) is merged, step 4 (the screen) is in PR (#297), step 5 is planned. Amends ADR 0034
 point 4 (shipping is the host's job only) and extends ADR 0040 (levels) and ADR 0042 (`LOG_LEVEL`
 with expiry). ADR 0008 (encrypted integration secrets) and ADR 0047 (one home per screen)
-apply.
+apply. §10 (diagnostic events and trace lines may go to a destination that opts in, switched on
+per destination by the superuser and audited) was confirmed by the product owner on 2026-11-01;
+the assumption there no longer stands.
 
 ## Context
 

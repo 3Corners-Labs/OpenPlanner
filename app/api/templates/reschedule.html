@@ -5,9 +5,9 @@
 <p class="eyebrow">{{ group.name }}</p>
 <h1>{{ _("reschedule.title") }}</h1>
 <p class="lead">{{ _("reschedule.current", slot=slot_label) }} {{ _("reschedule.intro") }}</p>
-{% set action = "/b/" ~ token ~ "/reschedule" %}
+{% set action = "/b/m/" ~ ref ~ "/reschedule" %}
 {% set method = "get" %}
 {% include "_slot_picker.html" %}
-<p><a href="/b/{{ token }}">{{ _("cancel.back") }}</a></p>
+<p><a href="/b/m/{{ ref }}">{{ _("cancel.back") }}</a></p>
 {% endblock %}
 {% block scripts %}<script src="{{ static_url('calendar.js') }}" defer></script>{% endblock %}

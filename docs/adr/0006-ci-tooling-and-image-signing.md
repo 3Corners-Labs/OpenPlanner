@@ -1,6 +1,9 @@
 # 0006. Test tooling outside the Python runtime; image publishing and signing
 
-Status: accepted (2026-10-23)
+Status: accepted (2026-10-23). Amended by ADR 0051 (supply chain), ADR 0059 (release-candidate
+images) and ADR 0067. Note (2026-11-01 review): §3: mutation testing also covers `app/i18n`
+(CLAUDE.md, `main.yml`). Note (2026-11-01 review): the deploy-time `cosign verify` is built by
+ADR 0029 and ADR 0050.
 
 ## Context
 

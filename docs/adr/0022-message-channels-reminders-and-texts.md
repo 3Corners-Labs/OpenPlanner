@@ -3,6 +3,7 @@
 Status: accepted (2026-10-25); superseded in part by ADR 0028 (SMS provider as data, Webex
 Connect as one adapter). Implements ADR 0008 for SMTP and SMS, and the editors of ADR 0009.
 Built; the organisation-wide text editor it deferred came with ADR 0074 (checked on 2026-10-31).
+Amended by ADR 0091 (encrypted hops: the SMTP channel).
 
 ## Context
 

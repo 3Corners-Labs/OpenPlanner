@@ -2,7 +2,9 @@
 
 Since ADR 0056 the management token reaches the participant by email only; the booking page
 redirects to "check your email". Tests read the newest booking's salt from the database and
-derive the token as the mail composer does, then confirm with the page's POST.
+derive the token as the mail composer does. Since ADR 0093 opening that link trades the token
+for a cookie and redirects to ``/b/m/{public_ref}``; ``open_link`` does that and returns the
+address of the page, free of any token.
 """
 
 import httpx
@@ -28,14 +30,27 @@ async def emailed_token(client: httpx.AsyncClient) -> str:
     return derive_token(management_token_key(app.state.settings), salt)
 
 
+async def open_link(client: httpx.AsyncClient, token: str) -> str:
+    """Open the emailed link as a browser does and return the page's address (no token).
+
+    The client keeps the cookie that the exchange sets (ADR 0093).
+    """
+    response = await client.get(f"/b/{token}")
+    assert response.status_code == 303
+    page = response.headers["location"]
+    assert page.startswith("/b/m/")
+    return page.split("?")[0]
+
+
 async def confirm_by_link(client: httpx.AsyncClient, token: str) -> httpx.Response:
-    """Confirm the booking behind ``token`` with the confirm page's button."""
-    return await client.post(f"/b/{token}/confirm", headers=SAME_ORIGIN)
+    """Open the link and confirm the booking behind ``token`` with the confirm page's button."""
+    page = await open_link(client, token)
+    return await client.post(f"{page}/confirm", headers=SAME_ORIGIN)
 
 
 async def confirm_newest(client: httpx.AsyncClient) -> str:
     """Confirm the newest booking by its emailed link and return its token."""
     token = await emailed_token(client)
     response = await confirm_by_link(client, token)
-    assert response.headers["location"] == f"/b/{token}?status=confirmed"
+    assert response.headers["location"].endswith("?status=confirmed")
     return token

@@ -1,7 +1,11 @@
 # 0013. Admin login with OIDC: PingFederate in production, Keycloak in development
 
-Status: accepted (2026-10-23); §5 superseded by 0098. Resolves open point O3 in part; refines "OIDC: authlib" in
-CLAUDE.md.
+Status: accepted (2026-10-23). Resolves open point O3 in part; refines "OIDC: authlib" in
+CLAUDE.md. §1 refined by ADR 0097 (the issuer is pinned, not taken from discovery). §3 (claim
+mapping) amended by ADR 0042 §8 (class C) and ADR 0049 (entitlements). Extended by ADR 0046,
+0083 and 0090. ADR 0098 (proposed) would supersede §5; §5 stands until 0098 is accepted and
+built. Note (2026-11-01 review): the session also holds the login's roles, organisations,
+groups and claim values and UI preferences (`app/admin/session.py`), more than §5 says.
 
 ## Context
 

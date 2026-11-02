@@ -6,6 +6,15 @@ view it. The superuser can change some of the settings; the auditor only reads.
 
 Secret values, such as passwords and keys, are never shown: only whether they are set.
 
+The screen has three tabs under its title:
+
+- **System status**: the environment, the certificate and the data fields;
+- **Settings**: every platform setting by topic, with *On this page* at the top, a list of links
+  to each topic, and the trial of the login mapping;
+- **Configuration package** (the superuser only): export and import.
+
+A change or an error shows on the tab of the form you used.
+
 ## System status
 
 The settings that only the server operator sets, in the server's environment or in a file.
@@ -15,6 +24,16 @@ For each one you see whether it is set and where it comes from, never its value.
 When the installation does not run as production (for example a test environment), the
 screen also lists what production would refuse: a missing key or an address without https.
 Production never starts with any of these.
+
+### Key rotation
+
+While `SETTINGS_ENCRYPTION_KEY_PREVIOUS` or `MANAGEMENT_TOKEN_KEY_PREVIOUS` is set, a block
+*Key rotation* shows how many encrypted secrets are still under the previous settings key and
+how many open bookings still have a link under the previous token key. Only numbers appear,
+never keys or contents. At 0 the screen says the previous key can be removed; otherwise it
+says what to do first (run `rekey` on the host, or wait until those bookings are over). Without
+a previous key the block does not appear. The procedure is in the runbook, *Rotating secrets*,
+and the inventory of all keys in `docs/cryptography.md`.
 
 ### Certificate of the public address
 
