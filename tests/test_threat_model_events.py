@@ -153,7 +153,9 @@ FLOWS: dict[str, Flow] = {
     ),
     "## Shared trust boundaries (TEN-06, BP-4)": Flow(ADMIN),
     "## Cross-cutting": Flow((PUBLIC, WEBHOOK, TOKEN, CHANGE)),
-    "## Flow: booking, cancelling, rescheduling (domain and persistence, WP2)": Flow((PUBLIC, OWN_FAILURE)),
+    "## Flow: booking, cancelling, rescheduling (domain and persistence, WP2)": Flow(
+        (PUBLIC, OWN_FAILURE)
+    ),
     "## Flow: public booking pages (WP3)": Flow((PUBLIC, OWN_FAILURE)),
     "## Flow: organisation branding (WP3b, ADR 0041)": Flow(ADMIN),
     "## Flow: organisation management": Flow(ADMIN),
