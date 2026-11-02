@@ -6,6 +6,10 @@ class A; a second identity provider was rejected as a fallback) and ADR 0046 (a 
 keyed by the IdP subject). Builds on ADR 0008 (encrypted integration secrets), ADR 0015 (fresh
 login), ADR 0049 (entitlements) and ADR 0073 (DNS lookups with `dnspython`). §7 refined by
 ADR 0097 (the stored issuer is pinned and compared exactly, with no trailing-slash tolerance).
+Amended on 2026-11-02 by the product owner: `ORGANISATION_IDPS_ENABLED=false` keeps the
+*Login* pages of the organisations visible with a notice that logins through them are off, so
+the superuser can prepare registrations and domains before the host switches them on; it still
+routes every login to the platform provider and ends organisation-provider sessions.
 
 ## Context
 
@@ -194,7 +198,7 @@ Each becomes a test in the step that builds it and a row in `docs/threat-model.m
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `ORGANISATION_IDPS_ENABLED` | B deployment | `false` | – | – | Kill switch: off hides the pages, routes every login to the platform provider and ends organisation-provider sessions. Class B because it opens a new trust boundary that the host team should agree to. |
+| `ORGANISATION_IDPS_ENABLED` | B deployment | `false` | – | – | Kill switch: off routes every login to the platform provider and ends organisation-provider sessions; the pages stay, with a notice (amended 2026-11-02). Class B because it opens a new trust boundary that the host team should agree to. |
 | `idp_max_per_organisation` | C platform | 2 | 1–5 | `settings.platform.manage` | Two allows moving from one IdP to the next without a gap. |
 | `idp_domain_recheck_hours` | C platform | 24 | 1–168 | `settings.platform.manage` | DNS re-check of verified domains (point 12). |
 | `idp_domain_grace_days` | C platform | 7 | 0–30 | `settings.platform.manage` | How long a missing TXT record is tolerated before the domain stops routing. |
