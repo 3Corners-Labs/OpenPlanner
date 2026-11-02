@@ -143,4 +143,4 @@ identifiers and DNS labels, which is a format rule, not a preference.
 | 3 | User names under the suffix: setting, invite form, adapter, scope check, `username` masked (points 5–8, 11) | #430 | merged |
 | 4 | Reserved suffix in the login routing and the provider registration; login label (points 9, 10) | #443, #453 | merged |
 | 5 | Installer `--idp bundled\|own` default in every mode; production `start` with `idp-db`, proxy, backup and runbook (points 1, 4) | – | planned |
-| 6 | docker01 moved to the bundled provider (point 12): realm rendered, `idp` under the `dev` profile on port 8780, the old lab realm off, mail to Mailpit; users to re-invite; render-script mode fix in this PR | follows #453 | in PR |
+| 6 | docker01 moved to the bundled provider (point 12): realm rendered, `idp` under the `dev` profile on port 8780, the old lab realm off, mail to Mailpit; users to re-invite; render-script mode fix in this PR | #455 | in PR |
