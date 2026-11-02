@@ -1404,16 +1404,17 @@ is tagged after a merge.
 **The release app (ADR 0107), once.** Under *Organization settings → Developer settings →
 GitHub Apps → New GitHub App*: a name such as `openplanner-release`, the repository as
 homepage, webhook off, repository permissions *Contents* and *Pull requests* read and write
-and nothing else, installable on this account only. Generate a private key, install the app
-on this repository only, then:
+and nothing else, installable on this account only. Install the app on this repository only.
+The key: *Edit* next to the app → *Credentials* → *Key pairs* → *New key* (a `.pem` is
+downloaded; GitHub keeps only the public part). Then:
 
 ```bash
 gh variable set RELEASE_APP_CLIENT_ID --env release --repo 3Corners-Labs/OpenPlanner --body "<client id>"
 gh secret set RELEASE_APP_PRIVATE_KEY --env release --repo 3Corners-Labs/OpenPlanner < key.pem
 ```
 
-Delete the `.pem` afterwards. The key does not expire; to rotate it, generate a new key in the
-app, store it the same way and delete the old key in the app. The tag ruleset `release tags`
+Delete the `.pem` afterwards. The key does not expire; to rotate it, add a new key under *Key pairs*,
+store it the same way and delete the old one there. The tag ruleset `release tags`
 lets only the app and repository administrators create, move or delete a `v*` tag; an
 administrator can still tag by hand when the app is broken. The Codex CLI is installed at its newest version on every audit run
 (`codex-version` empty), as on a laptop; it is a tool of the forge, not a dependency of the
