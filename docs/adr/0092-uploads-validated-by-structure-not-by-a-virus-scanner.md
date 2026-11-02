@@ -77,7 +77,7 @@ they are in this ADR.
 | 0 | ADR accepted | #309 | merged |
 | 1 | WOFF2 structural validation and `max_font_unpacked_bytes`, tests with malformed fonts | #385 | built |
 | 2 | Test on every download route: server-chosen file name, fixed pattern | #338, #379 | built: `tests/admin/test_download_headers.py` pins the five modules that set a `content-disposition` and the pattern of each name |
-| 3 | Deviation and compensating controls in `docs/threat-model.md` | THISPR | built: section *Uploads without a virus scan (ASVS V5.4.3, ADR 0092)* |
+| 3 | Deviation and compensating controls in `docs/threat-model.md` | #423 | built: section *Uploads without a virus scan (ASVS V5.4.3, ADR 0092)* |
 
 ## Consequences
 
