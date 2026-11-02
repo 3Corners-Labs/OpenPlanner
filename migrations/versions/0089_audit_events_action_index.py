@@ -4,11 +4,11 @@ Every admin page reads the newest system events of a few condition actions to sh
 banner; without an index on ``action`` that is a scan of every system event. No data changes,
 so the downgrade only drops the index.
 
-Revises 0087 (actor role, ADR 0103). Open PRs also claim numbers, so recheck the head before
+Revises 0088 (identity provider domains). Open PRs also claim numbers, so recheck the head before
 merging.
 
-Revision ID: 0088
-Revises: 0087
+Revision ID: 0089
+Revises: 0088
 Create Date: 2026-11-02 18:00:00.000000
 """
 
@@ -16,8 +16,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0088"
-down_revision: str | None = "0087"
+revision: str = "0089"
+down_revision: str | None = "0088"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
