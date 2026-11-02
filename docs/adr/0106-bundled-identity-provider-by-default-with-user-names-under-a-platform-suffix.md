@@ -1,6 +1,6 @@
 # 0106. The bundled identity provider by default, with user names under a platform suffix
 
-Status: proposed (2026-11-02), requested by the product owner. Amends ADR 0090 point 1 (the
+Status: proposed (2026-11-02, #425), requested by the product owner. Amends ADR 0090 point 1 (the
 bundled Keycloak becomes the default in every installer mode, production included), ADR 0095
 (the user name of a staff member it creates) and ADR 0083 points 11 and 13 (a reserved domain
 that always routes to the platform provider). Not built.
@@ -134,7 +134,7 @@ identifiers and DNS labels, which is a format rule, not a preference.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | – | planned |
+| 0 | ADR proposed | #425 | in PR |
 | 1 | Render script writes the application's half; development realm gets `openplanner-directory`; compose `env_file` | – | planned |
 | 2 | Staff screen notice and System status check for an unconnected directory (point 3) | – | planned |
 | 3 | User names under the suffix: setting, invite form, adapter, scope check, `username` masked (points 5–8, 11) | – | planned |
