@@ -7,7 +7,35 @@
     <h1 id="page-title">{{ _("admin.staff.title") }}</h1>
     <p class="page-header__lead">{{ _("admin.staff.intro") }}</p>
   </div>
+  {% if can_invite %}<a class="button" href="/admin/staff/invite">{{ _("admin.staff.invite.link") }}</a>{% endif %}
 </div>
+{% if pending %}
+<section class="card" aria-labelledby="pending-heading">
+  <h2 id="pending-heading">{{ _("admin.staff.pending.title") }}</h2>
+  <p class="muted">{{ _("admin.staff.pending.intro") }}</p>
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.staff.pending.title") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.staff.invite.email") }}</th><th scope="col">{{ _("admin.staff.manage.role") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.staff.manage.actions") }}</span></th></tr></thead>
+    <tbody>
+      {% for p in pending %}
+      <tr>
+        <th scope="row">{{ p.email }}{% if not p.enabled %}<br><span class="chip chip--warning">{{ _("admin.staff.manage.disabled") }}</span>{% endif %}</th>
+        <td>{% for g in p.grants %}{{ g.role }}, {{ g.place }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+        <td>
+          <form method="post" action="/admin/staff/directory/reset">
+            <input type="hidden" name="subject" value="{{ p.subject }}">
+            <input type="hidden" name="back" value="/admin/staff">
+            <button type="submit" class="button button--secondary">{{ _("admin.staff.pending.resend") }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
 <form class="card" method="get" action="/admin/staff" aria-labelledby="filter-heading">
   <h2 id="filter-heading" class="visually-hidden">{{ _("admin.staff.filter") }}</h2>
   <div class="inline-forms">

@@ -211,6 +211,25 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/settings/idp-key": {
         "/admin/groups/demo/settings/idp-key": statuses(422, 422, 403, 403, 403, 403, 403),
     },
+    # ADR 0095: without a bundled provider the form sends the admin back to the list (303), a
+    # change finds no directory (an error page, 200) and an empty invitation is refused (422);
+    # the permission is the organisation admin's and the superuser's, no one else's.
+    "GET /admin/staff/invite": {"/admin/staff/invite": statuses(303, 303, 403, 303, 403, 403, 403)},
+    "POST /admin/staff/invite": {
+        "/admin/staff/invite": statuses(422, 422, 403, 422, 403, 403, 403)
+    },
+    "POST /admin/staff/directory/grants/add": {
+        "/admin/staff/directory/grants/add": statuses(303, 303, 403, 303, 403, 403, 403)
+    },
+    "POST /admin/staff/directory/grants/remove": {
+        "/admin/staff/directory/grants/remove": statuses(303, 303, 403, 303, 403, 403, 403)
+    },
+    "POST /admin/staff/directory/enabled": {
+        "/admin/staff/directory/enabled": statuses(200, 200, 403, 200, 403, 403, 403)
+    },
+    "POST /admin/staff/directory/reset": {
+        "/admin/staff/directory/reset": statuses(200, 200, 403, 200, 403, 403, 403)
+    },
     "GET /admin/staff/{member_id}": {
         "/admin/staff/999": statuses(404, 404, 404, 404, 404, 403, 403)
     },

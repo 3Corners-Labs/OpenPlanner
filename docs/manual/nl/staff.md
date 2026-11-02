@@ -32,6 +32,33 @@ medewerker onder **Niet herkende rechten**, met de reden en het moment. Het filt
 niet-herkende rechten** vindt deze medewerkers. De juiste waarden staan op **Koppeling
 identiteitsprovider**; geef de afwijking door aan het IdP-team.
 
+## Medewerkers beheren bij de meegeleverde identiteitsprovider
+
+Gebruikt dit platform de meegeleverde Keycloak (test- en labinstallaties), dan beheert u
+medewerkers hier zelf. Bij een eigen identiteitsprovider, zoals PingFederate, ziet u deze
+knoppen niet: daar wijzigt het IdP-team rechten.
+
+- **Medewerker uitnodigen** (knop boven de lijst): vul e-mailadres, voor- en achternaam in en kies
+  de eerste rol en plaats. De medewerker krijgt een e-mail met een link om een wachtwoord te
+  kiezen. De link is standaard 7 dagen geldig (door de superuser in te stellen).
+- **Uitgenodigd, nog niet ingelogd**: mensen die u heeft aangemaakt en die nog niet hebben
+  ingelogd. U kunt de uitnodiging opnieuw sturen.
+- Op de pagina van een persoon, onder **Beheer bij de identiteitsprovider**: een rol
+  verwijderen, een rol met plaats toevoegen, de persoon uitschakelen of weer inschakelen, en
+  een wachtwoordreset sturen. Een wijziging werkt bij de eerstvolgende login.
+
+Wat u mag:
+
+- Een **organisatiebeheerder** werkt alleen binnen de eigen organisaties en kent nooit meer toe
+  dan de eigen rechten: de rol superuser kan alleen de superuser toekennen.
+- Een persoon die ook buiten uw organisaties werkt: rollen elders blijven ongemoeid en
+  uitschakelen kan alleen de superuser.
+- U kunt uzelf niet wijzigen of uitschakelen.
+
+Elke wijziging staat in de auditlog, met rolnamen en plaatsen en zonder namen of
+e-mailadressen. Staat de identiteitsprovider niet bereikbaar, dan meldt het scherm dat zonder
+de melding van de provider zelf.
+
 ## Filters
 
 - **Organisatie**, **Groep** en **Rol**: alleen medewerkers die daarbij horen.
