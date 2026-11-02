@@ -30,6 +30,7 @@ stays open to every role as usual.
 | Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – | – |
 | Switch maintenance mode on and off (`system.maintenance`) | Portal | locked, maintenance | yes | – | – | – | – |
 | Adjust roles (`roles.manage`) | Portal | locked | yes | – | – | – | – |
+| Erase a staff member's data (`staff.erase`) | Portal | locked, needs `staff.view` | yes | – | – | – | – |
 | View system status and advanced settings (`settings.platform.view`) | Portal | – | yes | – | – | yes | – |
 | Change platform settings (`settings.platform.manage`) | Portal | locked | yes | – | – | – | – |
 | Change the login mapping (claims and roles) (`settings.login.manage`) | Portal | locked | yes | – | – | – | – |

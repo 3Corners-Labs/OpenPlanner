@@ -8,6 +8,7 @@ Called once per worker loop, after the due jobs:
     hourly ─► PRAGMA incremental_vacuum ─► pages back to the file system
     daily ─► erase the archived groups nothing refers to any more (ADR 0084 step 3)
     hourly ─► delete ended and expired admin sessions (ADR 0098 step 2)
+    daily ─► erase staff records without a login for ``staff_retention_days`` (ADR 0046 step 2)
     hourly ─► delete update back-ups older than a day, the second safety net (ADR 0102 point 10)
     daily ─► retention sweep: purge personal data the purge job missed, alert on a backlog
              ─► purged something? ─► PRAGMA wal_checkpoint(TRUNCATE) (WP-A3)
@@ -57,6 +58,9 @@ ERASE_EVERY = timedelta(days=1)
 SESSIONS_EVERY = timedelta(hours=1)
 """How often ended and expired admin sessions are deleted; the lifetime is a setting."""
 
+STAFF_EVERY = timedelta(days=1)
+"""How often staff records past their retention are erased; the period is a setting."""
+
 
 BACKUPS_EVERY = timedelta(hours=1)
 """How often update back-ups past their lifetime are deleted (the lifetime is fixed, ADR 0102)."""
@@ -78,6 +82,8 @@ class Housekeeping:
             ``SWEEP_EVERY``.
         clean_sessions: Deletes the ended and expired admin sessions and returns the count;
             called once per ``SESSIONS_EVERY``.
+        erase_staff: Erases the staff records past ``staff_retention_days`` and returns the
+            count; called once per ``STAFF_EVERY``.
         backups: The directory of the update back-ups (``data/backups``), or ``None`` to leave
             them to the updater; pruned once per ``BACKUPS_EVERY``.
     """
@@ -93,9 +99,12 @@ class Housekeeping:
         erase: Callable[[], Awaitable[int]] | None = None,
         sweep: Callable[[], Awaitable[SweepResult]] | None = None,
         clean_sessions: Callable[[], Awaitable[int]] | None = None,
+        erase_staff: Callable[[], Awaitable[int]] | None = None,
         backups: Path | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
+        self._erase_staff = erase_staff
+        self._staff_erased_at: datetime | None = None
         self._clean_sessions = clean_sessions
         self._backups = backups
         self._backups_pruned_at: datetime | None = None
@@ -125,6 +134,7 @@ class Housekeeping:
         erase: Callable[[], Awaitable[int]] | None = None,
         sweep: Callable[[], Awaitable[SweepResult]] | None = None,
         clean_sessions: Callable[[], Awaitable[int]] | None = None,
+        erase_staff: Callable[[], Awaitable[int]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
         return cls(
@@ -137,6 +147,7 @@ class Housekeeping:
             erase,
             sweep,
             clean_sessions,
+            erase_staff,
             _backup_directory(database_url),
         )
 
@@ -148,6 +159,7 @@ class Housekeeping:
         await self._erase_groups(now)
         await self._sweep_retention(now)
         await self._clean_admin_sessions(now)
+        await self._erase_staff_records(now)
         self._prune_backups(now)
 
     def _prune_backups(self, now: datetime) -> None:
@@ -164,6 +176,21 @@ class Housekeeping:
         else:
             if deleted:
                 log.info("backups.pruned", backups=deleted)
+
+    async def _erase_staff_records(self, now: datetime) -> None:
+        """Erase staff records past their retention, at most once per ``STAFF_EVERY``."""
+        if self._erase_staff is None:
+            return
+        if self._staff_erased_at is not None and now - self._staff_erased_at < STAFF_EVERY:
+            return
+        self._staff_erased_at = now
+        try:
+            erased = await self._erase_staff()
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.warning("staff.erase_failed", error=type(exc).__name__)
+        else:
+            if erased:
+                log.info("staff.erased", staff=erased)
 
     async def _clean_admin_sessions(self, now: datetime) -> None:
         """Delete ended and expired admin sessions, at most once per ``SESSIONS_EVERY``."""

@@ -169,6 +169,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.SETTINGS_LOGIN_MANAGE,  # ADR 0042 §5: never grantable to another role
         Permission.IDENTITY_PROVIDERS_MANAGE,  # ADR 0083 point 4
         Permission.LOGGING_MANAGE,  # ADR 0085: credentials of a log platform
+        Permission.STAFF_ERASE,  # ADR 0046 point 9: erasing a person is the superuser's
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]

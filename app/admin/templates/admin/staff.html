@@ -77,6 +77,8 @@
     {% for person in people %}
     <tr>
       <th scope="row"><a href="/admin/staff/{{ person.id }}">{{ person.name }}</a>
+        {%- if person.suspended %}<br><span class="chip chip--warning">{{ _("admin.staff.status.suspended") }}</span>{% endif %}
+        {%- if person.erased %}<br><span class="chip">{{ _("admin.staff.status.erased") }}</span>{% endif %}
         {%- if person.dormant %}<br><span class="chip chip--warning">{{ _("admin.staff.dormant") }}</span>{% endif %}</th>
       <td>{{ person.roles | join(", ") if person.roles else _("admin.staff.no_role") }}</td>
       <td>{% for place in person.places %}{{ place.organisation }}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}</td>
