@@ -705,6 +705,17 @@ class Transaction(Protocol):
         """Write the latest activity of a live session."""
         ...
 
+    async def end_all_admin_sessions(self, reason: EndReason, at: datetime) -> int:
+        """End every live session with ``reason``; return how many (ADR 0098 point 9c)."""
+        ...
+
+    async def delete_admin_sessions(self, login_before: datetime) -> int:
+        """Delete the sessions that ended or whose login lies before ``login_before``.
+
+        Return how many rows went (ADR 0098 point 11).
+        """
+        ...
+
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
         """Record the latest request of ``subject``; unknown subjects are ignored."""
         ...

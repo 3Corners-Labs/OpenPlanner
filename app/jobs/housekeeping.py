@@ -7,6 +7,7 @@ Called once per worker loop, after the due jobs:
     critical ─► brake: every diagnostic mode ends, so no debug events are written (part 4)
     hourly ─► PRAGMA incremental_vacuum ─► pages back to the file system
     daily ─► erase the archived groups nothing refers to any more (ADR 0084 step 3)
+    hourly ─► delete ended and expired admin sessions (ADR 0098 step 2)
     daily ─► retention sweep: purge personal data the purge job missed, alert on a backlog
              ─► purged something? ─► PRAGMA wal_checkpoint(TRUNCATE) (WP-A3)
 
@@ -50,6 +51,10 @@ ERASE_EVERY = timedelta(days=1)
 """How often archived groups are swept (ADR 0084 step 3); the delay itself is a setting."""
 
 
+SESSIONS_EVERY = timedelta(hours=1)
+"""How often ended and expired admin sessions are deleted; the lifetime is a setting."""
+
+
 class Housekeeping:
     """Storage watch and page reclaim for the worker loop.
 
@@ -64,6 +69,8 @@ class Housekeeping:
             ``ERASE_EVERY``.
         sweep: Runs the retention sweep and returns what it found; called once per
             ``SWEEP_EVERY``.
+        clean_sessions: Deletes the ended and expired admin sessions and returns the count;
+            called once per ``SESSIONS_EVERY``.
     """
 
     def __init__(
@@ -76,8 +83,11 @@ class Housekeeping:
         brake: Callable[[str], Awaitable[int]] | None = None,
         erase: Callable[[], Awaitable[int]] | None = None,
         sweep: Callable[[], Awaitable[SweepResult]] | None = None,
+        clean_sessions: Callable[[], Awaitable[int]] | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
+        self._clean_sessions = clean_sessions
+        self._sessions_cleaned_at: datetime | None = None
         self._sweep = sweep
         self._swept_at: datetime | None = None
         self._brake = brake
@@ -102,10 +112,19 @@ class Housekeeping:
         brake: Callable[[str], Awaitable[int]] | None = None,
         erase: Callable[[], Awaitable[int]] | None = None,
         sweep: Callable[[], Awaitable[SweepResult]] | None = None,
+        clean_sessions: Callable[[], Awaitable[int]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
         return cls(
-            engine, uow, clock, limits, lambda: measure_storage(database_url), brake, erase, sweep
+            engine,
+            uow,
+            clock,
+            limits,
+            lambda: measure_storage(database_url),
+            brake,
+            erase,
+            sweep,
+            clean_sessions,
         )
 
     async def run(self) -> None:
@@ -115,6 +134,25 @@ class Housekeeping:
         await self._reclaim(now)
         await self._erase_groups(now)
         await self._sweep_retention(now)
+        await self._clean_admin_sessions(now)
+
+    async def _clean_admin_sessions(self, now: datetime) -> None:
+        """Delete ended and expired admin sessions, at most once per ``SESSIONS_EVERY``."""
+        if self._clean_sessions is None:
+            return
+        if (
+            self._sessions_cleaned_at is not None
+            and now - self._sessions_cleaned_at < SESSIONS_EVERY
+        ):
+            return
+        self._sessions_cleaned_at = now
+        try:
+            deleted = await self._clean_sessions()
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.warning("sessions.clean_failed", error=type(exc).__name__)
+        else:
+            if deleted:
+                log.info("sessions.cleaned", sessions=deleted)
 
     async def _sweep_retention(self, now: datetime) -> None:
         """Purge overdue personal data, at most once per ``SWEEP_EVERY``; alert on a backlog."""
