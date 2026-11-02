@@ -81,7 +81,11 @@ TOPICS = (
         Permission.ROLES_MANAGE,
     ),
     HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
-    HelpTopic("staff", ("/admin/staff", "/admin/staff/{member_id}"), Permission.STAFF_VIEW),
+    HelpTopic(
+        "staff",
+        ("/admin/staff", "/admin/staff/invite", "/admin/staff/{member_id}"),
+        Permission.STAFF_VIEW,
+    ),
     HelpTopic("idp-mapping", ("/admin/idp-mapping",), Permission.IDP_MAPPING_VIEW),
     HelpTopic("audit", ("/admin/audit",), Permission.AUDIT_VIEW),
     HelpTopic(

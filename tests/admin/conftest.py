@@ -20,6 +20,7 @@ from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.identity_providers import FakeDiscoveryFetcher, FakeSigningKeys
 from tests.fakes.integrations import FakeVideo
 from tests.fakes.log_destinations import FakeFactory
+from tests.fakes.staff_directory import FakeStaffDirectory
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
 from tests.support.principals import legacy_claims, principal
@@ -70,6 +71,7 @@ class Site:
         dns: FakeTxtResolver | None = None,
         discovery: FakeDiscoveryFetcher | None = None,
         providers: FakeOrganisationProviders | None = None,
+        directory: FakeStaffDirectory | None = None,
         log_senders: FakeFactory | None = None,
     ):
         self.client = client
@@ -80,6 +82,8 @@ class Site:
         """The discovery documents the registration check sees (ADR 0083 step 2)."""
         self.providers = providers or FakeOrganisationProviders()
         """The adapters of the registered organisation providers, for the test login."""
+        self.directory = directory
+        """The staff directory of the bundled provider, when the test has one (ADR 0095)."""
         self.log_senders = log_senders or FakeFactory()
         """The senders the log destinations deliver through (ADR 0085): fakes, no network."""
 
@@ -102,7 +106,10 @@ def admin_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
 
 @asynccontextmanager
 async def _running_site(
-    settings: Settings, admin_db: str, integrations: Integrations | None = None
+    settings: Settings,
+    admin_db: str,
+    integrations: Integrations | None = None,
+    directory: FakeStaffDirectory | None = None,
 ) -> AsyncIterator[Site]:
     """Seed the demo data and run the app, with explicit integration adapters if given."""
     engine = create_engine(admin_db)
@@ -120,6 +127,7 @@ async def _running_site(
         discovery_fetcher=discovery,
         signing_keys=FakeSigningKeys(),
         organisation_providers=providers,  # type: ignore[arg-type]
+        staff_directory=directory,
         log_sender_factory=log_senders,
     )
     async with (
@@ -128,7 +136,7 @@ async def _running_site(
             transport=httpx.ASGITransport(app=app), base_url="http://testserver"
         ) as client,
     ):
-        yield Site(client, idp, clock, dns, discovery, providers, log_senders)
+        yield Site(client, idp, clock, dns, discovery, providers, directory, log_senders)
 
 
 @pytest.fixture
