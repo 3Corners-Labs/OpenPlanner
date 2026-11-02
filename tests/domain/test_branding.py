@@ -17,11 +17,13 @@ from app.domain.branding import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.theme import Theme
+from tests.fakes.woff2 import make_woff2, uint_base128
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
 WEBP = b"RIFF\x00\x00\x00\x00WEBPVP8 " + b"\x00" * 32
-WOFF2 = b"wOF2" + b"\x00" * 64
+WOFF2 = make_woff2()
+MAX_UNPACKED = 2_000_000
 
 
 def _field(error: pytest.ExceptionInfo[DomainError]) -> str | None:
@@ -115,18 +117,110 @@ def test_webp_needs_the_riff_header_too() -> None:
         Logo.from_upload(b"XXXX\x00\x00\x00\x00WEBPVP8 " + b"\x00" * 32)
 
 
-def test_fonts_must_be_woff2_and_small() -> None:
-    font = FontFile.from_upload(FontRole.HEADING, WOFF2)
+def _font_refused(data: bytes, limit: int = MAX_UNPACKED) -> None:
+    with pytest.raises(DomainError) as error:
+        FontFile.from_upload(FontRole.TEXT, data, limit)
+    assert _field(error) == "font"
+
+
+def test_a_structurally_valid_woff2_is_accepted() -> None:
+    font = FontFile.from_upload(FontRole.HEADING, WOFF2, MAX_UNPACKED)
     assert font.ref == FontRef(FontRole.HEADING, font.digest)
+
+
+def test_fonts_must_be_woff2_and_small() -> None:
     for data in (
         b"",
         b"wOFF" + b"\x00" * 64,
         b"\x00\x01\x00\x00",
-        WOFF2 + b"\x00" * MAX_FONT_BYTES,
+        make_woff2(compressed=MAX_FONT_BYTES),
     ):
-        with pytest.raises(DomainError) as error:
-            FontFile.from_upload(FontRole.TEXT, data)
-        assert _field(error) == "font"
+        _font_refused(data)
+
+
+def test_a_header_that_lies_about_the_length_is_refused() -> None:
+    size = len(WOFF2)
+    for length in (size - 1, size + 1, 0):
+        _font_refused(make_woff2(length=length))
+
+
+def test_the_number_of_tables_is_bounded() -> None:
+    _font_refused(make_woff2(tables=0))
+    _font_refused(make_woff2(tables=65))
+    assert FontFile.from_upload(FontRole.TEXT, make_woff2(tables=64), MAX_UNPACKED)
+
+
+def test_the_unpacked_size_is_bounded_by_the_setting() -> None:
+    big = make_woff2(sfnt_size=3_000_000)
+    _font_refused(big)
+    assert FontFile.from_upload(FontRole.TEXT, big, 3_000_000)
+    _font_refused(make_woff2(sfnt_size=0))
+    _font_refused(make_woff2(sfnt_size=0xFFFFFFFF))
+
+
+def test_a_table_directory_outside_the_file_is_refused() -> None:
+    header = WOFF2[:48]
+    # More tables than the file holds, a cut-off integer and a custom tag cut off.
+    for directory in (b"\x01\x64", b"\x01\xff", b"\x3f\x00", b"\x01\x80\x01", b""):
+        data = header + directory
+        _font_refused(make_woff2(directory=directory, compressed=0, length=len(data)))
+    # Directory fits, but the compressed block does not.
+    _font_refused(make_woff2(compressed=64)[:-1] + b"", MAX_UNPACKED)
+
+
+def test_a_compressed_block_that_does_not_fit_is_refused() -> None:
+    data = bytearray(make_woff2(compressed=64))
+    data[20:24] = (10_000).to_bytes(4, "big")  # totalCompressedSize
+    _font_refused(bytes(data))
+    data[20:24] = (0).to_bytes(4, "big")
+    _font_refused(bytes(data))
+
+
+def test_a_reserved_field_must_be_zero() -> None:
+    _font_refused(make_woff2(reserved=1))
+
+
+def test_transformed_tables_and_custom_tags_are_read() -> None:
+    # glyf (index 10) at version 0 and a custom tag at version 1 both carry a transformLength.
+    directory = (
+        bytes([10])
+        + uint_base128(300)
+        + uint_base128(200)
+        + bytes([0x3F | 0x40])
+        + b"abcd"
+        + uint_base128(70_000)
+        + uint_base128(5)
+    )
+    assert FontFile.from_upload(
+        FontRole.TEXT, make_woff2(tables=2, directory=directory), MAX_UNPACKED
+    )
+    # A 5-byte integer and a leading 0x80 byte (not allowed) or a sixth byte.
+    long = bytes([1]) + b"\x8f\xff\xff\xff\x7f"
+    assert FontFile.from_upload(FontRole.TEXT, make_woff2(tables=1, directory=long), MAX_UNPACKED)
+    for bad in (
+        bytes([1]) + b"\x80\x01",
+        bytes([1]) + b"\xff\xff\xff\xff\xff\x01",
+        bytes([1]) + b"\x90\x80\x80\x80\x00",
+    ):
+        _font_refused(make_woff2(tables=1, directory=bad))
+
+
+def test_metadata_and_private_blocks_must_lie_inside_the_file() -> None:
+    base = bytearray(make_woff2(compressed=64))
+    end = len(base)
+    ok = bytearray(base)
+    ok[28:32] = end.to_bytes(4, "big")  # metaOffset
+    ok[32:36] = (0).to_bytes(4, "big")
+    assert FontFile.from_upload(FontRole.TEXT, bytes(ok), MAX_UNPACKED)
+    for at, size_at in ((28, 32), (40, 44)):
+        bad = bytearray(base)
+        bad[at : at + 4] = (end - 4).to_bytes(4, "big")
+        bad[size_at : size_at + 4] = (100).to_bytes(4, "big")
+        _font_refused(bytes(bad))
+        early = bytearray(base)
+        early[at : at + 4] = (10).to_bytes(4, "big")
+        early[size_at : size_at + 4] = (4).to_bytes(4, "big")
+        _font_refused(bytes(early))
 
 
 def test_logo_header_without_a_logo_falls_back_to_standard() -> None:

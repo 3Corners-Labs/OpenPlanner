@@ -46,6 +46,7 @@ SETTING_LABELS: dict[str, str] = {
     "security_event_max_sources": "settings.field.security_event_max_sources.label",
     "audit_export_max_rows": "settings.field.audit_export_max_rows.label",
     "audit_export_max_days": "settings.field.audit_export_max_days.label",
+    "max_font_unpacked_bytes": "settings.field.max_font_unpacked_bytes.label",
     "configuration_package_max_mb": "settings.field.configuration_package_max_mb.label",
     "embedding_max_origins": "settings.field.embedding_max_origins.label",
     "storage_low_free_percent": "settings.field.storage_low_free_percent.label",

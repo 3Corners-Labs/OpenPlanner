@@ -7,6 +7,7 @@ from app.domain.authorization import Scope
 from app.domain.branding import Branding
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
 from tests.admin.test_admin_flow import audit_events
+from tests.fakes.woff2 import make_woff2
 
 PAGE = "/admin/organisations/demo/branding"
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
@@ -111,7 +112,7 @@ async def test_cross_site_branding_posts_are_refused(site: Site) -> None:
     assert response.status_code == 403
 
 
-WOFF2 = b"wOF2" + b"\x00" * 64
+WOFF2 = make_woff2()
 
 
 async def _last_change(site: Site) -> str | None:
@@ -249,10 +250,14 @@ async def test_disguised_and_oversized_fonts_are_refused(site: Site) -> None:
     ttf = b"\x00\x01\x00\x00" + b"\x00" * 64
 
     refused = await _upload(site, "font/text", "font", ttf)
-    huge = await _upload(site, "font/text", "font", WOFF2 + b"\x00" * 300_000)
+    huge = await _upload(site, "font/text", "font", make_woff2(compressed=300_000))
+    lying = await _upload(site, "font/text", "font", make_woff2(length=99))
+    bomb = await _upload(site, "font/text", "font", make_woff2(sfnt_size=9_000_000))
 
     assert refused.status_code == 422
     assert 'href="#font-text"' in refused.text
     assert 'aria-describedby="font-text-hint font-text-error"' in refused.text
     assert huge.status_code == 413
+    assert lying.status_code == 422
+    assert bomb.status_code == 422
     assert (await site.client.get("/o/demo/font/text")).status_code == 404

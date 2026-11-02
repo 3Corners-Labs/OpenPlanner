@@ -8671,6 +8671,9 @@ msgstr "{count} mislukt"
 msgid "admin.settings.logging.open"
 msgstr "Logbestemmingen openen"
 
+msgid "settings.field.max_font_unpacked_bytes.label"
+msgstr "Grootste uitgepakte omvang van een geüpload lettertype (bytes)"
+
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Maximale grootte van een configuratiepakket (MB)"
 

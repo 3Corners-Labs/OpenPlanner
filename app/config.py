@@ -207,6 +207,9 @@ class Settings(BaseSettings):
     # days; a larger one is refused, never cut short.
     audit_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
     audit_export_max_days: int = Field(default=366, ge=1, le=3660)
+    # ADR 0092 (class C, platform): the largest unpacked size (WOFF2 totalSfntSize) of an
+    # uploaded font; a family with many glyphs may need more. A fixed rule: at most 64 tables.
+    max_font_unpacked_bytes: int = Field(default=2_000_000, ge=256_000, le=8_000_000)
     # ADR 0089 (class C, platform): the largest configuration package the portal and the API
     # accept for import, in MB; fonts and closure images make up most of a package.
     configuration_package_max_mb: int = Field(default=64, ge=1, le=512)
