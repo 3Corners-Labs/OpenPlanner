@@ -86,6 +86,7 @@ TOPICS = (
         ("/admin/staff", "/admin/staff/invite", "/admin/staff/{member_id}"),
         Permission.STAFF_VIEW,
     ),
+    HelpTopic("my-sessions", ("/admin/rights/sessions",), Permission.RIGHTS_VIEW),
     HelpTopic("idp-mapping", ("/admin/idp-mapping",), Permission.IDP_MAPPING_VIEW),
     HelpTopic("audit", ("/admin/audit",), Permission.AUDIT_VIEW),
     HelpTopic(

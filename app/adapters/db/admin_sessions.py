@@ -119,6 +119,18 @@ class AdminSessionQueries:
         )
         return int(result.rowcount)  # type: ignore[attr-defined]
 
+    async def end_admin_sessions_of(
+        self, subject: str, reason: EndReason, at: datetime, keep: str | None = None
+    ) -> int:
+        """End the live sessions of ``subject`` except ``keep`` (a hash); return how many."""
+        condition = [AdminSessionRow.subject == subject, AdminSessionRow.ended_at.is_(None)]
+        if keep is not None:
+            condition.append(AdminSessionRow.id_hash != keep)
+        result = await self._session.execute(
+            update(AdminSessionRow).where(*condition).values(ended_at=at, end_reason=reason.value)
+        )
+        return int(result.rowcount)  # type: ignore[attr-defined]
+
     async def delete_admin_sessions(self, login_before: datetime) -> int:
         """Delete the sessions that ended or whose login lies before ``login_before``."""
         result = await self._session.execute(

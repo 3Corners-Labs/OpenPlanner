@@ -25,6 +25,7 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 | Staff | `/admin/staff` | `staff.view` | wide | `/admin/staff/invite`, `/admin/staff/{member_id}` |
 | Identity provider mapping | `/admin/idp-mapping` | `idp_mapping.view` | standard | – |
 | My rights | `/admin/rights` | `rights.view` | standard | – |
+| My rights › My sessions | `/admin/rights/sessions` | `rights.view` | standard | – |
 | Rights matrix | `/admin/matrix` | `matrix.view` | wide | `/admin/roles`, `/admin/roles/new`, `/admin/roles/{role_id}` |
 
 ### Platform

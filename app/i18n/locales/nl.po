@@ -2499,6 +2499,9 @@ msgstr "Uw afspraak kan niet doorgaan op dit moment"
 msgid "manage.suspended.text"
 msgstr "Kies hieronder een nieuwe tijd of annuleer de afspraak. Uw gegevens zijn bewaard, u hoeft niets opnieuw in te vullen."
 
+msgid "manage.suspended.delete_by"
+msgstr "Uw gegevens worden uiterlijk op {date} verwijderd."
+
 msgid "manage.suspended.reschedule"
 msgstr "Kies een nieuwe tijd"
 
@@ -8987,3 +8990,75 @@ msgstr "Gebruik hoogstens 10 waarden van gewone tekens, gescheiden door spaties.
 
 msgid "admin.idp.test_result.mfa"
 msgstr "Tweede factor getoond"
+
+msgid "admin.nav.my_sessions"
+msgstr "Mijn sessies"
+
+msgid "audit.event.session_ended"
+msgstr "Sessie beëindigd door het systeem"
+
+msgid "audit.event.sessions_ended_all"
+msgstr "Alle sessies beëindigd"
+
+msgid "audit.event.sessions_ended_by_self"
+msgstr "Eigen andere sessies beëindigd"
+
+msgid "audit.event.sessions_ended_by_admin"
+msgstr "Sessies van een medewerker beëindigd"
+
+msgid "admin.audit.detail.sessions"
+msgstr "Sessies: {count}"
+
+msgid "admin.audit.detail.subject"
+msgstr "Medewerker: {value}"
+
+msgid "admin.done.sessions_ended_others"
+msgstr "Uw andere sessies zijn beëindigd. Aantal: {count}."
+
+msgid "admin.done.sessions_ended_person"
+msgstr "De sessies van deze medewerker zijn beëindigd. Aantal: {count}. De medewerker moet opnieuw inloggen."
+
+msgid "admin.sessions.title"
+msgstr "Mijn sessies"
+
+msgid "admin.sessions.intro"
+msgstr "Hier ziet u waar u op dit moment bent ingelogd in het beheerportaal. Herkent u een sessie niet, beëindig dan de andere sessies en log zo nodig opnieuw in bij uw identity provider."
+
+msgid "admin.sessions.caption"
+msgstr "Uw sessies in het beheerportaal"
+
+msgid "admin.sessions.login"
+msgstr "Ingelogd"
+
+msgid "admin.sessions.last_seen"
+msgstr "Laatst actief"
+
+msgid "admin.sessions.status"
+msgstr "Status"
+
+msgid "admin.sessions.current"
+msgstr "Deze sessie"
+
+msgid "admin.sessions.other"
+msgstr "Andere sessie"
+
+msgid "admin.sessions.end_others"
+msgstr "Andere sessies beëindigen"
+
+msgid "admin.sessions.no_others"
+msgstr "U heeft geen andere sessies."
+
+msgid "admin.sessions.end_others_help"
+msgstr "De sessie waarmee u nu werkt blijft bestaan. De andere sessies zijn daarna niet meer te gebruiken."
+
+msgid "admin.staff.sessions.heading"
+msgstr "Sessies"
+
+msgid "admin.staff.sessions.intro"
+msgstr "Beëindigt alle sessies van deze medewerker in het beheerportaal, ook die voor andere organisaties: een sessie hoort bij de persoon. De medewerker moet daarna opnieuw inloggen. Gebruik dit bijvoorbeeld als iemand is uitgezet bij de identity provider."
+
+msgid "admin.staff.sessions.end_all"
+msgstr "Alle sessies beëindigen"
+
+msgid "admin.rights.sections"
+msgstr "Onderdelen van Mijn rechten"

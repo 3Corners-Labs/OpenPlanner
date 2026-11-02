@@ -213,6 +213,17 @@ SECTIONS = (
                 "/admin/rights",
                 Permission.RIGHTS_VIEW,
                 "rights",
+                # ADR 0098 point 9a: the admin's own sessions; personal, so next to the
+                # own rights and for every admin, without a permission of its own.
+                subtabs=(
+                    Screen(
+                        "manage.rights.sessions",
+                        "admin.nav.my_sessions",
+                        "/admin/rights/sessions",
+                        Permission.RIGHTS_VIEW,
+                        "lock",
+                    ),
+                ),
             ),
             Screen(
                 "manage.matrix",
