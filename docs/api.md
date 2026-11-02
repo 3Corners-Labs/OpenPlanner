@@ -10,6 +10,7 @@ The machine API for contact-center bots (`/api/agent/v1`, ADR 0023) has its own 
 |---|---|---|
 | GET | `/healthz` | `200 {"status": "ok"}` |
 | GET | `/readyz` | `200 {"status": "ok"}`, `200 {"status": "degraded"}` (data volume short of space, ADR 0040) or `503 {"status": "unavailable"}` |
+| GET | `/api/v1/instance[?probe={nonce}]` | `200 {"instance_id", "scheme", "forwarded"}`: the installation's random id to every caller (public, no permission, availability-read limit, `Cache-Control: no-store`, no cookie); `scheme` (`https` or `http`, as the app saw it) and `forwarded` (`honoured`, `ignored` or `absent`, what the app did with `X-Forwarded-*`) only for the holder of the pending nonce the worker stored, else `null`; `422` for a probe value over 64 characters, `429 rate_limited` (ADR 0086) |
 
 ## Widget API (`/api/v1/widget`, ADR 0035)
 

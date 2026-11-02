@@ -54,6 +54,7 @@ from app.api import (
     brand_assets,
     direct_pages,
     health,
+    instance,
     join_pages,
     pages,
     trial_pages,
@@ -66,6 +67,7 @@ from app.api.maintenance import participant_gate, register_maintenance
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
+from app.domain.address_check import AddressStatus, InstanceService
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.agenda_service import AgendaService
@@ -109,6 +111,7 @@ from app.domain.ports import (
     MailDomainResolver,
     SigningKeys,
 )
+from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
 from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
@@ -138,6 +141,8 @@ from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
 from app.web.organisation_settings import ClockScopeMiddleware
 from app.web.protection import configure_rate_limits, limiter, set_rate_limits
+from app.web.proxy_headers import ProxyHeaderMiddleware
+from app.web.public_links import PublicRedirectMiddleware
 from app.web.static_assets import ASSETS, VersionedStaticFiles
 
 
@@ -443,6 +448,18 @@ def create_app(
             max_bytes=lambda: live().configuration_package_max_mb * 1024 * 1024,
         )
         app.state.certificate_status = CertificateStatus(uow)
+        # ADR 0086: the round trip to the public address, the endpoint it asks and the watch on
+        # forwarded headers from a peer that is not trusted.
+        app.state.address_status = AddressStatus(uow)
+        app.state.instance_service = InstanceService(uow, clock)
+        try:
+            await app.state.instance_service.prepare()
+        except Exception as exc:  # e.g. schema not migrated yet; the endpoint then answers 500
+            structlog.get_logger().warning("instance.prepare_failed", error=type(exc).__name__)
+        app.state.system_log = SystemLog(uow, clock)
+        app.state.proxy_watch = ProxyHeaderWatch(
+            clock, lambda: timedelta(hours=live().tls_alert_repeat_hours)
+        )
         # ADR 0070: the certificate source of the bundled proxy, with the pair handed to the
         # proxy through the shared volume whenever the effective source changes.
         app.state.certificate_source = CertificateSourceService(
@@ -663,6 +680,10 @@ def create_app(
         https_only=cookie.secure,
     )
     app.add_middleware(SecurityHeadersMiddleware)
+    # ADR 0086: forwarded headers from a peer that FORWARDED_ALLOW_IPS does not name.
+    app.add_middleware(ProxyHeaderMiddleware)
+    # ADR 0086 point 4: a redirect to the request's own origin goes to the public address.
+    app.add_middleware(PublicRedirectMiddleware)
     # Outermost: every request, its log lines and its audit events share one trace (ADR 0040).
     app.add_middleware(TraceMiddleware)
     # ADR 0042 step 5: one clock scope per request; routes fill in the organisation's style.
@@ -674,6 +695,7 @@ def create_app(
     gate = [Depends(participant_gate)]
     for public_router in (
         health.router,
+        instance.router,
         pages.router,
         booking_pages.router,
         join_pages.router,
