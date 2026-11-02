@@ -275,3 +275,23 @@ async def test_the_status_widget_shows_maintenance_and_a_fresh_worker_heartbeat(
 
     assert "Aan sinds" in text
     assert "Actief," in text
+
+
+async def test_the_status_widget_reports_mail_without_tls_in_production_adr_0091(
+    site: Site,
+) -> None:
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    current = app.state.settings
+    await site.login_as(SUPER)
+    plain = {"environment": "prod", "smtp_host": "relay.demo.nl", "smtp_starttls": False}
+    app.state.settings = current.model_copy(update=plain)
+    try:
+        text = (await site.client.get("/admin/overview/w/status")).text
+        assert "zonder TLS" in text
+        assert 'href="/admin/integrations"' in text
+        app.state.settings = current.model_copy(
+            update={**plain, "smtp_plaintext_relay_allowed": True}
+        )
+        assert "zonder TLS" not in (await site.client.get("/admin/overview/w/status")).text
+    finally:
+        app.state.settings = current

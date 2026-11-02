@@ -310,6 +310,23 @@ def _update_row(_: BoundGettext, notice: UpdateNotice) -> tuple[str, str]:
     return _("admin.overview.widget.status.update.current"), "success"
 
 
+async def _plaintext_mail(
+    request: Request, principal: Principal, settings: Settings, can: Callable[[Permission], bool]
+) -> int:
+    """Count the mail servers that run without TLS in production (ADR 0091 point 4).
+
+    Stored SMTP settings of organisations plus the ``SMTP_*`` fallback; zero for anyone
+    without ``integrations.manage``, outside production, or with the host's exception set.
+    """
+    if not can(Permission.INTEGRATIONS_MANAGE):
+        return 0
+    service = request.app.state.channel_service
+    count = len(await service.plaintext_relays(principal))
+    if settings.environment == "prod" and not settings.smtp_plaintext_relay_allowed:
+        count += int(settings.smtp_fallback_plaintext)
+    return count
+
+
 async def _status(request: Request, locale: RequestLocale, principal: Principal) -> WidgetView:
     """System status: what the updates page, maintenance mode and the health checks know."""
     _ = locale.gettext
@@ -324,6 +341,7 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
     diagnostics: DiagnosticsService = request.app.state.diagnostics_service
     modes = len(await diagnostics.active())
     problems = 0 if settings.environment == "prod" else len(settings.production_problems())
+    plaintext_mail = await _plaintext_mail(request, principal, settings, can)
     updates_href = "/admin/updates" if can(Permission.SYSTEM_UPDATE) else None
     version = (
         str(updates.current) if updates.current else _("admin.overview.widget.status.version.none")
@@ -402,6 +420,17 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
             "/admin/settings",
         ),
     ]
+    if plaintext_mail:
+        # An error is shown before the quiet rows, so the default row count never hides it.
+        rows.insert(
+            2,
+            StatusRow(
+                _("admin.overview.widget.status.mail"),
+                _("admin.overview.widget.status.mail.plaintext", count=plaintext_mail),
+                "danger",
+                "/admin/integrations",
+            ),
+        )
     return WidgetView(item, list(rows[: item.default_rows]), len(rows), "/admin/settings")
 
 

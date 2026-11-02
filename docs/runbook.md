@@ -1063,9 +1063,20 @@ stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be
 - **Mail.** An organisation without its own SMTP settings uses the installation's server from
   `SMTP_HOST` (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
   `MAIL_FROM`; `SMTP_USER` and `SMTP_USER_PASSWORD` are accepted as aliases); Mailpit in
-  development. Use STARTTLS on 587 or TLS on 465 (port 465 always means TLS); plain only for a
-  relay on a trusted network. The services refuse to start with a login but neither STARTTLS
-  nor TLS.
+  development. Use STARTTLS on 587 or TLS on 465 (port 465 always means TLS). In production
+  the channel form refuses *Security: none* (ADR 0091), because mail carries names, addresses and
+  join links. A relay on a trusted network without TLS needs the host setting
+  `SMTP_PLAINTEXT_RELAY_ALLOWED=true` (class B, default `false`; set it in `.env`, restart
+  `web` and `worker`) and is a recorded exception. The services refuse to start with a login but
+  neither STARTTLS nor TLS.
+
+  *Upgrading.* A plain configuration saved before this rule (an organisation's stored server
+  or the `SMTP_*` fallback without `SMTP_STARTTLS`/`SMTP_TLS`) keeps sending in the first minor
+  release that ships it. **System status** on the overview shows it as an error (*Mail*, with
+  the count). Fix it by switching the server to STARTTLS or TLS under **Berichtkanalen** (or
+  set `SMTP_STARTTLS=true` / `SMTP_TLS=true`), or record the exception with
+  `SMTP_PLAINTEXT_RELAY_ALLOWED=true`. From the next minor release on, sending refuses it like
+  saving does.
 - **SMS.** Choose the provider (ADR 0028), then enter its API address, API key, the sender
   and the country code for national numbers (31). For **Webex Connect**: create a service
   with an SMS number or alphanumeric sender, copy the service key (service → Messaging API)
