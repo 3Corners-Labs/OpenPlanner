@@ -38,6 +38,7 @@ from app.adapters.integrations import (
 from app.adapters.live_settings import LiveSettings
 from app.adapters.log_senders import build_sender
 from app.adapters.log_shipping import LogShipper, ship_settings
+from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.adapters.tls_probe import SslCertificateProbe
@@ -51,6 +52,7 @@ from app.domain.event_context import set_service, trace_scope
 from app.domain.group_erase import GroupEraser
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService, IntegrationWatch
+from app.domain.login_domain_watch import DomainWatch
 from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.platform_settings import PlatformSettingsStore
@@ -261,6 +263,15 @@ async def run_worker(
         repeat=lambda: timedelta(hours=live.settings.tls_alert_repeat_hours),
         enabled=settings.public_address_check_enabled,
     )
+    # ADR 0083 point 12: the TXT records of the routing login domains.
+    domains = DomainWatch(
+        uow,
+        clock,
+        DnsTxtResolver(),
+        SystemLog(uow, clock),
+        interval=lambda: timedelta(hours=live.settings.idp_domain_recheck_hours),
+        grace=lambda: timedelta(days=live.settings.idp_domain_grace_days),
+    )
     log.info(
         "worker.started",
         poll_seconds=settings.worker_poll_seconds,
@@ -292,6 +303,7 @@ async def run_worker(
                     await _watch_maintenance(maintenance)
                     await _watch_certificate(tls)
                     await _watch_address(address)
+                    await _watch_domains(domains)
                     await _check_integrations(watch)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
@@ -359,6 +371,17 @@ async def _watch_certificate(watch: TlsWatch) -> None:
         return
     if check is not None and not check.ok:
         log.warning("tls.certificate", finding=check.finding.value, host=check.host)
+
+
+async def _watch_domains(watch: DomainWatch) -> None:
+    """Re-check the routing login domains when due; a failure never stops the loop.
+
+    A changed state is a system event (``idp.domain_check``), written by the watch itself.
+    """
+    try:
+        await watch.run()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("idp.domain_watch_failed", error=type(exc).__name__)
 
 
 async def _watch_address(watch: AddressWatch) -> None:

@@ -95,7 +95,7 @@ follows in a later version); a domain also covers its subdomains.
 A domain belongs to one provider on the whole installation. The suffix of the bundled identity
 provider (`openplanner.internal` by default, and everything under it) is reserved for the
 platform and cannot be claimed. When the record disappears later, the domain shows **Record
-gone, still routing**; after the grace period (7 days by default, *Grace for a missing domain
+gone, still routing** (the worker re-checks every verified domain every 24 hours, *Re-check of login domains*, and reports a change as a system event); after the grace period (7 days by default, *Grace for a missing domain
 record*) it becomes **Lapsed** and logins go to the platform provider again. **Remove**
 releases the domain at once.
 
