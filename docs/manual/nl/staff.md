@@ -50,6 +50,9 @@ knoppen niet: daar wijzigt het IdP-team rechten.
   geldt alleen voor nieuwe accounts.
 - **Uitgenodigd, nog niet ingelogd**: mensen die u heeft aangemaakt en die nog niet hebben
   ingelogd. U kunt de uitnodiging opnieuw sturen.
+  De lijst en de pagina van een persoon tonen de **inlognaam** naast het **e-mailadres**: inloggen
+  kan met allebei, de mail gaat naar het e-mailadres. Geef nieuwe medewerkers de inlognaam
+  door als hun e-mailadres bij een eigen identiteitsprovider van de organisatie hoort.
 - Op de pagina van een persoon, onder **Beheer bij de identiteitsprovider**: een rol
   verwijderen, een rol met plaats toevoegen, de persoon uitschakelen of weer inschakelen, en
   een wachtwoordreset sturen. Een wijziging werkt bij de eerstvolgende login.

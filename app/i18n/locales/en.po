@@ -9605,3 +9605,9 @@ msgstr "The answer did not come from the login service you started at. Please lo
 
 msgid "admin.idp.routing_off"
 msgstr "Logins through organisations' identity providers are switched off on this host (ORGANISATION_IDPS_ENABLED). You can register and verify providers and domains already; everyone logs in at the platform provider until the server administrator switches it on."
+
+msgid "admin.staff.manage.user_name"
+msgstr "User name"
+
+msgid "admin.staff.manage.user_name.hint"
+msgstr "The staff member logs in with the user name or with the e-mail address. Invitations, password resets and calendar invitations go to the e-mail address."

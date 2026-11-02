@@ -89,6 +89,8 @@ class ManageView:
     grants: tuple[GrantView, ...]
     works_elsewhere: bool
     can_reset: bool
+    username: str = ""
+    """The name the person logs in with (ADR 0106); shown next to the address, which differs."""
 
 
 def grant_from_key(key: str) -> Grant | None:
@@ -142,6 +144,7 @@ def manage_view(
         ),
         person.works_elsewhere,
         can,
+        person.user.username,
     )
 
 

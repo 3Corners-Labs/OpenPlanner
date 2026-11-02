@@ -136,3 +136,15 @@ def test_collaborators_come_from_each_users_role_and_the_owners(tmp_path: Path) 
         {"login": "owner", "role_name": "admin"},
         {"login": "writer", "role_name": "write"},
     ]
+
+
+def test_bypass_actors_shown_without_their_mode_stay_unknown(tmp_path: Path) -> None:
+    """The audit app's token got the actors from GraphQL with ``bypassMode`` null (2026-11-02)."""
+    half = json.loads(json.dumps(GRAPH))
+    for node in half["rulesets"]["nodes"][1]["bypassActors"]["nodes"]:
+        node["bypassMode"] = None
+
+    rulesets = {r["name"]: r for r in read(fetch(tmp_path, graph=half), "rulesets")}
+
+    assert rulesets["release tags"]["bypass_actors"] is None
+    assert rulesets["main"]["bypass_actors"] == []

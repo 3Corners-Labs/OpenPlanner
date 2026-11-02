@@ -69,6 +69,7 @@ async def test_an_organisation_admin_sees_the_invite_button_and_the_pending_peop
     assert 'href="/admin/staff/invite"' in text
     assert "mine@example.test" in text
     assert "Uitgenodigd, nog niet ingelogd" in text
+    assert "Inlognaam" in text
 
 
 async def test_the_invite_form_renders(managed: Site) -> None:
@@ -291,3 +292,16 @@ async def test_the_invitation_takes_a_typed_user_name_and_explains_a_wrong_one(
     assert managed.directory is not None
     created = next(u for u in managed.directory.users.values() if u.email == INVITE["email"])
     assert created.username == "nnieuw@demo.openplanner.internal"
+
+
+async def test_the_user_name_is_shown_next_to_the_address(managed: Site) -> None:
+    """ADR 0106 point 7: an admin sees the name to log in with, not only the address."""
+    await managed.login_as(ORG_ADMIN)
+    await managed.client.post(
+        "/admin/staff/invite", data={**INVITE, "user_name": "nnieuw"}, headers=SAME_ORIGIN
+    )
+
+    text = (await managed.client.get("/admin/staff")).text
+
+    assert "<code>nnieuw@demo.openplanner.internal</code>" in text
+    assert "nina@example.test" in text

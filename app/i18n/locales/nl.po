@@ -9617,3 +9617,9 @@ msgstr "Het antwoord kwam niet van de inlogdienst waar u begon. Probeer opnieuw 
 
 msgid "admin.idp.routing_off"
 msgstr "Logins via de identity providers van organisaties staan op deze host uit (ORGANISATION_IDPS_ENABLED). U kunt providers en domeinen alvast registreren en verifiëren; iedereen logt in bij de platformprovider tot de serverbeheerder de schakelaar aanzet."
+
+msgid "admin.staff.manage.user_name"
+msgstr "Inlognaam"
+
+msgid "admin.staff.manage.user_name.hint"
+msgstr "De medewerker logt in met de inlognaam of met het e-mailadres. Uitnodigingen, wachtwoordresets en agenda-uitnodigingen gaan naar het e-mailadres."
