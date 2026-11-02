@@ -83,6 +83,7 @@ from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.public_address import PublicAddressQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
+from app.adapters.db.rollup import RollupQueries
 from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
@@ -436,6 +437,7 @@ class SqlTransaction(
     LogDestinationQueries,
     UpdateQueries,
     RetentionQueries,
+    RollupQueries,
     StaffQueries,
     MaintenanceQueries,
     RoleQueries,

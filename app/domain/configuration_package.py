@@ -83,6 +83,7 @@ STATE_TABLES = frozenset(
         "admin_sessions",
         "api_access_tokens",
         "audit_events",
+        "booking_day_counts",
         "booking_events",
         "bookings",
         "call_status",
