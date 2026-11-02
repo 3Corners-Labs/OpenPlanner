@@ -521,6 +521,8 @@ def create_app(
             senders,
             mail_domain_resolver or DnsTxtResolver(),
             lambda: live().mail_from if live().smtp_host else None,
+            production=settings.environment == "prod",
+            plaintext_relay_allowed=settings.smtp_plaintext_relay_allowed,
         )
         text_overrides.attach(uow)
         app.state.organisation_text_service = OrganisationTextService(

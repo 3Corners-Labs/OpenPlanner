@@ -64,6 +64,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
 | `OIDC_CLAIM_MODE` | enum | `legacy` | Where rights come from: legacy (three claims), shadow (compare), entitlements (ADR 0049); moving back to legacy weakens a protection, so env only. |
+| `SMTP_PLAINTEXT_RELAY_ALLOWED` | bool | `false` | Allow mail without TLS in production, for a relay on a trusted network (ADR 0091); otherwise saving it is refused and System status reports it. Never in the portal. |
 
 ## C. Platform (portal, *Advanced settings*; lockable by env)
 

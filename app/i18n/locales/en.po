@@ -3124,7 +3124,7 @@ msgid "admin.messages.save_hint"
 msgstr "Empty a field to restore the default text."
 
 msgid "admin.form.error.smtp_security"
-msgstr "Choose STARTTLS or TLS: with a username the password must not travel unencrypted."
+msgstr "Choose STARTTLS or TLS: mail carries names and join links, and a password, so it must not travel unencrypted. A relay without TLS needs the host setting SMTP_PLAINTEXT_RELAY_ALLOWED in production."
 
 msgid "admin.nav.organisations"
 msgstr "Organisations"
@@ -6721,6 +6721,12 @@ msgstr "{environment}"
 
 msgid "admin.overview.widget.status.environment.problems"
 msgstr "{environment}, {count} not production-ready"
+
+msgid "admin.overview.widget.status.mail"
+msgstr "Mail"
+
+msgid "admin.overview.widget.status.mail.plaintext"
+msgstr "{count} mail server(s) without TLS: choose STARTTLS or TLS, or set SMTP_PLAINTEXT_RELAY_ALLOWED"
 
 msgid "audit.job.send_rebook_request"
 msgstr "Send request to rebook"
