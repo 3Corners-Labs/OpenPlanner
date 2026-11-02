@@ -43,7 +43,12 @@ def test_pii_fields_cover_the_booking_pii_columns() -> None:
     # ADR 0055: the split name and the answers to custom fields.
     assert {"first_name", "last_name", "form_answers", "answers"} <= PII_FIELDS
     # ADR 0063: one home for the list; the mask adds only the other names the data travels by.
-    assert PII_FIELDS == PII_COLUMNS | ALIASES
+    assert PII_FIELDS == PII_COLUMNS | ALIASES | {"username"}
+
+
+def test_the_staff_user_name_is_masked() -> None:
+    """ADR 0106 point 11: the bundled provider's user name holds the person's name."""
+    assert "username" in PII_FIELDS
 
 
 def test_structlog_masks_every_pii_field(stream: io.StringIO) -> None:

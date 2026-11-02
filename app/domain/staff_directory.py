@@ -112,11 +112,20 @@ class DirectoryUser:
 
 @dataclass(frozen=True)
 class NewStaffMember:
-    """What the portal asks the provider to create."""
+    """What the portal asks the provider to create.
+
+    Attributes:
+        email: The person's own address: invitation, reset and calendar mail go there.
+        first_name: Given name.
+        last_name: Family name.
+        username: The user name they log in with (ADR 0106, ``app.domain.user_names``);
+            empty means the address, as before ADR 0106.
+    """
 
     email: str = field(repr=False)
     first_name: str = field(repr=False)
     last_name: str = field(repr=False)
+    username: str = field(default="", repr=False)
 
 
 def refusal_of(scope: Scope, grant: Grant, *, superuser: bool) -> DirectoryRefusal | None:

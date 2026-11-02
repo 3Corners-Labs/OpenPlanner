@@ -470,6 +470,7 @@ def create_app(
                 live().staff_directory_enabled,
                 live().oidc_entitlement_prefix,
                 live().staff_invite_expiry_days,
+                live().bundled_idp_login_suffix,
             ),
             () if staff_directory is not None else _directory_missing(settings),
         )

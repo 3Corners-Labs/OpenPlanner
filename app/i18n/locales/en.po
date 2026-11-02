@@ -9335,3 +9335,18 @@ msgstr "Not connected: the bundled identity provider runs, but the server lacks 
 
 msgid "admin.settings.directory.absent"
 msgstr "Not applicable: staff are managed at the organisation's identity provider and only shown here."
+
+msgid "settings.field.bundled_idp_login_suffix.label"
+msgstr "User name suffix (bundled identity provider)"
+
+msgid "admin.staff.invite.user_name"
+msgstr "User name (optional)"
+
+msgid "admin.staff.invite.user_name.hint"
+msgstr "Only the part before the @. Leave empty for firstname.lastname. The staff member logs in as name@organisation.{suffix}; a superuser as name@{suffix}. The user name cannot be changed afterwards."
+
+msgid "admin.form.error.staff_user_name_invalid"
+msgstr "Use only lower-case letters, digits, dots and hyphens for the user name, start and end with a letter or digit, and at most 64 characters."
+
+msgid "admin.form.error.staff_user_name_in_use"
+msgstr "This user name is already in use. Choose another."
