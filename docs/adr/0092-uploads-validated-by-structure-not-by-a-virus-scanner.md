@@ -3,7 +3,7 @@
 Status: accepted (2026-11-01), requested by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (V5.1.1, V5.2.2, V5.4.3). Amends ADR 0020 and ADR 0041 (branding, fonts,
 theme file), ADR 0037 (closure images), ADR 0064/0070 (own certificate) and ADR 0089
-(configuration package). Partly built (step 1); see *Build status*.
+(configuration package). Built (steps 1 to 3); see *Build status*.
 
 ## Context
 
@@ -76,8 +76,8 @@ they are in this ADR.
 |---|---|---|---|
 | 0 | ADR accepted | #309 | merged |
 | 1 | WOFF2 structural validation and `max_font_unpacked_bytes`, tests with malformed fonts | #385 | built |
-| 2 | Test on every download route: server-chosen file name, fixed pattern | | planned |
-| 3 | Deviation and compensating controls in `docs/threat-model.md` | | planned |
+| 2 | Test on every download route: server-chosen file name, fixed pattern | #338, #379 | built: `tests/admin/test_download_headers.py` pins the five modules that set a `content-disposition` and the pattern of each name |
+| 3 | Deviation and compensating controls in `docs/threat-model.md` | #423 | built: section *Uploads without a virus scan (ASVS V5.4.3, ADR 0092)* |
 
 ## Consequences
 
