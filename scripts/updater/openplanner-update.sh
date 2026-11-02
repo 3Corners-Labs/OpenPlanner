@@ -16,6 +16,11 @@
 #              no:  restore backup, pin the newer digest again -> report rolled_back,
 #                   maintenance off
 #
+# After an update or restore that succeeded, every other release of the application (and proxy)
+# image on the host is removed: only the running one and, after an update, the previous one that
+# a restore needs stay. Without this each release candidate (about 440 MB) stays behind and the
+# disk fills up. Images of other repositories are never touched.
+#
 # Where the HTTPS proxy runs (OPENPLANNER_TLS=1 or the tls profile in .env.update; ADR 0064
 # step 2) the proxy image <image>-proxy:<version> is pulled, verified, pinned
 # (OPENPLANNER_PROXY_IMAGE), started and rolled back together with the application image, and
@@ -172,6 +177,32 @@ verified() { # verified DIGEST: signed by this repository's release workflow (AD
     --certificate-oidc-issuer "$OIDC_ISSUER" >/dev/null 2>&1
 }
 
+prune_images() { # remove our releases that neither run nor are kept for a restore
+  # Never fails the script: the update itself has succeeded. `docker rmi` without -f refuses
+  # an image a container still uses, which is the safety net if the pins and the host disagree.
+  # Only the proxy's repository where the proxy runs: an installation without it never touches
+  # that image (ADR 0064 step 2).
+  local keep repositories=("$UPDATE_IMAGE") repository reference name
+  keep=" $(pinned) $(pinned_proxy) "
+  ((!PROXY)) || repositories+=("$UPDATE_PROXY_IMAGE")
+  if [[ -f $STATE_FILE ]]; then
+    keep+="$(state PREVIOUS_IMAGE) $(state PREVIOUS_PROXY_IMAGE) "
+  fi
+  for repository in "${repositories[@]}"; do
+    docker image ls --format '{{.Repository}}@{{.Digest}} {{.Repository}}:{{.Tag}}' \
+      "$repository" 2>/dev/null \
+      | while read -r reference name; do
+        [[ $keep == *" $reference "* ]] && continue
+        # An image without a tag is removed by its digest.
+        [[ $name == "$repository:<none>" ]] && name=$reference
+        # Data from docker, never shell: only a well-formed reference of this repository.
+        [[ $name =~ $IMAGE_RE && $name == "$repository"[:@]* ]] || continue
+        docker rmi "$name" >/dev/null 2>&1 || log "could not remove $name"
+      done \
+      || log "could not list the images of $repository"
+  done
+}
+
 do_update() { # do_update ID TARGET FROM
   local id=$1 target=$2 from=$3 previous previous_proxy digest proxy_digest='' revision
   local backup="request-$1"
@@ -211,6 +242,7 @@ do_update() { # do_update ID TARGET FROM
   if healthy; then
     report "$id" succeeded
     maintenance off
+    prune_images
     return
   fi
   log "request $id: $target did not become healthy; rolling back"
@@ -270,6 +302,7 @@ do_restore() { # do_restore ID TARGET
     report "$id" succeeded
     maintenance off
     rm -f "$STATE_FILE"
+    prune_images
     return
   fi
   log "request $id: $target did not become healthy; returning to the newer version"
