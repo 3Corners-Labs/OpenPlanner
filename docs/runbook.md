@@ -1833,6 +1833,43 @@ Client secrets live only in the contact center's vault; OpenPlanner keeps their 
 - **Who did what:** the audit log shows client changes (`API-koppelingen beheren`), token
   requests and refused calls, with the client id as actor.
 
+## Evidence report for an audit (WP-C2)
+
+For a security officer, an auditor or the identity provider's administrator who asks what this
+installation does and has been measured to do. One command bundles what the application already
+measures, as Markdown for people and JSON for tools:
+
+```
+docker compose exec web python -m app.cli evidence --out data/evidence
+docker compose exec web python -m app.cli evidence --format json | jq .
+```
+
+`--out DIR` writes `evidence.md` and `evidence.json` (mode 600); without it one format goes to the
+terminal. The exit code is 1 when a section failed, so the command can gate a go-live checklist.
+Run it on the day, keep the files with the dated checklists of `docs/assurance/`, and say which
+version it was made for (the first section tells).
+
+| Section | What it holds | Where it comes from |
+|---|---|---|
+| Version | release, commit, image digest, environment | `APP_VERSION`, `APP_COMMIT`; the digest only when the host sets `APP_IMAGE_DIGEST` (`unknown` otherwise, then `docker inspect` or the updater state file is the proof) |
+| Identity provider | every finding of `oidc-check` (issuer compared exactly, HTTPS back channel, algorithms, PKCE, signing keys), the pinned issuer, and the lists the provider announced: response types, grant types, PKCE methods, token endpoint authentication methods, signing algorithms, `acr` values | the same discovery read as `oidc-check`; there is no `oidc-check --evidence`, because this section is that report |
+| Public address, Certificate | the outcome of `address-check` and `tls-check` | both commands run as they do on their own, so System status shows the result too |
+| Configured external hosts | scheme and host (never path, query or credentials) of video, contact center, identity providers, mail, SMS, release list, and every log destination | the effective settings and the portal configuration; `docs/dataflow.md` has the full outbound table |
+| Log destinations | per destination: host, on or off, level, credential set or not, last test, and per service the state and counters | the status the web and the worker report (ADR 0085); no stored error text |
+| Retention | bookings holding personal data, overdue, failed purges, last purge, per group | the retention overview (ADR 0039); counts only, no booking |
+| Key rotation | records and open bookings still on the previous key | System status (ADR 0094) |
+| Settings | every variable with class, source (`env`, `file`, `portal`, `default`), lock and value | `settings list`; numbers, switches and choices show their value, an address only its host, secrets, text and paths only `set` or `not set` |
+
+The report holds no secret and no personal data. A test sets a marker in every secret, address,
+free-text setting and personal field and fails if one appears. A collector that fails (the
+database is unreadable, say) turns its own section `failed` with the exception's class name and
+the other sections stay. Read the report before it leaves the host anyway: the host names, the
+organisation slugs and the group slugs it lists are part of the installation's structure.
+
+What it does not prove: anything on the host or the network (TLS versions and ciphers at the
+edge, NTP, volume encryption, the firewall). Those stay with the commands of
+`docs/assurance/hosting.md`.
+
 ## Emergency closure of a team (ADR 0024)
 
 When a team cannot hold its appointments (outage, illness, closed building):

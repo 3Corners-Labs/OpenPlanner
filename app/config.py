@@ -432,6 +432,10 @@ class Settings(BaseSettings):
     # commit the image was built from; empty for a local build.
     app_version: str = ""
     app_commit: str = Field(default="", pattern=r"^([0-9a-f]{7,40})?$")
+    # Class B (WP-C2): the registry digest the host pinned this image at (``sha256:`` and 64
+    # hex digits). An image cannot know its own digest, so the host sets it when it pins one;
+    # ``evidence`` reports it when known and says "unknown" otherwise.
+    app_image_digest: str = Field(default="", pattern=r"^(sha256:[0-9a-f]{64})?$")
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
     # ADR 0059, 0065: UPDATE_CHANNEL (class C) says whether release candidates are offered too;
