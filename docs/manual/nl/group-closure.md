@@ -81,8 +81,8 @@ na het einde van de sluiting verwijderd, en in elk geval uiterlijk het maximum v
 organisatie na de oorspronkelijke afspraak (90 dagen, tenzij de organisatiebeheerder een ander
 aantal tussen 30 en 180 heeft ingesteld), ook als de sluiting geen einde heeft. Ongeveer 14 dagen
 daarvoor toont het auditlogboek van het team de
-systeemgebeurtenis `closure.retention_notice` met de datum; hef de sluiting op of verplaats de afspraken vóór die datum. De pagina van de sluiting
-toont de deelnemers de dag waarop hun gegevens uiterlijk worden verwijderd.
+systeemgebeurtenis `closure.retention_notice` met de datum; hef de sluiting op of verplaats de afspraken vóór die datum. De pagina van de sluiting en de eigen afsprakenpagina van de deelnemer
+tonen de deelnemer de dag waarop hun gegevens uiterlijk worden verwijderd.
 
 ## Wat wordt vastgelegd
 

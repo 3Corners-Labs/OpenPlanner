@@ -136,5 +136,20 @@ async def test_the_closure_page_names_the_day_the_details_are_deleted_by(
     assert "deleted by Wednesday, April 8, 2026 at the latest." in english
 
 
+async def test_the_management_page_of_a_booking_on_hold_names_the_day_its_details_go(
+    site: httpx.AsyncClient, examples: ClosureExamples
+) -> None:
+    base = (await site.get(examples.suspended_booking)).headers["location"]
+    dutch = (await site.get(base)).text
+    english = (await site.get(base, params={"lang": "en"})).text
+
+    # Same moment as the closure page: the original appointment plus the 90 day maximum.
+    assert (
+        '<p id="manage-delete-by">Uw gegevens worden uiterlijk op woensdag 8 april 2026 '
+        "verwijderd.</p>"
+    ) in dutch
+    assert "Your details are deleted by Wednesday, April 8, 2026 at the latest." in english
+
+
 async def test_a_closure_without_bookings_on_hold_promises_nothing(site: httpx.AsyncClient) -> None:
     assert "closure-delete-by" not in (await site.get(PLANNED + "/closure")).text
