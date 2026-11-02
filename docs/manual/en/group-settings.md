@@ -7,6 +7,8 @@ superuser can change settings; before saving, the portal may ask you to log in a
 
 Changes apply to new appointments. Existing appointments stay as they were booked.
 
+At the top, *On this page* lists every topic of this screen (general, integrations, identity provider, booking form, check and archiving) so you can jump straight to it. You only see archiving if you may archive a group.
+
 ## Web address
 
 When you create a group you may leave the web address empty: the portal then makes it from

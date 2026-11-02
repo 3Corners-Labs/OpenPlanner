@@ -8,6 +8,8 @@ loggen.
 
 Wijzigingen gelden voor nieuwe afspraken. Bestaande afspraken blijven zoals ze zijn geboekt.
 
+Bovenaan staat *Op deze pagina*: een lijst met alle onderwerpen van dit scherm (algemeen, koppelingen, identiteitsprovider, boekingsformulier, controle en archiveren) waarmee u er direct naartoe springt. Archiveren ziet u alleen als u een groep mag archiveren.
+
 ## Webadres
 
 Bij het aanmaken mag u het webadres leeg laten: het portaal maakt het dan uit de naam. Wat u
