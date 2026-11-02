@@ -365,14 +365,39 @@ async def _wxcc_config_check(
     return format_report(results), passed(results)
 
 
+async def _queue_ids(
+    settings: Settings, transport: httpx.AsyncBaseTransport | None
+) -> dict[str, str]:
+    """Return the id of every queue by name, or nothing when WxCC cannot be read (names only)."""
+    if not settings.dispatch_configured or not settings.wxcc_api_base_url:
+        return {}
+    async with _service_app(settings, transport) as (http, tokens):
+        if tokens is None:  # pragma: no cover - dispatch_configured implies tokens
+            return {}
+        try:
+            token = await tokens.access_token()
+            _, host, org = await region_check(http, token, settings.wxcc_api_base_url)
+            if not host or not org:
+                return {}
+            config = await fetch_config(http, token, host, org)
+        except IntegrationError:
+            return {}
+    return {q.name: q.id for q in config.queues}
+
+
 async def _wxcc_sample_flow(
-    settings: Settings, slug: str, queues: Sequence[str], fallback: str | None
+    settings: Settings,
+    slug: str,
+    queues: Sequence[str],
+    fallback: str | None,
+    transport: httpx.AsyncBaseTransport | None = None,
 ) -> tuple[str, bool]:
     """Return the sample flow for ``slug`` and every group sharing its business address.
 
     One branch per routing value; a value's queue is its ``--queue VALUE=QUEUE`` or, by the
     naming rule, the routing value itself. The default branch goes to ``fallback`` or to the
-    first branch's queue.
+    first branch's queue. Queue ids come from the organisation's configuration (read only);
+    a queue not found there stays a name that is chosen again in Flow Designer.
     """
     groups = await _groups(settings)
     group = next((g for g in groups if g.slug == slug), None)
@@ -395,7 +420,12 @@ async def _wxcc_sample_flow(
         }
     )
     routes = [Route(value, chosen.get(value, value)) for value in values]
-    flow = sample_flow(f"openplanner_{group.slug}", routes, fallback or routes[0].queue)
+    fallback = fallback or routes[0].queue
+    ids = await _queue_ids(settings, transport)
+    flow = sample_flow(f"openplanner_{group.slug}", routes, fallback, ids)
+    unknown = sorted(({r.queue for r in routes} | {fallback}) - ids.keys())
+    if unknown:
+        sys.stderr.write(f"queue not found in WxCC, choose it in Flow Designer: {unknown}\n")
     return json.dumps(flow, indent=2, ensure_ascii=False) + "\n", True
 
 

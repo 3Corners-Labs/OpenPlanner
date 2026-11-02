@@ -12,13 +12,11 @@ Control Hub setup around it: channel, asset, schema, entry point and queues.
 flowchart LR
     start([NewContact]) --> kind{Case<br/>kind}
     kind -- probe --> endProbe([End Flow])
-    kind -- direct --> prio[Set Contact Priority<br/>P1]
-    kind -- default / error --> pop
-    prio -- success / failure --> pop[Screen Pop<br/>meetingLink]
+    kind -- default --> pop[Screen Pop<br/>meetingLink]
     pop --> group{Case<br/>openplannerGroup}
     group -- "routing value 1" --> q1[Queue Contact<br/>queue 1]
     group -- "routing value 2" --> q2[Queue Contact<br/>queue 2]
-    group -- default / error --> qd[Queue Contact<br/>fallback queue]
+    group -- default --> qd[Queue Contact<br/>fallback queue]
     q1 --> done([End Flow])
     q2 --> done
     qd --> done
@@ -26,11 +24,15 @@ flowchart LR
 
 | Step | Activity | Why |
 |---|---|---|
-| Case on `kind` | `case-statement` on the work item's `kind` | `probe` is the group check's probe work item (ADR 0082): it ends before any queue, so no agent sees it. `direct` is a direct call (ADR 0072). Everything else (`scheduled`) goes on. |
-| Set Contact Priority | `set-contact-priority`, static P1 | a participant who calls now is waiting; a scheduled appointment is not yet. Optional: delete the activity if every work item should have the same priority. |
-| Screen Pop | `screen-pop` of `meetingLink`, opened outside the desktop | the agent opens the Webex meeting in one click (in the Webex app, signed in: cohost). |
+| Case on `kind` | `case-statement` on the work item's `kind` | `probe` is the group check's probe work item (ADR 0082): it ends before any queue, so no agent sees it. Everything else (`scheduled`, `direct`) goes on. |
+| Screen Pop | `screen-pop` of `meetingLink`, in a new browser tab | the agent opens the Webex meeting in one click (in the Webex app, signed in: cohost). |
 | Case on `openplannerGroup` | `case-statement` on the flow variable `openplannerGroup` | OpenPlanner fills this variable with the group's routing value (`flowSettings`); one branch per group. |
 | Queue Contact | `queue-contact` on a Work Item queue per branch | the default branch catches a routing value without a branch, so no work item is lost. |
+
+**Optional, by hand: priority for direct calls.** Add a Case branch `direct` on the first Case
+(value `direct`), and behind it a **Set Contact Priority** (P1) that leads on to the Screen
+Pop. The generated file leaves it out: no export holds that activity's id, and a wrong id can
+break the import.
 
 The flow declares one variable, `openplannerGroup` (String). It reads `kind` and `meetingLink`
 from the work item data, which Flow Designer offers on the start node as
@@ -67,8 +69,8 @@ named `openplanner_<group>`; rename it on import if that name is taken.
 
 1. Control Hub → **Contact Center** → **Customer experience** → **Flows** → **Import**, and
    choose the generated file.
-2. Open the flow. Check that each **Queue Contact** shows the queue you meant (Flow Designer
-   looks the queues up by name) and that the Case branches show your routing values.
+2. Open the flow. Check that each **Queue Contact** shows the queue you meant (the command fills in the queue ids
+   from WxCC; a queue it did not find has to be chosen again) and that the Case branches show your routing values.
 3. In the flow's **Global Flow Properties**, check that `openplannerGroup` may be set from
    outside (flow settings), then **Validate** and **Publish**.
 4. **Channels** → your Work Item entry point → set this flow and its version label (Live).
@@ -77,23 +79,22 @@ named `openplanner_<group>`; rename it on import if that name is taken.
 
 ## What is verified, and what still needs a live check
 
-Checked on 2026-11-02 against the lab organisation (eu2), without saving anything:
-
-- The format is Flow Designer's FlowV2 (`schemaVersion` 2.0), the same format the
-  configuration API exports (`v2/flows/{id}:export`) and OpenPlanner's flow check reads.
-- Flow Designer's dry-run validator (`v2/flows:validate`) accepts every activity and edge
-  except the Case branches: it only knows a Case's fixed `error` port. The branches follow
-  the form Cisco's own exported flows store (`menuLinks` numbered `0`, `1`, … with the values
-  next to them, edges on `0`, `1`, … and `default`).
+- The file has the format of Flow Designer's own export screen (`process.activities` and
+  `links` plus a `diagram` that places every activity and link). Taken from a flow exported
+  from the lab organisation on 2026-11-02; a first version in the API's FlowV2 format
+  imported as an empty canvas and was replaced.
+- OpenPlanner's flow check reads the file without warnings (`tests/adapters/test_wxcc_sample_flow.py`).
+- The command reads the queue ids from the organisation's configuration (read only, like
+  `wxcc-config-check`). A queue it cannot find stays a name: choose it again in Flow Designer.
 
 Still to confirm on the first import:
 
-- that **Import** in the Flows screen takes the FlowV2 file (the API import
-  `v2/flows:import` does; if the screen refuses it, report it so the sample can follow);
+- that the links of the Screen Pop and the Case branches show as connected, and that the canvas
+  is tidy enough (move activities as you like);
 - that `NewContact.MediaPayload.workItemData.kind` resolves. **Check integration** shows it:
   when the probe line is OK, the flow ended the probe and the `kind` branch works. When it
   says the probe was not ended, the expression did not resolve and the probe went on to a
-  queue (an agent may see it): adjust the path in both Case `kind` and the Screen Pop, which
+  queue (an agent may see it): adjust the path in the Case `kind` and the Screen Pop, which
   reads `meetingLink` the same way.
 
 ## Changing it

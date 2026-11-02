@@ -216,7 +216,12 @@ async def test_wxcc_sample_flow_prints_a_flow_for_the_group(configured: Settings
     flow = json.loads(report)
     assert ok
     assert flow["name"] == "openplanner_aangifte"
-    queues = [n["properties"]["queueId"] for n in flow["nodes"] if "queueId" in n["properties"]]
+    activities = flow["process"]["activities"].values()
+    queues = [
+        a["properties"]["destination:name"]
+        for a in activities
+        if "destination:name" in a["properties"]
+    ]
     assert queues == ["ORG_aangifte_01", "ORG_aangifte_01"]
 
 

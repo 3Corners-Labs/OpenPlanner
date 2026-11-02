@@ -67,26 +67,48 @@ def test_a_flow_with_only_one_branch_leaves_the_other_group_on_the_default_branc
     ]
 
 
-def test_probe_ends_before_any_queue_and_every_branch_reaches_a_queue() -> None:
-    flow = sample_flow("openplanner_aangifte", ROUTES, "ORG_fallback")
-    nodes = {n["name"]: n["properties"] for n in flow["nodes"]}
-    edges = {(e["from"], e.get("condition")): e["to"] for e in flow["edges"]}
+def _graph(flow: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str], str]]:
+    """Return the activities by name and the link targets by (source name, port)."""
+    by_id = flow["process"]["activities"]
+    nodes = {a["name"]: a["properties"] for a in by_id.values()}
+    edges = {
+        (by_id[link["sourceActivityId"]]["name"], link["conditionExpr"]): by_id[
+            link["targetActivityId"]
+        ]["name"]
+        for link in flow["process"]["links"]
+    }
+    return nodes, edges
 
-    kind = nodes["CaseKind"]
-    assert kind["menuLinks_input"][0] == "probe"
+
+def test_probe_ends_before_any_queue_and_every_branch_reaches_a_queue() -> None:
+    flow = sample_flow("openplanner_aangifte", ROUTES, "ORG_fallback", {"toeslagen": "id-2"})
+    nodes, edges = _graph(flow)
+
+    assert nodes["CaseKind"]["menuLinks_input"] == ["probe"]
     assert nodes[edges[("CaseKind", "0")]]["activityName"] == "end"
-    assert kind["menuLinks_input"][1] == "direct"
-    assert nodes[edges[("CaseKind", "1")]]["activityName"] == "set-contact-priority"
+    assert nodes[edges[("CaseKind", "default")]]["activityName"] == "screen-pop"
     for i, route in enumerate(ROUTES):
         queue = nodes[edges[("CaseGroup", str(i))]]
-        assert (queue["queueId"], queue["channelType"]) == (route.queue, "WORK_ITEM")
-    assert nodes[edges[("CaseGroup", "default")]]["queueId"] == "ORG_fallback"
-    assert {e["from"] for e in flow["edges"]} | {e["to"] for e in flow["edges"]} <= set(nodes)
+        assert (queue["destination:name"], queue["channelType"]) == (route.queue, "WORK_ITEM")
+    assert nodes["Queue_1"]["destination"] == "id-2"
+    assert nodes["Queue_0"]["destination"] is None
+    assert nodes[edges[("CaseGroup", "default")]]["destination:name"] == "ORG_fallback"
+
+
+def test_every_activity_and_link_is_on_the_canvas() -> None:
+    # A file without its diagram imports as an empty canvas (seen 2026-11-02).
+    flow = sample_flow("openplanner_aangifte", ROUTES, "ORG_fallback")
+    widgets = flow["diagram"]["widgets"]
+    activities = flow["process"]["activities"]
+
+    assert set(widgets) == set(activities) | {link["id"] for link in flow["process"]["links"]}
+    wired = {p["linkId"] for w in widgets.values() for p in w.get("ports", []) if p["linkId"]}
+    assert wired == {w["id"] for w in widgets.values() if w["widgetType"] == "link"}
 
 
 def test_the_sample_flow_reads_routing_and_meeting_link_and_carries_no_participant_data() -> None:
     flow = sample_flow("openplanner_aangifte", ROUTES, "ORG_fallback")
-    nodes = {n["name"]: n["properties"] for n in flow["nodes"]}
+    nodes, _ = _graph(flow)
 
     assert [v["name"] for v in flow["variables"]] == ["openplannerGroup"]
     assert nodes["CaseGroup"]["expression"] == "{{openplannerGroup}}"

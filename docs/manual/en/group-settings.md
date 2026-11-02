@@ -218,8 +218,7 @@ Instead of building the flow by hand, you can generate one. A host administrator
 `python -m app.cli wxcc-sample-flow --group <web address>` (add `--queue VALUE=QUEUE` for each
 routing value and `--fallback-queue` for the default branch). The result is a file for **Control
 Hub → Contact Center → Customer experience → Flows → Import**. The flow has the variable
-`openplannerGroup`, a branch for kind `probe` that ends the check item, a priority for direct
-calls, a Screen Pop with the meeting link, and a branch with a queue for each routing value of the
+`openplannerGroup`, a branch for kind `probe` that ends the check item, a Screen Pop with the meeting link, and a branch with a queue for each routing value of the
 groups that share this business address. After importing, check the queues, validate, publish and
 link the flow to the entry point; then press **Check integration**. The diagram and the details are
 in `docs/wxcc-sample-flow.md`.

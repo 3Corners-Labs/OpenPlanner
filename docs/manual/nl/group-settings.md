@@ -226,8 +226,7 @@ In plaats van de flow met de hand te bouwen kunt u er een laten genereren. Een b
 host draait `python -m app.cli wxcc-sample-flow --group <webadres>` (met `--queue WAARDE=QUEUE`
 per routeringswaarde en `--fallback-queue` voor de standaardtak). Het resultaat is een bestand
 voor **Control Hub → Contact Center → Customer experience → Flows → Import**. De flow heeft de
-variabele `openplannerGroup`, een tak voor soort `probe` die het controle-item beëindigt, een
-prioriteit voor directe gesprekken, een Screen Pop met de vergaderlink en een tak met een queue
+variabele `openplannerGroup`, een tak voor soort `probe` die het controle-item beëindigt, een Screen Pop met de vergaderlink en een tak met een queue
 per routeringswaarde van de groepen met dit business address. Controleer na het importeren de
 queues, valideer, publiceer en koppel de flow aan het entry point; druk daarna op **Koppeling
 controleren**. Het diagram en de details staan in `docs/wxcc-sample-flow.md`.
