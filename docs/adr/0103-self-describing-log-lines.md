@@ -121,7 +121,7 @@ closed list for the same reason.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | | in PR |
+| 0 | ADR proposed | #412 | in PR |
 | 1 | The register (`app/domain/log_events.py`) with every current action and trace point, the scan test, `docs/logging.md` generated | | planned |
 | 2 | `openplanner.event/3`: envelope on every line, message from the template, `error.message`, `labels.*`, `actor.type` and `actor.role`, library lines; `docs/audit-events.md`, CSV export | | planned |
 | 3 | Category `authz` for destinations, syslog `MSGID` from the category | | planned |
