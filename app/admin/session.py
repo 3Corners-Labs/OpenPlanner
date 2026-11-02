@@ -24,6 +24,14 @@ from app.domain.identity import PLATFORM
 from app.domain.ports import LoginStart
 from app.web.cookies import CookieSpec, cookie_for
 
+LOGOUT_CLEAR_SITE_DATA = {"clear-site-data": '"cookies", "storage"'}
+"""Header of the logout response (ASVS V14.3.1): the browser drops cookies and storage of the site.
+
+``"cache"`` is left out on purpose: every HTML response is ``no-store`` (``app/web/templates.py``),
+so nothing of the session sits in the HTTP cache, and ``"cache"`` would also empty the caches of
+participants' pages and static files for no gain. It is a fixed protocol value, not a setting.
+"""
+
 _BASE_COOKIE = "op_admin"
 _SID = "sid"
 _OIDC = "oidc"

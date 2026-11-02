@@ -101,6 +101,7 @@ from app.admin.pages import (
 from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import (
+    LOGOUT_CLEAR_SITE_DATA,
     end_session,
     has_login_trial,
     pop_login_start,
@@ -375,12 +376,16 @@ async def logout(request: Request, locale: Locale, _: SameOrigin) -> Response:
     provider = _identity_provider(request)
     provider_logout = await provider.logout_url(logged_out) if provider else None
     if provider_logout is None:
-        return RedirectResponse("/admin/logged-out", status_code=303)
+        return RedirectResponse(
+            "/admin/logged-out", status_code=303, headers=LOGOUT_CLEAR_SITE_DATA
+        )
     # A redirect from a form POST to the provider would be blocked by CSP form-action 'self';
     # a page that navigates on (meta refresh, plus a visible link) keeps the CSP strict.
-    return render(
+    response = render(
         templates, request, "admin/logout_redirect.html", locale, {"logout_url": provider_logout}
     )
+    response.headers.update(LOGOUT_CLEAR_SITE_DATA)
+    return response
 
 
 @router.get("/logged-out", response_class=HTMLResponse)

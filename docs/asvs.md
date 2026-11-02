@@ -34,19 +34,20 @@ by itself.
 
 | Status | ASVS requirements | Further controls |
 |---|---|---|
-| Closed | 74 | 7 |
+| Closed | 77 | 7 |
 | Limitation | 5 | 0 |
-| Open | 13 | 0 |
+| Open | 10 | 0 |
 | Total | 92 | 7 |
 
 **Limitation** (5): V3.5.4 (one origin for all organisations), V5.4.3 (no virus scan, ADR 0092),
 V11.4.1 and V11.4.3 (the provider-imposed HMAC-SHA1 of Webex webhooks), V12.3.3 (plain HTTP from the
 bundled proxy to web on one host, ADR 0091).
 
-**Open** (13): V2.4.1, V4.1.3, V6.1.1, V6.3.1, V6.3.2, V7.1.3, V7.6.1, V12.3.1, V13.3.1, V13.3.2,
-V14.3.1, V15.2.2 and V15.3.4. The reason of each is in its row.
+**Open** (10): V2.4.1, V6.1.1, V6.3.1, V6.3.2, V7.1.3, V7.6.1, V12.3.1, V13.3.1, V13.3.2 and
+V15.2.2. The reason of each is in its row. V6.3.1 and V6.3.2 also have their row in the identity
+provider's checklist (`docs/assurance/idp.md`): what is open is the provider's own evidence.
 
-**Not repeated here, with a checklist:** 66 ASVS requirements and 5 further controls need evidence from
+**Not repeated here, with a checklist:** 68 ASVS requirements and 5 further controls need evidence from
 the client's identity provider, the host, Cisco or the data controller. They are listed under
 *Evidence that only an outside party can give* and live in `docs/assurance/`.
 
@@ -99,7 +100,7 @@ The reasoning for the rows of this chapter is the section *Browser model* of `do
 | ID | The audit asked for | Where the measure is | Status |
 |---|---|---|---|
 | V4.1.2 | Only HTTPS for the API; no silent upgrade | Port 80 answers `/api/*` and `/webhooks/*` with 403 and no `Location`; browser paths keep the redirect. `deploy/proxy/Caddyfile`, `scripts/check-proxy.sh`, `tests/scripts/test_check_proxy.py`, `docs/runbook.md` (#311) | Closed |
-| V4.1.3 | Headers set by the proxy cannot be overridden | The app trusts `X-Forwarded-*` only from the proxy address (`FORWARDED_ALLOW_IPS`), Caddy replaces what the visitor sent, and the address check finds a wrong trust. What is missing is a test on the real edge that sends a forged `X-Forwarded-For` and shows it is dropped. `docker-compose.yml`, `deploy/proxy/Caddyfile`, `tests/api/test_instance.py`, `scripts/check-proxy.sh` | Open |
+| V4.1.3 | Headers set by the proxy cannot be overridden | The app trusts `X-Forwarded-*` only from the proxy address (`FORWARDED_ALLOW_IPS`), Caddy replaces what the visitor sent, and the address check finds a wrong trust. On the real edge, every pass of the proxy check sends a forged `X-Forwarded-For: 203.0.113.7` (with a forged `-Proto` and `-Host`) through the proxy and reads the wire between proxy and web: web receives one address that is not the forged one, and `https`. The check needs no hook in the app and stores no address. `scripts/check-proxy.sh`, `tests/scripts/test_check_proxy.py`, `docker-compose.yml`, `deploy/proxy/Caddyfile`, `tests/api/test_instance.py` (#PR) | Closed |
 
 ## V5 File handling
 
@@ -124,8 +125,8 @@ the identity provider (see the last section).
 |---|---|---|---|
 | V6.1.1 | One approved policy against credential attacks | The paths and who owns each control are in `docs/authentication.md`; the bot token endpoint is rate limited. The policy of the identity provider has to be approved by its owner, which the repository cannot do. `docs/authentication.md`, `docs/assurance/idp.md` | Open |
 | V6.1.3 | All authentication paths documented together | Three paths with proof, strength and withdrawal in one table. `docs/authentication.md` (#344) | Closed |
-| V6.3.1 | Credential-stuffing controls in place | Machine API: the token endpoint is rate limited. Staff: the identity provider's policy; the application only checks the token. The identity provider's evidence is not in a checklist yet. `app/api/agent/token.py`, `tests/api/test_agent_api.py` | Open |
-| V6.3.2 | No default accounts | The application has no accounts of its own and no break-glass login. The accounts and realm of the production identity provider and host have to be shown from there. `docs/authentication.md`, `docs/adr/0090-bundled-identity-provider-for-test-and-lab-installations.md` | Open |
+| V6.3.1 | Credential-stuffing controls in place | Machine API: the token endpoint is rate limited. Staff: the identity provider's lockout policy; the application only checks the token. The identity provider's evidence is now a row in its checklist, to be filled by its owner. `app/api/agent/token.py`, `tests/api/test_agent_api.py`, `docs/assurance/idp.md` (#PR) | Open |
+| V6.3.2 | No default accounts | The application has no accounts of its own and no break-glass login. The accounts and realm of the production identity provider and host have to be shown from there; the checklist row names what to show and what the bundled Keycloak sets. `docs/authentication.md`, `docs/assurance/idp.md`, `docs/adr/0090-bundled-identity-provider-for-test-and-lab-installations.md` (#PR) | Open |
 | V6.3.4 | No undocumented authentication path | Every admin route declares a permission and the matrix test sweeps all of them; the other entry points are in the authentication document. `tests/admin/test_authorization_matrix.py`, `tests/support/routes.py`, `docs/authentication.md` | Closed |
 
 ## V7 Session management
@@ -208,7 +209,7 @@ The classification and retention of every kind of data is the *Retention matrix*
 | V14.2.1 | No sensitive data in URLs | The management link is exchanged once for a cookie and the browser lands on a reference that authorises nothing. `app/api/link_session.py`, `tests/api/test_participant_link.py`, `docs/adr/0093-the-management-link-is-exchanged-for-a-participant-cookie.md` (#391, #393) | Closed |
 | V14.2.2 | Sensitive data not cached | HTML is `no-store`; the proxy does not cache and the edge check asserts it; a purge removes derived copies. `app/web/templates.py`, `scripts/check-proxy.sh`, `tests/adapters/db/test_purge_remains.py` | Closed |
 | V14.2.4 | Retention enforced, gaps repaired | The purge job, a nightly sweep for stragglers, a maximum for bookings on hold under an open closure, daily counts instead of old rows, and the invariant test. `app/domain/retention_sweep.py`, `tests/domain/test_purge_invariant.py`, `tests/domain/test_retention_sweep.py`, `tests/adapters/db/test_booking_rollup.py` (#328, #394, #395, #401) | Closed |
-| V14.3.1 | Authenticated data cleared at logout | The session ends on the server at logout and HTML is `no-store`, but no `Clear-Site-Data` header is sent and no decision has been taken on it. `app/web/templates.py`, `app/admin/session.py` | Open |
+| V14.3.1 | Authenticated data cleared at logout | The session ends on the server at logout and HTML is `no-store`; the logout response also sends `Clear-Site-Data: "cookies", "storage"`, on both of its answers. `"cache"` is left out on purpose (HTML is `no-store` already, and it would empty participants' caches). `app/admin/session.py`, `app/admin/routes.py`, `tests/admin/test_admin_sessions.py`, `docs/authentication.md` (#PR) | Closed |
 | V14.3.3 | No sensitive data in browser storage | The admin cookie holds a random reference and preferences, no name, role or claim; the participant cookie holds a random value. `tests/admin/test_admin_sessions.py`, `tests/web/test_cookies.py` (#350) | Closed |
 
 ## V15 Secure coding and architecture
@@ -219,7 +220,7 @@ The classification and retention of every kind of data is the *Retention matrix*
 | V15.1.2 | Components tracked (SBOM) | A CycloneDX SBOM of the image is scanned by grype in every PR and attached to releases; every pin has a Renovate tracker. `.github/workflows/ci.yml`, `.github/workflows/main.yml`, `scripts/check_pins.py`, `docs/dependencies.md` | Closed |
 | V15.1.3 | Costly functions identified, with limits | *Heavy functions and their limits* below. `docs/settings.md` | Closed |
 | V15.2.2 | Availability under heavy use | The defences exist (limits, caps, timeouts, bounded queues); proving them needs a capacity and failure trial on the target environment. `docs/adr/0036-scaling-envelope-and-path-beyond-one-vm.md`, `tests/jobs/test_fault_injection_jobs.py` | Open |
-| V15.3.4 | The visitor's real address passed on safely | As V4.1.3: trusted proxy address, replaced `X-Forwarded-For`, address check; the forged-header test on the real edge is missing. `docker-compose.yml`, `docs/runbook.md`, `tests/api/test_instance.py` | Open |
+| V15.3.4 | The visitor's real address passed on safely | As V4.1.3: trusted proxy address, replaced `X-Forwarded-For`, address check, and the forged-header check on the real edge in every pass of the proxy check. `scripts/check-proxy.sh`, `docker-compose.yml`, `docs/runbook.md`, `tests/api/test_instance.py` (#PR) | Closed |
 | V15.3.5 | Duplicate or wrongly typed parameters | Tests with doubled query and form fields and wrong JSON types. `tests/api/test_parameter_pollution.py` (#338) | Closed |
 | V15.3.6 | No prototype pollution in JavaScript | *Widget review* below; a test keeps the dangerous constructs out. `widget/src/dom.js`, `tests/test_asvs_doc.py` | Closed |
 | V15.3.7 | HTTP parameter pollution handled | Same tests; for a doubled field Starlette takes the last value and the tests pin what the routes do. `tests/api/test_parameter_pollution.py` | Closed |
@@ -392,7 +393,7 @@ evidence` (runbook *Evidence report for an audit*).
 
 | Checklist | Requirements |
 |---|---|
-| `docs/assurance/idp.md` | V6.1.2, V6.2.1 to V6.2.12, V6.3.3, V6.4.1 to V6.4.4, V6.5.1 to V6.5.5, V6.6.1 to V6.6.3, V6.8.4, V7.4.3, V7.5.1, V9.2.4, V10.4.1 to V10.4.3, V10.4.5, V10.4.6, V10.4.8, V10.6.1, V10.6.2, V10.7.1 to V10.7.3, V11.4.2, V11.4.4 |
+| `docs/assurance/idp.md` | V6.1.2, V6.2.1 to V6.2.12, V6.3.1 to V6.3.3, V6.4.1 to V6.4.4, V6.5.1 to V6.5.5, V6.6.1 to V6.6.3, V6.8.4, V7.4.3, V7.5.1, V9.2.4, V10.4.1 to V10.4.3, V10.4.5, V10.4.6, V10.4.8, V10.6.1, V10.6.2, V10.7.1 to V10.7.3, V11.4.2, V11.4.4 |
 | `docs/assurance/hosting.md` | V4.2.1, V12.1.1, V12.1.2, V12.2.1, V12.2.2, V12.3.4, V13.2.1 to V13.2.5, V15.2.1, V16.2.2, V16.4.2, V16.4.3, TEN-06, PI-08 |
 | `docs/assurance/cisco.md` | V17.1.1, V17.2.1 to V17.2.4, V17.3.1, V17.3.2 |
 | `docs/assurance/dpia-input.md` | V14.2.3, PI-06, PI-07, PI-10 |
