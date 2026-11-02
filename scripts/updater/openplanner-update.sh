@@ -114,11 +114,15 @@ container_healthy() { # container_healthy SERVICE: the service's container repor
   [[ -n $container && $(docker inspect -f '{{.State.Health.Status}}' "$container") == healthy ]]
 }
 
+# A READY_URL on https (web serves TLS to its proxy, ADR 0091) names the loopback, which the
+# certificate does not: check that web answers, not the certificate.
+ready() { if [[ $READY_URL == https://* ]]; then curl -fsSk -o /dev/null "$READY_URL"; else curl -fsS -o /dev/null "$READY_URL"; fi; }
+
 healthy() { # web answers /readyz; the worker, and the proxy where it runs, report healthy
   # Check before looking at the deadline: SECONDS may tick past it before the first check.
   local deadline=$((SECONDS + HEALTH_TIMEOUT))
   while true; do
-    if curl -fsS -o /dev/null "$READY_URL" && container_healthy worker \
+    if ready && container_healthy worker \
       && { ((!PROXY)) || container_healthy proxy; }; then
       return 0
     fi

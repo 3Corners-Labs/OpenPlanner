@@ -6728,6 +6728,12 @@ msgstr "E-mail"
 msgid "admin.overview.widget.status.mail.plaintext"
 msgstr "{count} mailserver(s) zonder TLS: kies STARTTLS of TLS, of zet SMTP_PLAINTEXT_RELAY_ALLOWED"
 
+msgid "admin.overview.widget.status.proxy"
+msgstr "Proxy"
+
+msgid "admin.overview.widget.status.proxy.plaintext"
+msgstr "FORWARDED_ALLOW_IPS vertrouwt een andere proxy dan de meegeleverde en de verbinding loopt zonder TLS naar web: het verkeer tussen proxy en web is onversleuteld. Zet WEB_TLS_CERT_FILE en WEB_TLS_KEY_FILE (runbook)"
+
 msgid "audit.job.send_rebook_request"
 msgstr "Verzoek om opnieuw te plannen versturen"
 

@@ -6728,6 +6728,12 @@ msgstr "Mail"
 msgid "admin.overview.widget.status.mail.plaintext"
 msgstr "{count} mail server(s) without TLS: choose STARTTLS or TLS, or set SMTP_PLAINTEXT_RELAY_ALLOWED"
 
+msgid "admin.overview.widget.status.proxy"
+msgstr "Proxy"
+
+msgid "admin.overview.widget.status.proxy.plaintext"
+msgstr "FORWARDED_ALLOW_IPS trusts a proxy other than the bundled one and web runs without TLS: traffic between proxy and web is unencrypted. Set WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE (runbook)"
+
 msgid "audit.job.send_rebook_request"
 msgstr "Send request to rebook"
 
