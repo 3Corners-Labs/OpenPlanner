@@ -8,8 +8,8 @@
     "aria": "Schakel naar Nederlands"
   },
   "meta": {
-    "title": "OpenPlanner – video appointments with your team, booked in seconds",
-    "description": "OpenPlanner is the open-source scheduler for video calls on Webex. Participants pick a free time on a page in your branding, the call lands in Webex Contact Center, and personal data is gone 24 hours after the call."
+    "title": "OpenPlanner – video appointments that land in your contact center",
+    "description": "Open-source scheduling for video appointments on Webex. People book a time on a page in your house style and join from the browser; the call arrives in Webex Contact Center for the first free agent. Personal data is deleted 24 hours after the call."
   },
   "skip": "Skip to content",
   "nav": [
@@ -40,33 +40,33 @@
   ],
   "nav_github": "GitHub",
   "hero": {
-    "eyebrow": "Open source · EUPL-1.2 · WCAG 2.2 AA",
-    "title_a": "Video appointments with your team,",
-    "title_b": "booked in seconds.",
-    "lead": "OpenPlanner is the scheduler for video calls on Webex. A participant picks a free time on a page in your branding, gets a confirmation with a calendar invite and joins from the browser. No account, no app, no login. Your team receives the call at the right moment in Webex Contact Center, and personal data is gone 24 hours after the call.",
-    "cta_demo": "Try the demo",
+    "eyebrow": "Open source · for Webex Contact Center · WCAG 2.2 AA",
+    "title_a": "Video appointments that land",
+    "title_b": "in your contact center.",
+    "lead": "People book a video call with your team on a page in your house style, and join from their browser: no app, no account. Five minutes before the start, the call arrives in Webex Contact Center like any other contact, and the first free agent picks it up. A day after the call, the personal data is deleted.",
+    "cta_demo": "Try the booking page",
     "cta_install": "Install",
-    "cta_source": "View the source",
+    "cta_source": "See the source code",
     "facts": [
       {
         "value": "0",
-        "label": "cookies on this site and on the booking page"
+        "label": "apps or accounts the person you call needs"
+      },
+      {
+        "value": "5 min",
+        "label": "before the start, the call is in your agents' queue"
       },
       {
         "value": "24 h",
-        "label": "after the call, personal data is purged"
-      },
-      {
-        "value": "2",
-        "label": "containers and one SQLite file, nothing more"
+        "label": "after the call, the personal data is deleted"
       }
     ],
     "command": "git clone https://github.com/3Corners-Labs/OpenPlanner && cd OpenPlanner\ncp .env.example .env\ndocker compose --profile dev up --build -d\ndocker compose exec web python -m app.cli seed-demo",
-    "command_label": "Try it on your laptop in five minutes, then open http://127.0.0.1:8000/g/demo"
+    "command_label": "For developers: run it on a laptop in five minutes, then open http://127.0.0.1:8000/g/demo"
   },
   "demo": {
-    "title": "What booking feels like for a participant",
-    "lead": "A real appointment page, without the real appointment. Everything works by keyboard. Nothing is stored or sent.",
+    "title": "Book a call yourself",
+    "lead": "This is the booking page your visitors see, without a real appointment behind it. It works fully by keyboard, and nothing you type is stored or sent.",
     "nojs": "This interactive demo needs JavaScript. The real booking flow is in the demo installation from the README.",
     "step_day": "1. Pick a day",
     "step_time": "2. Pick a time",
@@ -83,8 +83,8 @@
     "done_title": "Your appointment is set",
     "done_text": "You receive a confirmation with a calendar invite and a personal link to move or cancel. A few minutes before the start, the call lands with the team.",
     "done_meeting": "Webex meeting created",
-    "done_task": "Work item scheduled for T−5",
-    "done_purge": "Data purged 24 h after the call",
+    "done_task": "In the team's queue 5 minutes before the start",
+    "done_purge": "Personal data deleted 24 h after the call",
     "restart": "Start over",
     "announce_day": "Day chosen: {day}. Pick a time.",
     "announce_time": "Time chosen: {time}. Fill in your details.",
@@ -115,78 +115,78 @@
     "closed": "closed"
   },
   "tour": {
-    "title": "From click to call, and everything behind it",
-    "lead": "Two tracks through the product: what the participant experiences, from picking a time to the call, and what the team and the administrators hold, from the organisation to the agent who picks up.",
+    "title": "From booking to conversation",
+    "lead": "Follow both sides: what the person you serve sees, from picking a time to the call, and what your team sees, from planning the staffing to picking up.",
     "tracks": [
       {
         "key": "participant",
-        "title": "The participant",
+        "title": "The person you serve",
         "steps": [
           {
             "key": "book",
             "title": "Picking a time",
-            "text": "Month calendar, free times of the day, a short form with three fields and the group's own questions. On your domain, in your branding."
+            "text": "A month calendar, the free times of a day and a short form: name, email and, if you want, a few questions of your own. On your own web address, in your house style."
           },
           {
             "key": "direct",
-            "title": "Or talk now",
-            "text": "When the group is open, the participant can call right away. A cap on the number waiting and honest queue feedback keep it tidy."
+            "title": "Or talk right away",
+            "text": "When the team is open, people can start a call on the spot. You decide how many may wait, and they see honestly how long it will take."
           },
           {
             "key": "mail",
-            "title": "Confirmation by email",
-            "text": "Confirmation with a calendar invite (.ics), the personal management link and the reminder later. By SMS if the group wants it. SPF, DKIM and DMARC checked."
+            "title": "Confirmed by email",
+            "text": "One click confirms the booking. Then a calendar invite, a personal link and a reminder before the start. By text message too, if you want."
           },
           {
             "key": "manage",
             "title": "Move or cancel",
-            "text": "Through the personal link, without an account. Cancel until the start, move until an hour before; known details are filled in already."
+            "text": "Through the personal link, no account needed. Cancel up to the start, move up to an hour before; what they filled in is already there."
           },
           {
             "key": "trial",
             "title": "Test the video first",
-            "text": "A real trial call on Webex: camera, microphone and sound checked before it matters, with the result visible in the team's agenda."
+            "text": "A short trial call on Webex checks camera, microphone and sound before it matters. Your team sees in the agenda who has tested."
           },
           {
             "key": "join",
-            "title": "Starting the call",
-            "text": "Join from the browser, no app or account. Every appointment is its own Webex meeting; the participant waits in the lobby until the agent is there."
+            "title": "Joining the call",
+            "text": "One click in the browser, no app or account. Each appointment is its own Webex meeting; they wait in the lobby until the agent joins."
           }
         ]
       },
       {
         "key": "team",
-        "title": "The team and the administrators",
+        "title": "Your team",
         "steps": [
           {
             "key": "orgs",
-            "title": "One installation, several organisations",
-            "text": "Each organisation with its own groups, branding, texts, channels and identity provider. Roles from the IdP: superuser, organisation admin, group admin, planner, agent, auditor."
+            "title": "Several organisations, one installation",
+            "text": "Each organisation has its own teams, house style, texts, channels and sign-in. Roles come from your own sign-in system: administrator, planner, agent, auditor."
           },
           {
             "key": "groups",
-            "title": "Groups as skills",
-            "text": "A group is a skill: a subject, a team, a queue, its own opening hours and form. The participant never picks a person; the call goes to the first free agent."
+            "title": "Teams work like skills",
+            "text": "Each team has its own queue, opening hours, form and texts. People never pick a person; the call goes to the first free agent."
           },
           {
             "key": "staffing",
             "title": "Staffing per block",
-            "text": "Blocks per day with the number of agents, holidays, exceptions and an emergency closure in one action. Capacity decides what the participant gets to see."
+            "text": "Say how many agents are on duty in each block of the day, with holidays and exceptions. Only times you can staff are offered. Need to close at short notice? One action, and people are asked to pick a new time."
           },
           {
             "key": "agenda",
             "title": "Agenda and planner, live",
-            "text": "Every call with its status: planned, trial call done, in the call, finished. The planner moves or cancels on the participant's behalf and sees the reason of every failure."
+            "text": "Every appointment and its state: booked, video tested, in the call, finished. Planners move or cancel on someone's behalf and see why something failed."
           },
           {
             "key": "queue",
-            "title": "The work item at T−5",
-            "text": "Five minutes before the start the call lands as a work item in Webex Contact Center, or in OpenPlanner's own queue. Chosen per group, and switched when the contact center is down."
+            "title": "In the queue five minutes before",
+            "text": "Five minutes before the start, the call arrives as a work item in Webex Contact Center, or in OpenPlanner's own queue for a team without a contact center. You choose per team."
           },
           {
             "key": "agent",
             "title": "The agent picks up",
-            "text": "With the agent role, the agent takes the call from the queue, sees only a first name and a subject, and joins the meeting as cohost. 24 hours after the call the data is gone."
+            "text": "The agent takes the call from the queue, sees only a first name, and joins the meeting as cohost. A day after the call, the personal data is deleted."
           }
         ]
       }
@@ -195,8 +195,8 @@
     "pause": "Pause",
     "scene_label": "Animation of the participant and admin flows",
     "video_title": "Screen recording of the real interface",
-    "video_text": "Recorded by the pipeline at release {version} ({date}), against the real application with test data: from a participant booking to the agent who picks up the call.",
-    "video_soon": "From the next release on, the pipeline records the booking flow, the portal and the queue, and the recording appears here. Until then the animation above shows the chain.",
+    "video_text": "Recorded automatically at release {version} ({date}), on the real application with test data: from someone booking a call to the agent who picks it up.",
+    "video_soon": "A screen recording of the real interface appears here with the next release. Until then, the animation above shows how it works.",
     "art": {
       "direct_btn": "Talk now",
       "direct_wait": "2 waiting · about 3 min",
@@ -272,96 +272,96 @@
     "screens_alt": "Screen {n} of the recording, full size"
   },
   "how": {
-    "title": "How it works",
+    "title": "Up and running in three steps",
     "steps": [
       {
-        "title": "You set up a group",
-        "text": "A team is a group: opening hours, staffing per block, holidays, exceptions, texts and branding. All in the admin portal, no code."
+        "title": "Set up a team",
+        "text": "In the portal a team is called a group: opening hours, staffing, holidays, texts and house style, all in one place. No code, no developer needed."
       },
       {
-        "title": "Your website links to the page",
-        "text": "Every group has its own page on your domain. Or you place the calendar as a Web Component right inside your own site."
+        "title": "Link to its booking page",
+        "text": "Each team gets its own booking page on your web address. Link to it from your website, or place the calendar right inside one of your pages."
       },
       {
-        "title": "The call arrives by itself",
-        "text": "As a work item in Webex Contact Center, or in OpenPlanner's own queue where staff with the agent role pick up the call themselves. Chosen per group."
+        "title": "Calls arrive by themselves",
+        "text": "In Webex Contact Center as a work item, or in OpenPlanner's own queue where agents pick them up. You choose per team."
       }
     ]
   },
   "features": {
-    "title": "Everything a call needs, nothing that distracts",
-    "lead": "Built for teams that serve many people by video: customer service, advisory desks, intake, helpdesks.",
+    "title": "Everything a video appointment needs, nothing more",
+    "lead": "Made for teams that help many people by video: customer service, advice desks, intake and support.",
     "items": [
       {
         "icon": "calendar",
-        "title": "Booking without friction",
-        "text": "Month calendar, free times, a short form. The participant confirms by email; move or cancel through a personal link. Works without JavaScript and fully by keyboard."
+        "title": "Booking without hurdles",
+        "text": "A calendar, the free times and a short form. People confirm by email and move or cancel through a personal link. Works without JavaScript and fully by keyboard."
       },
       {
         "icon": "video",
         "title": "Webex built in",
-        "text": "Every appointment gets its own Webex meeting. The participant joins from the browser, no app or account; your team joins as cohost."
+        "text": "Every appointment gets its own Webex meeting. Your visitor joins from the browser, with no app or account; your agent joins as cohost."
       },
       {
         "icon": "queue",
-        "title": "Lands where your team works",
-        "text": "The call goes to the queue in Webex Contact Center as a work item, or to OpenPlanner's own queue for a team without a contact center. The first free agent picks up. Nobody has to watch a calendar."
+        "title": "Lands where your agents work",
+        "text": "The call arrives in the Webex Contact Center queue as a work item, or in OpenPlanner's own queue for teams without a contact center. The first free agent picks up; nobody has to watch a calendar."
       },
       {
         "icon": "bolt",
-        "title": "Talk now",
-        "text": "A group that is open can offer a direct call, with a cap on the number waiting and honest queue feedback."
+        "title": "Talk right away",
+        "text": "When a team is open, it can offer a call on the spot, with a limit on how many people wait and an honest waiting time."
       },
       {
         "icon": "grid",
-        "title": "Multitenant with real roles",
-        "text": "One installation, several organisations, each with its own groups, branding, texts and identity provider. Roles and scope come from your IdP; one authorisation matrix decides what everyone sees and does."
+        "title": "Many organisations, clear roles",
+        "text": "One installation serves several organisations, each with its own teams, house style, texts and sign-in. One rights model decides who sees and does what."
       },
       {
         "icon": "queue",
-        "title": "Groups as skills",
-        "text": "A group is a skill with a subject, a team and a queue. The participant never picks a person; the first free agent picks up. One agent can be in several groups."
+        "title": "Teams, not individuals",
+        "text": "Each team works like a skill in your contact center, with its own queue and opening hours. Visitors never choose a person; the first free agent picks up."
       },
       {
         "icon": "shield",
         "title": "Privacy by design",
-        "text": "Personal data lives only on the booking and is gone 24 hours after the call. Never in logs, URLs, jobs or error messages."
+        "text": "Personal data is kept only with the appointment and deleted 24 hours after the call. Never in logs, web addresses or error messages."
       },
       {
         "icon": "brush",
-        "title": "Your brand, your words",
-        "text": "Colours, logo and font per organisation. Every text editable in the portal. Dutch and English out of the box, more locales possible."
+        "title": "Your house style, your words",
+        "text": "Colours, logo and font per organisation, and every text editable in the portal. Dutch and English included, more languages possible."
       },
       {
         "icon": "message",
         "title": "Messages that arrive",
-        "text": "Confirmation, change, reminder and cancellation by email (with .ics) and SMS. SPF, DKIM and DMARC are checked for you."
+        "text": "Confirmation, change, reminder and cancellation by email with a calendar invite, and by text message. The portal checks that your mail domain is set up to be trusted (SPF, DKIM, DMARC)."
       },
       {
         "icon": "grid",
-        "title": "Agenda and planner",
-        "text": "Admins follow every call live, plan staffing per block and close a group in one action when needed, after which participants pick a new time themselves."
+        "title": "Planning and agenda",
+        "text": "Follow every call live, plan staffing per block, and close a team in one action when you must; people then pick a new time themselves."
       }
     ]
   },
   "integrations": {
-    "title": "Webex Meetings is the heart. Everything else connects to it.",
-    "lead": "OpenPlanner is not a video platform and not a contact center. It is the scheduler that ties together the Webex products you already have, and keeps every other system behind a clean adapter.",
+    "title": "Built around Webex, open to the rest",
+    "lead": "OpenPlanner is not a video platform and not a contact center. It connects the Webex products you already have, and keeps every other system behind its own connector, so each one can be replaced.",
     "center": "OpenPlanner",
     "items": [
       {
         "key": "meetings",
         "name": "Webex Meetings",
         "tag": "the heart",
-        "text": "Every appointment is a real Webex meeting through the Meetings API. Browser-direct join, a trial call beforehand, live meeting status in the agenda.",
+        "text": "Every appointment is a real Webex meeting. People join straight from the browser, can do a trial call first, and your agenda shows live who is in the call.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0017-video-through-webex-meetings-api.md",
         "link": "Technical background"
       },
       {
         "key": "wxcc",
         "name": "Webex Contact Center",
-        "tag": "dispatch",
-        "text": "Five minutes before the start the call becomes a work item in the team's queue, carrying only a first name, the join link and routing attributes. Webex Contact Center is the first integration; the layer behind it is provider-neutral, and a group can also work without a contact center through OpenPlanner's own queue.",
+        "tag": "hand-over",
+        "text": "Five minutes before the start, the call becomes a work item in your team's queue, carrying only the reference, a first name, the team and the join link. No contact center? A team can use OpenPlanner's own queue.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0018-wxcc-work-items.md",
         "link": "Technical background"
       },
@@ -377,7 +377,7 @@
         "key": "idp",
         "name": "Your identity provider",
         "tag": "OIDC",
-        "text": "Administrators sign in through the identity provider bundled with OpenPlanner, with staff managed in the portal, or through your own (PingFederate, Keycloak, Entra ID, any OIDC provider), chosen per organisation by email domain. Roles come from the claims and a second factor can be required.",
+        "text": "Administrators sign in with the identity provider that comes with OpenPlanner, managed in the portal, or with your own (PingFederate, Entra ID, Keycloak or any OpenID Connect provider), chosen per organisation by email domain. A second factor can be required.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0083-identity-providers-per-organisation-chosen-by-email-domain.md",
         "link": "Technical background"
       },
@@ -385,7 +385,7 @@
         "key": "mail",
         "name": "Email and SMS",
         "tag": "channels",
-        "text": "SMTP and a provider-neutral SMS gateway per organisation. Texts per channel and per group editable in the portal.",
+        "text": "Email through your own mail server and text messages through an SMS gateway, per organisation. Every text editable per channel and per team.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0022-message-channels-reminders-and-texts.md",
         "link": "Technical background"
       },
@@ -393,20 +393,20 @@
         "key": "bot",
         "name": "AI agents and bots",
         "tag": "machine API",
-        "text": "A contact-center bot (such as the Webex AI Agent) asks for free times and books on the participant's behalf through an API with scopes and per-client keys.",
+        "text": "A contact-center bot, such as the Webex AI Agent, can look up free times and book on someone's behalf, through an API with its own keys and permissions.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/agent-api.md",
         "link": "docs/agent-api.md"
       }
     ],
-    "roadmap_title": "On the roadmap",
-    "roadmap": "Other contact-center platforms on the same adapter layer, health checks with a fallback per group, subjects and routing per group, bots that can change bookings and staff through SCIM."
+    "roadmap_title": "Coming next",
+    "roadmap": "Other contact-center platforms on the same connectors, health checks with a fallback per team, subjects and routing per team, bots that can change bookings, and staff provisioned from your directory."
   },
   "enterprise": {
-    "title": "Why we call OpenPlanner enterprise-ready",
-    "lead": "Not because of a list of ticks, but because of how it is built: a core without a framework, every external service behind a port, and rules the pipeline enforces instead of a reviewer.",
+    "title": "Ready for IT, security and procurement",
+    "lead": "Your IT and security colleagues will ask how it is built, where the data goes and who can change what. Here are the answers, and they are checked automatically on every change, not just promised.",
     "plate": {
-      "title": "Architecture plate: what runs and what goes where",
-      "lead": "One server you manage yourself, two containers and one database. Everything outside it is a system you already have, connected through an adapter.",
+      "title": "What runs where",
+      "lead": "One server you manage yourself, with two containers and one database. Everything else is a system you already have, connected through its own connector.",
       "people_title": "Who uses it",
       "people": [
         {
@@ -419,7 +419,7 @@
         },
         {
           "name": "Agents",
-          "sub": "work item in Webex Contact Center or the own queue"
+          "sub": "work item in Webex Contact Center or OpenPlanner's own queue"
         },
         {
           "name": "Bots",
@@ -441,12 +441,12 @@
         {
           "key": "worker",
           "name": "worker",
-          "sub": "scheduled jobs: meetings, messages, work items, purging"
+          "sub": "scheduled jobs: meetings, messages, work items, deleting personal data"
         },
         {
           "key": "db",
           "name": "SQLite (WAL)",
-          "sub": "personal data only on the appointment, erased 24 hours after the call"
+          "sub": "personal data only with the appointment, deleted 24 hours after the call"
         },
         {
           "key": "updater",
@@ -464,7 +464,7 @@
         },
         {
           "name": "Webex Contact Center",
-          "sub": "work item with first name, join link and routing"
+          "sub": "work item with a first name and the join link"
         },
         {
           "name": "Identity provider",
@@ -493,7 +493,7 @@
       "flows": [
         "The participant books over HTTPS; the data stays in the database on your server.",
         "The worker creates the Webex meeting and sends the confirmation and reminders by email or SMS.",
-        "Five minutes before the start the contact center gets a work item with only the first name, the join link and the routing attributes.",
+        "Five minutes before the start, the contact center gets a work item with only the reference, the first name, the team and the join link.",
         "Administrators sign in at your own identity provider; every decision goes to the audit log, which you can ship to your own log systems.",
         "Updates arrive as signed images; the host updater checks the signature before it switches."
       ],
@@ -503,8 +503,8 @@
         "label": "System context and containers"
       }
     },
-    "arch_title": "Architecture and building blocks",
-    "arch_caption": "The arrows point one way. On every pull request import-linter refuses an import that breaks these layers.",
+    "arch_title": "How it is built",
+    "arch_caption": "Each layer depends only on the layer below it. An automatic check on every change refuses code that breaks this.",
     "layers": [
       {
         "name": "Channels",
@@ -528,14 +528,14 @@
         "name": "Domain",
         "items": [
           "Booking and capacity",
-          "Groups and staffing",
+          "Teams and staffing",
           "Rights and scope",
           "Privacy rules"
         ],
         "note": "Pure Python, no framework, ≥ 90% test coverage"
       }
     ],
-    "ports_title": "Ports and adapters",
+    "ports_title": "Connectors (ports and adapters)",
     "ports": [
       {
         "port": "VideoProvider",
@@ -565,37 +565,37 @@
     "pillars": [
       {
         "title": "One core, replaceable edges",
-        "text": "Another contact center or video platform is a new adapter behind an existing port. The domain, the screens and the texts do not change."
+        "text": "Another contact center or video platform means a new connector. Your teams, screens and texts stay as they are."
       },
       {
-        "title": "Enforced, not agreed",
-        "text": "Layers, types, rights and privacy rules are checked on every pull request. What does not hold never reaches main."
+        "title": "Checked, not promised",
+        "text": "Structure, types, rights and privacy rules are checked automatically on every change. What fails never ships."
       },
       {
-        "title": "One source per subject",
-        "text": "Rights, settings and the portal's structure each live in one place; their documentation is generated from the code."
+        "title": "One source for each subject",
+        "text": "Rights, settings and the portal's structure each live in one place, and their documentation is generated from the code, so it cannot drift."
       },
       {
         "title": "Decision by decision on record",
         "text": "Every design decision is in the repository with its context, its choice, its settings and what has been built of it. An architect reads why things are the way they are, and what does not run yet."
       }
     ],
-    "scale_title": "Scalable, honestly",
+    "scale_title": "Room to grow",
     "scale": [
       {
         "state": "now",
-        "title": "Now: one host, well above the design target",
-        "text": "Proxy, web and worker on one VM with SQLite in WAL mode. Readers do not block each other, a booking is a few rows under a write lock, several workers share the job queue. One installation serves many organisations. Scaling is vertical first: more CPU, memory and a faster disk."
+        "title": "Today: one server, with room to spare",
+        "text": "Proxy, web and worker on one virtual machine with SQLite. One installation serves many organisations; growing means more processor power, memory and a faster disk."
       },
       {
         "state": "now",
-        "title": "A recorded limit",
-        "text": "The design target is about 80 bookings per working day. The scaling record states when we go further: above 2,000 bookings per working day, at a p95 above one second, with a stricter availability requirement, or when a client requires managed Postgres."
+        "title": "A known limit",
+        "text": "Designed for around 80 appointments per working day. The scaling plan says when we move on: above 2,000 appointments a working day, when responses slow past one second, when stricter availability is required, or when a client requires managed Postgres."
       },
       {
         "state": "designed",
-        "title": "After that: designed, not built yet",
-        "text": "Postgres with row locks, several web instances behind the proxy, workers on any host and shared storage for rate limits. All database access already sits behind one port in one adapter module, so the domain, the routes and the screens stay the same."
+        "title": "After that: designed, not yet built",
+        "text": "Postgres, several web servers behind the proxy and workers on more machines. All database access already goes through one connector, so teams, screens and texts stay the same."
       }
     ],
     "scale_state": {
@@ -613,20 +613,20 @@
     "security_title": "Security and operations",
     "items": [
       {
-        "title": "One authorisation matrix",
-        "text": "Role × permission × level in one place. Every admin route declares one permission, every query filters by scope, every denial is in the audit log. No exception for superusers."
+        "title": "One rights model",
+        "text": "Who may do what is defined in one table of roles, rights and levels. Every screen and action checks it, and every refusal is logged. No exceptions, not even for the superuser."
       },
       {
-        "title": "Multitenant, separated per organisation",
-        "text": "Every query filters by the role's scope; an organisation admin never sees another organisation, a group admin never another group. The same matrix drives the menu, the buttons and the API."
+        "title": "Organisations kept apart",
+        "text": "An organisation administrator never sees another organisation, a team administrator never another team. The menu, the buttons and the API follow the same rules."
       },
       {
-        "title": "Single sign-on, no detour",
+        "title": "Single sign-on, nothing on the side",
         "text": "OIDC with PKCE, state and nonce, asymmetric algorithms only, sessions held on the server, a second factor that can be required. No local accounts, no break-glass login, on purpose."
       },
       {
-        "title": "An audit log you can forward",
-        "text": "Logins, changes and denials as structured events, to syslog, Splunk or Elastic. Without personal data."
+        "title": "An audit trail you can forward",
+        "text": "Sign-ins, changes and refusals as structured events, sent to syslog, Splunk or Elastic if you want. Without personal data."
       },
       {
         "title": "Signed releases",
@@ -634,11 +634,11 @@
       },
       {
         "title": "A strict pipeline",
-        "text": "mypy strict, ruff, bandit, semgrep, gitleaks, mutation testing, schemathesis, OWASP ZAP, Playwright with axe-core and Lighthouse. Everything blocks the merge."
+        "text": "Type checks, security scanners, secret scanning, mutation tests, API fuzzing, OWASP ZAP and accessibility tests with axe-core and Lighthouse. Any failure blocks the change."
       },
       {
         "title": "Light to run",
-        "text": "Two containers, one SQLite file, HTTPS with automatic certificates or your own proxy. Updates and release channel from the portal. The backup is one file."
+        "text": "Two containers and one database file. HTTPS with automatic certificates or your own proxy, updates from the portal, and the backup is one file."
       },
       {
         "title": "Accessible, provably",
@@ -678,7 +678,7 @@
   },
   "releases": {
     "title": "Releases",
-    "lead": "Every merge to main becomes a release candidate on the rc channel. A release is a signed image, an SBOM and this website, in one train.",
+    "lead": "Every merged change becomes a release candidate for test environments; stable releases follow from those. Each one is a signed image with a software bill of materials (SBOM).",
     "latest": "Latest release",
     "candidate": "Latest release candidate",
     "none": "No release on this channel yet.",
@@ -690,7 +690,7 @@
     "fresh": "When this page loads, your browser asks GitHub for the current release list and for nothing else: no cookie, no account, no storage. The list built into the page is what you see when GitHub does not answer."
   },
   "footer": {
-    "tagline": "Video appointments with your team, booked in seconds, privacy by default.",
+    "tagline": "Video appointments that land in your contact center. Open source, privacy by default.",
     "nocookies": "This website sets no cookies, uses no trackers and loads no scripts, fonts or images from third parties. Only the release list is requested from GitHub by your browser.",
     "license": "Source code under EUPL-1.2. Made by 3Corners and the OpenPlanner contributors.",
     "links": [
@@ -726,8 +726,8 @@
     "disclaimer": "OpenPlanner is provided as it is, without warranty of any kind, as the EUPL-1.2 sets out (sections 7 and 8). 3Corners and the contributors are not liable for damage from its use. Whoever installs and runs it is responsible for its configuration, its hosting, its compliance with the law (including privacy, accessibility and retention rules) and its use. Statements on this site describe the software, not a legal or compliance advice or a guarantee that an installation meets a standard."
   },
   "standards": {
-    "title": "Quality and standards, provably",
-    "lead": "What we claim is in the code, in a test or in the pipeline. For each standard you see how far it is and where the evidence is.",
+    "title": "Standards, with the evidence",
+    "lead": "Every claim below points to the code, a test or the pipeline, with an honest status: done, partly done or planned.",
     "col_standard": "Standard",
     "col_what": "What it means",
     "col_status": "Status",
@@ -738,7 +738,7 @@
       "partly": "partly",
       "planned": "planned"
     },
-    "code_title": "Coding standards",
+    "code_title": "How we write code",
     "code": [
       "Python 3.12 with full type checking (mypy strict) and ruff for style and common mistakes.",
       "A layered architecture, enforced with import-linter: the domain knows no framework.",
@@ -747,7 +747,7 @@
       "Conventional Commits, one recorded decision per choice with its build status, and every PR answers seven review questions.",
       "bandit, semgrep, gitleaks, pip-audit and a licence check on every pull request."
     ],
-    "update_title": "Automatic updates",
+    "update_title": "Updates without a maintenance weekend",
     "update": [
       "The superuser picks the channel in the portal: stable, or release candidate for a test environment.",
       "Install a new version with one click in the portal, or let the installation do it by itself.",
@@ -786,7 +786,7 @@
       },
       {
         "name": "OpenID Connect",
-        "what": "Administrators sign in through their own identity provider: PKCE, state and nonce, asymmetric algorithms only. Tested against Keycloak, PingFederate in production.",
+        "what": "Administrators sign in through their own identity provider: PKCE, state and nonce, asymmetric algorithms only. Tested against Keycloak, built for PingFederate at the first client.",
         "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0013-admin-login-with-oidc.md",
         "link": "Technical background"
@@ -800,7 +800,7 @@
       },
       {
         "name": "GDPR and privacy by design",
-        "what": "Personal data only on the booking, purged 24 hours after the call, never in logs. The data-flow diagram is the input for the organisation's DPIA.",
+        "what": "Personal data only with the appointment, deleted 24 hours after the call, never in logs. The data-flow diagram is the input for the organisation's DPIA.",
         "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/dataflow.md",
         "link": "docs/dataflow.md"
@@ -844,7 +844,7 @@
     "fold": "Show all standards with their evidence"
   },
   "roadmap": {
-    "title": "Roadmap",
+    "title": "What comes next",
     "lead": "Decided and not built yet. Everything above this section runs today; the open work is public on GitHub.",
     "items": [
       {
@@ -855,12 +855,12 @@
       {
         "adr": "0082",
         "title": "Health checks and fallback",
-        "text": "The integration is checked all the time; administrators are alerted in email or a Webex space, and a group can fall back to its own queue when the contact center is down."
+        "text": "The connection to the contact center is checked all the time; administrators get an alert by email or in a Webex space, and a team can fall back to OpenPlanner's own queue when the contact center is down."
       },
       {
         "adr": "0081",
         "title": "Subjects and routing",
-        "text": "Per group a subject and routing attributes from a closed list, so the contact center routes the call to the right skill."
+        "text": "A subject and routing attributes per team from a fixed list, so the contact center sends the call to the right skill."
       },
       {
         "adr": "0057",
@@ -887,14 +887,18 @@
   },
   "nav_start": "Get started",
   "involved": {
-    "title": "Use it, run it, or help build it",
-    "lead": "OpenPlanner is built in the open by a small team. You are welcome at every step: look around, put it on a server, or take a piece of the work.",
+    "title": "Start today, or help build it",
+    "lead": "OpenPlanner is built in the open by a small team. Look around, put it on a server, or take a piece of the work: you are welcome at every step.",
     "paths": [
       {
         "key": "try",
         "title": "Try it",
-        "text": "Five minutes on your laptop with docker compose. A demo group, a mailbox that catches every email, and a test user for every role.",
+        "text": "Book a call on the demo page above, or have your IT team run the full demo on a laptop in five minutes: a demo team, a mailbox that catches every email, and a test user for every role.",
         "links": [
+          {
+            "label": "Try the booking page",
+            "href": "#demo"
+          },
           {
             "label": "Quick start",
             "href": "https://github.com/3Corners-Labs/OpenPlanner#quick-start-demo"
