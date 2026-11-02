@@ -424,6 +424,12 @@ class Settings(BaseSettings):
     tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
     tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
     tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # Class B (ADR 0091 point 3): uvicorn serves HTTPS to an own reverse proxy on another machine
+    # when both files are set (docker-compose.yml passes them on); both or neither. The
+    # forwarded addresses are read by uvicorn itself and only inspected here, for System status.
+    web_tls_cert_file: Path | None = None
+    web_tls_key_file: Path | None = None
+    forwarded_allow_ips: str | None = None
     # ADR 0072: the certificate source of the bundled proxy, managed in the portal.
     tls_certificate_source: Literal["acme", "own"] = "acme"
     tls_proxy_bundled: bool = False
@@ -452,6 +458,8 @@ class Settings(BaseSettings):
             return "STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT"
         if self.planner_rebook_reminder_days >= self.planner_rebook_days:
             return "PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS"
+        if (self.web_tls_cert_file is None) != (self.web_tls_key_file is None):
+            return "WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE must be set together"
         if (
             self.smtp_host
             and self.smtp_username
@@ -575,6 +583,11 @@ class Settings(BaseSettings):
     def event_envelope(self) -> Envelope:
         """Release and installation name for every log line and event record (ADR 0040)."""
         return Envelope(self.app_version, self.installation_name)
+
+    @property
+    def web_tls_enabled(self) -> bool:
+        """Whether web serves HTTPS to the proxy (``WEB_TLS_CERT_FILE`` and ``..._KEY_FILE``)."""
+        return self.web_tls_cert_file is not None and self.web_tls_key_file is not None
 
     @property
     def smtp_fallback_plaintext(self) -> bool:
