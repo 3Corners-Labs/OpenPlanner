@@ -27,6 +27,21 @@ test('book through the widget with the keyboard only', async ({ page }, info) =>
   await expect(active).not.toHaveAttribute('data-day', day ?? '');
   await page.keyboard.press('ArrowLeft');
   await expect(grid.locator(`[data-day="${day}"]`)).toBeFocused();
+  // The first free day may be today, with only its last times left, and the three browsers each
+  // take a different time from the end (below): a late run would find fewer times than browsers.
+  // So go on to the next free day, which has all its times (after the month's last day: PageDown
+  // loads the next month, whose first tab stop is a free day).
+  const tabStop = grid.locator('.calendar__day[tabindex="0"]');
+  for (let step = 0; step < 31; step++) {
+    const before = await tabStop.getAttribute('data-day');
+    await page.keyboard.press('ArrowRight');
+    if ((await tabStop.getAttribute('data-day')) === before) {
+      await page.keyboard.press('PageDown');
+      await expect(tabStop).not.toHaveAttribute('data-day', before ?? '');
+      break;
+    }
+    if (await tabStop.evaluate((el) => el.classList.contains('calendar__day--free'))) break;
+  }
   // Enter shows that day's times; focus moves to their heading and the count is announced.
   await page.keyboard.press('Enter');
   await expect(widget.locator('#times-heading')).toBeFocused();
