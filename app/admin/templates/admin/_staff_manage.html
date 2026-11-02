@@ -2,6 +2,11 @@
 <section class="card" aria-labelledby="manage-heading">
   <h2 id="manage-heading">{{ _("admin.staff.manage.title") }}</h2>
   <p class="muted">{{ _("admin.staff.manage.intro") }}</p>
+  <dl class="facts">
+    <div><dt>{{ _("admin.staff.manage.user_name") }}</dt><dd><code>{{ manage.username }}</code></dd></div>
+    <div><dt>{{ _("admin.staff.invite.email") }}</dt><dd>{{ manage.email }}</dd></div>
+  </dl>
+  <p class="hint">{{ _("admin.staff.manage.user_name.hint") }}</p>
   {% if not manage.enabled %}<p><span class="chip chip--warning">{{ _("admin.staff.manage.disabled") }}</span></p>{% endif %}
   <div class="table-scroll">
   <table class="data-table">
