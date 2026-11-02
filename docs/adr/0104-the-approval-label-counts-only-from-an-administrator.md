@@ -76,6 +76,7 @@ listing to catch up, short enough that a real absence fails within the job's tim
 |---|---|---|---|
 | 0 | ADR proposed and accepted | #414 | in PR |
 | 1 | `approval()` and `--events`, `--admins`, `--withdrawn`, `--pull N=FILE` in `scripts/decision_gate.py`; the workflow reads events and administrators and takes the label off after a foreign push; tests; ADR 0078 and 0088 tables, CONTRIBUTING.md, threat model | #414 | in PR |
+| 2 | fix: the job checks out `github.sha`, the commit the workflow comes from, also on `pull_request_target`; a pull request opened before #414 still had the old script at its base and was refused with "unrecognized arguments" (#374) | #NNN | in PR |
 
 ## Consequences
 

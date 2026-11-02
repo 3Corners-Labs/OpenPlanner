@@ -86,8 +86,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The pull request: the base's gate. The queue: the group's head, like the workflow.
-          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.head_sha }}
+          # The commit the workflow itself comes from, so workflow and script always match:
+          # on `pull_request_target` the base branch's current head (never the pull request's
+          # older base commit, whose script may predate the workflow), in the queue the group's
+          # head (ADR 0104 point 7).
+          ref: ${{ github.sha }}
           fetch-depth: 0
       - name: fetch the judged commits (objects only, nothing is checked out or run)
         run: git fetch --no-tags origin "$HEAD"
