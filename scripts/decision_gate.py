@@ -10,9 +10,12 @@ outside its *Build status* table and its Status line (a new or removed ADR alway
 ``CLAUDE.md``, ``SECURITY.md``, the authorisation matrix, anything under ``.github/`` or
 ``.semgrep/``, the ``Makefile`` (what CI runs), the gates themselves (this script and the
 release audit scripts), or when its title starts with ``chore(release):``. A decision passes
-the check only with the label ``po:approved`` on the pull request; build work passes without
-it. The output names every file that made the pull request a decision, so the product owner
-knows what they are approving.
+the check only with the label ``po:approved``, set last by an administrator of the repository
+(ADR 0104); build work passes without it. The workflow hands over the pull request's label
+events and the administrators as files (``--events``, ``--admins``), and ``--withdrawn`` when
+a push by someone else has just taken the label off; this script makes no network call. The
+output names every file that made the pull request a decision, and who set the label, so the
+product owner knows what they are approving.
 
 The list of decision paths is fixed on purpose and lives here: changing it is itself a
 decision (ADR 0078, *Settings*).
@@ -20,20 +23,25 @@ decision (ADR 0078, *Settings*).
 In the merge queue every first-parent commit between the group's base (``main``) and its head
 is one pull request's squash commit, whose subject ends in ``(#N)``, or its merge commit,
 whose subject starts with ``Merge pull request #N``. ``--list-pull-requests`` prints those
-numbers so the workflow can ask the API for each pull request's labels; ``--merge-group`` then
-judges each commit against its parent with the labels given as ``--pull N=label,label``. A
-commit that names no pull request, or a pull request whose labels were not given, fails the
-check: the gate fails closed.
+numbers so the workflow can ask the API for each pull request's label events;
+``--merge-group`` then judges each commit against its parent with the events file given as
+``--pull N=FILE``. A commit that names no pull request, a pull request whose events were not
+given, or a file that cannot be read fails the check: the gate fails closed.
 """
 
 import argparse
+import functools
+import json
 import re
 import subprocess  # noqa: S404 - runs git with fixed arguments only
 import sys
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 
 LABEL = "po:approved"
-"""The product owner's approval; only a collaborator can set a label."""
+"""The product owner's approval; any collaborator can set it, only an administrator's counts."""
+
+Approval = tuple[bool, str]
+"""Whether a pull request is approved, and the reason in words for the check's output."""
 
 DECISION_FILES = frozenset(
     {
@@ -131,10 +139,72 @@ def pull_request_number(subject: str) -> int | None:
     return int(found.group(1) or found.group(2))
 
 
-def parse_pull(argument: str) -> tuple[int, set[str]]:
-    """Parse one ``--pull N=label,label`` argument into the number and its labels."""
-    number, _, labels = argument.partition("=")
-    return int(number), {label.strip() for label in labels.split(",") if label.strip()}
+def parse_pull(argument: str) -> tuple[int, str]:
+    """Parse one ``--pull N=FILE`` argument into the number and its events file."""
+    number, _, path = argument.partition("=")
+    return int(number), path
+
+
+def approval(events: Iterable[Mapping[str, str]], admins: set[str]) -> Approval:
+    """Return whether the label stands as the product owner's approval (ADR 0104).
+
+    Args:
+        events: The pull request's label events, oldest first, each with ``event``
+            (``labeled`` or ``unlabeled``), ``actor`` and ``label``.
+        admins: The logins of the repository's administrators.
+
+    Returns:
+        ``True`` only when the latest event for the label is ``labeled`` by an administrator,
+        and the reason either way.
+    """
+    last = None
+    for event in events:
+        if event.get("label") == LABEL and event.get("event") in {"labeled", "unlabeled"}:
+            last = event
+    if last is None or last["event"] == "unlabeled":
+        return False, f"the label {LABEL} is missing"
+    actor = last.get("actor", "")
+    if actor not in admins:
+        return False, f"the label {LABEL} was set by {actor}, who is not an administrator"
+    return True, f"the label {LABEL} was set by {actor}, an administrator"
+
+
+def read_events(path: str) -> list[dict[str, str]]:
+    """Read label events written by the workflow, one JSON object per line.
+
+    Raises:
+        OSError: The file cannot be read.
+        ValueError: A line is not a JSON object.
+    """
+    events = []
+    with open(path, encoding="utf-8") as lines:
+        for line in lines:
+            if line.strip():
+                event = json.loads(line)
+                if not isinstance(event, dict):
+                    raise ValueError("an event is not a JSON object")
+                events.append(event)
+    return events
+
+
+def read_admins(path: str) -> set[str]:
+    """Read the administrators' logins, one per line.
+
+    Raises:
+        OSError: The file cannot be read.
+    """
+    with open(path, encoding="utf-8") as lines:
+        return {line.strip() for line in lines if line.strip()}
+
+
+def _approval_from(events_path: str, admins_path: str | None) -> Approval:
+    """Return the approval from the two files; no approval when either cannot be read."""
+    if admins_path is None:
+        return False, "the administrators were not given"
+    try:
+        return approval(read_events(events_path), read_admins(admins_path))
+    except (OSError, ValueError) as error:
+        return False, f"the label events or the administrators cannot be read ({error})"
 
 
 def _git(*args: str) -> str:
@@ -155,8 +225,8 @@ def _show(revision: str, path: str) -> str | None:
         return None
 
 
-def _judge(base: str, head: str, title: str, labels: set[str]) -> int:
-    """Print what makes one change a decision and return 1 when it lacks the label."""
+def _judge(base: str, head: str, title: str, approved: Callable[[], Approval]) -> int:
+    """Print what makes one change a decision and return 1 when it lacks the approval."""
     paths = _git("diff", "--name-only", base, head).split()
     found = reasons(paths, title, lambda path: (_show(base, path), _show(head, path)))
     if not found:
@@ -165,10 +235,11 @@ def _judge(base: str, head: str, title: str, labels: set[str]) -> int:
     print("decision (ADR 0078):")
     for reason in found:
         print(f"  - {reason}")
-    if LABEL in labels:
-        print(f"approved: the label {LABEL} is set")
+    ok, why = approved()
+    if ok:
+        print(f"approved: {why}")
         return 0
-    print(f"::error::a decision waits for the product owner: the label {LABEL} is missing")
+    print(f"::error::a decision waits for the product owner: {why}")
     return 1
 
 
@@ -199,7 +270,7 @@ def _list_pull_requests(base: str, head: str) -> int:
     return status
 
 
-def _judge_merge_group(base: str, head: str, pulls: dict[int, set[str]]) -> int:
+def _judge_merge_group(base: str, head: str, pulls: dict[int, str], admins: str | None) -> int:
     """Judge every pull request in the merge group by its own commit; 1 when one fails."""
     status = 0
     for commit, subject, number in _queue_commits(base, head):
@@ -209,10 +280,11 @@ def _judge_merge_group(base: str, head: str, pulls: dict[int, set[str]]) -> int:
             status = 1
             continue
         if number not in pulls:
-            print(f"::error::the labels of pull request #{number} were not given")
+            print(f"::error::the events of pull request #{number} were not given")
             status = 1
             continue
-        status = max(status, _judge(f"{commit}^", commit, subject, pulls[number]))
+        approved = functools.partial(_approval_from, pulls[number], admins)
+        status = max(status, _judge(f"{commit}^", commit, subject, approved))
     return status
 
 
@@ -222,7 +294,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--base", required=True, help="the base commit of the pull request")
     parser.add_argument("--head", required=True, help="the head commit of the pull request")
     parser.add_argument("--title", default="", help="the pull request's title")
-    parser.add_argument("--labels", default="", help="the pull request's labels, comma-separated")
+    parser.add_argument(
+        "--events", default="", help="the pull request's label events, one JSON object per line"
+    )
+    parser.add_argument("--admins", help="the repository's administrators, one login per line")
+    parser.add_argument(
+        "--withdrawn",
+        action="store_true",
+        help="a push by someone else has just taken the label off: no approval in this run",
+    )
     parser.add_argument(
         "--list-pull-requests",
         action="store_true",
@@ -237,19 +317,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--pull",
         action="append",
         default=[],
-        metavar="N=LABEL,LABEL",
-        help="a pull request in the merge group with its labels (with --merge-group)",
+        metavar="N=FILE",
+        help="a pull request in the merge group with its label events (with --merge-group)",
     )
     args = parser.parse_args(argv)
 
     if args.list_pull_requests:
         return _list_pull_requests(args.base, args.head)
     if args.merge_group:
-        return _judge_merge_group(args.base, args.head, dict(map(parse_pull, args.pull)))
+        pulls = dict(map(parse_pull, args.pull))
+        return _judge_merge_group(args.base, args.head, pulls, args.admins)
+
+    def approved() -> Approval:
+        if args.withdrawn:
+            return False, f"the approval was withdrawn: someone else pushed after the {LABEL} label"
+        return _approval_from(args.events, args.admins)
 
     base = _git("merge-base", args.base, args.head).strip()
-    labels = {label.strip() for label in args.labels.split(",")}
-    return _judge(base, args.head, args.title, labels)
+    return _judge(base, args.head, args.title, approved)
 
 
 if __name__ == "__main__":

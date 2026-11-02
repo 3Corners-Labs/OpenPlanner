@@ -6,15 +6,25 @@ name: decision gate
 # the base, not from the pull request: `pull_request_target` takes the workflow and the checkout
 # from the base, and the pull request's commits are only fetched as git objects to diff them.
 # Nothing from the pull request is executed here, and the job holds no secret beyond the
-# read-only `GITHUB_TOKEN` it needs to read labels.
+# `GITHUB_TOKEN` it needs to read label events and take the label off (ADR 0104).
 #
 # ADR 0088: the gate runs again in the merge queue. A skipped required check counts as passed,
 # and the check on the pull request can be stale (the base branch changed, or the pull request
 # was stacked on another branch that was closed) by the time auto-merge queues it; on
-# 2026-10-31 an ADR reached `main` that way (#266). On `merge_group` the job checks out the
-# group's base (`main`), judges every pull request in the group by its own commit on the queue
-# branch, and reads each pull request's labels through the API. A commit that names no pull
-# request, or a pull request whose labels cannot be read, fails the check.
+# 2026-10-31 an ADR reached `main` that way (#266). On `merge_group` the job judges every pull
+# request in the group by its own commit on the queue branch and reads each pull request's
+# labels through the API. A commit that names no pull request, or a pull request whose labels
+# cannot be read, fails the check. In the queue the workflow file comes from the group's head,
+# so the script does too (ADR 0104 point 7): a workflow and a script from different commits
+# break as soon as the script's arguments change. A pull request that changes the gate was
+# already judged on the pull request by `main`'s copy of both.
+#
+# ADR 0104: the label counts only when an administrator of the repository set it last. The job
+# hands the gate the pull request's label events and the administrators as files, never the
+# bare label list. A push by anyone who is not an administrator takes the label off, and that
+# run counts no approval; a push by an administrator (Claude Code works under the product
+# owner's account) keeps it. The withdrawal is its own job without a concurrency group: a later
+# event on the pull request (an edited title) cancels a running gate, never a withdrawal.
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, edited, labeled, unlabeled]
@@ -24,41 +34,128 @@ permissions:
   contents: read
   pull-requests: read
 
-concurrency:
-  group: decision-gate-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  gate:
-    name: decision gate
+  withdraw:
+    name: a push by someone who is not an administrator takes the approval back
+    if: >-
+      github.event_name == 'pull_request_target'
+      && github.event.action == 'synchronize'
+      && contains(github.event.pull_request.labels.*.name, 'po:approved')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # `pull-requests: write` only takes the label off; this job checks out and runs nothing.
+    permissions:
+      pull-requests: write
+    outputs:
+      withdrawn: ${{ steps.withdraw.outputs.withdrawn }}
+    steps:
+      - id: withdraw
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SENDER: ${{ github.event.sender.login }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # The pusher's own permission; GITHUB_TOKEN gets an empty collaborator list (#442).
+          # An unreadable permission counts as none: the label comes off.
+          permission=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${SENDER}/permission" \
+            --jq .permission || true)
+          if [ "$permission" = admin ]; then
+            echo "pushed by an administrator: the approval stands"
+            exit 0
+          fi
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/issues/${NUMBER}/labels/po%3Aapproved" > /dev/null
+          echo "withdrawn=--withdrawn" >> "$GITHUB_OUTPUT"
+          echo "::warning::pushed by ${SENDER} after the approval: the label po:approved is off, the product owner approves again"
+
+  gate:
+    name: decision gate
+    needs: withdraw
+    # Runs also when the withdrawal was skipped (most events) or failed; a skipped gate would
+    # count as a passed required check.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    concurrency:
+      group: decision-gate-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     env:
       BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
       HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          # The pull request: the base's gate. The queue: the group's head, like the workflow.
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.head_sha }}
           fetch-depth: 0
       - name: fetch the judged commits (objects only, nothing is checked out or run)
         run: git fetch --no-tags origin "$HEAD"
+      # A failed read leaves an empty file: build work still passes, a decision counts no
+      # approval. The gate stays closed for decisions without blocking every pull request.
+      - name: helpers for the label events and the administrators (ADR 0104)
+        run: |
+          set -uo pipefail
+          cat > "$RUNNER_TEMP/label-events.sh" <<'SCRIPT'
+          # Writes the label events of pull request $1 to $2, one JSON object per line; empty
+          # with a warning when the API cannot be read.
+          if ! gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/$1/events" \
+            --jq '.[] | select(.event == "labeled" or .event == "unlabeled")
+                  | {event, actor: .actor.login, label: .label.name} | tojson' > "$2"; then
+            echo "::warning::the label events of #$1 cannot be read; it counts as not approved"
+            : > "$2"
+          fi
+          SCRIPT
+          cat > "$RUNNER_TEMP/admins.sh" <<'SCRIPT'
+          # Writes to $1 every user who set or removed po:approved in the events files that
+          # follow and is an administrator of the repository, one login per line. GITHUB_TOKEN
+          # gets an empty collaborator list (#442), so each labeller's own permission is read;
+          # one that cannot be read counts as no administrator.
+          out=$1; shift
+          : > "$out"
+          jq -r 'select(.label == "po:approved") | .actor' "$@" | sort -u | while read -r login; do
+            permission=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${login}/permission" \
+              --jq .permission 2>/dev/null || true)
+            [ "$permission" = admin ] && echo "$login" >> "$out"
+          done
+          true
+          SCRIPT
       - name: build work or decision? (the pull request)
         if: github.event_name == 'pull_request_target'
         env:
           TITLE: ${{ github.event.pull_request.title }}
-          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --title "$TITLE" --labels "$LABELS"
+          NUMBER: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
+          ADDED: ${{ github.event.label.name }}
+          # A failed withdrawal counts as one: the gate stays closed for a decision.
+          WITHDRAWN: ${{ needs.withdraw.result == 'failure' && '--withdrawn' || needs.withdraw.outputs.withdrawn }}
+        run: |
+          set -euo pipefail
+          events="$RUNNER_TEMP/events"
+          # A label set right before this run may not be listed yet: read again, at most five
+          # times, while the newest po:approved event is not the `labeled` that started the run.
+          for attempt in 1 2 3 4 5; do
+            bash "$RUNNER_TEMP/label-events.sh" "$NUMBER" "$events"
+            [ "$ACTION" = labeled ] && [ "$ADDED" = po:approved ] || break
+            last=$(jq -rs '[.[] | select(.label == "po:approved")] | last | .event // ""' "$events")
+            [ "$last" = labeled ] && break
+            echo "attempt ${attempt}: the new label is not listed yet"
+            sleep 3
+          done
+          bash "$RUNNER_TEMP/admins.sh" "$RUNNER_TEMP/admins" "$events"
+          # shellcheck disable=SC2086 # WITHDRAWN is empty or one flag
+          python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --title "$TITLE" \
+            --admins "$RUNNER_TEMP/admins" --events "$events" $WITHDRAWN
       - name: build work or decision? (every pull request in the merge group)
         if: github.event_name == 'merge_group'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           numbers=$(python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --list-pull-requests)
           pulls=()
           for number in $numbers; do
-            labels=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${number}" --jq '[.labels[].name] | join(",")')
-            pulls+=(--pull "${number}=${labels}")
+            bash "$RUNNER_TEMP/label-events.sh" "$number" "$RUNNER_TEMP/events-${number}"
+            pulls+=(--pull "${number}=$RUNNER_TEMP/events-${number}")
           done
-          python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --merge-group "${pulls[@]}"
+          bash "$RUNNER_TEMP/admins.sh" "$RUNNER_TEMP/admins" "$RUNNER_TEMP"/events-*
+          python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --merge-group \
+            --admins "$RUNNER_TEMP/admins" "${pulls[@]}"
