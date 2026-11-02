@@ -25,7 +25,7 @@ from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
 from tests.support.domain import NOW
-from tests.support.participant import confirm_newest
+from tests.support.participant import confirm_newest, open_link
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
@@ -508,7 +508,7 @@ async def test_the_token_of_an_appointment_is_not_a_way_to_leave_it_as_a_call(si
     assert page.headers["location"] == f"/b/{token}"
     assert post.status_code == 303
     assert post.headers["location"] == f"/b/{token}"
-    assert "Geannuleerd" not in (await site.client.get(f"/b/{token}")).text
+    assert "Geannuleerd" not in (await site.client.get(await open_link(site.client, token))).text
 
 
 async def test_leaving_is_refused_across_sites(site: Site) -> None:

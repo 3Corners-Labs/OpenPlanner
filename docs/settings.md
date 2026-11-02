@@ -157,6 +157,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `MEETING_STATUS_REFRESH_SECONDS` | int | `30` | 10–300 | `settings.platform.manage` | Seconds a meeting status on the agenda may be old before the video provider is asked (webhooks come first), and between two refreshes of the agenda's status columns (ADR 0010). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
+| `PARTICIPANT_LINK_SESSION_HOURS` | int | `24` | 20–168 | `settings.platform.manage` | Hours after its last use that a participant's browser may still use a booking it opened from the emailed link (ADR 0093); the email link always works again. |
 
 ## D. Organisation (portal, organisation settings; lockable by env)
 

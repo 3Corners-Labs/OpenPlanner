@@ -67,6 +67,7 @@ from app.adapters.db.models import (
     OrganisationOriginRow,
     OrganisationRow,
     OrganisationTextRow,
+    ParticipantLinkBookingRow,
     ReminderRuleRow,
     ScheduleOverrideRow,
     ScheduleRuleRow,
@@ -76,6 +77,7 @@ from app.adapters.db.models import (
     WebhookEventRow,
 )
 from app.adapters.db.own_certificate import OwnCertificateQueries
+from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
@@ -139,6 +141,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.images import PageImage
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
+from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
 from app.domain.scheduling import (
     DispatchKind,
@@ -347,6 +350,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         token_hash=row.management_token_hash,
         created_at=row.created_at,
         token_salt=row.management_token_salt,
+        public_ref=row.public_ref,
         consents=frozenset(ChannelKind(c) for c in row.consents.split(",") if c),
         cancelled_at=row.cancelled_at,
         rescheduled_from_id=row.rescheduled_from_id,
@@ -422,6 +426,7 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 
 class SqlTransaction(
     AdminSessionQueries,
+    ParticipantLinkQueries,
     ApiClientQueries,
     IdentityProviderQueries,
     LogDestinationQueries,
@@ -1682,6 +1687,7 @@ class SqlTransaction(
             consents=",".join(sorted(booking.consents)),
             management_token_hash=booking.token_hash,
             management_token_salt=booking.token_salt,
+            public_ref=booking.public_ref or new_public_ref(),
             created_at=booking.created_at,
             cancelled_at=booking.cancelled_at,
             rescheduled_from_id=booking.rescheduled_from_id,
@@ -1720,6 +1726,22 @@ class SqlTransaction(
                 pii_purged_at=now,
             )
         )
+        # ADR 0093 point 5: a purged booking leaves every participant link session.
+        await self._session.execute(
+            delete(ParticipantLinkBookingRow).where(
+                ParticipantLinkBookingRow.booking_id == booking_id
+            )
+        )
+
+    async def get_booking_by_public_ref(self, public_ref: str) -> Booking | None:
+        """Return the booking named by ``public_ref`` (ADR 0093)."""
+        result = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(BookingRow.public_ref == public_ref)
+        )
+        found = result.one_or_none()
+        return _booking(*found) if found else None
 
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         """Return the booking whose management token hashes to ``token_hash``."""

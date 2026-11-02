@@ -16,6 +16,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.security_log import (
     DATABASE_ERROR,
     DATABASE_FAILED,
+    LINK_REQUIRED,
     RATE_LIMITED,
     REQUEST_REJECTED,
     TOKEN_REJECTED,
@@ -34,6 +35,9 @@ MACHINE_PREFIXES = ("/api/", "/webhooks/")
 """Paths whose callers are programs: they keep FastAPI's JSON validation answer, which the
 OpenAPI spec documents (``HTTPValidationError``)."""
 """Path prefix of the participant's management link; a 404 under it matches no link."""
+
+_LINK_MISSES = {ErrorCode.BOOKING_NOT_FOUND, ErrorCode.LINK_REQUIRED}
+"""Errors under a management link that count against the budget for links that match nothing."""
 
 _NOT_FOUND = {
     ErrorCode.GROUP_NOT_FOUND,
@@ -77,12 +81,13 @@ async def domain_error_page(request: Request, exc: Exception) -> Response:
     """Render a domain error that a route did not handle itself."""
     if not isinstance(exc, DomainError):  # pragma: no cover - registered for DomainError only
         raise TypeError("expected a DomainError")
-    if exc.code is ErrorCode.BOOKING_NOT_FOUND and request.url.path.startswith(
-        MANAGEMENT_LINK_PREFIX
-    ):
+    if exc.code in _LINK_MISSES and request.url.path.startswith(MANAGEMENT_LINK_PREFIX):
         if count_unknown_link(request):
             return await _too_many_unknown_links(request)
-        await report(request, TOKEN_REJECTED, UNKNOWN_MANAGEMENT_LINK)
+        reason = (
+            UNKNOWN_MANAGEMENT_LINK if exc.code is ErrorCode.BOOKING_NOT_FOUND else LINK_REQUIRED
+        )
+        await report(request, TOKEN_REJECTED, reason)
     if exc.code in _NOT_FOUND:
         return _page(request, 404, "error.not_found.title", "error.not_found.text")
     return _page(request, status_for(exc), "error.title", ERROR_KEYS[exc.code])

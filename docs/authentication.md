@@ -102,17 +102,23 @@ HMAC-SHA256 of a 32-byte per-booking salt under `MANAGEMENT_TOKEN_KEY`; the data
 the salt and `sha256(token)`, never the token, and comparison is constant time. The link is a
 bearer credential: whoever holds it can confirm, cancel, move, test the call and join that
 one booking. Confirming by email (ADR 0056) is a second step on the link, a button that
-POSTs, not a link that acts. There is no account, password or cookie in today's flow.
+POSTs, not a link that acts. There is no account or password. Since ADR 0093 the link is
+exchanged for a cookie (below).
 
-**ADR 0093 (accepted, not built).** `GET /b/{token}` is exchanged once for the cookie
+**ADR 0093 (steps 1 and 2 built).** `GET /b/{token}` is exchanged once for the cookie
 `__Host-op_link` (opaque random value, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, no
-`Domain`; the database keeps its SHA-256) and redirects with `303` to `/b/m/{public_ref}`,
-so the token stays out of browser history and the address bar. The `public_ref` names a
+`Domain`; over plain http in development `op_link` with `Path=/b`; the database keeps the
+SHA-256 of the value) and redirects with `303` to `/b/m/{public_ref}`,
+so the token stays out of browser history and the address bar. The session lives
+`participant_link_session_hours` (class C, 20-168, default 24) after its last use and holds at
+most 20 bookings; the rule for the cookie's name and attributes is shared with, and separate
+from, the admin cookie (`app/web/cookies.py`). The `public_ref` names a
 booking and authorises nothing; the cookie's session must hold the booking. The cookie proves
 possession of the link, not an identity. Old `/b/{token}/…` links keep working through the
-exchange. Until the build lands, the token is in every participant URL; what limits that is
-in ADR 0093 (no access log, route templates in traces, `Referrer-Policy: same-origin`,
-`no-store` pages).
+exchange. The confirm, cancel and move pages are already on `/b/m/{ref}`; until step 3 the
+trial, join and waiting pages still carry the token in their URL, and what limits that is in
+ADR 0093 (no access log, route templates in traces, `Referrer-Policy: same-origin`, `no-store`
+pages).
 
 **How strong.** 256 bits of entropy behind an HMAC; guessing is not feasible and is also
 rate limited (unknown links draw on one bucket per address, `unknown_links`) and recorded as

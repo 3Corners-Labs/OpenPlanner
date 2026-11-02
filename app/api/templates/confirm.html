@@ -8,10 +8,10 @@
   <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
 </dl>
 <p>{{ _("confirm.text", deadline=confirm_by) }}</p>
-<form method="post" action="/b/{{ token }}/confirm">
+<form method="post" action="/b/m/{{ ref }}/confirm">
   <button type="submit" class="button button--large">{{ _("confirm.submit") }}</button>
 </form>
 {% if cancellable %}
-<p><a href="/b/{{ token }}/cancel">{{ _("confirm.not_me") }}</a></p>
+<p><a href="/b/m/{{ ref }}/cancel">{{ _("confirm.not_me") }}</a></p>
 {% endif %}
 {% endblock %}
