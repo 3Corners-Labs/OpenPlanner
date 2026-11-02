@@ -27,6 +27,17 @@
   {% if rotation.records_done %}<p>{{ _("admin.settings.keys.records_done") }}</p>{% elif rotation.records is not none %}<p>{{ _("admin.settings.keys.records_todo") }}</p>{% endif %}
   {% if rotation.bookings_done %}<p>{{ _("admin.settings.keys.bookings_done") }}</p>{% elif rotation.bookings is not none %}<p>{{ _("admin.settings.keys.bookings_todo") }}</p>{% endif %}
   {% endif %}
+  <h3 id="backups-heading">{{ _("admin.settings.backups.title") }}</h3>
+  <p>{{ _("admin.settings.backups.intro") }}</p>
+  {% if backups.warning %}<p role="alert"><span class="chip chip--warning">{{ _("admin.settings.backups.chip") }}</span> {{ backups.warning }}</p>{% endif %}
+  {% if backups.count %}
+  <dl class="facts" aria-labelledby="backups-heading">
+    <div><dt>{{ _("admin.settings.backups.count") }}</dt><dd>{{ backups.count }}</dd></div>
+    <div><dt>{{ _("admin.settings.backups.oldest") }}</dt><dd>{{ backups.oldest }}</dd></div>
+  </dl>
+  {% else %}
+  <p>{{ _("admin.settings.backups.none") }}</p>
+  {% endif %}
   <h3 id="address-heading">{{ _("admin.settings.address.title") }}</h3>
   <p>{{ _("admin.settings.address.intro") }}</p>
   {% if address.hop_warning %}<p><span class="chip chip--warning">{{ _("admin.overview.widget.status.proxy") }}</span> {{ address.hop_warning }}</p>{% endif %}
