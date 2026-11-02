@@ -944,6 +944,9 @@ Work Items is in beta; the organisation must be enabled by Cisco.
    an agent may see it for a moment. **To verify on the test tenant:** that the flow can read
    `kind` from the work item data; if it cannot, route the probe on a flow setting instead
    (the Case value stays `probe`).
+   **Sample flow.** `python -m app.cli wxcc-sample-flow --group <slug>` prints a flow with all of
+   this, ready to import in Flow Designer (Flows → Import); how, what it does (with diagram) and
+   what is still to confirm live is in [docs/wxcc-sample-flow.md](wxcc-sample-flow.md).
 4. **Queues** with channel type Work Item, the **multimedia profile** capacity for work items,
    and a **RONA** timeout.
 5. Set `WXCC_API_BASE_URL` to your region's API host.
