@@ -1,6 +1,6 @@
 # 0105. Release tags come only from the release app
 
-Status: accepted (2026-11-02, `po:approved` on #NNN), requested by the product owner. Amends
+Status: accepted (2026-11-02, `po:approved` on #422), requested by the product owner. Amends
 ADR 0079 (point 7: the release identity is a GitHub App of the organisation, not a personal
 token) and ADR 0059 (the release-candidate tag is pushed by that app). Partly built; see
 *Build status*.
@@ -61,9 +61,9 @@ app's permissions. Widening any of them is a decision, not a tuning knob.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; environment `release` created with branch policy `main` (2026-11-02) | #NNN | in PR |
+| 0 | ADR proposed; environment `release` created with branch policy `main` (2026-11-02) | #422 | in PR |
 | 1 | The product owner creates the release app, installs it on this repository and stores its client ID and key in the environment `release` | GitHub setting | planned |
-| 2 | `main.yml` (candidate tag through the app, tag trigger without `-rc.`) and `release.yml` (app token in `release-pr` and `tag`, `RELEASE_TOKEN` removed); tests; runbook, threat model, ADR 0079 table | #NNN | in PR |
+| 2 | `main.yml` (candidate tag through the app, tag trigger without `-rc.`) and `release.yml` (app token in `release-pr` and `tag`, `RELEASE_TOKEN` removed); tests; runbook, threat model, ADR 0079 table | #422 | in PR |
 | 3 | The tag ruleset restricts creation, with the release app and the administrator role as bypass; checked on the first candidate after the merge | GitHub setting | planned |
 
 ## Consequences

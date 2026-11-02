@@ -3,7 +3,9 @@ name: main
 on:
   push:
     branches: [main]
-    tags: ["v*.*.*"]
+    # ADR 0105: the release app pushes the candidate tag, and an app's push starts workflows;
+    # a candidate is built in the run that tags it, so only release tags start this workflow.
+    tags: ["v*.*.*", "!v*.*.*-rc.*"]
 
 permissions:
   contents: read
@@ -60,6 +62,8 @@ jobs:
     name: release candidate from main
     if: github.ref_type == 'branch'
     needs: [zap-baseline]
+    # ADR 0105: the release app's key lives in this environment, which only `main` may use.
+    environment: release
     concurrency:
       group: release-candidate
       cancel-in-progress: false
@@ -109,17 +113,28 @@ jobs:
             type=raw,value=${{ steps.candidate.outputs.version }}
             type=sha,format=long
             type=ref,event=branch
-      # The tag comes after the images: a failed build leaves no tag and no pre-release. A tag
-      # pushed with GITHUB_TOKEN starts no workflow, so this never triggers the release job.
+      # ADR 0105: only the release app may create a `v*` tag (tag ruleset); its token lives for
+      # this job only. The candidate's tag does not start main.yml again (see `on.push.tags`).
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      # The tag comes after the images: a failed build leaves no tag and no pre-release.
       - name: tag and pre-release
         env:
           GH_TOKEN: ${{ github.token }}
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
           VERSION: ${{ steps.candidate.outputs.version }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          set -euo pipefail
+          GH_TOKEN="$APP_TOKEN" scripts/release-git-identity.sh
           git tag -a "v$VERSION" -m "v$VERSION: release candidate of main @ $GITHUB_SHA ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
-          git push origin "refs/tags/v$VERSION"
+          # The checkout's own header carries GITHUB_TOKEN; empty it so the app's token is used.
+          git -c "http.https://github.com/.extraheader=" \
+            push "https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/v$VERSION"
           gh release create "v$VERSION" sbom.cdx.json sbom-proxy.cdx.json --prerelease --verify-tag \
             --generate-notes --title "v$VERSION (release candidate)"
 
