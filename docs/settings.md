@@ -168,6 +168,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_CHECK_MINUTES` | int | `60` | 5–1440 | `settings.platform.manage` | Minutes between two release checks by the worker (ADR 0067); "Check now" on the updates page asks for one ahead of time. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the participant's waiting page (ADR 0072). |
+| `OVERVIEW_LIVE_ENABLED` | bool | `true` | — | `settings.platform.manage` | Lets the overview's widgets refresh themselves and pop up new alerts; off, the page shows what it loaded with and a Refresh link (ADR 0061 §3, §4). |
+| `OVERVIEW_POLL_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of a live widget on the overview (ADR 0061 §4). |
 | `MEETING_STATUS_REFRESH_SECONDS` | int | `30` | 10–300 | `settings.platform.manage` | Seconds a meeting status on the agenda may be old before the video provider is asked (webhooks come first), and between two refreshes of the agenda's status columns (ADR 0010). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
@@ -182,6 +184,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `PRODUCT_FOOTER` | bool | `true` | — | `settings.organisation.manage` | "Appointments via OpenPlanner" with the product mark at the foot of the booking pages and in the HTML part of emails (ADR 0060 §6). |
 | `STAFF_DORMANT_AFTER_DAYS` | int | `90` | 14–365 | `settings.organisation.manage` | Days without a login after which a person is marked dormant in the staff list (ADR 0046). |
 | `SHORTFALL_HORIZON_DAYS` | int | `14` | 1–60 | `settings.organisation.manage` | Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044). |
+| `QUEUE_WAIT_WARNING_MINUTES` | int | `8` | 2–60 | `settings.organisation.manage` | Longest wait in an own queue, in minutes, above which a warning alert is raised; one alert per crossing, ended when the wait is back under it (ADR 0061 OV-7). |
+| `QUEUE_WAIT_TARGET_MINUTES` | int | `5` | 1–60 | `settings.organisation.manage` | Target for the longest wait, shown in the queue widget; not above the warning threshold (ADR 0061 OV-7). |
 | `PLANNER_REBOOK_DAYS` | int | `14` | 1–30 | `settings.organisation.manage` | Days after the original start after which an unanswered request to rebook lapses. |
 | `PLANNER_REBOOK_REMINDER_DAYS` | int | `3` | 1–29 | `settings.organisation.manage` | Days before the lapse at which the one reminder to rebook goes (below the lapse). |
 | `CLOSURE_MAX_RETENTION_DAYS` | int | `90` | 30–180 | `settings.organisation.manage` | Days after the original appointment at the latest that the details of a booking on hold by a closure are deleted, also while the closure has no end (ADR 0102). It cannot be switched off. |

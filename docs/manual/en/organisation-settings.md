@@ -33,6 +33,11 @@ page* at the top jumps to a topic; one *Save* button saves all topics together.
   after the original appointment that an appointment on hold by an emergency closure keeps the
   participant's details, also while the closure has no end, and how many days before that the
   team's audit log shows the notice. The maximum cannot be switched off.
+- **Target wait** (1 to 60 minutes, default 5) and **Alert when the wait exceeds** (2 to 60
+  minutes, default 8): for groups with an own queue. The *Queue across my groups* widget on the
+  overview says whether the longest wait stays within the target; when it goes above the limit,
+  those who work the queue get one alert, which goes when the wait is back under the limit. The
+  target may not be above the limit.
 
 ## Changing a setting
 

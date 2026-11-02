@@ -399,6 +399,8 @@ def page(
             "update_banner": getattr(request.state, "update_notice", None),
             # Set by ``maintenance_routes.load_maintenance_notice`` (ADR 0038).
             "maintenance_notice": maintenance,
+            # Set by ``alerts.load_alerts`` for every admin page (ADR 0061 §7).
+            "alert_banner": getattr(request.state, "alert_banner", None),
         },
         scripts=scripts,
     )

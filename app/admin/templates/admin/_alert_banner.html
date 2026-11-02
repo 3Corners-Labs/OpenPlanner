@@ -1,0 +1,23 @@
+{#- Alert banner (ADR 0061 §7): every open outage in the admin's reach, on every admin page until it ends. Each can be closed for this streak; a new streak or a more urgent level shows it again. The level is written out, so colour is never the only signal. -#}
+{% from "admin/_icons.html" import icon %}
+<section class="alert alert-banner" aria-labelledby="alert-banner-title">
+  {{ icon("alert") }}
+  <div class="alert-banner__body">
+    <h2 class="alert-banner__title" id="alert-banner-title">{{ _("admin.alerts.banner.title", count=alert_banner|length) }}</h2>
+    <ul class="alert-banner__list" role="list">
+      {% for alert in alert_banner %}
+      <li class="alert-banner__item">
+        <p><span class="chip chip--{{ alert.tone }}">{{ alert.level_label }}</span> <strong>{{ alert.title }}</strong> {{ alert.text }} <span class="alert-banner__since">{{ alert.since }}</span></p>
+        <div class="alert-banner__actions">
+          {% if alert.href %}<a href="{{ alert.href }}">{{ _("admin.alerts.open") }}</a>{% endif %}
+          <form method="get" action="/admin/alerts/close">
+            <input type="hidden" name="token" value="{{ alert.token }}">
+            <input type="hidden" name="next" value="{{ back }}">
+            <button type="submit" class="button button--ghost button--small" aria-label="{{ _("admin.alerts.close.label", title=alert.title) }}">{{ icon("close") }}<span>{{ _("admin.alerts.close") }}</span></button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>

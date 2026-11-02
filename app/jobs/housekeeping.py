@@ -23,6 +23,7 @@ every failure is logged with its type only.
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
+from functools import partial
 from pathlib import Path
 
 import structlog
@@ -30,11 +31,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.backup import backup_directory, prune_backups
 from app.adapters.db.maintenance import checkpoint_wal, measure_storage, reclaim_free_pages
+from app.domain.alerts import open_conditions
 from app.domain.booking_rollup import RollupResult
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.retention_sweep import SweepResult
 from app.domain.storage import (
     MIB,
+    STORAGE_EVENT,
     StorageGrade,
     StorageLimits,
     StorageUsage,
@@ -130,7 +133,7 @@ class Housekeeping:
         self._clock = clock
         self._limits = limits
         self._measure = measure
-        self._watch = StorageWatch(SystemLog(uow, clock), limits)
+        self._watch = StorageWatch(SystemLog(uow, clock), limits, partial(_open_storage, uow))
         self._logged: tuple[str, datetime] | None = None
         self._reclaimed_at: datetime | None = None
 
@@ -347,6 +350,12 @@ class Housekeeping:
             return
         if pages:
             log.info("database.reclaimed", pages=pages)
+
+
+async def _open_storage(uow: UnitOfWork) -> str:
+    """Return the reason of the open storage alert, so a restarted watch continues from it."""
+    found = await open_conditions(uow, STORAGE_EVENT)
+    return found[0].reason if found else ""
 
 
 def _backup_directory(database_url: str) -> Path | None:

@@ -9351,6 +9351,141 @@ msgstr "Use only lower-case letters, digits, dots and hyphens for the user name,
 msgid "admin.form.error.staff_user_name_in_use"
 msgstr "This user name is already in use. Choose another."
 
+msgid "settings.field.overview_live_enabled.label"
+msgstr "Overview refreshes itself"
+
+msgid "settings.field.overview_poll_seconds.label"
+msgstr "Overview refresh (seconds)"
+
+msgid "settings.field.queue_wait_warning_minutes.label"
+msgstr "Alert when the wait exceeds (minutes)"
+
+msgid "settings.field.queue_wait_target_minutes.label"
+msgstr "Target wait (minutes)"
+
+msgid "admin.alerts.source.storage"
+msgstr "Storage"
+
+msgid "admin.alerts.source.certificate"
+msgstr "Certificate"
+
+msgid "admin.alerts.source.address"
+msgstr "Public address"
+
+msgid "admin.alerts.source.log_destination"
+msgstr "Log destination"
+
+msgid "admin.alerts.source.retention"
+msgstr "Retention"
+
+msgid "admin.alerts.source.integration"
+msgstr "Integration of {group}"
+
+msgid "admin.alerts.source.queue_wait"
+msgstr "Queue of {group}"
+
+msgid "admin.alerts.source.worker"
+msgstr "Worker"
+
+msgid "admin.alerts.level.info"
+msgstr "Information"
+
+msgid "admin.alerts.level.warning"
+msgstr "Warning"
+
+msgid "admin.alerts.level.outage"
+msgstr "Outage"
+
+msgid "admin.alerts.text.queue_wait"
+msgstr "Participants wait too long for a staff member: the longest wait was {minutes} minutes when this was reported."
+
+msgid "admin.alerts.text.worker"
+msgstr "The worker has given no heartbeat since {time}: messages, meetings and the deletion of data have stopped."
+
+msgid "admin.alerts.text.log_destination"
+msgstr "A log destination no longer accepts lines."
+
+msgid "admin.alerts.text.retention"
+msgstr "Not all personal data past its retention period could be deleted."
+
+msgid "admin.alerts.text.other"
+msgstr "A problem was reported ({code})."
+
+msgid "admin.alerts.since"
+msgstr "since {time}"
+
+msgid "admin.alerts.banner.title"
+msgstr "Outages that need attention now: {count}"
+
+msgid "admin.alerts.open"
+msgstr "View"
+
+msgid "admin.alerts.close"
+msgstr "Close"
+
+msgid "admin.alerts.close.label"
+msgstr "Close the alert {title}"
+
+msgid "admin.alerts.popup.new"
+msgstr "New alert:"
+
+msgid "admin.overview.widget.alerts.series"
+msgstr "Alerts"
+
+msgid "admin.overview.widget.alerts.chart_item"
+msgstr "{label}: {value}"
+
+msgid "admin.overview.widget.alerts.level"
+msgstr "Level"
+
+msgid "admin.overview.widget.alerts.filter.label"
+msgstr "Filter alerts by level"
+
+msgid "admin.overview.widget.alerts.filter.all"
+msgstr "All"
+
+msgid "admin.overview.widget.alerts.filter.warning"
+msgstr "Warnings and outages"
+
+msgid "admin.overview.widget.alerts.filter.outage"
+msgstr "Outages only"
+
+msgid "admin.overview.widget.alerts.status"
+msgstr "{count} open alerts, {outages} of them outages."
+
+msgid "admin.overview.widget.alerts.empty"
+msgstr "No open alerts."
+
+msgid "admin.overview.widget.queue.over_warning"
+msgstr "above the limit of {minutes} min"
+
+msgid "admin.overview.widget.queue.over_target"
+msgstr "above the target of {minutes} min"
+
+msgid "admin.overview.widget.queue.on_target"
+msgstr "within the target of {minutes} min"
+
+msgid "admin.overview.widget.status.storage"
+msgstr "Storage"
+
+msgid "admin.overview.widget.status.storage.ok"
+msgstr "{free}% free, database {size} MB"
+
+msgid "admin.overview.widget.status.storage.low"
+msgstr "Low on space: {free}% free, database {size} MB"
+
+msgid "admin.overview.widget.status.storage.critical"
+msgstr "Almost full: {free}% free, database {size} MB"
+
+msgid "audit.event.queue_wait"
+msgstr "Queue wait"
+
+msgid "admin.audit.reason.wait_over_warning"
+msgstr "Participants wait longer than the set limit."
+
+msgid "admin.topbar.alerts.count"
+msgstr "{label}, {count} open"
+
 msgid "settings.field.idp_domain_grace_days.label"
 msgstr "Grace for a missing domain record (days)"
 

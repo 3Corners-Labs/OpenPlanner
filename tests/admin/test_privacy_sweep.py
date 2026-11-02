@@ -30,7 +30,7 @@ from app.admin.overview_charts import CHART_SERIES, KIND_OF_VIEW
 from app.admin.routes import PUBLIC_ADMIN_PATHS
 from app.config import Settings
 from app.domain.admin import AdminService
-from app.domain.audit import AuditFilter
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, AuditFilter, Outcome, Source
 from app.domain.authorization import MATRIX, Role
 from app.domain.booking import ChangeReason, MeetingRef, TrialCall
 from app.domain.form_fields import FieldDefinition, FieldType, FormDefinition
@@ -40,6 +40,7 @@ from app.domain.scheduling import DispatchKind, ScheduleOverride, TimeWindow
 from app.domain.services import BookingService, ContactInput
 from app.domain.staff import StaffFilter
 from app.domain.staff_directory import DirectoryUser
+from app.domain.storage import FREE_SPACE_CRITICAL, STORAGE_EVENT
 from app.domain.updates import Release, ReleaseCheck, Version
 from app.web.widgets import OVERVIEW_PATH, WIDGETS
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
@@ -543,6 +544,22 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         ),
     ):
         assert not _leaks(response.text, set()), path
+
+    # ADR 0061 §7: the alert banner shows only with an open outage; codes and slugs, no marker.
+    async with _uow(site).locked() as tx:
+        await tx.add_audit_event(
+            AuditEvent(
+                site.clock.now(),
+                SYSTEM_ACTOR,
+                STORAGE_EVENT,
+                Outcome.FAILURE,
+                FREE_SPACE_CRITICAL,
+                source=Source.SYSTEM,
+            )
+        )
+    banner = await site.client.get("/admin/")
+    assert 'class="alert alert-banner"' in banner.text
+    assert not _leaks(banner.text, set()), "alert banner"
 
     # The pages outside the happy path: a refusal, and the sign-out pages without a session.
     for path, response in (

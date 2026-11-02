@@ -36,6 +36,11 @@ bewaart alle onderwerpen samen.
   de oorspronkelijke afspraak waarna de gegevens van een door een noodsluiting opgeschorte afspraak
   uiterlijk verdwijnen, ook zolang de sluiting geen einde heeft, en hoeveel dagen daarvoor het
   auditlogboek van het team de melding toont. Het maximum kan niet worden uitgezet.
+- **Doel voor de wachttijd** (1 tot 60 minuten, standaard 5) en **Melding bij wachttijd boven**
+  (2 tot 60 minuten, standaard 8): voor groepen met een eigen wachtrij. De widget *Wachtrij in
+  mijn groepen* op het overzicht zegt of de langste wachttijd binnen het doel blijft; komt die
+  boven de grens, dan krijgen wie de wachtrij bedienen één melding, die verdwijnt als de
+  wachttijd weer onder de grens is. Het doel mag niet boven de grens liggen.
 
 ## Een instelling wijzigen
 

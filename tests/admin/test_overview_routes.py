@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.db.models import JobRow
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.calls import CallStatus
-from app.web.templates import HTML_CSP
+from app.web.templates import HTML_CSP, SCRIPT_CSP
 from tests.admin.conftest import (
     AGENT,
     AUDITOR,
@@ -31,11 +31,11 @@ def _widgets(html: str) -> list[str]:
 
 async def test_the_overview_renders_the_visible_widgets_of_the_role(site: Site) -> None:
     expected = {
-        SUPER: ["queue", "bookings-today", "changes", "tasks", "status", "rights"],
-        ORG_ADMIN: ["bookings-today", "queue", "changes", "tasks", "rights"],
-        GROUP_ADMIN: ["bookings-today", "queue", "changes", "rights"],
-        AUDITOR: ["changes", "status", "rights"],
-        AGENT: ["queue", "rights"],
+        SUPER: ["alerts", "queue", "bookings-today", "changes", "tasks", "status", "rights"],
+        ORG_ADMIN: ["alerts", "bookings-today", "queue", "changes", "tasks", "rights"],
+        GROUP_ADMIN: ["alerts", "bookings-today", "queue", "changes", "rights"],
+        AUDITOR: ["changes", "status", "alerts", "rights"],
+        AGENT: ["queue", "alerts", "rights"],
     }
     for principal, keys in expected.items():
         await site.login_as(principal)
@@ -46,11 +46,14 @@ async def test_the_overview_renders_the_visible_widgets_of_the_role(site: Site) 
 
 
 async def test_the_overview_works_without_script(site: Site) -> None:
+    """Every widget is in the page as loaded; the scripts only refresh it (ADR 0061 §3)."""
     await site.login_as(SUPER)
     response = await site.client.get("/admin/")
 
-    assert response.headers["content-security-policy"] == HTML_CSP
-    assert "<script" not in response.text
+    assert response.headers["content-security-policy"] == SCRIPT_CSP
+    assert re.findall(r"<script[^>]*>", response.text) == [
+        f'<script src="{src}" defer>' for src in re.findall(r'<script src="([^"]+)"', response.text)
+    ]  # only the page's own files, nothing inline
     assert 'class="widget-grid"' in response.text
     assert 'href="/admin/"' in response.text  # the Refresh link
     assert "Vernieuwen" in response.text
@@ -85,12 +88,6 @@ async def test_a_widget_the_user_may_not_see_is_refused_and_not_rendered(site: S
     await site.login_as(AUDITOR)
     assert (await site.client.get("/admin/overview/w/queue")).status_code == 403
     assert "queue" not in _widgets((await site.client.get("/admin/")).text)
-
-
-async def test_a_widget_that_is_not_available_yet_has_no_route(site: Site) -> None:
-    await site.login_as(SUPER)
-
-    assert (await site.client.get("/admin/overview/w/alerts")).status_code == 404
 
 
 async def test_the_rights_widget_shows_roles_and_permissions_without_values(site: Site) -> None:
@@ -164,7 +161,7 @@ async def test_the_changes_widget_has_an_empty_state(site: Site) -> None:
 async def test_no_pii_in_any_fragment(site: Site) -> None:
     """Counts, group names and times only (ADR 0061 §8)."""
     await site.login_as(SUPER)
-    for key in ("rights", "bookings-today", "changes", "queue", "tasks", "status"):
+    for key in ("rights", "bookings-today", "changes", "queue", "tasks", "status", "alerts"):
         text = (await site.client.get(f"/admin/overview/w/{key}")).text
         assert "@" not in text, key
         assert "example.org" not in text, key

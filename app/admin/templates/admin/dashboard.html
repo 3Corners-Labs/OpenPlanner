@@ -11,6 +11,11 @@
     <a class="button button--secondary" href="/admin/">{{ icon("refresh") }}<span>{{ _("admin.overview.refresh") }}</span></a>
   </div>
 </div>
+{% if live %}
+{#- The page's one polite live region (ADR 0061 §4): refreshes of the widgets and new pop-ups are read out here, never per widget. -#}
+<p class="visually-hidden" aria-live="polite" id="overview-announce" data-live-announce></p>
+<div class="alert-popups" data-alert-popups{% if popup_level %} data-popup-level="{{ popup_level }}"{% endif %} data-close-label="{{ _("admin.alerts.close") }}" data-open-label="{{ _("admin.alerts.open") }}" data-new-label="{{ _("admin.alerts.popup.new") }}"></div>
+{% endif %}
 {% if views %}
 <div class="widget-grid">
   {% for view in views %}
@@ -43,3 +48,4 @@
 <p class="empty-state">{{ _("admin.dashboard.no_groups") }}</p>
 {% endif %}
 {% endblock %}
+{% block scripts %}{% if live %}<script src="{{ static_url('live-region.js') }}" defer></script><script src="{{ static_url('alert-popups.js') }}" defer></script>{% endif %}{% endblock %}

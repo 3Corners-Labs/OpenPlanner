@@ -322,8 +322,7 @@ SECTIONS = (
 
 TOP_BAR = (
     # Shortcuts (ADR 0047 stays whole: they own no route). Status opens System status; tasks
-    # the overview widget of the same name; alerts the log from warnings up, until the alert
-    # model of ADR 0061 step 4 brings its own list.
+    # and alerts the overview widgets of the same name (ADR 0061 §7).
     Screen(
         "top.status",
         "admin.nav.status",
@@ -344,10 +343,11 @@ TOP_BAR = (
     Screen(
         "top.alerts",
         "admin.nav.alerts",
-        "/admin/audit?level=warning",
-        Permission.AUDIT_VIEW,
+        "/admin/#widget-alerts",
+        Permission.DASHBOARD_VIEW,
         "bell",
-        target="monitor.audit",
+        target="monitor.overview",
+        widget="alerts",
     ),
     Screen(
         "top.help",

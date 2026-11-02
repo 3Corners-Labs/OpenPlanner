@@ -3,9 +3,10 @@
 The signed cookie (``__Host-op_admin`` on https, ``op_admin`` over http; see
 ``session_cookie_for``) holds ``sid``, a random reference, next to what exists before
 a session does: the OIDC login in progress, the test login, the update snooze, and the chosen
-theme, menu width, alert preferences and scope filter. Who is logged in (``LoginClaims``:
-subject, display name, roles, organisations, groups, entitlements), when, and until when lives
-in the register (``app.domain.admin_session_service``) and is looked up on every request, so
+theme, menu width, alert preferences, closed banner alerts and scope filter. Who is logged in
+(``LoginClaims``: subject, display name, roles, organisations, groups, entitlements), when,
+and until when lives in the register (``app.domain.admin_session_service``) and is looked up
+on every request, so
 logging out, a new login, the idle limit and the absolute lifetime all take effect on the
 server, whatever copy of the cookie someone holds. The grants themselves are resolved from the
 claims on every request (``app.domain.login_service``), never stored.
@@ -19,6 +20,7 @@ from fastapi import Request
 
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.admin_sessions import AdminSession, EndReason, SessionPolicy
+from app.domain.alerts import TOKEN_LENGTH, remember_dismissal
 from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM
 from app.domain.ports import LoginStart
@@ -47,6 +49,7 @@ _NAV = "nav"
 _LOGGED_OUT = "logged_out"
 _ALERT_BANNER = "alert_banner"
 _ALERT_POPUPS = "alert_popups"
+_ALERTS_CLOSED = "alerts_closed"
 _SCOPE = "scope"
 
 THEMES = ("system", "light", "dark")
@@ -338,6 +341,25 @@ def choose_alert_prefs(
         if popups in ALERT_POPUPS:
             request.session[_ALERT_POPUPS] = popups
     return session_alert_prefs(request)
+
+
+def session_closed_alerts(request: Request) -> list[str]:
+    """Return the tokens of the banner alerts the admin closed in this session (ADR 0061 §7)."""
+    value: Any = request.session.get(_ALERTS_CLOSED)
+    if not isinstance(value, list):
+        return []
+    return [t for t in value if isinstance(t, str) and _is_token(t)]
+
+
+def close_alert(request: Request, token: str | None) -> None:
+    """Remember that the admin closed the banner alert ``token``; anything else is ignored."""
+    if token is not None and _is_token(token):
+        request.session[_ALERTS_CLOSED] = remember_dismissal(session_closed_alerts(request), token)
+
+
+def _is_token(value: str) -> bool:
+    """Whether ``value`` has the shape of ``Alert.token``: 16 lower-case hex characters."""
+    return len(value) == TOKEN_LENGTH and all(c in "0123456789abcdef" for c in value)
 
 
 def session_scope(request: Request) -> tuple[str | None, str | None]:

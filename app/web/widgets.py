@@ -3,14 +3,14 @@
 Each widget of the overview page is a server-rendered fragment with its own route under
 ``/admin/overview/w/{key}`` and its own permission from the matrix (ADR 0014). This module
 declares them: key, i18n title, permission, scope, the views it supports, its default number
-of rows, whether it can be live (ADR 0061 §4, a later step) and its manual topic. It also
+of rows, whether it refreshes itself (ADR 0061 §4) and its manual topic. It also
 holds the default layout per role, which ADR 0062 reads as the starting point of a personal
 layout.
 
 Like the navigation register (ADR 0047), the register decides *what* exists and *where* it
 sits, never *who* may see it: visibility comes only from the matrix, through each widget's
-permission. A widget that is declared but not ``available`` yet has no route and is not
-rendered; *Alerts* waits for the alert model of OV-6.
+permission. A widget that is declared but not ``available`` has no route and is not rendered;
+since OV-6 every widget is.
 """
 
 from collections.abc import Callable, Iterator
@@ -98,6 +98,7 @@ WIDGETS: tuple[Widget, ...] = (
         (View.LIST, View.BAR, View.PIE),
         default_rows=8,
         live=True,
+        available=True,
     ),
     Widget(
         "queue",
@@ -145,7 +146,7 @@ WIDGETS: tuple[Widget, ...] = (
         Permission.SETTINGS_PLATFORM_VIEW,
         WidgetScope.PLATFORM,
         (View.LIST,),
-        default_rows=6,
+        default_rows=7,
         live=True,
         available=True,
     ),

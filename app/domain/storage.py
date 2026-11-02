@@ -8,7 +8,7 @@ a steady grade records nothing, so a full disk cannot flood the audit log.
             ─► grade changed? ─► system event storage.check (failure, or success on recovery)
 """
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -108,20 +108,27 @@ class StorageCheck:
 class StorageWatch:
     """Remembers the last grade and records a system event when it changes.
 
-    The watch starts at ok, so a healthy start records nothing and an unhealthy start is
-    reported at once.
+    Without ``reported`` the watch starts at ok, so a healthy start records nothing and an
+    unhealthy start is reported at once. With it, the first observation starts from the reason
+    of the open alert (ADR 0061 §7), so a disk that was freed while the worker was down closes
+    that alert with a success.
 
     Args:
         system_log: Where the events go.
         limits: The grade boundaries.
+        reported: Returns the reason of the open storage alert, or an empty string.
     """
 
     def __init__(
-        self, system_log: SystemLog, limits: StorageLimits | Callable[[], StorageLimits]
+        self,
+        system_log: SystemLog,
+        limits: StorageLimits | Callable[[], StorageLimits],
+        reported: Callable[[], Awaitable[str]] | None = None,
     ) -> None:
-        """Start at grade ok."""
+        """Start at grade ok, or at what ``reported`` says on the first observation."""
         self._system_log = system_log
         self._limits = limits
+        self._reported = reported
         self._reason = ""
 
     async def observe(self, usage: StorageUsage) -> StorageCheck:
@@ -133,6 +140,9 @@ class StorageWatch:
         Raises:
             Exception: Whatever writing the event raises.
         """
+        if self._reported is not None:
+            self._reason = await self._reported()
+            self._reported = None
         grade, reason = assess(usage, value_of(self._limits))
         changed = reason != self._reason
         if changed:

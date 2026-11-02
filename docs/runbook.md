@@ -2377,6 +2377,7 @@ Three things keep the host from filling up:
 | `storage.degraded`, `error` | worker log, on change and then hourly | free space below the critical limit (`free_space_critical`) |
 | `storage.recovered` | worker log | back to normal |
 | *Opslag controleren*, failed | superuser's audit log | the same change of grade, with `free_percent` and `database_mb` |
+| Alert *Opslag* (ADR 0061) | portal: a warning in the overview's *Alerts*; at `free_space_critical` an outage banner on every admin page for whoever may see System status | open until the grade is back to ok; *System status* shows free space and database size |
 | `{"status":"degraded"}` | `GET /readyz` (still 200) | either grade; alert on it, it does not take the service out |
 
 What to do: `docker system df` and `du -sh /var/lib/docker/volumes/*` show what grows. Usual
