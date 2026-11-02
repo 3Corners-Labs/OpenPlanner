@@ -537,3 +537,40 @@ def test_existing_bookings_get_distinct_public_references(
     assert len(refs) == 2
     assert refs[0] != refs[1]
     assert all(len(ref) >= 22 for ref in refs)
+
+
+def test_existing_destinations_keep_the_decisions_and_events_get_an_empty_role(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0103 point 9: a destination that received authz lines as ordinary lines keeps them.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0086")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO log_destinations (name, kind, address, min_level, categories,
+                                          created_at, updated_at)
+                VALUES ('a', 'syslog', 'syslog+tls://s:6514', 'info', 'audit,system',
+                        '2026-11-01 08:00:00', '2026-11-01 08:00:00'),
+                       ('b', 'http', 'https://c/x', 'info', '',
+                        '2026-11-01 08:00:00', '2026-11-01 08:00:00');
+            INSERT INTO audit_events (at, actor, action, outcome, source, event_id)
+                VALUES ('2026-11-01 08:00:00', 'sub-1', 'group.edit', 'success', 'admin',
+                        'e1');
+            """
+        )
+
+    command.upgrade(alembic_config, "head")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        upgraded = database.execute("SELECT categories FROM log_destinations ORDER BY name")
+        assert [r[0] for r in upgraded] == ["audit,authz,system", "authz"]
+        assert database.execute("SELECT actor_role FROM audit_events").fetchone() == ("",)
+
+    command.downgrade(alembic_config, "0086")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        downgraded = database.execute("SELECT categories FROM log_destinations ORDER BY name")
+        assert [r[0] for r in downgraded] == ["audit,system", ""]
+        columns = {r[1] for r in database.execute("PRAGMA table_info(audit_events)")}
+    assert "actor_role" not in columns

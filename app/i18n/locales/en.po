@@ -8618,13 +8618,16 @@ msgid "admin.logging.categories"
 msgstr "Audit events to send"
 
 msgid "admin.logging.categories_hint"
-msgstr "Admin actions, what the platform does on its own, and security events. The level does not apply to them."
+msgstr "Admin actions, what the platform does on its own, and security events: the level does not apply to them. Access decisions are one or two lines per admin page; the level does apply to those."
 
 msgid "admin.logging.category.audit"
 msgstr "Admin actions"
 
 msgid "admin.logging.category.system"
 msgstr "System events"
+
+msgid "admin.logging.category.authz"
+msgstr "Access decisions"
 
 msgid "admin.logging.category.security"
 msgstr "Security events"

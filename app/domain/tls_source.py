@@ -274,10 +274,15 @@ class CertificateSourceService:
 async def _audit(
     tx: Transaction, now: datetime, actor: str, event: str, stored: OwnCertificate | None = None
 ) -> None:
-    """Record a change: the event, and for a chain its fingerprint and expiry date only."""
+    """Record a change: the event, and for a chain its fingerprint and expiry date only.
+
+    ``tls.certificate.upload,fingerprint:<sha256>,not_after:2026-03-02``, in the detail
+    convention of ``app.domain.event_schema`` (ADR 0103 point 6).
+    """
     detail = event
     if stored is not None:
-        detail = f"{event}:{stored.fingerprint}:{stored.certificate.not_after.date().isoformat()}"
+        expires = stored.certificate.not_after.date().isoformat()
+        detail = f"{event},fingerprint:{stored.fingerprint},not_after:{expires}"
     await tx.add_audit_event(
         AuditEvent(now, actor, _PERMISSION.value, Outcome.SUCCESS, detail=detail)
     )

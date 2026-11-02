@@ -45,11 +45,14 @@ def test_missing_key_returns_key_and_logs_once(log_stream: io.StringIO) -> None:
     records = [json.loads(line) for line in log_stream.getvalue().splitlines()]
     assert records == [
         {
-            "message": "i18n.missing_key",
-            "key": "no.such.key",
-            "locale": "en",
-            "log.level": "warning",
             "@timestamp": records[0]["@timestamp"],
+            "log.level": "warning",
+            "event.category": "operations",
+            "event.action": "i18n.missing_key",
+            "message": "Text no.such.key is missing in en.",
+            "schema": "openplanner.event/3",
+            "labels.key": "no.such.key",
+            "labels.locale": "en",
         }
     ]
 

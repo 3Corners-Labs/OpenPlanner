@@ -16,7 +16,7 @@ The sockets are not opened here: the sender is an adapter (``LogDestinationSende
 test goes through ``tester``.
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, replace
 
 from app.domain.admin import AdminService, require
@@ -27,6 +27,7 @@ from app.domain.log_destinations import (
     AUDIT_ACTION,
     DeliveryError,
     DestinationDraft,
+    DestinationKind,
     DestinationStatus,
     LogDestination,
     validate_draft,
@@ -185,7 +186,7 @@ class LogDestinationService:
                 ),
                 sealed,
             )
-            await self._audit(tx, principal, f"created:{created.kind}:{created.id}")
+            await self._audit(tx, principal, _detail("created", created.kind, created.id))
         self._on_change()
         return created
 
@@ -233,7 +234,7 @@ class LogDestinationService:
             )
             await tx.save_log_destination(updated, sealed)
             await self._audit(
-                tx, principal, f"changed:{updated.kind}:{destination_id}:{','.join(changed)}"
+                tx, principal, _detail("changed", updated.kind, destination_id, changed)
             )
         self._on_change()
         return changed
@@ -253,7 +254,7 @@ class LogDestinationService:
                 replace(current, enabled=enabled, updated_at=self._clock.now()), None
             )
             verb = "enabled" if enabled else "disabled"
-            await self._audit(tx, principal, f"{verb}:{current.kind}:{destination_id}")
+            await self._audit(tx, principal, _detail(verb, current.kind, destination_id))
         self._on_change()
         return True
 
@@ -267,7 +268,7 @@ class LogDestinationService:
         async with self._uow.locked() as tx:
             current = await _found(tx, destination_id)
             await tx.delete_log_destination(destination_id)
-            await self._audit(tx, principal, f"deleted:{current.kind}:{destination_id}")
+            await self._audit(tx, principal, _detail("deleted", current.kind, destination_id))
         self._on_change()
 
     async def send_test(self, principal: Principal, destination_id: int) -> TestResult:
@@ -296,7 +297,7 @@ class LogDestinationService:
             await self._audit(
                 tx,
                 principal,
-                f"tested:{current.kind}:{destination_id}",
+                _detail("tested", current.kind, destination_id),
                 Outcome.SUCCESS if result.ok else Outcome.FAILURE,
                 result.reason,
             )
@@ -325,6 +326,19 @@ class LogDestinationService:
                 detail,
             )
         )
+
+
+def _detail(
+    change: str, kind: DestinationKind, destination_id: int | None, fields: Sequence[str] = ()
+) -> str:
+    """Return the audit detail of a change: ``change:changed,kind:syslog,destination:3,...``.
+
+    The changed field names follow as flags, in the detail convention of
+    ``app.domain.event_schema`` (ADR 0103 point 6).
+    """
+    return ",".join(
+        [f"change:{change}", f"kind:{kind.value}", f"destination:{destination_id}", *fields]
+    )
 
 
 async def _found(tx: Transaction, destination_id: int) -> LogDestination:

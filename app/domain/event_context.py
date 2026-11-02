@@ -8,6 +8,7 @@ context lives in ``contextvars``, so concurrent requests never see each other's 
     request / job ─► trace_scope()        new trace id, no level yet
                   ─► bind_level(org, grp)  once the route or job knows its target
                   ─► bind_booking(id)      once it knows the booking (request events, ADR 0068)
+                  ─► bind_actor_role(role) once the matrix allowed an admin (ADR 0103 point 7)
                   ─► log line, AuditEvent  read current() and carry both
 
 The service (``web`` or ``worker``) is set once per process. This module is plain Python so
@@ -25,6 +26,7 @@ _TRACE_ID: ContextVar[str] = ContextVar("trace_id", default="")
 _ORGANISATION: ContextVar[str | None] = ContextVar("organisation", default=None)
 _GROUP: ContextVar[str | None] = ContextVar("group", default=None)
 _BOOKING: ContextVar[int | None] = ContextVar("booking", default=None)
+_ACTOR_ROLE: ContextVar[str] = ContextVar("actor_role", default="")
 _service = ""
 
 TRACE_ID = re.compile(r"^[0-9a-f]{32}$")
@@ -41,6 +43,8 @@ class EventContext:
         group: Slug of the group concerned, once known.
         service: ``web`` or ``worker``; empty until the process sets it.
         booking_id: The booking the job or request is about, once known (ADR 0068).
+        actor_role: The role key that granted the admin the permission of the request
+            (``superuser``, ``org_admin``, ``custom.3``); empty outside an allowed admin request.
     """
 
     trace_id: str
@@ -48,6 +52,7 @@ class EventContext:
     group: str | None
     service: str
     booking_id: int | None = None
+    actor_role: str = ""
 
 
 def new_id() -> str:
@@ -74,10 +79,12 @@ def trace_scope() -> Iterator[str]:
         _ORGANISATION.set(None),
         _GROUP.set(None),
         _BOOKING.set(None),
+        _ACTOR_ROLE.set(""),
     )
     try:
         yield trace_id
     finally:
+        _ACTOR_ROLE.reset(tokens[4])
         _BOOKING.reset(tokens[3])
         _GROUP.reset(tokens[2])
         _ORGANISATION.reset(tokens[1])
@@ -95,11 +102,26 @@ def bind_booking(booking_id: int | None) -> None:
     _BOOKING.set(booking_id)
 
 
+def bind_actor_role(role: str) -> None:
+    """Record the role key that granted the current admin request its permission (ADR 0103)."""
+    _ACTOR_ROLE.set(role)
+
+
 def current() -> EventContext:
     """Return the context of the current request or job."""
     return EventContext(
-        _TRACE_ID.get(), _ORGANISATION.get(), _GROUP.get(), _service, _BOOKING.get()
+        _TRACE_ID.get(),
+        _ORGANISATION.get(),
+        _GROUP.get(),
+        _service,
+        _BOOKING.get(),
+        _ACTOR_ROLE.get(),
     )
+
+
+def current_actor_role() -> str:
+    """Return the role key bound by ``bind_actor_role``; empty when none is."""
+    return _ACTOR_ROLE.get()
 
 
 def current_trace_id() -> str:

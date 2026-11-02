@@ -677,6 +677,8 @@ class AuditEventRow(Base):
     category: Mapped[str] = mapped_column(String(16), server_default=text("'audit'"))
     trace_id: Mapped[str] = mapped_column(String(32), server_default=text("''"))
     service: Mapped[str] = mapped_column(String(16), server_default=text("''"))
+    # ADR 0103 point 7: the role key that granted the admin the permission; never a name.
+    actor_role: Mapped[str] = mapped_column(String(64), server_default=text("''"))
 
     __table_args__ = (
         Index("ix_audit_events_at", "at"),

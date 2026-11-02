@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from app.domain.log_destinations import TEST_ACTION
 from app.domain.log_events import BY_OUTCOME, COMMON_FIELDS, ENTRIES, EVENTS
 
 APP = Path(__file__).resolve().parents[1] / "app"
@@ -105,8 +106,12 @@ def test_a_log_call_is_registered(call: Call) -> None:
     )
 
 
+BUILT_LINES = {TEST_ACTION}
+"""Actions whose line is built, not logged: *Send test line* (``log_shipping.probe_line``)."""
+
+
 def test_every_listed_log_line_is_still_written() -> None:
-    written = {call.action for call in CALLS}
+    written = {call.action for call in CALLS} | BUILT_LINES
     logged = [e.action for e in ENTRIES if set(e.levels) - {BY_OUTCOME}]
 
     assert [action for action in logged if action not in written] == []

@@ -13,8 +13,13 @@ Which line a destination receives (point 3 of the ADR):
     audit, system, security events   only when their category is ticked; the level does not
                                      apply, as on stdout the audit trail bypasses LOG_LEVEL
     diagnostic events                only with ``include_diagnostic``
+    authorisation decisions          only when ``authz`` is ticked (ADR 0103 point 9), and at
+                                     least ``min_level``
     trace lines                      only with ``include_trace``, and at least ``min_level``
     every other line                 at least ``min_level``
+
+Every line carries ``event.category`` since ``openplanner.event/3``; an audit-trail line is the
+one marked ``log_type: "audit"``.
 
 A destination narrows the process's own level, it never widens it: a ``trace`` destination
 sees trace lines only while ``LOG_LEVEL`` is ``TRACE`` too.
@@ -26,14 +31,24 @@ from datetime import datetime
 from enum import StrEnum
 from urllib.parse import urlsplit
 
-from app.domain.audit import Category
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.log_events import LogCategory
 
 LEVELS = ("trace", "debug", "info", "warning", "error", "critical")
 """The ``log.level`` values in order, lowest first (ADR 0040 part 2 and ADR 0085 point 8)."""
 
-SHIPPED_CATEGORIES = (Category.AUDIT, Category.SYSTEM, Category.SECURITY)
-"""The audit-line categories a destination may tick (ADR 0034: diagnostic is its own switch)."""
+SHIPPED_CATEGORIES = (
+    LogCategory.AUDIT,
+    LogCategory.SYSTEM,
+    LogCategory.SECURITY,
+    LogCategory.AUTHZ,
+)
+"""The categories a destination may tick (ADR 0034: diagnostic is its own switch; ADR 0103
+point 9 adds the authorisation decisions)."""
+
+DEFAULT_CATEGORIES = frozenset({LogCategory.AUDIT, LogCategory.SYSTEM, LogCategory.SECURITY})
+"""What a new destination receives: the audit trail; authorisation decisions only on request,
+they are one or two lines per admin page."""
 
 MAX_NAME = 80
 MAX_ADDRESS = 500
@@ -44,8 +59,9 @@ MAX_CA_BYTES = 65_536
 _TARGET_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.:*")
 """What an index, source or data stream name may hold (no spaces, slashes or quotes)."""
 
-TEST_MESSAGE = "logging.test"
-"""The ``message`` of the line *Send test line* sends (ADR 0085 point 5)."""
+TEST_ACTION = "logging.test"
+"""The action of the line *Send test line* sends (ADR 0085 point 5); the register has its
+sentence."""
 
 AUDIT_ACTION = "logging.destination"
 """Audit action of a change; the detail says ``created|changed|deleted|enabled|disabled|tested``."""
@@ -157,7 +173,7 @@ class LogDestination:
     index: str
     source: str
     min_level: str
-    categories: frozenset[Category]
+    categories: frozenset[LogCategory]
     include_diagnostic: bool
     include_trace: bool
     enabled: bool
@@ -178,7 +194,7 @@ class DestinationDraft:
     index: str = ""
     source: str = ""
     min_level: str = "info"
-    categories: frozenset[Category] = frozenset(SHIPPED_CATEGORIES)
+    categories: frozenset[LogCategory] = DEFAULT_CATEGORIES
     include_diagnostic: bool = False
     include_trace: bool = False
     ca_pem: str = ""
@@ -318,22 +334,24 @@ def level_rank(level: object) -> int:
 def accepts(destination: LogDestination, record: Mapping[str, object]) -> bool:
     """Return whether ``destination`` receives the line with this parsed ``record``."""
     category = record.get("event.category")
-    if record.get("log_type") == "audit" or category is not None:
-        if category == Category.DIAGNOSTIC:
+    if record.get("log_type") == "audit":
+        if category == LogCategory.DIAGNOSTIC:
             return destination.include_diagnostic
         return any(category == c for c in destination.categories)
+    if category == LogCategory.AUTHZ and LogCategory.AUTHZ not in destination.categories:
+        return False
     level = record.get("log.level")
     if level == "trace" and not destination.include_trace:
         return False
     return level_rank(level) >= level_rank(destination.min_level)
 
 
-def categories_text(categories: Collection[Category]) -> str:
+def categories_text(categories: Collection[LogCategory]) -> str:
     """Return the categories as a stable, comma-separated string (for storage)."""
     return ",".join(sorted(str(c) for c in categories))
 
 
-def parse_categories(text: str) -> frozenset[Category]:
+def parse_categories(text: str) -> frozenset[LogCategory]:
     """Return the categories stored by ``categories_text``; unknown names are dropped."""
     wanted = {part for part in text.split(",") if part}
     return frozenset(c for c in SHIPPED_CATEGORIES if str(c) in wanted)
