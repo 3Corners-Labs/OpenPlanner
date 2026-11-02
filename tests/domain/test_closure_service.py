@@ -526,3 +526,22 @@ async def test_the_closure_page_date_is_that_of_the_latest_booking_on_hold(
 
     expected = uow.state.bookings[later].end + DEFAULT_CLOSURE_RETENTION.max_retention
     assert await bookings.closure_delete_by(group, closure) == expected
+
+
+async def test_the_details_of_a_booking_on_hold_say_when_its_data_is_deleted_at_the_latest(
+    closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book_confirmed(
+        bookings, group_slug="demo", start=SLOT_0900, contact=ADA, locale="nl"
+    )
+    assert (await bookings.find(receipt.management_token)).delete_by is None  # not on hold
+
+    await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
+    details = await bookings.find(receipt.management_token)
+
+    end = uow.state.bookings[receipt.booking.id or 0].end
+    assert details.delete_by == end + DEFAULT_CLOSURE_RETENTION.max_retention  # open closure
+
+    await closures.update(GROUP_ADMIN, "demo", NEXT_MONDAY, NOTICES, notify=False)
+    soon = await bookings.find(receipt.management_token)
+    assert soon.delete_by == NEXT_MONDAY + RETENTION_AFTER_CLOSURE  # the earlier of the two

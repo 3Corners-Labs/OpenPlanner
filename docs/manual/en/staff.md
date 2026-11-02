@@ -79,6 +79,20 @@ logins, logouts and changes, within your own organisations or groups.
   its own (after 8 hours) does not count as a logout. The same goes for a session that ends because it was idle
   for too long (60 minutes by default) or because a newer login replaced it.
 
+## End a staff member's sessions
+
+A staff member's page has the button **End all sessions**. Organisation admins and the
+superuser see it (permission `staff.manage`). It works for every staff member you see in
+the overview; for anyone outside it, it is refused and the attempt is in the audit log.
+
+A session belongs to the person, not to an organisation. If you end all sessions of someone who
+works for two organisations, what they use for the other organisation ends too. That is
+intended: ending protects and gives nobody more rights. The staff member has to log in again.
+Use it, for example, when someone has been switched off at the identity provider: otherwise
+their session keeps working until it goes idle (60 minutes by default). The audit log has an
+event with you, the staff member and the number of sessions. Everyone can see and end their own
+sessions on [My sessions](my-sessions.md).
+
 ## Second factor (MFA)
 
 Staff log in with a second factor besides their password: a code from an authenticator app

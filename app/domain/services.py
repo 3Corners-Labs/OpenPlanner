@@ -108,7 +108,8 @@ class BookingDetails:
     ``changeable`` says whether the participant may move it, ``cancellable`` whether they may
     cancel it (ADR 0069). ``cancellable`` is also true for a booking that awaits confirmation
     ("this was not me", ADR 0056), which cannot be rescheduled. ``closure`` is the closure that
-    suspended the booking, for its notice.
+    suspended the booking, for its notice. ``delete_by`` is the moment its personal data is
+    deleted at the latest while it is on hold under that closure (ADR 0102), else ``None``.
     """
 
     booking: Booking
@@ -117,6 +118,7 @@ class BookingDetails:
     changeable: bool
     closure: Closure | None = None
     cancellable: bool = False
+    delete_by: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -352,7 +354,12 @@ class BookingService:
             (booking.is_active or booking.awaits_confirmation)
             and now < group.cancel_deadline(booking.start)
         )
-        return BookingDetails(booking, group, deadline, changeable, closure, cancellable)
+        delete_by = (
+            closure.purge_at(booking.end, self._closure_retention(group.organisation_id))
+            if closure is not None
+            else None
+        )
+        return BookingDetails(booking, group, deadline, changeable, closure, cancellable, delete_by)
 
     async def confirm(self, management_token: str | PublicRef) -> Booking:
         """Confirm a booking by its email link (ADR 0056) and return it as it now is.

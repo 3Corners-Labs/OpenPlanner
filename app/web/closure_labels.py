@@ -93,7 +93,24 @@ def closure_view(
         closure.heading(locale.code),
         contact_view(closure.contacts, locale),
         ImageView(image_url(group, image.digest), image.text.alt(locale.code)) if image else None,
-        _("closure.page.delete_by", date=format_day(local_day(delete_by, group.tz), locale.code))
+        _("closure.page.delete_by", date=delete_by_day(delete_by, group, locale))
         if delete_by
         else None,
+    )
+
+
+def delete_by_day(delete_by: datetime, group: Group, locale: RequestLocale) -> str:
+    """Return the day, in the group's time zone, by which details on hold are deleted."""
+    return format_day(local_day(delete_by, group.tz), locale.code)
+
+
+def delete_by_label(delete_by: datetime | None, group: Group, locale: RequestLocale) -> str | None:
+    """Return the sentence telling a participant when their own details are deleted at the latest.
+
+    ``None`` when the booking is not on hold, so the page promises nothing it does not know.
+    """
+    if delete_by is None:
+        return None
+    return locale.gettext(
+        "manage.suspended.delete_by", date=delete_by_day(delete_by, group, locale)
     )

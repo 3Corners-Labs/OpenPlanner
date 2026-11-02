@@ -22,6 +22,7 @@
 <div class="notice notice--warning">
   <h2>{{ _("manage.suspended.title") }}</h2>
   <p>{{ _("manage.suspended.text") }}</p>
+  {% if delete_by %}<p id="manage-delete-by">{{ delete_by }}</p>{% endif %}
 </div>
 {% include "_closure_notice.html" %}
 {% if closure %}{{ contact_block(closure.contacts, id="closure-contacts") }}{% endif %}
