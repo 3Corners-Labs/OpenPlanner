@@ -95,6 +95,8 @@ STATE_TABLES = frozenset(
         "log_destination_status",
         "maintenance_state",
         "own_certificates",
+        "participant_link_bookings",
+        "participant_link_sessions",
         "release_checks",
         "release_listing",
         "running_versions",

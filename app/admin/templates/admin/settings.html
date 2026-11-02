@@ -13,6 +13,20 @@
   <h3 id="logging-heading">{{ _("admin.settings.logging.title") }}</h3>
   <p>{% if log_summary.total == 0 %}{{ _("admin.settings.logging.none") }}{% else %}{{ _("admin.settings.logging.summary", total=log_summary.total, enabled=log_summary.enabled) }}{% if log_summary.failing %} <span class="chip chip--danger">{{ _("admin.settings.logging.failing", count=log_summary.failing) }}</span>{% endif %}{% endif %} <a href="/admin/logging">{{ _("admin.settings.logging.open") }}</a></p>
   {% endif %}
+  {% if rotation.active %}
+  <h3 id="keys-heading">{{ _("admin.settings.keys.title") }}</h3>
+  <p>{{ _("admin.settings.keys.intro") }}</p>
+  <dl class="facts" aria-labelledby="keys-heading">
+    {% if rotation.records is not none %}
+    <div><dt>{{ _("admin.settings.keys.records") }}</dt><dd>{{ rotation.records }}</dd></div>
+    {% endif %}
+    {% if rotation.bookings is not none %}
+    <div><dt>{{ _("admin.settings.keys.bookings") }}</dt><dd>{{ rotation.bookings }}</dd></div>
+    {% endif %}
+  </dl>
+  {% if rotation.records_done %}<p>{{ _("admin.settings.keys.records_done") }}</p>{% elif rotation.records is not none %}<p>{{ _("admin.settings.keys.records_todo") }}</p>{% endif %}
+  {% if rotation.bookings_done %}<p>{{ _("admin.settings.keys.bookings_done") }}</p>{% elif rotation.bookings is not none %}<p>{{ _("admin.settings.keys.bookings_todo") }}</p>{% endif %}
+  {% endif %}
   <h3 id="tls-heading">{{ _("admin.settings.tls.title") }}</h3>
   {% if certificate %}
   <dl class="facts" aria-labelledby="tls-heading">

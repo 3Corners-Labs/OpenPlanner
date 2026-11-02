@@ -22,9 +22,9 @@ from app.domain.admin_sessions import AdminSession, EndReason, SessionPolicy
 from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM
 from app.domain.ports import LoginStart
+from app.web.cookies import CookieSpec, cookie_for
 
-_PLAIN_COOKIE = "op_admin"
-_HOST_COOKIE = "__Host-op_admin"
+_BASE_COOKIE = "op_admin"
 _SID = "sid"
 _OIDC = "oidc"
 _TRIAL = "login_trial"
@@ -51,28 +51,16 @@ DEFAULT_ALERT_POPUPS = "warnings"
 """The pop-up choice until the admin picks one."""
 
 
-@dataclass(frozen=True)
-class SessionCookie:
-    """The name and attributes of the admin session cookie (ADR 0098 point 12).
-
-    Attributes:
-        name: ``__Host-op_admin`` on https, ``op_admin`` over plain http.
-        path: ``/`` for the prefixed name (the prefix requires it), ``/admin`` otherwise.
-        secure: Whether the cookie is sent only over https.
-    """
-
-    name: str
-    path: str
-    secure: bool
+SessionCookie = CookieSpec
+"""The name and attributes of the admin session cookie (ADR 0098 point 12)."""
 
 
 def session_cookie_for(public_base_url: str) -> SessionCookie:
-    """Return the cookie to use for the address the installation is served on.
+    """Return the admin cookie to use for the address the installation is served on.
 
-    A fixed security rule, not a setting. On an ``https://`` address the cookie carries the
-    ``__Host-`` prefix, ``Path=/``, ``Secure`` and no ``Domain``, whatever ``ENVIRONMENT`` says.
-    Over ``http://`` (development) browsers refuse a prefixed cookie without ``Secure``, so it
-    keeps the plain name and ``Path=/admin``.
+    ``__Host-op_admin`` with ``Path=/`` and ``Secure`` on an ``https://`` address, ``op_admin``
+    with ``Path=/admin`` over ``http://`` (development). The rule is shared with the
+    participant's cookie in ``app.web.cookies``; the two cookies are independent.
 
     Args:
         public_base_url: The ``PUBLIC_BASE_URL`` setting.
@@ -80,9 +68,7 @@ def session_cookie_for(public_base_url: str) -> SessionCookie:
     Returns:
         The cookie name, path and ``Secure`` flag for ``SessionMiddleware``.
     """
-    if public_base_url.lower().startswith("https://"):
-        return SessionCookie(_HOST_COOKIE, "/", True)
-    return SessionCookie(_PLAIN_COOKIE, "/admin", False)
+    return cookie_for(public_base_url, _BASE_COOKIE, "/admin")
 
 
 @dataclass(frozen=True)

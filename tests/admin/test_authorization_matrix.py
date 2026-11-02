@@ -27,7 +27,7 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
-from tests.support.routes import all_routes
+from tests.support.routes import all_routes, scoped_routes
 
 ROLES = {
     "superuser": SUPER,
@@ -1207,3 +1207,68 @@ def test_expectations_cover_every_role(site: Site) -> None:
         for by_role in routes.values():
             assert set(by_role) == set(ROLES)
     assert all(isinstance(p, Principal) for p in ROLES.values())
+
+
+# WP-B2 (TEN-01): a route that addresses an organisation or a group is checked before release,
+# automatically. Admin routes sit in EXPECTED with a case that refuses an administrator of
+# the other organisation. The routes below it are open to participants by design: they answer
+# for the slug in the path and are proved tenant by tenant in test_tenant_isolation_concurrent.
+PUBLIC_SCOPED = frozenset(
+    {
+        "GET /api/v1/widget/{org}/{group}/",
+        "GET /api/v1/widget/{org}/{group}/availability",
+        "OPTIONS /api/v1/widget/{org}/{group}/bookings",
+        "POST /api/v1/widget/{org}/{group}/bookings",
+        "GET /g/{slug}",
+        "GET /g/{slug}/book",
+        "GET /g/{slug}/booked",
+        "GET /g/{slug}/closure",
+        "GET /g/{slug}/closure/image",
+        "GET /g/{slug}/direct",
+        "POST /g/{slug}/book",
+        "POST /g/{slug}/direct",
+        "GET /o/{slug}/font/{role}",
+        "GET /o/{slug}/logo",
+        "GET /o/{slug}/theme.css",
+    }
+)
+QUERY_SCOPED = frozenset({"GET /admin/audit", "GET /admin/audit/export.csv", "GET /admin/staff"})
+"""Admin lists whose scope comes from the principal; ``group`` or ``organisation`` in the query
+only narrows. ``test_privacy_sweep_exports`` proves a narrowing cannot widen."""
+
+
+def refuses_the_other_organisation(by_path: dict[str, dict[str, int]]) -> bool:
+    """Whether one case shows an administrator of the other organisation refused.
+
+    A path under ``andere`` is tried by the organisation admin of ``demo``, any other path by
+    the organisation admin of ``andere``; both must get 403 or 404.
+    """
+    for path, by_role in by_path.items():
+        if "andere" in path:
+            other = by_role["org_admin (demo)"]
+        elif "demo" in path:
+            other = by_role["org_admin (andere)"]
+        else:
+            continue
+        if other in {403, 404}:
+            return True
+    return False
+
+
+def test_every_route_with_an_organisation_or_group_is_in_the_matrix_sweep(site: Site) -> None:
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    scoped = scoped_routes(all_routes(app.routes))
+
+    admin = {k for k in scoped if k.split(" ", 1)[1].startswith("/admin")}
+    missing = sorted(admin - set(EXPECTED))
+    assert missing == [], f"add these to the matrix sweep (EXPECTED): {missing}"
+    unproved = sorted(
+        k for k in admin - QUERY_SCOPED if not refuses_the_other_organisation(EXPECTED[k])
+    )
+    assert unproved == [], f"no case refuses the other organisation for: {unproved}"
+    assert QUERY_SCOPED <= admin
+    outside = set(scoped) - admin
+    assert outside == PUBLIC_SCOPED, (
+        f"a route addressing an organisation or group: {sorted(outside ^ PUBLIC_SCOPED)}; "
+        "decide who may call it and add it to the sweep or to PUBLIC_SCOPED"
+    )

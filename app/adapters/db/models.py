@@ -495,6 +495,8 @@ class BookingRow(Base):
     consents: Mapped[str] = mapped_column(String(64), server_default=text("''"))
     management_token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     management_token_salt: Mapped[str] = mapped_column(String(64), server_default=text("''"))
+    # ADR 0093: names the booking in a URL; not PII, authorises nothing, survives the purge.
+    public_ref: Mapped[str] = mapped_column(String(32), unique=True)
     guest_join_url: Mapped[str | None] = mapped_column(String(2048))
     host_join_url: Mapped[str | None] = mapped_column(String(2048))
     video_room_id: Mapped[str | None] = mapped_column(String(255))
@@ -1245,3 +1247,40 @@ class AdminSessionRow(Base):
     last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
     ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     end_reason: Mapped[str | None] = mapped_column(String(16))
+
+
+class ParticipantLinkSessionRow(Base):
+    """One browser that opened a management link (ADR 0093).
+
+    ``value_hash`` is the ``sha256`` of the random cookie value; the value itself is never
+    stored. No personal data: the session names bookings by id only.
+    """
+
+    __tablename__ = "participant_link_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    value_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    last_used_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+
+
+class ParticipantLinkBookingRow(Base):
+    """A booking that a participant link session holds (at most 20 per session, ADR 0093)."""
+
+    __tablename__ = "participant_link_bookings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("participant_link_sessions.id", ondelete="CASCADE")
+    )
+    booking_id: Mapped[int] = mapped_column(
+        ForeignKey("bookings.id", ondelete="CASCADE"), index=True
+    )
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "booking_id", name="uq_participant_link_bookings_session_booking"
+        ),
+    )
