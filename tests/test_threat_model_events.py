@@ -168,6 +168,11 @@ FLOWS: dict[str, Flow] = {
     ),
     "## Flow: public booking pages (WP3)": Flow((PUBLIC, OWN_FAILURE)),
     "## Flow: organisation branding (WP3b, ADR 0041)": Flow(ADMIN),
+    "### Uploads without a virus scan (ASVS V5.4.3, ADR 0092)": Flow(
+        no_event="a recorded deviation, not an attack path: the controls refuse a bad file with a "
+        "coded error to an authenticated administrator, and the branding change is audited in "
+        "the branding flow above"
+    ),
     "## Flow: organisation management": Flow(ADMIN),
     "## Flow: groups list (ADR 0047 step 5)": Flow(ADMIN),
     "## Flow: outgoing email (WP3, worker)": Flow((JOB,)),
