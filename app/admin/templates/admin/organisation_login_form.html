@@ -5,6 +5,7 @@
 {% include "admin/_organisation_header.html" %}
 <h2 class="section-title" id="page-title">{% if view %}{{ view.provider.name }}{% else %}{{ _("admin.idp.add") }}{% endif %}</h2>
 <p class="page-header__lead"><a href="/admin/organisations/{{ organisation.slug }}/login">{{ _("admin.idp.title") }}</a>{% if view %} · <code>{{ view.provider.key }}</code>{% endif %}</p>
+{% if routing_off %}<div class="alert alert--info" role="status"><p>{{ _("admin.idp.routing_off") }}</p></div>{% endif %}
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% if test_failed %}<div class="alert alert--error" role="alert"><p>{{ test_failed }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
