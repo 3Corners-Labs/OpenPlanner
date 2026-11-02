@@ -278,3 +278,21 @@ async def test_the_summaries_leave_out_contact_center_groups_and_groups_outside_
     assert await queue.summaries(AUDITOR, timedelta(hours=8)) == []
     own = await queue.summaries(OTHER_TEAM, timedelta(hours=8))
     assert [s.summary.group.slug for s in own] == ["andere"]
+
+
+async def test_claims_made_before_a_token_key_rotation_still_read_as_mine(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0094 point 4: agent pseudonyms are compared under both keys."""
+    old_key, new_key = b"o" * 32, b"n" * 32
+    before = QueueService(uow, clock, AdminService(uow, clock), old_key)
+    booking_id = await _book(uow, clock)
+    clock.advance(SLOT_0900 - timedelta(minutes=10) - clock.now())
+    await before.claim_next(AGENT, "demo")
+
+    rotated = QueueService(uow, clock, AdminService(uow, clock), new_key, old_key)
+    forgotten = QueueService(uow, clock, AdminService(uow, clock), new_key)
+
+    assert [r.mine for r in (await rotated.view(AGENT, "demo")).rows] == [True]
+    assert [r.mine for r in (await forgotten.view(AGENT, "demo")).rows] == [False]
+    assert uow.state.bookings[booking_id].claim is not None
