@@ -876,7 +876,7 @@ class InMemoryTransaction:
                 )
         return due
 
-    async def list_rollable(
+    async def find_rollable(
         self, purged_before: datetime, after_id: int, limit: int
     ) -> list[RollableBooking]:
         rows = [

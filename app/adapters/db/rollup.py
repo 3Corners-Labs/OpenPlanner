@@ -1,7 +1,7 @@
 """SQL for merging old booking rows into daily counts (ADR 0102 step 4).
 
 A mixin of ``SqlTransaction``, so every method runs in the caller's transaction. Nothing here
-selects a personal data column except to say whether one is still filled: ``list_rollable``
+selects a personal data column except to say whether one is still filled: ``find_rollable``
 returns a flag, never a value. The domain (``app.domain.booking_rollup``) decides which row may
 go; the SQL only narrows the candidates and does the writes.
 """
@@ -38,7 +38,7 @@ class _Transaction(Protocol):
 class RollupQueries:
     """The booking row rollup's part of ``SqlTransaction``."""
 
-    async def list_rollable(
+    async def find_rollable(
         self: _Transaction, purged_before: datetime, after_id: int, limit: int
     ) -> list[RollableBooking]:
         """Return up to ``limit`` rows purged before ``purged_before``, ascending by id.

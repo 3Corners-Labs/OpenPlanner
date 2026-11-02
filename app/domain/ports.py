@@ -1206,7 +1206,7 @@ class Transaction(Protocol):
         """
         ...
 
-    async def list_rollable(
+    async def find_rollable(
         self, purged_before: datetime, after_id: int, limit: int
     ) -> list[RollableBooking]:
         """Return up to ``limit`` booking rows purged before ``purged_before``, by id.

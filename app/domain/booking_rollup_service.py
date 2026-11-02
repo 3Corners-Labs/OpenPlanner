@@ -56,7 +56,7 @@ class BookingRowRollup:
         after_id = 0
         while True:
             async with self._uow.locked() as tx:
-                found = await tx.list_rollable(purged_before(now, retention), after_id, BATCH_SIZE)
+                found = await tx.find_rollable(purged_before(now, retention), after_id, BATCH_SIZE)
                 ready = [r for r in found if is_rollable(r, now, retention)]
                 if ready:
                     counts = tally(ready)
