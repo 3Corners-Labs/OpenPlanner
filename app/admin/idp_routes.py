@@ -334,9 +334,13 @@ def _fields(
     return with_manual(request, locale, filled)
 
 
-def _draft(form: FormData, key: str | None = None) -> ProviderDraft:
-    """Build the draft from the form; the domain validates it."""
+def _draft(request: Request, form: FormData, key: str | None = None) -> ProviderDraft:
+    """Build the draft from the form; the domain validates it.
+
+    Outside production a lab provider may have an ``http`` discovery address.
+    """
     return ProviderDraft.create(
+        allow_http=request.app.state.settings.environment != "prod",
         key=key if key is not None else form.text("key"),
         name=form.text("name"),
         discovery_url=form.text("discovery_url"),
@@ -457,7 +461,7 @@ async def create_provider(
     form = await read_form(request, locale)
     try:
         provider = await service(request).create(
-            context.principal, org, _draft(form), _secret(form)
+            context.principal, org, _draft(request, form), _secret(form)
         )
     except DomainError as error:
         raise_refusal(error)
@@ -484,7 +488,7 @@ async def update_provider(
     form = await read_form(request, locale)
     try:
         changed = await service(request).update(
-            context.principal, org, idp_key, _draft(form, idp_key), _secret(form)
+            context.principal, org, idp_key, _draft(request, form, idp_key), _secret(form)
         )
     except DomainError as error:
         raise_refusal(error)

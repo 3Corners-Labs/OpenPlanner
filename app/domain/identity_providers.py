@@ -85,14 +85,20 @@ def _check_text(value: str, name: str, max_length: int) -> str:
     return text
 
 
-def is_discovery_url(value: str) -> bool:
-    """Return whether ``value`` is an ``https`` discovery URL without query or fragment."""
-    if len(value) > MAX_URL_LENGTH or not value.startswith("https://"):
+def is_discovery_url(value: str, *, allow_http: bool = False) -> bool:
+    """Return whether ``value`` is a discovery URL without query or fragment.
+
+    ``https`` only, except with ``allow_http`` (outside production, for a provider on the
+    lab network): the outbound guard relaxes the same check there, and the fetch is still
+    refused in production whatever the form accepted (ADR 0083 point 8).
+    """
+    scheme = next((s for s in ("https://", "http://") if value.startswith(s)), "")
+    if len(value) > MAX_URL_LENGTH or not scheme or (scheme == "http://" and not allow_http):
         return False
     if any(c in value for c in "?#@ ") or _CONTROL_CHARS.search(value):
         return False
     base = value[: -len(DISCOVERY_SUFFIX)]
-    return value.endswith(DISCOVERY_SUFFIX) and len(base) > len("https://")
+    return value.endswith(DISCOVERY_SUFFIX) and len(base) > len(scheme)
 
 
 def issuer_of(discovery_url: str) -> str:
@@ -162,15 +168,16 @@ class ProviderDraft:
         mfa_policy: str = MfaPolicy.RECORD.value,
         mfa_amr_values: str = "",
         mfa_acr_values: str = "",
+        allow_http: bool = False,
     ) -> "ProviderDraft":
-        """Validate the submitted values.
+        """Validate the submitted values; ``allow_http`` accepts a lab provider's ``http`` URL.
 
         Raises:
             DomainError: ``invalid_configuration`` naming the field.
         """
         if _KEY.fullmatch(key) is None:
             raise _invalid("key")
-        if not is_discovery_url(discovery_url.strip()):
+        if not is_discovery_url(discovery_url.strip(), allow_http=allow_http):
             raise _invalid("discovery_url")
         try:
             auth = ClientAuth(client_auth)
