@@ -481,7 +481,7 @@ sequenceDiagram
     S-->>W: receipt (token, only in memory)
     W-->>C: 303 /g/demo/booked (no token, ADR 0056)
     K->>M: request to confirm + confirm link
-    C->>W: GET /b/{token}/confirm, then POST (same-origin)
+    C->>W: GET /b/{token}/confirm: 303 to /b/m/{ref}/confirm (cookie set), then POST (same-origin)
     W->>S: confirm(token): before confirm_by? confirmed, plan jobs
     loop every poll interval
         K->>DB: claim due jobs (write lock)
@@ -583,7 +583,7 @@ sequenceDiagram
     A->>X: accept
     X-->>O: webhook task:connected (signed)
     A->>W: open meeting link in the Webex app, cohost
-    C->>O: GET /b/{token}/join/go
+    C->>O: GET /b/m/{ref}/join/go (participant cookie)
     O-->>C: 303 to the Webex link
     C->>W: join in the browser, waits in the lobby
     W-->>O: webhooks: started, host joined, guest joined (signed)

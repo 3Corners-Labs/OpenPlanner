@@ -9,6 +9,7 @@ holds the booking gets the same answer whether or not the booking exists (``link
 and draws on the budget for links that match nothing.
 """
 
+import re
 from datetime import timedelta
 
 from fastapi import Request
@@ -17,10 +18,14 @@ from starlette.responses import RedirectResponse
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.participant_links import PublicRef
+from app.domain.services import BookingService
 from app.web.cookies import CookieSpec, cookie_for, set_cookie
+from app.web.organisation_settings import follow
 
 COOKIE_BASE = "op_link"
 """The cookie's name without the ``__Host-`` prefix (ADR 0093 point 2)."""
+
+_LANG = re.compile(r"[a-z]{2}(-[A-Za-z]{2})?")
 
 PLAIN_PATH = "/b"
 """The path over plain http (development); the prefixed name requires ``/``."""
@@ -72,3 +77,25 @@ async def start(request: Request, booking_id: int, target: str) -> RedirectRespo
     response.headers["cache-control"] = "no-store"  # it carries a cookie
     set_cookie(response, spec, value, int(lifetime(request).total_seconds()))
     return response
+
+
+def _lang_query(request: Request) -> str:
+    """Return ``?lang=xx`` when the link carried a well-formed language, else nothing."""
+    lang = request.query_params.get("lang", "")
+    return f"?lang={lang}" if _LANG.fullmatch(lang) else ""
+
+
+async def exchange(request: Request, token: str, suffix: str = "") -> RedirectResponse:
+    """Trade a management token for the participant cookie and go to the page without it.
+
+    The token is checked as always (ADR 0011: unknown ones become ``booking_not_found`` and
+    count against the budget for links that match nothing). On success the browser may use
+    the booking and is redirected to ``/b/m/{public_ref}{suffix}`` (ADR 0093), so only the
+    final address, free of any credential, stays in the history.
+    """
+    service_: BookingService = request.app.state.booking_service
+    details = await service_.find(token)
+    follow(request, details.group.organisation_id)
+    booking = details.booking
+    target = f"/b/m/{booking.public_ref}{suffix}{_lang_query(request)}"
+    return await start(request, booking.id or 0, target)

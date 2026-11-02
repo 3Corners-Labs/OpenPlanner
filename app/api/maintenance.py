@@ -6,8 +6,9 @@ machine API, and a test checks that every public route is either closed or expli
 no route can forget it.
 
     closed    /g/{slug} (and /book, /direct), /b/{token}/cancel, /b/{token}/reschedule,
-              /b/{token}/wait/leave, and under the reference of ADR 0093 /b/m/{ref}/cancel,
-              /b/m/{ref}/reschedule, /b/m/{ref}/test
+              /b/{token}/test, /b/{token}/wait/leave, and under the reference of ADR 0093
+              /b/m/{ref}/cancel, /b/m/{ref}/reschedule, /b/m/{ref}/test (and /test/go),
+              /b/m/{ref}/wait/leave
               ─► 503 + Retry-After: the maintenance page instead of the form or the write
     open      the booking page /b/{token} and /b/m/{ref}, the closure page /g/{slug}/closure
               (ADR 0037), waiting and join pages, health, brand assets, webhooks (they record what
@@ -56,6 +57,8 @@ BOOKING_ROUTES = frozenset(
         "/b/m/{public_ref}/cancel",
         "/b/m/{public_ref}/reschedule",
         "/b/m/{public_ref}/test",
+        "/b/m/{public_ref}/test/go",
+        "/b/m/{public_ref}/wait/leave",
     }
 )
 """Participant routes under a management link that close (both the form and the write). The trial
@@ -88,6 +91,9 @@ OPEN_ROUTES = frozenset(
         "/b/m/{public_ref}",
         "/b/m/{public_ref}/confirm",
         "/b/m/{public_ref}/join",
+        "/b/m/{public_ref}/join/go",
+        "/b/m/{public_ref}/wait",
+        "/b/m/{public_ref}/wait/status",
         "/healthz",
         "/readyz",
         "/o/{slug}/theme.css",
