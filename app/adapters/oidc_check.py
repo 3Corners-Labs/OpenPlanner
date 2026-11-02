@@ -52,18 +52,57 @@ class OidcTarget:
         return self.expected_issuer or issuer_of(self.discovery_url)
 
 
+ADVERTISED = (
+    "response_types_supported",
+    "grant_types_supported",
+    "code_challenge_methods_supported",
+    "token_endpoint_auth_methods_supported",
+    "id_token_signing_alg_values_supported",
+    "acr_values_supported",
+)
+"""The discovery lists an IdP administrator attaches to the dossier (WP-C2)."""
+
+MAX_ADVERTISED_VALUES = 20
+MAX_ADVERTISED_LENGTH = 100
+"""Bounds on what is copied out of a provider's document: it is not ours."""
+
+
+@dataclass(frozen=True)
+class OidcInspection:
+    """The findings of one check, and what the provider announced for the evidence report.
+
+    Attributes:
+        results: The findings, as ``check_oidc`` returns them.
+        announced: The ``ADVERTISED`` lists the document carries, bounded; empty when the
+            document was unusable.
+    """
+
+    results: list[CheckResult]
+    announced: dict[str, tuple[str, ...]]
+
+
 async def check_oidc(http: httpx.AsyncClient, target: OidcTarget) -> list[CheckResult]:
     """Return the findings; stop after the discovery when the document is unusable."""
+    return (await inspect_oidc(http, target)).results
+
+
+async def inspect_oidc(http: httpx.AsyncClient, target: OidcTarget) -> OidcInspection:
+    """Run the checks of ``check_oidc`` and keep what the discovery document announced.
+
+    One discovery read serves both, so the evidence report cannot disagree with the check.
+    """
     results = _local_checks(target)
     try:
         response = await http.get(target.discovery_url)
     except httpx.HTTPError as exc:
-        return [CheckResult("discovery", None, False, type(exc).__name__), *results]
+        failed = CheckResult("discovery", None, False, type(exc).__name__)
+        return OidcInspection([failed, *results], {})
     metadata = _metadata(response)
     if metadata is None:
         hint = f"no usable discovery document ({', '.join(REQUIRED_METADATA)} required)"
-        return [CheckResult("discovery", response.status_code, False, hint), *results]
-    return [
+        failed = CheckResult("discovery", response.status_code, False, hint)
+        return OidcInspection([failed, *results], {})
+    found = [
         _issuer(response.status_code, str(metadata["issuer"]), target.issuer),
         _endpoints(metadata, target.require_https),
         _algorithms(metadata),
@@ -71,6 +110,21 @@ async def check_oidc(http: httpx.AsyncClient, target: OidcTarget) -> list[CheckR
         await _signing_keys(http, str(metadata["jwks_uri"])),
         *results,
     ]
+    return OidcInspection(found, _announced(metadata))
+
+
+def _announced(metadata: dict[str, Any]) -> dict[str, tuple[str, ...]]:
+    """Return the ``ADVERTISED`` lists of the document, as short strings only."""
+    found: dict[str, tuple[str, ...]] = {}
+    for key in ADVERTISED:
+        values = metadata.get(key)
+        if isinstance(values, list):
+            found[key] = tuple(
+                value[:MAX_ADVERTISED_LENGTH]
+                for value in values[:MAX_ADVERTISED_VALUES]
+                if isinstance(value, str)
+            )
+    return found
 
 
 def _metadata(response: httpx.Response) -> dict[str, Any] | None:

@@ -62,6 +62,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WORKER_HEARTBEAT_MAX_AGE_SECONDS` | float | `120.0` | Age after which the worker healthcheck fails. |
 | `APP_VERSION` | string | `""` | Baked into release images (ADR 0029). |
 | `APP_COMMIT` | string | `""` | Git commit baked into every image (ADR 0052). |
+| `APP_IMAGE_DIGEST` | string | `""` | Registry digest the host pinned this image at, for the evidence report (WP-C2). |
 | `INSTALLATION_NAME` | string | `""` | Name of this installation in every log line and event record (ADR 0040/0034). |
 | `WEBEX_API_BASE_URL` | url | `https://webexapis.com/v1` | Webex API endpoint; changed only for test doubles. |
 | `SIMULATOR_ENABLED` | bool | `false` | Platform-event simulator on admin booking pages; refused in production. |
