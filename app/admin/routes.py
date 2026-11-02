@@ -67,6 +67,7 @@ from app.admin import (
     simulator_routes,
     staff_directory_routes,
     staff_routes,
+    staff_status_routes,
     update_routes,
 )
 from app.admin.authz import (
@@ -125,6 +126,7 @@ from app.domain.errors import DomainError
 from app.domain.identity import PLATFORM
 from app.domain.login_service import (
     AMBIGUOUS_CLAIMS,
+    SUSPENDED,
     TOO_MANY_ENTITLEMENTS,
     LoginRefusedError,
 )
@@ -152,6 +154,7 @@ LOGIN_REFUSED_TEXTS: dict[str, str] = {
     AMBIGUOUS_CLAIMS: "admin.login_refused.ambiguous_claims",
     TOO_MANY_ENTITLEMENTS: "admin.login_refused.too_many_entitlements",
     MFA_REQUIRED: "admin.login_refused.mfa_required",
+    SUSPENDED: "admin.login_refused.suspended",
 }
 """What the error page says per refusal reason of the login service (ADR 0049)."""
 
@@ -657,6 +660,7 @@ def register_admin(app: FastAPI) -> None:
         staff_directory_routes.router,
         staff_routes.router,
         session_routes.router,
+        staff_status_routes.router,
         group_routes.router,
         call_routes.router,
         agenda_routes.router,

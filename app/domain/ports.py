@@ -65,7 +65,13 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
-from app.domain.staff import GrantHolders, RefusedEntitlement, StaffFilter, StaffMember
+from app.domain.staff import (
+    GrantHolders,
+    RefusedEntitlement,
+    StaffFilter,
+    StaffMember,
+    StaffStatus,
+)
 from app.domain.staff_directory import DirectoryUser, NewStaffMember, StaffAction
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
@@ -684,6 +690,18 @@ class Transaction(Protocol):
 
     async def save_staff(self, member: StaffMember) -> None:
         """Create or replace the staff record of ``member.subject`` and its memberships."""
+        ...
+
+    async def set_staff_status(self, subject: str, status: StaffStatus, at: datetime) -> None:
+        """Set the status of ``subject`` (suspended or active again); unknown ones are ignored."""
+        ...
+
+    async def erase_staff(self, subject: str, at: datetime) -> None:
+        """Erase the record of ``subject`` (ADR 0046 point 9); the subject and times stay.
+
+        The name, roles, memberships and refused values go and the status becomes ``erased``;
+        an unknown or already erased subject is ignored, so the retention job can run twice.
+        """
         ...
 
     async def add_admin_session(self, session: AdminSession) -> None:

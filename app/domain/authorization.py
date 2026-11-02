@@ -119,6 +119,8 @@ class Permission(StrEnum):
     """ADR 0095: create, change and disable staff in the platform's own identity provider."""
     STAFF_RESET_PASSWORD = "staff.reset_password"  # noqa: S105  # nosec B105 - a permission name
     """ADR 0095: mail a staff member a password reset or invitation link."""
+    STAFF_ERASE = "staff.erase"
+    """ADR 0046 point 9: erase a suspended person's record; superuser only, locked."""
     EMBEDDING_MANAGE = "embedding.manage"
     QUEUE_WORK = "queue.work"
     SETTINGS_PLATFORM_VIEW = "settings.platform.view"
@@ -180,6 +182,8 @@ LEVELS: dict[Permission, Level] = {
     # ADR 0095: staff of the bundled identity provider, per organisation.
     Permission.STAFF_MANAGE: Level.ORGANISATION,
     Permission.STAFF_RESET_PASSWORD: Level.ORGANISATION,
+    # ADR 0046 point 9: erasing a person's record is the superuser's alone.
+    Permission.STAFF_ERASE: Level.GLOBAL,
     # ADR 0035: on which websites the organisation's groups may be embedded.
     Permission.EMBEDDING_MANAGE: Level.ORGANISATION,
     # ADR 0043: see and claim the bookings in a group's own queue.
@@ -221,6 +225,7 @@ LOCKED_PERMISSIONS = frozenset(
         Permission.SETTINGS_LOGIN_MANAGE,
         Permission.IDENTITY_PROVIDERS_MANAGE,
         Permission.LOGGING_MANAGE,
+        Permission.STAFF_ERASE,
     }
 )
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
@@ -272,6 +277,7 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
     # ADR 0095: changing people presumes seeing them.
     Permission.STAFF_MANAGE: frozenset({Permission.STAFF_VIEW}),
     Permission.STAFF_RESET_PASSWORD: frozenset({Permission.STAFF_VIEW}),
+    Permission.STAFF_ERASE: frozenset({Permission.STAFF_VIEW}),
 }
 """ADR 0039: permissions a permission depends on; a custom role must hold them too."""
 

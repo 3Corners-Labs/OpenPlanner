@@ -162,3 +162,22 @@ rule that the stricter of claims and SCIM state applies.
 | U2 | Does "staff" mean admin-portal users only, or also contact-center agents (who never log in here)? | Admin-portal users only; agents live in WxCC. |
 | U3 | May a `group_admin` see the staff of their own groups? | Yes, read-only. |
 | U4 | Build SCIM now or after the JIT overview? | After: PRs 1–2 first, SCIM when the PingFederate provisioner is confirmed (O3). |
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | `staff` table, JIT upsert at login, overview and detail pages, memberships, refused values | #61 | built |
+| 2a | End sessions (points 8 and 10): moved to ADR 0098 (the server-side register, `staff.manage` on a person's page) | #350, #381, #399 | built |
+| 2b | Suspend and reinstate (point 7): `staff.status`, login refused, sessions ended in the same transaction, a superuser only touched by a superuser, `staff.suspended` / `staff.reinstated` | this PR | in PR |
+| 2c | Erase (point 9): `staff.erase` (superuser, locked), automatic after `staff_retention_days` in the worker's daily housekeeping, `staff.erased`, "erased staff member" in the audit log | this PR | in PR |
+| 2d | CSV export of the listing for an access review (point 6, `staff.exported`) | | follow-up |
+| 3 | SCIM 2.0 (points 11 to 14) | | planned |
+
+Settled while building step 2: the subject of an erased record stays, as the ADR says (point 9),
+so the audit log still resolves to "an erased person"; it is a pseudonym that goes with the
+audit events (`AUDIT_RETENTION_DAYS`). The status check of point 10 is not a per-request read of
+`sessions_valid_after` any more: ADR 0098 holds the session on the server, suspending ends the
+person's sessions in the same transaction, and the login refuses a suspended subject.
+`StaffStatus` has no `deprovisioned` yet; step 3 adds it.
+

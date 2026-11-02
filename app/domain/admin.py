@@ -59,6 +59,7 @@ from app.domain.staff import (
     RefusedEntitlement,
     StaffFilter,
     StaffMember,
+    StaffStatus,
     change_events,
 )
 from app.domain.tasks import ActiveJobs
@@ -235,6 +236,8 @@ class AdminService:
         async with self._uow.locked() as tx:
             await self._record_session_event(tx, principal, LOGIN_EVENT, memberships)
             old = await tx.get_staff(principal.subject)
+            if old is not None and old.status is StaffStatus.ERASED:
+                old = None  # an erased person who returns starts a fresh record (ADR 0046)
             new = StaffMember(
                 subject=principal.subject,
                 display_name=principal.display_name,

@@ -3773,6 +3773,9 @@ msgstr "The database is larger than the configured maximum."
 msgid "audit.actor.system"
 msgstr "System"
 
+msgid "audit.actor.erased"
+msgstr "Erased staff member"
+
 msgid "audit.outcome.retry"
 msgstr "Will be retried"
 
@@ -5716,6 +5719,9 @@ msgstr "Manage staff"
 msgid "authz.permission.staff_reset_password"
 msgstr "Send a password reset or invitation"
 
+msgid "authz.permission.staff_erase"
+msgstr "Erase a staff member's data"
+
 msgid "admin.nav.staff"
 msgstr "Staff"
 
@@ -5724,6 +5730,15 @@ msgstr "First login"
 
 msgid "audit.event.staff_changed"
 msgstr "Roles or memberships changed"
+
+msgid "audit.event.staff_suspended"
+msgstr "Staff member suspended"
+
+msgid "audit.event.staff_reinstated"
+msgstr "Suspension lifted"
+
+msgid "audit.event.staff_erased"
+msgstr "Staff member data erased"
 
 msgid "admin.audit.detail.role_add"
 msgstr "role added: {value}"
@@ -6135,6 +6150,9 @@ msgstr "Manage staff in the portal"
 
 msgid "settings.field.staff_last_seen_interval_seconds.label"
 msgstr "Last-seen update interval (seconds)"
+
+msgid "settings.field.staff_retention_days.label"
+msgstr "Erase staff data after (days without a login)"
 
 msgid "settings.field.system_event_retention_days.label"
 msgstr "Keep system events (days)"
@@ -7645,6 +7663,9 @@ msgstr "Your account sends more rights than OpenPlanner can handle. Ask the IdP 
 msgid "admin.login_refused.mfa_required"
 msgstr "Sign-in was refused: your account shows no second factor (MFA). Set up multi-factor authentication at your identity provider and sign in again; if it keeps failing, contact the IdP team."
 
+msgid "admin.login_refused.suspended"
+msgstr "Sign-in was refused: your access to the admin portal is suspended. Contact the administrator of your organisation."
+
 msgid "admin.rights_not_recognised.text"
 msgstr "Your account has rights for OpenPlanner that this installation does not recognise. Contact your administrator; your page under Staff shows which values were not recognised."
 
@@ -9006,6 +9027,15 @@ msgstr "Your other sessions have been ended. Number: {count}."
 msgid "admin.done.sessions_ended_person"
 msgstr "The sessions of this staff member have been ended. Number: {count}. They have to log in again."
 
+msgid "admin.done.staff_suspended"
+msgstr "The staff member is suspended and their sessions have ended."
+
+msgid "admin.done.staff_reinstated"
+msgstr "The suspension is lifted. The staff member can log in again."
+
+msgid "admin.done.staff_erased"
+msgstr "The staff member's data is erased."
+
 msgid "admin.sessions.title"
 msgstr "My sessions"
 
@@ -9047,6 +9077,36 @@ msgstr "Ends all sessions of this staff member in the admin portal, also those f
 
 msgid "admin.staff.sessions.end_all"
 msgstr "End all sessions"
+
+msgid "admin.staff.erased_name"
+msgstr "Erased staff member"
+
+msgid "admin.staff.status.suspended"
+msgstr "Suspended"
+
+msgid "admin.staff.status.erased"
+msgstr "Erased"
+
+msgid "admin.staff.status.heading"
+msgstr "Access"
+
+msgid "admin.staff.status.suspend_intro"
+msgstr "Suspending blocks access to the admin portal, even if the identity provider still grants the rights, and ends all sessions of this staff member. You can lift the suspension later."
+
+msgid "admin.staff.status.suspend"
+msgstr "Suspend staff member"
+
+msgid "admin.staff.status.reinstate_intro"
+msgstr "Lifting the suspension lets the staff member log in again; their rights come from the identity provider afresh."
+
+msgid "admin.staff.status.reinstate"
+msgstr "Lift suspension"
+
+msgid "admin.staff.status.erase_intro"
+msgstr "Erasing removes the name, roles and memberships of this suspended staff member. The audit log keeps pointing to an erased staff member. This cannot be undone."
+
+msgid "admin.staff.status.erase"
+msgstr "Erase data"
 
 msgid "admin.rights.sections"
 msgstr "Parts of My rights"

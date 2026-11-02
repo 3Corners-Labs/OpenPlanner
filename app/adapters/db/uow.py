@@ -157,6 +157,7 @@ from app.domain.scheduling import (
     ScheduleRule,
     TimeWindow,
 )
+from app.domain.staff import StaffStatus
 from app.domain.tasks import ActiveJob, ActiveJobs, JobState
 from app.domain.theme import Theme
 from app.domain.worker_check import WorkerHeartbeat
@@ -529,7 +530,7 @@ class SqlTransaction(
     ) -> list[AuditEntry]:
         """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0031)."""
         query = (
-            select(AuditEventRow, StaffRow.display_name)
+            select(AuditEventRow, StaffRow.display_name, StaffRow.status)
             .outerjoin(StaffRow, StaffRow.subject == AuditEventRow.actor)
             .where(scope_filter(scope, AuditEventRow.organisation, AuditEventRow.group))
         )
@@ -571,13 +572,15 @@ class SqlTransaction(
     async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
         """Return the newest audit events with one of ``actions``, with the actors' names."""
         query = (
-            select(AuditEventRow, StaffRow.display_name)
+            select(AuditEventRow, StaffRow.display_name, StaffRow.status)
             .outerjoin(StaffRow, StaffRow.subject == AuditEventRow.actor)
             .where(AuditEventRow.action.in_(list(actions)))
         )
         return await self._entries(query, limit)
 
-    async def _entries(self, query: Select[AuditEventRow, str], limit: int) -> list[AuditEntry]:
+    async def _entries(
+        self, query: Select[AuditEventRow, str, str], limit: int
+    ) -> list[AuditEntry]:
         """Run an audit query newest first and map the rows with the actors' names."""
         rows = await self._session.execute(
             query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
@@ -602,9 +605,10 @@ class SqlTransaction(
                     event_id=row.event_id,
                     message=row.message,
                 ),
-                name,
+                name or None,
+                status == StaffStatus.ERASED.value,
             )
-            for row, name in rows
+            for row, name, status in rows
         ]
 
     async def delete_audit_events(

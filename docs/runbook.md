@@ -470,8 +470,14 @@ not end the session OpenPlanner already holds. The route is:
    new login needs the identity provider, which now refuses it.
 4. Only when the whole installation is at risk, end all sessions on the host (above). It also
    logs out everyone else, who log in again.
-5. Remove the person's roles in the portal (*Staff*) so a login by another route grants
-   nothing, and note the date for the audit trail.
+5. Suspend the person in the portal (*Staff*, *Suspend staff member*, `staff.manage`, ADR 0046
+   step 2): a login is refused whatever the identity provider says, and their sessions end in
+   the same step (`staff.suspended`). Lift it with *Lift suspension* if the person returns.
+6. The superuser may erase a suspended person's name, roles and memberships (`staff.erase`).
+   It also happens by itself after `STAFF_RETENTION_DAYS` (default 365) without a login: the
+   worker's daily housekeeping writes `staff.erased` and logs `staff.erased` with a count. A
+   `staff.erase_failed` warning in the worker log means the run failed; the next run repeats it
+   (it is idempotent). Note the date for the audit trail.
 
 The cookie name follows `PUBLIC_BASE_URL` (ADR 0098 step 4), not `ENVIRONMENT`. On an `https://`
 address the cookie is `__Host-op_admin` with `Path=/`, `Secure`, `HttpOnly`, `SameSite=Lax` and

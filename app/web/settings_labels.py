@@ -28,6 +28,7 @@ SETTING_LABELS: dict[str, str] = {
     "staff_invite_expiry_days": "settings.field.staff_invite_expiry_days.label",
     "staff_directory_enabled": "settings.field.staff_directory_enabled.label",
     "staff_last_seen_interval_seconds": "settings.field.staff_last_seen_interval_seconds.label",
+    "staff_retention_days": "settings.field.staff_retention_days.label",
     "system_event_retention_days": "settings.field.system_event_retention_days.label",
     "group_erase_after_days": "settings.field.group_erase_after_days.label",
     "integration_request_retention_days": (
