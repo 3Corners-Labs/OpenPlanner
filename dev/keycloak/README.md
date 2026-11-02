@@ -4,8 +4,10 @@ Stands in for PingFederate in development and CI (ADR 0013). Started by
 `docker compose --profile dev up` and imported from `openplanner-realm.json`.
 
 Every password in this realm is the development-only value `dev-only-password`; the client
-secret is `dev-only-openplanner-admin-secret`. They exist only for local testing and never
-reach production, which uses PingFederate.
+secret is `dev-only-openplanner-admin-secret`. The service account `openplanner-directory`
+(secret `dev-only-openplanner-directory-secret`, roles `manage-users` and `view-realm`) lets the
+portal manage staff on Manage › Staff (ADR 0095, ADR 0106); `.env.example` points the app at
+it. They exist only for local testing and never reach production, which refuses `dev-only-`.
 
 | User | Role | Scope | Purpose |
 |---|---|---|---|

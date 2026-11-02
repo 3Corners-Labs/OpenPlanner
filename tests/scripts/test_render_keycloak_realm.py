@@ -91,6 +91,23 @@ def test_the_directory_service_account_may_only_manage_users() -> None:
     assert "realmRoles" not in account
 
 
+def test_the_development_realm_has_the_same_directory_service_account() -> None:
+    """ADR 0106 point 2: staff management works under ``--profile dev`` too."""
+    dev = json.loads(DEV_REALM.read_text())
+    template = json.loads(TEMPLATE.read_text())
+
+    def directory(realm: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        client = next(c for c in realm["clients"] if c["clientId"] == "openplanner-directory")
+        account = next(
+            u for u in realm["users"] if u.get("serviceAccountClientId") == client["clientId"]
+        )
+        return {k: v for k, v in client.items() if k != "secret"}, account
+
+    assert directory(dev) == directory(template)
+    dev_client = next(c for c in dev["clients"] if c["clientId"] == "openplanner-directory")
+    assert dev_client["secret"].startswith("dev-only-")
+
+
 def test_the_template_keeps_the_development_realm_contract() -> None:
     """Same client mappers and the same roles for ``super`` as development, so a login that
     works against ``dev`` works against the bundled provider."""
@@ -149,6 +166,33 @@ def test_missing_values_are_generated_and_kept_private(tmp_path: Path) -> None:
         env["KC_OPENPLANNER_CLIENT_SECRET"]
         in (tmp_path / "secrets/keycloak-realm.json").read_text()
     )
+
+
+def test_the_application_half_carries_the_realm_s_directory_secret(tmp_path: Path) -> None:
+    """ADR 0106 point 2: web and worker get the directory without a value copied by hand."""
+    env = "".join(f"{key}={value}\n" for key, value in FIXED.items())
+    result = render(tmp_path, env)
+    assert result.returncode == 0, result.stderr
+
+    app = read_env(tmp_path / "secrets/keycloak-app.env")
+    realm = json.loads((tmp_path / "secrets/keycloak-realm.json").read_text())
+    client = next(c for c in realm["clients"] if c["clientId"] == "openplanner-directory")
+    assert app == {
+        "KEYCLOAK_ADMIN_URL": "http://idp:8080/admin/realms/openplanner",
+        "KEYCLOAK_DIRECTORY_CLIENT_ID": "openplanner-directory",
+        "KEYCLOAK_DIRECTORY_CLIENT_SECRET": FIXED["KC_DIRECTORY_CLIENT_SECRET"],
+    }
+    assert client["secret"] == app["KEYCLOAK_DIRECTORY_CLIENT_SECRET"]
+    assert mode(tmp_path / "secrets/keycloak-app.env") == 0o600
+    assert FIXED["KC_DIRECTORY_CLIENT_SECRET"] not in result.stdout + result.stderr
+
+
+def test_web_and_worker_read_the_application_half_after_env() -> None:
+    """The rendered directory values win over ``.env``: they must equal the realm's."""
+    text = (REPO / "docker-compose.yml").read_text()
+    block = text[text.index("x-app: &app") : text.index("\nservices:")]
+
+    assert block.index("- path: .env") < block.index("- path: secrets/keycloak-app.env")
 
 
 def test_existing_values_are_kept_on_a_second_run(tmp_path: Path) -> None:
