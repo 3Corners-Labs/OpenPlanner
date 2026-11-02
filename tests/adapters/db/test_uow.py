@@ -152,19 +152,41 @@ async def test_closed_day_is_respected(engine: AsyncEngine, service: BookingServ
     assert await service.availability("aangifte", MONDAY, MONDAY) == []
 
 
+PATIENT_BUSY_TIMEOUT_MS = 60_000
+"""A lock wait no test should ever reach: waiting costs nothing while the lock frees up."""
+
+
 async def test_concurrent_bookings_on_separate_connections(
     engine: AsyncEngine, database_url: str
 ) -> None:
+    """Two bookings for the last place never overbook, whichever one gets the lock first.
+
+    The contenders queue behind a third connection that holds the write lock, so the
+    contention is certain instead of depending on scheduling. Both wait patiently: the shared
+    ``engine`` fixture has a 200 ms busy timeout (it is meant to make ``database_busy`` fast to
+    provoke, see the next test), and a loser on that engine would otherwise give up with
+    ``database_busy`` on a slow machine before the winner commits. ``database_busy`` is a correct
+    answer of the app to a lock that stays taken, not to the loser of a race, so only
+    ``slot_full`` is accepted for the loser.
+    """
     await seed_group(engine)
-    other_engine = create_engine(database_url, busy_timeout_ms=5000)
-    services = [
-        BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY),
-        BookingService(SqlUnitOfWork(other_engine), FixedClock(NOW), TEST_TOKEN_KEY),
+    engines = [
+        create_engine(database_url, busy_timeout_ms=PATIENT_BUSY_TIMEOUT_MS),
+        create_engine(database_url, busy_timeout_ms=PATIENT_BUSY_TIMEOUT_MS),
     ]
+    blocker = create_engine(database_url)
     try:
-        results = await asyncio.gather(*(book(s) for s in services), return_exceptions=True)
+        services = [
+            BookingService(SqlUnitOfWork(e), FixedClock(NOW), TEST_TOKEN_KEY) for e in engines
+        ]
+        async with hold_write_lock(blocker):
+            pending = [asyncio.ensure_future(book(s)) for s in services]
+            await asyncio.sleep(0.1)  # both are now queued behind the blocker
+            assert not any(task.done() for task in pending)
+        results = await asyncio.gather(*pending, return_exceptions=True)
     finally:
-        await other_engine.dispose()
+        for e in (*engines, blocker):
+            await e.dispose()
 
     successes = [r for r in results if not isinstance(r, BaseException)]
     failures = [r for r in results if isinstance(r, BaseException)]
