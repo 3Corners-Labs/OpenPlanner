@@ -2,7 +2,8 @@
 
 Status: proposed (2026-11-02), requested by the product owner after the first syslog test on
 docker01. Extends ADR 0040 (part 2, the event schema: `openplanner.event/2` becomes
-`openplanner.event/3`) and ADR 0085 (what a destination receives). Not built.
+`openplanner.event/3`) and ADR 0085 (what a destination receives). Not built yet: step 1 (the
+register) is in PR #416.
 
 ## Context
 
@@ -122,7 +123,7 @@ closed list for the same reason.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #412 | in PR |
-| 1 | The register (`app/domain/log_events.py`) with every current action and trace point, the scan test, `docs/logging.md` generated | | planned |
+| 1 | The register (`app/domain/log_events.py`) with every current action and trace point, the scan test, `docs/logging.md` generated | #416 | in PR |
 | 2 | `openplanner.event/3`: envelope on every line, message from the template, `error.message`, `labels.*`, `actor.type` and `actor.role`, library lines; `docs/audit-events.md`, CSV export | | planned |
 | 3 | Category `authz` for destinations, syslog `MSGID` from the category | | planned |
 | 4 | Installer writes `INSTALLATION_NAME`; warning on *System status* | | planned |
