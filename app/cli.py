@@ -93,6 +93,7 @@ from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.diagnostics import CheckResult, format_report, passed, run_checks
 from app.adapters.integrations import build_integrations, installation_box, secret_box
+from app.adapters.live_settings import LiveSettings
 from app.adapters.oidc import claim_mapping, login_claims
 from app.adapters.oidc_check import OidcTarget, check_oidc
 from app.adapters.registrations import (
@@ -138,7 +139,7 @@ from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
-from app.domain.ports import CertificateProbe, IdentityError, IntegrationError
+from app.domain.ports import CertificateProbe, Clock, IdentityError, IntegrationError
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
@@ -473,6 +474,17 @@ async def _rekey(settings: Settings) -> tuple[str, int]:
     )
 
 
+async def _live_settings(settings: Settings, uow: SqlUnitOfWork, clock: Clock) -> LiveSettings:
+    """Return the effective settings with the portal values, so the CLI applies the same limits.
+
+    A tool that decides what to purge must read the organisation's maximum (ADR 0102, class D)
+    like the worker does; a failed read keeps the environment's values (``LiveSettings``).
+    """
+    live = LiveSettings(settings, environment(), PlatformSettingsStore(uow), clock)
+    await live.refresh()
+    return live
+
+
 async def _purge_overdue(settings: Settings, dry_run: bool = False) -> tuple[str, bool]:
     """Run the retention sweep once and report counts (WP-A1); the second item is success.
 
@@ -480,7 +492,10 @@ async def _purge_overdue(settings: Settings, dry_run: bool = False) -> tuple[str
     """
     engine = create_engine(settings.database_url)
     try:
-        result = await RetentionSweep(SqlUnitOfWork(engine), SystemClock()).run(dry_run=dry_run)
+        uow = SqlUnitOfWork(engine)
+        clock = SystemClock()
+        live = await _live_settings(settings, uow, clock)
+        result = await RetentionSweep(uow, clock, live.closure_retention).run(dry_run=dry_run)
         if result.purged:
             await checkpoint_wal(engine)  # WP-A3: no older copy of the data stays in the WAL
     finally:
@@ -815,8 +830,11 @@ async def _closures(settings: Settings) -> AsyncIterator[ClosureService]:
     try:
         uow = SqlUnitOfWork(engine, secret_box(settings))
         clock = SystemClock()
-        bookings = BookingService(uow, clock, management_token_key(settings))
-        yield ClosureService(uow, clock, AdminService(uow, clock), bookings)
+        live = await _live_settings(settings, uow, clock)
+        bookings = BookingService(
+            uow, clock, management_token_key(settings), closure_retention=live.closure_retention
+        )
+        yield ClosureService(uow, clock, AdminService(uow, clock), bookings, live.closure_retention)
     finally:
         await engine.dispose()
 

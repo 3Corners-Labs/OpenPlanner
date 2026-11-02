@@ -155,3 +155,21 @@ async def test_headings_and_the_contact_copy_round_trip_and_follow_an_update(
 
     assert stored is not None
     assert (stored.headings, stored.contacts) == ({"nl": "Storing"}, block)
+
+
+async def test_the_latest_end_of_the_bookings_on_hold_is_a_time_only_read(
+    engine: AsyncEngine,
+) -> None:
+    uow, _, booking_id = await _closed(engine)
+
+    async with uow.read() as tx:
+        closure_id = (await tx.get_booking(booking_id)).closure_id  # type: ignore[union-attr]
+        latest = await tx.latest_suspended_end(closure_id or 0)
+        nothing = await tx.latest_suspended_end(999)
+    async with uow.locked() as tx:
+        await tx.purge_personal_data(booking_id, NOW)
+
+    assert latest == SLOT_0900 + timedelta(minutes=30)
+    assert nothing is None
+    async with uow.read() as tx:
+        assert await tx.latest_suspended_end(closure_id or 0) is None  # purged: nothing on hold

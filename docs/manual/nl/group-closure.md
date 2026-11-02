@@ -77,7 +77,12 @@ nog kunnen doorgaan weer bevestigd worden; de deelnemer krijgt dan een e-mail.
 De lijst toont per afspraak het kenmerk en de oorspronkelijke tijd, nooit de gegevens van de
 deelnemer. Per afspraak kunt u verplaatsen naar een vrije tijd, weer bevestigen of annuleren, of
 alles in één keer. De persoonsgegevens van een afspraak die opgeschort blijft, worden 30 dagen
-na het einde van de sluiting verwijderd.
+na het einde van de sluiting verwijderd, en in elk geval uiterlijk het maximum van de
+organisatie na de oorspronkelijke afspraak (90 dagen, tenzij de organisatiebeheerder een ander
+aantal tussen 30 en 180 heeft ingesteld), ook als de sluiting geen einde heeft. Ongeveer 14 dagen
+daarvoor toont het auditlogboek van het team de
+systeemgebeurtenis `closure.retention_notice` met de datum; hef de sluiting op of verplaats de afspraken vóór die datum. De pagina van de sluiting
+toont de deelnemers de dag waarop hun gegevens uiterlijk worden verwijderd.
 
 ## Wat wordt vastgelegd
 

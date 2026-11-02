@@ -2487,6 +2487,9 @@ msgstr "Meer over de sluiting en andere manieren om ons te bereiken"
 msgid "closure.page.calendar"
 msgstr "Naar de kalender: tot de sluiting kunt u nog een afspraak maken"
 
+msgid "closure.page.delete_by"
+msgstr "Gegevens van afspraken die door deze sluiting stilliggen, worden uiterlijk op {date} verwijderd."
+
 msgid "manage.status.suspended"
 msgstr "Opgeschort"
 
@@ -6321,6 +6324,12 @@ msgstr "Verzoek om opnieuw te boeken vervalt na (dagen)"
 
 msgid "settings.field.planner_rebook_reminder_days.label"
 msgstr "Herinnering om opnieuw te boeken (dagen voor het vervallen)"
+
+msgid "settings.field.closure_max_retention_days.label"
+msgstr "Gegevens bij een sluiting uiterlijk verwijderd na (dagen na de afspraak)"
+
+msgid "settings.field.closure_max_notice_days.label"
+msgstr "Melding aan beheerders vóór dat maximum (dagen)"
 
 msgid "settings.field.booking_confirm_min_minutes.label"
 msgstr "Minimale tijd om te bevestigen (minuten)"

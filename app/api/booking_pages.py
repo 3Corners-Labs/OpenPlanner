@@ -137,7 +137,9 @@ async def group_page(
     now = _clock(request).now()
     closure = await service.closure_notice(group)
     banner = closure_view(closure, group, locale, now) if closure else None
-    if banner and banner.active:
+    if closure and banner and banner.active:
+        deleted_by = await service.closure_delete_by(group, closure)
+        banner = closure_view(closure, group, locale, now, deleted_by)
         return await participant_page(request, locale, "closure.html", group, {"closure": banner})
     view = await picker(
         service,
@@ -173,7 +175,13 @@ async def closure_page(request: Request, slug: str, locale: Locale) -> Response:
     closure = await service.closure_notice(group)
     if closure is None:
         return RedirectResponse(f"/g/{group.slug}", status_code=303)
-    banner = closure_view(closure, group, locale, _clock(request).now())
+    banner = closure_view(
+        closure,
+        group,
+        locale,
+        _clock(request).now(),
+        await service.closure_delete_by(group, closure),
+    )
     return await participant_page(request, locale, "closure.html", group, {"closure": banner})
 
 

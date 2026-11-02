@@ -7,10 +7,14 @@ import pytest
 from app.domain.audit import Outcome
 from app.domain.authorization import Role
 from app.domain.booking import BookingStatus
-from app.domain.closure import RETENTION_AFTER_CLOSURE
+from app.domain.closure_retention import (
+    DEFAULT_CLOSURE_RETENTION,
+    RETENTION_AFTER_CLOSURE,
+    ClosureRetention,
+)
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.job_plan import JobType
-from app.domain.retention_sweep import RetentionSweep
+from app.domain.retention_sweep import CLOSURE_NOTICE, RetentionSweep
 from app.domain.services import BookingService, ContactInput
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -148,7 +152,7 @@ async def test_an_unconfirmed_booking_is_purged_after_its_deadline_not_its_slot(
     assert (await sweep.run()).purged == 1
 
 
-async def test_a_suspended_booking_follows_its_closure_and_an_open_one_is_left(
+async def test_a_suspended_booking_follows_its_closure_and_an_open_one_waits_for_the_maximum(
     sweep: RetentionSweep,
     bookings: BookingService,
     closures: ClosureService,
@@ -168,6 +172,110 @@ async def test_a_suspended_booking_follows_its_closure_and_an_open_one_is_left(
 
     result = await sweep.run()
 
-    assert result.purged == 1  # the open-ended one waits for a decision (WP-A2)
+    assert result.purged == 1  # the open-ended one is not yet at its maximum
     assert not _holds_data(uow, ended)
     assert _holds_data(uow, open_ended)
+
+
+async def test_an_open_closure_cannot_hold_data_past_the_maximum(
+    sweep: RetentionSweep,
+    bookings: BookingService,
+    closures: ClosureService,
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
+) -> None:
+    booking_id = await _book(bookings)
+    await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
+    maximum = SLOT_0930 + DEFAULT_CLOSURE_RETENTION.max_retention
+    clock.advance(maximum - NOW + timedelta(minutes=30))  # within the grace
+    assert (await sweep.run()).overdue == 0
+    assert _holds_data(uow, booking_id)
+
+    clock.advance(timedelta(hours=1))
+    result = await sweep.run()
+
+    assert (result.overdue, result.purged) == (1, 1)
+    assert not _holds_data(uow, booking_id)
+
+
+async def test_the_sweep_uses_the_maximum_of_the_bookings_organisation(
+    bookings: BookingService,
+    closures: ClosureService,
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
+) -> None:
+    booking_id = await _book(bookings)
+    await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
+    clock.advance(SLOT_0930 - NOW + 31 * DAY)
+    shorter = RetentionSweep(uow, clock, lambda _org: ClosureRetention.from_days(30, 3))
+
+    assert (await RetentionSweep(uow, clock).run(dry_run=True)).overdue == 0
+    assert (await shorter.run()).purged == 1
+    assert not _holds_data(uow, booking_id)
+
+
+def _notices(uow: InMemoryUnitOfWork) -> list[tuple[str | None, str]]:
+    return [(e.group, e.detail) for e in uow.state.audit if e.action == CLOSURE_NOTICE]
+
+
+async def test_the_administrators_are_told_before_the_maximum_with_counts_and_a_date(
+    sweep: RetentionSweep,
+    bookings: BookingService,
+    closures: ClosureService,
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
+) -> None:
+    await _book(bookings)
+    await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
+    maximum = SLOT_0930 + DEFAULT_CLOSURE_RETENTION.max_retention
+    clock.advance(maximum - timedelta(days=15) - NOW)
+    assert (await sweep.run()).notices == 0
+    assert _notices(uow) == []
+
+    clock.advance(timedelta(days=1))  # 14 days left: the notice period
+    result = await sweep.run()
+
+    assert result.notices == 1
+    [(group, detail)] = _notices(uow)
+    assert group == "demo"
+    [closure_id] = uow.state.closures
+    assert detail == f"closure:{closure_id},bookings:1,delete_by:{maximum.date().isoformat()}"
+    assert "@" not in detail  # counts and a date, no participant data
+
+
+async def test_the_notice_is_given_once_a_day_and_not_for_a_dry_run(
+    sweep: RetentionSweep,
+    bookings: BookingService,
+    closures: ClosureService,
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
+) -> None:
+    await _book(bookings)
+    await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
+    clock.advance(SLOT_0930 + DEFAULT_CLOSURE_RETENTION.max_retention - NOW - timedelta(days=10))
+
+    await sweep.run(dry_run=True)
+    assert _notices(uow) == []
+    await sweep.run()
+    await sweep.run()
+    assert len(_notices(uow)) == 1
+    clock.advance(DAY)
+    await sweep.run()
+
+    assert len(_notices(uow)) == 2
+
+
+async def test_a_closure_that_ends_before_the_maximum_needs_no_notice(
+    sweep: RetentionSweep,
+    bookings: BookingService,
+    closures: ClosureService,
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
+) -> None:
+    await _book(bookings)
+    ends = SLOT_0930 + timedelta(days=60)
+    await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, ends, NOTICES))
+    clock.advance(ends + RETENTION_AFTER_CLOSURE - NOW - timedelta(days=5))  # before the maximum
+
+    assert (await sweep.run()).notices == 0
+    assert _notices(uow) == []

@@ -50,6 +50,7 @@ from app.domain.booking_changes import lapse_unconfirmed
 from app.domain.calls import apply_event, new_status
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure, covering
+from app.domain.closure_retention import ClosureRetentionOf, default_closure_retention
 from app.domain.confirmation import DEFAULT_CONFIRM_POLICY, ConfirmPolicy, confirm_window
 from app.domain.direct_leave import DirectLeft, plan_leave
 from app.domain.direct_queue import (
@@ -136,6 +137,8 @@ class BookingService:
         token_key: Server key for deriving management tokens (ADR 0011).
         confirm_policy: The rules for confirming a new booking (ADR 0056), per organisation
             id when it is a function (class D settings, read live).
+        closure_retention: The organisation's maximum for bookings on hold (ADR 0102), to
+            tell participants the date their details are deleted by.
 
     Raises:
         ValueError: If ``token_key`` is shorter than 32 bytes.
@@ -149,6 +152,7 @@ class BookingService:
         phone_region: Callable[[int], str] = lambda _organisation_id: DEFAULT_PHONE_REGION,
         confirm_policy: ConfirmPolicy | Callable[[int], ConfirmPolicy] = DEFAULT_CONFIRM_POLICY,
         previous_token_key: bytes | None = None,
+        closure_retention: ClosureRetentionOf = default_closure_retention,
     ) -> None:
         """Store the collaborators.
 
@@ -160,6 +164,7 @@ class BookingService:
             confirm_policy: The rules for confirming a new booking (ADR 0056), per
                 organisation id when it is a function (class D settings, read live).
             previous_token_key: ``MANAGEMENT_TOKEN_KEY_PREVIOUS`` during a rotation (ADR 0094).
+            closure_retention: The organisation's maximum for bookings on hold (ADR 0102).
         """
         if len(token_key) < MIN_KEY_BYTES:
             raise ValueError(f"the token key must be at least {MIN_KEY_BYTES} bytes")
@@ -169,6 +174,7 @@ class BookingService:
         self._token_keys = (token_key, *([previous_token_key] if previous_token_key else []))
         self._confirm_policy = confirm_policy
         self._phone_region = phone_region
+        self._closure_retention = closure_retention
 
     async def get_group(self, group_slug: str) -> Group:
         """Return the group behind a booking page.
@@ -184,6 +190,21 @@ class BookingService:
         async with self._uow.read() as tx:
             closures = await tx.get_closures(group.id, self._clock.now())
         return closures[0] if closures else None
+
+    async def closure_delete_by(self, group: Group, closure: Closure) -> datetime | None:
+        """Return the date by which the details of the bookings on hold are deleted.
+
+        The latest of the bookings still on hold in ``closure`` (ADR 0102): the earlier of
+        30 days after the closure ends and the maximum after the original appointment. ``None``
+        when nothing is on hold, so the page says nothing about data it does not hold.
+        """
+        if closure.id is None:
+            return None
+        async with self._uow.read() as tx:
+            slot_end = await tx.latest_suspended_end(closure.id)
+        if slot_end is None:
+            return None
+        return closure.purge_at(slot_end, self._closure_retention(group.organisation_id))
 
     async def closure_image(self, group: Group) -> ImageFile | None:
         """Return the image of the closure participants of ``group`` see now, if it has one.

@@ -132,9 +132,14 @@ identity document or special categories of personal data (ADR 0055).
 
 **Exception: emergency closure (ADR 0024).** A booking suspended by an emergency closure keeps
 the data above until it is moved, reinstated or cancelled (then the rules above apply again),
-and at most until 30 days after the closure ends (`purge_pii` planned at the closure's end +
-30 days; none while the closure is open-ended). Decided by the product owner on 2026-10-25; to
-be confirmed in the DPIA (O7). The closure notice is admin text without personal data
+and at most until the earlier of 30 days after the closure ends and `closure_max_retention_days`
+(class D, default 90, 30 to 180) after the end of the booking's original slot (`purge_pii`
+planned at that moment; the maximum also applies while the closure is open-ended, ADR 0102).
+The 30 days were decided by the product owner on 2026-10-25, the maximum on 2026-11-01; both to
+be confirmed in the DPIA (O7). `closure_max_notice_days` before the maximum the worker records
+the system event `closure.retention_notice` at the group (closure id, a count and a date, no
+participant data), and the closure page tells participants the date their details are deleted
+by. The closure notice is admin text without personal data
 (`closure_notices`); it goes to the participant by mail and on the public group page.
 
 **Alternative contact options (ADR 0037).** Phone numbers, email addresses, links and addresses
