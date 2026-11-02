@@ -82,7 +82,7 @@ async def test_the_groups_and_their_embedding_switch_are_listed(site: Site) -> N
 
     page = (await site.client.get(PAGE)).text
 
-    assert 'href="/admin/groups/demo/settings"' in page
+    assert 'href="/admin/groups/demo/settings#integrations"' in page  # straight to the switch
     assert "Aan</span>" in page  # the demo group is switched on by seed-demo
 
 
