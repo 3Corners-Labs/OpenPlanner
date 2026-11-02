@@ -14,13 +14,18 @@ registration did not go through.
     rotate_key               identity_providers.manage   old key published 24 h longer
     published_keys           (public)                    the JWKS of every provider
     record_test_login        identity_providers.manage   the verdict of a guided test login
+    claim_domain             identity_providers.manage   step 3: a domain, refused on the suffix
+    verify_domain            identity_providers.manage   step 3: look up the TXT record now
+    remove_domain            identity_providers.manage   step 3
 
 The provider itself is never called from here: the adapter fetches the discovery document
 through the outbound guard (``DiscoveryFetcher``) and the domain checks it (point 7).
 """
 
+import secrets
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
+from datetime import timedelta
 
 from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, Outcome
@@ -36,16 +41,27 @@ from app.domain.identity_providers import (
     jwks,
     validate_secret,
 )
+from app.domain.login_domains import (
+    DEFAULT_GRACE,
+    DomainClaim,
+    DomainState,
+    checked,
+    normalise_domain,
+    refusal_of_claim,
+    suffix_conflicts,
+)
 from app.domain.organisations import organisation_by_slug
 from app.domain.ports import (
     Clock,
     DiscoveryFetcher,
     IdentityError,
+    MailDomainResolver,
     SigningKeys,
     Transaction,
     UnitOfWork,
 )
 from app.domain.scheduling import Organisation
+from app.domain.user_names import DEFAULT_SUFFIX
 
 CREATED_EVENT = "idp.created"
 UPDATED_EVENT = "idp.updated"
@@ -54,7 +70,14 @@ DISABLED_EVENT = "idp.disabled"
 DELETED_EVENT = "idp.deleted"
 KEY_ROTATED_EVENT = "idp.key_rotated"
 TEST_LOGIN_EVENT = "idp.test_login"
-"""The audit actions of ADR 0083 point 4; the detail names the provider key."""
+DOMAIN_CLAIMED_EVENT = "idp.domain_claimed"
+DOMAIN_VERIFIED_EVENT = "idp.domain_verified"
+DOMAIN_FAILED_EVENT = "idp.domain_failed"
+DOMAIN_REMOVED_EVENT = "idp.domain_removed"
+"""The audit actions of ADR 0083 point 4; the detail names the provider key (and domain)."""
+
+TOKEN_BYTES = 32
+"""Random bytes of a domain's verification token (point 10; fixed)."""
 
 _VIEW = Permission.IDENTITY_PROVIDERS_VIEW
 _MANAGE = Permission.IDENTITY_PROVIDERS_MANAGE
@@ -91,6 +114,7 @@ class ProviderDetail:
     organisation: Organisation
     provider: OrganisationProvider
     keys: list[SigningKey]
+    domains: list[DomainClaim] = field(default_factory=list)
 
     @property
     def current_key(self) -> SigningKey | None:
@@ -113,6 +137,10 @@ class IdentityProviderService:
             no organisation provider may share (point 7).
         on_change: Called with the provider key after every change, so a cached adapter is
             rebuilt.
+        resolver: Looks up the TXT records that prove a domain (step 3).
+        login_suffix: Returns ``bundled_idp_login_suffix``, which no provider may claim
+            (ADR 0106 point 9).
+        grace: Returns how long a lost record is tolerated (``idp_domain_grace_days``).
     """
 
     def __init__(  # noqa: PLR0913
@@ -126,6 +154,9 @@ class IdentityProviderService:
         limit: Callable[[], int],
         platform_discovery_url: Callable[[], str | None],
         on_change: Callable[[str], None] = lambda _: None,
+        resolver: MailDomainResolver | None = None,
+        login_suffix: Callable[[], str] = lambda: DEFAULT_SUFFIX,
+        grace: Callable[[], timedelta] = lambda: DEFAULT_GRACE,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -136,6 +167,9 @@ class IdentityProviderService:
         self._limit = limit
         self._platform_discovery_url = platform_discovery_url
         self._on_change = on_change
+        self._resolver = resolver
+        self._login_suffix = login_suffix
+        self._grace = grace
 
     # --- reading -------------------------------------------------------------------------
 
@@ -165,7 +199,8 @@ class IdentityProviderService:
             organisation = await organisation_by_slug(tx, slug)
             provider = await _provider_of(tx, slug, key)
             keys = await tx.get_signing_keys(key)
-        return ProviderDetail(organisation, provider, keys)
+            domains = await tx.list_login_domains(_everything(), key)
+        return ProviderDetail(organisation, provider, keys, domains)
 
     async def published_keys(self) -> dict[str, list[dict[str, str]]]:
         """Return the JWKS of every provider: current keys and those retired within a day."""
@@ -373,6 +408,95 @@ class IdentityProviderService:
 
     # --- helpers -------------------------------------------------------------------------
 
+    async def claim_domain(
+        self, principal: Principal, slug: str, key: str, text: str
+    ) -> DomainClaim:
+        """Claim an e-mail domain for the provider; it routes only once verified (point 10).
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``,
+                ``identity_provider_not_found``, ``idp_domain_invalid``,
+                ``idp_domain_reserved`` (the platform suffix, ADR 0106 point 9),
+                ``idp_domain_taken`` or ``idp_domain_limit``.
+        """
+        require(await self._admin.authorize(principal, _MANAGE))
+        domain = normalise_domain(text)
+        async with self._uow.locked() as tx:
+            provider = await _provider_of(tx, slug, key)
+            claims = await tx.list_login_domains(_everything())
+            refusal = refusal_of_claim(domain, key, claims, self._login_suffix())
+            if refusal is not None:
+                raise DomainError(refusal, "domain")
+            claim = await tx.add_login_domain(
+                DomainClaim(
+                    None,
+                    key,
+                    domain,
+                    secrets.token_urlsafe(TOKEN_BYTES),
+                    DomainState.PENDING,
+                    self._clock.now(),
+                )
+            )
+            await self._audit(
+                tx, principal, DOMAIN_CLAIMED_EVENT, provider, f"key:{key},domain:{domain}"
+            )
+        return claim
+
+    async def verify_domain(
+        self, principal: Principal, slug: str, key: str, claim_id: int
+    ) -> DomainClaim:
+        """Look up the claim's TXT record now and store what it shows (point 10).
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``,
+                ``identity_provider_not_found`` or ``idp_domain_not_found``.
+        """
+        require(await self._admin.authorize(principal, _MANAGE))
+        async with self._uow.read() as tx:
+            await _provider_of(tx, slug, key)
+            claim = _claim_of(await tx.list_login_domains(_everything(), key), claim_id)
+        found = (
+            None if self._resolver is None else await self._resolver.txt_records(claim.record_name)
+        )
+        async with self._uow.locked() as tx:
+            provider = await _provider_of(tx, slug, key)
+            claim = _claim_of(await tx.list_login_domains(_everything(), key), claim_id)
+            after = checked(claim, found, self._clock.now(), self._grace())
+            await tx.save_login_domain(after)
+            if after.state is not claim.state:
+                event = (
+                    DOMAIN_VERIFIED_EVENT
+                    if after.state is DomainState.VERIFIED
+                    else DOMAIN_FAILED_EVENT
+                )
+                detail = f"key:{key},domain:{claim.domain},state:{after.state.value}"
+                await self._audit(tx, principal, event, provider, detail)
+        if after.state.routes != claim.state.routes:
+            self._on_change(key)
+        return after
+
+    async def remove_domain(self, principal: Principal, slug: str, key: str, claim_id: int) -> None:
+        """Stop routing a domain to the provider and release the claim.
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``,
+                ``identity_provider_not_found`` or ``idp_domain_not_found``.
+        """
+        require(await self._admin.authorize(principal, _MANAGE))
+        async with self._uow.locked() as tx:
+            provider = await _provider_of(tx, slug, key)
+            claim = _claim_of(await tx.list_login_domains(_everything(), key), claim_id)
+            await tx.delete_login_domain(claim_id)
+            await self._audit(
+                tx, principal, DOMAIN_REMOVED_EVENT, provider, f"key:{key},domain:{claim.domain}"
+            )
+        self._on_change(key)
+
+    async def suffix_conflicts(self, suffix: str) -> bool:
+        """Return whether a provider claims a domain overlapping ``suffix`` (ADR 0106 point 9)."""
+        async with self._uow.read() as tx:
+            return suffix_conflicts(suffix, await tx.list_login_domains(_everything()))
+
     async def _checked_issuer(
         self, principal: Principal, slug: str, draft: ProviderDraft, event: str
     ) -> str:
@@ -433,6 +557,18 @@ class IdentityProviderService:
 def _everything() -> Scope:
     """The scope of every organisation; the service narrows to one organisation by slug."""
     return Scope(everything=True)
+
+
+def _claim_of(claims: list[DomainClaim], claim_id: int) -> DomainClaim:
+    """Return the provider's claim with ``claim_id``.
+
+    Raises:
+        DomainError: ``idp_domain_not_found`` when the provider has no such claim.
+    """
+    found = next((c for c in claims if c.id == claim_id), None)
+    if found is None:
+        raise DomainError(ErrorCode.IDP_DOMAIN_NOT_FOUND, "domain")
+    return found
 
 
 async def _provider_of(tx: Transaction, slug: str, key: str) -> OrganisationProvider:

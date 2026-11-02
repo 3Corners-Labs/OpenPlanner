@@ -48,6 +48,7 @@ from app.domain.identity_providers import (
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
 from app.domain.log_destinations import DestinationStatus, LogDestination
+from app.domain.login_domains import DomainClaim
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import OwnCertificate
@@ -121,6 +122,7 @@ class State:
     api_settings: ApiSettings = field(default_factory=ApiSettings)
     api_clients: dict[str, ApiClient] = field(default_factory=dict)
     identity_providers: dict[str, OrganisationProvider] = field(default_factory=dict)
+    login_domains: dict[int, DomainClaim] = field(default_factory=dict)
     provider_secrets: dict[str, str] = field(default_factory=dict)
     log_destinations: dict[int, LogDestination] = field(default_factory=dict)
     log_secrets: dict[int, str] = field(default_factory=dict)
@@ -1250,7 +1252,36 @@ class InMemoryTransaction:
         if secret is not None:
             self.state.provider_secrets[provider.key] = secret
 
+    async def list_login_domains(
+        self, scope: Scope, provider: str | None = None
+    ) -> list[DomainClaim]:
+        providers = self.state.identity_providers
+        found = [
+            c
+            for c in self.state.login_domains.values()
+            if provider in (None, c.provider)
+            and c.provider in providers
+            and scope.contains(providers[c.provider].organisation, None)
+        ]
+        return sorted(found, key=lambda c: c.domain)
+
+    async def add_login_domain(self, claim: DomainClaim) -> DomainClaim:
+        if claim.provider not in self.state.identity_providers:
+            raise LookupError("unknown provider")
+        stored = replace(claim, id=self._new_id())
+        self.state.login_domains[stored.id or 0] = stored
+        return stored
+
+    async def save_login_domain(self, claim: DomainClaim) -> None:
+        self.state.login_domains[claim.id or 0] = claim
+
+    async def delete_login_domain(self, claim_id: int) -> bool:
+        return self.state.login_domains.pop(claim_id, None) is not None
+
     async def delete_identity_provider(self, key: str) -> bool:
+        self.state.login_domains = {
+            i: c for i, c in self.state.login_domains.items() if c.provider != key
+        }
         self.state.provider_secrets.pop(key, None)
         for stored in self.state.signing_keys.pop(key, []):
             self.state.private_keys.pop(stored.kid, None)

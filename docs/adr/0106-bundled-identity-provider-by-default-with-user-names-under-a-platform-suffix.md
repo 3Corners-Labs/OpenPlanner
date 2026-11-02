@@ -139,6 +139,6 @@ identifiers and DNS labels, which is a format rule, not a preference.
 | 1 | Render script writes the application's half; development realm gets `openplanner-directory`; compose `env_file` | #427, merged with #425 | merged |
 | 2 | Staff screen notice and System status check for an unconnected directory (point 3) | #429 | merged |
 | 3 | User names under the suffix: setting, invite form, adapter, scope check, `username` masked (points 5–8, 11) | #430 | in PR |
-| 4 | Reserved suffix in the login routing and the provider registration; login label (points 9, 10) | – | planned |
+| 4 | Reserved suffix in the login routing and the provider registration; login label (points 9, 10) | with ADR 0083 step 3 | planned |
 | 5 | Installer `--idp bundled\|own` default in every mode; production `start` with `idp-db`, proxy, backup and runbook (points 1, 4) | – | planned |
 | 6 | docker01 moved to the bundled provider (point 12); interim: directory client added to the lab realm by hand on 2026-11-02 | – | planned |

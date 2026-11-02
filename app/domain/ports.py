@@ -54,6 +54,7 @@ from app.domain.identity_providers import GeneratedKey, OrganisationProvider, Si
 from app.domain.images import ImageFile, ImageText
 from app.domain.job_plan import JobCounts, JobSummary, JobType, PlannedJob
 from app.domain.log_destinations import DestinationStatus, LogDestination
+from app.domain.login_domains import DomainClaim
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.participant_links import LinkSession
@@ -1549,6 +1550,32 @@ class Transaction(Protocol):
 
     async def delete_identity_provider(self, key: str) -> bool:
         """Remove the provider, its secret and its keys; ``False`` if there was none."""
+        ...
+
+    async def list_login_domains(
+        self, scope: Scope, provider: str | None = None
+    ) -> list[DomainClaim]:
+        """Return the e-mail domains claimed by providers inside ``scope``, by domain (ADR 0083).
+
+        Like the providers, only the organisation part of the scope (or ``everything``)
+        matches; ``provider`` narrows to one provider.
+        """
+        ...
+
+    async def add_login_domain(self, claim: DomainClaim) -> DomainClaim:
+        """Store a new domain claim and return it with its id.
+
+        Raises:
+            LookupError: The provider does not exist.
+        """
+        ...
+
+    async def save_login_domain(self, claim: DomainClaim) -> None:
+        """Store the state and times of an existing domain claim."""
+        ...
+
+    async def delete_login_domain(self, claim_id: int) -> bool:
+        """Remove one domain claim; ``False`` if there was none."""
         ...
 
     async def get_signing_keys(self, provider_key: str) -> list[SigningKey]:

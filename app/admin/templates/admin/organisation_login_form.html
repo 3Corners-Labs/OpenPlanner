@@ -51,6 +51,53 @@
   <p class="hint">{{ _("admin.idp.actions_hint") }}</p>
   {% endif %}
 </section>
+<section class="card" aria-labelledby="domains-heading">
+  <h2 id="domains-heading">{{ _("admin.idp.domains.title") }}</h2>
+  <p>{{ _("admin.idp.domains.intro") }}</p>
+  {% if domains %}
+  <div class="table-scroll" role="region" aria-labelledby="domains-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.idp.domains.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.idp.domains.domain") }}</th>
+        <th scope="col">{{ _("admin.idp.domains.state") }}</th>
+        <th scope="col">{{ _("admin.idp.domains.record") }}</th>
+        {% if can("identity_providers.manage") %}<th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in domains %}
+      <tr>
+        <th scope="row"><code>{{ d.domain }}</code></th>
+        <td><span class="chip{{ d.chip }}">{{ d.state }}</span>{% if d.checked %}<br><span class="muted">{{ d.checked }}</span>{% endif %}</td>
+        <td>{{ _("admin.idp.domains.record_name") }}: <code>{{ d.record_name }}</code><br>{{ _("admin.idp.domains.record_value") }}: <code>{{ d.record_value }}</code></td>
+        {% if can("identity_providers.manage") %}
+        <td>
+          <div class="inline-forms">
+            <form method="post" action="/admin/organisations/{{ organisation.slug }}/login/{{ view.provider.key }}/domains/{{ d.id }}/verify">
+              <button type="submit" class="button button--secondary">{{ _("admin.idp.domains.verify") }}<span class="visually-hidden"> {{ d.domain }}</span></button>
+            </form>
+            <form method="post" action="/admin/organisations/{{ organisation.slug }}/login/{{ view.provider.key }}/domains/{{ d.id }}/remove">
+              <button type="submit" class="button button--danger">{{ _("admin.idp.domains.remove") }}<span class="visually-hidden"> {{ d.domain }}</span></button>
+            </form>
+          </div>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="muted">{{ _("admin.idp.domains.none") }}</p>
+  {% endif %}
+  {% if can("identity_providers.manage") %}
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/login/{{ view.provider.key }}/domains" novalidate>
+    {{ form_body(domain_fields, _("admin.idp.domains.add"), None) }}
+  </form>
+  {% endif %}
+</section>
 {% endif %}
 {% if can("identity_providers.manage") %}
 <form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/login{% if view %}/{{ view.provider.key }}{% endif %}" novalidate aria-labelledby="registration-heading">
