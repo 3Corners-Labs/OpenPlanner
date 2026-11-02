@@ -50,6 +50,9 @@ IdP team changes rights there.
   only.
 - **Invited, not logged in yet**: people you created who have not logged in. You can resend the
   invitation.
+  The list and a person's page show the **user name** next to the **e-mail address**: either
+  logs in, and mail goes to the address. Give new staff their user name when their address
+  belongs to an identity provider of the organisation's own.
 - On a person's page, under **Managed at the identity provider**: remove a role, add a role
   with a place, disable or enable the person, and send a password reset. A change takes effect at
   the next login.
