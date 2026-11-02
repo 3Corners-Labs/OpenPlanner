@@ -3,6 +3,11 @@
 Status: skeleton (work package 1). Hosting and backup ownership are open (HANDOVER O7);
 sections marked *TBD* are completed in work package 9.
 
+**Evidence for auditors and the client.** The checklists for the identity provider, the host,
+Cisco and the data controller, with the commands that show each requirement, are in
+`docs/assurance/` (start with its `README.md`). The host checklist there complements the
+sections *Production settings*, *Backup and restore* and *Verifying the image signature* below.
+
 ## Deploy
 
 A host is installed, and repaired, with `scripts/install.sh` from the checkout in
