@@ -100,6 +100,14 @@
         "workflows": "write"
       },
       "repository_selection": "selected"
+    },
+    "3corners-openplanner-audit": {
+      "permissions": {
+        "administration": "read",
+        "metadata": "read",
+        "organization_administration": "read"
+      },
+      "repository_selection": "selected"
     }
   },
   "organisation": {
