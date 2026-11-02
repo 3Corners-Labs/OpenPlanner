@@ -33,6 +33,8 @@ from app.domain.form_fields import (
     Classification,
     FieldDefinition,
     FieldType,
+    default_classification,
+    derive_key,
     format_options,
     parse_options,
 )
@@ -60,6 +62,18 @@ TYPE_LABELS: dict[FieldType, str] = {
     FieldType.CHOICE: "admin.form_fields.type.choice",
     FieldType.CHECKBOX: "admin.form_fields.type.checkbox",
 }
+TYPE_HELP: dict[FieldType, str] = {
+    FieldType.SHORT_TEXT: "admin.form_fields.type.short_text.help",
+    FieldType.LONG_TEXT: "admin.form_fields.type.long_text.help",
+    FieldType.EMAIL: "admin.form_fields.type.email.help",
+    FieldType.PHONE: "admin.form_fields.type.phone.help",
+    FieldType.NUMBER: "admin.form_fields.type.number.help",
+    FieldType.DATE: "admin.form_fields.type.date.help",
+    FieldType.POSTCODE_NL: "admin.form_fields.type.postcode_nl.help",
+    FieldType.CHOICE: "admin.form_fields.type.choice.help",
+    FieldType.CHECKBOX: "admin.form_fields.type.checkbox.help",
+}
+"""What each kind of question is for, shown when the administrator chooses one."""
 CLASSIFICATION_LABELS: dict[Classification, str] = {
     Classification.PII: "admin.form_fields.classification.pii",
     Classification.NOT_PII: "admin.form_fields.classification.not_pii",
@@ -108,13 +122,19 @@ def _url(slug: str) -> str:
     return f"/admin/groups/{slug}/settings/form"
 
 
-def _refusal(form: FormData, error: DomainError) -> None:
-    """Add the message for a refused definition, linked to its input."""
+def _refusal(form: FormData, error: DomainError, key_input: str = "key") -> None:
+    """Add the message for a refused definition, linked to its input.
+
+    ``key_input`` is where a refused key points: the question's input when the key was derived
+    from it, as the administrator never typed one.
+    """
     if error.code is ErrorCode.FORM_FIELD_FORBIDDEN:
         target = FIELD_FOR.get(error.field or "", error.field or "label_nl")
+        target = key_input if target == "key" else target
         form.errors.append(FormError(target, form._("admin.form.error.form_field_forbidden")))
     elif error.code is ErrorCode.INVALID_FORM_FIELD and error.field in ERROR_KEYS:
         target = FIELD_FOR.get(error.field, error.field)
+        target = key_input if target == "key" else target
         form.errors.append(FormError(target, form._(ERROR_KEYS[error.field])))
     else:
         form.refusal(error)
@@ -131,10 +151,12 @@ def _bound(form: FormData, name: str) -> int | None:
     return None
 
 
-def _definition(form: FormData, key: str, kind: FieldType) -> FieldDefinition | None:
+def _definition(
+    form: FormData, key: str, kind: FieldType, key_input: str = "key"
+) -> FieldDefinition | None:
     """Return the definition the form describes, or ``None`` with the errors on ``form``."""
     minimum, maximum = _bound(form, "minimum"), _bound(form, "maximum")
-    classification = form.text("classification")
+    classification = Classification.PII.value if kind in ALWAYS_PII else form.text("classification")
     if classification not in {c.value for c in Classification} or form.errors:
         if not form.errors:
             form.errors.append(FormError("classification", form._(ERROR_KEYS["classification"])))
@@ -156,37 +178,23 @@ def _definition(form: FormData, key: str, kind: FieldType) -> FieldDefinition | 
             maximum=maximum if kind in (FieldType.NUMBER, FieldType.DATE) else None,
         )
     except DomainError as error:
-        _refusal(form, error)
+        _refusal(form, error, key_input)
         return None
 
 
-def _inputs(_: BoundGettext, form: FormData, current: FieldDefinition | None) -> list[Field]:
-    """Return the inputs of the add or edit form, filled from ``form`` or ``current``."""
+def _inputs(
+    _: BoundGettext, form: FormData, current: FieldDefinition | None, kind: FieldType
+) -> list[Field]:
+    """Return the inputs of the add or edit form for a field of ``kind``.
+
+    Filled from ``form`` or ``current``. Only the inputs that belong to the kind appear, and a
+    new field starts with the classification proposed for its kind.
+    """
 
     def value(name: str, stored: str) -> str:
         return form.values.get(name, stored) if form.values else stored
 
     fields: list[Field] = []
-    if current is None:
-        fields += [
-            Field(
-                "key",
-                _("admin.form_fields.key"),
-                value=value("key", ""),
-                hint=_("admin.form_fields.key_hint"),
-                error=form.error_for("key"),
-                attributes={"maxlength": "40", "autocomplete": "off", "spellcheck": "false"},
-            ),
-            Field(
-                "type",
-                _("admin.form_fields.type"),
-                "select",
-                value("type", FieldType.SHORT_TEXT.value),
-                hint=_("admin.form_fields.type_hint"),
-                error=form.error_for("type"),
-                options=options((t.value, _(TYPE_LABELS[t])) for t in FieldType),
-            ),
-        ]
     for locale in REQUIRED_LOCALES:
         fields.append(
             Field(
@@ -208,19 +216,20 @@ def _inputs(_: BoundGettext, form: FormData, current: FieldDefinition | None) ->
                 attributes={"maxlength": "300"},
             )
         )
-    stored_class = current.classification.value if current else Classification.PII.value
-    fields += [
-        Field(
-            "classification",
-            _("admin.form_fields.classification"),
-            "select",
-            value("classification", stored_class),
-            hint=_("admin.form_fields.classification_hint"),
-            error=form.error_for("classification"),
-            options=options((c.value, _(CLASSIFICATION_LABELS[c])) for c in Classification),
-        ),
-    ]
-    if current is None or current.type is FieldType.CHOICE:
+    stored_class = (current.classification if current else default_classification(kind)).value
+    if kind not in ALWAYS_PII:
+        fields.append(
+            Field(
+                "classification",
+                _("admin.form_fields.classification"),
+                "select",
+                value("classification", stored_class),
+                hint=_("admin.form_fields.classification_hint"),
+                error=form.error_for("classification"),
+                options=options((c.value, _(CLASSIFICATION_LABELS[c])) for c in Classification),
+            )
+        )
+    if kind is FieldType.CHOICE:
         fields.append(
             Field(
                 "options",
@@ -233,7 +242,7 @@ def _inputs(_: BoundGettext, form: FormData, current: FieldDefinition | None) ->
                 attributes={"rows": "5", "spellcheck": "false"},
             )
         )
-    if current is None or current.type in (FieldType.NUMBER, FieldType.DATE):
+    if kind in (FieldType.NUMBER, FieldType.DATE):
         for name in ("minimum", "maximum"):
             stored = getattr(current, name) if current else None
             fields.append(
@@ -247,6 +256,18 @@ def _inputs(_: BoundGettext, form: FormData, current: FieldDefinition | None) ->
                     attributes={"inputmode": "numeric", "maxlength": "7"},
                 )
             )
+    if current is None:
+        fields.append(
+            Field(
+                "key",
+                _("admin.form_fields.key"),
+                value=value("key", ""),
+                hint=_("admin.form_fields.key_hint"),
+                error=form.error_for("key"),
+                required=False,
+                attributes={"maxlength": "40", "autocomplete": "off", "spellcheck": "false"},
+            )
+        )
     return fields
 
 
@@ -257,8 +278,12 @@ async def _page(
     slug: str,
     form: FormData,
     status: int = 200,
+    chosen: FieldType | None = None,
 ) -> HTMLResponse:
-    """Render the list of fields and the form to add one."""
+    """Render the list of fields, and the form to add one of the ``chosen`` kind.
+
+    Without a kind the page offers the kinds to choose from, each with what it is for.
+    """
     _ = locale.gettext
     found = await form_service(request).view(context.principal, slug)
     rows = [
@@ -283,8 +308,17 @@ async def _page(
             "retired": [f.label(locale.code) for f in found.form.retired],
             "can_add": found.can_add,
             "limit": found.max_custom_fields,
-            "always_pii": False,
-            "fields": with_manual(request, locale, _inputs(_, form, None)),
+            "chosen": chosen.value if chosen else None,
+            "chosen_label": _(TYPE_LABELS[chosen]) if chosen else "",
+            "chosen_help": _(TYPE_HELP[chosen]) if chosen else "",
+            "kinds": [
+                {"value": t.value, "label": _(TYPE_LABELS[t]), "help": _(TYPE_HELP[t])}
+                for t in FieldType
+            ],
+            "always_pii": chosen in ALWAYS_PII,
+            "fields": with_manual(request, locale, _inputs(_, form, None, chosen))
+            if chosen
+            else [],
             "required": form.checked("required") if form.values else False,
             "confirm": form.checked("confirm_not_pii"),
             "confirm_error": form.error_for("confirm_not_pii"),
@@ -323,7 +357,7 @@ async def _edit_page(
             ),
             "field_label": current.label(locale.code),
             "always_pii": current.type in ALWAYS_PII,
-            "fields": with_manual(request, locale, _inputs(_, form, current)),
+            "fields": with_manual(request, locale, _inputs(_, form, current, current.type)),
             "required": form.checked("required") if form.values else current.required,
             "confirm": form.checked("confirm_not_pii"),
             "confirm_error": form.error_for("confirm_not_pii"),
@@ -335,8 +369,10 @@ async def _edit_page(
 
 @router.get("/groups/{slug}/settings/form", response_class=HTMLResponse)
 async def booking_form(request: Request, locale: Locale, slug: str, context: Manage) -> Response:
-    """Show the group's custom fields and the form to add one."""
-    return await _page(request, locale, context, slug, FormData({}, locale.gettext))
+    """Show the group's custom fields; with ``?type=`` the form to add one of that kind."""
+    asked = request.query_params.get("type", "")
+    chosen = FieldType(asked) if asked in {t.value for t in FieldType} else None
+    return await _page(request, locale, context, slug, FormData({}, locale.gettext), chosen=chosen)
 
 
 @router.post("/groups/{slug}/settings/form", response_class=HTMLResponse)
@@ -346,7 +382,14 @@ async def add_field(
     """Add a field at the end of the form."""
     form = await read_form(request, locale)
     kind = form.choice("type", {t.value for t in FieldType})
-    definition = _definition(form, form.text("key").strip(), FieldType(kind)) if kind else None
+    key = form.text("key").strip()
+    key_input = "key"
+    if kind and not key:
+        # The administrator asked a question and typed no key: make one from the question.
+        found = await form_service(request).view(context.principal, slug)
+        taken = {f.key for f in (*found.form.fields, *found.form.retired)}
+        key, key_input = derive_key(form.text("label_nl"), taken), "label_nl"
+    definition = _definition(form, key, FieldType(kind), key_input) if kind else None
     if definition is not None:
         try:
             await form_service(request).add(
@@ -354,10 +397,11 @@ async def add_field(
             )
         except DomainError as error:
             raise_refusal(error)
-            _refusal(form, error)
+            _refusal(form, error, key_input)
         else:
             return redirect_done(_url(slug), "created")
-    return await _page(request, locale, context, slug, form, 422)
+    chosen = FieldType(kind) if kind else None
+    return await _page(request, locale, context, slug, form, 422, chosen)
 
 
 @router.get("/groups/{slug}/settings/form/{key}", response_class=HTMLResponse)

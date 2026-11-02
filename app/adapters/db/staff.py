@@ -43,6 +43,7 @@ from app.domain.staff import (
     RefusedEntitlement,
     StaffFilter,
     StaffMember,
+    StaffStatus,
 )
 
 
@@ -116,6 +117,8 @@ def _member(
         last_logout_at=row.last_logout_at,
         recorded=row.roles is not None,
         id=row.id,
+        status=StaffStatus(row.status),
+        status_at=row.status_at,
         refused=tuple(
             RefusedEntitlement(r.value, r.reason, r.organisation, r.received_at)
             for r in sorted(refusals, key=lambda r: r.value)
@@ -151,6 +154,8 @@ class StaffQueries:
         row.last_login_at = member.last_login_at
         row.last_seen_at = member.last_seen_at
         row.last_logout_at = member.last_logout_at
+        row.status = member.status.value
+        row.status_at = member.status_at
         await self._session.flush()
         await self._session.execute(
             delete(StaffMembershipRow).where(StaffMembershipRow.staff_id == row.id)
@@ -173,6 +178,33 @@ class StaffQueries:
                 received_at=r.received_at,
             )
             for r in member.refused
+        )
+        await self._session.flush()
+
+    async def set_staff_status(
+        self: _Transaction, subject: str, status: StaffStatus, at: datetime
+    ) -> None:
+        """Set the status of ``subject``; unknown subjects are ignored."""
+        row = await self._session.scalar(select(StaffRow).where(StaffRow.subject == subject))
+        if row is not None:
+            row.status = status.value
+            row.status_at = at
+            await self._session.flush()
+
+    async def erase_staff(self: _Transaction, subject: str, at: datetime) -> None:
+        """Erase the record of ``subject``; the subject, the id and the times stay."""
+        row = await self._session.scalar(select(StaffRow).where(StaffRow.subject == subject))
+        if row is None or row.status == StaffStatus.ERASED.value:
+            return
+        row.display_name = ""
+        row.roles = ""
+        row.status = StaffStatus.ERASED.value
+        row.status_at = at
+        await self._session.execute(
+            delete(StaffMembershipRow).where(StaffMembershipRow.staff_id == row.id)
+        )
+        await self._session.execute(
+            delete(StaffRefusalRow).where(StaffRefusalRow.staff_id == row.id)
         )
         await self._session.flush()
 

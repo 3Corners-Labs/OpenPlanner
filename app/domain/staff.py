@@ -17,6 +17,7 @@ list never tells an organisation admin where else a colleague works.
 
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
+from enum import StrEnum
 
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Role, Scope
@@ -27,10 +28,40 @@ CREATED_EVENT = "staff.created"
 CHANGED_EVENT = "staff.membership_changed"
 """Audit event of a login whose roles, organisations or groups differ from the last one."""
 
+SUSPENDED_EVENT = "staff.suspended"
+"""Audit event of an administrator suspending a person (ADR 0046 point 7)."""
+
+REINSTATED_EVENT = "staff.reinstated"
+"""Audit event of an administrator lifting a suspension."""
+
+ERASED_EVENT = "staff.erased"
+"""Audit event of a person's data being erased, by the superuser or after the retention period."""
+
+ERASED_MANUALLY = "manual"
+"""Detail of ``staff.erased`` when the superuser erased the record (point 9)."""
+
+ERASED_BY_RETENTION = "retention"
+"""Detail of ``staff.erased`` when ``staff_retention_days`` passed without a login."""
+
 ROLE_ADDED = "role.add"
 ROLE_REMOVED = "role.remove"
 GRANT_ADDED = "grant.add"
 GRANT_REMOVED = "grant.remove"
+
+
+class StaffStatus(StrEnum):
+    """Whether a person may use the portal, and whether their data still exists (ADR 0046).
+
+    Attributes:
+        ACTIVE: The normal state; rights come from the claims at login.
+        SUSPENDED: No portal access whatever the claims say; a login is refused.
+        ERASED: Name, roles, memberships and refused values are gone; only the subject and
+            the timestamps stay, so the audit log still resolves to an erased person.
+    """
+
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+    ERASED = "erased"
 
 
 @dataclass(frozen=True)
@@ -108,6 +139,8 @@ class StaffMember:
         recorded: ``False`` for a record carried over from before ADR 0046, whose roles and
             memberships are not known yet; its next login writes no change event.
         id: Database id, used in links instead of the subject.
+        status: Active, suspended or erased (ADR 0046 step 2).
+        status_at: When the status last changed; ``None`` for a person never suspended or erased.
     """
 
     subject: str
@@ -121,6 +154,8 @@ class StaffMember:
     recorded: bool = True
     id: int | None = None
     refused: tuple[RefusedEntitlement, ...] = ()
+    status: StaffStatus = StaffStatus.ACTIVE
+    status_at: datetime | None = None
 
     @property
     def organisations(self) -> list[str]:
@@ -131,6 +166,23 @@ class StaffMember:
         """Slugs of the groups of the memberships in ``organisation``, sorted."""
         return sorted(
             m.group for m in self.memberships if m.organisation == organisation and m.group
+        )
+
+    def erased(self, at: datetime) -> "StaffMember":
+        """Return the record with every personal and access detail removed (ADR 0046 point 9).
+
+        The subject, the id and the timestamps stay, so the audit log still resolves to "an
+        erased person"; the name, roles, memberships and refused values go.
+        """
+        return replace(
+            self,
+            display_name="",
+            roles=frozenset(),
+            memberships=frozenset(),
+            refused=(),
+            recorded=True,
+            status=StaffStatus.ERASED,
+            status_at=at,
         )
 
     def is_dormant(self, now: datetime, after: timedelta) -> bool:

@@ -3,13 +3,19 @@
 #
 # Reads secrets/keycloak.env (created if missing), generates every value that is not there yet,
 # and renders deploy/keycloak/realm.template.json into secrets/keycloak-realm.json, which the
-# compose profile `idp` mounts. Both files get mode 600. Nothing a value holds is ever printed:
+# compose profile `idp` mounts. It also writes the application's half, secrets/keycloak-app.env
+# (KEYCLOAK_ADMIN_URL, KEYCLOAK_DIRECTORY_CLIENT_ID and _SECRET), which web and worker read, so
+# staff management works without copying a value by hand (ADR 0106). All files get mode 600. Nothing a value holds is ever printed:
 # an operator reads secrets/keycloak.env on the host, with `cat`, when they need one.
 #
 # Values (secrets/keycloak.env):
 #   KC_BOOTSTRAP_ADMIN_PASSWORD   Keycloak admin console, user `admin` (generated)
 #   KC_OPENPLANNER_CLIENT_SECRET  client `openplanner-admin`; must equal OIDC_CLIENT_SECRET in
 #                                 .env (generated; the installer copies it, ADR 0090 step 2)
+#   KC_DIRECTORY_CLIENT_SECRET    service account `openplanner-directory` that manages staff
+#                                 (roles manage-users and view-realm only, ADR 0095); written
+#                                 to secrets/keycloak-app.env as KEYCLOAK_DIRECTORY_CLIENT_SECRET
+#                                 (generated)
 #   KC_SUPER_PASSWORD             first password of the portal user `super`, changed at the
 #                                 first login (generated)
 #   KC_OPENPLANNER_BASE_URL       the portal's address for the redirect URIs: PUBLIC_BASE_URL
@@ -26,7 +32,7 @@ DIR=$(cd "$(dirname "$0")/.." && pwd)
 while (($#)); do
   case $1 in
     --dir) DIR=$2; shift 2 ;;
-    -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -35,7 +41,10 @@ TEMPLATE=$DIR/deploy/keycloak/realm.template.json
 SECRETS_DIR=$DIR/secrets
 ENV_FILE=$SECRETS_DIR/keycloak.env
 REALM_FILE=$SECRETS_DIR/keycloak-realm.json
-GENERATED=(KC_BOOTSTRAP_ADMIN_PASSWORD KC_OPENPLANNER_CLIENT_SECRET KC_SUPER_PASSWORD)
+APP_ENV_FILE=$SECRETS_DIR/keycloak-app.env
+# How web and worker reach the realm's admin API: the compose service `idp` on its own network.
+ADMIN_URL=http://idp:8080/admin/realms/openplanner
+GENERATED=(KC_BOOTSTRAP_ADMIN_PASSWORD KC_OPENPLANNER_CLIENT_SECRET KC_DIRECTORY_CLIENT_SECRET KC_SUPER_PASSWORD)
 KEYS=("${GENERATED[@]}" KC_OPENPLANNER_BASE_URL KC_HOSTNAME)
 
 log() { echo "render-keycloak-realm: $*" >&2; }
@@ -87,11 +96,24 @@ mv "$tmp" "$ENV_FILE"
 
 tmp=$(mktemp "$SECRETS_DIR/.keycloak-realm.json.XXXXXX")
 sed -e "s|\${KC_OPENPLANNER_CLIENT_SECRET}|$KC_OPENPLANNER_CLIENT_SECRET|g" \
+  -e "s|\${KC_DIRECTORY_CLIENT_SECRET}|$KC_DIRECTORY_CLIENT_SECRET|g" \
   -e "s|\${KC_SUPER_PASSWORD}|$KC_SUPER_PASSWORD|g" \
   -e "s|\${KC_OPENPLANNER_BASE_URL}|$KC_OPENPLANNER_BASE_URL|g" \
   "$TEMPLATE" > "$tmp"
 chmod 600 "$tmp"
 mv "$tmp" "$REALM_FILE"
 
+tmp=$(mktemp "$SECRETS_DIR/.keycloak-app.env.XXXXXX")
+{
+  printf '# Written by scripts/render-keycloak-realm.sh (ADR 0106): the staff directory of the\n'
+  printf '# bundled provider, read by web and worker. Holds a secret: mode 600, never copied off.\n'
+  printf 'KEYCLOAK_ADMIN_URL=%s\n' "$ADMIN_URL"
+  printf 'KEYCLOAK_DIRECTORY_CLIENT_ID=openplanner-directory\n'
+  printf 'KEYCLOAK_DIRECTORY_CLIENT_SECRET=%s\n' "$KC_DIRECTORY_CLIENT_SECRET"
+} > "$tmp"
+chmod 600 "$tmp"
+mv "$tmp" "$APP_ENV_FILE"
+
 ((${#generated[@]} == 0)) || log "generated ${generated[*]} in $ENV_FILE"
+log "wrote $APP_ENV_FILE (staff directory at $ADMIN_URL)"
 log "rendered $REALM_FILE (portal at $KC_OPENPLANNER_BASE_URL, Keycloak at $KC_HOSTNAME)"

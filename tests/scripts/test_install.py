@@ -77,7 +77,10 @@ class Host:
             "PATH": str(self.root / "bin"),
             "HOME": str(self.root / "home" / "operator"),
             "INSTALL_ROOT": str(self.staged),
-            "HEALTH_TIMEOUT": "1",
+            # Whole seconds: with "1" the health loop of install.sh is skipped when the clock
+            # ticks over between computing the deadline and testing it, which a loaded machine
+            # makes likely enough. The fake stack is healthy at once, so a long limit costs nothing.
+            "HEALTH_TIMEOUT": "30",
             "FAKE_HOST_DIR": str(self.fakes),
             "FAKE_PIN_FILE": str(self.file(".env.update")),
             **settings,
@@ -88,7 +91,9 @@ class Host:
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
-            timeout=60,
+            # Only a guard against a hang. The script makes about forty fake tool calls, each a
+            # Python start-up; a busy machine (parallel test workers) is five times slower.
+            timeout=300,
             check=False,
         )
 

@@ -11,16 +11,32 @@ purges directly instead of planning another job:
                     ─► system event ``retention.sweep`` (counts only)
 
 It is idempotent: a purged booking is no candidate any more. A booking under an open-ended
-closure has no purge moment and is left alone until WP-A2 decides on a maximum. Events carry
-counts, never names, addresses or booking contents.
+closure is purged at the maximum after its original slot (``closure_max_retention_days``,
+ADR 0102), the same moment the job plan and the overview use. Before that moment the sweep tells
+the group's administrators, ``closure_max_notice_days`` ahead, that a closure still holds data
+and on what date it goes (system event ``closure.retention_notice``: counts and a date).
+Events carry counts, never names, addresses or booking contents.
 """
 
 from dataclasses import dataclass, field
+from datetime import date, datetime
 
 from app.domain.audit import Outcome
+from app.domain.booking import BookingStatus
+from app.domain.closure_retention import (
+    ClosureRetentionOf,
+    default_closure_retention,
+    is_capped,
+)
 from app.domain.job_plan import JobType
 from app.domain.ports import Clock, UnitOfWork
-from app.domain.retention import DueBooking, candidates_before, is_backlog, is_overdue
+from app.domain.retention import (
+    DueBooking,
+    candidates_before,
+    is_backlog,
+    is_overdue,
+    purge_moment,
+)
 from app.domain.system_log import SystemLog
 
 _PURGED = "purged"
@@ -28,6 +44,9 @@ _CHANGED = "changed"
 
 SWEPT = "retention.sweep"
 """The system event written when the sweep found something overdue."""
+
+CLOSURE_NOTICE = "closure.retention_notice"
+"""The system event, at the group, that a closure still holds data until a date (ADR 0102)."""
 
 
 @dataclass(frozen=True)
@@ -40,6 +59,7 @@ class SweepResult:
         failed: Of those, how many could not be purged (they are tried again next time).
         backlog: Of those, how many were past ``BACKLOG_AGE``: the alert condition.
         per_group: Overdue bookings per group slug.
+        notices: Closures the administrators were told about (ADR 0102).
     """
 
     overdue: int = 0
@@ -47,6 +67,49 @@ class SweepResult:
     failed: int = 0
     backlog: int = 0
     per_group: dict[str, int] = field(default_factory=dict)
+    notices: int = 0
+
+
+@dataclass(frozen=True)
+class ClosureNotice:
+    """A closure whose bookings reach the maximum soon: counts and a date, nothing else.
+
+    Attributes:
+        group_id: The closed group.
+        closure_id: The closure.
+        bookings: How many suspended bookings reach the maximum within the notice period.
+        delete_by: The first date their personal data is deleted at the latest.
+    """
+
+    group_id: int
+    closure_id: int
+    bookings: int
+    delete_by: datetime
+
+
+def closure_notices(
+    found: list[DueBooking], now: datetime, retention_of: ClosureRetentionOf
+) -> list[ClosureNotice]:
+    """Return the closures to warn about: the maximum, not the closure's end, is due soon.
+
+    A suspended booking counts when the maximum decides its purge moment (``is_capped``), the
+    moment lies ahead and is at most the organisation's notice period away.
+    """
+    grouped: dict[tuple[int, int], list[datetime]] = {}
+    for due in found:
+        candidate = due.candidate
+        if candidate.status is not BookingStatus.SUSPENDED or candidate.closure_id is None:
+            continue
+        retention = retention_of(candidate.organisation_id)
+        if not is_capped(candidate.end, candidate.closure_ends_at, retention):
+            continue
+        moment = purge_moment(candidate, retention)
+        if now < moment <= now + retention.notice:
+            grouped.setdefault((candidate.group_id, candidate.closure_id), []).append(moment)
+    return [
+        ClosureNotice(group_id, closure_id, len(moments), min(moments))
+        for (group_id, closure_id), moments in sorted(grouped.items())
+    ]
 
 
 class RetentionSweep:
@@ -55,33 +118,52 @@ class RetentionSweep:
     Args:
         uow: Opens database transactions.
         clock: Current time.
+        retention_of: The organisation's maximum for bookings on hold (ADR 0102, class D).
     """
 
-    def __init__(self, uow: UnitOfWork, clock: Clock) -> None:
-        """Store the collaborators."""
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        retention_of: ClosureRetentionOf = default_closure_retention,
+    ) -> None:
+        """Store the collaborators; no closure has been announced yet."""
         self._uow = uow
         self._clock = clock
+        self._retention_of = retention_of
         self._events = SystemLog(uow, clock)
+        self._announced: set[tuple[int, int, date]] = set()
 
     async def run(self, *, dry_run: bool = False) -> SweepResult:
         """Purge every overdue booking; with ``dry_run`` only count them per group."""
         now = self._clock.now()
         async with self._uow.read() as tx:
             found = await tx.due_for_purge(candidates_before(now))
-            overdue = [d for d in found if is_overdue(d.candidate, now)]
+            overdue = [
+                d
+                for d in found
+                if is_overdue(d.candidate, now, self._retention_of(d.candidate.organisation_id))
+            ]
             per_group: dict[str, int] = {}
             for due in overdue:
                 group = await tx.get_group_by_id(due.candidate.group_id)
                 slug = group.slug if group is not None else "unknown"
                 per_group[slug] = per_group.get(slug, 0) + 1
-        backlog = sum(1 for d in overdue if is_backlog(d.candidate, now))
-        if dry_run or not overdue:
+        backlog = sum(
+            1
+            for d in overdue
+            if is_backlog(d.candidate, now, self._retention_of(d.candidate.organisation_id))
+        )
+        if dry_run:
             return SweepResult(len(overdue), 0, 0, backlog, per_group)
+        notices = await self._announce(closure_notices(found, now, self._retention_of))
+        if not overdue:
+            return SweepResult(0, 0, 0, backlog, per_group, notices)
         outcomes = [await self._purge(due) for due in overdue]
         purged = outcomes.count(_PURGED)
         errors = sorted({o for o in outcomes if o not in (_PURGED, _CHANGED)})
         failed = sum(1 for o in outcomes if o in errors)
-        result = SweepResult(len(overdue), purged, failed, backlog, per_group)
+        result = SweepResult(len(overdue), purged, failed, backlog, per_group, notices)
         await self._events.record(
             SWEPT,
             Outcome.FAILURE if failed else Outcome.SUCCESS,
@@ -89,6 +171,37 @@ class RetentionSweep:
             detail=f"overdue:{result.overdue},purged:{purged},failed:{failed},backlog:{backlog}",
         )
         return result
+
+    async def _announce(self, notices: list[ClosureNotice]) -> int:
+        """Tell the group's administrators about each closure once per day; return how many.
+
+        The event sits at the group, so its admins, the organisation's admins and the
+        superuser see it; it carries the closure id, a count and a date. A closure is told
+        again on a later day, which is the reminder; a restart of the process may repeat one.
+        """
+        told = 0
+        for notice in notices:
+            today = self._clock.now().date()
+            self._announced = {k for k in self._announced if k[2] == today}
+            key = (notice.group_id, notice.closure_id, today)
+            if key in self._announced:
+                continue
+            async with self._uow.read() as tx:
+                group = await tx.get_group_by_id(notice.group_id)
+            if group is None:
+                continue
+            await self._events.record(
+                CLOSURE_NOTICE,
+                Outcome.SUCCESS,
+                group_slug=group.slug,
+                detail=(
+                    f"closure:{notice.closure_id},bookings:{notice.bookings},"
+                    f"delete_by:{notice.delete_by.date().isoformat()}"
+                ),
+            )
+            self._announced.add(key)
+            told += 1
+        return told
 
     async def _purge(self, due: DueBooking) -> str:
         """Purge one booking if it is still in the state that made it a candidate.

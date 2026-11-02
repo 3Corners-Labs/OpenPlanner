@@ -115,6 +115,12 @@ class Permission(StrEnum):
     RETENTION_VIEW = "retention.view"
     ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
+    STAFF_MANAGE = "staff.manage"
+    """ADR 0095: create, change and disable staff in the platform's own identity provider."""
+    STAFF_RESET_PASSWORD = "staff.reset_password"  # noqa: S105  # nosec B105 - a permission name
+    """ADR 0095: mail a staff member a password reset or invitation link."""
+    STAFF_ERASE = "staff.erase"
+    """ADR 0046 point 9: erase a suspended person's record; superuser only, locked."""
     EMBEDDING_MANAGE = "embedding.manage"
     QUEUE_WORK = "queue.work"
     SETTINGS_PLATFORM_VIEW = "settings.platform.view"
@@ -173,6 +179,11 @@ LEVELS: dict[Permission, Level] = {
     Permission.ROLES_MANAGE: Level.GLOBAL,
     # ADR 0046: who uses the portal; group level so a group admin sees their own team.
     Permission.STAFF_VIEW: Level.GROUP,
+    # ADR 0095: staff of the bundled identity provider, per organisation.
+    Permission.STAFF_MANAGE: Level.ORGANISATION,
+    Permission.STAFF_RESET_PASSWORD: Level.ORGANISATION,
+    # ADR 0046 point 9: erasing a person's record is the superuser's alone.
+    Permission.STAFF_ERASE: Level.GLOBAL,
     # ADR 0035: on which websites the organisation's groups may be embedded.
     Permission.EMBEDDING_MANAGE: Level.ORGANISATION,
     # ADR 0043: see and claim the bookings in a group's own queue.
@@ -214,6 +225,7 @@ LOCKED_PERMISSIONS = frozenset(
         Permission.SETTINGS_LOGIN_MANAGE,
         Permission.IDENTITY_PROVIDERS_MANAGE,
         Permission.LOGGING_MANAGE,
+        Permission.STAFF_ERASE,
     }
 )
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
@@ -262,6 +274,10 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
     Permission.ORGANISATION_CLOSURE: frozenset({Permission.CLOSURE_MANAGE}),
     # ADR 0049: changing a group's IdP value presumes seeing the mapping.
     Permission.IDP_MAPPING_MANAGE: frozenset({Permission.IDP_MAPPING_VIEW}),
+    # ADR 0095: changing people presumes seeing them.
+    Permission.STAFF_MANAGE: frozenset({Permission.STAFF_VIEW}),
+    Permission.STAFF_RESET_PASSWORD: frozenset({Permission.STAFF_VIEW}),
+    Permission.STAFF_ERASE: frozenset({Permission.STAFF_VIEW}),
 }
 """ADR 0039: permissions a permission depends on; a custom role must hold them too."""
 
@@ -303,6 +319,9 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.RETENTION_VIEW,
         # ADR 0046: the staff of the own organisations.
         Permission.STAFF_VIEW,
+        # ADR 0095: invite, change and disable them in the bundled identity provider.
+        Permission.STAFF_MANAGE,
+        Permission.STAFF_RESET_PASSWORD,
         # ADR 0035: the host websites allowed to embed the organisation's groups.
         Permission.EMBEDDING_MANAGE,
         # ADR 0043: can step in as an agent in the own queue.
@@ -549,10 +568,20 @@ class Reason(StrEnum):
 
 @dataclass(frozen=True)
 class Decision:
-    """The outcome of ``decide``."""
+    """The outcome of ``decide``.
+
+    Attributes:
+        allowed: Whether the permission may be used.
+        reason: Why, or why not.
+        role: The role key of the grant that allowed it (``superuser``, ``org_admin``,
+            ``custom.3``), for ``actor.role`` on the log line (ADR 0103 point 7); empty when
+            denied or for a machine client. It describes the decision and is not part of it,
+            so two decisions with the same outcome and reason are equal.
+    """
 
     allowed: bool
     reason: Reason
+    role: str = field(default="", compare=False)
 
 
 @dataclass(frozen=True)
@@ -787,11 +816,38 @@ def decide(principal: Principal, permission: Permission, target: Target) -> Deci
     ]
     if not holding:
         return Decision(False, Reason.NOT_PERMITTED)
-    reasons = {_covers(reach, grant, target) for reach, grant in holding} - {None}
+    covering: dict[Reason, str] = {}
+    for reach, grant in holding:
+        reason = _covers(reach, grant, target)
+        if reason is not None:
+            covering.setdefault(reason, grant.role)
     for reason in (Reason.SUPERUSER, Reason.ROLE, Reason.ORGANISATION, Reason.GROUP):
-        if reason in reasons:
-            return Decision(True, reason)
+        if reason in covering:
+            return Decision(True, reason, covering[reason])
     return Decision(False, Reason.OUT_OF_SCOPE)
+
+
+def target_text(target: Target) -> str:
+    """Return ``target`` as a log line names it (ADR 0103).
+
+    ``gemeente/burgerzaken`` for a group, ``gemeente`` for an organisation, ``everything`` for
+    a global permission.
+    """
+    if target.organisation is None:
+        return "everything"
+    return f"{target.organisation}/{target.group}" if target.group else target.organisation
+
+
+def granting_role(principal: Principal, permission: Permission) -> str:
+    """Return the first role key, by grant, that holds ``permission``; empty when none does.
+
+    For a decision over every target at once (an overview page), where no single grant covers
+    one target; the role only describes the actor on the log line (ADR 0103 point 7).
+    """
+    return next(
+        (grant.role for permissions, _, grant in _grants(principal) if permission in permissions),
+        "",
+    )
 
 
 def decide_in_maintenance(
@@ -804,8 +860,10 @@ def decide_in_maintenance(
     reaches everything. The superuser is not an exception beyond that.
     """
     writable = permission in MAINTENANCE_WRITABLE or maintenance_safe
-    if writable and Reach.EVERYTHING in reaches(principal, permission):
-        return Decision(True, Reason.SUPERUSER)
+    if writable:
+        for permissions, reach, grant in _grants(principal):
+            if reach is Reach.EVERYTHING and permission in permissions:
+                return Decision(True, Reason.SUPERUSER, grant.role)
     return Decision(False, Reason.MAINTENANCE)
 
 

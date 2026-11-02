@@ -17,6 +17,7 @@ from tests.api.test_booking_pages import booked as book_and_confirm
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
+from tests.support.participant import open_link
 
 START = datetime.fromisoformat(FRIDAY_0900.replace("Z", "+00:00"))
 LINK = "https://site.webex.com/site/j.php?MTID=m123"
@@ -75,10 +76,11 @@ async def booked(demo_settings: Settings) -> tuple[str, int, Settings]:
 async def test_no_join_button_without_video(booked: tuple[str, int, Settings]) -> None:
     token, _, settings = booked
     async with app_client(settings, FixedClock(NOW)) as client:
-        manage = (await client.get(f"/b/{token}")).text
-        join = (await client.get(f"/b/{token}/join")).text
+        base = await open_link(client, token)
+        manage = (await client.get(base)).text
+        join = (await client.get(f"{base}/join")).text
 
-    assert f'href="/b/{token}/join"' not in manage
+    assert f'href="{base}/join"' not in manage
     assert "wordt klaargezet" in join  # no meeting yet
 
 
@@ -87,15 +89,16 @@ async def test_page_waits_until_fifteen_minutes_before(booked: tuple[str, int, S
     await _wire(settings.database_url, booking_id)
 
     async with app_client(settings, FixedClock(START - timedelta(minutes=30))) as client:
-        early = await client.get(f"/b/{token}/join")
-        manage = (await client.get(f"/b/{token}")).text
-        go = await client.get(f"/b/{token}/join/go")
+        base = await open_link(client, token)
+        early = await client.get(f"{base}/join")
+        manage = (await client.get(base)).text
+        go = await client.get(f"{base}/join/go")
 
     assert "http-equiv" not in early.text  # no automatic reload (WCAG 2.2.1)
-    assert f'href="/b/{token}/join">Status verversen' in early.text
+    assert f'href="{base}/join">Status verversen' in early.text
     assert "U kunt deelnemen vanaf 08:45" in early.text
-    assert f'href="/b/{token}/join"' in manage
-    assert go.headers["location"] == f"/b/{token}/join"
+    assert f'href="{base}/join"' in manage
+    assert go.headers["location"] == f"{base}/join"
     assert await _events(settings.database_url, booking_id) == []
 
 
@@ -104,10 +107,11 @@ async def test_open_page_sends_the_participant_to_webex(booked: tuple[str, int, 
     await _wire(settings.database_url, booking_id)
 
     async with app_client(settings, FixedClock(START - timedelta(minutes=5))) as client:
-        page = await client.get(f"/b/{token}/join")
-        go = await client.get(f"/b/{token}/join/go")
+        base = await open_link(client, token)
+        page = await client.get(f"{base}/join")
+        go = await client.get(f"{base}/join/go")
 
-    assert f'href="/b/{token}/join/go"' in page.text
+    assert f'href="{base}/join/go"' in page.text
     assert "Status verversen" not in page.text
     assert "wachtruimte" in page.text
     assert go.status_code == 303
@@ -126,7 +130,8 @@ async def test_a_group_that_keeps_webexs_choice_gets_the_stored_link(
     await _set_client(settings.database_url, JoinClient.CHOICE)
 
     async with app_client(settings, FixedClock(START - timedelta(minutes=5))) as client:
-        go = await client.get(f"/b/{token}/join/go")
+        base = await open_link(client, token)
+        go = await client.get(f"{base}/join/go")
 
     assert go.headers["location"] == LINK
 
@@ -138,10 +143,12 @@ async def test_the_page_tells_what_the_participant_will_see_per_client(
     await _wire(settings.database_url, booking_id)
 
     async with app_client(settings, FixedClock(START - timedelta(minutes=5))) as client:
-        browser = (await client.get(f"/b/{token}/join")).text
+        base = await open_link(client, token)
+        browser = (await client.get(f"{base}/join")).text
     await _set_client(settings.database_url, JoinClient.CHOICE)
     async with app_client(settings, FixedClock(START - timedelta(minutes=5))) as client:
-        choice = (await client.get(f"/b/{token}/join")).text
+        base = await open_link(client, token)
+        choice = (await client.get(f"{base}/join")).text
 
     assert "Het gesprek opent in uw browser" in browser
     assert "Deelnemen via deze browser" not in browser
@@ -156,7 +163,8 @@ async def test_closed_after_the_call(booked: tuple[str, int, Settings]) -> None:
     await _wire(settings.database_url, booking_id)
 
     async with app_client(settings, FixedClock(START + timedelta(hours=2))) as client:
-        page = (await client.get(f"/b/{token}/join")).text
+        base = await open_link(client, token)
+        page = (await client.get(f"{base}/join")).text
 
     assert "Dit gesprek is voorbij" in page
 
@@ -166,14 +174,16 @@ async def test_never_redirects_to_a_non_https_link(booked: tuple[str, int, Setti
     await _wire(settings.database_url, booking_id, link="javascript:alert(1)")
 
     async with app_client(settings, FixedClock(START)) as client:
-        go = await client.get(f"/b/{token}/join/go")
+        base = await open_link(client, token)
+        go = await client.get(f"{base}/join/go")
 
-    assert go.headers["location"] == f"/b/{token}/join"
+    assert go.headers["location"] == f"{base}/join"
 
 
 async def test_unknown_token_is_a_404(demo_settings: Settings) -> None:
     async with app_client(demo_settings, FixedClock(NOW)) as client:
-        assert (await client.get("/b/not-a-token/join")).status_code == 404
+        assert (await client.get("/b/not-a-token/join")).status_code == 404  # the old link
+        assert (await client.get("/b/m/not-a-reference/join")).status_code == 403  # no cookie
 
 
 @pytest.mark.parametrize("client", list(JoinClient))
@@ -186,7 +196,8 @@ async def test_the_click_says_which_page_the_participant_was_sent_to(
     await _set_client(settings.database_url, client)
 
     async with app_client(settings, FixedClock(START - timedelta(minutes=5))) as http:
-        await http.get(f"/b/{token}/join/go")
+        base = await open_link(http, token)
+        await http.get(f"{base}/join/go")
 
     assert await _details(settings.database_url, booking_id, EventKind.JOIN_CLICKED) == [
         client.value

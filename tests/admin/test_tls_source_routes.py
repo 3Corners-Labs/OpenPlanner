@@ -63,9 +63,7 @@ async def site(
     )
     async with (
         app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as c,
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=f"https://{HOST}") as c,
     ):
         yield Site(c, idp, clock)
 
@@ -180,7 +178,7 @@ async def test_the_default_path_request_issue_place_switch_and_back(
         row = (await session.scalars(select(OwnCertificateRow))).one()
     assert (volume / "privkey.pem").read_text() not in page
     assert any(
-        d.startswith(f"tls.certificate.upload:{row.fingerprint}:")
+        d.startswith(f"tls.certificate.upload,fingerprint:{row.fingerprint},")
         for d in await audit_details(site)
     )
 
@@ -217,7 +215,7 @@ async def test_migrating_an_existing_pair_puts_the_key_on_the_volume_only(
     assert pair.key.decode() not in row.chain_pem
     assert pair.key.decode() not in (await site.client.get(URL)).text
     details = await audit_details(site)
-    assert any(d.startswith("tls.key.import:") for d in details)
+    assert any(d.startswith("tls.key.import,fingerprint:") for d in details)
     assert all(pair.key.decode() not in d for d in details)
 
 
@@ -314,7 +312,9 @@ async def test_removing_is_refused_while_in_use_and_works_after_switching_back(
     assert "done=certificate_removed" in removed.headers["location"]
     assert "Er is geen eigen certificaat geüpload." in (await site.client.get(URL)).text
     assert (volume / "privkey.pem").exists()
-    assert any(d.startswith("tls.certificate.remove:") for d in await audit_details(site))
+    assert any(
+        d.startswith("tls.certificate.remove,fingerprint:") for d in await audit_details(site)
+    )
 
 
 async def test_check_now_probes_and_shows_the_served_certificate(

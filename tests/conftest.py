@@ -1,5 +1,6 @@
 """Shared fixtures: isolated settings per test and an in-process HTTP client."""
 
+import sys
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,9 +11,48 @@ from pydantic import SecretStr
 
 from app.adapters.integrations import Integrations
 from app.config import Settings
+from app.domain.audit import AuditEvent
 from app.domain.event_context import set_service
+from app.domain.event_schema import detail_problem
+from app.domain.log_events import lookup
 from app.domain.ports import Clock
 from app.main import create_app
+
+APP = str(Path(__file__).resolve().parents[1] / "app") + "/"
+READ_BACK = APP + "adapters/db/"
+"""Where events are built from stored rows; the action was checked when it was written."""
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _audited_actions_are_registered() -> Iterator[None]:
+    """Every action the application audits while the tests run is registered (ADR 0103).
+
+    Audit, system and security events build their action in many ways (a permission, a
+    constant, ``job.<type>``), so this watches the events the code in ``app/`` creates instead
+    of reading the source; ``tests/test_log_events_scan.py`` covers the log calls. The same
+    watch checks that every detail follows the convention the line's ``labels.*`` are read
+    from (ADR 0103 point 6, ``app.domain.event_schema.detail_problem``).
+    """
+    seen: dict[str, str] = {}
+    malformed: dict[str, str] = {}
+    original = AuditEvent.__post_init__
+
+    def watched(event: AuditEvent) -> None:
+        original(event)
+        caller = sys._getframe(2).f_code  # 1: the dataclass __init__, 2: who built the event
+        if caller.co_filename.startswith(APP) and not caller.co_filename.startswith(READ_BACK):
+            where = caller.co_filename.removeprefix(APP)
+            seen.setdefault(event.action, where)
+            problem = detail_problem(event.detail)
+            if problem is not None:
+                malformed.setdefault(f"{where} ({event.action})", problem)
+
+    AuditEvent.__post_init__ = watched  # type: ignore[method-assign]
+    yield
+    AuditEvent.__post_init__ = original  # type: ignore[method-assign]
+    unknown = {action: where for action, where in seen.items() if lookup(action) is None}
+    assert unknown == {}, "audited actions missing from app/domain/log_events.py"
+    assert malformed == {}, "audit details that break the convention of app/domain/event_schema"
 
 
 @pytest.fixture(autouse=True)

@@ -10,7 +10,8 @@ name the field key only, never the value.
 """
 
 import re
-from collections.abc import Iterable, Mapping
+import unicodedata
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from enum import StrEnum
@@ -102,6 +103,7 @@ class FieldType(StrEnum):
 ALWAYS_PII = frozenset({FieldType.EMAIL, FieldType.PHONE, FieldType.LONG_TEXT})
 """Types that can never be tagged ``not_pii``: contact details and free text."""
 _BOUNDED = frozenset({FieldType.NUMBER, FieldType.DATE})
+_CLOSED_ANSWERS = frozenset({FieldType.CHOICE, FieldType.CHECKBOX})
 
 
 class Classification(StrEnum):
@@ -147,6 +149,16 @@ _VISIBILITY: Mapping[Purpose, _Visibility] = MappingProxyType(
 AnswerValue = str | int | bool
 
 
+def default_classification(kind: FieldType) -> "Classification":
+    """Return the classification the add form proposes for a field of ``kind``.
+
+    ``not_pii`` only where the answer is one of the administrator's own options or a tick box;
+    every other type, including numbers and dates (a date of birth), is proposed as personal data.
+    It is a proposal: the administrator sees it, and ``not_pii`` still needs the confirmation.
+    """
+    return Classification.NOT_PII if kind in _CLOSED_ANSWERS else Classification.PII
+
+
 def _definition_error(field_name: str) -> DomainError:
     """Return the error for an invalid field definition attribute."""
     return DomainError(ErrorCode.INVALID_FORM_FIELD, field_name)
@@ -161,6 +173,34 @@ def check_label(text: str, field_name: str = "label") -> None:
     squashed = _TERM_SEPARATORS.sub("", text.casefold())
     if any(term in squashed for term in FORBIDDEN_TERMS):
         raise DomainError(ErrorCode.FORM_FIELD_FORBIDDEN, field_name)
+
+
+_KEY_BASE_LENGTH = 36
+"""Room left in the 40-character key for a ``_NN`` suffix."""
+_NON_KEY_CHARS = re.compile(r"[^a-z0-9]+")
+
+
+def derive_key(label: str, taken: Collection[str]) -> str:
+    """Return a valid key for a question, so an administrator never has to invent one.
+
+    The key is the label folded to ASCII, lower case, words joined by ``_``. It starts with a
+    letter, fits the length limit and differs from every key in ``taken`` and from the system
+    keys; the caller passes the keys of active and retired fields. The result still goes through
+    ``FieldDefinition.create``, so the blocklist and the key rules apply to it as to a typed key.
+    """
+    folded = unicodedata.normalize("NFKD", label).encode("ascii", "ignore").decode().casefold()
+    base = _NON_KEY_CHARS.sub("_", folded).strip("_")
+    if not base:
+        base = "question"
+    elif not base[0].isalpha():
+        base = f"q_{base}"
+    base = base[:_KEY_BASE_LENGTH].rstrip("_")
+    used = set(taken) | SYSTEM_KEYS
+    candidate, number = base, 1
+    while candidate in used:
+        number += 1
+        candidate = f"{base}_{number}"
+    return candidate
 
 
 def normalise_email(raw: str, field_name: str, code: ErrorCode = ErrorCode.INVALID_CONTACT) -> str:

@@ -1,10 +1,20 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_fields.html" import field with context %}
+{% from "admin/_page_toc.html" import page_toc with context %}
 {% block title %}{{ _("admin.tab.settings") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
 {% include "_error_summary.html" %}
-<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/settings" novalidate>
+{% set topics = [
+  ("#general", _("admin.group.settings.general")),
+  ("#integrations", _("admin.settings.integrations")),
+  ("#idp-key", _("admin.group.idp_key.title")),
+  ("#booking-form", _("admin.form_fields.title")),
+  ("#check", _("admin.check.title")),
+] %}
+{% if can("group.delete", summary) %}{% set topics = topics + [("#archive", _("admin.group.archive.title"))] %}{% endif %}
+{{ page_toc(topics) }}
+<form class="card" id="general" method="post" action="/admin/groups/{{ summary.group.slug }}/settings" novalidate>
   <div class="card__header">
     <h2>{{ _("admin.tab.settings") }}</h2>
     <p class="card__lead">{{ _("admin.settings.lead") }}</p>
@@ -17,7 +27,7 @@
     </div>
     {% for f in fields %}{{ field(f) }}{% endfor %}
   </div>
-  <div class="form-section">
+  <div class="form-section" id="integrations">
     <h3>{{ _("admin.settings.integrations") }}</h3>
     <p class="card__lead">{{ _("admin.settings.integrations_lead") }}</p>
     <div class="form-grid">

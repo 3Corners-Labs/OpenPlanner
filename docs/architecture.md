@@ -62,6 +62,8 @@ flowchart LR
     video[Webex Meetings API]
     idp[Identity provider<br/>OIDC]
     sms[SMS provider<br/>today Webex Connect]
+    logs[Log platform<br/>syslog, Splunk, Elastic]
+    dns[DNS<br/>host resolver]
     whatsapp[WhatsApp]
 
     website -- links to /g/slug --> service
@@ -75,6 +77,8 @@ flowchart LR
     agent -- joins as cohost, Webex app --> video
     admin -. login .-> idp
     service -- SMS reminders --> sms --> participant
+    service -- masked log lines, TLS --> logs
+    service -- TXT lookups, domain names only --> dns
     service -. roadmap .-> whatsapp
     bot -- free times, OAuth client credentials --> service
 
@@ -90,6 +94,8 @@ flowchart LR
 | Identity provider | in | Admin login with roles | HANDOVER B8, O3 |
 | SMS provider (Webex Connect) | out | SMS reminders, per organisation and provider | ADR 0022, 0028 |
 | WhatsApp | out | Reminders | ADR 0009 (roadmap) |
+| Log platform (syslog, Splunk, Elastic) | out | Masked log lines and audit events; `syslog+tls` or `https` in production | ADR 0085 |
+| DNS (host resolver) | out | TXT lookups of the sender domain (SPF, DKIM, DMARC); domain names only | ADR 0073 |
 | Contact-center bot (WxCC AI Agent) | in | Free times through `/api/agent/v1`; changes through the participant's confirmation (next step) | ADR 0023 |
 
 ## 4. Containers and deployment
@@ -98,6 +104,11 @@ flowchart LR
 flowchart TB
     browser([Browser])
     acme[Let's Encrypt<br/>ACME CA]
+    ownproxy["Own reverse proxy<br/>on another machine (ADR 0086)"]
+    logs[Log platform]
+    idp[Identity provider]
+    cisco[Webex, WxCC, SMS provider]
+    dns[DNS resolver]
 
     subgraph host [One VM]
         proxy["proxy (profile tls)<br/>Caddy: TLS, auto-renewal,<br/>body limit, forwarded IPs"]
@@ -112,13 +123,21 @@ flowchart TB
     github[GitHub releases<br/>GHCR images]
     updater["host updater<br/>systemd timer, cosign"]
 
-    browser -- "https :443" --> proxy -- edge network --> web
+    browser -- "https :443" --> proxy -- "http, edge network, one host (recorded exception)" --> web
+    browser -- https --> ownproxy -- "https when WEB_TLS_CERT_FILE is set (ADR 0091)" --> web
     proxy -. "ACME, renewal" .-> acme
     web <--> volume
     worker <--> volume
-    worker -- SMTP --> smtp
+    worker -- "SMTP, STARTTLS or TLS" --> smtp
+    web -- "OIDC, https" --> idp
+    web -- https --> cisco
+    worker -- https --> cisco
+    web -- "syslog+tls or https" --> logs
+    worker -- "syslog+tls or https" --> logs
+    worker -- "TXT lookups" --> dns
     worker -- release check (interval setting) --> github
     worker -. "certificate probe, https :443" .-> proxy
+    worker -. "round trip: GET /api/v1/instance (ADR 0086)" .-> proxy
     web -- "own certificate (ADR 0070)" --> certs -. "watcher, caddy reload" .-> proxy
     updater -- "app.cli: claim, progress, report, backup" --> web
     updater -- "pull, verify, pin digest" --> github
@@ -132,12 +151,21 @@ flowchart TB
   uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
   fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
   The worker probes the public address every few hours and shows the certificate's issuer,
-  expiry and one finding on *System status*; a failing one is a system event. The superuser
+  expiry and one finding on *System status*; a failing one is a system event. On the same cycle
+  it asks the public address for `/api/v1/instance` with a nonce it stored first, and judges the
+  round trip (does the name reach this installation, over https, with the proxy trusted;
+  ADR 0086), shown in the *Address and proxy* part above the certificate. The superuser
   chooses the source there (ADR 0070): Let's Encrypt, or an own certificate whose key `web`
   makes in the `portal-certs` volume (a signing request for the CA; the chain comes back
   through the portal, the key never enters the database) and whose pair the entrypoint's
   watcher reloads Caddy with on change. Without the profile (`--no-tls`), a
   load balancer of the host does TLS and the source is not the portal's.
+- **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The one
+  exception is the bundled proxy to `web` on the `edge` network of one host. An own reverse proxy
+  on another machine gets HTTPS from uvicorn (`WEB_TLS_CERT_FILE`, `WEB_TLS_KEY_FILE`, class B;
+  the image's healthcheck follows), and *System status* warns while `FORWARDED_ALLOW_IPS` names
+  another proxy and web serves no TLS. All outbound connections are listed in `docs/dataflow.md`
+  (*Outbound connections and the hop to web*).
 - **One image, two roles.** `web` runs `alembic upgrade head` and then uvicorn; `worker` runs
   `python -m app.jobs.worker` and starts only when `web` is healthy. Both run as uid 10001
   with a read-only root filesystem, no capabilities and `no-new-privileges`.
@@ -206,7 +234,7 @@ import-linter enforces these arrows in CI (ADR 0005):
 flowchart LR
     subgraph domain [app.domain]
         service[BookingService · AdminService · ApiAccessService · UpdateService]
-        ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider ·<br/>ReleaseSource"}}
+        ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider ·<br/>ReleaseSource · LogDestinationSender"}}
         service --> ports
     end
 
@@ -218,6 +246,7 @@ flowchart LR
     wxccad[adapters.wxcc<br/>WxccTasks]
     idpad[adapters.oidc<br/>OidcIdentityProvider]
     releasead[adapters.releases<br/>GitHubReleases]
+    logad[adapters.log_senders<br/>Syslog · Splunk · Elastic · Http]
 
     clock -.implements.-> ports
     uow -.implements.-> ports
@@ -227,6 +256,7 @@ flowchart LR
     wxccad -.implements.-> ports
     idpad -.implements.-> ports
     releasead -.implements.-> ports
+    logad -.implements.-> ports
 
 ```
 
@@ -457,7 +487,7 @@ sequenceDiagram
     S-->>W: receipt (token, only in memory)
     W-->>C: 303 /g/demo/booked (no token, ADR 0056)
     K->>M: request to confirm + confirm link
-    C->>W: GET /b/{token}/confirm, then POST (same-origin)
+    C->>W: GET /b/{token}/confirm: 303 to /b/m/{ref}/confirm (cookie set), then POST (same-origin)
     W->>S: confirm(token): before confirm_by? confirmed, plan jobs
     loop every poll interval
         K->>DB: claim due jobs (write lock)
@@ -530,7 +560,7 @@ flowchart LR
     hold(["suspended<br/>(emergency closure)"]) --> hmail["notice mail<br/>now"]
     hmail --> resolve{"moved, reinstated<br/>or cancelled?"}
     resolve -->|yes| book
-    resolve -->|no| hpurge["closure end + 30 days<br/>purge PII"]
+    resolve -->|no| hpurge["earlier of closure end + 30 days<br/>and slot end + maximum (ADR 0102)<br/>purge PII"]
 
 ```
 
@@ -559,7 +589,7 @@ sequenceDiagram
     A->>X: accept
     X-->>O: webhook task:connected (signed)
     A->>W: open meeting link in the Webex app, cohost
-    C->>O: GET /b/{token}/join/go
+    C->>O: GET /b/m/{ref}/join/go (participant cookie)
     O-->>C: 303 to the Webex link
     C->>W: join in the browser, waits in the lobby
     W-->>O: webhooks: started, host joined, guest joined (signed)
@@ -569,6 +599,28 @@ sequenceDiagram
 
 Every arrow back into OpenPlanner becomes a timeline event and updates the booking's call
 status; the agenda in the admin portal shows it per day.
+
+### Log destinations (ADR 0085)
+
+```mermaid
+flowchart LR
+    line["log line (JSON, masked)<br/>structlog or stdlib"] --> tap{"line tap"}
+    event["audit / system / security event<br/>after commit (EventSink)"] --> tap
+    diag["diagnostic event<br/>(never to stdout)"] --> tap
+    line --> stdout["stdout (always)<br/>json-file, rotated"]
+    event --> stdout
+    tap --> filter{"accepts(destination)?<br/>level · category · opt-ins"}
+    filter --> queue["bounded queue per destination<br/>and process, drop oldest"]
+    queue --> sender["sender task: batch, timeout,<br/>backoff, drop hopeless batch"]
+    sender -->|"syslog TLS/TCP/UDP · Splunk HEC ·<br/>Elastic _bulk · HTTP NDJSON"| platform[(log platform)]
+    sender --> status["counters and reason<br/>log_destination_status"]
+    status --> screen["Platform → Log destinations"]
+    kill["LOG_SHIPPING_ENABLED=false<br/>(host)"] -.stops.-> sender
+```
+
+Web and worker each run one shipper. It reads the enabled destinations (with their opened
+credentials) every 15 seconds, so a change in the portal reaches both without a restart, and
+reports its counters every 30 seconds. Delivery never runs in a request or a job.
 
 ### Maintenance mode (ADR 0038)
 
@@ -632,7 +684,7 @@ flowchart LR
     end
 
     subgraph edge [Edge]
-        proxy[Caddy proxy<br/>TLS, auto-renewal, body limit]
+        proxy["Caddy proxy<br/>TLS, auto-renewal, body limit<br/>to web: http on one host,<br/>https with WEB_TLS_CERT_FILE"]
     end
 
     subgraph app [Application, trusted]
@@ -647,6 +699,7 @@ flowchart LR
         smtp[Mail provider]
         wxcc[WxCC]
         webex[Webex Meetings]
+        logs[Log platform]
     end
 
     browser --> proxy --> mw --> prot --> pages --> domain --> db
@@ -654,6 +707,7 @@ flowchart LR
     domain -. via worker .-> smtp
     domain -- first name + meeting link only --> wxcc
     domain -- group name + times only --> webex
+    domain -. masked lines only, TLS .-> logs
     wxcc -- signed webhooks --> pages
     webex -- signed webhooks --> pages
 
@@ -668,12 +722,15 @@ flowchart LR
 | Management tokens: 256 bits, HMAC-derived, only the salt and hash stored | `app/domain/tokens.py` | ADR 0011 |
 | No PII in logs (masking processor and semgrep rule), errors, URLs or jobs | `app/logging.py`, `.semgrep/` | CLAUDE.md |
 | Audit events shipped after commit as `log_type: audit` lines; security events deduplicated | `app/adapters/event_sink.py`, `app/domain/security_log.py` | ADR 0034 |
-| One event schema (`openplanner.event/2`) for audit table and log lines; a trace id per request and job, set by the server only | `app/domain/event_schema.py`, `app/domain/event_context.py`, `app/api/trace.py` | ADR 0040 |
+| One event schema (`openplanner.event/3`) for audit table and log lines; a trace id per request and job, set by the server only | `app/domain/event_schema.py`, `app/domain/event_context.py`, `app/api/trace.py` | ADR 0040 |
 | Authorisation matrix: one `RequirePermission` per admin route, scoped SQL, audit of denials and logins | `app/domain/authorization.py`, `app/admin/authz.py` | ADR 0014 |
 | OIDC with PKCE, nonce, asymmetric algorithms only; RP-initiated logout | `app/adapters/oidc.py` | ADR 0013 |
 | Encrypted, write-only integration secrets | WP7 | ADR 0008 |
 | Machine API: off by default (environment and superuser switch), OAuth client credentials, hashed secrets and 10-minute opaque tokens, one `RequireScope` per route, per-client grant and network allow-list, no personal data | `app/api/agent/`, `app/domain/api_access.py` | ADR 0023 |
 | Signed images, SBOM, image and dependency scanning | CI | ADR 0006 |
+
+Every key and algorithm, with where it lives, who can read it and how it is rotated and
+destroyed, is in [`docs/cryptography.md`](cryptography.md) (ADR 0094).
 
 ### Shared trust boundaries
 
@@ -712,7 +769,7 @@ The STRIDE analysis per flow, with a test for every abuse case, is in
   `bookings`; jobs, slots and logs hold IDs.
 - **Purge:** the `purge_pii` job sets them to NULL at slot end + 24 h, or 24 h after a
   cancellation. A booking on hold by an emergency closure keeps them until it is resolved, at
-  most 30 days after the closure ends (ADR 0024). The nightly sweep (`app.domain.retention_sweep`, run by worker housekeeping) purges what the job
+  most the earlier of 30 days after the closure ends and `closure_max_retention_days` after its original slot, also under an open closure (ADR 0024, 0102). The nightly sweep (`app.domain.retention_sweep`, run by worker housekeeping) purges what the job
   missed and alerts on a backlog older than 48 h.
 - **What leaves the system:** mails carry the first name, date, team and the management link;
   the calendar file carries no personal data. WxCC will receive only the first name and the
@@ -778,6 +835,7 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0032 | Provider-neutral contact-center integration (proposed; renumbered from 0021) |
 | 0033 | Context-sensitive help: one Markdown manual, shown on GitHub and in the portal, (i) per field |
 | 0034 | Audit events also on the log stream for an external log platform such as Splunk |
+| 0085 | Log destinations in the portal (syslog, Splunk, Elastic, HTTP), a trace level, a host kill switch |
 | 0035 | Embedding as a Web Component with a CORS allow-list per organisation; no iframes |
 | 0036 | Scaling envelope of one VM with SQLite, triggers and seams for the step beyond |
 | 0037 | Closure page: prepared scenarios, structured alternative contact options, an image with alt text |

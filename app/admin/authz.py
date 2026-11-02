@@ -41,8 +41,9 @@ from app.domain.authorization import (
     decide,
     decide_in_maintenance,
     scope_for,
+    target_text,
 )
-from app.domain.event_context import bind_level
+from app.domain.event_context import bind_actor_role, bind_level
 from app.domain.login_service import LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.ports import Clock
@@ -289,10 +290,14 @@ class RequirePermission:
             )
         else:
             authorization = await service.authorize_anywhere(principal, self.permission)
+        # ADR 0103 point 7: the decision line and every later line and event of the request say
+        # under which role the admin acted.
+        bind_actor_role(authorization.decision.role)
         log.info(
             "authz.decision",
             actor=principal.subject,
             permission=self.permission.value,
+            target=target_text(authorization.target),
             target_group=authorization.target.group,
             target_organisation=authorization.target.organisation,
             allowed=authorization.decision.allowed,
@@ -328,6 +333,7 @@ class RequirePermission:
             "authz.maintenance_refused",
             actor=principal.subject,
             permission=self.permission.value,
+            target=target_text(target),
             target_group=target.group,
             target_organisation=target.organisation,
         )

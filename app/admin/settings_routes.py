@@ -61,13 +61,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
+from app.adapters.db.rotation import rotation_status
 from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
+from app.admin.address_view import address_view
 from app.admin.authz import AdminContext, RequirePermission, can_function
+from app.admin.backup_view import backup_view
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.session import save_login_trial
+from app.admin.staff_directory_routes import directory_service
 from app.admin.uploads import read_uploads
 from app.config import Settings
 from app.domain.authorization import Permission
@@ -78,6 +82,7 @@ from app.domain.configuration_package import (
 )
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.key_rotation import RotationStatus
 from app.domain.log_destination_service import LogDestinationService
 from app.domain.log_destinations import State
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
@@ -97,6 +102,7 @@ from app.domain.settings_registry import (
     Topic,
 )
 from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
+from app.domain.staff_directory import DirectoryState
 from app.domain.tls import Finding
 from app.domain.tls_check import CertificateStatus
 from app.domain.tls_source import CertificateSourceService
@@ -279,7 +285,6 @@ _FIELD_LABELS = {
     "last_name": "admin.settings.data_fields.field.last_name",
     "email": "admin.settings.data_fields.field.email",
     "phone": "admin.settings.data_fields.field.phone",
-    "note": "admin.settings.data_fields.field.note",
     "form_answers": "admin.settings.data_fields.field.form_answers",
     "guest_join_url": "admin.settings.data_fields.field.guest_join_url",
     "host_join_url": "admin.settings.data_fields.field.host_join_url",
@@ -620,8 +625,12 @@ async def _overview(
     if tab is Tab.STATUS:
         values |= {
             "environment": current.environment,
+            "address": await address_view(request, locale, current),
+            "backups": backup_view(request, locale, current),
             "certificate": await _certificate(request, locale),
             "log_summary": await _log_summary(request, context),
+            "directory": await _directory_status(request, locale),
+            "rotation": await _rotation(request),
             "source": await _source_view(request, locale, states, manage=manage, errors=errors),
             "status": [
                 StatusRow(
@@ -658,6 +667,13 @@ async def _overview(
     return response
 
 
+async def _rotation(request: Request) -> RotationStatus:
+    """Return the key-rotation counters of ADR 0094 (numbers only; see ``rotation_status``)."""
+    return await rotation_status(
+        request.app.state.engine, request.app.state.settings, request.app.state.clock.now()
+    )
+
+
 @dataclass(frozen=True)
 class LogSummary:
     """How many log destinations there are, are on and are failing (ADR 0085)."""
@@ -665,6 +681,32 @@ class LogSummary:
     total: int
     enabled: int
     failing: int
+
+
+_DIRECTORY_TEXTS = {
+    DirectoryState.CONNECTED: "admin.settings.directory.connected",
+    DirectoryState.UNREACHABLE: "admin.settings.directory.unreachable",
+    DirectoryState.SWITCHED_OFF: "admin.settings.directory.switched_off",
+    DirectoryState.INCOMPLETE: "admin.settings.directory.incomplete",
+    DirectoryState.ABSENT: "admin.settings.directory.absent",
+}
+"""The sentence per state of the staff directory (ADR 0106 point 3)."""
+
+
+@dataclass(frozen=True)
+class DirectoryStatus:
+    """The staff directory on System status: its state and the sentence that explains it."""
+
+    state: DirectoryState
+    text: str
+
+
+async def _directory_status(request: Request, locale: RequestLocale) -> DirectoryStatus:
+    """Return whether staff can be managed in the portal, naming missing settings only."""
+    service = directory_service(request)
+    state = await service.state()
+    text = locale.gettext(_DIRECTORY_TEXTS[state], names=", ".join(service.missing))
+    return DirectoryStatus(state, text)
 
 
 async def _log_summary(request: Request, context: AdminContext) -> LogSummary | None:

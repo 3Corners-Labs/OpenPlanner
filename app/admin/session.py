@@ -1,6 +1,7 @@
 """The admin session: a reference in the cookie, the session itself on the server (ADR 0098).
 
-The signed cookie (``op_admin``) holds ``sid``, a random reference, next to what exists before
+The signed cookie (``__Host-op_admin`` on https, ``op_admin`` over http; see
+``session_cookie_for``) holds ``sid``, a random reference, next to what exists before
 a session does: the OIDC login in progress, the test login, the update snooze, and the chosen
 theme, menu width, alert preferences and scope filter. Who is logged in (``LoginClaims``:
 subject, display name, roles, organisations, groups, entitlements), when, and until when lives
@@ -21,12 +22,29 @@ from app.domain.admin_sessions import AdminSession, EndReason, SessionPolicy
 from app.domain.entitlements import LoginClaims
 from app.domain.identity import PLATFORM
 from app.domain.ports import LoginStart
+from app.web.cookies import CookieSpec, cookie_for
 
+LOGOUT_CLEAR_SITE_DATA = {"clear-site-data": '"cookies", "storage"'}
+"""Header of ``/admin/logged-out`` after a logout (ASVS V14.3.1): the browser drops the site's data.
+
+It is sent on the page the logout ends at, not on the ``POST /admin/logout`` response: that one
+is followed by the identity provider's own logout, and ``"cookies"`` also clears the cookies of
+a provider on the same host or registrable domain, which then cannot finish the logout and the
+return (the end-to-end suite caught this). The flag that allows it is in the signed session
+cookie, so a link from another site to ``/admin/logged-out`` clears nothing.
+
+``"cache"`` is left out on purpose: every HTML response is ``no-store`` (``app/web/templates.py``),
+so nothing of the session sits in the HTTP cache, and ``"cache"`` would also empty the caches of
+participants' pages and static files for no gain. It is a fixed protocol value, not a setting.
+"""
+
+_BASE_COOKIE = "op_admin"
 _SID = "sid"
 _OIDC = "oidc"
 _TRIAL = "login_trial"
 _THEME = "theme"
 _NAV = "nav"
+_LOGGED_OUT = "logged_out"
 _ALERT_BANNER = "alert_banner"
 _ALERT_POPUPS = "alert_popups"
 _SCOPE = "scope"
@@ -46,6 +64,26 @@ ALERT_POPUPS = ("all", "warnings", "outages", "off")
 
 DEFAULT_ALERT_POPUPS = "warnings"
 """The pop-up choice until the admin picks one."""
+
+
+SessionCookie = CookieSpec
+"""The name and attributes of the admin session cookie (ADR 0098 point 12)."""
+
+
+def session_cookie_for(public_base_url: str) -> SessionCookie:
+    """Return the admin cookie to use for the address the installation is served on.
+
+    ``__Host-op_admin`` with ``Path=/`` and ``Secure`` on an ``https://`` address, ``op_admin``
+    with ``Path=/admin`` over ``http://`` (development). The rule is shared with the
+    participant's cookie in ``app.web.cookies``; the two cookies are independent.
+
+    Args:
+        public_base_url: The ``PUBLIC_BASE_URL`` setting.
+
+    Returns:
+        The cookie name, path and ``Secure`` flag for ``SessionMiddleware``.
+    """
+    return cookie_for(public_base_url, _BASE_COOKIE, "/admin")
 
 
 @dataclass(frozen=True)
@@ -159,6 +197,16 @@ def pop_login_start(request: Request) -> dict[str, str] | None:
     """Return and forget the login in progress (each one can be completed once)."""
     value = request.session.pop(_OIDC, None)
     return value if isinstance(value, dict) else None
+
+
+def mark_logged_out(request: Request) -> None:
+    """Remember in the signed cookie that this browser has just logged out (after the clear)."""
+    request.session[_LOGGED_OUT] = True
+
+
+def pop_logged_out(request: Request) -> bool:
+    """Return whether this browser has just logged out, and forget it."""
+    return request.session.pop(_LOGGED_OUT, None) is True
 
 
 async def start_session(

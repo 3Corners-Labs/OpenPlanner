@@ -13,6 +13,7 @@
   <h2 id="state-heading">{{ _("admin.idp.state") }}</h2>
   <dl class="facts">
     <div><dt>{{ _("admin.idp.status") }}</dt><dd>{% if view.provider.enabled %}<span class="chip chip--success">{{ _("admin.idp.on") }}</span>{% else %}<span class="chip">{{ _("admin.idp.off") }}</span>{% endif %}</dd></div>
+    <div><dt>{{ _("admin.idp.mfa_policy") }}</dt><dd>{{ view.mfa_label }}</dd></div>
     <div><dt>{{ _("admin.idp.issuer") }}</dt><dd><code>{{ view.provider.issuer }}</code></dd></div>
     <div><dt>{{ _("admin.idp.checked") }}</dt><dd>{{ view.checked or _("admin.idp.never") }}</dd></div>
     <div><dt>{{ _("admin.idp.updated") }}</dt><dd>{{ view.updated }}</dd></div>

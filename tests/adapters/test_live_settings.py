@@ -151,6 +151,16 @@ async def test_an_organisation_gets_its_own_values_over_the_platform() -> None:
     assert live.for_organisation(None) is live.settings
 
 
+async def test_an_organisation_reads_its_own_closure_limits() -> None:
+    live = await _with_organisations({7: {"closure_max_retention_days": 45}})
+
+    own = live.closure_retention(7)
+    other = live.closure_retention(8)
+
+    assert (own.max_retention.days, own.notice.days) == (45, 14)
+    assert (other.max_retention.days, other.notice.days) == (90, 14)
+
+
 async def test_organisation_values_that_break_a_rule_together_do_not_apply() -> None:
     live = await _with_organisations({7: {"planner_rebook_reminder_days": 20}})  # lapse 14
 
@@ -176,6 +186,8 @@ async def test_the_organisation_states_show_the_source() -> None:
         "booking_confirm_window_hours",
         "booking_confirm_cutoff_hours",
         "booking_confirm_reminders",
+        "closure_max_retention_days",
+        "closure_max_notice_days",
     }
     assert (states["time_format"].source, states["time_format"].shown) == ("organisation", "12h")
     assert states["admin_timezone"].source == "default"

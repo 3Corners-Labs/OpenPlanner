@@ -45,7 +45,7 @@ async def test_meeting_and_task_are_stored_and_found(engine: AsyncEngine) -> Non
     assert missing is None
 
 
-async def test_purge_removes_the_join_link_but_keeps_the_ids(engine: AsyncEngine) -> None:
+async def test_purge_removes_the_join_link_and_the_meeting_id(engine: AsyncEngine) -> None:
     booking_id = await _booking_id(engine)
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
@@ -55,8 +55,7 @@ async def test_purge_removes_the_join_link_but_keeps_the_ids(engine: AsyncEngine
         booking = await tx.get_booking(booking_id)
 
     assert booking is not None
-    assert booking.meeting == MeetingRef("meeting-1", None)
-    assert booking.meeting.link is None
+    assert booking.meeting is None  # ADR 0102 point 11: the id is the key to a record at Cisco
 
 
 async def test_timeline_and_status_round_trip(engine: AsyncEngine) -> None:

@@ -26,6 +26,7 @@ from app.domain.booking import (
     SlotUsage,
     TrialCall,
 )
+from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import (
     BookingEvent,
@@ -55,6 +56,8 @@ from app.domain.job_plan import JobCounts, JobSummary, JobType, PlannedJob
 from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
+from app.domain.participant_links import LinkSession
+from app.domain.public_address import AddressCheck, AddressKind, InstanceReply
 from app.domain.retention import DueBooking, RetentionFacts
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
@@ -64,7 +67,14 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
-from app.domain.staff import GrantHolders, RefusedEntitlement, StaffFilter, StaffMember
+from app.domain.staff import (
+    GrantHolders,
+    RefusedEntitlement,
+    StaffFilter,
+    StaffMember,
+    StaffStatus,
+)
+from app.domain.staff_directory import DirectoryUser, NewStaffMember, StaffAction
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
@@ -185,12 +195,15 @@ class LoginTestReport:
         claim_names: The names of the claims in the ID token, sorted and bounded.
         email_verified: The ``email_verified`` claim, ``None`` when absent.
         email_domain: The part after ``@`` of the ``email`` claim, ``None`` when absent.
+        mfa_shown: Whether the token showed a second factor under the provider's accepted
+            ``amr``/``acr`` values (ADR 0100).
     """
 
     claims: LoginClaims
     claim_names: tuple[str, ...]
     email_verified: bool | None
     email_domain: str | None
+    mfa_shown: bool = False
 
 
 class DiscoveryFetcher(Protocol):
@@ -389,6 +402,17 @@ class CertificateProbe(Protocol):
         ...
 
 
+class InstanceProbe(Protocol):
+    """Asks the public address for ``/api/v1/instance`` like a participant's browser (ADR 0086)."""
+
+    async def probe(self, url: str, nonce: str) -> InstanceReply:
+        """Request ``{url}/api/v1/instance?probe={nonce}`` without following a redirect.
+
+        Never raises: a failed request is a reply with an error code.
+        """
+        ...
+
+
 class MailDomainResolver(Protocol):
     """Looks up the TXT records of a DNS name, for the sender domain check (ADR 0073)."""
 
@@ -562,6 +586,54 @@ class IdentityProvider(Protocol):
         ...
 
 
+class StaffDirectory(Protocol):
+    """An identity provider that also keeps the admin staff, which the portal may manage.
+
+    Optional capability of the provider the platform owns (ADR 0095): only the bundled
+    Keycloak implements it, through its admin REST API. A provider without it keeps the
+    read-only Staff screen. Every method raises ``DirectoryError`` with a code; the code
+    carries no personal data and nothing the provider said.
+    """
+
+    async def reachable(self) -> bool:
+        """Return whether the directory answers with the service account's credentials."""
+        ...
+
+    async def list_users(self) -> list[DirectoryUser]:
+        """Return every person the provider holds."""
+        ...
+
+    async def get_user(self, user_id: str) -> DirectoryUser | None:
+        """Return one person by the provider's id, or ``None``."""
+        ...
+
+    async def user_name_taken(self, username: str) -> bool:
+        """Return whether a person with exactly this user name exists (ADR 0106 point 6)."""
+        ...
+
+    async def create_user(self, new: NewStaffMember) -> DirectoryUser:
+        """Create a person without a password; the invitation link sets it.
+
+        Raises:
+            DirectoryError: With code ``conflict`` when the address is already in use.
+        """
+        ...
+
+    async def set_entitlements(self, user_id: str, values: Collection[str]) -> None:
+        """Replace the person's entitlement claim values (ADR 0049)."""
+        ...
+
+    async def set_enabled(self, user_id: str, enabled: bool) -> None:
+        """Enable or disable the person; a disabled person cannot log in."""
+        ...
+
+    async def send_actions_email(
+        self, user_id: str, actions: Collection[StaffAction], lifespan_seconds: int
+    ) -> None:
+        """Mail the person a link that asks for ``actions``, valid for ``lifespan_seconds``."""
+        ...
+
+
 class Transaction(Protocol):
     """Everything the domain reads and writes within one database transaction.
 
@@ -637,6 +709,18 @@ class Transaction(Protocol):
         """Create or replace the staff record of ``member.subject`` and its memberships."""
         ...
 
+    async def set_staff_status(self, subject: str, status: StaffStatus, at: datetime) -> None:
+        """Set the status of ``subject`` (suspended or active again); unknown ones are ignored."""
+        ...
+
+    async def erase_staff(self, subject: str, at: datetime) -> None:
+        """Erase the record of ``subject`` (ADR 0046 point 9); the subject and times stay.
+
+        The name, roles, memberships and refused values go and the status becomes ``erased``;
+        an unknown or already erased subject is ignored, so the retention job can run twice.
+        """
+        ...
+
     async def add_admin_session(self, session: AdminSession) -> None:
         """Store a new admin session (ADR 0098); only the hash of its reference is kept."""
         ...
@@ -655,6 +739,63 @@ class Transaction(Protocol):
 
     async def touch_admin_session(self, id_hash: str, at: datetime) -> None:
         """Write the latest activity of a live session."""
+        ...
+
+    async def end_all_admin_sessions(self, reason: EndReason, at: datetime) -> int:
+        """End every live session with ``reason``; return how many (ADR 0098 point 9c)."""
+        ...
+
+    async def end_admin_sessions_of(
+        self, subject: str, reason: EndReason, at: datetime, keep: str | None = None
+    ) -> int:
+        """End the live sessions of ``subject`` except the one with hash ``keep``; return how many.
+
+        For a person ending their other sessions and an administrator ending all of a
+        person's (ADR 0098 point 9a and 9b).
+        """
+        ...
+
+    async def delete_admin_sessions(self, login_before: datetime) -> int:
+        """Delete the sessions that ended or whose login lies before ``login_before``.
+
+        Return how many rows went (ADR 0098 point 11).
+        """
+        ...
+
+    async def get_booking_id_by_public_ref(self, public_ref: str) -> int | None:
+        """Return the id of the booking named by ``public_ref`` (ADR 0093), or ``None``."""
+        ...
+
+    async def add_link_session(self, value_hash: str, now: datetime, expires_at: datetime) -> int:
+        """Store a new participant link session (only the hash of its value) and return its id."""
+        ...
+
+    async def get_link_session(self, value_hash: str) -> LinkSession | None:
+        """Return the session with this value hash, lapsed or not, with its bookings."""
+        ...
+
+    async def touch_link_session(
+        self, session_id: int, now: datetime, expires_at: datetime
+    ) -> None:
+        """Record a use of the session and push its end to ``expires_at``."""
+        ...
+
+    async def add_booking_to_link_session(
+        self, session_id: int, booking_id: int, now: datetime
+    ) -> None:
+        """Let the session hold the booking (no effect when it already does)."""
+        ...
+
+    async def remove_booking_from_link_session(self, session_id: int, booking_id: int) -> None:
+        """Take the booking out of the session."""
+        ...
+
+    async def delete_link_session(self, session_id: int) -> None:
+        """Delete one session and the list of its bookings."""
+        ...
+
+    async def delete_lapsed_link_sessions(self, now: datetime) -> int:
+        """Delete the sessions that lapsed before ``now``; return how many went."""
         ...
 
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
@@ -1094,6 +1235,10 @@ class Transaction(Protocol):
         """Set every PII column of the booking to NULL and record ``pii_purged_at``."""
         ...
 
+    async def get_booking_by_public_ref(self, public_ref: str) -> Booking | None:
+        """Return the booking named by ``public_ref`` (ADR 0093), or ``None``."""
+        ...
+
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         """Return the booking whose management token hashes to ``token_hash``."""
         ...
@@ -1103,6 +1248,28 @@ class Transaction(Protocol):
 
         For the nightly sweep (system, no scope). Same selection as ``list_retention``.
         """
+        ...
+
+    async def find_rollable(
+        self, purged_before: datetime, after_id: int, limit: int
+    ) -> list[RollableBooking]:
+        """Return up to ``limit`` booking rows purged before ``purged_before``, by id.
+
+        Only rows with an id above ``after_id`` (keyset paging). The caller checks each row
+        with ``booking_rollup.is_rollable``; the SQL only narrows the candidates (ADR 0102).
+        """
+        ...
+
+    async def add_day_counts(self, counts: Sequence[DayCount]) -> None:
+        """Add ``counts`` to the stored daily counts (per group, day and status)."""
+        ...
+
+    async def delete_booking_rows(self, booking_ids: Sequence[int]) -> None:
+        """Delete the booking rows with their events, call status and finished jobs."""
+        ...
+
+    async def booking_totals(self, group_id: int) -> dict[BookingStatus, int]:
+        """Return the group's bookings per status: live rows plus the merged daily counts."""
         ...
 
     async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:
@@ -1272,6 +1439,13 @@ class Transaction(Protocol):
         ``status`` is ``suspended`` (a closure, ADR 0024) or ``awaiting_rebook`` (a planner's
         request, ADR 0044). The group must lie inside ``scope`` (ADR 0014); otherwise the list
         is empty.
+        """
+        ...
+
+    async def latest_suspended_end(self, closure_id: int) -> datetime | None:
+        """Return the latest slot end of the bookings still on hold in a closure, if any.
+
+        Times only: the closure page derives the date the data is deleted by (ADR 0102).
         """
         ...
 
@@ -1449,6 +1623,34 @@ class Transaction(Protocol):
 
     async def save_certificate_check(self, check: CertificateCheck) -> None:
         """Replace the latest certificate check."""
+        ...
+
+    async def ensure_instance_id(self) -> str:
+        """Return the installation's id, making and storing it on first use (ADR 0086)."""
+        ...
+
+    async def get_instance_id(self) -> str | None:
+        """Return the installation's id, or ``None`` before the first start made one."""
+        ...
+
+    async def store_probe_nonce(self, digest: str, at: datetime) -> None:
+        """Keep the hash of the one pending probe nonce, replacing any earlier one."""
+        ...
+
+    async def take_probe_nonce(self, digest: str, not_before: datetime) -> bool:
+        """Consume the pending nonce when it matches ``digest`` and is newer than ``not_before``."""
+        ...
+
+    async def get_address_checks(self) -> list[AddressCheck]:
+        """Return the latest round trip per address (ADR 0086)."""
+        ...
+
+    async def save_address_check(self, check: AddressCheck) -> None:
+        """Replace the latest round trip of ``check.kind``."""
+        ...
+
+    async def delete_address_check(self, kind: AddressKind) -> None:
+        """Forget the stored round trip of ``kind`` (the address was unset)."""
         ...
 
     async def get_own_certificate(self) -> OwnCertificate | None:

@@ -12,6 +12,7 @@ from app.domain.audit import Outcome
 from app.domain.authorization import Role, Scope
 from app.domain.entitlements import LoginClaims
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
+from tests.fakes.staff_directory import FakeStaffDirectory
 
 SUPERUSER = LoginClaims("sub-root", "Root", entitlements=frozenset({"openplanner:superuser"}))
 TEAM_LEAD = LoginClaims(
@@ -164,7 +165,7 @@ async def test_a9_a12_access_follows_the_idp_value_and_a_change_takes_effect_at_
         Outcome.FAILURE,
         "",
         "demo",
-        "openplanner:group_admin:demo/demo=unknown_group",
+        "unknown_group:openplanner:group_admin:demo/demo",
     ) in found
 
 
@@ -261,7 +262,7 @@ async def test_a13_shadow_mode_grants_the_legacy_claims_and_audits_the_mismatch(
         Outcome.FAILURE,
         "",
         None,
-        "legacy_only:auditor:demo;entitlements_only:org_admin:demo",
+        "legacy_only:auditor:demo,entitlements_only:org_admin:demo",
     ) in await events(shadow)
 
 
@@ -325,3 +326,38 @@ async def test_the_superuser_sets_the_organisations_idp_value_on_its_page(site: 
         "demo",
         "demo->gem-demo",
     ) in (await events(site))
+
+
+DISCOVERY = "https://idp.test/realms/x/.well-known/openid-configuration"
+
+
+async def test_the_mapping_page_names_the_own_identity_provider(
+    settings: Settings, admin_db: str
+) -> None:
+    configured = settings.model_copy(update={"oidc_discovery_url": DISCOVERY})
+    async with _running_site(configured, admin_db) as running:
+        await running.login_as(SUPER)
+
+        text = (await running.client.get("/admin/idp-mapping")).text
+
+    assert "Eigen identiteitsprovider van de organisatie" in text
+    assert "https://idp.test/realms/x" in text
+    assert "Bij de identiteitsprovider zelf" in text
+
+
+async def test_the_mapping_page_names_the_bundled_identity_provider(
+    settings: Settings, admin_db: str
+) -> None:
+    configured = settings.model_copy(
+        update={
+            "oidc_discovery_url": DISCOVERY,
+            "keycloak_admin_url": "http://kc.test/admin/realms/x",
+        }
+    )
+    async with _running_site(configured, admin_db, directory=FakeStaffDirectory()) as running:
+        await running.login_as(SUPER)
+
+        text = (await running.client.get("/admin/idp-mapping")).text
+
+    assert "Meegeleverde Keycloak van dit platform" in text
+    assert "In het portaal: uitnodigen" in text

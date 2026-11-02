@@ -140,3 +140,71 @@ async def test_an_unreadable_register_gives_no_access(site: Site) -> None:
     except RuntimeError:
         return
     assert response.status_code != 200
+
+
+CLEAR_SITE_DATA = '"cookies", "storage"'
+
+
+async def test_the_page_a_logout_ends_at_clears_cookies_and_storage(site: Site) -> None:
+    """ASVS V14.3.1: after the logout (and the provider's), the browser drops the site's data."""
+    await site.login_as(ORG_ADMIN)
+
+    out = await site.client.post("/admin/logout", headers=SAME_ORIGIN)
+    final = await site.client.get("/admin/logged-out")
+
+    assert out.status_code == 200  # the page that navigates on to the identity provider
+    assert final.headers["clear-site-data"] == CLEAR_SITE_DATA
+    assert "no-store" in final.headers["cache-control"]
+
+
+async def test_the_logout_post_itself_sends_no_clear_site_data(site: Site) -> None:
+    """It is followed by the provider's logout, which needs the provider's own cookies."""
+    await site.login_as(ORG_ADMIN)
+
+    out = await site.client.post("/admin/logout", headers=SAME_ORIGIN)
+
+    assert "clear-site-data" not in out.headers
+
+
+async def test_logout_without_a_provider_logout_url_ends_at_the_same_page(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app.state.identity_provider = None
+
+    out = await site.client.post("/admin/logout", headers=SAME_ORIGIN)
+    final = await site.client.get("/admin/logged-out")
+
+    assert out.status_code == 303
+    assert out.headers["location"] == "/admin/logged-out"
+    assert final.headers["clear-site-data"] == CLEAR_SITE_DATA
+
+
+async def test_a_link_to_the_logged_out_page_clears_nothing(site: Site) -> None:
+    """Without a logout of this browser first, the page sends no header (no forced clearing)."""
+    await site.login_as(ORG_ADMIN)
+
+    page = await site.client.get("/admin/logged-out")
+
+    assert page.status_code == 200
+    assert "clear-site-data" not in page.headers
+
+
+async def test_the_header_is_sent_once_per_logout(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await site.client.post("/admin/logout", headers=SAME_ORIGIN)
+
+    first = await site.client.get("/admin/logged-out")
+    second = await site.client.get("/admin/logged-out")
+
+    assert "clear-site-data" in first.headers
+    assert "clear-site-data" not in second.headers
+
+
+async def test_the_cache_directive_is_left_out_on_purpose(site: Site) -> None:
+    """HTML is ``no-store`` already, and ``"cache"`` would also empty the participants' caches."""
+    await site.login_as(ORG_ADMIN)
+    await site.client.post("/admin/logout", headers=SAME_ORIGIN)
+
+    final = await site.client.get("/admin/logged-out")
+
+    assert '"cache"' not in final.headers["clear-site-data"]

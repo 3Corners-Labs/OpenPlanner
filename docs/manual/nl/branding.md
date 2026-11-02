@@ -2,7 +2,7 @@
 
 Op dit scherm bepaalt u hoe de afspraakpagina's van een organisatie eruitzien: naam en logo in
 de kop, kleuren, lettertypen en de vorm van kaarten en knoppen. U opent het via
-**Organisaties → organisatie → Huisstijl**. Alleen een superuser kan de huisstijl wijzigen; voor het opslaan
+**Organisaties → organisatie → Deelnemers → Huisstijl**. Alleen een superuser kan de huisstijl wijzigen; voor het opslaan
 vraagt het portaal soms opnieuw om in te loggen. Het beheerportaal zelf houdt één vaste stijl.
 
 Bovenaan ziet u een voorbeeld zoals de huisstijl nu is opgeslagen. Een wijziging geldt direct
@@ -75,7 +75,12 @@ bevatten. Een liggend logo van ongeveer 80 pixels hoog werkt het best.
 ## Lettertypen
 
 U kunt drie lettertypen uploaden: voor gewone tekst, voor vette tekst en voor koppen. Alleen
-WOFF2, hoogstens 250 kB per bestand. Zonder vet lettertype maakt de browser de gewone letter
+WOFF2, hoogstens 250 kB per bestand. Het bestand moet een compleet, correct WOFF2-bestand zijn: de kop
+en de tabellijst worden gecontroleerd, en een bestand dat een andere omvang opgeeft dan het
+heeft, of dat uitgepakt groter wordt dan de limiet van het platform (standaard 2 MB, in te
+stellen door de superuser bij de platforminstellingen), wordt geweigerd. Wordt een lettertype
+dat elders wel werkt geweigerd, exporteer het dan opnieuw als WOFF2 met een gangbare
+converter. Zonder vet lettertype maakt de browser de gewone letter
 zelf vetter; zonder lettertype voor koppen gebruiken de koppen het tekstlettertype.
 
 De lettertypen worden vanaf deze dienst geladen, nooit van een andere website zoals Google

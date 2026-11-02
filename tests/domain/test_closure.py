@@ -6,11 +6,11 @@ from app.domain.booking import BookingStatus
 from app.domain.channels import ChannelKind
 from app.domain.closure import (
     MAX_NOTICE_LENGTH,
-    RETENTION_AFTER_CLOSURE,
     Closure,
     clean_notice,
     covering,
 )
+from app.domain.closure_retention import DEFAULT_CLOSURE_RETENTION, RETENTION_AFTER_CLOSURE
 from app.domain.errors import DomainError
 from app.domain.job_plan import (
     JobType,
@@ -25,6 +25,7 @@ from tests.support.domain import NOW
 
 START = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)
 END = START + timedelta(days=2)
+SLOT_END = START + timedelta(hours=1)
 
 
 def closure(ends_at: datetime | None = END, **notices: str) -> Closure:
@@ -45,7 +46,8 @@ def test_open_ended_closure_covers_everything_after_its_start() -> None:
 
     assert c.covers(START + timedelta(days=365))
     assert c.is_visible(START + timedelta(days=365))
-    assert c.purge_at is None
+    # ADR 0102: also an open closure purges, at the maximum after the original slot.
+    assert c.purge_at(SLOT_END, DEFAULT_CLOSURE_RETENTION) == SLOT_END + timedelta(days=90)
 
 
 def test_visibility_and_activity() -> None:
@@ -60,8 +62,14 @@ def test_visibility_and_activity() -> None:
 
 
 def test_purge_follows_the_end_by_the_retention_period() -> None:
-    assert closure().purge_at == END + RETENTION_AFTER_CLOSURE
+    assert closure().purge_at(SLOT_END, DEFAULT_CLOSURE_RETENTION) == END + RETENTION_AFTER_CLOSURE
     assert timedelta(days=30) == RETENTION_AFTER_CLOSURE
+
+
+def test_a_closure_that_ends_late_is_cut_short_by_the_maximum() -> None:
+    late = closure(ends_at=START + timedelta(days=300))
+
+    assert late.purge_at(SLOT_END, DEFAULT_CLOSURE_RETENTION) == SLOT_END + timedelta(days=90)
 
 
 def test_notice_falls_back_to_dutch() -> None:
@@ -143,12 +151,7 @@ def test_suspension_plan_mails_now_and_purges_after_the_closure() -> None:
         PlannedJob(JobType.SEND_SUSPENSION, NOW, None, ChannelKind.EMAIL),
         PlannedJob(JobType.PURGE_PII, purge_at, None),
     ]
-    assert [j.type for j in plan_for_suspension(now=NOW, purge_at=None)] == [
-        JobType.END_WXCC_TASK,
-        JobType.DELETE_TRIAL_CALL,
-        JobType.SEND_SUSPENSION,
-    ]
-    assert plan_purge(None) == []
+    assert plan_purge(purge_at) == [PlannedJob(JobType.PURGE_PII, purge_at, None)]
     assert plan_closure_update(now=NOW) == [
         PlannedJob(JobType.SEND_CLOSURE_UPDATE, NOW, None, ChannelKind.EMAIL)
     ]

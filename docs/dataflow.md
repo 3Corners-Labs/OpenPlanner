@@ -110,8 +110,9 @@ filter matches on it. The list and the rule are constants, not settings.
 | Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
-| Video join URLs | `bookings.guest_join_url`, `host_join_url` | video provider (WP5) | as above | guest URL to the participant, host URL to WxCC |
-| Management token | `bookings.management_token_hash` (SHA-256 only) | generated | kept (not personal data once the booking is purged) | token itself only in the confirmation mail |
+| Video join URLs | `bookings.guest_join_url`, `host_join_url`, `trial_join_url` | video provider (WP5) | as above | guest URL to the participant, host URL to WxCC |
+| Provider links | `bookings.video_room_id`, `trial_room_id`, `wxcc_task_id` | video provider, WxCC | as above (deleted by the purge, ADR 0102 point 11) | no. Each is the key to a meeting or work item at Cisco that holds the participant's name and email address |
+| Management token | `bookings.management_token_hash` (SHA-256 only) | generated | replaced by a random value by the purge, so the link stops working; the salt stays and identifies nothing without the token | token itself only in the confirmation mail |
 
 Jobs, slots, schedules and audit events carry no personal data of participants. A failed meeting
 job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
@@ -132,9 +133,14 @@ identity document or special categories of personal data (ADR 0055).
 
 **Exception: emergency closure (ADR 0024).** A booking suspended by an emergency closure keeps
 the data above until it is moved, reinstated or cancelled (then the rules above apply again),
-and at most until 30 days after the closure ends (`purge_pii` planned at the closure's end +
-30 days; none while the closure is open-ended). Decided by the product owner on 2026-10-25; to
-be confirmed in the DPIA (O7). The closure notice is admin text without personal data
+and at most until the earlier of 30 days after the closure ends and `closure_max_retention_days`
+(class D, default 90, 30 to 180) after the end of the booking's original slot (`purge_pii`
+planned at that moment; the maximum also applies while the closure is open-ended, ADR 0102).
+The 30 days were decided by the product owner on 2026-10-25, the maximum on 2026-11-01; both to
+be confirmed in the DPIA (O7). `closure_max_notice_days` before the maximum the worker records
+the system event `closure.retention_notice` at the group (closure id, a count and a date, no
+participant data), and the closure page and the participant's management page tell participants the date their
+details are deleted by. The closure notice is admin text without personal data
 (`closure_notices`); it goes to the participant by mail and on the public group page.
 
 **Alternative contact options (ADR 0037).** Phone numbers, email addresses, links and addresses
@@ -191,8 +197,8 @@ anyone ──GET /admin/jwks.json──> web (public keys of every organisation 
 | Data item | Table.column / place | Source | Retention | Leaves the system |
 |---|---|---|---|---|
 | Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject` | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
-| Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; to be erased for admins inactive longer than `staff_retention_days` (ADR 0046, step 2) | no |
-| Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed` | no |
+| Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; erased daily by the worker for people without a login for `staff_retention_days` (class C, 365 days, 90–1825; ADR 0046 step 2), or by the superuser for a suspended person; the session row follows the session clean-up | no |
+| Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed`; removed with the display name at erasure | no |
 | Entitlement values (ADR 0049) | `admin_sessions.claims` (the recognised values), `staff_refused_entitlements` (value, reason code, organisation), `audit_events` (`auth.entitlement_refused`, `auth.entitlement_mismatch`, `auth.ambiguous_claims`) | identity provider claim `openplanner_entitlements` | session: until it ends and is cleaned up (ADR 0098); refusals: replaced at every login; events: as admin actions | no; the values hold the prefix, a role key and the IdP values of organisations and groups, linked to the employee's subject |
 | Admin session (ADR 0098) | `admin_sessions` (`id_hash` = sha256 of 32 random bytes, subject, provider, login claims as JSON, `login_at`, `last_seen_at`, `ended_at`, `end_reason`); the cookie holds the reference only | the login; the requests | ends at logout, idle (`admin_idle_minutes`), absolute end (`admin_session_hours`), a newer login or the limit per person; rows are removed by the worker's clean-up (ADR 0098 step 2) | no; staff data, never the reference itself in a log, audit event or URL |
 | Organisation provider registration (ADR 0083 step 2) | `identity_providers` (key, name, discovery URL, issuer, client id, method, scopes, claim and prefix, on/off; client secret sealed AES-256-GCM), `identity_provider_keys` (public JWK; private key sealed) | the superuser's form; the provider's discovery document | until the superuser removes the provider; a retired key stays published 24 h | public keys at `/admin/jwks.json`; the client assertion to the provider's token endpoint; no personal data in any of it |
@@ -200,10 +206,12 @@ anyone ──GET /admin/jwks.json──> web (public keys of every organisation 
 | Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |
 | Audit events on the log platform (ADR 0034) | one JSON line per audit, system and security event on stdout, shipped by the host to the organisation's log platform (SIEM) | web, worker | the organisation's log policy | no participant data; **admin subjects** (personal data of employees): the log platform is a recipient |
+| Copies of the log on the destinations of the platform (ADR 0085) | the same masked JSON lines as stdout (and, only for a destination that opts in, diagnostic events and trace lines), delivered over syslog, Splunk HEC, Elastic or HTTP to the address the superuser typed | web, worker (memory queue, at most `LOG_SHIP_QUEUE_SIZE` lines per destination; nothing on disk) | the organisation's log policy on the platform; the token or key is sealed in `log_destinations` until the destination is deleted | no participant data; **admin subjects** and, in trace lines, route templates, hosts and durations; the log platform is a recipient |
 | Caller pseudonym in security events (ADR 0053) | `audit_events.detail` as `client:<16 hex>`, and on the log platform | web (from the request's IP address; the address itself is never stored) | as the security event (`SECURITY_EVENT_RETENTION_DAYS`; the organisation's log policy on the platform) | pseudonymised personal data of the caller: HMAC-SHA256 under a key derived from `MANAGEMENT_TOKEN_KEY`, IPv6 by /64; only reversible by trying a known address on the host (`python -m app.cli client-pseudonym`) |
 | Audit log export (ADR 0040) | CSV download of the audit log in the admin's scope: ids, codes, admin subjects | web → admin's browser | the organisation's policy; every export is an audit event | no participant data; admin subjects |
 | Diagnostic mode (ADR 0040) | `diagnostic_modes`: organisation and group slug, end time, superuser's subject; debug events in `audit_events` (category `diagnostic`: job type, attempt, duration) | web (superuser), worker | mode: until it ends; debug events `DIAGNOSTIC_EVENT_RETENTION_DAYS` (7) | no |
 | Event schema fields (ADR 0040) | `audit_events.event_id`, `level`, `category`, `trace_id`, `service`; the same trace id on stdout | web, worker | as the event they belong to | no: random ids and codes |
+| Actor kind and role (ADR 0103) | `audit_events.actor_role`; `actor.type` and `actor.role` on every line and in the CSV export, also to log destinations | web (the role key of the grant that allowed the request) | as the event they belong to | no: a role key and a kind next to the subject that is already there; never a name |
 
 System events hold no personal data: no names, addresses, message text or join links, only codes
 and the booking id. Each admin sees them at their own level only (group admin: their groups;
@@ -239,9 +247,10 @@ operator CLI <──HTTPS── WxCC configuration (wxcc-config-check): channel,
 operator CLI <──HTTPS── Webex webhooks (ownedBy=org), WxCC subscriptions (webhooks-list/-reset): ids, events, hostEmail filters, status, secret set or not, target without query → integration_reports
 operator CLI ──DELETE──> Webex webhooks, WxCC subscriptions (webhooks-reset --yes): ids of stale registrations only
 operator CLI ──signed test events (unknown ids)──> WEBHOOK_BASE_URL/webhooks/* (webhooks-health) → outcome codes in integration_reports
-participant ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex web app (no data added to the link)
-participant ──POST /b/{token}/test──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0071)
-participant ──GET /b/{token}/test/go──> OpenPlanner ──303──> the trial meeting in the Webex web app
+participant ──GET /b/{token} (from the email)──> OpenPlanner ──Set-Cookie op_link (random value), 303──> participant ──GET /b/m/{public_ref}──> OpenPlanner (ADR 0093; the cookie names no person, the server keeps its SHA-256 and booking ids, no PII)
+participant ──GET /b/m/{public_ref}/join/go (cookie)──> OpenPlanner ──303──> Webex web app (no data added to the link)
+participant ──POST /b/m/{public_ref}/test (cookie)──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0071)
+participant ──GET /b/m/{public_ref}/test/go (cookie)──> OpenPlanner ──303──> the trial meeting in the Webex web app
 Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
 web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex (ADR 0010, when an admin opens or polls the agenda and a status is older than MEETING_STATUS_REFRESH_SECONDS): meeting id and the group's host address out; state and participant list back, reduced in the adapter to state, count, host flag, first join and last leave → call_status. Participant names, addresses and IPs are processed in memory only, never stored or logged
 ```
@@ -287,6 +296,10 @@ visitor browser ──fetch same page (?day=)──> web   (calendar.js, same or
 Branding is organisation data, not personal data. Fonts come from our own origin only
 (`font-src 'self'`, ADR 0041), so no font or stylesheet request reaches a third party. The calendar script sends nothing the page
 link does not already send, and stores nothing in the browser.
+
+The claim that no page sends anything to a third party (ASVS V14.2.3) is proven by `e2e/tests/no-third-parties.spec.ts`: for every public page and
+widget page in `e2e/pages.json`, in nl and en, it records every request and fails on any origin other than the app host (and the widget host page's own origin), and
+checks that the page's CSP names no other source. The configured video link is the only exit and is followed only after a click, which the test never makes.
 
 ## Machine API for contact-center bots (ADR 0023)
 
@@ -338,7 +351,7 @@ host updater ──docker exec python -m app.cli (claim, progress, report)──
 Nothing about participants leaves the system: the release lookup sends no data. The database
 backups the updater takes before every change contain the PII of `bookings`; they stay in the
 data volume with mode 600 and are deleted after 24 hours (`backup-db --prune` on every updater
-run). A backup that is put back is minutes old: purge jobs that ran after it are still pending
+run and, as a second safety net, by the worker's hourly housekeeping). A backup that is put back is minutes old: purge jobs that ran after it are still pending
 in it and run again on the next worker cycle.
 
 ## Maintenance mode (ADR 0038)
@@ -348,7 +361,7 @@ superuser ──POST /admin/maintenance/on|off (reason code, expected end)──
 host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
 operator ──MAINTENANCE_MODE (environment)──> web (no database read)
 admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
-participant ──GET/POST /g/{slug}…, /b/{token}/cancel|reschedule──> web ──503 maintenance page (no write)
+participant ──GET/POST /g/{slug}…, /b/m/{public_ref}/cancel|reschedule──> web ──503 maintenance page (no write)
 bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error": "maintenance"} (no write)
 ```
 
@@ -361,6 +374,7 @@ data. A refused change is audited with its permission and target only, never the
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
 Let's Encrypt ──HTTP-01 / TLS-ALPN-01──> proxy (ports 80/443): challenge token only
 visitor ──https──> proxy ──http, edge network──> web (X-Forwarded-For set by the proxy)
+   own proxy on another machine ──https (WEB_TLS_CERT_FILE/KEY_FILE)──> web (ADR 0091 point 3)
 worker ──TLS handshake, no request──> proxy (public name, port 443): reads the public certificate
        ──> certificate_checks (issuer, names, validity, finding; no personal data; ADR 0064)
 ```
@@ -381,6 +395,38 @@ a page. It concerns the organisation's server identity, not a participant. The C
 leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
 written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
 name only).
+
+## Outbound connections and the hop to web (ADR 0091)
+
+Every connection that leaves the installation, or crosses a machine boundary, in one table
+(ASVS V1.3.6, V13.1.1). **A PR that adds an outbound connection adds its row here.** *Class* is
+who sets the destination (ADR 0042): A bootstrap and B deployment are the host's environment, C
+is the superuser in the portal. Organisation-level addresses are entered by the superuser too, per
+organisation (the permissions are locked to the superuser, ADR 0039). *Guard* says whether the destination goes
+through the outbound guard (`app/adapters/outbound.py`: https only, public addresses only, no
+redirects, size cap); where it does not, the destination is set by the host or the superuser only
+and must be https (or the named secure transport) in production.
+
+| Connection | From → to | Protocol | Encryption in production | Set by | Guard | Carries |
+|---|---|---|---|---|---|---|
+| Mail | worker → the organisation's SMTP server; else the `SMTP_HOST` fallback | SMTP, port 587 (STARTTLS) or 465 (implicit TLS) | Required: saving a server without TLS is refused (ADR 0091 point 4); exception `SMTP_PLAINTEXT_RELAY_ALLOWED` (B) for a relay on a trusted network | The superuser per organisation (`integrations.manage`); fallback B | no | Participant name, email address, dates, join and management links |
+| SMS | worker → the provider's API (today Webex Connect) | HTTPS | Required: https only, no credentials in the address | The superuser per organisation (`integrations.manage`; address, API key sealed, ADR 0008) | no | Phone number, first name, date, time, team, management link |
+| Webex Meetings | web, worker → `webexapis.com/v1` (OAuth token from the same host) | HTTPS | Required | B (`WEBEX_API_BASE_URL`, default Webex; changed only for test doubles); credentials A/B or sealed | no | Group name and times; host, never participants |
+| Webex Contact Center | web, worker → the WxCC API of the region | HTTPS | Required: https only | C (`WXCC_API_BASE_URL`, superuser); service app sealed | no | First name, host join URL, routing variables (ADR 0081) |
+| Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |
+| Identity providers, organisation | web → discovery, token and key endpoints of an organisation's IdP (ADR 0083) | HTTPS | Required | The superuser per organisation (`identity_providers.manage`; confined to its own domains) | yes | OIDC protocol only |
+| Log destinations | web, worker → syslog, Splunk, Elastic or an HTTP collector (ADR 0085) | `syslog+tls` or `https`; `syslog+tcp`, `syslog+udp` and `http` only outside production | Required: production refuses clear-text transports when saving | C (superuser, portal; credentials sealed) | no | Masked log lines and audit, system and security events: no PII fields (ADR 0034, 0040) |
+| ACME | proxy → the ACME CA (Let's Encrypt) and CA → proxy challenge on 80/443 | HTTPS (ACME); HTTP-01 on 80 | Required towards the CA | B (`ACME_CA`, `ACME_EMAIL` in `proxy.env`) | no | Domain name, operator email address, public key |
+| Release channel | worker → `api.github.com` (release list); host updater → GHCR and GitHub (images, signatures; cosign verifies keyless against Sigstore) | HTTPS | Required | Repository: C (`UPDATE_REPOSITORY`); the hosts are fixed in the code and the updater | no | Nothing about participants; optional read-only token |
+| Certificate probe | worker → the public address, port 443 | TLS handshake, no request | Is the TLS check itself | B (`PUBLIC_BASE_URL`) | no | Nothing; reads the public certificate (ADR 0064) |
+| Public address round trip | worker, and `address-check` → `PUBLIC_BASE_URL` and, when set, `WEBHOOK_BASE_URL`: `GET /api/v1/instance?probe={nonce}` | HTTPS | Required: the address must be https in production; the certificate is verified against the host's CA bundle | B (`PUBLIC_BASE_URL`, `WEBHOOK_BASE_URL`); kill switch `PUBLIC_ADDRESS_CHECK_ENABLED` (B) | no | Nothing about participants: a random nonce out, the instance id (a random UUID), the scheme seen and whether the forwarded headers were honoured back; no address in the answer (ADR 0086) |
+| DNS checks | worker → the host's resolver (`/etc/resolv.conf`): TXT lookups of the sender domain (SPF, DKIM, DMARC; ADR 0073) and, from ADR 0083 step 3, the organisation's domain claims | DNS (UDP/TCP 53) | Not encrypted by the application; the answers only fill a status, they gate nothing | Names: the superuser (sender domain, domain claims); resolver: the host | no | Domain names only, never personal data |
+| Proxy to web, bundled | proxy → `web:8000` on the `edge` network of one host | HTTP | **Recorded exception** (ADR 0091 point 2): the hop never leaves the host, and whoever reads the bridge already has the host and the TLS keys | B (`docker-compose.yml`, fixed addresses) | n/a | Everything the visitor sends |
+| Proxy to web, own proxy | an own reverse proxy on another machine → `web:8000` | HTTP, or HTTPS when `WEB_TLS_CERT_FILE` and `WEB_TLS_KEY_FILE` are set | HTTPS expected: *System status* warns while `FORWARDED_ALLOW_IPS` names another address than the bundled proxy's and web serves no TLS (ADR 0091 point 3) | B | n/a | Everything the visitor sends |
+
+Not outbound but listed so the picture is complete: webhooks from Webex and WxCC reach `web`
+inbound and are verified by signature or token (`docs/webhooks.md`); the container logs leave
+the host only if the host ships them (`docs/runbook.md`).
 
 ## Configuration package (ADR 0089)
 
@@ -426,6 +472,44 @@ What remains is outside the application and is the hosting party's responsibilit
   disaster-recovery copy is outside the application (WP-A4). The hosting checklist names the
   snapshot and back-up retention, which must not exceed the retention promised in the DPIA.
 - **Memory and swap** of the running processes are not scrubbed.
+
+## Retention matrix (ADR 0102 point 14, PI-01)
+
+One row per table of `app/adapters/db/models.py` that holds personal columns or identifiers that
+lead to a person. *Removed by* names who deletes it. *Restore* says what a restored back-up
+does with it (ADR 0102 point 9): the procedure always runs `purge-overdue` before the system
+goes back online, so booking data that was already deleted on the live system is deleted again.
+**The word is "deleted", never "anonymised":** what the purge does is delete fields from the
+appointment; the booking row stays, and its times and reference can identify a person together
+with data held elsewhere. The row itself is deleted `booking_row_retention_days` after
+`pii_purged_at` (ADR 0102 step 4, built): the worker first merges it into `booking_day_counts`.
+
+| Table | Personal columns | Held for | Removed by | Restore |
+|---|---|---|---|---|
+| `bookings` | `first_name`, `last_name`, `email`, `phone`, `form_answers`, `guest_join_url`, `host_join_url`, `trial_join_url`; provider links `video_room_id`, `trial_room_id`, `wxcc_task_id`; `claimed_by` (the list `privacy.PURGED_FIELDS`) | slot end + 24 h, cancellation + 24 h; a suspended booking at most until the earlier of closure end + 30 days and `closure_max_retention_days` after the slot end | the `purge_pii` job, else the daily retention sweep, else `python -m app.cli purge-overdue`; `management_token_hash` is replaced by a random value, `booking_events.message` emptied | `purge-overdue` runs before the system is back |
+| `bookings` (what stays after the purge) | `management_token_salt`, `public_ref` (random, names no one), `locale`, `consents`, times, `closure_id`, `change_reason`, status | until `booking_row_retention_days` (class C, default 730 days, 365 to 3650) after `pii_purged_at` | the worker's daily housekeeping (`booking_rows.rollup`): merges the row into a count per group, day and status, then deletes it with its events, call status and finished jobs; never a row that still holds personal data or has an open job | `purge-overdue` first; rows already merged stay merged |
+| `booking_day_counts` | none: group, UTC day of the slot, final status, a count and the latest `pii_purged_at` among them | for good: statistics without a person or an identifier | deleted with the group (cascade) | as the live system |
+| `booking_events` | `message` (provider reason, up to 300 characters, masked); kind, time and reason code carry no personal data | `message`: as the booking's purge; the rest with the booking row | the purge empties `message`; the row goes with the booking (cascade) | as `bookings` |
+| `call_status` | none: states and times of the meeting and the work item, by booking id | with the booking row | cascade with the booking | as `bookings` |
+| `jobs` | none: booking id, type, run time, status, last error as a reason code (no payload with personal data) | pending jobs until they run; the row with the booking | the purge job is the last job of every plan; cascade with the booking | restored jobs find their booking purged or stale and end silently |
+| `participant_link_sessions`, `participant_link_bookings` | none: hash of a random cookie value, booking ids | cookie lifetime (ADR 0093); a purged booking leaves every session at once | the purge; the worker's clean-up of lapsed sessions | sessions of the copy are lapsed or hold only purged bookings |
+| `staff` | `subject`, `display_name`, `roles`, first seen, last login, last seen, last logout, `status` (active, suspended, erased) and `status_at` | replaced at every login; after `staff_retention_days` without a login `display_name` and `roles` are emptied, the memberships and refused values deleted, `status` becomes `erased` (ADR 0046 step 2). The `subject` and the times stay as a pseudonym so `audit_events.actor` still resolves to "an erased person"; they go with the audit events (`AUDIT_RETENTION_DAYS`) | the worker's daily housekeeping (`StaffLifecycleService.erase_inactive`, idempotent); the superuser for a suspended person | an old copy holds the names again until the worker's next run erases them; the restore procedure ends all sessions |
+| `staff_memberships` | role key, organisation and group slugs by staff id | replaced at every login; deleted at erasure | the erasure; cascade with `staff` | as `staff` |
+| `staff_refused_entitlements` | `value` (prefix, role key, IdP values), reason code, organisation | replaced at every login; deleted at erasure | the erasure; cascade with `staff` | as `staff` |
+| `audit_events` | `actor` (admin subject), `detail`, `message`; for security events `client:<16 hex>` (HMAC pseudonym of the caller's address, never the address) | admin actions `AUDIT_RETENTION_DAYS` (730); system 90 days; security 365 days; diagnostic 7 days (ADR 0040) | the worker's housekeeping by category | older rows return and are removed at the next housekeeping |
+| `admin_sessions` | `subject`, `provider`, `claims` (the login claims as JSON, with the display name), times | until the session ends (logout, idle, absolute end, newer login) and the worker's clean-up (ADR 0098) | `AdminSessionService.clean`; `sessions end-all --reason restore` after a restore | all sessions are ended by the restore procedure |
+| `diagnostic_modes` | `started_by` (admin subject) | until `until` (hours, `diagnostic_mode_hours`) | the mode ends by itself; the row is replaced by the next one | expires on its own |
+| `organisation_contacts`, `group_contacts` | phone numbers, email addresses and links of the organisation or the team: general contact points, not participants | until changed | an admin edits or removes them; deleted with the organisation or group (cascade) | as the live system |
+| `groups.video_host_email` | the address of the Webex host account of the group (a staff or functional address) | until changed | an admin; deleted with the group | as the live system |
+| `webhook_events` | none: provider, event key, time | 30 days (`WEBHOOK_MEMORY`) | the next webhook handled forgets the old keys | expires on its own |
+| `data/backups/*.db` (files, not a table) | a copy of the whole database, so every column above as it was at the update | 24 hours (`BACKUP_LIFETIME`, fixed); the volume must be encrypted (ADR 0102 point 7) | the updater (`backup-db --prune`) and, as a second safety net, the worker's hourly housekeeping; *System status* shows the oldest age and warns past 24 h plus 2 h | a copy that is put back is minutes old; `purge-overdue` still runs before the system is back |
+| Disaster-recovery copies of the host (outside the application) | the same, as of the moment of the copy | the maximum age in the hosting agreement, consistent with the DPIA (reference: PII term plus 7 days) | the hosting party, with a record of destruction (ADR 0102 point 8; open point O7) | older than the live data: `purge-overdue` is mandatory before the system is back (runbook, *Backup and restore*) |
+
+Tables not listed hold no personal data: the organisation's own texts, colours, logo and font,
+schedules, holidays, closure texts and images (stripped of metadata), settings, certificates
+(public part), integration credentials (sealed, no participant data), identity-provider
+registration, API clients, update and release records. A table that gets a personal column adds
+its row here in the same PR.
 
 ## Shared by all organisations of an installation (TEN-06, BP-4)
 
@@ -474,5 +558,14 @@ in its own transaction, deletes its pending jobs and writes the system event `re
 data leaves the database; the host command `python -m app.cli purge-overdue [--dry-run]` does the
 same and prints counts per group.
 
-To be added per work package: backups (WP8). Each flow lists: data items, source, destination, legal
-basis owner, retention.
+Booking row rollup: the worker's daily housekeeping selects the booking rows whose `pii_purged_at` is
+older than `booking_row_retention_days`, checks that no personal column is filled and no job is open,
+adds one count per group, day and status to `booking_day_counts` and deletes the rows with their
+events and call status in the same transaction (200 rows per transaction). It writes the system event
+`booking_rows.rollup` (counts only) and the log line of the same name. The retention overview keeps
+its *Last removed* from the merged counts.
+
+Back-ups: the updater's rollback copy lives 24 hours and the hosting party's disaster-recovery
+copies are outside the application (ADR 0102 points 7 to 10, step 3 not built); the restore
+procedure and the retention matrix above say what a restored copy does. Each flow lists: data
+items, source, destination, legal basis owner, retention.

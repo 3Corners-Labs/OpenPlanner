@@ -27,6 +27,60 @@ Draait de installatie niet als productie (bijvoorbeeld een testomgeving), dan st
 wat productie zou weigeren: een ontbrekende sleutel of een adres zonder https. Productie start
 nooit met een van deze punten.
 
+### Sleutelrotatie
+
+Zolang `SETTINGS_ENCRYPTION_KEY_PREVIOUS` of `MANAGEMENT_TOKEN_KEY_PREVIOUS` is gezet, toont
+het blok *Sleutelrotatie* hoeveel versleutelde geheimen nog onder de vorige instellingensleutel
+staan en hoeveel lopende boekingen nog een koppeling onder de vorige tokensleutel hebben. Er
+staan alleen aantallen, nooit sleutels of inhoud. Bij 0 staat er dat de vorige sleutel weg kan;
+anders staat er wat u eerst doet (`rekey` op de host uitvoeren, of wachten tot die boekingen
+voorbij zijn). Zonder vorige sleutel verschijnt het blok niet. De werkwijze staat in het
+draaiboek, *Rotating secrets*, en de inventaris van alle sleutels in `docs/cryptography.md`.
+
+### Back-ups van updates
+
+Vóór elke update kopieert de updater de database om te kunnen terugdraaien. Die kopie bevat
+persoonsgegevens en wordt daarom na 24 uur verwijderd, door de updater en als tweede vangnet
+door de worker, ook als de updater of zijn timer niet draait. Het blok toont hoeveel kopieën er
+zijn en hoe oud de oudste is. Is de oudste meer dan twee uur over zijn 24 uur, dan staat er een
+waarschuwing: geen van beide verwijdert nog, dus controleer of de worker draait en of het
+datavolume schrijfbaar is. Bestandsnamen worden nooit getoond. Back-ups voor disaster recovery
+zijn een zaak van de hostingpartij, niet van dit scherm (draaiboek, *Backup and restore*).
+
+### Adres en proxy
+
+Boven het certificaat staat wat de installatie over haar eigen adres weet. Elke link in een
+e-mail, de inlogredirect en de widget is gebouwd op het publieke adres, nooit op het adres van
+het verzoek; dat ene adres bepaalt of deelnemers de installatie bereiken. Het blok toont:
+
+- **Installatie**: de meegeleverde proxy, een eigen reverse proxy of geen proxy (een lab);
+- **Publiek adres** en, als het anders is, het **Webhook-adres**;
+- het **vertrouwde proxyadres** (`FORWARDED_ALLOW_IPS`);
+- de **OIDC-redirect-URI**, om te vergelijken met wat bij de identiteitsprovider is
+  geregistreerd, en de **widget-loader**, om te vergelijken met de site die de widget insluit.
+
+Deze waarden staan op de server, in de omgeving (klasse B): ze zijn hier niet te wijzigen,
+omdat een verkeerd publiek adres iedere beheerder bij de volgende login buitensluit. Een
+wijziging vraagt een herstart; de werkwijze staat in het draaiboek, *Address and proxy*.
+
+Onder **Rondgang** staat de uitkomst van de controle die de server om de paar uur doet: hij
+vraagt het publieke adres om `/api/v1/instance`, zoals de browser van een deelnemer dat doet, en
+beoordeelt het antwoord met één bevinding en het tijdstip. De bevindingen zijn **in orde**,
+**niet bereikbaar** (met de reden van het netwerk of de server), **andere installatie**,
+**geen https**, **proxy niet vertrouwd**, **geen proxy-headers** en **doorverwezen**. Bij
+*proxy niet vertrouwd* staat `FORWARDED_ALLOW_IPS` niet op het adres waarmee de web-container de
+proxy ziet verbinden: alle bezoekers delen dan één adres en de eigen redirects wijzen naar
+`http://`. Is de controle op de server uitgezet (`PUBLIC_ADDRESS_CHECK_ENABLED`), dan staat er
+*niet gecontroleerd*, nooit *in orde*.
+
+Ziet de webserver verzoeken met `X-Forwarded-For` of `X-Forwarded-Proto` van een proxy die hij
+niet vertrouwt, dan staat dat er ook, met het aantal en de soort afzender (loopback, privé of
+publiek). Het adres staat er alleen als het een proxy in het eigen netwerk is, nooit dat van een
+bezoeker. Elke bevinding die niet *in orde* is, komt ook in het auditlog als systeemgebeurtenis
+`public_address`, en wordt herhaald zolang hij duurt (instelling *Melding over het certificaat
+herhalen elke*). In de Overzicht-widget Systeemstatus staat dan één rij *Proxy* die hierheen
+verwijst.
+
 ### Certificaat van het publieke adres
 
 Onder de omgeving staat het certificaat waarmee bezoekers de installatie bereiken: het adres,

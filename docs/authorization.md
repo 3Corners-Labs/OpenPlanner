@@ -30,6 +30,7 @@ stays open to every role as usual.
 | Update the installation (`system.update`) | Portal | locked, maintenance | yes | – | – | – | – |
 | Switch maintenance mode on and off (`system.maintenance`) | Portal | locked, maintenance | yes | – | – | – | – |
 | Adjust roles (`roles.manage`) | Portal | locked | yes | – | – | – | – |
+| Erase a staff member's data (`staff.erase`) | Portal | locked, needs `staff.view` | yes | – | – | – | – |
 | View system status and advanced settings (`settings.platform.view`) | Portal | – | yes | – | – | yes | – |
 | Change platform settings (`settings.platform.manage`) | Portal | locked | yes | – | – | – | – |
 | Change the login mapping (claims and roles) (`settings.login.manage`) | Portal | locked | yes | – | – | – | – |
@@ -44,6 +45,8 @@ stays open to every role as usual.
 | Archive groups (`group.delete`) | Organisation | – | yes | yes | – | – | – |
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | needs `closure.manage` | yes | yes | – | – | – |
 | View retention (`retention.view`) | Organisation | – | yes | yes | – | yes | – |
+| Manage staff (`staff.manage`) | Organisation | needs `staff.view` | yes | yes | – | – | – |
+| Send a password reset or invitation (`staff.reset_password`) | Organisation | needs `staff.view` | yes | yes | – | – | – |
 | Manage embedding on websites (`embedding.manage`) | Organisation | – | yes | yes | – | – | – |
 | Change the organisation's settings (`settings.organisation.manage`) | Organisation | – | yes | yes | – | – | – |
 | Change the organisation's texts (`texts.organisation.manage`) | Organisation | – | yes | yes | – | – | – |
@@ -75,7 +78,7 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 
 | Template | Reach | Delegable permissions |
 |---|---|---|
-| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.delete`, `group.edit`, `group.view`, `holidays.assign`, `identity_providers.view`, `idp_mapping.manage`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.delete`, `group.edit`, `group.view`, `holidays.assign`, `identity_providers.view`, `idp_mapping.manage`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.manage`, `staff.reset_password`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
 | Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `logging.view`, `matrix.view`, `queue.work`, `reminders.manage`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
 | Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `identity_providers.view`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
 

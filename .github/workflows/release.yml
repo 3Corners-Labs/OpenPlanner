@@ -18,9 +18,11 @@ name: release
 # file only wires them to git and GitHub.
 #
 # Secrets and variables (docs/runbook.md, Releasing a version):
-#   RELEASE_TOKEN   a token with contents and pull-requests write (fine-grained PAT or a GitHub
-#                   App token). Needed because a PR or tag made with GITHUB_TOKEN starts no
-#                   workflow: the release PR would get no CI and the tag no build.
+#   RELEASE_APP_CLIENT_ID, RELEASE_APP_PRIVATE_KEY   the release app (ADR 0107), in the
+#                   environment `release`, which only `main` may use. Its short-lived token
+#                   pushes the branch, opens the PR and pushes the tag: a PR or tag made with
+#                   GITHUB_TOKEN starts no workflow, and only the app may create a `v*` tag.
+#                   A dry run uses neither the environment nor the app.
 #   OPENAI_API_KEY  for the audit (the Codex CLI through the action's proxy).
 #   RELEASE_RUNNER  (variable, optional) the label of a self-hosted runner; default
 #                   ubuntu-24.04. The audit job drops sudo irreversibly: give it a disposable
@@ -61,6 +63,7 @@ jobs:
     name: release PR
     if: inputs.step == 'release-pr'
     runs-on: ${{ vars.RELEASE_RUNNER || 'ubuntu-24.04' }}
+    environment: ${{ !inputs.dry_run && 'release' || '' }}
     timeout-minutes: 10
     permissions:
       contents: write        # push the release branch
@@ -81,18 +84,19 @@ jobs:
         run: |
           echo "::error::dispatch the release on ${{ github.event.repository.default_branch }}, not on $REF (or tick dry_run)"
           exit 1
-      - name: a real run needs RELEASE_TOKEN
+      - id: app
+        name: a short-lived token from the release app (ADR 0107)
         if: ${{ !inputs.dry_run }}
-        env:
-          TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          [ -n "$TOKEN" ] && exit 0
-          echo "::error::the secret RELEASE_TOKEN is missing; a PR opened with GITHUB_TOKEN gets no CI (docs/runbook.md, Releasing a version)"
-          exit 1
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # the last release tag and the commits since then
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          token: ${{ steps.app.outputs.token || github.token }}
       - id: plan
         name: the number, from the commits since the last release unless given
         env:
@@ -126,7 +130,7 @@ jobs:
       - name: no second PR for the same release
         if: ${{ !inputs.dry_run }}
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           BRANCH: ${{ steps.plan.outputs.branch }}
         run: |
           open="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')"
@@ -135,12 +139,12 @@ jobs:
         name: branch, commit, PR, auto-merge
         if: ${{ !inputs.dry_run }}
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
           TITLE: ${{ steps.plan.outputs.title }}
           BRANCH: ${{ steps.plan.outputs.branch }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          scripts/release-git-identity.sh
           git switch -c "$BRANCH"
           git commit -am "$TITLE"
           # --force: a branch left by an earlier failed run is replaced, never a PR (checked above).
@@ -210,6 +214,7 @@ jobs:
     name: tag the merged release
     if: inputs.step == 'tag'
     runs-on: ${{ vars.RELEASE_RUNNER || 'ubuntu-24.04' }}
+    environment: ${{ !inputs.dry_run && 'release' || '' }}
     timeout-minutes: 10
     permissions:
       contents: write        # the tag
@@ -227,18 +232,19 @@ jobs:
         run: |
           echo "::error::dispatch the tag on ${{ github.event.repository.default_branch }}, not on $REF (or tick dry_run)"
           exit 1
-      - name: a real run needs RELEASE_TOKEN
+      - id: app
+        name: a short-lived token from the release app (ADR 0107)
         if: ${{ !inputs.dry_run }}
-        env:
-          TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          [ -n "$TOKEN" ] && exit 0
-          echo "::error::the secret RELEASE_TOKEN is missing; a tag pushed with GITHUB_TOKEN starts no build"
-          exit 1
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # the release commit on main, and whether the tag exists
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          token: ${{ steps.app.outputs.token || github.token }}
       - id: release
         name: the merged release PR on main, pyproject.toml agrees, no tag yet
         env:
@@ -267,12 +273,13 @@ jobs:
       - name: annotated tag, pushed
         if: ${{ !inputs.dry_run }}
         env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
           VERSION: ${{ inputs.version }}
           COMMIT: ${{ steps.release.outputs.commit }}
           MESSAGE: ${{ steps.release.outputs.message }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          scripts/release-git-identity.sh
           git tag -a "v$VERSION" "$COMMIT" -m "$MESSAGE"
           git push origin "refs/tags/v$VERSION"
           echo "::notice::v$VERSION tagged on $COMMIT; main.yml builds, signs and publishes it ($MESSAGE)"

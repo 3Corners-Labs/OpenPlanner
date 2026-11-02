@@ -83,6 +83,9 @@ vertrouwd. Een privésleutel wordt geweigerd.
 - **Auditgebeurtenissen** (beheeracties, systeemgebeurtenissen, beveiligingsgebeurtenissen):
   die waarvan de categorie is aangevinkt. Het niveau geldt hier niet voor, net als op de
   standaarduitvoer.
+- **Toegangsbeslissingen**: alleen met die categorie aangevinkt, en op het laagste niveau en
+  hoger. Elke beheerpagina schrijft er één of twee: wie welk recht kreeg of geweigerd werd. Een
+  nieuwe bestemming heeft ze uit; een bestemming die al bestond, houdt ze aan.
 - **Diagnosegebeurtenissen**: alleen met de optie aan. Dat is foutopsporingsdetail dat wordt
   vastgelegd zolang de diagnosemodus voor een groep aan staat, en het verlaat de installatie
   alleen naar een bestemming die erom vraagt.
@@ -92,6 +95,18 @@ vertrouwd. Een privésleutel wordt geweigerd.
 - **Alle andere regels**: op het laagste niveau en hoger.
 
 Persoonsgegevens zijn in elke regel gemaskeerd, net als op de standaarduitvoer.
+
+## Hoe een regel eruitziet
+
+Elke regel begint met een leesbare zin en draagt daarna de velden: wanneer, hoe ernstig, de
+categorie, de actie en de velden van die actie apart (`labels.free_percent`). Wat elke actie
+betekent en wat u eraan doet, staat in `docs/logging.md`. Op een syslogserver is de *MSGID* de
+categorie (`audit`, `system`, `security`, `authz`, `operations`), zodat u daarop kunt filteren,
+en staat de zin vóór de JSON-regel:
+
+```
+openplanner - operations - Disk space is low: 6% free, database 1 MB (free_space_low). {"@timestamp":…}
+```
 
 ## De status lezen
 

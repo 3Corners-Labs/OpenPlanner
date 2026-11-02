@@ -2,14 +2,18 @@
 
 Op dit scherm legt de superuser per organisatie vast hoe berichten aan deelnemers de deur uit
 gaan: de mailserver (SMTP) voor e-mail en de sms-gateway voor sms. U opent het via
-**Organisaties → organisatie → Kanalen**. Wachtwoorden en API-sleutels zijn alleen te schrijven:
+**Organisaties → organisatie → Deelnemers → Kanalen**. Wachtwoorden en API-sleutels zijn alleen te schrijven:
 het veld is altijd leeg, en een leeg veld laat het opgeslagen geheim staan (ADR 0022).
 
 ## E-mail
 
 Vul de mailserver van de organisatie in: host, poort, beveiliging (STARTTLS op 587, TLS op 465)
 en, als de server dat vraagt, een gebruikersnaam met wachtwoord. Een login zonder STARTTLS of
-TLS weigert het portaal: het wachtwoord zou dan leesbaar over de lijn gaan.
+TLS weigert het portaal: het wachtwoord zou dan leesbaar over de lijn gaan. In productie weigert het portaal
+ook een server zonder STARTTLS of TLS (*geen*): de e-mail bevat namen, adressen en deelnamelinks.
+Alleen de beheerder van de server kan een uitzondering toestaan, met de hostinstelling
+`SMTP_PLAINTEXT_RELAY_ALLOWED`; een oudere server van die soort staat als fout op het overzicht tot
+hij is aangepast.
 
 Het **afzenderadres** is wat deelnemers in hun postvak zien. Gebruik een adres van het domein van
 de organisatie, bijvoorbeeld `afspraken@gemeente.nl`, met een **afzendernaam** zoals

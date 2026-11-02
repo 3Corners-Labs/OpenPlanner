@@ -71,6 +71,16 @@ screen.
 rights the entitlement values resolve to. No session is started; your own session stays as it
 was. The verdict is in the audit log as `idp.test_login`.
 
+## Second factor (MFA policy)
+
+Each provider has an **MFA policy** (ADR 0100). The provider itself asks for the second factor;
+OpenPlanner only checks that the ID token says it was used, by an `amr` or `acr` value you accept
+(empty: `amr` `mfa otp hwk swk`, no `acr`). **Off** ignores it. **Record** (the default) lets the
+login through and writes a security event, `admin.login.mfa_missing`, with the provider's key
+and no personal data. **Require** refuses the login with the message that the account shows no
+second factor. The test login shows whether a second factor showed, so choose **Require** only
+after a test login with MFA says *yes*; otherwise every admin of the organisation is locked out.
+
 ## Rotating the key, switching on or off, removing
 
 **Rotate key** generates a new key pair; the old public key stays in the JWKS for 24 hours, so

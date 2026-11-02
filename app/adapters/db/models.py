@@ -495,6 +495,8 @@ class BookingRow(Base):
     consents: Mapped[str] = mapped_column(String(64), server_default=text("''"))
     management_token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     management_token_salt: Mapped[str] = mapped_column(String(64), server_default=text("''"))
+    # ADR 0093: names the booking in a URL; not PII, authorises nothing, survives the purge.
+    public_ref: Mapped[str] = mapped_column(String(32), unique=True)
     guest_join_url: Mapped[str | None] = mapped_column(String(2048))
     host_join_url: Mapped[str | None] = mapped_column(String(2048))
     video_room_id: Mapped[str | None] = mapped_column(String(255))
@@ -675,6 +677,8 @@ class AuditEventRow(Base):
     category: Mapped[str] = mapped_column(String(16), server_default=text("'audit'"))
     trace_id: Mapped[str] = mapped_column(String(32), server_default=text("''"))
     service: Mapped[str] = mapped_column(String(16), server_default=text("''"))
+    # ADR 0103 point 7: the role key that granted the admin the permission; never a name.
+    actor_role: Mapped[str] = mapped_column(String(64), server_default=text("''"))
 
     __table_args__ = (
         Index("ix_audit_events_at", "at"),
@@ -731,6 +735,9 @@ class StaffRow(Base):
     last_login_at: Mapped[datetime] = mapped_column(UTCDateTime())
     last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
     last_logout_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0046 step 2: active, suspended or erased, and when it last changed.
+    status: Mapped[str] = mapped_column(String(16), server_default=text("'active'"), index=True)
+    status_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class StaffMembershipRow(Base):
@@ -788,6 +795,24 @@ class BookingEventRow(Base):
     version: Mapped[str] = mapped_column(String(40), server_default=text("''"))
 
     __table_args__ = (Index("ix_booking_events_booking_id", "booking_id"),)
+
+
+class BookingDayCountRow(Base):
+    """Bookings of one group on one day that ended in one status (ADR 0102 step 4).
+
+    What is left of a booking row after ``booking_row_retention_days``: a count, the day of
+    the slot and the latest purge among them. No personal data and no identifier.
+    """
+
+    __tablename__ = "booking_day_counts"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    status: Mapped[str] = mapped_column(String(24), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer)
+    last_purged_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
 class CallStatusRow(Base):
@@ -905,11 +930,15 @@ class IdentityProviderRow(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
     checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    mfa_policy: Mapped[str] = mapped_column(String(16), server_default="record")
+    mfa_amr_values: Mapped[str] = mapped_column(String(1100), server_default="")
+    mfa_acr_values: Mapped[str] = mapped_column(String(1100), server_default="")
 
     __table_args__ = (
         CheckConstraint(
             "client_auth IN ('private_key_jwt', 'client_secret_basic')", name="client_auth"
         ),
+        CheckConstraint("mfa_policy IN ('off', 'record', 'require')", name="mfa_policy"),
     )
 
 
@@ -1122,6 +1151,37 @@ class CertificateCheckRow(Base):
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 
 
+class InstanceRow(Base):
+    """The installation's identity and the one pending probe nonce (ADR 0086); at most one row.
+
+    ``instance_id`` is a random UUID made at first use, never editable and no secret. The nonce
+    is kept as its ``sha256`` and used once.
+    """
+
+    __tablename__ = "instance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    instance_id: Mapped[str] = mapped_column(String(36))
+    probe_nonce_hash: Mapped[str | None] = mapped_column(String(64))
+    probe_nonce_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class PublicAddressCheckRow(Base):
+    """The latest round trip to one address, ``public`` or ``webhook`` (ADR 0086)."""
+
+    __tablename__ = "public_address_checks"
+
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    url: Mapped[str] = mapped_column(String(255))
+    finding: Mapped[str] = mapped_column(String(24))
+    scheme: Mapped[str | None] = mapped_column(String(8))
+    forwarded: Mapped[str | None] = mapped_column(String(12))
+    error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+
+
 class PlatformSettingRow(Base):
     """The portal value of one class C setting (ADR 0042 §4), as JSON; never a secret."""
 
@@ -1241,3 +1301,40 @@ class AdminSessionRow(Base):
     last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
     ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     end_reason: Mapped[str | None] = mapped_column(String(16))
+
+
+class ParticipantLinkSessionRow(Base):
+    """One browser that opened a management link (ADR 0093).
+
+    ``value_hash`` is the ``sha256`` of the random cookie value; the value itself is never
+    stored. No personal data: the session names bookings by id only.
+    """
+
+    __tablename__ = "participant_link_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    value_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    last_used_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+
+
+class ParticipantLinkBookingRow(Base):
+    """A booking that a participant link session holds (at most 20 per session, ADR 0093)."""
+
+    __tablename__ = "participant_link_bookings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("participant_link_sessions.id", ondelete="CASCADE")
+    )
+    booking_id: Mapped[int] = mapped_column(
+        ForeignKey("bookings.id", ondelete="CASCADE"), index=True
+    )
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "booking_id", name="uq_participant_link_bookings_session_booking"
+        ),
+    )

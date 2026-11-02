@@ -69,6 +69,19 @@ async def test_the_settings_card_summarises_the_booking_form(site: Site) -> None
     assert f'href="{PAGE}"' in after
 
 
+async def test_the_group_settings_list_their_topics_by_right(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    org_admin = (await site.client.get("/admin/groups/demo/settings")).text
+    await site.login_as(GROUP_ADMIN)
+    group_admin = (await site.client.get("/admin/groups/demo/settings")).text
+
+    for anchor in ("general", "integrations", "idp-key", "booking-form", "check"):
+        assert f'href="#{anchor}"' in org_admin  # "On this page" names every topic
+        assert f'id="{anchor}"' in org_admin  # and each link has its target
+    assert 'href="#archive"' in org_admin
+    assert 'href="#archive"' not in group_admin  # archiving needs group.delete
+
+
 async def test_fields_are_added_listed_and_audited_by_key(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
@@ -85,6 +98,99 @@ async def test_fields_are_added_listed_and_audited_by_key(site: Site) -> None:
         "field.add,key:customer_no,type:short_text",
         "field.add,key:topic,type:choice",
     ]
+
+
+async def test_the_key_is_made_from_the_question_when_left_empty(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    without_key = {k: v for k, v in CUSTOMER.items() if k != "key"}
+
+    first = await _post(site, PAGE, without_key)
+    second = await _post(site, PAGE, without_key)
+
+    assert first.headers["location"] == f"{PAGE}?done=created"
+    assert second.headers["location"] == f"{PAGE}?done=created"
+    assert (await _details(site))[-2:] == [
+        "field.add,key:klantnummer,type:short_text",
+        "field.add,key:klantnummer_2,type:short_text",
+    ]
+
+
+async def test_a_forbidden_question_without_a_key_is_refused_at_the_question(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    refused = await _post(
+        site, PAGE, {**CUSTOMER, "key": "", "label_nl": "Burgerservicenummer", "label_en": "BSN"}
+    )
+
+    assert refused.status_code == 422
+    assert '<a href="#label_nl">' in refused.text  # the administrator never typed a key
+
+
+async def test_the_administrator_first_chooses_what_kind_of_question(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    page = (await site.client.get(PAGE)).text
+
+    for kind in ("short_text", "long_text", "email", "phone", "number", "date", "postcode_nl"):
+        assert f'href="{PAGE}?type={kind}#add-field"' in page
+    assert f'href="{PAGE}?type=choice#add-field"' in page
+    assert 'id="label_nl"' not in page  # the form comes after the choice
+
+
+async def test_the_form_of_a_kind_asks_the_question_first_and_the_key_last(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    page = (await site.client.get(f"{PAGE}?type=short_text")).text
+
+    order = [page.index(f'id="{name}"') for name in ("label_nl", "classification", "key")]
+    assert order == sorted(order)
+    assert '<input type="hidden" name="type" value="short_text">' in page
+    assert 'id="options"' not in page  # only a choice has options
+    assert 'id="minimum"' not in page
+
+
+async def test_the_form_proposes_the_classification_of_its_kind(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    text = (await site.client.get(f"{PAGE}?type=short_text")).text
+    choice = (await site.client.get(f"{PAGE}?type=choice")).text
+    email = (await site.client.get(f"{PAGE}?type=email")).text
+    number = (await site.client.get(f"{PAGE}?type=number")).text
+
+    assert '<option value="pii" selected>' in text
+    assert '<option value="not_pii" selected>' in choice  # still needs the confirmation
+    assert 'id="options"' in choice
+    assert 'id="classification"' not in email  # contact details are always personal data
+    assert 'id="minimum"' in number
+    assert '<option value="pii" selected>' in number
+
+
+async def test_a_proposed_not_personal_data_is_still_confirmed_by_the_administrator(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    refused = await _post(site, PAGE, {**TOPIC, "confirm_not_pii": ""})
+
+    assert refused.status_code == 422
+    assert 'id="options"' in refused.text  # the form of the chosen kind stays
+    assert '<a href="#confirm_not_pii">' in refused.text
+
+
+async def test_an_always_personal_kind_is_added_without_a_classification(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    contact = {
+        "key": "",
+        "type": "email",
+        "label_nl": "Mailadres van de partner",
+        "label_en": "Partner email",
+    }
+
+    created = await _post(site, PAGE, contact)
+
+    assert created.headers["location"] == f"{PAGE}?done=created"
+    row = (await site.client.get(PAGE)).text.split("Mailadres van de partner")[1].split("</tr>")[0]
+    assert "chip--warning" in row  # tagged as personal data without being asked
 
 
 async def test_refusals_are_linked_to_their_inputs(site: Site) -> None:

@@ -196,7 +196,7 @@ SECTIONS = (
                 "/admin/staff",
                 Permission.STAFF_VIEW,
                 "people",
-                ("/admin/staff/{member_id}",),
+                ("/admin/staff/invite", "/admin/staff/{member_id}"),
                 width=Width.WIDE,
             ),
             # ADR 0049 point 17: the values the identity provider must send, read-only.
@@ -213,6 +213,17 @@ SECTIONS = (
                 "/admin/rights",
                 Permission.RIGHTS_VIEW,
                 "rights",
+                # ADR 0098 point 9a: the admin's own sessions; personal, so next to the
+                # own rights and for every admin, without a permission of its own.
+                subtabs=(
+                    Screen(
+                        "manage.rights.sessions",
+                        "admin.nav.my_sessions",
+                        "/admin/rights/sessions",
+                        Permission.RIGHTS_VIEW,
+                        "lock",
+                    ),
+                ),
             ),
             Screen(
                 "manage.matrix",
@@ -360,7 +371,8 @@ OBJECTS = (
         "manage.organisations",
         (
             # The overview: the organisation's groups and profile. Its second row holds the
-            # organisation-wide settings of ADR 0042 step 5, ADR 0074 and ADR 0035.
+            # organisation-wide settings of ADR 0042 step 5, ADR 0074 and ADR 0035; the texts for
+            # participants moved to *Participants* (ADR 0105).
             Screen(
                 "organisation.overview",
                 "admin.tab.overview",
@@ -379,14 +391,6 @@ OBJECTS = (
                         "sliders",
                     ),
                     Screen(
-                        "organisation.texts",
-                        "admin.tab.texts",
-                        f"{_ORGANISATION}/texts",
-                        Permission.TEXTS_ORGANISATION_MANAGE,
-                        "mail",
-                        (f"{_ORGANISATION}/texts/{{text_locale}}",),
-                    ),
-                    Screen(
                         "organisation.embedding",
                         "admin.tab.embedding",
                         f"{_ORGANISATION}/embedding",
@@ -395,7 +399,7 @@ OBJECTS = (
                     ),
                     # ADR 0083 step 2: the organisation's own identity providers. A sub-tab
                     # of the overview, like the other organisation-wide settings, so the
-                    # organisation page keeps its six tabs (ADR 0047 §7).
+                    # organisation page keeps its tabs (ADR 0047 §7).
                     Screen(
                         "organisation.login",
                         "admin.tab.login",
@@ -409,19 +413,32 @@ OBJECTS = (
                     ),
                 ),
             ),
+            # ADR 0105: what participants see and receive. The tab's own page is the branding;
+            # the tab shows for anyone who may open one of its pages (see ``object_tabs``).
             Screen(
-                "organisation.branding",
-                "admin.tab.branding",
+                "organisation.participants",
+                "admin.tab.participants",
                 f"{_ORGANISATION}/branding",
                 Permission.BRANDING_MANAGE,
                 "palette",
-            ),
-            Screen(
-                "organisation.channels",
-                "admin.tab.channels",
-                f"{_ORGANISATION}/channels",
-                Permission.INTEGRATIONS_MANAGE,
-                "mail",
+                subtabs=(
+                    Screen(
+                        "organisation.channels",
+                        "admin.tab.channels",
+                        f"{_ORGANISATION}/channels",
+                        Permission.INTEGRATIONS_MANAGE,
+                        "mail",
+                    ),
+                    Screen(
+                        "organisation.texts",
+                        "admin.tab.texts",
+                        f"{_ORGANISATION}/texts",
+                        Permission.TEXTS_ORGANISATION_MANAGE,
+                        "mail",
+                        (f"{_ORGANISATION}/texts/{{text_locale}}",),
+                    ),
+                ),
+                own_label_key="admin.tab.branding",
             ),
             Screen(
                 "organisation.contact",

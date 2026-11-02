@@ -48,3 +48,48 @@ a structural scan of every object page. Other screens (organisation, platform) a
 - Do admins want a "setup checklist" on a new group (name, hours, form, texts, publish)?
 - Who should we test with? Five admins doing three tasks (add a question, change hours, close for a day)
   find most of these in a day.
+
+## Status after the first fixes
+
+Built: the booking form card (S2, #360), "On this page" on the group settings (S1, #400), the add
+form with the question first and a derived technical name (B1, B3, B5, #403), the kind chosen first
+with a proposed classification (B2, B4, #407), the organisation settings by topic (O2, O5, #415) and the *Participants* tab that gathers Huisstijl, Kanalen and Teksten (O1, O4, ADR 0105). Open: S4, S5, S6, B6, B7, O3, O6 to O9.
+
+## Organisation screens (second pass)
+
+Method as above, from the templates, `docs/admin-map.md` and the Dutch texts; not yet checked in a
+browser. The organisation has six tabs, and *Overview* carries four sub-tabs.
+
+| # | Finding | Heuristic | Sev |
+|---|---|---|---|
+| O1 | **Four unrelated topics hide as sub-tabs of *Overzicht***: Instellingen, Teksten, Inbedding, Inloggen. An overview is where one looks for a summary, not for settings. On a group, *Instellingen* is a top tab, so the same word is at another level here. | Findability, consistency | 3 |
+| O2 | **Organisation *Instellingen* is one flat table of 13 class D settings** (time format, time zone, footer, dormant staff days, shortfall horizon, rebooking days, rebooking reminder, closure retention and notice, phone region, three booking-confirmation values). No grouping, no "On this page", no word on which feature each belongs to. | Minimalist design, recognition | 3 |
+| O3 | **Ways to log in have three homes**: providers on the organisation (*Inloggen*), the mapping in *Manage › Identity provider mapping*, and the key in each group's settings. Nothing answers "how do my staff log in?" in one place. (ADR 0083 explains it; the screens do not.) | Consistency, help | 3 |
+| O4 | **What participants see is spread over three places**: *Huisstijl* (top tab), *Kanalen* (top tab) and *Teksten* (a sub-tab of Overzicht). The group repeats it with *Berichtteksten* and *Herinneringen*; the labels *Teksten* and *Berichtteksten* do not say how they relate (organisation default, group override). | Match with the real world | 2 |
+| O5 | **Inbedding is a read-only list.** The lead tells the admin to switch it on "bij Groepsinstellingen › Insluiten op websites", and each row links to the group's settings top, not to that field. | Visibility, efficiency | 2 |
+| O6 | **Contact** says nothing about what it is for; only the lead does ("how participants reach you when they cannot book"). It is shown on the closure page and the maintenance page, and it sits next to *Noodsluiting* that holds the same contacts (permission `organisation.closure`). | Match with the real world | 2 |
+| O7 | **Two edit paths for the organisation itself**: the profile card on *Overzicht* (name, language: a small link) and the *Instellingen* sub-tab. | Consistency | 2 |
+| O8 | **Feestdagen** (organisation) chooses calendars that *Platform › Holiday calendars* creates; one word for two jobs, and no link from the choice to the calendars. | Recognition | 1 |
+| O9 | A new organisation has no next steps: groups, huisstijl, kanalen, teksten and login all start empty and nothing says what is needed before the first booking. | Help, visibility of status | 2 |
+
+### Proposed fixes for the organisation
+
+1. **Settings in topics with "On this page"** (O2): group the 13 settings under Formats and time,
+   Planner and shortfalls, Closure, Booking confirmation, Contact; same pattern as ADR 0101 and
+   the group settings. No new tab; the settings stay class D with the same bounds.
+2. **Link *Inbedding* rows to the field** (O5): `.../settings#integrations`, which has an anchor
+   since #400. A one-line change.
+3. **Move the sub-tabs out of *Overzicht*** (O1, O4): *Instellingen* and *Teksten* become top tabs,
+   *Inloggen* and *Inbedding* stay as sub-tabs of a new or existing tab. This is an ADR 0047
+   change (more than six tabs on an object) and needs the product owner's decision.
+4. **A login summary** (O3): one card on *Inloggen* that names the three places and links to each,
+   no new setting.
+5. **Name the purpose in the labels** (O4, O6): for example *Contact bij sluiting*, and a line on
+   each text page saying whose default it is.
+6. **Setup checklist on the organisation overview** (O9): see the open questions.
+
+### Open questions for the product owner (organisation)
+
+- Fix 3 changes the tab structure (ADR 0047). Which variant: *Instellingen* and *Teksten* as top
+  tabs, or a new top tab *Deelnemers* that holds Huisstijl, Kanalen and Teksten?
+- A setup checklist for a new organisation (O9): wanted, and shown to whom?

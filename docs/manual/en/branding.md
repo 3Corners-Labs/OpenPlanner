@@ -1,7 +1,7 @@
 # Branding
 
 On this screen you set how an organisation's booking pages look: name and logo in the header,
-colours, fonts and the shape of cards and buttons. Open it via **Organisations → organisation → Branding**.
+colours, fonts and the shape of cards and buttons. Open it via **Organisations → organisation → Participants → Branding**.
 Only a superuser can change branding; the portal may ask you to sign in again before saving.
 The admin portal itself keeps one fixed style.
 
@@ -73,7 +73,11 @@ scripts. A landscape logo of about 80 pixels high works best.
 ## Fonts
 
 You can upload three fonts: for regular text, for bold text and for headings. WOFF2 only, at
-most 250 kB per file. Without a bold font the browser makes the regular font bolder itself;
+most 250 kB per file. The file must be a complete, correct WOFF2 file: its header and table
+list are checked, and a file that claims a different size than it has, or that unpacks to more
+than the platform limit (2 MB by default, set by the superuser under platform settings), is
+refused. If a font that works elsewhere is refused, export it again as WOFF2 with a standard
+converter. Without a bold font the browser makes the regular font bolder itself;
 without a heading font, headings use the text font.
 
 Fonts are loaded from this service, never from another website such as Google Fonts, so a

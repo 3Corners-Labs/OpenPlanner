@@ -48,7 +48,7 @@ def test_csv_is_bom_semicolon_crlf_and_rfc4180_quoted() -> None:
     event = AuditEvent(NOW, "sub;1", "group.edit", Outcome.SUCCESS, detail='name,"x"')
     document = to_csv([to_record(event, Envelope())])
 
-    assert document.startswith(BOM + "schema;event_id;@timestamp;")
+    assert document.startswith(BOM + "@timestamp;log.level;event.category;event.action;message;")
     assert "\r\n" in document
     header, row = _rows(document)
     assert tuple(header) == FIELDS

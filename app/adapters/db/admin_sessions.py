@@ -7,7 +7,7 @@ A mixin of ``SqlTransaction``, so these queries run in the caller's transaction.
 import json
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import AdminSessionRow
@@ -109,3 +109,33 @@ class AdminSessionQueries:
             .where(AdminSessionRow.id_hash == id_hash, AdminSessionRow.ended_at.is_(None))
             .values(last_seen_at=at)
         )
+
+    async def end_all_admin_sessions(self, reason: EndReason, at: datetime) -> int:
+        """End every live session with ``reason``; return how many."""
+        result = await self._session.execute(
+            update(AdminSessionRow)
+            .where(AdminSessionRow.ended_at.is_(None))
+            .values(ended_at=at, end_reason=reason.value)
+        )
+        return int(result.rowcount)  # type: ignore[attr-defined]
+
+    async def end_admin_sessions_of(
+        self, subject: str, reason: EndReason, at: datetime, keep: str | None = None
+    ) -> int:
+        """End the live sessions of ``subject`` except ``keep`` (a hash); return how many."""
+        condition = [AdminSessionRow.subject == subject, AdminSessionRow.ended_at.is_(None)]
+        if keep is not None:
+            condition.append(AdminSessionRow.id_hash != keep)
+        result = await self._session.execute(
+            update(AdminSessionRow).where(*condition).values(ended_at=at, end_reason=reason.value)
+        )
+        return int(result.rowcount)  # type: ignore[attr-defined]
+
+    async def delete_admin_sessions(self, login_before: datetime) -> int:
+        """Delete the sessions that ended or whose login lies before ``login_before``."""
+        result = await self._session.execute(
+            delete(AdminSessionRow).where(
+                or_(AdminSessionRow.ended_at.is_not(None), AdminSessionRow.login_at < login_before)
+            )
+        )
+        return int(result.rowcount)  # type: ignore[attr-defined]

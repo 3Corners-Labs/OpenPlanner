@@ -250,6 +250,8 @@ class LoginClaims:
         groups: Group slugs from the legacy group claim.
         role_claims: Other values of the legacy role claim (custom roles link to them).
         entitlements: Values of the entitlement claim that carry the prefix.
+        mfa_missing: The provider's policy is ``record`` and the ID token showed no second
+            factor (ADR 0100); the login goes on and the route records a security event.
     """
 
     subject: str
@@ -259,6 +261,7 @@ class LoginClaims:
     groups: frozenset[str] = frozenset()
     role_claims: frozenset[str] = frozenset()
     entitlements: frozenset[str] = frozenset()
+    mfa_missing: bool = False
 
 
 def _legacy_roles(claims: LoginClaims, catalogue: RoleCatalogue) -> list[tuple[str, Reach]]:
@@ -315,21 +318,22 @@ MAX_DETAIL = 255
 def mismatch_detail(legacy: frozenset[Grant], entitled: frozenset[Grant]) -> str | None:
     """Return what differs between the two sets of grants, or ``None`` when they agree.
 
-    Keys only (role keys and slugs): ``legacy_only:org_admin:demo;entitlements_only:...``.
-    When the keys would not fit the detail they are counted instead.
+    Keys only (role keys and slugs), one part per key in the detail convention of
+    ``app.domain.event_schema``: ``legacy_only:org_admin:demo,entitlements_only:...``. When the
+    keys would not fit the detail they are counted instead.
     """
     only_legacy = sorted(g.key for g in legacy - entitled)
     only_entitled = sorted(g.key for g in entitled - legacy)
     if not only_legacy and not only_entitled:
         return None
-    detail = ";".join(
-        f"{name}:{','.join(keys)}"
+    detail = ",".join(
+        f"{name}:{key}"
         for name, keys in (("legacy_only", only_legacy), ("entitlements_only", only_entitled))
-        if keys
+        for key in keys
     )
     if len(detail) <= MAX_DETAIL:
         return detail
-    return f"legacy_only:{len(only_legacy)};entitlements_only:{len(only_entitled)}"
+    return f"legacy_only:{len(only_legacy)},entitlements_only:{len(only_entitled)}"
 
 
 @dataclass(frozen=True)

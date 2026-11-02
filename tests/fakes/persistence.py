@@ -2,12 +2,14 @@
 
 import asyncio
 import copy
+from collections import Counter
 from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
 from app.domain import holidays as holiday_model
+from app.domain.admin_sessions import AdminSession, EndReason
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
@@ -23,6 +25,7 @@ from app.domain.booking import (
     SlotUsage,
     TrialCall,
 )
+from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
@@ -48,6 +51,8 @@ from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import OwnCertificate
+from app.domain.participant_links import new_public_ref
+from app.domain.public_address import AddressCheck, AddressKind
 from app.domain.retention import (
     DueBooking,
     GroupRetentionCounts,
@@ -68,6 +73,7 @@ from app.domain.staff import (
     RefusedEntitlement,
     StaffFilter,
     StaffMember,
+    StaffStatus,
     visible,
 )
 from app.domain.tasks import ActiveJob, ActiveJobs
@@ -96,6 +102,7 @@ class State:
     audit: list[AuditEvent] = field(default_factory=list)
     diagnostic_modes: list[DiagnosticMode] = field(default_factory=list)
     staff: dict[str, StaffMember] = field(default_factory=dict)
+    admin_sessions: list[AdminSession] = field(default_factory=list)
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
     contact_blocks: dict[int, ContactBlock] = field(default_factory=dict)
@@ -129,6 +136,9 @@ class State:
     running_versions: list[RunningVersion] = field(default_factory=list)
     release_listing: list[ListedRelease] = field(default_factory=list)
     certificate_check: CertificateCheck | None = None
+    instance_id: str | None = None
+    probe_nonce: tuple[str, datetime] | None = None
+    address_checks: dict[AddressKind, AddressCheck] = field(default_factory=dict)
     own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
@@ -140,6 +150,7 @@ class State:
     platform_secrets: dict[str, str] = field(default_factory=dict)
     secrets_available: bool = True
     purged_at: dict[int, datetime] = field(default_factory=dict)
+    day_counts: dict[tuple[int, date, BookingStatus], DayCount] = field(default_factory=dict)
     forms: dict[int, FormDefinition] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
     failed_jobs: dict[int, list[JobSummary]] = field(default_factory=dict)
@@ -189,7 +200,11 @@ class InMemoryTransaction:
         ]
         staff = self.state.staff
         return [
-            AuditEntry(e, staff[e.actor].display_name if e.actor in staff else None)
+            AuditEntry(
+                e,
+                (staff[e.actor].display_name or None) if e.actor in staff else None,
+                e.actor in staff and staff[e.actor].status is StaffStatus.ERASED,
+            )
             for e in reversed(events)
         ][:limit]
 
@@ -240,6 +255,33 @@ class InMemoryTransaction:
         old = self.state.staff.get(member.subject)
         member_id = old.id if old and old.id is not None else self._new_id()
         self.state.staff[member.subject] = replace(member, id=member_id, recorded=True)
+
+    async def add_admin_session(self, session: AdminSession) -> None:
+        self.state.admin_sessions.append(session)
+
+    async def active_admin_sessions_of(self, subject: str) -> list[AdminSession]:
+        return [s for s in self.state.admin_sessions if s.subject == subject and s.ended_at is None]
+
+    async def end_admin_sessions_of(
+        self, subject: str, reason: EndReason, at: datetime, keep: str | None = None
+    ) -> int:
+        ended = 0
+        for i, session in enumerate(self.state.admin_sessions):
+            if session.subject == subject and session.ended_at is None and session.id_hash != keep:
+                self.state.admin_sessions[i] = replace(session, ended_at=at, end_reason=reason)
+                ended += 1
+        return ended
+
+    async def set_staff_status(self, subject: str, status: StaffStatus, at: datetime) -> None:
+        if subject in self.state.staff:
+            self.state.staff[subject] = replace(
+                self.state.staff[subject], status=status, status_at=at
+            )
+
+    async def erase_staff(self, subject: str, at: datetime) -> None:
+        member = self.state.staff.get(subject)
+        if member is not None and member.status is not StaffStatus.ERASED:
+            self.state.staff[subject] = member.erased(at)
 
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
         if subject in self.state.staff:
@@ -812,17 +854,30 @@ class InMemoryTransaction:
         ]
 
     async def add_booking(self, booking: Booking) -> Booking:
-        stored = replace(booking, id=self._new_id())
+        stored = replace(
+            booking, id=self._new_id(), public_ref=booking.public_ref or new_public_ref()
+        )
         self.state.bookings[stored.id or 0] = stored
         return stored
+
+    async def get_booking_by_public_ref(self, public_ref: str) -> Booking | None:
+        return next((b for b in self.state.bookings.values() if b.public_ref == public_ref), None)
 
     async def get_booking(self, booking_id: int) -> Booking | None:
         return self.state.bookings.get(booking_id)
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(
-            self.state.bookings[booking_id], contact=None, claim=None, trial=None
+            self.state.bookings[booking_id],
+            contact=None,
+            claim=None,
+            trial=None,
+            meeting=None,
+            wxcc_task_id=None,
         )
+        self.state.booking_events[booking_id] = [
+            replace(e, message="") for e in self.state.booking_events.get(booking_id, [])
+        ]
         self.state.purged_at[booking_id] = now
 
     async def due_for_purge(self, candidates_before: datetime) -> list[DueBooking]:
@@ -852,10 +907,61 @@ class InMemoryTransaction:
                             ends,
                             b.rebook_by,
                             b.confirm_by,
+                            self.state.groups[b.group_id].organisation_id,
+                            b.closure_id,
                         ),
                     )
                 )
         return due
+
+    async def find_rollable(
+        self, purged_before: datetime, after_id: int, limit: int
+    ) -> list[RollableBooking]:
+        rows = [
+            RollableBooking(
+                b.id or 0,
+                b.group_id,
+                b.start.date(),
+                b.status,
+                self.state.purged_at.get(b.id or 0),
+                b.contact is not None,
+                len(self.state.jobs.get(b.id or 0, [])),
+            )
+            for b in sorted(self.state.bookings.values(), key=lambda b: b.id or 0)
+            if (b.id or 0) > after_id
+            and self.state.purged_at.get(b.id or 0, purged_before) < purged_before
+        ]
+        return rows[:limit]
+
+    async def add_day_counts(self, counts: Sequence[DayCount]) -> None:
+        for c in counts:
+            key = (c.group_id, c.day, c.status)
+            old = self.state.day_counts.get(key)
+            if old is None:
+                self.state.day_counts[key] = c
+            else:
+                self.state.day_counts[key] = replace(
+                    old,
+                    count=old.count + c.count,
+                    last_purged_at=max(old.last_purged_at, c.last_purged_at),
+                )
+
+    async def delete_booking_rows(self, booking_ids: Sequence[int]) -> None:
+        for booking_id in booking_ids:
+            self.state.bookings.pop(booking_id, None)
+            self.state.booking_events.pop(booking_id, None)
+            self.state.call_status.pop(booking_id, None)
+            self.state.jobs.pop(booking_id, None)
+            self.state.purged_at.pop(booking_id, None)
+
+    async def booking_totals(self, group_id: int) -> dict[BookingStatus, int]:
+        totals: Counter[BookingStatus] = Counter(
+            b.status for b in self.state.bookings.values() if b.group_id == group_id
+        )
+        for (group, _day, status), c in self.state.day_counts.items():
+            if group == group_id:
+                totals[status] += c.count
+        return dict(totals)
 
     async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:
         groups = await self.list_groups(scope)
@@ -864,6 +970,11 @@ class InMemoryTransaction:
             bookings = [b for b in self.state.bookings.values() if b.group_id == summary.group.id]
             holding = [b for b in bookings if b.contact is not None]
             purged = [self.state.purged_at[b.id] for b in bookings if b.id in self.state.purged_at]
+            purged += [
+                c.last_purged_at
+                for (group, _d, _s), c in self.state.day_counts.items()
+                if group == summary.group.id
+            ]
             failed = sum(1 for b in holding if b.id in self.state.failed_purges)
             counts.append(
                 GroupRetentionCounts(summary, len(holding), failed, max(purged, default=None))
@@ -877,7 +988,15 @@ class InMemoryTransaction:
                 ):
                     ends = closure.ends_at if closure else None
                     candidates.append(
-                        PurgeCandidate(b.group_id, b.status, b.end, b.cancelled_at, ends)
+                        PurgeCandidate(
+                            b.group_id,
+                            b.status,
+                            b.end,
+                            b.cancelled_at,
+                            ends,
+                            organisation_id=self.state.groups[b.group_id].organisation_id,
+                            closure_id=b.closure_id,
+                        )
                     )
         return RetentionFacts(counts, candidates)
 
@@ -1067,6 +1186,14 @@ class InMemoryTransaction:
         ]
         return sorted(found, key=lambda b: (b.start, b.id or 0))
 
+    async def latest_suspended_end(self, closure_id: int) -> datetime | None:
+        ends = [
+            b.end
+            for b in self.state.bookings.values()
+            if b.closure_id == closure_id and b.status is BookingStatus.SUSPENDED
+        ]
+        return max(ends, default=None)
+
     async def get_api_settings(self) -> ApiSettings:
         return self.state.api_settings
 
@@ -1248,6 +1375,33 @@ class InMemoryTransaction:
     async def save_certificate_check(self, check: CertificateCheck) -> None:
         self.state.certificate_check = check
 
+    async def ensure_instance_id(self) -> str:
+        if self.state.instance_id is None:
+            self.state.instance_id = "00000000-0000-4000-8000-000000000001"
+        return self.state.instance_id
+
+    async def get_instance_id(self) -> str | None:
+        return self.state.instance_id
+
+    async def store_probe_nonce(self, digest: str, at: datetime) -> None:
+        self.state.probe_nonce = (digest, at)
+
+    async def take_probe_nonce(self, digest: str, not_before: datetime) -> bool:
+        pending = self.state.probe_nonce
+        if pending is None or pending[0] != digest or pending[1] < not_before:
+            return False
+        self.state.probe_nonce = None
+        return True
+
+    async def get_address_checks(self) -> list[AddressCheck]:
+        return list(self.state.address_checks.values())
+
+    async def save_address_check(self, check: AddressCheck) -> None:
+        self.state.address_checks[check.kind] = check
+
+    async def delete_address_check(self, kind: AddressKind) -> None:
+        self.state.address_checks.pop(kind, None)
+
     async def get_own_certificate(self) -> OwnCertificate | None:
         return self.state.own_certificate
 
@@ -1280,7 +1434,11 @@ class InMemoryTransaction:
     async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
         staff = self.state.staff
         return [
-            AuditEntry(e, staff[e.actor].display_name if e.actor in staff else None)
+            AuditEntry(
+                e,
+                (staff[e.actor].display_name or None) if e.actor in staff else None,
+                e.actor in staff and staff[e.actor].status is StaffStatus.ERASED,
+            )
             for e in reversed(self.state.audit)
             if e.action in actions
         ][:limit]

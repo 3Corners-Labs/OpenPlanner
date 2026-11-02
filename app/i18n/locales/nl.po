@@ -403,6 +403,9 @@ msgstr "Pagina niet gevonden"
 msgid "error.not_found.text"
 msgstr "Deze link klopt niet of is niet meer geldig."
 
+msgid "error.link_required"
+msgstr "Open de link uit uw e-mail opnieuw om uw afspraak te bekijken of te wijzigen."
+
 msgid "manage.title"
 msgstr "Uw afspraak"
 
@@ -2484,6 +2487,9 @@ msgstr "Meer over de sluiting en andere manieren om ons te bereiken"
 msgid "closure.page.calendar"
 msgstr "Naar de kalender: tot de sluiting kunt u nog een afspraak maken"
 
+msgid "closure.page.delete_by"
+msgstr "Gegevens van afspraken die door deze sluiting stilliggen, worden uiterlijk op {date} verwijderd."
+
 msgid "manage.status.suspended"
 msgstr "Opgeschort"
 
@@ -2492,6 +2498,9 @@ msgstr "Uw afspraak kan niet doorgaan op dit moment"
 
 msgid "manage.suspended.text"
 msgstr "Kies hieronder een nieuwe tijd of annuleer de afspraak. Uw gegevens zijn bewaard, u hoeft niets opnieuw in te vullen."
+
+msgid "manage.suspended.delete_by"
+msgstr "Uw gegevens worden uiterlijk op {date} verwijderd."
 
 msgid "manage.suspended.reschedule"
 msgstr "Kies een nieuwe tijd"
@@ -3124,7 +3133,7 @@ msgid "admin.messages.save_hint"
 msgstr "Maak een veld leeg om de standaardtekst terug te zetten."
 
 msgid "admin.form.error.smtp_security"
-msgstr "Kies STARTTLS of TLS: met een gebruikersnaam mag het wachtwoord niet onversleuteld over het netwerk."
+msgstr "Kies STARTTLS of TLS: e-mail bevat namen en deelnamelinks, en een wachtwoord, en mag niet onversleuteld over het netwerk. Een relay zonder TLS vraagt in productie de hostinstelling SMTP_PLAINTEXT_RELAY_ALLOWED."
 
 msgid "admin.nav.organisations"
 msgstr "Organisaties"
@@ -3764,6 +3773,9 @@ msgstr "De database is groter dan het ingestelde maximum."
 msgid "audit.actor.system"
 msgstr "Systeem"
 
+msgid "audit.actor.erased"
+msgstr "Gewiste medewerker"
+
 msgid "audit.outcome.retry"
 msgstr "Wordt opnieuw geprobeerd"
 
@@ -3934,6 +3946,18 @@ msgstr "op de machine-API"
 
 msgid "admin.audit.detail.surface_links"
 msgstr "bij onbekende beheerlinks"
+
+msgid "audit.event.database_error"
+msgstr "Databasefout"
+
+msgid "admin.audit.reason.database_error"
+msgstr "Een databaseopdracht mislukte; het verzoek is teruggedraaid."
+
+msgid "admin.audit.detail.surface_widget"
+msgstr "op de widget-API"
+
+msgid "error.database_unavailable"
+msgstr "Dit lukte nu niet en er is niets opgeslagen. Probeer het over enkele minuten opnieuw."
 
 msgid "admin.audit.detail.client"
 msgstr "afzender {value}"
@@ -5689,6 +5713,15 @@ msgstr "{count} uur"
 msgid "authz.permission.staff_view"
 msgstr "Medewerkers bekijken"
 
+msgid "authz.permission.staff_manage"
+msgstr "Medewerkers beheren"
+
+msgid "authz.permission.staff_reset_password"
+msgstr "Wachtwoordreset of uitnodiging sturen"
+
+msgid "authz.permission.staff_erase"
+msgstr "Gegevens van een medewerker wissen"
+
 msgid "admin.nav.staff"
 msgstr "Medewerkers"
 
@@ -5697,6 +5730,15 @@ msgstr "Eerste keer ingelogd"
 
 msgid "audit.event.staff_changed"
 msgstr "Rollen of lidmaatschappen gewijzigd"
+
+msgid "audit.event.staff_suspended"
+msgstr "Medewerker geschorst"
+
+msgid "audit.event.staff_reinstated"
+msgstr "Schorsing opgeheven"
+
+msgid "audit.event.staff_erased"
+msgstr "Gegevens van medewerker gewist"
 
 msgid "admin.audit.detail.role_add"
 msgstr "rol erbij: {value}"
@@ -5911,6 +5953,9 @@ msgstr "Onderdelen van Geavanceerde instellingen"
 msgid "admin.page_toc"
 msgstr "Op deze pagina"
 
+msgid "admin.group.settings.general"
+msgstr "Algemeen"
+
 msgid "admin.settings.intro"
 msgstr "Hoe deze installatie is ingesteld en waar elke waarde vandaan komt. Geheime waarden worden nooit getoond. De superuser wijzigt hier bedrijfsvoering, bewaartermijnen, opslag, snelheidslimieten en sessies; een wijziging geldt binnen tien seconden."
 
@@ -6085,6 +6130,9 @@ msgstr "Planner"
 msgid "settings.topic.confirmation"
 msgstr "Afspraken bevestigen"
 
+msgid "settings.topic.participant_link"
+msgstr "Link van de deelnemer"
+
 msgid "settings.field.log_level.label"
 msgstr "Logniveau"
 
@@ -6097,14 +6145,26 @@ msgstr "Onderhoudsstand onthouden (seconden)"
 msgid "settings.field.maintenance_retry_after_seconds.label"
 msgstr "Opnieuw proberen na onderhoud (seconden)"
 
+msgid "settings.field.staff_invite_expiry_days.label"
+msgstr "Geldigheid uitnodiging of wachtwoordreset (dagen)"
+
+msgid "settings.field.staff_directory_enabled.label"
+msgstr "Medewerkers beheren in het portaal"
+
 msgid "settings.field.staff_last_seen_interval_seconds.label"
 msgstr "Laatst gezien bijwerken (seconden)"
+
+msgid "settings.field.staff_retention_days.label"
+msgstr "Medewerkergegevens wissen na (dagen zonder inlog)"
 
 msgid "settings.field.system_event_retention_days.label"
 msgstr "Systeemgebeurtenissen bewaren (dagen)"
 
 msgid "settings.field.audit_retention_days.label"
 msgstr "Beheeracties bewaren (dagen)"
+
+msgid "settings.field.booking_row_retention_days.label"
+msgstr "Boekingsrijen bewaren na verwijdering van de gegevens (dagen)"
 
 msgid "settings.field.security_event_retention_days.label"
 msgstr "Beveiligingsgebeurtenissen bewaren (dagen)"
@@ -6304,8 +6364,17 @@ msgstr "Verzoek om opnieuw te boeken vervalt na (dagen)"
 msgid "settings.field.planner_rebook_reminder_days.label"
 msgstr "Herinnering om opnieuw te boeken (dagen voor het vervallen)"
 
+msgid "settings.field.closure_max_retention_days.label"
+msgstr "Gegevens bij een sluiting uiterlijk verwijderd na (dagen na de afspraak)"
+
+msgid "settings.field.closure_max_notice_days.label"
+msgstr "Melding aan beheerders vóór dat maximum (dagen)"
+
 msgid "settings.field.booking_confirm_min_minutes.label"
 msgstr "Minimale tijd om te bevestigen (minuten)"
+
+msgid "settings.field.participant_link_session_hours.label"
+msgstr "Geldigheid van de deelnemerslink in de browser (uren)"
 
 msgid "settings.field.booking_confirm_reminders.label"
 msgstr "Aantal herinneringen om te bevestigen"
@@ -6420,7 +6489,7 @@ msgid "admin.form_fields.system"
 msgstr "Voornaam, achternaam en e-mailadres vraagt het formulier altijd; het telefoonnummer stelt u in bij de instellingen."
 
 msgid "admin.form_fields.none"
-msgstr "Dit team heeft nog geen eigen velden."
+msgstr "Dit team heeft nog geen eigen velden. Voorbeelden: een klantnummer (korte tekst) of het onderwerp van het gesprek (keuzelijst)."
 
 msgid "admin.form_fields.retired"
 msgstr "Uitgezet (alleen nog bij eerdere afspraken): {names}"
@@ -6429,16 +6498,49 @@ msgid "admin.form_fields.label"
 msgstr "Vraag"
 
 msgid "admin.form_fields.key"
-msgstr "Sleutel"
+msgstr "Technische naam"
 
 msgid "admin.form_fields.key_hint"
-msgstr "Kleine letters, cijfers en _, beginnend met een letter, bijvoorbeeld klantnummer. Ligt vast na opslaan."
+msgstr "Laat dit leeg: de naam wordt gemaakt uit de vraag. Alleen kleine letters, cijfers en _, beginnend met een letter. Ligt vast na opslaan."
 
 msgid "admin.form_fields.type"
 msgstr "Soort"
 
-msgid "admin.form_fields.type_hint"
-msgstr "Bepaalt de controle op het antwoord. Ligt vast na opslaan."
+msgid "admin.form_fields.type.short_text.help"
+msgstr "Een kort antwoord van één regel, zoals een klantnummer."
+
+msgid "admin.form_fields.type.long_text.help"
+msgstr "Een langer antwoord in een groot tekstvak."
+
+msgid "admin.form_fields.type.email.help"
+msgstr "Een e-mailadres, gecontroleerd op de vorm."
+
+msgid "admin.form_fields.type.phone.help"
+msgstr "Een telefoonnummer, gecontroleerd en bewaard als internationaal nummer."
+
+msgid "admin.form_fields.type.number.help"
+msgstr "Een geheel getal, eventueel met een minimum en maximum."
+
+msgid "admin.form_fields.type.date.help"
+msgstr "Een datum, eventueel binnen een aantal dagen vanaf vandaag."
+
+msgid "admin.form_fields.type.postcode_nl.help"
+msgstr "Een Nederlandse postcode, bijvoorbeeld 1234 AB."
+
+msgid "admin.form_fields.type.choice.help"
+msgstr "Eén keuze uit een lijst die u zelf opstelt, bijvoorbeeld het onderwerp van het gesprek."
+
+msgid "admin.form_fields.type.checkbox.help"
+msgstr "Een vakje dat de deelnemer aankruist, bijvoorbeeld een toestemming."
+
+msgid "admin.form_fields.choose_kind"
+msgstr "Wat voor vraag wilt u stellen?"
+
+msgid "admin.form_fields.other_kind"
+msgstr "Andere soort kiezen"
+
+msgid "admin.form_fields.always_pii"
+msgstr "Antwoorden van deze soort tellen altijd als persoonsgegevens."
 
 msgid "admin.form_fields.type.short_text"
 msgstr "Korte tekst (tot 100 tekens)"
@@ -6721,6 +6823,18 @@ msgstr "{environment}"
 
 msgid "admin.overview.widget.status.environment.problems"
 msgstr "{environment}, {count} niet productiewaardig"
+
+msgid "admin.overview.widget.status.mail"
+msgstr "E-mail"
+
+msgid "admin.overview.widget.status.mail.plaintext"
+msgstr "{count} mailserver(s) zonder TLS: kies STARTTLS of TLS, of zet SMTP_PLAINTEXT_RELAY_ALLOWED"
+
+msgid "admin.overview.widget.status.proxy"
+msgstr "Proxy"
+
+msgid "admin.overview.widget.status.proxy.plaintext"
+msgstr "FORWARDED_ALLOW_IPS vertrouwt een andere proxy dan de meegeleverde en de verbinding loopt zonder TLS naar web: het verkeer tussen proxy en web is onversleuteld. Zet WEB_TLS_CERT_FILE en WEB_TLS_KEY_FILE (runbook)"
 
 msgid "audit.job.send_rebook_request"
 msgstr "Verzoek om opnieuw te plannen versturen"
@@ -7053,9 +7167,6 @@ msgstr "E-mailadres"
 
 msgid "admin.settings.data_fields.field.phone"
 msgstr "Telefoonnummer"
-
-msgid "admin.settings.data_fields.field.note"
-msgstr "Notitie"
 
 msgid "admin.settings.data_fields.field.form_answers"
 msgstr "Antwoorden op de eigen vragen van het team"
@@ -7600,6 +7711,12 @@ msgstr "Uw account heeft meer dan één rol voor meer dan één organisatie of g
 msgid "admin.login_refused.too_many_entitlements"
 msgstr "Uw account stuurt meer rechten mee dan OpenPlanner kan verwerken. Vraag het IdP-team om alleen de rechten voor OpenPlanner mee te sturen."
 
+msgid "admin.login_refused.mfa_required"
+msgstr "Inloggen is geweigerd: uw account laat geen tweede factor (MFA) zien. Stel meervoudige authenticatie in bij uw identiteitsprovider en log opnieuw in; blijft het mislukken, neem dan contact op met het IdP-team."
+
+msgid "admin.login_refused.suspended"
+msgstr "Inloggen is geweigerd: uw toegang tot het beheerportaal is geschorst. Neem contact op met de beheerder van uw organisatie."
+
 msgid "admin.rights_not_recognised.text"
 msgstr "Uw account heeft rechten voor OpenPlanner die deze installatie niet herkent. Neem contact op met uw beheerder; die ziet op uw pagina bij Medewerkers welke waarden niet herkend zijn."
 
@@ -7794,6 +7911,9 @@ msgstr "Inbedding"
 
 msgid "admin.tab.branding"
 msgstr "Huisstijl"
+
+msgid "admin.tab.participants"
+msgstr "Deelnemers"
 
 msgid "admin.tab.channels"
 msgstr "Kanalen"
@@ -8510,13 +8630,16 @@ msgid "admin.logging.categories"
 msgstr "Te sturen auditgebeurtenissen"
 
 msgid "admin.logging.categories_hint"
-msgstr "Beheeracties, wat het platform zelf doet en beveiligingsgebeurtenissen. Het niveau geldt hier niet voor."
+msgstr "Beheeracties, wat het platform zelf doet en beveiligingsgebeurtenissen: het niveau geldt hier niet voor. Toegangsbeslissingen zijn één of twee regels per beheerpagina; voor die regels geldt het niveau wel."
 
 msgid "admin.logging.category.audit"
 msgstr "Beheeracties"
 
 msgid "admin.logging.category.system"
 msgstr "Systeemgebeurtenissen"
+
+msgid "admin.logging.category.authz"
+msgstr "Toegangsbeslissingen"
 
 msgid "admin.logging.category.security"
 msgstr "Beveiligingsgebeurtenissen"
@@ -8662,6 +8785,33 @@ msgstr "{count} mislukt"
 msgid "admin.settings.logging.open"
 msgstr "Logbestemmingen openen"
 
+msgid "admin.settings.keys.title"
+msgstr "Sleutelrotatie"
+
+msgid "admin.settings.keys.intro"
+msgstr "Alleen aantallen, nooit sleutels of inhoud. Ze tonen wanneer een vorige sleutel veilig kan worden verwijderd."
+
+msgid "admin.settings.keys.records"
+msgstr "Versleutelde geheimen onder de vorige sleutel"
+
+msgid "admin.settings.keys.bookings"
+msgstr "Lopende boekingen met een koppeling onder de vorige sleutel"
+
+msgid "admin.settings.keys.records_done"
+msgstr "Alle versleutelde geheimen staan onder de huidige sleutel. SETTINGS_ENCRYPTION_KEY_PREVIOUS kan worden verwijderd."
+
+msgid "admin.settings.keys.records_todo"
+msgstr "Voer op de host het commando rekey uit (python -m app.cli rekey) en verwijder SETTINGS_ENCRYPTION_KEY_PREVIOUS pas als dit aantal 0 is."
+
+msgid "admin.settings.keys.bookings_done"
+msgstr "Geen lopende boeking heeft nog een koppeling onder de vorige sleutel. MANAGEMENT_TOKEN_KEY_PREVIOUS kan worden verwijderd."
+
+msgid "admin.settings.keys.bookings_todo"
+msgstr "Wacht tot deze boekingen voorbij zijn en verwijder MANAGEMENT_TOKEN_KEY_PREVIOUS pas als dit aantal 0 is."
+
+msgid "settings.field.max_font_unpacked_bytes.label"
+msgstr "Grootste uitgepakte omvang van een geüpload lettertype (bytes)"
+
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Maximale grootte van een configuratiepakket (MB)"
 
@@ -8730,3 +8880,485 @@ msgstr "Configuratiepakket geëxporteerd"
 
 msgid "admin.audit.detail.configuration_import"
 msgstr "Configuratiepakket geïmporteerd"
+
+msgid "admin.staff.invite.link"
+msgstr "Medewerker uitnodigen"
+
+msgid "admin.staff.invite.title"
+msgstr "Medewerker uitnodigen"
+
+msgid "admin.staff.invite.intro"
+msgstr "De medewerker krijgt een e-mail met een link om een wachtwoord te kiezen. De link is {days} dagen geldig."
+
+msgid "admin.staff.invite.email"
+msgstr "E-mailadres"
+
+msgid "admin.staff.invite.first_name"
+msgstr "Voornaam"
+
+msgid "admin.staff.invite.last_name"
+msgstr "Achternaam"
+
+msgid "admin.staff.invite.submit"
+msgstr "Uitnodiging versturen"
+
+msgid "admin.staff.invite.error.email"
+msgstr "Vul een geldig e-mailadres in."
+
+msgid "admin.staff.invite.error.first_name"
+msgstr "Vul een voornaam in."
+
+msgid "admin.staff.invite.error.last_name"
+msgstr "Vul een achternaam in."
+
+msgid "admin.staff.invite.error.role"
+msgstr "Kies een rol."
+
+msgid "admin.staff.pending.title"
+msgstr "Uitgenodigd, nog niet ingelogd"
+
+msgid "admin.staff.pending.intro"
+msgstr "Deze mensen zijn aangemaakt bij de identiteitsprovider maar hebben nog niet ingelogd."
+
+msgid "admin.staff.pending.resend"
+msgstr "Uitnodiging opnieuw sturen"
+
+msgid "admin.staff.manage.title"
+msgstr "Beheer bij de identiteitsprovider"
+
+msgid "admin.staff.manage.intro"
+msgstr "Deze persoon staat in de identiteitsprovider van het platform. U wijzigt hier alleen wat binnen uw eigen organisaties valt; de wijziging werkt bij de eerstvolgende login."
+
+msgid "admin.staff.manage.grants"
+msgstr "Rollen en plaatsen binnen uw bereik"
+
+msgid "admin.staff.manage.role"
+msgstr "Rol"
+
+msgid "admin.staff.manage.place"
+msgstr "Plaats"
+
+msgid "admin.staff.manage.place_hint"
+msgstr "Een organisatie of een groep. Alleen de rol superuser geldt voor het hele platform."
+
+msgid "admin.staff.manage.whole_platform"
+msgstr "Hele platform"
+
+msgid "admin.staff.manage.actions"
+msgstr "Acties"
+
+msgid "admin.staff.manage.remove"
+msgstr "Verwijderen"
+
+msgid "admin.staff.manage.add"
+msgstr "Rol toevoegen"
+
+msgid "admin.staff.manage.add_submit"
+msgstr "Rol toevoegen"
+
+msgid "admin.staff.manage.disable"
+msgstr "Uitschakelen"
+
+msgid "admin.staff.manage.enable"
+msgstr "Weer inschakelen"
+
+msgid "admin.staff.manage.reset"
+msgstr "Wachtwoordreset sturen"
+
+msgid "admin.staff.manage.disabled"
+msgstr "Uitgeschakeld"
+
+msgid "admin.staff.manage.elsewhere"
+msgstr "Deze persoon werkt ook buiten uw organisaties. Rollen elders blijven ongemoeid; uitschakelen kan alleen de superuser."
+
+msgid "admin.done.staff_invited"
+msgstr "De uitnodiging is verstuurd."
+
+msgid "admin.done.staff_grants_saved"
+msgstr "De rollen zijn bijgewerkt."
+
+msgid "admin.done.staff_enabled"
+msgstr "De medewerker kan weer inloggen."
+
+msgid "admin.done.staff_disabled"
+msgstr "De medewerker kan niet meer inloggen."
+
+msgid "admin.done.staff_reset_sent"
+msgstr "De e-mail met de link is verstuurd."
+
+msgid "admin.form.error.staff_directory_unavailable"
+msgstr "De identiteitsprovider is niet beschikbaar of medewerkers beheren staat uit. Probeer het later opnieuw."
+
+msgid "admin.form.error.staff_address_in_use"
+msgstr "Dit e-mailadres is al in gebruik."
+
+msgid "admin.form.error.staff_grant_refused"
+msgstr "Deze rol of plaats mag u niet toekennen."
+
+msgid "admin.form.error.staff_not_found"
+msgstr "Deze persoon is niet gevonden binnen uw bereik."
+
+msgid "admin.form.error.staff_mail_failed"
+msgstr "De e-mail kon niet worden verstuurd. Controleer de e-mailinstellingen van de identiteitsprovider."
+
+msgid "admin.idp_mapping.provider"
+msgstr "Identiteitsprovider"
+
+msgid "admin.idp_mapping.issuer"
+msgstr "Adres (issuer)"
+
+msgid "admin.idp_mapping.staff"
+msgstr "Medewerkers beheren"
+
+msgid "admin.idp_mapping.staff_link"
+msgstr "Naar medewerkers"
+
+msgid "admin.idp_mapping.provider.own"
+msgstr "Eigen identiteitsprovider van de organisatie"
+
+msgid "admin.idp_mapping.provider.bundled"
+msgstr "Meegeleverde Keycloak van dit platform"
+
+msgid "admin.idp_mapping.staff.at_provider"
+msgstr "Bij de identiteitsprovider zelf; het portaal toont ze alleen."
+
+msgid "admin.idp_mapping.staff.in_portal"
+msgstr "In het portaal: uitnodigen, rollen wijzigen, uitschakelen."
+
+msgid "admin.idp_mapping.staff.off"
+msgstr "Staat uit (instelling Medewerkers beheren in het portaal); beheer in de Keycloak-console."
+msgid "admin.idp.mfa_policy"
+msgstr "MFA-beleid"
+
+msgid "admin.idp.mfa_policy_hint"
+msgstr "Wat er gebeurt als het ID-token geen tweede factor toont. Bij Vastleggen gaat het inloggen door en komt er een beveiligingsgebeurtenis."
+
+msgid "admin.idp.mfa.off"
+msgstr "Uit"
+
+msgid "admin.idp.mfa.record"
+msgstr "Vastleggen"
+
+msgid "admin.idp.mfa.require"
+msgstr "Afdwingen"
+
+msgid "admin.idp.mfa_amr_values"
+msgstr "Geaccepteerde amr-waarden"
+
+msgid "admin.idp.mfa_acr_values"
+msgstr "Geaccepteerde acr-waarden"
+
+msgid "admin.idp.mfa_values_hint"
+msgstr "Waarden gescheiden door spaties; leeg: de standaard (amr: mfa otp hwk swk, acr: geen)."
+
+msgid "admin.form.error.mfa_values"
+msgstr "Gebruik hoogstens 10 waarden van gewone tekens, gescheiden door spaties."
+
+msgid "admin.idp.test_result.mfa"
+msgstr "Tweede factor getoond"
+
+msgid "admin.overview.widget.status.proxy.untrusted"
+msgstr "Verzoeken komen binnen met doorgestuurde headers van een proxy die FORWARDED_ALLOW_IPS niet noemt: elke bezoeker lijkt één adres en links krijgen http. Zet FORWARDED_ALLOW_IPS op het adres waarmee de web-container de proxy ziet verbinden (details onder Geavanceerde instellingen, Adres en proxy)"
+
+msgid "admin.overview.widget.status.proxy.finding"
+msgstr "Rondgang naar het publieke adres: {finding} (details onder Geavanceerde instellingen, Adres en proxy)"
+
+msgid "admin.settings.address.title"
+msgstr "Adres en proxy"
+
+msgid "admin.settings.address.intro"
+msgstr "Elke link in een e-mail, de inlogredirect en de widget is gebouwd op het publieke adres, nooit op het adres van het verzoek. Deze waarden staan op de server (klasse B) en vragen een herstart om te wijzigen; de worker controleert of het adres echt bij deze installatie uitkomt."
+
+msgid "admin.settings.address.shape"
+msgstr "Installatie"
+
+msgid "admin.settings.address.shape.bundled"
+msgstr "Meegeleverde proxy (HTTPS door de proxy van deze installatie)"
+
+msgid "admin.settings.address.shape.own"
+msgstr "Eigen reverse proxy (vertrouwd via FORWARDED_ALLOW_IPS)"
+
+msgid "admin.settings.address.shape.none"
+msgstr "Geen proxy (een lab: links en cookies zijn niet door HTTPS beschermd)"
+
+msgid "admin.settings.address.public"
+msgstr "Publiek adres"
+
+msgid "admin.settings.address.webhook"
+msgstr "Webhook-adres"
+
+msgid "admin.settings.address.proxy"
+msgstr "Vertrouwd proxyadres"
+
+msgid "admin.settings.address.proxy.none"
+msgstr "geen"
+
+msgid "admin.settings.address.callback"
+msgstr "OIDC-redirect-URI (registreer deze bij de identiteitsprovider)"
+
+msgid "admin.settings.address.widget"
+msgstr "Widget-loader (voor de site die de widget insluit)"
+
+msgid "admin.settings.address.set_on_server"
+msgstr "Ingesteld op de server, in de omgeving. Een wijziging vraagt een herstart (handleiding: Geavanceerde instellingen)."
+
+msgid "admin.settings.address.round_trip"
+msgstr "Rondgang"
+
+msgid "admin.settings.address.none"
+msgstr "Nog niet gecontroleerd. De worker controleert om de paar uur; op de server doet python -m app.cli address-check het meteen."
+
+msgid "admin.settings.address.off"
+msgstr "Niet gecontroleerd: uitgezet op de server (PUBLIC_ADDRESS_CHECK_ENABLED)."
+
+msgid "admin.settings.address.checked_at"
+msgstr "Laatst gecontroleerd"
+
+msgid "admin.settings.address.reason"
+msgstr "Reden"
+
+msgid "admin.settings.address.seen"
+msgstr "De app zag schema {scheme}, doorgestuurde headers {forwarded}"
+
+msgid "admin.settings.address.kind.public"
+msgstr "Publiek adres"
+
+msgid "admin.settings.address.kind.webhook"
+msgstr "Webhook-adres"
+
+msgid "admin.settings.address.finding.ok"
+msgstr "In orde: het adres komt via https bij deze installatie uit en de proxy wordt vertrouwd."
+
+msgid "admin.settings.address.finding.unreachable"
+msgstr "Niet bereikbaar: de worker kreeg geen antwoord van dit adres."
+
+msgid "admin.settings.address.finding.other_instance"
+msgstr "Een andere installatie antwoordt: de naam wijst elders heen (DNS, een verhuisde host of een gekopieerde .env). Links in e-mails leiden naar de verkeerde plek."
+
+msgid "admin.settings.address.finding.not_https"
+msgstr "De app ziet http: de proxy geeft X-Forwarded-Proto niet door, of PUBLIC_BASE_URL is niet https. Sessiecookies reizen dan niet mee."
+
+msgid "admin.settings.address.finding.proxy_not_trusted"
+msgstr "De proxy wordt niet vertrouwd: zet FORWARDED_ALLOW_IPS op het adres waarmee de web-container de proxy ziet verbinden. Tot dan delen alle bezoekers één adres en wijzen redirects naar http."
+
+msgid "admin.settings.address.finding.no_proxy_headers"
+msgstr "Er komen geen doorgestuurde headers binnen: de proxy zet er geen, of web is rechtstreeks gepubliceerd."
+
+msgid "admin.settings.address.finding.redirected"
+msgstr "Het adres verwijst door naar een andere naam (bijvoorbeeld www voor het hoofddomein): zet PUBLIC_BASE_URL op het uiteindelijke adres."
+
+msgid "admin.settings.address.error.timeout"
+msgstr "geen antwoord op tijd"
+
+msgid "admin.settings.address.error.unreachable"
+msgstr "verbinding geweigerd of naam niet gevonden"
+
+msgid "admin.settings.address.error.tls"
+msgstr "TLS-handshake of certificaat geweigerd"
+
+msgid "admin.settings.address.error.unreadable"
+msgstr "het antwoord kwam niet van OpenPlanner"
+
+msgid "admin.settings.address.error.http"
+msgstr "antwoordde met HTTP {status}"
+
+msgid "admin.settings.address.untrusted"
+msgstr "Sinds {since} droegen {count} verzoek(en) X-Forwarded-For of X-Forwarded-Proto {where}, en de app negeerde ze. Zet FORWARDED_ALLOW_IPS op het adres waarmee de web-container de proxy ziet verbinden."
+
+msgid "admin.settings.address.untrusted.from"
+msgstr "van {peer}"
+
+msgid "admin.settings.address.untrusted.class"
+msgstr "van een {peer} adres"
+
+msgid "admin.settings.address.peer.loopback"
+msgstr "loopback"
+
+msgid "admin.settings.address.peer.private"
+msgstr "privé"
+
+msgid "admin.settings.address.peer.public"
+msgstr "publiek"
+
+msgid "admin.nav.my_sessions"
+msgstr "Mijn sessies"
+
+msgid "audit.event.session_ended"
+msgstr "Sessie beëindigd door het systeem"
+
+msgid "audit.event.sessions_ended_all"
+msgstr "Alle sessies beëindigd"
+
+msgid "audit.event.sessions_ended_by_self"
+msgstr "Eigen andere sessies beëindigd"
+
+msgid "audit.event.sessions_ended_by_admin"
+msgstr "Sessies van een medewerker beëindigd"
+
+msgid "admin.audit.detail.sessions"
+msgstr "Sessies: {count}"
+
+msgid "admin.audit.detail.subject"
+msgstr "Medewerker: {value}"
+
+msgid "admin.done.sessions_ended_others"
+msgstr "Uw andere sessies zijn beëindigd. Aantal: {count}."
+
+msgid "admin.done.sessions_ended_person"
+msgstr "De sessies van deze medewerker zijn beëindigd. Aantal: {count}. De medewerker moet opnieuw inloggen."
+
+msgid "admin.done.staff_suspended"
+msgstr "De medewerker is geschorst en de sessies zijn beëindigd."
+
+msgid "admin.done.staff_reinstated"
+msgstr "De schorsing is opgeheven. De medewerker kan weer inloggen."
+
+msgid "admin.done.staff_erased"
+msgstr "De gegevens van de medewerker zijn gewist."
+
+msgid "admin.sessions.title"
+msgstr "Mijn sessies"
+
+msgid "admin.sessions.intro"
+msgstr "Hier ziet u waar u op dit moment bent ingelogd in het beheerportaal. Herkent u een sessie niet, beëindig dan de andere sessies en log zo nodig opnieuw in bij uw identity provider."
+
+msgid "admin.sessions.caption"
+msgstr "Uw sessies in het beheerportaal"
+
+msgid "admin.sessions.login"
+msgstr "Ingelogd"
+
+msgid "admin.sessions.last_seen"
+msgstr "Laatst actief"
+
+msgid "admin.sessions.status"
+msgstr "Status"
+
+msgid "admin.sessions.current"
+msgstr "Deze sessie"
+
+msgid "admin.sessions.other"
+msgstr "Andere sessie"
+
+msgid "admin.sessions.end_others"
+msgstr "Andere sessies beëindigen"
+
+msgid "admin.sessions.no_others"
+msgstr "U heeft geen andere sessies."
+
+msgid "admin.sessions.end_others_help"
+msgstr "De sessie waarmee u nu werkt blijft bestaan. De andere sessies zijn daarna niet meer te gebruiken."
+
+msgid "admin.staff.sessions.heading"
+msgstr "Sessies"
+
+msgid "admin.staff.sessions.intro"
+msgstr "Beëindigt alle sessies van deze medewerker in het beheerportaal, ook die voor andere organisaties: een sessie hoort bij de persoon. De medewerker moet daarna opnieuw inloggen. Gebruik dit bijvoorbeeld als iemand is uitgezet bij de identity provider."
+
+msgid "admin.staff.sessions.end_all"
+msgstr "Alle sessies beëindigen"
+
+msgid "admin.staff.erased_name"
+msgstr "Gewiste medewerker"
+
+msgid "admin.staff.status.suspended"
+msgstr "Geschorst"
+
+msgid "admin.staff.status.erased"
+msgstr "Gewist"
+
+msgid "admin.staff.status.heading"
+msgstr "Toegang"
+
+msgid "admin.staff.status.suspend_intro"
+msgstr "Schorsen blokkeert de toegang tot het beheerportaal, ook als de identity provider de rechten nog toekent, en beëindigt alle sessies van deze medewerker. U kunt de schorsing later opheffen."
+
+msgid "admin.staff.status.suspend"
+msgstr "Medewerker schorsen"
+
+msgid "admin.staff.status.reinstate_intro"
+msgstr "Opheffen laat de medewerker weer inloggen; de rechten komen opnieuw uit de identity provider."
+
+msgid "admin.staff.status.reinstate"
+msgstr "Schorsing opheffen"
+
+msgid "admin.staff.status.erase_intro"
+msgstr "Wissen verwijdert de naam, rollen en lidmaatschappen van deze geschorste medewerker. Het auditlog blijft verwijzen naar een gewiste medewerker. Dit kan niet ongedaan worden gemaakt."
+
+msgid "admin.staff.status.erase"
+msgstr "Gegevens wissen"
+
+msgid "admin.rights.sections"
+msgstr "Onderdelen van Mijn rechten"
+
+msgid "admin.settings.backups.title"
+msgstr "Back-ups van updates"
+
+msgid "admin.settings.backups.intro"
+msgstr "Voor elke update maakt de updater een kopie van de database om terug te kunnen draaien. Die kopie bevat persoonsgegevens en wordt na 24 uur verwijderd, door de updater en als vangnet ook door de worker."
+
+msgid "admin.settings.backups.none"
+msgstr "Geen back-ups aanwezig."
+
+msgid "admin.settings.backups.count"
+msgstr "Aantal back-ups"
+
+msgid "admin.settings.backups.oldest"
+msgstr "Oudste back-up"
+
+msgid "admin.settings.backups.oldest.value"
+msgstr "{hours} uur oud (geschreven {since})"
+
+msgid "admin.settings.backups.chip"
+msgstr "Waarschuwing"
+
+msgid "admin.settings.backups.overdue"
+msgstr "De oudste back-up is ouder dan {hours} uur en is niet verwijderd. Controleer of de worker draait en of het volume schrijfbaar is: een back-up bevat persoonsgegevens."
+
+msgid "admin.logging.shipping_off"
+msgstr "Het versturen van logs staat uit op de host (LOG_SHIPPING_ENABLED). Geen enkele bestemming ontvangt iets en er kan geen testregel worden gestuurd; de instellingen blijven bewaard."
+
+msgid "admin.form.error.log_shipping_off"
+msgstr "Het versturen van logs staat uit op de host, dus er kan geen testregel worden gestuurd."
+
+msgid "admin.staff.directory.missing"
+msgstr "Medewerkers toevoegen, wijzigen en rollen geven kan hier nog niet: de ingebouwde identiteitsprovider is niet volledig gekoppeld. Op de server ontbreekt: {names}. De serverbeheerder zet dit met scripts/render-keycloak-realm.sh (zie het runbook)."
+
+msgid "admin.staff.directory.unreachable"
+msgstr "De ingebouwde identiteitsprovider antwoordt niet. Medewerkers toevoegen en wijzigen kan pas weer als die bereikbaar is; de lijst hieronder blijft kloppen."
+
+msgid "admin.settings.directory.title"
+msgstr "Medewerkerbeheer"
+
+msgid "admin.settings.directory.chip"
+msgstr "Aandacht"
+
+msgid "admin.settings.directory.connected"
+msgstr "Gekoppeld: medewerkers worden in het portaal beheerd via de ingebouwde identiteitsprovider."
+
+msgid "admin.settings.directory.unreachable"
+msgstr "Ingesteld, maar de ingebouwde identiteitsprovider antwoordt niet. Controleer of de container idp draait en of het secret van openplanner-directory klopt."
+
+msgid "admin.settings.directory.switched_off"
+msgstr "Uitgezet met de instelling staff_directory_enabled: medewerkers worden bij de identiteitsprovider zelf beheerd."
+
+msgid "admin.settings.directory.incomplete"
+msgstr "Niet gekoppeld: de ingebouwde identiteitsprovider draait, maar op de server ontbreekt {names}. Draai scripts/render-keycloak-realm.sh en herstart web en worker."
+
+msgid "admin.settings.directory.absent"
+msgstr "Niet van toepassing: medewerkers worden bij de identiteitsprovider van de organisatie beheerd en hier alleen getoond."
+
+msgid "settings.field.bundled_idp_login_suffix.label"
+msgstr "Achtervoegsel van de inlognaam (ingebouwde identiteitsprovider)"
+
+msgid "admin.staff.invite.user_name"
+msgstr "Inlognaam (optioneel)"
+
+msgid "admin.staff.invite.user_name.hint"
+msgstr "Alleen het deel vóór de @. Leeg laten: voornaam.achternaam. De medewerker logt in als naam@organisatie.{suffix}; een superuser als naam@{suffix}. De inlognaam is daarna niet meer te wijzigen."
+
+msgid "admin.form.error.staff_user_name_invalid"
+msgstr "Gebruik voor de inlognaam alleen kleine letters, cijfers, punten en streepjes, begin en eindig met een letter of cijfer, en hoogstens 64 tekens."
+
+msgid "admin.form.error.staff_user_name_in_use"
+msgstr "Deze inlognaam is al in gebruik. Kies een andere."

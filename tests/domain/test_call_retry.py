@@ -89,3 +89,16 @@ async def test_nothing_is_retried_that_exists_is_not_retryable_or_is_cancelled()
     with pytest.raises(DomainError, match="booking_not_found"):
         await service.retry(GROUP_ADMIN, "demo", 999, JobType.CREATE_VIDEO_ROOM)
     assert uow.state.jobs[booking_id] == []
+
+
+async def test_a_purged_booking_is_never_given_a_new_meeting() -> None:
+    """ADR 0102 point 11: the purge empties the meeting id, which must not read as 'missing'."""
+    uow, service, booking_id = await _setup()
+    booking = uow.state.bookings[booking_id]
+    uow.state.bookings[booking_id] = replace(booking, contact=None)
+
+    with pytest.raises(DomainError, match="nothing_to_retry"):
+        await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.CREATE_VIDEO_ROOM)
+    with pytest.raises(DomainError, match="nothing_to_retry"):
+        await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.DISPATCH_WXCC_TASK)
+    assert uow.state.jobs[booking_id] == []

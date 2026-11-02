@@ -299,3 +299,27 @@ async def test_a_test_login_belongs_to_the_admin_who_started_it(site: Site) -> N
     )
 
     assert with_other_session.status_code == 400
+
+
+async def test_the_mfa_policy_is_registered_shown_and_validated(superuser: Site) -> None:
+    page_url = await register(superuser, mfa_policy="require", mfa_amr_values="otp  x-strong")
+
+    page = await superuser.client.get(page_url)
+    assert "Afdwingen" in page.text
+    assert 'value="otp x-strong"' in page.text
+
+    refused = await superuser.client.post(
+        LOGIN,
+        data={**NEW_PROVIDER, "key": "gem-b", "mfa_policy": "sometimes"},
+        headers=SAME_ORIGIN,
+    )
+    assert refused.status_code == 422
+    assert 'id="mfa_policy"' in refused.text
+
+
+async def test_a_test_login_says_whether_a_second_factor_showed(superuser: Site) -> None:
+    await start_test(superuser)
+
+    result = await superuser.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+
+    assert "Tweede factor getoond" in result.text

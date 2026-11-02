@@ -502,3 +502,75 @@ def test_the_change_lead_column_is_renamed_with_its_values_and_back(
     with pytest.raises(sqlite3.IntegrityError, match="citizen_lead"):
         database.execute("UPDATE groups SET citizen_change_lead_minutes = 1441")
     database.close()
+
+
+def test_existing_bookings_get_distinct_public_references(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    """ADR 0093: the migration names every booking that already exists, each differently."""
+    import sqlite3
+
+    command.upgrade(alembic_config, "0006")
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    database.executescript(
+        """
+        INSERT INTO organisations (id, name, slug) VALUES (1, 'Gemeente', 'gemeente');
+        INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+            min_notice_minutes, horizon_days, phone_mode, wxcc_queue_id)
+            VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional', 'q-1');
+        INSERT INTO slots (id, group_id, start, "end", capacity_snapshot)
+            VALUES (1, 1, '2026-01-05 08:00:00', '2026-01-05 08:30:00', 2);
+        INSERT INTO bookings (id, slot_id, group_id, status, locale, management_token_hash,
+            management_token_salt, created_at, consents)
+            VALUES (1, 1, 1, 'confirmed', 'nl', 'h1', 's', '2026-01-01 08:00:00', ''),
+                   (2, 1, 1, 'confirmed', 'nl', 'h2', 's', '2026-01-01 08:00:00', '');
+        """
+    )
+    database.commit()
+    database.close()
+
+    command.upgrade(alembic_config, "head")
+
+    database = sqlite3.connect(tmp_path / "migrate.db")
+    refs = [row[0] for row in database.execute("SELECT public_ref FROM bookings ORDER BY id")]
+    database.close()
+    assert len(refs) == 2
+    assert refs[0] != refs[1]
+    assert all(len(ref) >= 22 for ref in refs)
+
+
+def test_existing_destinations_keep_the_decisions_and_events_get_an_empty_role(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0103 point 9: a destination that received authz lines as ordinary lines keeps them.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0086")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO log_destinations (name, kind, address, min_level, categories,
+                                          created_at, updated_at)
+                VALUES ('a', 'syslog', 'syslog+tls://s:6514', 'info', 'audit,system',
+                        '2026-11-01 08:00:00', '2026-11-01 08:00:00'),
+                       ('b', 'http', 'https://c/x', 'info', '',
+                        '2026-11-01 08:00:00', '2026-11-01 08:00:00');
+            INSERT INTO audit_events (at, actor, action, outcome, source, event_id)
+                VALUES ('2026-11-01 08:00:00', 'sub-1', 'group.edit', 'success', 'admin',
+                        'e1');
+            """
+        )
+
+    command.upgrade(alembic_config, "head")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        upgraded = database.execute("SELECT categories FROM log_destinations ORDER BY name")
+        assert [r[0] for r in upgraded] == ["audit,authz,system", "authz"]
+        assert database.execute("SELECT actor_role FROM audit_events").fetchone() == ("",)
+
+    command.downgrade(alembic_config, "0086")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        downgraded = database.execute("SELECT categories FROM log_destinations ORDER BY name")
+        assert [r[0] for r in downgraded] == ["audit,system", ""]
+        columns = {r[1] for r in database.execute("PRAGMA table_info(audit_events)")}
+    assert "actor_role" not in columns

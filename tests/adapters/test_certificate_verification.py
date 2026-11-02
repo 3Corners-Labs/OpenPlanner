@@ -2,8 +2,8 @@
 
 The SMTP adapter hands a verifying context to ``starttls`` and ``SMTP_SSL``, the log shipper's
 context verifies the chain and the host name, and no code in ``app/`` switches verification off
-except the certificate probe's second, read-only handshake (ADR 0064). Fakes come from the SMTP
-tests.
+except the certificate probe's second, read-only handshake (ADR 0064) and the web healthcheck's
+loopback request (ADR 0091). Fakes come from the SMTP tests.
 """
 
 import ast
@@ -19,8 +19,9 @@ from app.adapters.smtp import SmtpConfig, SmtpMailSender
 from tests.adapters.test_smtp import MESSAGE, FakeSMTP, FakeSMTPSSL, fake_smtp  # noqa: F401
 
 APP = Path(__file__).resolve().parents[2] / "app"
-UNVERIFIED_ON_PURPOSE = {"adapters/tls_probe.py"}
-"""The probe reads the certificate of a server the host does not trust, after a verified try."""
+UNVERIFIED_ON_PURPOSE = {"adapters/tls_probe.py", "healthcheck.py"}
+"""The probe reads the certificate of a server the host does not trust, after a verified try; the
+healthcheck asks the container's own web on the loopback whether it is alive, sending nothing."""
 
 contexts: list[ssl.SSLContext] = []
 

@@ -11,7 +11,14 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    Field,
+    SecretStr,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -22,7 +29,9 @@ from pydantic_settings import (
 from app.domain.event_schema import Envelope
 from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
+from app.domain.staff_directory import ADMIN_URL_PATTERN
 from app.domain.system_log import EventRetention
+from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -56,6 +65,9 @@ FILE_SECRETS: tuple[str, ...] = tuple(
     if spec.secret and spec.class_ in (SettingClass.BOOTSTRAP, SettingClass.DEPLOYMENT)
 )
 """Secrets that ``X_FILE`` may supply: the class A and B secrets of the registry (§9)."""
+
+MIN_PREVIOUS_KEY_BYTES = 32
+"""The least a previous key may hold (ADR 0094), as for the current key."""
 
 _PRIVATE_MODE = 0o077
 """Permission bits for group and others; a secret file with any of them set is reported."""
@@ -207,6 +219,9 @@ class Settings(BaseSettings):
     # days; a larger one is refused, never cut short.
     audit_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
     audit_export_max_days: int = Field(default=366, ge=1, le=3660)
+    # ADR 0092 (class C, platform): the largest unpacked size (WOFF2 totalSfntSize) of an
+    # uploaded font; a family with many glyphs may need more. A fixed rule: at most 64 tables.
+    max_font_unpacked_bytes: int = Field(default=2_000_000, ge=256_000, le=8_000_000)
     # ADR 0089 (class C, platform): the largest configuration package the portal and the API
     # accept for import, in MB; fonts and closure images make up most of a package.
     configuration_package_max_mb: int = Field(default=64, ge=1, le=512)
@@ -215,6 +230,9 @@ class Settings(BaseSettings):
     # 2026-10-29), security 1 year, debug events 7 days; system events above. Diagnostic mode
     # ends by itself after DIAGNOSTIC_MODE_HOURS.
     audit_retention_days: int = Field(default=730, ge=365, le=3650)
+    # ADR 0102 point 12 (class C, platform): days after pii_purged_at until a booking row is
+    # merged into a daily count per group and deleted.
+    booking_row_retention_days: int = Field(default=730, ge=365, le=3650)
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
@@ -247,6 +265,11 @@ class Settings(BaseSettings):
     # settings registry).
     planner_rebook_days: int = Field(default=14, ge=1, le=30)
     planner_rebook_reminder_days: int = Field(default=3, ge=1, le=29)
+    # ADR 0102: the most personal data of a booking on hold is kept after the end of its original
+    # slot, also while the closure has no end, and how many days before it the administrators
+    # are told. Class D organisation (ADR 0042, settings registry); the maximum has no off value.
+    closure_max_retention_days: int = Field(default=90, ge=30, le=180)
+    closure_max_notice_days: int = Field(default=14, ge=3, le=28)
     # ADR 0055: custom fields per group's booking form at most (class C platform), and the
     # country of phone numbers typed without a country code (class D organisation).
     booking_form_max_custom_fields: int = Field(default=5, ge=0, le=15)
@@ -270,6 +293,9 @@ class Settings(BaseSettings):
     # ADR 0011. Required in production; in development a shared key is generated in the data
     # volume (see app.keys).
     management_token_key: SecretStr | None = None
+    # ADR 0094: the key before a rotation. Links of bookings made under it keep working while it
+    # is set; empty outside a rotation. Class A: env or MANAGEMENT_TOKEN_KEY_PREVIOUS_FILE only.
+    management_token_key_previous: SecretStr | None = None
     dev_token_key_path: Path = Path("data/dev-token.key")
 
     # Outgoing mail: the fallback for organisations without their own SMTP server in the admin
@@ -286,6 +312,9 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("smtp_password", "smtp_user_password")
     )
+    # Class B (ADR 0091): the host's recorded exception for a relay without TLS. In production
+    # mail without STARTTLS or TLS is refused unless this is true; never a portal setting.
+    smtp_plaintext_relay_allowed: bool = False
     mail_from: str = "OpenPlanner <noreply@openplanner.invalid>"
 
     # Admin portal (ADR 0013). Without OIDC_DISCOVERY_URL the admin portal is disabled.
@@ -299,9 +328,15 @@ class Settings(BaseSettings):
     # most this many sessions at once (the one idle longest lapses). Class C, platform.
     admin_idle_minutes: int = Field(default=60, ge=15, le=120)
     admin_max_sessions_per_person: int = Field(default=5, ge=1, le=20)
+    # ADR 0093: how long a participant's browser keeps the right to use a booking after it last
+    # did. At least 20 hours, so no form has a time limit in practice (WCAG 2.2.1). Class C.
+    participant_link_session_hours: int = Field(default=24, ge=20, le=168)
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
+    # ADR 0046 point 9: a person's name, roles and memberships are erased after this many days
+    # without a login (class C, platform). The subject stays, so the audit log still resolves.
+    staff_retention_days: int = Field(default=365, ge=90, le=1825)
     # Without a login for this many days, a person is marked dormant in the staff list
     # (class D, organisation; one value for every organisation until the portal stores it).
     staff_dormant_after_days: int = Field(default=90, ge=14, le=365)
@@ -314,6 +349,26 @@ class Settings(BaseSettings):
     oidc_client_id: str = "openplanner-admin"
     oidc_client_secret: SecretStr | None = None
     oidc_scopes: str = "openid profile email"
+    # ADR 0095: the bundled Keycloak's admin API, for managing staff in the portal. Class A:
+    # needed before the portal can ask the provider anything. Empty URL: no directory.
+    keycloak_admin_url: str | None = None
+    keycloak_directory_client_id: str = "openplanner-directory"
+    keycloak_directory_client_secret: SecretStr | None = None
+    # ADR 0095: validity of the invitation and reset link, and the switch of the actions.
+    staff_invite_expiry_days: int = Field(default=7, ge=1, le=30)
+    staff_directory_enabled: bool = True
+    # ADR 0106: staff of the bundled Keycloak log in as <name>@<organisation>.<this suffix>.
+    bundled_idp_login_suffix: str = DEFAULT_SUFFIX
+    # ADR 0100: the admin must show a second factor (amr/acr in the ID token). Class B. Off by
+    # default: the bundled Keycloak sets it on; another provider turns it on once the IdP team
+    # has named its amr/acr values. The IdP owns the MFA itself.
+    admin_mfa_required: bool = False
+    # ``acr_values`` asked for at login (space separated).
+    oidc_acr_values: str = "mfa"
+    # Values that count as proof (space separated). amr: RFC 8176. acr: empty means the values
+    # asked for above.
+    oidc_mfa_amr_values: str = "hwk mfa otp swk"
+    oidc_mfa_acr_values: str = ""
     oidc_role_claim: str = "roles"
     oidc_organisation_claim: str = "organisations"
     oidc_group_claim: str = "groups"
@@ -336,6 +391,9 @@ class Settings(BaseSettings):
 
     # Integration secrets at rest (ADR 0008): AES-256-GCM under a key derived from this value.
     settings_encryption_key: SecretStr | None = None
+    # ADR 0094: the key before a rotation; sealed values under it stay readable until
+    # ``python -m app.cli rekey`` has sealed them again. Empty outside a rotation.
+    settings_encryption_key_previous: SecretStr | None = None
     dev_settings_key_path: Path = Path("data/dev-settings.key")
 
     # Webex Service App (ADR 0017/0018): one app for meetings and WxCC work items. The refresh
@@ -351,6 +409,10 @@ class Settings(BaseSettings):
 
     # Rate limits on public endpoints (CLAUDE.md security baseline).
     rate_limit_enabled: bool = True
+
+    # ADR 0085 point 7 (class B, kill switch): off stops every log destination without deleting
+    # its configuration, for an incident in which the platform's own traffic is the problem.
+    log_shipping_enabled: bool = True
 
     # Simulator for platform events on admin booking pages; off unless switched on, refused in
     # production (docs/runbook.md, section 10).
@@ -376,6 +438,10 @@ class Settings(BaseSettings):
     # commit the image was built from; empty for a local build.
     app_version: str = ""
     app_commit: str = Field(default="", pattern=r"^([0-9a-f]{7,40})?$")
+    # Class B (WP-C2): the registry digest the host pinned this image at (``sha256:`` and 64
+    # hex digits). An image cannot know its own digest, so the host sets it when it pins one;
+    # ``evidence`` reports it when known and says "unknown" otherwise.
+    app_image_digest: str = Field(default="", pattern=r"^(sha256:[0-9a-f]{64})?$")
     update_repository: str | None = None
     update_check_token: SecretStr | None = None
     # ADR 0059, 0065: UPDATE_CHANNEL (class C) says whether release candidates are offered too;
@@ -408,6 +474,15 @@ class Settings(BaseSettings):
     tls_check_interval_hours: int = Field(default=6, ge=1, le=168)
     tls_expiry_warning_days: int = Field(default=20, ge=1, le=60)
     tls_alert_repeat_hours: int = Field(default=24, ge=1, le=168)
+    # Class B (ADR 0091 point 3): uvicorn serves HTTPS to an own reverse proxy on another machine
+    # when both files are set (docker-compose.yml passes them on); both or neither. The
+    # forwarded addresses are read by uvicorn itself and only inspected here, for System status.
+    web_tls_cert_file: Path | None = None
+    web_tls_key_file: Path | None = None
+    forwarded_allow_ips: str | None = None
+    # Class B (ADR 0086): the worker's round trip to the public address; off only for a network
+    # that cannot reach its own public name from inside (NAT without hairpin).
+    public_address_check_enabled: bool = True
     # ADR 0072: the certificate source of the bundled proxy, managed in the portal.
     tls_certificate_source: Literal["acme", "own"] = "acme"
     tls_proxy_bundled: bool = False
@@ -436,6 +511,8 @@ class Settings(BaseSettings):
             return "STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT"
         if self.planner_rebook_reminder_days >= self.planner_rebook_days:
             return "PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS"
+        if (self.web_tls_cert_file is None) != (self.web_tls_key_file is None):
+            return "WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE must be set together"
         if (
             self.smtp_host
             and self.smtp_username
@@ -561,6 +638,16 @@ class Settings(BaseSettings):
         return Envelope(self.app_version, self.installation_name)
 
     @property
+    def web_tls_enabled(self) -> bool:
+        """Whether web serves HTTPS to the proxy (``WEB_TLS_CERT_FILE`` and ``..._KEY_FILE``)."""
+        return self.web_tls_cert_file is not None and self.web_tls_key_file is not None
+
+    @property
+    def smtp_fallback_plaintext(self) -> bool:
+        """Whether the mail fallback (``SMTP_HOST``) would send without TLS (ADR 0091)."""
+        return bool(self.smtp_host) and not (self.smtp_starttls or self.smtp_implicit_tls)
+
+    @property
     def smtp_implicit_tls(self) -> bool:
         """Whether the mail fallback opens a TLS connection: ``SMTP_TLS`` or port 465."""
         return self.smtp_tls or self.smtp_port == SMTPS_PORT
@@ -588,6 +675,40 @@ class Settings(BaseSettings):
             not _REPOSITORY.fullmatch(value) or {".", ".."} & set(value.split("/"))
         ):
             raise ValueError("UPDATE_REPOSITORY must be owner/name")
+        return value
+
+    @field_validator("keycloak_admin_url")
+    @classmethod
+    def _realm_admin_url(cls, value: str | None) -> str | None:
+        """Accept only the admin API of one realm: the portal derives the token URL from it."""
+        if value and not ADMIN_URL_PATTERN.match(value.rstrip("/")):
+            raise ValueError("KEYCLOAK_ADMIN_URL must end in /admin/realms/<realm>")
+        return value or None
+
+    @field_validator("bundled_idp_login_suffix")
+    @classmethod
+    def _suffix_is_a_domain(cls, value: str) -> str:
+        """Accept only a lower-case domain of two to ten labels (ADR 0106 point 5)."""
+        if not valid_suffix(value):
+            raise ValueError("BUNDLED_IDP_LOGIN_SUFFIX must be a lower-case domain name")
+        return value
+
+    @field_validator(
+        "management_token_key_previous", "settings_encryption_key_previous", mode="before"
+    )
+    @classmethod
+    def _empty_previous_key_is_unset(cls, value: object) -> object:
+        """Treat an empty previous key as unset: compose files pass ``KEY=`` when unused."""
+        return None if value == "" else value
+
+    @field_validator("management_token_key_previous", "settings_encryption_key_previous")
+    @classmethod
+    def _previous_key_is_long_enough(
+        cls, value: SecretStr | None, info: ValidationInfo
+    ) -> SecretStr | None:
+        """Refuse a previous key shorter than 32 bytes (ADR 0094); the message names no value."""
+        if value is not None and len(value.get_secret_value().encode()) < MIN_PREVIOUS_KEY_BYTES:
+            raise ValueError(f"{str(info.field_name).upper()} must be at least 32 bytes")
         return value
 
     @field_validator("phone_default_region")

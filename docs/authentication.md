@@ -37,33 +37,56 @@ provider the issuer stored at registration. A discovery document or token that n
 issuer refuses the login (`oidc.issuer_mismatch`, no values logged). The provider's
 document therefore cannot move the issuer after the fact.
 
-**Session.** Today (ADR 0013 §5) the session is the signed cookie `op_admin`: `HttpOnly`,
-`SameSite=Lax`, `Path=/admin`, `Secure` when `ENVIRONMENT=prod`, absolute lifetime
-`admin_session_hours` (8 h) enforced on the server from the login time in the cookie.
-Changes need a login younger than `admin_reauth_minutes` (60 min, ADR 0015). ADR 0098
-(proposed, not built) replaces this with a server-side register: the cookie holds
-only a random reference, every request looks the row up, logout and a new login end the old
-session, there is an idle limit and a limit on parallel sessions, and a person or an
-administrator can end sessions. Until it is built, a cookie copied before logout stays valid
-until its 8 h end; the mitigation is `HttpOnly`/`Secure` and rotating `SESSION_SECRET`, which
-ends everyone's session. This document describes the target state of ADR 0098 where it says
-*after ADR 0098*.
+**Session (ADR 0098, built).** The session is a row on the server (`admin_sessions`, the reference
+stored only as its SHA-256). The signed cookie `__Host-op_admin` (`Path=/`, `Secure`, no `Domain`) when
+`PUBLIC_BASE_URL` is https, `op_admin` (`Path=/admin`) over http, `HttpOnly`, `SameSite=Lax`, holds
+only a random reference next to the login in progress and preferences; claims, roles and entitlements
+live on the server. Every request looks the row up and accepts it while it is not ended, younger than
+`admin_session_hours` (8 h) and active within `admin_idle_minutes` (60 min). Every login, a re-login
+included, creates a new session and ends the one the browser brought; at most
+`admin_max_sessions_per_person` (5) run at once. Changes need a login younger than
+`admin_reauth_minutes` (60 min, ADR 0015).
 
-**How strong.** OpenPlanner does not see or enforce the authentication factor. The strength
-is that of the IdP's own policy; for PingFederate the required `acr` is an open decision and
-not yet checked by the platform (ASVS V6.8.4 is tracked outside this document). What
-OpenPlanner adds: a fresh login for changes (`admin_reauth_minutes`), `fresh=1` logins that
-force a new IdP login (`prompt=login`, `max_age=0`) for a mapping dry run, and rights derived only from claims through the matrix.
+**How strong.** OpenPlanner does not run the authentication factor; the strength is that of the
+IdP's own policy. It can require proof of a second factor: with the second-factor requirement on
+(ADR 0100, `ADMIN_MFA_REQUIRED`, or the policy of a registered provider) a login whose ID token shows
+no `amr` or `acr` from the configured lists is refused (`mfa_required`). For PingFederate the value to
+require is for the IdP team to name; the accepted values stay configurable. What OpenPlanner adds: a
+fresh login for changes (`admin_reauth_minutes`), `fresh=1` logins that force a new IdP login
+(`prompt=login`, `max_age=0`) for a mapping dry run, and rights derived only from claims through the matrix.
 
 **How it is withdrawn.**
 
-| Case | Today | After ADR 0098 |
-|---|---|---|
-| The admin logs out | `POST /admin/logout` clears the browser's cookie and ends the IdP session (RP-initiated logout). A copy of the cookie stays valid until its end. | The row is ended first; a copy is dead at once. |
-| A person leaves or is switched off at the IdP | Their session runs until its 8 h end; the next login fails. A superuser can rotate `SESSION_SECRET` to end all sessions. | A person's sessions are ended from the staff record; `sessions end-all` on the host ends all of them. Back-channel logout stays a later option. |
-| Role or membership changes at the IdP | Takes effect at the next login; the difference is audited (`staff.membership_changed`). | Same. |
-| Idle | No limit before the 8 h end. | `admin_idle_minutes` (class C, default 60). |
-| IdP outage | Admins cannot log in. There is no break-glass login; the host CLI offers closure and `oidc-check` only. | Same. |
+| Case | What happens |
+|---|---|
+| The admin logs out | `POST /admin/logout` ends the session on the server first, then clears the cookie and ends the IdP session (RP-initiated logout). A copy of the cookie is dead at once. The page the logout ends at also sends `Clear-Site-Data: "cookies", "storage"` (see below). |
+| A person leaves or is switched off at the IdP | Their sessions run until idle (60 min) or their 8 h end unless an administrator ends them (*End all sessions* under `staff.manage`, or suspending the person, ADR 0046 step 2); the next login fails. The person can end their own other sessions (*My sessions*). `sessions end-all` on the host ends everyone's. |
+| Role or membership changes at the IdP | Takes effect at the next login; the difference is audited (`staff.membership_changed`). |
+| Idle | `admin_idle_minutes` (class C, default 60, 15-120). |
+| IdP outage | Admins cannot log in. There is no break-glass login; the host CLI offers closure and `oidc-check` only. |
+
+**Clear-Site-Data at logout (ASVS V14.3.1).** `GET /admin/logged-out`, the page every logout ends at (after
+the IdP's own logout, or at once when the IdP offers no logout address), sends
+`Clear-Site-Data: "cookies", "storage"` (`LOGOUT_CLEAR_SITE_DATA` in `app/admin/session.py`, tests in
+`tests/admin/test_admin_sessions.py`). The server side has ended the session before that, so the header
+is a second layer: the browser also drops cookies and local data of the site. Choices:
+
+- **Where.** Not on the `POST /admin/logout` response: that one is followed by the IdP's logout, and
+  `"cookies"` also clears the cookies of an IdP on the same host or registrable domain (the end-to-end
+  suite stalled on exactly that with Keycloak on the same host), so the IdP could not finish and return.
+  The final page comes after all of that. The header is sent only when the signed session cookie carries a
+  mark set by this browser's own logout, once; a link from another site to `/admin/logged-out` clears nothing.
+  If the person abandons the IdP step, the header does not come; the server session has ended anyway.
+
+- `"cache"` is left out. Every HTML response is `Cache-Control: no-store`, so the session leaves nothing in
+  the HTTP cache; `"cache"` would also empty the caches of participants' pages and static files. Firefox
+  does not support it either.
+- Browsers apply the header only over HTTPS (a secure context) and `"cookies"` covers the site's origin
+  and its subdomains. Because of the `__Host-` prefix our cookies have no `Domain`, so nothing is shared
+  with other sites. A side effect: an administrator who is also a participant in the same browser loses
+  the participant cookie (ADR 0093) too and opens the booking from the email link again. The participant
+  side sends no header of its own: ADR 0093 does not ask for one.
+- It is a fixed protocol value, not a setting.
 
 **What lies with the IdP.** Password policy and storage, MFA and its enrolment, account
 lockout and recovery, the lifetime of the IdP's own SSO session, the mapping of people to
@@ -101,17 +124,23 @@ HMAC-SHA256 of a 32-byte per-booking salt under `MANAGEMENT_TOKEN_KEY`; the data
 the salt and `sha256(token)`, never the token, and comparison is constant time. The link is a
 bearer credential: whoever holds it can confirm, cancel, move, test the call and join that
 one booking. Confirming by email (ADR 0056) is a second step on the link, a button that
-POSTs, not a link that acts. There is no account, password or cookie in today's flow.
+POSTs, not a link that acts. There is no account or password. Since ADR 0093 the link is
+exchanged for a cookie (below).
 
-**ADR 0093 (accepted, not built).** `GET /b/{token}` is exchanged once for the cookie
+**ADR 0093 (built).** `GET /b/{token}` is exchanged once for the cookie
 `__Host-op_link` (opaque random value, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, no
-`Domain`; the database keeps its SHA-256) and redirects with `303` to `/b/m/{public_ref}`,
-so the token stays out of browser history and the address bar. The `public_ref` names a
+`Domain`; over plain http in development `op_link` with `Path=/b`; the database keeps the
+SHA-256 of the value) and redirects with `303` to `/b/m/{public_ref}`,
+so the token stays out of browser history and the address bar. The session lives
+`participant_link_session_hours` (class C, 20-168, default 24) after its last use and holds at
+most 20 bookings; the rule for the cookie's name and attributes is shared with, and separate
+from, the admin cookie (`app/web/cookies.py`). The `public_ref` names a
 booking and authorises nothing; the cookie's session must hold the booking. The cookie proves
 possession of the link, not an identity. Old `/b/{token}/…` links keep working through the
-exchange. Until the build lands, the token is in every participant URL; what limits that is
-in ADR 0093 (no access log, route templates in traces, `Referrer-Policy: same-origin`,
-`no-store` pages).
+exchange. Every participant page (booking, confirm, cancel, move, trial, join and the waiting room of a
+direct call, including its poll) is on `/b/m/{ref}`; a direct call sets the cookie itself when
+it starts. Only the first request from an email carries the token. No access log, route
+templates in traces, `Referrer-Policy: same-origin` and `no-store` pages stay as defence in depth.
 
 **How strong.** 256 bits of entropy behind an HMAC; guessing is not feasible and is also
 rate limited (unknown links draw on one bucket per address, `unknown_links`) and recorded as

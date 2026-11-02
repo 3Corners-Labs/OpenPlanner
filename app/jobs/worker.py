@@ -28,6 +28,7 @@ from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.http_trace import traced_transport
+from app.adapters.instance_probe import HttpxInstanceProbe
 from app.adapters.integrations import (
     Integrations,
     build_integrations,
@@ -41,18 +42,23 @@ from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.adapters.tls_probe import SslCertificateProbe
 from app.config import Settings, environment, loose_secret_files
+from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
+from app.domain.admin_session_service import AdminSessionService
+from app.domain.booking_rollup_service import BookingRowRollup
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.group_erase import GroupEraser
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService, IntegrationWatch
 from app.domain.maintenance_service import MaintenanceWatch
+from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.request_log import RequestEvents
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
+from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.system_log import SystemLog
 from app.domain.tls_check import TlsWatch
 from app.domain.update_service import UpdateService
@@ -62,7 +68,7 @@ from app.i18n.dates import configure_clock
 from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
-from app.keys import management_token_key
+from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 
 log = structlog.get_logger()
@@ -112,6 +118,7 @@ async def run_worker(
         clock,
         "worker",
         lambda: ship_settings(live.settings),
+        enabled=lambda: live.settings.log_shipping_enabled,
         window=lambda: timedelta(minutes=live.settings.security_event_window_minutes),
     )
     shipping_stop = asyncio.Event()
@@ -168,6 +175,7 @@ async def run_worker(
                     Translator(load_catalogues(), CachedTextOverrides(uow)),
                     management_token_key(settings),
                     settings.public_base_url,
+                    management_token_key_previous(settings),
                 ),
                 video=wired.video,
                 dispatcher=wired.dispatcher,
@@ -192,6 +200,22 @@ async def run_worker(
         lambda: timedelta(hours=live.settings.diagnostic_mode_hours),
     )
     eraser = GroupEraser(uow, clock, lambda: timedelta(days=live.settings.group_erase_after_days))
+    sessions = AdminSessionService(uow, clock)
+    links = ParticipantLinkService(uow, clock)
+
+    async def clean_sessions() -> int:
+        """Delete the ended admin sessions and the lapsed participant link sessions."""
+        admin = await sessions.clean(timedelta(hours=live.settings.admin_session_hours))
+        return admin + await links.clean()
+
+    staff_lifecycle = StaffLifecycleService(uow, clock)
+
+    async def erase_staff() -> int:
+        """Erase the staff records without a login for ``staff_retention_days`` (ADR 0046)."""
+        return await staff_lifecycle.erase_inactive(
+            timedelta(days=live.settings.staff_retention_days)
+        )
+
     housekeeping = Housekeeping.for_database(
         engine,
         uow,
@@ -200,7 +224,12 @@ async def run_worker(
         settings.database_url,
         diagnostics.brake,
         eraser.run,
-        RetentionSweep(uow, clock).run,
+        RetentionSweep(uow, clock, live.closure_retention).run,
+        clean_sessions,
+        erase_staff,
+        BookingRowRollup(
+            uow, clock, lambda: timedelta(days=live.settings.booking_row_retention_days)
+        ).run,
     )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
@@ -219,6 +248,18 @@ async def run_worker(
         interval=lambda: timedelta(hours=live.settings.tls_check_interval_hours),
         warn_within=lambda: timedelta(days=live.settings.tls_expiry_warning_days),
         repeat=lambda: timedelta(hours=live.settings.tls_alert_repeat_hours),
+    )
+    # ADR 0086: the round trip to the public address, on the certificate's cycle.
+    address = AddressWatch(
+        uow,
+        clock,
+        HttpxInstanceProbe(transport=transport),
+        SystemLog(uow, clock),
+        public_base_url=settings.public_base_url,
+        webhook_base_url=settings.webhook_base_url,
+        interval=lambda: timedelta(hours=live.settings.tls_check_interval_hours),
+        repeat=lambda: timedelta(hours=live.settings.tls_alert_repeat_hours),
+        enabled=settings.public_address_check_enabled,
     )
     log.info(
         "worker.started",
@@ -250,6 +291,7 @@ async def run_worker(
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)
                     await _watch_certificate(tls)
+                    await _watch_address(address)
                     await _check_integrations(watch)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
@@ -317,6 +359,18 @@ async def _watch_certificate(watch: TlsWatch) -> None:
         return
     if check is not None and not check.ok:
         log.warning("tls.certificate", finding=check.finding.value, host=check.host)
+
+
+async def _watch_address(watch: AddressWatch) -> None:
+    """Probe the public address's round trip when due; a failure never stops the loop."""
+    try:
+        checks = await watch.check_if_due()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("address.watch_failed", error=type(exc).__name__)
+        return
+    for check in checks:
+        if not check.ok:
+            log.warning("address.round_trip", finding=check.finding.value, kind=check.kind.value)
 
 
 async def _check_integrations(watch: IntegrationWatch) -> None:

@@ -34,6 +34,8 @@ class ClosureView:
         heading: The admin's heading in the reader's language (ADR 0037), if any.
         contacts: The closure's copy of the contact options, in the reader's language.
         image: The closure's image with its text alternative in the reader's language.
+        delete_by: The sentence naming the date the details of bookings on hold are deleted by
+            (ADR 0102); only the closure page sets it.
     """
 
     title: str
@@ -43,6 +45,7 @@ class ClosureView:
     heading: str | None = None
     contacts: ContactBlockView | None = None
     image: ImageView | None = None
+    delete_by: str | None = None
 
 
 def moment_label(moment: datetime, group: Group, locale: str) -> str:
@@ -57,9 +60,17 @@ def image_url(group: Group, digest: str) -> str:
 
 
 def closure_view(
-    closure: Closure, group: Group, locale: RequestLocale, now: datetime
+    closure: Closure,
+    group: Group,
+    locale: RequestLocale,
+    now: datetime,
+    delete_by: datetime | None = None,
 ) -> ClosureView:
-    """Return the banner of ``closure`` for ``locale`` at ``now``."""
+    """Return the banner of ``closure`` for ``locale`` at ``now``.
+
+    With ``delete_by`` (the closure page) the view names the day, in the group's time zone, by
+    which the details of the bookings on hold are deleted at the latest.
+    """
     _ = locale.gettext
     start = moment_label(closure.starts_at, group, locale.code)
     if closure.ends_at is None:
@@ -82,4 +93,24 @@ def closure_view(
         closure.heading(locale.code),
         contact_view(closure.contacts, locale),
         ImageView(image_url(group, image.digest), image.text.alt(locale.code)) if image else None,
+        _("closure.page.delete_by", date=delete_by_day(delete_by, group, locale))
+        if delete_by
+        else None,
+    )
+
+
+def delete_by_day(delete_by: datetime, group: Group, locale: RequestLocale) -> str:
+    """Return the day, in the group's time zone, by which details on hold are deleted."""
+    return format_day(local_day(delete_by, group.tz), locale.code)
+
+
+def delete_by_label(delete_by: datetime | None, group: Group, locale: RequestLocale) -> str | None:
+    """Return the sentence telling a participant when their own details are deleted at the latest.
+
+    ``None`` when the booking is not on hold, so the page promises nothing it does not know.
+    """
+    if delete_by is None:
+        return None
+    return locale.gettext(
+        "manage.suspended.delete_by", date=delete_by_day(delete_by, group, locale)
     )

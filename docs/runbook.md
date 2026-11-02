@@ -3,6 +3,11 @@
 Status: skeleton (work package 1). Hosting and backup ownership are open (HANDOVER O7);
 sections marked *TBD* are completed in work package 9.
 
+**Evidence for auditors and the client.** The checklists for the identity provider, the host,
+Cisco and the data controller, with the commands that show each requirement, are in
+`docs/assurance/` (start with its `README.md`). The host checklist there complements the
+sections *Production settings*, *Backup and restore* and *Verifying the image signature* below.
+
 ## Deploy
 
 A host is installed, and repaired, with `scripts/install.sh` from the checkout in
@@ -129,6 +134,108 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   `@machine path /api/* /webhooks/*`, `handle @machine { respond "HTTPS required" 403 }`, then
   `handle { redir https://{host}{uri} 308 }`. Also let `TRACE` reach the app (it answers 405) and
   do not serve `/static/` from the proxy itself. `scripts/check-proxy.sh` shows what to expect.
+
+### Address and proxy (ADR 0086)
+
+*Advanced settings* → *System status* → **Address and proxy** shows what the installation
+believes about its own address: the shape (bundled proxy, own reverse proxy, no proxy), the
+public address and the webhook address, the proxy address that `FORWARDED_ALLOW_IPS` trusts, the
+OIDC redirect URI to register at the identity provider and the widget loader URL for the
+embedding site. All of it is class B (set on the server, a change needs a restart): a wrong
+`PUBLIC_BASE_URL` would lock every administrator out at the next login, so it is not editable
+in the portal.
+
+The worker asks `GET {PUBLIC_BASE_URL}/api/v1/instance?probe={nonce}` through the public
+address, exactly as a participant's browser would, every `tls_check_interval_hours`, and the
+same for `WEBHOOK_BASE_URL` when that differs. `docker compose exec web python -m app.cli
+address-check` does it at once and exits 1 on a finding; run it as the last step of an
+installation and as part of the go-live checklist (`--ca-file <PEM>` trusts only that CA instead
+of the host's bundle, for a proxy whose certificate comes from an internal CA). What each finding means and what to change
+on the host:
+
+| Finding | Meaning | What to do |
+|---|---|---|
+| `ok` | The name reaches this installation over https and the proxy is trusted | nothing |
+| `unreachable` | No answer; the reason (timeout, connection refused or name not found, TLS refused, an HTTP status) is on the page, as the network or the server gave it | DNS, firewall, proxy or certificate; for a network without hairpin NAT set `PUBLIC_ADDRESS_CHECK_ENABLED=false` (the page then says *not checked*) |
+| `other_instance` | The name reaches another installation: stale DNS, a moved host, a copied `.env` | Point the name at this host, or correct `PUBLIC_BASE_URL`; links in emails lead to the wrong place until then |
+| `not_https` | The app saw `http`: the proxy does not pass `X-Forwarded-Proto`, or `PUBLIC_BASE_URL` is not https. Session cookies will not travel | Let the proxy set `X-Forwarded-Proto`; use an `https` address |
+| `proxy_not_trusted` | The headers are there and the app ignored them: `FORWARDED_ALLOW_IPS` does not name the proxy | See below |
+| `no_proxy_headers` | No `X-Forwarded-*` header arrives: the proxy sets none, or `web` is published directly | Configure the proxy; do not publish `web` on a public interface |
+| `redirected` | The address answers with a redirect to another name (`www` for the apex) | Set `PUBLIC_BASE_URL` to the final address |
+
+A finding other than `ok` is a system event `public_address` (superuser only) the first time
+and every `tls_alert_repeat_hours` while it lasts; the return to `ok` is recorded once. The
+event carries the finding, the address kind and the network's reason, never an address of a
+visitor.
+
+**Proxy not trusted (the tunnel trial of 1 November 2026).** Without the right
+`FORWARDED_ALLOW_IPS` the app ignores the proxy's `X-Forwarded-Proto: https`, so its own
+redirects (`/admin` to `/admin/`) send the browser to `http://`, and every visitor shares the
+proxy's address, so one bot exhausts the booking limit for everyone. The right value is the
+address the `web` container sees the proxy connect from, which is the gateway of the compose
+network for a proxy on the same host, not the proxy's own address (see *Production settings*
+above and *TLS from a proxy on another machine*). Two places show this without waiting for the
+worker. The *Proxy* row of the overview and the block itself count the requests that came with
+`X-Forwarded-For` or `X-Forwarded-Proto` while the app ignored them, per web process since its
+start, with the class of the peer; only for a private or loopback peer (the proxy) the address
+is shown, never that of a public peer, which is a visitor. And the first such request in every
+repeat period leaves the system event. The page also warns while `FORWARDED_ALLOW_IPS` names a
+proxy other than the bundled one and web serves no TLS (the unencrypted hop of ADR 0091). Fix
+`FORWARDED_ALLOW_IPS` in `.env`, restart `web`, run `address-check`: the finding returns to
+`ok` and the count stops growing (it starts at zero after the restart).
+
+### TLS from a proxy on another machine to web (ADR 0091 point 3)
+
+With the bundled proxy the hop to `web` is plain HTTP on the `edge` network of one host, a
+recorded exception (`docs/threat-model.md`): whoever can read that bridge already has the host.
+A reverse proxy of your own on **another machine** crosses a real network, and then the visitor's
+names, booking data and management links travel in clear text unless `web` serves HTTPS.
+
+1. **Get a certificate and key for `web`.** Any CA your proxy trusts: an internal CA (the usual
+   choice), or a self-signed pair that the proxy is told to trust. Its name must be the name the
+   proxy connects to (for example `openplanner-web.internal`). Put the PEM files in `./web-tls/`
+   next to `docker-compose.yml`; `web` mounts it read-only at `/web-tls`. The key must be
+   readable by uid 10001 and nobody else (`chown 10001 web-tls/key.pem; chmod 600
+   web-tls/key.pem`). Keep it out of backups and out of the repository (`web-tls/` is ignored).
+2. **Set both variables in `.env`** (class B, both or neither; web refuses to start with one):
+
+   ```
+   WEB_TLS_CERT_FILE=/web-tls/cert.pem
+   WEB_TLS_KEY_FILE=/web-tls/key.pem
+   FORWARDED_ALLOW_IPS=<the proxy's address as the web container sees it>
+   ```
+
+   `FORWARDED_ALLOW_IPS` must be the address the `web` container sees the proxy connect from,
+   not the proxy's own address on its machine: a proxy behind NAT, a tunnel or the Docker
+   gateway shows up under another address, and with the wrong one every visitor shares one IP
+   and one bot exhausts the booking limit for everyone (proven in the tunnel trial of 1
+   November 2026). Never `*`. The check from the section above applies: `curl -sI
+   https://<host name>/admin` must answer with a `Location: https://…`; with a wrong address it
+   answers `http://`.
+3. **Make the port reachable for the proxy only.** `docker-compose.yml` publishes web on
+   `127.0.0.1:8000`. For a proxy on another machine publish it on the internal interface in a
+   `docker-compose.override.yml` (`ports: !override ["10.0.0.7:8000:8000"]`) and close it to
+   everything but the proxy with the host firewall. Never `0.0.0.0` on a public interface.
+4. **Restart and check.** `docker compose up -d web`, then from the proxy machine
+   `curl --cacert ca.pem https://<web name>:8000/healthz` must answer `ok`. The container's own
+   healthcheck switches to HTTPS by itself (`python -m app.healthcheck`; it checks that web
+   answers on the loopback, not the certificate). If you use the host updater, set
+   `READY_URL=https://127.0.0.1:8000/readyz` in `updater.env`; it then skips the certificate
+   name check on the loopback.
+5. **Point the proxy at `https://`.** Caddy: `reverse_proxy https://<web name>:8000 { transport
+   http { tls_trust_pool file /etc/caddy/ca.pem } }`. nginx: `proxy_pass https://<web name>:8000;
+   proxy_ssl_verify on; proxy_ssl_trusted_certificate /etc/nginx/ca.pem;`. Verify the
+   certificate; an unverified hop protects against nobody.
+6. **Renewal.** Uvicorn reads the files at start. After replacing the pair run
+   `docker compose restart web`; calendar the expiry yourself, nothing in OpenPlanner watches
+   this certificate. A web that is down because the certificate expired shows up as a failing
+   public address check and a failing `web` healthcheck.
+
+**System status** (*Address and proxy*, ADR 0086) warns while `FORWARDED_ALLOW_IPS` names an address other
+than the bundled proxy's (`172.31.240.2`) and `WEB_TLS_*` is not set: that points to a proxy on
+another machine whose traffic runs unencrypted. If the proxy really is on the same host and
+reaches web over the loopback or the compose gateway, the hop never leaves the machine; record
+that as your own exception and ignore the warning.
 
 **What is configured, and from where?** Every setting and its class (ADR 0042) is listed in
 `docs/settings.md`. On the host, without sending anyone the `.env`:
@@ -344,6 +451,56 @@ On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab)
    to *own*, press *Check now* and see your own issuer with *niet vertrouwd*; switch back to
    Let's Encrypt and see *ok* again, without touching the host.
 
+### Standards the proxy and the address follow (ADR 0086)
+
+The standards below are the yardstick for the TLS proxy, the certificate processes and the proxy
+headers; the table is the one place that says which version is followed. A change of a standard
+(a new NCSC version, a change on the Forum Standaardisatie list) is a new ADR that amends it.
+"Asserted by" is what fails when the installation drifts; `scripts/check-proxy.sh` (`make
+proxy-check`, CI step *proxy check*) runs against the bundled proxy in every certificate mode
+(ACME, the portal's certificate, an own certificate from files).
+
+| Process | Standard | What OpenPlanner does | Asserted by |
+|---|---|---|---|
+| Obtaining and renewing a certificate | ACME, RFC 8555, `http-01`; CAA, RFC 8659 | Caddy as ACME client, renewal at a third of the lifetime; ask your DNS operator for a CAA record that allows your CA (Let's Encrypt: `0 issue "letsencrypt.org"`) | `check-proxy.sh` pass 1 against Pebble |
+| Certificate contents and chain | X.509, RFC 5280; names in `subjectAltName`, RFC 6125 | An uploaded chain is validated for order, validity, names and key match (ADR 0070); the probe verifies the served chain against the system CA bundle (ADR 0064) | `tests/domain/test_own_certificate.py`, `tls-check` |
+| Private key of an own certificate | NCSC TLS guidelines (key types, sizes); PKIoverheid CPS: the subscriber makes the key | ECDSA P-256 made on the host, never transported, never in the database or a backup (ADR 0070) | `tests/domain/test_tls_source.py` |
+| TLS versions and cipher suites | NCSC-NL *ICT-beveiligingsrichtlijnen voor TLS* v2.1 (*Goed*, *Voldoende* at most), RFC 8446 | TLS 1.3 and 1.2 only, AEAD suites, OCSP stapling: Caddy's defaults, never weakened, no setting | `check-proxy.sh`: TLS 1.0 and 1.1 refused, 1.2 (with a GCM or ChaCha20 suite) and 1.3 accepted |
+| HTTPS and HSTS | Forum Standaardisatie *pas toe of leg uit* (HTTPS, HSTS); RFC 6797; `max-age` of at least one year | Port 80 redirects with 308 and otherwise answers only ACME; the app sends `Strict-Transport-Security: max-age=63072000; includeSubDomains` (two years), never on port 80 | `check-proxy.sh`: the redirect, the header on a proxied response (at least a year, `includeSubDomains`), none on port 80 |
+| Proxy headers | `X-Forwarded-For`, `-Proto`, `-Host` (de facto; RFC 7239 `Forwarded` is **not** read by uvicorn); OWASP: trust them from named proxy addresses only | Caddy sets them and drops what the client sent; uvicorn honours them from `FORWARDED_ALLOW_IPS` only, never `*` | `check-proxy.sh`: `address-check` through the proxy is `ok` (https seen, headers honoured), and `proxy_not_trusted` with a wrong `FORWARDED_ALLOW_IPS`; a forged `X-Forwarded-For`, `-Proto` and `-Host` from the visitor is replaced by the proxy (read from the wire between proxy and web, in every pass) |
+| HTTP security headers | OWASP ASVS 4.0 V14.4 | CSP, HSTS, `X-Frame-Options` on admin, `Referrer-Policy`, `X-Content-Type-Options` come from the app, not the proxy, so an own reverse proxy changes nothing | `tests/api/test_health.py` |
+| Responsible disclosure | RFC 9116 | `/.well-known/security.txt` (ADR 0003) | existing test |
+| External check of the public address | internet.nl *Website test* (Forum Standaardisatie, NCSC) | The go-live check and the yearly review below | a person |
+
+With a reverse proxy of your own (`--no-tls`) the script does not run against it; ask its
+operator for the same: TLS 1.2 and 1.3 only, HSTS (the app already sends it, do not strip it),
+`X-Forwarded-*` set and not passed through from the client, and run `address-check`.
+
+### Go-live check of the public address (ADR 0086)
+
+Before the first real participant and then once a year, and after every change of proxy,
+certificate source or domain:
+
+1. `docker compose exec web python -m app.cli address-check` exits 0: the name reaches this
+   installation over https and the proxy is trusted (*Address and proxy* on System status says
+   the same). Fix a finding with the table in *Address and proxy* above.
+2. `docker compose exec web python -m app.cli tls-check` says *in orde*, with the issuer you
+   expect and the days left.
+3. Run the internet.nl **Website test** (`https://internet.nl/site/<host name>/`) against the
+   public address, and the **Email test** for the sender domain (ADR 0073). Open the report's
+   *IPv6*, *DNSSEC*, *HTTPS* (TLS, HTTP headers incl. HSTS, certificate) and *Application
+   security options* parts. Expected: 100% on *HTTPS* and *Application security options*; IPv6
+   and DNSSEC depend on the host's network and the registrar. A part below 100% is a finding:
+   fix it, or write the reason in the record below. Do not paste the report's link into a public
+   place.
+4. Add a row to the record.
+
+**TLS audit** (date, address, who ran it, score per part, findings and what was done):
+
+| Date | Address | Run by | Website test: HTTPS / security options / IPv6 / DNSSEC | Findings and action |
+|---|---|---|---|---|
+| (none yet) | | | | |
+
 ## Time zones and clock format
 
 Each group has an IANA time zone (default `Europe/Amsterdam`), chosen from a list in the
@@ -373,6 +530,7 @@ In PingFederate, create an OIDC client:
 | ID token signing | RS256, PS256 or ES256 (symmetric algorithms are refused) |
 | Scopes | `openid profile email` |
 | Claims in the ID token | `roles`, `organisations`, `groups` (multi-valued; names configurable with `OIDC_ROLE_CLAIM`, `OIDC_ORGANISATION_CLAIM`, `OIDC_GROUP_CLAIM`) |
+| Second factor (ADR 0100) | optional until the IdP team names its values: the ID token must carry an `amr` out of `OIDC_MFA_AMR_VALUES` (default `mfa otp hwk swk`) or an `acr` out of `OIDC_MFA_ACR_VALUES` (empty: `OIDC_ACR_VALUES`, default `mfa`, which OpenPlanner also sends as `acr_values`). Then set `ADMIN_MFA_REQUIRED=true` |
 | Role values | `openplanner-superuser`, `openplanner-org-admin`, `openplanner-group-admin`, `openplanner-auditor`, `openplanner-agent` (ADR 0043; configurable with `OIDC_ROLE_*`) |
 
 Organisation and group claims carry the slugs shown in the portal (`/g/<group-slug>`). A claim
@@ -383,10 +541,56 @@ would let anyone grant themselves the superuser role.
 Roles are read at login and kept in the session for its lifetime (`ADMIN_SESSION_HOURS`,
 default 8). The session lives on the server (table `admin_sessions`, ADR 0098): logging out,
 a new login and `admin_idle_minutes` (default 60) end it at once, whatever copy of the cookie
-someone holds. After the release that introduced it everyone logs in once more. Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
+someone holds. After the release that introduced it everyone logs in once more, and once more
+after the release that renamed the cookie (below). Changes need a login of at most `ADMIN_REAUTH_MINUTES` (default 60, ADR 0015):
 older sessions pass through PingFederate first, which refreshes the roles. A revoked role
 therefore stops granting changes within an hour; reading continues until the session ends.
-For an urgent revocation, rotate `SESSION_SECRET` (logs everyone out).
+For an urgent revocation, end every session on the host (below) or, as the last resort,
+rotate `SESSION_SECRET`.
+
+**Ending all admin sessions (ADR 0098).** On the host, in the `web` container:
+
+```sh
+docker compose --env-file .env.update exec web python -m app.cli sessions end-all --reason cli
+```
+
+`--reason` is one of `cli` (an operator's choice), `restore` (after a database restore) and
+`secret_rotated` (with a `SESSION_SECRET` rotation). The command ends every live session, so
+everyone logs in again, and writes one audit event (`admin.sessions_ended_all`, actor
+`system:cli`) with the reason and the number of sessions, never an identifier. The worker
+deletes ended rows and rows past `ADMIN_SESSION_HOURS` once an hour; the history stays in the
+audit log.
+
+**Offboarding a person (ASVS V7.4.2).** Switching a person off at the identity provider does
+not end the session OpenPlanner already holds. The route is:
+
+1. Switch the person off at the identity provider (or remove their groups and claims there).
+2. End their sessions at once: an organisation admin or the superuser opens the person under
+   *Staff* and presses *End all sessions* (permission `staff.manage`, ADR 0098 step 3).
+   This ends every session of the person, also those for other organisations, and writes the
+   audit event `admin.sessions_ended_by_admin` with the administrator, the person and the number.
+3. Without that, their open session lapses at the idle limit (`admin_idle_minutes`, default 60)
+   at the latest, and in any case at its absolute end (`ADMIN_SESSION_HOURS`, default 8). Every
+   new login needs the identity provider, which now refuses it.
+4. Only when the whole installation is at risk, end all sessions on the host (above). It also
+   logs out everyone else, who log in again.
+5. Suspend the person in the portal (*Staff*, *Suspend staff member*, `staff.manage`, ADR 0046
+   step 2): a login is refused whatever the identity provider says, and their sessions end in
+   the same step (`staff.suspended`). Lift it with *Lift suspension* if the person returns.
+6. The superuser may erase a suspended person's name, roles and memberships (`staff.erase`).
+   It also happens by itself after `STAFF_RETENTION_DAYS` (default 365) without a login: the
+   worker's daily housekeeping writes `staff.erased` and logs `staff.erased` with a count. A
+   `staff.erase_failed` warning in the worker log means the run failed; the next run repeats it
+   (it is idempotent). Note the date for the audit trail.
+
+The cookie name follows `PUBLIC_BASE_URL` (ADR 0098 step 4), not `ENVIRONMENT`. On an `https://`
+address the cookie is `__Host-op_admin` with `Path=/`, `Secure`, `HttpOnly`, `SameSite=Lax` and
+no `Domain`; this also holds on a test host (`ENVIRONMENT=test`). On an `http://` address
+(development, or a host that has not moved to HTTPS yet) it stays `op_admin` with
+`Path=/admin` and no `Secure`, because browsers refuse a prefixed cookie without it. After
+the update that introduced the new name, every administrator on an https host has to log in once
+more: the old `op_admin` cookie is no longer read. Setting `PUBLIC_BASE_URL` to the `https://`
+address (ADR 0064, ADR 0086) is what switches a host to the new cookie.
 
 Logout sends `client_id` and `post_logout_redirect_uri` to the `end_session_endpoint`, without
 `id_token_hint`. Check during set-up that PingFederate accepts this and ends the SSO session;
@@ -444,6 +648,24 @@ share one PingFederate: give acceptance `openplanner-acc`, and production values
 there. The claim name and the prefix are class C settings with the dry run of §8; the host
 resets them like the other login settings.
 
+### Second factor required (ADR 0100)
+
+`ADMIN_MFA_REQUIRED` (class B, default `false`) makes `web` refuse
+a login whose ID token shows no second factor. MFA itself is the identity provider's: with
+the bundled Keycloak the realm asks for an authenticator app or a security key (`acr` `mfa`,
+level 2) and `super` must register one at the first login (set `ADMIN_MFA_REQUIRED=true` in `.env` for the
+bundled Keycloak; the installer does it in step 2 of ADR 0090); with PingFederate the IdP team's
+policy must set `amr` or `acr` (see the table above). The web log has `oidc.mfa_missing` and
+the security log `admin.login` with reason `mfa_required`; neither holds a claim value.
+
+**MFA locks the superuser out** (lost phone, a policy that does not emit `amr`). There is no
+break-glass login. Fix it at the identity provider: with the bundled Keycloak open the admin
+console (realm `openplanner` → *Users* → `super` → *Credentials*, delete the OTP credential;
+the next login asks to register a new one). If the IdP cannot be fixed in time, use the host
+CLI of the next section (closure, `oidc-check`); lowering the requirement is a deployment
+change in `.env` (`ADMIN_MFA_REQUIRED=false` and a restart of `web`), a decision for the
+product owner.
+
 ### Nobody can log in (ADR 0042 §8)
 
 There is no login bypass, fallback IdP or local account. Diagnose and act from the host:
@@ -495,8 +717,11 @@ and one user, `super`, who holds every built-in role. It is an identity provider
 **Where the secrets are.** `secrets/keycloak.env` (mode 600, next to `secrets/secrets.env`,
 never copied off the host) holds the admin console password (`KC_BOOTSTRAP_ADMIN_PASSWORD`,
 user `admin`), the client secret (`KC_OPENPLANNER_CLIENT_SECRET`) and the first password of
-`super` (`KC_SUPER_PASSWORD`). The realm Keycloak imports is `secrets/keycloak-realm.json`,
-rendered from `deploy/keycloak/realm.template.json`:
+`super` (`KC_SUPER_PASSWORD`), and the secret of the service account that manages staff
+(`KC_DIRECTORY_CLIENT_SECRET`). The script also writes `secrets/keycloak-app.env` (mode 600) with
+`KEYCLOAK_ADMIN_URL`, `KEYCLOAK_DIRECTORY_CLIENT_ID` and `KEYCLOAK_DIRECTORY_CLIENT_SECRET`,
+which `web` and `worker` read after `.env` (ADR 0106). The realm Keycloak imports is
+`secrets/keycloak-realm.json`, rendered from `deploy/keycloak/realm.template.json`:
 
 ```sh
 cd ~/openplanner
@@ -523,9 +748,28 @@ and is step 2. The admin console is bound to the host's loopback and is never pu
 (`grep KC_SUPER_PASSWORD secrets/keycloak.env`), log in to the portal as `super`, and Keycloak
 asks for a new password before it returns to the portal (the required action
 `UPDATE_PASSWORD`). The first password is then spent; the file keeps it only as the value the
-realm was rendered with. Staff of organisations without a provider of their own are created
-in this Keycloak (admin console, realm `openplanner`, with the `roles`, `organisations`,
-`groups` or `entitlements` attributes the development realm's `README.md` describes).
+realm was rendered with.
+
+**Staff.** Staff of organisations without a provider of their own are managed in the portal,
+Manage › Staff: invite, add or remove a role, disable, send a password reset (ADR 0095). The
+actions appear only when `web` has the three `KEYCLOAK_*` values above; restart `web` and
+`worker` after a render (`docker compose --profile idp up -d web worker`). A realm imported
+before ADR 0095 (such as an older lab realm) has no `openplanner-directory` client; add it with
+Keycloak's own CLI and put its secret in `secrets/keycloak-app.env` by hand:
+
+```sh
+docker compose exec idp /opt/keycloak/bin/kcadm.sh config credentials \
+  --server http://localhost:8080 --realm master --user admin   # asks for the admin password
+docker compose exec idp /opt/keycloak/bin/kcadm.sh create clients -r openplanner \
+  -s clientId=openplanner-directory -s serviceAccountsEnabled=true -s publicClient=false \
+  -s standardFlowEnabled=false -s directAccessGrantsEnabled=false
+docker compose exec idp /opt/keycloak/bin/kcadm.sh add-roles -r openplanner \
+  --uusername service-account-openplanner-directory --cclientid realm-management \
+  --rolename manage-users --rolename view-realm
+```
+
+Read the generated secret in the admin console (*Clients* → `openplanner-directory` →
+*Credentials*), never in a shell history.
 
 **Resetting the password of `super`.** On the host, open the admin console at
 http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` with
@@ -1007,9 +1251,20 @@ stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be
 - **Mail.** An organisation without its own SMTP settings uses the installation's server from
   `SMTP_HOST` (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
   `MAIL_FROM`; `SMTP_USER` and `SMTP_USER_PASSWORD` are accepted as aliases); Mailpit in
-  development. Use STARTTLS on 587 or TLS on 465 (port 465 always means TLS); plain only for a
-  relay on a trusted network. The services refuse to start with a login but neither STARTTLS
-  nor TLS.
+  development. Use STARTTLS on 587 or TLS on 465 (port 465 always means TLS). In production
+  the channel form refuses *Security: none* (ADR 0091), because mail carries names, addresses and
+  join links. A relay on a trusted network without TLS needs the host setting
+  `SMTP_PLAINTEXT_RELAY_ALLOWED=true` (class B, default `false`; set it in `.env`, restart
+  `web` and `worker`) and is a recorded exception. The services refuse to start with a login but
+  neither STARTTLS nor TLS.
+
+  *Upgrading.* A plain configuration saved before this rule (an organisation's stored server
+  or the `SMTP_*` fallback without `SMTP_STARTTLS`/`SMTP_TLS`) keeps sending in the first minor
+  release that ships it. **System status** on the overview shows it as an error (*Mail*, with
+  the count). Fix it by switching the server to STARTTLS or TLS under **Berichtkanalen** (or
+  set `SMTP_STARTTLS=true` / `SMTP_TLS=true`), or record the exception with
+  `SMTP_PLAINTEXT_RELAY_ALLOWED=true`. From the next minor release on, sending refuses it like
+  saving does.
 - **SMS.** Choose the provider (ADR 0028), then enter its API address, API key, the sender
   and the country code for national numbers (31). For **Webex Connect**: create a service
   with an SMS number or alphanumeric sender, copy the service key (service → Messaging API)
@@ -1128,12 +1383,12 @@ sets no cookie; the host's access log is TransIP's and is not shipped anywhere b
 
 ## Management token key
 
-`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Until ADR 0094 step 2 is built,
-rotating it does not break the links in mails already sent (they are found by their stored
-hash), but every message sent afterwards to an open booking (reminder, change, confirmation)
-carries a link that no longer works. Rotate only after an incident, tell the contact center
-that participants may call about broken links, and expect that agents no longer see their
-earlier claims as their own (ADR 0043 pseudonyms).
+`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Rotate it with
+`MANAGEMENT_TOKEN_KEY_PREVIOUS` (next section, ADR 0094): links in mails already sent keep
+working, and so does the link in every message sent afterwards to a booking made under the
+old key. Without the previous key a message sent after the rotation to an open booking
+(reminder, change, confirmation) carries a link that no longer works, and agents no longer
+see their earlier claims as their own (ADR 0043 pseudonyms).
 
 ## Releasing a version (ADR 0052, ADR 0079)
 
@@ -1159,14 +1414,31 @@ repository:
 
 | Name | Kind | What | Why |
 |---|---|---|---|
-| `RELEASE_TOKEN` | secret | a fine-grained personal access token on this repository with *Contents: read and write* and *Pull requests: read and write* (or a GitHub App token later) | a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow: the release PR would get no CI and the tag no build |
+| `RELEASE_APP_CLIENT_ID` | variable in the environment `release` | the client ID of the release app (ADR 0107) | the release jobs take a short-lived token from the app: a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow, and only the app may create a `v*` tag |
+| `RELEASE_APP_PRIVATE_KEY` | secret in the environment `release` | a private key of the release app (PEM) | as above; the environment `release` may only be used from `main` |
 | `OPENAI_API_KEY` | secret | an OpenAI API key | the audit job (`openai/codex-action`); the key stays in the action's proxy and never reaches the review process |
 | `RELEASE_RUNNER` | variable, optional | the label of a self-hosted runner | default `ubuntu-24.04`; see *Self-hosted runner* below |
 
-A real run stops at its first step without `RELEASE_TOKEN`; a dry run needs none of them. A
-personal access token expires: note the date, renew it under the same name before it does
-(a release then fails at its first step, nothing half-done), or replace it with a GitHub App
-token later. The Codex CLI is installed at its newest version on every audit run
+A real run stops at the app-token step without the release app; a dry run needs none of
+them. The release-candidate job of `main.yml` uses the same app, so without it no candidate
+is tagged after a merge.
+
+**The release app (ADR 0107), once.** Under *Organization settings → Developer settings →
+GitHub Apps → New GitHub App*: a name such as `openplanner-release`, the repository as
+homepage, webhook off, repository permissions *Contents* and *Pull requests* read and write
+and nothing else, installable on this account only. Install the app on this repository only.
+The key: *Edit* next to the app → *Credentials* → *Key pairs* → *New key* (a `.pem` is
+downloaded; GitHub keeps only the public part). Then:
+
+```bash
+gh variable set RELEASE_APP_CLIENT_ID --env release --repo 3Corners-Labs/OpenPlanner --body "<client id>"
+gh secret set RELEASE_APP_PRIVATE_KEY --env release --repo 3Corners-Labs/OpenPlanner < key.pem
+```
+
+Delete the `.pem` afterwards. The key does not expire; to rotate it, add a new key under *Key pairs*,
+store it the same way and delete the old one there. The tag ruleset `release tags`
+lets only the app and repository administrators create, move or delete a `v*` tag; an
+administrator can still tag by hand when the app is broken. The Codex CLI is installed at its newest version on every audit run
 (`codex-version` empty), as on a laptop; it is a tool of the forge, not a dependency of the
 product.
 
@@ -1205,7 +1477,8 @@ A patch release has no audit job.
    `Verdict: pass`. This is a human act on purpose; `main.yml` refuses the tag until it is done.
 3. Set the label `po:approved`. The PR is a decision (ADR 0078): with the label and green CI
    the merge queue squash-merges it. The gate checks the label again in the queue (ADR 0088),
-   so removing the label before the merge sends the PR back.
+   so removing the label before the merge sends the PR back. Only a label set by an
+   administrator of the repository counts, and a push by anyone else takes it off (ADR 0104).
 
 ### Step 3: the tag (one click)
 
@@ -1418,6 +1691,12 @@ verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the 
 does not stop the updater. The updater's own log is in the journal:
 `journalctl -u openplanner-updater`.
 
+Every time the updater puts a backup back (a rollback after an unhealthy update or restore) it
+runs `sessions end-all --reason restore` before the old version starts (ADR 0098 point 10),
+because the restored database may hold sessions that were ended after the backup. If that
+command fails (a version from before ADR 0098), the journal says `sessions could not be
+ended` and the rollback goes on; run the command by hand afterwards.
+
 A request that stays at "Waiting for the updater" is not picked up: check
 `systemctl list-timers openplanner-updater.timer` and the journal.
 
@@ -1430,6 +1709,7 @@ the image from `previous.env`:
 ```sh
 docker compose --env-file .env.update stop web worker
 docker compose --env-file .env.update run --rm --no-deps web python -m app.cli restore-db request-<id>
+docker compose --env-file .env.update run --rm --no-deps web python -m app.cli sessions end-all --reason restore
 sed -i 's|^OPENPLANNER_IMAGE=.*|OPENPLANNER_IMAGE=<PREVIOUS_IMAGE>|; s|^OPENPLANNER_PROXY_IMAGE=.*|OPENPLANNER_PROXY_IMAGE=<PREVIOUS_PROXY_IMAGE>|' .env.update
 docker compose --env-file .env.update up -d
 ```
@@ -1438,7 +1718,7 @@ docker compose --env-file .env.update up -d
 locally built proxy: remove the `OPENPLANNER_PROXY_IMAGE` line then.)
 
 Backups hold personal data: they stay in the data volume (mode 600) and every updater run
-deletes those older than 24 hours (`backup-db --prune`). Never copy them off the host.
+deletes those older than 24 hours (`backup-db --prune`), and so does the worker once an hour (*Backup and restore*). Never copy them off the host.
 
 ### The browser shows old styling after an update (versioned static files)
 
@@ -1467,8 +1747,52 @@ deploy the old images. Every migration is reversible (enforced in CI).
 
 ## Backup and restore
 
-*TBD (O7).* Planned: Litestream or a daily `sqlite3 .backup`, encrypted, retention = PII term
-+ 7 days (HANDOVER §7).
+OpenPlanner has two kinds of copies of the database, with different purposes (ADR 0102,
+`docs/HANDOVER.md` §7). Do not mix them up.
+
+**Rollback copy of an update (built).** The updater copies the database to `data/backups` before
+each update (mode 600, directory mode 700). It is not encrypted by the application, so the data
+volume **must be encrypted** (a requirement on the host; the go-live checklist asks the host to
+confirm it). It lives 24 hours (`BACKUP_LIFETIME`, fixed: the restore window of an update) and
+is deleted by the updater (`backup-db --prune`) and, as a second safety net, by the worker's
+housekeeping once an hour, so an installation without the updater or its timer keeps no copy.
+*System status* (Advanced settings) shows how many copies there are and how old the oldest is,
+with a warning when it is more than two hours past 24 hours. If that warning stays: check
+`docker compose ps worker` and the log lines `backups.prune_failed` (volume read-only), then
+delete the file by hand and report it. Never copy these files off the host.
+
+**Disaster recovery (not built; the hosting party, open point O7).** It is not a setting of
+this application. The host's agreement must meet these requirements, and the controller can ask
+for proof of each:
+
+| Requirement | What it means |
+|---|---|
+| Encrypted | copies are encrypted at rest and in transit |
+| Term | a fixed maximum age in the agreement, consistent with the DPIA (reference: the PII term plus 7 days) |
+| Access | named roles only, with a log of who read or restored a copy |
+| Destruction | copies are destroyed at the end of the term, with a record of it |
+| Restore test | one per year, documented with its date and outcome |
+
+A restored copy is older than the live data, so it can hold personal data that was already
+deleted on the live system. The procedure below therefore always runs the sweep.
+
+### Restoring a copy by hand (ADR 0102 point 9, ADR 0098 point 10)
+
+The updater does the session step itself for its rollbacks (*Updates*). For a restore by hand
+(a copy from the host's backup, moving the volume) the order is fixed:
+
+1. `maintenance on`: set `MAINTENANCE_MODE=true` for `web` and restart it when the database is
+   unavailable (*Maintenance mode*), otherwise `python -m app.cli maintenance on --reason incident`.
+2. Stop `web` and `worker`, restore the copy (`python -m app.cli restore-db NAME`), start them.
+3. `python -m app.cli purge-overdue`: a copy is older than the live data and can hold personal
+   data that was already deleted (*Retention*). Check that the retention overview shows 0
+   bookings holding data past their moment.
+4. `python -m app.cli sessions end-all --reason restore`: the copy can bring back sessions
+   that were ended after it was made (logout, replaced, idle). Everyone logs in again.
+5. `maintenance off`.
+
+Skipping step 4 leaves a window of at most `ADMIN_SESSION_HOURS` in which a session that had
+been ended, for example after someone was switched off, works again.
 
 The `portal-certs` volume (ADR 0070: the private key of an own certificate, its signing
 request and the served pair) is **not** part of the database backup, on purpose: the database
@@ -1519,13 +1843,67 @@ again asks the login questions as before.
 
 ## Rotating secrets
 
-Bootstrap secrets come from environment variables, `X_FILE` or `secrets/secrets.env`
-(`app.cli init`); none are baked into the image. To rotate `MANAGEMENT_TOKEN_KEY` or
-`SESSION_SECRET`, replace the value in that file or the secret store and restart `web` and
-`worker`; `init` never overwrites the file, so edit it or move it away first. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
-value on the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` makes every
-stored channel secret and Webex token unreadable: re-enter the channel secrets afterwards
-(ADR 0008).
+Which key protects what, who can read it and how it is destroyed is in
+[`docs/cryptography.md`](cryptography.md). Bootstrap secrets come from environment variables,
+`X_FILE` or `secrets/secrets.env` (`app.cli init`); none are baked into the image. To rotate one, replace the value in that file
+or the secret store and restart `web` and `worker`; `init` never overwrites the file, so edit
+it or move it away first.
+
+**Rotating `SETTINGS_ENCRYPTION_KEY`** loses nothing (ADR 0094). The key before the rotation
+stays readable as `SETTINGS_ENCRYPTION_KEY_PREVIOUS` until every stored secret is sealed
+again. Each sealed value carries the id of the key that sealed it. In this order:
+
+1. Make a backup of the database and keep the old key where you can find it.
+2. Put the old value in `SETTINGS_ENCRYPTION_KEY_PREVIOUS` (or `…_PREVIOUS_FILE`) and a new
+   random value of at least 32 bytes in `SETTINGS_ENCRYPTION_KEY`.
+3. Restart `web` and `worker`. Channel secrets, Webex tokens, identity provider secrets and
+   log destination secrets keep working; new values are sealed under the new key.
+4. `docker compose exec web python -m app.cli rekey`. It seals every stored secret again under
+   the current key, one transaction, and writes one audit event with counts only. It prints
+   no key or secret. Running it again changes nothing. If it reports that a secret opens
+   under no configured key, nothing was changed: the previous key is missing or wrong.
+5. Remove `SETTINGS_ENCRYPTION_KEY_PREVIOUS` and restart `web` and `worker`. Do not do this
+   before step 4 has reported success: a secret still under the old key becomes unreadable.
+   System status (Advanced settings) shows under *Key rotation* how many encrypted secrets are
+   still under the previous key, and says when the count is 0 and the key may go.
+
+A configuration package (ADR 0089) can be exported and imported during a rotation: the
+installation opens its secrets under either key.
+
+**Rotating `MANAGEMENT_TOKEN_KEY`** keeps every link working while the previous key is set
+(ADR 0094 point 4):
+
+1. Put the old value in `MANAGEMENT_TOKEN_KEY_PREVIOUS` (or `…_PREVIOUS_FILE`) and a new random
+   value of at least 32 bytes in `MANAGEMENT_TOKEN_KEY`.
+2. Restart `web` and `worker`. New bookings get their link under the new key; a message to a
+   booking made under the old key carries the link it was given; claims made by agents still
+   read as their own. Participants' security-event pseudonyms (ADR 0053) start anew.
+3. Wait until the bookings made before the rotation are over (the longest booking horizon plus
+   the purge period), then remove `MANAGEMENT_TOKEN_KEY_PREVIOUS` and restart. There is
+   nothing to run: links are derived when a message is built, so there is nothing to re-seal.
+   System status shows under *Key rotation* how many open bookings still have a link under the
+   previous key; at 0 the key may go.
+
+Both previous keys are bootstrap secrets (class A): environment or `X_FILE` only, never the
+database, and empty outside a rotation.
+
+**Rotating `SESSION_SECRET`** is separate (below).
+
+**Rotating `SESSION_SECRET`** logs every admin out and, in addition, drops the signed login
+state (a login in progress, the update snooze, interface choices). In this order, so the
+register agrees with the cookies:
+
+1. `docker compose --env-file .env.update exec web python -m app.cli sessions end-all --reason secret_rotated`
+2. Replace `SESSION_SECRET` (at least 32 random bytes) in `secrets/secrets.env` or the secret
+   store.
+3. Restart `web` and `worker`.
+
+A cookie signed with the old secret is invalid from step 3 on; step 1 makes sure no session
+stays in the register for a reference that nobody can present any more. 
+Channel secrets (SMTP password, Connect service key) are replaced by entering a new value on
+the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` without
+`SETTINGS_ENCRYPTION_KEY_PREVIOUS` makes every stored channel secret and Webex token
+unreadable (ADR 0008); use the procedure above.
 
 ### API clients of contact-center bots (ADR 0023)
 
@@ -1545,6 +1923,43 @@ Client secrets live only in the contact center's vault; OpenPlanner keeps their 
   *Production settings*); never set it to `*`, or a forged `X-Forwarded-For` passes the list.
 - **Who did what:** the audit log shows client changes (`API-koppelingen beheren`), token
   requests and refused calls, with the client id as actor.
+
+## Evidence report for an audit (WP-C2)
+
+For a security officer, an auditor or the identity provider's administrator who asks what this
+installation does and has been measured to do. One command bundles what the application already
+measures, as Markdown for people and JSON for tools:
+
+```
+docker compose exec web python -m app.cli evidence --out data/evidence
+docker compose exec web python -m app.cli evidence --format json | jq .
+```
+
+`--out DIR` writes `evidence.md` and `evidence.json` (mode 600); without it one format goes to the
+terminal. The exit code is 1 when a section failed, so the command can gate a go-live checklist.
+Run it on the day, keep the files with the dated checklists of `docs/assurance/`, and say which
+version it was made for (the first section tells).
+
+| Section | What it holds | Where it comes from |
+|---|---|---|
+| Version | release, commit, image digest, environment | `APP_VERSION`, `APP_COMMIT`; the digest only when the host sets `APP_IMAGE_DIGEST` (`unknown` otherwise, then `docker inspect` or the updater state file is the proof) |
+| Identity provider | every finding of `oidc-check` (issuer compared exactly, HTTPS back channel, algorithms, PKCE, signing keys), the pinned issuer, and the lists the provider announced: response types, grant types, PKCE methods, token endpoint authentication methods, signing algorithms, `acr` values | the same discovery read as `oidc-check`; there is no `oidc-check --evidence`, because this section is that report |
+| Public address, Certificate | the outcome of `address-check` and `tls-check` | both commands run as they do on their own, so System status shows the result too |
+| Configured external hosts | scheme and host (never path, query or credentials) of video, contact center, identity providers, mail, SMS, release list, and every log destination | the effective settings and the portal configuration; `docs/dataflow.md` has the full outbound table |
+| Log destinations | per destination: host, on or off, level, credential set or not, last test, and per service the state and counters | the status the web and the worker report (ADR 0085); no stored error text |
+| Retention | bookings holding personal data, overdue, failed purges, last purge, per group | the retention overview (ADR 0039); counts only, no booking |
+| Key rotation | records and open bookings still on the previous key | System status (ADR 0094) |
+| Settings | every variable with class, source (`env`, `file`, `portal`, `default`), lock and value | `settings list`; numbers, switches and choices show their value, an address only its host, secrets, text and paths only `set` or `not set` |
+
+The report holds no secret and no personal data. A test sets a marker in every secret, address,
+free-text setting and personal field and fails if one appears. A collector that fails (the
+database is unreadable, say) turns its own section `failed` with the exception's class name and
+the other sections stay. Read the report before it leaves the host anyway: the host names, the
+organisation slugs and the group slugs it lists are part of the installation's structure.
+
+What it does not prove: anything on the host or the network (TLS versions and ciphers at the
+edge, NTP, volume encryption, the firewall). Those stay with the commands of
+`docs/assurance/hosting.md`.
 
 ## Emergency closure of a team (ADR 0024)
 
@@ -1572,8 +1987,13 @@ When a team cannot hold its appointments (outage, illness, closed building):
    once.
 5. **Reopen.** *Opheffen*, optionally confirming again every appointment that can still go
    ahead (before its dispatch lead and outside any closure).
-6. **Retention.** Appointments still on hold lose their personal data 30 days after the end of
-   the closure. An open-ended closure keeps it until it is lifted, so lift or end it promptly.
+6. **Retention.** Appointments still on hold lose their personal data at the earlier of 30 days
+   after the end of the closure and `closure_max_retention_days` (organisation setting, default
+   90, 30 to 180) after the original appointment, also while the closure has no end (ADR 0102).
+   `closure_max_notice_days` (default 14) before that, the worker records the system event
+   `closure.retention_notice` at the group, which the group's and the organisation's admins see
+   in the audit log: lift or end the closure, or move the appointments, before that date. The
+   closure page and the participant's appointment page tell participants the date.
 
 ## Onderhoudsmodus (ADR 0038)
 
@@ -1639,7 +2059,8 @@ is not judged: it is the operator's own doing.
 shows per group how many bookings still hold personal data past their purge moment and how
 many `purge_pii` jobs failed. Both should be 0. A booking counts as overdue one hour after its
 purge moment (slot end + 24 h, cancellation + 24 h, deadline to confirm or choose a new time
-+ 24 h, or closure end + 30 days), which leaves
++ 24 h, or for a booking on hold the earlier of closure end + 30 days and the maximum after
+its slot, ADR 0102), which leaves
 room for the worker and its retries.
 
 | Shown | Likely cause | What to do |
@@ -1655,10 +2076,22 @@ backup. It is idempotent and needs no action. What it leaves behind is visible t
 
 - the system event **retention.sweep** (audit log, global, superuser) with the counts
   `overdue`, `purged`, `failed` and `backlog`; no event on a night with nothing overdue;
+- the system event **closure.retention_notice** (at the group, so its admins see it) once a day
+  while a closure's maximum is less than `closure_max_notice_days` away: closure id, number of
+  bookings and the date, nothing else;
 - the log line `retention.sweep` (warning) with the same counts;
 - the log line `retention.backlog` (error) when a booking still held personal data more than
   48 hours after its retention began, or a purge failed. **Alert on this event in monitoring.**
   `retention.sweep_failed` means the sweep itself could not run (database locked or full).
+
+**Old booking rows (ADR 0102 step 4).** The same housekeeping merges booking rows
+`booking_row_retention_days` after their purge (default 730 days; the superuser sets it in the
+portal) into a count per group, day and status and deletes them. Look for the system event
+**booking_rows.rollup** (global, superuser: `rows`, `days`, `skipped`; no event on a day with
+nothing to do) and the log line `booking_rows.rollup`. `skipped` above 0 means a row past its
+term still holds personal data or has an open job: the retention sweep deals with the first, the
+second ends with its job. `booking_rows.rollup_failed` (error) means the run could not finish and
+is tried again the next day; the counts and deletions of a finished batch stay.
 
 To run it by hand (for example after a restore from a backup, with maintenance mode on),
 inside the `web` container:
@@ -1670,8 +2103,10 @@ docker compose exec web python -m app.cli purge-overdue
 
 `--dry-run` prints the overdue bookings per group and changes nothing. The second prints how many
 were purged and exits non-zero if any could not be purged. Only counts and group slugs are
-printed. A booking that is suspended by a closure without an end date is left alone: its
-personal data goes when the closure is lifted or ends, plus 30 days.
+printed. A booking that is suspended by a closure without an end date is purged at the maximum
+after its original appointment (`closure_max_retention_days`, ADR 0102), like the worker does;
+the command reads the organisation's portal value, so it needs the same database as the
+worker.
 
 ## Widget on a host website (ADR 0035)
 
@@ -1734,7 +2169,7 @@ caller by pseudonym (`client:<16 hex>`), never by IP address:
 To check whether an IP address from a firewall or proxy log is the caller in an event, run
 `docker compose exec web python -m app.cli client-pseudonym 203.0.113.7` and compare. There
 is no way from a pseudonym back to an address. Rotating `MANAGEMENT_TOKEN_KEY` changes every
-pseudonym (and every management link). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
+pseudonym (management links keep working with `MANAGEMENT_TOKEN_KEY_PREVIOUS`). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
 1000) are tracked per window and process; beyond that, events count under `client:many`.
 
 ### A booking without a video meeting (ADR 0068)
@@ -1759,21 +2194,27 @@ Open the booking from the group's agenda (**Details**). Three blocks tell the st
 
 ## Log lines and the event schema (ADR 0040)
 
-Every line on stdout is one JSON object in the field names of `openplanner.event/2`
-(`docs/audit-events.md`), so a log platform needs no mapping:
+Every line on stdout is one JSON object in the field names of `openplanner.event/3`
+(`docs/audit-events.md`, `docs/logging.md`), so a log platform needs no mapping:
 
 | Field | Meaning |
 |---|---|
 | `@timestamp` | RFC 3339 in UTC with milliseconds, e.g. `2026-10-27T14:03:12.345Z` |
-| `log.level` | `debug`, `info`, `warning`, `error`, `critical` |
-| `message` | the event key, e.g. `job.sent`, `storage.degraded` |
+| `log.level` | `trace`, `debug`, `info`, `warning`, `error`, `critical` |
+| `event.category` | `audit`, `system`, `security`, `authz`, `operations`, `diagnostic` |
+| `event.action` | the action, e.g. `job.sent`, `storage.degraded`; `docs/logging.md` says what each means and what to do |
+| `message` | a readable sentence, e.g. `Disk space is low: 6% free, database 1 MB (free_space_low).` |
+| `labels.<name>` | the action's own fields, e.g. `labels.free_percent` |
 | `service.name`, `service.version` | `web` or `worker`, and `APP_VERSION` |
 | `installation` | `INSTALLATION_NAME`, when set |
 | `trace.id` | one id per HTTP request or worker job; the audit events it writes carry the same id |
 | `organisation`, `group` | slugs of the tenant the request or job is about, once known |
 
-Lines before this release had `timestamp`, `level` and `event`: change saved searches and
-alerts on the log platform to `@timestamp`, `log.level` and `message`. To follow one request
+Since `openplanner.event/3` (ADR 0103) `message` is a sentence and the code is in
+`event.action`: change saved searches and alerts that match `message` against a code to
+`event.action`, and searches that parse `detail` to `labels.<name>`. Before that, lines had
+`timestamp`, `level` and `event`: change those to `@timestamp`, `log.level` and
+`event.action`. To follow one request
 or job, search for its `trace.id`; to see one tenant, filter on `organisation` or `group`.
 Public pages under `/g/{slug}` carry only `group`; admin routes carry what they act on.
 Timestamps are only as good as the host clock: keep NTP (`timedatectl` shows
@@ -1797,13 +2238,55 @@ and the group's admins see these with the kind *Diagnose*. It ends by itself aft
 worker ends every mode (`diagnostics.braked` in the log, *Diagnosemodus gestopt* in the
 superuser's audit log). Debug events never go to the log platform.
 
-## Shipping audit events to a log platform (ADR 0034)
+## Shipping the log to a log platform (ADR 0034, ADR 0085)
 
-After each commit, every audit, system and security event is written once more to stdout as
-one JSON line with `"log_type": "audit"` and the fields of `docs/audit-events.md`. Diagnostic
-events never are. The line ignores `LOG_LEVEL`. OpenPlanner holds no credential for the
-platform: the host ships the container log. Route `log_type = audit` to its own index and
-alert on `event.category = security` and on `outcome = denied`.
+Two routes lead to the same place. Both ship copies of the same masked lines.
+
+**1. In the portal (ADR 0085).** The superuser connects a platform under **Platform → Log
+destinations** (`docs/manual/en/logging.md`): syslog over TLS (RFC 5424), Splunk HTTP Event
+Collector, Elastic or OpenSearch (`_bulk` into a data stream), or any HTTP endpoint that takes
+JSON lines. Add the destination, choose **Send test line** (one real line, with the platform's
+status code on the page), then **Switch on**. Each destination has a lowest level, the audit
+categories it takes, and opt-ins for trace lines and diagnostic events. The token or key is
+stored encrypted and never shown again. Web and worker pick a change up within about 15
+seconds and deliver in the background, so a slow or down platform never slows a booking page
+or a job. The stored token needs `SETTINGS_ENCRYPTION_KEY`; without it the page says the token
+cannot be opened.
+
+What to do when a destination fails (the page shows the reason; the first failure and the
+recovery are system events in the audit log):
+
+| Reason | Meaning | What to do |
+|---|---|---|
+| `unreachable` | no connection: DNS, port, firewall or time-out | check the address and the route from the container (`docker compose exec web python -c ...` or `curl`); `LOG_SHIP_TIMEOUT_SECONDS` raises the time-out |
+| `refused` (401, 403) | the platform did not accept the token | enter the token or key again |
+| `refused` (400, 413, 422) | the platform will never accept that batch (malformed for it): it is dropped and counted | check the index or data stream and the platform's mapping; lower `LOG_SHIP_BATCH_SIZE` for 413 |
+| `tls` | the certificate is not trusted | use the platform's real name in the address, or add its certificate authority (public PEM) on the destination |
+| `server` | the platform reported an error (5xx, 429) | wait: it is retried with a growing pause up to `LOG_SHIP_BACKOFF_MAX_SECONDS` (300) |
+| `not_ready` | the stored token cannot be opened | `SETTINGS_ENCRYPTION_KEY` is missing or was changed; enter the token again |
+
+Each process keeps its own queue of at most `LOG_SHIP_QUEUE_SIZE` lines (default 10 000) per
+destination, in memory only; a restart loses what was still queued, and a platform that stays
+away longer than the queue holds loses the oldest lines (the page counts them as dropped).
+For a guarantee of delivery use route 2, which reads the rotated files on the host.
+
+**Kill switch.** `LOG_SHIPPING_ENABLED=false` in `.env` and `docker compose up -d` stops every
+destination and every test line within about 15 seconds and keeps the configuration. Use it when
+the platform's own traffic is the problem during an incident; the screen then says so.
+`docker compose logs` is unaffected.
+
+**Trace logging off the platform.** `settings set LOG_LEVEL TRACE --hours 1` writes the trace
+lines (every request by route template, job step, outgoing call by host, slow statement and
+page render; no personal data; `docs/logging.md`) to stdout, and a destination with the lowest
+level `trace` and *Trace lines* ticked receives them. `TRACE` falls back by itself after at
+most `TRACE_LEVEL_MAX_HOURS` (4). A destination can only narrow what the platform logs, never
+widen it.
+
+**2. On the host (ADR 0034).** After each commit, every audit, system and security event is
+written once more to stdout as one JSON line with `"log_type": "audit"` and the fields of
+`docs/audit-events.md`; the line ignores `LOG_LEVEL`. Diagnostic events are not written there.
+The host ships the container log. Route `log_type = audit` to its own index and alert on
+`event.category = security` and on `outcome = denied`.
 
 Docker's `splunk` driver, in `docker-compose.override.yml` (token from the host's secret
 store, never committed):

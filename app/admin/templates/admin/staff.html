@@ -7,7 +7,38 @@
     <h1 id="page-title">{{ _("admin.staff.title") }}</h1>
     <p class="page-header__lead">{{ _("admin.staff.intro") }}</p>
   </div>
+  {% if can_invite %}<a class="button" href="/admin/staff/invite">{{ _("admin.staff.invite.link") }}</a>{% endif %}
 </div>
+{% if directory_notice %}
+<div class="alert alert--warning" role="status"><p>{{ directory_notice }}</p></div>
+{% endif %}
+{% if pending %}
+<section class="card" aria-labelledby="pending-heading">
+  <h2 id="pending-heading">{{ _("admin.staff.pending.title") }}</h2>
+  <p class="muted">{{ _("admin.staff.pending.intro") }}</p>
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.staff.pending.title") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.staff.invite.email") }}</th><th scope="col">{{ _("admin.staff.manage.role") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.staff.manage.actions") }}</span></th></tr></thead>
+    <tbody>
+      {% for p in pending %}
+      <tr>
+        <th scope="row">{{ p.email }}{% if not p.enabled %}<br><span class="chip chip--warning">{{ _("admin.staff.manage.disabled") }}</span>{% endif %}</th>
+        <td>{% for g in p.grants %}{{ g.role }}, {{ g.place }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+        <td>
+          <form method="post" action="/admin/staff/directory/reset">
+            <input type="hidden" name="subject" value="{{ p.subject }}">
+            <input type="hidden" name="back" value="/admin/staff">
+            <button type="submit" class="button button--secondary">{{ _("admin.staff.pending.resend") }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
 <form class="card" method="get" action="/admin/staff" aria-labelledby="filter-heading">
   <h2 id="filter-heading" class="visually-hidden">{{ _("admin.staff.filter") }}</h2>
   <div class="inline-forms">
@@ -49,6 +80,8 @@
     {% for person in people %}
     <tr>
       <th scope="row"><a href="/admin/staff/{{ person.id }}">{{ person.name }}</a>
+        {%- if person.suspended %}<br><span class="chip chip--warning">{{ _("admin.staff.status.suspended") }}</span>{% endif %}
+        {%- if person.erased %}<br><span class="chip">{{ _("admin.staff.status.erased") }}</span>{% endif %}
         {%- if person.dormant %}<br><span class="chip chip--warning">{{ _("admin.staff.dormant") }}</span>{% endif %}</th>
       <td>{{ person.roles | join(", ") if person.roles else _("admin.staff.no_role") }}</td>
       <td>{% for place in person.places %}{{ place.organisation }}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}</td>

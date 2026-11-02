@@ -14,7 +14,8 @@ A failure here is logged and swallowed: the caller still gets the answer it woul
 import structlog
 from fastapi import Request
 
-from app.domain.audit import SYSTEM_ACTOR, Outcome
+from app.adapters.event_sink import StdoutEventSink
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.security_log import SecurityLog
 
@@ -44,3 +45,41 @@ async def report(
         )
     except Exception as exc:  # the refusal itself must not turn into a 500
         log.warning("security_log.failed", error=type(exc).__name__)
+
+
+async def report_failure(request: Request, action: str, reason: str, *, detail: str = "") -> None:
+    """Record a failure of our own (a database error) as a security event with a code.
+
+    The event goes through the security log, so a flood of failures is one event per window.
+    When that write fails too (the database is gone), the same event goes to stdout in the
+    format of ADR 0034, so the log platform still has it. Nothing from the request is used.
+
+    Args:
+        request: The failed request; used to reach the application's collaborators only.
+        action: Event key, e.g. ``database.error``.
+        reason: Machine-readable reason, e.g. ``database_error``.
+        detail: Machine keys, e.g. ``surface:web``; never values from the request.
+    """
+    state = request.app.state
+    security: SecurityLog | None = getattr(state, "security_log", None)
+    try:
+        if security is None:
+            raise LookupError("no security log")
+        await security.record(action, Outcome.FAILURE, reason=reason, detail=detail)
+    except Exception as exc:  # the database is the thing that failed: fall back to stdout
+        log.warning("security_log.failed", error=type(exc).__name__)
+        settings = getattr(state, "settings", None)
+        clock = getattr(state, "clock", None)
+        if settings is None or clock is None:
+            return
+        event = AuditEvent(
+            clock.now(),
+            SYSTEM_ACTOR,
+            action,
+            Outcome.FAILURE,
+            reason,
+            detail=detail,
+            source=Source.SYSTEM,
+            category=Category.SECURITY,
+        )
+        StdoutEventSink(settings.event_envelope).emit([event])

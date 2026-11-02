@@ -84,3 +84,26 @@ async def test_the_scope_is_applied_in_sql(engine: AsyncEngine) -> None:
     assert elders.candidates == []
     assert nothing.groups == []
     assert nothing.candidates == []
+
+
+async def test_a_suspended_candidate_carries_its_organisation_and_closure(
+    engine: AsyncEngine,
+) -> None:
+    uow, _, holding = await _two_bookings(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        await session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == holding)
+            .values(status=BookingStatus.SUSPENDED.value)
+        )
+
+    async with uow.read() as tx:
+        [due] = await tx.due_for_purge(NOW)
+        group = await tx.get_group("aangifte")
+
+    assert group is not None
+    assert (due.candidate.organisation_id, due.candidate.closure_id) == (
+        group.organisation_id,
+        None,
+    )
+    assert (due.candidate.status, due.candidate.closure_ends_at) == (BookingStatus.SUSPENDED, None)

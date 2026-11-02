@@ -17,9 +17,11 @@ gegevens. Die controle is een vangnet, geen garantie: kies ook zelf geen vraag d
 neerkomt.
 
 <!-- field: key -->
-## Sleutel
+## Technische naam
 
-De sleutel is de vaste naam van het veld, bijvoorbeeld `klantnummer`. Hij bestaat uit kleine
+U hoeft deze niet in te vullen. Laat u hem leeg, dan maakt het portaal de naam uit de vraag in het
+Nederlands, bijvoorbeeld `klantnummer` bij de vraag *Klantnummer*; bestaat die naam al, dan wordt
+het `klantnummer_2`. De technische naam is de vaste naam van het veld. Hij bestaat uit kleine
 letters, cijfers en `_`, begint met een letter en is 2 tot 40 tekens lang. Na opslaan ligt hij
 vast, en een sleutel die het team eerder gebruikte kan niet opnieuw. Zo betekent een antwoord
 bij een afspraak altijd wat de vraag toen betekende.
@@ -27,7 +29,9 @@ bij een afspraak altijd wat de vraag toen betekende.
 <!-- field: type -->
 ## Soort
 
-De soort bepaalt hoe het antwoord gecontroleerd wordt. U kunt geen eigen controle schrijven.
+U kiest eerst de soort; daarna toont het portaal alleen de velden die bij die soort horen (de
+keuzes bij een keuzelijst, de grenzen bij een getal of datum). De soort bepaalt hoe het antwoord
+gecontroleerd wordt. U kunt geen eigen controle schrijven.
 
 - **Korte tekst**: tot 100 tekens.
 - **Vrij tekstveld**: tot 1000 tekens. Dit is altijd een persoonsgegeven, omdat een inwoner er
@@ -55,7 +59,11 @@ die staat onder de vraag. De inwoner ziet de taal van de pagina, en anders het N
 <!-- field: classification -->
 ## Persoonsgegeven
 
-Elk nieuw veld is een persoonsgegeven. Antwoorden op zo'n veld komen nooit in logs, in de
+Het portaal stelt per soort een markering voor: een keuzelijst en een aankruisvak staan
+voorgesteld als *Geen persoonsgegeven*, elke andere soort als persoonsgegeven (ook getal, datum
+en postcode: een geboortedatum is er een). E-mailadres, telefoonnummer en vrij tekstveld zijn
+altijd persoonsgegevens en tonen deze keuze niet. Het is een voorstel: u ziet het en kunt het
+wijzigen. Antwoorden op zo'n veld komen nooit in logs, in de
 auditlog, in exports, in berichten of in de wachtrij van medewerkers. Alleen de pagina van de
 afspraak in de agenda toont ze, aan wie afspraken mag bekijken.
 

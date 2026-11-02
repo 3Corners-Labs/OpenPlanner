@@ -26,9 +26,11 @@ from app.domain.authorization import (
     decide,
     decide_client,
     decide_in_maintenance,
+    granting_role,
     permissions_for,
     role_keys,
     scope_for,
+    target_text,
 )
 from tests.support.principals import principal
 
@@ -83,6 +85,8 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.ORGANISATION_CLOSURE,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
+        Permission.STAFF_MANAGE,  # ADR 0095
+        Permission.STAFF_RESET_PASSWORD,  # ADR 0095
         Permission.EMBEDDING_MANAGE,  # ADR 0035
         Permission.QUEUE_WORK,  # ADR 0043
         Permission.SETTINGS_ORGANISATION_MANAGE,  # ADR 0042: the own organisation's settings
@@ -167,6 +171,7 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         Permission.SETTINGS_LOGIN_MANAGE,  # ADR 0042 §5: never grantable to another role
         Permission.IDENTITY_PROVIDERS_MANAGE,  # ADR 0083 point 4
         Permission.LOGGING_MANAGE,  # ADR 0085: credentials of a log platform
+        Permission.STAFF_ERASE,  # ADR 0046 point 9: erasing a person is the superuser's
     } == LOCKED_PERMISSIONS
     for permission in LOCKED_PERMISSIONS:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
@@ -519,3 +524,36 @@ def test_a_maintenance_safe_route_is_open_to_the_superuser_only() -> None:
 
     assert allowed == Decision(True, Reason.SUPERUSER)
     assert not decide_in_maintenance(ORG, Permission.GROUP_EDIT, maintenance_safe=True).allowed
+
+
+# --- ADR 0103 point 7: the role that granted it, for actor.role on the log line ----------
+
+
+def test_an_allowed_decision_names_the_role_of_the_grant_that_covered_it() -> None:
+    assert decide(SUPER, Permission.GROUP_VIEW, OWN_GROUP).role == "superuser"
+    assert decide(ORG, Permission.GROUP_VIEW, OWN_GROUP).role == "org_admin"
+    assert decide(GROUP, Permission.GROUP_VIEW, OWN_GROUP).role == "group_admin"
+    assert decide(MIXED, Permission.GROUP_VIEW, OWN_GROUP).role == "group_admin"
+
+
+def test_a_denied_decision_names_no_role() -> None:
+    assert decide(ORG, Permission.GROUP_VIEW, OTHER_GROUP).role == ""
+    assert decide(NOBODY, Permission.GROUP_VIEW, OWN_GROUP).role == ""
+
+
+def test_maintenance_names_the_superusers_role() -> None:
+    writable = next(iter(MAINTENANCE_WRITABLE))
+
+    assert decide_in_maintenance(SUPER, writable).role == "superuser"
+    assert decide_in_maintenance(ORG, writable).role == ""
+
+
+def test_the_granting_role_of_an_overview_is_a_role_that_holds_the_permission() -> None:
+    assert granting_role(AUDITOR, Permission.GROUP_VIEW) == "auditor"
+    assert granting_role(NOBODY, Permission.GROUP_VIEW) == ""
+
+
+def test_a_target_reads_as_a_place() -> None:
+    assert target_text(OWN_GROUP) == "demo/demo"
+    assert target_text(OWN_ORG) == "demo"
+    assert target_text(Target.everything()) == "everything"

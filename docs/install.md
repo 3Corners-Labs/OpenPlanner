@@ -124,7 +124,12 @@ system.
 
 4. Check the result: the script ends with the address and waits until `web` and `worker` are
    healthy. `docker compose --env-file .env.update ps` shows them, and
-   `systemctl list-timers openplanner-updater.timer` shows the updater.
+   `systemctl list-timers openplanner-updater.timer` shows the updater. As the last step, once
+   the name resolves to this host, run `docker compose --env-file .env.update exec web python -m
+   app.cli address-check` (ADR 0086): it asks `PUBLIC_BASE_URL` for `/api/v1/instance` the way a
+   participant's browser would and exits 1 on a finding (another installation answers, the proxy
+   is not trusted, the app sees `http`); the findings are explained in `docs/runbook.md`,
+   *Address and proxy*.
 
 With the HTTPS proxy, a trial run against Let's Encrypt's staging CA first keeps you clear of its
 rate limits: add `--acme-staging` on the first run, then follow *HTTPS certificate* in

@@ -9,7 +9,9 @@ A booking's purge moment follows the privacy rules (CLAUDE.md, ADR 0024):
 
     confirmed / completed / no show / direct call ─► slot end + 24 h
     cancelled                                      ─► cancellation + 24 h
-    suspended                                      ─► closure end + 30 days (none while open)
+    suspended                                      ─► min(closure end + 30 days, slot end + the
+                                                      organisation's maximum); the maximum also
+                                                      applies while the closure is open (ADR 0102)
     awaiting a new time (ADR 0044)                 ─► rebook_by + 24 h (it lapses then)
     awaiting confirmation (ADR 0056)               ─► confirm_by + 24 h (it lapses then)
 
@@ -23,7 +25,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.domain.booking import BookingStatus
-from app.domain.closure import RETENTION_AFTER_CLOSURE
+from app.domain.closure_retention import (
+    ClosureRetention,
+    ClosureRetentionOf,
+    suspended_purge_moment,
+)
 from app.domain.job_plan import PURGE_AFTER
 from app.domain.scheduling import GroupSummary
 
@@ -64,6 +70,9 @@ class PurgeCandidate:
         closure_ends_at: For a suspended booking, the end of its closure (``None`` while open).
         rebook_by: For a booking awaiting a new time, when the request lapses (ADR 0044).
         confirm_by: For a booking awaiting confirmation, when it lapses (ADR 0056).
+        organisation_id: The group's organisation, whose settings decide the maximum for a
+            suspended booking (ADR 0102).
+        closure_id: For a suspended booking, its closure.
     """
 
     group_id: int
@@ -73,6 +82,8 @@ class PurgeCandidate:
     closure_ends_at: datetime | None
     rebook_by: datetime | None = None
     confirm_by: datetime | None = None
+    organisation_id: int = 0
+    closure_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -140,14 +151,16 @@ class RetentionOverview:
         return not any(g.needs_attention for g in self.groups)
 
 
-def purge_moment(candidate: PurgeCandidate) -> datetime | None:
-    """Return when the booking's personal data must go; ``None`` while a closure is open."""
+def purge_moment(candidate: PurgeCandidate, retention: ClosureRetention) -> datetime:
+    """Return when the booking's personal data must go.
+
+    ``retention`` is the maximum for a booking on hold (ADR 0102): an open closure no longer
+    leaves the booking without a moment.
+    """
     if candidate.status is BookingStatus.CANCELLED and candidate.cancelled_at is not None:
         return candidate.cancelled_at + PURGE_AFTER
     if candidate.status is BookingStatus.SUSPENDED:
-        if candidate.closure_ends_at is None:
-            return None
-        return candidate.closure_ends_at + RETENTION_AFTER_CLOSURE
+        return suspended_purge_moment(candidate.end, candidate.closure_ends_at, retention)
     if candidate.status is BookingStatus.AWAITING_REBOOK and candidate.rebook_by is not None:
         return candidate.rebook_by + PURGE_AFTER
     if candidate.status is BookingStatus.PENDING_CONFIRMATION and candidate.confirm_by is not None:
@@ -165,27 +178,30 @@ def candidates_before(now: datetime) -> datetime:
     return now - PURGE_AFTER - PURGE_GRACE
 
 
-def is_overdue(candidate: PurgeCandidate, now: datetime) -> bool:
+def is_overdue(candidate: PurgeCandidate, now: datetime, retention: ClosureRetention) -> bool:
     """Return whether the booking still holds personal data past its purge moment and grace."""
-    moment = purge_moment(candidate)
-    return moment is not None and moment + PURGE_GRACE < now
+    return purge_moment(candidate, retention) + PURGE_GRACE < now
 
 
-def is_backlog(candidate: PurgeCandidate, now: datetime) -> bool:
+def is_backlog(candidate: PurgeCandidate, now: datetime, retention: ClosureRetention) -> bool:
     """Return whether the booking held personal data ``BACKLOG_AGE`` after retention began.
 
     Retention begins ``PURGE_AFTER`` before the purge moment (slot end, cancellation, lapse), so
     this is the case once the purge moment lies ``BACKLOG_AGE - PURGE_AFTER`` in the past.
     """
-    moment = purge_moment(candidate)
-    return moment is not None and moment + (BACKLOG_AGE - PURGE_AFTER) < now
+    return purge_moment(candidate, retention) + (BACKLOG_AGE - PURGE_AFTER) < now
 
 
-def summarise(facts: RetentionFacts, now: datetime) -> RetentionOverview:
-    """Combine the counts and the overdue candidates into the overview, per group."""
+def summarise(
+    facts: RetentionFacts, now: datetime, retention_of: ClosureRetentionOf
+) -> RetentionOverview:
+    """Combine the counts and the overdue candidates into the overview, per group.
+
+    ``retention_of`` gives the maximum of the organisation a candidate belongs to (ADR 0102).
+    """
     overdue: dict[int, int] = {}
     for candidate in facts.candidates:
-        if is_overdue(candidate, now):
+        if is_overdue(candidate, now, retention_of(candidate.organisation_id)):
             overdue[candidate.group_id] = overdue.get(candidate.group_id, 0) + 1
     return RetentionOverview(
         now,

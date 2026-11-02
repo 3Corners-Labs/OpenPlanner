@@ -29,7 +29,7 @@ from app.domain.job_plan import JobType
 from app.domain.message_texts import GroupTexts
 from app.domain.ports import Attachment, OutboundMessage
 from app.domain.scheduling import Group, JoinClient
-from app.domain.tokens import derive_token
+from app.domain.tokens import token_for_booking
 from app.i18n import BoundGettext, Translator
 from app.i18n.dates import format_clock, format_day, local_day
 from app.jobs.calendar import build_ics
@@ -220,12 +220,20 @@ class MessageComposer:
         translator: The application translator.
         token_key: Server key for re-deriving the management token (ADR 0011).
         public_base_url: Base URL of the booking pages, e.g. ``https://afspraak.example.nl``.
+        previous_token_key: ``MANAGEMENT_TOKEN_KEY_PREVIOUS`` during a rotation (ADR 0094), so
+            a booking made under it keeps the link it was given.
     """
 
-    def __init__(self, translator: Translator, token_key: bytes, public_base_url: str) -> None:
+    def __init__(
+        self,
+        translator: Translator,
+        token_key: bytes,
+        public_base_url: str,
+        previous_token_key: bytes | None = None,
+    ) -> None:
         """Prepare the template environment."""
         self._translator = translator
-        self._token_key = token_key
+        self._token_keys = (token_key, *([previous_token_key] if previous_token_key else []))
         self._base_url = public_base_url.rstrip("/")
         self._environment = create_environment([TEMPLATE_DIR])
 
@@ -235,7 +243,8 @@ class MessageComposer:
 
     def manage_url(self, booking: Booking) -> str:
         """Return the participant's management link for ``booking``."""
-        return f"{self._base_url}/b/{derive_token(self._token_key, booking.token_salt)}"
+        token = token_for_booking(self._token_keys, booking.token_salt, booking.token_hash)
+        return f"{self._base_url}/b/{token}"
 
     def compose(
         self,

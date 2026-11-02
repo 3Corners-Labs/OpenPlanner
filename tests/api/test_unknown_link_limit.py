@@ -112,7 +112,7 @@ async def test_valid_tokens_and_other_addresses_are_unaffected(demo_settings: Se
         assert booked.status_code == 303
         token = await confirm_newest(client)
         for _ in range(BOUND + 2):  # valid links are not counted, however often they are read
-            assert (await hit(client, "GET", f"/b/{token}")).status_code == 200
+            assert (await hit(client, "GET", f"/b/{token}")).status_code == 303
         for n in range(BOUND):
             assert (await hit(client, "GET", f"/b/guess{n}")).status_code == 404
         assert (await hit(client, "GET", "/b/guess-over")).status_code == 429
@@ -122,7 +122,7 @@ async def test_valid_tokens_and_other_addresses_are_unaffected(demo_settings: Se
         async with site.client("198.51.100.9") as other:
             elsewhere = await hit(other, "GET", "/b/guess0")
 
-    assert (own.status_code, cancel_page.status_code) == (200, 200)
+    assert (own.status_code, cancel_page.status_code) == (303, 303)  # the exchange (ADR 0093)
     assert elsewhere.status_code == 404
 
 

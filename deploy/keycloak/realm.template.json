@@ -4,7 +4,7 @@
   "displayName": "OpenPlanner",
   "sslRequired": "external",
   "registrationAllowed": false,
-  "loginWithEmailAllowed": false,
+  "loginWithEmailAllowed": true,
   "bruteForceProtected": true,
   "accessTokenLifespan": 300,
   "components": {
@@ -41,7 +41,9 @@
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "${KC_OPENPLANNER_BASE_URL}/admin/logged-out"
+        "post.logout.redirect.uris": "${KC_OPENPLANNER_BASE_URL}/admin/logged-out",
+        "acr.loa.map": "{\"mfa\":2}",
+        "default.acr.values": "mfa"
       },
       "protocolMappers": [
         {
@@ -105,6 +107,19 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "openplanner-directory",
+      "name": "OpenPlanner staff management (ADR 0095)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KC_DIRECTORY_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true
     }
   ],
   "users": [
@@ -141,8 +156,112 @@
         }
       ],
       "requiredActions": [
-        "UPDATE_PASSWORD"
+        "UPDATE_PASSWORD",
+        "CONFIGURE_TOTP"
+      ]
+    },
+    {
+      "username": "service-account-openplanner-directory",
+      "enabled": true,
+      "serviceAccountClientId": "openplanner-directory",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-realm"
+        ]
+      }
+    }
+  ],
+  "browserFlow": "openplanner browser",
+  "otpPolicyType": "totp",
+  "webAuthnPolicyUserVerificationRequirement": "required",
+  "authenticationFlows": [
+    {
+      "alias": "openplanner browser",
+      "description": "Cookie, or password and a second factor (ADR 0100)",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "flowAlias": "openplanner browser forms",
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "openplanner browser forms",
+      "description": "Password, then the second factor when level 2 (mfa) is asked",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "flowAlias": "openplanner second factor",
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "openplanner second factor",
+      "description": "Only when the client asks for acr mfa (level 2)",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticatorConfig": "openplanner level 2"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": true
+        },
+        {
+          "authenticator": "webauthn-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "userSetupAllowed": true
+        }
       ]
     }
-  ]
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "openplanner level 2",
+      "config": {
+        "loa-condition-level": "2",
+        "loa-max-age": "36000"
+      }
+    }
+  ],
+  "resetPasswordAllowed": true
 }

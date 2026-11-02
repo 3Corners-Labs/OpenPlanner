@@ -12,7 +12,14 @@ from typing import Protocol
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import BookingRow, ClosureRow, JobRow, SlotRow
+from app.adapters.db.models import (
+    BookingDayCountRow,
+    BookingRow,
+    ClosureRow,
+    GroupRow,
+    JobRow,
+    SlotRow,
+)
 from app.domain.authorization import Scope
 from app.domain.booking import BookingStatus
 from app.domain.job_plan import JobType
@@ -52,7 +59,7 @@ class RetentionQueries:
         """Return the counts per group in ``scope`` and the bookings that may be overdue.
 
         Candidates still hold personal data and either ended or were cancelled before
-        ``candidates_before``, or are suspended (their closure decides).
+        ``candidates_before``, or are suspended (their closure and the maximum decide).
         """
         groups = await self.list_groups(scope)
         ids = [g.group.id for g in groups if g.group.id is not None]
@@ -69,6 +76,15 @@ class RetentionQueries:
             .group_by(BookingRow.group_id)
         )
         per_group = {group_id: (int(held or 0), last) for group_id, held, last in counts}
+        # Rows merged into daily counts (ADR 0102 step 4) still count as the last removal.
+        merged = await self._session.execute(
+            select(BookingDayCountRow.group_id, func.max(BookingDayCountRow.last_purged_at))
+            .where(BookingDayCountRow.group_id.in_(ids))
+            .group_by(BookingDayCountRow.group_id)
+        )
+        for group_id, last_merged in merged:
+            held, last = per_group.get(group_id, (0, None))
+            per_group[group_id] = (held, max(filter(None, (last, last_merged))))
         failed = await self._session.execute(
             select(BookingRow.group_id, func.count(JobRow.id))
             .join(BookingRow, BookingRow.id == JobRow.booking_id)
@@ -131,8 +147,11 @@ async def _candidates(
             ClosureRow.ends_at,
             BookingRow.rebook_by,
             BookingRow.confirm_by,
+            GroupRow.organisation_id,
+            BookingRow.closure_id,
         )
         .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+        .join(GroupRow, GroupRow.id == BookingRow.group_id)
         .outerjoin(ClosureRow, ClosureRow.id == BookingRow.closure_id)
         .where(*where)
         .order_by(BookingRow.id)
@@ -148,6 +167,8 @@ async def _candidates(
                 closure_end,
                 rebook_by,
                 confirm_by,
+                organisation_id,
+                closure_id,
             ),
         )
         for (
@@ -159,5 +180,7 @@ async def _candidates(
             closure_end,
             rebook_by,
             confirm_by,
+            organisation_id,
+            closure_id,
         ) in rows
     ]

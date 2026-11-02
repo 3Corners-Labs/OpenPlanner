@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 
-from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Outcome
+from app.domain.audit import ANONYMOUS_ACTOR, AuditEntry, AuditEvent, AuditFilter, Outcome
 from app.domain.audit_export import (
     EXPORT_EVENT,
     ExportLimits,
@@ -42,11 +42,13 @@ from app.domain.authorization import (
     Scope,
     Target,
     decide,
+    granting_role,
     holds_a_role,
     reaches,
     role_keys,
     scope_for,
 )
+from app.domain.closure_retention import ClosureRetentionOf, default_closure_retention
 from app.domain.entitlements import Refusal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_schema import Envelope, to_record
@@ -58,11 +60,12 @@ from app.domain.staff import (
     RefusedEntitlement,
     StaffFilter,
     StaffMember,
+    StaffStatus,
     change_events,
 )
 from app.domain.tasks import ActiveJobs
 
-ANONYMOUS = "anonymous"
+ANONYMOUS = ANONYMOUS_ACTOR
 """Actor recorded for events without a logged-in admin (e.g. a failed login)."""
 
 LOGIN_EVENT = "admin.login"
@@ -95,12 +98,20 @@ class AdminService:
     Args:
         uow: Opens database transactions.
         clock: Current time, for audit events.
+        retention_of: The organisation's maximum for bookings on hold, for the retention
+            overview (ADR 0102, class D).
     """
 
-    def __init__(self, uow: UnitOfWork, clock: Clock) -> None:
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        retention_of: ClosureRetentionOf = default_closure_retention,
+    ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
+        self._retention_of = retention_of
 
     async def authorize(
         self,
@@ -170,7 +181,8 @@ class AdminService:
             reason = Reason.OUT_OF_SCOPE if holds_a_role(principal) else Reason.NO_ROLE
             await self.record(principal.subject, permission.value, Outcome.DENIED, reason.value)
             return Authorization(Decision(False, reason), Target.everything())
-        return Authorization(Decision(True, Reason.ROLE), Target.everything())
+        role = granting_role(principal, permission)
+        return Authorization(Decision(True, Reason.ROLE, role), Target.everything())
 
     async def organisation_id(self, slug: str) -> int | None:
         """Return the id of the organisation ``slug``, or ``None`` when there is none.
@@ -226,6 +238,8 @@ class AdminService:
         async with self._uow.locked() as tx:
             await self._record_session_event(tx, principal, LOGIN_EVENT, memberships)
             old = await tx.get_staff(principal.subject)
+            if old is not None and old.status is StaffStatus.ERASED:
+                old = None  # an erased person who returns starts a fresh record (ADR 0046)
             new = StaffMember(
                 subject=principal.subject,
                 display_name=principal.display_name,
@@ -427,7 +441,7 @@ class AdminService:
         scope = scope_for(principal, Permission.RETENTION_VIEW)
         async with self._uow.read() as tx:
             facts = await tx.list_retention(scope, candidates_before(now))
-        return summarise(facts, now)
+        return summarise(facts, now, self._retention_of)
 
 
 def memberships_of(principal: Principal) -> list[Membership]:
@@ -447,15 +461,16 @@ def refusal_events(subject: str, now: datetime, refused: Sequence[Refusal]) -> l
     """Return one ``auth.entitlement_refused`` event per organisation named (ADR 0049 point 7).
 
     Values naming no known organisation go into one global event, which only the superuser
-    sees. The detail lists ``value=reason`` pairs; values hold prefixes, role keys and IdP
-    values, never personal data. A detail that would not fit is counted instead.
+    sees. The detail lists ``reason:value`` parts (``unknown_organisation:fin-x``, ADR 0103
+    point 6); values hold prefixes, role keys and IdP values, never personal data. A detail that
+    would not fit is counted instead.
     """
     by_organisation: dict[str | None, list[Refusal]] = {}
     for refusal in refused:
         by_organisation.setdefault(refusal.organisation, []).append(refusal)
     events = []
     for organisation, found in sorted(by_organisation.items(), key=lambda item: item[0] or ""):
-        detail = ",".join(f"{r.value}={r.reason.value}" for r in found)
+        detail = ",".join(f"{r.reason.value}:{r.value}" for r in found)
         if len(detail) > 255:
             detail = f"refused:{len(found)}"
         events.append(

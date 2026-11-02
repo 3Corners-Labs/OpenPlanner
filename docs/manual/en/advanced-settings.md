@@ -25,6 +25,59 @@ When the installation does not run as production (for example a test environment
 screen also lists what production would refuse: a missing key or an address without https.
 Production never starts with any of these.
 
+### Key rotation
+
+While `SETTINGS_ENCRYPTION_KEY_PREVIOUS` or `MANAGEMENT_TOKEN_KEY_PREVIOUS` is set, a block
+*Key rotation* shows how many encrypted secrets are still under the previous settings key and
+how many open bookings still have a link under the previous token key. Only numbers appear,
+never keys or contents. At 0 the screen says the previous key can be removed; otherwise it
+says what to do first (run `rekey` on the host, or wait until those bookings are over). Without
+a previous key the block does not appear. The procedure is in the runbook, *Rotating secrets*,
+and the inventory of all keys in `docs/cryptography.md`.
+
+### Update back-ups
+
+Before every update the updater copies the database so that it can roll back. That copy holds
+personal data, so it is deleted after 24 hours, by the updater and, as a second safety net, by
+the worker, also when the updater or its timer does not run. The block shows how many copies
+there are and how old the oldest is. When the oldest is more than two hours past its 24 hours,
+a warning appears: neither deleter has worked, so check that the worker runs and that the data
+volume is writable. File names are never shown. Back-ups for disaster recovery are a matter of
+the hosting party, not of this screen (runbook, *Backup and restore*).
+
+### Address and proxy
+
+Above the certificate is what the installation knows about its own address. Every link in an
+email, the login redirect and the widget is built on the public address, never on the address of
+the request; that one address decides whether participants reach the installation. The block
+shows:
+
+- **Installation**: the bundled proxy, an own reverse proxy or no proxy (a lab);
+- **Public address** and, when it differs, the **Webhook address**;
+- the **trusted proxy address** (`FORWARDED_ALLOW_IPS`);
+- the **OIDC redirect URI**, to compare with what is registered at the identity provider, and the
+  **widget loader**, to compare with the site that embeds the widget.
+
+These values are set on the server, in the environment (class B): they cannot be changed here,
+because a wrong public address would lock every administrator out at the next login. A change
+needs a restart; the procedure is in the runbook, *Address and proxy*.
+
+Under **Round trip** is the outcome of the check the server makes every few hours: it asks the
+public address for `/api/v1/instance`, as a participant's browser does, and judges the answer
+with one finding and the time. The findings are **fine**, **not reachable** (with the reason of
+the network or the server), **another installation**, **not https**, **proxy not trusted**,
+**no forwarded headers** and **redirected**. With *proxy not trusted*, `FORWARDED_ALLOW_IPS` is
+not the address the web container sees the proxy connect from: every visitor then shares one
+address and the app's own redirects point to `http://`. When the check is switched off on the
+server (`PUBLIC_ADDRESS_CHECK_ENABLED`) the page says *not checked*, never *fine*.
+
+When the web server sees requests with `X-Forwarded-For` or `X-Forwarded-Proto` from a proxy it
+does not trust, that shows here too, with the count and the kind of sender (loopback, private or
+public). The address is shown only when it is a proxy in your own network, never that of a
+visitor. Every finding that is not *fine* is also a system event `public_address` in the audit
+log, repeated while it lasts (setting *Repeat the certificate report every*). In the Overview
+widget System status one row *Proxy* then points here.
+
 ### Certificate of the public address
 
 Below the environment is the certificate visitors reach the installation with: the address,

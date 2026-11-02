@@ -8,6 +8,7 @@ All mapping between rows and domain objects lives in this module.
 """
 
 import json
+import secrets
 from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -67,6 +68,7 @@ from app.adapters.db.models import (
     OrganisationOriginRow,
     OrganisationRow,
     OrganisationTextRow,
+    ParticipantLinkBookingRow,
     ReminderRuleRow,
     ScheduleOverrideRow,
     ScheduleRuleRow,
@@ -76,9 +78,12 @@ from app.adapters.db.models import (
     WebhookEventRow,
 )
 from app.adapters.db.own_certificate import OwnCertificateQueries
+from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
+from app.adapters.db.public_address import PublicAddressQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
+from app.adapters.db.rollup import RollupQueries
 from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
@@ -139,7 +144,9 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.images import PageImage
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
+from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
+from app.domain.privacy import PURGED_FIELDS
 from app.domain.scheduling import (
     DispatchKind,
     Group,
@@ -152,6 +159,7 @@ from app.domain.scheduling import (
     ScheduleRule,
     TimeWindow,
 )
+from app.domain.staff import StaffStatus
 from app.domain.tasks import ActiveJob, ActiveJobs, JobState
 from app.domain.theme import Theme
 from app.domain.worker_check import WorkerHeartbeat
@@ -347,6 +355,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         token_hash=row.management_token_hash,
         created_at=row.created_at,
         token_salt=row.management_token_salt,
+        public_ref=row.public_ref,
         consents=frozenset(ChannelKind(c) for c in row.consents.split(",") if c),
         cancelled_at=row.cancelled_at,
         rescheduled_from_id=row.rescheduled_from_id,
@@ -422,11 +431,13 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 
 class SqlTransaction(
     AdminSessionQueries,
+    ParticipantLinkQueries,
     ApiClientQueries,
     IdentityProviderQueries,
     LogDestinationQueries,
     UpdateQueries,
     RetentionQueries,
+    RollupQueries,
     StaffQueries,
     MaintenanceQueries,
     RoleQueries,
@@ -435,6 +446,7 @@ class SqlTransaction(
     PlatformSettingsQueries,
     FormFieldQueries,
     CertificateQueries,
+    PublicAddressQueries,
     OwnCertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
@@ -512,6 +524,7 @@ class SqlTransaction(
                 trace_id=event.trace_id[:32],
                 service=event.service[:16],
                 message=event.message[:300],
+                actor_role=event.actor_role[:64],
             )
         )
         await self._session.flush()
@@ -522,7 +535,7 @@ class SqlTransaction(
     ) -> list[AuditEntry]:
         """Return the newest audit events inside ``scope``, narrowed by ``narrow`` (ADR 0031)."""
         query = (
-            select(AuditEventRow, StaffRow.display_name)
+            select(AuditEventRow, StaffRow.display_name, StaffRow.status)
             .outerjoin(StaffRow, StaffRow.subject == AuditEventRow.actor)
             .where(scope_filter(scope, AuditEventRow.organisation, AuditEventRow.group))
         )
@@ -564,13 +577,15 @@ class SqlTransaction(
     async def get_events(self, actions: Sequence[str], limit: int) -> list[AuditEntry]:
         """Return the newest audit events with one of ``actions``, with the actors' names."""
         query = (
-            select(AuditEventRow, StaffRow.display_name)
+            select(AuditEventRow, StaffRow.display_name, StaffRow.status)
             .outerjoin(StaffRow, StaffRow.subject == AuditEventRow.actor)
             .where(AuditEventRow.action.in_(list(actions)))
         )
         return await self._entries(query, limit)
 
-    async def _entries(self, query: Select[AuditEventRow, str], limit: int) -> list[AuditEntry]:
+    async def _entries(
+        self, query: Select[AuditEventRow, str, str], limit: int
+    ) -> list[AuditEntry]:
         """Run an audit query newest first and map the rows with the actors' names."""
         rows = await self._session.execute(
             query.order_by(AuditEventRow.at.desc(), AuditEventRow.id.desc()).limit(limit)
@@ -594,10 +609,12 @@ class SqlTransaction(
                     service=row.service,
                     event_id=row.event_id,
                     message=row.message,
+                    actor_role=row.actor_role,
                 ),
-                name,
+                name or None,
+                status == StaffStatus.ERASED.value,
             )
-            for row, name in rows
+            for row, name, status in rows
         ]
 
     async def delete_audit_events(
@@ -1682,6 +1699,7 @@ class SqlTransaction(
             consents=",".join(sorted(booking.consents)),
             management_token_hash=booking.token_hash,
             management_token_salt=booking.token_salt,
+            public_ref=booking.public_ref or new_public_ref(),
             created_at=booking.created_at,
             cancelled_at=booking.cancelled_at,
             rescheduled_from_id=booking.rescheduled_from_id,
@@ -1703,23 +1721,45 @@ class SqlTransaction(
         return _booking(*found) if found else None
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
-        """NULL every PII column (CLAUDE.md privacy rules) and record ``pii_purged_at``."""
+        """Delete the personal fields and provider links of a booking (ADR 0102 point 11).
+
+        Sets every column of ``privacy.PURGED_FIELDS`` to NULL, empties the message of the
+        booking's timeline events, replaces the management token hash by a random value (the
+        column is unique and not null; the old hash can no longer find the booking) and records
+        ``pii_purged_at``. The salt stays: without the token it identifies nothing.
+        """
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking_id)
             .values(
-                first_name=None,
-                last_name=None,
-                email=None,
-                phone=None,
-                form_answers=None,
-                guest_join_url=None,
-                host_join_url=None,
-                trial_join_url=None,
-                claimed_by=None,
-                pii_purged_at=now,
+                {
+                    **dict.fromkeys(PURGED_FIELDS),
+                    "management_token_hash": secrets.token_hex(32),
+                    "pii_purged_at": now,
+                }
             )
         )
+        await self._session.execute(
+            update(BookingEventRow)
+            .where(BookingEventRow.booking_id == booking_id)
+            .values(message="")
+        )
+        # ADR 0093 point 5: a purged booking leaves every participant link session.
+        await self._session.execute(
+            delete(ParticipantLinkBookingRow).where(
+                ParticipantLinkBookingRow.booking_id == booking_id
+            )
+        )
+
+    async def get_booking_by_public_ref(self, public_ref: str) -> Booking | None:
+        """Return the booking named by ``public_ref`` (ADR 0093)."""
+        result = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(BookingRow.public_ref == public_ref)
+        )
+        found = result.one_or_none()
+        return _booking(*found) if found else None
 
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         """Return the booking whose management token hashes to ``token_hash``."""
@@ -1991,6 +2031,19 @@ class SqlTransaction(
             .order_by(SlotRow.start, BookingRow.id)
         )
         return [_booking(booking, slot) for booking, slot in rows]
+
+    async def latest_suspended_end(self, closure_id: int) -> datetime | None:
+        """Return the latest slot end of the bookings still on hold in the closure."""
+        found = await self._session.scalar(
+            select(func.max(SlotRow.end))
+            .join(BookingRow, BookingRow.slot_id == SlotRow.id)
+            .where(
+                BookingRow.closure_id == closure_id,
+                BookingRow.status == BookingStatus.SUSPENDED.value,
+                BookingRow.pii_purged_at.is_(None),
+            )
+        )
+        return found
 
     async def _with_notices(self, row: ClosureRow) -> Closure:
         """Return the closure of ``row`` with its notices."""

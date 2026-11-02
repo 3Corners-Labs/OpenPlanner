@@ -13,6 +13,62 @@
   <h3 id="logging-heading">{{ _("admin.settings.logging.title") }}</h3>
   <p>{% if log_summary.total == 0 %}{{ _("admin.settings.logging.none") }}{% else %}{{ _("admin.settings.logging.summary", total=log_summary.total, enabled=log_summary.enabled) }}{% if log_summary.failing %} <span class="chip chip--danger">{{ _("admin.settings.logging.failing", count=log_summary.failing) }}</span>{% endif %}{% endif %} <a href="/admin/logging">{{ _("admin.settings.logging.open") }}</a></p>
   {% endif %}
+  <h3 id="directory-heading">{{ _("admin.settings.directory.title") }}</h3>
+  <p>{% if directory.state in ("unreachable", "incomplete") %}<span class="chip chip--warning">{{ _("admin.settings.directory.chip") }}</span> {% endif %}{{ directory.text }}</p>
+  {% if rotation.active %}
+  <h3 id="keys-heading">{{ _("admin.settings.keys.title") }}</h3>
+  <p>{{ _("admin.settings.keys.intro") }}</p>
+  <dl class="facts" aria-labelledby="keys-heading">
+    {% if rotation.records is not none %}
+    <div><dt>{{ _("admin.settings.keys.records") }}</dt><dd>{{ rotation.records }}</dd></div>
+    {% endif %}
+    {% if rotation.bookings is not none %}
+    <div><dt>{{ _("admin.settings.keys.bookings") }}</dt><dd>{{ rotation.bookings }}</dd></div>
+    {% endif %}
+  </dl>
+  {% if rotation.records_done %}<p>{{ _("admin.settings.keys.records_done") }}</p>{% elif rotation.records is not none %}<p>{{ _("admin.settings.keys.records_todo") }}</p>{% endif %}
+  {% if rotation.bookings_done %}<p>{{ _("admin.settings.keys.bookings_done") }}</p>{% elif rotation.bookings is not none %}<p>{{ _("admin.settings.keys.bookings_todo") }}</p>{% endif %}
+  {% endif %}
+  <h3 id="backups-heading">{{ _("admin.settings.backups.title") }}</h3>
+  <p>{{ _("admin.settings.backups.intro") }}</p>
+  {% if backups.warning %}<p role="alert"><span class="chip chip--warning">{{ _("admin.settings.backups.chip") }}</span> {{ backups.warning }}</p>{% endif %}
+  {% if backups.count %}
+  <dl class="facts" aria-labelledby="backups-heading">
+    <div><dt>{{ _("admin.settings.backups.count") }}</dt><dd>{{ backups.count }}</dd></div>
+    <div><dt>{{ _("admin.settings.backups.oldest") }}</dt><dd>{{ backups.oldest }}</dd></div>
+  </dl>
+  {% else %}
+  <p>{{ _("admin.settings.backups.none") }}</p>
+  {% endif %}
+  <h3 id="address-heading">{{ _("admin.settings.address.title") }}</h3>
+  <p>{{ _("admin.settings.address.intro") }}</p>
+  {% if address.hop_warning %}<p><span class="chip chip--warning">{{ _("admin.overview.widget.status.proxy") }}</span> {{ address.hop_warning }}</p>{% endif %}
+  {% if address.untrusted %}<p role="alert"><span class="chip chip--danger">{{ _("admin.overview.widget.status.proxy") }}</span> {{ address.untrusted }}</p>{% endif %}
+  <dl class="facts" aria-labelledby="address-heading">
+    <div><dt>{{ _("admin.settings.address.shape") }}</dt><dd>{{ address.shape }}</dd></div>
+    <div><dt>{{ _("admin.settings.address.public") }}</dt><dd><code>{{ address.public }}</code></dd></div>
+    {% if address.webhook %}<div><dt>{{ _("admin.settings.address.webhook") }}</dt><dd><code>{{ address.webhook }}</code></dd></div>{% endif %}
+    <div><dt>{{ _("admin.settings.address.proxy") }}</dt><dd>{% if address.proxy %}<code>{{ address.proxy }}</code>{% else %}{{ _("admin.settings.address.proxy.none") }}{% endif %}</dd></div>
+    <div><dt>{{ _("admin.settings.address.callback") }}</dt><dd><code>{{ address.callback }}</code></dd></div>
+    <div><dt>{{ _("admin.settings.address.widget") }}</dt><dd><code>{{ address.widget }}</code></dd></div>
+  </dl>
+  <p class="muted">{{ _("admin.settings.address.set_on_server") }}</p>
+  <h4 id="address-trip-heading">{{ _("admin.settings.address.round_trip") }}</h4>
+  {% if address.switched_off %}
+  <p>{{ _("admin.settings.address.off") }}</p>
+  {% elif address.checks %}
+  {% for check in address.checks %}
+  <dl class="facts" aria-label="{{ check.kind }}">
+    <div><dt>{{ check.kind }}</dt><dd><code>{{ check.url }}</code></dd></div>
+    <div><dt>{{ _("admin.settings.address.checked_at") }}</dt><dd>{{ check.checked_at }}</dd></div>
+    {% if check.reason %}<div><dt>{{ _("admin.settings.address.reason") }}</dt><dd>{{ check.reason }}</dd></div>{% endif %}
+  </dl>
+  <p><span class="chip chip--{{ check.chip }}">{{ _("admin.settings.tls.finding") }}</span> {{ check.finding }}</p>
+  {% if check.seen %}<p class="muted">{{ check.seen }}</p>{% endif %}
+  {% endfor %}
+  {% else %}
+  <p>{{ _("admin.settings.address.none") }}</p>
+  {% endif %}
   <h3 id="tls-heading">{{ _("admin.settings.tls.title") }}</h3>
   {% if certificate %}
   <dl class="facts" aria-labelledby="tls-heading">

@@ -13,6 +13,10 @@ scope. Links use the record's number, never the identity-provider subject.
                                                                                staff.view
     GET /admin/staff/{member_id}                                               staff.view
 
+A suspended or erased person carries a chip in words (ADR 0046 steps 2); an erased one shows
+no name, only "Erased staff member". The actions on a person (suspend, reinstate, erase) are
+in ``app.admin.staff_status_routes``.
+
 A person's page also lists the entitlement values of their last login that this installation
 did not recognise, with the reason (ADR 0049 point 8), within the viewer's scope.
 """
@@ -26,14 +30,20 @@ from starlette.responses import HTMLResponse
 
 from app.admin.audit_routes import audit_views
 from app.admin.authz import AdminContext, RequirePermission, admin_service
-from app.admin.forms import Option
+from app.admin.forms import FormData, Option
 from app.admin.idp_mapping_routes import reason_label
 from app.admin.pages import Locale, admin_moment
 from app.admin.pages import page as _page
+from app.admin.staff_directory_routes import (
+    add_fields,
+    directory_service,
+    manage_view,
+)
 from app.domain.audit import AuditFilter
 from app.domain.authorization import Permission, Role, scope_for
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import GroupSummary
-from app.domain.staff import StaffFilter, StaffMember
+from app.domain.staff import StaffFilter, StaffMember, StaffStatus
 from app.web.authz_labels import ROLE_LABELS
 from app.web.locale import RequestLocale
 from app.web.organisation_settings import settings_for
@@ -76,6 +86,8 @@ class StaffView:
     last_logout: str
     dormant: bool
     refused: tuple[RefusedView, ...] = ()
+    suspended: bool = False
+    erased: bool = False
 
 
 @dataclass(frozen=True)
@@ -116,9 +128,10 @@ def _view(
     _ = locale.gettext
     organisations, groups = names
     never = _("admin.staff.never")
+    erased = member.status is StaffStatus.ERASED
     return StaffView(
         id=member.id or 0,
-        name=member.display_name,
+        name=_("admin.staff.erased_name") if erased else member.display_name,
         roles=tuple(_(ROLE_LABELS[r]) for r in Role if r in member.roles),
         places=tuple(
             PlaceView(
@@ -133,7 +146,9 @@ def _view(
         last_logout=(
             admin_moment(request, locale, member.last_logout_at) if member.last_logout_at else never
         ),
-        dormant=member.is_dormant(now, _dormant_after(request)),
+        dormant=not erased and member.is_dormant(now, _dormant_after(request)),
+        suspended=member.status is StaffStatus.SUSPENDED,
+        erased=erased,
         refused=tuple(
             RefusedView(
                 r.value,
@@ -164,6 +179,22 @@ def _narrow(
         dormant_before=dormant_before if dormant == "1" else None,
         unrecognised=unrecognised == "1",
     )
+
+
+def _directory_notice(
+    locale: RequestLocale, missing: tuple[str, ...], unreachable: bool
+) -> str | None:
+    """Say why the bundled provider's actions are missing, naming settings, never values.
+
+    ADR 0106 point 3: a directory that is half configured or does not answer is shown, never
+    silent. A provider without a directory by design (ADR 0095 point 1) gets no notice.
+    """
+    _ = locale.gettext
+    if missing:
+        return _("admin.staff.directory.missing", names=", ".join(missing))
+    if unreachable:
+        return _("admin.staff.directory.unreachable")
+    return None
 
 
 @router.get("/staff", response_class=HTMLResponse)
@@ -198,6 +229,15 @@ async def staff_list(
         unrecognised=narrow.unrecognised,
         active=narrow != StaffFilter(),
     )
+    directory = directory_service(request)
+    manager = not scope_for(context.principal, Permission.STAFF_MANAGE).is_empty
+    try:
+        pending = await directory.pending(context.principal)
+        unreachable = False
+    except DomainError as error:
+        if error.code is not ErrorCode.STAFF_DIRECTORY_UNAVAILABLE:
+            raise
+        pending, unreachable = [], True
     return _page(
         request,
         locale,
@@ -205,6 +245,11 @@ async def staff_list(
         context.principal,
         {
             "people": [_view(request, locale, m, names, now) for m in members],
+            "can_invite": directory.available and manager and not unreachable,
+            "directory_notice": _directory_notice(locale, directory.missing, unreachable)
+            if manager
+            else None,
+            "pending": [manage_view(request, locale, context, p, in_scope) for p in pending],
             "filters": filters,
             "dormant_days": settings_for(request).staff_dormant_after_days,
         },
@@ -229,8 +274,11 @@ async def staff_member(
             context.principal, AuditFilter(actor=member.subject), ACTIVITY_LIMIT
         )
         activity = audit_views(request, locale, context.principal, entries)
-    names = _names(await service.groups(context.principal, Permission.STAFF_VIEW))
+    in_scope = await service.groups(context.principal, Permission.STAFF_VIEW)
+    names = _names(in_scope)
     now = request.app.state.clock.now()
+    managed = await directory_service(request).person(context.principal, member.subject)
+    manage = manage_view(request, locale, context, managed, in_scope) if managed else None
     return _page(
         request,
         locale,
@@ -239,6 +287,10 @@ async def staff_member(
         {
             "person": _view(request, locale, member, names, now),
             "events": activity,
+            "manage": manage,
+            "add_fields": add_fields(
+                context.principal, locale, in_scope, FormData({}, locale.gettext)
+            ),
             "activity_limit": ACTIVITY_LIMIT,
         },
     )

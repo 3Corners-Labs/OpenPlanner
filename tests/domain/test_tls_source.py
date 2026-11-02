@@ -177,7 +177,9 @@ async def test_the_chain_for_the_request_promotes_the_key_and_is_stored(
     assert status.key_on_host
     assert status.usable
     assert not status.key_missing
-    assert harness.audit_details()[-1] == f"tls.certificate.upload:{FINGERPRINT}:2026-03-02"
+    assert harness.audit_details()[-1] == (
+        f"tls.certificate.upload,fingerprint:{FINGERPRINT},not_after:2026-03-02"
+    )
     assert harness.volume.published is None  # the source is still acme
 
 
@@ -254,8 +256,8 @@ async def test_an_imported_pair_goes_to_the_volume_and_the_chain_to_the_store(
     assert harness.volume.calls == ["import"]
     assert harness.uow.state.own_certificate == stored
     assert harness.audit_details() == [
-        f"tls.certificate.upload:{FINGERPRINT}:2026-03-02",
-        f"tls.key.import:{FINGERPRINT}:2026-03-02",
+        f"tls.certificate.upload,fingerprint:{FINGERPRINT},not_after:2026-03-02",
+        f"tls.key.import,fingerprint:{FINGERPRINT},not_after:2026-03-02",
     ]
     assert all(KEY not in d for d in harness.audit_details())
 
@@ -325,7 +327,10 @@ async def test_removing_with_acme_deletes_the_chain_and_keeps_the_key(harness: H
     assert harness.uow.state.own_certificate is None
     assert harness.volume.current == PUBLIC  # the key on this host is not touched
     assert harness.volume.calls[-1] == "withdraw"
-    assert harness.audit_details()[-1] == f"tls.certificate.remove:{FINGERPRINT}:2026-03-02"
+    assert (
+        harness.audit_details()[-1]
+        == f"tls.certificate.remove,fingerprint:{FINGERPRINT},not_after:2026-03-02"
+    )
     assert await harness.service.remove(DEMO_SUPERUSER) is False
 
 

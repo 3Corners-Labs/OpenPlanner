@@ -122,6 +122,8 @@ make check
 - `docs/install.md` — installing and repairing a host with `scripts/install.sh`.
 - `site/` — the public website, openplanner.nl, built from the repository (ADR 0087).
 - `docs/runbook.md` — operating the service.
+- `docs/asvs.md` — for each requirement of the ASVS 5.0.0 level 2 audit that was not fully accepted: where the measure is now, and whether the gap is closed, accepted on purpose or open.
+- `docs/assurance/` — checklists for the parties that must give evidence we cannot (identity provider, hosting, Cisco, data controller) and the scope for the penetration test.
 - `docs/adr/` — decisions.
 - `CONTRIBUTING.md` — dev setup, tests, PR checklist.
 - `CLAUDE.md` — working agreements, architecture rules, quality gates.

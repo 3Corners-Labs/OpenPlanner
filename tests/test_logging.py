@@ -5,9 +5,11 @@ import re
 
 import pytest
 import structlog
+from sqlalchemy import text
 
-from app.domain.event_context import bind_level, set_service, trace_scope
-from app.domain.event_schema import Envelope
+from app.adapters.db.engine import create_engine
+from app.domain.event_context import bind_actor_role, bind_level, set_service, trace_scope
+from app.domain.event_schema import SCHEMA, Envelope
 from app.domain.privacy import ALIASES
 from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 from app.logging import (
@@ -16,6 +18,7 @@ from app.logging import (
     TRACE,
     TRACE_POINTS,
     configure_logging,
+    set_line_tap,
     set_log_level,
     tracer,
     warn_loose_secret_files,
@@ -40,7 +43,12 @@ def test_pii_fields_cover_the_booking_pii_columns() -> None:
     # ADR 0055: the split name and the answers to custom fields.
     assert {"first_name", "last_name", "form_answers", "answers"} <= PII_FIELDS
     # ADR 0063: one home for the list; the mask adds only the other names the data travels by.
-    assert PII_FIELDS == PII_COLUMNS | ALIASES
+    assert PII_FIELDS == PII_COLUMNS | ALIASES | {"username"}
+
+
+def test_the_staff_user_name_is_masked() -> None:
+    """ADR 0106 point 11: the bundled provider's user name holds the person's name."""
+    assert "username" in PII_FIELDS
 
 
 def test_structlog_masks_every_pii_field(stream: io.StringIO) -> None:
@@ -144,8 +152,79 @@ def test_a_loose_secret_file_is_reported_by_variable_name_only(stream: io.String
     warn_loose_secret_files(["SESSION_SECRET_FILE"])
 
     (record,) = _records(stream)
-    assert record["message"] == "settings.secret_file_readable"
-    assert record["variable"] == "SESSION_SECRET_FILE"
+    assert record["event.action"] == "settings.secret_file_readable"
+    assert record["message"] == "The secret file of SESSION_SECRET_FILE can be read by others."
+    assert record["labels.variable"] == "SESSION_SECRET_FILE"
+
+
+# --- ADR 0103: the line explains itself ----------------------------------------------------
+
+
+def test_a_line_reads_as_a_sentence_with_its_action_category_and_labels(
+    stream: io.StringIO,
+) -> None:
+    structlog.get_logger().warning(
+        "storage.degraded", grade="low", free_percent=6, database_mb=1, reason="free_space_low"
+    )
+
+    (record,) = _records(stream)
+    assert list(record)[:5] == [
+        "@timestamp",
+        "log.level",
+        "event.category",
+        "event.action",
+        "message",
+    ]
+    assert record["message"] == "Disk space is low: 6% free, database 1 MB (free_space_low)."
+    assert (record["event.action"], record["event.category"]) == ("storage.degraded", "operations")
+    assert (record["labels.free_percent"], record["labels.database_mb"]) == (6, 1)
+    assert record["reason"] == "free_space_low"  # an envelope field stays where it is
+    assert record["schema"] == SCHEMA
+    assert "free_percent" not in record
+
+
+def test_an_authorisation_decision_is_its_own_category_with_the_actors_kind_and_role(
+    stream: io.StringIO,
+) -> None:
+    with trace_scope():
+        bind_actor_role("org_admin")
+        structlog.get_logger().info(
+            "authz.decision",
+            actor="8c1f",
+            permission="group.view",
+            target="gemeente/burgerzaken",
+            target_group="burgerzaken",
+            target_organisation="gemeente",
+            allowed=True,
+            reason="group",
+        )
+
+    (record,) = _records(stream)
+    assert record["event.category"] == "authz"
+    assert record["message"] == (
+        "Permission group.view on gemeente/burgerzaken: allowed yes (group)."
+    )
+    assert (record["actor.type"], record["actor.role"]) == ("user", "org_admin")
+    assert record["labels.allowed"] == "true"
+
+
+def test_a_library_line_names_its_logger_and_keeps_its_own_text(stream: io.StringIO) -> None:
+    logging.getLogger("uvicorn.error").warning("Waiting for application shutdown.")
+
+    (record,) = _records(stream)
+    assert record["event.action"] == "library.uvicorn.error"
+    assert record["event.category"] == "operations"
+    assert record["message"] == "Waiting for application shutdown."
+    assert record["log.logger"] == "uvicorn.error"
+
+
+def test_the_sentence_carries_a_masked_value_never_the_value(stream: io.StringIO) -> None:
+    structlog.get_logger().info("i18n.missing_key", key="booking.title", locale="nl", email="a@b.c")
+
+    (record,) = _records(stream)
+    assert "a@b.c" not in stream.getvalue()
+    assert record["labels.email"] == MASK
+    assert record["message"] == "Text booking.title is missing in nl."
 
 
 def test_the_level_can_change_while_running_and_masking_stays() -> None:
@@ -187,10 +266,11 @@ def test_trace_lines_appear_at_trace_level_only() -> None:
         loud = _trace_stream("TRACE")
         tracer.trace("http.request", method="GET", route="/g/{slug}", status=200, ms=3)
         record = _records(loud)[0]
-        assert record["message"] == "http.request"
+        assert record["event.action"] == "http.request"
+        assert record["message"] == "GET /g/{slug} answered 200 in 3 ms."
         assert record["log.level"] == "trace"
-        assert record["route"] == "/g/{slug}"
-        assert record["status"] == 200
+        assert record["labels.route"] == "/g/{slug}"
+        assert record["labels.status"] == 200
         assert "name" not in record  # the stdlib logger's name does not leak into the line
     finally:
         structlog.reset_defaults()
@@ -243,13 +323,136 @@ def test_httpx_request_lines_with_their_urls_are_not_logged(stream: io.StringIO)
     assert stream.getvalue() == ""
 
 
-@pytest.mark.parametrize("level", ["INFO", "DEBUG"])
-def test_aiosqlite_parameter_lines_are_not_logged_at_any_level(level: str) -> None:
-    buffer = io.StringIO()
-    configure_logging(level, buffer)
+def _marker(field: str) -> str:
+    return f"marker-{field}-x@example.test"
 
-    logging.getLogger("aiosqlite").debug(
-        "operation %s parameters %s", "INSERT", ("marker-x@example.test",)
-    )
 
-    assert "marker-x" not in buffer.getvalue()
+def _foreign_noise() -> None:
+    """Lines as libraries write them at DEBUG, TRACE and INFO, holding a marker per PII field."""
+    for field in sorted(PII_FIELDS):
+        value = _marker(field)
+        logging.getLogger("aiosqlite").debug("operation %s parameters %s", "INSERT", (value,))
+        logging.getLogger("httpcore.http11").debug(
+            "receive_response_headers.complete return_value=%r", (200, [(b"x-" + b"a", value)])
+        )
+        logging.getLogger("httpcore.connection").log(TRACE, "connect %s", value)
+        logging.getLogger("some.future.library").info("payload %s", value)
+
+
+def _assert_no_marker(text: str) -> None:
+    assert "marker-" not in text
+
+
+@pytest.mark.parametrize("level", ["INFO", "DEBUG", "TRACE"])
+def test_a_foreign_logger_stays_at_warning_at_every_level(level: str) -> None:
+    """ASVS V16.2.5: only our own loggers follow ``LOG_LEVEL``; any other holds at WARNING."""
+    out = io.StringIO()
+    taps: list[str] = []
+    configure_logging(level, out)
+    set_line_tap(taps.append)
+    try:
+        _foreign_noise()
+        set_log_level(level)  # a live level change must not widen it
+        _foreign_noise()
+        # a library that sets its own level, or one that sets the root, does not widen it either
+        logging.getLogger("httpcore").setLevel(TRACE)
+        logging.getLogger("some.future.library").setLevel(logging.DEBUG)
+        _foreign_noise()
+        logging.getLogger("some.future.library").warning("kept %s", "visible")
+    finally:
+        set_line_tap(None)
+        logging.getLogger("httpcore").setLevel(logging.NOTSET)
+        logging.getLogger("some.future.library").setLevel(logging.NOTSET)
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    _assert_no_marker(out.getvalue())
+    _assert_no_marker("\n".join(taps))
+    assert "kept visible" in out.getvalue()  # a warning from a library is still shown
+    assert "kept visible" in "\n".join(taps)
+
+
+@pytest.mark.parametrize("level", ["INFO", "DEBUG", "TRACE"])
+async def test_the_real_engine_logs_no_bound_value_at_any_level(level: str) -> None:
+    """A real async engine, with the driver loggers asked for everything, shows no marker."""
+    out = io.StringIO()
+    taps: list[str] = []
+    configure_logging(level, out)
+    set_line_tap(taps.append)
+    for name in ("aiosqlite", "sqlalchemy.engine", "sqlalchemy.pool"):
+        logging.getLogger(name).setLevel(TRACE)
+    engine = create_engine("sqlite+aiosqlite://")
+    try:
+        async with engine.begin() as conn:
+            columns = ", ".join(f"{field} TEXT" for field in sorted(PII_COLUMNS))
+            await conn.execute(text(f"CREATE TABLE booking ({columns})"))
+            marks = {field: _marker(field) for field in sorted(PII_COLUMNS)}
+            names = ", ".join(marks)
+            binds = ", ".join(f":{field}" for field in marks)
+            insert = f"INSERT INTO booking ({names}) VALUES ({binds})"  # noqa: S608
+            await conn.execute(text(insert), marks)
+            await conn.execute(text("SELECT * FROM booking"))
+    finally:
+        await engine.dispose()
+        set_line_tap(None)
+        for name in ("aiosqlite", "sqlalchemy.engine", "sqlalchemy.pool"):
+            logging.getLogger(name).setLevel(logging.NOTSET)
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    _assert_no_marker(out.getvalue())
+    _assert_no_marker("\n".join(taps))
+
+
+def test_our_own_loggers_follow_the_level_and_the_trace_points_work() -> None:
+    out = io.StringIO()
+    taps: list[str] = []
+    configure_logging("TRACE", out)
+    set_line_tap(taps.append)
+    try:
+        logging.getLogger("openplanner.adapters.something").debug("own debug")
+        logging.getLogger("uvicorn.error").info("own uvicorn")
+        structlog.get_logger().debug("own structlog")
+        tracer.trace("outbound.request", method="GET", host="h.example", status=200, ms=2)
+        logging.getLogger("httpcore").debug("foreign debug")
+    finally:
+        set_line_tap(None)
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    messages = [record["message"] for record in _records(out)]
+    assert messages == [
+        "own debug",
+        "own uvicorn",
+        "own structlog",
+        "GET to h.example answered 200 in 2 ms.",
+    ]
+    assert [json.loads(line)["message"] for line in taps] == messages
+
+
+def test_our_own_loggers_stay_quiet_below_the_level() -> None:
+    out = io.StringIO()
+    configure_logging("INFO", out)
+    try:
+        logging.getLogger("openplanner.x").debug("hidden")
+        logging.getLogger("openplanner.x").info("shown")
+    finally:
+        structlog.reset_defaults()
+        logging.getLogger().handlers.clear()
+
+    assert [record["message"] for record in _records(out)] == ["shown"]
+
+
+def test_a_rendered_parameter_list_is_cut_from_an_exception_text(stream: io.StringIO) -> None:
+    """The net under ``hide_parameters``: another engine's exception text loses its values."""
+    try:
+        raise ValueError(
+            "(sqlite3.IntegrityError) NOT NULL\n[SQL: INSERT INTO t (e) VALUES (?)]\n"
+            "[parameters: ('ada@example.org',)]\n(Background on this error at: https://x)"
+        )
+    except ValueError:
+        structlog.get_logger().exception("insert.failed")
+
+    output = stream.getvalue()
+    assert "ada@example.org" not in output
+    assert "[SQL: INSERT INTO t" in output

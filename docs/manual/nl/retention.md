@@ -11,10 +11,18 @@ telefoonnummers, en ook niet welke afspraak het is.
 
 - **Afspraak voorbij**: 24 uur na het einde van de afspraak.
 - **Afspraak geannuleerd**: 24 uur na de annulering.
-- **Afspraak opgeschort door een noodsluiting**: uiterlijk 30 dagen na het einde van de
-  sluiting. Zolang de sluiting geen einde heeft, telt de afspraak nog niet mee.
+- **Afspraak opgeschort door een noodsluiting**: 30 dagen na het einde van de sluiting, en
+  uiterlijk het maximum van de organisatie na de oorspronkelijke afspraak (standaard 90 dagen),
+  ook zolang de sluiting geen einde heeft.
 
-Na het verwijderen blijft de afspraak bestaan zonder persoonsgegevens, voor de statistiek.
+Bij het verwijderen gaan de persoonsvelden van de boeking weg, samen met de koppelingen naar de
+vergadering en het werkitem bij de aanbieders en de redentekst op de tijdlijn. De afspraak zelf
+blijft bestaan met zijn referentie en tijden; samen met gegevens elders kunnen die nog naar een persoon wijzen.
+
+De afspraak zelf verdwijnt later ook: de beheerder van het platform stelt in hoeveel dagen na het
+verwijderen van de gegevens dat gebeurt (standaard 730). Van de afspraken blijft dan alleen een telling per
+groep, dag en eindstatus over, zonder persoonsgegevens of referentie. De cijfers op dit scherm
+veranderen daardoor niet; ook **Laatst verwijderd** blijft kloppen.
 
 ## Wat de kolommen betekenen
 

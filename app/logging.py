@@ -4,10 +4,22 @@ Every log line, from structlog or the stdlib (uvicorn, SQLAlchemy, ...), passes 
 ``mask_pii`` before rendering. Masking is a safety net: code must still never pass PII
 to a logger (enforced by the semgrep rules in ``.semgrep/``).
 
-Lines use the envelope of ``openplanner.event/2`` (ADR 0040, part 2), so a log platform reads
-them without mapping: ``@timestamp`` (RFC 3339 UTC, milliseconds), ``log.level``, ``message``,
-``service.name``, ``service.version``, ``installation``, and, inside a request or job,
-``trace.id``, ``organisation`` and ``group`` from ``app.domain.event_context``.
+Lines use the envelope of ``openplanner.event/3`` (ADR 0040 part 2, ADR 0103), so a log
+platform reads them without mapping: ``schema``, ``@timestamp`` (RFC 3339 UTC, milliseconds),
+``log.level``, ``event.action``, ``event.category``, ``message``, ``service.name``,
+``service.version``, ``installation``, and, inside a request or job, ``trace.id``,
+``organisation``, ``group`` and ``actor.role`` from ``app.domain.event_context``.
+
+A log call names its action (``log.warning("storage.degraded", free_percent=6)``); ``describe``
+turns that into the line: the code goes to ``event.action``, the register's category to
+``event.category``, the call's own fields to ``labels.<name>``, and ``message`` becomes the
+register's sentence with those fields filled in ("Disk space is low: 6% free ..."). It runs after
+the PII mask, so the sentence carries only masked values. A line of a library's own logger is
+``library.<logger>`` in category ``operations`` and keeps its own text (ADR 0103 point 8).
+
+``LOG_LEVEL`` governs our own loggers only (``OWN_LOGGERS``). Every other stdlib logger stays at
+WARNING at any level, TRACE included, so a library's DEBUG lines (bound SQL values, response
+headers) never reach the stream, the tap or log shipping (ASVS V16.2.5).
 
 ``TRACE`` (ADR 0085 part 2) sits below ``DEBUG``. Trace lines come only from the fixed points
 in ``TRACE_POINTS``, through ``tracer.trace(point, **fields)``: a point takes its registered
@@ -17,6 +29,7 @@ keeps it in step with the registry.
 """
 
 import logging
+import re
 import sys
 from collections.abc import Callable, Mapping, MutableMapping
 from contextlib import suppress
@@ -26,14 +39,27 @@ from typing import Any, TextIO
 import structlog
 from structlog.typing import EventDict, Processor, WrappedLogger
 
+from app.domain.audit import actor_type
 from app.domain.event_context import current
-from app.domain.event_schema import Envelope, rfc3339
+from app.domain.event_schema import LABELS, SCHEMA, Envelope, label_name, label_value, rfc3339
+from app.domain.log_events import (
+    COMMON_FIELDS,
+    LIBRARY_PREFIX,
+    LogCategory,
+    describe,
+    lookup,
+    trace_points,
+)
 from app.domain.privacy import ALIASES
 from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 
-PII_FIELDS = PII_COLUMNS | ALIASES
+STAFF_FIELDS = frozenset({"username"})
+"""Personal data of staff that a log line could carry: the user name of the bundled provider
+holds the person's name (ADR 0106 point 11). Their e-mail address is masked as ``email``."""
+PII_FIELDS = PII_COLUMNS | ALIASES | STAFF_FIELDS
 """Every personal-data field of ``Booking`` (``app.domain.privacy``, the one home of the
-list, ADR 0063) plus the other names the same data travels by (``name``, ``answers``)."""
+list, ADR 0063), the other names the same data travels by (``name``, ``answers``), and the
+staff user name."""
 MASK = "***"
 
 TRACE = 5
@@ -43,15 +69,9 @@ logging.addLevelName(TRACE, "TRACE")
 TRACE_LOGGER = "openplanner.trace"
 """The stdlib logger every trace line goes through, so it shares the root's level and format."""
 
-TRACE_POINTS: Mapping[str, tuple[str, ...]] = {
-    "http.request": ("method", "route", "status", "ms"),
-    "job.run": ("type", "attempt", "ms"),
-    "job.step": ("type", "step", "ms"),
-    "outbound.request": ("method", "host", "status", "ms", "error"),
-    "sql.slow": ("statement", "table", "ms"),
-    "template.render": ("template", "ms"),
-}
-"""The trace points of ADR 0085 point 9 and the only fields each may carry.
+TRACE_POINTS: Mapping[str, tuple[str, ...]] = trace_points()
+"""The trace points of ADR 0085 point 9 and the only fields each may carry, from the register
+of actions (``app.domain.log_events``, ADR 0103).
 
 ``http.request`` takes the route template, never the raw path (``/b/{token}`` carries the
 management token); ``outbound.request`` the host, never a URL, query, header or body;
@@ -111,6 +131,22 @@ def mask_pii(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> Eve
     return event_dict
 
 
+_BOUND_PARAMETERS = re.compile(r"\[parameters: [^\n]*")
+"""SQLAlchemy's rendering of the values bound to a failed statement, on one line."""
+
+
+def hide_bound_parameters(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> EventDict:
+    """Structlog processor: cut SQLAlchemy's ``[parameters: ...]`` from any text (ASVS V16.2.5).
+
+    The engines are built with ``hide_parameters`` so the text never has them; this is the net
+    below that for an exception that comes from some other engine, rendered into a log line.
+    """
+    for key, value in event_dict.items():
+        if isinstance(value, str) and "[parameters: " in value:
+            event_dict[key] = _BOUND_PARAMETERS.sub(f"[parameters: {MASK}]", value)
+    return event_dict
+
+
 def _stdlib_extra(
     _logger: WrappedLogger, _method: str, event_dict: MutableMapping[str, Any]
 ) -> MutableMapping[str, Any]:
@@ -144,6 +180,7 @@ def _with_context(envelope: Envelope) -> Processor:
             "trace.id": context.trace_id,
             "organisation": context.organisation,
             "group": context.group,
+            "actor.role": context.actor_role,
         }
         for key, value in fields.items():
             if value:
@@ -163,6 +200,91 @@ def _schema_names(_logger: WrappedLogger, _method: str, event_dict: EventDict) -
     if "level" in event_dict:
         event_dict["log.level"] = event_dict.pop("level")
     return event_dict
+
+
+LOGGER = "log.logger"
+"""ECS field with the name of the stdlib logger a line came from."""
+
+_KEPT = frozenset(COMMON_FIELDS) | {"exception", "stack", LOGGER}
+"""Fields of a line that stay where they are: the envelope's own and an exception's text."""
+
+
+def _logger_name(
+    _logger: WrappedLogger, _method: str, event_dict: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
+    """Note the stdlib logger of a foreign record as ``log.logger``."""
+    record = event_dict.get("_record")
+    if record is not None:
+        event_dict.setdefault(LOGGER, record.name)
+    return event_dict
+
+
+def describe_line(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> EventDict:
+    """Structlog processor: give the line the action, category, labels and sentence (ADR 0103).
+
+    Runs after ``_schema_names``, so the call's action is in ``message``.
+    """
+    action = str(event_dict.get("message", ""))
+    entry = lookup(action)
+    logger = event_dict.get(LOGGER)
+    event_dict["schema"] = SCHEMA
+    if entry is None:
+        if logger is not None and logger != TRACE_LOGGER:
+            event_dict["event.action"] = f"{LIBRARY_PREFIX}{logger}"
+        else:
+            event_dict["event.action"] = action
+        event_dict["event.category"] = LogCategory.OPERATIONS.value
+        return _in_reading_order(event_dict)
+    event_dict["event.action"] = action
+    event_dict["event.category"] = entry.category.value
+    values: dict[str, object] = {}
+    for name in [k for k in event_dict if k not in _KEPT and not _is_envelope(k)]:
+        value = event_dict.pop(name)
+        values[name] = value
+        event_dict[f"{LABELS}{label_name(name)}"] = label_value(value)
+    values.update({k: event_dict[k] for k in COMMON_FIELDS if k in event_dict})
+    event_dict["message"] = describe(action, values)
+    if "actor" in event_dict:
+        event_dict["actor.type"] = actor_type(str(event_dict["actor"])).value
+    return _in_reading_order(event_dict)
+
+
+READING_ORDER = ("@timestamp", "log.level", "event.category", "event.action", "message")
+"""The fields a person reads first; a raw line starts with them, the rest follows."""
+
+
+def _in_reading_order(event_dict: EventDict) -> EventDict:
+    """Return the line with ``READING_ORDER`` first, then every other field as it came."""
+    ordered: EventDict = {k: event_dict[k] for k in READING_ORDER if k in event_dict}
+    ordered.update(event_dict)
+    return ordered
+
+
+_ENVELOPE = frozenset(
+    {
+        "schema",
+        "message",
+        "@timestamp",
+        "log.level",
+        "event.action",
+        "event.category",
+        "event.outcome",
+        "service.name",
+        "service.version",
+        "installation",
+        "trace.id",
+        "actor.role",
+        "actor.type",
+        "error.message",
+        "log_type",
+    }
+)
+"""The envelope's fields: never labels."""
+
+
+def _is_envelope(name: str) -> bool:
+    """Return whether ``name`` is an envelope field or already a label."""
+    return name in _ENVELOPE or name.startswith(LABELS)
 
 
 # Standard LogRecord attributes, plus uvicorn's ANSI-coloured duplicate of the message.
@@ -222,6 +344,36 @@ class _TapStream:
         return getattr(self._inner, name)
 
 
+OWN_LOGGERS = ("openplanner", "uvicorn.error")
+"""The stdlib loggers that follow ``LOG_LEVEL`` (and their children): ours, including the trace
+logger ``openplanner.trace``, and uvicorn's start-up and error lines. structlog loggers do not
+go through the stdlib and follow the level through their own filter."""
+FOREIGN_LEVEL = logging.WARNING
+"""The lowest level any other logger gets through, whatever ``LOG_LEVEL`` says.
+
+A fixed protection (ASVS V16.2.5), not a setting: libraries log at DEBUG what they handle
+(bound SQL values, response headers) and a log line can leave the host through log shipping.
+"""
+
+
+def _is_own(name: str) -> bool:
+    """Return whether the stdlib logger ``name`` is one of ``OWN_LOGGERS`` or below one."""
+    return any(name == own or name.startswith(f"{own}.") for own in OWN_LOGGERS)
+
+
+class _ForeignLevelFilter(logging.Filter):
+    """Drop a record of a logger that is not ours when it is below ``FOREIGN_LEVEL``.
+
+    The root logger's level only decides for loggers without a level of their own; this filter
+    on the handler also holds when a library sets its own logger to DEBUG, or when
+    ``set_log_level`` changes the level while running. The tap sits behind it.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return whether the record may be written."""
+        return record.levelno >= FOREIGN_LEVEL or _is_own(record.name)
+
+
 _CONFIGURED: list[tuple[TextIO, Envelope | None]] = []
 """The stream and envelope of the last ``configure_logging``, for ``set_log_level``."""
 
@@ -229,7 +381,8 @@ _CONFIGURED: list[tuple[TextIO, Envelope | None]] = []
 def set_log_level(level: str) -> None:
     """Change the minimum level live, keeping stream and envelope (ADR 0042 §6).
 
-    The PII masking applies at every level. Before ``configure_logging`` it does nothing.
+    The PII masking applies at every level, and the level applies to our own loggers only.
+    Before ``configure_logging`` it does nothing.
     """
     if _CONFIGURED:
         stream, envelope = _CONFIGURED[-1]
@@ -244,7 +397,7 @@ def configure_logging(
     Safe to call more than once (tests do); each call replaces the previous configuration.
 
     Args:
-        level: Minimum level name, e.g. ``"INFO"``.
+        level: Minimum level name, e.g. ``"INFO"``, for our own loggers (``OWN_LOGGERS``).
         stream: Output stream; defaults to stdout. Tests pass a ``StringIO``.
         envelope: Release and installation name added to every line.
     """
@@ -260,7 +413,9 @@ def configure_logging(
     finalize: list[Processor] = [
         mask_pii,
         structlog.processors.format_exc_info,
+        hide_bound_parameters,
         _schema_names,
+        describe_line,
         structlog.processors.JSONRenderer(),
     ]
 
@@ -276,15 +431,20 @@ def configure_logging(
     )
 
     handler = logging.StreamHandler(out)
+    handler.addFilter(_ForeignLevelFilter())
     handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
-            foreign_pre_chain=[*shared, _stdlib_extra],
+            foreign_pre_chain=[*shared, _logger_name, _stdlib_extra],
             processors=[structlog.stdlib.ProcessorFormatter.remove_processors_meta, *finalize],
         )
     )
+    # The level is for our own loggers only; the root, and so every other library, stays at
+    # WARNING (V16.2.5). An allowlist: a library added tomorrow is covered without a line here.
     root = logging.getLogger()
     root.handlers[:] = [handler]
-    root.setLevel(level)
+    root.setLevel(FOREIGN_LEVEL)
+    for own in OWN_LOGGERS:
+        logging.getLogger(own).setLevel(level)
 
     # uvicorn installs its own plain-text handlers; route them through ours instead.
     for name in ("uvicorn", "uvicorn.error"):
@@ -293,12 +453,6 @@ def configure_logging(
         uvicorn_logger.propagate = True
     # Access lines contain request paths, which will carry management tokens (/b/{token}).
     logging.getLogger("uvicorn.access").disabled = True
-    # httpx logs every outgoing request at INFO with its full URL, query string included; the
-    # ``outbound.request`` trace point (ADR 0085) carries method, host and status instead.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    # aiosqlite logs each statement with its bound parameters at DEBUG, which holds PII; the
-    # ``sql.slow`` trace point carries statement type and table only.
-    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 
 
 def warn_loose_secret_files(variables: list[str]) -> None:

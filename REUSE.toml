@@ -20,3 +20,12 @@ path = "app/web/static/brand/**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 3Corners Internetworking Services BV and the OpenPlanner contributors"
 SPDX-License-Identifier = "EUPL-1.2"
+
+# docs/assurance/ and docs/asvs.md: checklists and evidence that cite OWASP ASVS 5.0.0 requirement IDs
+# (CC BY-SA 4.0) and describe each requirement in our own words; no requirement text is copied.
+# EUPL-1.2 like the rest. The two JSON files pin the IDs the tests check those documents against.
+[[annotations]]
+path = ["docs/assurance/**", "docs/asvs.md", "tests/assurance_external_ids.json", "tests/asvs_audited_ids.json"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 3Corners Internetworking Services BV and the OpenPlanner contributors"
+SPDX-License-Identifier = "EUPL-1.2"

@@ -3,6 +3,8 @@ from datetime import timedelta
 import pytest
 
 from app.domain.booking import BookingStatus
+from app.domain.closure_retention import DEFAULT_CLOSURE_RETENTION as LIMITS
+from app.domain.closure_retention import ClosureRetention
 from app.domain.retention import (
     PURGE_GRACE,
     GroupRetentionCounts,
@@ -43,21 +45,57 @@ def candidate(
     "status", [BookingStatus.CONFIRMED, BookingStatus.COMPLETED, BookingStatus.NO_SHOW]
 )
 def test_an_ended_booking_is_purged_a_day_after_its_slot(status: BookingStatus) -> None:
-    assert purge_moment(candidate(status, end_ago=DAY)) == NOW
+    assert purge_moment(candidate(status, end_ago=DAY), LIMITS) == NOW
 
 
 def test_a_cancelled_booking_is_purged_a_day_after_the_cancellation() -> None:
     found = candidate(BookingStatus.CANCELLED, end_ago=-7 * DAY, cancelled_ago=DAY)
 
-    assert purge_moment(found) == NOW
+    assert purge_moment(found, LIMITS) == NOW
 
 
 def test_a_suspended_booking_waits_for_the_end_of_its_closure() -> None:
-    open_ended = candidate(BookingStatus.SUSPENDED, end_ago=60 * DAY)
     lifted = candidate(BookingStatus.SUSPENDED, closure_ended_ago=30 * DAY)
 
-    assert purge_moment(open_ended) is None
-    assert purge_moment(lifted) == NOW
+    assert purge_moment(lifted, LIMITS) == NOW
+
+
+def test_a_suspended_booking_under_an_open_closure_goes_at_the_maximum() -> None:
+    open_ended = candidate(BookingStatus.SUSPENDED, end_ago=60 * DAY)
+    shorter = ClosureRetention.from_days(30, 3)
+
+    assert purge_moment(open_ended, LIMITS) == NOW + 30 * DAY
+    assert purge_moment(open_ended, shorter) == NOW - 30 * DAY
+    assert not is_overdue(open_ended, NOW, LIMITS)
+    assert is_overdue(open_ended, NOW, shorter)
+
+
+def test_a_late_closure_end_does_not_keep_the_data_past_the_maximum() -> None:
+    late = PurgeCandidate(
+        1, BookingStatus.SUSPENDED, NOW - 100 * DAY, None, NOW + 200 * DAY, organisation_id=3
+    )
+
+    assert purge_moment(late, LIMITS) == NOW - 10 * DAY
+    assert is_overdue(late, NOW, LIMITS)
+    assert is_backlog(late, NOW, LIMITS)
+
+
+def test_the_overview_uses_the_maximum_of_the_candidates_own_organisation() -> None:
+    held = PurgeCandidate(1, BookingStatus.SUSPENDED, NOW - 60 * DAY, None, None, organisation_id=7)
+    other = PurgeCandidate(
+        2, BookingStatus.SUSPENDED, NOW - 60 * DAY, None, None, organisation_id=8
+    )
+    facts = RetentionFacts(
+        [GroupRetentionCounts(DEMO, 1, 0, None), GroupRetentionCounts(OTHER, 1, 0, None)],
+        [held, other],
+    )
+
+    def of(organisation_id: int) -> ClosureRetention:
+        return ClosureRetention.from_days(30 if organisation_id == 7 else 90, 7)
+
+    overview = summarise(facts, NOW, of)
+
+    assert [g.overdue for g in overview.groups] == [1, 0]
 
 
 def test_a_booking_awaiting_a_new_time_is_purged_a_day_after_the_request_lapses() -> None:
@@ -65,16 +103,15 @@ def test_a_booking_awaiting_a_new_time_is_purged_a_day_after_the_request_lapses(
         1, BookingStatus.AWAITING_REBOOK, NOW - 13 * DAY, None, None, rebook_by=NOW - DAY
     )
 
-    assert purge_moment(waiting) == NOW
+    assert purge_moment(waiting, LIMITS) == NOW
 
 
 def test_a_purge_within_its_grace_is_not_overdue() -> None:
     waiting = candidate(end_ago=DAY + PURGE_GRACE)
     late = candidate(end_ago=DAY + PURGE_GRACE + timedelta(seconds=1))
 
-    assert not is_overdue(waiting, NOW)
-    assert is_overdue(late, NOW)
-    assert not is_overdue(candidate(BookingStatus.SUSPENDED, end_ago=60 * DAY), NOW)
+    assert not is_overdue(waiting, NOW, LIMITS)
+    assert is_overdue(late, NOW, LIMITS)
 
 
 def test_candidates_start_where_the_earliest_purge_plus_grace_lies() -> None:
@@ -96,7 +133,7 @@ def test_the_overview_counts_per_group_and_in_total() -> None:
         ],
     )
 
-    overview = summarise(facts, NOW)
+    overview = summarise(facts, NOW, lambda _org: LIMITS)
 
     rows = [(g.group.group.slug, g.holding, g.overdue, g.failed_purges) for g in overview.groups]
     assert rows == [
@@ -115,7 +152,7 @@ def test_the_overview_counts_per_group_and_in_total() -> None:
 def test_an_overview_without_problems_is_in_order() -> None:
     facts = RetentionFacts([GroupRetentionCounts(DEMO, 3, 0, None)], [candidate(end_ago=DAY)])
 
-    overview = summarise(facts, NOW)
+    overview = summarise(facts, NOW, lambda _org: LIMITS)
 
     assert overview.in_order
     assert overview.last_purged_at is None
@@ -127,13 +164,13 @@ def test_an_unconfirmed_booking_is_purged_a_day_after_its_confirm_deadline() -> 
         1, BookingStatus.PENDING_CONFIRMATION, NOW + 7 * DAY, None, None, confirm_by=NOW - DAY
     )
 
-    assert purge_moment(pending) == NOW
+    assert purge_moment(pending, LIMITS) == NOW
 
 
 def test_a_booking_is_backlog_once_it_held_data_two_days_after_it_started_to_count() -> None:
     old = candidate(end_ago=2 * DAY + DAY)  # ended 3 days ago: purge moment was 2 days ago
     fresh = candidate(end_ago=2 * DAY)  # ended 2 days ago: only 24 h overdue
 
-    assert is_backlog(old, NOW)
-    assert not is_backlog(fresh, NOW)
-    assert not is_backlog(candidate(BookingStatus.SUSPENDED, end_ago=90 * DAY), NOW)
+    assert is_backlog(old, NOW, LIMITS)
+    assert not is_backlog(fresh, NOW, LIMITS)
+    assert not is_backlog(candidate(BookingStatus.SUSPENDED, end_ago=50 * DAY), NOW, LIMITS)
