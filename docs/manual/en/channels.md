@@ -9,7 +9,10 @@ field is always empty, and an empty field keeps the stored secret (ADR 0022).
 
 Enter the organisation's mail server: host, port, security (STARTTLS on 587, TLS on 465) and,
 when the server asks for it, a user name with password. A login without STARTTLS or TLS is
-refused: the password would travel readable over the line.
+refused: the password would travel readable over the line. In production a server without
+STARTTLS or TLS (*none*) is refused as well: the mail holds names, addresses and join links. Only
+the server operator can allow an exception, with the host setting `SMTP_PLAINTEXT_RELAY_ALLOWED`;
+an older server of that kind is shown as an error on the overview until it is changed.
 
 The **sender address** is what participants see in their inbox. Use an address in the
 organisation's own domain, for example `appointments@city.example`, with a **sender name**

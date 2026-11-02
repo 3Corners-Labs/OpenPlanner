@@ -17,6 +17,7 @@ keeps it in step with the registry.
 """
 
 import logging
+import re
 import sys
 from collections.abc import Callable, Mapping, MutableMapping
 from contextlib import suppress
@@ -108,6 +109,22 @@ def mask_pii(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> Eve
     """Structlog processor: replace the value of every ``PII_FIELDS`` key with ``MASK``."""
     for key, value in event_dict.items():
         event_dict[key] = MASK if key in PII_FIELDS else _mask(value)
+    return event_dict
+
+
+_BOUND_PARAMETERS = re.compile(r"\[parameters: [^\n]*")
+"""SQLAlchemy's rendering of the values bound to a failed statement, on one line."""
+
+
+def hide_bound_parameters(_logger: WrappedLogger, _method: str, event_dict: EventDict) -> EventDict:
+    """Structlog processor: cut SQLAlchemy's ``[parameters: ...]`` from any text (ASVS V16.2.5).
+
+    The engines are built with ``hide_parameters`` so the text never has them; this is the net
+    below that for an exception that comes from some other engine, rendered into a log line.
+    """
+    for key, value in event_dict.items():
+        if isinstance(value, str) and "[parameters: " in value:
+            event_dict[key] = _BOUND_PARAMETERS.sub(f"[parameters: {MASK}]", value)
     return event_dict
 
 
@@ -260,6 +277,7 @@ def configure_logging(
     finalize: list[Processor] = [
         mask_pii,
         structlog.processors.format_exc_info,
+        hide_bound_parameters,
         _schema_names,
         structlog.processors.JSONRenderer(),
     ]

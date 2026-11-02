@@ -69,7 +69,11 @@ test('book, confirm, move and cancel with the keyboard only', async ({ page }, t
 
   // The emailed link opens the confirm page; only its button confirms. Each browser confirms
   // its own seeded booking, since a confirmed one no longer shows the button.
-  await page.goto(fixture(`pending_flow_${testInfo.project.name}`));
+  // ADR 0093: the link's token is traded for a cookie; the address that stays holds none.
+  const emailed = fixture(`pending_flow_${testInfo.project.name}`);
+  await page.goto(emailed);
+  expect(new URL(page.url()).pathname).toMatch(/^\/b\/m\/[\w-]+\/confirm$/);
+  expect(page.url()).not.toContain(emailed.split('/')[2]);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Afspraak bevestigen');
   await expectNoAxeViolations(page);
   await tabTo(page, page.getByRole('button', { name: 'Afspraak bevestigen' }));

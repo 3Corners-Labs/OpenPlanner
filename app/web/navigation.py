@@ -196,7 +196,7 @@ SECTIONS = (
                 "/admin/staff",
                 Permission.STAFF_VIEW,
                 "people",
-                ("/admin/staff/{member_id}",),
+                ("/admin/staff/invite", "/admin/staff/{member_id}"),
                 width=Width.WIDE,
             ),
             # ADR 0049 point 17: the values the identity provider must send, read-only.

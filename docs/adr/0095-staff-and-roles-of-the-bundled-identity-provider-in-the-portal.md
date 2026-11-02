@@ -1,8 +1,9 @@
 # 0095. Staff and roles of the bundled identity provider, managed in the portal
 
-Status: proposed (2026-11-01), requested by the product owner. Extends ADR 0090 (bundled
+Status: accepted (2026-11-01), requested by the product owner. Extends ADR 0090 (bundled
 identity provider), ADR 0013 (OIDC admin login), ADR 0049 (entitlements) and ADR 0083
-(identity providers per organisation). Not built; see *Build status*.
+(identity providers per organisation). Partly built (steps 1–3 in PR; System status, the
+console link and the end-to-end run open); see *Build status*.
 
 ## Context
 
@@ -60,10 +61,11 @@ portal and, where it is OpenPlanner's own, integrated.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #310 | in PR |
-| 1 | `StaffDirectory` port, fake, Keycloak adapter, service account in the realm template | | planned |
-| 2 | Permissions `staff.manage`, `staff.reset_password`; matrix, `docs/authorization.md` | | planned |
-| 3 | Staff screen actions, manual topic nl/en, audit events | | planned |
-| 4 | Threat model (service-account secret, privilege escalation by claims), data flow, e2e | | planned |
+| 1 | `StaffDirectory` port, fake, Keycloak adapter, service account in the realm template | #361 | in PR |
+| 2 | Permissions `staff.manage`, `staff.reset_password`; matrix, `docs/authorization.md` | #361 | in PR |
+| 3 | Staff screen actions (invite, add and remove a role, disable, password reset), manual topic nl/en, audit events | #361 | in PR |
+| 4 | Threat model (service-account secret, privilege escalation by claims) | #361 | in PR |
+| 5 | System status shows the platform's provider and the directory state (point 6); the console link for the superuser (point 4); data flow; e2e against the template realm | | planned |
 
 ## Consequences
 

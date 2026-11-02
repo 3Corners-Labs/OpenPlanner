@@ -403,6 +403,9 @@ msgstr "Page not found"
 msgid "error.not_found.text"
 msgstr "This link is not correct or no longer valid."
 
+msgid "error.link_required"
+msgstr "Open the link from your email again to see or change your appointment."
+
 msgid "manage.title"
 msgstr "Your appointment"
 
@@ -2484,6 +2487,9 @@ msgstr "More about the closure and other ways to reach us"
 msgid "closure.page.calendar"
 msgstr "To the calendar: you can still book an appointment until the closure"
 
+msgid "closure.page.delete_by"
+msgstr "Details of appointments on hold because of this closure are deleted by {date} at the latest."
+
 msgid "manage.status.suspended"
 msgstr "On hold"
 
@@ -3124,7 +3130,7 @@ msgid "admin.messages.save_hint"
 msgstr "Empty a field to restore the default text."
 
 msgid "admin.form.error.smtp_security"
-msgstr "Choose STARTTLS or TLS: with a username the password must not travel unencrypted."
+msgstr "Choose STARTTLS or TLS: mail carries names and join links, and a password, so it must not travel unencrypted. A relay without TLS needs the host setting SMTP_PLAINTEXT_RELAY_ALLOWED in production."
 
 msgid "admin.nav.organisations"
 msgstr "Organisations"
@@ -3934,6 +3940,18 @@ msgstr "on the machine API"
 
 msgid "admin.audit.detail.surface_links"
 msgstr "on unknown management links"
+
+msgid "audit.event.database_error"
+msgstr "Database error"
+
+msgid "admin.audit.reason.database_error"
+msgstr "A database statement failed; the request was rolled back."
+
+msgid "admin.audit.detail.surface_widget"
+msgstr "on the widget API"
+
+msgid "error.database_unavailable"
+msgstr "We could not complete this right now and nothing was saved. Please try again in a few minutes."
 
 msgid "admin.audit.detail.client"
 msgstr "caller {value}"
@@ -5689,6 +5707,12 @@ msgstr "{count} hours"
 msgid "authz.permission.staff_view"
 msgstr "View staff"
 
+msgid "authz.permission.staff_manage"
+msgstr "Manage staff"
+
+msgid "authz.permission.staff_reset_password"
+msgstr "Send a password reset or invitation"
+
 msgid "admin.nav.staff"
 msgstr "Staff"
 
@@ -6085,6 +6109,9 @@ msgstr "Planner"
 msgid "settings.topic.confirmation"
 msgstr "Confirming appointments"
 
+msgid "settings.topic.participant_link"
+msgstr "Participant link"
+
 msgid "settings.field.log_level.label"
 msgstr "Log level"
 
@@ -6096,6 +6123,12 @@ msgstr "Maintenance switch cache (seconds)"
 
 msgid "settings.field.maintenance_retry_after_seconds.label"
 msgstr "Retry after maintenance (seconds)"
+
+msgid "settings.field.staff_invite_expiry_days.label"
+msgstr "Invitation or password reset validity (days)"
+
+msgid "settings.field.staff_directory_enabled.label"
+msgstr "Manage staff in the portal"
 
 msgid "settings.field.staff_last_seen_interval_seconds.label"
 msgstr "Last-seen update interval (seconds)"
@@ -6304,8 +6337,17 @@ msgstr "Request to rebook lapses after (days)"
 msgid "settings.field.planner_rebook_reminder_days.label"
 msgstr "Rebook reminder (days before the lapse)"
 
+msgid "settings.field.closure_max_retention_days.label"
+msgstr "Details held for a closure deleted at the latest after (days after the appointment)"
+
+msgid "settings.field.closure_max_notice_days.label"
+msgstr "Notice to administrators before that maximum (days)"
+
 msgid "settings.field.booking_confirm_min_minutes.label"
 msgstr "Minimum time to confirm (minutes)"
+
+msgid "settings.field.participant_link_session_hours.label"
+msgstr "How long a participant link stays valid in the browser (hours)"
 
 msgid "settings.field.booking_confirm_reminders.label"
 msgstr "Number of reminders to confirm"
@@ -6721,6 +6763,18 @@ msgstr "{environment}"
 
 msgid "admin.overview.widget.status.environment.problems"
 msgstr "{environment}, {count} not production-ready"
+
+msgid "admin.overview.widget.status.mail"
+msgstr "Mail"
+
+msgid "admin.overview.widget.status.mail.plaintext"
+msgstr "{count} mail server(s) without TLS: choose STARTTLS or TLS, or set SMTP_PLAINTEXT_RELAY_ALLOWED"
+
+msgid "admin.overview.widget.status.proxy"
+msgstr "Proxy"
+
+msgid "admin.overview.widget.status.proxy.plaintext"
+msgstr "FORWARDED_ALLOW_IPS trusts a proxy other than the bundled one and web runs without TLS: traffic between proxy and web is unencrypted. Set WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE (runbook)"
 
 msgid "audit.job.send_rebook_request"
 msgstr "Send request to rebook"
@@ -8653,6 +8707,33 @@ msgstr "{count} failing"
 msgid "admin.settings.logging.open"
 msgstr "Open Log destinations"
 
+msgid "admin.settings.keys.title"
+msgstr "Key rotation"
+
+msgid "admin.settings.keys.intro"
+msgstr "Counts only, never keys or contents. They show when a previous key can be removed safely."
+
+msgid "admin.settings.keys.records"
+msgstr "Encrypted secrets still under the previous key"
+
+msgid "admin.settings.keys.bookings"
+msgstr "Open bookings whose link is still under the previous key"
+
+msgid "admin.settings.keys.records_done"
+msgstr "Every encrypted secret is under the current key. SETTINGS_ENCRYPTION_KEY_PREVIOUS can be removed."
+
+msgid "admin.settings.keys.records_todo"
+msgstr "Run the rekey command on the host (python -m app.cli rekey) and remove SETTINGS_ENCRYPTION_KEY_PREVIOUS only when this number is 0."
+
+msgid "admin.settings.keys.bookings_done"
+msgstr "No open booking has a link under the previous key any more. MANAGEMENT_TOKEN_KEY_PREVIOUS can be removed."
+
+msgid "admin.settings.keys.bookings_todo"
+msgstr "Wait until these bookings are over and remove MANAGEMENT_TOKEN_KEY_PREVIOUS only when this number is 0."
+
+msgid "settings.field.max_font_unpacked_bytes.label"
+msgstr "Largest unpacked size of an uploaded font (bytes)"
+
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Largest configuration package (MB)"
 
@@ -8722,6 +8803,152 @@ msgstr "Configuration package exported"
 msgid "admin.audit.detail.configuration_import"
 msgstr "Configuration package imported"
 
+msgid "admin.staff.invite.link"
+msgstr "Invite staff member"
+
+msgid "admin.staff.invite.title"
+msgstr "Invite staff member"
+
+msgid "admin.staff.invite.intro"
+msgstr "The staff member receives an email with a link to choose a password. The link is valid for {days} days."
+
+msgid "admin.staff.invite.email"
+msgstr "Email address"
+
+msgid "admin.staff.invite.first_name"
+msgstr "First name"
+
+msgid "admin.staff.invite.last_name"
+msgstr "Last name"
+
+msgid "admin.staff.invite.submit"
+msgstr "Send invitation"
+
+msgid "admin.staff.invite.error.email"
+msgstr "Enter a valid email address."
+
+msgid "admin.staff.invite.error.first_name"
+msgstr "Enter a first name."
+
+msgid "admin.staff.invite.error.last_name"
+msgstr "Enter a last name."
+
+msgid "admin.staff.invite.error.role"
+msgstr "Choose a role."
+
+msgid "admin.staff.pending.title"
+msgstr "Invited, not logged in yet"
+
+msgid "admin.staff.pending.intro"
+msgstr "These people were created at the identity provider but have not logged in yet."
+
+msgid "admin.staff.pending.resend"
+msgstr "Resend invitation"
+
+msgid "admin.staff.manage.title"
+msgstr "Managed at the identity provider"
+
+msgid "admin.staff.manage.intro"
+msgstr "This person is in the platform's identity provider. You change only what falls inside your own organisations; a change takes effect at their next login."
+
+msgid "admin.staff.manage.grants"
+msgstr "Roles and places within your reach"
+
+msgid "admin.staff.manage.role"
+msgstr "Role"
+
+msgid "admin.staff.manage.place"
+msgstr "Place"
+
+msgid "admin.staff.manage.place_hint"
+msgstr "An organisation or a group. Only the superuser role applies to the whole platform."
+
+msgid "admin.staff.manage.whole_platform"
+msgstr "Whole platform"
+
+msgid "admin.staff.manage.actions"
+msgstr "Actions"
+
+msgid "admin.staff.manage.remove"
+msgstr "Remove"
+
+msgid "admin.staff.manage.add"
+msgstr "Add a role"
+
+msgid "admin.staff.manage.add_submit"
+msgstr "Add role"
+
+msgid "admin.staff.manage.disable"
+msgstr "Disable"
+
+msgid "admin.staff.manage.enable"
+msgstr "Enable again"
+
+msgid "admin.staff.manage.reset"
+msgstr "Send password reset"
+
+msgid "admin.staff.manage.disabled"
+msgstr "Disabled"
+
+msgid "admin.staff.manage.elsewhere"
+msgstr "This person also works outside your organisations. Roles elsewhere are left alone; only the superuser can disable them."
+
+msgid "admin.done.staff_invited"
+msgstr "The invitation has been sent."
+
+msgid "admin.done.staff_grants_saved"
+msgstr "The roles have been updated."
+
+msgid "admin.done.staff_enabled"
+msgstr "The staff member can log in again."
+
+msgid "admin.done.staff_disabled"
+msgstr "The staff member can no longer log in."
+
+msgid "admin.done.staff_reset_sent"
+msgstr "The email with the link has been sent."
+
+msgid "admin.form.error.staff_directory_unavailable"
+msgstr "The identity provider is unavailable or staff management is switched off. Try again later."
+
+msgid "admin.form.error.staff_address_in_use"
+msgstr "This email address is already in use."
+
+msgid "admin.form.error.staff_grant_refused"
+msgstr "You may not grant this role or place."
+
+msgid "admin.form.error.staff_not_found"
+msgstr "This person was not found within your reach."
+
+msgid "admin.form.error.staff_mail_failed"
+msgstr "The email could not be sent. Check the email settings of the identity provider."
+
+msgid "admin.idp_mapping.provider"
+msgstr "Identity provider"
+
+msgid "admin.idp_mapping.issuer"
+msgstr "Address (issuer)"
+
+msgid "admin.idp_mapping.staff"
+msgstr "Staff management"
+
+msgid "admin.idp_mapping.staff_link"
+msgstr "Go to staff"
+
+msgid "admin.idp_mapping.provider.own"
+msgstr "The organisation's own identity provider"
+
+msgid "admin.idp_mapping.provider.bundled"
+msgstr "This platform's bundled Keycloak"
+
+msgid "admin.idp_mapping.staff.at_provider"
+msgstr "At the identity provider itself; the portal only shows them."
+
+msgid "admin.idp_mapping.staff.in_portal"
+msgstr "In the portal: invite, change roles, disable."
+
+msgid "admin.idp_mapping.staff.off"
+msgstr "Switched off (setting Manage staff in the portal); manage in the Keycloak console."
 msgid "admin.idp.mfa_policy"
 msgstr "MFA policy"
 
@@ -8754,9 +8981,6 @@ msgstr "Second factor shown"
 
 msgid "admin.nav.my_sessions"
 msgstr "My sessions"
-
-msgid "authz.permission.staff_sessions_end"
-msgstr "End staff sessions"
 
 msgid "audit.event.session_ended"
 msgstr "Session ended by the system"

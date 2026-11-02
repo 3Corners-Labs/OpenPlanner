@@ -352,3 +352,46 @@ async def test_the_domain_check_is_superuser_only(uow: InMemoryUnitOfWork) -> No
 
     assert error.value.code is ErrorCode.NOT_PERMITTED
     assert resolver.asked == []
+
+
+RELAY = SmtpSettings("relay.demo.nl", 25, SmtpSecurity.NONE, None, "noreply@demo.nl")
+
+
+def production_service(uow: InMemoryUnitOfWork, *, allowed: bool = False) -> ChannelSettingsService:
+    clock = FixedClock(NOW)
+    return ChannelSettingsService(
+        uow, clock, AdminService(uow, clock), production=True, plaintext_relay_allowed=allowed
+    )
+
+
+async def test_production_refuses_to_save_smtp_without_tls(uow: InMemoryUnitOfWork) -> None:
+    with pytest.raises(DomainError) as error:
+        await production_service(uow).save(SUPER, "demo", RELAY, None)
+    assert (error.value.code, error.value.field) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "smtp_security",
+    )
+    assert (await production_service(uow).overview(SUPER, "demo")).channels[
+        ChannelKind.EMAIL
+    ] is None
+
+
+async def test_production_saves_smtp_without_tls_when_the_host_allows_it(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    await production_service(uow, allowed=True).save(SUPER, "demo", RELAY, None)
+    assert await production_service(uow, allowed=True).plaintext_relays(SUPER) == []
+
+
+async def test_a_stored_plaintext_relay_is_reported_after_an_upgrade(
+    uow: InMemoryUnitOfWork, service: ChannelSettingsService
+) -> None:
+    await service.save(SUPER, "demo", RELAY, None)  # saved before the rule existed
+    assert await production_service(uow).plaintext_relays(SUPER) == ["demo"]
+    assert await service.plaintext_relays(SUPER) == []  # outside production nothing changes
+    assert await production_service(uow, allowed=True).plaintext_relays(SUPER) == []
+
+
+async def test_an_organisation_admin_sees_no_plaintext_relays(uow: InMemoryUnitOfWork) -> None:
+    await production_service(uow, allowed=True).save(SUPER, "demo", RELAY, None)
+    assert await production_service(uow).plaintext_relays(ORG_ADMIN) == []

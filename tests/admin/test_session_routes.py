@@ -136,7 +136,7 @@ async def test_ending_the_sessions_of_someone_outside_the_scope_is_refused(site:
     assert await _opens(site, otto) == 200
     assert (
         ORG_ADMIN.subject,
-        "staff.sessions.end",
+        "staff.manage",
         "denied",
         None,
         "",

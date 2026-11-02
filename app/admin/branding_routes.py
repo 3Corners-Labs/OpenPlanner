@@ -485,7 +485,7 @@ async def upload_font(
     """Store an uploaded WOFF2 font for ``role``; the domain checks size and type."""
     data = (await read_upload(request, "font", MAX_FONT_BYTES)).data
     try:
-        font = FontFile.from_upload(role, data)
+        font = FontFile.from_upload(role, data, request.app.state.settings.max_font_unpacked_bytes)
         await branding_service(request).set_font(context.principal, org, font)
     except DomainError as error:
         raise_refusal(error)

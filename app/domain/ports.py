@@ -55,6 +55,7 @@ from app.domain.job_plan import JobCounts, JobSummary, JobType, PlannedJob
 from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
+from app.domain.participant_links import LinkSession
 from app.domain.retention import DueBooking, RetentionFacts
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
@@ -65,6 +66,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.staff import GrantHolders, RefusedEntitlement, StaffFilter, StaffMember
+from app.domain.staff_directory import DirectoryUser, NewStaffMember, StaffAction
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
@@ -565,6 +567,50 @@ class IdentityProvider(Protocol):
         ...
 
 
+class StaffDirectory(Protocol):
+    """An identity provider that also keeps the admin staff, which the portal may manage.
+
+    Optional capability of the provider the platform owns (ADR 0095): only the bundled
+    Keycloak implements it, through its admin REST API. A provider without it keeps the
+    read-only Staff screen. Every method raises ``DirectoryError`` with a code; the code
+    carries no personal data and nothing the provider said.
+    """
+
+    async def reachable(self) -> bool:
+        """Return whether the directory answers with the service account's credentials."""
+        ...
+
+    async def list_users(self) -> list[DirectoryUser]:
+        """Return every person the provider holds."""
+        ...
+
+    async def get_user(self, user_id: str) -> DirectoryUser | None:
+        """Return one person by the provider's id, or ``None``."""
+        ...
+
+    async def create_user(self, new: NewStaffMember) -> DirectoryUser:
+        """Create a person without a password; the invitation link sets it.
+
+        Raises:
+            DirectoryError: With code ``conflict`` when the address is already in use.
+        """
+        ...
+
+    async def set_entitlements(self, user_id: str, values: Collection[str]) -> None:
+        """Replace the person's entitlement claim values (ADR 0049)."""
+        ...
+
+    async def set_enabled(self, user_id: str, enabled: bool) -> None:
+        """Enable or disable the person; a disabled person cannot log in."""
+        ...
+
+    async def send_actions_email(
+        self, user_id: str, actions: Collection[StaffAction], lifespan_seconds: int
+    ) -> None:
+        """Mail the person a link that asks for ``actions``, valid for ``lifespan_seconds``."""
+        ...
+
+
 class Transaction(Protocol):
     """Everything the domain reads and writes within one database transaction.
 
@@ -679,6 +725,42 @@ class Transaction(Protocol):
 
         Return how many rows went (ADR 0098 point 11).
         """
+        ...
+
+    async def get_booking_id_by_public_ref(self, public_ref: str) -> int | None:
+        """Return the id of the booking named by ``public_ref`` (ADR 0093), or ``None``."""
+        ...
+
+    async def add_link_session(self, value_hash: str, now: datetime, expires_at: datetime) -> int:
+        """Store a new participant link session (only the hash of its value) and return its id."""
+        ...
+
+    async def get_link_session(self, value_hash: str) -> LinkSession | None:
+        """Return the session with this value hash, lapsed or not, with its bookings."""
+        ...
+
+    async def touch_link_session(
+        self, session_id: int, now: datetime, expires_at: datetime
+    ) -> None:
+        """Record a use of the session and push its end to ``expires_at``."""
+        ...
+
+    async def add_booking_to_link_session(
+        self, session_id: int, booking_id: int, now: datetime
+    ) -> None:
+        """Let the session hold the booking (no effect when it already does)."""
+        ...
+
+    async def remove_booking_from_link_session(self, session_id: int, booking_id: int) -> None:
+        """Take the booking out of the session."""
+        ...
+
+    async def delete_link_session(self, session_id: int) -> None:
+        """Delete one session and the list of its bookings."""
+        ...
+
+    async def delete_lapsed_link_sessions(self, now: datetime) -> int:
+        """Delete the sessions that lapsed before ``now``; return how many went."""
         ...
 
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
@@ -1118,6 +1200,10 @@ class Transaction(Protocol):
         """Set every PII column of the booking to NULL and record ``pii_purged_at``."""
         ...
 
+    async def get_booking_by_public_ref(self, public_ref: str) -> Booking | None:
+        """Return the booking named by ``public_ref`` (ADR 0093), or ``None``."""
+        ...
+
     async def get_booking_by_token_hash(self, token_hash: str) -> Booking | None:
         """Return the booking whose management token hashes to ``token_hash``."""
         ...
@@ -1296,6 +1382,13 @@ class Transaction(Protocol):
         ``status`` is ``suspended`` (a closure, ADR 0024) or ``awaiting_rebook`` (a planner's
         request, ADR 0044). The group must lie inside ``scope`` (ADR 0014); otherwise the list
         is empty.
+        """
+        ...
+
+    async def latest_suspended_end(self, closure_id: int) -> datetime | None:
+        """Return the latest slot end of the bookings still on hold in a closure, if any.
+
+        Times only: the closure page derives the date the data is deleted by (ADR 0102).
         """
         ...
 

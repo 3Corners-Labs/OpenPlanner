@@ -1,13 +1,13 @@
-"""The participant's trial call on Webex (ADR 0071): ``/b/{token}/test``.
+"""The participant's trial call on Webex (ADR 0071): ``/b/m/{ref}/test``.
 
 Participants, often first-timers, can try camera, microphone, speakers and browser in a real Webex
 meeting on the group's site, well before the appointment. The page offers a button that opens
 the meeting; the meeting stays open for a few minutes and nobody from the team is waiting in
 it. Like the join page it never reloads by itself (WCAG 2.2.1).
 
-    GET  /b/{token}/test       status page: what the trial call is, the button, or why not
-    POST /b/{token}/test       open a trial call ─► 303 back to the status page
-    GET  /b/{token}/test/go    record the click, 303 to the trial meeting (else back)
+    GET  /b/m/{ref}/test       status page: what the trial call is, the button, or why not
+    POST /b/m/{ref}/test       open a trial call ─► 303 back to the status page
+    GET  /b/m/{ref}/test/go    record the click, 303 to the trial meeting (else back)
 """
 
 from typing import Annotated
@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.api.labels import slot_label
+from app.api.link_session import authorise
 from app.api.participant import participant_page
 from app.domain.trial_call_service import TrialCallService, TrialView
 from app.i18n.dates import format_clock
@@ -35,11 +36,11 @@ def _service(request: Request) -> TrialCallService:
     return service
 
 
-def _context(view: TrialView, token: str, locale: RequestLocale) -> dict[str, object]:
+def _context(view: TrialView, public_ref: str, locale: RequestLocale) -> dict[str, object]:
     """Context of the trial call page: names, times and the state, never contact details."""
     group, booking = view.group, view.booking
     return {
-        "token": token,
+        "ref": public_ref,
         "state": view.state.value,
         "failed": view.failed,
         "calls_left": view.calls_left,
@@ -51,33 +52,33 @@ def _context(view: TrialView, token: str, locale: RequestLocale) -> dict[str, ob
     }
 
 
-@router.get("/b/{token}/test", response_class=HTMLResponse)
+@router.get("/b/m/{public_ref}/test", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def trial_page(request: Request, token: str, locale: Locale) -> HTMLResponse:
+async def trial_page(request: Request, public_ref: str, locale: Locale) -> HTMLResponse:
     """Show what the trial call is and the button that opens it."""
-    view = await _service(request).view(token)
+    view = await _service(request).view(await authorise(request, public_ref))
     follow(request, view.group.organisation_id)
     return await participant_page(
-        request, locale, "trial.html", view.group, _context(view, token, locale)
+        request, locale, "trial.html", view.group, _context(view, public_ref, locale)
     )
 
 
-@router.post("/b/{token}/test", response_class=HTMLResponse)
+@router.post("/b/m/{public_ref}/test", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def open_trial(request: Request, token: str, locale: Locale, _: SameOrigin) -> Response:
+async def open_trial(request: Request, public_ref: str, locale: Locale, _: SameOrigin) -> Response:
     """Open a trial call. A refusal by Webex is shown on the page; it does not count."""
-    view = await _service(request).open(token)
+    view = await _service(request).open(await authorise(request, public_ref))
     follow(request, view.group.organisation_id)
     if view.failed:
         return await participant_page(
-            request, locale, "trial.html", view.group, _context(view, token, locale), 503
+            request, locale, "trial.html", view.group, _context(view, public_ref, locale), 503
         )
-    return RedirectResponse(f"/b/{token}/test", status_code=303)
+    return RedirectResponse(f"/b/m/{public_ref}/test", status_code=303)
 
 
-@router.get("/b/{token}/test/go")
+@router.get("/b/m/{public_ref}/test/go")
 @limiter.limit(read_limit)
-async def trial_go(request: Request, token: str) -> Response:
+async def trial_go(request: Request, public_ref: str) -> Response:
     """Send the participant into the open trial meeting, or back to the page when there is none."""
-    link = await _service(request).join_link(token)
-    return RedirectResponse(link or f"/b/{token}/test", status_code=303)
+    link = await _service(request).join_link(await authorise(request, public_ref))
+    return RedirectResponse(link or f"/b/m/{public_ref}/test", status_code=303)

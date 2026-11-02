@@ -6,7 +6,7 @@ of ``app.domain.admin_session_service``; these routes only show it and ask the s
 
     GET  /admin/rights/sessions                 rights.view          My sessions
     POST /admin/rights/sessions/end-others      rights.view          end the other sessions
-    POST /admin/staff/{member_id}/sessions/end  staff.sessions.end   end all of a person's
+    POST /admin/staff/{member_id}/sessions/end  staff.manage   end all of a person's
 
 *My sessions* needs no permission of its own: it only concerns the own sessions and every admin
 holds ``rights.view``. The list shows the login time and the last activity, and marks the
@@ -42,9 +42,7 @@ SESSIONS_PATH = "/admin/rights/sessions"
 """The *My sessions* page, a sub-tab of *My rights*."""
 
 Viewer = Annotated[AdminContext, Depends(RequirePermission(Permission.RIGHTS_VIEW))]
-EndPerson = Annotated[
-    AdminContext, Depends(RequirePermission(Permission.STAFF_SESSIONS_END, fresh=True))
-]
+EndPerson = Annotated[AdminContext, Depends(RequirePermission(Permission.STAFF_MANAGE, fresh=True))]
 
 
 @dataclass(frozen=True)
@@ -111,7 +109,7 @@ async def end_sessions_of_person(
     service = session_service(request)
     ended = await service.end_of_person(context.principal, member_id)
     if ended is None:
-        if scope_for(context.principal, Permission.STAFF_SESSIONS_END).everything:
+        if scope_for(context.principal, Permission.STAFF_MANAGE).everything:
             raise RejectedRequest(404)
         raise AccessDenied
     if ended.subject == context.principal.subject:

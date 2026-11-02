@@ -49,7 +49,7 @@ from app.domain.own_queue import (
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, GroupSummary
 from app.domain.staff import StaffFilter, StaffMember
-from app.domain.tokens import agent_pseudonym
+from app.domain.tokens import agent_pseudonym, agent_pseudonyms
 
 CLAIMED = "queue.claimed"
 RELEASED = "queue.released"
@@ -139,16 +139,24 @@ class QueueService:
         clock: Current time.
         admin: Authorises every use case and audits refusals.
         pseudonym_key: Key of the agents' pseudonyms (``keys.agent_pseudonym_key``).
+        previous_pseudonym_key: The same key under ``MANAGEMENT_TOKEN_KEY_PREVIOUS`` during a
+            rotation (ADR 0094 point 4): earlier claims still read as the agent's own.
     """
 
     def __init__(
-        self, uow: UnitOfWork, clock: Clock, admin: AdminService, pseudonym_key: bytes
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        admin: AdminService,
+        pseudonym_key: bytes,
+        previous_pseudonym_key: bytes | None = None,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._key = pseudonym_key
+        self._keys = (pseudonym_key, *([previous_pseudonym_key] if previous_pseudonym_key else []))
 
     async def view(self, principal: Principal, slug: str) -> QueueView:
         """Return the group's queue as ``principal`` sees it.
@@ -161,7 +169,7 @@ class QueueService:
         now = self._clock.now()
         async with self._uow.read() as tx:
             entries = await self._entries(tx, principal, group, now)
-        me = agent_pseudonym(self._key, principal.subject)
+        me = agent_pseudonyms(self._keys, principal.subject)
         limit = timedelta(minutes=group.not_picked_up_minutes)
         nxt = next_up(entries)
         return QueueView(
@@ -314,8 +322,8 @@ class QueueService:
 
     def _holds(self, principal: Principal, booking: Booking) -> bool:
         """Return whether ``principal`` holds the claim on ``booking``."""
-        return booking.claim is not None and booking.claim.claimed_by == agent_pseudonym(
-            self._key, principal.subject
+        return booking.claim is not None and booking.claim.claimed_by in agent_pseudonyms(
+            self._keys, principal.subject
         )
 
     async def _audit(
@@ -362,7 +370,7 @@ def _supervises(principal: Principal, summary: GroupSummary) -> bool:
     return decide(principal, Permission.BOOKINGS_VIEW, target).allowed
 
 
-def _row(entry: QueueEntry, me: str, overdue: bool) -> QueueRow:
+def _row(entry: QueueEntry, me: tuple[str, ...], overdue: bool) -> QueueRow:
     """Map a queue entry to what the agent sees."""
     booking = entry.booking
     claim = booking.claim
@@ -373,7 +381,7 @@ def _row(entry: QueueEntry, me: str, overdue: bool) -> QueueRow:
         first_name=booking.contact.first_name if booking.contact else "",
         in_lobby=entry.in_lobby,
         claimed=claim is not None,
-        mine=claim is not None and claim.claimed_by == me,
+        mine=claim is not None and claim.claimed_by in me,
         direct=entry.is_direct,
         overdue=overdue,
         video=entry.video,

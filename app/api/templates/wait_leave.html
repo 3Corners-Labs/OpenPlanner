@@ -4,10 +4,10 @@
 <p class="eyebrow">{{ group.name }}</p>
 <h1>{{ _("wait.leave.title") }}</h1>
 <p>{% if agent %}{{ _("wait.leave.question.agent") }}{% else %}{{ _("wait.leave.question.waiting") }}{% endif %}</p>
-<form method="post" action="/b/{{ token }}/wait/leave">
+<form method="post" action="/b/m/{{ ref }}/wait/leave">
   <ul class="actions">
     <li><button type="submit" class="button button--danger">{{ _("wait.leave.confirm") }}</button></li>
-    <li><a href="/b/{{ token }}/wait">{{ _("wait.leave.back") }}</a></li>
+    <li><a href="/b/m/{{ ref }}/wait">{{ _("wait.leave.back") }}</a></li>
   </ul>
 </form>
 {% endblock %}

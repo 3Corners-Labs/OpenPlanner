@@ -52,7 +52,11 @@ test('the participant tries the connection, joins the call, and the admin follow
 
   // No Webex here, so the participant cannot open a trial call yet (opening one is covered by
   // the API tests with a fake Webex): the page says so and offers no way in.
+  // The seeded link is a link from an email: its token is traded for the cookie (ADR 0093) and
+  // the page stays at an address without it, so reloading and the links on it use the cookie.
   await participant.goto(paths.trial_page);
+  expect(new URL(participant.url()).pathname).toMatch(/^\/b\/m\/[\w-]+\/test$/);
+  expect(participant.url()).not.toContain(paths.trial_page.split('/')[2]);
   await expect(participant.getByRole('heading', { level: 1 })).toHaveText('Proefgesprek');
   await expect(participant.getByText('Voor deze afspraak is geen proefgesprek beschikbaar.')).toBeVisible();
   await expect(participant.getByRole('link', { name: 'Naar het proefgesprek' })).toHaveCount(0);
@@ -70,6 +74,7 @@ test('the participant tries the connection, joins the call, and the admin follow
   await expect(participant.getByRole('status')).toContainText('Uw proefgesprek staat open tot');
   const wayIn = participant.getByRole('link', { name: 'Naar het proefgesprek' });
   await expectNoAxeViolations(participant);
+  await expect(wayIn).toHaveAttribute('href', /^\/b\/m\/[\w-]+\/test\/go$/);
   expect(await destinationOf(participant, wayIn)).toBe(SIMULATED_MEETING);
 
   // Webex reports the participant in and out of the trial meeting. The timeline shows the
@@ -85,6 +90,8 @@ test('the participant tries the connection, joins the call, and the admin follow
 
   // The call: the join page is open, but the meeting is not there yet.
   await participant.goto(paths.call_page);
+  expect(new URL(participant.url()).pathname).toMatch(/^\/b\/m\/[\w-]+\/join$/);
+  expect(participant.url()).not.toContain(paths.call_page.split('/')[2]);
   await expect(participant.getByRole('heading', { level: 1 })).toHaveText('Uw videogesprek');
   await expect(participant.getByRole('status')).toContainText('wordt klaargezet');
   await expectNoAxeViolations(participant);
@@ -95,6 +102,7 @@ test('the participant tries the connection, joins the call, and the admin follow
   await participant.reload();
   const joinLink = participant.getByRole('link', { name: 'Deelnemen aan het videogesprek' });
   await expectNoAxeViolations(participant);
+  await expect(joinLink).toHaveAttribute('href', /^\/b\/m\/[\w-]+\/join\/go$/);
   expect(await destinationOf(participant, joinLink)).toBe(SIMULATED_MEETING);
 
   // The call as the contact center and Webex would report it.
@@ -108,8 +116,8 @@ test('the participant tries the connection, joins the call, and the admin follow
   await expect(fact(page, 'Medewerker binnen')).toHaveText('Ja');
   await expectNoAxeViolations(page);
 
-  // Today's agenda shows the call with the agent in.
-  await page.goto('/admin/groups/demo-reis/agenda');
+  // The agenda of the day the call starts on (not "today": near midnight that day moves) shows the call with the agent in.
+  await page.goto(paths.call_agenda);
   const row = page.getByRole('row').filter({ has: page.locator(`a[href="${paths.call_booking}"]`) });
   await expect(row).toContainText('Ja');
   await expectNoAxeViolations(page);

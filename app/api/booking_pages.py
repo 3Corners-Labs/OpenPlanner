@@ -11,15 +11,19 @@ Server-rendered and usable without JavaScript. Every response goes through
     POST /g/{slug}/book            book ─► 303 /g/{slug}/booked?start= (ADR 0056: the token
                                    goes to the participant by email only, never to the browser)
     GET  /g/{slug}/booked?start=   "check your email to confirm"
-    GET  /b/{token}/confirm        the appointment and one button; a GET never confirms, mail
+    GET  /b/{token}[/page]         the link of an email (ADR 0011): token checked, cookie set,
+                                   303 to the same page under /b/m/{ref} (ADR 0093)
+    GET  /b/m/{ref}/confirm        the appointment and one button; a GET never confirms, mail
                                    scanners open links in advance (ADR 0056 §8)
-    POST /b/{token}/confirm        confirm ─► 303 /b/{token}?status=confirmed (or lapsed)
-    GET  /b/{token}                booking (no move from the change lead, no cancel from the
+    POST /b/m/{ref}/confirm        confirm ─► 303 /b/m/{ref}?status=confirmed (or lapsed)
+    GET  /b/m/{ref}                booking (no move from the change lead, no cancel from the
                                    start, ADR 0069; a booking on hold by an emergency
                                    closure shows its notice, ADR 0024)
-    GET  /b/{token}/cancel         confirm ─► POST ─► 303 /b/{token}?status=cancelled
-    GET  /b/{token}/reschedule     slot picker ─► ?start= confirm ─► POST
-                                   ─► 303 /b/{new token}?status=rescheduled
+    GET  /b/m/{ref}/cancel         confirm ─► POST ─► 303 /b/m/{ref}?status=cancelled
+    GET  /b/m/{ref}/reschedule     slot picker ─► ?start= confirm ─► POST
+                                   ─► 303 /b/m/{new ref}?status=rescheduled
+The cookie rule is in ``app.api.link_session``; the join, trial and waiting pages are in
+``join_pages``, ``trial_pages`` and ``direct_pages``.
 """
 
 from datetime import datetime, timedelta
@@ -36,6 +40,7 @@ from app.api.contact_form import (
     read_contact,
 )
 from app.api.labels import slot_label
+from app.api.link_session import authorise, exchange, start
 from app.api.participant import participant_page
 from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
@@ -98,9 +103,9 @@ def _clock(request: Request) -> Clock:
     return clock
 
 
-def _manage_url(token: str, status: str) -> str:
+def _manage_url(public_ref: str, status: str) -> str:
     """Return the management page URL with a one-time notice."""
-    return f"/b/{token}?status={status}"
+    return f"/b/m/{public_ref}?status={status}"
 
 
 async def _available(
@@ -133,7 +138,9 @@ async def group_page(
     now = _clock(request).now()
     closure = await service.closure_notice(group)
     banner = closure_view(closure, group, locale, now) if closure else None
-    if banner and banner.active:
+    if closure and banner and banner.active:
+        deleted_by = await service.closure_delete_by(group, closure)
+        banner = closure_view(closure, group, locale, now, deleted_by)
         return await participant_page(request, locale, "closure.html", group, {"closure": banner})
     view = await picker(
         service,
@@ -169,7 +176,13 @@ async def closure_page(request: Request, slug: str, locale: Locale) -> Response:
     closure = await service.closure_notice(group)
     if closure is None:
         return RedirectResponse(f"/g/{group.slug}", status_code=303)
-    banner = closure_view(closure, group, locale, _clock(request).now())
+    banner = closure_view(
+        closure,
+        group,
+        locale,
+        _clock(request).now(),
+        await service.closure_delete_by(group, closure),
+    )
     return await participant_page(request, locale, "closure.html", group, {"closure": banner})
 
 
@@ -314,62 +327,118 @@ def _manage_context(
     }
 
 
-@router.get("/b/{token}", response_class=HTMLResponse)
+LEGACY_SUBPATHS = (
+    "",
+    "/confirm",
+    "/cancel",
+    "/reschedule",
+    "/wait",
+    "/wait/status",
+    "/wait/leave",
+    "/join",
+    "/join/go",
+    "/test",
+    "/test/go",
+)
+"""Pages an email or a bookmark made before ADR 0093 may still link to under ``/b/{token}``."""
+
+
+@limiter.limit(read_limit)
+async def exchange_legacy_link(request: Request, token: str) -> Response:
+    """Open a link from the email: check the token, set the cookie, go to the same page.
+
+    The page is named by the route that matched (``/b/{token}/wait`` ─► ``/b/m/{ref}/wait``), and
+    only the language is carried along. A POST (a form left open from before) is answered the
+    same way: it is not carried out, the browser gets the page whose button it would have
+    pressed.
+    """
+    path = str(request.scope["route"].path)
+    return await exchange(request, token, path.removeprefix("/b/{token}"))
+
+
+for _suffix in LEGACY_SUBPATHS:
+    router.add_api_route(
+        f"/b/{{token}}{_suffix}",
+        exchange_legacy_link,
+        methods=["GET", "POST"] if _suffix else ["GET"],
+        response_class=HTMLResponse,
+    )
+
+
+async def _details(request: Request, public_ref: str) -> BookingDetails:
+    """Authorise the cookie for ``public_ref`` and return the booking with its group."""
+    ref = await authorise(request, public_ref)
+    details = await _service(request).find(ref)
+    follow(request, details.group.organisation_id)
+    return details
+
+
+def _page_context(
+    details: BookingDetails,
+    locale: RequestLocale,
+    public_ref: str,
+    status: str | None,
+    now: datetime,
+) -> dict[str, object]:
+    """Context of a page under ``/b/m/{public_ref}``: the booking and its reference."""
+    return {**_manage_context(details, locale, status, now), "ref": public_ref}
+
+
+@router.get("/b/m/{public_ref}", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def manage_page(
-    request: Request, token: str, locale: Locale, status: str | None = None
+    request: Request, public_ref: str, locale: Locale, status: str | None = None
 ) -> HTMLResponse:
     """Show a booking; read-only once its change deadline has passed."""
-    details = await _service(request).find(token)
-    follow(request, details.group.organisation_id)
-    context = {**_manage_context(details, locale, status, _clock(request).now()), "token": token}
+    details = await _details(request, public_ref)
+    context = _page_context(details, locale, public_ref, status, _clock(request).now())
     return await participant_page(request, locale, "manage.html", details.group, context)
 
 
-@router.get("/b/{token}/cancel", response_class=HTMLResponse)
+@router.get("/b/m/{public_ref}/cancel", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def cancel_page(request: Request, token: str, locale: Locale) -> Response:
+async def cancel_page(request: Request, public_ref: str, locale: Locale) -> Response:
     """Ask for confirmation before cancelling."""
-    details = await _service(request).find(token)
-    follow(request, details.group.organisation_id)
+    details = await _details(request, public_ref)
     if not details.cancellable:
-        return RedirectResponse(f"/b/{token}", status_code=303)
-    context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
+        return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
+    context = _page_context(details, locale, public_ref, None, _clock(request).now())
     return await participant_page(request, locale, "cancel.html", details.group, context)
 
 
-@router.get("/b/{token}/confirm", response_class=HTMLResponse)
+@router.get("/b/m/{public_ref}/confirm", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def confirm_page(request: Request, token: str, locale: Locale) -> Response:
+async def confirm_page(request: Request, public_ref: str, locale: Locale) -> Response:
     """Show the appointment with one button to confirm it; a GET never confirms (ADR 0056)."""
-    details = await _service(request).find(token)
-    follow(request, details.group.organisation_id)
+    details = await _details(request, public_ref)
     if not details.booking.awaits_confirmation:
-        return RedirectResponse(f"/b/{token}", status_code=303)
-    context = {**_manage_context(details, locale, None, _clock(request).now()), "token": token}
+        return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
+    context = _page_context(details, locale, public_ref, None, _clock(request).now())
     return await participant_page(request, locale, "confirm.html", details.group, context)
 
 
-@router.post("/b/{token}/confirm", response_class=HTMLResponse)
+@router.post("/b/m/{public_ref}/confirm", response_class=HTMLResponse)
 @limiter.limit(booking_limit)
-async def confirm(request: Request, token: str, locale: Locale, _: SameOrigin) -> Response:
+async def confirm(request: Request, public_ref: str, locale: Locale, _: SameOrigin) -> Response:
     """Confirm the booking; one that came too late lapses and says so."""
-    booking = await _service(request).confirm(token)
+    ref = await authorise(request, public_ref)
+    booking = await _service(request).confirm(ref)
     status = "lapsed" if booking.lapsed_unconfirmed else "confirmed"
-    return RedirectResponse(_manage_url(token, status), status_code=303)
+    return RedirectResponse(_manage_url(public_ref, status), status_code=303)
 
 
-@router.post("/b/{token}/cancel", response_class=HTMLResponse)
+@router.post("/b/m/{public_ref}/cancel", response_class=HTMLResponse)
 @limiter.limit(booking_limit)
-async def cancel(request: Request, token: str, locale: Locale, _: SameOrigin) -> Response:
+async def cancel(request: Request, public_ref: str, locale: Locale, _: SameOrigin) -> Response:
     """Cancel the booking."""
-    await _service(request).cancel(token)
-    return RedirectResponse(_manage_url(token, "cancelled"), status_code=303)
+    ref = await authorise(request, public_ref)
+    await _service(request).cancel(ref)
+    return RedirectResponse(_manage_url(public_ref, "cancelled"), status_code=303)
 
 
 async def _reschedule_response(
     request: Request,
-    token: str,
+    public_ref: str,
     locale: RequestLocale,
     *,
     month: str | None = None,
@@ -383,16 +452,12 @@ async def _reschedule_response(
     Goes back to the booking page when it can no longer change.
     """
     service = _service(request)
-    details = await service.find(token)
-    follow(request, details.group.organisation_id)
+    details = await _details(request, public_ref)
     group = details.group
     if not details.changeable:
-        return RedirectResponse(f"/b/{token}", status_code=303)
-    context: dict[str, object] = {
-        **_manage_context(details, locale, None, _clock(request).now()),
-        "token": token,
-        "errors": errors or [],
-    }
+        return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
+    context = _page_context(details, locale, public_ref, None, _clock(request).now())
+    context["errors"] = errors or []
     chosen = parse_start(start)
     slot = await _available(service, group, chosen) if chosen else None
     if chosen is not None and slot is not None and chosen != details.booking.start:
@@ -405,7 +470,7 @@ async def _reschedule_response(
             group,
             _clock(request).now(),
             locale,
-            f"/b/{token}/reschedule",
+            f"/b/m/{public_ref}/reschedule",
             month=month,
             day=day,
             exclude=details.booking.start,
@@ -415,37 +480,41 @@ async def _reschedule_response(
     return await participant_page(request, locale, name, group, context, status_code)
 
 
-@router.get("/b/{token}/reschedule", response_class=HTMLResponse)
+@router.get("/b/m/{public_ref}/reschedule", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def reschedule_page(
     request: Request,
-    token: str,
+    public_ref: str,
     locale: Locale,
     month: str | None = None,
     day: str | None = None,
     start: str | None = None,
 ) -> Response:
     """Show the picker for a new time, or confirm the chosen one (``?start=``)."""
-    return await _reschedule_response(request, token, locale, month=month, day=day, start=start)
+    return await _reschedule_response(
+        request, public_ref, locale, month=month, day=day, start=start
+    )
 
 
-@router.post("/b/{token}/reschedule", response_class=HTMLResponse)
+@router.post("/b/m/{public_ref}/reschedule", response_class=HTMLResponse)
 @limiter.limit(booking_limit)
-async def reschedule(request: Request, token: str, locale: Locale, _: SameOrigin) -> Response:
-    """Move the booking; the new booking gets a new management link."""
+async def reschedule(request: Request, public_ref: str, locale: Locale, _: SameOrigin) -> Response:
+    """Move the booking; the new booking gets a new reference and the browser holds it too."""
+    ref = await authorise(request, public_ref)
     form = await request.form()
-    start = parse_start(str(form.get("start", "")))
-    if start is None:
+    start_at = parse_start(str(form.get("start", "")))
+    if start_at is None:
         raise RejectedRequest(400)
     try:
-        receipt = await _service(request).reschedule(token, start)
+        receipt = await _service(request).reschedule(ref, start_at)
     except DomainError as error:
         return await _reschedule_response(
             request,
-            token,
+            public_ref,
             locale,
-            day=start.date().isoformat(),
+            day=start_at.date().isoformat(),
             errors=form_errors(error, locale.gettext),
             status_code=status_for(error),
         )
-    return RedirectResponse(_manage_url(receipt.management_token, "rescheduled"), status_code=303)
+    new = receipt.booking
+    return await start(request, new.id or 0, _manage_url(new.public_ref, "rescheduled"))

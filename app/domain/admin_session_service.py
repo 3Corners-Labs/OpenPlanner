@@ -193,7 +193,7 @@ class AdminSessionService:
     ) -> PersonSessionsEnded | None:
         """End all sessions of the staff member ``member_id``; ``None`` if they are out of scope.
 
-        The person must be one the administrator's scope for ``staff.sessions.end`` already
+        The person must be one the administrator's scope for ``staff.manage`` already
         shows in the staff overview (organisation level, the SQL adapter filters by it); for
         anyone else nothing is ended and the refusal is audited. A session belongs to the
         person, not to an organisation, so the sessions they use for other organisations end
@@ -202,7 +202,7 @@ class AdminSessionService:
         person and the count.
         """
         now = self._clock.now()
-        scope = scope_for(principal, Permission.STAFF_SESSIONS_END)
+        scope = scope_for(principal, Permission.STAFF_MANAGE)
         async with self._uow.locked() as tx:
             found = await tx.list_staff(scope, StaffFilter(id=member_id))
             if not found:
@@ -210,7 +210,7 @@ class AdminSessionService:
                     AuditEvent(
                         now,
                         principal.subject,
-                        Permission.STAFF_SESSIONS_END.value,
+                        Permission.STAFF_MANAGE.value,
                         Outcome.DENIED,
                         "out_of_scope",
                     )

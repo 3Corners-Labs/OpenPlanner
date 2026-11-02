@@ -24,11 +24,16 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DATABASE_URL` | string | `sqlite+aiosqlite:///data/booking.db` | The database the portal settings live in. |
 | `SETTINGS_ENCRYPTION_KEY` | secret | — | Seals every secret in the database (ADR 0008). |
 | `MANAGEMENT_TOKEN_KEY` | secret | — | Derives management tokens (ADR 0011); required in production. |
+| `SETTINGS_ENCRYPTION_KEY_PREVIOUS` | secret | — | The key before a rotation (at least 32 bytes); sealed values under it stay readable until `rekey` has run. Empty outside a rotation (ADR 0094). |
+| `MANAGEMENT_TOKEN_KEY_PREVIOUS` | secret | — | The token key before a rotation (at least 32 bytes); links of bookings made under it keep working. Empty outside a rotation (ADR 0094). |
 | `SESSION_SECRET` | secret | — | Signs admin sessions; required in production. |
 | `OIDC_DISCOVERY_URL` | url | — | IdP discovery document; without it the admin portal is disabled. |
 | `OIDC_CLIENT_ID` | string | `openplanner-admin` | OIDC client of the portal. |
 | `OIDC_CLIENT_SECRET` | secret | — | OIDC client secret. |
 | `OIDC_SCOPES` | string | `openid profile email` | Scopes requested at login; wrong scopes break login. |
+| `KEYCLOAK_ADMIN_URL` | url | — | Admin API of the bundled Keycloak realm, ending in /admin/realms/<realm>; empty: staff is not managed in the portal (ADR 0095). |
+| `KEYCLOAK_DIRECTORY_CLIENT_ID` | string | `openplanner-directory` | Service account of the bundled Keycloak that creates and changes staff (ADR 0095). |
+| `KEYCLOAK_DIRECTORY_CLIENT_SECRET` | secret | — | Secret of that service account (ADR 0095). |
 
 ## B. Deployment (environment only)
 
@@ -41,7 +46,9 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `OIDC_MFA_ACR_VALUES` | string | `""` | acr values that count as proof of MFA; empty: the values asked for (ADR 0100). |
 | `PUBLIC_BASE_URL` | url | `http://127.0.0.1:8000` | Base of every link and of the OIDC redirect; https in production. |
 | `WEBHOOK_BASE_URL` | url | — | Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL. |
-| `FORWARDED_ALLOW_IPS` | string | — | Address of the reverse proxy (read by uvicorn). |
+| `FORWARDED_ALLOW_IPS` | string | — | Address of the reverse proxy (read by uvicorn). Other than the bundled proxy's, System status warns unless web serves TLS (ADR 0091). |
+| `WEB_TLS_CERT_FILE` | path | — | Certificate chain (PEM) for uvicorn, for an own reverse proxy on another machine; with WEB_TLS_KEY_FILE web serves HTTPS (ADR 0091). |
+| `WEB_TLS_KEY_FILE` | path | — | Private key (PEM) of WEB_TLS_CERT_FILE; readable by the web user only (ADR 0091). |
 | `TLS_DOMAIN` | string | — | Certificate domain (proxy.env, ADR 0030). |
 | `ACME_EMAIL` | string | — | Mailbox for CA notices (proxy.env). |
 | `ACME_CA` | url | — | ACME directory (proxy.env). |
@@ -64,6 +71,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
 | `OIDC_CLAIM_MODE` | enum | `legacy` | Where rights come from: legacy (three claims), shadow (compare), entitlements (ADR 0049); moving back to legacy weakens a protection, so env only. |
+| `SMTP_PLAINTEXT_RELAY_ALLOWED` | bool | `false` | Allow mail without TLS in production, for a relay on a trusted network (ADR 0091); otherwise saving it is refused and System status reports it. Never in the portal. |
 
 ## C. Platform (portal, *Advanced settings*; lockable by env)
 
@@ -89,6 +97,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `INTEGRATION_CHECK_INTERVAL_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The worker checks every group with a Webex host or a contact-center mapping this often and reports a broken chain as a system event (ADR 0065, 0082). |
 | `INTEGRATION_PROBE_TIMEOUT_SECONDS` | int | `60` | 10–300 | `settings.platform.manage` | How long a group check waits for the task:new and task:ended events of its probe work item before it reports the webhook path broken (ADR 0082). |
 | `JOB_OVERDUE_MINUTES` | int | `10` | 1–1440 | `settings.platform.manage` | A pending job this many minutes past its planned time counts as overdue in a group's integration check (ADR 0068). |
+| `STAFF_INVITE_EXPIRY_DAYS` | int | `7` | 1–30 | `settings.platform.manage` | Days an invitation or password reset link of a staff member stays valid (ADR 0095). |
+| `STAFF_DIRECTORY_ENABLED` | bool | `true` | — | `settings.platform.manage` | Show the actions that create and change staff in the bundled identity provider; off hides them and leaves the provider's data untouched (ADR 0095). |
 | `STAFF_LAST_SEEN_INTERVAL_SECONDS` | int | `300` | 60–3600 | `settings.platform.manage` | An admin's last-seen time is written at most once per this interval (ADR 0046). |
 | `SYSTEM_EVENT_RETENTION_DAYS` | int | `90` | 30–3650 | `settings.platform.manage` | Days after which system events leave the audit log (ADR 0031). |
 | `INTEGRATION_REQUEST_RETENTION_DAYS` | int | `30` | 1–365 | `settings.platform.manage` | Days after which request events (every call to Webex and WxCC for a booking) leave the audit log, apart from the other system events (ADR 0068). |
@@ -100,6 +110,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `SECURITY_EVENT_WINDOW_MINUTES` | int | `15` | 1–1440 | `settings.platform.manage` | One security event per source and reason per window; repeats are counted (ADR 0034). |
 | `SECURITY_EVENT_MAX_SOURCES` | int | `1000` | 10–100000 | `settings.platform.manage` | Windows (kind of event × caller) a process keeps; beyond that, callers count as many (ADR 0053). |
 | `AUDIT_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of the audit log may hold; more is refused (ADR 0040). |
+| `MAX_FONT_UNPACKED_BYTES` | int | `2000000` | 256000–8000000 | `settings.platform.manage` | Largest unpacked size (WOFF2 totalSfntSize) of an uploaded font, in bytes (ADR 0092). |
 | `CONFIGURATION_PACKAGE_MAX_MB` | int | `64` | 1–512 | `settings.platform.manage` | Largest configuration package (MB) the portal and the API accept for import (ADR 0089). |
 | `AUDIT_EXPORT_MAX_DAYS` | int | `366` | 1–3660 | `settings.platform.manage` | Most days one CSV export of the audit log may cover (ADR 0040). |
 | `EMBEDDING_MAX_ORIGINS` | int | `20` | 1–100 | `settings.platform.manage` | Most host websites one organisation may allow for the embedded widget (ADR 0035). |
@@ -151,6 +162,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `MEETING_STATUS_REFRESH_SECONDS` | int | `30` | 10–300 | `settings.platform.manage` | Seconds a meeting status on the agenda may be old before the video provider is asked (webhooks come first), and between two refreshes of the agenda's status columns (ADR 0010). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
+| `PARTICIPANT_LINK_SESSION_HOURS` | int | `24` | 20–168 | `settings.platform.manage` | Hours after its last use that a participant's browser may still use a booking it opened from the emailed link (ADR 0093); the email link always works again. |
 
 ## D. Organisation (portal, organisation settings; lockable by env)
 
@@ -163,6 +175,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `SHORTFALL_HORIZON_DAYS` | int | `14` | 1–60 | `settings.organisation.manage` | Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044). |
 | `PLANNER_REBOOK_DAYS` | int | `14` | 1–30 | `settings.organisation.manage` | Days after the original start after which an unanswered request to rebook lapses. |
 | `PLANNER_REBOOK_REMINDER_DAYS` | int | `3` | 1–29 | `settings.organisation.manage` | Days before the lapse at which the one reminder to rebook goes (below the lapse). |
+| `CLOSURE_MAX_RETENTION_DAYS` | int | `90` | 30–180 | `settings.organisation.manage` | Days after the original appointment at the latest that the details of a booking on hold by a closure are deleted, also while the closure has no end (ADR 0102). It cannot be switched off. |
+| `CLOSURE_MAX_NOTICE_DAYS` | int | `14` | 3–28 | `settings.organisation.manage` | Days before that maximum that the administrators are told a closure still holds details, and on what date they are deleted (ADR 0102). |
 | `PHONE_DEFAULT_REGION` | enum | `NL` | AC, AD, AE, AF, AG, AI, AL, AM, AO, AR, AS, AT, AU, AW, AX, AZ, BA, BB, BD, BE, BF, BG, BH, BI, BJ, BL, BM, BN, BO, BQ, BR, BS, BT, BW, BY, BZ, CA, CC, CD, CF, CG, CH, CI, CK, CL, CM, CN, CO, CR, CU, CV, CW, CX, CY, CZ, DE, DJ, DK, DM, DO, DZ, EC, EE, EG, EH, ER, ES, ET, FI, FJ, FK, FM, FO, FR, GA, GB, GD, GE, GF, GG, GH, GI, GL, GM, GN, GP, GQ, GR, GT, GU, GW, GY, HK, HN, HR, HT, HU, ID, IE, IL, IM, IN, IO, IQ, IR, IS, IT, JE, JM, JO, JP, KE, KG, KH, KI, KM, KN, KP, KR, KW, KY, KZ, LA, LB, LC, LI, LK, LR, LS, LT, LU, LV, LY, MA, MC, MD, ME, MF, MG, MH, MK, ML, MM, MN, MO, MP, MQ, MR, MS, MT, MU, MV, MW, MX, MY, MZ, NA, NC, NE, NF, NG, NI, NL, NO, NP, NR, NU, NZ, OM, PA, PE, PF, PG, PH, PK, PL, PM, PR, PS, PT, PW, PY, QA, RE, RO, RS, RU, RW, SA, SB, SC, SD, SE, SG, SH, SI, SJ, SK, SL, SM, SN, SO, SR, SS, ST, SV, SX, SY, SZ, TA, TC, TD, TG, TH, TJ, TK, TL, TM, TN, TO, TR, TT, TV, TW, TZ, UA, UG, US, UY, UZ, VA, VC, VE, VG, VI, VN, VU, WF, WS, XK, YE, YT, ZA, ZM, ZW | `settings.organisation.manage` | Country of phone numbers typed without a country code (ADR 0055). |
 | `BOOKING_CONFIRM_WINDOW_HOURS` | int | `24` | 1–72 | `settings.organisation.manage` | Hours after booking within which the participant confirms by email link (ADR 0056). |
 | `BOOKING_CONFIRM_CUTOFF_HOURS` | int | `2` | 0–24 | `settings.organisation.manage` | Hours before the start by which the participant confirms at the latest (ADR 0056). |

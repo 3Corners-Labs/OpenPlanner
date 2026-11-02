@@ -6,6 +6,7 @@ with the names of what changed, never the values (ADR 0008).
 
     organisations   integrations.manage   organisations in scope
     overview        integrations.manage   stored settings, whether a secret is set
+    plaintext_relays integrations.manage  organisations with SMTP without TLS (ADR 0091)
     save / remove   integrations.manage   change or remove one channel
     send_test_email integrations.manage   one email through the server the worker would use
     check_sender_domain integrations.manage   SPF, DKIM and DMARC of the sender in effect (ADR 0073)
@@ -21,6 +22,7 @@ from app.domain.channel_settings import (
     ChannelConfig,
     ChannelSettings,
     SmtpSettings,
+    check_smtp_transport,
     secret_field,
     validate_secret,
     validate_test_recipient,
@@ -64,6 +66,9 @@ class ChannelSettingsService:
             nothing to check.
         fallback_sender: Returns the installation's fallback ``From`` (``SMTP_HOST`` /
             ``MAIL_FROM``) or ``None``, read at each check so portal changes apply live.
+        production: Whether this is a production installation (mail without TLS is refused).
+        plaintext_relay_allowed: ``SMTP_PLAINTEXT_RELAY_ALLOWED``, the host's recorded
+            exception for a relay without TLS (ADR 0091).
     """
 
     def __init__(
@@ -74,8 +79,13 @@ class ChannelSettingsService:
         senders: SenderDirectory | None = None,
         resolver: MailDomainResolver | None = None,
         fallback_sender: Callable[[], str | None] | None = None,
+        *,
+        production: bool = False,
+        plaintext_relay_allowed: bool = False,
     ) -> None:
         """Store the collaborators."""
+        self._production = production
+        self._plaintext_allowed = plaintext_relay_allowed
         self._uow = uow
         self._clock = clock
         self._admin = admin
@@ -87,6 +97,25 @@ class ChannelSettingsService:
         """Return the organisations whose channels ``principal`` may configure."""
         async with self._uow.read() as tx:
             return await tx.list_organisations(scope_for(principal, Permission.INTEGRATIONS_MANAGE))
+
+    async def plaintext_relays(self, principal: Principal) -> list[str]:
+        """Return the slugs of organisations whose stored SMTP server runs without TLS.
+
+        Only in production and without the host's exception; empty otherwise. System status
+        shows these as an error, because the first release of ADR 0091 lets them keep sending
+        (upgrade path) and a later one refuses them.
+        """
+        if not self._production or self._plaintext_allowed:
+            return []
+        found: list[str] = []
+        async with self._uow.read() as tx:
+            for organisation in await tx.list_organisations(
+                scope_for(principal, Permission.INTEGRATIONS_MANAGE)
+            ):
+                for stored in await tx.get_channel_settings(organisation.id):
+                    if isinstance(stored.config, SmtpSettings) and stored.config.plaintext:
+                        found.append(organisation.slug)
+        return found
 
     async def overview(self, principal: Principal, slug: str) -> ChannelOverview:
         """Return the organisation's channel settings.
@@ -118,6 +147,10 @@ class ChannelSettingsService:
         """
         if secret is not None:
             validate_secret(secret, config.channel)
+        if isinstance(config, SmtpSettings):
+            check_smtp_transport(
+                config, production=self._production, plaintext_allowed=self._plaintext_allowed
+            )
         await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
             organisation = await organisation_by_slug(tx, slug)

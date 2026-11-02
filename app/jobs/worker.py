@@ -49,6 +49,7 @@ from app.domain.group_erase import GroupEraser
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService, IntegrationWatch
 from app.domain.maintenance_service import MaintenanceWatch
+from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.request_log import RequestEvents
@@ -63,7 +64,7 @@ from app.i18n.dates import configure_clock
 from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
-from app.keys import management_token_key
+from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 
 log = structlog.get_logger()
@@ -169,6 +170,7 @@ async def run_worker(
                     Translator(load_catalogues(), CachedTextOverrides(uow)),
                     management_token_key(settings),
                     settings.public_base_url,
+                    management_token_key_previous(settings),
                 ),
                 video=wired.video,
                 dispatcher=wired.dispatcher,
@@ -194,6 +196,13 @@ async def run_worker(
     )
     eraser = GroupEraser(uow, clock, lambda: timedelta(days=live.settings.group_erase_after_days))
     sessions = AdminSessionService(uow, clock)
+    links = ParticipantLinkService(uow, clock)
+
+    async def clean_sessions() -> int:
+        """Delete the ended admin sessions and the lapsed participant link sessions."""
+        admin = await sessions.clean(timedelta(hours=live.settings.admin_session_hours))
+        return admin + await links.clean()
+
     housekeeping = Housekeeping.for_database(
         engine,
         uow,
@@ -202,8 +211,8 @@ async def run_worker(
         settings.database_url,
         diagnostics.brake,
         eraser.run,
-        RetentionSweep(uow, clock).run,
-        lambda: sessions.clean(timedelta(hours=live.settings.admin_session_hours)),
+        RetentionSweep(uow, clock, live.closure_retention).run,
+        clean_sessions,
     )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(

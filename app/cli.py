@@ -37,6 +37,8 @@ When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
     ``python -m app.cli oidc-check``  check the login configuration and print the claim mapping
     ``python -m app.cli tls-check [--host H] [--port P]``  the certificate of the public address
         (ADR 0064): stored for System status; with ``--host`` another server, stored nowhere
+    ``python -m app.cli rekey``  seal every stored secret again under the current
+        ``SETTINGS_ENCRYPTION_KEY`` after a rotation (ADR 0094); idempotent, one audit event
     ``python -m app.cli purge-overdue [--dry-run]``  purge the personal data past its purge
         moment now (the nightly sweep does this too); ``--dry-run`` only counts per group
     ``python -m app.cli sessions end-all --reason restore|secret_rotated|cli``  end every admin
@@ -63,6 +65,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
+from cryptography.exceptions import InvalidTag
 
 from app.adapters.bootstrap import (
     DEFAULT_PATH,
@@ -85,10 +88,12 @@ from app.adapters.db.configuration_package import (
 from app.adapters.db.engine import create_engine
 from app.adapters.db.maintenance import checkpoint_wal
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
+from app.adapters.db.sealed import rekey_database
 from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.diagnostics import CheckResult, format_report, passed, run_checks
-from app.adapters.integrations import build_integrations, secret_box
+from app.adapters.integrations import build_integrations, installation_box, secret_box
+from app.adapters.live_settings import LiveSettings
 from app.adapters.oidc import claim_mapping, login_claims
 from app.adapters.oidc_check import OidcTarget, check_oidc
 from app.adapters.registrations import (
@@ -117,17 +122,24 @@ from app.config import Settings, environment
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.admin_sessions import EndReason
+from app.domain.audit import Outcome
 from app.domain.authorization import Grant, Principal, Role, RoleCatalogue, Scope
 from app.domain.client_pseudonym import UNKNOWN_CLIENT, ClientPseudonyms
 from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcome
-from app.domain.configuration_package import COUNTED_TABLES, PackageSummary
+from app.domain.configuration_package import (
+    COUNTED_TABLES,
+    PackageSummary,
+)
+from app.domain.configuration_package import (
+    PERMISSION as PLATFORM_MANAGE,
+)
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.entitlements import ClaimMode, resolve
 from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
-from app.domain.ports import CertificateProbe, IdentityError, IntegrationError
+from app.domain.ports import CertificateProbe, Clock, IdentityError, IntegrationError
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
@@ -420,6 +432,59 @@ async def _sessions_end_all(settings: Settings, reason: EndReason) -> str:
     return f"ended {count} sessions ({reason.value})\n"
 
 
+REKEY_DETAIL = "secrets.rekey"
+"""The audit detail of ``rekey``; the counts follow it."""
+
+
+async def _rekey(settings: Settings) -> tuple[str, int]:
+    """Seal every stored secret again under the current key (ADR 0094 point 3).
+
+    Idempotent: values that already carry the current key id are left alone. One system audit
+    event with counts only; no key, plaintext or ciphertext reaches the output.
+    """
+    try:
+        box = installation_box(settings)
+    except RuntimeError as error:
+        return f"{error}\n", 1
+    path = database_path(settings.database_url)
+    try:
+        counts = await asyncio.to_thread(rekey_database, path, box)
+    except InvalidTag:
+        return (
+            "A stored secret opens under no configured key; nothing was changed.\n"
+            "Set the previous key as SETTINGS_ENCRYPTION_KEY_PREVIOUS and run it again.\n",
+            1,
+        )
+    engine = create_engine(settings.database_url)
+    try:
+        clock = SystemClock()
+        await AdminService(SqlUnitOfWork(engine), clock).record(
+            CONFIG_ACTOR,
+            PLATFORM_MANAGE.value,
+            Outcome.SUCCESS,
+            detail=f"{REKEY_DETAIL} resealed={counts.resealed} current={counts.current}",
+        )
+    finally:
+        await engine.dispose()
+    return (
+        f"resealed {counts.resealed} secrets under the current key; "
+        f"{counts.current} were already under it.\n"
+        "SETTINGS_ENCRYPTION_KEY_PREVIOUS may be removed now.\n",
+        0,
+    )
+
+
+async def _live_settings(settings: Settings, uow: SqlUnitOfWork, clock: Clock) -> LiveSettings:
+    """Return the effective settings with the portal values, so the CLI applies the same limits.
+
+    A tool that decides what to purge must read the organisation's maximum (ADR 0102, class D)
+    like the worker does; a failed read keeps the environment's values (``LiveSettings``).
+    """
+    live = LiveSettings(settings, environment(), PlatformSettingsStore(uow), clock)
+    await live.refresh()
+    return live
+
+
 async def _purge_overdue(settings: Settings, dry_run: bool = False) -> tuple[str, bool]:
     """Run the retention sweep once and report counts (WP-A1); the second item is success.
 
@@ -427,7 +492,10 @@ async def _purge_overdue(settings: Settings, dry_run: bool = False) -> tuple[str
     """
     engine = create_engine(settings.database_url)
     try:
-        result = await RetentionSweep(SqlUnitOfWork(engine), SystemClock()).run(dry_run=dry_run)
+        uow = SqlUnitOfWork(engine)
+        clock = SystemClock()
+        live = await _live_settings(settings, uow, clock)
+        result = await RetentionSweep(uow, clock, live.closure_retention).run(dry_run=dry_run)
         if result.purged:
             await checkpoint_wal(engine)  # WP-A3: no older copy of the data stays in the WAL
     finally:
@@ -762,8 +830,11 @@ async def _closures(settings: Settings) -> AsyncIterator[ClosureService]:
     try:
         uow = SqlUnitOfWork(engine, secret_box(settings))
         clock = SystemClock()
-        bookings = BookingService(uow, clock, management_token_key(settings))
-        yield ClosureService(uow, clock, AdminService(uow, clock), bookings)
+        live = await _live_settings(settings, uow, clock)
+        bookings = BookingService(
+            uow, clock, management_token_key(settings), closure_retention=live.closure_retention
+        )
+        yield ClosureService(uow, clock, AdminService(uow, clock), bookings, live.closure_retention)
     finally:
         await engine.dispose()
 
@@ -1075,6 +1146,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     end_all_cmd.add_argument(
         "--reason", required=True, choices=[r.value for r in SESSION_REASONS], help="why"
     )
+    commands.add_parser(
+        "rekey", help="seal every stored secret again under the current key (ADR 0094)"
+    )
     commands.add_parser("version", help="print the release and commit of this image")
     commands.add_parser("update-claim", help="claim the waiting update request (host updater)")
     progress_cmd = commands.add_parser("update-progress", help="record the step an update starts")
@@ -1161,6 +1235,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "sessions":
         sys.stdout.write(asyncio.run(_sessions_end_all(Settings(), EndReason(args.reason))))
         return 0
+    if args.command == "rekey":
+        text, code = asyncio.run(_rekey(Settings()))
+        sys.stdout.write(text)
+        return code
     if args.command == "tls-check":
         return _write(asyncio.run(_tls_check(Settings(), args.host, args.port)))
     if args.command == "closure":

@@ -44,19 +44,30 @@ services:
     command:
       - sh
       - -c
-      - >-
-        alembic upgrade head &&
-        exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000
-        --no-access-log --proxy-headers
-        --forwarded-allow-ips "$${FORWARDED_ALLOW_IPS:-172.31.240.2}"
+      - |-
+        alembic upgrade head || exit 1
+        set -- --no-access-log --proxy-headers --forwarded-allow-ips "$${FORWARDED_ALLOW_IPS:-172.31.240.2}"
+        if [ -n "$${WEB_TLS_CERT_FILE:-}$${WEB_TLS_KEY_FILE:-}" ]; then
+          if [ -z "$${WEB_TLS_CERT_FILE:-}" ] || [ -z "$${WEB_TLS_KEY_FILE:-}" ]; then
+            echo "WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE must be set together" >&2
+            exit 1
+          fi
+          set -- "$$@" --ssl-certfile "$$WEB_TLS_CERT_FILE" --ssl-keyfile "$$WEB_TLS_KEY_FILE"
+        fi
+        exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 "$$@"
     # X-Forwarded-For is trusted only from the TLS proxy's fixed address (ADR 0030; edge network
-    # below). Behind a proxy of your own, FORWARDED_ALLOW_IPS in .env replaces it.
+    # below). Behind a proxy of your own, FORWARDED_ALLOW_IPS in .env replaces it: the address
+    # as this container sees the proxy. A proxy on another machine also gets HTTPS from web when
+    # WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE are set (ADR 0091 point 3); the healthcheck follows.
     networks: [default, edge]
     volumes:
       - data:/srv/data
       # The own certificate managed in the portal (ADR 0070): its private key lives here and
       # nowhere else (never in the database); web writes, the proxy reads. Empty with ACME.
       - portal-certs:/srv/portal-certs
+      # Certificate and key for WEB_TLS_CERT_FILE/WEB_TLS_KEY_FILE (ADR 0091): /web-tls/cert.pem
+      # and /web-tls/key.pem, readable by uid 10001. Unused without those two settings.
+      - ./web-tls:/web-tls:ro
     environment:
       # ADR 0070: whether the bundled proxy runs (the installer's OPENPLANNER_TLS pin), so the
       # portal knows the certificate source is its to manage; and the volume with the own key.

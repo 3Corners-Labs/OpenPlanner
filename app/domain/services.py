@@ -50,6 +50,7 @@ from app.domain.booking_changes import lapse_unconfirmed
 from app.domain.calls import apply_event, new_status
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure, covering
+from app.domain.closure_retention import ClosureRetentionOf, default_closure_retention
 from app.domain.confirmation import DEFAULT_CONFIRM_POLICY, ConfirmPolicy, confirm_window
 from app.domain.direct_leave import DirectLeft, plan_leave
 from app.domain.direct_queue import (
@@ -72,6 +73,7 @@ from app.domain.job_plan import (
     plan_for_direct,
     plan_for_pending,
 )
+from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, open_for_direct
 from app.domain.tokens import (
@@ -134,6 +136,8 @@ class BookingService:
         token_key: Server key for deriving management tokens (ADR 0011).
         confirm_policy: The rules for confirming a new booking (ADR 0056), per organisation
             id when it is a function (class D settings, read live).
+        closure_retention: The organisation's maximum for bookings on hold (ADR 0102), to
+            tell participants the date their details are deleted by.
 
     Raises:
         ValueError: If ``token_key`` is shorter than 32 bytes.
@@ -146,6 +150,8 @@ class BookingService:
         token_key: bytes,
         phone_region: Callable[[int], str] = lambda _organisation_id: DEFAULT_PHONE_REGION,
         confirm_policy: ConfirmPolicy | Callable[[int], ConfirmPolicy] = DEFAULT_CONFIRM_POLICY,
+        previous_token_key: bytes | None = None,
+        closure_retention: ClosureRetentionOf = default_closure_retention,
     ) -> None:
         """Store the collaborators.
 
@@ -156,14 +162,18 @@ class BookingService:
             phone_region: The organisation's default phone region (class D, ADR 0055).
             confirm_policy: The rules for confirming a new booking (ADR 0056), per
                 organisation id when it is a function (class D settings, read live).
+            previous_token_key: ``MANAGEMENT_TOKEN_KEY_PREVIOUS`` during a rotation (ADR 0094).
+            closure_retention: The organisation's maximum for bookings on hold (ADR 0102).
         """
         if len(token_key) < MIN_KEY_BYTES:
             raise ValueError(f"the token key must be at least {MIN_KEY_BYTES} bytes")
         self._uow = uow
         self._clock = clock
         self._token_key = token_key
+        self._token_keys = (token_key, *([previous_token_key] if previous_token_key else []))
         self._confirm_policy = confirm_policy
         self._phone_region = phone_region
+        self._closure_retention = closure_retention
 
     async def get_group(self, group_slug: str) -> Group:
         """Return the group behind a booking page.
@@ -179,6 +189,21 @@ class BookingService:
         async with self._uow.read() as tx:
             closures = await tx.get_closures(group.id, self._clock.now())
         return closures[0] if closures else None
+
+    async def closure_delete_by(self, group: Group, closure: Closure) -> datetime | None:
+        """Return the date by which the details of the bookings on hold are deleted.
+
+        The latest of the bookings still on hold in ``closure`` (ADR 0102): the earlier of
+        30 days after the closure ends and the maximum after the original appointment. ``None``
+        when nothing is on hold, so the page says nothing about data it does not hold.
+        """
+        if closure.id is None:
+            return None
+        async with self._uow.read() as tx:
+            slot_end = await tx.latest_suspended_end(closure.id)
+        if slot_end is None:
+            return None
+        return closure.purge_at(slot_end, self._closure_retention(group.organisation_id))
 
     async def closure_image(self, group: Group) -> ImageFile | None:
         """Return the image of the closure participants of ``group`` see now, if it has one.
@@ -306,7 +331,7 @@ class BookingService:
             await tx.replace_jobs(_id(booking), plan_for_direct(start=now, end=end))
         return BookingReceipt(booking, token)
 
-    async def find(self, management_token: str) -> BookingDetails:
+    async def find(self, management_token: str | PublicRef) -> BookingDetails:
         """Return the booking behind a management link, with its group and changeability.
 
         Raises:
@@ -329,7 +354,7 @@ class BookingService:
         )
         return BookingDetails(booking, group, deadline, changeable, closure, cancellable)
 
-    async def confirm(self, management_token: str) -> Booking:
+    async def confirm(self, management_token: str | PublicRef) -> Booking:
         """Confirm a booking by its email link (ADR 0056) and return it as it now is.
 
         A pending booking before its ``confirm_by`` is confirmed: the meeting, reminders,
@@ -354,7 +379,7 @@ class BookingService:
             await tx.replace_jobs(_id(booking), await self._booked_jobs(tx, group, confirmed))
             return confirmed
 
-    async def cancel(self, management_token: str) -> Booking:
+    async def cancel(self, management_token: str | PublicRef) -> Booking:
         """Cancel the booking; its pending jobs become a cancellation mail and the purge.
 
         Raises:
@@ -372,7 +397,7 @@ class BookingService:
             await tx.replace_jobs(_id(booking), jobs)
             return cancelled
 
-    async def leave_direct(self, management_token: str) -> DirectLeft:
+    async def leave_direct(self, management_token: str | PublicRef) -> DirectLeft:
         """Stop waiting for a direct call: cancel it and end its work item (ADR 0019 point 4).
 
         The pending jobs are replaced in the same transaction by the work item's ending (ADR
@@ -398,7 +423,9 @@ class BookingService:
             await tx.save_call_status(apply_event(status, plan.event.kind, now))
             return DirectLeft(plan.booking, changed=True, agent_present=plan.agent_present)
 
-    async def reschedule(self, management_token: str, new_start: datetime) -> BookingReceipt:
+    async def reschedule(
+        self, management_token: str | PublicRef, new_start: datetime
+    ) -> BookingReceipt:
         """Move a booking to another slot of the same group, keeping contact and locale.
 
         The old booking is cancelled without a cancellation mail; the new one gets a change
@@ -523,8 +550,17 @@ class BookingService:
             raise DomainError(ErrorCode.GROUP_NOT_FOUND)
         return group
 
-    async def _booking(self, tx: Transaction, management_token: str) -> Booking:
-        """Return the booking for a token or raise ``booking_not_found``."""
+    async def _booking(self, tx: Transaction, management_token: str | PublicRef) -> Booking:
+        """Return the booking for a token or an authorised reference, else ``booking_not_found``.
+
+        A ``PublicRef`` names a booking the caller has already checked against the participant
+        link session (ADR 0093); it is never read from a request without that check.
+        """
+        if isinstance(management_token, PublicRef):
+            by_ref = await tx.get_booking_by_public_ref(management_token.value)
+            if by_ref is None:
+                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+            return by_ref
         booking = await tx.get_booking_by_token_hash(hash_token(management_token))
         if booking is None or not token_matches(management_token, booking.token_hash):
             raise DomainError(ErrorCode.BOOKING_NOT_FOUND)

@@ -10,16 +10,16 @@
   {% endif %}
 </div>
 {% if joinable %}
-<p><a class="button button--large" href="/b/{{ token }}/join/go">{{ _("join.button") }}</a></p>
+<p><a class="button button--large" href="/b/m/{{ ref }}/join/go">{{ _("join.button") }}</a></p>
 <p>{{ _("join.tips.lobby") }}</p>
 {% endif %}
 {% if refresh %}
-<p><a class="button button--secondary" href="/b/{{ token }}/wait">{{ _("join.refresh") }}</a></p>
+<p><a class="button button--secondary" href="/b/m/{{ ref }}/wait">{{ _("join.refresh") }}</a></p>
 {% endif %}
 {% if schedule %}
 <p><a class="button" href="/g/{{ group.slug }}">{{ _("direct.schedule_instead") }}</a></p>
 {% endif %}
 {% if leavable %}
-<p><a href="/b/{{ token }}/wait/leave">{{ _("wait.leave.link") }}</a></p>
+<p><a href="/b/m/{{ ref }}/wait/leave">{{ _("wait.leave.link") }}</a></p>
 {% endif %}
 </div>

@@ -112,10 +112,29 @@ async def test_the_closure_page_of_an_open_team_goes_back_to_the_calendar(
 async def test_a_booking_on_hold_shows_the_contact_options_above_its_actions(
     site: httpx.AsyncClient, examples: ClosureExamples
 ) -> None:
-    page = (await site.get(examples.suspended_booking)).text
+    base = (await site.get(examples.suspended_booking)).headers["location"]  # the exchange
+    page = (await site.get(base)).text
 
     assert "Uw afspraak kan niet doorgaan op dit moment" in page
     assert "<p><strong>Storing bij het loket</strong></p>" in page
     assert PHONE_LINK in page
-    assert page.index(PHONE_LINK) < page.index(f'href="{examples.suspended_booking}/reschedule"')
+    assert page.index(PHONE_LINK) < page.index(f'href="{base}/reschedule"')
     assert "inwoner@example.org" not in page  # the page never shows contact details
+
+
+async def test_the_closure_page_names_the_day_the_details_are_deleted_by(
+    site: httpx.AsyncClient,
+) -> None:
+    dutch = (await site.get(CLOSED)).text
+    english = (await site.get(CLOSED, params={"lang": "en"})).text
+
+    # The booking on hold ends next week; an open closure keeps its details 90 days after that.
+    assert (
+        '<p id="closure-delete-by">Gegevens van afspraken die door deze sluiting stilliggen, '
+        "worden uiterlijk op woensdag 8 april 2026 verwijderd.</p>"
+    ) in dutch
+    assert "deleted by Wednesday, April 8, 2026 at the latest." in english
+
+
+async def test_a_closure_without_bookings_on_hold_promises_nothing(site: httpx.AsyncClient) -> None:
+    assert "closure-delete-by" not in (await site.get(PLANNED + "/closure")).text

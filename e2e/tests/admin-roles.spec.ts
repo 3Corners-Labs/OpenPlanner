@@ -110,7 +110,7 @@ test('auditor reads the matrix, the own log, retention and the settings, but no 
   await adminMenu(page).getByRole('link', { name: 'Geavanceerde instellingen' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Geavanceerde instellingen');
   await expect(page.getByRole('heading', { name: 'Systeemstatus' })).toBeVisible();
-  await expect(page.getByRole('rowheader', { name: /SETTINGS_ENCRYPTION_KEY/ })).toBeVisible();
+  await expect(page.getByRole('rowheader', { name: /SETTINGS_ENCRYPTION_KEY(?!_)/ })).toBeVisible();
   await expectNoAxeViolations(page);
 
   await expectForbidden(page, '/admin/groups/demo/agenda');

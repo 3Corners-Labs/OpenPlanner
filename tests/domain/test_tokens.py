@@ -5,9 +5,11 @@ import pytest
 
 from app.domain.tokens import (
     agent_pseudonym,
+    agent_pseudonyms,
     derive_token,
     hash_token,
     new_token_salt,
+    token_for_booking,
     token_matches,
 )
 
@@ -62,3 +64,33 @@ def test_agent_pseudonym_is_stable_per_subject_and_key() -> None:
     assert first != agent_pseudonym(b"j" * 32, "user-1")
     assert "user-1" not in first
     assert len(first) == 64
+
+
+def test_the_link_of_a_booking_made_under_the_previous_key_is_kept() -> None:
+    old, new = b"o" * 32, b"n" * 32
+    salt = new_token_salt()
+    stored = hash_token(derive_token(old, salt))
+
+    assert token_for_booking([new, old], salt, stored) == derive_token(old, salt)
+    assert token_for_booking([new, old], salt, hash_token(derive_token(new, salt))) == (
+        derive_token(new, salt)
+    )
+
+
+def test_without_the_previous_key_a_booking_under_it_gets_a_dead_link() -> None:
+    old, new = b"o" * 32, b"n" * 32
+    salt = new_token_salt()
+
+    token = token_for_booking([new], salt, hash_token(derive_token(old, salt)))
+
+    assert token == derive_token(new, salt)
+    assert not token_matches(token, hash_token(derive_token(old, salt)))
+
+
+def test_agent_pseudonyms_cover_both_keys() -> None:
+    old, new = b"o" * 32, b"n" * 32
+
+    assert agent_pseudonyms([new, old], "u") == (
+        agent_pseudonym(new, "u"),
+        agent_pseudonym(old, "u"),
+    )
