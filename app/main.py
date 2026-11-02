@@ -442,6 +442,7 @@ def create_app(
             max_entitlements=lambda: live().oidc_entitlements_max_values,
         )
         app.state.organisation_providers = providers
+        txt_resolver = mail_domain_resolver or DnsTxtResolver()
         app.state.identity_provider_service = IdentityProviderService(
             uow,
             clock,
@@ -451,6 +452,9 @@ def create_app(
             limit=lambda: live().idp_max_per_organisation,
             platform_discovery_url=lambda: settings.oidc_discovery_url,
             on_change=providers.invalidate,
+            resolver=txt_resolver,
+            login_suffix=lambda: live().bundled_idp_login_suffix,
+            grace=lambda: timedelta(days=live().idp_domain_grace_days),
         )
         app.state.idp_mapping_service = IdpMappingService(
             uow,
@@ -611,7 +615,7 @@ def create_app(
             clock,
             app.state.admin_service,
             senders,
-            mail_domain_resolver or DnsTxtResolver(),
+            txt_resolver,
             lambda: live().mail_from if live().smtp_host else None,
             production=settings.environment == "prod",
             plaintext_relay_allowed=settings.smtp_plaintext_relay_allowed,

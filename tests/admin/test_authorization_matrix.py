@@ -1046,6 +1046,22 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             404, 403, 403, 403, 403, 403, 403
         ),
     },
+    # ADR 0083 step 3: login domains, superuser only; an unknown provider answers 404.
+    "POST /admin/organisations/{org}/login/{idp_key}/domains": {
+        "/admin/organisations/demo/login/gem-x/domains": statuses(
+            404, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/login/{idp_key}/domains/{claim_id}/verify": {
+        "/admin/organisations/demo/login/gem-x/domains/1/verify": statuses(
+            404, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/login/{idp_key}/domains/{claim_id}/remove": {
+        "/admin/organisations/demo/login/gem-x/domains/1/remove": statuses(
+            404, 403, 403, 403, 403, 403, 403
+        ),
+    },
     "POST /admin/organisations/{org}/login/{idp_key}/test": {
         "/admin/organisations/demo/login/gem-x/test": statuses(404, 403, 403, 403, 403, 403, 403),
     },

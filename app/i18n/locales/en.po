@@ -9485,3 +9485,84 @@ msgstr "Participants wait longer than the set limit."
 
 msgid "admin.topbar.alerts.count"
 msgstr "{label}, {count} open"
+
+msgid "settings.field.idp_domain_grace_days.label"
+msgstr "Grace for a missing domain record (days)"
+
+msgid "admin.idp.domains.title"
+msgstr "Domains"
+
+msgid "admin.idp.domains.intro"
+msgstr "Someone who logs in with an address on a verified domain goes to this identity provider. A domain counts only once the organisation has published the TXT record below in its DNS and you press Verify; after that OpenPlanner re-checks the record regularly. A domain also covers its subdomains."
+
+msgid "admin.idp.domains.domain"
+msgstr "Domain"
+
+msgid "admin.idp.domains.state"
+msgstr "State"
+
+msgid "admin.idp.domains.record"
+msgstr "TXT record"
+
+msgid "admin.idp.domains.record_name"
+msgstr "Name"
+
+msgid "admin.idp.domains.record_value"
+msgstr "Value"
+
+msgid "admin.idp.domains.verify"
+msgstr "Verify"
+
+msgid "admin.idp.domains.remove"
+msgstr "Remove"
+
+msgid "admin.idp.domains.none"
+msgstr "No domains yet: every login goes to the platform's identity provider."
+
+msgid "admin.idp.domains.new"
+msgstr "Add domain"
+
+msgid "admin.idp.domains.new.hint"
+msgstr "For example gemeente.nl. The suffix of the bundled identity provider (and everything under it) is reserved."
+
+msgid "admin.idp.domains.add"
+msgstr "Add domain"
+
+msgid "admin.idp.domains.pending"
+msgstr "Waiting for verification"
+
+msgid "admin.idp.domains.verified"
+msgstr "Verified"
+
+msgid "admin.idp.domains.failing"
+msgstr "Record gone, still routing"
+
+msgid "admin.idp.domains.lapsed"
+msgstr "Lapsed, not routing"
+
+msgid "admin.idp.domains.checked"
+msgstr "Checked {moment}"
+
+msgid "admin.done.idp_domain_claimed"
+msgstr "Domain added. Have the organisation publish the TXT record, then press Verify."
+
+msgid "admin.done.idp_domain_verified"
+msgstr "Domain verified: logins on this domain go to this identity provider."
+
+msgid "admin.done.idp_domain_not_found_yet"
+msgstr "The TXT record was not found (yet). DNS changes can take a while; try again later."
+
+msgid "admin.form.error.idp_domain_invalid"
+msgstr "Enter a domain name, such as gemeente.nl."
+
+msgid "admin.form.error.idp_domain_reserved"
+msgstr "This domain falls under the suffix of the bundled identity provider and is reserved for the platform."
+
+msgid "admin.form.error.idp_domain_taken"
+msgstr "This domain is already claimed by an identity provider on this installation."
+
+msgid "admin.form.error.idp_domain_limit"
+msgstr "This identity provider has reached the maximum of 20 domains."
+
+msgid "admin.form.error.idp_domain_not_found"
+msgstr "This domain does not (or no longer) belong to this identity provider."

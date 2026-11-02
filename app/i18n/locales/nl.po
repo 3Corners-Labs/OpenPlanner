@@ -9497,3 +9497,84 @@ msgstr "Deelnemers wachten langer dan de ingestelde grens."
 
 msgid "admin.topbar.alerts.count"
 msgstr "{label}, {count} open"
+
+msgid "settings.field.idp_domain_grace_days.label"
+msgstr "Tolerantie verdwenen domeinrecord (dagen)"
+
+msgid "admin.idp.domains.title"
+msgstr "Domeinen"
+
+msgid "admin.idp.domains.intro"
+msgstr "Wie inlogt met een e-mailadres op een geverifieerd domein, gaat naar deze identity provider. Een domein telt pas mee als de organisatie het TXT-record hieronder in haar DNS heeft gezet en u op Controleren drukt; daarna controleert OpenPlanner het record regelmatig. Een domein dekt ook zijn subdomeinen."
+
+msgid "admin.idp.domains.domain"
+msgstr "Domein"
+
+msgid "admin.idp.domains.state"
+msgstr "Stand"
+
+msgid "admin.idp.domains.record"
+msgstr "TXT-record"
+
+msgid "admin.idp.domains.record_name"
+msgstr "Naam"
+
+msgid "admin.idp.domains.record_value"
+msgstr "Waarde"
+
+msgid "admin.idp.domains.verify"
+msgstr "Controleren"
+
+msgid "admin.idp.domains.remove"
+msgstr "Verwijderen"
+
+msgid "admin.idp.domains.none"
+msgstr "Nog geen domeinen: alle logins gaan naar de identity provider van het platform."
+
+msgid "admin.idp.domains.new"
+msgstr "Domein toevoegen"
+
+msgid "admin.idp.domains.new.hint"
+msgstr "Bijvoorbeeld gemeente.nl. Het achtervoegsel van de ingebouwde identiteitsprovider (en alles daaronder) is gereserveerd."
+
+msgid "admin.idp.domains.add"
+msgstr "Domein toevoegen"
+
+msgid "admin.idp.domains.pending"
+msgstr "Wacht op verificatie"
+
+msgid "admin.idp.domains.verified"
+msgstr "Geverifieerd"
+
+msgid "admin.idp.domains.failing"
+msgstr "Record verdwenen, routeert nog"
+
+msgid "admin.idp.domains.lapsed"
+msgstr "Vervallen, routeert niet"
+
+msgid "admin.idp.domains.checked"
+msgstr "Gecontroleerd {moment}"
+
+msgid "admin.done.idp_domain_claimed"
+msgstr "Domein toegevoegd. Laat de organisatie het TXT-record publiceren en druk dan op Controleren."
+
+msgid "admin.done.idp_domain_verified"
+msgstr "Domein geverifieerd: logins op dit domein gaan naar deze identity provider."
+
+msgid "admin.done.idp_domain_not_found_yet"
+msgstr "Het TXT-record is (nog) niet gevonden. DNS-wijzigingen kunnen even duren; probeer het later opnieuw."
+
+msgid "admin.form.error.idp_domain_invalid"
+msgstr "Vul een domeinnaam in, zoals gemeente.nl."
+
+msgid "admin.form.error.idp_domain_reserved"
+msgstr "Dit domein valt onder het achtervoegsel van de ingebouwde identiteitsprovider en is gereserveerd voor het platform."
+
+msgid "admin.form.error.idp_domain_taken"
+msgstr "Dit domein is al geclaimd door een identity provider op deze installatie."
+
+msgid "admin.form.error.idp_domain_limit"
+msgstr "Deze identity provider heeft het maximum van 20 domeinen bereikt."
+
+msgid "admin.form.error.idp_domain_not_found"
+msgstr "Dit domein hoort niet (meer) bij deze identity provider."
