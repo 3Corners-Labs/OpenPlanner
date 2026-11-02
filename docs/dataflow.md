@@ -365,6 +365,7 @@ data. A refused change is audited with its permission and target only, never the
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
 Let's Encrypt ──HTTP-01 / TLS-ALPN-01──> proxy (ports 80/443): challenge token only
 visitor ──https──> proxy ──http, edge network──> web (X-Forwarded-For set by the proxy)
+   own proxy on another machine ──https (WEB_TLS_CERT_FILE/KEY_FILE)──> web (ADR 0091 point 3)
 worker ──TLS handshake, no request──> proxy (public name, port 443): reads the public certificate
        ──> certificate_checks (issuer, names, validity, finding; no personal data; ADR 0064)
 ```
@@ -385,6 +386,37 @@ a page. It concerns the organisation's server identity, not a participant. The C
 leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
 written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
 name only).
+
+## Outbound connections and the hop to web (ADR 0091)
+
+Every connection that leaves the installation, or crosses a machine boundary, in one table
+(ASVS V1.3.6, V13.1.1). **A PR that adds an outbound connection adds its row here.** *Class* is
+who sets the destination (ADR 0042): A bootstrap and B deployment are the host's environment, C
+is the superuser in the portal. Organisation-level addresses are entered by the superuser too, per
+organisation (the permissions are locked to the superuser, ADR 0039). *Guard* says whether the destination goes
+through the outbound guard (`app/adapters/outbound.py`: https only, public addresses only, no
+redirects, size cap); where it does not, the destination is set by the host or the superuser only
+and must be https (or the named secure transport) in production.
+
+| Connection | From → to | Protocol | Encryption in production | Set by | Guard | Carries |
+|---|---|---|---|---|---|---|
+| Mail | worker → the organisation's SMTP server; else the `SMTP_HOST` fallback | SMTP, port 587 (STARTTLS) or 465 (implicit TLS) | Required: saving a server without TLS is refused (ADR 0091 point 4); exception `SMTP_PLAINTEXT_RELAY_ALLOWED` (B) for a relay on a trusted network | The superuser per organisation (`integrations.manage`); fallback B | no | Participant name, email address, dates, join and management links |
+| SMS | worker → the provider's API (today Webex Connect) | HTTPS | Required: https only, no credentials in the address | The superuser per organisation (`integrations.manage`; address, API key sealed, ADR 0008) | no | Phone number, first name, date, time, team, management link |
+| Webex Meetings | web, worker → `webexapis.com/v1` (OAuth token from the same host) | HTTPS | Required | B (`WEBEX_API_BASE_URL`, default Webex; changed only for test doubles); credentials A/B or sealed | no | Group name and times; host, never participants |
+| Webex Contact Center | web, worker → the WxCC API of the region | HTTPS | Required: https only | C (`WXCC_API_BASE_URL`, superuser); service app sealed | no | First name, host join URL, routing variables (ADR 0081) |
+| Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |
+| Identity providers, organisation | web → discovery, token and key endpoints of an organisation's IdP (ADR 0083) | HTTPS | Required | The superuser per organisation (`identity_providers.manage`; confined to its own domains) | yes | OIDC protocol only |
+| Log destinations | web, worker → syslog, Splunk, Elastic or an HTTP collector (ADR 0085) | `syslog+tls` or `https`; `syslog+tcp`, `syslog+udp` and `http` only outside production | Required: production refuses clear-text transports when saving | C (superuser, portal; credentials sealed) | no | Masked log lines and audit, system and security events: no PII fields (ADR 0034, 0040) |
+| ACME | proxy → the ACME CA (Let's Encrypt) and CA → proxy challenge on 80/443 | HTTPS (ACME); HTTP-01 on 80 | Required towards the CA | B (`ACME_CA`, `ACME_EMAIL` in `proxy.env`) | no | Domain name, operator email address, public key |
+| Release channel | worker → `api.github.com` (release list); host updater → GHCR and GitHub (images, signatures; cosign verifies keyless against Sigstore) | HTTPS | Required | Repository: C (`UPDATE_REPOSITORY`); the hosts are fixed in the code and the updater | no | Nothing about participants; optional read-only token |
+| Certificate probe | worker → the public address, port 443 | TLS handshake, no request | Is the TLS check itself | B (`PUBLIC_BASE_URL`) | no | Nothing; reads the public certificate (ADR 0064) |
+| DNS checks | worker → the host's resolver (`/etc/resolv.conf`): TXT lookups of the sender domain (SPF, DKIM, DMARC; ADR 0073) and, from ADR 0083 step 3, the organisation's domain claims | DNS (UDP/TCP 53) | Not encrypted by the application; the answers only fill a status, they gate nothing | Names: the superuser (sender domain, domain claims); resolver: the host | no | Domain names only, never personal data |
+| Proxy to web, bundled | proxy → `web:8000` on the `edge` network of one host | HTTP | **Recorded exception** (ADR 0091 point 2): the hop never leaves the host, and whoever reads the bridge already has the host and the TLS keys | B (`docker-compose.yml`, fixed addresses) | n/a | Everything the visitor sends |
+| Proxy to web, own proxy | an own reverse proxy on another machine → `web:8000` | HTTP, or HTTPS when `WEB_TLS_CERT_FILE` and `WEB_TLS_KEY_FILE` are set | HTTPS expected: *System status* warns while `FORWARDED_ALLOW_IPS` names another address than the bundled proxy's and web serves no TLS (ADR 0091 point 3) | B | n/a | Everything the visitor sends |
+
+Not outbound but listed so the picture is complete: webhooks from Webex and WxCC reach `web`
+inbound and are verified by signature or token (`docs/webhooks.md`); the container logs leave
+the host only if the host ships them (`docs/runbook.md`).
 
 ## Configuration package (ADR 0089)
 

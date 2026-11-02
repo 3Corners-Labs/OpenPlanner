@@ -130,6 +130,59 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   `handle { redir https://{host}{uri} 308 }`. Also let `TRACE` reach the app (it answers 405) and
   do not serve `/static/` from the proxy itself. `scripts/check-proxy.sh` shows what to expect.
 
+### TLS from a proxy on another machine to web (ADR 0091 point 3)
+
+With the bundled proxy the hop to `web` is plain HTTP on the `edge` network of one host, a
+recorded exception (`docs/threat-model.md`): whoever can read that bridge already has the host.
+A reverse proxy of your own on **another machine** crosses a real network, and then the visitor's
+names, booking data and management links travel in clear text unless `web` serves HTTPS.
+
+1. **Get a certificate and key for `web`.** Any CA your proxy trusts: an internal CA (the usual
+   choice), or a self-signed pair that the proxy is told to trust. Its name must be the name the
+   proxy connects to (for example `openplanner-web.internal`). Put the PEM files in `./web-tls/`
+   next to `docker-compose.yml`; `web` mounts it read-only at `/web-tls`. The key must be
+   readable by uid 10001 and nobody else (`chown 10001 web-tls/key.pem; chmod 600
+   web-tls/key.pem`). Keep it out of backups and out of the repository (`web-tls/` is ignored).
+2. **Set both variables in `.env`** (class B, both or neither; web refuses to start with one):
+
+   ```
+   WEB_TLS_CERT_FILE=/web-tls/cert.pem
+   WEB_TLS_KEY_FILE=/web-tls/key.pem
+   FORWARDED_ALLOW_IPS=<the proxy's address as the web container sees it>
+   ```
+
+   `FORWARDED_ALLOW_IPS` must be the address the `web` container sees the proxy connect from,
+   not the proxy's own address on its machine: a proxy behind NAT, a tunnel or the Docker
+   gateway shows up under another address, and with the wrong one every visitor shares one IP
+   and one bot exhausts the booking limit for everyone (proven in the tunnel trial of 1
+   November 2026). Never `*`. The check from the section above applies: `curl -sI
+   https://<host name>/admin` must answer with a `Location: https://…`; with a wrong address it
+   answers `http://`.
+3. **Make the port reachable for the proxy only.** `docker-compose.yml` publishes web on
+   `127.0.0.1:8000`. For a proxy on another machine publish it on the internal interface in a
+   `docker-compose.override.yml` (`ports: !override ["10.0.0.7:8000:8000"]`) and close it to
+   everything but the proxy with the host firewall. Never `0.0.0.0` on a public interface.
+4. **Restart and check.** `docker compose up -d web`, then from the proxy machine
+   `curl --cacert ca.pem https://<web name>:8000/healthz` must answer `ok`. The container's own
+   healthcheck switches to HTTPS by itself (`python -m app.healthcheck`; it checks that web
+   answers on the loopback, not the certificate). If you use the host updater, set
+   `READY_URL=https://127.0.0.1:8000/readyz` in `updater.env`; it then skips the certificate
+   name check on the loopback.
+5. **Point the proxy at `https://`.** Caddy: `reverse_proxy https://<web name>:8000 { transport
+   http { tls_trust_pool file /etc/caddy/ca.pem } }`. nginx: `proxy_pass https://<web name>:8000;
+   proxy_ssl_verify on; proxy_ssl_trusted_certificate /etc/nginx/ca.pem;`. Verify the
+   certificate; an unverified hop protects against nobody.
+6. **Renewal.** Uvicorn reads the files at start. After replacing the pair run
+   `docker compose restart web`; calendar the expiry yourself, nothing in OpenPlanner watches
+   this certificate. A web that is down because the certificate expired shows up as a failing
+   public address check and a failing `web` healthcheck.
+
+**System status** (the *Proxy* row) warns while `FORWARDED_ALLOW_IPS` names an address other
+than the bundled proxy's (`172.31.240.2`) and `WEB_TLS_*` is not set: that points to a proxy on
+another machine whose traffic runs unencrypted. If the proxy really is on the same host and
+reaches web over the loopback or the compose gateway, the hop never leaves the machine; record
+that as your own exception and ignore the warning.
+
 **What is configured, and from where?** Every setting and its class (ADR 0042) is listed in
 `docs/settings.md`. On the host, without sending anyone the `.env`:
 

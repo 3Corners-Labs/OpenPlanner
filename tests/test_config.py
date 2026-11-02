@@ -259,3 +259,12 @@ def test_admin_mfa_is_off_until_the_installation_turns_it_on() -> None:
     assert settings.oidc_acr_values == "mfa"
     assert set(settings.oidc_mfa_amr_values.split()) == {"mfa", "otp", "hwk", "swk"}
     assert settings.oidc_mfa_acr_values == ""
+
+
+def test_web_tls_needs_both_files_or_neither_adr_0091() -> None:
+    assert Settings(environment="dev").web_tls_enabled is False
+    pair = {"web_tls_cert_file": "/web-tls/c.pem", "web_tls_key_file": "/web-tls/k.pem"}
+    assert Settings(environment="dev", **pair).web_tls_enabled is True
+    for only in pair:
+        with pytest.raises(ValidationError, match="WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE"):
+            Settings(environment="dev", **{only: pair[only]})

@@ -402,8 +402,25 @@ REGISTRY: tuple[SettingSpec, ...] = (
         None,
         _B,
         T.HOST,
-        "Address of the reverse proxy (read by uvicorn).",
-        in_config=False,
+        "Address of the reverse proxy (read by uvicorn). Other than the bundled proxy's, "
+        "System status warns unless web serves TLS (ADR 0091).",
+    ),
+    S(
+        "web_tls_cert_file",
+        K.PATH,
+        None,
+        _B,
+        T.HOST,
+        "Certificate chain (PEM) for uvicorn, for an own reverse proxy on another machine; with "
+        "WEB_TLS_KEY_FILE web serves HTTPS (ADR 0091).",
+    ),
+    S(
+        "web_tls_key_file",
+        K.PATH,
+        None,
+        _B,
+        T.HOST,
+        "Private key (PEM) of WEB_TLS_CERT_FILE; readable by the web user only (ADR 0091).",
     ),
     S(
         "tls_domain",
