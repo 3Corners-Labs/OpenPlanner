@@ -2,8 +2,9 @@
 
 Status: accepted (2026-11-02, `po:approved` on #422), requested by the product owner. Amends
 ADR 0079 (point 7: the release identity is a GitHub App of the organisation, not a personal
-token) and ADR 0059 (the release-candidate tag is pushed by that app). Partly built; see
-*Build status*.
+token) and ADR 0059 (the release-candidate tag is pushed by that app). Built: the app
+`3corners-openplanner-release` tagged `v0.4.0-rc.156` on 2026-11-02, and the tag ruleset
+restricts creation to it and the administrator role.
 
 ## Context
 
@@ -61,10 +62,10 @@ app's permissions. Widening any of them is a decision, not a tuning knob.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; environment `release` created with branch policy `main` (2026-11-02) | #422 | in PR |
-| 1 | The product owner creates the release app, installs it on this repository and stores its client ID and key in the environment `release` | GitHub setting | planned |
-| 2 | `main.yml` (candidate tag through the app, tag trigger without `-rc.`) and `release.yml` (app token in `release-pr` and `tag`, `RELEASE_TOKEN` removed); tests; runbook, threat model, ADR 0079 table | #422 | in PR |
-| 3 | The tag ruleset restricts creation, with the release app and the administrator role as bypass; checked on the first candidate after the merge | GitHub setting | planned |
+| 0 | ADR proposed; environment `release` created with branch policy `main` (2026-11-02) | #422 | merged 2026-11-02 |
+| 1 | The product owner creates the release app, installs it on this repository and stores its client ID and key in the environment `release` | GitHub setting | built 2026-11-02: app `3corners-openplanner-release` (ID 5579411), installed on this repository only |
+| 2 | `main.yml` (candidate tag through the app, tag trigger without `-rc.`) and `release.yml` (app token in `release-pr` and `tag`, `RELEASE_TOKEN` removed); tests; runbook, threat model, ADR 0079 table | #422 | merged 2026-11-02; the first candidate `v0.4.0-rc.156` was tagged by the app and started no second run |
+| 3 | The tag ruleset restricts creation, with the release app and the administrator role as bypass; checked on the first candidate after the merge | GitHub setting | built 2026-11-02: ruleset `release tags` (creation, update, deletion; bypass: the app and the administrator role) |
 
 ## Consequences
 
