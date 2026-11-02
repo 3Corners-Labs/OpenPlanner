@@ -37,6 +37,40 @@ anders staat er wat u eerst doet (`rekey` op de host uitvoeren, of wachten tot d
 voorbij zijn). Zonder vorige sleutel verschijnt het blok niet. De werkwijze staat in het
 draaiboek, *Rotating secrets*, en de inventaris van alle sleutels in `docs/cryptography.md`.
 
+### Adres en proxy
+
+Boven het certificaat staat wat de installatie over haar eigen adres weet. Elke link in een
+e-mail, de inlogredirect en de widget is gebouwd op het publieke adres, nooit op het adres van
+het verzoek; dat ene adres bepaalt of deelnemers de installatie bereiken. Het blok toont:
+
+- **Installatie**: de meegeleverde proxy, een eigen reverse proxy of geen proxy (een lab);
+- **Publiek adres** en, als het anders is, het **Webhook-adres**;
+- het **vertrouwde proxyadres** (`FORWARDED_ALLOW_IPS`);
+- de **OIDC-redirect-URI**, om te vergelijken met wat bij de identiteitsprovider is
+  geregistreerd, en de **widget-loader**, om te vergelijken met de site die de widget insluit.
+
+Deze waarden staan op de server, in de omgeving (klasse B): ze zijn hier niet te wijzigen,
+omdat een verkeerd publiek adres iedere beheerder bij de volgende login buitensluit. Een
+wijziging vraagt een herstart; de werkwijze staat in het draaiboek, *Address and proxy*.
+
+Onder **Rondgang** staat de uitkomst van de controle die de server om de paar uur doet: hij
+vraagt het publieke adres om `/api/v1/instance`, zoals de browser van een deelnemer dat doet, en
+beoordeelt het antwoord met één bevinding en het tijdstip. De bevindingen zijn **in orde**,
+**niet bereikbaar** (met de reden van het netwerk of de server), **andere installatie**,
+**geen https**, **proxy niet vertrouwd**, **geen proxy-headers** en **doorverwezen**. Bij
+*proxy niet vertrouwd* staat `FORWARDED_ALLOW_IPS` niet op het adres waarmee de web-container de
+proxy ziet verbinden: alle bezoekers delen dan één adres en de eigen redirects wijzen naar
+`http://`. Is de controle op de server uitgezet (`PUBLIC_ADDRESS_CHECK_ENABLED`), dan staat er
+*niet gecontroleerd*, nooit *in orde*.
+
+Ziet de webserver verzoeken met `X-Forwarded-For` of `X-Forwarded-Proto` van een proxy die hij
+niet vertrouwt, dan staat dat er ook, met het aantal en de soort afzender (loopback, privé of
+publiek). Het adres staat er alleen als het een proxy in het eigen netwerk is, nooit dat van een
+bezoeker. Elke bevinding die niet *in orde* is, komt ook in het auditlog als systeemgebeurtenis
+`public_address`, en wordt herhaald zolang hij duurt (instelling *Melding over het certificaat
+herhalen elke*). In de Overzicht-widget Systeemstatus staat dan één rij *Proxy* die hierheen
+verwijst.
+
 ### Certificaat van het publieke adres
 
 Onder de omgeving staat het certificaat waarmee bezoekers de installatie bereiken: het adres,

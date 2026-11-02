@@ -77,6 +77,7 @@ WIDGET_ROUTES = frozenset(
 OPEN_ROUTES = frozenset(
     {
         "/",
+        "/api/v1/instance",
         "/api/v1/widget/texts",
         "/widget/v1/gov-booking.js",
         "/b/{token}",

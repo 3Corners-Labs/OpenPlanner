@@ -102,6 +102,14 @@ CLASSES: dict[str, EventClass] = {
             "tests/domain/test_settings_service.py::test_a_change_is_stored_bumps_the_version_and_is_audited",
         ),
     ),
+    "address": EventClass(
+        "system",
+        ("public_address",),
+        (
+            "tests/domain/test_address_check.py::test_a_problem_is_reported_when_it_appears_repeated_while_it_lasts_and_cleared_once",
+            "tests/api/test_instance.py::test_forwarded_headers_that_are_ignored_leave_one_system_event_with_codes_only",
+        ),
+    ),
     "job": EventClass(
         "system",
         ("integration.request",),
@@ -116,6 +124,7 @@ CLASSES: dict[str, EventClass] = {
 
 PUBLIC, WEBHOOK, TOKEN, LOGIN = "public_refusal", "webhook", "provider_token", "login"
 OWN_FAILURE = "own_failure"
+ADDRESS = "address"
 DENIED, CHANGE, JOB = "denied", "change", "job"
 ADMIN = (DENIED, CHANGE)
 
@@ -142,6 +151,7 @@ FLOWS: dict[str, Flow] = {
         "reverse proxy (open decision O7)"
     ),
     "## Flow: TLS termination (ADR 0030)": Flow((CHANGE, JOB)),
+    "## Flow: public address and round trip (ADR 0086)": Flow((PUBLIC, ADDRESS)),
     "## Flow: public pages and language choice": Flow((PUBLIC,)),
     "### `GET` routes with an effect (V3.5.3)": Flow((PUBLIC,)),
     "### Redirects (V3.7.2)": Flow(

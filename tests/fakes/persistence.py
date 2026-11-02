@@ -50,6 +50,7 @@ from app.domain.maintenance import OFF as MAINTENANCE_OFF
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import OwnCertificate
 from app.domain.participant_links import new_public_ref
+from app.domain.public_address import AddressCheck, AddressKind
 from app.domain.retention import (
     DueBooking,
     GroupRetentionCounts,
@@ -133,6 +134,9 @@ class State:
     running_versions: list[RunningVersion] = field(default_factory=list)
     release_listing: list[ListedRelease] = field(default_factory=list)
     certificate_check: CertificateCheck | None = None
+    instance_id: str | None = None
+    probe_nonce: tuple[str, datetime] | None = None
+    address_checks: dict[AddressKind, AddressCheck] = field(default_factory=dict)
     own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
@@ -1313,6 +1317,33 @@ class InMemoryTransaction:
 
     async def save_certificate_check(self, check: CertificateCheck) -> None:
         self.state.certificate_check = check
+
+    async def ensure_instance_id(self) -> str:
+        if self.state.instance_id is None:
+            self.state.instance_id = "00000000-0000-4000-8000-000000000001"
+        return self.state.instance_id
+
+    async def get_instance_id(self) -> str | None:
+        return self.state.instance_id
+
+    async def store_probe_nonce(self, digest: str, at: datetime) -> None:
+        self.state.probe_nonce = (digest, at)
+
+    async def take_probe_nonce(self, digest: str, not_before: datetime) -> bool:
+        pending = self.state.probe_nonce
+        if pending is None or pending[0] != digest or pending[1] < not_before:
+            return False
+        self.state.probe_nonce = None
+        return True
+
+    async def get_address_checks(self) -> list[AddressCheck]:
+        return list(self.state.address_checks.values())
+
+    async def save_address_check(self, check: AddressCheck) -> None:
+        self.state.address_checks[check.kind] = check
+
+    async def delete_address_check(self, kind: AddressKind) -> None:
+        self.state.address_checks.pop(kind, None)
 
     async def get_own_certificate(self) -> OwnCertificate | None:
         return self.state.own_certificate

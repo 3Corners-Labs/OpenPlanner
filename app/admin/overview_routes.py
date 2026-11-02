@@ -29,6 +29,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse
 
 from app.adapters.heartbeat import read_heartbeat
+from app.admin.address_view import address_problem
 from app.admin.audit_routes import audit_views
 from app.admin.authz import (
     AdminContext,
@@ -64,7 +65,6 @@ from app.domain.staff import CREATED_EVENT
 from app.domain.tasks import JobState
 from app.domain.update_service import UpdateNotice
 from app.domain.updates import UpdateStatus
-from app.domain.web_transport import proxy_hop_unencrypted
 from app.i18n import BoundGettext
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.charts import Datum
@@ -343,9 +343,7 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
     modes = len(await diagnostics.active())
     problems = 0 if settings.environment == "prod" else len(settings.production_problems())
     plaintext_mail = await _plaintext_mail(request, principal, settings, can)
-    open_proxy_hop = proxy_hop_unencrypted(
-        settings.forwarded_allow_ips, web_tls=settings.web_tls_enabled
-    )
+    proxy_problem = await address_problem(request, locale, settings)
     updates_href = "/admin/updates" if can(Permission.SYSTEM_UPDATE) else None
     version = (
         str(updates.current) if updates.current else _("admin.overview.widget.status.version.none")
@@ -435,15 +433,16 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
                 "/admin/integrations",
             ),
         )
-    if open_proxy_hop:
-        # A warning, shown before the quiet rows like the mail error (ADR 0091 point 3).
+    if proxy_problem:
+        # One row for the whole *Address and proxy* part of System status (ADR 0086): forwarded
+        # headers ignored, a round trip with a finding, or an unencrypted proxy hop (ADR 0091).
         rows.insert(
             2,
             StatusRow(
                 _("admin.overview.widget.status.proxy"),
-                _("admin.overview.widget.status.proxy.plaintext"),
-                "warning",
-                "/admin/settings",
+                proxy_problem[0],
+                proxy_problem[1],
+                "/admin/settings#address-heading",
             ),
         )
     return WidgetView(item, list(rows[: item.default_rows]), len(rows), "/admin/settings")

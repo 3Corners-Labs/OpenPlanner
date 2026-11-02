@@ -80,6 +80,7 @@ from app.adapters.db.models import (
 from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
+from app.adapters.db.public_address import PublicAddressQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.scenarios import ScenarioQueries
@@ -443,6 +444,7 @@ class SqlTransaction(
     PlatformSettingsQueries,
     FormFieldQueries,
     CertificateQueries,
+    PublicAddressQueries,
     OwnCertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.

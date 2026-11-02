@@ -1131,6 +1131,37 @@ class CertificateCheckRow(Base):
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 
 
+class InstanceRow(Base):
+    """The installation's identity and the one pending probe nonce (ADR 0086); at most one row.
+
+    ``instance_id`` is a random UUID made at first use, never editable and no secret. The nonce
+    is kept as its ``sha256`` and used once.
+    """
+
+    __tablename__ = "instance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    instance_id: Mapped[str] = mapped_column(String(36))
+    probe_nonce_hash: Mapped[str | None] = mapped_column(String(64))
+    probe_nonce_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class PublicAddressCheckRow(Base):
+    """The latest round trip to one address, ``public`` or ``webhook`` (ADR 0086)."""
+
+    __tablename__ = "public_address_checks"
+
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    url: Mapped[str] = mapped_column(String(255))
+    finding: Mapped[str] = mapped_column(String(24))
+    scheme: Mapped[str | None] = mapped_column(String(8))
+    forwarded: Mapped[str | None] = mapped_column(String(12))
+    error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+
+
 class PlatformSettingRow(Base):
     """The portal value of one class C setting (ADR 0042 §4), as JSON; never a secret."""
 
