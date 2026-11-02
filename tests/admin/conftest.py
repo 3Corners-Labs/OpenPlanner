@@ -94,7 +94,8 @@ class Site:
     async def login_with(self, claims: LoginClaims) -> httpx.Response:
         """Log in with exactly ``claims`` (entitlement values, ambiguous claims; ADR 0049)."""
         self.idp.next_claims = claims
-        start = await self.client.get("/admin/login")
+        # ``platform``: straight to the platform provider, also when domains route (ADR 0083).
+        start = await self.client.get("/admin/login", params={"platform": "1"})
         assert start.status_code == 303
         return await self.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
 

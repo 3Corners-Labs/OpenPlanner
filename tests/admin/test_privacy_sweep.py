@@ -549,6 +549,8 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         ("/admin/help/nope", await site.client.get("/admin/help/nope")),
         ("POST /admin/logout", await _post(site, "/admin/logout", {})),
         ("/admin/logged-out", await site.client.get("/admin/logged-out")),
+        # ADR 0083 point 13: the e-mail-first page, here with its refusal of an empty field.
+        ("POST /admin/login", await _post(site, "/admin/login", {"identifier": ""})),
     ):
         assert not _leaks(response.text, set()), path
 

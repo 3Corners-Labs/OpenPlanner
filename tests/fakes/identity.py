@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 from app.domain.authorization import Principal
 from app.domain.entitlements import LoginClaims
-from app.domain.ports import IdentityError, LoginStart, LoginTestReport
+from app.domain.ports import IdentityError, LoginStart, LoginTestReport, OrganisationLogin
 from tests.support.principals import legacy_claims
 
 
@@ -19,6 +19,10 @@ class FakeIdentityProvider:
         self.fail: str | None = None
         self.redirect_uris: list[str] = []
         self.fresh: list[bool] = []
+        self.login_hints: list[str | None] = []
+        self.email: str | None = None
+        self.email_verified: bool | None = True
+        self.issuers: list[str | None] = []
         self.trial_claims: LoginClaims | None = None
         self.test_report: LoginTestReport | None = None
         """What ``finish_test_login`` reports (ADR 0083 point 9); default from ``next_claims``."""
@@ -39,9 +43,12 @@ class FakeIdentityProvider:
     def trial_principal(self, admin: Principal | None) -> None:
         self.trial_claims = legacy_claims(admin) if admin is not None else None
 
-    async def start_login(self, redirect_uri: str, *, fresh: bool = False) -> LoginStart:
+    async def start_login(
+        self, redirect_uri: str, *, fresh: bool = False, login_hint: str | None = None
+    ) -> LoginStart:
         self.redirect_uris.append(redirect_uri)
         self.fresh.append(fresh)
+        self.login_hints.append(login_hint)
         return LoginStart("https://idp.test/authorize?x=1", "state-1", "nonce-1", "verifier-1")
 
     async def finish_login(
@@ -76,6 +83,21 @@ class FakeIdentityProvider:
         if self.test_report is not None:
             return self.test_report
         return LoginTestReport(claims, ("email", "email_verified", "sub"), True, "example.test")
+
+    async def finish_organisation_login(
+        self,
+        *,
+        code: str,
+        redirect_uri: str,
+        code_verifier: str,
+        nonce: str,
+        response_issuer: str | None,
+    ) -> OrganisationLogin:
+        self.issuers.append(response_issuer)
+        claims = await self.finish_login(
+            code=code, redirect_uri=redirect_uri, code_verifier=code_verifier, nonce=nonce
+        )
+        return OrganisationLogin(claims, self.email, self.email_verified)
 
     async def logout_url(self, post_logout_redirect_uri: str) -> str | None:
         return f"https://idp.test/logout?post_logout_redirect_uri={post_logout_redirect_uri}"

@@ -435,6 +435,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "(ADR 0086).",
     ),
     S(
+        "organisation_idps_enabled",
+        K.BOOL,
+        False,
+        _B,
+        T.SWITCHES,
+        "Lets logins go to organisation identity providers by e-mail domain; off routes every "
+        "login to the platform provider and ends their sessions (ADR 0083).",
+    ),
+    S(
         "web_tls_cert_file",
         K.PATH,
         None,

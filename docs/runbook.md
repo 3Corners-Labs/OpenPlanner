@@ -707,6 +707,17 @@ There is no login bypass, fallback IdP or local account. Diagnose and act from t
    reinstating and cancelling wait until someone can log in to the portal (*Noodsluiting*).
    The notices are shown to participants and mailed: plain text, no names or other personal data.
 
+## Identity providers of organisations (ADR 0083)
+
+Organisations can bring their own identity provider; the superuser registers it on the
+organisation's *Login* sub-tab, with its e-mail domains, each verified by a TXT record. Logins
+go there only when the host allows it: `ORGANISATION_IDPS_ENABLED=true` in `.env` (class B,
+off by default), then restart `web`. With the switch off, `/admin/login` goes straight to the
+platform provider and sessions that started at an organisation provider end at their next
+request; registrations and domains stay as they are. The worker re-checks every verified
+domain every `idp_domain_recheck_hours`; a record that disappears raises the system event
+`idp.domain_check` and, after `idp_domain_grace_days`, the domain stops routing.
+
 ## Bundled identity provider (ADR 0090)
 
 A `test` or `lab` installation can log in without an identity provider of the organisation's
