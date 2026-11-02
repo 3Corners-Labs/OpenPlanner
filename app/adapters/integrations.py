@@ -31,7 +31,7 @@ from app.domain.ports import (
     VideoProvider,
 )
 from app.domain.security_log import SecurityLog
-from app.keys import settings_encryption_key
+from app.keys import settings_encryption_key, settings_encryption_key_previous
 
 log = structlog.get_logger()
 
@@ -69,10 +69,20 @@ def secret_box(settings: Settings) -> SecretBox | None:
     use channels without a secret (and the environment's SMTP fallback).
     """
     try:
-        return SecretBox(settings_encryption_key(settings))
+        return installation_box(settings)
     except RuntimeError:
         log.warning("settings_key.missing")
         return None
+
+
+def installation_box(settings: Settings) -> SecretBox:
+    """Return the box under the current ``SETTINGS_ENCRYPTION_KEY``, reading the previous one too.
+
+    Raises:
+        RuntimeError: If the current key is missing in production or either key is too short.
+    """
+    previous = settings_encryption_key_previous(settings)
+    return SecretBox(settings_encryption_key(settings), [previous] if previous else [])
 
 
 def build_integrations(
@@ -103,7 +113,7 @@ def build_integrations(
         bootstrap_refresh_token=refresh.get_secret_value(),
         oauth_url=f"{settings.webex_api_base_url.rstrip('/')}/access_token",
     )
-    store = CredentialStore(engine, SecretBox(settings_encryption_key(settings)))
+    store = CredentialStore(engine, installation_box(settings))
     tokens = WebexTokens(config, http, store, clock, security)
     client = AuthorizedClient(http, tokens, request_log)
     video = WebexMeetings(client, settings.webex_api_base_url, clock)

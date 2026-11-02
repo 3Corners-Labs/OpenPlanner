@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-01), requested by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (V11.1.1, V11.1.2, V11.2.2, V11.4.1, V11.4.3). Amends ADR 0008 (integration
-secrets) and ADR 0011 (management tokens). Not built; see *Build status*. §7 defers the
+secrets) and ADR 0011 (management tokens). Partly built; see *Build status*. §7 defers the
 `SESSION_SECRET` rotation to ADR 0098 (proposed), which does not decide it yet.
 
 ## Context
@@ -89,8 +89,8 @@ are crypto parameters; they change only through this inventory and a new label.
 |---|---|---|---|
 | 0 | ADR accepted | #309 | merged |
 | 1 | `docs/cryptography.md`; runbook *Rotating secrets* written for the new procedure (the wrong statement about `MANAGEMENT_TOKEN_KEY` is corrected in the PR of this ADR) | | planned |
-| 2 | Management links under the previous key (point 4), with a test that a reminder after rotation carries a working link | | planned |
-| 3 | Key id on sealed records (migration), `SETTINGS_ENCRYPTION_KEY_PREVIOUS`, `rekey`, shared re-sealing with the configuration package, System status count | | planned |
+| 2 | Management links under the previous key (point 4), with a test that a reminder after rotation carries a working link | #388 | in PR #388 |
+| 3 | Key id on sealed records, `SETTINGS_ENCRYPTION_KEY_PREVIOUS`, `rekey`, shared re-sealing with the configuration package. Built without a migration: the key id is appended to the stored nonce (12 bytes without an id, 20 with), so no column is added and old values stay readable. The System status count is not built yet | #388 | in PR #388 |
 
 ## Consequences
 

@@ -314,6 +314,24 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Derives management tokens (ADR 0011); required in production.",
     ),
     S(
+        "settings_encryption_key_previous",
+        K.SECRET,
+        None,
+        _A,
+        T.BOOTSTRAP,
+        "The key before a rotation (at least 32 bytes); sealed values under it stay readable "
+        "until `rekey` has run. Empty outside a rotation (ADR 0094).",
+    ),
+    S(
+        "management_token_key_previous",
+        K.SECRET,
+        None,
+        _A,
+        T.BOOTSTRAP,
+        "The token key before a rotation (at least 32 bytes); links of bookings made under it "
+        "keep working. Empty outside a rotation (ADR 0094).",
+    ),
+    S(
         "session_secret",
         K.SECRET,
         None,
@@ -402,8 +420,25 @@ REGISTRY: tuple[SettingSpec, ...] = (
         None,
         _B,
         T.HOST,
-        "Address of the reverse proxy (read by uvicorn).",
-        in_config=False,
+        "Address of the reverse proxy (read by uvicorn). Other than the bundled proxy's, "
+        "System status warns unless web serves TLS (ADR 0091).",
+    ),
+    S(
+        "web_tls_cert_file",
+        K.PATH,
+        None,
+        _B,
+        T.HOST,
+        "Certificate chain (PEM) for uvicorn, for an own reverse proxy on another machine; with "
+        "WEB_TLS_KEY_FILE web serves HTTPS (ADR 0091).",
+    ),
+    S(
+        "web_tls_key_file",
+        K.PATH,
+        None,
+        _B,
+        T.HOST,
+        "Private key (PEM) of WEB_TLS_CERT_FILE; readable by the web user only (ADR 0091).",
     ),
     S(
         "tls_domain",
@@ -883,6 +918,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1_000_000,
     ),
     S(
+        "max_font_unpacked_bytes",
+        K.INT,
+        2_000_000,
+        _C,
+        T.OPERATIONS,
+        "Largest unpacked size (WOFF2 totalSfntSize) of an uploaded font, in bytes (ADR 0092).",
+        minimum=256_000,
+        maximum=8_000_000,
+    ),
+    S(
         "configuration_package_max_mb",
         K.INT,
         64,
@@ -1179,6 +1224,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Password of the login; write-only.",
         optional=True,
         aliases=("smtp_user_password",),
+    ),
+    S(
+        "smtp_plaintext_relay_allowed",
+        K.BOOL,
+        False,
+        _B,
+        T.MAIL,
+        "Allow mail without TLS in production, for a relay on a trusted network (ADR 0091); "
+        "otherwise saving it is refused and System status reports it. Never in the portal.",
     ),
     S(
         "mail_from",

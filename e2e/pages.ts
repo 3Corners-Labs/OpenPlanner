@@ -37,6 +37,8 @@ export interface JourneyExample {
   call_page: string;
   /** The admin booking page of that booking. */
   call_booking: string;
+  /** The group's agenda on the day that call starts (not "today": midnight moves it). */
+  call_agenda: string;
 }
 
 const SEED_COMMAND = 'run python -m app.cli seed-closures > e2e/fixtures.json';

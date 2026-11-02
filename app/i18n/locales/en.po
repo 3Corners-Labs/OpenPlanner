@@ -3124,7 +3124,7 @@ msgid "admin.messages.save_hint"
 msgstr "Empty a field to restore the default text."
 
 msgid "admin.form.error.smtp_security"
-msgstr "Choose STARTTLS or TLS: with a username the password must not travel unencrypted."
+msgstr "Choose STARTTLS or TLS: mail carries names and join links, and a password, so it must not travel unencrypted. A relay without TLS needs the host setting SMTP_PLAINTEXT_RELAY_ALLOWED in production."
 
 msgid "admin.nav.organisations"
 msgstr "Organisations"
@@ -3934,6 +3934,18 @@ msgstr "on the machine API"
 
 msgid "admin.audit.detail.surface_links"
 msgstr "on unknown management links"
+
+msgid "audit.event.database_error"
+msgstr "Database error"
+
+msgid "admin.audit.reason.database_error"
+msgstr "A database statement failed; the request was rolled back."
+
+msgid "admin.audit.detail.surface_widget"
+msgstr "on the widget API"
+
+msgid "error.database_unavailable"
+msgstr "We could not complete this right now and nothing was saved. Please try again in a few minutes."
 
 msgid "admin.audit.detail.client"
 msgstr "caller {value}"
@@ -6722,6 +6734,18 @@ msgstr "{environment}"
 msgid "admin.overview.widget.status.environment.problems"
 msgstr "{environment}, {count} not production-ready"
 
+msgid "admin.overview.widget.status.mail"
+msgstr "Mail"
+
+msgid "admin.overview.widget.status.mail.plaintext"
+msgstr "{count} mail server(s) without TLS: choose STARTTLS or TLS, or set SMTP_PLAINTEXT_RELAY_ALLOWED"
+
+msgid "admin.overview.widget.status.proxy"
+msgstr "Proxy"
+
+msgid "admin.overview.widget.status.proxy.plaintext"
+msgstr "FORWARDED_ALLOW_IPS trusts a proxy other than the bundled one and web runs without TLS: traffic between proxy and web is unencrypted. Set WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE (runbook)"
+
 msgid "audit.job.send_rebook_request"
 msgstr "Send request to rebook"
 
@@ -8652,6 +8676,9 @@ msgstr "{count} failing"
 
 msgid "admin.settings.logging.open"
 msgstr "Open Log destinations"
+
+msgid "settings.field.max_font_unpacked_bytes.label"
+msgstr "Largest unpacked size of an uploaded font (bytes)"
 
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Largest configuration package (MB)"

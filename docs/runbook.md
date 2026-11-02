@@ -130,6 +130,59 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   `handle { redir https://{host}{uri} 308 }`. Also let `TRACE` reach the app (it answers 405) and
   do not serve `/static/` from the proxy itself. `scripts/check-proxy.sh` shows what to expect.
 
+### TLS from a proxy on another machine to web (ADR 0091 point 3)
+
+With the bundled proxy the hop to `web` is plain HTTP on the `edge` network of one host, a
+recorded exception (`docs/threat-model.md`): whoever can read that bridge already has the host.
+A reverse proxy of your own on **another machine** crosses a real network, and then the visitor's
+names, booking data and management links travel in clear text unless `web` serves HTTPS.
+
+1. **Get a certificate and key for `web`.** Any CA your proxy trusts: an internal CA (the usual
+   choice), or a self-signed pair that the proxy is told to trust. Its name must be the name the
+   proxy connects to (for example `openplanner-web.internal`). Put the PEM files in `./web-tls/`
+   next to `docker-compose.yml`; `web` mounts it read-only at `/web-tls`. The key must be
+   readable by uid 10001 and nobody else (`chown 10001 web-tls/key.pem; chmod 600
+   web-tls/key.pem`). Keep it out of backups and out of the repository (`web-tls/` is ignored).
+2. **Set both variables in `.env`** (class B, both or neither; web refuses to start with one):
+
+   ```
+   WEB_TLS_CERT_FILE=/web-tls/cert.pem
+   WEB_TLS_KEY_FILE=/web-tls/key.pem
+   FORWARDED_ALLOW_IPS=<the proxy's address as the web container sees it>
+   ```
+
+   `FORWARDED_ALLOW_IPS` must be the address the `web` container sees the proxy connect from,
+   not the proxy's own address on its machine: a proxy behind NAT, a tunnel or the Docker
+   gateway shows up under another address, and with the wrong one every visitor shares one IP
+   and one bot exhausts the booking limit for everyone (proven in the tunnel trial of 1
+   November 2026). Never `*`. The check from the section above applies: `curl -sI
+   https://<host name>/admin` must answer with a `Location: https://…`; with a wrong address it
+   answers `http://`.
+3. **Make the port reachable for the proxy only.** `docker-compose.yml` publishes web on
+   `127.0.0.1:8000`. For a proxy on another machine publish it on the internal interface in a
+   `docker-compose.override.yml` (`ports: !override ["10.0.0.7:8000:8000"]`) and close it to
+   everything but the proxy with the host firewall. Never `0.0.0.0` on a public interface.
+4. **Restart and check.** `docker compose up -d web`, then from the proxy machine
+   `curl --cacert ca.pem https://<web name>:8000/healthz` must answer `ok`. The container's own
+   healthcheck switches to HTTPS by itself (`python -m app.healthcheck`; it checks that web
+   answers on the loopback, not the certificate). If you use the host updater, set
+   `READY_URL=https://127.0.0.1:8000/readyz` in `updater.env`; it then skips the certificate
+   name check on the loopback.
+5. **Point the proxy at `https://`.** Caddy: `reverse_proxy https://<web name>:8000 { transport
+   http { tls_trust_pool file /etc/caddy/ca.pem } }`. nginx: `proxy_pass https://<web name>:8000;
+   proxy_ssl_verify on; proxy_ssl_trusted_certificate /etc/nginx/ca.pem;`. Verify the
+   certificate; an unverified hop protects against nobody.
+6. **Renewal.** Uvicorn reads the files at start. After replacing the pair run
+   `docker compose restart web`; calendar the expiry yourself, nothing in OpenPlanner watches
+   this certificate. A web that is down because the certificate expired shows up as a failing
+   public address check and a failing `web` healthcheck.
+
+**System status** (the *Proxy* row) warns while `FORWARDED_ALLOW_IPS` names an address other
+than the bundled proxy's (`172.31.240.2`) and `WEB_TLS_*` is not set: that points to a proxy on
+another machine whose traffic runs unencrypted. If the proxy really is on the same host and
+reaches web over the loopback or the compose gateway, the hop never leaves the machine; record
+that as your own exception and ignore the warning.
+
 **What is configured, and from where?** Every setting and its class (ADR 0042) is listed in
 `docs/settings.md`. On the host, without sending anyone the `.env`:
 
@@ -1063,9 +1116,20 @@ stored encrypted with `SETTINGS_ENCRYPTION_KEY`; without that key they cannot be
 - **Mail.** An organisation without its own SMTP settings uses the installation's server from
   `SMTP_HOST` (`SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_TLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
   `MAIL_FROM`; `SMTP_USER` and `SMTP_USER_PASSWORD` are accepted as aliases); Mailpit in
-  development. Use STARTTLS on 587 or TLS on 465 (port 465 always means TLS); plain only for a
-  relay on a trusted network. The services refuse to start with a login but neither STARTTLS
-  nor TLS.
+  development. Use STARTTLS on 587 or TLS on 465 (port 465 always means TLS). In production
+  the channel form refuses *Security: none* (ADR 0091), because mail carries names, addresses and
+  join links. A relay on a trusted network without TLS needs the host setting
+  `SMTP_PLAINTEXT_RELAY_ALLOWED=true` (class B, default `false`; set it in `.env`, restart
+  `web` and `worker`) and is a recorded exception. The services refuse to start with a login but
+  neither STARTTLS nor TLS.
+
+  *Upgrading.* A plain configuration saved before this rule (an organisation's stored server
+  or the `SMTP_*` fallback without `SMTP_STARTTLS`/`SMTP_TLS`) keeps sending in the first minor
+  release that ships it. **System status** on the overview shows it as an error (*Mail*, with
+  the count). Fix it by switching the server to STARTTLS or TLS under **Berichtkanalen** (or
+  set `SMTP_STARTTLS=true` / `SMTP_TLS=true`), or record the exception with
+  `SMTP_PLAINTEXT_RELAY_ALLOWED=true`. From the next minor release on, sending refuses it like
+  saving does.
 - **SMS.** Choose the provider (ADR 0028), then enter its API address, API key, the sender
   and the country code for national numbers (31). For **Webex Connect**: create a service
   with an SMS number or alphanumeric sender, copy the service key (service → Messaging API)
@@ -1184,12 +1248,12 @@ sets no cookie; the host's access log is TransIP's and is not shipped anywhere b
 
 ## Management token key
 
-`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Until ADR 0094 step 2 is built,
-rotating it does not break the links in mails already sent (they are found by their stored
-hash), but every message sent afterwards to an open booking (reminder, change, confirmation)
-carries a link that no longer works. Rotate only after an incident, tell the contact center
-that participants may call about broken links, and expect that agents no longer see their
-earlier claims as their own (ADR 0043 pseudonyms).
+`MANAGEMENT_TOKEN_KEY` (ADR 0011) is required in production. Rotate it with
+`MANAGEMENT_TOKEN_KEY_PREVIOUS` (next section, ADR 0094): links in mails already sent keep
+working, and so does the link in every message sent afterwards to a booking made under the
+old key. Without the previous key a message sent after the rotation to an open booking
+(reminder, change, confirmation) carries a link that no longer works, and agents no longer
+see their earlier claims as their own (ADR 0043 pseudonyms).
 
 ## Releasing a version (ADR 0052, ADR 0079)
 
@@ -1601,9 +1665,45 @@ again asks the login questions as before.
 ## Rotating secrets
 
 Bootstrap secrets come from environment variables, `X_FILE` or `secrets/secrets.env`
-(`app.cli init`); none are baked into the image. To rotate `MANAGEMENT_TOKEN_KEY` or
-`SESSION_SECRET`, replace the value in that file or the secret store and restart `web` and
-`worker`; `init` never overwrites the file, so edit it or move it away first.
+(`app.cli init`); none are baked into the image. To rotate one, replace the value in that file
+or the secret store and restart `web` and `worker`; `init` never overwrites the file, so edit
+it or move it away first.
+
+**Rotating `SETTINGS_ENCRYPTION_KEY`** loses nothing (ADR 0094). The key before the rotation
+stays readable as `SETTINGS_ENCRYPTION_KEY_PREVIOUS` until every stored secret is sealed
+again. Each sealed value carries the id of the key that sealed it. In this order:
+
+1. Make a backup of the database and keep the old key where you can find it.
+2. Put the old value in `SETTINGS_ENCRYPTION_KEY_PREVIOUS` (or `…_PREVIOUS_FILE`) and a new
+   random value of at least 32 bytes in `SETTINGS_ENCRYPTION_KEY`.
+3. Restart `web` and `worker`. Channel secrets, Webex tokens, identity provider secrets and
+   log destination secrets keep working; new values are sealed under the new key.
+4. `docker compose exec web python -m app.cli rekey`. It seals every stored secret again under
+   the current key, one transaction, and writes one audit event with counts only. It prints
+   no key or secret. Running it again changes nothing. If it reports that a secret opens
+   under no configured key, nothing was changed: the previous key is missing or wrong.
+5. Remove `SETTINGS_ENCRYPTION_KEY_PREVIOUS` and restart `web` and `worker`. Do not do this
+   before step 4 has reported success: a secret still under the old key becomes unreadable.
+
+A configuration package (ADR 0089) can be exported and imported during a rotation: the
+installation opens its secrets under either key.
+
+**Rotating `MANAGEMENT_TOKEN_KEY`** keeps every link working while the previous key is set
+(ADR 0094 point 4):
+
+1. Put the old value in `MANAGEMENT_TOKEN_KEY_PREVIOUS` (or `…_PREVIOUS_FILE`) and a new random
+   value of at least 32 bytes in `MANAGEMENT_TOKEN_KEY`.
+2. Restart `web` and `worker`. New bookings get their link under the new key; a message to a
+   booking made under the old key carries the link it was given; claims made by agents still
+   read as their own. Participants' security-event pseudonyms (ADR 0053) start anew.
+3. Wait until the bookings made before the rotation are over (the longest booking horizon plus
+   the purge period), then remove `MANAGEMENT_TOKEN_KEY_PREVIOUS` and restart. There is
+   nothing to run: links are derived when a message is built, so there is nothing to re-seal.
+
+Both previous keys are bootstrap secrets (class A): environment or `X_FILE` only, never the
+database, and empty outside a rotation.
+
+**Rotating `SESSION_SECRET`** is separate (below).
 
 **Rotating `SESSION_SECRET`** logs every admin out and, in addition, drops the signed login
 state (a login in progress, the update snooze, interface choices). In this order, so the
@@ -1615,10 +1715,11 @@ register agrees with the cookies:
 3. Restart `web` and `worker`.
 
 A cookie signed with the old secret is invalid from step 3 on; step 1 makes sure no session
-stays in the register for a reference that nobody can present any more. Channel secrets (SMTP password, Connect service key) are replaced by entering a new
-value on the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` makes every
-stored channel secret and Webex token unreadable: re-enter the channel secrets afterwards
-(ADR 0008).
+stays in the register for a reference that nobody can present any more. 
+Channel secrets (SMTP password, Connect service key) are replaced by entering a new value on
+the organisation's channels page. Changing `SETTINGS_ENCRYPTION_KEY` without
+`SETTINGS_ENCRYPTION_KEY_PREVIOUS` makes every stored channel secret and Webex token
+unreadable (ADR 0008); use the procedure above.
 
 ### API clients of contact-center bots (ADR 0023)
 
@@ -1827,7 +1928,7 @@ caller by pseudonym (`client:<16 hex>`), never by IP address:
 To check whether an IP address from a firewall or proxy log is the caller in an event, run
 `docker compose exec web python -m app.cli client-pseudonym 203.0.113.7` and compare. There
 is no way from a pseudonym back to an address. Rotating `MANAGEMENT_TOKEN_KEY` changes every
-pseudonym (and every management link). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
+pseudonym (management links keep working with `MANAGEMENT_TOKEN_KEY_PREVIOUS`). At most `SECURITY_EVENT_MAX_SOURCES` callers (default
 1000) are tracked per window and process; beyond that, events count under `client:many`.
 
 ### A booking without a video meeting (ADR 0068)

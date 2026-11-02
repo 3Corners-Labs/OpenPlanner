@@ -24,6 +24,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DATABASE_URL` | string | `sqlite+aiosqlite:///data/booking.db` | The database the portal settings live in. |
 | `SETTINGS_ENCRYPTION_KEY` | secret | — | Seals every secret in the database (ADR 0008). |
 | `MANAGEMENT_TOKEN_KEY` | secret | — | Derives management tokens (ADR 0011); required in production. |
+| `SETTINGS_ENCRYPTION_KEY_PREVIOUS` | secret | — | The key before a rotation (at least 32 bytes); sealed values under it stay readable until `rekey` has run. Empty outside a rotation (ADR 0094). |
+| `MANAGEMENT_TOKEN_KEY_PREVIOUS` | secret | — | The token key before a rotation (at least 32 bytes); links of bookings made under it keep working. Empty outside a rotation (ADR 0094). |
 | `SESSION_SECRET` | secret | — | Signs admin sessions; required in production. |
 | `OIDC_DISCOVERY_URL` | url | — | IdP discovery document; without it the admin portal is disabled. |
 | `OIDC_CLIENT_ID` | string | `openplanner-admin` | OIDC client of the portal. |
@@ -41,7 +43,9 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `OIDC_MFA_ACR_VALUES` | string | `""` | acr values that count as proof of MFA; empty: the values asked for (ADR 0100). |
 | `PUBLIC_BASE_URL` | url | `http://127.0.0.1:8000` | Base of every link and of the OIDC redirect; https in production. |
 | `WEBHOOK_BASE_URL` | url | — | Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL. |
-| `FORWARDED_ALLOW_IPS` | string | — | Address of the reverse proxy (read by uvicorn). |
+| `FORWARDED_ALLOW_IPS` | string | — | Address of the reverse proxy (read by uvicorn). Other than the bundled proxy's, System status warns unless web serves TLS (ADR 0091). |
+| `WEB_TLS_CERT_FILE` | path | — | Certificate chain (PEM) for uvicorn, for an own reverse proxy on another machine; with WEB_TLS_KEY_FILE web serves HTTPS (ADR 0091). |
+| `WEB_TLS_KEY_FILE` | path | — | Private key (PEM) of WEB_TLS_CERT_FILE; readable by the web user only (ADR 0091). |
 | `TLS_DOMAIN` | string | — | Certificate domain (proxy.env, ADR 0030). |
 | `ACME_EMAIL` | string | — | Mailbox for CA notices (proxy.env). |
 | `ACME_CA` | url | — | ACME directory (proxy.env). |
@@ -64,6 +68,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
 | `OIDC_CLAIM_MODE` | enum | `legacy` | Where rights come from: legacy (three claims), shadow (compare), entitlements (ADR 0049); moving back to legacy weakens a protection, so env only. |
+| `SMTP_PLAINTEXT_RELAY_ALLOWED` | bool | `false` | Allow mail without TLS in production, for a relay on a trusted network (ADR 0091); otherwise saving it is refused and System status reports it. Never in the portal. |
 
 ## C. Platform (portal, *Advanced settings*; lockable by env)
 
@@ -100,6 +105,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `SECURITY_EVENT_WINDOW_MINUTES` | int | `15` | 1–1440 | `settings.platform.manage` | One security event per source and reason per window; repeats are counted (ADR 0034). |
 | `SECURITY_EVENT_MAX_SOURCES` | int | `1000` | 10–100000 | `settings.platform.manage` | Windows (kind of event × caller) a process keeps; beyond that, callers count as many (ADR 0053). |
 | `AUDIT_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of the audit log may hold; more is refused (ADR 0040). |
+| `MAX_FONT_UNPACKED_BYTES` | int | `2000000` | 256000–8000000 | `settings.platform.manage` | Largest unpacked size (WOFF2 totalSfntSize) of an uploaded font, in bytes (ADR 0092). |
 | `CONFIGURATION_PACKAGE_MAX_MB` | int | `64` | 1–512 | `settings.platform.manage` | Largest configuration package (MB) the portal and the API accept for import (ADR 0089). |
 | `AUDIT_EXPORT_MAX_DAYS` | int | `366` | 1–3660 | `settings.platform.manage` | Most days one CSV export of the audit log may cover (ADR 0040). |
 | `EMBEDDING_MAX_ORIGINS` | int | `20` | 1–100 | `settings.platform.manage` | Most host websites one organisation may allow for the embedded widget (ADR 0035). |

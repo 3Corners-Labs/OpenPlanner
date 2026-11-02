@@ -8,10 +8,12 @@ validation here is what makes that stylesheet safe to generate.
 
 Logos are PNG, JPEG or WebP, recognised from their bytes by ``app.domain.images`` (shared
 with closure images), never from a file name or a client-supplied type. Fonts are WOFF2 only,
-recognised the same way (ADR 0041). The other design tokens live in ``app.domain.theme``.
+recognised the same way (ADR 0041) and then checked by structure: header and table directory
+(ADR 0092). The other design tokens live in ``app.domain.theme``.
 """
 
 import re
+import struct
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -28,6 +30,16 @@ MAX_LOGO_BYTES = 200_000
 MAX_FONT_BYTES = 250_000
 
 _WOFF2 = b"wOF2"
+_WOFF2_HEADER = struct.Struct(">4s4sIHHIIHHIIIII")
+"""signature, flavor, length, numTables, reserved, totalSfntSize, totalCompressedSize,
+majorVersion, minorVersion, metaOffset, metaLength, metaOrigLength, privOffset, privLength."""
+_MAX_WOFF2_TABLES = 64
+"""The OpenType format has fewer table kinds; a fixed rule, not a tuning value (ADR 0092)."""
+_KNOWN_TAG_FLAG = 63
+"""Table flag meaning an arbitrary four-byte tag follows."""
+_GLYF_LOCA = frozenset({10, 11})
+"""Indexes of ``glyf`` and ``loca`` in the WOFF2 known-tag list; transformed at version 0."""
+_UINT_BASE128_MAX_BYTES = 5
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -171,6 +183,80 @@ class Logo:
         return LogoRef(self.media_type, self.digest)
 
 
+def _uint_base128(data: bytes, offset: int) -> tuple[int, int] | None:
+    """Read a WOFF2 ``UIntBase128`` at ``offset``; return ``(value, next offset)`` or ``None``."""
+    value = 0
+    for i in range(_UINT_BASE128_MAX_BYTES):
+        if offset + i >= len(data):
+            return None
+        byte = data[offset + i]
+        if i == 0 and byte == 0x80:
+            return None  # leading zeros are not allowed
+        if value > 0x01FFFFFF:
+            return None  # the next shift would overflow 32 bits
+        value = (value << 7) | (byte & 0x7F)
+        if not byte & 0x80:
+            return value, offset + i + 1
+    return None
+
+
+def _directory_end(data: bytes, tables: int) -> int | None:
+    """Return the offset after the table directory, or ``None`` if it leaves the file."""
+    offset = _WOFF2_HEADER.size
+    for _ in range(tables):
+        if offset >= len(data):
+            return None
+        flags = data[offset]
+        offset += 1
+        index = flags & 0x3F
+        if index == _KNOWN_TAG_FLAG:
+            offset += 4
+        original = _uint_base128(data, offset)
+        if original is None:
+            return None
+        offset = original[1]
+        version = flags >> 6
+        transformed = version == 0 if index in _GLYF_LOCA else version != 0
+        if transformed:
+            length = _uint_base128(data, offset)
+            if length is None:
+                return None
+            offset = length[1]
+    return offset if offset <= len(data) else None
+
+
+def _woff2_structure_ok(data: bytes, max_unpacked_bytes: int) -> bool:
+    """Return whether the WOFF2 header and table directory are consistent with the file."""
+    if len(data) < _WOFF2_HEADER.size:
+        return False
+    (
+        _,
+        _,
+        length,
+        tables,
+        reserved,
+        sfnt,
+        compressed,
+        _,
+        _,
+        meta_at,
+        meta_len,
+        _,
+        priv_at,
+        priv_len,
+    ) = _WOFF2_HEADER.unpack_from(data)
+    if length != len(data) or reserved != 0 or not 0 < tables <= _MAX_WOFF2_TABLES:
+        return False
+    if not 0 < sfnt <= max_unpacked_bytes or compressed == 0:
+        return False
+    end = _directory_end(data, tables)
+    if end is None or end + compressed > len(data):
+        return False
+    if meta_len and not end + compressed <= meta_at <= len(data) - meta_len:
+        return False
+    return not priv_len or end + compressed <= priv_at <= len(data) - priv_len
+
+
 @dataclass(frozen=True)
 class FontFile:
     """A validated WOFF2 font for one role. Build with ``from_upload``."""
@@ -179,14 +265,24 @@ class FontFile:
     data: bytes
 
     @classmethod
-    def from_upload(cls, role: FontRole, data: bytes) -> "FontFile":
-        """Validate uploaded bytes: WOFF2 by its signature, at most ``MAX_FONT_BYTES``.
+    def from_upload(cls, role: FontRole, data: bytes, max_unpacked_bytes: int) -> "FontFile":
+        """Validate uploaded bytes: WOFF2 by structure, at most ``MAX_FONT_BYTES`` (ADR 0092).
+
+        Args:
+            role: Where the font is used.
+            data: The uploaded file.
+            max_unpacked_bytes: Ceiling for ``totalSfntSize`` (``max_font_unpacked_bytes``).
 
         Raises:
             DomainError: ``invalid_configuration`` with ``font`` for an empty, too large or
-                non-WOFF2 file.
+                non-WOFF2 file, a header whose ``length`` differs from the file size, a
+                ``numTables`` of 0 or above 64, a ``totalSfntSize`` of 0 or above the ceiling,
+                a non-zero reserved field, or a table directory, compressed block, metadata
+                block or private block that does not fit in the file.
         """
         if not data.startswith(_WOFF2) or len(data) > MAX_FONT_BYTES:
+            raise _invalid("font")
+        if not _woff2_structure_ok(data, max_unpacked_bytes):
             raise _invalid("font")
         return cls(role, data)
 
