@@ -59,17 +59,24 @@ fresh login for changes (`admin_reauth_minutes`), `fresh=1` logins that force a 
 
 | Case | What happens |
 |---|---|
-| The admin logs out | `POST /admin/logout` ends the session on the server first, then clears the cookie and ends the IdP session (RP-initiated logout). A copy of the cookie is dead at once. The response also carries `Clear-Site-Data: "cookies", "storage"` (see below). |
+| The admin logs out | `POST /admin/logout` ends the session on the server first, then clears the cookie and ends the IdP session (RP-initiated logout). A copy of the cookie is dead at once. The page the logout ends at also sends `Clear-Site-Data: "cookies", "storage"` (see below). |
 | A person leaves or is switched off at the IdP | Their sessions run until idle (60 min) or their 8 h end unless an administrator ends them (*End all sessions* under `staff.manage`, or suspending the person, ADR 0046 step 2); the next login fails. The person can end their own other sessions (*My sessions*). `sessions end-all` on the host ends everyone's. |
 | Role or membership changes at the IdP | Takes effect at the next login; the difference is audited (`staff.membership_changed`). |
 | Idle | `admin_idle_minutes` (class C, default 60, 15-120). |
 | IdP outage | Admins cannot log in. There is no break-glass login; the host CLI offers closure and `oidc-check` only. |
 
-**Clear-Site-Data at logout (ASVS V14.3.1).** The logout response, both the page that navigates on to
-the IdP and the redirect to `/admin/logged-out` when the IdP offers no logout address, carries
-`Clear-Site-Data: "cookies", "storage"` (`LOGOUT_CLEAR_SITE_DATA` in `app/admin/session.py`, test in
+**Clear-Site-Data at logout (ASVS V14.3.1).** `GET /admin/logged-out`, the page every logout ends at (after
+the IdP's own logout, or at once when the IdP offers no logout address), sends
+`Clear-Site-Data: "cookies", "storage"` (`LOGOUT_CLEAR_SITE_DATA` in `app/admin/session.py`, tests in
 `tests/admin/test_admin_sessions.py`). The server side has ended the session before that, so the header
 is a second layer: the browser also drops cookies and local data of the site. Choices:
+
+- **Where.** Not on the `POST /admin/logout` response: that one is followed by the IdP's logout, and
+  `"cookies"` also clears the cookies of an IdP on the same host or registrable domain (the end-to-end
+  suite stalled on exactly that with Keycloak on the same host), so the IdP could not finish and return.
+  The final page comes after all of that. The header is sent only when the signed session cookie carries a
+  mark set by this browser's own logout, once; a link from another site to `/admin/logged-out` clears nothing.
+  If the person abandons the IdP step, the header does not come; the server session has ended anyway.
 
 - `"cache"` is left out. Every HTML response is `Cache-Control: no-store`, so the session leaves nothing in
   the HTTP cache; `"cache"` would also empty the caches of participants' pages and static files. Firefox
