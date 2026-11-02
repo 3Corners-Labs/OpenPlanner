@@ -80,7 +80,7 @@ they follow from the routes and are not a tuning value.
 |---|---|---|---|
 | 0 | ADR accepted | #309 | merged |
 | 1 | Port 80 refuses machine paths; edge checks in `check-proxy.sh` (also XFF spoofing, TRACE, `/static/` listing, `no-store`); runbook for an own proxy | | planned |
-| 2 | SMTP without TLS refused in production; `SMTP_PLAINTEXT_RELAY_ALLOWED`; System status error | #PR | built: saving refused, System status error; sending refuses from the next minor release |
+| 2 | SMTP without TLS refused in production; `SMTP_PLAINTEXT_RELAY_ALLOWED`; System status error | #383 | built: saving refused, System status error; sending refuses from the next minor release |
 | 3 | TLS from an own proxy to web (`WEB_TLS_*`), System status error; the exception of point 2 in threat model and data flow | | planned |
 | 4 | The list of outbound connections in `docs/dataflow.md` | | planned |
 
