@@ -288,6 +288,10 @@ Branding is organisation data, not personal data. Fonts come from our own origin
 (`font-src 'self'`, ADR 0041), so no font or stylesheet request reaches a third party. The calendar script sends nothing the page
 link does not already send, and stores nothing in the browser.
 
+The claim that no page sends anything to a third party (ASVS V14.2.3) is proven by `e2e/tests/no-third-parties.spec.ts`: for every public page and
+widget page in `e2e/pages.json`, in nl and en, it records every request and fails on any origin other than the app host (and the widget host page's own origin), and
+checks that the page's CSP names no other source. The configured video link is the only exit and is followed only after a click, which the test never makes.
+
 ## Machine API for contact-center bots (ADR 0023)
 
 ```
