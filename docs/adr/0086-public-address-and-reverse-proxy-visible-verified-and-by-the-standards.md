@@ -3,9 +3,9 @@
 Status: accepted (2026-10-31, `po:approved` on #265), requested by the product owner. Extends ADR
 0064 (HTTPS by default, the certificate watched on System status), ADR 0070 (certificate source
 in the portal), ADR 0030 (TLS proxy) and ADR 0042 §11 (System status); builds on ADR 0038 (system
-events from the worker). Partly built (step 1: *Address and proxy*, the instance endpoint, the
-round trip, the link-building test); step 2 (the standards in `check-proxy.sh`) not built; see
-*Build status*.
+events from the worker). Built (step 1: *Address and proxy*, the instance endpoint, the
+round trip, the link-building test; step 2: the standards asserted in `check-proxy.sh`, the
+runbook's standards table and internet.nl check, the data flow); see *Build status*.
 Amended by ADR 0091 (own reverse proxy).
 
 ## Context
@@ -146,7 +146,7 @@ always told apart from one that reaches this one).
 |---|---|---|---|
 | 0 | ADR proposed | #265 | merged |
 | 1 | Decisions 1–4: *Address and proxy* on System status, `instance_id` (migration), `/api/v1/instance`, the round-trip probe in the worker, `address-check` CLI, the link-building test, system event `public_address`, manual topic | #397 | built: `app/domain/public_address.py`, `app/domain/address_check.py` (`AddressWatch`, `InstanceService`), `app/adapters/instance_probe.py`, `app/api/instance.py`, migration 0084 (`instance`, `public_address_checks`), `python -m app.cli address-check`, `PUBLIC_ADDRESS_CHECK_ENABLED`, *Address and proxy* on System status (`app/admin/address_view.py`; the *Proxy* row of ADR 0091 is folded in), `ProxyHeaderMiddleware` and `PublicRedirectMiddleware`, `tests/api/test_public_links.py`; runbook, manual and threat model updated; the `docs/dataflow.md` entry for the probe is left to step 2 |
-| 2 | Decision 5: the standards table in the runbook, `check-proxy.sh` asserts TLS versions, HSTS and the round trip, internet.nl in the go-live checklist, threat model and data flow | | planned |
+| 2 | Decision 5: the standards table in the runbook, `check-proxy.sh` asserts TLS versions, HSTS and the round trip, internet.nl in the go-live checklist, threat model and data flow | #410 | built: `scripts/check-proxy.sh` (`tls_version_checks`: TLS 1.0 and 1.1 refused, 1.2 with an AEAD suite and 1.3 accepted; `hsts_checks`: at least a year, `includeSubDomains`, none on port 80; `round_trip`: `address-check` through the proxy is `ok` in all three certificate passes and `proxy_not_trusted` with a wrong `FORWARDED_ALLOW_IPS`), `python -m app.cli address-check --ca-file`, `deploy/proxy/compose.pebble.yml`, `tests/scripts/test_check_proxy.py`; `docs/runbook.md` (*Standards the proxy and the address follow*, *Go-live check of the public address*, the *TLS audit* record), `docs/threat-model.md` (downgrade abuse case), `docs/dataflow.md` (the round trip in the egress table) |
 
 ## Consequences
 
