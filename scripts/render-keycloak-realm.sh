@@ -5,7 +5,10 @@
 # and renders deploy/keycloak/realm.template.json into secrets/keycloak-realm.json, which the
 # compose profile `idp` mounts. It also writes the application's half, secrets/keycloak-app.env
 # (KEYCLOAK_ADMIN_URL, KEYCLOAK_DIRECTORY_CLIENT_ID and _SECRET), which web and worker read, so
-# staff management works without copying a value by hand (ADR 0106). All files get mode 600. Nothing a value holds is ever printed:
+# staff management works without copying a value by hand (ADR 0106). The env files get mode
+# 600; the realm gets 644, because Keycloak reads it as its own user (uid 1000), which is
+# rarely the host user. The secrets directory is 700, so nobody else on the host gets past
+# it; the container reads the file through its bind mount. Nothing a value holds is ever printed:
 # an operator reads secrets/keycloak.env on the host, with `cat`, when they need one.
 #
 # Values (secrets/keycloak.env):
@@ -32,7 +35,7 @@ DIR=$(cd "$(dirname "$0")/.." && pwd)
 while (($#)); do
   case $1 in
     --dir) DIR=$2; shift 2 ;;
-    -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -63,6 +66,7 @@ read_var() {
 [[ -f $TEMPLATE ]] || { log "template not found: $TEMPLATE"; exit 1; }
 umask 077
 mkdir -p "$SECRETS_DIR"
+chmod 700 "$SECRETS_DIR"
 
 # Existing values win; missing ones are generated or defaulted.
 for key in "${KEYS[@]}"; do
@@ -100,7 +104,7 @@ sed -e "s|\${KC_OPENPLANNER_CLIENT_SECRET}|$KC_OPENPLANNER_CLIENT_SECRET|g" \
   -e "s|\${KC_SUPER_PASSWORD}|$KC_SUPER_PASSWORD|g" \
   -e "s|\${KC_OPENPLANNER_BASE_URL}|$KC_OPENPLANNER_BASE_URL|g" \
   "$TEMPLATE" > "$tmp"
-chmod 600 "$tmp"
+chmod 644 "$tmp"  # read by the container's own user; the directory keeps others out
 mv "$tmp" "$REALM_FILE"
 
 tmp=$(mktemp "$SECRETS_DIR/.keycloak-app.env.XXXXXX")
