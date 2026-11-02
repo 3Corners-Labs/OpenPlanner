@@ -8,6 +8,8 @@ Called once per worker loop, after the due jobs:
     hourly ─► PRAGMA incremental_vacuum ─► pages back to the file system
     daily ─► erase the archived groups nothing refers to any more (ADR 0084 step 3)
     hourly ─► delete ended and expired admin sessions (ADR 0098 step 2)
+    daily ─► merge booking rows past booking_row_retention_days into daily counts and delete
+             them (ADR 0102 step 4)
     daily ─► retention sweep: purge personal data the purge job missed, alert on a backlog
              ─► purged something? ─► PRAGMA wal_checkpoint(TRUNCATE) (WP-A3)
 
@@ -23,6 +25,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.maintenance import checkpoint_wal, measure_storage, reclaim_free_pages
+from app.domain.booking_rollup import RollupResult
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.retention_sweep import SweepResult
 from app.domain.storage import (
@@ -51,6 +54,9 @@ ERASE_EVERY = timedelta(days=1)
 """How often archived groups are swept (ADR 0084 step 3); the delay itself is a setting."""
 
 
+ROLLUP_EVERY = timedelta(days=1)
+"""How often old booking rows are merged into daily counts; the term itself is a setting."""
+
 SESSIONS_EVERY = timedelta(hours=1)
 """How often ended and expired admin sessions are deleted; the lifetime is a setting."""
 
@@ -71,6 +77,8 @@ class Housekeeping:
             ``SWEEP_EVERY``.
         clean_sessions: Deletes the ended and expired admin sessions and returns the count;
             called once per ``SESSIONS_EVERY``.
+        rollup: Merges old booking rows into daily counts and deletes them (ADR 0102 step 4);
+            called once per ``ROLLUP_EVERY``.
     """
 
     def __init__(
@@ -84,8 +92,11 @@ class Housekeeping:
         erase: Callable[[], Awaitable[int]] | None = None,
         sweep: Callable[[], Awaitable[SweepResult]] | None = None,
         clean_sessions: Callable[[], Awaitable[int]] | None = None,
+        rollup: Callable[[], Awaitable[RollupResult]] | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
+        self._rollup = rollup
+        self._rolled_up_at: datetime | None = None
         self._clean_sessions = clean_sessions
         self._sessions_cleaned_at: datetime | None = None
         self._sweep = sweep
@@ -113,6 +124,7 @@ class Housekeeping:
         erase: Callable[[], Awaitable[int]] | None = None,
         sweep: Callable[[], Awaitable[SweepResult]] | None = None,
         clean_sessions: Callable[[], Awaitable[int]] | None = None,
+        rollup: Callable[[], Awaitable[RollupResult]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
         return cls(
@@ -125,6 +137,7 @@ class Housekeeping:
             erase,
             sweep,
             clean_sessions,
+            rollup,
         )
 
     async def run(self) -> None:
@@ -135,6 +148,27 @@ class Housekeeping:
         await self._erase_groups(now)
         await self._sweep_retention(now)
         await self._clean_admin_sessions(now)
+        await self._roll_up_bookings(now)
+
+    async def _roll_up_bookings(self, now: datetime) -> None:
+        """Merge old purged booking rows into daily counts, at most once per ``ROLLUP_EVERY``."""
+        if self._rollup is None:
+            return
+        if self._rolled_up_at is not None and now - self._rolled_up_at < ROLLUP_EVERY:
+            return
+        self._rolled_up_at = now
+        try:
+            result = await self._rollup()
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.error("booking_rows.rollup_failed", error=type(exc).__name__)
+        else:
+            if result.rows or result.skipped:
+                log.info(
+                    "booking_rows.rollup",
+                    rows=result.rows,
+                    days=result.day_counts,
+                    skipped=result.skipped,
+                )
 
     async def _clean_admin_sessions(self, now: datetime) -> None:
         """Delete ended and expired admin sessions, at most once per ``SESSIONS_EVERY``."""

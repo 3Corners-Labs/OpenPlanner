@@ -2,6 +2,7 @@
 
 import asyncio
 import copy
+from collections import Counter
 from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
@@ -23,6 +24,7 @@ from app.domain.booking import (
     SlotUsage,
     TrialCall,
 )
+from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
@@ -141,6 +143,7 @@ class State:
     platform_secrets: dict[str, str] = field(default_factory=dict)
     secrets_available: bool = True
     purged_at: dict[int, datetime] = field(default_factory=dict)
+    day_counts: dict[tuple[int, date, BookingStatus], DayCount] = field(default_factory=dict)
     forms: dict[int, FormDefinition] = field(default_factory=dict)
     failed_purges: set[int] = field(default_factory=set)
     failed_jobs: dict[int, list[JobSummary]] = field(default_factory=dict)
@@ -873,6 +876,55 @@ class InMemoryTransaction:
                 )
         return due
 
+    async def list_rollable(
+        self, purged_before: datetime, after_id: int, limit: int
+    ) -> list[RollableBooking]:
+        rows = [
+            RollableBooking(
+                b.id or 0,
+                b.group_id,
+                b.start.date(),
+                b.status,
+                self.state.purged_at.get(b.id or 0),
+                b.contact is not None,
+                len(self.state.jobs.get(b.id or 0, [])),
+            )
+            for b in sorted(self.state.bookings.values(), key=lambda b: b.id or 0)
+            if (b.id or 0) > after_id
+            and self.state.purged_at.get(b.id or 0, purged_before) < purged_before
+        ]
+        return rows[:limit]
+
+    async def add_day_counts(self, counts: Sequence[DayCount]) -> None:
+        for c in counts:
+            key = (c.group_id, c.day, c.status)
+            old = self.state.day_counts.get(key)
+            if old is None:
+                self.state.day_counts[key] = c
+            else:
+                self.state.day_counts[key] = replace(
+                    old,
+                    count=old.count + c.count,
+                    last_purged_at=max(old.last_purged_at, c.last_purged_at),
+                )
+
+    async def delete_booking_rows(self, booking_ids: Sequence[int]) -> None:
+        for booking_id in booking_ids:
+            self.state.bookings.pop(booking_id, None)
+            self.state.booking_events.pop(booking_id, None)
+            self.state.call_status.pop(booking_id, None)
+            self.state.jobs.pop(booking_id, None)
+            self.state.purged_at.pop(booking_id, None)
+
+    async def booking_totals(self, group_id: int) -> dict[BookingStatus, int]:
+        totals: Counter[BookingStatus] = Counter(
+            b.status for b in self.state.bookings.values() if b.group_id == group_id
+        )
+        for (group, _day, status), c in self.state.day_counts.items():
+            if group == group_id:
+                totals[status] += c.count
+        return dict(totals)
+
     async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:
         groups = await self.list_groups(scope)
         counts, candidates = [], []
@@ -880,6 +932,11 @@ class InMemoryTransaction:
             bookings = [b for b in self.state.bookings.values() if b.group_id == summary.group.id]
             holding = [b for b in bookings if b.contact is not None]
             purged = [self.state.purged_at[b.id] for b in bookings if b.id in self.state.purged_at]
+            purged += [
+                c.last_purged_at
+                for (group, _d, _s), c in self.state.day_counts.items()
+                if group == summary.group.id
+            ]
             failed = sum(1 for b in holding if b.id in self.state.failed_purges)
             counts.append(
                 GroupRetentionCounts(summary, len(holding), failed, max(purged, default=None))

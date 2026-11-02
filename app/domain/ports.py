@@ -26,6 +26,7 @@ from app.domain.booking import (
     SlotUsage,
     TrialCall,
 )
+from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import (
     BookingEvent,
@@ -1203,6 +1204,28 @@ class Transaction(Protocol):
 
         For the nightly sweep (system, no scope). Same selection as ``list_retention``.
         """
+        ...
+
+    async def list_rollable(
+        self, purged_before: datetime, after_id: int, limit: int
+    ) -> list[RollableBooking]:
+        """Return up to ``limit`` booking rows purged before ``purged_before``, by id.
+
+        Only rows with an id above ``after_id`` (keyset paging). The caller checks each row
+        with ``booking_rollup.is_rollable``; the SQL only narrows the candidates (ADR 0102).
+        """
+        ...
+
+    async def add_day_counts(self, counts: Sequence[DayCount]) -> None:
+        """Add ``counts`` to the stored daily counts (per group, day and status)."""
+        ...
+
+    async def delete_booking_rows(self, booking_ids: Sequence[int]) -> None:
+        """Delete the booking rows with their events, call status and finished jobs."""
+        ...
+
+    async def booking_totals(self, group_id: int) -> dict[BookingStatus, int]:
+        """Return the group's bookings per status: live rows plus the merged daily counts."""
         ...
 
     async def list_retention(self, scope: Scope, candidates_before: datetime) -> RetentionFacts:

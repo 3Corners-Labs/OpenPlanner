@@ -43,6 +43,7 @@ from app.adapters.tls_probe import SslCertificateProbe
 from app.config import Settings, environment, loose_secret_files
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
+from app.domain.booking_rollup_service import BookingRowRollup
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.group_erase import GroupEraser
@@ -213,6 +214,9 @@ async def run_worker(
         eraser.run,
         RetentionSweep(uow, clock, live.closure_retention).run,
         clean_sessions,
+        BookingRowRollup(
+            uow, clock, lambda: timedelta(days=live.settings.booking_row_retention_days)
+        ).run,
     )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(

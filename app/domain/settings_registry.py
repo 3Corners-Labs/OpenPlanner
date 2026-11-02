@@ -902,6 +902,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=3650,
     ),
     S(
+        "booking_row_retention_days",
+        K.INT,
+        730,
+        _C,
+        T.RETENTION,
+        "Days after the personal data of a booking was deleted before its row is merged into a "
+        "daily count per group and removed (ADR 0102).",
+        minimum=365,
+        maximum=3650,
+    ),
+    S(
         "security_event_retention_days",
         K.INT,
         365,

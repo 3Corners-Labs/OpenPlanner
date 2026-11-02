@@ -6142,6 +6142,9 @@ msgstr "Systeemgebeurtenissen bewaren (dagen)"
 msgid "settings.field.audit_retention_days.label"
 msgstr "Beheeracties bewaren (dagen)"
 
+msgid "settings.field.booking_row_retention_days.label"
+msgstr "Boekingsrijen bewaren na verwijdering van de gegevens (dagen)"
+
 msgid "settings.field.security_event_retention_days.label"
 msgstr "Beveiligingsgebeurtenissen bewaren (dagen)"
 

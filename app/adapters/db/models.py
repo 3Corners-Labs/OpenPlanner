@@ -792,6 +792,24 @@ class BookingEventRow(Base):
     __table_args__ = (Index("ix_booking_events_booking_id", "booking_id"),)
 
 
+class BookingDayCountRow(Base):
+    """Bookings of one group on one day that ended in one status (ADR 0102 step 4).
+
+    What is left of a booking row after ``booking_row_retention_days``: a count, the day of
+    the slot and the latest purge among them. No personal data and no identifier.
+    """
+
+    __tablename__ = "booking_day_counts"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    status: Mapped[str] = mapped_column(String(24), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer)
+    last_purged_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
 class CallStatusRow(Base):
     """The aggregated meeting and work item state of a booking (ADR 0010)."""
 
