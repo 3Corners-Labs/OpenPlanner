@@ -301,7 +301,7 @@
       {
         "icon": "calendar",
         "title": "Booking without friction",
-        "text": "Month calendar, free times, three fields. Move or cancel through a personal link. Works without JavaScript and fully by keyboard."
+        "text": "Month calendar, free times, a short form. The participant confirms by email; move or cancel through a personal link. Works without JavaScript and fully by keyboard."
       },
       {
         "icon": "video",
@@ -311,7 +311,7 @@
       {
         "icon": "queue",
         "title": "Lands where your team works",
-        "text": "The call goes to the queue in Webex Contact Center as a work item. The first free agent picks up. Nobody has to watch a calendar."
+        "text": "The call goes to the queue in Webex Contact Center as a work item, or to OpenPlanner's own queue for a team without a contact center. The first free agent picks up. Nobody has to watch a calendar."
       },
       {
         "icon": "bolt",
@@ -361,7 +361,7 @@
         "tag": "the heart",
         "text": "Every appointment is a real Webex meeting through the Meetings API. Browser-direct join, a trial call beforehand, live meeting status in the agenda.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0017-video-through-webex-meetings-api.md",
-        "link": "ADR 0017"
+        "link": "Technical background"
       },
       {
         "key": "wxcc",
@@ -369,23 +369,23 @@
         "tag": "dispatch",
         "text": "Five minutes before the start the call becomes a work item in the team's queue, carrying only a first name, the join link and routing attributes. Webex Contact Center is the first integration; the layer behind it is provider-neutral, and a group can also work without a contact center through OpenPlanner's own queue.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0018-wxcc-work-items.md",
-        "link": "ADR 0018"
+        "link": "Technical background"
       },
       {
         "key": "messaging",
         "name": "Webex Messaging",
-        "tag": "alerts",
-        "text": "A bot tells administrators in Webex when the integration falters, a queue fills up or a check fails. Never personal data, always a link to the portal.",
+        "tag": "planned",
+        "text": "Planned: a bot tells administrators in Webex when the integration falters, a queue fills up or a check fails. Never personal data, always a link to the portal.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0082-contact-center-verification-health-alerts-and-fallback.md",
-        "link": "ADR 0082"
+        "link": "Technical background"
       },
       {
         "key": "idp",
         "name": "Your identity provider",
         "tag": "OIDC",
-        "text": "Administrators sign in through your own IdP (PingFederate, Keycloak, Entra ID, any OIDC provider), per organisation, with roles from the claims.",
+        "text": "Administrators sign in through the identity provider bundled with OpenPlanner, with staff managed in the portal, or through your own (PingFederate, Keycloak, Entra ID, any OIDC provider), chosen per organisation by email domain. Roles come from the claims and a second factor can be required.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0083-identity-providers-per-organisation-chosen-by-email-domain.md",
-        "link": "ADR 0083"
+        "link": "Technical background"
       },
       {
         "key": "mail",
@@ -393,7 +393,7 @@
         "tag": "channels",
         "text": "SMTP and a provider-neutral SMS gateway per organisation. Texts per channel and per group editable in the portal.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0022-message-channels-reminders-and-texts.md",
-        "link": "ADR 0022"
+        "link": "Technical background"
       },
       {
         "key": "bot",
@@ -405,7 +405,7 @@
       }
     ],
     "roadmap_title": "On the roadmap",
-    "roadmap": "Other contact-center platforms on the same adapter layer (ADR 0032), the calendar invite as a third dispatch kind (ADR 0043), changes through the bot API (ADR 0023) and staff through SCIM (ADR 0046)."
+    "roadmap": "Other contact-center platforms on the same adapter layer, health checks with a fallback per group, subjects and routing per group, bots that can change bookings and staff through SCIM."
   },
   "enterprise": {
     "title": "Why we call OpenPlanner enterprise-ready",
@@ -582,8 +582,8 @@
         "text": "Rights, settings and the portal's structure each live in one place; their documentation is generated from the code."
       },
       {
-        "title": "Recorded decision by decision",
-        "text": "More than eighty ADRs with context, choice, settings and build status. An architect reads why things are the way they are, and what does not run yet."
+        "title": "Decision by decision on record",
+        "text": "Every design decision is in the repository with its context, its choice, its settings and what has been built of it. An architect reads why things are the way they are, and what does not run yet."
       }
     ],
     "scale_title": "Scalable, honestly",
@@ -596,7 +596,7 @@
       {
         "state": "now",
         "title": "A recorded limit",
-        "text": "The design target is about 80 bookings per working day. ADR 0036 records when we go further: above 2,000 bookings per working day, at a p95 above one second, with a stricter availability requirement, or when a client requires managed Postgres."
+        "text": "The design target is about 80 bookings per working day. The scaling record states when we go further: above 2,000 bookings per working day, at a p95 above one second, with a stricter availability requirement, or when a client requires managed Postgres."
       },
       {
         "state": "designed",
@@ -610,7 +610,7 @@
     },
     "scale_link": {
       "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0036-scaling-envelope-and-path-beyond-one-vm.md",
-      "label": "ADR 0036: scaling envelope and the path beyond one VM"
+      "label": "Scaling envelope and the path beyond one VM"
     },
     "arch_link": {
       "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/architecture.md",
@@ -628,7 +628,7 @@
       },
       {
         "title": "Single sign-on, no detour",
-        "text": "OIDC with PKCE, state and nonce, asymmetric algorithms only, eight-hour session. No local accounts, no break-glass login, on purpose."
+        "text": "OIDC with PKCE, state and nonce, asymmetric algorithms only, sessions held on the server, a second factor that can be required. No local accounts, no break-glass login, on purpose."
       },
       {
         "title": "An audit log you can forward",
@@ -658,15 +658,15 @@
   },
   "opensource": {
     "title": "Open source, open decisions",
-    "lead": "OpenPlanner is published under the EUPL-1.2, the open-source licence of the European Commission. Not only the code is open: every design decision sits in the repository as an ADR, with what has been built of it.",
+    "lead": "OpenPlanner is published under the EUPL-1.2, the open-source licence of the European Commission. Not only the code is open: every design decision sits in the repository, with what has been built of it.",
     "points": [
       {
         "title": "EUPL-1.2",
         "text": "Use, change and distribute it, commercially too. Compatible with GPL, AGPL and most European procurement rules."
       },
       {
-        "title": "Architecture Decision Records",
-        "text": "More than eighty decisions, each with context, choice, settings and build status. You read why things are the way they are, and what does not run yet."
+        "title": "Decisions on record",
+        "text": "Every design decision has its context, choice, settings and build status in the repository. You read why things are the way they are, and what does not run yet."
       },
       {
         "title": "Security up front",
@@ -692,7 +692,7 @@
     "prerelease": "release candidate",
     "built": "This page was built from commit {commit}.",
     "no_data": "The release list is read from GitHub on every build; this local build has none.",
-    "fresh": "On every merge to main and on every release this page is rebuilt with the releases of that moment. Your browser never talks to GitHub, which keeps this site free of third parties."
+    "fresh": "When this page loads, your browser asks GitHub for the current release list and for nothing else: no cookie, no account, no storage. The list built into the page is what you see when GitHub does not answer."
   },
   "cta": {
     "title": "Put it on a test server this afternoon",
@@ -702,7 +702,7 @@
   },
   "footer": {
     "tagline": "Video appointments with your team, booked in seconds, privacy by default.",
-    "nocookies": "This website sets no cookies, uses no trackers and loads nothing from third parties.",
+    "nocookies": "This website sets no cookies, uses no trackers and loads no scripts, fonts or images from third parties. Only the release list is requested from GitHub by your browser.",
     "license": "Source code under EUPL-1.2. Made by 3Corners and the OpenPlanner contributors.",
     "links": [
       {
@@ -715,7 +715,7 @@
       },
       {
         "href": "https://github.com/3Corners-Labs/OpenPlanner/tree/main/docs/adr",
-        "label": "ADRs"
+        "label": "Decisions"
       },
       {
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md",
@@ -729,7 +729,8 @@
         "href": "https://3corners.nl",
         "label": "3Corners"
       }
-    ]
+    ],
+    "disclaimer": "OpenPlanner is provided as it is, without warranty of any kind, as the EUPL-1.2 sets out (sections 7 and 8). 3Corners and the contributors are not liable for damage from its use. Whoever installs and runs it is responsible for its configuration, its hosting, its compliance with the law (including privacy, accessibility and retention rules) and its use. Statements on this site describe the software, not a legal or compliance advice or a guarantee that an installation meets a standard."
   },
   "standards": {
     "title": "Quality and standards, provably",
@@ -750,7 +751,7 @@
       "A layered architecture, enforced with import-linter: the domain knows no framework.",
       "Every module and function with a Google-style docstring, readable by documentation tools.",
       "Test coverage ≥ 90% on the domain and translations, mutation score ≥ 80%, abuse cases as tests.",
-      "Conventional Commits, one ADR per decision with its build status, and every PR answers seven review questions.",
+      "Conventional Commits, one recorded decision per choice with its build status, and every PR answers seven review questions.",
       "bandit, semgrep, gitleaks, pip-audit and a licence check on every pull request."
     ],
     "update_title": "Automatic updates",
@@ -778,24 +779,24 @@
       },
       {
         "name": "HTTPS, HSTS and NCSC TLS guidelines",
-        "what": "HTTPS with HSTS (Forum Standaardisatie comply-or-explain list), TLS 1.2 and 1.3 per the NCSC guidelines. A check in CI and internet.nl in the go-live checklist are planned.",
-        "status": "partly",
+        "what": "HTTPS with HSTS (Forum Standaardisatie comply-or-explain list), TLS 1.2 and 1.3 per the NCSC guidelines. A script checks the TLS versions, HSTS and the round trip of the public address; internet.nl is in the go-live checklist.",
+        "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0086-public-address-and-reverse-proxy-visible-verified-and-by-the-standards.md",
-        "link": "ADR 0086"
+        "link": "Technical background"
       },
       {
         "name": "SPF, DKIM and DMARC",
         "what": "Comply-or-explain standards for email. The portal checks each organisation's sender domain and shows what is missing.",
         "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0073-email-deliverability-sender-domain-check-and-system-mail-headers.md",
-        "link": "ADR 0073"
+        "link": "Technical background"
       },
       {
         "name": "OpenID Connect",
         "what": "Administrators sign in through their own identity provider: PKCE, state and nonce, asymmetric algorithms only. Tested against Keycloak, PingFederate in production.",
         "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0013-admin-login-with-oidc.md",
-        "link": "ADR 0013"
+        "link": "Technical background"
       },
       {
         "name": "OpenAPI 3",
@@ -816,7 +817,7 @@
         "what": "An audit log of every change and denial, security events on attacks, an auditor role and export to your log platform. The BIO itself remains the organisation's responsibility.",
         "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0053-security-events-for-attacks-on-public-entry-points.md",
-        "link": "ADR 0053"
+        "link": "Technical background"
       },
       {
         "name": "security.txt (RFC 9116)",
@@ -830,11 +831,11 @@
         "what": "Every image signed keyless with cosign, a CycloneDX SBOM with every release, CVE scans with trivy and grype, dependencies pinned with hashes.",
         "status": "ci",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0006-ci-tooling-and-image-signing.md",
-        "link": "ADR 0006"
+        "link": "Technical background"
       },
       {
         "name": "Standard for Public Code",
-        "what": "EUPL-1.2, a licence per file through REUSE, decisions public as ADRs, and a publiccode.yml that CI validates and every release updates. The listing on developer.overheid.nl is still open.",
+        "what": "EUPL-1.2, a licence per file through REUSE, decisions public in the repository, and a publiccode.yml that CI validates and every release updates. The listing on developer.overheid.nl is still open.",
         "status": "partly",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/publiccode.yml",
         "link": "publiccode.yml"
@@ -850,11 +851,44 @@
   },
   "roadmap": {
     "title": "Roadmap",
-    "lead": "Straight from GitHub: every open step of a decision is an issue. What is listed here is decided but not built yet.",
-    "steps": "{n} open steps",
-    "step": "1 open step",
-    "all": "All open steps on GitHub",
-    "no_data": "The roadmap is read from the GitHub issues on every build; this local build has none.",
-    "total": "{n} open steps in {m} decisions"
+    "lead": "Decided and not built yet. Everything above this section runs today; the open work is public on GitHub.",
+    "items": [
+      {
+        "adr": "0032",
+        "title": "Other contact centers",
+        "text": "The same hand-over to platforms other than Webex Contact Center, behind the adapter that already exists."
+      },
+      {
+        "adr": "0082",
+        "title": "Health checks and fallback",
+        "text": "The integration is checked all the time; administrators are alerted in email or a Webex space, and a group can fall back to its own queue when the contact center is down."
+      },
+      {
+        "adr": "0081",
+        "title": "Subjects and routing",
+        "text": "Per group a subject and routing attributes from a closed list, so the contact center routes the call to the right skill."
+      },
+      {
+        "adr": "0057",
+        "title": "Rebooking assistant",
+        "text": "When a team falls short, the participant is offered a new time and keeps the place until they answer."
+      },
+      {
+        "adr": "0023",
+        "title": "Bots can change bookings",
+        "text": "A contact-center bot that today offers free times and books can also move and cancel on the participant's behalf."
+      },
+      {
+        "adr": "0046",
+        "title": "Staff through SCIM",
+        "text": "Staff and roles provisioned from your directory, without typing them in the portal."
+      },
+      {
+        "adr": "0099",
+        "title": "Configuration as a document",
+        "text": "Compare and apply a whole configuration as one JSON document, with a plan of what will change first."
+      }
+    ],
+    "all": "All open work on GitHub"
   }
 }

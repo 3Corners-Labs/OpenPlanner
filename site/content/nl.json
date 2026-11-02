@@ -301,7 +301,7 @@
       {
         "icon": "calendar",
         "title": "Boeken zonder drempel",
-        "text": "Maandkalender, vrije tijden, drie velden. Verzetten of annuleren via een persoonlijke link. Werkt zonder JavaScript en volledig met het toetsenbord."
+        "text": "Maandkalender, vrije tijden, een kort formulier. De deelnemer bevestigt per e-mail; verzetten of annuleren via een persoonlijke link. Werkt zonder JavaScript en volledig met het toetsenbord."
       },
       {
         "icon": "video",
@@ -311,7 +311,7 @@
       {
         "icon": "queue",
         "title": "Landt waar je team werkt",
-        "text": "Het gesprek gaat als werkitem naar de wachtrij in Webex Contact Center. De eerste vrije medewerker neemt op. Niemand hoeft naar een agenda te kijken."
+        "text": "Het gesprek gaat als werkitem naar de wachtrij in Webex Contact Center, of naar de eigen wachtrij van OpenPlanner voor een team zonder contact center. De eerste vrije medewerker neemt op. Niemand hoeft naar een agenda te kijken."
       },
       {
         "icon": "bolt",
@@ -361,7 +361,7 @@
         "tag": "het hart",
         "text": "Elke afspraak is een echte Webex-meeting via de Meetings API. Browser-direct deelnemen, proefgesprek vooraf, live meetingstatus in de agenda.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0017-video-through-webex-meetings-api.md",
-        "link": "ADR 0017"
+        "link": "Technische achtergrond"
       },
       {
         "key": "wxcc",
@@ -369,23 +369,23 @@
         "tag": "dispatch",
         "text": "Vijf minuten voor de start wordt het gesprek een werkitem in de wachtrij van het team, met alleen voornaam, join-link en routeringskenmerken. Webex Contact Center is de eerste koppeling; de laag erachter is leverancieronafhankelijk, en een groep kan ook zonder contact center werken met de eigen wachtrij van OpenPlanner.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0018-wxcc-work-items.md",
-        "link": "ADR 0018"
+        "link": "Technische achtergrond"
       },
       {
         "key": "messaging",
         "name": "Webex Messaging",
-        "tag": "alerts",
-        "text": "Een bot meldt beheerders in Webex wanneer de koppeling hapert, een wachtrij volloopt of een controle faalt. Nooit persoonsgegevens, altijd een link naar het portaal.",
+        "tag": "gepland",
+        "text": "Gepland: een bot meldt beheerders in Webex wanneer de koppeling hapert, een wachtrij volloopt of een controle faalt. Nooit persoonsgegevens, altijd een link naar het portaal.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0082-contact-center-verification-health-alerts-and-fallback.md",
-        "link": "ADR 0082"
+        "link": "Technische achtergrond"
       },
       {
         "key": "idp",
         "name": "Jouw identity provider",
         "tag": "OIDC",
-        "text": "Beheerders loggen in via jullie eigen IdP (PingFederate, Keycloak, Entra ID, elke OIDC-provider), per organisatie, met rollen uit de claims.",
+        "text": "Beheerders loggen in via de identity provider die met OpenPlanner meekomt, met medewerkers beheerd in het portaal, of via jullie eigen (PingFederate, Keycloak, Entra ID, elke OIDC-provider), per organisatie gekozen op e-maildomein. Rollen komen uit de claims en een tweede factor kan verplicht worden.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0083-identity-providers-per-organisation-chosen-by-email-domain.md",
-        "link": "ADR 0083"
+        "link": "Technische achtergrond"
       },
       {
         "key": "mail",
@@ -393,7 +393,7 @@
         "tag": "kanalen",
         "text": "SMTP en een providerneutrale sms-gateway per organisatie. Teksten per kanaal en per groep aanpasbaar in het portaal.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0022-message-channels-reminders-and-texts.md",
-        "link": "ADR 0022"
+        "link": "Technische achtergrond"
       },
       {
         "key": "bot",
@@ -405,7 +405,7 @@
       }
     ],
     "roadmap_title": "Op de roadmap",
-    "roadmap": "Andere contact-centerplatforms op dezelfde adapterlaag (ADR 0032), de agenda-uitnodiging als derde dispatchvorm (ADR 0043), wijzigen via de bot-API (ADR 0023) en medewerkers via SCIM (ADR 0046)."
+    "roadmap": "Andere contact-centerplatforms op dezelfde adapterlaag, gezondheidscontrole met terugval per groep, onderwerpen en routering per groep, bots die boekingen kunnen wijzigen en medewerkers via SCIM."
   },
   "enterprise": {
     "title": "Waarom we OpenPlanner enterprise-klaar noemen",
@@ -583,7 +583,7 @@
       },
       {
         "title": "Besluit voor besluit vastgelegd",
-        "text": "Meer dan tachtig ADR's met context, keuze, instellingen en bouwstatus. Een architect leest waarom iets zo is, en wat nog niet draait."
+        "text": "Elk ontwerpbesluit staat in de repository met context, keuze, instellingen en wat ervan gebouwd is. Een architect leest waarom iets zo is, en wat nog niet draait."
       }
     ],
     "scale_title": "Schaalbaar, eerlijk gezegd",
@@ -596,7 +596,7 @@
       {
         "state": "now",
         "title": "Vastgelegde grens",
-        "text": "De ontwerpdoelstelling is zo'n 80 boekingen per werkdag. ADR 0036 legt vast wanneer we verder gaan: boven 2.000 boekingen per werkdag, bij een p95 boven 1 seconde, bij een strengere beschikbaarheidseis of als een klant beheerde Postgres eist."
+        "text": "De ontwerpdoelstelling is zo'n 80 boekingen per werkdag. Het schaalbesluit legt vast wanneer we verder gaan: boven 2.000 boekingen per werkdag, bij een p95 boven één seconde, bij een strengere beschikbaarheidseis, of wanneer een klant beheerde Postgres eist."
       },
       {
         "state": "designed",
@@ -610,7 +610,7 @@
     },
     "scale_link": {
       "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0036-scaling-envelope-and-path-beyond-one-vm.md",
-      "label": "ADR 0036: schaalgrenzen en het pad voorbij één VM"
+      "label": "Schaalgrenzen en het pad voorbij één VM"
     },
     "arch_link": {
       "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/architecture.md",
@@ -628,7 +628,7 @@
       },
       {
         "title": "Single sign-on, geen omweg",
-        "text": "OIDC met PKCE, state en nonce, alleen asymmetrische algoritmes, sessie van acht uur. Geen lokale accounts, geen break-glass login, bewust."
+        "text": "OIDC met PKCE, state en nonce, alleen asymmetrische algoritmes, sessies op de server bewaard, een tweede factor die verplicht kan worden. Geen lokale accounts, geen break-glass login, bewust."
       },
       {
         "title": "Auditlog dat je kunt doorsturen",
@@ -658,15 +658,15 @@
   },
   "opensource": {
     "title": "Open source, open besluiten",
-    "lead": "OpenPlanner is gepubliceerd onder de EUPL-1.2, de open-source-licentie van de Europese Commissie. Niet alleen de code is open: elk ontwerpbesluit staat als ADR in de repository, met wat er van gebouwd is.",
+    "lead": "OpenPlanner is gepubliceerd onder de EUPL-1.2, de open-source-licentie van de Europese Commissie. Niet alleen de code is open: elk ontwerpbesluit staat in de repository, met wat er van gebouwd is.",
     "points": [
       {
         "title": "EUPL-1.2",
         "text": "Gebruik, wijzig en verspreid, ook commercieel. Compatibel met GPL, AGPL en de meeste Europese aanbestedingsregels."
       },
       {
-        "title": "Architecture Decision Records",
-        "text": "Meer dan tachtig besluiten, elk met context, keuze, instellingen en bouwstatus. Je leest wat waarom zo is, en wat nog niet draait."
+        "title": "Besluiten vastgelegd",
+        "text": "Elk ontwerpbesluit staat met context, keuze, instellingen en bouwstatus in de repository. Je leest wat waarom zo is, en wat nog niet draait."
       },
       {
         "title": "Beveiliging op de voorgrond",
@@ -692,7 +692,7 @@
     "prerelease": "release candidate",
     "built": "Deze pagina is gebouwd uit commit {commit}.",
     "no_data": "De releaselijst wordt bij elke bouw uit GitHub ingelezen; in deze lokale bouw is die er niet.",
-    "fresh": "Bij elke merge naar main en bij elke release wordt deze pagina opnieuw gebouwd met de releases van dat moment. Je browser praat niet met GitHub; dat houdt deze site vrij van derden."
+    "fresh": "Zodra deze pagina laadt, vraagt je browser GitHub om de actuele releaselijst en om niets anders: geen cookie, geen account, geen opslag. De lijst die in de pagina is ingebouwd zie je als GitHub niet antwoordt."
   },
   "cta": {
     "title": "Zet 'm vanmiddag op een testserver",
@@ -702,7 +702,7 @@
   },
   "footer": {
     "tagline": "Video-afspraken met je team, in seconden geboekt, privacy standaard.",
-    "nocookies": "Deze website plaatst geen cookies, gebruikt geen trackers en laadt niets van derden.",
+    "nocookies": "Deze website zet geen cookies, gebruikt geen trackers en laadt geen scripts, lettertypen of afbeeldingen van derden. Alleen de releaselijst wordt door je browser bij GitHub opgevraagd.",
     "license": "Broncode onder EUPL-1.2. Gemaakt door 3Corners en de OpenPlanner-bijdragers.",
     "links": [
       {
@@ -715,7 +715,7 @@
       },
       {
         "href": "https://github.com/3Corners-Labs/OpenPlanner/tree/main/docs/adr",
-        "label": "ADR's"
+        "label": "Besluiten"
       },
       {
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/SECURITY.md",
@@ -729,7 +729,8 @@
         "href": "https://3corners.nl",
         "label": "3Corners"
       }
-    ]
+    ],
+    "disclaimer": "OpenPlanner wordt geleverd zoals het is, zonder enige garantie, zoals de EUPL-1.2 vastlegt (artikel 7 en 8). 3Corners en de bijdragers zijn niet aansprakelijk voor schade door het gebruik. Wie het installeert en draait, is zelf verantwoordelijk voor de inrichting, de hosting, het naleven van de wet (waaronder privacy-, toegankelijkheids- en bewaarregels) en het gebruik. Uitspraken op deze site beschrijven de software; het is geen juridisch of compliance-advies en geen garantie dat een installatie aan een norm voldoet."
   },
   "standards": {
     "title": "Kwaliteit en standaarden, aantoonbaar",
@@ -750,7 +751,7 @@
       "Een gelaagde architectuur, afgedwongen met import-linter: het domein kent geen framework.",
       "Elke module en functie met een docstring in Google-stijl, leesbaar voor documentatietools.",
       "Testdekking ≥ 90% op domein en vertalingen, mutatiescore ≥ 80%, misbruikscenario's als tests.",
-      "Conventional Commits, één ADR per besluit met bouwstatus, en elke PR beantwoordt zeven reviewvragen.",
+      "Conventional Commits, één vastgelegd besluit per keuze met bouwstatus, en elke PR beantwoordt zeven reviewvragen.",
       "bandit, semgrep, gitleaks, pip-audit en een licentiecontrole bij elke pull request."
     ],
     "update_title": "Automatisch bijwerken",
@@ -778,24 +779,24 @@
       },
       {
         "name": "HTTPS, HSTS en NCSC TLS-richtlijnen",
-        "what": "HTTPS met HSTS (pas-toe-of-leg-uit van Forum Standaardisatie), TLS 1.2 en 1.3 volgens de NCSC-richtlijnen. Een controle in CI en internet.nl in de go-live-checklist zijn gepland.",
-        "status": "partly",
+        "what": "HTTPS met HSTS (pas-toe-of-leg-uit van Forum Standaardisatie), TLS 1.2 en 1.3 volgens de NCSC-richtlijnen. Een script controleert de TLS-versies, HSTS en de rondgang van het publieke adres; internet.nl staat in de go-live-checklist.",
+        "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0086-public-address-and-reverse-proxy-visible-verified-and-by-the-standards.md",
-        "link": "ADR 0086"
+        "link": "Technische achtergrond"
       },
       {
         "name": "SPF, DKIM en DMARC",
         "what": "Pas-toe-of-leg-uit-standaarden voor e-mail. Het portaal controleert het afzenderdomein van elke organisatie en toont wat ontbreekt.",
         "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0073-email-deliverability-sender-domain-check-and-system-mail-headers.md",
-        "link": "ADR 0073"
+        "link": "Technische achtergrond"
       },
       {
         "name": "OpenID Connect",
         "what": "Beheerders loggen in via de eigen identity provider: PKCE, state en nonce, alleen asymmetrische algoritmes. Getest tegen Keycloak, in productie PingFederate.",
         "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0013-admin-login-with-oidc.md",
-        "link": "ADR 0013"
+        "link": "Technische achtergrond"
       },
       {
         "name": "OpenAPI 3",
@@ -816,7 +817,7 @@
         "what": "Auditlog van elke wijziging en weigering, beveiligingsevents bij aanvallen, een auditor-rol en export naar je logplatform. De BIO zelf blijft de verantwoordelijkheid van de organisatie.",
         "status": "built",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0053-security-events-for-attacks-on-public-entry-points.md",
-        "link": "ADR 0053"
+        "link": "Technische achtergrond"
       },
       {
         "name": "security.txt (RFC 9116)",
@@ -830,11 +831,11 @@
         "what": "Elke image keyless getekend met cosign, een CycloneDX-SBOM bij elke release, CVE-scans met trivy en grype, afhankelijkheden met hashes vastgezet.",
         "status": "ci",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0006-ci-tooling-and-image-signing.md",
-        "link": "ADR 0006"
+        "link": "Technische achtergrond"
       },
       {
         "name": "Standaard voor Publieke Code",
-        "what": "EUPL-1.2, licentie per bestand via REUSE, besluiten openbaar als ADR, en een publiccode.yml die CI valideert en die elke release bijwerkt. De aanmelding bij developer.overheid.nl staat nog open.",
+        "what": "EUPL-1.2, licentie per bestand via REUSE, besluiten openbaar in de repository, en een publiccode.yml die CI valideert en die elke release bijwerkt. De aanmelding bij developer.overheid.nl staat nog open.",
         "status": "partly",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/publiccode.yml",
         "link": "publiccode.yml"
@@ -850,11 +851,44 @@
   },
   "roadmap": {
     "title": "Roadmap",
-    "lead": "Rechtstreeks uit GitHub: elke openstaande stap van een besluit is een issue. Wat hier staat is besloten maar nog niet gebouwd.",
-    "steps": "{n} open stappen",
-    "step": "1 open stap",
-    "all": "Alle open stappen op GitHub",
-    "no_data": "De roadmap wordt bij elke bouw uit de GitHub-issues gelezen; in deze lokale bouw is die er niet.",
-    "total": "{n} open stappen in {m} besluiten"
+    "lead": "Besloten en nog niet gebouwd. Alles boven deze sectie draait vandaag; het openstaande werk staat openbaar op GitHub.",
+    "items": [
+      {
+        "adr": "0032",
+        "title": "Andere contact centers",
+        "text": "Dezelfde overdracht naar andere platforms dan Webex Contact Center, achter de adapter die er al is."
+      },
+      {
+        "adr": "0082",
+        "title": "Gezondheidscontrole en terugval",
+        "text": "De koppeling wordt voortdurend gecontroleerd; beheerders krijgen een melding per e-mail of in een Webex-ruimte, en een groep kan terugvallen op de eigen wachtrij als het contact center uitvalt."
+      },
+      {
+        "adr": "0081",
+        "title": "Onderwerpen en routering",
+        "text": "Per groep een onderwerp en routeringskenmerken uit een gesloten lijst, zodat het contact center het gesprek naar de juiste vaardigheid stuurt."
+      },
+      {
+        "adr": "0057",
+        "title": "Herplan-assistent",
+        "text": "Als een team tekortschiet, krijgt de deelnemer een nieuw moment voorgesteld en houdt de plek vast tot het antwoord er is."
+      },
+      {
+        "adr": "0023",
+        "title": "Bots kunnen boekingen wijzigen",
+        "text": "Een contact-centerbot die nu vrije tijden aanbiedt en boekt, kan ook verzetten en annuleren namens de deelnemer."
+      },
+      {
+        "adr": "0046",
+        "title": "Medewerkers via SCIM",
+        "text": "Medewerkers en rollen uit jullie directory, zonder ze in het portaal over te typen."
+      },
+      {
+        "adr": "0099",
+        "title": "Configuratie als document",
+        "text": "Een hele configuratie vergelijken en toepassen als één JSON-document, eerst met een plan van wat er verandert."
+      }
+    ],
+    "all": "Al het openstaande werk op GitHub"
   }
 }
