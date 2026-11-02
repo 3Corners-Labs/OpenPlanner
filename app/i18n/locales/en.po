@@ -8659,6 +8659,9 @@ msgstr "{count} failing"
 msgid "admin.settings.logging.open"
 msgstr "Open Log destinations"
 
+msgid "settings.field.max_font_unpacked_bytes.label"
+msgstr "Largest unpacked size of an uploaded font (bytes)"
+
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Largest configuration package (MB)"
 

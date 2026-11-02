@@ -6,6 +6,7 @@ from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.branding import Branding, FontFile, FontRole, HeaderStyle, Logo
 from app.domain.theme import Theme
+from tests.fakes.woff2 import make_woff2
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x01" * 64
 
@@ -90,8 +91,8 @@ async def test_fonts_are_stored_per_role_with_their_digest(engine: AsyncEngine) 
     async with uow.read() as tx:
         demo = await tx.get_organisation("demo")
     assert demo is not None
-    text = FontFile.from_upload(FontRole.TEXT, b"wOF2" + b"\x01" * 64)
-    heading = FontFile.from_upload(FontRole.HEADING, b"wOF2" + b"\x02" * 64)
+    text = FontFile.from_upload(FontRole.TEXT, make_woff2(1), 2_000_000)
+    heading = FontFile.from_upload(FontRole.HEADING, make_woff2(2), 2_000_000)
 
     async with uow.locked() as tx:
         await tx.save_font(demo.id, FontRole.TEXT, text)
