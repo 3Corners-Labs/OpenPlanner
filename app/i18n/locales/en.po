@@ -6163,6 +6163,9 @@ msgstr "Keep system events (days)"
 msgid "settings.field.audit_retention_days.label"
 msgstr "Keep admin actions (days)"
 
+msgid "settings.field.booking_row_retention_days.label"
+msgstr "Keep booking rows after the details are deleted (days)"
+
 msgid "settings.field.security_event_retention_days.label"
 msgstr "Keep security events (days)"
 

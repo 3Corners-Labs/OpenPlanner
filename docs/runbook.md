@@ -149,7 +149,8 @@ The worker asks `GET {PUBLIC_BASE_URL}/api/v1/instance?probe={nonce}` through th
 address, exactly as a participant's browser would, every `tls_check_interval_hours`, and the
 same for `WEBHOOK_BASE_URL` when that differs. `docker compose exec web python -m app.cli
 address-check` does it at once and exits 1 on a finding; run it as the last step of an
-installation and as part of the go-live checklist. What each finding means and what to change
+installation and as part of the go-live checklist (`--ca-file <PEM>` trusts only that CA instead
+of the host's bundle, for a proxy whose certificate comes from an internal CA). What each finding means and what to change
 on the host:
 
 | Finding | Meaning | What to do |
@@ -449,6 +450,56 @@ On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab)
    (or import a self-signed pair for the host with its key), place the chain, switch the source
    to *own*, press *Check now* and see your own issuer with *niet vertrouwd*; switch back to
    Let's Encrypt and see *ok* again, without touching the host.
+
+### Standards the proxy and the address follow (ADR 0086)
+
+The standards below are the yardstick for the TLS proxy, the certificate processes and the proxy
+headers; the table is the one place that says which version is followed. A change of a standard
+(a new NCSC version, a change on the Forum Standaardisatie list) is a new ADR that amends it.
+"Asserted by" is what fails when the installation drifts; `scripts/check-proxy.sh` (`make
+proxy-check`, CI step *proxy check*) runs against the bundled proxy in every certificate mode
+(ACME, the portal's certificate, an own certificate from files).
+
+| Process | Standard | What OpenPlanner does | Asserted by |
+|---|---|---|---|
+| Obtaining and renewing a certificate | ACME, RFC 8555, `http-01`; CAA, RFC 8659 | Caddy as ACME client, renewal at a third of the lifetime; ask your DNS operator for a CAA record that allows your CA (Let's Encrypt: `0 issue "letsencrypt.org"`) | `check-proxy.sh` pass 1 against Pebble |
+| Certificate contents and chain | X.509, RFC 5280; names in `subjectAltName`, RFC 6125 | An uploaded chain is validated for order, validity, names and key match (ADR 0070); the probe verifies the served chain against the system CA bundle (ADR 0064) | `tests/domain/test_own_certificate.py`, `tls-check` |
+| Private key of an own certificate | NCSC TLS guidelines (key types, sizes); PKIoverheid CPS: the subscriber makes the key | ECDSA P-256 made on the host, never transported, never in the database or a backup (ADR 0070) | `tests/domain/test_tls_source.py` |
+| TLS versions and cipher suites | NCSC-NL *ICT-beveiligingsrichtlijnen voor TLS* v2.1 (*Goed*, *Voldoende* at most), RFC 8446 | TLS 1.3 and 1.2 only, AEAD suites, OCSP stapling: Caddy's defaults, never weakened, no setting | `check-proxy.sh`: TLS 1.0 and 1.1 refused, 1.2 (with a GCM or ChaCha20 suite) and 1.3 accepted |
+| HTTPS and HSTS | Forum Standaardisatie *pas toe of leg uit* (HTTPS, HSTS); RFC 6797; `max-age` of at least one year | Port 80 redirects with 308 and otherwise answers only ACME; the app sends `Strict-Transport-Security: max-age=63072000; includeSubDomains` (two years), never on port 80 | `check-proxy.sh`: the redirect, the header on a proxied response (at least a year, `includeSubDomains`), none on port 80 |
+| Proxy headers | `X-Forwarded-For`, `-Proto`, `-Host` (de facto; RFC 7239 `Forwarded` is **not** read by uvicorn); OWASP: trust them from named proxy addresses only | Caddy sets them and drops what the client sent; uvicorn honours them from `FORWARDED_ALLOW_IPS` only, never `*` | `check-proxy.sh`: `address-check` through the proxy is `ok` (https seen, headers honoured), and `proxy_not_trusted` with a wrong `FORWARDED_ALLOW_IPS` |
+| HTTP security headers | OWASP ASVS 4.0 V14.4 | CSP, HSTS, `X-Frame-Options` on admin, `Referrer-Policy`, `X-Content-Type-Options` come from the app, not the proxy, so an own reverse proxy changes nothing | `tests/api/test_health.py` |
+| Responsible disclosure | RFC 9116 | `/.well-known/security.txt` (ADR 0003) | existing test |
+| External check of the public address | internet.nl *Website test* (Forum Standaardisatie, NCSC) | The go-live check and the yearly review below | a person |
+
+With a reverse proxy of your own (`--no-tls`) the script does not run against it; ask its
+operator for the same: TLS 1.2 and 1.3 only, HSTS (the app already sends it, do not strip it),
+`X-Forwarded-*` set and not passed through from the client, and run `address-check`.
+
+### Go-live check of the public address (ADR 0086)
+
+Before the first real participant and then once a year, and after every change of proxy,
+certificate source or domain:
+
+1. `docker compose exec web python -m app.cli address-check` exits 0: the name reaches this
+   installation over https and the proxy is trusted (*Address and proxy* on System status says
+   the same). Fix a finding with the table in *Address and proxy* above.
+2. `docker compose exec web python -m app.cli tls-check` says *in orde*, with the issuer you
+   expect and the days left.
+3. Run the internet.nl **Website test** (`https://internet.nl/site/<host name>/`) against the
+   public address, and the **Email test** for the sender domain (ADR 0073). Open the report's
+   *IPv6*, *DNSSEC*, *HTTPS* (TLS, HTTP headers incl. HSTS, certificate) and *Application
+   security options* parts. Expected: 100% on *HTTPS* and *Application security options*; IPv6
+   and DNSSEC depend on the host's network and the registrar. A part below 100% is a finding:
+   fix it, or write the reason in the record below. Do not paste the report's link into a public
+   place.
+4. Add a row to the record.
+
+**TLS audit** (date, address, who ran it, score per part, findings and what was done):
+
+| Date | Address | Run by | Website test: HTTPS / security options / IPv6 / DNSSEC | Findings and action |
+|---|---|---|---|---|
+| (none yet) | | | | |
 
 ## Time zones and clock format
 
@@ -1956,6 +2007,15 @@ backup. It is idempotent and needs no action. What it leaves behind is visible t
 - the log line `retention.backlog` (error) when a booking still held personal data more than
   48 hours after its retention began, or a purge failed. **Alert on this event in monitoring.**
   `retention.sweep_failed` means the sweep itself could not run (database locked or full).
+
+**Old booking rows (ADR 0102 step 4).** The same housekeeping merges booking rows
+`booking_row_retention_days` after their purge (default 730 days; the superuser sets it in the
+portal) into a count per group, day and status and deletes them. Look for the system event
+**booking_rows.rollup** (global, superuser: `rows`, `days`, `skipped`; no event on a day with
+nothing to do) and the log line `booking_rows.rollup`. `skipped` above 0 means a row past its
+term still holds personal data or has an open job: the retention sweep deals with the first, the
+second ends with its job. `booking_rows.rollup_failed` (error) means the run could not finish and
+is tried again the next day; the counts and deletions of a finished batch stay.
 
 To run it by hand (for example after a restore from a backup, with maintenance mode on),
 inside the `web` container:
