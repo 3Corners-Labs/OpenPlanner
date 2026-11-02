@@ -3935,6 +3935,18 @@ msgstr "op de machine-API"
 msgid "admin.audit.detail.surface_links"
 msgstr "bij onbekende beheerlinks"
 
+msgid "audit.event.database_error"
+msgstr "Databasefout"
+
+msgid "admin.audit.reason.database_error"
+msgstr "Een databaseopdracht mislukte; het verzoek is teruggedraaid."
+
+msgid "admin.audit.detail.surface_widget"
+msgstr "op de widget-API"
+
+msgid "error.database_unavailable"
+msgstr "Dit lukte nu niet en er is niets opgeslagen. Probeer het over enkele minuten opnieuw."
+
 msgid "admin.audit.detail.client"
 msgstr "afzender {value}"
 

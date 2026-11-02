@@ -52,6 +52,15 @@ the installation. Security events (`event.category = security`): `webhook.reject
 per kind per window, with `suppressed:<n>` for the ones held back. Shipping is described in
 `docs/runbook.md`.
 
+`database.error` (category `security`, outcome `failure`, reason `database_error`, detail
+`surface:web`, `surface:widget` or `surface:agent`, ASVS V16.3.4) is written when a request
+fails on a database error that is not a busy lock: the transaction is rolled back, the
+participant gets a 503 page (or `{"error": "database_unavailable"}` from the widget API) and
+the event has a code and nothing else. At most one per window. When the database is gone and
+the write fails too, the same event goes to stdout in the format of this page. SQLAlchemy never
+puts bound values in an exception text (`hide_parameters` on every engine, ASVS V16.2.5), and
+the log processor cuts any `[parameters: …]` it still meets.
+
 ADR 0068 adds `integration.request` (category `system`): one per call to Webex or WxCC, at the
 level of the booking (or group, for the probe meeting) of the trace that made it. `outcome`
 success or failure, `reason` the error code (`rejected_400`, `unreachable`, ...), `booking_id`,

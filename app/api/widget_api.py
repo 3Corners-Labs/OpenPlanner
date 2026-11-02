@@ -37,6 +37,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import DBAPIError
 from starlette.responses import JSONResponse, Response
 
 from app.api.contact_form import ANSWER_PREFIX, HONEYPOT_FIELD, load_contact_form
@@ -64,12 +65,14 @@ from app.domain.embedding_service import EmbeddingService, WidgetAccess
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import UNKNOWN_FIELD
 from app.domain.scheduling import Group
+from app.domain.security_log import DATABASE_ERROR, DATABASE_FAILED
 from app.domain.services import BookingService, ContactInput
 from app.web.closure_labels import closure_view
 from app.web.errors import status_for
 from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow_group_from_path
 from app.web.protection import booking_limit, limiter, read_limit
+from app.web.security_events import report_failure
 from app.web.slot_values import parse_start
 
 log = structlog.get_logger()
@@ -233,6 +236,12 @@ class WidgetRoute(APIRoute):
                 names = sorted({str(e["loc"][-1]) for e in invalid.errors() if e.get("loc")})
                 log.info("widget.invalid_request", fields=",".join(names)[:200])
                 response = problem("invalid_request", 422)
+            except DBAPIError:
+                await report_failure(
+                    request, DATABASE_ERROR, DATABASE_FAILED, detail="surface:widget"
+                )
+                response = problem("database_unavailable", 503)
+                response.headers["retry-after"] = "60"
             except RateLimitExceeded:
                 response = problem("rate_limited", 429)
                 response.headers["retry-after"] = "60"

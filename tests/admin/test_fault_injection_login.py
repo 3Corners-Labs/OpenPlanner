@@ -41,9 +41,10 @@ async def test_a_database_fault_while_resolving_the_rights_grants_no_session(
 ) -> None:
     with monkeypatch.context() as broken:
         broken.setattr(SqlTransaction, "get_directory", _locked)
-        with pytest.raises(OperationalError):
-            await site.login_as(GROUP_ADMIN)
+        response = await site.login_as(GROUP_ADMIN)
 
+    assert response.status_code == 503  # fail closed: a page with a text, no session
+    assert "set-cookie" not in response.headers or "session" not in response.headers["set-cookie"]
     assert not await _is_signed_in(site)
 
 
@@ -55,5 +56,7 @@ async def test_a_database_fault_after_login_shows_no_admin_page(
 
     monkeypatch.setattr(SqlTransaction, "get_directory", _locked)
 
-    with pytest.raises(OperationalError):  # the rights cannot be read: no page, no default role
-        await site.client.get("/admin/")
+    response = await site.client.get("/admin/")  # the rights cannot be read: no default role
+
+    assert response.status_code == 503
+    assert "Admin" not in response.text  # the error page, not the portal
