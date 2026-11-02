@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
 {% block title %}{{ person.name }} – {{ _("admin.staff.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <p><a href="/admin/staff">{{ _("admin.staff.back") }}</a></p>
@@ -18,6 +19,7 @@
   </dl>
   <p class="muted">{{ _("admin.staff.source") }}</p>
 </section>
+{% if manage %}{% set back = "/admin/staff/" ~ person.id %}{% include "admin/_staff_manage.html" %}{% endif %}
 {% if person.refused %}
 <section class="card" aria-labelledby="refused-heading">
   <h2 id="refused-heading">{{ _("admin.staff.refused") }}</h2>

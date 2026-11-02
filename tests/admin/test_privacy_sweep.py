@@ -39,11 +39,13 @@ from app.domain.privacy import ALIASES, PII_FIELDS
 from app.domain.scheduling import DispatchKind, ScheduleOverride, TimeWindow
 from app.domain.services import BookingService, ContactInput
 from app.domain.staff import StaffFilter
+from app.domain.staff_directory import DirectoryUser
 from app.domain.updates import Release, ReleaseCheck, Version
 from app.web.widgets import OVERVIEW_PATH, WIDGETS
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_idp_routes import NEW_PROVIDER, organisation_claims
 from tests.fakes.identity import FakeIdentityProvider
+from tests.fakes.staff_directory import FakeStaffDirectory
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.routes import all_routes
 
@@ -343,6 +345,21 @@ async def marked(site: Site, monkeypatch: pytest.MonkeyPatch) -> tuple[Site, Fix
     uow = _uow(site)
     found = Fixture()
     _record_templates(monkeypatch, found.rendered)
+    # ADR 0095: a staff directory, so the invitation form and the actions on a person render.
+    directory = FakeStaffDirectory(
+        [
+            DirectoryUser(
+                "sub-group",
+                "g",
+                "g@example.test",
+                "G",
+                "G",
+                True,
+                frozenset({"openplanner:group_admin:demo/demo"}),
+            )
+        ]
+    )
+    _app(site).state.staff_directory_service._directory = directory  # type: ignore[attr-defined]  # noqa: SLF001
     async with uow.locked() as tx:
         summary = await tx.get_group_summary("demo")
         assert summary is not None
@@ -516,6 +533,16 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
                 assert response.status_code == 200, path
                 assert "<svg" in response.text or "widget__empty" in response.text, path
                 assert not _leaks(response.text, set()), path
+
+    # ADR 0095: the invitation form, and the page of a refused action on a person.
+    for path, response in (
+        ("/admin/staff/invite", await site.client.get("/admin/staff/invite")),
+        (
+            "POST /admin/staff/directory/reset",
+            await _post(site, "/admin/staff/directory/reset", {"subject": "nobody"}),
+        ),
+    ):
+        assert not _leaks(response.text, set()), path
 
     # The pages outside the happy path: a refusal, and the sign-out pages without a session.
     for path, response in (

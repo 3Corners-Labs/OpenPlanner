@@ -10,6 +10,9 @@
 #   KC_BOOTSTRAP_ADMIN_PASSWORD   Keycloak admin console, user `admin` (generated)
 #   KC_OPENPLANNER_CLIENT_SECRET  client `openplanner-admin`; must equal OIDC_CLIENT_SECRET in
 #                                 .env (generated; the installer copies it, ADR 0090 step 2)
+#   KC_DIRECTORY_CLIENT_SECRET    service account `openplanner-directory` that manages staff
+#                                 (roles manage-users and view-realm only, ADR 0095); must equal
+#                                 KEYCLOAK_DIRECTORY_CLIENT_SECRET in .env (generated)
 #   KC_SUPER_PASSWORD             first password of the portal user `super`, changed at the
 #                                 first login (generated)
 #   KC_OPENPLANNER_BASE_URL       the portal's address for the redirect URIs: PUBLIC_BASE_URL
@@ -26,7 +29,7 @@ DIR=$(cd "$(dirname "$0")/.." && pwd)
 while (($#)); do
   case $1 in
     --dir) DIR=$2; shift 2 ;;
-    -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -35,7 +38,7 @@ TEMPLATE=$DIR/deploy/keycloak/realm.template.json
 SECRETS_DIR=$DIR/secrets
 ENV_FILE=$SECRETS_DIR/keycloak.env
 REALM_FILE=$SECRETS_DIR/keycloak-realm.json
-GENERATED=(KC_BOOTSTRAP_ADMIN_PASSWORD KC_OPENPLANNER_CLIENT_SECRET KC_SUPER_PASSWORD)
+GENERATED=(KC_BOOTSTRAP_ADMIN_PASSWORD KC_OPENPLANNER_CLIENT_SECRET KC_DIRECTORY_CLIENT_SECRET KC_SUPER_PASSWORD)
 KEYS=("${GENERATED[@]}" KC_OPENPLANNER_BASE_URL KC_HOSTNAME)
 
 log() { echo "render-keycloak-realm: $*" >&2; }
@@ -87,6 +90,7 @@ mv "$tmp" "$ENV_FILE"
 
 tmp=$(mktemp "$SECRETS_DIR/.keycloak-realm.json.XXXXXX")
 sed -e "s|\${KC_OPENPLANNER_CLIENT_SECRET}|$KC_OPENPLANNER_CLIENT_SECRET|g" \
+  -e "s|\${KC_DIRECTORY_CLIENT_SECRET}|$KC_DIRECTORY_CLIENT_SECRET|g" \
   -e "s|\${KC_SUPER_PASSWORD}|$KC_SUPER_PASSWORD|g" \
   -e "s|\${KC_OPENPLANNER_BASE_URL}|$KC_OPENPLANNER_BASE_URL|g" \
   "$TEMPLATE" > "$tmp"

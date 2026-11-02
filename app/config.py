@@ -29,6 +29,7 @@ from pydantic_settings import (
 from app.domain.event_schema import Envelope
 from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
+from app.domain.staff_directory import ADMIN_URL_PATTERN
 from app.domain.system_log import EventRetention
 from app.i18n.dates import ClockStyle
 
@@ -333,6 +334,14 @@ class Settings(BaseSettings):
     oidc_client_id: str = "openplanner-admin"
     oidc_client_secret: SecretStr | None = None
     oidc_scopes: str = "openid profile email"
+    # ADR 0095: the bundled Keycloak's admin API, for managing staff in the portal. Class A:
+    # needed before the portal can ask the provider anything. Empty URL: no directory.
+    keycloak_admin_url: str | None = None
+    keycloak_directory_client_id: str = "openplanner-directory"
+    keycloak_directory_client_secret: SecretStr | None = None
+    # ADR 0095: validity of the invitation and reset link, and the switch of the actions.
+    staff_invite_expiry_days: int = Field(default=7, ge=1, le=30)
+    staff_directory_enabled: bool = True
     # ADR 0100: the admin must show a second factor (amr/acr in the ID token). Class B. Off by
     # default: the bundled Keycloak sets it on; another provider turns it on once the IdP team
     # has named its amr/acr values. The IdP owns the MFA itself.
@@ -639,6 +648,14 @@ class Settings(BaseSettings):
         ):
             raise ValueError("UPDATE_REPOSITORY must be owner/name")
         return value
+
+    @field_validator("keycloak_admin_url")
+    @classmethod
+    def _realm_admin_url(cls, value: str | None) -> str | None:
+        """Accept only the admin API of one realm: the portal derives the token URL from it."""
+        if value and not ADMIN_URL_PATTERN.match(value.rstrip("/")):
+            raise ValueError("KEYCLOAK_ADMIN_URL must end in /admin/realms/<realm>")
+        return value or None
 
     @field_validator(
         "management_token_key_previous", "settings_encryption_key_previous", mode="before"

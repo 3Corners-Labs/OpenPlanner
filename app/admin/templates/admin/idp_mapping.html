@@ -13,6 +13,11 @@
 <section class="card" aria-labelledby="mapping-settings-heading">
   <h2 id="mapping-settings-heading">{{ _("admin.idp_mapping.settings") }}</h2>
   <dl class="facts">
+    {% if provider %}
+    <div><dt>{{ _("admin.idp_mapping.provider") }}</dt><dd>{{ provider.kind }}</dd></div>
+    <div><dt>{{ _("admin.idp_mapping.issuer") }}</dt><dd><code>{{ provider.issuer }}</code></dd></div>
+    <div><dt>{{ _("admin.idp_mapping.staff") }}</dt><dd>{{ provider.staff }}{% if can("staff.view") %} <a href="/admin/staff">{{ _("admin.idp_mapping.staff_link") }}</a>{% endif %}</dd></div>
+    {% endif %}
     <div><dt>{{ _("admin.idp_mapping.mode") }}</dt><dd>{{ mode_label }}</dd></div>
     <div><dt>{{ _("admin.idp_mapping.claim") }}</dt><dd><code>{{ settings.claim }}</code></dd></div>
     <div><dt>{{ _("admin.idp_mapping.prefix") }}</dt><dd><code>{{ settings.prefix }}</code></dd></div>

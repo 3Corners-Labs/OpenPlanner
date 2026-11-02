@@ -176,6 +176,44 @@ def _views(
     return organisations, refused
 
 
+@dataclass(frozen=True)
+class ProviderView:
+    """Which identity provider the platform logs in with, for the top of the page."""
+
+    kind: str
+    issuer: str
+    staff: str
+
+
+def _provider(request: Request, locale: Locale) -> ProviderView | None:
+    """Describe the platform's provider; ``None`` while the portal has no login configured.
+
+    The issuer is the address the provider announces (a public value, ADR 0097); no secret
+    and no client identifier is shown.
+    """
+    _ = locale.gettext
+    settings = request.app.state.settings
+    if settings.oidc_discovery_url is None:
+        return None
+    issuer = settings.oidc_issuer or settings.oidc_discovery_url.removesuffix(
+        "/.well-known/openid-configuration"
+    )
+    service = request.app.state.staff_directory_service
+    if not settings.keycloak_admin_url:
+        kind, staff = _("admin.idp_mapping.provider.own"), _("admin.idp_mapping.staff.at_provider")
+    elif service.available:
+        kind, staff = (
+            _("admin.idp_mapping.provider.bundled"),
+            _("admin.idp_mapping.staff.in_portal"),
+        )
+    else:
+        kind, staff = (
+            _("admin.idp_mapping.provider.bundled"),
+            _("admin.idp_mapping.staff.off"),
+        )
+    return ProviderView(kind, issuer, staff)
+
+
 @router.get("/idp-mapping", response_class=HTMLResponse)
 async def idp_mapping(request: Request, locale: Locale, context: View) -> HTMLResponse:
     """Show the values the identity provider must send, within the viewer's scope."""
@@ -190,6 +228,7 @@ async def idp_mapping(request: Request, locale: Locale, context: View) -> HTMLRe
             "settings": overview.settings,
             "mode_label": locale.gettext(MODE_LABELS[overview.settings.mode]),
             "superuser_value": overview.superuser_value,
+            "provider": _provider(request, locale),
             "organisations": organisations,
             "refused": refused,
         },

@@ -115,6 +115,7 @@ def test_files_are_only_for_bootstrap_secrets() -> None:
         "management_token_key_previous",
         "session_secret",
         "oidc_client_secret",
+        "keycloak_directory_client_secret",
     }
 
 

@@ -83,6 +83,8 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.ORGANISATION_CLOSURE,
         Permission.RETENTION_VIEW,
         Permission.STAFF_VIEW,  # ADR 0046
+        Permission.STAFF_MANAGE,  # ADR 0095
+        Permission.STAFF_RESET_PASSWORD,  # ADR 0095
         Permission.EMBEDDING_MANAGE,  # ADR 0035
         Permission.QUEUE_WORK,  # ADR 0043
         Permission.SETTINGS_ORGANISATION_MANAGE,  # ADR 0042: the own organisation's settings

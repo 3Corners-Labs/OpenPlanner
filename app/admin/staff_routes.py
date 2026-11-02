@@ -26,10 +26,15 @@ from starlette.responses import HTMLResponse
 
 from app.admin.audit_routes import audit_views
 from app.admin.authz import AdminContext, RequirePermission, admin_service
-from app.admin.forms import Option
+from app.admin.forms import FormData, Option
 from app.admin.idp_mapping_routes import reason_label
 from app.admin.pages import Locale, admin_moment
 from app.admin.pages import page as _page
+from app.admin.staff_directory_routes import (
+    add_fields,
+    directory_service,
+    manage_view,
+)
 from app.domain.audit import AuditFilter
 from app.domain.authorization import Permission, Role, scope_for
 from app.domain.scheduling import GroupSummary
@@ -205,6 +210,12 @@ async def staff_list(
         context.principal,
         {
             "people": [_view(request, locale, m, names, now) for m in members],
+            "can_invite": directory_service(request).available
+            and not scope_for(context.principal, Permission.STAFF_MANAGE).is_empty,
+            "pending": [
+                manage_view(request, locale, context, p, in_scope)
+                for p in await directory_service(request).pending(context.principal)
+            ],
             "filters": filters,
             "dormant_days": settings_for(request).staff_dormant_after_days,
         },
@@ -229,8 +240,11 @@ async def staff_member(
             context.principal, AuditFilter(actor=member.subject), ACTIVITY_LIMIT
         )
         activity = audit_views(request, locale, context.principal, entries)
-    names = _names(await service.groups(context.principal, Permission.STAFF_VIEW))
+    in_scope = await service.groups(context.principal, Permission.STAFF_VIEW)
+    names = _names(in_scope)
     now = request.app.state.clock.now()
+    managed = await directory_service(request).person(context.principal, member.subject)
+    manage = manage_view(request, locale, context, managed, in_scope) if managed else None
     return _page(
         request,
         locale,
@@ -239,6 +253,10 @@ async def staff_member(
         {
             "person": _view(request, locale, member, names, now),
             "events": activity,
+            "manage": manage,
+            "add_fields": add_fields(
+                context.principal, locale, in_scope, FormData({}, locale.gettext)
+            ),
             "activity_limit": ACTIVITY_LIMIT,
         },
     )
