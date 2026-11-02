@@ -12,7 +12,7 @@ from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.job_plan import JobType
 from app.domain.scheduling import DispatchKind, PhoneMode
-from app.domain.tokens import derive_token, new_token_salt
+from app.domain.tokens import derive_token, hash_token, new_token_salt
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -685,3 +685,22 @@ async def test_a_group_text_may_use_the_agent_placeholders() -> None:
     email = composer.compose(JobType.SEND_REMINDER, BOOKING, GROUP, NOW, texts=own)
 
     assert email.subject == "Behandelaar belt op maandag 5 januari 2026"
+
+
+def test_a_reminder_after_a_rotation_carries_the_link_the_booking_was_given() -> None:
+    """ADR 0094 point 4: a booking made under the old token key keeps its link."""
+    old_key, new_key = b"o" * 32, b"n" * 32
+    booking = replace(BOOKING, token_hash=hash_token(derive_token(old_key, SALT)))
+    after = MessageComposer(
+        Translator(load_catalogues()), new_key, "https://afspraak.example.nl", old_key
+    )
+    forgotten = MessageComposer(
+        Translator(load_catalogues()), new_key, "https://afspraak.example.nl"
+    )
+    link = f"https://afspraak.example.nl/b/{derive_token(old_key, SALT)}"
+
+    assert link in after.compose(JobType.SEND_REMINDER, booking, GROUP, NOW).text
+    assert after.manage_url(booking) == link
+    assert forgotten.manage_url(booking) != link  # the defect the previous key fixes
+    new_booking = replace(BOOKING, token_hash=hash_token(derive_token(new_key, SALT)))
+    assert after.manage_url(new_booking).endswith(derive_token(new_key, SALT))

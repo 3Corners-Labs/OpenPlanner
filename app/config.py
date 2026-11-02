@@ -11,7 +11,14 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    Field,
+    SecretStr,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -56,6 +63,9 @@ FILE_SECRETS: tuple[str, ...] = tuple(
     if spec.secret and spec.class_ in (SettingClass.BOOTSTRAP, SettingClass.DEPLOYMENT)
 )
 """Secrets that ``X_FILE`` may supply: the class A and B secrets of the registry (§9)."""
+
+MIN_PREVIOUS_KEY_BYTES = 32
+"""The least a previous key may hold (ADR 0094), as for the current key."""
 
 _PRIVATE_MODE = 0o077
 """Permission bits for group and others; a secret file with any of them set is reported."""
@@ -273,6 +283,9 @@ class Settings(BaseSettings):
     # ADR 0011. Required in production; in development a shared key is generated in the data
     # volume (see app.keys).
     management_token_key: SecretStr | None = None
+    # ADR 0094: the key before a rotation. Links of bookings made under it keep working while it
+    # is set; empty outside a rotation. Class A: env or MANAGEMENT_TOKEN_KEY_PREVIOUS_FILE only.
+    management_token_key_previous: SecretStr | None = None
     dev_token_key_path: Path = Path("data/dev-token.key")
 
     # Outgoing mail: the fallback for organisations without their own SMTP server in the admin
@@ -352,6 +365,9 @@ class Settings(BaseSettings):
 
     # Integration secrets at rest (ADR 0008): AES-256-GCM under a key derived from this value.
     settings_encryption_key: SecretStr | None = None
+    # ADR 0094: the key before a rotation; sealed values under it stay readable until
+    # ``python -m app.cli rekey`` has sealed them again. Empty outside a rotation.
+    settings_encryption_key_previous: SecretStr | None = None
     dev_settings_key_path: Path = Path("data/dev-settings.key")
 
     # Webex Service App (ADR 0017/0018): one app for meetings and WxCC work items. The refresh
@@ -622,6 +638,24 @@ class Settings(BaseSettings):
             not _REPOSITORY.fullmatch(value) or {".", ".."} & set(value.split("/"))
         ):
             raise ValueError("UPDATE_REPOSITORY must be owner/name")
+        return value
+
+    @field_validator(
+        "management_token_key_previous", "settings_encryption_key_previous", mode="before"
+    )
+    @classmethod
+    def _empty_previous_key_is_unset(cls, value: object) -> object:
+        """Treat an empty previous key as unset: compose files pass ``KEY=`` when unused."""
+        return None if value == "" else value
+
+    @field_validator("management_token_key_previous", "settings_encryption_key_previous")
+    @classmethod
+    def _previous_key_is_long_enough(
+        cls, value: SecretStr | None, info: ValidationInfo
+    ) -> SecretStr | None:
+        """Refuse a previous key shorter than 32 bytes (ADR 0094); the message names no value."""
+        if value is not None and len(value.get_secret_value().encode()) < MIN_PREVIOUS_KEY_BYTES:
+            raise ValueError(f"{str(info.field_name).upper()} must be at least 32 bytes")
         return value
 
     @field_validator("phone_default_region")

@@ -50,6 +50,32 @@ def management_token_key(settings: Settings) -> bytes:
     )
 
 
+def _previous_key(value: SecretStr | None, name: str) -> bytes | None:
+    """Return a previous key, or ``None`` outside a rotation.
+
+    Raises:
+        RuntimeError: If the key is shorter than ``MIN_KEY_BYTES``.
+    """
+    if value is None:
+        return None
+    key = value.get_secret_value().encode()
+    if len(key) < MIN_KEY_BYTES:
+        raise RuntimeError(f"{name} must be at least {MIN_KEY_BYTES} bytes")
+    return key
+
+
+def management_token_key_previous(settings: Settings) -> bytes | None:
+    """Return ``MANAGEMENT_TOKEN_KEY_PREVIOUS`` (ADR 0094), set only during a rotation."""
+    return _previous_key(settings.management_token_key_previous, "MANAGEMENT_TOKEN_KEY_PREVIOUS")
+
+
+def settings_encryption_key_previous(settings: Settings) -> bytes | None:
+    """Return ``SETTINGS_ENCRYPTION_KEY_PREVIOUS`` (ADR 0094), set only during a rotation."""
+    return _previous_key(
+        settings.settings_encryption_key_previous, "SETTINGS_ENCRYPTION_KEY_PREVIOUS"
+    )
+
+
 def _derived(settings: Settings, info: bytes) -> bytes:
     """Return a 32-byte key derived from ``MANAGEMENT_TOKEN_KEY`` with HKDF-SHA256 under ``info``.
 
@@ -57,8 +83,12 @@ def _derived(settings: Settings, info: bytes) -> bytes:
     neither key reveals the other and no extra secret has to be managed. Rotating the token
     key changes every derived key.
     """
-    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
-    return hkdf.derive(management_token_key(settings))
+    return _derive_from(management_token_key(settings), info)
+
+
+def _derive_from(key: bytes, info: bytes) -> bytes:
+    """Return the 32-byte HKDF-SHA256 key of ``key`` under the label ``info``."""
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info).derive(key)
 
 
 def client_pseudonym_key(settings: Settings) -> bytes:
@@ -69,6 +99,15 @@ def client_pseudonym_key(settings: Settings) -> bytes:
 def agent_pseudonym_key(settings: Settings) -> bytes:
     """Return the key of the agents' pseudonyms in the own queue (ADR 0043)."""
     return _derived(settings, AGENT_PSEUDONYM_INFO)
+
+
+def agent_pseudonym_key_previous(settings: Settings) -> bytes | None:
+    """Return the agents' pseudonym key under ``MANAGEMENT_TOKEN_KEY_PREVIOUS``, if one is set.
+
+    Claims made before a rotation are recognised as the agent's own while it is set.
+    """
+    previous = management_token_key_previous(settings)
+    return None if previous is None else _derive_from(previous, AGENT_PSEUDONYM_INFO)
 
 
 def session_secret(settings: Settings) -> str:

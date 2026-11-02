@@ -125,6 +125,7 @@ from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
     agent_pseudonym_key,
+    agent_pseudonym_key_previous,
     client_pseudonym_key,
     management_token_key,
     session_secret,
@@ -469,7 +470,11 @@ def create_app(
         )
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         app.state.queue_service = QueueService(
-            uow, clock, app.state.admin_service, agent_pseudonym_key(settings)
+            uow,
+            clock,
+            app.state.admin_service,
+            agent_pseudonym_key(settings),
+            agent_pseudonym_key_previous(settings),
         )
         app.state.integration_service = IntegrationService(
             uow,

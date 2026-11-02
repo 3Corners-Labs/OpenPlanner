@@ -26,6 +26,7 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from pydantic import SecretStr
 
 from app.adapters.crypto import SecretBox
+from app.adapters.db.sealed import SEALED, reseal
 from app.config import Settings
 from app.domain.configuration_package import (
     CONFIGURATION_TABLES,
@@ -52,46 +53,6 @@ VERIFIER_TEXT = b"openplanner configuration package"
 ENVIRONMENT_PREFIX = "env:"
 SQLITE_HEADER = b"SQLite format 3\x00"
 BUSY_TIMEOUT_SECONDS = 5.0
-
-_SEALED: tuple[tuple[str, str, str, str], ...] = (
-    (
-        "integration_credentials",
-        "nonce",
-        "ciphertext",
-        "SELECT rowid, name, nonce, ciphertext FROM integration_credentials",
-    ),
-    (
-        "channel_settings",
-        "secret_nonce",
-        "secret_ciphertext",
-        "SELECT rowid, 'channel:' || organisation_id || ':' || channel, secret_nonce, "
-        "secret_ciphertext FROM channel_settings WHERE secret_ciphertext IS NOT NULL",
-    ),
-    (
-        "identity_providers",
-        "secret_nonce",
-        "secret_ciphertext",
-        "SELECT rowid, 'idp:' || key || ':secret', secret_nonce, secret_ciphertext "
-        "FROM identity_providers WHERE secret_ciphertext IS NOT NULL",
-    ),
-    (
-        "log_destinations",
-        "secret_nonce",
-        "secret_ciphertext",
-        "SELECT rowid, 'logdest:' || id || ':secret', secret_nonce, secret_ciphertext "
-        "FROM log_destinations WHERE secret_ciphertext IS NOT NULL",
-    ),
-    (
-        "identity_provider_keys",
-        "key_nonce",
-        "key_ciphertext",
-        "SELECT k.rowid, 'idp:' || p.key || ':key:' || k.kid, k.key_nonce, k.key_ciphertext "
-        "FROM identity_provider_keys k JOIN identity_providers p ON p.id = k.provider_id",
-    ),
-)
-"""Every sealed column: table, nonce column, ciphertext column, and the query that yields
-``rowid, record name, nonce, ciphertext``. The names are those of the writers (ADR 0008), so a
-re-sealed value opens again on the other side under the same associated data."""
 
 
 def package_box(passphrase: str, salt: bytes) -> SecretBox:
@@ -132,29 +93,17 @@ def _temporary(work_dir: Path, data: bytes | None = None) -> Path:
     return Path(name)
 
 
-def _reseal(db: sqlite3.Connection, opener: SecretBox, sealer: SecretBox) -> int:
-    """Open every sealed value with ``opener`` and seal it again with ``sealer``; count them.
+def _reseal_or_refuse(db: sqlite3.Connection, opener: SecretBox, sealer: SecretBox) -> None:
+    """Re-seal every value; a value that does not open is a wrong passphrase or damaged file.
 
     Raises:
-        DomainError: ``configuration_passphrase_wrong`` when a value does not open (the
-            verifier is checked first, so this means a damaged file; the same code keeps
-            the two cases from being told apart by an attacker).
+        DomainError: ``configuration_passphrase_wrong`` (the verifier is checked first, so this
+            means a damaged file; the same code keeps the two cases from being told apart).
     """
-    count = 0
-    for table, nonce_column, cipher_column, query in _SEALED:
-        rows = db.execute(query).fetchall()
-        for rowid, name, nonce, ciphertext in rows:
-            try:
-                plaintext = opener.open(name, nonce, ciphertext)
-            except InvalidTag as exc:
-                raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_WRONG, "passphrase") from exc
-            new_nonce, new_ciphertext = sealer.seal(name, plaintext)
-            db.execute(
-                f"UPDATE {table} SET {nonce_column} = ?, {cipher_column} = ? WHERE rowid = ?",  # noqa: S608  # nosec B608 - names from the fixed list above
-                (new_nonce, new_ciphertext, rowid),
-            )
-            count += 1
-    return count
+    try:
+        reseal(db, opener, sealer)
+    except InvalidTag as exc:
+        raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_WRONG, "passphrase") from exc
 
 
 def _revision(db: sqlite3.Connection, schema: str = "main") -> str:
@@ -235,7 +184,7 @@ def export_package(
                     f"INSERT INTO {ENVIRONMENT_TABLE} VALUES (?, ?, ?)",  # noqa: S608  # nosec B608 - fixed name
                     (key, nonce, ciphertext),
                 )
-            _reseal(db, box, sealer)
+            _reseal_or_refuse(db, box, sealer)
             db.execute("COMMIT")
             db.execute("VACUUM")
         return copy.read_bytes()
@@ -270,7 +219,7 @@ def _open_package(
             table: int(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])  # noqa: S608  # nosec B608 - registry names
             for table in COUNTED_TABLES
         }
-        secrets = sum(len(db.execute(query).fetchall()) for *_, query in _SEALED)
+        secrets = sum(len(db.execute(query).fetchall()) for *_, query in SEALED)
         environment = tuple(
             str(r[0])
             for r in db.execute(f"SELECT key FROM {ENVIRONMENT_TABLE} ORDER BY key")  # noqa: S608  # nosec B608 - fixed name
@@ -370,7 +319,7 @@ def import_package(
         db.close()
         with closing(_connect(path)) as package:
             package.execute("BEGIN IMMEDIATE")
-            _reseal(package, opener, box)
+            _reseal_or_refuse(package, opener, box)
             package.execute("COMMIT")
         with closing(_connect(database)) as db:
             db.execute("PRAGMA foreign_keys = ON")

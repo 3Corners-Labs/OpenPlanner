@@ -24,6 +24,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DATABASE_URL` | string | `sqlite+aiosqlite:///data/booking.db` | The database the portal settings live in. |
 | `SETTINGS_ENCRYPTION_KEY` | secret | — | Seals every secret in the database (ADR 0008). |
 | `MANAGEMENT_TOKEN_KEY` | secret | — | Derives management tokens (ADR 0011); required in production. |
+| `SETTINGS_ENCRYPTION_KEY_PREVIOUS` | secret | — | The key before a rotation (at least 32 bytes); sealed values under it stay readable until `rekey` has run. Empty outside a rotation (ADR 0094). |
+| `MANAGEMENT_TOKEN_KEY_PREVIOUS` | secret | — | The token key before a rotation (at least 32 bytes); links of bookings made under it keep working. Empty outside a rotation (ADR 0094). |
 | `SESSION_SECRET` | secret | — | Signs admin sessions; required in production. |
 | `OIDC_DISCOVERY_URL` | url | — | IdP discovery document; without it the admin portal is disabled. |
 | `OIDC_CLIENT_ID` | string | `openplanner-admin` | OIDC client of the portal. |

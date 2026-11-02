@@ -314,6 +314,24 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Derives management tokens (ADR 0011); required in production.",
     ),
     S(
+        "settings_encryption_key_previous",
+        K.SECRET,
+        None,
+        _A,
+        T.BOOTSTRAP,
+        "The key before a rotation (at least 32 bytes); sealed values under it stay readable "
+        "until `rekey` has run. Empty outside a rotation (ADR 0094).",
+    ),
+    S(
+        "management_token_key_previous",
+        K.SECRET,
+        None,
+        _A,
+        T.BOOTSTRAP,
+        "The token key before a rotation (at least 32 bytes); links of bookings made under it "
+        "keep working. Empty outside a rotation (ADR 0094).",
+    ),
+    S(
         "session_secret",
         K.SECRET,
         None,
