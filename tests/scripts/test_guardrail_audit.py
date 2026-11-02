@@ -164,6 +164,18 @@ def test_a_section_that_cannot_be_read_is_reported(tmp_path: Path) -> None:
     assert "could not be read" in render(findings, TODAY)
 
 
+def test_a_value_the_token_cannot_see_is_unreadable_not_drift(tmp_path: Path) -> None:
+    """First audit run, 2026-11-02: the app saw ``allow_merge_commit`` as null."""
+    expected = baseline(tmp_path)
+    hidden_repo = {"visibility": "public", "allow_merge_commit": None}
+    hidden_rules = [{**RULESET, "bypass_actors": None}]
+
+    findings = audit(expected, live(tmp_path, repository=hidden_repo, rulesets=hidden_rules))
+
+    assert findings.drift == []
+    assert findings.unreadable == ["rulesets/main/bypass_actors", "repository/allow_merge_commit"]
+
+
 def test_only_the_expected_bypass_is_quiet() -> None:
     expected = [{"actor": RELEASE_BOT, "ref_prefix": "refs/tags/v"}]
     bypasses = [
