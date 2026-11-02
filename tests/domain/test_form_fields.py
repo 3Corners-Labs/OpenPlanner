@@ -11,6 +11,7 @@ from app.domain.form_fields import (
     FormDefinition,
     Purpose,
     check_label,
+    derive_key,
     format_options,
     labelled_answers,
     normalise_email,
@@ -423,3 +424,37 @@ def test_answers_are_shared_by_a_deep_copy() -> None:
 
     answers = _mixed_answers()
     assert copy.deepcopy(answers) is answers
+
+
+@pytest.mark.parametrize(
+    ("label", "taken", "expected"),
+    [
+        ("Klantnummer", (), "klantnummer"),
+        ("Waar gaat uw vraag over?", (), "waar_gaat_uw_vraag_over"),
+        ("Café  Zoë — nummer", (), "cafe_zoe_nummer"),
+        ("Klantnummer", ("klantnummer",), "klantnummer_2"),
+        ("Klantnummer", ("klantnummer", "klantnummer_2"), "klantnummer_3"),
+        ("E-mail", ("email",), "e_mail"),
+        ("Email", (), "email_2"),  # a system key is never reused
+        ("12345", (), "q_12345"),
+        ("???", (), "question"),
+    ],
+)
+def test_a_key_is_derived_from_the_question(
+    label: str, taken: tuple[str, ...], expected: str
+) -> None:
+    assert derive_key(label, taken) == expected
+
+
+def test_a_derived_key_is_always_valid_and_fits_the_limit() -> None:
+    key = derive_key("een heel lange vraag " * 5, ("een_heel_lange_vraag_een_heel_lange_vraag",))
+
+    FieldDefinition.create(
+        key=key,
+        type=FieldType.SHORT_TEXT,
+        labels={"nl": "Vraag", "en": "Question"},
+        hints={"nl": "", "en": ""},
+        required=False,
+        classification=Classification.PII,
+    )
+    assert len(key) <= 39

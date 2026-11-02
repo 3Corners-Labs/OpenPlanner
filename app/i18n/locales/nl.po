@@ -6489,7 +6489,7 @@ msgid "admin.form_fields.system"
 msgstr "Voornaam, achternaam en e-mailadres vraagt het formulier altijd; het telefoonnummer stelt u in bij de instellingen."
 
 msgid "admin.form_fields.none"
-msgstr "Dit team heeft nog geen eigen velden."
+msgstr "Dit team heeft nog geen eigen velden. Voorbeelden: een klantnummer (korte tekst) of het onderwerp van het gesprek (keuzelijst)."
 
 msgid "admin.form_fields.retired"
 msgstr "Uitgezet (alleen nog bij eerdere afspraken): {names}"
@@ -6498,16 +6498,16 @@ msgid "admin.form_fields.label"
 msgstr "Vraag"
 
 msgid "admin.form_fields.key"
-msgstr "Sleutel"
+msgstr "Technische naam"
 
 msgid "admin.form_fields.key_hint"
-msgstr "Kleine letters, cijfers en _, beginnend met een letter, bijvoorbeeld klantnummer. Ligt vast na opslaan."
+msgstr "Laat dit leeg: de naam wordt gemaakt uit de vraag. Alleen kleine letters, cijfers en _, beginnend met een letter. Ligt vast na opslaan."
 
 msgid "admin.form_fields.type"
 msgstr "Soort"
 
 msgid "admin.form_fields.type_hint"
-msgstr "Bepaalt de controle op het antwoord. Ligt vast na opslaan."
+msgstr "Wat de deelnemer invult: kort of lang tekstvak, e-mailadres, telefoonnummer, getal, datum, postcode, keuzelijst of aankruisvak. Bepaalt de controle op het antwoord. Ligt vast na opslaan."
 
 msgid "admin.form_fields.type.short_text"
 msgstr "Korte tekst (tot 100 tekens)"
