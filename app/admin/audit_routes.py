@@ -46,6 +46,12 @@ from app.domain.admin import (
     LOGIN_EVENT,
     LOGOUT_EVENT,
 )
+from app.domain.admin_session_service import (
+    SESSION_ENDED_EVENT,
+    SESSIONS_ENDED_ALL_EVENT,
+    SESSIONS_ENDED_BY_ADMIN_EVENT,
+    SESSIONS_ENDED_BY_SELF_EVENT,
+)
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
 from app.domain.audit import (
     SUBJECT_ACTIONS,
@@ -154,6 +160,12 @@ EVENT_LABELS: dict[str, str] = {
     # Staff directory (ADR 0046): first login, and roles or memberships changed at login.
     staff.CREATED_EVENT: "audit.event.staff_created",
     staff.CHANGED_EVENT: "audit.event.staff_changed",
+    # Admin sessions (ADR 0098): the system ended one, a person ended theirs, an administrator
+    # ended a person's, or all were ended at once.
+    SESSION_ENDED_EVENT: "audit.event.session_ended",
+    SESSIONS_ENDED_ALL_EVENT: "audit.event.sessions_ended_all",
+    SESSIONS_ENDED_BY_SELF_EVENT: "audit.event.sessions_ended_by_self",
+    SESSIONS_ENDED_BY_ADMIN_EVENT: "audit.event.sessions_ended_by_admin",
     # ADR 0038: maintenance on longer than the alert threshold (global).
     OVERDUE_EVENT: "audit.event.maintenance_overdue",
     # ADR 0065: "Koppeling controleren", by hand or by the worker (at the group).
@@ -293,6 +305,7 @@ COUNT_LABELS: dict[str, str] = {
     "changes": "admin.audit.detail.changes",
     "suppressed": "admin.audit.detail.suppressed",
     "modes": "admin.audit.detail.modes",
+    "sessions": "admin.audit.detail.sessions",
 }
 """Readable label per counted audit detail, e.g. ``bookings:3`` (ADR 0024)."""
 
@@ -309,6 +322,7 @@ VALUE_LABELS: dict[str, str] = {
     "client": "admin.audit.detail.client",
     "reason": "admin.audit.detail.reason",
     "actor": "admin.audit.detail.actor",
+    "subject": "admin.audit.detail.subject",
 }
 """Readable label per audit detail with a code or slug, e.g. ``role.add:org_admin`` (ADR 0046)."""
 

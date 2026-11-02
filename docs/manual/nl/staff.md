@@ -53,6 +53,21 @@ logins, afmeldingen en wijzigingen, binnen uw eigen organisaties of groepen.
   vanzelf verloopt (na 8 uur) telt niet als afmelding. Hetzelfde geldt voor een sessie die eindigt na te lang
   stilzitten (standaard 60 minuten) of omdat een nieuwere inlog haar vervangt.
 
+## Sessies van een medewerker beëindigen
+
+Op de pagina van een medewerker staat de knop **Alle sessies beëindigen**. Organisatiebeheerders
+en de superuser zien hem (permissie `staff.sessions.end`). Hij werkt voor elke medewerker die u
+in het overzicht ziet; voor iemand daarbuiten wordt hij geweigerd en staat de poging in het
+auditlog.
+
+Een sessie hoort bij de persoon, niet bij een organisatie. Beëindigt u alle sessies van iemand
+die voor twee organisaties werkt, dan eindigt dus ook wat die persoon voor de andere
+organisatie gebruikt. Dat is bedoeld: beëindigen beschermt en geeft niemand meer rechten. De
+medewerker moet opnieuw inloggen. Gebruik het bijvoorbeeld als iemand is uitgezet bij de
+identiteitsprovider: anders blijft de sessie werken tot ze stilvalt (standaard 60 minuten). Het
+auditlog heeft een gebeurtenis met u, de medewerker en het aantal sessies. Iedereen kan zijn
+eigen sessies zien en beëindigen op [Mijn sessies](my-sessions.md).
+
 ## Tweede factor (MFA)
 
 Medewerkers loggen in met een tweede factor naast het wachtwoord: een code uit een

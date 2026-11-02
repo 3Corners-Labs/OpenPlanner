@@ -46,6 +46,16 @@
     <div><dt>{{ _("admin.staff.last_logout") }}</dt><dd>{{ person.last_logout }}</dd></div>
   </dl>
 </section>
+{% if can("staff.sessions.end") %}
+<section class="card" aria-labelledby="sessions-heading">
+  <h2 id="sessions-heading">{{ _("admin.staff.sessions.heading") }}</h2>
+  {% if request.query_params.get("done") == "sessions_ended_person" %}<div class="alert alert--success" role="status"><p>{{ _("admin.done.sessions_ended_person", count=request.query_params.get("count", "0")|int) }}</p></div>{% endif %}
+  <form method="post" action="/admin/staff/{{ person.id }}/sessions/end">
+    <p class="muted" id="sessions-end-help">{{ _("admin.staff.sessions.intro") }}</p>
+    <button type="submit" class="button button--secondary" aria-describedby="sessions-end-help">{{ _("admin.staff.sessions.end_all") }}</button>
+  </form>
+</section>
+{% endif %}
 <h2 id="activity-heading">{{ _("admin.staff.activity") }}</h2>
 <p class="muted">{{ _("admin.staff.activity_intro", count=activity_limit) }}</p>
 {% if events %}

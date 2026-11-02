@@ -115,6 +115,8 @@ class Permission(StrEnum):
     RETENTION_VIEW = "retention.view"
     ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
+    STAFF_SESSIONS_END = "staff.sessions.end"
+    """ADR 0098 point 9b: end all admin sessions of a person shown in the staff overview."""
     EMBEDDING_MANAGE = "embedding.manage"
     QUEUE_WORK = "queue.work"
     SETTINGS_PLATFORM_VIEW = "settings.platform.view"
@@ -173,6 +175,8 @@ LEVELS: dict[Permission, Level] = {
     Permission.ROLES_MANAGE: Level.GLOBAL,
     # ADR 0046: who uses the portal; group level so a group admin sees their own team.
     Permission.STAFF_VIEW: Level.GROUP,
+    # ADR 0098 point 9b: ending a person's sessions is decided at the organisation.
+    Permission.STAFF_SESSIONS_END: Level.ORGANISATION,
     # ADR 0035: on which websites the organisation's groups may be embedded.
     Permission.EMBEDDING_MANAGE: Level.ORGANISATION,
     # ADR 0043: see and claim the bookings in a group's own queue.
@@ -262,6 +266,8 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
     Permission.ORGANISATION_CLOSURE: frozenset({Permission.CLOSURE_MANAGE}),
     # ADR 0049: changing a group's IdP value presumes seeing the mapping.
     Permission.IDP_MAPPING_MANAGE: frozenset({Permission.IDP_MAPPING_VIEW}),
+    # ADR 0098: ending a person's sessions presumes seeing the person in the staff overview.
+    Permission.STAFF_SESSIONS_END: frozenset({Permission.STAFF_VIEW}),
 }
 """ADR 0039: permissions a permission depends on; a custom role must hold them too."""
 
@@ -303,6 +309,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.RETENTION_VIEW,
         # ADR 0046: the staff of the own organisations.
         Permission.STAFF_VIEW,
+        # ADR 0098 point 9b: end all sessions of a person in the staff overview.
+        Permission.STAFF_SESSIONS_END,
         # ADR 0035: the host websites allowed to embed the organisation's groups.
         Permission.EMBEDDING_MANAGE,
         # ADR 0043: can step in as an agent in the own queue.

@@ -113,6 +113,8 @@ DONE_MESSAGES: dict[str, str] = {
     "request_cancelled": "admin.done.request_cancelled",
     "texts_saved": "admin.done.texts_saved",
     "test_sent": "admin.done.test_sent",
+    "sessions_ended_others": "admin.done.sessions_ended_others",
+    "sessions_ended_person": "admin.done.sessions_ended_person",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
