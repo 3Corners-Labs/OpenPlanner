@@ -17,7 +17,7 @@ from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
 from tests.support.domain import NOW
-from tests.support.participant import confirm_newest, emailed_token
+from tests.support.participant import confirm_newest, emailed_token, open_link
 
 FRIDAY_0900 = "2026-01-02T08:00:00Z"
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
@@ -131,7 +131,7 @@ async def test_a_refusal_by_webex_is_shown_kindly_and_leaves_the_appointment_alo
     site.video.error = IntegrationError("rejected_400", retryable=False, reason="not allowed")
 
     response = await site.open()
-    manage = await site.client.get(f"/b/{site.token}")
+    manage = await site.client.get(await open_link(site.client, site.token))
 
     assert response.status_code == 503
     assert "Het proefgesprek openen lukt nu niet." in response.text
@@ -156,7 +156,7 @@ async def test_a_group_without_the_switch_offers_no_trial_call(
     ) as client:
         site = await Site(client, FixedClock(NOW), video).booked()
         page = await client.get(f"/b/{site.token}/test")
-        manage = await client.get(f"/b/{site.token}")
+        manage = await client.get(await open_link(client, site.token))
         await site.open()
 
     assert "Voor deze afspraak is geen proefgesprek beschikbaar." in page.text
@@ -165,10 +165,11 @@ async def test_a_group_without_the_switch_offers_no_trial_call(
 
 
 async def test_the_booking_and_join_pages_link_to_the_trial_call(site: Site) -> None:
-    manage = await site.client.get(f"/b/{site.token}")
+    base = await open_link(site.client, site.token)
+    manage = await site.client.get(base)
     early = await site.client.get(f"/b/{site.token}/join")  # long before the appointment
 
-    assert f'href="/b/{site.token}/test"' in manage.text
+    assert f'href="{base}/test"' in manage.text
     assert "Uw verbinding vooraf uitproberen" in manage.text
     assert f'href="/b/{site.token}/test"' in early.text
     assert "Liever eerst uw verbinding uitproberen?" in early.text

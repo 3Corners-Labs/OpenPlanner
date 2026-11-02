@@ -403,6 +403,9 @@ msgstr "Page not found"
 msgid "error.not_found.text"
 msgstr "This link is not correct or no longer valid."
 
+msgid "error.link_required"
+msgstr "Open the link from your email again to see or change your appointment."
+
 msgid "manage.title"
 msgstr "Your appointment"
 
@@ -6097,6 +6100,9 @@ msgstr "Planner"
 msgid "settings.topic.confirmation"
 msgstr "Confirming appointments"
 
+msgid "settings.topic.participant_link"
+msgstr "Participant link"
+
 msgid "settings.field.log_level.label"
 msgstr "Log level"
 
@@ -6318,6 +6324,9 @@ msgstr "Rebook reminder (days before the lapse)"
 
 msgid "settings.field.booking_confirm_min_minutes.label"
 msgstr "Minimum time to confirm (minutes)"
+
+msgid "settings.field.participant_link_session_hours.label"
+msgstr "How long a participant link stays valid in the browser (hours)"
 
 msgid "settings.field.booking_confirm_reminders.label"
 msgstr "Number of reminders to confirm"
