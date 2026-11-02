@@ -12,7 +12,14 @@ from typing import Protocol
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import BookingRow, ClosureRow, GroupRow, JobRow, SlotRow
+from app.adapters.db.models import (
+    BookingDayCountRow,
+    BookingRow,
+    ClosureRow,
+    GroupRow,
+    JobRow,
+    SlotRow,
+)
 from app.domain.authorization import Scope
 from app.domain.booking import BookingStatus
 from app.domain.job_plan import JobType
@@ -69,6 +76,15 @@ class RetentionQueries:
             .group_by(BookingRow.group_id)
         )
         per_group = {group_id: (int(held or 0), last) for group_id, held, last in counts}
+        # Rows merged into daily counts (ADR 0102 step 4) still count as the last removal.
+        merged = await self._session.execute(
+            select(BookingDayCountRow.group_id, func.max(BookingDayCountRow.last_purged_at))
+            .where(BookingDayCountRow.group_id.in_(ids))
+            .group_by(BookingDayCountRow.group_id)
+        )
+        for group_id, last_merged in merged:
+            held, last = per_group.get(group_id, (0, None))
+            per_group[group_id] = (held, max(filter(None, (last, last_merged))))
         failed = await self._session.execute(
             select(BookingRow.group_id, func.count(JobRow.id))
             .join(BookingRow, BookingRow.id == JobRow.booking_id)
