@@ -4,15 +4,29 @@ import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import AuditEventRow, PlatformSettingRow, SettingsVersionRow
+from app.adapters.crypto import SecretBox
+from app.adapters.db.credentials import CredentialStore
+from app.adapters.db.engine import create_engine
+from app.adapters.db.models import (
+    AuditEventRow,
+    BookingRow,
+    GroupRow,
+    PlatformSettingRow,
+    SettingsVersionRow,
+    SlotRow,
+)
+from app.adapters.integrations import installation_box
 from app.admin.settings_routes import _FIELD_LABELS
+from app.config import Settings
 from app.domain.authorization import Principal
 from app.domain.privacy import PII_FIELDS
+from app.domain.tokens import derive_token, hash_token
 from app.web.protection import booking_limit, unknown_link_limit
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
 from tests.support.principals import principal
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
@@ -651,3 +665,105 @@ async def test_advanced_settings_shows_its_sub_tabs_and_a_table_of_contents(site
     assert "Op deze pagina" in values
     for topic in re.findall(r'<h2 id="(topic-[a-z_]+)">', values):
         assert f'href="#{topic}"' in values, topic
+
+
+# --- Key rotation counters on System status (ADR 0094 points 3 and 4) ---
+
+OLD_SETTINGS_KEY = "o" * 40
+NEW_SETTINGS_KEY = "n" * 40
+
+
+async def test_without_a_previous_key_system_status_has_no_rotation_block(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    text = (await site.client.get("/admin/settings")).text
+
+    assert 'id="keys-heading"' not in text
+
+
+async def test_system_status_counts_what_is_still_under_the_previous_key(
+    settings: Settings, admin_db: str
+) -> None:
+    engine = create_engine(admin_db)
+    await CredentialStore(engine, SecretBox(OLD_SETTINGS_KEY.encode())).put(
+        "webex_service_app", {"access_token": "secret-value"}, NOW
+    )
+    await engine.dispose()
+    rotating = settings.model_copy(
+        update={
+            "settings_encryption_key": SecretStr(NEW_SETTINGS_KEY),
+            "settings_encryption_key_previous": SecretStr(OLD_SETTINGS_KEY),
+        }
+    )
+
+    async with _running_site(rotating, admin_db) as running:
+        await running.login_as(SUPER)
+        text = (await running.client.get("/admin/settings")).text
+
+        assert 'id="keys-heading"' in text
+        assert "<dt>Versleutelde geheimen onder de vorige sleutel</dt><dd>1</dd>" in text
+        assert "python -m app.cli rekey" in text
+        assert "PREVIOUS kan worden verwijderd" not in text
+        assert "secret-value" not in text
+        assert OLD_SETTINGS_KEY not in text
+        assert NEW_SETTINGS_KEY not in text
+
+        app = running.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        await CredentialStore(app.state.engine, installation_box(rotating)).put(
+            "webex_service_app", {"access_token": "secret-value"}, NOW
+        )
+        text = (await running.client.get("/admin/settings")).text
+
+        assert "<dt>Versleutelde geheimen onder de vorige sleutel</dt><dd>0</dd>" in text
+        assert "SETTINGS_ENCRYPTION_KEY_PREVIOUS kan worden verwijderd" in text
+
+
+async def test_system_status_counts_open_bookings_on_the_previous_token_key(
+    settings: Settings, admin_db: str
+) -> None:
+    previous = "p" * 40
+    current = "c" * 40
+    rotating = settings.model_copy(
+        update={
+            "management_token_key": SecretStr(current),
+            "management_token_key_previous": SecretStr(previous),
+        }
+    )
+
+    async with _running_site(rotating, admin_db) as running:
+        app = running.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        async with AsyncSession(app.state.engine) as session:
+            group = (await session.scalars(select(GroupRow.id).limit(1))).one()
+        # A separate write transaction: a read that turns into a write can be refused as busy.
+        async with AsyncSession(app.state.engine) as session, session.begin():
+            slot = SlotRow(
+                group_id=group,
+                start=NOW + timedelta(days=1),
+                end=NOW + timedelta(days=1, hours=1),
+                capacity_snapshot=1,
+            )
+            session.add(slot)
+            await session.flush()
+            for status, salt, key in (
+                ("confirmed", "one", previous),
+                ("confirmed", "two", current),
+                ("cancelled", "three", previous),
+            ):
+                session.add(
+                    BookingRow(
+                        slot_id=slot.id,
+                        group_id=group,
+                        status=status,
+                        locale="nl",
+                        management_token_hash=hash_token(derive_token(key.encode(), salt)),
+                        management_token_salt=salt,
+                        created_at=NOW,
+                    )
+                )
+        await running.login_as(SUPER)
+
+        text = (await running.client.get("/admin/settings")).text
+
+        assert "Lopende boekingen met een koppeling onder de vorige sleutel</dt><dd>1</dd>" in text
+        assert "MANAGEMENT_TOKEN_KEY_PREVIOUS pas als dit aantal 0 is" in text
+        assert "Versleutelde geheimen onder de vorige sleutel" not in text

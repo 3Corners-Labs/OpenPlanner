@@ -1664,8 +1664,9 @@ again asks the login questions as before.
 
 ## Rotating secrets
 
-Bootstrap secrets come from environment variables, `X_FILE` or `secrets/secrets.env`
-(`app.cli init`); none are baked into the image. To rotate one, replace the value in that file
+Which key protects what, who can read it and how it is destroyed is in
+[`docs/cryptography.md`](cryptography.md). Bootstrap secrets come from environment variables,
+`X_FILE` or `secrets/secrets.env` (`app.cli init`); none are baked into the image. To rotate one, replace the value in that file
 or the secret store and restart `web` and `worker`; `init` never overwrites the file, so edit
 it or move it away first.
 
@@ -1684,6 +1685,8 @@ again. Each sealed value carries the id of the key that sealed it. In this order
    under no configured key, nothing was changed: the previous key is missing or wrong.
 5. Remove `SETTINGS_ENCRYPTION_KEY_PREVIOUS` and restart `web` and `worker`. Do not do this
    before step 4 has reported success: a secret still under the old key becomes unreadable.
+   System status (Advanced settings) shows under *Key rotation* how many encrypted secrets are
+   still under the previous key, and says when the count is 0 and the key may go.
 
 A configuration package (ADR 0089) can be exported and imported during a rotation: the
 installation opens its secrets under either key.
@@ -1699,6 +1702,8 @@ installation opens its secrets under either key.
 3. Wait until the bookings made before the rotation are over (the longest booking horizon plus
    the purge period), then remove `MANAGEMENT_TOKEN_KEY_PREVIOUS` and restart. There is
    nothing to run: links are derived when a message is built, so there is nothing to re-seal.
+   System status shows under *Key rotation* how many open bookings still have a link under the
+   previous key; at 0 the key may go.
 
 Both previous keys are bootstrap secrets (class A): environment or `X_FILE` only, never the
 database, and empty outside a rotation.
