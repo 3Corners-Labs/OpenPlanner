@@ -31,19 +31,27 @@ function zoneAwayFromMidnight(): string {
 }
 
 async function addAllDayHours(page: Page): Promise<void> {
-  for (const day of WEEKDAYS) {
+  for (const [added, day] of WEEKDAYS.entries()) {
     await page.getByLabel('Dag', { exact: true }).selectOption({ label: day });
     await page.getByLabel('Van uu:mm', { exact: true }).fill('00:00');
     await page.getByLabel('Tot uu:mm', { exact: true }).fill('23:55');
     await page.getByLabel('Aantal medewerkers').fill('1');
     await page.getByLabel('Aanbod', { exact: true }).selectOption({ label: 'Afspraken en direct gesprek' });
     await page.getByRole('button', { name: 'Tijdblok toevoegen' }).press('Enter');
+    // Every add reloads the page and shows the same "Toegevoegd." again. Wait for the new row
+    // first: that is the one signal the reloaded page has, whereas the previous page's banner
+    // already matches the text and would let the next add start on the page that is leaving
+    // (WebKit commits the form navigation later than the other browsers).
+    await expect(page.locator('.window__offer')).toHaveCount(added + 1);
     await expect(page.getByRole('status')).toHaveText('Toegevoegd.');
   }
 }
 
 test('a participant starts a call right away and the admin sees it', async ({ page, browser }, testInfo) => {
-  const slug = `e2e-direct-${testInfo.project.name}-${Date.now().toString(36)}`;
+  // A long journey: Keycloak login, seven staffing round trips, two browser contexts and axe on
+  // each page. It takes about 17 s alone, so the default 30 s leaves no room on a busy runner.
+  test.slow();
+  const slug = `e2e-direct-${testInfo.project.name}-${testInfo.repeatEachIndex}-${Date.now().toString(36)}`;
   const tabs = page.getByRole('navigation', { name: 'Onderdelen van de groep' });
 
   // Admin: group open around the clock (but 23:55–00:00), every block offers direct calls.
