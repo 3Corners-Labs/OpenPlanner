@@ -61,8 +61,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
-from app.adapters.crypto import SecretBox
-from app.adapters.db.rotation import open_booking_credentials, records_not_current
+from app.adapters.db.rotation import rotation_status
 from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
 from app.admin.address_view import address_view
@@ -82,7 +81,7 @@ from app.domain.configuration_package import (
 )
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.key_rotation import RotationStatus, bookings_on_previous_key
+from app.domain.key_rotation import RotationStatus
 from app.domain.log_destination_service import LogDestinationService
 from app.domain.log_destinations import State
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
@@ -105,12 +104,6 @@ from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
 from app.domain.tls import Finding
 from app.domain.tls_check import CertificateStatus
 from app.domain.tls_source import CertificateSourceService
-from app.keys import (
-    management_token_key,
-    management_token_key_previous,
-    settings_encryption_key,
-    settings_encryption_key_previous,
-)
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
 from app.web.settings_labels import (
@@ -672,25 +665,10 @@ async def _overview(
 
 
 async def _rotation(request: Request) -> RotationStatus:
-    """Return the key-rotation counters of ADR 0094: numbers only, and only for a set previous key.
-
-    The sealed records are read from the tables; the open bookings are checked by deriving their
-    token under the current key again, because no key id is stored with a booking (a column
-    would need a migration for what an HMAC per open booking answers).
-    """
-    settings: Settings = request.app.state.settings
-    engine = request.app.state.engine
-    records = bookings = None
-    if (previous := settings_encryption_key_previous(settings)) is not None:
-        records = await records_not_current(
-            engine, SecretBox(settings_encryption_key(settings), [previous])
-        )
-    if (previous_token := management_token_key_previous(settings)) is not None:
-        credentials = await open_booking_credentials(engine, request.app.state.clock.now())
-        bookings = bookings_on_previous_key(
-            credentials, management_token_key(settings), previous_token
-        )
-    return RotationStatus(records, bookings)
+    """Return the key-rotation counters of ADR 0094 (numbers only; see ``rotation_status``)."""
+    return await rotation_status(
+        request.app.state.engine, request.app.state.settings, request.app.state.clock.now()
+    )
 
 
 @dataclass(frozen=True)

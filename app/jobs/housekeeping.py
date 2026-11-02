@@ -20,6 +20,7 @@ event may fail, and monitoring must still see the problem. Housekeeping never st
 every failure is logged with its type only.
 """
 
+import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -323,8 +324,9 @@ class Housekeeping:
             logged_reason, logged_at = self._logged
             if logged_reason == reason and now - logged_at < REMIND_EVERY:
                 return
-        emit = log.error if grade is StorageGrade.CRITICAL else log.warning
-        emit(
+        level = logging.ERROR if grade is StorageGrade.CRITICAL else logging.WARNING
+        log.log(
+            level,
             "storage.degraded",
             grade=grade.value,
             reason=reason,

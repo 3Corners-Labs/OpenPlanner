@@ -22,13 +22,13 @@ from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, organisation_header, organisation_redirect
 from app.admin.pages import page as _page
-from app.admin.settings_routes import SettingRow, _input, _value
+from app.admin.settings_routes import SettingRow, TopicSection, _input, _value
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
-from app.domain.settings_registry import BY_KEY, Kind
+from app.domain.settings_registry import BY_KEY, Kind, Topic
 from app.domain.settings_service import SettingsService
 from app.web.locale import RequestLocale
-from app.web.settings_labels import SETTING_LABELS, SOURCE_LABELS
+from app.web.settings_labels import SETTING_LABELS, SOURCE_LABELS, TOPIC_LABELS
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -146,24 +146,30 @@ async def _overview(
     errors: dict[str, str] = {}
     if refusal is not None:
         errors[refusal[0]] = _(CODE_MESSAGES.get(refusal[1].code, "error.invalid_request"))
-    rows = [
-        SettingRow(
-            _(SETTING_LABELS[state.spec.key]),
-            state.spec.env,
-            _value(state, locale),
-            _(SOURCE_LABELS[state.source]),
-            False,
-            False,
-            state.portal_ignored,
-            key=state.spec.key,
-            editable=True,
-            input=_input(state),
-            choices=state.spec.choices,
-            from_portal=state.source.value == "organisation",
-            error=errors.get(state.spec.key),
-            boolean=state.spec.kind is Kind.BOOL,
+    by_topic: dict[Topic, list[SettingRow]] = {}
+    for state in live.organisation_states(organisation.id):
+        by_topic.setdefault(state.spec.topic, []).append(
+            SettingRow(
+                _(SETTING_LABELS[state.spec.key]),
+                state.spec.env,
+                _value(state, locale),
+                _(SOURCE_LABELS[state.source]),
+                False,
+                False,
+                state.portal_ignored,
+                key=state.spec.key,
+                editable=True,
+                input=_input(state),
+                choices=state.spec.choices,
+                from_portal=state.source.value == "organisation",
+                error=errors.get(state.spec.key),
+                boolean=state.spec.kind is Kind.BOOL,
+            )
         )
-        for state in live.organisation_states(organisation.id)
+    sections = [
+        TopicSection(topic.value, _(TOPIC_LABELS[topic]), by_topic[topic])
+        for topic in Topic
+        if topic in by_topic
     ]
     response = _page(
         request,
@@ -175,7 +181,7 @@ async def _overview(
             "org_header": organisation_header(
                 request, locale, context.principal, organisation.name, organisation.slug
             ),
-            "rows": rows,
+            "sections": sections,
             "done": done_message(request, locale.gettext),
             "unknown_error": next((m for k, m in errors.items() if k not in BY_KEY), None),
         },

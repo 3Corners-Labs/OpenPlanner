@@ -1,5 +1,6 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_setting_form.html" import setting_row, setting_head with context %}
+{% from "admin/_page_toc.html" import page_toc with context %}
 {% block title %}{{ _("admin.org_settings.page_title", name=organisation.name) }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_organisation_header.html" %}
@@ -7,14 +8,22 @@
 <p>{{ _("admin.org_settings.page_lead") }}</p>
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% if unknown_error %}<div class="alert alert--error" role="alert"><p>{{ unknown_error }}</p></div>{% endif %}
+{% set topics = [] %}
+{% for section in sections %}{% set added = topics.append(("#topic-" ~ section.key, section.heading)) %}{% endfor %}
+{{ page_toc(topics) }}
 <form method="post" action="/admin/organisations/{{ organisation.slug }}/settings" novalidate class="card settings-group" aria-labelledby="settings-heading">
   <h2 id="settings-heading">{{ _("admin.org_settings.settings") }}</h2>
-  <div class="settings-list">
-    {{ setting_head() }}
-    {% for row in rows %}
-    {{ setting_row(row, "/admin/organisations/" ~ organisation.slug ~ "/settings/" ~ row.key, _("admin.org_settings.reset")) }}
-    {% endfor %}
-  </div>
+  {% for section in sections %}
+  <section class="settings-topic" id="topic-{{ section.key }}" aria-labelledby="topic-{{ section.key }}-heading">
+    <h3 id="topic-{{ section.key }}-heading">{{ section.heading }}</h3>
+    <div class="settings-list">
+      {{ setting_head() }}
+      {% for row in section.rows %}
+      {{ setting_row(row, "/admin/organisations/" ~ organisation.slug ~ "/settings/" ~ row.key, _("admin.org_settings.reset")) }}
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
   <div class="form-actions">
     <button type="submit" class="button">{{ _("admin.settings.save") }}</button>
   </div>

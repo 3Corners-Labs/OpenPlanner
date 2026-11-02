@@ -8,6 +8,9 @@ Without a value of its own, an organisation follows the platform value, which th
 sets on **Advanced settings**. The **Source** column says which one applies:
 **Organisation** or the platform's (default, admin portal or environment).
 
+The settings are grouped by topic (display, staff, planner, confirmation and so on). *On this
+page* at the top jumps to a topic; one *Save* button saves all topics together.
+
 ## The settings
 
 - **Time format**: how clock times are written: 24 hours (`15:05`), 12 hours (`3:05 PM`) or as

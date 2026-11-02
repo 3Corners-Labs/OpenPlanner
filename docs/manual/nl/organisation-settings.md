@@ -9,6 +9,10 @@ Zonder eigen waarde volgt een organisatie de waarde van het platform, die de sup
 op **Geavanceerde instellingen**. De kolom **Bron** laat zien welke geldt: **Organisatie** of
 die van het platform (standaardwaarde, beheerportaal of omgeving).
 
+De instellingen staan per onderwerp bij elkaar (weergave, medewerkers, planner, bevestiging en
+zo verder). Bovenaan staat *Op deze pagina* om naar een onderwerp te springen; één knop *Opslaan*
+bewaart alle onderwerpen samen.
+
 ## De instellingen
 
 - **Tijdnotatie**: hoe kloktijden worden geschreven: 24 uur (`15:05`), 12 uur (`3:05 PM`) of

@@ -15,8 +15,15 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.crypto import SecretBox
 from app.adapters.db.models import BookingRow, SlotRow
 from app.adapters.db.sealed import SEALED
+from app.config import Settings
 from app.domain.booking import HOLDS_PLACE
-from app.domain.key_rotation import BookingCredential
+from app.domain.key_rotation import BookingCredential, RotationStatus, bookings_on_previous_key
+from app.keys import (
+    management_token_key,
+    management_token_key_previous,
+    settings_encryption_key,
+    settings_encryption_key_previous,
+)
 
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 
@@ -44,3 +51,24 @@ async def open_booking_credentials(engine: AsyncEngine, now: datetime) -> list[B
             .where(BookingRow.status.in_(_HOLDS_PLACE), SlotRow.end > now)
         )
         return [BookingCredential(salt, token_hash) for salt, token_hash in rows]
+
+
+async def rotation_status(engine: AsyncEngine, settings: Settings, now: datetime) -> RotationStatus:
+    """Return the key-rotation counters of ADR 0094: numbers only, and only for a set previous key.
+
+    The sealed records are read from the tables; the open bookings are checked by deriving their
+    token under the current key again, because no key id is stored with a booking (a column
+    would need a migration for what an HMAC per open booking answers). System status and the
+    evidence report both read it here.
+    """
+    records = bookings = None
+    if (previous := settings_encryption_key_previous(settings)) is not None:
+        records = await records_not_current(
+            engine, SecretBox(settings_encryption_key(settings), [previous])
+        )
+    if (previous_token := management_token_key_previous(settings)) is not None:
+        credentials = await open_booking_credentials(engine, now)
+        bookings = bookings_on_previous_key(
+            credentials, management_token_key(settings), previous_token
+        )
+    return RotationStatus(records, bookings)
