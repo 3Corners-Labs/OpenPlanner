@@ -69,6 +69,19 @@ async def test_the_settings_card_summarises_the_booking_form(site: Site) -> None
     assert f'href="{PAGE}"' in after
 
 
+async def test_the_group_settings_list_their_topics_by_right(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    org_admin = (await site.client.get("/admin/groups/demo/settings")).text
+    await site.login_as(GROUP_ADMIN)
+    group_admin = (await site.client.get("/admin/groups/demo/settings")).text
+
+    for anchor in ("general", "integrations", "idp-key", "booking-form", "check"):
+        assert f'href="#{anchor}"' in org_admin  # "On this page" names every topic
+        assert f'id="{anchor}"' in org_admin  # and each link has its target
+    assert 'href="#archive"' in org_admin
+    assert 'href="#archive"' not in group_admin  # archiving needs group.delete
+
+
 async def test_fields_are_added_listed_and_audited_by_key(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
