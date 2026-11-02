@@ -1298,6 +1298,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=30,
     ),
     S(
+        "idp_domain_recheck_hours",
+        K.INT,
+        24,
+        _C,
+        T.LOGIN_MAPPING,
+        "Hours between the worker's re-checks of the TXT record of each routing login domain "
+        "(ADR 0083 point 12).",
+        minimum=1,
+        maximum=168,
+    ),
+    S(
         "smtp_host",
         K.STRING,
         None,

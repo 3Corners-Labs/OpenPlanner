@@ -9566,3 +9566,6 @@ msgstr "This identity provider has reached the maximum of 20 domains."
 
 msgid "admin.form.error.idp_domain_not_found"
 msgstr "This domain does not (or no longer) belong to this identity provider."
+
+msgid "settings.field.idp_domain_recheck_hours.label"
+msgstr "Re-check of login domains (hours)"

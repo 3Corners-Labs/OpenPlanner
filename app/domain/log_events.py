@@ -846,6 +846,15 @@ _OPERATIONS = (
         "The proxy falls back to its default certificate.",
     ),
     _e(
+        "idp.domain_watch_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The re-check of the login domains did not run: {error}.",
+        "The worker could not run the scheduled TXT check of the login domains (ADR 0083).",
+        _CHECK_HOST,
+    ),
+    _e(
         "tls.watch_failed",
         _OPS,
         "warning",
@@ -1344,6 +1353,16 @@ _AUDIT = (
         "",
         "An identity provider was switched on.",
         "Its users can sign in.",
+    ),
+    _e(
+        "idp.domain_check",
+        _SYS,
+        "outcome",
+        "",
+        "Re-check of a login domain: {reason}.",
+        "The worker looked up the TXT record of a routing domain and its state changed: failing "
+        "(still routes), lapsed (stops routing) or verified again (ADR 0083 point 12).",
+        "Ask the organisation to restore the TXT record shown on the provider's page.",
     ),
     _e(
         "idp.domain_claimed",

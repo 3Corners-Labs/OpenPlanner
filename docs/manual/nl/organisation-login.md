@@ -96,7 +96,7 @@ volgende versie); een domein dekt ook zijn subdomeinen.
 Een domein hoort bij één provider op de hele installatie. Het achtervoegsel van de ingebouwde
 identiteitsprovider (standaard `openplanner.internal`, en alles daaronder) is gereserveerd
 voor het platform en kan niet worden geclaimd. Verdwijnt het record later, dan staat het
-domein op **Record verdwenen, routeert nog**; na de ingestelde tolerantie (standaard 7 dagen,
+domein op **Record verdwenen, routeert nog** (de worker controleert elk geverifieerd domein elke 24 uur, *Herhaalcontrole logindomeinen*, en meldt een verandering als systeemgebeurtenis); na de ingestelde tolerantie (standaard 7 dagen,
 *Tolerantie verdwenen domeinrecord*) wordt het **Vervallen** en gaan logins weer naar de
 platformprovider. **Verwijderen** geeft het domein direct vrij.
 
