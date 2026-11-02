@@ -5,11 +5,11 @@
 audit log still resolves to "erased person"). ``status_at`` is when the status last changed.
 Existing rows are active.
 
-Revises 0083 (participant link sessions, ADR 0093). Open PRs also claim numbers, so recheck
-the head before merging.
+Revises 0084 (public address checks, ADR 0086). Open PRs also claim numbers, so recheck the
+head before merging.
 
 Revision ID: 0085
-Revises: 0083
+Revises: 0084
 Create Date: 2026-11-02 10:00:00.000000
 """
 
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0085"
-down_revision: str | None = "0083"
+down_revision: str | None = "0084"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
