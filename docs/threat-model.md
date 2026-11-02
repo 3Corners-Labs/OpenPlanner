@@ -368,6 +368,28 @@ Admin: `GET /admin/branding`, `GET/POST /admin/organisations/{org}/branding`,
 | Denial of service | Huge font or theme uploads | Font 250 kB, theme file 8 kB; `Content-Length` far above the limit refused unread (413) | `test_disguised_and_oversized_fonts_are_refused`, `tests/domain/test_theme.py::test_empty_oversized_or_non_utf8_files_are_refused_as_a_whole` |
 | Information disclosure (accessibility) | Chosen colours make text, borders or focus unreadable | Contrast rules across all colour tokens on save (4.5:1 text, 3:1 borders and focus); spacing, target size and focus colours not editable; `prefers-contrast: more` restores the defaults | `tests/domain/test_theme.py::test_contrast_rules_blame_the_changed_colour`, `tests/admin/test_branding_routes.py::test_colours_without_contrast_are_refused_and_linked`, `tests/api/test_brand_assets.py::test_theme_colours_give_way_to_prefers_contrast_more` |
 
+### Uploads without a virus scan (ASVS V5.4.3, ADR 0092)
+
+**Recorded deviation.** OpenPlanner does not scan uploads for malware: there is no ClamAV, no ICAP
+service and no `FileScanner` port. The decision and its reasons are in ADR 0092 (a scanner would add
+a container, a daily signature download from the internet, a dependency and a failure mode on every
+upload, and adds little for the closed list below). It is a limitation we accept, not an oversight, and
+a client who requires a scan gets one behind a port by a new ADR.
+
+The compensating controls, each with a test:
+
+| Control | Where | Test |
+|---|---|---|
+| Only a closed list of types is accepted, recognised by structure (magic bytes, WOFF2 header and table directory), never by file name or client type; no format with active content (SVG, HTML, PDF, office files, archives) | `app/domain/images.py`, `app/domain/branding.py` | `tests/domain/test_images.py`, `tests/domain/test_branding.py`, `tests/fakes/woff2.py` (malformed fonts) |
+| Sizes are bounded: per file, per request body before it is read, and the unpacked size of a font (`max_font_unpacked_bytes`) | `app/admin/branding_routes.py`, `app/domain/settings_registry.py` | `tests/admin/test_branding_routes.py` |
+| Only an authenticated administrator with the matching permission uploads; every upload is audited and needs a recent login | `app/admin/authz.py`, the authorisation matrix | `tests/admin/test_authorization_matrix.py` |
+| Served with the exact media type, `nosniff` and a CSP of `default-src 'none'`; metadata is stripped from images | `app/api/brand_assets.py`, `app/api/security_headers.py` | `tests/api/test_brand_assets.py`, `tests/api/test_health.py` |
+| The name of a download comes from the server, in a fixed pattern; an uploaded file name is never used | the five modules pinned in the test | `tests/admin/test_download_headers.py` |
+
+Residual risk: a font that passes the structural check can still hit a memory-safety bug in a browser's
+font parser. Browsers sanitise fonts before use, only an administrator can upload, and the font reaches
+participants only as `font/woff2` from our own origin.
+
 ## Flow: organisation management
 
 Admin: `GET /admin/organisations` (a list, or a redirect to the one organisation in reach),
