@@ -115,6 +115,10 @@ class Permission(StrEnum):
     RETENTION_VIEW = "retention.view"
     ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
+    STAFF_MANAGE = "staff.manage"
+    """ADR 0095: create, change and disable staff in the platform's own identity provider."""
+    STAFF_RESET_PASSWORD = "staff.reset_password"  # noqa: S105  # nosec B105 - a permission name
+    """ADR 0095: mail a staff member a password reset or invitation link."""
     EMBEDDING_MANAGE = "embedding.manage"
     QUEUE_WORK = "queue.work"
     SETTINGS_PLATFORM_VIEW = "settings.platform.view"
@@ -173,6 +177,9 @@ LEVELS: dict[Permission, Level] = {
     Permission.ROLES_MANAGE: Level.GLOBAL,
     # ADR 0046: who uses the portal; group level so a group admin sees their own team.
     Permission.STAFF_VIEW: Level.GROUP,
+    # ADR 0095: staff of the bundled identity provider, per organisation.
+    Permission.STAFF_MANAGE: Level.ORGANISATION,
+    Permission.STAFF_RESET_PASSWORD: Level.ORGANISATION,
     # ADR 0035: on which websites the organisation's groups may be embedded.
     Permission.EMBEDDING_MANAGE: Level.ORGANISATION,
     # ADR 0043: see and claim the bookings in a group's own queue.
@@ -262,6 +269,9 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
     Permission.ORGANISATION_CLOSURE: frozenset({Permission.CLOSURE_MANAGE}),
     # ADR 0049: changing a group's IdP value presumes seeing the mapping.
     Permission.IDP_MAPPING_MANAGE: frozenset({Permission.IDP_MAPPING_VIEW}),
+    # ADR 0095: changing people presumes seeing them.
+    Permission.STAFF_MANAGE: frozenset({Permission.STAFF_VIEW}),
+    Permission.STAFF_RESET_PASSWORD: frozenset({Permission.STAFF_VIEW}),
 }
 """ADR 0039: permissions a permission depends on; a custom role must hold them too."""
 
@@ -303,6 +313,9 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.RETENTION_VIEW,
         # ADR 0046: the staff of the own organisations.
         Permission.STAFF_VIEW,
+        # ADR 0095: invite, change and disable them in the bundled identity provider.
+        Permission.STAFF_MANAGE,
+        Permission.STAFF_RESET_PASSWORD,
         # ADR 0035: the host websites allowed to embed the organisation's groups.
         Permission.EMBEDDING_MANAGE,
         # ADR 0043: can step in as an agent in the own queue.

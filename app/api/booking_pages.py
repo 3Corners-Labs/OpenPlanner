@@ -11,18 +11,21 @@ Server-rendered and usable without JavaScript. Every response goes through
     POST /g/{slug}/book            book ─► 303 /g/{slug}/booked?start= (ADR 0056: the token
                                    goes to the participant by email only, never to the browser)
     GET  /g/{slug}/booked?start=   "check your email to confirm"
-    GET  /b/{token}/confirm        the appointment and one button; a GET never confirms, mail
+    GET  /b/{token}[/page]         the link of an email (ADR 0011): token checked, cookie set,
+                                   303 to the same page under /b/m/{ref} (ADR 0093)
+    GET  /b/m/{ref}/confirm        the appointment and one button; a GET never confirms, mail
                                    scanners open links in advance (ADR 0056 §8)
-    POST /b/{token}/confirm        confirm ─► 303 /b/{token}?status=confirmed (or lapsed)
-    GET  /b/{token}                booking (no move from the change lead, no cancel from the
+    POST /b/m/{ref}/confirm        confirm ─► 303 /b/m/{ref}?status=confirmed (or lapsed)
+    GET  /b/m/{ref}                booking (no move from the change lead, no cancel from the
                                    start, ADR 0069; a booking on hold by an emergency
                                    closure shows its notice, ADR 0024)
-    GET  /b/{token}/cancel         confirm ─► POST ─► 303 /b/{token}?status=cancelled
-    GET  /b/{token}/reschedule     slot picker ─► ?start= confirm ─► POST
-                                   ─► 303 /b/{new token}?status=rescheduled
+    GET  /b/m/{ref}/cancel         confirm ─► POST ─► 303 /b/m/{ref}?status=cancelled
+    GET  /b/m/{ref}/reschedule     slot picker ─► ?start= confirm ─► POST
+                                   ─► 303 /b/m/{new ref}?status=rescheduled
+The cookie rule is in ``app.api.link_session``; the join, trial and waiting pages are in
+``join_pages``, ``trial_pages`` and ``direct_pages``.
 """
 
-import re
 from datetime import datetime, timedelta
 from typing import Annotated
 
@@ -37,7 +40,7 @@ from app.api.contact_form import (
     read_contact,
 )
 from app.api.labels import slot_label
-from app.api.link_session import authorise, start
+from app.api.link_session import authorise, exchange, start
 from app.api.participant import participant_page
 from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
@@ -83,8 +86,6 @@ STATUS_LABELS: dict[BookingStatus, str] = {
     BookingStatus.AWAITING_REBOOK: "manage.status.awaiting_rebook",
     BookingStatus.PENDING_CONFIRMATION: "manage.status.pending_confirmation",
 }
-
-_LANG = re.compile(r"[a-z]{2}(-[A-Za-z]{2})?")
 
 Locale = Annotated[RequestLocale, Depends(request_locale)]
 SameOrigin = Annotated[None, Depends(require_same_origin)]
@@ -326,57 +327,42 @@ def _manage_context(
     }
 
 
-def _lang_query(request: Request) -> str:
-    """Return ``?lang=xx`` when the link carried a well-formed language, else nothing."""
-    lang = request.query_params.get("lang", "")
-    return f"?lang={lang}" if _LANG.fullmatch(lang) else ""
+LEGACY_SUBPATHS = (
+    "",
+    "/confirm",
+    "/cancel",
+    "/reschedule",
+    "/wait",
+    "/wait/status",
+    "/wait/leave",
+    "/join",
+    "/join/go",
+    "/test",
+    "/test/go",
+)
+"""Pages an email or a bookmark made before ADR 0093 may still link to under ``/b/{token}``."""
 
 
-async def _exchange(request: Request, token: str, suffix: str = "") -> Response:
-    """Trade a management token for the participant cookie and go to the page without it.
+@limiter.limit(read_limit)
+async def exchange_legacy_link(request: Request, token: str) -> Response:
+    """Open a link from the email: check the token, set the cookie, go to the same page.
 
-    The token is checked as always (ADR 0011: unknown ones become ``booking_not_found`` and
-    count against the budget for links that match nothing). On success the browser may use
-    the booking and is redirected to ``/b/m/{public_ref}{suffix}`` (ADR 0093), so only the
-    final address, free of any credential, stays in the history.
+    The page is named by the route that matched (``/b/{token}/wait`` ─► ``/b/m/{ref}/wait``), and
+    only the language is carried along. A POST (a form left open from before) is answered the
+    same way: it is not carried out, the browser gets the page whose button it would have
+    pressed.
     """
-    details = await _service(request).find(token)
-    follow(request, details.group.organisation_id)
-    booking = details.booking
-    target = f"/b/m/{booking.public_ref}{suffix}{_lang_query(request)}"
-    return await start(request, booking.id or 0, target)
+    path = str(request.scope["route"].path)
+    return await exchange(request, token, path.removeprefix("/b/{token}"))
 
 
-@router.get("/b/{token}", response_class=HTMLResponse)
-@limiter.limit(read_limit)
-async def exchange_page(request: Request, token: str) -> Response:
-    """Open the link from the email: check the token, set the cookie, go to the booking."""
-    return await _exchange(request, token)
-
-
-@router.api_route("/b/{token}/confirm", methods=["GET", "POST"], response_class=HTMLResponse)
-@limiter.limit(read_limit)
-async def exchange_confirm(request: Request, token: str) -> Response:
-    """The confirm link of mails already sent: exchange, then the confirm page (ADR 0093).
-
-    A POST (a form left open from before) is answered the same way: it is not carried out, the
-    browser gets the page whose button it would have pressed.
-    """
-    return await _exchange(request, token, "/confirm")
-
-
-@router.api_route("/b/{token}/cancel", methods=["GET", "POST"], response_class=HTMLResponse)
-@limiter.limit(read_limit)
-async def exchange_cancel(request: Request, token: str) -> Response:
-    """The cancel link of mails already sent: exchange, then the cancel page (ADR 0093)."""
-    return await _exchange(request, token, "/cancel")
-
-
-@router.api_route("/b/{token}/reschedule", methods=["GET", "POST"], response_class=HTMLResponse)
-@limiter.limit(read_limit)
-async def exchange_reschedule(request: Request, token: str) -> Response:
-    """The reschedule link of mails already sent: exchange, then the picker (ADR 0093)."""
-    return await _exchange(request, token, "/reschedule")
+for _suffix in LEGACY_SUBPATHS:
+    router.add_api_route(
+        f"/b/{{token}}{_suffix}",
+        exchange_legacy_link,
+        methods=["GET", "POST"] if _suffix else ["GET"],
+        response_class=HTMLResponse,
+    )
 
 
 async def _details(request: Request, public_ref: str) -> BookingDetails:
@@ -448,27 +434,6 @@ async def cancel(request: Request, public_ref: str, locale: Locale, _: SameOrigi
     ref = await authorise(request, public_ref)
     await _service(request).cancel(ref)
     return RedirectResponse(_manage_url(public_ref, "cancelled"), status_code=303)
-
-
-async def _legacy_page(request: Request, public_ref: str, suffix: str) -> Response:
-    """Redirect an authorised browser to a page that is not yet on the reference (step 3)."""
-    ref = await authorise(request, public_ref)
-    token = await _service(request).management_token_of(ref)
-    return RedirectResponse(f"/b/{token}{suffix}", status_code=303)
-
-
-@router.get("/b/m/{public_ref}/join", response_class=HTMLResponse)
-@limiter.limit(read_limit)
-async def join_bridge(request: Request, public_ref: str) -> Response:
-    """Go to the join page, which still sits under the token until ADR 0093 step 3."""
-    return await _legacy_page(request, public_ref, "/join")
-
-
-@router.get("/b/m/{public_ref}/test", response_class=HTMLResponse)
-@limiter.limit(read_limit)
-async def trial_bridge(request: Request, public_ref: str) -> Response:
-    """Go to the trial call page, which still sits under the token until ADR 0093 step 3."""
-    return await _legacy_page(request, public_ref, "/test")
 
 
 async def _reschedule_response(

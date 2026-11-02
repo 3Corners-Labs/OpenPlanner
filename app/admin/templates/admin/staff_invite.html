@@ -1,0 +1,22 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.staff.invite.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<p><a href="/admin/staff">{{ _("admin.staff.back") }}</a></p>
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.staff.invite.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.staff.invite.intro", days=days) }}</p>
+  </div>
+</div>
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/staff/invite" novalidate>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.staff.invite.submit") }}</button>
+    <a href="/admin/staff">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

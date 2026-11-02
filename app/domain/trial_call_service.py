@@ -20,6 +20,7 @@ from app.domain.calls import join_link as client_link
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType, PlannedJob
+from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, IntegrationError, Transaction, UnitOfWork, VideoProvider
 from app.domain.scheduling import Group
 from app.domain.tokens import hash_token, token_matches
@@ -65,7 +66,7 @@ class TrialCallService:
         self._integration = integration
         self._clock = clock
 
-    async def view(self, management_token: str) -> TrialView:
+    async def view(self, management_token: str | PublicRef) -> TrialView:
         """Return the state of the booking's trial call.
 
         Raises:
@@ -75,7 +76,7 @@ class TrialCallService:
             booking, group = await self._load(tx, management_token)
         return self._view(booking, group)
 
-    async def open(self, management_token: str) -> TrialView:
+    async def open(self, management_token: str | PublicRef) -> TrialView:
         """Open a trial call when the booking may have one, else return its state unchanged.
 
         Raises:
@@ -117,7 +118,7 @@ class TrialCallService:
             booking, group = await self._load(tx, management_token)
         return self._view(booking, group)
 
-    async def join_link(self, management_token: str) -> str | None:
+    async def join_link(self, management_token: str | PublicRef) -> str | None:
         """Return the link into the open trial call and record that it was followed.
 
         ``None`` when there is no open trial call (the caller sends the participant back).
@@ -165,10 +166,21 @@ class TrialCallService:
             except IntegrationError:
                 return
 
-    async def _load(self, tx: Transaction, management_token: str) -> tuple[Booking, Group]:
-        """Return the booking behind a token with its group, or raise ``booking_not_found``."""
-        booking = await tx.get_booking_by_token_hash(hash_token(management_token))
-        if booking is None or not token_matches(management_token, booking.token_hash):
+    async def _load(
+        self, tx: Transaction, management_token: str | PublicRef
+    ) -> tuple[Booking, Group]:
+        """Return the booking behind a token or an authorised reference, with its group.
+
+        Raises:
+            DomainError: ``booking_not_found``.
+        """
+        if isinstance(management_token, PublicRef):
+            booking = await tx.get_booking_by_public_ref(management_token.value)
+        else:
+            booking = await tx.get_booking_by_token_hash(hash_token(management_token))
+            if booking is not None and not token_matches(management_token, booking.token_hash):
+                booking = None
+        if booking is None:
             raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
         group = await tx.get_group_by_id(booking.group_id)
         if group is None:
