@@ -4,6 +4,7 @@ import pytest
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import (
+    ALWAYS_PII,
     Answers,
     Classification,
     FieldDefinition,
@@ -11,6 +12,7 @@ from app.domain.form_fields import (
     FormDefinition,
     Purpose,
     check_label,
+    default_classification,
     derive_key,
     format_options,
     labelled_answers,
@@ -458,3 +460,12 @@ def test_a_derived_key_is_always_valid_and_fits_the_limit() -> None:
         classification=Classification.PII,
     )
     assert len(key) <= 39
+
+
+@pytest.mark.parametrize("kind", list(FieldType))
+def test_only_closed_answers_are_proposed_as_not_personal_data(kind: FieldType) -> None:
+    proposed = default_classification(kind)
+
+    assert (proposed is Classification.NOT_PII) == (kind in {FieldType.CHOICE, FieldType.CHECKBOX})
+    if kind in ALWAYS_PII:
+        assert proposed is Classification.PII  # a proposal the definition would accept

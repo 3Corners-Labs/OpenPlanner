@@ -61,11 +61,14 @@
   <p><a href="/admin/groups/{{ summary.group.slug }}/settings">{{ _("admin.form_fields.back") }}</a></p>
 </section>
 {% if can_add %}
-<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/form" novalidate aria-labelledby="add-field-heading">
+{% if chosen %}
+<form class="card" id="add-field" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/form" novalidate aria-labelledby="add-field-heading">
   <div class="card__header">
     <h2 id="add-field-heading">{{ _("admin.form_fields.add") }}</h2>
     <p class="card__lead">{{ _("admin.form_fields.add_lead", count=limit) }}</p>
   </div>
+  <input type="hidden" name="type" value="{{ chosen }}">
+  <p><strong>{{ chosen_label }}</strong>. {{ chosen_help }} <a href="/admin/groups/{{ summary.group.slug }}/settings/form#add-field">{{ _("admin.form_fields.other_kind") }}</a></p>
   <div class="form-grid">
     {% for f in fields %}{{ field(f) }}{% endfor %}
   </div>
@@ -74,6 +77,20 @@
     <button type="submit" class="button">{{ _("admin.form_fields.add_button") }}</button>
   </div>
 </form>
+{% else %}
+<section class="card" id="add-field" aria-labelledby="add-field-heading">
+  <div class="card__header">
+    <h2 id="add-field-heading">{{ _("admin.form_fields.add") }}</h2>
+    <p class="card__lead">{{ _("admin.form_fields.add_lead", count=limit) }}</p>
+  </div>
+  <h3>{{ _("admin.form_fields.choose_kind") }}</h3>
+  <ul>
+    {% for kind in kinds %}
+    <li><a href="/admin/groups/{{ summary.group.slug }}/settings/form?type={{ kind.value }}#add-field">{{ kind.label }}</a>: {{ kind.help }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 {% else %}
 <section class="card"><p>{{ _("admin.form_fields.limit_reached", count=limit) }}</p></section>
 {% endif %}

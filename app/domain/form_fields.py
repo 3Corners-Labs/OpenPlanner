@@ -103,6 +103,7 @@ class FieldType(StrEnum):
 ALWAYS_PII = frozenset({FieldType.EMAIL, FieldType.PHONE, FieldType.LONG_TEXT})
 """Types that can never be tagged ``not_pii``: contact details and free text."""
 _BOUNDED = frozenset({FieldType.NUMBER, FieldType.DATE})
+_CLOSED_ANSWERS = frozenset({FieldType.CHOICE, FieldType.CHECKBOX})
 
 
 class Classification(StrEnum):
@@ -146,6 +147,16 @@ _VISIBILITY: Mapping[Purpose, _Visibility] = MappingProxyType(
 )
 
 AnswerValue = str | int | bool
+
+
+def default_classification(kind: FieldType) -> "Classification":
+    """Return the classification the add form proposes for a field of ``kind``.
+
+    ``not_pii`` only where the answer is one of the administrator's own options or a tick box;
+    every other type, including numbers and dates (a date of birth), is proposed as personal data.
+    It is a proposal: the administrator sees it, and ``not_pii`` still needs the confirmation.
+    """
+    return Classification.NOT_PII if kind in _CLOSED_ANSWERS else Classification.PII
 
 
 def _definition_error(field_name: str) -> DomainError:
