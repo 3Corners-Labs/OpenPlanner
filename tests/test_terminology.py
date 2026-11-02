@@ -139,3 +139,21 @@ def test_the_exempt_documents_exist() -> None:
 def test_the_kept_sentence_is_still_in_the_glossary() -> None:
     glossary = (ROOT / "docs" / "architecture.md").read_text()
     assert all(sentence in glossary for sentence in KEPT_SENTENCES)
+
+
+ANONYMISED = re.compile(r"anonim|anonymi|geanonim", re.IGNORECASE)
+"""What a purge does is delete fields from the appointment; the booking is not made anonymous
+(ADR 0102): the provider links and times can identify a person together with data held
+elsewhere. The texts say "deleted" / "verwijderd"."""
+
+
+def test_the_texts_and_docs_never_say_the_booking_is_anonymised() -> None:
+    found = [
+        f"{path.relative_to(ROOT).as_posix()}:{number}: {line.strip()[:100]}"
+        for path, only_texts in guarded_files()
+        for number, line in (catalogue_texts(path) if only_texts else plain_lines(path))
+        if ANONYMISED.search(line)
+        and not path.name.startswith(("0102-", "HANDOVER"))
+        and path.name != "adr-status.md"
+    ]
+    assert found == [], "say deleted / verwijderd, never anonymised (ADR 0102)"

@@ -13,7 +13,7 @@ organisatie, een berichttekst of een logregel.
 - **Directe** velden identificeren de deelnemer op zichzelf: voornaam, achternaam, e-mailadres en
   telefoonnummer.
 - **Gevoelige** velden bevatten wat de deelnemer ons heeft verteld, of geven toegang tot het
-  gesprek: een notitie, de antwoorden op de eigen vragen van het team op het
+  gesprek: de antwoorden op de eigen vragen van het team op het
   boekingsformulier, en de koppelingen om aan het videogesprek en aan het proefgesprek deel te nemen (twee voor het
   gesprek zelf en één voor het proefgesprek ervoor).
 
@@ -38,5 +38,6 @@ afspraak heeft. De rol Compliance en privacy ziet nooit persoonsgegevens.
 ## Bewaartermijn
 
 Persoonsgegevens worden 24 uur na afloop of annulering van de afspraak verwijderd; zie
-[Bewaartermijnen](retention.md). Van een verwijderde afspraak blijven alleen het kenmerk en
-de tijden over.
+[Bewaartermijnen](retention.md). Daarbij gaan ook de koppelingen naar de vergadering en het
+werkitem bij de aanbieders weg. Van een verwijderde afspraak blijven alleen het kenmerk en de
+tijden over; samen met gegevens elders kunnen die nog naar een persoon wijzen.
