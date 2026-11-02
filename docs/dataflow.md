@@ -479,13 +479,14 @@ does with it (ADR 0102 point 9): the procedure always runs `purge-overdue` befor
 goes back online, so booking data that was already deleted on the live system is deleted again.
 **The word is "deleted", never "anonymised":** what the purge does is delete fields from the
 appointment; the booking row stays, and its times and reference can identify a person together
-with data held elsewhere. Deleting the row itself after `booking_row_retention_days` is ADR 0102
-step 4 and is not built yet.
+with data held elsewhere. The row itself is deleted `booking_row_retention_days` after
+`pii_purged_at` (ADR 0102 step 4, built): the worker first merges it into `booking_day_counts`.
 
 | Table | Personal columns | Held for | Removed by | Restore |
 |---|---|---|---|---|
 | `bookings` | `first_name`, `last_name`, `email`, `phone`, `form_answers`, `guest_join_url`, `host_join_url`, `trial_join_url`; provider links `video_room_id`, `trial_room_id`, `wxcc_task_id`; `claimed_by` (the list `privacy.PURGED_FIELDS`) | slot end + 24 h, cancellation + 24 h; a suspended booking at most until the earlier of closure end + 30 days and `closure_max_retention_days` after the slot end | the `purge_pii` job, else the daily retention sweep, else `python -m app.cli purge-overdue`; `management_token_hash` is replaced by a random value, `booking_events.message` emptied | `purge-overdue` runs before the system is back |
-| `bookings` (what stays after the purge) | `management_token_salt`, `public_ref` (random, names no one), `locale`, `consents`, times, `closure_id`, `change_reason`, status | until the row is deleted (ADR 0102 step 4, not built: today the row is kept) | not yet; step 4 merges it into a daily count per group and deletes it | as the live system |
+| `bookings` (what stays after the purge) | `management_token_salt`, `public_ref` (random, names no one), `locale`, `consents`, times, `closure_id`, `change_reason`, status | until `booking_row_retention_days` (class C, default 730 days, 365 to 3650) after `pii_purged_at` | the worker's daily housekeeping (`booking_rows.rollup`): merges the row into a count per group, day and status, then deletes it with its events, call status and finished jobs; never a row that still holds personal data or has an open job | `purge-overdue` first; rows already merged stay merged |
+| `booking_day_counts` | none: group, UTC day of the slot, final status, a count and the latest `pii_purged_at` among them | for good: statistics without a person or an identifier | deleted with the group (cascade) | as the live system |
 | `booking_events` | `message` (provider reason, up to 300 characters, masked); kind, time and reason code carry no personal data | `message`: as the booking's purge; the rest with the booking row | the purge empties `message`; the row goes with the booking (cascade) | as `bookings` |
 | `call_status` | none: states and times of the meeting and the work item, by booking id | with the booking row | cascade with the booking | as `bookings` |
 | `jobs` | none: booking id, type, run time, status, last error as a reason code (no payload with personal data) | pending jobs until they run; the row with the booking | the purge job is the last job of every plan; cascade with the booking | restored jobs find their booking purged or stale and end silently |
@@ -554,6 +555,13 @@ in its own transaction, deletes its pending jobs and writes the system event `re
 (counts only) and the log lines `retention.sweep` and `retention.backlog` (counts only). No personal
 data leaves the database; the host command `python -m app.cli purge-overdue [--dry-run]` does the
 same and prints counts per group.
+
+Booking row rollup: the worker's daily housekeeping selects the booking rows whose `pii_purged_at` is
+older than `booking_row_retention_days`, checks that no personal column is filled and no job is open,
+adds one count per group, day and status to `booking_day_counts` and deletes the rows with their
+events and call status in the same transaction (200 rows per transaction). It writes the system event
+`booking_rows.rollup` (counts only) and the log line of the same name. The retention overview keeps
+its *Last removed* from the merged counts.
 
 Back-ups: the updater's rollback copy lives 24 hours and the hosting party's disaster-recovery
 copies are outside the application (ADR 0102 points 7 to 10, step 3 not built); the restore

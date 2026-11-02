@@ -14,8 +14,9 @@ and, inside a request or job, `trace.id`, `organisation` and `group`. Every line
 PII mask: the fields of `app/domain/privacy.py` are replaced by `***` at any depth, as a
 safety net on top of the rule that code never passes personal data to a logger (semgrep,
 `.semgrep/rules.yml`). The access log of uvicorn is off (paths carry management tokens) and
-httpx's own request lines are not logged (they carry the full URL); the `http.request` and
-`outbound.request` trace points carry what is safe instead.
+the `http.request` and `outbound.request` trace points carry what is safe instead of the
+request lines of httpx (full URL) and the statement lines of the SQL driver (bound values).
+Libraries never log below `warning` (see *Levels*).
 
 Audit, system and security events are on the same stream after their transaction commits,
 marked `log_type: "audit"` (`docs/audit-events.md`). Diagnostic events (ADR 0040 part 4) are
@@ -37,6 +38,15 @@ minimum. Set in the portal or from the host it falls back to the default after a
 hours; `TRACE` after at most `TRACE_LEVEL_MAX_HOURS` (default 4), because the volume is higher
 and the lines closer to the data. The audit line bypasses the level, so a quiet log never
 drops the trail.
+
+`LOG_LEVEL` governs our own loggers only: `openplanner.*` (including the trace logger),
+the structlog loggers of the app and `uvicorn.error`. Every other logger (`httpcore`,
+`aiosqlite`, `sqlalchemy`, a library added later) lets nothing below `warning` through, at any
+`LOG_LEVEL`, after a live level change, and even if the library sets its own logger to
+`DEBUG`: libraries log at DEBUG what they handle (bound SQL values, response headers), and a
+line can leave the host through log shipping (ASVS V16.2.5). It is a fixed protection, not a
+setting (ADR 0042: a protection is never switched off in C or D). An allowlist, so a new
+library is covered without a change here. Tests: `tests/test_logging.py`.
 
 ## Trace points
 

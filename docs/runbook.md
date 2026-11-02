@@ -1956,6 +1956,15 @@ backup. It is idempotent and needs no action. What it leaves behind is visible t
   48 hours after its retention began, or a purge failed. **Alert on this event in monitoring.**
   `retention.sweep_failed` means the sweep itself could not run (database locked or full).
 
+**Old booking rows (ADR 0102 step 4).** The same housekeeping merges booking rows
+`booking_row_retention_days` after their purge (default 730 days; the superuser sets it in the
+portal) into a count per group, day and status and deletes them. Look for the system event
+**booking_rows.rollup** (global, superuser: `rows`, `days`, `skipped`; no event on a day with
+nothing to do) and the log line `booking_rows.rollup`. `skipped` above 0 means a row past its
+term still holds personal data or has an open job: the retention sweep deals with the first, the
+second ends with its job. `booking_rows.rollup_failed` (error) means the run could not finish and
+is tried again the next day; the counts and deletions of a finished batch stay.
+
 To run it by hand (for example after a restore from a backup, with maintenance mode on),
 inside the `web` container:
 
