@@ -12,6 +12,7 @@ from app.domain.scheduling import Organisation
 from app.domain.theme import Theme, ThemeFileError
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.fakes.woff2 import make_woff2
 from tests.support.domain import NOW, make_group
 from tests.support.principals import principal
 
@@ -113,7 +114,8 @@ async def test_public_lookup_by_slug(service: BrandingService) -> None:
     assert error.value.code is ErrorCode.ORGANISATION_NOT_FOUND
 
 
-WOFF2 = b"wOF2" + b"\x00" * 64
+WOFF2 = make_woff2()
+MAX_UNPACKED = 2_000_000
 
 
 async def test_theme_and_header_are_saved_and_audited_by_name(
@@ -172,7 +174,7 @@ async def test_org_admin_may_not_upload_a_theme_file(service: BrandingService) -
 async def test_fonts_are_stored_per_role_and_removed(
     service: BrandingService, uow: InMemoryUnitOfWork
 ) -> None:
-    font = FontFile.from_upload(FontRole.HEADING, WOFF2)
+    font = FontFile.from_upload(FontRole.HEADING, WOFF2, MAX_UNPACKED)
     await service.set_font(SUPER, "demo", font)
 
     assert uow.state.organisations[1].branding.font(FontRole.HEADING) == font.ref
@@ -189,5 +191,7 @@ async def test_fonts_are_stored_per_role_and_removed(
 
 async def test_org_admin_may_not_upload_a_font(service: BrandingService) -> None:
     with pytest.raises(DomainError) as error:
-        await service.set_font(ORG_ADMIN, "demo", FontFile.from_upload(FontRole.TEXT, WOFF2))
+        await service.set_font(
+            ORG_ADMIN, "demo", FontFile.from_upload(FontRole.TEXT, WOFF2, MAX_UNPACKED)
+        )
     assert error.value.code is ErrorCode.NOT_PERMITTED

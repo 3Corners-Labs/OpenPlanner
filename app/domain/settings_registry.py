@@ -883,6 +883,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1_000_000,
     ),
     S(
+        "max_font_unpacked_bytes",
+        K.INT,
+        2_000_000,
+        _C,
+        T.OPERATIONS,
+        "Largest unpacked size (WOFF2 totalSfntSize) of an uploaded font, in bytes (ADR 0092).",
+        minimum=256_000,
+        maximum=8_000_000,
+    ),
+    S(
         "configuration_package_max_mb",
         K.INT,
         64,
