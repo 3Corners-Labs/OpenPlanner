@@ -139,8 +139,8 @@ planned at that moment; the maximum also applies while the closure is open-ended
 The 30 days were decided by the product owner on 2026-10-25, the maximum on 2026-11-01; both to
 be confirmed in the DPIA (O7). `closure_max_notice_days` before the maximum the worker records
 the system event `closure.retention_notice` at the group (closure id, a count and a date, no
-participant data), and the closure page tells participants the date their details are deleted
-by. The closure notice is admin text without personal data
+participant data), and the closure page and the participant's management page tell participants the date their
+details are deleted by. The closure notice is admin text without personal data
 (`closure_notices`); it goes to the participant by mail and on the public group page.
 
 **Alternative contact options (ADR 0037).** Phone numbers, email addresses, links and addresses

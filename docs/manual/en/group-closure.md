@@ -79,7 +79,7 @@ ends, and in any case at the latest the organisation's maximum after the origina
 (90 days unless the organisation admin set another number between 30 and 180), also when the
 closure has no end. About 14 days before that the audit log of the team shows the system
 event `closure.retention_notice` with the date; lift the closure or move the appointments before
-then. The closure page tells participants the day their details are deleted by.
+then. The closure page and the participant's own appointment page tell the participant the day their details are deleted by.
 
 ## What is recorded
 

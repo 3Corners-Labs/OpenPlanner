@@ -2499,6 +2499,9 @@ msgstr "Your appointment cannot go ahead at this time"
 msgid "manage.suspended.text"
 msgstr "Choose a new time below or cancel the appointment. Your details have been kept, so you do not need to fill anything in again."
 
+msgid "manage.suspended.delete_by"
+msgstr "Your details are deleted by {date} at the latest."
+
 msgid "manage.suspended.reschedule"
 msgstr "Choose a new time"
 
