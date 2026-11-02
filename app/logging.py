@@ -9,6 +9,10 @@ them without mapping: ``@timestamp`` (RFC 3339 UTC, milliseconds), ``log.level``
 ``service.name``, ``service.version``, ``installation``, and, inside a request or job,
 ``trace.id``, ``organisation`` and ``group`` from ``app.domain.event_context``.
 
+``LOG_LEVEL`` governs our own loggers only (``OWN_LOGGERS``). Every other stdlib logger stays at
+WARNING at any level, TRACE included, so a library's DEBUG lines (bound SQL values, response
+headers) never reach the stream, the tap or log shipping (ASVS V16.2.5).
+
 ``TRACE`` (ADR 0085 part 2) sits below ``DEBUG``. Trace lines come only from the fixed points
 in ``TRACE_POINTS``, through ``tracer.trace(point, **fields)``: a point takes its registered
 fields and nothing else, so a raw path, a URL, a body or a PII field cannot slip in; the mask
@@ -239,6 +243,36 @@ class _TapStream:
         return getattr(self._inner, name)
 
 
+OWN_LOGGERS = ("openplanner", "uvicorn.error")
+"""The stdlib loggers that follow ``LOG_LEVEL`` (and their children): ours, including the trace
+logger ``openplanner.trace``, and uvicorn's start-up and error lines. structlog loggers do not
+go through the stdlib and follow the level through their own filter."""
+FOREIGN_LEVEL = logging.WARNING
+"""The lowest level any other logger gets through, whatever ``LOG_LEVEL`` says.
+
+A fixed protection (ASVS V16.2.5), not a setting: libraries log at DEBUG what they handle
+(bound SQL values, response headers) and a log line can leave the host through log shipping.
+"""
+
+
+def _is_own(name: str) -> bool:
+    """Return whether the stdlib logger ``name`` is one of ``OWN_LOGGERS`` or below one."""
+    return any(name == own or name.startswith(f"{own}.") for own in OWN_LOGGERS)
+
+
+class _ForeignLevelFilter(logging.Filter):
+    """Drop a record of a logger that is not ours when it is below ``FOREIGN_LEVEL``.
+
+    The root logger's level only decides for loggers without a level of their own; this filter
+    on the handler also holds when a library sets its own logger to DEBUG, or when
+    ``set_log_level`` changes the level while running. The tap sits behind it.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return whether the record may be written."""
+        return record.levelno >= FOREIGN_LEVEL or _is_own(record.name)
+
+
 _CONFIGURED: list[tuple[TextIO, Envelope | None]] = []
 """The stream and envelope of the last ``configure_logging``, for ``set_log_level``."""
 
@@ -246,7 +280,8 @@ _CONFIGURED: list[tuple[TextIO, Envelope | None]] = []
 def set_log_level(level: str) -> None:
     """Change the minimum level live, keeping stream and envelope (ADR 0042 §6).
 
-    The PII masking applies at every level. Before ``configure_logging`` it does nothing.
+    The PII masking applies at every level, and the level applies to our own loggers only.
+    Before ``configure_logging`` it does nothing.
     """
     if _CONFIGURED:
         stream, envelope = _CONFIGURED[-1]
@@ -261,7 +296,7 @@ def configure_logging(
     Safe to call more than once (tests do); each call replaces the previous configuration.
 
     Args:
-        level: Minimum level name, e.g. ``"INFO"``.
+        level: Minimum level name, e.g. ``"INFO"``, for our own loggers (``OWN_LOGGERS``).
         stream: Output stream; defaults to stdout. Tests pass a ``StringIO``.
         envelope: Release and installation name added to every line.
     """
@@ -294,15 +329,20 @@ def configure_logging(
     )
 
     handler = logging.StreamHandler(out)
+    handler.addFilter(_ForeignLevelFilter())
     handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             foreign_pre_chain=[*shared, _stdlib_extra],
             processors=[structlog.stdlib.ProcessorFormatter.remove_processors_meta, *finalize],
         )
     )
+    # The level is for our own loggers only; the root, and so every other library, stays at
+    # WARNING (V16.2.5). An allowlist: a library added tomorrow is covered without a line here.
     root = logging.getLogger()
     root.handlers[:] = [handler]
-    root.setLevel(level)
+    root.setLevel(FOREIGN_LEVEL)
+    for own in OWN_LOGGERS:
+        logging.getLogger(own).setLevel(level)
 
     # uvicorn installs its own plain-text handlers; route them through ours instead.
     for name in ("uvicorn", "uvicorn.error"):
@@ -311,12 +351,6 @@ def configure_logging(
         uvicorn_logger.propagate = True
     # Access lines contain request paths, which will carry management tokens (/b/{token}).
     logging.getLogger("uvicorn.access").disabled = True
-    # httpx logs every outgoing request at INFO with its full URL, query string included; the
-    # ``outbound.request`` trace point (ADR 0085) carries method, host and status instead.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    # aiosqlite logs each statement with its bound parameters at DEBUG, which holds PII; the
-    # ``sql.slow`` trace point carries statement type and table only.
-    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 
 
 def warn_loose_secret_files(variables: list[str]) -> None:
