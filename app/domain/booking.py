@@ -223,6 +223,8 @@ class Booking:
     token_hash: str = field(repr=False)
     created_at: datetime
     token_salt: str = field(default="", repr=False)
+    public_ref: str = ""
+    """Names the booking in a URL (ADR 0093); not PII and not a credential."""
     consents: frozenset[ChannelKind] = frozenset()
     cancelled_at: datetime | None = None
     rescheduled_from_id: int | None = None

@@ -27,6 +27,16 @@ Draait de installatie niet als productie (bijvoorbeeld een testomgeving), dan st
 wat productie zou weigeren: een ontbrekende sleutel of een adres zonder https. Productie start
 nooit met een van deze punten.
 
+### Sleutelrotatie
+
+Zolang `SETTINGS_ENCRYPTION_KEY_PREVIOUS` of `MANAGEMENT_TOKEN_KEY_PREVIOUS` is gezet, toont
+het blok *Sleutelrotatie* hoeveel versleutelde geheimen nog onder de vorige instellingensleutel
+staan en hoeveel lopende boekingen nog een koppeling onder de vorige tokensleutel hebben. Er
+staan alleen aantallen, nooit sleutels of inhoud. Bij 0 staat er dat de vorige sleutel weg kan;
+anders staat er wat u eerst doet (`rekey` op de host uitvoeren, of wachten tot die boekingen
+voorbij zijn). Zonder vorige sleutel verschijnt het blok niet. De werkwijze staat in het
+draaiboek, *Rotating secrets*, en de inventaris van alle sleutels in `docs/cryptography.md`.
+
 ### Certificaat van het publieke adres
 
 Onder de omgeving staat het certificaat waarmee bezoekers de installatie bereiken: het adres,

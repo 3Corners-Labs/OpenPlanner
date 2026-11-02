@@ -25,6 +25,16 @@ When the installation does not run as production (for example a test environment
 screen also lists what production would refuse: a missing key or an address without https.
 Production never starts with any of these.
 
+### Key rotation
+
+While `SETTINGS_ENCRYPTION_KEY_PREVIOUS` or `MANAGEMENT_TOKEN_KEY_PREVIOUS` is set, a block
+*Key rotation* shows how many encrypted secrets are still under the previous settings key and
+how many open bookings still have a link under the previous token key. Only numbers appear,
+never keys or contents. At 0 the screen says the previous key can be removed; otherwise it
+says what to do first (run `rekey` on the host, or wait until those bookings are over). Without
+a previous key the block does not appear. The procedure is in the runbook, *Rotating secrets*,
+and the inventory of all keys in `docs/cryptography.md`.
+
 ### Certificate of the public address
 
 Below the environment is the certificate visitors reach the installation with: the address,
