@@ -67,6 +67,7 @@ from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
 from app.admin.address_view import address_view
 from app.admin.authz import AdminContext, RequirePermission, can_function
+from app.admin.backup_view import backup_view
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
@@ -630,6 +631,7 @@ async def _overview(
         values |= {
             "environment": current.environment,
             "address": await address_view(request, locale, current),
+            "backups": backup_view(request, locale, current),
             "certificate": await _certificate(request, locale),
             "log_summary": await _log_summary(request, context),
             "rotation": await _rotation(request),

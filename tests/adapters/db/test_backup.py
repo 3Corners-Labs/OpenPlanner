@@ -11,7 +11,9 @@ import pytest
 from app.adapters.db.backup import (
     BACKUP_LIFETIME,
     backup_database,
+    backup_directory,
     database_path,
+    oldest_backup,
     prune_backups,
     restore_database,
 )
@@ -78,3 +80,25 @@ def test_prune_deletes_backups_older_than_a_day(database: Path, tmp_path: Path) 
     assert not old.exists()
     assert new.exists()
     assert prune_backups(tmp_path / "none", NOW) == 0
+
+
+def test_the_oldest_backup_is_reported_with_the_count(database: Path, tmp_path: Path) -> None:
+    directory = tmp_path / "backups"
+    assert oldest_backup(directory) is None
+    directory.mkdir()
+    assert oldest_backup(directory) is None
+    old = backup_database(database, directory, "old")
+    backup_database(database, directory, "new")
+    written = NOW - timedelta(hours=30)
+    os.utime(old, (written.timestamp(), written.timestamp()))
+
+    found = oldest_backup(directory)
+
+    assert found is not None
+    assert (found.count, found.oldest_since) == (2, written)
+
+
+def test_the_backup_directory_is_next_to_the_database() -> None:
+    assert backup_directory("sqlite+aiosqlite:////srv/data/booking.db") == Path("/srv/data/backups")
+    with pytest.raises(ValueError, match="SQLite"):
+        backup_directory("postgresql+asyncpg://db/booking")

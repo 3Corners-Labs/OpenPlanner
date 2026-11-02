@@ -1,7 +1,8 @@
 """Worker housekeeping (ADR 0040): storage watch with log and event, hourly page reclaim."""
 
+import os
 from collections.abc import AsyncIterator
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from structlog.testing import capture_logs
 
 from app.adapters.db.engine import create_engine
+from app.domain.backup_age import BACKUP_LIFETIME
 from app.domain.retention_sweep import SweepResult
 from app.domain.storage import MIB, StorageLimits, StorageUsage
 from app.jobs.housekeeping import Housekeeping
@@ -378,3 +380,95 @@ async def test_a_failing_session_clean_never_stops_housekeeping(engine: AsyncEng
     assert [e["event"] for e in logs if e["event"].startswith("sessions.")] == [
         "sessions.clean_failed"
     ]
+
+
+# --- update back-ups (ADR 0102 point 10) -----------------------------------------------------
+
+
+def _backup_at(directory: Path, name: str, written: datetime) -> Path:
+    directory.mkdir(exist_ok=True)
+    path = directory / f"{name}.db"
+    path.write_bytes(b"x")
+    os.utime(path, (written.timestamp(), written.timestamp()))
+    return path
+
+
+def _with_backups(setup: Setup, engine: AsyncEngine, directory: Path) -> None:
+    setup.housekeeping = Housekeeping(
+        engine, setup.uow, setup.clock, StorageLimits(), setup.disk, backups=directory
+    )
+
+
+async def test_the_worker_deletes_backups_older_than_a_day_without_the_updater(
+    engine: AsyncEngine, tmp_path: Path
+) -> None:
+    setup = Setup(engine)
+    directory = tmp_path / "backups"
+    now = setup.clock.now()
+    old = _backup_at(directory, "request-1", now - BACKUP_LIFETIME - timedelta(minutes=1))
+    new = _backup_at(directory, "request-2", now - timedelta(hours=1))
+    _with_backups(setup, engine, directory)
+
+    with capture_logs() as logs:
+        await setup.housekeeping.run()
+
+    assert not old.exists()
+    assert new.exists()
+    assert [(e["event"], e["backups"]) for e in logs if e["event"] == "backups.pruned"] == [
+        ("backups.pruned", 1)
+    ]
+
+
+async def test_backups_are_pruned_once_an_hour(engine: AsyncEngine, tmp_path: Path) -> None:
+    setup = Setup(engine)
+    directory = tmp_path / "backups"
+    _with_backups(setup, engine, directory)
+    await setup.housekeeping.run()
+    stale = _backup_at(
+        directory, "request-3", setup.clock.now() - BACKUP_LIFETIME - timedelta(minutes=5)
+    )
+
+    setup.clock.advance(timedelta(minutes=30))
+    await setup.housekeeping.run()
+    assert stale.exists()
+
+    setup.clock.advance(timedelta(minutes=30))
+    await setup.housekeeping.run()
+    assert not stale.exists()
+
+
+async def test_a_backup_that_cannot_be_deleted_is_logged_and_never_stops_housekeeping(
+    engine: AsyncEngine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    setup = Setup(engine)
+    _with_backups(setup, engine, tmp_path / "backups")
+
+    def refuse(_directory: Path, _now: datetime) -> int:
+        raise PermissionError("read-only volume")
+
+    monkeypatch.setattr("app.jobs.housekeeping.prune_backups", refuse)
+
+    with capture_logs() as logs:
+        await setup.housekeeping.run()
+
+    assert [e["event"] for e in logs if e["event"].startswith("backups.")] == [
+        "backups.prune_failed"
+    ]
+
+
+async def test_housekeeping_for_a_database_prunes_the_backups_next_to_it(
+    engine: AsyncEngine, tmp_path: Path
+) -> None:
+    clock = FixedClock()
+    old = _backup_at(tmp_path / "backups", "request-9", clock.now() - timedelta(days=3))
+    housekeeping = Housekeeping.for_database(
+        engine,
+        InMemoryUnitOfWork(State()),
+        clock,
+        StorageLimits(),
+        f"sqlite+aiosqlite:///{tmp_path}/booking.db",
+    )
+
+    await housekeeping.run()
+
+    assert not old.exists()
