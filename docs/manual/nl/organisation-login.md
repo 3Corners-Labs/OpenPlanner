@@ -84,9 +84,18 @@ met MFA die *ja* zegt, anders sluit u alle beheerders van de organisatie buiten.
 
 ## Domeinen
 
-Onder **Domeinen** bepaalt de superuser welke e-maildomeinen bij deze provider horen. Wie later
-inlogt met een adres op zo'n domein, gaat naar deze provider (dat inlogscherm volgt in een
-volgende versie); een domein dekt ook zijn subdomeinen.
+Onder **Domeinen** bepaalt de superuser welke e-maildomeinen bij deze provider horen; een
+domein dekt ook zijn subdomeinen. Zodra de host organisatieproviders toestaat
+(`ORGANISATION_IDPS_ENABLED`) en een aangezette provider een geverifieerd domein heeft, vraagt
+het inlogscherm eerst om het **werk-e-mailadres of de inlognaam**. Wie een adres op een domein
+van deze provider invult, logt daar in; elk ander adres, en elke inlognaam onder het
+achtervoegsel van de ingebouwde identiteitsprovider, gaat naar de platformprovider. Via
+**Inloggen met een platformaccount** slaat u die vraag over.
+
+Een login via deze provider lukt alleen als het ID-token een bevestigd e-mailadres
+(`email_verified`) op een van haar eigen domeinen bevat, en geeft alleen rechten binnen deze
+organisatie. Zet u de provider uit, dan eindigen de sessies die via haar zijn begonnen bij het
+volgende verzoek.
 
 1. Vul het domein in (bijvoorbeeld `gemeente.nl`) en kies **Domein toevoegen**.
 2. Laat de organisatie het getoonde TXT-record in haar DNS zetten: naam

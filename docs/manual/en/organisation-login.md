@@ -83,9 +83,18 @@ after a test login with MFA says *yes*; otherwise every admin of the organisatio
 
 ## Domains
 
-Under **Domains** the superuser decides which e-mail domains belong to this provider. Someone
-who later logs in with an address on such a domain goes to this provider (that login screen
-follows in a later version); a domain also covers its subdomains.
+Under **Domains** the superuser decides which e-mail domains belong to this provider; a domain
+also covers its subdomains. Once the host allows organisation providers
+(`ORGANISATION_IDPS_ENABLED`) and a switched-on provider has a verified domain, the login screen
+first asks for the **work e-mail address or user name**. Someone who enters an address on a
+domain of this provider logs in there; any other address, and every user name under the suffix
+of the bundled identity provider, goes to the platform provider. **Log in with a platform
+account** skips the question.
+
+A login through this provider succeeds only when the ID token carries a confirmed e-mail
+address (`email_verified`) on one of its own domains, and grants rights inside this
+organisation only. Switching the provider off ends the sessions that started through it at
+their next request.
 
 1. Enter the domain (for example `gemeente.nl`) and choose **Add domain**.
 2. Have the organisation publish the TXT record shown in its DNS: name

@@ -430,6 +430,7 @@ def create_app(
             lambda: ClaimSettings(
                 ClaimMode(settings.oidc_claim_mode), live().oidc_entitlement_prefix
             ),
+            organisation_idps=lambda: settings.organisation_idps_enabled,
         )
         # ADR 0083 step 2: organisation identity providers, their adapters and registration.
         lab = settings.environment != "prod"
@@ -453,6 +454,7 @@ def create_app(
             resolver=txt_resolver,
             login_suffix=lambda: live().bundled_idp_login_suffix,
             grace=lambda: timedelta(days=live().idp_domain_grace_days),
+            routing=lambda: settings.organisation_idps_enabled,
         )
         app.state.idp_mapping_service = IdpMappingService(
             uow,
