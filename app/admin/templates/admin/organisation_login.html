@@ -4,6 +4,7 @@
 {% include "admin/_organisation_header.html" %}
 <h2 class="section-title" id="page-title">{{ _("admin.idp.title") }}</h2>
 <p>{{ _("admin.idp.lead") }}</p>
+{% if routing_off %}<div class="alert alert--info" role="status"><p>{{ _("admin.idp.routing_off") }}</p></div>{% endif %}
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 <section class="card" aria-labelledby="providers-heading">
   <h2 id="providers-heading">{{ _("admin.idp.providers") }}</h2>

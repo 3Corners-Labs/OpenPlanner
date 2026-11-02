@@ -103,6 +103,7 @@ from app.admin.pages import message as _message
 from app.admin.pages import page as _page
 from app.admin.session import (
     LOGOUT_CLEAR_SITE_DATA,
+    current_session,
     end_session,
     has_login_trial,
     mark_logged_out,
@@ -275,16 +276,41 @@ async def login(
         return _message(
             request, locale, 503, "admin.not_configured.title", "admin.not_configured.text"
         )
-    if not fresh and not platform and await idp_routes.service(request).offers_choice():
+    own = await _session_provider(request)
+    if own is not None:
+        # ADR 0083 point 17: a fresh login of a session goes to the provider it came from.
+        key, provider = own
+    elif not fresh and not platform and await idp_routes.service(request).offers_choice():
         return _identifier_page(request, locale, safe_next(next))
+    else:
+        key = PLATFORM
     try:
         start = await provider.start_login(
             _callback_url(request), fresh=fresh and has_login_trial(request)
         )
     except IdentityError:
         return _message(request, locale, 503, "admin.login_failed.title", "admin.login_failed.text")
-    save_login_start(request, start, safe_next(next))
+    save_login_start(request, start, safe_next(next), key)
     return RedirectResponse(start.url, status_code=303)
+
+
+async def _session_provider(request: Request) -> tuple[str, IdentityProvider] | None:
+    """Return the organisation provider of the live session, if it came from one.
+
+    A fresh login (ADR 0015) and the logout go to the session's own provider (ADR 0083 point
+    17), never to the e-mail-first question, so a re-authentication cannot switch identity. A
+    session of the platform provider, no session, or a provider that is no longer live gives
+    ``None``: the ordinary login then applies.
+    """
+    found = current_session(request)
+    if found is None or found.provider == PLATFORM:
+        return None
+    if await idp_routes.service(request).live_provider(found.provider) is None:
+        return None
+    adapter: IdentityProvider | None = await request.app.state.organisation_providers.provider(
+        found.provider
+    )
+    return (found.provider, adapter) if adapter is not None else None
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -526,11 +552,12 @@ async def _finish_login_trial(
 async def logout(request: Request, locale: Locale, _: SameOrigin) -> Response:
     """End the admin session here and at the identity provider (no silent re-login)."""
     principal = session_principal(request)
+    own = await _session_provider(request)  # read before the session ends (ADR 0083 point 17)
     await end_session(request, session_service(request))
     if principal is not None:
         await admin_service(request).record_logout(principal)
     logged_out = f"{request.app.state.settings.public_base_url.rstrip('/')}/admin/logged-out"
-    provider = _identity_provider(request)
+    provider = own[1] if own is not None else _identity_provider(request)
     provider_logout = await provider.logout_url(logged_out) if provider else None
     mark_logged_out(request)
     if provider_logout is None:

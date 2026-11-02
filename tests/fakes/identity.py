@@ -20,6 +20,7 @@ class FakeIdentityProvider:
         self.redirect_uris: list[str] = []
         self.fresh: list[bool] = []
         self.login_hints: list[str | None] = []
+        self.logouts = 0
         self.email: str | None = None
         self.email_verified: bool | None = True
         self.issuers: list[str | None] = []
@@ -100,4 +101,5 @@ class FakeIdentityProvider:
         return OrganisationLogin(claims, self.email, self.email_verified)
 
     async def logout_url(self, post_logout_redirect_uri: str) -> str | None:
+        self.logouts += 1
         return f"https://idp.test/logout?post_logout_redirect_uri={post_logout_redirect_uri}"
