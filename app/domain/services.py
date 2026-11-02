@@ -81,7 +81,6 @@ from app.domain.tokens import (
     derive_token,
     hash_token,
     new_token_salt,
-    token_for_booking,
     token_matches,
 )
 from app.domain.tunable import value_for
@@ -566,19 +565,6 @@ class BookingService:
         if booking is None or not token_matches(management_token, booking.token_hash):
             raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
         return booking
-
-    async def management_token_of(self, ref: PublicRef) -> str:
-        """Return the management token of the booking behind an authorised reference.
-
-        For the pages that still sit under ``/b/{token}`` (ADR 0093 step 3); it re-derives the
-        token from the booking's salt, as the mail composer does.
-
-        Raises:
-            DomainError: ``booking_not_found``.
-        """
-        async with self._uow.read() as tx:
-            booking = await self._booking(tx, ref)
-        return token_for_booking(self._token_keys, booking.token_salt, booking.token_hash)
 
     async def _place(
         self,

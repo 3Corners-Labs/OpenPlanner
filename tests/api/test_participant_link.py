@@ -260,7 +260,7 @@ async def test_one_cookie_holds_a_rescheduled_booking_too(site: httpx.AsyncClien
     assert (await site.get(old)).status_code == 200
 
 
-async def test_the_join_and_trial_links_of_the_booking_page_still_lead_there(
+async def test_the_join_and_trial_pages_answer_under_the_reference(
     site: httpx.AsyncClient,
 ) -> None:
     token = await _book(site)
@@ -269,20 +269,41 @@ async def test_the_join_and_trial_links_of_the_booking_page_still_lead_there(
     join = await site.get(f"{base}/join")
     trial = await site.get(f"{base}/test")
 
-    assert join.headers["location"] == f"/b/{token}/join"  # moves in ADR 0093 step 3
-    assert trial.headers["location"] == f"/b/{token}/test"
+    assert (join.status_code, trial.status_code) == (200, 200)  # no hop back to a token path
 
 
-async def test_the_bridge_to_the_join_page_needs_the_cookie(
+async def test_the_join_and_trial_pages_need_the_cookie(
     demo_settings: Settings, clock: FixedClock
 ) -> None:
     async with app_client(demo_settings, clock) as first:
         base = await open_link(first, await _book(first))
     async with app_client(demo_settings, clock) as other:
-        response = await other.get(f"{base}/join")
+        join = await other.get(f"{base}/join")
+        go = await other.get(f"{base}/join/go")
+        trial = await other.get(f"{base}/test")
+        wait = await other.get(f"{base}/wait")
+        poll = await other.get(f"{base}/wait/status")
 
-    assert response.status_code == 403
-    assert "location" not in response.headers
+    for response in (join, go, trial, wait, poll):
+        assert response.status_code == 403
+        assert "location" not in response.headers
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    ["", "/wait", "/wait/status", "/wait/leave", "/join", "/join/go", "/test", "/test/go"],
+)
+async def test_an_old_link_with_a_token_trades_it_and_lands_on_the_reference(
+    site: httpx.AsyncClient, suffix: str
+) -> None:
+    token = await _book(site)
+
+    response = await site.get(f"/b/{token}{suffix}?lang=en")
+
+    assert response.status_code == 303
+    assert response.headers["location"] == (f"{(await open_link(site, token))}{suffix}?lang=en")
+    assert "op_link" in response.headers["set-cookie"]
+    assert token not in response.headers["location"]
 
 
 async def test_neither_the_token_nor_personal_data_reach_the_log(

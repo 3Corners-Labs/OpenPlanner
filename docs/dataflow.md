@@ -245,9 +245,9 @@ operator CLI <──HTTPS── Webex webhooks (ownedBy=org), WxCC subscriptions
 operator CLI ──DELETE──> Webex webhooks, WxCC subscriptions (webhooks-reset --yes): ids of stale registrations only
 operator CLI ──signed test events (unknown ids)──> WEBHOOK_BASE_URL/webhooks/* (webhooks-health) → outcome codes in integration_reports
 participant ──GET /b/{token} (from the email)──> OpenPlanner ──Set-Cookie op_link (random value), 303──> participant ──GET /b/m/{public_ref}──> OpenPlanner (ADR 0093; the cookie names no person, the server keeps its SHA-256 and booking ids, no PII)
-participant ──GET /b/{token}/join/go──> OpenPlanner ──303──> Webex web app (no data added to the link)
-participant ──POST /b/{token}/test──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0071)
-participant ──GET /b/{token}/test/go──> OpenPlanner ──303──> the trial meeting in the Webex web app
+participant ──GET /b/m/{public_ref}/join/go (cookie)──> OpenPlanner ──303──> Webex web app (no data added to the link)
+participant ──POST /b/m/{public_ref}/test (cookie)──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0071)
+participant ──GET /b/m/{public_ref}/test/go (cookie)──> OpenPlanner ──303──> the trial meeting in the Webex web app
 Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
 web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex (ADR 0010, when an admin opens or polls the agenda and a status is older than MEETING_STATUS_REFRESH_SECONDS): meeting id and the group's host address out; state and participant list back, reduced in the adapter to state, count, host flag, first join and last leave → call_status. Participant names, addresses and IPs are processed in memory only, never stored or logged
 ```
@@ -358,7 +358,7 @@ superuser ──POST /admin/maintenance/on|off (reason code, expected end)──
 host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
 operator ──MAINTENANCE_MODE (environment)──> web (no database read)
 admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
-participant ──GET/POST /g/{slug}…, /b/{token}/cancel|reschedule──> web ──503 maintenance page (no write)
+participant ──GET/POST /g/{slug}…, /b/m/{public_ref}/cancel|reschedule──> web ──503 maintenance page (no write)
 bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error": "maintenance"} (no write)
 ```
 

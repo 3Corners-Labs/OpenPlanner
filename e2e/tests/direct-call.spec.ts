@@ -71,7 +71,10 @@ test('a participant starts a call right away and the admin sees it', async ({ pa
   await participant.getByLabel('Achternaam').fill('Lovelace');
   await participant.getByLabel('E-mailadres').fill('ada@example.org');
   await participant.getByRole('button', { name: 'Gesprek starten' }).press('Enter');
-  await expect(participant).toHaveURL(/\/b\/[A-Za-z0-9_-]+\/wait$/);
+  // ADR 0093: the call sets the participant cookie itself, so the waiting room sits under the
+  // reference, and the poll URL of the live region is on it too (no credential in any address).
+  await expect(participant).toHaveURL(/\/b\/m\/[A-Za-z0-9_-]{22}\/wait$/);
+  await expect(participant.locator('[data-poll]')).toHaveAttribute('data-poll', /^\/b\/m\/[A-Za-z0-9_-]{22}\/wait\/status\?seen=/);
   await expect(participant.getByRole('status')).toContainText('We zoeken een medewerker');
   await expectNoAxeViolations(participant);
   await participantContext.close();
