@@ -717,8 +717,11 @@ and one user, `super`, who holds every built-in role. It is an identity provider
 **Where the secrets are.** `secrets/keycloak.env` (mode 600, next to `secrets/secrets.env`,
 never copied off the host) holds the admin console password (`KC_BOOTSTRAP_ADMIN_PASSWORD`,
 user `admin`), the client secret (`KC_OPENPLANNER_CLIENT_SECRET`) and the first password of
-`super` (`KC_SUPER_PASSWORD`). The realm Keycloak imports is `secrets/keycloak-realm.json`,
-rendered from `deploy/keycloak/realm.template.json`:
+`super` (`KC_SUPER_PASSWORD`), and the secret of the service account that manages staff
+(`KC_DIRECTORY_CLIENT_SECRET`). The script also writes `secrets/keycloak-app.env` (mode 600) with
+`KEYCLOAK_ADMIN_URL`, `KEYCLOAK_DIRECTORY_CLIENT_ID` and `KEYCLOAK_DIRECTORY_CLIENT_SECRET`,
+which `web` and `worker` read after `.env` (ADR 0106). The realm Keycloak imports is
+`secrets/keycloak-realm.json`, rendered from `deploy/keycloak/realm.template.json`:
 
 ```sh
 cd ~/openplanner
@@ -745,9 +748,28 @@ and is step 2. The admin console is bound to the host's loopback and is never pu
 (`grep KC_SUPER_PASSWORD secrets/keycloak.env`), log in to the portal as `super`, and Keycloak
 asks for a new password before it returns to the portal (the required action
 `UPDATE_PASSWORD`). The first password is then spent; the file keeps it only as the value the
-realm was rendered with. Staff of organisations without a provider of their own are created
-in this Keycloak (admin console, realm `openplanner`, with the `roles`, `organisations`,
-`groups` or `entitlements` attributes the development realm's `README.md` describes).
+realm was rendered with.
+
+**Staff.** Staff of organisations without a provider of their own are managed in the portal,
+Manage › Staff: invite, add or remove a role, disable, send a password reset (ADR 0095). The
+actions appear only when `web` has the three `KEYCLOAK_*` values above; restart `web` and
+`worker` after a render (`docker compose --profile idp up -d web worker`). A realm imported
+before ADR 0095 (such as an older lab realm) has no `openplanner-directory` client; add it with
+Keycloak's own CLI and put its secret in `secrets/keycloak-app.env` by hand:
+
+```sh
+docker compose exec idp /opt/keycloak/bin/kcadm.sh config credentials \
+  --server http://localhost:8080 --realm master --user admin   # asks for the admin password
+docker compose exec idp /opt/keycloak/bin/kcadm.sh create clients -r openplanner \
+  -s clientId=openplanner-directory -s serviceAccountsEnabled=true -s publicClient=false \
+  -s standardFlowEnabled=false -s directAccessGrantsEnabled=false
+docker compose exec idp /opt/keycloak/bin/kcadm.sh add-roles -r openplanner \
+  --uusername service-account-openplanner-directory --cclientid realm-management \
+  --rolename manage-users --rolename view-realm
+```
+
+Read the generated secret in the admin console (*Clients* → `openplanner-directory` →
+*Credentials*), never in a shell history.
 
 **Resetting the password of `super`.** On the host, open the admin console at
 http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` with
