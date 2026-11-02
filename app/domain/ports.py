@@ -184,6 +184,22 @@ class IdentityError(Exception):
 
 
 @dataclass(frozen=True)
+class OrganisationLogin:
+    """A login through an organisation provider, before the domain check (ADR 0083 point 15).
+
+    Attributes:
+        claims: The claims as ``finish_login`` returns them (subject qualified, MFA applied).
+        email: The ``email`` claim; personal data, used for the domain check only and never
+            stored or logged.
+        email_verified: The ``email_verified`` claim, ``None`` when absent.
+    """
+
+    claims: LoginClaims
+    email: str | None = field(repr=False)
+    email_verified: bool | None
+
+
+@dataclass(frozen=True)
 class LoginTestReport:
     """What a guided test login through an organisation provider showed (ADR 0083 point 9).
 
@@ -529,7 +545,9 @@ class ConfigurationTransfer(Protocol):
 class IdentityProvider(Protocol):
     """The admin portal's identity provider (OIDC; PingFederate in production, ADR 0013)."""
 
-    async def start_login(self, redirect_uri: str, *, fresh: bool = False) -> LoginStart:
+    async def start_login(
+        self, redirect_uri: str, *, fresh: bool = False, login_hint: str | None = None
+    ) -> LoginStart:
         """Prepare an authorisation request with fresh ``state``, ``nonce`` and PKCE.
 
         ``fresh`` asks the provider to authenticate again instead of single sign-on (the dry
@@ -576,6 +594,26 @@ class IdentityProvider(Protocol):
 
         Raises:
             IdentityError: If the exchange or any token check fails.
+        """
+        ...
+
+    async def finish_organisation_login(
+        self,
+        *,
+        code: str,
+        redirect_uri: str,
+        code_verifier: str,
+        nonce: str,
+        response_issuer: str | None,
+    ) -> "OrganisationLogin":
+        """Complete a login through an organisation provider (ADR 0083 points 14 and 15).
+
+        ``response_issuer`` is the ``iss`` parameter of the authorisation response (RFC
+        9207): when sent it must equal the provider's issuer, and when the provider announces
+        it, it must be sent.
+
+        Raises:
+            IdentityError: As ``finish_login``, and ``issuer_mismatch``.
         """
         ...
 

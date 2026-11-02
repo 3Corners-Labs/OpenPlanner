@@ -817,6 +817,15 @@ _OPERATIONS = (
         "The proxy falls back to its default certificate.",
     ),
     _e(
+        "idp.domain_watch_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The re-check of the login domains did not run: {error}.",
+        "The worker could not run the scheduled TXT check of the login domains (ADR 0083).",
+        _CHECK_HOST,
+    ),
+    _e(
         "tls.watch_failed",
         _OPS,
         "warning",
@@ -1046,6 +1055,16 @@ _SECURITY = (
         "A login's subject was refused: {reason}.",
         "The `sub` claim is empty, too long or has characters that are not allowed.",
         "Check the identity provider's subject format.",
+    ),
+    _e(
+        "oidc.response_issuer_mismatch",
+        _SEC,
+        "warning",
+        "provider",
+        "A login answer named another issuer than provider {provider} (RFC 9207).",
+        "The authorisation response's iss did not match, or was missing while the provider "
+        "announces it: a mix-up attempt or a misconfigured provider (ADR 0083 point 14).",
+        "Check the provider's issuer on its page; repeated events may be an attack.",
     ),
     _e(
         "oidc.token_exchange_failed",
@@ -1315,6 +1334,16 @@ _AUDIT = (
         "",
         "An identity provider was switched on.",
         "Its users can sign in.",
+    ),
+    _e(
+        "idp.domain_check",
+        _SYS,
+        "outcome",
+        "",
+        "Re-check of a login domain: {reason}.",
+        "The worker looked up the TXT record of a routing domain and its state changed: failing "
+        "(still routes), lapsed (stops routing) or verified again (ADR 0083 point 12).",
+        "Ask the organisation to restore the TXT record shown on the provider's page.",
     ),
     _e(
         "idp.domain_claimed",

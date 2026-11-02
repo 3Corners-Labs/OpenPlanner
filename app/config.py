@@ -390,6 +390,8 @@ class Settings(BaseSettings):
     idp_max_per_organisation: int = Field(default=2, ge=1, le=5)
     # ADR 0083 point 12: a verified domain whose TXT record went missing keeps routing this long.
     idp_domain_grace_days: int = Field(default=7, ge=0, le=30)
+    # ADR 0083 point 12: how often the worker re-checks the TXT record of a routing domain.
+    idp_domain_recheck_hours: int = Field(default=24, ge=1, le=168)
 
     # Integration secrets at rest (ADR 0008): AES-256-GCM under a key derived from this value.
     settings_encryption_key: SecretStr | None = None
@@ -485,6 +487,10 @@ class Settings(BaseSettings):
     # Class B (ADR 0086): the worker's round trip to the public address; off only for a network
     # that cannot reach its own public name from inside (NAT without hairpin).
     public_address_check_enabled: bool = True
+    # ADR 0083: the host's switch for logins through organisation providers. Class B: it opens
+    # a new trust boundary the host team agrees to; off routes every login to the platform
+    # provider and ends the sessions of organisation providers.
+    organisation_idps_enabled: bool = False
     # ADR 0072: the certificate source of the bundled proxy, managed in the portal.
     tls_certificate_source: Literal["acme", "own"] = "acme"
     tls_proxy_bundled: bool = False

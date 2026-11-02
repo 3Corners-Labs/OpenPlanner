@@ -22,6 +22,11 @@ from enum import StrEnum
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.identity import PLATFORM
 
+EMAIL_NOT_VERIFIED = "email_not_verified"
+"""Refusal: an organisation provider's ID token lacks ``email_verified: true`` (point 15)."""
+EMAIL_DOMAIN_MISMATCH = "email_domain_mismatch"
+"""Refusal: the address is not on one of the provider's routing domains (point 15, B3)."""
+
 MAX_DOMAINS_PER_PROVIDER = 20
 """Fixed in ADR 0083 point 11."""
 DEFAULT_GRACE = timedelta(days=7)
@@ -198,3 +203,20 @@ def route(address: str, claims: Iterable[DomainClaim], suffix: str) -> str:
     if not matches:
         return PLATFORM
     return max(matches, key=lambda c: len(c.domain)).provider
+
+
+def refusal_of_identity(
+    email: str | None, verified: bool | None, provider: str, claims: Iterable[DomainClaim]
+) -> str | None:
+    """Return why an organisation provider may not sign this person in, or ``None``.
+
+    The ID token must carry ``email`` with ``email_verified`` true, on a domain the provider
+    itself routes (point 15): no provider speaks for a domain it does not own.
+    """
+    if verified is not True:
+        return EMAIL_NOT_VERIFIED
+    domain = domain_of(email or "")
+    owned = any(
+        c.provider == provider and c.state.routes and covers(c.domain, domain) for c in claims
+    )
+    return None if domain and owned else EMAIL_DOMAIN_MISMATCH

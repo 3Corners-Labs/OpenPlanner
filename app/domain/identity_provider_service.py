@@ -31,6 +31,7 @@ from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Permission, Principal, Scope
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.identity import PLATFORM
 from app.domain.identity_providers import (
     DiscoveryRefusedError,
     OrganisationProvider,
@@ -48,6 +49,8 @@ from app.domain.login_domains import (
     checked,
     normalise_domain,
     refusal_of_claim,
+    refusal_of_identity,
+    route,
     suffix_conflicts,
 )
 from app.domain.organisations import organisation_by_slug
@@ -141,6 +144,8 @@ class IdentityProviderService:
         login_suffix: Returns ``bundled_idp_login_suffix``, which no provider may claim
             (ADR 0106 point 9).
         grace: Returns how long a lost record is tolerated (``idp_domain_grace_days``).
+        routing: Returns ``ORGANISATION_IDPS_ENABLED``: whether logins go to organisation
+            providers at all (step 3c).
     """
 
     def __init__(  # noqa: PLR0913
@@ -157,6 +162,7 @@ class IdentityProviderService:
         resolver: MailDomainResolver | None = None,
         login_suffix: Callable[[], str] = lambda: DEFAULT_SUFFIX,
         grace: Callable[[], timedelta] = lambda: DEFAULT_GRACE,
+        routing: Callable[[], bool] = lambda: False,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -170,6 +176,7 @@ class IdentityProviderService:
         self._resolver = resolver
         self._login_suffix = login_suffix
         self._grace = grace
+        self._routing = routing
 
     # --- reading -------------------------------------------------------------------------
 
@@ -491,6 +498,56 @@ class IdentityProviderService:
                 tx, principal, DOMAIN_REMOVED_EVENT, provider, f"key:{key},domain:{claim.domain}"
             )
         self._on_change(key)
+
+    # --- the login (step 3c, no principal: nobody is logged in yet) ------------------------
+
+    async def offers_choice(self) -> bool:
+        """Return whether the login page asks for the address first (point 13).
+
+        Only when the host allows organisation providers and at least one switched-on
+        provider has a routing domain; otherwise ``/admin/login`` goes straight to the
+        platform provider, as before.
+        """
+        if not self._routing():
+            return False
+        async with self._uow.read() as tx:
+            claims = await tx.list_login_domains(_everything())
+            providers = {p.key: p for p in await tx.list_identity_providers(_everything())}
+        return any(
+            c.state.routes and c.provider in providers and providers[c.provider].enabled
+            for c in claims
+        )
+
+    async def login_provider(self, identifier: str) -> OrganisationProvider | None:
+        """Return the organisation provider a login with ``identifier`` goes to, if any.
+
+        Only the domain of the address counts; the address itself is neither stored nor
+        logged (point 13, B12). The reserved suffix of the bundled provider and every address
+        without a routing domain go to the platform provider (``None``).
+        """
+        if not self._routing():
+            return None
+        async with self._uow.read() as tx:
+            claims = await tx.list_login_domains(_everything())
+            key = route(identifier, claims, self._login_suffix())
+            provider = None if key == PLATFORM else await tx.get_identity_provider(key)
+        return provider if provider is not None and provider.enabled else None
+
+    async def live_provider(self, key: str) -> OrganisationProvider | None:
+        """Return the switched-on provider ``key`` while the host allows them, else ``None``."""
+        if not self._routing():
+            return None
+        async with self._uow.read() as tx:
+            provider = await tx.get_identity_provider(key)
+        return provider if provider is not None and provider.enabled else None
+
+    async def identity_refusal(
+        self, key: str, email: str | None, verified: bool | None
+    ) -> str | None:
+        """Return why provider ``key`` may not sign in this address, or ``None`` (point 15)."""
+        async with self._uow.read() as tx:
+            claims = await tx.list_login_domains(_everything(), key)
+        return refusal_of_identity(email, verified, key, claims)
 
     async def suffix_conflicts(self, suffix: str) -> bool:
         """Return whether a provider claims a domain overlapping ``suffix`` (ADR 0106 point 9)."""

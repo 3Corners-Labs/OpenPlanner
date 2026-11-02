@@ -1,0 +1,17 @@
+{#- ADR 0083 point 13: the address first, when organisations bring their own login. -#}
+{% extends "admin/_public.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.login.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<h1>{{ _("admin.login.title") }}</h1>
+<p>{{ _("admin.login.intro") }}</p>
+{% include "_error_summary.html" %}
+<form method="post" action="/admin/login" novalidate>
+  <input type="hidden" name="next" value="{{ next_url }}">
+  {{ field(identifier) }}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.login.continue") }}</button>
+  </div>
+</form>
+<p><a href="/admin/login?platform=1&amp;next={{ next_url | urlencode }}">{{ _("admin.login.platform") }}</a></p>
+{% endblock %}

@@ -171,6 +171,7 @@ async def load_principal(request: Request) -> None:
     principal = None
     if claims is not None:
         principal = await login_service(request).principal_for(claims)
+    if principal is not None:
         # ADR 0042 step 5: the admin's own organisation's time format and zone apply.
         live = getattr(request.app.state, "live_settings", None)
         home = await admin_service(request).home_organisation(principal)

@@ -48,6 +48,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WEBHOOK_BASE_URL` | url | — | Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL. |
 | `FORWARDED_ALLOW_IPS` | string | — | Address of the reverse proxy (read by uvicorn). Other than the bundled proxy's, System status warns unless web serves TLS (ADR 0091). |
 | `PUBLIC_ADDRESS_CHECK_ENABLED` | bool | `true` | Switches the worker's round trip to the public address off, for a network that cannot reach its own public name from inside; System status then says it is not checked (ADR 0086). |
+| `ORGANISATION_IDPS_ENABLED` | bool | `false` | Lets logins go to organisation identity providers by e-mail domain; off routes every login to the platform provider and ends their sessions (ADR 0083). |
 | `WEB_TLS_CERT_FILE` | path | — | Certificate chain (PEM) for uvicorn, for an own reverse proxy on another machine; with WEB_TLS_KEY_FILE web serves HTTPS (ADR 0091). |
 | `WEB_TLS_KEY_FILE` | path | — | Private key (PEM) of WEB_TLS_CERT_FILE; readable by the web user only (ADR 0091). |
 | `TLS_DOMAIN` | string | — | Certificate domain (proxy.env, ADR 0030). |
@@ -146,6 +147,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `IDP_MAPPING_REFUSED_WINDOW_DAYS` | int | `30` | 7–365 | `settings.platform.manage` | How far back the identity provider mapping page lists refused values (ADR 0049). |
 | `IDP_MAX_PER_ORGANISATION` | int | `2` | 1–5 | `settings.login.manage` | Identity providers an organisation may register (ADR 0083); two allows moving from one to the next without a gap. |
 | `IDP_DOMAIN_GRACE_DAYS` | int | `7` | 0–30 | `settings.login.manage` | Days a verified login domain keeps routing after its TXT record went missing; then it stops (ADR 0083 point 12). |
+| `IDP_DOMAIN_RECHECK_HOURS` | int | `24` | 1–168 | `settings.login.manage` | Hours between the worker's re-checks of the TXT record of each routing login domain (ADR 0083 point 12). |
 | `SMTP_HOST` | string | — | — | `settings.platform.manage` | Fallback mail server (ADR 0022); empty means no fallback mail. |
 | `SMTP_PORT` | int | `25` | 1–65535 | `settings.platform.manage` | Port of the fallback mail server. |
 | `SMTP_STARTTLS` | bool | `false` | — | `settings.platform.manage` | Upgrade the connection with STARTTLS. |

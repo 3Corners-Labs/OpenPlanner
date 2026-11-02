@@ -435,6 +435,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "(ADR 0086).",
     ),
     S(
+        "organisation_idps_enabled",
+        K.BOOL,
+        False,
+        _B,
+        T.SWITCHES,
+        "Lets logins go to organisation identity providers by e-mail domain; off routes every "
+        "login to the platform provider and ends their sessions (ADR 0083).",
+    ),
+    S(
         "web_tls_cert_file",
         K.PATH,
         None,
@@ -1296,6 +1305,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "stops (ADR 0083 point 12).",
         minimum=0,
         maximum=30,
+    ),
+    S(
+        "idp_domain_recheck_hours",
+        K.INT,
+        24,
+        _C,
+        T.LOGIN_MAPPING,
+        "Hours between the worker's re-checks of the TXT record of each routing login domain "
+        "(ADR 0083 point 12).",
+        minimum=1,
+        maximum=168,
     ),
     S(
         "smtp_host",
