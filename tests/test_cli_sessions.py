@@ -68,7 +68,7 @@ async def test_end_all_ends_every_live_session_with_one_audit_event(configured: 
         "system:cli",
         "admin.sessions_ended_all",
         "restore",
-        "sessions=2",
+        "sessions:2",
     )
 
 
@@ -81,7 +81,7 @@ async def test_end_all_without_sessions_still_leaves_one_audit_event(configured:
             audit = list((await connection.execute(select(AuditEventRow))).all())
     finally:
         await engine.dispose()
-    assert [(e.reason, e.detail) for e in audit] == [("cli", "sessions=0")]
+    assert [(e.reason, e.detail) for e in audit] == [("cli", "sessions:0")]
 
 
 def test_the_parser_wants_a_reason_from_the_closed_list(

@@ -37,11 +37,11 @@ from app.admin.forms import (
 )
 from app.admin.pages import Locale, SameOrigin, admin_moment, with_manual
 from app.admin.pages import page as _page
-from app.domain.audit import Category
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
 from app.domain.log_destination_service import LogDestinationService
 from app.domain.log_destinations import (
+    DEFAULT_CATEGORIES,
     LEVELS,
     SHIPPED_CATEGORIES,
     DestinationDraft,
@@ -51,6 +51,7 @@ from app.domain.log_destinations import (
     Reason,
     State,
 )
+from app.domain.log_events import LogCategory
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
 
@@ -76,10 +77,11 @@ REASON_LABELS: dict[str, str] = {
 }
 """Explanation per reason; a test checks every reason has one."""
 
-CATEGORY_LABELS: dict[Category, str] = {
-    Category.AUDIT: "admin.logging.category.audit",
-    Category.SYSTEM: "admin.logging.category.system",
-    Category.SECURITY: "admin.logging.category.security",
+CATEGORY_LABELS: dict[LogCategory, str] = {
+    LogCategory.AUDIT: "admin.logging.category.audit",
+    LogCategory.SYSTEM: "admin.logging.category.system",
+    LogCategory.SECURITY: "admin.logging.category.security",
+    LogCategory.AUTHZ: "admin.logging.category.authz",
 }
 """Label per audit category a destination may take."""
 
@@ -294,7 +296,8 @@ def _choices(
                 "name": f"category_{c.value}",
                 "label": _(CATEGORY_LABELS[c]),
                 "checked": checked(
-                    f"category_{c.value}", c in current.categories if current else True
+                    f"category_{c.value}",
+                    c in (current.categories if current else DEFAULT_CATEGORIES),
                 ),
             }
             for c in SHIPPED_CATEGORIES

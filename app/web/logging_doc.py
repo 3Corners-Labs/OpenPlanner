@@ -22,10 +22,27 @@ points and the log destinations in the portal), ADR 0103 (the register of action
 
 ## The record
 
-Every line is one JSON object on stdout in the `openplanner.event/2` envelope (ADR 0040,
-`app/logging.py`): `@timestamp` (RFC 3339 UTC, milliseconds), `log.level`, `message`,
-`service.name` (`web` or `worker`), `service.version`, `installation` (`INSTALLATION_NAME`)
-and, inside a request or job, `trace.id`, `organisation` and `group`. Every line passes the
+Every line is one JSON object on stdout in the `openplanner.event/3` envelope (ADR 0040,
+ADR 0103, `app/logging.py`). It starts with what a person reads first and then the rest:
+
+- `@timestamp`: RFC 3339, UTC, milliseconds (`2026-11-02T14:03:12.345Z`).
+- `log.level`: see *Levels*.
+- `event.category`: `audit`, `system`, `security`, `authz`, `operations` or `diagnostic`; the
+  sections of *Actions* below, and the syslog `MSGID`.
+- `event.action`: the action, the key of the tables below (`storage.degraded`); a library's
+  own line is `library.<logger>`.
+- `message`: the action's sentence with the line's fields filled in ("Disk space is low: 6%
+  free, database 1 MB (free_space_low)."); a library line keeps its own text.
+- `labels.<name>`: the fields of the action (the *Fields* column), one per field, searchable
+  on their own (`labels.free_percent: 6`).
+- `actor`, `actor.type`, `actor.role`: who, without a name: the subject, the kind (`user`,
+  `system`, `host`, `api`, `anonymous`) and the role that granted the permission.
+- `service.name`, `service.version`, `installation`: the process, the release,
+  `INSTALLATION_NAME`.
+- `trace.id`, `organisation`, `group`: inside a request or job, the chain and the tenant.
+- `schema`: `openplanner.event/3`, the version of this shape.
+
+Every line passes the
 PII mask: the fields of `app/domain/privacy.py` are replaced by `***` at any depth, as a
 safety net on top of the rule that code never passes personal data to a logger (semgrep,
 `.semgrep/rules.yml`). The access log of uvicorn is off (paths carry management tokens) and
@@ -34,8 +51,9 @@ request lines of httpx (full URL) and the statement lines of the SQL driver (bou
 Libraries never log below `warning` (see *Levels*).
 
 Audit, system and security events are on the same stream after their transaction commits,
-marked `log_type: "audit"` (`docs/audit-events.md`). Diagnostic events (ADR 0040 part 4) are
-in the portal only.
+marked `log_type: "audit"` (`docs/audit-events.md`), in the same shape; their sentence also
+says the outcome and the organisation when the template does not. Diagnostic events (ADR 0040
+part 4) are in the portal only.
 
 ## Levels
 
@@ -72,11 +90,14 @@ _OUTRO = """## Where the lines go
 - **The host route** (ADR 0034): Docker's `splunk` logging driver, a Splunk Universal
   Forwarder or Fluent Bit reading the rotated files; `docs/runbook.md`, *Shipping audit events
   to a log platform*. Route `log_type = audit` to its own index.
-- **Log destinations** (ADR 0085 part 1): syslog (RFC 5424 over TLS, TCP or UDP), Splunk HEC,
-  Elastic or OpenSearch (`_bulk` into a data stream) and NDJSON over HTTP, each a copy of the
-  masked lines stdout carries, with its own minimum level, the audit categories it takes and an
-  opt-in for trace lines and diagnostic events. Every process (web, worker) keeps one bounded
-  queue per destination and delivers in batches in the background; a full queue drops the
+- **Log destinations** (ADR 0085 part 1): syslog (RFC 5424 over TLS, TCP or UDP; `MSGID` is
+  the line's `event.category` and the message starts with its sentence, followed by the JSON
+  line, ADR 0103 point 10), Splunk HEC, Elastic or OpenSearch (`_bulk` into a data stream)
+  and NDJSON over HTTP, each a copy of the masked lines stdout carries, with its own minimum
+  level, the categories it takes (the audit trail's `audit`, `system`, `security`, and `authz`
+  for the authorisation decisions, which a new destination leaves out) and an opt-in for trace
+  lines and diagnostic events. Every process (web, worker) keeps one bounded queue per
+  destination and delivers in batches in the background; a full queue drops the
   oldest line, a failing platform is retried with backoff, and a batch the platform will never
   accept is dropped instead of blocking the rest. A destination narrows the process's own
   level and never widens it: it sees trace lines only while `LOG_LEVEL` is `TRACE` too. The

@@ -211,6 +211,7 @@ anyone ──GET /admin/jwks.json──> web (public keys of every organisation 
 | Audit log export (ADR 0040) | CSV download of the audit log in the admin's scope: ids, codes, admin subjects | web → admin's browser | the organisation's policy; every export is an audit event | no participant data; admin subjects |
 | Diagnostic mode (ADR 0040) | `diagnostic_modes`: organisation and group slug, end time, superuser's subject; debug events in `audit_events` (category `diagnostic`: job type, attempt, duration) | web (superuser), worker | mode: until it ends; debug events `DIAGNOSTIC_EVENT_RETENTION_DAYS` (7) | no |
 | Event schema fields (ADR 0040) | `audit_events.event_id`, `level`, `category`, `trace_id`, `service`; the same trace id on stdout | web, worker | as the event they belong to | no: random ids and codes |
+| Actor kind and role (ADR 0103) | `audit_events.actor_role`; `actor.type` and `actor.role` on every line and in the CSV export, also to log destinations | web (the role key of the grant that allowed the request) | as the event they belong to | no: a role key and a kind next to the subject that is already there; never a name |
 
 System events hold no personal data: no names, addresses, message text or join links, only codes
 and the booking id. Each admin sees them at their own level only (group admin: their groups;
