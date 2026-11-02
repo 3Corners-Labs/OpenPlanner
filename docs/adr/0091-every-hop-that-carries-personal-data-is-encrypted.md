@@ -82,8 +82,8 @@ they follow from the routes and are not a tuning value.
 | 0 | ADR accepted | #309 | merged |
 | 1 | Port 80 refuses machine paths; edge checks in `check-proxy.sh` (also XFF spoofing, TRACE, `/static/` listing, `no-store`); runbook for an own proxy | | planned |
 | 2 | SMTP without TLS refused in production; `SMTP_PLAINTEXT_RELAY_ALLOWED`; System status error | #383 | built: saving refused, System status error; sending refuses from the next minor release |
-| 3 | TLS from an own proxy to web (`WEB_TLS_*`), System status warning; the exception of point 2 in threat model and data flow | #PR | built: `docker-compose.yml` passes `--ssl-certfile`/`--ssl-keyfile`, the image healthcheck follows (`app/healthcheck.py`), *Proxy* row on System status, runbook section; the warning is a warning, not an error as point 3 says, because a proxy on the same host over the gateway is legitimate |
-| 4 | The list of outbound connections in `docs/dataflow.md` | #PR | built: table *Outbound connections and the hop to web*, Mermaid diagrams in `docs/architecture.md` |
+| 3 | TLS from an own proxy to web (`WEB_TLS_*`), System status warning; the exception of point 2 in threat model and data flow | #386 | built: `docker-compose.yml` passes `--ssl-certfile`/`--ssl-keyfile`, the image healthcheck follows (`app/healthcheck.py`), *Proxy* row on System status, runbook section; the warning is a warning, not an error as point 3 says, because a proxy on the same host over the gateway is legitimate |
+| 4 | The list of outbound connections in `docs/dataflow.md` | #386 | built: table *Outbound connections and the hop to web*, Mermaid diagrams in `docs/architecture.md` |
 
 ## Consequences
 
