@@ -6468,7 +6468,7 @@ msgid "admin.form_fields.system"
 msgstr "The form always asks first name, last name and email address; the phone number is set in the settings."
 
 msgid "admin.form_fields.none"
-msgstr "This team has no custom fields yet."
+msgstr "This team has no custom fields yet. Examples: a customer number (short text) or the subject of the call (choice list)."
 
 msgid "admin.form_fields.retired"
 msgstr "Retired (only on earlier bookings): {names}"
@@ -6477,16 +6477,16 @@ msgid "admin.form_fields.label"
 msgstr "Question"
 
 msgid "admin.form_fields.key"
-msgstr "Key"
+msgstr "Technical name"
 
 msgid "admin.form_fields.key_hint"
-msgstr "Lower-case letters, digits and _, starting with a letter, for example customer_number. Fixed once saved."
+msgstr "Leave this empty: the name is made from the question. Only lower-case letters, digits and _, starting with a letter. Fixed once saved."
 
 msgid "admin.form_fields.type"
 msgstr "Type"
 
 msgid "admin.form_fields.type_hint"
-msgstr "Decides how the answer is checked. Fixed once saved."
+msgstr "What the participant fills in: a short or long text box, email address, phone number, number, date, postcode, choice list or checkbox. Decides how the answer is checked. Fixed once saved."
 
 msgid "admin.form_fields.type.short_text"
 msgstr "Short text (up to 100 characters)"
