@@ -5,7 +5,8 @@
 # the proxy passes only what the app should see (TRACE, /static/, no-store on HTML), public form bodies are capped, the proxy runs as non-root; the
 # standards of ADR 0086 hold (TLS 1.2 and 1.3 only with AEAD suites, HSTS of at least a year and
 # none on port 80, and the app's round trip through the proxy is `ok`, or `proxy_not_trusted` with
-# a wrong FORWARDED_ALLOW_IPS); a
+# a wrong FORWARDED_ALLOW_IPS); a forged X-Forwarded-For/-Proto/-Host from the visitor is replaced
+# by the proxy before it reaches web (ASVS V4.1.3, V15.3.4; read from the wire); a
 # pair handed over through the portal-certs volume is served within the poll interval and ACME
 # applies again when it is withdrawn; then the same proxy serves an own certificate from files,
 # and `tls-check` from the web container reads either certificate and judges it. Used by CI
@@ -161,6 +162,55 @@ round_trip() { # round_trip FINDING SOURCE: web asks the public address through 
   fi
 }
 
+# Reads the X-Forwarded-* lines that cross the web container's network interface, nothing else
+# (no path, no cookie, no token is printed). Runs in web's own network namespace.
+sniffer_code='
+import socket, sys, time
+raw = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(3))
+raw.settimeout(1)
+print("ready", flush=True)
+end = time.time() + int(sys.argv[1])
+while time.time() < end:
+    try:
+        packet = raw.recv(65535)
+    except socket.timeout:
+        continue
+    for line in packet.split(b"\r\n"):
+        if line.lower().startswith(b"x-forwarded-"):
+            print(line.decode("latin-1"), flush=True)
+'
+
+forged_header_check() { # a forged X-Forwarded-* is replaced at the edge (ASVS V4.1.3, V15.3.4)
+  # The visitor claims to be 203.0.113.7 (a documentation address, RFC 5737), to have used http
+  # and to be asking for another host. Caddy has no trusted_proxies, so it must replace all
+  # three. The only place that shows what web is given is the wire between proxy and web: a
+  # sniffer in web's network namespace prints the X-Forwarded-* lines of that request, so the
+  # app needs no hook and no address is ever stored or logged.
+  web="$(compose ps -q web)"
+  image="$(docker inspect -f '{{.Config.Image}}' "$web")"
+  sniffer="$(docker run -d --rm --network "container:$web" --cap-add NET_RAW --user 0 \
+    --entrypoint python "$image" -I -c "$sniffer_code" 30)"
+  for _ in $(seq 1 30); do
+    docker logs "$sniffer" 2>&1 | grep -q '^ready$' && break
+    sleep 1
+  done
+  # shellcheck disable=SC2086
+  curl -sk $resolve -o /dev/null -H 'X-Forwarded-For: 203.0.113.7' -H 'X-Forwarded-Proto: http' \
+    -H 'X-Forwarded-Host: forged.example' https://booking.test:18443/healthz
+  sleep 2
+  seen="$(docker logs "$sniffer" 2>&1 | tr -d '\r')"
+  docker stop "$sniffer" >/dev/null 2>&1 || true
+  echo "$seen" | sed 's/^/  on the wire to web: /'
+  forwarded_for="$(echo "$seen" | grep -i '^x-forwarded-for:' || true)"
+  [ -n "$forwarded_for" ] || fail "the sniffer saw no proxied request, so the forged header could not be judged"
+  ! echo "$seen" | grep -q '203\.0\.113\.7' || fail "web receives the X-Forwarded-For the visitor forged"
+  [ "$(echo "$forwarded_for" | wc -l)" = "1" ] || fail "web receives more than one X-Forwarded-For line: $forwarded_for"
+  ! echo "$forwarded_for" | grep -q ',' \
+    || fail "the proxy kept the visitor's value next to its own (not a single address): $forwarded_for"
+  echo "$seen" | grep -qi '^x-forwarded-proto: https$' || fail "web does not receive X-Forwarded-Proto: https from the proxy"
+  ! echo "$seen" | grep -qi 'forged.example' || fail "web receives the X-Forwarded-Host the visitor forged"
+}
+
 edge_checks() { # redirect, machine paths, body limit, non-root, standards: the same in every pass
   redirect="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Host: booking.test' 'http://127.0.0.1:18080/g/x?a=1')"
   [ "$redirect" = "308 https://booking.test/g/x?a=1" ] || fail "port 80 does not redirect ($redirect)"
@@ -171,6 +221,7 @@ edge_checks() { # redirect, machine paths, body limit, non-root, standards: the 
   [ "$(compose exec -T proxy id -u)" != "0" ] || fail "proxy runs as root"
   tls_version_checks
   hsts_checks
+  forged_header_check
 }
 
 tls_check() { # tls_check EXPECTED_FINDING EXPECTED_ISSUER_FRAGMENT: run the CLI from web
