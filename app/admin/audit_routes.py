@@ -85,6 +85,8 @@ from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
 from app.domain.scheduling import GroupSummary
 from app.domain.security_log import (
     CROSS_SITE,
+    DATABASE_ERROR,
+    DATABASE_FAILED,
     HONEYPOT,
     INVALID_SIGNATURE,
     ORIGIN_MISMATCH,
@@ -169,6 +171,7 @@ EVENT_LABELS: dict[str, str] = {
     RATE_LIMITED: "audit.event.rate_limited",
     REQUEST_REJECTED: "audit.event.request_rejected",
     TOKEN_REJECTED: "audit.event.token_rejected",
+    DATABASE_ERROR: "audit.event.database_error",
     # Diagnostic mode (ADR 0040, part 4).
     "job.run": "audit.event.job_run",
     BRAKE_EVENT: "audit.event.diagnostics_brake",
@@ -276,6 +279,7 @@ DETAIL_LABELS: dict[str, str] = {
     "surface:web": "admin.audit.detail.surface_web",
     "surface:agent": "admin.audit.detail.surface_agent",
     "surface:links": "admin.audit.detail.surface_links",
+    "surface:widget": "admin.audit.detail.surface_widget",
     "diagnostics.on": "admin.audit.detail.diagnostics_on",
     "diagnostics.off": "admin.audit.detail.diagnostics_off",
 }
@@ -319,6 +323,7 @@ REASON_LABELS: dict[str, str] = {
     Reason.MAINTENANCE: "admin.audit.reason.maintenance",
     # ADR 0038: why maintenance was switched on (the reason codes of the switch).
     **{reason.value: f"admin.maintenance.reason.{reason.value}" for reason in MaintenanceReason},
+    DATABASE_FAILED: "admin.audit.reason.database_error",
     "stale": "admin.audit.reason.stale",
     "no_recipient": "admin.audit.reason.no_recipient",
     "no_booking": "admin.audit.reason.no_booking",

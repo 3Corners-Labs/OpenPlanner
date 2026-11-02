@@ -33,6 +33,12 @@ WEBHOOK_REJECTED = "webhook.rejected"
 TOKEN_REFRESH_FAILED = "webex.token_refresh"  # noqa: S105  # nosec B105 - an event key
 """Webex refused, or could not be reached for, a token refresh."""
 
+DATABASE_ERROR = "database.error"
+"""A request failed on a database error that is not a busy lock (ASVS V16.3.4): our own failure."""
+
+DATABASE_FAILED = "database_error"
+"""Reason of ``database.error``; the detail names the surface (``surface:web``, …)."""
+
 INVALID_SIGNATURE = "invalid_signature"
 """Reason of a rejected webhook."""
 

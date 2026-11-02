@@ -3935,6 +3935,18 @@ msgstr "on the machine API"
 msgid "admin.audit.detail.surface_links"
 msgstr "on unknown management links"
 
+msgid "audit.event.database_error"
+msgstr "Database error"
+
+msgid "admin.audit.reason.database_error"
+msgstr "A database statement failed; the request was rolled back."
+
+msgid "admin.audit.detail.surface_widget"
+msgstr "on the widget API"
+
+msgid "error.database_unavailable"
+msgstr "We could not complete this right now and nothing was saved. Please try again in a few minutes."
+
 msgid "admin.audit.detail.client"
 msgstr "caller {value}"
 
