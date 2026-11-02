@@ -334,3 +334,24 @@ def test_the_probe_branch_is_advice_until_the_flow_ends_probes_itself() -> None:
     assert not without["probe branch"].required  # ADR 0082: OpenPlanner ends the probe itself
     assert without["probe branch"].code == "probe.missing"
     assert _by_name(check_groups([GROUP], _config(flow=with_branch)))["probe branch"].ok
+
+
+def test_a_screen_pop_in_an_event_flow_and_a_queue_by_name_are_found() -> None:
+    # The API export keeps a Screen Pop on AgentAccepted under eventFlows (recorded 2026-11-02);
+    # a flow imported from FlowV2 may name its queue instead of giving its id.
+    doc = {
+        **FLOW_DOC,
+        "nodes": [
+            {"name": "Q", "properties": {"activityName": "queue-contact", "queueId": "teams"}}
+        ],
+        "eventFlows": {
+            "nodes": [{"name": "Pop", "properties": {"activityName": "screen-pop"}}],
+            "edges": [],
+        },
+    }
+    queues = (Queue("q-9", "teams", "WORK_ITEM"),)
+
+    results = _by_name(check_groups([GROUP], _config(flow=parse_flow(doc), queues=queues)))
+
+    assert results["screen pop"].ok
+    assert results["flow queues"].ok

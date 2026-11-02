@@ -124,16 +124,28 @@ def _parts(text: str) -> list[str]:
 
 
 def parse_flow(doc: dict[str, Any]) -> FlowSummary:
-    """Reduce a flow export to variable names, activity names and all string values."""
+    """Reduce a flow export to variable names, activity names and all string values.
+
+    Activities are read wherever the export holds them: the main ``nodes`` and the event
+    flows (``eventFlows``), where Flow Designer puts a Screen Pop on *AgentAccepted*.
+    """
     variables = {
         str(v["name"]) for v in doc.get("variables") or [] if isinstance(v, dict) and "name" in v
     }
-    activities = {
-        str(node.get("properties", {}).get("activityName"))
-        for node in doc.get("nodes") or []
-        if isinstance(node, dict) and node.get("properties", {}).get("activityName")
-    }
-    return FlowSummary(frozenset(variables), frozenset(activities), frozenset(_strings(doc)))
+    return FlowSummary(frozenset(variables), frozenset(_activities(doc)), frozenset(_strings(doc)))
+
+
+def _activities(value: object) -> Iterator[str]:
+    """Yield the ``properties.activityName`` of every node inside ``value``."""
+    if isinstance(value, dict):
+        properties = value.get("properties")
+        if isinstance(properties, dict) and isinstance(properties.get("activityName"), str):
+            yield properties["activityName"]
+        for item in value.values():
+            yield from _activities(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _activities(item)
 
 
 def _strings(value: object) -> Iterator[str]:
@@ -352,7 +364,9 @@ def _flow_results(
             )
         )
 
-    used = [q for q in queues if q.id in flow.strings]
+    # A flow made in Flow Designer names its queue by id; one imported from FlowV2 (the sample
+    # flow, ``wxcc_sample_flow``) may keep the queue's name.
+    used = [q for q in queues if q.id in flow.strings or q.name in flow.strings]
     wrong = [q for q in used if q.channel_type != WORK_ITEM]
     if not used:
         out.append(
