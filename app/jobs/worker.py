@@ -63,7 +63,7 @@ from app.i18n.dates import configure_clock
 from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
-from app.keys import management_token_key
+from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 
 log = structlog.get_logger()
@@ -169,6 +169,7 @@ async def run_worker(
                     Translator(load_catalogues(), CachedTextOverrides(uow)),
                     management_token_key(settings),
                     settings.public_base_url,
+                    management_token_key_previous(settings),
                 ),
                 video=wired.video,
                 dispatcher=wired.dispatcher,

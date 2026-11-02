@@ -44,6 +44,7 @@ from app.keys import management_token_key
 from app.web.organisation_settings import follow_group_from_path
 from tests.admin.conftest import ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.fakes.messaging import SmtpRecorder
+from tests.fakes.woff2 import make_woff2
 
 MIN_REQUESTS = 200
 BACKGROUND_PATH = "/__probe/{slug}/background"
@@ -51,7 +52,6 @@ MOMENT = datetime(2026, 1, 5, 14, 30, tzinfo=UTC)
 TWELVE_HOUR = re.compile(r"\b\d{1,2}:\d{2}\s?[ap]\.?m\.?", re.IGNORECASE)
 """A 12-hour clock time: ``9:00 a.m.`` in Dutch, ``9:00 AM`` in English (Babel)."""
 PNG = b"\x89PNG\r\n\x1a\n"
-WOFF2 = b"wOF2"
 FALLBACK = SmtpConfig(
     host="smtp.platform-fallback.example", port=25, sender="no-reply@platform.example"
 )
@@ -130,7 +130,7 @@ A = Org(
     phone="14 020",
     first_slot_utc="2026-01-02T08:00:00Z",
     logo=PNG + b"\x00" * 64,
-    font=WOFF2 + b"\x00" * 64,
+    font=make_woff2(0),
 )
 B = Org(
     slug="andere",
@@ -147,7 +147,7 @@ B = Org(
     phone="14 030",
     first_slot_utc="2026-01-02T14:00:00Z",
     logo=PNG + b"\x01" * 64,
-    font=WOFF2 + b"\x01" * 64,
+    font=make_woff2(1),
 )
 ORGS = (A, B)
 SMTP = {

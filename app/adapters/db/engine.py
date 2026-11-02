@@ -6,7 +6,10 @@ for reads and ``BEGIN IMMEDIATE`` for booking transactions, selected per connect
 ``sqlite_begin`` execution option (see ``app.adapters.db.uow``). A new database is created in
 incremental auto-vacuum mode, so pages freed by pruning can go back to the disk (ADR 0040,
 ``app.adapters.db.maintenance``). ``secure_delete`` is on for every connection, so purged
-personal data is overwritten in the database file and not merely marked free.
+personal data is overwritten in the database file and not merely marked free. Every engine hides
+bound parameters (``hide_parameters``), so a failing insert of a booking leaves no name or
+address in the exception text (ASVS V16.2.5). This factory is the only one: the web process, the
+worker, the CLI and Alembic all use it.
 A statement slower than ``set_slow_query_ms`` leaves a
 ``sql.slow`` trace line with its kind and first table, never its text (ADR 0085 point 9).
 """
@@ -124,7 +127,9 @@ def create_engine(database_url: str, busy_timeout_ms: int = SQLITE_BUSY_TIMEOUT_
     if url.get_backend_name() == "sqlite" and url.database and url.database != ":memory:":
         Path(url.database).parent.mkdir(parents=True, exist_ok=True)
 
-    engine = create_async_engine(url, pool_pre_ping=True)
+    # Fixed privacy rule (ASVS V16.2.5): a failing statement must not carry its bound values
+    # (names, addresses) into the exception text and from there into a traceback log.
+    engine = create_async_engine(url, pool_pre_ping=True, hide_parameters=True)
     event.listen(engine.sync_engine, "before_cursor_execute", _before_execute)
     event.listen(engine.sync_engine, "after_cursor_execute", _after_execute)
     if engine.dialect.name == "sqlite":

@@ -14,10 +14,11 @@ from app.domain.theme import Theme
 from app.web.branding import theme_css
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.fakes.woff2 import make_woff2
 from tests.support.domain import NOW
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x07" * 64
-WOFF2 = b"wOF2" + b"\x07" * 64
+WOFF2 = make_woff2(7)
 
 
 async def _brand(
@@ -142,7 +143,7 @@ async def test_unknown_organisation_and_missing_logo(site: httpx.AsyncClient) ->
 async def test_fonts_are_served_as_woff2_and_404_otherwise(
     site: httpx.AsyncClient, demo_settings: Settings
 ) -> None:
-    font = FontFile.from_upload(FontRole.TEXT, WOFF2)
+    font = FontFile.from_upload(FontRole.TEXT, WOFF2, 2_000_000)
     await _brand(demo_settings.database_url, Branding(), font=font)
 
     served = await site.get("/o/demo/font/text")

@@ -3124,7 +3124,7 @@ msgid "admin.messages.save_hint"
 msgstr "Maak een veld leeg om de standaardtekst terug te zetten."
 
 msgid "admin.form.error.smtp_security"
-msgstr "Kies STARTTLS of TLS: met een gebruikersnaam mag het wachtwoord niet onversleuteld over het netwerk."
+msgstr "Kies STARTTLS of TLS: e-mail bevat namen en deelnamelinks, en een wachtwoord, en mag niet onversleuteld over het netwerk. Een relay zonder TLS vraagt in productie de hostinstelling SMTP_PLAINTEXT_RELAY_ALLOWED."
 
 msgid "admin.nav.organisations"
 msgstr "Organisaties"
@@ -3934,6 +3934,18 @@ msgstr "op de machine-API"
 
 msgid "admin.audit.detail.surface_links"
 msgstr "bij onbekende beheerlinks"
+
+msgid "audit.event.database_error"
+msgstr "Databasefout"
+
+msgid "admin.audit.reason.database_error"
+msgstr "Een databaseopdracht mislukte; het verzoek is teruggedraaid."
+
+msgid "admin.audit.detail.surface_widget"
+msgstr "op de widget-API"
+
+msgid "error.database_unavailable"
+msgstr "Dit lukte nu niet en er is niets opgeslagen. Probeer het over enkele minuten opnieuw."
 
 msgid "admin.audit.detail.client"
 msgstr "afzender {value}"
@@ -6734,6 +6746,18 @@ msgstr "{environment}"
 msgid "admin.overview.widget.status.environment.problems"
 msgstr "{environment}, {count} niet productiewaardig"
 
+msgid "admin.overview.widget.status.mail"
+msgstr "E-mail"
+
+msgid "admin.overview.widget.status.mail.plaintext"
+msgstr "{count} mailserver(s) zonder TLS: kies STARTTLS of TLS, of zet SMTP_PLAINTEXT_RELAY_ALLOWED"
+
+msgid "admin.overview.widget.status.proxy"
+msgstr "Proxy"
+
+msgid "admin.overview.widget.status.proxy.plaintext"
+msgstr "FORWARDED_ALLOW_IPS vertrouwt een andere proxy dan de meegeleverde en de verbinding loopt zonder TLS naar web: het verkeer tussen proxy en web is onversleuteld. Zet WEB_TLS_CERT_FILE en WEB_TLS_KEY_FILE (runbook)"
+
 msgid "audit.job.send_rebook_request"
 msgstr "Verzoek om opnieuw te plannen versturen"
 
@@ -8676,6 +8700,9 @@ msgstr "{count} mislukt"
 
 msgid "admin.settings.logging.open"
 msgstr "Logbestemmingen openen"
+
+msgid "settings.field.max_font_unpacked_bytes.label"
+msgstr "Grootste uitgepakte omvang van een geüpload lettertype (bytes)"
 
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Maximale grootte van een configuratiepakket (MB)"

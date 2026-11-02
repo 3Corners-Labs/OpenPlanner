@@ -108,8 +108,8 @@ test('the participant tries the connection, joins the call, and the admin follow
   await expect(fact(page, 'Medewerker binnen')).toHaveText('Ja');
   await expectNoAxeViolations(page);
 
-  // Today's agenda shows the call with the agent in.
-  await page.goto('/admin/groups/demo-reis/agenda');
+  // The agenda of the day the call starts on (not "today": near midnight that day moves) shows the call with the agent in.
+  await page.goto(paths.call_agenda);
   const row = page.getByRole('row').filter({ has: page.locator(`a[href="${paths.call_booking}"]`) });
   await expect(row).toContainText('Ja');
   await expectNoAxeViolations(page);

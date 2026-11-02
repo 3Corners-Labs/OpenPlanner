@@ -9,10 +9,13 @@ from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
-from starlette.responses import Response
+from sqlalchemy.exc import DBAPIError
+from starlette.responses import JSONResponse, Response
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.security_log import (
+    DATABASE_ERROR,
+    DATABASE_FAILED,
     RATE_LIMITED,
     REQUEST_REJECTED,
     TOKEN_REJECTED,
@@ -22,7 +25,7 @@ from app.domain.security_log import (
 from app.web.errors import ERROR_KEYS, status_for
 from app.web.locale import resolve_locale
 from app.web.protection import RejectedRequest, count_unknown_link
-from app.web.security_events import report
+from app.web.security_events import report, report_failure
 from app.web.templates import create_templates, render
 
 templates = create_templates([])
@@ -113,9 +116,31 @@ async def rate_limited_page(request: Request, exc: Exception) -> Response:
     return _rate_limited_response(request)
 
 
+async def database_error_page(request: Request, exc: Exception) -> Response:
+    """Answer a database error with 503 and a catalogue text, after leaving a coded event.
+
+    The transaction has been rolled back by then. The exception is not logged with its text
+    (ASVS V16.2.5); the event carries the code ``database_error`` and the surface only.
+    """
+    machine = request.url.path.startswith(MACHINE_PREFIXES)
+    await report_failure(
+        request,
+        DATABASE_ERROR,
+        DATABASE_FAILED,
+        detail="surface:agent" if machine else "surface:web",
+    )
+    if machine:
+        response: Response = JSONResponse({"error": "database_unavailable"}, status_code=503)
+    else:
+        response = _page(request, 503, "error.title", "error.database_unavailable")
+    response.headers["retry-after"] = "60"
+    return response
+
+
 def register_error_pages(app: FastAPI) -> None:
     """Install the handlers on ``app``."""
     app.add_exception_handler(DomainError, domain_error_page)
     app.add_exception_handler(RejectedRequest, rejected_request_page)
     app.add_exception_handler(RateLimitExceeded, rate_limited_page)
     app.add_exception_handler(RequestValidationError, validation_error_page)
+    app.add_exception_handler(DBAPIError, database_error_page)
