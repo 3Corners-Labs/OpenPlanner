@@ -2,7 +2,8 @@
 
 ``scripts/render-keycloak-realm.sh`` generates the secrets of ``secrets/keycloak.env`` and
 renders ``deploy/keycloak/realm.template.json`` into ``secrets/keycloak-realm.json``. Both
-files must be mode 600, the script prints no value, and nothing ``dev-only-`` may remain.
+env files must be mode 600 and the realm 644 inside a 700 directory (Keycloak reads it as
+its own user), the script prints no value, and nothing ``dev-only-`` may remain.
 """
 
 import json
@@ -159,7 +160,8 @@ def test_missing_values_are_generated_and_kept_private(tmp_path: Path) -> None:
     assert set(FIXED) <= set(env)
     assert all(len(env[key]) >= 32 for key in FIXED)
     assert mode(tmp_path / "secrets/keycloak.env") == 0o600
-    assert mode(tmp_path / "secrets/keycloak-realm.json") == 0o600
+    assert mode(tmp_path / "secrets/keycloak-realm.json") == 0o644
+    assert mode(tmp_path / "secrets") == 0o700
     for value in (env[key] for key in FIXED):
         assert value not in result.stdout + result.stderr
     assert (
@@ -281,7 +283,12 @@ def test_the_dev_and_idp_services_pin_the_same_image() -> None:
 
 
 def test_the_realm_asks_for_a_second_factor_and_says_so_in_the_token() -> None:
-    """ADR 0100: acr ``mfa`` is level 2, the flow asks for OTP or WebAuthn at that level."""
+    """ADR 0100: acr ``mfa`` is level 2, and the flow asks for OTP at that level.
+
+    OTP is required, not an alternative: Keycloak skips an alternative the person has not set
+    up yet, so a first login (``CONFIGURE_TOTP`` pending) failed on docker01 with alternatives.
+    WebAuthn stays in the flow, switched off, until it gets a condition of its own.
+    """
     realm = json.loads(TEMPLATE.read_text(encoding="utf-8"))
     (client,) = [c for c in realm["clients"] if c["clientId"] == "openplanner-admin"]
     flows = {f["alias"]: f for f in realm["authenticationFlows"]}
@@ -297,6 +304,28 @@ def test_the_realm_asks_for_a_second_factor_and_says_so_in_the_token() -> None:
         "auth-otp-form",
         "webauthn-authenticator",
     }
+    requirement = {e["authenticator"]: e["requirement"] for e in second}
+    assert requirement["auth-otp-form"] == "REQUIRED"
+    assert requirement["webauthn-authenticator"] == "DISABLED"
     assert config["config"]["loa-condition-level"] == "2"
     assert "CONFIGURE_TOTP" in super_user["requiredActions"]
     assert realm["resetPasswordAllowed"] is True  # self-service reset at the login prompt
+
+
+def test_the_otp_policy_is_the_one_every_authenticator_app_reads() -> None:
+    """TOTP with SHA1, 6 digits and 30 seconds (RFC 6238 defaults).
+
+    Google and Microsoft Authenticator, Duo Mobile and FreeOTP all read it. An import that
+    names only the type sets the digits and the period to 0: the codes never match, and
+    Keycloak offers FreeOTP alone (docker01, 2026-11-02).
+    """
+    realm = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+
+    assert {k: v for k, v in realm.items() if k.startswith("otpPolicy")} == {
+        "otpPolicyType": "totp",
+        "otpPolicyAlgorithm": "HmacSHA1",
+        "otpPolicyDigits": 6,
+        "otpPolicyPeriod": 30,
+        "otpPolicyLookAheadWindow": 1,
+        "otpPolicyInitialCounter": 0,
+    }

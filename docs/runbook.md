@@ -755,6 +755,33 @@ for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`)
 host itself needs nothing more; reaching the login from another machine goes through the proxy
 and is step 2. The admin console is bound to the host's loopback and is never published.
 
+**Mail from Keycloak.** Invitations and password resets of the Staff screen are sent by
+Keycloak itself, not by OpenPlanner. The rendered realm has no mail server yet; set one in the
+admin console (realm `openplanner` → *Realm settings* → *Email*) or with `kcadm.sh update
+realms/openplanner -s 'smtpServer={"host":"…","port":"…","from":"…"}'`. On a lab with the `dev`
+profile, Mailpit (`mailpit:1025`, no authentication) catches them. Without it an invitation
+creates the person but reports that the mail failed.
+
+**Moving a lab from the development realm to the bundled one (ADR 0106 step 6).** Done on
+docker01 on 2026-11-02, without root:
+
+1. Back up `.env`, `docker-compose.override.yml` and the old realm file, and export the users
+   with their entitlements (`kcadm.sh get users -r openplanner -q briefRepresentation=false`);
+   their passwords do not move.
+2. Bring the checkout to the running release (`git merge --ff-only v<version>`), so compose
+   has the `idp` service.
+3. Write `KC_HOSTNAME` and `KC_OPENPLANNER_BASE_URL` to `secrets/keycloak.env` and run
+   `scripts/render-keycloak-realm.sh`.
+4. In `docker-compose.override.yml`, switch the old service off and run `idp` under the
+   profile the installer set: `keycloak: profiles: !override [lab-old-keycloak]` and
+   `idp: profiles: !override [dev]` with its published port.
+5. In `.env`, point `OIDC_DISCOVERY_URL` at `http://idp:8080/realms/openplanner/...`, set
+   `OIDC_CLIENT_SECRET` to `KC_OPENPLANNER_CLIENT_SECRET`, and drop any `KEYCLOAK_*` lines
+   (`secrets/keycloak-app.env` holds them).
+6. `docker compose --env-file .env.update up -d idp web worker`, then `python -m app.cli
+   oidc-check`, set the mail server, log in as `super`, and invite the test users again on
+   the Staff screen.
+
 **First login of `super`.** Read the first password on the host
 (`grep KC_SUPER_PASSWORD secrets/keycloak.env`), log in to the portal as `super`, and Keycloak
 asks for a new password before it returns to the portal (the required action

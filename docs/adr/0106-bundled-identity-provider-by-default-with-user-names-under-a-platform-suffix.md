@@ -3,8 +3,10 @@
 Status: accepted (2026-11-02, `po:approved` on #425), requested by the product owner. Amends ADR 0090 point 1 (the
 bundled Keycloak becomes the default in every installer mode, production included), ADR 0095
 (the user name of a staff member it creates) and ADR 0083 points 11 and 13 (a reserved domain
-that always routes to the platform provider). Partly built: step 1 (#425) and step 2 (#429)
-merged, step 3 in #430; steps 4 to 6 open.
+that always routes to the platform provider). Partly built: steps 1 to 4 merged (#425, #429,
+#430, #443 with ADR 0083 step 3 in #448 and #453); step 6 live on docker01 since 2026-11-02;
+step 5 open. Found on docker01: the rendered realm has no mail server, so the Staff screen's
+invitations need one set by hand until the installer does it (runbook).
 
 ## Context
 
@@ -138,7 +140,7 @@ identifiers and DNS labels, which is a format rule, not a preference.
 | 0 | ADR | #425 | merged |
 | 1 | Render script writes the application's half; development realm gets `openplanner-directory`; compose `env_file` | #427, merged with #425 | merged |
 | 2 | Staff screen notice and System status check for an unconnected directory (point 3) | #429 | merged |
-| 3 | User names under the suffix: setting, invite form, adapter, scope check, `username` masked (points 5–8, 11) | #430 | in PR |
-| 4 | Reserved suffix in the login routing and the provider registration; login label (points 9, 10) | #443 (claims, setting), routing with ADR 0083 step 3c | in PR |
+| 3 | User names under the suffix: setting, invite form, adapter, scope check, `username` masked (points 5–8, 11) | #430 | merged |
+| 4 | Reserved suffix in the login routing and the provider registration; login label (points 9, 10) | #443, #453 | merged |
 | 5 | Installer `--idp bundled\|own` default in every mode; production `start` with `idp-db`, proxy, backup and runbook (points 1, 4) | – | planned |
-| 6 | docker01 moved to the bundled provider (point 12); interim: directory client added to the lab realm by hand on 2026-11-02 | – | planned |
+| 6 | docker01 moved to the bundled provider (point 12): realm rendered, `idp` under the `dev` profile on port 8780, the old lab realm off, mail to Mailpit; users to re-invite; render-script mode fix in this PR | #455 | in PR |
