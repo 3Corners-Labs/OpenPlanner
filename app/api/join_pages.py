@@ -1,18 +1,19 @@
-"""The participant's way into the video call (ADR 0017): ``/b/{token}/join``.
+"""The participant's way into the video call (ADR 0017): ``/b/m/{ref}/join``.
 
 The email links here, not to Webex: the link never expires, nothing about the participant is sent
 to Webex for it, and opening and clicking are recorded on the booking's timeline. The page
 opens 15 minutes before the start; before that (and while the meeting is being prepared) it
 shows the time and a button to check again. It never reloads by itself (WCAG 2.2.1).
 
-    GET /b/{token}/join      status page (too early / open / ended / not active)
-    GET /b/{token}/join/go   record the click, 303 to the meeting's Webex link
+    GET /b/m/{ref}/join      status page (too early / open / ended / not active)
+    GET /b/m/{ref}/join/go   record the click, 303 to the meeting's Webex link
 """
 
 from fastapi import APIRouter, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.api.labels import slot_label
+from app.api.link_session import authorise
 from app.api.participant import participant_page
 from app.domain.calls import JOIN_OPENS_BEFORE, EventKind, JoinState, join_link, join_state
 from app.domain.integration import IntegrationService
@@ -35,13 +36,13 @@ def _services(request: Request) -> tuple[BookingService, IntegrationService, Clo
     return state.booking_service, state.integration_service, state.clock
 
 
-@router.get("/b/{token}/join", response_class=HTMLResponse)
+@router.get("/b/m/{public_ref}/join", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def join_page(request: Request, token: str) -> HTMLResponse:
+async def join_page(request: Request, public_ref: str) -> HTMLResponse:
     """Show whether the call can be joined now, and the button when it can."""
     bookings, integration, clock = _services(request)
     locale = resolve_locale(request)
-    details = await bookings.find(token)
+    details = await bookings.find(await authorise(request, public_ref))
     follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
     state = join_state(booking, clock.now())
@@ -49,7 +50,7 @@ async def join_page(request: Request, token: str) -> HTMLResponse:
         await integration.record(booking.id, EventKind.JOIN_PAGE_OPENED)
     context = {
         "group": group,
-        "token": token,
+        "ref": public_ref,
         "state": state.value,
         "refresh": state in REFRESHING,
         "trial_offered": group.trial_call_enabled and group.video_enabled,
@@ -59,19 +60,19 @@ async def join_page(request: Request, token: str) -> HTMLResponse:
     return await participant_page(request, locale, "join.html", group, context)
 
 
-@router.get("/b/{token}/join/go")
+@router.get("/b/m/{public_ref}/join/go")
 @limiter.limit(read_limit)
-async def join_go(request: Request, token: str) -> Response:
+async def join_go(request: Request, public_ref: str) -> Response:
     """Send the participant to the meeting, or back to the status page when it is not open."""
     bookings, integration, clock = _services(request)
-    details = await bookings.find(token)
+    details = await bookings.find(await authorise(request, public_ref))
     follow(request, details.group.organisation_id)
     booking = details.booking
     # The link comes from Webex: ``join_link`` refuses anything but https and sets the group's
     # client (ADR 0075), so nothing else can ever become a redirect.
     link = join_link(booking.meeting.link if booking.meeting else None, details.group.join_client)
     if join_state(booking, clock.now()) is not JoinState.OPEN or not link or booking.id is None:
-        return RedirectResponse(f"/b/{token}/join", status_code=303)
+        return RedirectResponse(f"/b/m/{public_ref}/join", status_code=303)
     await integration.record(
         booking.id, EventKind.JOIN_CLICKED, detail=details.group.join_client.value
     )

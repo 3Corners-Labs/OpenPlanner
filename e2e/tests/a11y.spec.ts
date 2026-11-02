@@ -12,10 +12,10 @@ for (const variant of pageVariants()) {
     // networkidle: the widget pages render after their API calls (ADR 0035).
     await page.goto(variant.path, { waitUntil: 'networkidle' });
     // ADR 0093: the link from an email trades its token for a cookie and ends on a page whose
-    // address holds no credential. The trial, join and waiting pages follow in a later step.
-    if (/^\/b\/[^/?]+(\/confirm)?(\?|$)/.test(variant.path)) {
+    // address holds no credential: the confirm, trial and join pages included.
+    if (/^\/b\/[^/?]+(\/(confirm|test|join))?(\?|$)/.test(variant.path)) {
       const token = variant.path.split(/[/?]/)[2];
-      expect(new URL(page.url()).pathname).toMatch(/^\/b\/m\/[\w-]+(\/confirm)?$/);
+      expect(new URL(page.url()).pathname).toMatch(/^\/b\/m\/[\w-]+(\/(confirm|test|join))?$/);
       expect(page.url()).not.toContain(token);
     }
     await expectNoAxeViolations(page);

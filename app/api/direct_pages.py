@@ -11,16 +11,17 @@ is reached the form says all agents are busy; the form and the waiting page show
 in line and the usual wait from OpenPlanner's own data (ADR 0026).
 
     GET  /g/{slug}/direct          form (or "not possible now")
-    POST /g/{slug}/direct          start, then 303 to the waiting page
-    GET  /b/{token}/wait           status: searching / accepted / in the call / no agent / failed
-    GET  /b/{token}/wait/status    the same as a fragment; 204 while ``seen`` is current
-    GET  /b/{token}/wait/leave     "stop waiting?": says what happens, with one form
-    POST /b/{token}/wait/leave     cancel the call, end the work item, 303 to the waiting page
+    POST /g/{slug}/direct          start, set the participant cookie, 303 to the waiting page
+    GET  /b/m/{ref}/wait           status: searching / accepted / in the call / no agent / failed
+    GET  /b/m/{ref}/wait/status    the same as a fragment; 204 while ``seen`` is current
+    GET  /b/m/{ref}/wait/leave     "stop waiting?": says what happens, with one form
+    POST /b/m/{ref}/wait/leave     cancel the call, end the work item, 303 to the waiting page
 
 Stopping (ADR 0019 point 4) works without a script: the waiting page links to the question and
-the answer is a plain POST, same-origin and rate limited like a booking. The token stays in the
-path of the page it belongs to and never reaches a log or a job; the outcome is a fixed word in
-the query (``status=left`` or ``left_agent``), no personal data.
+the answer is a plain POST, same-origin and rate limited like a booking. The pages sit under the
+booking's public reference and are opened with the participant cookie (ADR 0093); a call started
+here sets that cookie in its own response, so no token is ever in a URL. The outcome of stopping
+is a fixed word in the query (``status=left`` or ``left_agent``), no personal data.
 """
 
 import hashlib
@@ -37,6 +38,7 @@ from app.api.contact_form import (
     load_contact_form,
     read_contact,
 )
+from app.api.link_session import authorise, start
 from app.api.participant import participant_page, templates
 from app.api.trace import bind_group_from_path
 from app.domain.booking import BookingKind
@@ -91,7 +93,7 @@ class WaitView:
     """The waiting page's status: what the page and its fragment render."""
 
     group: Group
-    token: str
+    ref: str
     state: WaitState
     queue: QueueInfo | None
     joinable: bool
@@ -109,7 +111,7 @@ class WaitView:
         text = LEFT_TEXT[self.left] if self.left and self.state is WaitState.INACTIVE else None
         return {
             "group": self.group,
-            "token": self.token,
+            "ref": self.ref,
             "state": self.state.value,
             "status_text": locale.gettext(text or WAIT_TEXT[self.state]),
             "queue": self.queue,
@@ -118,7 +120,7 @@ class WaitView:
             "over": self.state in OVER,
             "schedule": self.state in OVER or self.state is WaitState.INACTIVE,
             "leavable": self.state in LEAVABLE,
-            "poll": f"/b/{self.token}/wait/status?seen={self.key}" if polling else None,
+            "poll": f"/b/m/{self.ref}/wait/status?seen={self.key}" if polling else None,
             "poll_seconds": follow(request, self.group.organisation_id).queue_refresh_seconds,
         }
 
@@ -195,17 +197,17 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
         await calls.create_now(receipt.booking, group, request.app.state.clock.now())
     except (IntegrationError, DomainError) as exc:  # the worker's jobs will retry
         log.warning("direct.deferred", booking_id=receipt.booking.id, error=type(exc).__name__)
-    return RedirectResponse(f"/b/{receipt.management_token}/wait", status_code=303)
+    return await start(request, receipt.booking.id or 0, f"/b/m/{receipt.booking.public_ref}/wait")
 
 
 async def _wait_view(
-    request: Request, token: str, left: Literal["left", "left_agent"] | None = None
+    request: Request, public_ref: str, left: Literal["left", "left_agent"] | None = None
 ) -> WaitView | None:
-    """Load the direct call behind ``token`` and decide what its page says.
+    """Load the direct call behind ``public_ref`` and decide what its page says.
 
     Returns ``None`` for a scheduled booking, whose management page is the place to be.
     """
-    details = await _bookings(request).find(token)
+    details = await _bookings(request).find(await authorise(request, public_ref))
     follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
     if booking.kind is not BookingKind.DIRECT or booking.id is None:
@@ -220,67 +222,70 @@ async def _wait_view(
         else None
     )
     joinable = state not in OVER and join_state(booking, now) is JoinState.OPEN
-    return WaitView(group, token, state, queue, joinable, left)
+    return WaitView(group, public_ref, state, queue, joinable, left)
 
 
-@router.get("/b/{token}/wait", response_class=HTMLResponse)
+@router.get("/b/m/{public_ref}/wait", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def wait_page(
-    request: Request, token: str, locale: Locale, status: LeftStatus = None
+    request: Request, public_ref: str, locale: Locale, status: LeftStatus = None
 ) -> Response:
     """Show the status of a direct call, with the join button while it is open.
 
     ``status`` is set by the redirect after stopping, so the page says what happened.
     """
-    view = await _wait_view(request, token, status)
+    view = await _wait_view(request, public_ref, status)
     if view is None:
-        return RedirectResponse(f"/b/{token}", status_code=303)
+        return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
     context = view.context(request, locale)
     return await participant_page(request, locale, "wait.html", view.group, context)
 
 
-@router.get("/b/{token}/wait/status", response_class=HTMLResponse)
+@router.get("/b/m/{public_ref}/wait/status", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def wait_status(request: Request, token: str, locale: Locale, seen: Seen = "") -> Response:
+async def wait_status(
+    request: Request, public_ref: str, locale: Locale, seen: Seen = ""
+) -> Response:
     """Return the status fragment for the page's poller; 204 while ``seen`` is current."""
-    view = await _wait_view(request, token)
+    view = await _wait_view(request, public_ref)
     if view is None:
-        return RedirectResponse(f"/b/{token}", status_code=303)
+        return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
     if view.key == seen:
         return Response(status_code=204, headers={"cache-control": "no-store"})
     return render(templates, request, "_wait_status.html", locale, view.context(request, locale))
 
 
-@router.get("/b/{token}/wait/leave", response_class=HTMLResponse)
+@router.get("/b/m/{public_ref}/wait/leave", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def leave_page(request: Request, token: str, locale: Locale) -> Response:
+async def leave_page(request: Request, public_ref: str, locale: Locale) -> Response:
     """Ask whether the participant wants to stop waiting, and say what that does."""
-    view = await _wait_view(request, token)
+    view = await _wait_view(request, public_ref)
     if view is None:
-        return RedirectResponse(f"/b/{token}", status_code=303)
+        return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
     if view.state is WaitState.INACTIVE:
-        return RedirectResponse(f"/b/{token}/wait", status_code=303)
+        return RedirectResponse(f"/b/m/{public_ref}/wait", status_code=303)
     context = {
         "group": view.group,
-        "token": token,
+        "ref": public_ref,
         "agent": view.state in (WaitState.ACCEPTED, WaitState.IN_CALL),
     }
     return await participant_page(request, locale, "wait_leave.html", view.group, context)
 
 
-@router.post("/b/{token}/wait/leave", response_class=HTMLResponse)
+@router.post("/b/m/{public_ref}/wait/leave", response_class=HTMLResponse)
 @limiter.limit(booking_limit)
-async def leave(request: Request, token: str, locale: Locale, _: SameOrigin) -> Response:
+async def leave(request: Request, public_ref: str, locale: Locale, _: SameOrigin) -> Response:
     """Stop waiting: cancel the call and end its work item (ADR 0019 point 4).
 
     Repeating it, or leaving a call that already ended, only shows the waiting page again.
     """
-    details = await _bookings(request).find(token)
+    ref = await authorise(request, public_ref)
+    details = await _bookings(request).find(ref)
     follow(request, details.group.organisation_id)
     if details.booking.kind is not BookingKind.DIRECT:
-        return RedirectResponse(f"/b/{token}", status_code=303)
+        return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
     bind_booking(details.booking.id or 0)
-    left = await _bookings(request).leave_direct(token)
+    left = await _bookings(request).leave_direct(ref)
     if left.changed:
         meeting = left.booking.meeting
         log.info(
@@ -290,5 +295,7 @@ async def leave(request: Request, token: str, locale: Locale, _: SameOrigin) -> 
             agent_present=left.agent_present,
         )
     outcome = "left_agent" if left.agent_present else "left"
-    target = f"/b/{token}/wait?status={outcome}" if left.changed else f"/b/{token}/wait"
+    target = (
+        f"/b/m/{public_ref}/wait?status={outcome}" if left.changed else f"/b/m/{public_ref}/wait"
+    )
     return RedirectResponse(target, status_code=303)

@@ -21,6 +21,7 @@ from tests.admin.test_call_routes import FRIDAY_0900
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
 from tests.support.domain import ADA, NOW, TEST_TOKEN_KEY, book_confirmed
+from tests.support.participant import open_link
 
 HOST = "host@example.nl"
 
@@ -179,9 +180,10 @@ async def test_the_trial_call_can_be_played_and_leaves_the_call_status_alone(
     await _play(site, booking_id, "prepare")
 
     # The participant's trial page now offers the way in, to the stand-in meeting (ADR 0075).
-    trial_page = (await site.client.get(f"/b/{token}/test")).text
+    base = await open_link(site.client, token)
+    trial_page = (await site.client.get(f"{base}/test")).text
     assert "Naar het proefgesprek" in trial_page
-    way_in = await site.client.get(f"/b/{token}/test/go")
+    way_in = await site.client.get(f"{base}/test/go")
     assert way_in.status_code == 303
     assert way_in.headers["location"] == f"{SIMULATED_LINK}?launchApp=true"
 
