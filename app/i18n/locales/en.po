@@ -5938,6 +5938,9 @@ msgstr "Parts of Advanced settings"
 msgid "admin.page_toc"
 msgstr "On this page"
 
+msgid "admin.group.settings.general"
+msgstr "General"
+
 msgid "admin.settings.intro"
 msgstr "How this installation is configured and where each value comes from. Secret values are never shown. The superuser changes operations, retention, storage, rate limits and sessions here; a change applies within ten seconds."
 

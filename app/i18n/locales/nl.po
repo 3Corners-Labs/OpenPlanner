@@ -5938,6 +5938,9 @@ msgstr "Onderdelen van Geavanceerde instellingen"
 msgid "admin.page_toc"
 msgstr "Op deze pagina"
 
+msgid "admin.group.settings.general"
+msgstr "Algemeen"
+
 msgid "admin.settings.intro"
 msgstr "Hoe deze installatie is ingesteld en waar elke waarde vandaan komt. Geheime waarden worden nooit getoond. De superuser wijzigt hier bedrijfsvoering, bewaartermijnen, opslag, snelheidslimieten en sessies; een wijziging geldt binnen tien seconden."
 

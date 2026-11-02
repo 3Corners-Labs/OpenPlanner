@@ -1,20 +1,14 @@
 {% extends "admin/layout.html" %}
 {% from "_error_message.html" import error_message %}
+{% from "admin/_page_toc.html" import page_toc with context %}
 {% from "admin/_setting_form.html" import setting_row, setting_head with context %}
 {% block title %}{{ _("admin.settings.tab.values") }} – {{ _("admin.settings.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_settings_header.html" %}
-{% if sections %}
-<nav class="card page-toc" aria-labelledby="toc-heading">
-  <h2 id="toc-heading">{{ _("admin.page_toc") }}</h2>
-  <ul>
-    {% if login_form %}<li><a href="#login-heading">{{ _("admin.settings.login.title") }}</a></li>{% endif %}
-    {% for section in sections %}
-    <li><a href="#topic-{{ section.key }}">{{ section.heading }}</a></li>
-    {% endfor %}
-  </ul>
-</nav>
-{% endif %}
+{% set topics = [] %}
+{% if login_form %}{% set added = topics.append(("#login-heading", _("admin.settings.login.title"))) %}{% endif %}
+{% for section in sections %}{% set added = topics.append(("#topic-" ~ section.key, section.heading)) %}{% endfor %}
+{{ page_toc(topics) }}
 {% if login_form %}
 <form class="card" method="post" action="/admin/settings/login/test" novalidate aria-labelledby="login-heading">
   <h2 id="login-heading">{{ _("admin.settings.login.title") }}</h2>
