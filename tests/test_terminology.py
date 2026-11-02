@@ -153,6 +153,8 @@ def test_the_texts_and_docs_never_say_the_booking_is_anonymised() -> None:
         for path, only_texts in guarded_files()
         for number, line in (catalogue_texts(path) if only_texts else plain_lines(path))
         if ANONYMISED.search(line)
+        and "never anonymised" not in line
+        and 'never "anonymised"' not in line
         and not path.name.startswith(("0102-", "HANDOVER"))
         and path.name != "adr-status.md"
     ]
