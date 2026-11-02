@@ -1,6 +1,6 @@
 # 0098. Admin sessions held on the server
 
-Status: proposed (2026-11-01); partly built: step 1 (register, logout revokes, rotation, idle and absolute check) and step 4 (cookie `__Host-op_admin`, `Secure` on https) are built, steps 2 and 3 are planned. Requested by the product owner after the ASVS 5.0.0 L2 audit of
+Status: proposed (2026-11-01); partly built: step 1 (register, logout revokes, rotation, idle and absolute check), step 4 (cookie `__Host-op_admin`, `Secure` on https) and step 2 (clean-up, `sessions end-all`, restore, runbook) are built, step 3 is planned. Requested by the product owner after the ASVS 5.0.0 L2 audit of
 1 November 2026 (V7, V3.3). Supersedes ADR 0013 §5 (Session); the rest of ADR 0013 stands.
 See *Build status*. Merged in #337 on 2026-11-01 without `po:approved`
 before the merge (the label followed seven minutes later); awaiting the product owner's
@@ -150,7 +150,7 @@ the register, the idle check or the revocation at logout.
 |---|---|---|---|
 | 0 | ADR proposed | #337 | merged |
 | 1 | Register, logout revokes, rotation at login, idle and absolute check, settings, data-flow entry (WP3) | #350 | merged |
-| 2 | Worker clean-up, `sessions end-all`, restore and rollback call it, runbook (WP4) | | planned |
+| 2 | Worker clean-up, `sessions end-all`, restore and rollback call it, runbook (WP4) | #381 | built |
 | 3 | Sessions viewable and endable: own list, administrator action, new permission, matrix, manual (WP5; a decision PR because it changes `authorization.py`) | | planned |
 | 4 | Cookie `__Host-op_admin`, `Path=/`, `Secure` on https (WP6) | #363 | built |
 

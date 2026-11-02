@@ -103,3 +103,61 @@ async def test_the_table_holds_hashes_never_a_reference(
 
     assert "sid" not in columns
     assert row.id_hash == "a" * 64
+
+
+async def test_end_all_ends_only_live_sessions_and_keeps_the_first_reason(
+    uow: SqlUnitOfWork,
+) -> None:
+    async with uow.locked() as tx:
+        await tx.add_admin_session(_session("1" * 64))
+        await tx.add_admin_session(_session("2" * 64, subject="sub-2"))
+        await tx.add_admin_session(_session("3" * 64))
+        await tx.end_admin_session("3" * 64, EndReason.LOGOUT, NOW)
+
+    async with uow.locked() as tx:
+        ended = await tx.end_all_admin_sessions(EndReason.RESTORE, NOW + timedelta(minutes=5))
+
+    async with uow.read() as tx:
+        found = [await tx.get_admin_session(h * 64) for h in "123"]
+    assert ended == 2
+    assert [s.end_reason for s in found if s] == [
+        EndReason.RESTORE,
+        EndReason.RESTORE,
+        EndReason.LOGOUT,
+    ]
+
+
+async def test_delete_removes_only_ended_or_past_lifetime_rows(uow: SqlUnitOfWork) -> None:
+    fresh = AdminSession("1" * 64, "sub-1", "platform", CLAIMS, NOW, NOW)
+    ended = AdminSession("2" * 64, "sub-1", "platform", CLAIMS, NOW, NOW)
+    old = AdminSession("3" * 64, "sub-2", "platform", CLAIMS, NOW - timedelta(hours=9), NOW)
+    async with uow.locked() as tx:
+        for session in (fresh, ended, old):
+            await tx.add_admin_session(session)
+        await tx.end_admin_session("2" * 64, EndReason.LOGOUT, NOW)
+
+    async with uow.locked() as tx:
+        deleted = await tx.delete_admin_sessions(NOW - timedelta(hours=8))
+
+    async with uow.read() as tx:
+        left = [await tx.get_admin_session(h * 64) for h in "123"]
+    assert deleted == 2
+    assert [s is not None for s in left] == [True, False, False]
+
+
+async def test_the_service_cleans_by_the_lifetime_it_is_given(uow: SqlUnitOfWork) -> None:
+    from app.domain.admin_session_service import AdminSessionService
+    from tests.fakes.clock import FixedClock
+
+    old = AdminSession("1" * 64, "sub-1", "platform", CLAIMS, NOW - timedelta(hours=9), NOW)
+    live = AdminSession("2" * 64, "sub-1", "platform", CLAIMS, NOW - timedelta(hours=7), NOW)
+    async with uow.locked() as tx:
+        await tx.add_admin_session(old)
+        await tx.add_admin_session(live)
+
+    deleted = await AdminSessionService(uow, FixedClock(NOW)).clean(timedelta(hours=8))
+
+    async with uow.read() as tx:
+        assert await tx.get_admin_session("1" * 64) is None
+        assert await tx.get_admin_session("2" * 64) is not None
+    assert deleted == 1

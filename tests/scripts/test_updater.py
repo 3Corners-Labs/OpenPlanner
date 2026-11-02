@@ -209,6 +209,53 @@ def test_unhealthy_update_restores_the_backup_and_the_previous_digest(host: Host
     assert not host.state_file.exists()
 
 
+END_SESSIONS = (
+    "docker compose run --rm --no-deps -T web python -m app.cli sessions end-all --reason restore"
+)
+
+
+def test_a_rollback_ends_every_admin_session_before_the_old_version_starts(host: Host) -> None:
+    host.given("unhealthy", f"{NEW}\n")
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+
+    host.run()
+
+    restore = "docker compose run --rm --no-deps -T web python -m app.cli restore-db request-7"
+    assert host.index(restore) < host.index(END_SESSIONS) < host.index(UP, pinned=OLD)
+    assert host.commands().count(END_SESSIONS) == 1
+
+
+def test_a_healthy_update_restores_nothing_and_ends_no_session(host: Host) -> None:
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+
+    host.run()
+
+    assert END_SESSIONS not in host.commands()
+
+
+def test_a_restore_that_returns_to_the_newer_version_ends_the_sessions_too(host: Host) -> None:
+    updated(host)
+    host.given("unhealthy", f"{OLD}\n")
+    host.given("claim", "8 restore 1.3.0 1.4.0\n")
+
+    host.run()
+
+    assert host.commands().count(END_SESSIONS) == 1
+    assert reports(host)[-1] == cli("update-report", "8", "rolled_back", "health_check_failed")
+
+
+def test_sessions_that_cannot_be_ended_do_not_stop_the_rollback(host: Host) -> None:
+    host.given("unhealthy", f"{NEW}\n")
+    host.given("fail", "sessions\n")
+    host.given("claim", "7 update 1.4.0 1.3.0\n")
+
+    result = host.run()
+
+    assert host.pinned() == OLD
+    assert reports(host)[-1] == cli("update-report", "7", "rolled_back", "health_check_failed")
+    assert "sessions could not be ended" in result.stderr
+
+
 def test_restore_downgrades_the_schema_then_runs_the_previous_digest(host: Host) -> None:
     updated(host)
     host.given("claim", "8 restore 1.3.0 1.4.0\n")
