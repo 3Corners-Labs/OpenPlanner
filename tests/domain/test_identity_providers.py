@@ -172,3 +172,16 @@ def test_the_mfa_policy_defaults_to_record_and_is_validated() -> None:
         with pytest.raises(DomainError) as refused:
             draft(**bad)
         assert refused.value.code is ErrorCode.INVALID_CONFIGURATION
+
+
+def test_outside_production_the_announced_issuer_is_pinned() -> None:
+    """A development Keycloak announces its browser address; the app fetches it internally."""
+    document = {**discovery_document(ISSUER), "issuer": "http://127.0.0.1:8080/realms/andere"}
+
+    pinned = check_discovery(
+        document, DISCOVERY_URL, ClientAuth.PRIVATE_KEY_JWT, strict_issuer=False
+    )
+
+    assert pinned == "http://127.0.0.1:8080/realms/andere"
+    with pytest.raises(DiscoveryRefusedError):
+        check_discovery(document, DISCOVERY_URL, ClientAuth.PRIVATE_KEY_JWT)

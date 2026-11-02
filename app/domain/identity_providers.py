@@ -326,9 +326,19 @@ class DiscoveryRefusedError(Exception):
 
 
 def check_discovery(
-    document: Mapping[str, Any], discovery_url: str, client_auth: ClientAuth
+    document: Mapping[str, Any],
+    discovery_url: str,
+    client_auth: ClientAuth,
+    *,
+    strict_issuer: bool = True,
 ) -> str:
     """Check a discovery document and return its issuer (ADR 0083 point 7).
+
+    ``strict_issuer`` (production) requires the issuer to be the discovery URL's base. Outside
+    production the announced issuer is accepted and pinned, as ``OIDC_ISSUER`` does for the
+    platform provider: a development Keycloak announces its browser address while the app
+    fetches it on the container network (ADR 0097). The login still compares every ID token
+    and RFC 9207 ``iss`` with the pinned issuer exactly.
 
     Raises:
         DiscoveryRefusedError: With the reason the document is refused.
@@ -337,7 +347,7 @@ def check_discovery(
         if not isinstance(document.get(name), str) or not document[name]:
             raise DiscoveryRefusedError(f"missing_{name}")
     issuer = str(document["issuer"])
-    if issuer != issuer_of(discovery_url):
+    if strict_issuer and issuer != issuer_of(discovery_url):
         raise DiscoveryRefusedError("issuer_mismatch")
     if "code" not in _strings(document.get("response_types_supported")):
         raise DiscoveryRefusedError("no_code_flow")

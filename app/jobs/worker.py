@@ -286,6 +286,7 @@ async def run_worker(
         SystemLog(uow, clock),
         interval=lambda: timedelta(hours=live.settings.idp_domain_recheck_hours),
         grace=lambda: timedelta(days=live.settings.idp_domain_grace_days),
+        production=settings.environment == "prod",
     )
     log.info(
         "worker.started",

@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 
 from app.domain.audit import Outcome
 from app.domain.authorization import Scope
-from app.domain.login_domains import DomainClaim, DomainState, checked
+from app.domain.login_domains import DomainClaim, DomainState, checked, lookup_record
 from app.domain.ports import Clock, MailDomainResolver, UnitOfWork
 from app.domain.system_log import SystemLog
 
@@ -45,14 +45,17 @@ class DomainWatch:
         system_log: SystemLog,
         interval: Callable[[], timedelta],
         grace: Callable[[], timedelta],
+        *,
+        production: bool = True,
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators; ``production`` as in ``login_domains.lookup_record``."""
         self._uow = uow
         self._clock = clock
         self._resolver = resolver
         self._system_log = system_log
         self._interval = interval
         self._grace = grace
+        self._production = production
 
     async def run(self) -> list[DomainClaim]:
         """Re-check every routing domain that is due; return the ones whose state changed."""
@@ -63,9 +66,7 @@ class DomainWatch:
         for claim in claims:
             if not _due(claim, now, self._interval()):
                 continue
-            found = None
-            if self._resolver is not None:
-                found = await self._resolver.txt_records(claim.record_name)
+            found = await lookup_record(claim, self._resolver, production=self._production)
             after = checked(claim, found, self._clock.now(), self._grace())
             async with self._uow.locked() as tx:
                 await tx.save_login_domain(after)
