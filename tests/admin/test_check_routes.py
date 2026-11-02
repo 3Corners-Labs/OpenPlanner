@@ -102,7 +102,12 @@ async def test_checking_shows_translated_findings_per_area(
     assert 'Uitslag: <span class="chip chip--danger">Fout</span>' in page
     assert "Webex (videogesprek)" in page
     assert "Een proefmeeting voor host host@example.nl is gepland" in page
-    assert "velden die ontbreken: meetingLink" in page
+    assert "voeg deze velden toe (Viewable Yes, Required No): meetingLink" in page
+    assert "zet Required op No bij: videoafspraak_Naam" in page
+    # The finding links to the manual section that shows the whole schema (ADR 0033).
+    assert (
+        '<a href="/admin/help/group-settings#field-wxcc_asset_schema">Zo lost u dit op</a>' in page
+    )
     assert "Geen Screen Pop" in page
     # Delivery outcomes are translated with the integrations page's labels.
     assert "Testbericht naar wxcc: " in page

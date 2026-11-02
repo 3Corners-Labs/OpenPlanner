@@ -88,7 +88,7 @@
   <h3 class="check-area">{{ area.label }}</h3>
   <ul class="check-list">
     {% for row in area.rows %}
-    <li class="check-list__item"><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ row.status }}</span><span>{{ row.text }}</span></li>
+    <li class="check-list__item"><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ row.status }}</span><span>{{ row.text }}{% if row.help %} <a href="{{ row.help }}">{{ _("admin.check.help") }}</a>{% endif %}</span></li>
     {% endfor %}
   </ul>
   {% endfor %}

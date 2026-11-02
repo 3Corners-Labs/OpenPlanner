@@ -89,6 +89,31 @@ FINDING_LABELS: dict[str, str] = {
 
 UNKNOWN_FINDING = "admin.check.unknown"
 
+FINDING_HELP: dict[str, tuple[str, str]] = {
+    "wxcc.region.wrong": ("group-settings", "wxcc_control_hub"),
+    "wxcc.channel.missing": ("group-settings", "wxcc_control_hub"),
+    "wxcc.channel.wrong_type": ("group-settings", "wxcc_control_hub"),
+    "wxcc.asset.missing": ("group-settings", "wxcc_control_hub"),
+    "wxcc.asset.wrong_channel": ("group-settings", "wxcc_control_hub"),
+    "wxcc.entry.missing": ("group-settings", "wxcc_control_hub"),
+    "wxcc.entry.no_flow": ("group-settings", "wxcc_control_hub"),
+    "wxcc.entry.inactive": ("group-settings", "wxcc_control_hub"),
+    "wxcc.queues.none": ("group-settings", "wxcc_control_hub"),
+    "wxcc.queues.wrong_type": ("group-settings", "wxcc_control_hub"),
+    "wxcc.schema.refused": ("group-settings", "wxcc_asset_schema"),
+    "wxcc.schema.hidden": ("group-settings", "wxcc_asset_schema"),
+    "wxcc.routing.not_read": ("group-settings", "wxcc_flow"),
+    "wxcc.branch.missing": ("group-settings", "wxcc_flow"),
+    "wxcc.screenpop.missing": ("group-settings", "wxcc_flow"),
+    "wxcc.probe.missing": ("group-settings", "wxcc_flow"),
+    "wxcc.probe.not_ended": ("group-settings", "wxcc_flow"),
+    "wxcc.probe.ended_here": ("group-settings", "wxcc_flow"),
+    "wxcc.probe.no_events": ("group-settings", "wxcc_events"),
+    "webhooks.wxcc_missing": ("group-settings", "wxcc_events"),
+    "webhooks.delivery_failed": ("group-settings", "wxcc_events"),
+}
+"""Manual topic and marked section that explain how to fix a finding (ADR 0033)."""
+
 AREA_LABELS: dict[CheckArea, str] = {
     CheckArea.PLATFORM: "admin.check.area.platform",
     CheckArea.WEBEX: "admin.check.area.webex",

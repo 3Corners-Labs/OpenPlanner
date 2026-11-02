@@ -4616,6 +4616,9 @@ msgstr "Check now"
 msgid "admin.check.never"
 msgstr "This group has not been checked yet."
 
+msgid "admin.check.help"
+msgstr "How to fix this"
+
 msgid "admin.check.last"
 msgstr "Last checked: {at}"
 
@@ -4740,7 +4743,7 @@ msgid "admin.check.wxcc.schema.ok"
 msgstr "The asset's schema has the fields OpenPlanner sends."
 
 msgid "admin.check.wxcc.schema.refused"
-msgstr "Webex Contact Center refuses the work item: missing fields: {missing}; required fields OpenPlanner does not know: {extra}. Change the asset's schema (runbook)."
+msgstr "Webex Contact Center refuses the work item because the asset's data schema does not match. In Control Hub, open Contact Center > Digital settings > Assets > this group's asset and change its Data schema: add these fields (Viewable Yes, Required No): {missing}; set Required to No for: {extra}. Only bookingReference has Required Yes."
 
 msgid "admin.check.wxcc.schema.hidden"
 msgstr "These fields are not visible to agents: {fields}."
@@ -4809,7 +4812,7 @@ msgid "admin.check.wxcc.probe.failed"
 msgstr "WxCC reported probe work item {task} as failed ({seconds} s): the flow or the queue refuses it."
 
 msgid "admin.check.wxcc.probe.no_events"
-msgstr "Probe work item {task} was created, but no task:new arrived within {seconds} s: the subscription is off or the webhook does not reach OpenPlanner. OpenPlanner ended the item itself."
+msgstr "Probe work item {task} was created, but no task:new arrived within {seconds} s: WxCC does not report back to OpenPlanner. See the Webhooks part of this check for the subscription and the test message. OpenPlanner ended the item itself."
 
 msgid "admin.check.wxcc.probe.not_ended"
 msgstr "Probe work item {task} arrived (task:new), but the flow did not end it within {seconds} s: check the branch on kind == probe. OpenPlanner ended the item itself."
