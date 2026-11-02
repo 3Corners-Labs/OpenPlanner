@@ -463,6 +463,9 @@ class Settings(BaseSettings):
     web_tls_cert_file: Path | None = None
     web_tls_key_file: Path | None = None
     forwarded_allow_ips: str | None = None
+    # Class B (ADR 0086): the worker's round trip to the public address; off only for a network
+    # that cannot reach its own public name from inside (NAT without hairpin).
+    public_address_check_enabled: bool = True
     # ADR 0072: the certificate source of the bundled proxy, managed in the portal.
     tls_certificate_source: Literal["acme", "own"] = "acme"
     tls_proxy_bundled: bool = False

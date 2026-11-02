@@ -37,6 +37,8 @@ When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
     ``python -m app.cli oidc-check``  check the login configuration and print the claim mapping
     ``python -m app.cli tls-check [--host H] [--port P]``  the certificate of the public address
         (ADR 0064): stored for System status; with ``--host`` another server, stored nowhere
+    ``python -m app.cli address-check``  the round trip to ``PUBLIC_BASE_URL`` through the proxy
+        (ADR 0086): stored for System status; exits 1 on a finding
     ``python -m app.cli rekey``  seal every stored secret again under the current
         ``SETTINGS_ENCRYPTION_KEY`` after a rotation (ADR 0094); idempotent, one audit event
     ``python -m app.cli purge-overdue [--dry-run]``  purge the personal data past its purge
@@ -92,6 +94,7 @@ from app.adapters.db.sealed import rekey_database
 from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.diagnostics import CheckResult, format_report, passed, run_checks
+from app.adapters.instance_probe import HttpxInstanceProbe
 from app.adapters.integrations import build_integrations, installation_box, secret_box
 from app.adapters.live_settings import LiveSettings
 from app.adapters.oidc import claim_mapping, login_claims
@@ -119,6 +122,7 @@ from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.config import Settings, environment
+from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.admin_sessions import EndReason
@@ -139,7 +143,13 @@ from app.domain.errors import DomainError
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
-from app.domain.ports import CertificateProbe, Clock, IdentityError, IntegrationError
+from app.domain.ports import (
+    CertificateProbe,
+    Clock,
+    IdentityError,
+    InstanceProbe,
+    IntegrationError,
+)
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
@@ -542,6 +552,42 @@ async def _tls_check(
         return _tls_lines(check, clock.now()), check.ok
     finally:
         await engine.dispose()
+
+
+async def _address_check(
+    settings: Settings, probe: InstanceProbe | None = None
+) -> tuple[str, bool]:
+    """Run the round trip to the public address (and the webhook address) and store it.
+
+    Returns the report and whether every address is ``ok``. A switched-off probe is reported
+    as such and counts as a pass for the exit code only when asked for on purpose.
+    """
+    if not settings.public_address_check_enabled:
+        return "not checked: PUBLIC_ADDRESS_CHECK_ENABLED is false on this server\n", True
+    engine = create_engine(settings.database_url)
+    try:
+        uow, clock = SqlUnitOfWork(engine), SystemClock()
+        watch = AddressWatch(
+            uow,
+            clock,
+            probe or HttpxInstanceProbe(),
+            SystemLog(uow, clock),
+            public_base_url=settings.public_base_url,
+            webhook_base_url=settings.webhook_base_url,
+            interval=timedelta(hours=settings.tls_check_interval_hours),
+            repeat=timedelta(hours=settings.tls_alert_repeat_hours),
+        )
+        checks = await watch.check()
+    finally:
+        await engine.dispose()
+    lines = "".join(
+        f"{c.kind.value:<9}{c.url}  {c.finding.value}"
+        f"{f' ({c.error})' if c.error else ''}"
+        f"{f'  scheme={c.scheme}' if c.scheme else ''}"
+        f"{f'  forwarded={c.forwarded.value}' if c.forwarded else ''}\n"
+        for c in checks
+    )
+    return lines, all(c.ok for c in checks)
 
 
 def _tls_lines(check: CertificateCheck, now: datetime) -> str:
@@ -1190,6 +1236,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="a JSON file with sample ID-token claims: print the grants and refused values "
         "they resolve to under the current mode and directory (ADR 0049 point 16)",
     )
+    commands.add_parser("address-check", help="the round trip to the public address")
     tls_cmd = commands.add_parser("tls-check", help="the certificate of the public address")
     tls_cmd.add_argument("--host", help="probe another server instead (stored nowhere)")
     tls_cmd.add_argument("--port", type=int, help="its port (default 443)")
@@ -1241,6 +1288,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return code
     if args.command == "tls-check":
         return _write(asyncio.run(_tls_check(Settings(), args.host, args.port)))
+    if args.command == "address-check":
+        return _write(asyncio.run(_address_check(Settings())))
     if args.command == "closure":
         return _closure(Settings(), args)
     if args.command == "config":

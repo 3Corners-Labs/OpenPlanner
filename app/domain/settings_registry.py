@@ -425,6 +425,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "System status warns unless web serves TLS (ADR 0091).",
     ),
     S(
+        "public_address_check_enabled",
+        K.BOOL,
+        True,
+        _B,
+        T.SWITCHES,
+        "Switches the worker's round trip to the public address off, for a network that cannot "
+        "reach its own public name from inside; System status then says it is not checked "
+        "(ADR 0086).",
+    ),
+    S(
         "web_tls_cert_file",
         K.PATH,
         None,
