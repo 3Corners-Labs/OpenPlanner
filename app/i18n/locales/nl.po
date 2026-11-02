@@ -9443,3 +9443,6 @@ msgstr "Deze identity provider heeft het maximum van 20 domeinen bereikt."
 
 msgid "admin.form.error.idp_domain_not_found"
 msgstr "Dit domein hoort niet (meer) bij deze identity provider."
+
+msgid "settings.field.idp_domain_recheck_hours.label"
+msgstr "Herhaalcontrole logindomeinen (uren)"
