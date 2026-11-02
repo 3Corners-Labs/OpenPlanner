@@ -19,6 +19,21 @@ async def test_an_org_admin_lists_and_opens_their_own_organisation(site: Site) -
     assert "Standaardwaarde" in page  # nothing set yet: the platform default
 
 
+async def test_the_settings_are_listed_by_topic_with_a_table_of_contents(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    page = (await site.client.get(URL)).text
+
+    topics = re.findall(r'<a href="#(topic-[a-z_]+)">', page)
+    assert "Op deze pagina" in page
+    assert len(topics) >= 3  # time and display, staff, planner, booking confirmation, ...
+    for topic in topics:
+        assert f'id="{topic}"' in page  # every link has its target
+    assert page.index("Op deze pagina") < page.index(f'id="{topics[0]}"')
+    assert page.count('name="time_format"') == 1  # each setting is still in the one form
+    assert page.count(f'<form method="post" action="{URL}"') == 1  # one save for all topics
+
+
 async def test_a_value_for_the_organisation_applies_to_its_admin_and_participants(
     site: Site,
 ) -> None:
