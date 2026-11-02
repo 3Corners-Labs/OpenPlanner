@@ -36,6 +36,8 @@ Settings (ADR 0042 §10; changes audited as ``system:cli``):
 
 When nobody can log in (ADR 0042 §8, §10; host access is the authorisation):
     ``python -m app.cli oidc-check``  check the login configuration and print the claim mapping
+    ``python -m app.cli oidc-check --idp KEY``  check one organisation identity provider (ADR 0083)
+    ``python -m app.cli idp disable KEY``  switch one organisation provider off, as ``system:cli``
     ``python -m app.cli tls-check [--host H] [--port P]``  the certificate of the public address
         (ADR 0064): stored for System status; with ``--host`` another server, stored nowhere
     ``python -m app.cli address-check``  the round trip to ``PUBLIC_BASE_URL`` through the proxy
@@ -119,6 +121,12 @@ from app.adapters.integrations import build_integrations, installation_box, secr
 from app.adapters.live_settings import LiveSettings
 from app.adapters.oidc import claim_mapping, login_claims
 from app.adapters.oidc_check import OidcInspection, OidcTarget, inspect_oidc
+from app.adapters.outbound import (
+    OutboundRefusedError,
+    Resolver,
+    guarded_request,
+    system_resolver,
+)
 from app.adapters.registrations import (
     Expected,
     Listing,
@@ -137,6 +145,7 @@ from app.adapters.settings_report import (
     format_one,
     locked_keys,
 )
+from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.tls_probe import SslCertificateProbe
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
@@ -163,6 +172,7 @@ from app.domain.entitlements import ClaimMode, resolve
 from app.domain.errors import DomainError
 from app.domain.evidence import Report, Row, Section, render_json
 from app.domain.evidence import render_markdown as render_evidence
+from app.domain.identity_provider_service import IdentityProviderService
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
@@ -897,6 +907,96 @@ async def _oidc_check(
     return format_report(results) + "\nClaim mapping (value, source):\n" + mapping, passed(results)
 
 
+async def _idp_check(
+    settings: Settings,
+    key: str,
+    transport: httpx.AsyncBaseTransport | None = None,
+    resolve: Resolver = system_resolver,
+) -> tuple[str, bool]:
+    """Check one organisation provider without a login (ADR 0083 point 19).
+
+    The outbound guard on its discovery address, then the same two reads as ``oidc-check``
+    against the issuer pinned at registration, and the client authentication method. Prints
+    the provider's switch and its domains with their state; never a secret or a key.
+    """
+    engine = create_engine(settings.database_url)
+    try:
+        uow = SqlUnitOfWork(engine, secret_box(settings))
+        async with uow.read() as tx:
+            provider = await tx.get_identity_provider(key)
+            keys = await tx.get_signing_keys(key) if provider is not None else []
+            domains = (
+                await tx.list_login_domains(Scope(everything=True), key)
+                if provider is not None
+                else []
+            )
+    finally:
+        await engine.dispose()
+    if provider is None:
+        return f"no identity provider with key {key!r}\n", False
+    lab = settings.environment != "prod"
+    async with httpx.AsyncClient(timeout=15.0, transport=transport) as http:
+        try:
+            await guarded_request(
+                http, "GET", provider.discovery_url, resolve=resolve, allow_private=lab
+            )
+            guard = CheckResult("outbound guard", None, True, "discovery address allowed")
+        except OutboundRefusedError as refused:
+            guard = CheckResult("outbound guard", None, False, f"refused: {refused.reason}")
+        except httpx.HTTPError as exc:
+            guard = CheckResult("outbound guard", None, False, f"no answer: {type(exc).__name__}")
+    credential = (
+        any(k.retired_at is None for k in keys) if provider.needs_key else provider.secret_set
+    )
+    target = OidcTarget(
+        discovery_url=provider.discovery_url,
+        redirect_uri=f"{settings.public_base_url.rstrip('/')}/admin/callback",
+        require_https=not lab,
+        client_secret_set=credential,
+        expected_issuer=provider.issuer,
+    )
+    results = [guard, *(await _oidc_inspection(target, transport)).results]
+    state = "on" if provider.enabled else "off"
+    lines = [
+        f"\nProvider {provider.key} of organisation {provider.organisation}: {state}, "
+        f"client authentication {provider.client_auth.value}\n",
+        "Domains:\n",
+        *(f"  {d.domain}  {d.state.value}\n" for d in domains),
+    ]
+    if not domains:
+        lines.append("  none: no login goes to this provider\n")
+    return format_report(results) + "".join(lines), passed(results)
+
+
+async def _idp_disable(settings: Settings, key: str) -> tuple[str, bool]:
+    """Switch one organisation provider off from the host (ADR 0083 point 19).
+
+    For when the portal cannot be reached. Audited as ``system:cli`` like the portal's switch;
+    the provider's sessions end at their next request. Nothing is added or deleted.
+    """
+    engine = create_engine(settings.database_url)
+    try:
+        uow = SqlUnitOfWork(engine, secret_box(settings))
+        clock = SystemClock()
+        async with uow.read() as tx:
+            provider = await tx.get_identity_provider(key)
+        if provider is None:
+            return f"no identity provider with key {key!r}\n", False
+        service = IdentityProviderService(
+            uow,
+            clock,
+            AdminService(uow, clock),
+            None,
+            EcSigningKeys(),
+            limit=lambda: settings.idp_max_per_organisation,
+            platform_discovery_url=lambda: settings.oidc_discovery_url,
+        )
+        changed = await service.set_enabled(CLI_ACTOR, provider.organisation, key, False)
+    finally:
+        await engine.dispose()
+    return (f"switched off {key}\n" if changed else f"{key} was already off\n"), True
+
+
 def _read_claims(path: Path) -> object:
     """Return the sample claims of ``path`` as data, or the reason it is unusable."""
     try:
@@ -1421,10 +1521,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         "oidc-check", help="check the login configuration (no login started)"
     )
     oidc_cmd.add_argument(
+        "--idp",
+        metavar="KEY",
+        help="check one organisation identity provider instead (ADR 0083 point 19)",
+    )
+    oidc_cmd.add_argument(
         "--claims",
         help="a JSON file with sample ID-token claims: print the grants and refused values "
         "they resolve to under the current mode and directory (ADR 0049 point 16)",
     )
+    idp_cmd = commands.add_parser(
+        "idp", help="an organisation identity provider, when the portal cannot be reached"
+    )
+    idp_actions = idp_cmd.add_subparsers(dest="idp_action", required=True)
+    idp_actions.add_parser(
+        "disable", help="switch one provider off (audited as system:cli)"
+    ).add_argument("key")
     address_cmd = commands.add_parser("address-check", help="the round trip to the public address")
     address_cmd.add_argument(
         "--ca-file",
@@ -1474,10 +1586,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stdout.write(f"{pseudonym}\n")
         return 0 if pseudonym != UNKNOWN_CLIENT else 1
     if args.command == "oidc-check":
+        if args.idp:
+            return _write(asyncio.run(_idp_check(Settings(), args.idp)))
         if args.claims:
             sample = _read_claims(Path(args.claims))
             return _write(asyncio.run(_oidc_claims(Settings(), sample)))
         return _write(asyncio.run(_oidc_check(Settings())))
+    if args.command == "idp":
+        return _write(asyncio.run(_idp_disable(Settings(), args.key)))
     if args.command == "evidence":
         return _evidence_command(Settings(), args)
     if args.command == "purge-overdue":
