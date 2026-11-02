@@ -7,6 +7,8 @@
   <div>
     <h1 id="page-title">{{ person.name }}</h1>
     {% if person.dormant %}<p><span class="chip chip--warning">{{ _("admin.staff.dormant") }}</span></p>{% endif %}
+    {% if person.suspended %}<p><span class="chip chip--warning">{{ _("admin.staff.status.suspended") }}</span></p>{% endif %}
+    {% if person.erased %}<p><span class="chip">{{ _("admin.staff.status.erased") }}</span></p>{% endif %}
   </div>
 </div>
 <section class="card" aria-labelledby="access-heading">
@@ -57,6 +59,29 @@
     <button type="submit" class="button button--secondary" aria-describedby="sessions-end-help">{{ _("admin.staff.sessions.end_all") }}</button>
   </form>
 </section>
+{% if not person.erased %}
+<section class="card" aria-labelledby="status-heading">
+  <h2 id="status-heading">{{ _("admin.staff.status.heading") }}</h2>
+  {% for key in ["staff_suspended", "staff_reinstated", "staff_erased"] %}{% if request.query_params.get("done") == key %}<div class="alert alert--success" role="status"><p>{{ _("admin.done." ~ key) }}</p></div>{% endif %}{% endfor %}
+  {% if person.suspended %}
+  <form method="post" action="/admin/staff/{{ person.id }}/reinstate">
+    <p class="muted" id="reinstate-help">{{ _("admin.staff.status.reinstate_intro") }}</p>
+    <button type="submit" class="button button--secondary" aria-describedby="reinstate-help">{{ _("admin.staff.status.reinstate") }}</button>
+  </form>
+  {% if can("staff.erase") %}
+  <form method="post" action="/admin/staff/{{ person.id }}/erase">
+    <p class="muted" id="erase-help">{{ _("admin.staff.status.erase_intro") }}</p>
+    <button type="submit" class="button button--danger" aria-describedby="erase-help">{{ _("admin.staff.status.erase") }}</button>
+  </form>
+  {% endif %}
+  {% else %}
+  <form method="post" action="/admin/staff/{{ person.id }}/suspend">
+    <p class="muted" id="suspend-help">{{ _("admin.staff.status.suspend_intro") }}</p>
+    <button type="submit" class="button button--secondary" aria-describedby="suspend-help">{{ _("admin.staff.status.suspend") }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
 {% endif %}
 <h2 id="activity-heading">{{ _("admin.staff.activity") }}</h2>
 <p class="muted">{{ _("admin.staff.activity_intro", count=activity_limit) }}</p>

@@ -95,6 +95,27 @@ identiteitsprovider: anders blijft de sessie werken tot ze stilvalt (standaard 6
 auditlog heeft een gebeurtenis met u, de medewerker en het aantal sessies. Iedereen kan zijn
 eigen sessies zien en beëindigen op [Mijn sessies](my-sessions.md).
 
+## Een medewerker schorsen, heractiveren en wissen
+
+Onder **Toegang** op de pagina van een medewerker kunt u de persoon **schorsen** (permissie
+`staff.manage`, organisatiebeheerders en de superuser). Schorsen blokkeert het beheerportaal
+voor die persoon, wat de identiteitsprovider ook nog over de rechten zegt, en beëindigt in één
+keer alle sessies. Een login wordt geweigerd met de melding *uw toegang is geschorst*; de poging
+staat in het auditlog. **Schorsing opheffen** laat de persoon weer inloggen; de rechten komen
+dan opnieuw uit de identiteitsprovider. U kunt uzelf niet schorsen en alleen de superuser kan een
+superuser schorsen. Elke stap is een auditgebeurtenis (`staff.suspended`, `staff.reinstated`)
+met de beheerder en de persoon, zonder naam.
+
+De superuser kan de gegevens van een geschorste persoon ook **wissen** (permissie
+`staff.erase`): naam, rollen en lidmaatschappen verdwijnen en de pagina toont daarna *Gewiste
+medewerker*. Het auditlog blijft naar die gewiste persoon verwijzen. Dit kan niet ongedaan
+worden gemaakt. Logt de persoon daarna opnieuw in, dan begint een nieuw record.
+
+Wissen gebeurt ook vanzelf. Wie 365 dagen niet heeft ingelogd (de superuser stelt dit in bij
+*Geavanceerde instellingen*, 90 tot 1825 dagen: *Medewerkergegevens wissen na*) wordt door de
+worker eenmaal per dag gewist, als systeemgebeurtenis `staff.erased`. Wie vóór dat moment
+terugkomt, blijft staan.
+
 ## Tweede factor (MFA)
 
 Medewerkers loggen in met een tweede factor naast het wachtwoord: een code uit een

@@ -93,6 +93,27 @@ their session keeps working until it goes idle (60 minutes by default). The audi
 event with you, the staff member and the number of sessions. Everyone can see and end their own
 sessions on [My sessions](my-sessions.md).
 
+## Suspend, reinstate and erase a staff member
+
+Under **Access** on a staff member's page you can **suspend** the person (permission
+`staff.manage`, organisation admins and the superuser). Suspending blocks the admin portal for
+that person whatever the identity provider still says about their rights, and ends all their
+sessions at once. A login is refused with the message *your access is suspended*, and the
+attempt is in the audit log. **Lift suspension** lets the person log in again; their rights
+then come from the identity provider afresh. You cannot suspend yourself, and only the
+superuser can suspend a superuser. Every step is an audit event (`staff.suspended`,
+`staff.reinstated`) with the administrator and the person, without a name.
+
+The superuser can also **erase** a suspended person's data (permission `staff.erase`): the
+name, roles and memberships go and the page then says *Erased staff member*. The audit log keeps
+pointing to that erased person. This cannot be undone. A person who logs in again afterwards
+starts a fresh record.
+
+Erasing also happens by itself. A person who has not logged in for 365 days (the superuser
+sets this in *Advanced settings*, 90 to 1825 days: *Erase staff data after*) is erased by the
+worker, once a day, as a system event `staff.erased`. Someone who comes back before that
+moment is kept.
+
 ## Second factor (MFA)
 
 Staff log in with a second factor besides their password: a code from an authenticator app

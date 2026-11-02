@@ -162,6 +162,10 @@ EVENT_LABELS: dict[str, str] = {
     # Staff directory (ADR 0046): first login, and roles or memberships changed at login.
     staff.CREATED_EVENT: "audit.event.staff_created",
     staff.CHANGED_EVENT: "audit.event.staff_changed",
+    # ADR 0046 step 2: suspended, reinstated, erased (by the superuser or by the retention job).
+    staff.SUSPENDED_EVENT: "audit.event.staff_suspended",
+    staff.REINSTATED_EVENT: "audit.event.staff_reinstated",
+    staff.ERASED_EVENT: "audit.event.staff_erased",
     # Admin sessions (ADR 0098): the system ended one, a person ended theirs, an administrator
     # ended a person's, or all were ended at once.
     SESSION_ENDED_EVENT: "audit.event.session_ended",
@@ -473,6 +477,8 @@ def _actor_label(entry: AuditEntry, _: BoundGettext) -> str:
         return _("audit.actor.anonymous")
     if entry.event.source is Source.SYSTEM and entry.event.actor == SYSTEM_ACTOR:
         return _("audit.actor.system")
+    if entry.actor_erased:
+        return _("audit.actor.erased")
     return entry.actor_name or entry.event.actor
 
 

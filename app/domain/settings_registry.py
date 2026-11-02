@@ -870,6 +870,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=3600,
     ),
     S(
+        "staff_retention_days",
+        K.INT,
+        365,
+        _C,
+        T.STAFF,
+        "Days without a login after which a person's name, roles and memberships are erased "
+        "from the staff list; the subject stays for the audit log (ADR 0046).",
+        minimum=90,
+        maximum=1825,
+    ),
+    S(
         "system_event_retention_days",
         K.INT,
         90,

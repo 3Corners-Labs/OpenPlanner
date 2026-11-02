@@ -246,6 +246,18 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/staff/{member_id}/sessions/end": {
         "/admin/staff/999/sessions/end": statuses(404, 403, 403, 403, 403, 403, 403)
     },
+    # ADR 0046 step 2: suspend and reinstate under staff.manage (organisation level, like
+    # ending sessions); erasing is the superuser's alone (staff.erase, locked). An unknown
+    # number is a 404 for the superuser only.
+    "POST /admin/staff/{member_id}/suspend": {
+        "/admin/staff/999/suspend": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
+    "POST /admin/staff/{member_id}/reinstate": {
+        "/admin/staff/999/reinstate": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
+    "POST /admin/staff/{member_id}/erase": {
+        "/admin/staff/999/erase": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
     # ADR 0033: the manual is public, every admin may read every topic.
     # Step 2b: the profile menu's theme and alert choices, stored in the own session (303 back).
     "GET /admin/preferences": {"/admin/preferences": statuses(303, 303, 303, 303, 303, 303, 403)},
