@@ -28,6 +28,7 @@ from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.http_trace import traced_transport
+from app.adapters.instance_probe import HttpxInstanceProbe
 from app.adapters.integrations import (
     Integrations,
     build_integrations,
@@ -41,6 +42,7 @@ from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.adapters.tls_probe import SslCertificateProbe
 from app.config import Settings, environment, loose_secret_files
+from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.booking_rollup_service import BookingRowRollup
@@ -236,6 +238,18 @@ async def run_worker(
         warn_within=lambda: timedelta(days=live.settings.tls_expiry_warning_days),
         repeat=lambda: timedelta(hours=live.settings.tls_alert_repeat_hours),
     )
+    # ADR 0086: the round trip to the public address, on the certificate's cycle.
+    address = AddressWatch(
+        uow,
+        clock,
+        HttpxInstanceProbe(transport=transport),
+        SystemLog(uow, clock),
+        public_base_url=settings.public_base_url,
+        webhook_base_url=settings.webhook_base_url,
+        interval=lambda: timedelta(hours=live.settings.tls_check_interval_hours),
+        repeat=lambda: timedelta(hours=live.settings.tls_alert_repeat_hours),
+        enabled=settings.public_address_check_enabled,
+    )
     log.info(
         "worker.started",
         poll_seconds=settings.worker_poll_seconds,
@@ -266,6 +280,7 @@ async def run_worker(
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)
                     await _watch_certificate(tls)
+                    await _watch_address(address)
                     await _check_integrations(watch)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
@@ -333,6 +348,18 @@ async def _watch_certificate(watch: TlsWatch) -> None:
         return
     if check is not None and not check.ok:
         log.warning("tls.certificate", finding=check.finding.value, host=check.host)
+
+
+async def _watch_address(watch: AddressWatch) -> None:
+    """Probe the public address's round trip when due; a failure never stops the loop."""
+    try:
+        checks = await watch.check_if_due()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("address.watch_failed", error=type(exc).__name__)
+        return
+    for check in checks:
+        if not check.ok:
+            log.warning("address.round_trip", finding=check.finding.value, kind=check.kind.value)
 
 
 async def _check_integrations(watch: IntegrationWatch) -> None:

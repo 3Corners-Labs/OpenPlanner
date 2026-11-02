@@ -130,6 +130,54 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   `handle { redir https://{host}{uri} 308 }`. Also let `TRACE` reach the app (it answers 405) and
   do not serve `/static/` from the proxy itself. `scripts/check-proxy.sh` shows what to expect.
 
+### Address and proxy (ADR 0086)
+
+*Advanced settings* → *System status* → **Address and proxy** shows what the installation
+believes about its own address: the shape (bundled proxy, own reverse proxy, no proxy), the
+public address and the webhook address, the proxy address that `FORWARDED_ALLOW_IPS` trusts, the
+OIDC redirect URI to register at the identity provider and the widget loader URL for the
+embedding site. All of it is class B (set on the server, a change needs a restart): a wrong
+`PUBLIC_BASE_URL` would lock every administrator out at the next login, so it is not editable
+in the portal.
+
+The worker asks `GET {PUBLIC_BASE_URL}/api/v1/instance?probe={nonce}` through the public
+address, exactly as a participant's browser would, every `tls_check_interval_hours`, and the
+same for `WEBHOOK_BASE_URL` when that differs. `docker compose exec web python -m app.cli
+address-check` does it at once and exits 1 on a finding; run it as the last step of an
+installation and as part of the go-live checklist. What each finding means and what to change
+on the host:
+
+| Finding | Meaning | What to do |
+|---|---|---|
+| `ok` | The name reaches this installation over https and the proxy is trusted | nothing |
+| `unreachable` | No answer; the reason (timeout, connection refused or name not found, TLS refused, an HTTP status) is on the page, as the network or the server gave it | DNS, firewall, proxy or certificate; for a network without hairpin NAT set `PUBLIC_ADDRESS_CHECK_ENABLED=false` (the page then says *not checked*) |
+| `other_instance` | The name reaches another installation: stale DNS, a moved host, a copied `.env` | Point the name at this host, or correct `PUBLIC_BASE_URL`; links in emails lead to the wrong place until then |
+| `not_https` | The app saw `http`: the proxy does not pass `X-Forwarded-Proto`, or `PUBLIC_BASE_URL` is not https. Session cookies will not travel | Let the proxy set `X-Forwarded-Proto`; use an `https` address |
+| `proxy_not_trusted` | The headers are there and the app ignored them: `FORWARDED_ALLOW_IPS` does not name the proxy | See below |
+| `no_proxy_headers` | No `X-Forwarded-*` header arrives: the proxy sets none, or `web` is published directly | Configure the proxy; do not publish `web` on a public interface |
+| `redirected` | The address answers with a redirect to another name (`www` for the apex) | Set `PUBLIC_BASE_URL` to the final address |
+
+A finding other than `ok` is a system event `public_address` (superuser only) the first time
+and every `tls_alert_repeat_hours` while it lasts; the return to `ok` is recorded once. The
+event carries the finding, the address kind and the network's reason, never an address of a
+visitor.
+
+**Proxy not trusted (the tunnel trial of 1 November 2026).** Without the right
+`FORWARDED_ALLOW_IPS` the app ignores the proxy's `X-Forwarded-Proto: https`, so its own
+redirects (`/admin` to `/admin/`) send the browser to `http://`, and every visitor shares the
+proxy's address, so one bot exhausts the booking limit for everyone. The right value is the
+address the `web` container sees the proxy connect from, which is the gateway of the compose
+network for a proxy on the same host, not the proxy's own address (see *Production settings*
+above and *TLS from a proxy on another machine*). Two places show this without waiting for the
+worker. The *Proxy* row of the overview and the block itself count the requests that came with
+`X-Forwarded-For` or `X-Forwarded-Proto` while the app ignored them, per web process since its
+start, with the class of the peer; only for a private or loopback peer (the proxy) the address
+is shown, never that of a public peer, which is a visitor. And the first such request in every
+repeat period leaves the system event. The page also warns while `FORWARDED_ALLOW_IPS` names a
+proxy other than the bundled one and web serves no TLS (the unencrypted hop of ADR 0091). Fix
+`FORWARDED_ALLOW_IPS` in `.env`, restart `web`, run `address-check`: the finding returns to
+`ok` and the count stops growing (it starts at zero after the restart).
+
 ### TLS from a proxy on another machine to web (ADR 0091 point 3)
 
 With the bundled proxy the hop to `web` is plain HTTP on the `edge` network of one host, a
@@ -177,7 +225,7 @@ names, booking data and management links travel in clear text unless `web` serve
    this certificate. A web that is down because the certificate expired shows up as a failing
    public address check and a failing `web` healthcheck.
 
-**System status** (the *Proxy* row) warns while `FORWARDED_ALLOW_IPS` names an address other
+**System status** (*Address and proxy*, ADR 0086) warns while `FORWARDED_ALLOW_IPS` names an address other
 than the bundled proxy's (`172.31.240.2`) and `WEB_TLS_*` is not set: that points to a proxy on
 another machine whose traffic runs unencrypted. If the proxy really is on the same host and
 reaches web over the loopback or the compose gateway, the hop never leaves the machine; record
@@ -458,16 +506,19 @@ deletes ended rows and rows past `ADMIN_SESSION_HOURS` once an hour; the history
 audit log.
 
 **Offboarding a person (ASVS V7.4.2).** Switching a person off at the identity provider does
-not end the session OpenPlanner already holds. Until the administrator's *End all sessions*
-button exists (ADR 0098 step 3), the route is:
+not end the session OpenPlanner already holds. The route is:
 
 1. Switch the person off at the identity provider (or remove their groups and claims there).
-2. Their open session then lapses at the idle limit (`admin_idle_minutes`, default 60) at the
-   latest, and in any case at its absolute end (`ADMIN_SESSION_HOURS`, default 8). Every new
-   login needs the identity provider, which now refuses it.
-3. When that is too slow, end all sessions on the host (above). It also logs out everyone
-   else, who log in again; there is no per-person command before step 3 of the ADR.
-4. Remove the person's roles in the portal (*Staff*) so a login by another route grants
+2. End their sessions at once: an organisation admin or the superuser opens the person under
+   *Staff* and presses *End all sessions* (permission `staff.manage`, ADR 0098 step 3).
+   This ends every session of the person, also those for other organisations, and writes the
+   audit event `admin.sessions_ended_by_admin` with the administrator, the person and the number.
+3. Without that, their open session lapses at the idle limit (`admin_idle_minutes`, default 60)
+   at the latest, and in any case at its absolute end (`ADMIN_SESSION_HOURS`, default 8). Every
+   new login needs the identity provider, which now refuses it.
+4. Only when the whole installation is at risk, end all sessions on the host (above). It also
+   logs out everyone else, who log in again.
+5. Remove the person's roles in the portal (*Staff*) so a login by another route grants
    nothing, and note the date for the audit trail.
 
 The cookie name follows `PUBLIC_BASE_URL` (ADR 0098 step 4), not `ENVIRONMENT`. On an `https://`

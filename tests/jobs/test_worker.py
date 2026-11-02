@@ -116,7 +116,8 @@ async def test_worker_lists_the_releases_once_per_hour(
     stop.set()
     await asyncio.wait_for(task, timeout=DEADLINE)
 
-    assert calls == ["/repos/acme/openplanner/releases"]
+    # The public address round trip (ADR 0086) goes through the same transport.
+    assert [c for c in calls if c != "/api/v1/instance"] == ["/repos/acme/openplanner/releases"]
     engine = create_engine(url)
     try:
         async with SqlUnitOfWork(engine).read() as tx:
@@ -186,6 +187,80 @@ async def test_worker_records_what_it_finds_about_the_public_address(
         await engine.dispose()
     assert check is not None
     assert check.finding is Finding.NOT_HTTPS
+
+
+async def test_worker_asks_the_public_address_for_the_instance_and_records_the_finding(
+    settings: Settings, migrated_url: str
+) -> None:
+    # ADR 0086: the answer comes from another installation; the nonce was stored before asking.
+    import httpx
+
+    from app.domain.address_check import AddressStatus
+    from app.domain.public_address import AddressFinding, AddressKind, nonce_hash
+
+    asked: list[str] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.params["probe"])
+        return httpx.Response(200, json={"instance_id": "another-installation"})
+
+    configured = settings.model_copy(update={"database_url": migrated_url})
+    stop = asyncio.Event()
+    task = asyncio.create_task(
+        run_worker(configured, stop, clock=FixedClock(), transport=httpx.MockTransport(answer))
+    )
+    await _until(lambda: bool(asked))
+    await _until(configured.worker_heartbeat_path.exists)
+    stop.set()
+    await asyncio.wait_for(task, timeout=2)
+
+    engine = create_engine(migrated_url)
+    try:
+        uow = SqlUnitOfWork(engine)
+        checks = await AddressStatus(uow).latest()
+        async with uow.read() as tx:
+            events = await tx.list_audit_events(Scope(everything=True), 50)
+    finally:
+        await engine.dispose()
+    assert checks[AddressKind.PUBLIC].finding is AddressFinding.OTHER_INSTANCE
+    assert asked
+    assert nonce_hash(asked[0])
+    assert [e.event.reason for e in events if e.event.action == "public_address"] == [
+        "other_instance"
+    ]
+
+
+async def test_worker_leaves_the_public_address_alone_when_the_probe_is_switched_off(
+    settings: Settings, migrated_url: str
+) -> None:
+    import httpx
+
+    from app.domain.address_check import AddressStatus
+
+    asked: list[httpx.Request] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return httpx.Response(200, json={"instance_id": "x"})
+
+    configured = settings.model_copy(
+        update={"database_url": migrated_url, "public_address_check_enabled": False}
+    )
+    stop = asyncio.Event()
+    task = asyncio.create_task(
+        run_worker(configured, stop, clock=FixedClock(), transport=httpx.MockTransport(answer))
+    )
+    await _until(configured.worker_heartbeat_path.exists)
+    stop.set()
+    await asyncio.wait_for(task, timeout=2)
+
+    engine = create_engine(migrated_url)
+    try:
+        checks = await AddressStatus(SqlUnitOfWork(engine)).latest()
+    finally:
+        await engine.dispose()
+    assert asked == []
+    assert checks == {}
 
 
 REFUSED = Finding(

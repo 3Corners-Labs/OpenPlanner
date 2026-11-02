@@ -1,8 +1,15 @@
 # 0098. Admin sessions held on the server
 
-Status: proposed (2026-11-01); partly built: step 1 (register, logout revokes, rotation, idle and absolute check), step 4 (cookie `__Host-op_admin`, `Secure` on https) and step 2 (clean-up, `sessions end-all`, restore, runbook) are built, step 3 is planned. Requested by the product owner after the ASVS 5.0.0 L2 audit of
-1 November 2026 (V7, V3.3). Supersedes ADR 0013 §5 (Session); the rest of ADR 0013 stands.
-See *Build status*.
+Status: accepted (2026-11-02, `po:approved` on #399, the decision PR of step 3; #337 had merged
+the ADR on 2026-11-01 before its label). Built: steps 1 to 4 (register, logout revokes, rotation,
+idle and absolute check; clean-up, `sessions end-all`, restore, runbook; own and administrator
+session views; cookie `__Host-op_admin`, `Secure` on https). Requested by the product owner after
+the ASVS 5.0.0 L2 audit of 1 November 2026 (V7, V3.3). Supersedes ADR 0013 §5 (Session); the rest
+of ADR 0013 stands. See *Build status*. Amended on 2026-11-01 (re-evaluation): this ADR is the
+single home for ending admin sessions; ADR 0046 §8 and §10 point here. §9b uses ADR 0046's
+`staff.manage` at organisation level instead of a new permission. The algorithm and the rotation
+of `SESSION_SECRET`, which ADR 0094 §7 defers to this ADR, are not decided here yet (point 9 keeps
+rotation as the last resort); a later ADR records them.
 
 ## Context
 
@@ -70,12 +77,12 @@ at most **5 sessions per person**, the oldest lapses.
      identifier, no IP or device data) and may end the others. This needs no permission
      because it concerns only their own sessions.
    - (b) An administrator ends all sessions of a person from that person's record in the staff
-     overview (ADR 0046), with a new permission in the matrix at **organisation level**. A
+     overview (ADR 0046), under `staff.manage` (ADR 0095) at **organisation level**; no new
+     permission is added (single home, re-evaluation of 2026-11-01). A
      session belongs to a person, not to an organisation, so ending it also ends what that
      person uses for other organisations. This is a deliberate choice: revoking is a
      protective act and cannot widen anyone's rights. The permission only applies to persons
-     the administrator's scope already shows in the staff overview. Its final name is fixed in
-     step 3 together with the matrix.
+     the administrator's scope already shows in the staff overview.
    - (c) All sessions: `python -m app.cli sessions end-all --reason ...` on the host.
      Rotating `SESSION_SECRET` keeps working as the last resort.
 
@@ -142,11 +149,11 @@ the register, the idle check or the revocation at logout.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #337 | in PR #337 |
-| 1 | Register, logout revokes, rotation at login, idle and absolute check, settings, data-flow entry (WP3) | #350 | in PR #350 |
-| 2 | Worker clean-up, `sessions end-all`, restore and rollback call it, runbook (WP4) | this PR | built |
-| 3 | Sessions viewable and endable: own list, administrator action, new permission, matrix, manual (WP5; a decision PR because it changes `authorization.py`) | | planned |
-| 4 | Cookie `__Host-op_admin`, `Path=/`, `Secure` on https (WP6) | this PR | built |
+| 0 | ADR proposed | #337 | merged |
+| 1 | Register, logout revokes, rotation at login, idle and absolute check, settings, data-flow entry (WP3) | #350 | built |
+| 2 | Worker clean-up, `sessions end-all`, restore and rollback call it, runbook (WP4) | #381 | built |
+| 3 | Sessions viewable and endable: own list (*My sessions*, a sub-tab of *My rights*), administrator action *End all sessions* under `staff.manage`, matrix, manual (WP5; a decision PR because it touches `authorization.py` and the matrix test) | #399 | built |
+| 4 | Cookie `__Host-op_admin`, `Path=/`, `Secure` on https (WP6) | #363 | built |
 
 Order of building: 1, then 4, then 2, then 3.
 

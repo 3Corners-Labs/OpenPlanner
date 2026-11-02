@@ -2,7 +2,11 @@
 
 Status: accepted (2026-10-28), requested by the product owner; U1–U4 settled as recommended. Amends ADR 0013 (claims are
 also stored, not only held in the session) and HANDOVER B8 ("no user table for admins").
-Builds on ADR 0014, 0031 and 0039. Partly built; see `docs/adr-status.md` for what is built.
+Builds on ADR 0014, 0031 and 0039. Amended on 2026-11-01 (re-evaluation): §8 and §10 (ending
+a person's sessions) move to ADR 0098 §3 and §9b, the single home for admin sessions, once 0098
+is accepted; 0098 uses this ADR's `staff.manage` at organisation level, not a new permission.
+For the bundled identity provider only, ADR 0095 amends U1: there the portal may also create
+staff and grant roles, under the same `staff.manage`. Partly built; see `docs/adr-status.md` for what is built.
 
 ## Context
 

@@ -233,6 +233,19 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/staff/{member_id}": {
         "/admin/staff/999": statuses(404, 404, 404, 404, 404, 403, 403)
     },
+    # ADR 0098 point 9a: every admin sees and ends their own sessions (rights.view).
+    "GET /admin/rights/sessions": {
+        "/admin/rights/sessions": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "POST /admin/rights/sessions/end-others": {
+        "/admin/rights/sessions/end-others": statuses(303, 303, 303, 303, 303, 303, 403)
+    },
+    # ADR 0098 point 9b: an organisation admin (and the superuser) ends a person's sessions.
+    # Outside the scope the answer is 403, an unknown number too; only the superuser, who sees
+    # everyone, gets a 404. The group admin, auditor and agent do not hold the permission.
+    "POST /admin/staff/{member_id}/sessions/end": {
+        "/admin/staff/999/sessions/end": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
     # ADR 0033: the manual is public, every admin may read every topic.
     # Step 2b: the profile menu's theme and alert choices, stored in the own session (303 back).
     "GET /admin/preferences": {"/admin/preferences": statuses(303, 303, 303, 303, 303, 303, 403)},
