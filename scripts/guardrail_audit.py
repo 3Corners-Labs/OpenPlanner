@@ -8,7 +8,9 @@ section, and this script compares the two without any network call:
 
 - every value that differs from the baseline, by its path (``rulesets/main/enforcement``);
 - every section that could not be read, and every value the token sees as null where the
-  baseline expects one (the audit fails closed, and says what it could not check);
+  baseline expects one (the audit fails closed, and says what it could not check), except the
+  values the baseline lists under ``known_unseen``: a read-only token can never see them, so
+  they are listed for information and do not keep the issue open;
 - every bypass of a ruleset in the last day that the baseline does not expect (the release
   app creating a ``v*`` tag is expected).
 
@@ -245,6 +247,8 @@ class Findings:
         self.drift: list[str] = []
         self.unreadable: list[str] = []
         self.bypasses: list[Mapping[str, Json]] = []
+        self.known_unseen: list[str] = []
+        """Unseen values the baseline expects to be unseen: reported, but no finding."""
 
     def __bool__(self) -> bool:
         """Whether anything was found."""
@@ -260,7 +264,9 @@ def audit(baseline: Mapping[str, Json], directory: Path) -> Findings:
             findings.unreadable.append(name)
         elif section in baseline:
             unseen = hidden(baseline[section], live[section], section)
-            findings.unreadable.extend(unseen)
+            known = set(baseline.get("known_unseen", {}))
+            findings.unreadable.extend(path for path in unseen if path not in known)
+            findings.known_unseen.extend(path for path in unseen if path in known)
             expected = _blank(json.loads(json.dumps(baseline[section])), unseen, section)
             findings.drift.extend(differences(expected, live[section], section))
     try:
@@ -274,8 +280,14 @@ def audit(baseline: Mapping[str, Json], directory: Path) -> Findings:
 def render(findings: Findings, today: date) -> str:
     """The report as Markdown, for the step summary and the issue."""
     lines = [f"# {REPORT_TITLE} {today.isoformat()}", ""]
+    known = [
+        f"- `{path}` (known: a read-only token cannot see it)" for path in findings.known_unseen
+    ]
     if not findings:
-        return "\n".join([*lines, "Every guardrail matches `.github/guardrails.json`.", ""])
+        lines.append("Every guardrail matches `.github/guardrails.json`.")
+        if known:
+            lines += ["", "Not checked, by design:", "", *known]
+        return "\n".join([*lines, ""])
     if findings.drift:
         lines += ["## Settings that differ from the baseline", ""]
         lines += [f"- {line}" for line in findings.drift]
@@ -291,6 +303,8 @@ def render(findings: Findings, today: date) -> str:
         lines += ["## What could not be read or seen (the audit fails closed)", ""]
         lines += [f"- `{name}`" for name in findings.unreadable]
         lines.append("")
+    if known:
+        lines += ["## Not checked, by design", "", *known, ""]
     lines += [
         "If a change was intended, change `.github/guardrails.json` in a decision PR "
         "(`python3 -m scripts.guardrail_audit --snapshot DIR` prints the live state). "
