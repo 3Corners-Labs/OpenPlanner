@@ -49,6 +49,20 @@ class StaffAction(StrEnum):
     VERIFY_EMAIL = "verify_email"
 
 
+class DirectoryState(StrEnum):
+    """Whether the portal can manage staff at the platform provider (ADR 0106 point 3).
+
+    ``ABSENT`` is a provider without a directory, by design (ADR 0095 point 1); ``INCOMPLETE``
+    is the bundled provider with some of its directory settings missing, which is a fault.
+    """
+
+    CONNECTED = "connected"
+    UNREACHABLE = "unreachable"
+    SWITCHED_OFF = "switched_off"
+    INCOMPLETE = "incomplete"
+    ABSENT = "absent"
+
+
 class DirectoryRefusal(StrEnum):
     """Why a requested grant is not written; a code, never user-facing text."""
 

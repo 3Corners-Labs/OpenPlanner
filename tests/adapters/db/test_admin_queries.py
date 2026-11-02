@@ -24,6 +24,7 @@ from app.domain.audit import (
 from app.domain.authorization import Scope
 from app.domain.booking import Slot
 from app.domain.diagnostic_mode import DiagnosticMode
+from app.domain.event_context import bind_actor_role, trace_scope
 from app.domain.ports import Transaction
 from app.domain.staff import StaffMember
 from tests.support.domain import NOW
@@ -141,6 +142,21 @@ async def test_audit_entries_carry_the_latest_profile_name(engine: AsyncEngine) 
         entries = await tx.list_audit_events(EVERYTHING)
 
     assert {e.event.actor: e.actor_name for e in entries} == {"sub-1": "Gina Groep", "sub-2": None}
+
+
+async def test_the_actors_role_is_stored_and_read_back(engine: AsyncEngine) -> None:
+    # ADR 0103 point 7: the CSV export carries actor.role, so the row keeps it.
+    uow = SqlUnitOfWork(engine)
+    with trace_scope():
+        bind_actor_role("org_admin")
+        event = AuditEvent(NOW, "sub-1", "group.edit", Outcome.SUCCESS, organisation="demo")
+    async with uow.locked() as tx:
+        await tx.add_audit_event(event)
+
+    async with uow.read() as tx:
+        (entry,) = await tx.list_audit_events(EVERYTHING)
+
+    assert entry.event.actor_role == "org_admin"
 
 
 def _staff(name: str) -> StaffMember:

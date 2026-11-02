@@ -200,3 +200,69 @@ async def test_a_cross_site_post_is_refused(managed: Site) -> None:
     assert response.status_code == 403
     assert managed.directory is not None
     assert managed.directory.users["kc-mine"].enabled
+
+
+BUNDLED_ADMIN_URL = "http://idp:8080/admin/realms/openplanner"
+
+
+@pytest.fixture
+async def half_connected(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
+    """The bundled provider with its admin URL but without the directory secret (ADR 0106)."""
+    half = settings.model_copy(update={"keycloak_admin_url": BUNDLED_ADMIN_URL})
+    async with _running_site(half, admin_db) as running:
+        yield running
+
+
+async def test_a_half_connected_bundled_provider_names_what_is_missing(
+    half_connected: Site,
+) -> None:
+    """ADR 0106 point 3: the actions are not hidden in silence."""
+    await half_connected.login_as(ORG_ADMIN)
+
+    text = (await half_connected.client.get("/admin/staff")).text
+
+    assert "niet volledig gekoppeld" in text
+    assert "KEYCLOAK_DIRECTORY_CLIENT_SECRET" in text
+    assert 'href="/admin/staff/invite"' not in text
+
+
+async def test_only_who_could_manage_staff_reads_the_notice(half_connected: Site) -> None:
+    await half_connected.login_as(AUDITOR)
+
+    text = (await half_connected.client.get("/admin/staff")).text
+
+    assert "niet volledig gekoppeld" not in text
+
+
+async def test_another_provider_gets_no_notice(site: Site) -> None:
+    """A provider without a directory by design (ADR 0095 point 1) lacks nothing."""
+    await site.login_as(ORG_ADMIN)
+
+    text = (await site.client.get("/admin/staff")).text
+
+    assert "niet volledig gekoppeld" not in text
+    assert "antwoordt niet" not in text
+
+
+async def test_an_unreachable_directory_is_said_not_an_error_page(managed: Site) -> None:
+    assert managed.directory is not None
+    managed.directory.fail = "failed"
+    await managed.login_as(ORG_ADMIN)
+
+    response = await managed.client.get("/admin/staff")
+
+    assert response.status_code == 200
+    assert "antwoordt niet" in response.text
+    assert 'href="/admin/staff/invite"' not in response.text
+
+
+async def test_system_status_shows_the_directory_state(managed: Site, half_connected: Site) -> None:
+    await managed.login_as(SUPER)
+    await half_connected.login_as(SUPER)
+
+    connected = (await managed.client.get("/admin/settings")).text
+    incomplete = (await half_connected.client.get("/admin/settings")).text
+
+    assert "Medewerkerbeheer" in connected
+    assert "Gekoppeld: medewerkers worden in het portaal beheerd" in connected
+    assert "op de server ontbreekt KEYCLOAK_DIRECTORY_CLIENT_SECRET" in incomplete

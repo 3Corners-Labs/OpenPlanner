@@ -71,6 +71,7 @@ from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_for
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.session import save_login_trial
+from app.admin.staff_directory_routes import directory_service
 from app.admin.uploads import read_uploads
 from app.config import Settings
 from app.domain.authorization import Permission
@@ -101,6 +102,7 @@ from app.domain.settings_registry import (
     Topic,
 )
 from app.domain.settings_service import LOG_LEVEL, SettingsService, editable
+from app.domain.staff_directory import DirectoryState
 from app.domain.tls import Finding
 from app.domain.tls_check import CertificateStatus
 from app.domain.tls_source import CertificateSourceService
@@ -627,6 +629,7 @@ async def _overview(
             "backups": backup_view(request, locale, current),
             "certificate": await _certificate(request, locale),
             "log_summary": await _log_summary(request, context),
+            "directory": await _directory_status(request, locale),
             "rotation": await _rotation(request),
             "source": await _source_view(request, locale, states, manage=manage, errors=errors),
             "status": [
@@ -678,6 +681,32 @@ class LogSummary:
     total: int
     enabled: int
     failing: int
+
+
+_DIRECTORY_TEXTS = {
+    DirectoryState.CONNECTED: "admin.settings.directory.connected",
+    DirectoryState.UNREACHABLE: "admin.settings.directory.unreachable",
+    DirectoryState.SWITCHED_OFF: "admin.settings.directory.switched_off",
+    DirectoryState.INCOMPLETE: "admin.settings.directory.incomplete",
+    DirectoryState.ABSENT: "admin.settings.directory.absent",
+}
+"""The sentence per state of the staff directory (ADR 0106 point 3)."""
+
+
+@dataclass(frozen=True)
+class DirectoryStatus:
+    """The staff directory on System status: its state and the sentence that explains it."""
+
+    state: DirectoryState
+    text: str
+
+
+async def _directory_status(request: Request, locale: RequestLocale) -> DirectoryStatus:
+    """Return whether staff can be managed in the portal, naming missing settings only."""
+    service = directory_service(request)
+    state = await service.state()
+    text = locale.gettext(_DIRECTORY_TEXTS[state], names=", ".join(service.missing))
+    return DirectoryStatus(state, text)
 
 
 async def _log_summary(request: Request, context: AdminContext) -> LogSummary | None:

@@ -11,10 +11,27 @@ points and the log destinations in the portal), ADR 0103 (the register of action
 
 ## The record
 
-Every line is one JSON object on stdout in the `openplanner.event/2` envelope (ADR 0040,
-`app/logging.py`): `@timestamp` (RFC 3339 UTC, milliseconds), `log.level`, `message`,
-`service.name` (`web` or `worker`), `service.version`, `installation` (`INSTALLATION_NAME`)
-and, inside a request or job, `trace.id`, `organisation` and `group`. Every line passes the
+Every line is one JSON object on stdout in the `openplanner.event/3` envelope (ADR 0040,
+ADR 0103, `app/logging.py`). It starts with what a person reads first and then the rest:
+
+- `@timestamp`: RFC 3339, UTC, milliseconds (`2026-11-02T14:03:12.345Z`).
+- `log.level`: see *Levels*.
+- `event.category`: `audit`, `system`, `security`, `authz`, `operations` or `diagnostic`; the
+  sections of *Actions* below, and the syslog `MSGID`.
+- `event.action`: the action, the key of the tables below (`storage.degraded`); a library's
+  own line is `library.<logger>`.
+- `message`: the action's sentence with the line's fields filled in ("Disk space is low: 6%
+  free, database 1 MB (free_space_low)."); a library line keeps its own text.
+- `labels.<name>`: the fields of the action (the *Fields* column), one per field, searchable
+  on their own (`labels.free_percent: 6`).
+- `actor`, `actor.type`, `actor.role`: who, without a name: the subject, the kind (`user`,
+  `system`, `host`, `api`, `anonymous`) and the role that granted the permission.
+- `service.name`, `service.version`, `installation`: the process, the release,
+  `INSTALLATION_NAME`.
+- `trace.id`, `organisation`, `group`: inside a request or job, the chain and the tenant.
+- `schema`: `openplanner.event/3`, the version of this shape.
+
+Every line passes the
 PII mask: the fields of `app/domain/privacy.py` are replaced by `***` at any depth, as a
 safety net on top of the rule that code never passes personal data to a logger (semgrep,
 `.semgrep/rules.yml`). The access log of uvicorn is off (paths carry management tokens) and
@@ -23,8 +40,9 @@ request lines of httpx (full URL) and the statement lines of the SQL driver (bou
 Libraries never log below `warning` (see *Levels*).
 
 Audit, system and security events are on the same stream after their transaction commits,
-marked `log_type: "audit"` (`docs/audit-events.md`). Diagnostic events (ADR 0040 part 4) are
-in the portal only.
+marked `log_type: "audit"` (`docs/audit-events.md`), in the same shape; their sentence also
+says the outcome and the organisation when the template does not. Diagnostic events (ADR 0040
+part 4) are in the portal only.
 
 ## Levels
 
@@ -99,7 +117,7 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | `oidc.subject_refused` | `warning` | `reason` | A login's subject was refused: {reason}. | The `sub` claim is empty, too long or has characters that are not allowed. | Check the identity provider's subject format. |
 | `oidc.token_exchange_failed` | `warning` | `error` | The login code could not be exchanged for a token: {error}. | The provider's token endpoint refused or did not answer. | Check the client secret and the provider's status. |
 | `oidc.too_many_entitlements` | `warning` | `actor`, `values` | A login carried {values} entitlements, more than allowed. | The token had more entitlement values than `oidc_max_entitlements`; the login is refused. | Reduce the user's groups at the provider, or raise the limit. |
-| `request.rate_limited` | outcome | – | A caller went over a rate limit. | Too many requests from one address (ADR 0053); the caller is a pseudonym. | Repeated: a bot or a misconfigured client. |
+| `request.rate_limited` | outcome | `surface`, `client` | A caller went over a rate limit on {surface}. | Too many requests from one address (ADR 0053); the caller is a pseudonym. | Repeated: a bot or a misconfigured client. |
 | `request.rejected` | `info`, outcome | `expected`, `origin`, `reason`, `sec_fetch_site` | A request was rejected before it reached the application: {reason}. | A honeypot field, a cross-site POST or a foreign `Origin` (ADR 0053). | Repeated `origin_mismatch` from your own site: check the proxy's `Host` header. |
 | `settings.secret_file_readable` | `warning` | `variable` | The secret file of {variable} can be read by others. | A bootstrap secret file (`X_FILE`, ADR 0042 §9) has loose permissions. | Run `chmod 600` on the file. |
 | `token.rejected` | outcome | – | A token or link that matches nothing was used: {reason}. | A guessed, forged or long-expired token or management link (ADR 0053). | Repeated from one caller: a guessing attempt. |
@@ -112,8 +130,8 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | Action | Level | Fields | Message | Meaning | What to do |
 |---|---|---|---|---|---|
 | `agent_api.decision` | `info` | `allowed`, `client`, `scope` | Machine API client {client}: scope {scope}, allowed {allowed}. | The decision on a machine API call (ADR 0023). | Nothing. |
-| `authz.decision` | `info` | `actor`, `allowed`, `permission`, `reason`, `target_group`, `target_organisation` | Permission {permission}: allowed {allowed} ({reason}). | The decision on an admin request (ADR 0014); a denial is also an audit event. | Nothing; a destination may leave the category `authz` out. |
-| `authz.maintenance_refused` | `info` | `actor`, `permission`, `target_group`, `target_organisation` | Permission {permission} refused during maintenance. | A change was refused because maintenance mode is on (ADR 0084). | Nothing. |
+| `authz.decision` | `info` | `actor`, `allowed`, `permission`, `reason`, `target`, `target_group`, `target_organisation` | Permission {permission} on {target}: allowed {allowed} ({reason}). | The decision on an admin request (ADR 0014); a denial is also an audit event. | Nothing; a destination may leave the category `authz` out. |
+| `authz.maintenance_refused` | `info` | `actor`, `permission`, `target`, `target_group`, `target_organisation` | Permission {permission} on {target} refused: maintenance mode is on. | A change was refused because maintenance mode is on (ADR 0084). | Nothing. |
 
 ### Admin actions (audit)
 
@@ -141,7 +159,7 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | `idp.updated` | outcome | – | An identity provider was changed. | Its settings changed; `detail` names the fields. | Nothing. |
 | `idp_mapping.exported` | outcome | – | The login mapping was exported. | An admin downloaded the claim mapping for the identity provider team. | Nothing. |
 | `integration.service_app_check` | outcome | – | The Webex service app was checked: {outcome}. | An admin checked the platform's Webex service app. | Nothing. |
-| `logging.destination` | outcome | – | Log destination {detail}: {outcome}. | A log destination was created, changed, tested or deleted (audit), or started or stopped failing (system, ADR 0085). | On failure: open *Log destinations*; it shows the last error. |
+| `logging.destination` | outcome | `change`, `kind`, `destination`, `what` | Log destination {destination} ({kind}) {change}: {outcome}. | A log destination was created, changed, tested or deleted (audit), or started or stopped failing (system, ADR 0085). | On failure: open *Log destinations*; it shows the last error. |
 | `organisation.closure` | outcome | – | An organisation-wide closure changed. | An emergency closure for the whole organisation was set or ended (ADR 0024). | Nothing; the audit log shows who did it. |
 | `organisation.idp_key_changed` | outcome | – | An organisation's identity provider key changed. | The organisation's staff now sign in through another provider. | Nothing; the audit log shows who did it. |
 | `role.created` | outcome | – | A role was created. | A custom role was added to the catalogue (ADR 0096). | Nothing; the audit log shows who did it. |
@@ -151,10 +169,10 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | `simulator.prepare` | outcome | – | A simulated booking was prepared. | An admin prepared a booking for the integration simulator. | Nothing. |
 | `staff.created` | outcome | – | A staff member was added. | A person was added to the staff directory (ADR 0046). | Nothing; the audit log shows who did it. |
 | `staff.erased` | `info`, outcome | `staff` | Staff erased after their retention. | Suspended staff past their retention were erased (ADR 0046). | Nothing. |
-| `staff.membership_changed` | outcome | – | A staff member's roles or groups changed. | `detail` names the role or grant added or removed. | Nothing; the audit log shows who did it. |
+| `staff.membership_changed` | outcome | – | A staff member's roles or groups changed: {detail}. | `detail` names the role or grant added or removed. | Nothing; the audit log shows who did it. |
 | `staff.reinstated` | outcome | – | A staff member was reinstated. | A suspended person can sign in again. | Nothing; the audit log shows who did it. |
 | `staff.suspended` | outcome | – | A staff member was suspended. | The person can no longer sign in; their sessions ended. | Nothing; the audit log shows who did it. |
-| `system.maintenance` | outcome | – | Maintenance mode changed. | Maintenance mode was switched on or off, or a change was refused (ADR 0084). | Nothing; the audit log shows who did it. |
+| `system.maintenance` | outcome | `what`, `hours` | Maintenance mode: {what}. | Maintenance mode was switched on or off, or a change was refused (ADR 0084). | Nothing; the audit log shows who did it. |
 
 ### System events
 
@@ -165,14 +183,14 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | `diagnostics.brake` | outcome | – | Diagnostic mode was switched off: the disk is nearly full. | The emergency brake of ADR 0040 point 13. | Free disk space on the host. |
 | `group.erased` | outcome | – | A deleted group was erased. | A group's data was removed after its deletion period. | Nothing. |
 | `integration.check` | outcome | – | Integration check of a group: {outcome} ({reason}). | A group's Webex and Contact Center connection was checked, by the worker or an admin. | On failure: open the group's *Integrations*; it names the provider's reason. |
-| `integration.request` | outcome | – | A provider request for booking {booking_id}: {outcome}. | One request in a booking's chain to Webex or Contact Center (ADR 0065). | On failure: the booking's timeline shows the provider's reason. |
+| `integration.request` | outcome | `method`, `path`, `status`, `ms`, `tracking`, `version` | {method} {path} for booking {booking_id} answered {status} in {ms} ms: {outcome}. | One request in a booking's chain to Webex or Contact Center (ADR 0065). | On failure: the booking's timeline shows the provider's reason. |
 | `maintenance.overdue` | `warning`, outcome | `hours` | Maintenance mode has been on for {hours} hours. | Maintenance mode is on longer than planned (ADR 0084). | Switch it off when the work is done: `python -m app.cli maintenance off`. |
 | `planner.changes_alert` | outcome | – | Planners were told about changes. | The alert about changed bookings went out (ADR 0044). | Nothing. |
 | `public_address` | outcome | – | Public address round trip: {outcome} ({reason}). | The worker's round trip through the public address (ADR 0086 point 2). | On failure: *System status* names the finding. |
 | `retention.sweep` | `warning`, outcome | `failed`, `overdue`, `purged` | Retention sweep: {overdue} bookings overdue, {purged} deleted, {failed} failed. | The nightly sweep found bookings whose personal data was not yet deleted and deleted them. | When `failed` is not zero: look at the worker's log; see also `retention.backlog`. |
-| `storage.check` | outcome | – | Storage check: {outcome} ({reason}). | The worker's disk check changed grade (ADR 0040 point 3). | On failure: free disk space on the host. |
-| `system.update` | outcome | – | Update {detail}: {outcome}. | A step of a requested update or restore (ADR 0059, 0067); `detail` holds the versions. | On failure: open *Updates*; the runbook explains a rollback. |
-| `system.version` | outcome | – | The running version changed: {detail}. | At start-up the web process saw another version or commit than last time. | Nothing. |
+| `storage.check` | outcome | `free_percent`, `database_mb` | Storage check: {outcome} ({reason}); {free_percent}% free, database {database_mb} MB. | The worker's disk check changed grade (ADR 0040 point 3). | On failure: free disk space on the host. |
+| `system.update` | outcome | `what`, `from`, `to` | Update step {what} from {from} to {to}: {outcome}. | A step of a requested update or restore (ADR 0059, 0067); `detail` holds the versions. | On failure: open *Updates*; the runbook explains a rollback. |
+| `system.version` | outcome | `what`, `from`, `to`, `commit` | The running version changed from {from} to {to} (commit {commit}). | At start-up the web process saw another version or commit than last time. | Nothing. |
 | `tls.certificate` | `warning`, outcome | `finding`, `host` | Certificate check of {host}: {finding}. | The certificate the public address serves expires soon or does not fit (ADR 0064). | Renew or replace the certificate (*Certificate* in the portal, or the host's own proxy). |
 
 ### Operations
@@ -212,6 +230,7 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | `job.retry` | `warning` | `attempt`, `error`, `job_id` | Job {job_id} failed (attempt {attempt}) and will be retried: {error}. | A job failed with a retryable error and is planned again with backoff. | Nothing, unless it ends in `job.failed`. |
 | `job.sent` | `info` | `channel`, `job_id`, `type` | Job {job_id} ({type}) sent its message by {channel}. | A message job handed its message to the email or SMS provider. | Nothing. |
 | `job.skipped` | `info` | `job_id`, `reason` | Job {job_id} skipped: {reason}. | A job found nothing to do: the booking moved, was cancelled, or has no recipient. | Nothing. |
+| `logging.test` | `info` | `destination`, `kind` | Test line for log destination {destination} ({kind}). | *Send test line* on a log destination (ADR 0085 point 5); it reaches only that destination. | Nothing. |
 | `maintenance.watch_failed` | `warning` | `error` | The maintenance check did not run: {error}. | The worker could not check whether maintenance mode is overdue. | Look at the container log around it; repeated failures point at the host or the database. |
 | `request_log.failed` | `warning` | `error` | A provider request could not be recorded: {error}. | The request chain of ADR 0065 lost one entry; the request itself went on. | Nothing. |
 | `retention.backlog` | `error` | `bookings`, `failed` | {bookings} bookings still hold personal data past their retention ({failed} failed). | The nightly sweep found bookings whose personal data should have been deleted 48 hours ago. | Open *Retention* in the portal and the worker's log; this is a privacy incident when it persists. |
@@ -280,11 +299,14 @@ Three kinds of action are generated, not listed:
 - **The host route** (ADR 0034): Docker's `splunk` logging driver, a Splunk Universal
   Forwarder or Fluent Bit reading the rotated files; `docs/runbook.md`, *Shipping audit events
   to a log platform*. Route `log_type = audit` to its own index.
-- **Log destinations** (ADR 0085 part 1): syslog (RFC 5424 over TLS, TCP or UDP), Splunk HEC,
-  Elastic or OpenSearch (`_bulk` into a data stream) and NDJSON over HTTP, each a copy of the
-  masked lines stdout carries, with its own minimum level, the audit categories it takes and an
-  opt-in for trace lines and diagnostic events. Every process (web, worker) keeps one bounded
-  queue per destination and delivers in batches in the background; a full queue drops the
+- **Log destinations** (ADR 0085 part 1): syslog (RFC 5424 over TLS, TCP or UDP; `MSGID` is
+  the line's `event.category` and the message starts with its sentence, followed by the JSON
+  line, ADR 0103 point 10), Splunk HEC, Elastic or OpenSearch (`_bulk` into a data stream)
+  and NDJSON over HTTP, each a copy of the masked lines stdout carries, with its own minimum
+  level, the categories it takes (the audit trail's `audit`, `system`, `security`, and `authz`
+  for the authorisation decisions, which a new destination leaves out) and an opt-in for trace
+  lines and diagnostic events. Every process (web, worker) keeps one bounded queue per
+  destination and delivers in batches in the background; a full queue drops the
   oldest line, a failing platform is retried with backoff, and a batch the platform will never
   accept is dropped instead of blocking the rest. A destination narrows the process's own
   level and never widens it: it sees trace lines only while `LOG_LEVEL` is `TRACE` too. The

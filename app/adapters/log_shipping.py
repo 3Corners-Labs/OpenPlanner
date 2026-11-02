@@ -35,10 +35,10 @@ from typing import Protocol
 from app.adapters.db.log_destinations import LogTarget
 from app.config import Settings
 from app.domain.audit import Outcome
-from app.domain.event_schema import rfc3339
+from app.domain.event_schema import LABELS, SCHEMA, rfc3339
 from app.domain.log_destinations import (
     HEALTH_EVENT,
-    TEST_MESSAGE,
+    TEST_ACTION,
     DeliveryError,
     DestinationStatus,
     LogDestination,
@@ -46,6 +46,7 @@ from app.domain.log_destinations import (
     State,
     accepts,
 )
+from app.domain.log_events import LogCategory, describe
 from app.domain.ports import Clock, LogDestinationSender, UnitOfWork
 from app.domain.system_log import SystemLog
 
@@ -94,14 +95,22 @@ SenderFactory = Callable[[LogTarget, Callable[[], float]], LogDestinationSender]
 
 
 def probe_line(clock: Clock, service: str, destination: LogDestination) -> str:
-    """Return the line *Send test line* delivers: an ``info`` line naming the destination."""
+    """Return the line *Send test line* delivers: an ``info`` line naming the destination.
+
+    It has the shape of every other line (``openplanner.event/3``), so the platform's parsing
+    and the syslog ``MSGID`` are tried with it too.
+    """
+    fields = {"destination": destination.id, "kind": destination.kind.value}
     return json.dumps(
         {
             "@timestamp": rfc3339(clock.now()),
             "log.level": "info",
-            "message": TEST_MESSAGE,
+            "event.category": LogCategory.OPERATIONS.value,
+            "event.action": TEST_ACTION,
+            "message": describe(TEST_ACTION, fields),
             "service.name": service,
-            "destination": destination.id,
+            **{f"{LABELS}{name}": value for name, value in fields.items()},
+            "schema": SCHEMA,
         },
         separators=(",", ":"),
     )
@@ -341,7 +350,7 @@ class LogShipper:
     async def _report(self, destination_id: int, pipeline: Pipeline, state: State) -> None:
         """Write the system event of a change from working to failing, and back."""
         destination = pipeline.destination
-        detail = f"{destination.kind}:{destination_id}"
+        where = f"kind:{destination.kind.value},destination:{destination_id}"
         with suppress(Exception):  # an event that cannot be written must not stop delivery
             if state is State.FAILING and destination_id not in self._reported:
                 last = self._failure_event_at.get(destination_id)
@@ -353,11 +362,13 @@ class LogShipper:
                         HEALTH_EVENT,
                         Outcome.FAILURE,
                         reason=pipeline.status().last_error,
-                        detail=detail,
+                        detail=f"change:failing,{where}",
                     )
             elif state is State.OK and destination_id in self._reported:
                 self._reported.discard(destination_id)
-                await self._system.record(HEALTH_EVENT, Outcome.SUCCESS, detail=detail)
+                await self._system.record(
+                    HEALTH_EVENT, Outcome.SUCCESS, detail=f"change:recovered,{where}"
+                )
 
     async def store_status(self) -> None:
         """Store the counters of the pipelines that changed, for the portal."""

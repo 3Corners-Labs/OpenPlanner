@@ -16,7 +16,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
-from app.domain.event_context import current_service, current_trace_id, new_id
+from app.domain.event_context import (
+    current_actor_role,
+    current_service,
+    current_trace_id,
+    new_id,
+)
 
 
 class Outcome(StrEnum):
@@ -44,6 +49,51 @@ class Source(StrEnum):
 
 SYSTEM_ACTOR = "system"
 """Actor recorded for system events."""
+
+ANONYMOUS_ACTOR = "anonymous"
+"""Actor of an event caused by someone who is not logged in (a participant, a caller)."""
+
+HOST_ACTOR_PREFIX = "host"
+"""Actors of the host: ``host`` (the installer, a change by hand), ``host-cli``,
+``host-updater``."""
+
+CLI_ACTOR_PREFIX = "system:"
+"""Start of the actor of a command run on the host as the system, e.g. ``system:cli``."""
+
+API_ACTOR_PREFIX = "opc_"
+"""Start of a machine API client id (``app.domain.api_clients``), the actor of its events."""
+
+
+class ActorType(StrEnum):
+    """What kind of actor caused an event, without naming it (ADR 0103 point 7)."""
+
+    USER = "user"
+    """An admin, by the identity provider's subject."""
+    SYSTEM = "system"
+    """The platform itself: the worker, a check, housekeeping."""
+    HOST = "host"
+    """A command on the host: the CLI, the installer or the updater."""
+    API = "api"
+    """A machine API client (ADR 0023)."""
+    ANONYMOUS = "anonymous"
+    """Someone not logged in: a participant's link, a public form, a forged request."""
+
+
+def actor_type(actor: str) -> ActorType:
+    """Return the kind of ``actor``, from the fixed shapes actors are written in."""
+    if actor == SYSTEM_ACTOR:
+        return ActorType.SYSTEM
+    if actor == ANONYMOUS_ACTOR or not actor:
+        return ActorType.ANONYMOUS
+    if (
+        actor == HOST_ACTOR_PREFIX
+        or actor.startswith(f"{HOST_ACTOR_PREFIX}-")
+        or actor.startswith(CLI_ACTOR_PREFIX)
+    ):
+        return ActorType.HOST
+    if actor.startswith(API_ACTOR_PREFIX):
+        return ActorType.API
+    return ActorType.USER
 
 
 class Category(StrEnum):
@@ -112,6 +162,8 @@ class AuditEvent:
         trace_id: The request or job that caused it; taken from the current context.
         service: ``web`` or ``worker``; taken from the current context.
         event_id: Unique id, so a copy on the log platform can be matched to the table.
+        actor_role: The role key that granted the admin the permission (ADR 0103 point 7);
+            taken from the current context, and empty for any actor that is not a person.
     """
 
     at: datetime
@@ -130,11 +182,23 @@ class AuditEvent:
     trace_id: str = field(default_factory=current_trace_id, compare=False)
     service: str = field(default_factory=current_service, compare=False)
     event_id: str = field(default_factory=new_id, compare=False)
+    actor_role: str = field(default_factory=current_actor_role, compare=False)
 
     def __post_init__(self) -> None:
-        """Fill in the derived category and level, so a stored event equals the one read back."""
+        """Fill in the derived category and level, so a stored event equals the one read back.
+
+        A role belongs to a person only: a system event written inside an admin's request does
+        not take the admin's role.
+        """
         object.__setattr__(self, "category", self.event_category)
         object.__setattr__(self, "level", self.log_level)
+        if self.actor_type is not ActorType.USER:
+            object.__setattr__(self, "actor_role", "")
+
+    @property
+    def actor_type(self) -> ActorType:
+        """The kind of actor (ADR 0103 point 7)."""
+        return actor_type(self.actor)
 
     @property
     def event_category(self) -> Category:

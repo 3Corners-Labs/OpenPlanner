@@ -26,9 +26,11 @@ from app.domain.authorization import (
     decide,
     decide_client,
     decide_in_maintenance,
+    granting_role,
     permissions_for,
     role_keys,
     scope_for,
+    target_text,
 )
 from tests.support.principals import principal
 
@@ -522,3 +524,36 @@ def test_a_maintenance_safe_route_is_open_to_the_superuser_only() -> None:
 
     assert allowed == Decision(True, Reason.SUPERUSER)
     assert not decide_in_maintenance(ORG, Permission.GROUP_EDIT, maintenance_safe=True).allowed
+
+
+# --- ADR 0103 point 7: the role that granted it, for actor.role on the log line ----------
+
+
+def test_an_allowed_decision_names_the_role_of_the_grant_that_covered_it() -> None:
+    assert decide(SUPER, Permission.GROUP_VIEW, OWN_GROUP).role == "superuser"
+    assert decide(ORG, Permission.GROUP_VIEW, OWN_GROUP).role == "org_admin"
+    assert decide(GROUP, Permission.GROUP_VIEW, OWN_GROUP).role == "group_admin"
+    assert decide(MIXED, Permission.GROUP_VIEW, OWN_GROUP).role == "group_admin"
+
+
+def test_a_denied_decision_names_no_role() -> None:
+    assert decide(ORG, Permission.GROUP_VIEW, OTHER_GROUP).role == ""
+    assert decide(NOBODY, Permission.GROUP_VIEW, OWN_GROUP).role == ""
+
+
+def test_maintenance_names_the_superusers_role() -> None:
+    writable = next(iter(MAINTENANCE_WRITABLE))
+
+    assert decide_in_maintenance(SUPER, writable).role == "superuser"
+    assert decide_in_maintenance(ORG, writable).role == ""
+
+
+def test_the_granting_role_of_an_overview_is_a_role_that_holds_the_permission() -> None:
+    assert granting_role(AUDITOR, Permission.GROUP_VIEW) == "auditor"
+    assert granting_role(NOBODY, Permission.GROUP_VIEW) == ""
+
+
+def test_a_target_reads_as_a_place() -> None:
+    assert target_text(OWN_GROUP) == "demo/demo"
+    assert target_text(OWN_ORG) == "demo"
+    assert target_text(Target.everything()) == "everything"

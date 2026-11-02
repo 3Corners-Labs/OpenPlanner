@@ -344,7 +344,7 @@ def test_a13_shadow_mode_grants_the_legacy_claims_only() -> None:
     entitled = resolve(claims, ClaimMode.ENTITLEMENTS, PREFIX, DIRECTORY, CATALOGUE)
 
     assert shadow.principal.grants == legacy.principal.grants == {Grant("auditor", "gem-a")}
-    assert shadow.mismatch == "legacy_only:auditor:gem-a;entitlements_only:org_admin:gem-a"
+    assert shadow.mismatch == "legacy_only:auditor:gem-a,entitlements_only:org_admin:gem-a"
     assert [r.reason for r in shadow.refused] == [RefusalReason.UNKNOWN_ORGANISATION]
     assert legacy.mismatch is None
     assert legacy.refused == ()
@@ -355,7 +355,7 @@ def test_a13_shadow_mode_grants_the_legacy_claims_only() -> None:
 def test_mismatch_detail_counts_when_the_keys_would_not_fit() -> None:
     many = frozenset(Grant("org_admin", f"organisation-number-{n}") for n in range(40))
 
-    assert mismatch_detail(many, frozenset()) == "legacy_only:40;entitlements_only:0"
+    assert mismatch_detail(many, frozenset()) == "legacy_only:40,entitlements_only:0"
     assert mismatch_detail(many, many) is None
 
 

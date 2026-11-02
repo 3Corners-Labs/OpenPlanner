@@ -81,7 +81,14 @@ async def test_the_superuser_creates_a_destination_switched_off_and_untested(env
     assert (created.enabled, created.secret_set, created.tested_at) == (False, True, None)
     assert env.uow.state.log_secrets[created.id] == TOKEN
     assert env.changes == 1
-    assert env.events() == [("sub-super", Outcome.SUCCESS, "", f"created:splunk_hec:{created.id}")]
+    assert env.events() == [
+        (
+            "sub-super",
+            Outcome.SUCCESS,
+            "",
+            f"change:created,kind:splunk_hec,destination:{created.id}",
+        )
+    ]
 
 
 async def test_nothing_secret_reaches_the_audit_log_or_the_overview(env: Env) -> None:
@@ -199,7 +206,7 @@ async def test_an_update_lists_what_changed_and_a_blank_credential_keeps_the_sto
         "sub-super",
         Outcome.SUCCESS,
         "",
-        f"changed:splunk_hec:{destination_id}:min_level",
+        f"change:changed,kind:splunk_hec,destination:{destination_id},min_level",
     )
     assert await env.service.update(SUPER, destination_id, draft(min_level="error"), None) == []
     assert len(env.events()) == 2  # an update that changes nothing writes nothing
@@ -229,9 +236,9 @@ async def test_switching_on_and_off_is_audited_once_per_change(env: Env) -> None
 
     details = [detail for *_, detail in env.events()]
     assert details == [
-        f"created:splunk_hec:{destination_id}",
-        f"enabled:splunk_hec:{destination_id}",
-        f"disabled:splunk_hec:{destination_id}",
+        f"change:created,kind:splunk_hec,destination:{destination_id}",
+        f"change:enabled,kind:splunk_hec,destination:{destination_id}",
+        f"change:disabled,kind:splunk_hec,destination:{destination_id}",
     ]
 
 
@@ -246,7 +253,7 @@ async def test_delete_removes_the_destination_its_credential_and_status(env: Env
     with pytest.raises(DomainError) as caught:
         await env.service.destination(SUPER, destination_id)
     assert caught.value.code is ErrorCode.LOG_DESTINATION_NOT_FOUND
-    assert env.events()[-1][3] == f"deleted:splunk_hec:{destination_id}"
+    assert env.events()[-1][3] == f"change:deleted,kind:splunk_hec,destination:{destination_id}"
 
 
 async def test_a_test_line_that_arrives_marks_the_destination_tested(env: Env) -> None:
@@ -272,7 +279,7 @@ async def test_a_test_line_that_fails_is_audited_with_its_reason_and_code_only(e
         "sub-super",
         Outcome.FAILURE,
         "refused",
-        f"tested:splunk_hec:{created.id}",
+        f"change:tested,kind:splunk_hec,destination:{created.id}",
     )
 
 

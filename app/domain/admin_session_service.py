@@ -149,7 +149,7 @@ class AdminSessionService:
                     SESSIONS_ENDED_ALL_EVENT,
                     Outcome.SUCCESS,
                     reason.value,
-                    detail=f"sessions={count}",
+                    detail=f"sessions:{count}",
                 )
             )
         return count
