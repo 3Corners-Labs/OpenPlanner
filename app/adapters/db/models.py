@@ -1017,6 +1017,28 @@ class IdentityProviderKeyRow(Base):
     retired_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
+class IdentityProviderDomainRow(Base):
+    """An e-mail domain claimed by a provider, with its TXT verification (ADR 0083 step 3)."""
+
+    __tablename__ = "identity_provider_domains"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider_id: Mapped[int] = mapped_column(
+        ForeignKey("identity_providers.id", ondelete="CASCADE"), index=True
+    )
+    domain: Mapped[str] = mapped_column(String(253), unique=True)
+    token: Mapped[str] = mapped_column(String(64))
+    state: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    missing_since: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        CheckConstraint("state IN ('pending', 'verified', 'failing', 'lapsed')", name="state"),
+    )
+
+
 class ApiClientRow(Base):
     """A registered bot (ADR 0023); only the SHA-256 of its secret is stored."""
 

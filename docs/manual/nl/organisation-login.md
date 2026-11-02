@@ -82,6 +82,24 @@ OpenPlanner controleert alleen dat het ID-token zegt dat die is gebruikt, met ee
 De proeflogin toont of een tweede factor zichtbaar was; kies **Afdwingen** pas na een proeflogin
 met MFA die *ja* zegt, anders sluit u alle beheerders van de organisatie buiten.
 
+## Domeinen
+
+Onder **Domeinen** bepaalt de superuser welke e-maildomeinen bij deze provider horen. Wie later
+inlogt met een adres op zo'n domein, gaat naar deze provider (dat inlogscherm volgt in een
+volgende versie); een domein dekt ook zijn subdomeinen.
+
+1. Vul het domein in (bijvoorbeeld `acme.nl`) en kies **Domein toevoegen**.
+2. Laat de organisatie het getoonde TXT-record in haar DNS zetten: naam
+   `_openplanner-challenge.<domein>`, waarde `openplanner-domain-verification=…`.
+3. Kies **Controleren**. Wordt het record gevonden, dan staat het domein op **Geverifieerd**.
+
+Een domein hoort bij één provider op de hele installatie. Het achtervoegsel van de ingebouwde
+identiteitsprovider (standaard `openplanner.internal`, en alles daaronder) is gereserveerd
+voor het platform en kan niet worden geclaimd. Verdwijnt het record later, dan staat het
+domein op **Record verdwenen, routeert nog**; na de ingestelde tolerantie (standaard 7 dagen,
+*Tolerantie verdwenen domeinrecord*) wordt het **Vervallen** en gaan logins weer naar de
+platformprovider. **Verwijderen** geeft het domein direct vrij.
+
 ## Sleutel roteren, aan- en uitzetten, verwijderen
 
 **Sleutel roteren** maakt een nieuw sleutelpaar; de oude publieke sleutel blijft 24 uur in

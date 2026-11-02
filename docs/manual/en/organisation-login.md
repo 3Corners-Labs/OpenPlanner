@@ -81,6 +81,24 @@ and no personal data. **Require** refuses the login with the message that the ac
 second factor. The test login shows whether a second factor showed, so choose **Require** only
 after a test login with MFA says *yes*; otherwise every admin of the organisation is locked out.
 
+## Domains
+
+Under **Domains** the superuser decides which e-mail domains belong to this provider. Someone
+who later logs in with an address on such a domain goes to this provider (that login screen
+follows in a later version); a domain also covers its subdomains.
+
+1. Enter the domain (for example `acme.nl`) and choose **Add domain**.
+2. Have the organisation publish the TXT record shown in its DNS: name
+   `_openplanner-challenge.<domain>`, value `openplanner-domain-verification=…`.
+3. Choose **Verify**. When the record is found, the domain shows **Verified**.
+
+A domain belongs to one provider on the whole installation. The suffix of the bundled identity
+provider (`openplanner.internal` by default, and everything under it) is reserved for the
+platform and cannot be claimed. When the record disappears later, the domain shows **Record
+gone, still routing**; after the grace period (7 days by default, *Grace for a missing domain
+record*) it becomes **Lapsed** and logins go to the platform provider again. **Remove**
+releases the domain at once.
+
 ## Rotating the key, switching on or off, removing
 
 **Rotate key** generates a new key pair; the old public key stays in the JWKS for 24 hours, so

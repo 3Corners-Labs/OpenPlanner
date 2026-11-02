@@ -56,6 +56,7 @@ CONFIGURATION_TABLES = frozenset(
         "groups",
         "holiday_calendars",
         "holidays",
+        "identity_provider_domains",
         "identity_provider_keys",
         "identity_providers",
         "integration_credentials",

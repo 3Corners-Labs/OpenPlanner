@@ -10,14 +10,19 @@ provider is built from it (``app.adapters.idp_registry``), outside any domain tr
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
-from app.adapters.db.models import IdentityProviderKeyRow, IdentityProviderRow, OrganisationRow
+from app.adapters.db.models import (
+    IdentityProviderDomainRow,
+    IdentityProviderKeyRow,
+    IdentityProviderRow,
+    OrganisationRow,
+)
 from app.domain.authorization import Scope
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.identity_providers import (
@@ -27,6 +32,7 @@ from app.domain.identity_providers import (
     OrganisationProvider,
     SigningKey,
 )
+from app.domain.login_domains import DomainClaim, DomainState
 from app.domain.mfa import MfaPolicy
 
 
@@ -69,6 +75,34 @@ def _signing_key(row: IdentityProviderKeyRow, provider_key: str) -> SigningKey:
     """Map a key row to its public side."""
     jwk: dict[str, str] = json.loads(row.public_jwk)
     return SigningKey(provider_key, row.kid, jwk, row.created_at, row.retired_at)
+
+
+def _claim(row: IdentityProviderDomainRow, provider: str) -> DomainClaim:
+    """Map a domain row to the domain object."""
+    return DomainClaim(
+        id=row.id,
+        provider=provider,
+        domain=row.domain,
+        token=row.token,
+        state=DomainState(row.state),
+        created_at=row.created_at,
+        verified_at=row.verified_at,
+        checked_at=row.checked_at,
+        missing_since=row.missing_since,
+    )
+
+
+def _claim_values(claim: DomainClaim) -> dict[str, object]:
+    """The columns of a claim, apart from its id and provider."""
+    return {
+        "domain": claim.domain,
+        "token": claim.token,
+        "state": claim.state.value,
+        "created_at": claim.created_at,
+        "verified_at": claim.verified_at,
+        "checked_at": claim.checked_at,
+        "missing_since": claim.missing_since,
+    }
 
 
 class IdentityProviderQueries:
@@ -145,9 +179,58 @@ class IdentityProviderQueries:
         await self._session.execute(
             delete(IdentityProviderKeyRow).where(IdentityProviderKeyRow.provider_id == row.id)
         )
+        await self._session.execute(
+            delete(IdentityProviderDomainRow).where(IdentityProviderDomainRow.provider_id == row.id)
+        )
         await self._session.delete(row)
         await self._session.flush()
         return True
+
+    async def list_login_domains(
+        self, scope: Scope, provider: str | None = None
+    ) -> list[DomainClaim]:
+        """Return the claimed domains of the providers inside ``scope``, by domain."""
+        query = (
+            select(IdentityProviderDomainRow, IdentityProviderRow.key)
+            .join(
+                IdentityProviderRow,
+                IdentityProviderRow.id == IdentityProviderDomainRow.provider_id,
+            )
+            .join(OrganisationRow, OrganisationRow.id == IdentityProviderRow.organisation_id)
+        )
+        if not scope.everything:
+            query = query.where(OrganisationRow.slug.in_(sorted(scope.organisations)))
+        if provider is not None:
+            query = query.where(IdentityProviderRow.key == provider)
+        rows = await self._session.execute(query.order_by(IdentityProviderDomainRow.domain))
+        return [_claim(row, key) for row, key in rows.all()]
+
+    async def add_login_domain(self, claim: DomainClaim) -> DomainClaim:
+        """Store a new claim and return it with its id."""
+        provider_id = await self._session.scalar(
+            select(IdentityProviderRow.id).where(IdentityProviderRow.key == claim.provider)
+        )
+        if provider_id is None:
+            raise LookupError("unknown provider")
+        row = IdentityProviderDomainRow(provider_id=provider_id, **_claim_values(claim))
+        self._session.add(row)
+        await self._session.flush()
+        return replace(claim, id=row.id)
+
+    async def save_login_domain(self, claim: DomainClaim) -> None:
+        """Store the state and times of an existing claim."""
+        await self._session.execute(
+            update(IdentityProviderDomainRow)
+            .where(IdentityProviderDomainRow.id == claim.id)
+            .values(**_claim_values(claim))
+        )
+
+    async def delete_login_domain(self, claim_id: int) -> bool:
+        """Remove one claim; ``False`` if there was none."""
+        result = await self._session.execute(
+            delete(IdentityProviderDomainRow).where(IdentityProviderDomainRow.id == claim_id)
+        )
+        return bool(getattr(result, "rowcount", 0))
 
     async def get_signing_keys(self, provider_key: str) -> list[SigningKey]:
         """Return the provider's keys, newest first."""

@@ -22,8 +22,9 @@ from datetime import datetime, timedelta
 
 from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, Outcome
-from app.domain.authorization import Permission, Principal, Role, scope_for
+from app.domain.authorization import Permission, Principal, Role, Scope, scope_for
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.login_domains import suffix_conflicts
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
 from app.domain.platform_settings import usable
 from app.domain.ports import Clock, Transaction, UnitOfWork
@@ -66,6 +67,8 @@ GENERATED_SECRETS = frozenset({"webex_webhook_secret", "wxcc_webhook_secret"})
 """Secrets the server generates and rotates with a button, never typed in (ADR 0042 inventory)."""
 
 LOG_LEVEL = "log_level"
+LOGIN_SUFFIX = "bundled_idp_login_suffix"
+"""The platform suffix of the bundled provider; it may not overlap a claimed login domain."""
 
 _PERMISSION = Permission.SETTINGS_PLATFORM_MANAGE
 _ORGANISATION = Permission.SETTINGS_ORGANISATION_MANAGE
@@ -413,6 +416,11 @@ class SettingsService:
                     raise DomainError(ErrorCode.SETTING_EXPIRY, key)
             if self._combination({**stored, key: value}):
                 raise DomainError(ErrorCode.SETTING_COMBINATION, key)
+            if key == LOGIN_SUFFIX and suffix_conflicts(
+                str(value), await tx.list_login_domains(Scope(everything=True))
+            ):
+                # ADR 0106 point 9: the suffix never overlaps an organisation's login domain.
+                raise DomainError(ErrorCode.IDP_DOMAIN_TAKEN, key)
             old = stored.get(key, spec.default)
             await tx.save_platform_setting(key, value, now, expires)
             await tx.bump_settings_version()

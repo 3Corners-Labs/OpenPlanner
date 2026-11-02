@@ -153,6 +153,10 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | `idp.created` | outcome | – | An identity provider was added. | An organisation registered a login provider (ADR 0083). | Nothing; the audit log shows who did it. |
 | `idp.deleted` | outcome | – | An identity provider was deleted. | An organisation removed a login provider. | Nothing; the audit log shows who did it. |
 | `idp.disabled` | outcome | – | An identity provider was switched off. | Its users can no longer sign in. | Nothing; the audit log shows who did it. |
+| `idp.domain_claimed` | outcome | – | An e-mail domain was claimed for an identity provider; it routes once verified. | The superuser added a login domain; the detail names the provider and the domain. | Nothing. |
+| `idp.domain_failed` | outcome | – | A login domain's TXT record was not found; the domain is failing or lapsed. | After the grace period the domain stops sending logins to the organisation provider. | Ask the organisation to restore the TXT record, or remove the domain. |
+| `idp.domain_removed` | outcome | – | A login domain was removed from an identity provider. | Logins on that domain go to the platform provider again. | Nothing. |
+| `idp.domain_verified` | outcome | – | A login domain was verified by its TXT record. | Logins on that domain now go to the organisation provider. | Nothing. |
 | `idp.enabled` | outcome | – | An identity provider was switched on. | Its users can sign in. | Nothing. |
 | `idp.key_rotated` | outcome | – | An identity provider's client secret was replaced. | The sealed client secret changed. | Nothing. |
 | `idp.test_login` | outcome | – | A test login through an identity provider: {outcome}. | An admin tried the provider before switching it on. | Nothing. |
