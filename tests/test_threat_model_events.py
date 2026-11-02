@@ -72,6 +72,15 @@ CLASSES: dict[str, EventClass] = {
             "tests/adapters/test_fault_injection_outbound.py::test_a_provider_timeout_on_the_token_refresh_is_a_security_event_with_a_code",
         ),
     ),
+    "own_failure": EventClass(
+        "security",
+        ("database.error",),
+        (
+            "tests/api/test_fault_injection_booking.py::test_a_database_fault_while_booking_leaves_an_event_with_a_code",
+            "tests/api/test_fault_injection_booking.py::test_a_database_fault_in_the_widget_api_is_a_503_with_a_code_and_an_event",
+            "tests/api/test_fault_injection_booking.py::test_when_the_event_cannot_be_written_it_goes_to_stdout",
+        ),
+    ),
     "login": EventClass(
         "security",
         ("admin.login", "admin.login.mfa_missing", "auth.entitlement_refused"),
@@ -106,6 +115,7 @@ CLASSES: dict[str, EventClass] = {
 """The event classes (``docs/audit-events.md``)."""
 
 PUBLIC, WEBHOOK, TOKEN, LOGIN = "public_refusal", "webhook", "provider_token", "login"
+OWN_FAILURE = "own_failure"
 DENIED, CHANGE, JOB = "denied", "change", "job"
 ADMIN = (DENIED, CHANGE)
 
@@ -143,8 +153,8 @@ FLOWS: dict[str, Flow] = {
     ),
     "## Shared trust boundaries (TEN-06, BP-4)": Flow(ADMIN),
     "## Cross-cutting": Flow((PUBLIC, WEBHOOK, TOKEN, CHANGE)),
-    "## Flow: booking, cancelling, rescheduling (domain and persistence, WP2)": Flow((PUBLIC,)),
-    "## Flow: public booking pages (WP3)": Flow((PUBLIC,)),
+    "## Flow: booking, cancelling, rescheduling (domain and persistence, WP2)": Flow((PUBLIC, OWN_FAILURE)),
+    "## Flow: public booking pages (WP3)": Flow((PUBLIC, OWN_FAILURE)),
     "## Flow: organisation branding (WP3b, ADR 0041)": Flow(ADMIN),
     "## Flow: organisation management": Flow(ADMIN),
     "## Flow: groups list (ADR 0047 step 5)": Flow(ADMIN),
@@ -163,7 +173,7 @@ FLOWS: dict[str, Flow] = {
     "## Flow: emergency closure (ADR 0024)": Flow(ADMIN),
     "## Flow: alternative contact options (ADR 0037 §2)": Flow(ADMIN),
     "## Flow: custom booking form fields (ADR 0055)": Flow((PUBLIC, DENIED, CHANGE)),
-    "## Flow: embedded booking (ADR 0035, EM-2)": Flow((PUBLIC,)),
+    "## Flow: embedded booking (ADR 0035, EM-2)": Flow((PUBLIC, OWN_FAILURE)),
     "## Flow: widget script on host websites (ADR 0035, EM-3)": Flow(
         no_event="a static script file; the booking it posts is refused by the booking flow"
     ),

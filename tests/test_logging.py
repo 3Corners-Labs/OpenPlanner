@@ -253,3 +253,18 @@ def test_aiosqlite_parameter_lines_are_not_logged_at_any_level(level: str) -> No
     )
 
     assert "marker-x" not in buffer.getvalue()
+
+
+def test_a_rendered_parameter_list_is_cut_from_an_exception_text(stream: io.StringIO) -> None:
+    """The net under ``hide_parameters``: another engine's exception text loses its values."""
+    try:
+        raise ValueError(
+            "(sqlite3.IntegrityError) NOT NULL\n[SQL: INSERT INTO t (e) VALUES (?)]\n"
+            "[parameters: ('ada@example.org',)]\n(Background on this error at: https://x)"
+        )
+    except ValueError:
+        structlog.get_logger().exception("insert.failed")
+
+    output = stream.getvalue()
+    assert "ada@example.org" not in output
+    assert "[SQL: INSERT INTO t" in output
