@@ -14,6 +14,7 @@ Usage:
     ``python -m app.cli settings list``  every setting with its class, source and lock (ADR 0042)
     ``python -m app.cli settings show KEY``  one setting in detail; secrets only set/not set
     ``python -m app.cli settings-doc``  print the settings reference (docs/settings.md)
+    ``python -m app.cli logging-doc``  print the logging reference (docs/logging.md, ADR 0103)
     ``python -m app.cli init [--out PATH]``  generate the bootstrap keys (secrets/secrets.env)
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
@@ -164,6 +165,7 @@ from app.i18n import Translator, load_catalogues
 from app.keys import client_pseudonym_key, management_token_key
 from app.web import navigation
 from app.web.authz_report import render_markdown
+from app.web.logging_doc import render_markdown as render_logging_doc
 from app.web.settings_doc import render_markdown as render_settings_doc
 
 
@@ -1260,6 +1262,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     target.add_argument("key", nargs="?", help="variable name")
     target.add_argument("--all-class-c", action="store_true", help="every changeable value")
     commands.add_parser("settings-doc", help="print the settings reference as Markdown")
+    commands.add_parser("logging-doc", help="print the logging reference as Markdown")
     init_cmd = commands.add_parser("init", help="generate the bootstrap keys (first install)")
     init_cmd.add_argument("--out", type=Path, default=DEFAULT_PATH, metavar="PATH")
     args = parser.parse_args(argv)
@@ -1306,6 +1309,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return code
     if args.command == "settings-doc":
         sys.stdout.write(render_settings_doc())
+        return 0
+    if args.command == "logging-doc":
+        sys.stdout.write(render_logging_doc())
         return 0
     if args.command == "update-claim":
         sys.stdout.write(asyncio.run(_update_claim(Settings())))

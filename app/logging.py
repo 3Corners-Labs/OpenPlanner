@@ -33,6 +33,7 @@ from structlog.typing import EventDict, Processor, WrappedLogger
 
 from app.domain.event_context import current
 from app.domain.event_schema import Envelope, rfc3339
+from app.domain.log_events import trace_points
 from app.domain.privacy import ALIASES
 from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 
@@ -48,15 +49,9 @@ logging.addLevelName(TRACE, "TRACE")
 TRACE_LOGGER = "openplanner.trace"
 """The stdlib logger every trace line goes through, so it shares the root's level and format."""
 
-TRACE_POINTS: Mapping[str, tuple[str, ...]] = {
-    "http.request": ("method", "route", "status", "ms"),
-    "job.run": ("type", "attempt", "ms"),
-    "job.step": ("type", "step", "ms"),
-    "outbound.request": ("method", "host", "status", "ms", "error"),
-    "sql.slow": ("statement", "table", "ms"),
-    "template.render": ("template", "ms"),
-}
-"""The trace points of ADR 0085 point 9 and the only fields each may carry.
+TRACE_POINTS: Mapping[str, tuple[str, ...]] = trace_points()
+"""The trace points of ADR 0085 point 9 and the only fields each may carry, from the register
+of actions (``app.domain.log_events``, ADR 0103).
 
 ``http.request`` takes the route template, never the raw path (``/b/{token}`` carries the
 management token); ``outbound.request`` the host, never a URL, query, header or body;
