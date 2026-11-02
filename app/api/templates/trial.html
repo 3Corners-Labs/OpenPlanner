@@ -22,14 +22,14 @@
 <p>{{ _("trial.browser_choice" if group.join_client.value == "choice" else "trial.browser") }}</p>
 {% endif %}
 {% if state == "available" %}
-<form method="post" action="/b/{{ token }}/test">
+<form method="post" action="/b/m/{{ ref }}/test">
   <p>{{ _("trial.open_hint", minutes=minutes) }}</p>
   <p><button type="submit" class="button button--large">{{ _("trial.open") }}</button></p>
 </form>
 <p>{{ _("trial.calls_left", count=calls_left) }}</p>
 {% elif state == "active" %}
 <div class="notice notice--success" role="status"><p>{{ _("trial.active", time=closes_at) }}</p></div>
-<p><a class="button button--large" href="/b/{{ token }}/test/go">{{ _("trial.join") }}</a></p>
+<p><a class="button button--large" href="/b/m/{{ ref }}/test/go">{{ _("trial.join") }}</a></p>
 <p>{{ _("trial.calls_left", count=calls_left) }}</p>
 {% elif state == "limit_reached" %}
 <div class="notice"><p>{{ _("trial.limit") }}</p></div>
@@ -40,5 +40,5 @@
 {% else %}
 <div class="notice"><p>{{ _("manage.inactive") }}</p></div>
 {% endif %}
-<p><a href="/b/{{ token }}">{{ _("trial.back") }}</a></p>
+<p><a href="/b/m/{{ ref }}">{{ _("trial.back") }}</a></p>
 {% endblock %}

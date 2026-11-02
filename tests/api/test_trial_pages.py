@@ -38,6 +38,7 @@ class Site:
     def __init__(self, client: httpx.AsyncClient, clock: FixedClock, video: FakeVideo) -> None:
         self.client, self.clock, self.video = client, clock, video
         self.token = ""
+        self.base = ""  # the page without a credential, once the link is opened (ADR 0093)
 
     async def booked(self, *, confirm: bool = True) -> "Site":
         """Book, then confirm by the emailed link (ADR 0056), as a participant does."""
@@ -45,10 +46,11 @@ class Site:
             "/g/demo/book", data={"start": FRIDAY_0900, **ADA}, headers=SAME_ORIGIN
         )
         self.token = await (confirm_newest if confirm else emailed_token)(self.client)
+        self.base = await open_link(self.client, self.token)
         return self
 
     async def open(self) -> httpx.Response:
-        return await self.client.post(f"/b/{self.token}/test", headers=SAME_ORIGIN)
+        return await self.client.post(f"{self.base}/test", headers=SAME_ORIGIN)
 
 
 @pytest.fixture
@@ -60,14 +62,14 @@ async def site(demo_settings: Settings) -> AsyncIterator[Site]:
 
 
 async def test_the_page_explains_and_offers_to_open_a_real_webex_meeting(site: Site) -> None:
-    response = await site.client.get(f"/b/{site.token}/test")
+    response = await site.client.get(f"{site.base}/test")
 
     assert response.status_code == 200
     text = response.text
     assert "<h1>Proefgesprek</h1>" in text
     assert "echte Webex-vergadering" in text
     assert "Er komt niemand van het team binnen" in text
-    assert f'action="/b/{site.token}/test"' in text
+    assert f'action="{site.base}/test"' in text
     assert "Proefgesprek openen" in text
     assert "Het proefgesprek blijft 30 minuten open." in text
     assert site.video.created == []  # looking creates nothing at Webex
@@ -75,10 +77,10 @@ async def test_the_page_explains_and_offers_to_open_a_real_webex_meeting(site: S
 
 async def test_opening_schedules_the_hosts_meeting_and_shows_the_way_in(site: Site) -> None:
     response = await site.open()
-    page = await site.client.get(f"/b/{site.token}/test")
+    page = await site.client.get(f"{site.base}/test")
 
     assert response.status_code == 303
-    assert response.headers["location"] == f"/b/{site.token}/test"
+    assert response.headers["location"] == f"{site.base}/test"
     request = site.video.created[0]
     assert (request.title, request.host_email, request.join_before_host) == (
         "Proefgesprek Demo: videogesprek",
@@ -86,25 +88,25 @@ async def test_opening_schedules_the_hosts_meeting_and_shows_the_way_in(site: Si
         True,
     )
     assert "Uw proefgesprek staat open tot 09:30." in page.text
-    assert f'href="/b/{site.token}/test/go"' in page.text
+    assert f'href="{site.base}/test/go"' in page.text
     assert "Proefgesprekken die u nog kunt openen: 2." in page.text
 
 
 async def test_the_way_in_leads_to_the_meeting_only_while_it_is_open(site: Site) -> None:
     await site.open()
 
-    during = await site.client.get(f"/b/{site.token}/test/go")
+    during = await site.client.get(f"{site.base}/test/go")
     site.clock.advance(timedelta(minutes=31))
-    after = await site.client.get(f"/b/{site.token}/test/go")
+    after = await site.client.get(f"{site.base}/test/go")
 
     assert during.status_code == 303
     assert during.headers["location"] == "https://site.webex.com/m/1?launchApp=true"
-    assert after.headers["location"] == f"/b/{site.token}/test"
+    assert after.headers["location"] == f"{site.base}/test"
 
 
 async def test_opening_needs_a_same_origin_post(site: Site) -> None:
     response = await site.client.post(
-        f"/b/{site.token}/test",
+        f"{site.base}/test",
         headers={"origin": "http://evil.example", "sec-fetch-site": "cross-site"},
     )
 
@@ -118,7 +120,7 @@ async def test_the_limit_is_told_to_the_participant(site: Site) -> None:
         site.clock.advance(timedelta(minutes=31))
 
     await site.open()
-    page = await site.client.get(f"/b/{site.token}/test")
+    page = await site.client.get(f"{site.base}/test")
 
     assert len(site.video.created) == 3
     assert "U heeft het aantal proefgesprekken voor deze afspraak gebruikt." in page.text
@@ -140,7 +142,7 @@ async def test_a_refusal_by_webex_is_shown_kindly_and_leaves_the_appointment_alo
 
 
 async def test_the_page_is_in_english_on_request(site: Site) -> None:
-    text = (await site.client.get(f"/b/{site.token}/test", params={"lang": "en"})).text
+    text = (await site.client.get(f"{site.base}/test", params={"lang": "en"})).text
 
     assert "<h1>Trial call</h1>" in text
     assert "Open trial call" in text
@@ -155,23 +157,23 @@ async def test_a_group_without_the_switch_offers_no_trial_call(
         demo_settings, FixedClock(NOW), Integrations(None, video, FakeDispatcher())
     ) as client:
         site = await Site(client, FixedClock(NOW), video).booked()
-        page = await client.get(f"/b/{site.token}/test")
+        page = await client.get(f"{site.base}/test")
         manage = await client.get(await open_link(client, site.token))
         await site.open()
 
     assert "Voor deze afspraak is geen proefgesprek beschikbaar." in page.text
-    assert f"/b/{site.token}/test" not in manage.text
+    assert f"{site.base}/test" not in manage.text
     assert video.created == []
 
 
 async def test_the_booking_and_join_pages_link_to_the_trial_call(site: Site) -> None:
     base = await open_link(site.client, site.token)
     manage = await site.client.get(base)
-    early = await site.client.get(f"/b/{site.token}/join")  # long before the appointment
+    early = await site.client.get(f"{site.base}/join")  # long before the appointment
 
     assert f'href="{base}/test"' in manage.text
     assert "Uw verbinding vooraf uitproberen" in manage.text
-    assert f'href="/b/{site.token}/test"' in early.text
+    assert f'href="{site.base}/test"' in early.text
     assert "Liever eerst uw verbinding uitproberen?" in early.text
 
 
@@ -179,6 +181,20 @@ async def test_an_unknown_token_is_a_404(site: Site) -> None:
     for path in ("/b/unknown/test", "/b/unknown/test/go"):
         assert (await site.client.get(path)).status_code == 404
     assert (await site.client.post("/b/unknown/test", headers=SAME_ORIGIN)).status_code == 404
+
+
+async def test_a_reference_without_the_cookie_is_refused_whatever_the_booking(
+    site: Site, demo_settings: Settings
+) -> None:
+    """ADR 0093: the page under the reference needs the cookie, and does not say if it exists."""
+    async with app_client(demo_settings, FixedClock(NOW)) as other:
+        known = await other.get(f"{site.base}/test")
+        post = await other.post(f"{site.base}/test", headers=SAME_ORIGIN)
+        unknown = await other.get("/b/m/not-a-reference/test")
+
+    assert (known.status_code, post.status_code, unknown.status_code) == (403, 403, 403)
+    assert known.text == unknown.text
+    assert site.video.created == []
 
 
 async def test_a_booking_that_awaits_confirmation_has_no_trial_call(site: Site) -> None:
@@ -190,8 +206,9 @@ async def test_a_booking_that_awaits_confirmation_has_no_trial_call(site: Site) 
     )
     pending = await emailed_token(site.client)
 
-    page = await site.client.get(f"/b/{pending}/test")
-    opened = await site.client.post(f"/b/{pending}/test", headers=SAME_ORIGIN)
+    pending_base = await open_link(site.client, pending)
+    page = await site.client.get(f"{pending_base}/test")
+    opened = await site.client.post(f"{pending_base}/test", headers=SAME_ORIGIN)
 
     assert page.status_code == 200
     assert "Proefgesprek openen" not in page.text
@@ -202,11 +219,11 @@ async def test_a_booking_that_awaits_confirmation_has_no_trial_call(site: Site) 
 async def test_the_trial_page_follows_the_groups_join_client(
     site: Site, demo_settings: Settings
 ) -> None:
-    browser = (await site.client.get(f"/b/{site.token}/test")).text
+    browser = (await site.client.get(f"{site.base}/test")).text
     await _configure(demo_settings.database_url, join_client=JoinClient.CHOICE)
-    choice = (await site.client.get(f"/b/{site.token}/test")).text
+    choice = (await site.client.get(f"{site.base}/test")).text
     await site.open()
-    go = await site.client.get(f"/b/{site.token}/test/go")
+    go = await site.client.get(f"{site.base}/test/go")
 
     assert "Deelnemen via deze browser" not in browser
     assert "Deelnemen via deze browser" in choice
@@ -220,8 +237,9 @@ async def test_without_webex_a_new_trial_call_cannot_open_but_an_open_one_keeps_
     async with app_client(
         demo_settings, FixedClock(NOW), Integrations(None, None, FakeDispatcher())
     ) as client:
-        page = await client.get(f"/b/{site.token}/test")
-        way_in = await client.get(f"/b/{site.token}/test/go")
+        base = await open_link(client, site.token)
+        page = await client.get(f"{base}/test")
+        way_in = await client.get(f"{base}/test/go")
 
     assert "Naar het proefgesprek" in page.text
     assert way_in.status_code == 303
@@ -233,6 +251,6 @@ async def test_without_webex_a_new_trial_call_cannot_open_but_an_open_one_keeps_
         FixedClock(NOW + timedelta(hours=1)),
         Integrations(None, None, FakeDispatcher()),
     ) as client:
-        later = await client.get(f"/b/{site.token}/test")
+        later = await client.get(f"{await open_link(client, site.token)}/test")
 
     assert "Proefgesprek openen" not in later.text  # nothing new can be opened without Webex

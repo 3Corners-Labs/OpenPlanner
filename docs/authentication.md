@@ -105,7 +105,7 @@ one booking. Confirming by email (ADR 0056) is a second step on the link, a butt
 POSTs, not a link that acts. There is no account or password. Since ADR 0093 the link is
 exchanged for a cookie (below).
 
-**ADR 0093 (steps 1 and 2 built).** `GET /b/{token}` is exchanged once for the cookie
+**ADR 0093 (built).** `GET /b/{token}` is exchanged once for the cookie
 `__Host-op_link` (opaque random value, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, no
 `Domain`; over plain http in development `op_link` with `Path=/b`; the database keeps the
 SHA-256 of the value) and redirects with `303` to `/b/m/{public_ref}`,
@@ -115,10 +115,10 @@ most 20 bookings; the rule for the cookie's name and attributes is shared with, 
 from, the admin cookie (`app/web/cookies.py`). The `public_ref` names a
 booking and authorises nothing; the cookie's session must hold the booking. The cookie proves
 possession of the link, not an identity. Old `/b/{token}/…` links keep working through the
-exchange. The confirm, cancel and move pages are already on `/b/m/{ref}`; until step 3 the
-trial, join and waiting pages still carry the token in their URL, and what limits that is in
-ADR 0093 (no access log, route templates in traces, `Referrer-Policy: same-origin`, `no-store`
-pages).
+exchange. Every participant page (booking, confirm, cancel, move, trial, join and the waiting room of a
+direct call, including its poll) is on `/b/m/{ref}`; a direct call sets the cookie itself when
+it starts. Only the first request from an email carries the token. No access log, route
+templates in traces, `Referrer-Policy: same-origin` and `no-store` pages stay as defence in depth.
 
 **How strong.** 256 bits of entropy behind an HMAC; guessing is not feasible and is also
 rate limited (unknown links draw on one bucket per address, `unknown_links`) and recorded as
