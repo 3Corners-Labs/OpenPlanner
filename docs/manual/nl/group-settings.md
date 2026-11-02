@@ -219,6 +219,19 @@ De waarde die de flow in Webex Contact Center gebruikt om de wachtrij te kiezen.
 veld leeg, dan stuurt het portaal het webadres van de groep mee. Vul alleen iets anders in als
 de flow een andere waarde verwacht.
 
+<!-- field: wxcc_sample_flow -->
+### Voorbeeldflow om te importeren
+
+In plaats van de flow met de hand te bouwen kunt u er een laten genereren. Een beheerder op de
+host draait `python -m app.cli wxcc-sample-flow --group <webadres>` (met `--queue WAARDE=QUEUE`
+per routeringswaarde en `--fallback-queue` voor de standaardtak). Het resultaat is een bestand
+voor **Control Hub → Contact Center → Customer experience → Flows → Import**. De flow heeft de
+variabele `openplannerGroup`, een tak voor soort `probe` die het controle-item beëindigt, een
+prioriteit voor directe gesprekken, een Screen Pop met de vergaderlink en een tak met een queue
+per routeringswaarde van de groepen met dit business address. Controleer na het importeren de
+queues, valideer, publiceer en koppel de flow aan het entry point; druk daarna op **Koppeling
+controleren**. Het diagram en de details staan in `docs/wxcc-sample-flow.md`.
+
 <!-- field: trial_call_enabled -->
 ### Proefgesprek voor de deelnemer
 

@@ -1,5 +1,6 @@
 """Operator commands: checks, webhook registration, listing, reset and delivery self-test."""
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ from app.cli import (
     _webhooks_reset,
     _wxcc_check,
     _wxcc_config_check,
+    _wxcc_sample_flow,
     main,
 )
 from app.config import Settings
@@ -204,6 +206,38 @@ async def test_wxcc_config_check_without_wired_groups_does_nothing(configured: S
 
     assert not passed
     assert "No group has a WxCC channel and business address" in report
+
+
+async def test_wxcc_sample_flow_prints_a_flow_for_the_group(configured: Settings) -> None:
+    await _wired_group(configured)
+
+    report, ok = await _wxcc_sample_flow(configured, "aangifte", ["aangifte=ORG_aangifte_01"], None)
+
+    flow = json.loads(report)
+    assert ok
+    assert flow["name"] == "openplanner_aangifte"
+    queues = [n["properties"]["queueId"] for n in flow["nodes"] if "queueId" in n["properties"]]
+    assert queues == ["ORG_aangifte_01", "ORG_aangifte_01"]
+
+
+async def test_wxcc_sample_flow_refuses_an_unknown_or_unwired_group(configured: Settings) -> None:
+    engine = create_engine(configured.database_url)
+    await seed_group(engine, slug="aangifte")
+    await engine.dispose()
+
+    assert await _wxcc_sample_flow(configured, "nope", [], None) == ("no group 'nope'\n", False)
+    report, ok = await _wxcc_sample_flow(configured, "aangifte", [], None)
+    assert not ok
+    assert "no WxCC channel" in report
+
+
+async def test_wxcc_sample_flow_refuses_a_queue_without_its_value(configured: Settings) -> None:
+    await _wired_group(configured)
+
+    report, ok = await _wxcc_sample_flow(configured, "aangifte", ["ORG_aangifte_01"], None)
+
+    assert not ok
+    assert "VALUE=QUEUE" in report
 
 
 async def test_wxcc_check_reports_a_wrong_region(configured: Settings) -> None:
