@@ -389,19 +389,19 @@ def test_the_workflow_runs_the_gate_in_the_merge_queue_too() -> None:
     assert "github.event.merge_group.base_sha" in text
 
 
-def test_in_the_queue_the_script_comes_from_the_same_commit_as_the_workflow() -> None:
-    """ADR 0104 point 7: the queue's workflow is the group head's, so its script must be too.
+def test_the_script_comes_from_the_same_commit_as_the_workflow() -> None:
+    """ADR 0104 point 7: the script comes from the commit the workflow comes from (``github.sha``).
 
     On 2026-11-02 the queue ran the new workflow (``--admins``) against ``main``'s old script
     and refused #414 with "unrecognized arguments".
     """
     text = WORKFLOW.read_text()
 
-    assert (
-        "ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.head_sha }}"
-        in text
+    assert "ref: ${{ github.sha }}" in text
+    assert "ref: ${{ github.event.pull_request.base.sha" not in text, (
+        "a pull request opened before a gate change has an older base; on 2026-11-02 #374 ran "
+        "the new workflow against that base's old script"
     )
-    assert "github.event.merge_group.head_sha" in text
     assert "pull-requests: read" in text
 
 

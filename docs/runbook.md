@@ -1425,14 +1425,31 @@ repository:
 
 | Name | Kind | What | Why |
 |---|---|---|---|
-| `RELEASE_TOKEN` | secret | a fine-grained personal access token on this repository with *Contents: read and write* and *Pull requests: read and write* (or a GitHub App token later) | a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow: the release PR would get no CI and the tag no build |
+| `RELEASE_APP_CLIENT_ID` | variable in the environment `release` | the client ID of the release app (ADR 0107) | the release jobs take a short-lived token from the app: a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow, and only the app may create a `v*` tag |
+| `RELEASE_APP_PRIVATE_KEY` | secret in the environment `release` | a private key of the release app (PEM) | as above; the environment `release` may only be used from `main` |
 | `OPENAI_API_KEY` | secret | an OpenAI API key | the audit job (`openai/codex-action`); the key stays in the action's proxy and never reaches the review process |
 | `RELEASE_RUNNER` | variable, optional | the label of a self-hosted runner | default `ubuntu-24.04`; see *Self-hosted runner* below |
 
-A real run stops at its first step without `RELEASE_TOKEN`; a dry run needs none of them. A
-personal access token expires: note the date, renew it under the same name before it does
-(a release then fails at its first step, nothing half-done), or replace it with a GitHub App
-token later. The Codex CLI is installed at its newest version on every audit run
+A real run stops at the app-token step without the release app; a dry run needs none of
+them. The release-candidate job of `main.yml` uses the same app, so without it no candidate
+is tagged after a merge.
+
+**The release app (ADR 0107), once.** Under *Organization settings → Developer settings →
+GitHub Apps → New GitHub App*: a name such as `openplanner-release`, the repository as
+homepage, webhook off, repository permissions *Contents* and *Pull requests* read and write
+and nothing else, installable on this account only. Install the app on this repository only.
+The key: *Edit* next to the app → *Credentials* → *Key pairs* → *New key* (a `.pem` is
+downloaded; GitHub keeps only the public part). Then:
+
+```bash
+gh variable set RELEASE_APP_CLIENT_ID --env release --repo 3Corners-Labs/OpenPlanner --body "<client id>"
+gh secret set RELEASE_APP_PRIVATE_KEY --env release --repo 3Corners-Labs/OpenPlanner < key.pem
+```
+
+Delete the `.pem` afterwards. The key does not expire; to rotate it, add a new key under *Key pairs*,
+store it the same way and delete the old one there. The tag ruleset `release tags`
+lets only the app and repository administrators create, move or delete a `v*` tag; an
+administrator can still tag by hand when the app is broken. The Codex CLI is installed at its newest version on every audit run
 (`codex-version` empty), as on a laptop; it is a tool of the forge, not a dependency of the
 product.
 
