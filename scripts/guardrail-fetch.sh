@@ -46,7 +46,8 @@ graphql() {
     }' --jq .data.repository
 }
 
-# Each ruleset; bypass actors from GraphQL when REST hides them, null when neither shows them.
+# Each ruleset; bypass actors from GraphQL when REST hides them, null when neither shows them
+# in full (the audit app's token gets the actors from GraphQL with their bypass mode as null).
 rulesets() {
   local ids graph
   ids=$(gh api "repos/$repo/rulesets" --jq '.[].id') || return 1
@@ -55,6 +56,7 @@ rulesets() {
     map(. as $r
       | ([$g.rulesets.nodes[]? | select(.name == $r.name) | .bypassActors.nodes] | first) as $via
       | if (($r.bypass_actors // []) | length) > 0 then .
+        elif $via != null and any($via[]; .bypassMode == null) then .bypass_actors = null
         elif $via != null and ($via | length) > 0 then .bypass_actors = [$via[] | {
             actor_type: (if .actor.__typename == "App" then "Integration" else "RepositoryRole" end),
             actor_id: (.actor.databaseId // .repositoryRoleDatabaseId),
