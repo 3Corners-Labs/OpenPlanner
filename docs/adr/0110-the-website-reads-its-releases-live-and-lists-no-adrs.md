@@ -75,11 +75,11 @@ releases the script asks for (enough to find the newest candidate and five recen
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | this PR | in PR |
-| 1 | Release section read live by `site.js`, CSP `connect-src`, texts nl/en, tests | this PR | in PR |
-| 2 | Roadmap as a hand-written list, ADR numbers off the page, `--issues` removed, test against `docs/adr-status.md` | this PR | in PR |
-| 3 | `SITE_DEPLOY_REQUIRED` in the `site` job; `deploy-site.sh` fails without its configuration on the real repository; test | this PR | in PR |
-| 3a | Disclaimer in the footer (nl, en) and in the README | this PR | in PR |
+| 0 | ADR | #472 | in PR |
+| 1 | Release section read live by `site.js`, CSP `connect-src`, texts nl/en, tests | #472 | in PR |
+| 2 | Roadmap as a hand-written list, ADR numbers off the page, `--issues` removed, test against `docs/adr-status.md` | #472 | in PR |
+| 3 | `SITE_DEPLOY_REQUIRED` in the `site` job; `deploy-site.sh` fails without its configuration on the real repository; test | #472 | in PR |
+| 3a | Disclaimer in the footer (nl, en) and in the README | #472 | in PR |
 | 4 | The deploy key and the variables in the environment `website` (ADR 0087 step 4; a repository administrator) | | planned |
 
 ## Consequences
