@@ -240,14 +240,14 @@
         {
           "authenticator": "auth-otp-form",
           "authenticatorFlow": false,
-          "requirement": "ALTERNATIVE",
+          "requirement": "REQUIRED",
           "priority": 20,
           "userSetupAllowed": true
         },
         {
           "authenticator": "webauthn-authenticator",
           "authenticatorFlow": false,
-          "requirement": "ALTERNATIVE",
+          "requirement": "DISABLED",
           "priority": 30,
           "userSetupAllowed": true
         }

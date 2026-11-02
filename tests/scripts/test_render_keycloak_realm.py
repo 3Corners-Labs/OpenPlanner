@@ -283,7 +283,12 @@ def test_the_dev_and_idp_services_pin_the_same_image() -> None:
 
 
 def test_the_realm_asks_for_a_second_factor_and_says_so_in_the_token() -> None:
-    """ADR 0100: acr ``mfa`` is level 2, the flow asks for OTP or WebAuthn at that level."""
+    """ADR 0100: acr ``mfa`` is level 2, and the flow asks for OTP at that level.
+
+    OTP is required, not an alternative: Keycloak skips an alternative the person has not set
+    up yet, so a first login (``CONFIGURE_TOTP`` pending) failed on docker01 with alternatives.
+    WebAuthn stays in the flow, switched off, until it gets a condition of its own.
+    """
     realm = json.loads(TEMPLATE.read_text(encoding="utf-8"))
     (client,) = [c for c in realm["clients"] if c["clientId"] == "openplanner-admin"]
     flows = {f["alias"]: f for f in realm["authenticationFlows"]}
@@ -299,6 +304,9 @@ def test_the_realm_asks_for_a_second_factor_and_says_so_in_the_token() -> None:
         "auth-otp-form",
         "webauthn-authenticator",
     }
+    requirement = {e["authenticator"]: e["requirement"] for e in second}
+    assert requirement["auth-otp-form"] == "REQUIRED"
+    assert requirement["webauthn-authenticator"] == "DISABLED"
     assert config["config"]["loa-condition-level"] == "2"
     assert "CONFIGURE_TOTP" in super_user["requiredActions"]
     assert realm["resetPasswordAllowed"] is True  # self-service reset at the login prompt
