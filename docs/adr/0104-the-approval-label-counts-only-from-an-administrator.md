@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-02, `po:approved` on #414), requested by the product owner. Amends
 ADR 0078 (point 3: what makes `po:approved` an approval) and ADR 0088 (the merge-group run
-reads the same evidence). Built in #414; it takes effect for the pull requests that follow,
+reads the same evidence, and runs the script from the group's head). Built in #414; it takes effect for the pull requests that follow,
 because the gate runs from `main`'s copy of the workflow.
 
 ## Context
@@ -51,6 +51,13 @@ for good.
 6. No required code-owner review while pull requests are opened under the product owner's own
    account. When Claude Code gets its own identity (a GitHub App of the organisation), a
    follow-up ADR may replace the label by a code-owner review.
+7. In the merge queue the job checks out the group's head, not its base, and runs the gate
+   script from there. GitHub takes a `merge_group` run's workflow file from the group's head,
+   so a script from the base meets a workflow from another commit and fails as soon as the
+   arguments change, as it did when this ADR's own pull request was queued. This amends
+   ADR 0088, which checked out the base. It costs no protection: a pull request that changes
+   the gate was already judged on the pull request by `main`'s copy of workflow and script
+   (`pull_request_target`), and in the queue the workflow came from the head already.
 
 ## Settings
 

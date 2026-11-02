@@ -2,7 +2,8 @@
 
 Status: accepted (2026-11-02, `po:approved` on #414), requested by the product owner. Amends
 ADR 0078 (point 3: where the check *decision gate* runs and what it reads); amended by ADR 0104
-(only an administrator's label counts). Built: step 1 merged in #284 on 2026-10-31 (without
+(only an administrator's label counts; point 7: the queue runs the script from the group's
+head, not the base). Built: step 1 merged in #284 on 2026-10-31 (without
 `po:approved` before the merge), step 2 done on 2026-11-02, when *decision gate* became a
 required check in the ruleset of `main`.
 

@@ -11,10 +11,13 @@ name: decision gate
 # ADR 0088: the gate runs again in the merge queue. A skipped required check counts as passed,
 # and the check on the pull request can be stale (the base branch changed, or the pull request
 # was stacked on another branch that was closed) by the time auto-merge queues it; on
-# 2026-10-31 an ADR reached `main` that way (#266). On `merge_group` the job checks out the
-# group's base (`main`), judges every pull request in the group by its own commit on the queue
-# branch, and reads each pull request's labels through the API. A commit that names no pull
-# request, or a pull request whose labels cannot be read, fails the check.
+# 2026-10-31 an ADR reached `main` that way (#266). On `merge_group` the job judges every pull
+# request in the group by its own commit on the queue branch and reads each pull request's
+# labels through the API. A commit that names no pull request, or a pull request whose labels
+# cannot be read, fails the check. In the queue the workflow file comes from the group's head,
+# so the script does too (ADR 0104 point 7): a workflow and a script from different commits
+# break as soon as the script's arguments change. A pull request that changes the gate was
+# already judged on the pull request by `main`'s copy of both.
 #
 # ADR 0104: the label counts only when an administrator of the repository set it last. The job
 # hands the gate the pull request's label events and the administrators as files, never the
@@ -82,7 +85,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          # The pull request: the base's gate. The queue: the group's head, like the workflow.
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.head_sha }}
           fetch-depth: 0
       - name: fetch the judged commits (objects only, nothing is checked out or run)
         run: git fetch --no-tags origin "$HEAD"
