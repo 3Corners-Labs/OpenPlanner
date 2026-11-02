@@ -25,6 +25,8 @@ SETTING_LABELS: dict[str, str] = {
     "integration_check_interval_hours": "settings.field.integration_check_interval_hours.label",
     "integration_probe_timeout_seconds": "settings.field.integration_probe_timeout_seconds.label",
     "job_overdue_minutes": "settings.field.job_overdue_minutes.label",
+    "staff_invite_expiry_days": "settings.field.staff_invite_expiry_days.label",
+    "staff_directory_enabled": "settings.field.staff_directory_enabled.label",
     "staff_last_seen_interval_seconds": "settings.field.staff_last_seen_interval_seconds.label",
     "system_event_retention_days": "settings.field.system_event_retention_days.label",
     "group_erase_after_days": "settings.field.group_erase_after_days.label",

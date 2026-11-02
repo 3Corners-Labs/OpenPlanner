@@ -8,6 +8,7 @@ All mapping between rows and domain objects lives in this module.
 """
 
 import json
+import secrets
 from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -144,6 +145,7 @@ from app.domain.images import PageImage
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
 from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
+from app.domain.privacy import PURGED_FIELDS
 from app.domain.scheduling import (
     DispatchKind,
     Group,
@@ -1711,22 +1713,28 @@ class SqlTransaction(
         return _booking(*found) if found else None
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
-        """NULL every PII column (CLAUDE.md privacy rules) and record ``pii_purged_at``."""
+        """Delete the personal fields and provider links of a booking (ADR 0102 point 11).
+
+        Sets every column of ``privacy.PURGED_FIELDS`` to NULL, empties the message of the
+        booking's timeline events, replaces the management token hash by a random value (the
+        column is unique and not null; the old hash can no longer find the booking) and records
+        ``pii_purged_at``. The salt stays: without the token it identifies nothing.
+        """
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking_id)
             .values(
-                first_name=None,
-                last_name=None,
-                email=None,
-                phone=None,
-                form_answers=None,
-                guest_join_url=None,
-                host_join_url=None,
-                trial_join_url=None,
-                claimed_by=None,
-                pii_purged_at=now,
+                {
+                    **dict.fromkeys(PURGED_FIELDS),
+                    "management_token_hash": secrets.token_hex(32),
+                    "pii_purged_at": now,
+                }
             )
+        )
+        await self._session.execute(
+            update(BookingEventRow)
+            .where(BookingEventRow.booking_id == booking_id)
+            .values(message="")
         )
         # ADR 0093 point 5: a purged booking leaves every participant link session.
         await self._session.execute(

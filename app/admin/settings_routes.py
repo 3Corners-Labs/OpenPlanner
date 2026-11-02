@@ -289,7 +289,6 @@ _FIELD_LABELS = {
     "last_name": "admin.settings.data_fields.field.last_name",
     "email": "admin.settings.data_fields.field.email",
     "phone": "admin.settings.data_fields.field.phone",
-    "note": "admin.settings.data_fields.field.note",
     "form_answers": "admin.settings.data_fields.field.form_answers",
     "guest_join_url": "admin.settings.data_fields.field.guest_join_url",
     "host_join_url": "admin.settings.data_fields.field.host_join_url",
