@@ -8991,6 +8991,129 @@ msgstr "Gebruik hoogstens 10 waarden van gewone tekens, gescheiden door spaties.
 msgid "admin.idp.test_result.mfa"
 msgstr "Tweede factor getoond"
 
+msgid "admin.overview.widget.status.proxy.untrusted"
+msgstr "Verzoeken komen binnen met doorgestuurde headers van een proxy die FORWARDED_ALLOW_IPS niet noemt: elke bezoeker lijkt één adres en links krijgen http. Zet FORWARDED_ALLOW_IPS op het adres waarmee de web-container de proxy ziet verbinden (details onder Geavanceerde instellingen, Adres en proxy)"
+
+msgid "admin.overview.widget.status.proxy.finding"
+msgstr "Rondgang naar het publieke adres: {finding} (details onder Geavanceerde instellingen, Adres en proxy)"
+
+msgid "admin.settings.address.title"
+msgstr "Adres en proxy"
+
+msgid "admin.settings.address.intro"
+msgstr "Elke link in een e-mail, de inlogredirect en de widget is gebouwd op het publieke adres, nooit op het adres van het verzoek. Deze waarden staan op de server (klasse B) en vragen een herstart om te wijzigen; de worker controleert of het adres echt bij deze installatie uitkomt."
+
+msgid "admin.settings.address.shape"
+msgstr "Installatie"
+
+msgid "admin.settings.address.shape.bundled"
+msgstr "Meegeleverde proxy (HTTPS door de proxy van deze installatie)"
+
+msgid "admin.settings.address.shape.own"
+msgstr "Eigen reverse proxy (vertrouwd via FORWARDED_ALLOW_IPS)"
+
+msgid "admin.settings.address.shape.none"
+msgstr "Geen proxy (een lab: links en cookies zijn niet door HTTPS beschermd)"
+
+msgid "admin.settings.address.public"
+msgstr "Publiek adres"
+
+msgid "admin.settings.address.webhook"
+msgstr "Webhook-adres"
+
+msgid "admin.settings.address.proxy"
+msgstr "Vertrouwd proxyadres"
+
+msgid "admin.settings.address.proxy.none"
+msgstr "geen"
+
+msgid "admin.settings.address.callback"
+msgstr "OIDC-redirect-URI (registreer deze bij de identiteitsprovider)"
+
+msgid "admin.settings.address.widget"
+msgstr "Widget-loader (voor de site die de widget insluit)"
+
+msgid "admin.settings.address.set_on_server"
+msgstr "Ingesteld op de server, in de omgeving. Een wijziging vraagt een herstart (handleiding: Geavanceerde instellingen)."
+
+msgid "admin.settings.address.round_trip"
+msgstr "Rondgang"
+
+msgid "admin.settings.address.none"
+msgstr "Nog niet gecontroleerd. De worker controleert om de paar uur; op de server doet python -m app.cli address-check het meteen."
+
+msgid "admin.settings.address.off"
+msgstr "Niet gecontroleerd: uitgezet op de server (PUBLIC_ADDRESS_CHECK_ENABLED)."
+
+msgid "admin.settings.address.checked_at"
+msgstr "Laatst gecontroleerd"
+
+msgid "admin.settings.address.reason"
+msgstr "Reden"
+
+msgid "admin.settings.address.seen"
+msgstr "De app zag schema {scheme}, doorgestuurde headers {forwarded}"
+
+msgid "admin.settings.address.kind.public"
+msgstr "Publiek adres"
+
+msgid "admin.settings.address.kind.webhook"
+msgstr "Webhook-adres"
+
+msgid "admin.settings.address.finding.ok"
+msgstr "In orde: het adres komt via https bij deze installatie uit en de proxy wordt vertrouwd."
+
+msgid "admin.settings.address.finding.unreachable"
+msgstr "Niet bereikbaar: de worker kreeg geen antwoord van dit adres."
+
+msgid "admin.settings.address.finding.other_instance"
+msgstr "Een andere installatie antwoordt: de naam wijst elders heen (DNS, een verhuisde host of een gekopieerde .env). Links in e-mails leiden naar de verkeerde plek."
+
+msgid "admin.settings.address.finding.not_https"
+msgstr "De app ziet http: de proxy geeft X-Forwarded-Proto niet door, of PUBLIC_BASE_URL is niet https. Sessiecookies reizen dan niet mee."
+
+msgid "admin.settings.address.finding.proxy_not_trusted"
+msgstr "De proxy wordt niet vertrouwd: zet FORWARDED_ALLOW_IPS op het adres waarmee de web-container de proxy ziet verbinden. Tot dan delen alle bezoekers één adres en wijzen redirects naar http."
+
+msgid "admin.settings.address.finding.no_proxy_headers"
+msgstr "Er komen geen doorgestuurde headers binnen: de proxy zet er geen, of web is rechtstreeks gepubliceerd."
+
+msgid "admin.settings.address.finding.redirected"
+msgstr "Het adres verwijst door naar een andere naam (bijvoorbeeld www voor het hoofddomein): zet PUBLIC_BASE_URL op het uiteindelijke adres."
+
+msgid "admin.settings.address.error.timeout"
+msgstr "geen antwoord op tijd"
+
+msgid "admin.settings.address.error.unreachable"
+msgstr "verbinding geweigerd of naam niet gevonden"
+
+msgid "admin.settings.address.error.tls"
+msgstr "TLS-handshake of certificaat geweigerd"
+
+msgid "admin.settings.address.error.unreadable"
+msgstr "het antwoord kwam niet van OpenPlanner"
+
+msgid "admin.settings.address.error.http"
+msgstr "antwoordde met HTTP {status}"
+
+msgid "admin.settings.address.untrusted"
+msgstr "Sinds {since} droegen {count} verzoek(en) X-Forwarded-For of X-Forwarded-Proto {where}, en de app negeerde ze. Zet FORWARDED_ALLOW_IPS op het adres waarmee de web-container de proxy ziet verbinden."
+
+msgid "admin.settings.address.untrusted.from"
+msgstr "van {peer}"
+
+msgid "admin.settings.address.untrusted.class"
+msgstr "van een {peer} adres"
+
+msgid "admin.settings.address.peer.loopback"
+msgstr "loopback"
+
+msgid "admin.settings.address.peer.private"
+msgstr "privé"
+
+msgid "admin.settings.address.peer.public"
+msgstr "publiek"
+
 msgid "admin.nav.my_sessions"
 msgstr "Mijn sessies"
 

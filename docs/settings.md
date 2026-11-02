@@ -47,6 +47,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `PUBLIC_BASE_URL` | url | `http://127.0.0.1:8000` | Base of every link and of the OIDC redirect; https in production. |
 | `WEBHOOK_BASE_URL` | url | — | Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL. |
 | `FORWARDED_ALLOW_IPS` | string | — | Address of the reverse proxy (read by uvicorn). Other than the bundled proxy's, System status warns unless web serves TLS (ADR 0091). |
+| `PUBLIC_ADDRESS_CHECK_ENABLED` | bool | `true` | Switches the worker's round trip to the public address off, for a network that cannot reach its own public name from inside; System status then says it is not checked (ADR 0086). |
 | `WEB_TLS_CERT_FILE` | path | — | Certificate chain (PEM) for uvicorn, for an own reverse proxy on another machine; with WEB_TLS_KEY_FILE web serves HTTPS (ADR 0091). |
 | `WEB_TLS_KEY_FILE` | path | — | Private key (PEM) of WEB_TLS_CERT_FILE; readable by the web user only (ADR 0091). |
 | `TLS_DOMAIN` | string | — | Certificate domain (proxy.env, ADR 0030). |

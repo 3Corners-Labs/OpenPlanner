@@ -56,6 +56,7 @@ from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.participant_links import LinkSession
+from app.domain.public_address import AddressCheck, AddressKind, InstanceReply
 from app.domain.retention import DueBooking, RetentionFacts
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
@@ -390,6 +391,17 @@ class CertificateProbe(Protocol):
         """Connect to ``host:port``, verify the chain against the host's CA bundle, read the leaf.
 
         Never raises: a failed connection or handshake is a result with an error code.
+        """
+        ...
+
+
+class InstanceProbe(Protocol):
+    """Asks the public address for ``/api/v1/instance`` like a participant's browser (ADR 0086)."""
+
+    async def probe(self, url: str, nonce: str) -> InstanceReply:
+        """Request ``{url}/api/v1/instance?probe={nonce}`` without following a redirect.
+
+        Never raises: a failed request is a reply with an error code.
         """
         ...
 
@@ -1566,6 +1578,34 @@ class Transaction(Protocol):
 
     async def save_certificate_check(self, check: CertificateCheck) -> None:
         """Replace the latest certificate check."""
+        ...
+
+    async def ensure_instance_id(self) -> str:
+        """Return the installation's id, making and storing it on first use (ADR 0086)."""
+        ...
+
+    async def get_instance_id(self) -> str | None:
+        """Return the installation's id, or ``None`` before the first start made one."""
+        ...
+
+    async def store_probe_nonce(self, digest: str, at: datetime) -> None:
+        """Keep the hash of the one pending probe nonce, replacing any earlier one."""
+        ...
+
+    async def take_probe_nonce(self, digest: str, not_before: datetime) -> bool:
+        """Consume the pending nonce when it matches ``digest`` and is newer than ``not_before``."""
+        ...
+
+    async def get_address_checks(self) -> list[AddressCheck]:
+        """Return the latest round trip per address (ADR 0086)."""
+        ...
+
+    async def save_address_check(self, check: AddressCheck) -> None:
+        """Replace the latest round trip of ``check.kind``."""
+        ...
+
+    async def delete_address_check(self, kind: AddressKind) -> None:
+        """Forget the stored round trip of ``kind`` (the address was unset)."""
         ...
 
     async def get_own_certificate(self) -> OwnCertificate | None:
