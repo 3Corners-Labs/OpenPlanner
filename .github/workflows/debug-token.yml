@@ -1,0 +1,19 @@
+name: debug token
+# Temporary: what GITHUB_TOKEN sees of the collaborators (ADR 0104). Never merged.
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: |
+          echo "--- collaborators"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/collaborators" --jq '.[] | {login, permissions, role_name}' || echo "FAILED"
+          echo "--- permission of cyberbeuk"
+          gh api "repos/${GITHUB_REPOSITORY}/collaborators/cyberbeuk/permission" --jq '{permission, role_name, user: .user.login, user_perms: .user.permissions}' || echo "FAILED"
