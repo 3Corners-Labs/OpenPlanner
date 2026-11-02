@@ -718,6 +718,23 @@ request; registrations and domains stay as they are. The worker re-checks every 
 domain every `idp_domain_recheck_hours`; a record that disappears raises the system event
 `idp.domain_check` and, after `idp_domain_grace_days`, the domain stops routing.
 
+From the host, without the portal (ADR 0083 point 19):
+
+```sh
+docker compose --env-file .env.update exec -T web python -m app.cli oidc-check --idp <key>
+docker compose --env-file .env.update exec -T web python -m app.cli idp disable <key>
+```
+
+The check passes the provider's discovery address through the outbound guard, then reads
+its discovery document and key set against the issuer pinned at registration. It also
+shows the client authentication method, whether the provider is on, and its domains with
+their state. No login is started and no secret is printed.
+
+`idp disable` switches one provider off when the portal cannot be reached, for example
+because the provider misbehaves. It is audited as `system:cli`, and the provider's sessions
+end at their next request. Switching it on again, and adding or removing providers, stays in
+the portal behind a superuser login.
+
 ## Bundled identity provider (ADR 0090)
 
 A `test` or `lab` installation can log in without an identity provider of the organisation's
