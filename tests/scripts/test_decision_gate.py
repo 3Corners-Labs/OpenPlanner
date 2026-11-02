@@ -411,8 +411,9 @@ def test_the_workflow_reads_who_set_the_label_and_withdraws_it_after_a_foreign_p
 
     assert "--labels" not in text, "the bare label list is no approval"
     assert "/issues/$1/events" in text
-    assert "/collaborators" in text
-    assert ".permissions.admin" in text
+    assert "/collaborators/${login}/permission" in text
+    assert "/collaborators/${SENDER}/permission" in text
+    assert ".permissions.admin" not in text, "GITHUB_TOKEN gets an empty collaborator list (#442)"
     assert "github.event.action == 'synchronize'" in text
     assert "github.event.sender.login" in text
     assert "--withdrawn" in text

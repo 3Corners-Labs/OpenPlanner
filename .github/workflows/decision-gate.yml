@@ -56,10 +56,11 @@ jobs:
           NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          # An unreadable list counts nobody as an administrator: the label comes off.
-          admins=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/collaborators" \
-            --jq '.[] | select(.permissions.admin) | .login' || true)
-          if grep -qxF "$SENDER" <<< "$admins"; then
+          # The pusher's own permission; GITHUB_TOKEN gets an empty collaborator list (#442).
+          # An unreadable permission counts as none: the label comes off.
+          permission=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${SENDER}/permission" \
+            --jq .permission || true)
+          if [ "$permission" = admin ]; then
             echo "pushed by an administrator: the approval stands"
             exit 0
           fi
@@ -92,14 +93,9 @@ jobs:
         run: git fetch --no-tags origin "$HEAD"
       # A failed read leaves an empty file: build work still passes, a decision counts no
       # approval. The gate stays closed for decisions without blocking every pull request.
-      - name: the administrators of the repository (ADR 0104)
+      - name: helpers for the label events and the administrators (ADR 0104)
         run: |
           set -uo pipefail
-          if ! gh api --paginate "repos/${GITHUB_REPOSITORY}/collaborators" \
-            --jq '.[] | select(.permissions.admin) | .login' > "$RUNNER_TEMP/admins"; then
-            echo "::warning::the administrators cannot be read; no decision counts as approved"
-            : > "$RUNNER_TEMP/admins"
-          fi
           cat > "$RUNNER_TEMP/label-events.sh" <<'SCRIPT'
           # Writes the label events of pull request $1 to $2, one JSON object per line; empty
           # with a warning when the API cannot be read.
@@ -109,6 +105,20 @@ jobs:
             echo "::warning::the label events of #$1 cannot be read; it counts as not approved"
             : > "$2"
           fi
+          SCRIPT
+          cat > "$RUNNER_TEMP/admins.sh" <<'SCRIPT'
+          # Writes to $1 every user who set or removed po:approved in the events files that
+          # follow and is an administrator of the repository, one login per line. GITHUB_TOKEN
+          # gets an empty collaborator list (#442), so each labeller's own permission is read;
+          # one that cannot be read counts as no administrator.
+          out=$1; shift
+          : > "$out"
+          jq -r 'select(.label == "po:approved") | .actor' "$@" | sort -u | while read -r login; do
+            permission=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${login}/permission" \
+              --jq .permission 2>/dev/null || true)
+            [ "$permission" = admin ] && echo "$login" >> "$out"
+          done
+          true
           SCRIPT
       - name: build work or decision? (the pull request)
         if: github.event_name == 'pull_request_target'
@@ -132,6 +142,7 @@ jobs:
             echo "attempt ${attempt}: the new label is not listed yet"
             sleep 3
           done
+          bash "$RUNNER_TEMP/admins.sh" "$RUNNER_TEMP/admins" "$events"
           # shellcheck disable=SC2086 # WITHDRAWN is empty or one flag
           python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --title "$TITLE" \
             --admins "$RUNNER_TEMP/admins" --events "$events" $WITHDRAWN
@@ -145,5 +156,6 @@ jobs:
             bash "$RUNNER_TEMP/label-events.sh" "$number" "$RUNNER_TEMP/events-${number}"
             pulls+=(--pull "${number}=$RUNNER_TEMP/events-${number}")
           done
+          bash "$RUNNER_TEMP/admins.sh" "$RUNNER_TEMP/admins" "$RUNNER_TEMP"/events-*
           python3 -m scripts.decision_gate --base "$BASE" --head "$HEAD" --merge-group \
             --admins "$RUNNER_TEMP/admins" "${pulls[@]}"

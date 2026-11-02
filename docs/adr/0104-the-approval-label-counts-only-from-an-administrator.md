@@ -32,10 +32,13 @@ for good.
    event for that label on the pull request is `labeled`, by a user who is an administrator of
    the repository at the time of the check. Any other labeller, or a label that was removed
    last, counts as no approval; the output names who set it.
-2. The workflow reads the label events (`GET /repos/{repo}/issues/{n}/events`) and the
-   administrators (`GET /repos/{repo}/collaborators`, `permissions.admin`) through the API with
-   the job's own token; `scripts/decision_gate.py` decides from those two files and runs no
-   network call itself. A missing or unreadable file fails the check (fail closed).
+2. The workflow reads the label events (`GET /repos/{repo}/issues/{n}/events`) and, for every
+   user who set or removed the label (and for the pusher in point 3), that user's own
+   permission (`GET /repos/{repo}/collaborators/{login}/permission`, `admin`) through the API
+   with the job's own token. The collaborator list is not used: with `GITHUB_TOKEN` it comes
+   back empty without an error (probed in #442). `scripts/decision_gate.py` decides from the
+   events and the administrators found and runs no network call itself. A missing or
+   unreadable file, or a permission that cannot be read, counts as no approval (fail closed).
 3. A push to a pull request (`synchronize`) by a user who is not an administrator takes the
    label off, and the gate of that run treats the pull request as not approved. A push by an
    administrator, which includes Claude Code working under the product owner's account and a
