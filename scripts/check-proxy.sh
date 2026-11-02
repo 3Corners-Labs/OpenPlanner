@@ -2,7 +2,10 @@
 # Start the compose stack with --profile tls against Pebble, Let's Encrypt's test ACME CA, and
 # check what ADR 0030, ADR 0064 and ADR 0070 promise: a certificate is obtained without manual
 # steps, port 80 redirects browser paths and refuses machine paths (/api, /webhooks) with 403,
-# the proxy passes only what the app should see (TRACE, /static/, no-store on HTML), public form bodies are capped, the proxy runs as non-root; a
+# the proxy passes only what the app should see (TRACE, /static/, no-store on HTML), public form bodies are capped, the proxy runs as non-root; the
+# standards of ADR 0086 hold (TLS 1.2 and 1.3 only with AEAD suites, HSTS of at least a year and
+# none on port 80, and the app's round trip through the proxy is `ok`, or `proxy_not_trusted` with
+# a wrong FORWARDED_ALLOW_IPS); a
 # pair handed over through the portal-certs volume is served within the poll interval and ACME
 # applies again when it is withdrawn; then the same proxy serves an own certificate from files,
 # and `tls-check` from the web container reads either certificate and judges it. Used by CI
@@ -87,7 +90,78 @@ https_edge_checks() { # what the proxy lets through on 443: TRACE, static direct
   done
 }
 
-edge_checks() { # redirect, machine paths, body limit, non-root: the same in every pass
+tls_negotiated() { # tls_negotiated OPENSSL_ARGS...: "TLSv1.3 <cipher>", or "(NONE) ..." when refused
+  # `New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384` is printed by OpenSSL and LibreSSL alike; a
+  # refused handshake prints `New, (NONE), Cipher is (NONE)`. SECLEVEL=0 lets the client offer
+  # TLS 1.0/1.1 at all, so a refusal is the server's.
+  openssl s_client -connect 127.0.0.1:18443 -servername booking.test -cipher 'ALL:@SECLEVEL=0' \
+    "$@" </dev/null 2>&1 | sed -n 's/^New, \([^,]*\), Cipher is \(.*\)$/\1 \2/p' | head -n 1
+}
+
+tls_version_checks() { # NCSC TLS guidelines (ADR 0086): TLS 1.2 and 1.3 only, AEAD suites
+  for flag in -tls1 -tls1_1; do
+    openssl s_client -help 2>&1 | grep -q -- "$flag" \
+      || fail "this openssl cannot offer $flag, so a refusal could not be told from a missing client"
+    refused="$(tls_negotiated "$flag")"
+    case "$refused" in "(NONE)"*|"") ;; *) fail "the proxy accepted $flag ($refused)" ;; esac
+  done
+  # The positive controls: the same client works on 1.2 and 1.3, so the refusals above are real.
+  tls12="$(tls_negotiated -tls1_2)"
+  tls13="$(tls_negotiated -tls1_3)"
+  case "$tls12" in TLSv1.2*) ;; *) fail "TLS 1.2 is not accepted ($tls12)" ;; esac
+  case "$tls13" in TLSv1.3*) ;; *) fail "TLS 1.3 is not accepted ($tls13)" ;; esac
+  # TLS 1.3 suites are all AEAD; for 1.2 the negotiated suite must be GCM or ChaCha20-Poly1305.
+  echo "$tls12" | grep -Eq 'GCM|CHACHA20' || fail "TLS 1.2 negotiated a suite that is not AEAD ($tls12)"
+}
+
+hsts_checks() { # Forum Standaardisatie, RFC 6797: HSTS of a year or more on HTTPS, never on HTTP
+  # shellcheck disable=SC2086
+  header="$(curl -sk $resolve -D - -o /dev/null https://booking.test:18443/healthz \
+    | tr -d '\r' | grep -i '^strict-transport-security:' || true)"
+  [ -n "$header" ] || fail "no Strict-Transport-Security header on a proxied response"
+  max_age="$(echo "$header" | sed -n 's/.*[mM]ax-[aA]ge=\([0-9]*\).*/\1/p')"
+  [ -n "$max_age" ] && [ "$max_age" -ge 31536000 ] || fail "HSTS max-age is below one year ($header)"
+  echo "$header" | grep -qi 'includeSubDomains' || fail "HSTS lacks includeSubDomains ($header)"
+  # RFC 6797 section 7.2: a host must not send the header over plain HTTP.
+  ! curl -s -D - -o /dev/null -H 'Host: booking.test' 'http://127.0.0.1:18080/g/x' \
+    | grep -qi '^strict-transport-security:' || fail "port 80 sends Strict-Transport-Security"
+}
+
+trust_root() { # trust_root SOURCE: put the CA that signs the served chain in web's /tmp/trusted-ca.pem
+  # SOURCE "pebble": the root of the test CA, from Pebble's management API (its own TLS is the
+  # minica); otherwise a certificate file in /pebble that is its own trust anchor (self-signed).
+  compose exec -T web python -c "
+import ssl, sys, urllib.request
+source = sys.argv[1]
+if source == 'pebble':
+    context = ssl.create_default_context(cafile='/pebble/pebble.minica.pem')
+    pem = urllib.request.urlopen('https://pebble:15000/roots/0', context=context).read()
+else:
+    pem = open('/pebble/' + source, 'rb').read()
+open('/tmp/trusted-ca.pem', 'wb').write(pem)
+" "$1"
+}
+
+round_trip() { # round_trip FINDING SOURCE: web asks the public address through the proxy (ADR 0086)
+  trust_root "$2"
+  set +e
+  report="$(compose exec -T -e PUBLIC_BASE_URL=https://booking.test:8443 web \
+    python -m app.cli address-check --ca-file /tmp/trusted-ca.pem)"
+  code=$?
+  set -e
+  echo "$report" | sed 's/^/  address-check: /'
+  echo "$report" | grep -Eq "^public +https://booking.test:8443 +$1( |\$)" \
+    || fail "address-check did not find '$1'"
+  if [ "$1" = "ok" ]; then
+    [ "$code" = "0" ] || fail "address-check should exit 0 through the proxy (exit $code)"
+    echo "$report" | grep -q 'scheme=https  forwarded=honoured' \
+      || fail "the app did not see https with the forwarded headers honoured"
+  else
+    [ "$code" = "1" ] || fail "address-check should exit 1 on a finding (exit $code)"
+  fi
+}
+
+edge_checks() { # redirect, machine paths, body limit, non-root, standards: the same in every pass
   redirect="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Host: booking.test' 'http://127.0.0.1:18080/g/x?a=1')"
   [ "$redirect" = "308 https://booking.test/g/x?a=1" ] || fail "port 80 does not redirect ($redirect)"
   machine_paths_check
@@ -95,6 +169,8 @@ edge_checks() { # redirect, machine paths, body limit, non-root: the same in eve
   status="$(oversized_post)"
   [ "$status" = "413" ] || fail "oversized form body not refused ($status)"
   [ "$(compose exec -T proxy id -u)" != "0" ] || fail "proxy runs as root"
+  tls_version_checks
+  hsts_checks
 }
 
 tls_check() { # tls_check EXPECTED_FINDING EXPECTED_ISSUER_FRAGMENT: run the CLI from web
@@ -114,8 +190,17 @@ compose up -d --build --wait proxy
 wait_for_proxy
 issuer | grep -q 'Pebble' || fail "no certificate from the ACME CA ($(issuer))"
 edge_checks
+round_trip ok pebble
 tls_check untrusted Pebble
-echo "pass 1 ok: certificate obtained over ACME, redirect, body limit, non-root, tls-check"
+echo "pass 1 ok: certificate obtained over ACME, redirect, body limit, non-root, TLS versions, HSTS, round trip, tls-check"
+
+# A proxy address the app does not trust: the app must say so, not report ok (ADR 0086 point 2).
+# In a subshell: an assignment in front of a shell function would outlive the call.
+(CHECK_FORWARDED_ALLOW_IPS=10.255.255.1 && export CHECK_FORWARDED_ALLOW_IPS && compose up -d --force-recreate --wait web)
+round_trip proxy_not_trusted pebble
+compose up -d --force-recreate --wait web
+round_trip ok pebble
+echo "pass 1a ok: a wrong FORWARDED_ALLOW_IPS is found as proxy_not_trusted, the right one as ok"
 
 self_signed() { # self_signed NAME ORGANISATION: a 30-day EC pair for booking.test in $certs
   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 30 \
@@ -147,6 +232,7 @@ $1"
 portal_volume "volume.import_key(os.environ['KEY'] + chr(10)); volume.publish(os.environ['CHAIN'] + chr(10), 'portal-1')"
 wait_for_issuer 'OpenPlanner portal check'
 edge_checks
+round_trip ok portal.crt
 tls_check untrusted "OpenPlanner portal check"
 portal_volume "volume.withdraw()"
 wait_for_issuer 'Pebble'
@@ -160,8 +246,9 @@ compose up -d --force-recreate --wait proxy
 wait_for_proxy
 issuer | grep -q 'OpenPlanner own CA check' || fail "the own certificate is not served ($(issuer))"
 edge_checks
+round_trip ok own.crt
 tls_check untrusted "OpenPlanner own CA check"
-echo "pass 2 ok: own certificate from files, redirect, body limit, non-root, tls-check"
+echo "pass 2 ok: own certificate from files, redirect, body limit, non-root, TLS versions, HSTS, round trip, tls-check"
 
 # A half-configured own certificate must stop the container, never serve plain HTTP.
 unset PROXY_KEY_FILE
