@@ -77,6 +77,9 @@ superuser ziet de stand ook op **Systeemstatus**, onder *Medewerkerbeheer*.
 ## Filters
 
 - **Organisatie**, **Groep** en **Rol**: alleen medewerkers die daarbij horen.
+- **Inlogdienst**: alleen medewerkers die via deze identity provider inloggen (*Platform*, of de
+  sleutel van de eigen provider van een organisatie). De kolom met dezelfde naam toont het per
+  persoon; het filter verschijnt zodra er meer dan één inlogdienst is.
 - **Alleen wie lang niet heeft ingelogd**: medewerkers zonder login in de ingestelde periode
   (standaard 90 dagen). Gebruik dit voor een periodieke toegangscontrole: heeft deze persoon
   de toegang nog nodig?

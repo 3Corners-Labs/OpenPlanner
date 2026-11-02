@@ -200,3 +200,32 @@ async def test_the_pages_say_when_the_host_switch_is_off(site: Site) -> None:
     page = (await site.client.get("/admin/organisations/demo/login")).text
 
     assert "staan op deze host uit" in page
+
+
+async def test_the_staff_directory_names_and_filters_the_login_service(routed: Site) -> None:
+    """ADR 0083 point 16: the provider of each person, as a column and a filter."""
+    _organisation_adapter(routed)
+    await _log_in(routed, ADDRESS)
+    routed.client.cookies.clear()
+    await routed.login_as(SUPER)
+
+    everyone = (await routed.client.get("/admin/staff")).text
+    only = (await routed.client.get("/admin/staff", params={"provider": "gem-a"})).text
+    platform = (await routed.client.get("/admin/staff", params={"provider": "platform"})).text
+
+    assert "Inlogdienst" in everyone
+    assert 'name="provider"' in everyone
+    assert ">gem-a<" in only
+    assert ">Platform<" not in only.split("<tbody>", 1)[-1].split("</table>", 1)[0]
+    assert ">gem-a<" not in platform.split("<tbody>", 1)[-1].split("</table>", 1)[0]
+
+
+async def test_system_status_lists_the_organisation_providers(routed: Site) -> None:
+    await routed.login_as(SUPER)
+
+    page = (await routed.client.get("/admin/settings")).text
+
+    assert "Identity providers van organisaties" in page
+    assert "Aan op deze host" in page
+    assert "<code>gem-a</code>" in page
+    assert "1 geverifieerd" in page

@@ -21,6 +21,7 @@ from enum import StrEnum
 
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Role, Scope
+from app.domain.identity import provider_of
 
 CREATED_EVENT = "staff.created"
 """Audit event of a person's first login (ADR 0046)."""
@@ -185,6 +186,11 @@ class StaffMember:
             status_at=at,
         )
 
+    @property
+    def provider(self) -> str:
+        """The key of the identity provider the person logs in through (``""``: platform)."""
+        return provider_of(self.subject)
+
     def is_dormant(self, now: datetime, after: timedelta) -> bool:
         """Whether the person has not logged in for longer than ``after``."""
         return now - self.last_login_at > after
@@ -227,6 +233,8 @@ class StaffFilter:
         dormant_before: Only people whose last login is before this moment.
         id: Only the person with this id (the detail page).
         unrecognised: Only people whose last login carried a refused entitlement value.
+        provider: Only people of this identity provider (ADR 0083 point 16): an organisation
+            provider's key, or ``PLATFORM`` (``""``) for the platform provider.
     """
 
     organisation: str | None = None
@@ -235,6 +243,7 @@ class StaffFilter:
     dormant_before: datetime | None = None
     id: int | None = None
     unrecognised: bool = False
+    provider: str | None = None
 
     def matches(self, member: StaffMember) -> bool:
         """Return whether ``member`` passes (the SQL adapter applies the same rules)."""
@@ -245,6 +254,7 @@ class StaffFilter:
             and (self.dormant_before is None or member.last_login_at < self.dormant_before)
             and (self.id is None or member.id == self.id)
             and (not self.unrecognised or bool(member.refused))
+            and (self.provider is None or member.provider == self.provider)
         )
 
 

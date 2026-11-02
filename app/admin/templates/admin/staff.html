@@ -50,6 +50,9 @@
     {{ filter_select("staff-group", "group", _("admin.staff.group"), filters.groups, filters.group) }}
     {% endif %}
     {{ filter_select("staff-role", "role", _("admin.staff.role"), filters.roles, filters.role) }}
+    {% if filters.providers | length > 1 %}
+    {{ filter_select("staff-provider", "provider", _("admin.staff.provider"), filters.providers, filters.provider) }}
+    {% endif %}
     <div class="choice__option">
       <input type="checkbox" id="staff-dormant" name="dormant" value="1"{% if filters.dormant %} checked{% endif %}>
       <label for="staff-dormant">{{ _("admin.staff.dormant_only", days=dormant_days) }}</label>
@@ -72,6 +75,7 @@
       <th scope="col">{{ _("admin.staff.roles") }}</th>
       <th scope="col">{{ _("admin.staff.organisations") }}</th>
       <th scope="col">{{ _("admin.staff.groups") }}</th>
+      <th scope="col">{{ _("admin.staff.provider") }}</th>
       <th scope="col">{{ _("admin.staff.last_login") }}</th>
       <th scope="col">{{ _("admin.staff.last_seen") }}</th>
       <th scope="col">{{ _("admin.staff.last_logout") }}</th>
@@ -87,6 +91,7 @@
       <td>{{ person.roles | join(", ") if person.roles else _("admin.staff.no_role") }}</td>
       <td>{% for place in person.places %}{{ place.organisation }}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}</td>
       <td>{% for place in person.places %}{{ place.groups | join(", ") if place.groups else _("admin.staff.whole_organisation") }}{% if not loop.last %}<br>{% endif %}{% else %}–{% endfor %}</td>
+      <td>{{ person.provider }}</td>
       <td class="nowrap">{{ person.last_login }}</td>
       <td class="nowrap">{{ person.last_seen }}</td>
       <td class="nowrap">{{ person.last_logout }}</td>
