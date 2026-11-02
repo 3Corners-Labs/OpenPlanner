@@ -1431,10 +1431,10 @@ every release carries `site-X.Y.Z.tar.gz`.
 
 Serve `openplanner.nl` and `www.openplanner.nl` (redirect `www` to the apex) over HTTPS only,
 with HSTS, and these headers, which the page also sets as meta tags where it can:
-`Content-Security-Policy: default-src 'self'; img-src 'self' data:; media-src 'self';
+`Content-Security-Policy: default-src 'self'; connect-src https://api.github.com; img-src 'self' data:; media-src 'self';
 frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`.
 On TransIP web hosting these go in an `.htaccess` in the web root (step 4 of ADR 0087). The site
-sets no cookie; the host's access log is TransIP's and is not shipped anywhere by us.
+sets no cookie; its script asks `api.github.com` for the public release list (ADR 0110) and nothing else; the host's access log is TransIP's and is not shipped anywhere by us. The `site` job of `main.yml` fails when the environment `website` has no deploy remote or key (ADR 0110), so a stale site shows as a red run.
 
 ## Management token key
 

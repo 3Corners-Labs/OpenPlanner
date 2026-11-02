@@ -69,6 +69,12 @@ def test_without_remote_or_key_it_builds_and_does_not_deploy(dist: Path) -> None
     assert "not deployed" in result.stdout
 
 
+def test_in_the_real_repository_a_missing_remote_or_key_fails(dist: Path) -> None:
+    result = _deploy(dist, {"SITE_DEPLOY_REQUIRED": "true"})
+    assert result.returncode == 1
+    assert "ADR 0110" in result.stdout
+
+
 def test_first_push_fills_an_empty_repository_and_a_second_changes_nothing(
     git: Git, dist: Path, remote: Path
 ) -> None:

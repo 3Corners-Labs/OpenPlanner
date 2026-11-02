@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.github.com; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="color-scheme" content="light dark">
@@ -490,47 +490,40 @@
   <div class="wrap">
     <h2 id="roadmap-title">{{ c.roadmap.title }}</h2>
     <p class="lead">{{ c.roadmap.lead }}</p>
-    {%- if roadmap %}
-    {%- set total = roadmap | sum(attribute='open_steps') %}
-    <p class="small">{{ c.roadmap.total.replace("{n}", total | string).replace("{m}", roadmap | length | string) }}</p>
     <ul class="roadmap-list">
-      {%- for item in roadmap %}
+      {%- for item in c.roadmap['items'] %}
       <li>
-        <a class="roadmap-list__adr" href="{{ item.adr_url }}">ADR {{ item.number }}</a>
-        <span class="roadmap-list__title">{{ item.title }}</span>
-        <a class="roadmap-list__steps" href="{{ item.issues_url }}">{{ c.roadmap.step if item.open_steps == 1 else c.roadmap.steps.replace("{n}", item.open_steps | string) }}</a>
+        <strong class="roadmap-list__title">{{ item.title }}</strong>
+        <span class="roadmap-list__text">{{ item.text }}</span>
       </li>
       {%- endfor %}
     </ul>
-    {%- else %}
-    <p class="notice">{{ c.roadmap.no_data }}</p>
-    {%- endif %}
-    <p class="actions"><a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen+label%3Aadr%3A">{{ c.roadmap.all }}</a></p>
+    <p class="actions"><a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen">{{ c.roadmap.all }}</a></p>
   </div>
 </section>
 
-<section class="section section--tint" id="releases" aria-labelledby="releases-title">
+<section class="section section--tint" id="releases" aria-labelledby="releases-title" data-releases>
   <div class="wrap">
     <h2 id="releases-title">{{ c.releases.title }}</h2>
     <p class="lead">{{ c.releases.lead }}</p>
     {%- if releases %}
     <div class="release-grid">
-      <div class="release release--latest">
+      <div class="release release--latest" data-release="latest">
         <p class="tag">{{ c.releases.latest }}</p>
         {%- if releases.latest %}
-        <p class="release__version"><a href="{{ releases.latest.url }}">{{ releases.latest.tag }}</a></p>
-        <p class="release__date"><time datetime="{{ releases.latest.date }}">{{ releases.latest.date }}</time></p>
+        <p class="release__version"><a href="{{ releases.latest.url }}" data-release-link>{{ releases.latest.tag }}</a></p>
+        <p class="release__date"><time datetime="{{ releases.latest.date }}" data-release-date>{{ releases.latest.date }}</time></p>
         {%- else %}<p>{{ c.releases.none }}</p>{%- endif %}
       </div>
-      <div class="release">
+      <div class="release" data-release="candidate">
         <p class="tag">{{ c.releases.candidate }}</p>
         {%- if releases.candidate %}
-        <p class="release__version"><a href="{{ releases.candidate.url }}">{{ releases.candidate.tag }}</a></p>
-        <p class="release__date"><time datetime="{{ releases.candidate.date }}">{{ releases.candidate.date }}</time></p>
+        <p class="release__version"><a href="{{ releases.candidate.url }}" data-release-link>{{ releases.candidate.tag }}</a></p>
+        <p class="release__date"><time datetime="{{ releases.candidate.date }}" data-release-date>{{ releases.candidate.date }}</time></p>
         {%- else %}<p>{{ c.releases.none }}</p>{%- endif %}
       </div>
     </div>
-    <ul class="release-list">
+    <ul class="release-list" data-release-list data-prerelease="{{ c.releases.prerelease }}">
       {%- for r in releases.recent %}
       <li><a href="{{ r.url }}">{{ r.tag }}</a> <time datetime="{{ r.date }}">{{ r.date }}</time>{% if r.prerelease %} <span class="tag">{{ c.releases.prerelease }}</span>{% endif %}</li>
       {%- endfor %}
@@ -572,6 +565,7 @@
       <li><a href="{{ c.other.path }}" lang="{{ c.other.lang }}" hreflang="{{ c.other.lang }}">{{ c.other.label }}</a></li>
     </ul>
     <p class="foot__legal">{{ c.footer.nocookies }}<br>{{ c.footer.license }}</p>
+    <p class="foot__disclaimer">{{ c.footer.disclaimer }}</p>
   </div>
 </footer>
 </body>
