@@ -9602,3 +9602,6 @@ msgstr "Your e-mail address does not belong to a domain of this login service. L
 
 msgid "admin.login_refused.issuer_mismatch"
 msgstr "The answer did not come from the login service you started at. Please log in again."
+
+msgid "admin.idp.routing_off"
+msgstr "Logins through organisations' identity providers are switched off on this host (ORGANISATION_IDPS_ENABLED). You can register and verify providers and domains already; everyone logs in at the platform provider until the server administrator switches it on."

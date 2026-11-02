@@ -9614,3 +9614,6 @@ msgstr "Uw e-mailadres hoort niet bij een domein van deze inlogdienst. Log in me
 
 msgid "admin.login_refused.issuer_mismatch"
 msgstr "Het antwoord kwam niet van de inlogdienst waar u begon. Probeer opnieuw in te loggen."
+
+msgid "admin.idp.routing_off"
+msgstr "Logins via de identity providers van organisaties staan op deze host uit (ORGANISATION_IDPS_ENABLED). U kunt providers en domeinen alvast registreren en verifiëren; iedereen logt in bij de platformprovider tot de serverbeheerder de schakelaar aanzet."

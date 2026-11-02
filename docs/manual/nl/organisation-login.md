@@ -97,6 +97,11 @@ Een login via deze provider lukt alleen als het ID-token een bevestigd e-mailadr
 organisatie. Zet u de provider uit, dan eindigen de sessies die via haar zijn begonnen bij het
 volgende verzoek.
 
+Wie via deze provider is ingelogd en opnieuw moet inloggen voor een wijziging, of uitlogt, gaat
+weer naar deze provider, nooit naar de vraag om het e-mailadres. Staat de schakelaar op de host
+uit, dan meldt deze pagina dat: u kunt providers en domeinen dan al voorbereiden, maar iedereen
+logt nog in bij de platformprovider.
+
 1. Vul het domein in (bijvoorbeeld `gemeente.nl`) en kies **Domein toevoegen**.
 2. Laat de organisatie het getoonde TXT-record in haar DNS zetten: naam
    `_openplanner-challenge.<domein>`, waarde `openplanner-domain-verification=…`.
