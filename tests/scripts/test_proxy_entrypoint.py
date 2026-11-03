@@ -20,6 +20,7 @@ SH = shutil.which("sh") or "/bin/sh"
 FAKE_CADDY = """#!/bin/sh
 # Fake caddy: records the command and the TLS_DIRECTIVE it was started or reloaded with.
 echo "$1:${TLS_DIRECTIVE-unset}" >> "$CADDY_LOG"
+echo "$1:${IDP_DIRECTIVE-unset}" >> "$CADDY_LOG.idp"
 if [ "$1" = run ]; then sleep "${CADDY_RUN_SECONDS:-0}"; fi
 """
 
@@ -31,7 +32,7 @@ def bin_dir(tmp_path: Path) -> Path:
     directory.mkdir()
     (directory / "caddy").write_text(FAKE_CADDY)
     (directory / "caddy").chmod(0o755)
-    for tool in ("sh", "head", "sleep", "echo"):
+    for tool in ("sh", "head", "sleep", "echo", "cp", "mv", "chmod"):
         real = shutil.which(tool)
         if real and not (directory / tool).exists():
             os.symlink(real, directory / tool)
@@ -46,6 +47,7 @@ class Outcome:
     stdout: str
     stderr: str
     logged: list[str]
+    idp: list[str]
 
 
 def run(bin_dir: Path, tmp_path: Path, run_seconds: int = 0, **env: str) -> Outcome:
@@ -74,7 +76,9 @@ def run(bin_dir: Path, tmp_path: Path, run_seconds: int = 0, **env: str) -> Outc
         returncode = process.wait(timeout=30)
     time.sleep(1.5)  # let the watcher notice that caddy is gone and write its last line
     lines = log.read_text().splitlines() if log.exists() else []
-    return Outcome(returncode, out.read_text(), err.read_text(), lines)
+    idp_log = Path(f"{log}.idp")
+    idp = idp_log.read_text().splitlines() if idp_log.exists() else []
+    return Outcome(returncode, out.read_text(), err.read_text(), lines, idp)
 
 
 def write_pair(portal: Path, serial: str) -> None:
@@ -183,3 +187,102 @@ def test_one_file_of_the_operators_pair_stops_the_container(bin_dir: Path, tmp_p
     assert outcome.returncode == 1
     assert "go together" in outcome.stderr
     assert outcome.logged == []
+
+
+# ADR 0112: the internal authority and the route to the bundled identity provider.
+
+
+def internal(tmp_path: Path, *, published: bool = True) -> dict[str, str]:
+    """The settings of an internal-CA run: a writable volume and, optionally, Caddy's root."""
+    volume, pki = tmp_path / "internal-ca", tmp_path / "pki"
+    volume.mkdir(exist_ok=True)
+    pki.mkdir(exist_ok=True)
+    if published:
+        root = "-----BEGIN CERTIFICATE-----\nroot\n-----END CERTIFICATE-----\n"
+        (pki / "root.crt").write_text(root)
+    return {
+        "TLS_DOMAIN": "docker01.example.nl",
+        "TLS_INTERNAL": "true",
+        "TLS_INTERNAL_CA_DIR": str(volume),
+        "TLS_CA_ROOT": str(pki / "root.crt"),
+    }
+
+
+def test_the_internal_authority_needs_no_mailbox_and_publishes_only_the_root(
+    bin_dir: Path, tmp_path: Path
+) -> None:
+    outcome = run(bin_dir, tmp_path, **internal(tmp_path))
+
+    assert outcome.returncode == 0, outcome.stderr
+    assert outcome.logged == ["run:tls internal"]
+    published = tmp_path / "internal-ca" / "root.crt"
+    assert "BEGIN CERTIFICATE" in published.read_text()
+    assert [p.name for p in (tmp_path / "internal-ca").iterdir()] == ["root.crt"]
+    assert published.stat().st_mode & 0o777 == 0o644  # a public certificate
+
+
+def test_the_internal_authority_ignores_the_portal_pair_and_starts_no_watcher(
+    bin_dir: Path, tmp_path: Path
+) -> None:
+    portal = tmp_path / "portal-certs"
+    portal.mkdir()
+    write_pair(portal, "ab" * 32)
+
+    outcome = run(bin_dir, tmp_path, run_seconds=3, **internal(tmp_path))
+
+    assert outcome.logged == ["run:tls internal"]
+
+
+def test_the_internal_authority_needs_a_writable_volume(bin_dir: Path, tmp_path: Path) -> None:
+    settings = internal(tmp_path)
+    settings["TLS_INTERNAL_CA_DIR"] = str(tmp_path / "missing")
+
+    outcome = run(bin_dir, tmp_path, **settings)
+
+    assert outcome.returncode == 1
+    assert "is not writable by uid 10001" in outcome.stderr
+    assert outcome.logged == []
+
+
+def test_operator_files_win_over_the_internal_authority(bin_dir: Path, tmp_path: Path) -> None:
+    cert, key = tmp_path / "c.pem", tmp_path / "k.pem"
+    cert.write_text("c")
+    key.write_text("k")
+
+    outcome = run(
+        bin_dir, tmp_path, TLS_CERT_FILE=str(cert), TLS_KEY_FILE=str(key), **internal(tmp_path)
+    )
+
+    assert outcome.logged == [f"run:tls {cert} {key}"]
+
+
+def test_the_identity_provider_is_routed_only_when_an_upstream_is_named(
+    bin_dir: Path, tmp_path: Path
+) -> None:
+    plain = run(bin_dir, tmp_path, TLS_DOMAIN="a.example.nl", ACME_EMAIL="ops@example.nl")
+    (tmp_path / "caddy.log.idp").unlink()
+    routed = run(
+        bin_dir,
+        tmp_path,
+        TLS_DOMAIN="a.example.nl",
+        ACME_EMAIL="ops@example.nl",
+        IDP_UPSTREAM="idp:8080",
+    )
+
+    assert plain.idp == ["run:"]
+    directive = "\n".join(routed.idp)  # a multi-line directive: one log line per line of it
+    assert directive.startswith("run:handle /idp/* {")
+    assert "reverse_proxy idp:8080" in directive
+
+
+def test_an_upstream_with_an_odd_character_is_refused(bin_dir: Path, tmp_path: Path) -> None:
+    outcome = run(
+        bin_dir,
+        tmp_path,
+        TLS_DOMAIN="a.example.nl",
+        ACME_EMAIL="ops@example.nl",
+        IDP_UPSTREAM="idp:8080; respond 200",
+    )
+
+    assert outcome.returncode == 1
+    assert "IDP_UPSTREAM must be host:port" in outcome.stderr

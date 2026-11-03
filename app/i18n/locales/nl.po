@@ -9656,3 +9656,9 @@ msgstr "{routing} geverifieerd, {failing} record verdwenen, {pending} wacht, {la
 
 msgid "admin.settings.org_idps.none"
 msgstr "Geen organisatie heeft een eigen identity provider."
+
+msgid "admin.settings.tls.internal_ca"
+msgstr "Het certificaat komt van de interne certificaatautoriteit van de proxy (lab). Een browser vertrouwt het pas nadat u het rootcertificaat eenmalig op uw computer hebt geïnstalleerd."
+
+msgid "admin.settings.tls.internal_ca.download"
+msgstr "Rootcertificaat downloaden"

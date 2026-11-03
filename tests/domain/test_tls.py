@@ -53,7 +53,7 @@ def test_a_trusted_certificate_with_time_left_is_ok() -> None:
 
 @pytest.mark.parametrize(("days_left", "finding"), [(19, Finding.EXPIRING), (20, Finding.OK)])
 def test_fewer_days_left_than_the_warning_is_expiring(days_left: int, finding: Finding) -> None:
-    result = ProbeResult(certificate(days_left), Trust.TRUSTED)
+    result = ProbeResult(certificate(days_left, since_days=90 - days_left), Trust.TRUSTED)
 
     assert judge(result, "afspraak.example.nl", NOW, WARN) is finding
 
@@ -114,3 +114,27 @@ def test_days_left_round_down() -> None:
     assert check.days_left(NOW + timedelta(hours=1)) == 59
     assert check.ok
     assert CertificateCheck(NOW, "x", Finding.UNREACHABLE).days_left(NOW) is None
+
+
+def test_a_short_lived_certificate_is_not_expiring_for_its_whole_life() -> None:
+    """ADR 0112: the internal authority issues 12-hour certificates and renews at 4 hours."""
+    short = Certificate(
+        "docker01.example.nl",
+        "Caddy Local Authority - ECC Intermediate",
+        NOW - timedelta(hours=1),
+        NOW + timedelta(hours=11),
+        ("docker01.example.nl",),
+    )
+    renewal_missed = Certificate(
+        short.subject,
+        short.issuer,
+        NOW - timedelta(hours=10),
+        NOW + timedelta(hours=2),
+        short.names,
+    )
+
+    assert judge(ProbeResult(short, Trust.TRUSTED), "docker01.example.nl", NOW, WARN) is Finding.OK
+    assert (
+        judge(ProbeResult(renewal_missed, Trust.TRUSTED), "docker01.example.nl", NOW, WARN)
+        is Finding.EXPIRING
+    )
