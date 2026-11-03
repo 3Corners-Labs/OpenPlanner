@@ -66,13 +66,28 @@ and `/readyz`. What does not carry over: the host installer and the host updater
 9. **The public images only give minor releases.** ADR 0108 publishes `vX.Y.0` only. A patch
    release (a security fix) is in the private package: a cluster that must follow patches needs
    a pull secret for it (`imagePullSecrets`), or ADR 0108 changes. The chart supports both.
+10. **Everything is published, the administrator subscribes** (product owner, 2026-11-03).
+    The chart goes to `oci://ghcr.io/<owner>/charts/openplanner` for every release candidate,
+    patch and minor or major release, signed like the images; the choice of what to follow is
+    the administrator's, not ours. A chart holds no personal data and no secret, so its package
+    is public (ADR 0108's reason to limit images does not apply); the images it points to keep
+    ADR 0108's visibility, so following candidates or patches needs a pull secret.
+11. **The subscription is the update channel, with a third level.** `update_channel` (class C,
+    ADR 0059, 0067: `release` or `rc`) gains `minor`, which follows `X.Y.0` only, so there are
+    three levels: `minor` (minor and major releases), `release` (every release, patches
+    included, the default) and `rc` (candidates too; not in production). The superuser sets it
+    in the portal as today. On Kubernetes the portal does not apply the update but shows what
+    the channel offers and the exact `helm upgrade` command for it (step 4). For a GitOps tool
+    the same choice is a version range on the chart: `>=0.5.0-0` follows candidates, `~0.5.0`
+    follows patches of one minor. A range that follows minor releases only cannot be written in
+    semver, so for that level the portal's notice or a pinned version is the way.
 
 ## Settings
 
 None in the application. The chart values are deployment parameters (class B, ADR 0042: tied
 to where the installation runs): `image.*`, `publicBaseUrl`, `forwardedAllowIps`, `env`,
 `existingSecret`, `persistence.*`, `ingress.*`, `webTls.*`, `networkPolicy.*`, `resources.*`.
-Defaults are in `deploy/helm/openplanner/values.yaml`; the three that must be set (`image.tag`
+Step 4 adds the channel level `minor` to the existing class C setting `update_channel` (`release`, `rc`, `minor`; default `release`; permission `settings.platform.manage`; `rc` not usable in production) and a class B deployment shape (`kubernetes`) with the host updater's place taken by the cluster. Defaults are in `deploy/helm/openplanner/values.yaml`; the three that must be set (`image.tag`
 or `digest`, `publicBaseUrl`, `existingSecret`, with `forwardedAllowIps`) fail the render when
 missing, so nothing runs on a guess.
 
@@ -87,8 +102,8 @@ uid 10001 and the read-only root filesystem (the image's own contract); the prob
 | 1 | `deploy/helm/openplanner/` chart, rendering tests | #495 | in PR |
 | 2 | `docs/kubernetes.md`: install, upgrade, backup, TransIP notes; `docs/install.md` pointer | #495 | in PR |
 | 3 | Trial on TransIP: ingress and certificates, volume snapshot, a real upgrade and a restore; findings written into `docs/kubernetes.md` (a person with a cluster) | | planned |
-| 4 | A deployment-shape setting (class B) that hides *Update now* and says "updated by your cluster" | | planned |
-| 5 | The chart published as an OCI artifact next to each release, signed (`helm install oci://ghcr.io/...`) | | planned |
+| 4 | A deployment-shape setting (class B) that replaces *Update now* by what the channel offers and the `helm upgrade` command; the third channel level `minor` (class C, domain, portal, manual) | | planned |
+| 5 | The chart published as an OCI artifact for every candidate and release, signed, package set to Public once (`helm install oci://ghcr.io/...`); the chart's `appVersion` and default tag follow the release | | planned |
 
 ## Consequences
 
