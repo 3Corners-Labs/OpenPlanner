@@ -32,7 +32,7 @@ from the rows below.
 | 0010 | Live meeting status for group admins | BUILT | #10, #81, #167 (AG-3); `adapters/webhooks.py`, `domain/calls.py`, `admin/_agenda_row.html`, `MeetingStatusService` | Webex webhooks carry no timestamp, replays are caught by `event_key` |
 | 0011 | Derived management tokens | BUILT | #10; `domain/tokens.py`, migration 0003, `tests/domain/test_tokens.py` | – |
 | 0012 | Merge only on the product owner's instruction | POLICY | CLAUDE.md, Git section; merge commits record the instruction; merge queue in `ci.yml` | No check that the instruction is recorded; the ADR says five review questions, the PR template has seven |
-| 0013 | Admin login with OIDC | BUILT | #7; `adapters/oidc.py` (PKCE, nonce, PyJWT), `admin/session.py`, Keycloak in `docker-compose.yml` | – (the session holds roles and scope as well, more than the ADR says) |
+| 0013 | Admin login with OIDC | BUILT | #7; `adapters/oidc.py` (PKCE, nonce, PyJWT), `admin/session.py`, Keycloak in `docker-compose.yml` | – (§5 superseded by ADR 0098, built) |
 | 0014 | Authorisation matrix at the core | BUILT | #7, #8; `domain/authorization.py`, `admin/authz.py`, matrix and docs tests | – |
 | 0015 | Admin changes need a recent login | BUILT | #8; `RequirePermission(fresh=)`, `admin_reauth_minutes`, `forms.safe_next` | – (queue next, claim, release and the update snooze are not fresh, by design) |
 | 0016 | Admin forms without JavaScript | BUILT | #7, #8; `HTML_CSP`, `admin.css`; amended by ADR 0048, 0061, 0072 | – (HTMX is not used; own scripts on three pages) |
