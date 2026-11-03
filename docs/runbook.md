@@ -452,6 +452,31 @@ Where it lives: the authority's private key stays in the volume `proxy-data` of 
 only the root certificate is copied to the volume `internal-ca`. Wiping `proxy-data` makes a new
 authority: every machine must then install the new root. Not for production.
 
+#### A lab that is not in DNS (docker01)
+
+Moving docker01 from plain http to this took these steps, all without root, because
+`.env.update` belongs to the host updater:
+
+1. `git fetch --tags && git merge --ff-only v<rc>` in the checkout, so compose has the volume
+   `internal-ca` and the `idp` service on the `edge` network.
+2. `proxy.env` with `TLS_DOMAIN`, `TLS_INTERNAL=true` and `IDP_UPSTREAM=idp:8080`.
+3. `docker-compose.override.yml`: `proxy` and `idp` under the profile the installer set
+   (`profiles: !override [dev]`), the proxy image pinned by hand
+   (`ghcr.io/3corners-labs/openplanner-proxy:<rc>`; the updater pins it only when
+   `.env.update` has it), the old `keycloak` under an inactive profile, and for `web` and
+   `worker` `extra_hosts: ["<host>:host-gateway"]`: the name resolves on the lab network only,
+   so without it the certificate and address checks cannot reach their own host.
+4. `.env`: `PUBLIC_BASE_URL=https://<host>`; remove `OIDC_DISCOVERY_URL`, `OIDC_ISSUER`,
+   `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` (the render script writes them to
+   `secrets/keycloak-app.env`); `TLS_CERTIFICATE_SOURCE=own`.
+5. `secrets/keycloak.env`: set `KC_OPENPLANNER_BASE_URL=https://<host>` (an existing value wins
+   over `PUBLIC_BASE_URL`), run `scripts/render-keycloak-realm.sh`, and recreate `idp`.
+6. An existing realm is not re-imported: set the redirect URI, web origin and post-logout URI of
+   client `openplanner-admin` to the https address with `kcadm.sh` (against
+   `http://localhost:8080/idp`).
+7. `docker compose --env-file .env.update up -d --force-recreate web worker proxy`.
+8. Verify with `oidc-check`, `tls-check` and `address-check` from `web`.
+
 #### The bundled identity provider behind the proxy
 
 With `IDP_UPSTREAM=idp:8080` in `proxy.env` the proxy serves the bundled Keycloak under `/idp` on
