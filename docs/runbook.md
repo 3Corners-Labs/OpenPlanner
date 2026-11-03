@@ -850,9 +850,13 @@ prints no value. The login (`OIDC_DISCOVERY_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID
 `.env`. `OIDC_ISSUER` is `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public
 address, not the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097).
 `python -m app.cli oidc-check` compares the two and names the issuer to set when they differ.
-When Keycloak itself sits behind a TLS proxy, set `KC_PROXY_HEADERS=xforwarded` (and let the
-proxy send `X-Forwarded-Proto`): otherwise Keycloak announces its token endpoint and key set as
-`http://`, and `oidc-check` fails on *provider endpoints* in production. Keycloak's own address
+When Keycloak itself sits behind a TLS proxy and OpenPlanner fetches its discovery document over
+https, set `KC_PROXY_HEADERS=xforwarded` (and let the proxy send `X-Forwarded-Proto`): otherwise
+Keycloak announces its token endpoint and key set as `http://`, and `oidc-check` fails on
+*provider endpoints* in production. With the bundled provider behind the bundled proxy
+(`render-keycloak-realm.sh` sets the header), web fetches the document on the internal network as
+`http://idp:8080/idp/...` (ADR 0112), the endpoints follow that address, and `oidc-check` reports
+them as expected. Keycloak's own address
 for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`): a lab on the
 host itself needs nothing more; reaching the login from another machine goes through the proxy
 and is step 2. The admin console is bound to the host's loopback and is never published.

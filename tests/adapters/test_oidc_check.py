@@ -190,6 +190,36 @@ async def test_plain_http_back_channel_endpoints_fail_in_production_only() -> No
     assert dev_endpoints.ok
 
 
+async def test_http_back_channel_on_an_internal_discovery_address_is_expected() -> None:
+    """ADR 0112: web reaches the bundled provider on the internal http address."""
+    internal = "http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration"
+    metadata = _metadata(
+        issuer="https://afspraak.example.nl/idp/realms/openplanner",
+        token_endpoint="http://idp:8080/idp/realms/openplanner/protocol/openid-connect/token",
+        jwks_uri="http://idp:8080/idp/realms/openplanner/protocol/openid-connect/certs",
+    )
+
+    def route(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == internal:
+            return httpx.Response(200, json=metadata)
+        return httpx.Response(200, json={"keys": [_jwk()]})
+
+    target = OidcTarget(
+        internal,
+        TARGET.redirect_uri,
+        require_https=True,
+        client_secret_set=True,
+        expected_issuer="https://afspraak.example.nl/idp/realms/openplanner",
+    )
+
+    results = await _check(httpx.MockTransport(route), target)
+
+    (endpoints,) = [r for r in results if r.name == "provider endpoints"]
+    assert endpoints.ok
+    assert "internal" in endpoints.hint
+    assert passed(results), results
+
+
 async def test_a_missing_client_secret_fails_in_production() -> None:
     target = OidcTarget(DISCOVERY, TARGET.redirect_uri, require_https=True, client_secret_set=False)
 
