@@ -124,6 +124,16 @@ def host(tmp_path: Path) -> Host:
         (tmp_path / directory).mkdir(parents=True)
     shutil.copytree(REPO / "scripts" / "updater", host.checkout / "scripts" / "updater")
     shutil.copy(REPO / "scripts" / "install.sh", host.checkout / "scripts" / "install.sh")
+    # The bundled identity provider is rendered on the host (ADR 0106 step 5).
+    shutil.copy(
+        REPO / "scripts" / "render-keycloak-realm.sh",
+        host.checkout / "scripts" / "render-keycloak-realm.sh",
+    )
+    (host.checkout / "deploy" / "keycloak").mkdir(parents=True)
+    shutil.copy(
+        REPO / "deploy" / "keycloak" / "realm.template.json",
+        host.checkout / "deploy" / "keycloak" / "realm.template.json",
+    )
     host.file("docker-compose.yml").write_text("services: {}\n")
     (tmp_path / "home/operator/.docker/config.json").write_text('{"auths": {"ghcr.io": {}}}\n')
     fake = f'"{sys.executable}" "{updater_host.__file__}"'
@@ -198,6 +208,7 @@ def test_production_install_from_scratch(host: Host) -> None:
     assert host.settings(".env.update") == {
         "OPENPLANNER_MODE": "production",
         "OPENPLANNER_TLS": "1",
+        "OPENPLANNER_IDP": "own",  # a login named in the environment stays (ADR 0106 point 4)
         "COMPOSE_PROFILES": "tls",
         "OPENPLANNER_IMAGE": RELEASE,
         "OPENPLANNER_PROXY_IMAGE": PROXY_RELEASE,
@@ -385,9 +396,15 @@ def test_lab_mode_runs_the_dev_services_and_removes_a_stray_proxy(host: Host) ->
 
     assert result.returncode == 0, result.stderr
     assert host.settings(".env")["ENVIRONMENT"] == "test"
-    # Keycloak announces KC_HOSTNAME, not the address the web container fetches it on (ADR 0097).
-    assert host.settings(".env")["OIDC_ISSUER"] == "http://127.0.0.1:8080/realms/openplanner"
-    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "dev"
+    # The login is the bundled provider's, rendered into secrets/keycloak-app.env (ADR 0106 step
+    # 5), not asked and not copied into .env. Keycloak announces KC_HOSTNAME, not the address the
+    # web container fetches it on (ADR 0097).
+    assert "OIDC_DISCOVERY_URL" not in host.settings(".env")
+    login = host.settings("secrets/keycloak-app.env")
+    assert login["OIDC_ISSUER"] == "http://127.0.0.1:8080/realms/openplanner"
+    assert login["OIDC_DISCOVERY_URL"].startswith("http://idp:8080/realms/openplanner/")
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "idp,mailpit"
+    assert host.settings(".env.update")["OPENPLANNER_IDP"] == "bundled"
     assert not host.file("proxy.env").exists()
     assert host.ran("--profile tls rm --stop --force proxy")
     assert not host.ran("repos/3Corners-Labs/OpenPlanner/releases")
@@ -486,8 +503,9 @@ def test_test_mode_runs_the_https_proxy_by_default(host: Host) -> None:
     assert host.settings("proxy.env") == {
         "TLS_DOMAIN": "test.example.nl",
         "ACME_EMAIL": "ops@example.nl",
+        "IDP_UPSTREAM": "idp:8080",  # the bundled Keycloak under /idp (ADR 0112)
     }
-    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "tls"
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "idp,tls"
     assert host.file("certs").is_dir()
     assert not host.ran("--profile tls rm --stop --force proxy")
 
@@ -535,11 +553,12 @@ def test_a_lab_opts_in_to_https_with_a_domain(host: Host) -> None:
 
     assert result.returncode == 0, result.stderr
     assert host.settings(".env")["PUBLIC_BASE_URL"] == "https://docker01.example.nl"
-    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "dev,tls"
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "idp,mailpit,tls"
     assert host.settings("proxy.env") == {
         "TLS_DOMAIN": "docker01.example.nl",
         "ACME_EMAIL": "ops@example.nl",
         "ACME_CA": "https://acme-staging-v02.api.letsencrypt.org/directory",
+        "IDP_UPSTREAM": "idp:8080",
     }
 
 
@@ -588,8 +607,9 @@ def test_the_internal_ca_needs_no_mailbox_and_locks_the_portal_source(host: Host
     assert host.settings("proxy.env") == {
         "TLS_DOMAIN": "afspraak.example.nl",
         "TLS_INTERNAL": "true",
+        "IDP_UPSTREAM": "idp:8080",
     }
-    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "tls"
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "idp,tls"
     assert host.settings(".env")["TLS_CERTIFICATE_SOURCE"] == "own"
 
 
@@ -855,3 +875,136 @@ def test_the_login_in_config_env_satisfies_the_production_checks(host: Host) -> 
     again = host.run("--non-interactive")
     assert again.returncode == 1
     assert "OIDC_DISCOVERY_URL must start with https://" in again.stderr
+
+
+# ADR 0106 step 5: the identity provider.
+
+
+def test_a_test_install_renders_the_bundled_realm_and_hands_over_the_login(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
+
+    result = host.run("--mode", "test", "--non-interactive", **settings)
+
+    assert result.returncode == 0, result.stderr
+    env, app = host.settings(".env"), host.settings("secrets/keycloak-app.env")
+    assert "OIDC_DISCOVERY_URL" not in env
+    assert "OIDC_CLIENT_SECRET" not in env
+    assert app["OIDC_ISSUER"] == "https://afspraak.example.nl/idp/realms/openplanner"
+    assert app["KEYCLOAK_ADMIN_URL"] == "http://idp:8080/idp/admin/realms/openplanner"
+    assert host.settings("secrets/keycloak.env")["KC_HOSTNAME"] == "https://afspraak.example.nl/idp"
+    assert host.file("secrets/keycloak-realm.json").is_file()
+    assert "KC_SUPER_PASSWORD in" in result.stderr + result.stdout
+    assert app["OIDC_CLIENT_SECRET"] not in result.stderr + result.stdout  # a path, never a value
+
+
+def test_the_realms_mail_server_is_set_after_the_start_without_a_password_in_an_argument(
+    host: Host,
+) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
+
+    result = host.run("--mode", "test", "--non-interactive", **settings)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("exec -T idp sh -c")
+    assert not host.ran("pass word #1")  # the password goes through stdin
+    assert "mail server: smtp.example.nl" in result.stderr + result.stdout
+
+
+def test_without_an_smtp_host_the_install_says_keycloak_cannot_mail(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith(("OIDC_", "SMTP_"))}
+
+    result = host.run("--mode", "test", "--non-interactive", **settings)
+
+    assert result.returncode == 0, result.stderr
+    assert "Keycloak cannot mail invitations" in result.stderr
+    assert not host.ran("exec -T idp")
+
+
+def test_own_asks_for_the_login_as_before_and_renders_nothing(host: Host) -> None:
+    result = host.run("--mode", "test", "--idp", "own", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    env = host.settings(".env")
+    assert env["OIDC_DISCOVERY_URL"] == PRODUCTION["OIDC_DISCOVERY_URL"]
+    assert not host.file("secrets/keycloak-realm.json").exists()
+    assert "IDP_UPSTREAM" not in host.settings("proxy.env")
+    pins = host.settings(".env.update")
+    assert (pins["OPENPLANNER_IDP"], pins["COMPOSE_PROFILES"]) == ("own", "tls")
+
+
+def test_a_lab_with_its_own_provider_keeps_mailpit_without_the_dev_keycloak(host: Host) -> None:
+    result = host.run("--mode", "lab", "--idp", "own", "--version", "1.4.0", "--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "mailpit"
+
+
+def test_the_choice_is_remembered_and_a_rerun_keeps_the_rendered_secrets(host: Host) -> None:
+    first = host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive")
+    secret = host.settings("secrets/keycloak.env")["KC_SUPER_PASSWORD"]
+
+    again = host.run("--non-interactive")
+
+    assert first.returncode == again.returncode == 0, again.stderr
+    assert host.settings(".env.update")["OPENPLANNER_IDP"] == "bundled"
+    assert host.settings("secrets/keycloak.env")["KC_SUPER_PASSWORD"] == secret
+
+
+def test_a_changed_public_address_moves_the_realm_along(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
+    host.run("--mode", "test", "--non-interactive", **settings)
+
+    env = host.file(".env")
+    env.write_text(
+        env.read_text().replace("https://afspraak.example.nl", "https://nieuw.example.nl")
+    )
+
+    moved = host.run("--mode", "test", "--non-interactive", **settings)
+
+    assert moved.returncode == 0, moved.stderr
+    assert host.settings("secrets/keycloak.env")["KC_HOSTNAME"] == "https://nieuw.example.nl/idp"
+
+
+def _production_bundled(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
+    result = host.run("--mode", "production", "--non-interactive", **settings)
+    assert result.returncode == 0, result.stderr
+
+
+def test_production_runs_the_bundled_keycloak_on_its_own_database(host: Host) -> None:
+    """ADR 0106 point 4: `start` on PostgreSQL, the second factor on, nothing asked."""
+    _production_bundled(host)
+
+    pins = host.settings(".env.update")
+    keycloak = host.settings("secrets/keycloak.env")
+    assert pins["OPENPLANNER_IDP"] == "bundled"
+    assert pins["OPENPLANNER_IDP_START"] == "start"
+    assert {"idp", "idp-db"} <= set(pins["COMPOSE_PROFILES"].split(","))
+    assert keycloak["KC_DB"] == "postgres"
+    assert keycloak["KC_DB_URL_HOST"] == "idp-db"
+    assert keycloak["KC_HTTP_ENABLED"] == "true"
+    assert host.settings("secrets/idp-db.env")["POSTGRES_PASSWORD"] == keycloak["KC_DB_PASSWORD"]
+    assert host.settings(".env")["ADMIN_MFA_REQUIRED"] == "true"
+
+
+def test_test_and_lab_keep_the_development_start_and_h2(host: Host) -> None:
+    result = host.run("--mode", "test", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert "OPENPLANNER_IDP_START" not in host.settings(".env.update")
+    assert "idp-db" not in host.settings(".env.update")["COMPOSE_PROFILES"]
+    assert "KC_DB" not in host.settings("secrets/keycloak.env")
+
+
+def test_a_production_host_with_its_own_login_keeps_it(host: Host) -> None:
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(".env.update")["OPENPLANNER_IDP"] == "own"
+
+
+def test_an_unknown_provider_choice_is_refused(host: Host) -> None:
+    result = host.run("--mode", "test", "--idp", "ldap", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 1
+    assert "--idp must be bundled or own" in result.stderr
