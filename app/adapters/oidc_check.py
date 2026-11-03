@@ -104,7 +104,7 @@ async def inspect_oidc(http: httpx.AsyncClient, target: OidcTarget) -> OidcInspe
         return OidcInspection([failed, *results], {})
     found = [
         _issuer(response.status_code, str(metadata["issuer"]), target.issuer),
-        _endpoints(metadata, target.require_https),
+        _endpoints(metadata, target),
         _algorithms(metadata),
         _pkce(metadata),
         await _signing_keys(http, str(metadata["jwks_uri"])),
@@ -154,17 +154,23 @@ BACK_CHANNEL = ("token_endpoint", "jwks_uri")
 """Endpoints OpenPlanner calls itself, with the client secret and for the signing keys."""
 
 
-def _endpoints(metadata: dict[str, Any], require_https: bool) -> CheckResult:
-    """Check that the endpoints OpenPlanner calls itself are https in production.
+def _endpoints(metadata: dict[str, Any], target: OidcTarget) -> CheckResult:
+    """Check that the endpoints OpenPlanner calls itself do not downgrade the discovery address.
 
-    A provider behind a TLS proxy that does not trust the proxy's ``X-Forwarded-Proto``
-    announces them as ``http://`` (Keycloak: ``KC_PROXY_HEADERS``).
+    A provider behind a TLS proxy that does not trust the proxy's ``X-Forwarded-Proto`` announces
+    ``http://`` endpoints although it was fetched over https (Keycloak: ``KC_PROXY_HEADERS``).
+    When the discovery address itself is plain http, such as the bundled provider on the internal
+    network (ADR 0112), the endpoints follow that address and that is expected.
     """
     plain = [key for key in BACK_CHANNEL if not str(metadata[key]).startswith("https://")]
     if not plain:
         return CheckResult("provider endpoints", None, True, "https")
+    if not target.discovery_url.startswith("https://"):
+        return CheckResult(
+            "provider endpoints", None, True, "http, as the internal discovery address (ADR 0112)"
+        )
     hint = f"{', '.join(plain)} over http; the provider does not trust its proxy's headers"
-    return CheckResult("provider endpoints", None, not require_https, hint)
+    return CheckResult("provider endpoints", None, not target.require_https, hint)
 
 
 def _algorithms(metadata: dict[str, Any]) -> CheckResult:
