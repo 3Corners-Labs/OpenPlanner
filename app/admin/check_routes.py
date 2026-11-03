@@ -35,7 +35,14 @@ from app.domain.errors import DomainError
 from app.domain.integration_check import SERVICE_APP_CHECK_EVENT, IntegrationCheckService
 from app.domain.ports import Clock
 from app.i18n import BoundGettext
-from app.web.check_labels import AREA_LABELS, FINDING_LABELS, STATUS_LABELS, UNKNOWN_FINDING
+from app.web.check_labels import (
+    AREA_LABELS,
+    FINDING_HELP,
+    FINDING_LABELS,
+    STATUS_LABELS,
+    UNKNOWN_FINDING,
+)
+from app.web.help import HELP_PATH
 from app.web.locale import RequestLocale
 from app.web.protection import check_limit, limiter
 
@@ -62,6 +69,7 @@ class FindingRow:
     status: str
     tone: str
     text: str
+    help: str | None = None
 
 
 @dataclass(frozen=True)
@@ -96,7 +104,7 @@ def _view(request: Request, locale: RequestLocale, check: GroupCheck) -> CheckVi
         status_key, tone = STATUS_LABELS[finding.status]
         text = _finding_text(finding, _)
         areas.setdefault(_(AREA_LABELS[finding.area]), []).append(
-            FindingRow(_(status_key), tone, text)
+            FindingRow(_(status_key), tone, text, _help_link(finding.code))
         )
     status_key, tone = STATUS_LABELS[check.overall]
     return CheckView(
@@ -105,6 +113,12 @@ def _view(request: Request, locale: RequestLocale, check: GroupCheck) -> CheckVi
         tone=tone,
         areas=[AreaRows(label, rows) for label, rows in areas.items()],
     )
+
+
+def _help_link(code: str) -> str | None:
+    """Return the manual section that explains how to fix a finding, if there is one."""
+    target = FINDING_HELP.get(code)
+    return f"{HELP_PATH}/{target[0]}#field-{target[1]}" if target else None
 
 
 def _finding_text(finding: Finding, _: BoundGettext) -> str:

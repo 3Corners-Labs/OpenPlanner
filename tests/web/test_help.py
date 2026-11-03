@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from app.web.check_labels import FINDING_HELP
 from app.web.help import MANUAL_DIR, TOPICS, Manual, ManualError, parse, topic, topic_for_path
 
 PAGE = """# Groepsinstellingen
@@ -135,6 +136,17 @@ def test_every_topic_exists_in_dutch_and_english_with_the_same_fields(slug: str)
     assert [p.locale if p else None for p in pages] == list(REQUIRED_LOCALES)
     nl, en = (p for p in pages if p is not None)
     assert list(nl.sections) == list(en.sections)
+
+
+@pytest.mark.parametrize("code", REQUIRED_LOCALES)
+@pytest.mark.parametrize("finding", sorted(FINDING_HELP))
+def test_every_check_finding_help_link_has_its_section(finding: str, code: str) -> None:
+    slug, key = FINDING_HELP[finding]
+    page = SHIPPED.page(slug, code)
+
+    assert page is not None
+    assert page.locale == code
+    assert key in page.sections
 
 
 @pytest.mark.parametrize("code", REQUIRED_LOCALES)

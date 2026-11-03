@@ -206,6 +206,87 @@ Het adres van het *digital channel asset* in Webex Contact Center waarop taken v
 binnenkomen. Meerdere groepen kunnen hetzelfde adres gebruiken; de routeringswaarde bepaalt dan
 de wachtrij.
 
+<!-- field: wxcc_control_hub -->
+### Waar het staat in Control Hub
+
+De controle gebruikt de namen van OpenPlanner; hier staat elk onderdeel in Control Hub
+(admin.webex.com > **Contact Center**). Flows wijzigt u in **Flow Designer**, dat vanuit de flow
+opent. Control Hub is Engelstalig; de namen staan hier zoals daar.
+
+| In de controle | In Control Hub | Waar u op let |
+|---|---|---|
+| Regio | de URL van Contact Center, of **Settings** > *Data location* | moet gelijk zijn aan de regio van OpenPlanner |
+| Work item-kanaal | **Digital settings** > **Custom Channels** | *Channel type* Work item; de naam is het *WxCC work item-kanaal* van de groep |
+| Asset, business address | **Digital settings** > **Assets** | *Channel*, *Business address* (het *WxCC business address* van de groep) en **Data schema** |
+| Entry point | **Customer experience** > **Channels** | het kanaal van type Work item dat naar de asset wijst; *Status* actief, een *Routing flow* gekozen |
+| Flow | **Customer experience** > **Flows** > de routing flow | *Flow variables*, **Case**, **Queue Contact**, **Screen Pop**, **End Flow**; publiceer na een wijziging |
+| Wachtrij | **Customer experience** > **Queues** | *Channel type* Work item, en de **Multimedia profiles** van agents (*User management*) staan work items toe |
+| Service App, scopes | developer.webex.com > *My Webex Apps*; goedgekeurd in Control Hub > **Apps** > **Service Apps** | scopes `cjp:config_read`, `cjp:config_write`, `cjp:user` |
+| Abonnement | niet in Control Hub; alleen via de API | `register-webhooks` op de server maakt het aan |
+
+<!-- field: wxcc_asset_schema -->
+### Dataschema van de WxCC-asset
+
+Webex Contact Center neemt een work item van OpenPlanner alleen aan als het *Data schema* van de
+asset precies deze velden heeft. Meldt **Koppeling controleren** dat het work item geweigerd
+wordt, vraag de beheerder van het contactcenter dan de asset in Control Hub aan te passen:
+**Contact Center** > **Digital settings** > **Assets** > de asset met het business address
+van deze groep > **Data schema**. Wijzig een veld met het potlood en voeg een ontbrekend veld
+toe met **Add a field**.
+
+| Field key | Display name (vrij) | Viewable | Required |
+|---|---|---|---|
+| `bookingReference` | Afspraak | Yes | **Yes** |
+| `firstName` | Voornaam | Yes | No |
+| `startTime` | Starttijd | Yes | No |
+| `groupName` | Team | Yes | No |
+| `meetingLink` | Videogesprek | Yes | No |
+| `kind` | Soort | Yes | No |
+
+Typ de field keys precies zo, met hoofdletters. Control Hub wil minstens één verplicht veld: dat
+is `bookingReference`, en alleen dat, want een annulering stuurt verder niets mee.
+Elk ander verplicht veld, ook een veld dat OpenPlanner meestuurt, laat Webex Contact Center die
+work items weigeren. Verwijder eigen velden of zet ze op Required No. Sla op en klik daarna
+opnieuw op **Koppeling controleren**.
+
+<!-- field: wxcc_flow -->
+### De WxCC-flow van deze groep
+
+**Koppeling controleren** leest de flow achter het entry point van de asset en waarschuwt bij
+drie onderdelen die de beheerder van het contactcenter in Flow Designer toevoegt:
+
+1. **Routering naar de juiste wachtrij.** Voeg een flowvariabele `openplannerGroup` toe (type
+   String). OpenPlanner vult die met de *Routeringswaarde* van de groep. Zet er een **Case** op
+   met per routeringswaarde een tak naar een **Queue Contact** met de wachtrij van die groep.
+   Zonder komt elk work item van dit entry point in één wachtrij; dat is goed zolang maar één
+   groep de asset gebruikt.
+2. **Een tak voor de proef.** De controle stuurt een work item met `kind` = `probe`. Zet vóór
+   de wachtrij een **Case** op `kind` met een tak `probe` die direct naar **End Flow** (of
+   Disconnect Contact) gaat. Zonder beëindigt OpenPlanner de proef zelf en kan een agent hem
+   even zien.
+3. **Screen Pop.** Voeg een **Screen Pop** toe met als URL `meetingLink`, zodat de agent het
+   videogesprek met één klik opent.
+
+Publiceer de flow en klik daarna opnieuw op **Koppeling controleren**.
+
+<!-- field: wxcc_events -->
+### Meldingen van WxCC terug naar OpenPlanner
+
+OpenPlanner hoort dat een work item binnenkwam, werd aangenomen of beëindigd via een
+**abonnement** op taakmeldingen bij Webex Contact Center, dat het webhookadres van OpenPlanner
+aanroept. Is de proef aangemaakt maar kwam er geen *task:new* terug, kijk dan bij het onderdeel
+**Webhooks** van dezelfde controle:
+
+- *Er is geen actief abonnement*: de platformbeheerder voert `register-webhooks` uit op de
+  server (runbook, paragraaf 4). De Service App heeft daarvoor de scope `cjp:config_write`
+  nodig. WxCC zet een abonnement uit na herhaald mislukte meldingen; voer het dus opnieuw uit na
+  een storing of een adreswijziging.
+- *Testbericht naar wxcc* mislukt: het webhookadres (Systeemstatus, *Webhook-adres*) is niet
+  bereikbaar vanaf internet, of de proxy weigert het verzoek. Herstel het adres of de proxy en
+  voer daarna opnieuw `register-webhooks` uit.
+- Beide in orde en toch geen melding: het abonnement hoort bij een andere organisatie of regio.
+  Controleer of de regel over de regio in deze controle OK is en voer `register-webhooks` opnieuw uit.
+
 <!-- field: wxcc_channel -->
 ### WxCC work item-kanaal
 

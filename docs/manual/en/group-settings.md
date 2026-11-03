@@ -198,6 +198,85 @@ the flow).
 The address of the *digital channel asset* in Webex Contact Center that receives this group's
 tasks. Several groups can share an address; the routing value then picks the queue.
 
+<!-- field: wxcc_control_hub -->
+### Where to find it in Control Hub
+
+The check uses OpenPlanner's names; this is where each part lives in Control Hub
+(admin.webex.com > **Contact Center**). Flows are edited in **Flow Designer**, which opens from
+the flow.
+
+| In the check | In Control Hub | What to look at |
+|---|---|---|
+| Region | the URL of Contact Center, or **Settings** > *Data location* | must match OpenPlanner's region |
+| Work item channel | **Digital settings** > **Custom Channels** | *Channel type* Work item; the name is the group's *WxCC work item channel* |
+| Asset, business address | **Digital settings** > **Assets** | *Channel*, *Business address* (the group's *WxCC business address*) and **Data schema** |
+| Entry point | **Customer experience** > **Channels** | the channel of type Work item that points at the asset; *Status* active, a *Routing flow* chosen |
+| Flow | **Customer experience** > **Flows** > the routing flow | *Flow variables*, **Case**, **Queue Contact**, **Screen Pop**, **End Flow**; publish after a change |
+| Queue | **Customer experience** > **Queues** | *Channel type* Work item, and agents' **Multimedia profiles** (*User management*) allow work items |
+| Service App, scopes | developer.webex.com > *My Webex Apps*; authorised in Control Hub > **Apps** > **Service Apps** | scopes `cjp:config_read`, `cjp:config_write`, `cjp:user` |
+| Subscription | not in Control Hub; only through the API | `register-webhooks` on the server creates it |
+
+<!-- field: wxcc_asset_schema -->
+### Data schema of the WxCC asset
+
+Webex Contact Center only accepts a work item from OpenPlanner when the *Data schema* of the
+asset has exactly these fields. When **Check integration** says the work item is refused, ask
+the contact-centre administrator to change the asset in Control Hub: **Contact Center** >
+**Digital settings** > **Assets** > the asset with this group's business address > **Data schema**. Per field, use
+the pencil to change it and **Add a field** for a field that is missing.
+
+| Field key | Display name (free) | Viewable | Required |
+|---|---|---|---|
+| `bookingReference` | Afspraak | Yes | **Yes** |
+| `firstName` | Voornaam | Yes | No |
+| `startTime` | Starttijd | Yes | No |
+| `groupName` | Team | Yes | No |
+| `meetingLink` | Videogesprek | Yes | No |
+| `kind` | Soort | Yes | No |
+
+Type the field keys exactly, including capitals. Control Hub wants at least one required
+field: that is `bookingReference`, and only that one, because a cancellation sends
+nothing else. Any other required field, also one OpenPlanner sends, makes Webex Contact Center
+refuse those work items. Remove fields of your own or set them to Required No. Save, then click
+**Check integration** again.
+
+<!-- field: wxcc_flow -->
+### The WxCC flow for this group
+
+**Check integration** reads the flow behind the asset's entry point and warns about three parts
+the contact-centre administrator adds in Flow Designer:
+
+1. **Routing to the right queue.** Add a flow variable `openplannerGroup` (type String, *Make
+   available in Desktop* not needed). OpenPlanner fills it with the group's *Routing value*. A
+   **Case** on `openplannerGroup` with one branch per routing value, each to a **Queue Contact**
+   with that group's queue. Without it every work item of the entry point goes to one queue,
+   which is fine while only one group uses the asset.
+2. **A branch for the probe.** OpenPlanner's check sends a work item with `kind` = `probe`. Put
+   a **Case** on `kind` before the queue, with a branch `probe` that goes straight to **End
+   Flow** (or Disconnect Contact). Without it OpenPlanner ends the probe itself, and an agent
+   may see it for a moment.
+3. **Screen Pop.** Add a **Screen Pop** activity with the URL `meetingLink`, so the agent opens
+   the video call in one click.
+
+Publish the flow, then click **Check integration** again.
+
+<!-- field: wxcc_events -->
+### Events from WxCC back to OpenPlanner
+
+OpenPlanner hears that a work item arrived, was accepted or ended through a **subscription** to
+task events at Webex Contact Center, which calls OpenPlanner's webhook address. When the probe
+was created but no *task:new* came back, look at the **Webhooks** part of the same check:
+
+- *There is no active subscription*: the platform administrator runs `register-webhooks` on the
+  server (runbook, section 4). The Service App needs the scope `cjp:config_write` for it. WxCC
+  switches a subscription off after repeated failed deliveries, so run it again after an
+  outage or an address change.
+- *Test message to wxcc* failed: the webhook address (System status, *Webhook address*) is
+  not reachable from the internet, or the proxy refuses the request. Fix the address or the
+  proxy, then run `register-webhooks` again.
+- Both OK and still no event: the subscription is for another organisation or region. Check
+  that the region line of this check is OK and run `register-webhooks` again.
+
 <!-- field: wxcc_channel -->
 ### WxCC work item channel
 
