@@ -126,11 +126,12 @@ services:
       - portal-certs:/portal-certs:ro
       # Where the internal authority's public root is published (ADR 0111); web and worker read it.
       - internal-ca:/internal-ca
+    # Only the edge network: web trusts X-Forwarded-For from this address alone, so the proxy
+    # must reach web over edge and nowhere else. The bundled identity provider joins edge too
+    # (IDP_UPSTREAM=idp:8080 in proxy.env, ADR 0111).
     networks:
       edge:
         ipv4_address: 172.31.240.2
-      # IDP_UPSTREAM=idp:8080 (proxy.env) serves the bundled identity provider under /idp.
-      default: {}
     ports:
       - "80:8080"
       - "443:8443"
@@ -193,6 +194,8 @@ services:
   idp:
     image: quay.io/keycloak/keycloak:26.8.1
     profiles: [idp]
+    # edge: the proxy serves it under /idp (ADR 0111); default: web and worker reach it as idp:8080.
+    networks: [default, edge]
     command: ["start-dev", "--import-realm", "--http-port=8080"]
     env_file:
       # KC_BOOTSTRAP_ADMIN_PASSWORD, KC_HOSTNAME and the values the realm was rendered with.
