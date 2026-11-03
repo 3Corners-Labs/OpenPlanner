@@ -678,7 +678,7 @@
   },
   "releases": {
     "title": "Releases",
-    "lead": "Every merged change becomes a release candidate for test environments; stable releases follow from those. Each one is a signed image with a software bill of materials (SBOM).",
+    "lead": "Every merged change becomes a release candidate for test environments; stable releases follow from those. Each one is a signed image with a software bill of materials (SBOM). This website is updated with every minor or major release.",
     "latest": "Latest release",
     "candidate": "Latest release candidate",
     "none": "No release on this channel yet.",
@@ -691,7 +691,7 @@
   },
   "footer": {
     "tagline": "Video appointments that land in your contact center. Open source, privacy by default.",
-    "nocookies": "This website sets no cookies, uses no trackers and loads no scripts, fonts or images from third parties. Only the release list is requested from GitHub by your browser.",
+    "nocookies": "This website is hosted on GitHub Pages. It sets no cookies, uses no trackers and loads nothing from other parties; your browser also asks GitHub for the release list.",
     "license": "Source code under EUPL-1.2. Made by 3Corners and the OpenPlanner contributors.",
     "links": [
       {

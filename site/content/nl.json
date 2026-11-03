@@ -678,7 +678,7 @@
   },
   "releases": {
     "title": "Releases",
-    "lead": "Elke samengevoegde wijziging wordt een release candidate voor testomgevingen; stabiele releases volgen daaruit. Elke release is een ondertekende image met een software bill of materials (SBOM).",
+    "lead": "Elke samengevoegde wijziging wordt een release candidate voor testomgevingen; stabiele releases volgen daaruit. Elke release is een ondertekende image met een software bill of materials (SBOM). Deze website wordt bij elke minor- of major-release bijgewerkt.",
     "latest": "Laatste release",
     "candidate": "Laatste release candidate",
     "none": "Nog geen release op dit kanaal.",
@@ -691,7 +691,7 @@
   },
   "footer": {
     "tagline": "Videoafspraken die in je contact center landen. Open source, privacy vanaf het ontwerp.",
-    "nocookies": "Deze website zet geen cookies, gebruikt geen trackers en laadt geen scripts, lettertypen of afbeeldingen van derden. Alleen de releaselijst wordt door je browser bij GitHub opgevraagd.",
+    "nocookies": "Deze website staat op GitHub Pages. Hij zet geen cookies, gebruikt geen trackers en laadt niets van andere partijen; je browser vraagt GitHub ook om de releaselijst.",
     "license": "Broncode onder EUPL-1.2. Gemaakt door 3Corners en de OpenPlanner-bijdragers.",
     "links": [
       {
