@@ -1,7 +1,7 @@
 # ADR build status
 
 What of each decision runs in the code on `main`, as opposed to being written down only.
-Checked against the code on 2026-10-30 (`main` at the merge of #155). Evidence is PR numbers
+Checked against the code on 2026-11-03 (`main` at the merge of #482; rows before ADR 0083 were last verified on 2026-10-30). Evidence is PR numbers
 and files. Nothing here says it runs on a given installation: the test host's version is on
 `/admin/updates`.
 
