@@ -6,6 +6,12 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ### Features
 
+- Try it on any computer (`docs/try-it.md`): `scripts/try.sh` (macOS, Linux, WSL, Git Bash) and
+  `scripts/try.ps1` (Windows) check Docker, Compose and the ports, write `.env`, build and start the
+  demo stack (web, worker, Mailpit, development Keycloak), wait until it is ready, load the demo
+  group and print the addresses; `down` and `reset` stop it. Only Docker is needed. The README
+  quick start and openplanner.nl use it. `docs/release-checklist.md` is the reusable step plan of
+  a release, from the inventory of open items to the check of the website.
 - The release is a workflow (ADR 0079, steps 1 and 2): `release.yml` opens the release PR
   (`release-pr` dispatch; `scripts/release_pr.py` edits `pyproject.toml`, `uv.lock` and
   `CHANGELOG.md` and fills the PR template), runs the audit of a minor or major release

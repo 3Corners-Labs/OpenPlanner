@@ -3,7 +3,8 @@
 One script installs, repairs and re-checks a host: `scripts/install.sh`. Run it after a fresh
 clone, after a manual change, or whenever something looks wrong; a second run changes nothing
 that is in order. This page explains what it does, where everything lives and what to do when it
-stops. Operating the running service is in `docs/runbook.md`.
+stops. Operating the running service is in `docs/runbook.md`. Only want to look at it on a laptop?
+That is `docs/try-it.md` (Docker only, any operating system).
 
 ## Where everything lives
 

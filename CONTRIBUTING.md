@@ -145,4 +145,5 @@ minor or major release into it (ADR 0078; the product owner changes `Verdict: op
 `Verdict: pass` after reading), the label `po:approved` lets it merge, and the dispatch `tag`
 sets the tag that publishes it; CI refuses a `vX.Y.0` tag without a passing audit. The steps and
 the laptop fallback are in `docs/runbook.md`, *Releasing a version*.
+The list to tick for any version is `docs/release-checklist.md`.
 `docs/skills.md` lists which Claude Code skills to use in each work package.
