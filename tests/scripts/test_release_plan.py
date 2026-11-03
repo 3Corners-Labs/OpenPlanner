@@ -7,9 +7,12 @@ import pytest
 from scripts.release_plan import (
     candidate_base,
     candidate_version,
+    main,
     next_version,
     project_version,
+    superseded_by,
 )
+from tests.scripts.conftest import Git, commit_all
 
 
 @pytest.mark.parametrize(
@@ -71,3 +74,49 @@ def test_candidate_number_is_one_above_the_highest_existing_one() -> None:
     assert candidate_version("0.4.0", ["v0.4.0-rc.9", "v0.4.0-rc.10"]) == "0.4.0-rc.11"
     # Other versions' candidates and stray tags do not count.
     assert candidate_version("0.4.0", ["v0.3.0-rc.7", "v0.4.0-rc1", "v0.4.0"]) == "0.4.0-rc.1"
+
+
+# A candidate's number follows main's commit order: a run that starts late on a commit an
+# existing candidate already contains makes no candidate (2026-11-03: rc.179 on #480 came after
+# rc.176 on #481, and docker01 went back past the fix).
+
+
+def test_a_commit_no_candidate_contains_yet_is_not_superseded() -> None:
+    assert superseded_by([]) is None
+
+
+def test_a_commit_a_later_candidate_contains_is_superseded_by_the_lowest_one() -> None:
+    tags = ["v0.4.0-rc.178", "v0.4.0-rc.176", "v0.4.0-rc.177", "v0.4.0"]
+    assert superseded_by(tags) == "v0.4.0-rc.176"
+    # Candidates of the next version count as well; numbers decide, not text.
+    assert superseded_by(["v0.5.0-rc.1", "v0.4.0-rc.10", "v0.4.0-rc.9"]) == "v0.4.0-rc.9"
+
+
+def test_a_release_tag_alone_does_not_supersede() -> None:
+    assert superseded_by(["v0.4.0", "v0.4.0-rc1"]) is None
+
+
+def test_candidate_run_on_an_older_commit_than_the_last_candidate_prints_nothing(
+    git: Git, capsys: pytest.CaptureFixture[str]
+) -> None:
+    Path("pyproject.toml").write_text('[project]\nname = "x"\nversion = "0.3.0"\n')
+    commit_all(git, "chore: start")
+    git("tag", "-a", "v0.3.0", "-m", "v0.3.0")
+    Path("a").write_text("a")
+    commit_all(git, "docs: older merge (#480)")
+    older = git("rev-parse", "HEAD").strip()
+    Path("b").write_text("b")
+    commit_all(git, "fix: newer merge (#481)")
+    git("tag", "-a", "v0.3.1-rc.1", "-m", "rc of the newer merge")
+
+    git("checkout", "-q", older)
+    assert main(["--candidate"]) == 0
+    out = capsys.readouterr()
+    assert out.out == ""
+    assert "v0.3.1-rc.1" in out.err
+
+    git("checkout", "-q", "main")
+    Path("c").write_text("c")
+    commit_all(git, "fix: next merge")
+    assert main(["--candidate"]) == 0
+    assert capsys.readouterr().out == "0.3.1-rc.2\n"

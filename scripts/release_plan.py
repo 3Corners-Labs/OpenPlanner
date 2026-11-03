@@ -7,7 +7,10 @@ release with the list in front of them. It changes nothing: no file, no tag, no 
 With ``--candidate`` it prints only the release candidate a merge to ``main`` becomes
 (ADR 0059): ``X.Y.Z-rc.N``, where ``X.Y.Z`` is the next release and ``N`` one above the highest
 ``rc`` tag of that version. ``main.yml`` tags and publishes it; release candidates never count
-as the last release here.
+as the last release here. A candidate's number follows main's commit order: when an existing
+candidate already contains ``HEAD`` (a run that started late, on an older merge than one
+already tagged), it prints nothing and says on stderr which candidate superseded it, so
+``main.yml`` tags nothing and an installation on the ``rc`` channel never goes back.
 """
 
 import argparse
@@ -85,6 +88,26 @@ def candidate_version(base: str, tags: Sequence[str]) -> str:
     return f"{base}-rc.{max(numbers, default=0) + 1}"
 
 
+def superseded_by(containing: Sequence[str]) -> str | None:
+    """Return the lowest candidate tag among ``containing``, or ``None`` when there is none.
+
+    Args:
+        containing: The tags whose commit has ``HEAD`` in its history
+            (``git tag --contains HEAD``).
+
+    Returns:
+        The first candidate made from ``HEAD`` or a later merge; a commit it contains must not
+        become a candidate with a higher number, or installations on the ``rc`` channel take
+        the older code for newer (ADR 0059).
+    """
+    candidates = [
+        (_numbers(match.group(1)), int(match.group(2)), tag.strip())
+        for tag in containing
+        if (match := _CANDIDATE_TAG.fullmatch(tag.strip()))
+    ]
+    return min(candidates)[2] if candidates else None
+
+
 def git(*args: str) -> str:
     """Return the output of one git command, run in the current directory.
 
@@ -130,6 +153,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if base is None:
             sys.stderr.write("nothing merged since the last release; no candidate\n")
             return 1
+        later = superseded_by(git("tag", "--list", "v*-rc.*", "--contains", "HEAD").split())
+        if later is not None:
+            sys.stderr.write(f"HEAD is already in {later}; no candidate out of commit order\n")
+            return 0
         tags = git("tag", "--list", f"v{base}-rc.*").split()
         sys.stdout.write(candidate_version(base, tags) + "\n")
         return 0
