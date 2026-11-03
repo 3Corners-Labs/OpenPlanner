@@ -2,7 +2,7 @@
 
 Status: proposed (2026-11-03), requested by the product owner. Amends ADR 0064 (two certificate
 sources become three), ADR 0090 step 2 (the bundled Keycloak is reached through the proxy) and
-ADR 0106 step 5 (the installer's https default covers the identity provider). Not built.
+ADR 0106 step 5 (the installer's https default covers the identity provider). Partly built: steps 0 to 5 merged or live (#476, docker01 since 2026-11-03); step 6 open.
 
 ## Context
 
@@ -95,10 +95,10 @@ default of `production`.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #476 | in PR |
-| 1 | Proxy: `internal` source, `/idp` route, root published to `internal-ca`; compose; the host's checks trust it (`app/adapters/internal_ca.py`, `TLS_INTERNAL_CA_FILE`) | #476 | in PR |
-| 2 | Keycloak: render script derives `KC_HOSTNAME`, relative path, proxy headers and the login half in `keycloak-app.env` from an https address | #476 | in PR |
-| 3 | System status offers the root (`GET /admin/settings/tls/ca.crt`); runbook (install the root, the identity provider behind the proxy); `scripts/check-proxy.sh` pass 3 | #476 | in PR |
-| 4 | Installer `--internal-ca` | #476 | in PR |
-| 5 | docker01 on https | | planned |
+| 0 | ADR | #476 | merged |
+| 1 | Proxy: `internal` source, `/idp` route, root published to `internal-ca`; compose; the host's checks trust it (`app/adapters/internal_ca.py`, `TLS_INTERNAL_CA_FILE`) | #476 | merged |
+| 2 | Keycloak: render script derives `KC_HOSTNAME`, relative path, proxy headers and the login half in `keycloak-app.env` from an https address | #476 | merged |
+| 3 | System status offers the root (`GET /admin/settings/tls/ca.crt`); runbook (install the root, the identity provider behind the proxy); `scripts/check-proxy.sh` pass 3 | #476 | merged |
+| 4 | Installer `--internal-ca` | #476 | merged |
+| 5 | docker01 on https (2026-11-03, by hand with the files the installer writes; runbook) | #476 | live |
 | 6 | `IDP_UPSTREAM` and the realm's mail server written by the installer (with ADR 0106 step 5) | | planned |
