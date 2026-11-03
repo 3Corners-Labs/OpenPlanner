@@ -9651,5 +9651,14 @@ msgstr "The certificate comes from the proxy's internal certificate authority (l
 msgid "admin.settings.tls.internal_ca.download"
 msgstr "Download root certificate"
 
+msgid "admin.logging_in.title"
+msgstr "Going to the login service"
+
+msgid "admin.logging_in.text"
+msgstr "You are being sent to your organisation's login service."
+
+msgid "admin.logging_in.continue"
+msgstr "Continue to the login service"
+
 msgid "admin.alerts.text.check"
 msgstr "The check of this group's integration found a problem ({code}). Open the group and choose Check integration for the explanation."

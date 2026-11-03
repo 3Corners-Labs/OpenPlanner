@@ -530,6 +530,42 @@ sequenceDiagram
     end
 ```
 
+### Login through an organisation's own identity provider (ADR 0083)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant W as web (app.admin)
+    participant R as IdentityProviderService
+    participant O as Organisation provider
+    participant P as Platform provider
+
+    A->>W: GET /admin/login
+    W->>R: offers_choice() (host switch on, a provider with a routing domain)
+    W-->>A: page "work e-mail address or user name"
+    A->>W: POST /admin/login (address)
+    W->>R: login_provider(address): reserved suffix? routing domain? longest wins
+    alt domain of an organisation provider
+        W-->>A: 302 to O (state, nonce, PKCE, login_hint)
+        A->>O: sign in
+        O-->>A: 302 /admin/callback?code&state&iss
+        A->>W: callback (pending login bound to O)
+        W->>O: token exchange (private_key_jwt or client secret)
+        W->>W: iss (RFC 9207) and ID token iss = O's pinned issuer
+        W->>R: identity_refusal(email, email_verified): on O's own verified domain?
+        W->>W: resolve entitlements confined to O's organisation
+    else platform suffix, unknown domain or a user name
+        W-->>A: 302 to P (login_hint), the ordinary login
+    end
+    W-->>A: session recording its provider
+    Note over W,R: every request: the session's provider still on and allowed, else the session ends
+```
+
+The worker re-checks the TXT record of every routing domain (`DomainWatch`); a lost record
+keeps routing for the grace period and then lapses. A fresh login and the logout go to the
+session's own provider.
+
 Listings never ask "may I see this row?" one by one: the matrix turns the permission into a
 `Scope`, and the SQL adapter filters with it. A test checks exhaustively that the scope and the
 single decision never disagree.

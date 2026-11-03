@@ -22,7 +22,7 @@ from tests.fakes.identity_providers import DISCOVERY_URL, ISSUER, discovery_docu
 from tests.support.domain import NOW
 
 
-def draft(**overrides: str) -> ProviderDraft:
+def draft(**overrides: str | bool) -> ProviderDraft:
     values = {
         "key": "org-a",
         "name": "Acme A",
@@ -172,3 +172,27 @@ def test_the_mfa_policy_defaults_to_record_and_is_validated() -> None:
         with pytest.raises(DomainError) as refused:
             draft(**bad)
         assert refused.value.code is ErrorCode.INVALID_CONFIGURATION
+
+
+def test_outside_production_the_announced_issuer_is_pinned() -> None:
+    """A development Keycloak announces its browser address; the app fetches it internally."""
+    document = {**discovery_document(ISSUER), "issuer": "http://127.0.0.1:8080/realms/andere"}
+
+    pinned = check_discovery(
+        document, DISCOVERY_URL, ClientAuth.PRIVATE_KEY_JWT, strict_issuer=False
+    )
+
+    assert pinned == "http://127.0.0.1:8080/realms/andere"
+    with pytest.raises(DiscoveryRefusedError):
+        check_discovery(document, DISCOVERY_URL, ClientAuth.PRIVATE_KEY_JWT)
+
+
+def test_a_lab_provider_may_have_an_http_address_outside_production() -> None:
+    """The form allows http only where the outbound guard does; production stays https."""
+    http = DISCOVERY_URL.replace("https://", "http://")
+
+    assert is_discovery_url(http, allow_http=True)
+    assert not is_discovery_url(http)
+    assert draft(discovery_url=http, allow_http=True).discovery_url == http
+    with pytest.raises(DomainError):
+        draft(discovery_url=http)

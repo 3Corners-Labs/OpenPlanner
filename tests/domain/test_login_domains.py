@@ -13,13 +13,16 @@ from app.domain.login_domains import (
     checked,
     covers,
     domain_of,
+    lookup_record,
     normalise_domain,
+    proven_without_dns,
     refusal_of_claim,
     refusal_of_identity,
     reserved,
     route,
     suffix_conflicts,
 )
+from tests.fakes.dns import FakeTxtResolver
 from tests.support.domain import NOW
 
 SUFFIX = "openplanner.internal"
@@ -161,3 +164,29 @@ def test_an_organisation_provider_signs_in_only_its_own_verified_addresses() -> 
     assert refusal_of_identity(None, True, "org-a", claims) == "email_domain_mismatch"
     lapsed = [claim("acme.nl", "org-a", DomainState.LAPSED)]
     assert refusal_of_identity("jan@acme.nl", True, "org-a", lapsed) == "email_domain_mismatch"
+
+
+@pytest.mark.parametrize(
+    "domain", ["andere.test", "acme.example", "x.invalid", "lab.localhost"]
+)
+async def test_a_test_domain_needs_no_record_outside_production(domain: str) -> None:
+    """Point 12: a lab with .test addresses works; the resolver is not even asked."""
+    resolver = FakeTxtResolver()
+    found = claim(domain, state=DomainState.PENDING)
+
+    outside = await lookup_record(found, resolver, production=False)
+    inside = await lookup_record(found, resolver, production=True)
+
+    assert outside == (found.record_value,)
+    assert inside == ()
+    assert resolver.asked == [found.record_name]
+
+
+async def test_a_real_domain_always_needs_its_record() -> None:
+    resolver = FakeTxtResolver({"_openplanner-challenge.acme.nl": ("other",)})
+
+    found = await lookup_record(claim("acme.nl"), resolver, production=False)
+
+    assert found == ("other",)
+    assert not proven_without_dns("test.nl", production=False)
+    assert await lookup_record(claim("acme.nl"), None, production=False) is None

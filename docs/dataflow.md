@@ -192,6 +192,14 @@ superuser ──form──> web ──guarded GET──> organisation provider /
 web ──SQL──> identity_providers (registration; client secret sealed), identity_provider_keys
              (public JWK; private key sealed; ADR 0083 step 2)
 anyone ──GET /admin/jwks.json──> web (public keys of every organisation provider)
+superuser ──form──> web ──SQL──> identity_provider_domains (domain, token, state; ADR 0083 step 3)
+web, worker ──DNS TXT _openplanner-challenge.<domain>──> public DNS (the domain only; a test TLD
+             outside production is not looked up)
+admin ──POST /admin/login (work address or user name)──> web: only its domain picks the provider;
+             not stored, not logged ──login_hint──> the chosen provider (ADR 0083 point 13)
+organisation provider ──ID token (sub, name, email, email_verified, entitlements)──> web
+             /admin/callback: email checked against the provider's domains, then dropped; the
+             subject is stored as idp:<provider key>:<sub>
 ```
 
 | Data item | Table.column / place | Source | Retention | Leaves the system |
@@ -202,6 +210,9 @@ anyone ──GET /admin/jwks.json──> web (public keys of every organisation 
 | Entitlement values (ADR 0049) | `admin_sessions.claims` (the recognised values), `staff_refused_entitlements` (value, reason code, organisation), `audit_events` (`auth.entitlement_refused`, `auth.entitlement_mismatch`, `auth.ambiguous_claims`) | identity provider claim `openplanner_entitlements` | session: until it ends and is cleaned up (ADR 0098); refusals: replaced at every login; events: as admin actions | no; the values hold the prefix, a role key and the IdP values of organisations and groups, linked to the employee's subject |
 | Admin session (ADR 0098) | `admin_sessions` (`id_hash` = sha256 of 32 random bytes, subject, provider, login claims as JSON, `login_at`, `last_seen_at`, `ended_at`, `end_reason`); the cookie holds the reference only | the login; the requests | ends at logout, idle (`admin_idle_minutes`), absolute end (`admin_session_hours`), a newer login or the limit per person; rows are removed by the worker's clean-up (ADR 0098 step 2) | no; staff data, never the reference itself in a log, audit event or URL |
 | Organisation provider registration (ADR 0083 step 2) | `identity_providers` (key, name, discovery URL, issuer, client id, method, scopes, claim and prefix, on/off; client secret sealed AES-256-GCM), `identity_provider_keys` (public JWK; private key sealed) | the superuser's form; the provider's discovery document | until the superuser removes the provider; a retired key stays published 24 h | public keys at `/admin/jwks.json`; the client assertion to the provider's token endpoint; no personal data in any of it |
+| E-mail address typed on the login page (ADR 0083) | not stored; request body only | the admin | none: its domain chooses the provider, the address goes to that provider as `login_hint` | to the chosen identity provider only |
+| `email` claim of an organisation provider | not stored; compared with the provider's verified domains at the callback | the organisation's identity provider | none | no |
+| Login domains | `identity_provider_domains` (domain, verification token, state, times) | superuser | as the provider; removed with it | the domain in DNS lookups (no personal data) |
 | IdP values of organisations and groups | `organisations.idp_key`, `groups.idp_key` | superuser and org admins in the portal | as the organisation or group; changes audited with old and new value | no (they are what PingFederate sends) |
 | Admin activity times | `staff.first_seen_at`, `last_login_at`, `last_seen_at` (at most once per `STAFF_LAST_SEEN_INTERVAL_SECONDS`), `last_logout_at` | web | as the record | no |
 | System events (job outcomes) | `audit_events` with `source = 'system'`: job type, outcome, error code, attempt, channel, booking id | worker | `SYSTEM_EVENT_RETENTION_DAYS` (default 90), pruned by the worker | no |

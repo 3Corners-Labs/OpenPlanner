@@ -16,6 +16,8 @@ runs:
         # Keycloak with one test user per role (dev/keycloak/), for the admin role specs.
         network="$(scripts/run-keycloak-container.sh)"
         # Three browsers each book, move and cancel from one IP: raise the write limit.
+        # ORGANISATION_IDPS_ENABLED: tests/admin-org-idp.spec.ts registers realm `andere` as an
+        # organisation's own identity provider (ADR 0083); until it does, logins are unchanged.
         # The journey spec (tests/video-journey.spec.ts) plays Webex and WxCC events with the
         # simulator (docs/runbook.md, section 10); the secrets sign them for the endpoints.
         scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour \
@@ -24,6 +26,7 @@ runs:
           -e OIDC_ISSUER=http://127.0.0.1:8080/realms/openplanner \
           -e ADMIN_MFA_REQUIRED=false \
           -e OIDC_CLIENT_SECRET=dev-only-openplanner-admin-secret \
+          -e ORGANISATION_IDPS_ENABLED=true \
           -e SIMULATOR_ENABLED=true \
           -e WEBEX_WEBHOOK_SECRET=dev-only-webex-webhook-secret \
           -e WXCC_WEBHOOK_SECRET=dev-only-wxcc-webhook-secret
