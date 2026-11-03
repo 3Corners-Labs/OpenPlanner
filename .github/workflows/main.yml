@@ -189,10 +189,20 @@ jobs:
           echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
           echo "proxy=${PROXY_IMAGE,,}" >> "$GITHUB_OUTPUT"
           echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      # ADR 0108: only a minor or major release (vX.Y.0) also goes to the public packages. The
+      # rule is here, not in a setting: widening it publishes images irreversibly.
+      - id: public
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.0$ ]]; then
+            echo "app=${IMAGE,,}-public" >> "$GITHUB_OUTPUT"
+            echo "proxy=${PROXY_IMAGE,,}-public" >> "$GITHUB_OUTPUT"
+            echo "::notice::$GITHUB_REF_NAME is a minor or major release: also pushed to the public packages"
+          fi
       - id: publish
         uses: ./.github/actions/publish-image
         with:
           image: ${{ steps.image.outputs.name }}
+          public-image: ${{ steps.public.outputs.app }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
           build-args: |
             APP_VERSION=${{ steps.image.outputs.version }}
@@ -204,16 +214,34 @@ jobs:
         uses: ./.github/actions/publish-image
         with:
           image: ${{ steps.image.outputs.proxy }}
+          public-image: ${{ steps.public.outputs.proxy }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
           context: deploy/proxy
           sbom-file: sbom-proxy.cdx.json
           tags: |
             type=sha,format=long
             type=semver,pattern={{version}}
+      # ADR 0108 point 5: an outsider must be able to pull what was published; a package that is
+      # still private (first release: set it to Public, then re-run this job) fails the release.
+      - name: the public images pull anonymously
+        if: steps.public.outputs.app != ''
+        env:
+          APP_REF: ${{ steps.public.outputs.app }}@${{ steps.publish.outputs.digest }}
+          PROXY_REF: ${{ steps.public.outputs.proxy }}@${{ steps.publish-proxy.outputs.digest }}
+        run: scripts/check-public-image.sh "$APP_REF" "$PROXY_REF"
+      - name: release notes with the verify commands
+        if: steps.public.outputs.app != ''
+        env:
+          APP_REF: ${{ steps.public.outputs.app }}@${{ steps.publish.outputs.digest }}
+          PROXY_REF: ${{ steps.public.outputs.proxy }}@${{ steps.publish-proxy.outputs.digest }}
+        run: scripts/public-release-notes.sh "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$APP_REF" "$PROXY_REF" > release-notes.md
       - name: attach the SBOMs to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes
+        run: |
+          notes=()
+          [ ! -s release-notes.md ] || notes=(--notes-file release-notes.md)
+          gh release create "$GITHUB_REF_NAME" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes "${notes[@]}"
 
   # ADR 0087 step 3: the recorded walkthrough, attached to every release.
   tour:

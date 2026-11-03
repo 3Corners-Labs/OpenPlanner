@@ -29,7 +29,9 @@ Playwright + axe-core (WCAG 2.2 AA) + Lighthouse on every public page.
 
 On merge to `main`: OWASP ZAP baseline scan, mutation testing on the domain (≥ 80%), image
 pushed to GHCR, signed keyless with cosign and SBOM attested (`docs/runbook.md` shows how to
-verify).
+verify). A minor or major release (`vX.Y.0`) is also pushed to public packages
+(`ghcr.io/<owner>/<repo>-public` and `-proxy-public`), so anyone can verify it without an
+account (ADR 0108); candidates and patch releases stay private.
 
 Weekly: Renovate dependency updates; security updates are opened immediately. Every pinned
 version is tracked by Renovate (`make pins`), deprecation warnings fail CI, and a weekly

@@ -84,6 +84,30 @@ cosign verify ghcr.io/<owner>/<repo>@sha256:<digest> \
 Deploy by digest, not by tag. The installer and the host updater do exactly this for both
 images (`OPENPLANNER_IMAGE` and `OPENPLANNER_PROXY_IMAGE` in `.env.update`).
 
+### As an outsider (public images, ADR 0108)
+
+A minor or major release (`vX.Y.0`, from 0.4.0) is also pushed, with the same digest and the
+same signature, to two public packages: `ghcr.io/<owner>/<repo>-public` and
+`ghcr.io/<owner>/<repo>-proxy-public`. No account or login is needed to pull or verify them.
+Release candidates and patch releases are never public. The release notes of the release list
+both references with their digests and the exact commands; they come down to:
+
+```sh
+cosign verify ghcr.io/<owner>/<repo>-public@sha256:<digest> \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+cosign verify-attestation ghcr.io/<owner>/<repo>-public@sha256:<digest> --type cyclonedx \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+**First release only (an organisation administrator, once):** the first push creates both
+packages private. Under the organisation's *Packages*, open each `-public` package, *Package
+settings → Change visibility → Public* (this cannot be undone), and link it to the repository.
+The release job `publish` checks anonymously that both references can be pulled
+(`scripts/check-public-image.sh`) and is red until that is done; set the visibility and re-run
+the job, the push is repeated with the same digest and nothing else changes.
+
 ## Health
 
 | Check | Healthy | Meaning when unhealthy |
