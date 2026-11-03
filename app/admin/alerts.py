@@ -48,7 +48,6 @@ from app.domain.public_address import EVENT as ADDRESS_EVENT
 from app.domain.retention_sweep import SWEPT
 from app.domain.storage import STORAGE_EVENT
 from app.domain.tls import EVENT as CERTIFICATE_EVENT
-from app.web.check_labels import FINDING_LABELS as CHECK_FINDING_LABELS
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.settings_labels import TLS_FINDING_LABELS
 from app.web.templates import FragmentResponse
@@ -90,6 +89,7 @@ OWN_TEXTS: dict[str, str] = {
     WORKER_ALERT: "admin.alerts.text.worker",
     HEALTH_EVENT: "admin.alerts.text.log_destination",
     SWEPT: "admin.alerts.text.retention",
+    CHECK_EVENT: "admin.alerts.text.check",
 }
 """Actions whose sentence is the alert's own rather than the reason's label."""
 
@@ -136,7 +136,6 @@ def _reason_key(alert: Alert) -> str | None:
         STORAGE_EVENT: REASON_LABELS,
         CERTIFICATE_EVENT: {f.value: key for f, key in TLS_FINDING_LABELS.items()},
         ADDRESS_EVENT: {f.value: key for f, key in ADDRESS_FINDING_LABELS.items()},
-        CHECK_EVENT: CHECK_FINDING_LABELS,
     }.get(alert.action, {})
     return labels.get(alert.reason)
 
@@ -148,6 +147,25 @@ def _minutes(detail: str) -> int:
         if name == "minutes" and value.isdigit():
             return int(value)
     return 0
+
+
+ALERT_PARAMS = frozenset({"minutes", "time", "code"})
+"""The placeholders an alert text may use: a text with another one would fail the whole page.
+
+A group check alert once named the failing finding's own text, which needs the finding's
+parameters (a host, an error, an address) that an alert does not keep: the overview of every
+admin who could see the alert answered 500. Its sentence is now its own and names only the
+code (docker01, 2026-11-03).
+"""
+
+
+def _params(request: Request, locale: RequestLocale, alert: Alert) -> dict[str, object]:
+    """Return the values every alert text may name (``ALERT_PARAMS``)."""
+    return {
+        "minutes": _minutes(alert.detail),
+        "time": admin_moment(request, locale, alert.latest),
+        "code": alert.reason or "-",
+    }
 
 
 def _href(principal: Principal, alert: Alert) -> str | None:
@@ -185,15 +203,7 @@ def alert_views(
         level_key, tone = LEVEL_LABELS[alert.level]
         title = _(SOURCE_LABELS.get(alert.action, OTHER_TEXT), group=alert.group or "")
         key = _reason_key(alert)
-        text = (
-            _(
-                key,
-                minutes=_minutes(alert.detail),
-                time=admin_moment(request, locale, alert.latest),
-            )
-            if key
-            else _(OTHER_TEXT, code=alert.reason or "-")
-        )
+        text = _(key or OTHER_TEXT, **_params(request, locale, alert))
         views.append(
             AlertView(
                 alert.token,

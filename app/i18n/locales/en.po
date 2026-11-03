@@ -9650,3 +9650,6 @@ msgstr "The certificate comes from the proxy's internal certificate authority (l
 
 msgid "admin.settings.tls.internal_ca.download"
 msgstr "Download root certificate"
+
+msgid "admin.alerts.text.check"
+msgstr "The check of this group's integration found a problem ({code}). Open the group and choose Check integration for the explanation."
