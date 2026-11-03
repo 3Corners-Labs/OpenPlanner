@@ -32,6 +32,9 @@ x-app: &app
       required: false
   volumes:
     - data:/srv/data
+    # The public root of the proxy's internal authority (ADR 0111): the checks of this host trust
+    # it when the file exists. Empty unless TLS_INTERNAL=true.
+    - internal-ca:/internal-ca:ro
   read_only: true
   tmpfs:
     - /tmp
@@ -67,6 +70,7 @@ services:
     networks: [default, edge]
     volumes:
       - data:/srv/data
+      - internal-ca:/internal-ca:ro
       # The own certificate managed in the portal (ADR 0070): its private key lives here and
       # nowhere else (never in the database); web writes, the proxy reads. Empty with ACME.
       - portal-certs:/srv/portal-certs
@@ -120,9 +124,13 @@ services:
       - ./certs:/certs:ro
       # The own certificate from the portal (ADR 0070); the entrypoint's watcher reloads on change.
       - portal-certs:/portal-certs:ro
+      # Where the internal authority's public root is published (ADR 0111); web and worker read it.
+      - internal-ca:/internal-ca
     networks:
       edge:
         ipv4_address: 172.31.240.2
+      # IDP_UPSTREAM=idp:8080 (proxy.env) serves the bundled identity provider under /idp.
+      default: {}
     ports:
       - "80:8080"
       - "443:8443"
@@ -219,4 +227,5 @@ volumes:
   data:
   proxy-data:
   portal-certs:
+  internal-ca:
   idp-data:

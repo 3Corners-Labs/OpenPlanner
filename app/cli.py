@@ -80,6 +80,7 @@ from pathlib import Path
 import httpx
 from cryptography.exceptions import InvalidTag
 
+from app.adapters import internal_ca
 from app.adapters.bootstrap import (
     DEFAULT_PATH,
     InitRefusedError,
@@ -148,7 +149,6 @@ from app.adapters.settings_report import (
     locked_keys,
 )
 from app.adapters.signing_keys import EcSigningKeys
-from app.adapters.tls_probe import SslCertificateProbe
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
@@ -647,7 +647,7 @@ async def _tls_probe(
         watch = TlsWatch(
             uow,
             clock,
-            probe or SslCertificateProbe(),
+            probe or internal_ca.certificate_probe(settings),
             SystemLog(uow, clock),
             public_base_url=settings.public_base_url,
             interval=timedelta(hours=settings.tls_check_interval_hours),
@@ -701,7 +701,7 @@ async def _address_checks(
         watch = AddressWatch(
             uow,
             clock,
-            probe or HttpxInstanceProbe(),
+            probe or internal_ca.instance_probe(settings),
             SystemLog(uow, clock),
             public_base_url=settings.public_base_url,
             webhook_base_url=settings.webhook_base_url,

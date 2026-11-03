@@ -61,6 +61,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
+from app.adapters import internal_ca
 from app.adapters.db.rotation import rotation_status
 from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
@@ -446,6 +447,23 @@ async def download_request(request: Request, context: Manage) -> Response:
     )
 
 
+@router.get("/settings/tls/ca.crt", response_class=PlainTextResponse)
+async def download_internal_root(request: Request, context: View) -> Response:
+    """Return the public root of the proxy's internal authority, to install once (ADR 0111).
+
+    A certificate, not a secret: anyone who can read System status may fetch it. The CA's key
+    stays in the proxy's volume and is not reachable from here.
+    """
+    root = internal_ca.root_file(request.app.state.settings)
+    if root is None:
+        raise RejectedRequest(404)
+    return PlainTextResponse(
+        root.read_text(encoding="ascii"),
+        media_type="application/x-x509-ca-cert",
+        headers={"content-disposition": 'attachment; filename="openplanner-internal-ca.crt"'},
+    )
+
+
 @router.post("/settings/tls/certificate", response_class=HTMLResponse)
 async def upload_certificate(
     request: Request, locale: Locale, _: SameOrigin, context: Change
@@ -632,6 +650,7 @@ async def _overview(
             "certificate": await _certificate(request, locale),
             "log_summary": await _log_summary(request, context),
             "directory": await _directory_status(request, locale),
+            "internal_ca": internal_ca.root_file(current) is not None,
             "organisation_idps": await _organisation_idps(request),
             "rotation": await _rotation(request),
             "source": await _source_view(request, locale, states, manage=manage, errors=errors),

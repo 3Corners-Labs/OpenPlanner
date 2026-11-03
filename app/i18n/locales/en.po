@@ -9644,3 +9644,9 @@ msgstr "{routing} verified, {failing} record gone, {pending} waiting, {lapsed} l
 
 msgid "admin.settings.org_idps.none"
 msgstr "No organisation has an identity provider of its own."
+
+msgid "admin.settings.tls.internal_ca"
+msgstr "The certificate comes from the proxy's internal certificate authority (lab). A browser trusts it only after you install the root certificate once on your computer."
+
+msgid "admin.settings.tls.internal_ca.download"
+msgstr "Download root certificate"

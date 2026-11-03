@@ -8,7 +8,9 @@
 # a wrong FORWARDED_ALLOW_IPS); a forged X-Forwarded-For/-Proto/-Host from the visitor is replaced
 # by the proxy before it reaches web (ASVS V4.1.3, V15.3.4; read from the wire); a
 # pair handed over through the portal-certs volume is served within the poll interval and ACME
-# applies again when it is withdrawn; then the same proxy serves an own certificate from files,
+# applies again when it is withdrawn; then the same proxy serves an own certificate from files and
+# one issued by its internal authority (ADR 0111; the root is published, trusted by `tls-check`,
+# and /idp/ is routed),
 # and `tls-check` from the web container reads either certificate and judges it. Used by CI
 # and by `make proxy-check`. Needs docker with compose v2, curl and openssl.
 set -eu
@@ -301,7 +303,36 @@ round_trip ok own.crt
 tls_check untrusted "OpenPlanner own CA check"
 echo "pass 2 ok: own certificate from files, redirect, body limit, non-root, TLS versions, HSTS, round trip, tls-check"
 
+# Pass 3: Caddy's internal authority (ADR 0111). No ACME, no mailbox; the public root is
+# published to the internal-ca volume, the app's checks trust it, and /idp/ is routed.
+unset PROXY_CERT_FILE PROXY_KEY_FILE
+export PROXY_INTERNAL=true PROXY_IDP_UPSTREAM=127.0.0.1:9
+compose up -d --force-recreate --wait proxy
+wait_for_proxy
+issuer | grep -q 'Caddy Local Authority' || fail "the internal authority did not issue the certificate ($(issuer))"
+for _ in $(seq 1 15); do
+  compose exec -T proxy test -s /internal-ca/root.crt && break
+  sleep 2
+done
+compose exec -T proxy test -s /internal-ca/root.crt || fail "the root certificate was not published"
+compose exec -T proxy sh -c 'grep -q "BEGIN CERTIFICATE" /internal-ca/root.crt' || fail "the published root is no certificate"
+compose exec -T proxy sh -c 'grep -q "PRIVATE KEY" /internal-ca/root.crt' && fail "the published root holds a private key"
+report="$(compose exec -T web python -m app.cli tls-check --host booking.test --port 8443)" \
+  || fail "tls-check does not trust the internal root ($report)"
+echo "$report" | sed 's/^/  tls-check: /'
+echo "$report" | grep -q "^finding  *ok" || fail "tls-check did not find 'ok' for the internal certificate"
+# shellcheck disable=SC2086
+[ "$(curl -sk $resolve -o /dev/null -w '%{http_code}' https://booking.test:18443/idp/realms/x)" = "502" ] \
+  || fail "/idp/ is not routed to IDP_UPSTREAM"
+# shellcheck disable=SC2086
+[ "$(curl -sk $resolve -o /dev/null -w '%{http_code}' https://booking.test:18443/healthz)" = "200" ] \
+  || fail "the app is not served next to /idp/"
+edge_checks
+echo "pass 3 ok: internal authority, root published without a key, tls-check ok, /idp routed, redirect, body limit, non-root, TLS versions, HSTS"
+unset PROXY_INTERNAL PROXY_IDP_UPSTREAM
+
 # A half-configured own certificate must stop the container, never serve plain HTTP.
+export PROXY_CERT_FILE=/pebble/own.crt
 unset PROXY_KEY_FILE
 compose up -d --force-recreate proxy >/dev/null 2>&1 || true
 sleep 3

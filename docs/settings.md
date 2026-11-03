@@ -48,6 +48,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WEBHOOK_BASE_URL` | url | — | Where Webex and WxCC deliver webhooks, if not PUBLIC_BASE_URL. |
 | `FORWARDED_ALLOW_IPS` | string | — | Address of the reverse proxy (read by uvicorn). Other than the bundled proxy's, System status warns unless web serves TLS (ADR 0091). |
 | `PUBLIC_ADDRESS_CHECK_ENABLED` | bool | `true` | Switches the worker's round trip to the public address off, for a network that cannot reach its own public name from inside; System status then says it is not checked (ADR 0086). |
+| `TLS_INTERNAL_CA_FILE` | path | `/internal-ca/root.crt` | The public root certificate of the proxy's internal authority (ADR 0111). The host's own certificate and address checks trust it when the file exists; the proxy writes it. |
 | `ORGANISATION_IDPS_ENABLED` | bool | `false` | Lets logins go to organisation identity providers by e-mail domain; off routes every login to the platform provider and ends their sessions (ADR 0083). |
 | `WEB_TLS_CERT_FILE` | path | — | Certificate chain (PEM) for uvicorn, for an own reverse proxy on another machine; with WEB_TLS_KEY_FILE web serves HTTPS (ADR 0091). |
 | `WEB_TLS_KEY_FILE` | path | — | Private key (PEM) of WEB_TLS_CERT_FILE; readable by the web user only (ADR 0091). |

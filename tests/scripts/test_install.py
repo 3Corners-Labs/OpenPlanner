@@ -578,6 +578,42 @@ def test_own_certificate_without_the_proxy_is_refused(host: Host) -> None:
     assert "--own-certificate needs the HTTPS proxy" in result.stderr
 
 
+def test_the_internal_ca_needs_no_mailbox_and_locks_the_portal_source(host: Host) -> None:
+    """ADR 0111: Caddy's own authority; ACME_EMAIL is not asked for."""
+    settings = {k: v for k, v in PRODUCTION.items() if k != "ACME_EMAIL"}
+
+    result = host.run("--mode", "test", "--internal-ca", "--non-interactive", **settings)
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings("proxy.env") == {
+        "TLS_DOMAIN": "afspraak.example.nl",
+        "TLS_INTERNAL": "true",
+    }
+    assert host.settings(".env.update")["COMPOSE_PROFILES"] == "tls"
+    assert host.settings(".env")["TLS_CERTIFICATE_SOURCE"] == "own"
+
+
+def test_the_internal_ca_excludes_the_other_sources_and_the_plain_shape(host: Host) -> None:
+    both = host.run(
+        "--mode", "test", "--own-certificate", "--internal-ca", "--non-interactive", **PRODUCTION
+    )
+    plain = host.run("--mode", "test", "--no-tls", "--internal-ca", "--non-interactive")
+
+    assert both.returncode == 1
+    assert "exclude each other" in both.stderr
+    assert plain.returncode == 1
+    assert "--internal-ca needs the HTTPS proxy" in plain.stderr
+
+
+def test_the_internal_ca_in_production_is_allowed_with_a_warning(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if k != "ACME_EMAIL"}
+
+    result = host.run("--mode", "production", "--internal-ca", "--non-interactive", **settings)
+
+    assert result.returncode == 0, result.stderr
+    assert "not trust the certificate until its root is installed" in result.stderr
+
+
 # The released proxy image (ADR 0064 step 2): pulled, verified and pinned like the application.
 
 

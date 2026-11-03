@@ -329,3 +329,51 @@ def test_the_otp_policy_is_the_one_every_authenticator_app_reads() -> None:
         "otpPolicyLookAheadWindow": 1,
         "otpPolicyInitialCounter": 0,
     }
+
+
+def test_an_https_address_puts_keycloak_under_idp_and_writes_the_login(tmp_path: Path) -> None:
+    """ADR 0111: one host name, the proxy serves /idp; nothing is copied into .env by hand."""
+    (tmp_path / ".env").write_text("PUBLIC_BASE_URL=https://docker01.example.nl\n")
+    env = "".join(f"{key}={value}\n" for key, value in FIXED.items())
+
+    result = render(tmp_path, env)
+
+    assert result.returncode == 0, result.stderr
+    keycloak = read_env(tmp_path / "secrets/keycloak.env")
+    app = read_env(tmp_path / "secrets/keycloak-app.env")
+    assert keycloak["KC_HOSTNAME"] == "https://docker01.example.nl/idp"
+    assert keycloak["KC_HTTP_RELATIVE_PATH"] == "/idp"
+    assert keycloak["KC_PROXY_HEADERS"] == "xforwarded"
+    assert app["KEYCLOAK_ADMIN_URL"] == "http://idp:8080/idp/admin/realms/openplanner"
+    assert app["OIDC_DISCOVERY_URL"] == (
+        "http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration"
+    )
+    assert app["OIDC_ISSUER"] == "https://docker01.example.nl/idp/realms/openplanner"
+    assert app["OIDC_CLIENT_SECRET"] == FIXED["KC_OPENPLANNER_CLIENT_SECRET"]
+    realm = json.loads((tmp_path / "secrets/keycloak-realm.json").read_text())
+    client = next(c for c in realm["clients"] if c["clientId"] == "openplanner-admin")
+    assert client["redirectUris"] == ["https://docker01.example.nl/admin/callback"]
+    assert mode(tmp_path / "secrets/keycloak-app.env") == 0o600
+
+
+def test_an_earlier_http_hostname_is_replaced_when_the_address_becomes_https(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".env").write_text("PUBLIC_BASE_URL=https://docker01.example.nl\n")
+    env = "KC_HOSTNAME=http://docker01.example.nl:8780\n" + "".join(
+        f"{key}={value}\n" for key, value in FIXED.items()
+    )
+
+    assert render(tmp_path, env).returncode == 0
+
+    keycloak = read_env(tmp_path / "secrets/keycloak.env")
+    assert keycloak["KC_HOSTNAME"] == "https://docker01.example.nl/idp"
+
+
+def test_an_http_address_keeps_the_loopback_shape(tmp_path: Path) -> None:
+    assert render(tmp_path).returncode == 0
+
+    keycloak = read_env(tmp_path / "secrets/keycloak.env")
+    app = read_env(tmp_path / "secrets/keycloak-app.env")
+    assert "KC_HTTP_RELATIVE_PATH" not in keycloak
+    assert "OIDC_DISCOVERY_URL" not in app

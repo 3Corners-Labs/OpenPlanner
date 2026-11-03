@@ -25,13 +25,15 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM caddy:2.11.7-alpine
 # curl is not used (the health check uses busybox wget) and carries its own CVEs.
+# /internal-ca receives the public root of the internal authority (ADR 0111).
 # Caddy runs as uid 10001 on unprivileged ports (8080/8443, published as 80/443). The file
 # capability on the binary is removed: with cap_drop ALL and no-new-privileges the kernel
 # refuses to exec a binary that asks for a capability it cannot get.
 COPY --from=build /out/caddy /usr/bin/caddy
 RUN setcap -r /usr/bin/caddy \
  && apk del --no-cache curl libcurl brotli-libs \
- && chown -R 10001:10001 /data /config
+ && mkdir -p /internal-ca \
+ && chown -R 10001:10001 /data /config /internal-ca
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 USER 10001:10001

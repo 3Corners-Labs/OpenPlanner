@@ -435,6 +435,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "(ADR 0086).",
     ),
     S(
+        "tls_internal_ca_file",
+        K.PATH,
+        "/internal-ca/root.crt",
+        _B,
+        T.SWITCHES,
+        "The public root certificate of the proxy's internal authority (ADR 0111). The host's own "
+        "certificate and address checks trust it when the file exists; the proxy writes it.",
+    ),
+    S(
         "organisation_idps_enabled",
         K.BOOL,
         False,

@@ -4,7 +4,7 @@
 # for sudo only to install the host updater (ADR 0029).
 #
 #   ./scripts/install.sh --mode production|test|lab [--version X.Y.Z] [--repository owner/name]
-#                        [--non-interactive] [--no-tls | --tls-domain HOST] [--own-certificate]
+#                        [--non-interactive] [--no-tls | --tls-domain HOST] [--own-certificate | --internal-ca]
 #                        [--acme-staging] [--no-updater] [--upgrade-docker] [--no-packages]
 #                        [--configuration FILE --passphrase-file PATH]
 #
@@ -25,7 +25,9 @@
 #                      are left out. Compose reads it before .env, so .env wins.
 #   3. proxy.env       with the HTTPS proxy (production and test by default, a lab with
 #                      --tls-domain; ADR 0064): TLS_DOMAIN and ACME_EMAIL, or with
-#                      --own-certificate the files in certs/; same rules
+#                      --own-certificate the files in certs/; same rules; with --internal-ca
+#                      TLS_INTERNAL=true instead (Caddy's own authority, for a lab or a network
+#                      without a public name; ADR 0111)
 #   4. .env.update     pull <image>:<version> -> digest -> cosign verify -> pin digest, profiles
 #                      and mode; with the HTTPS proxy the same for <image>-proxy:<version>
 #                      (ADR 0064 step 2: no host builds Caddy); without --version existing
@@ -74,7 +76,7 @@ DOCKER_KEYRING=$ROOT/etc/apt/keyrings/docker.asc
 
 MODE='' VERSION='' REPOSITORY='' INTERACTIVE=1 ACME_STAGING=0 UPDATER=1 PACKAGES=1 UPGRADE_DOCKER=0
 # TLS: '' decides by the pin file, then the mode; 1 runs the HTTPS proxy, 0 leaves TLS to your own.
-TLS='' OWN_CERT=0
+TLS='' OWN_CERT=0 INTERNAL_CA=0
 CERTS_DIR=$DIR/certs
 # --configuration FILE --passphrase-file PATH (ADR 0089 point 8); PACKAGE_DIR is the readable
 # copy made for the containers, removed on exit.
@@ -110,6 +112,7 @@ parse_args() {
       --no-tls) TLS=0 ;;
       --tls-domain) TLS=1 TLS_DOMAIN=${2:?--tls-domain needs a host name} && shift ;;
       --own-certificate) OWN_CERT=1 ;;
+      --internal-ca) INTERNAL_CA=1 ;;
       --no-updater) UPDATER=0 ;;
       --no-packages) PACKAGES=0 ;;
       --upgrade-docker) UPGRADE_DOCKER=1 ;;
@@ -138,6 +141,9 @@ parse_args() {
     if [[ $MODE == lab ]]; then TLS=0; else TLS=1; fi
   fi
   ((TLS)) || ((!OWN_CERT)) || die "--own-certificate needs the HTTPS proxy; drop --no-tls"
+  ((TLS)) || ((!INTERNAL_CA)) || die "--internal-ca needs the HTTPS proxy; drop --no-tls"
+  ((!OWN_CERT)) || ((!INTERNAL_CA)) || die "--own-certificate and --internal-ca exclude each other"
+  [[ $MODE != production ]] || ((!INTERNAL_CA)) || warn "--internal-ca in production: browsers will not trust the certificate until its root is installed on every machine; use ACME or --own-certificate"
   REPOSITORY=${REPOSITORY:-$(value "$ENV_FILE" UPDATE_REPOSITORY)}
   REPOSITORY=${REPOSITORY:-3Corners-Labs/OpenPlanner}
   [[ $REPOSITORY =~ $REPOSITORY_RE ]] || die "--repository must be owner/name"
@@ -602,8 +608,9 @@ proxy_settings() {
   local write=0
   [[ -f $PROXY_ENV ]] || write=1
   ((!OWN_CERT)) || [[ -n $(value "$PROXY_ENV" TLS_CERT_FILE) ]] || write=1 # switching to own files
+  ((!INTERNAL_CA)) || [[ $(value "$PROXY_ENV" TLS_INTERNAL) == true ]] || write=1 # switching to the internal CA
   if ((write)); then
-    ((OWN_CERT)) || ask ACME_EMAIL "Operations mailbox for the certificate authority" ''
+    ((OWN_CERT)) || ((INTERNAL_CA)) || ask ACME_EMAIL "Operations mailbox for the certificate authority" ''
     log "writing $PROXY_ENV"
     {
       printf '# Written by scripts/install.sh. Only the HTTPS proxy reads this file (ADR 0030, ADR 0064).\n'
@@ -612,6 +619,9 @@ proxy_settings() {
         printf '# Own certificate: renewal is yours; restart the proxy after replacing the files.\n'
         put TLS_CERT_FILE "$OWN_CERT_FILE"
         put TLS_KEY_FILE "$OWN_KEY_FILE"
+      elif ((INTERNAL_CA)); then
+        printf "# Caddy's own certificate authority (ADR 0111): install its root once (System status).\n"
+        put TLS_INTERNAL true
       else
         put ACME_EMAIL "$ACME_EMAIL"
         ((!ACME_STAGING)) || put ACME_CA https://acme-staging-v02.api.letsencrypt.org/directory
@@ -619,9 +629,11 @@ proxy_settings() {
     } | write_private "$PROXY_ENV"
   fi
   [[ -n $TLS_DOMAIN ]] || die "$PROXY_ENV needs TLS_DOMAIN"
-  [[ -n $(value "$PROXY_ENV" ACME_EMAIL) || -n $(value "$PROXY_ENV" TLS_CERT_FILE) ]] \
-    || die "$PROXY_ENV needs ACME_EMAIL, or TLS_CERT_FILE and TLS_KEY_FILE (--own-certificate)"
+  [[ -n $(value "$PROXY_ENV" ACME_EMAIL) || -n $(value "$PROXY_ENV" TLS_CERT_FILE) \
+    || $(value "$PROXY_ENV" TLS_INTERNAL) == true ]] \
+    || die "$PROXY_ENV needs ACME_EMAIL, or TLS_CERT_FILE and TLS_KEY_FILE (--own-certificate), or TLS_INTERNAL=true (--internal-ca)"
   ((!OWN_CERT)) || lock_certificate_source
+  ((!INTERNAL_CA)) || lock_certificate_source
   [[ $(value "$ENV_FILE" PUBLIC_BASE_URL) == "https://$TLS_DOMAIN"* ]] \
     || warn "PUBLIC_BASE_URL does not match TLS_DOMAIN=$TLS_DOMAIN"
   getent hosts "$TLS_DOMAIN" >/dev/null 2>&1 || warn "$TLS_DOMAIN does not resolve yet; the certificate will wait for DNS"
