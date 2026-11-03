@@ -61,8 +61,8 @@
         "label": "after the call, the personal data is deleted"
       }
     ],
-    "command": "git clone https://github.com/3Corners-Labs/OpenPlanner && cd OpenPlanner\ncp .env.example .env\ndocker compose --profile dev up --build -d\ndocker compose exec web python -m app.cli seed-demo",
-    "command_label": "For developers: run it on a laptop in five minutes, then open http://127.0.0.1:8000/g/demo"
+    "command": "git clone https://github.com/3Corners-Labs/OpenPlanner && cd OpenPlanner\n./scripts/try.sh",
+    "command_label": "Run it on your own computer in five minutes (needs Docker; Windows: scripts\\try.ps1), then open http://127.0.0.1:8000/g/demo"
   },
   "demo": {
     "title": "Book a call yourself",

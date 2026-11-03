@@ -411,5 +411,5 @@ def test_the_page_offers_three_ways_in_and_a_start_command(dist: Path, locale: s
     assert 'id="get-involved"' in html
     assert [p["key"] for p in content["involved"]["paths"]] == ["try", "run", "help"]
     assert 'href="#get-involved"' in html
-    assert "docker compose --profile dev up" in html
+    assert "./scripts/try.sh" in html
     assert "good+first+issue" in html
