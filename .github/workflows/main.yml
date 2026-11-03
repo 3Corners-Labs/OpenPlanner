@@ -213,10 +213,10 @@ jobs:
     with:
       tag: ${{ github.ref_name }}
 
-  # ADR 0087 and ADR 0111: the public website, openplanner.nl. Built from site/ on every merge
+  # ADR 0087 and ADR 0113: the public website, openplanner.nl. Built from site/ on every merge
   # to main and on every release tag, with the releases baked in; the tarball goes on the
-  # release the tag made. Only a minor or major release (vX.Y.0) publishes it, to GitHub Pages
-  # by the job `pages`; no key, no secret.
+  # release the tag made. Only a minor or major release (vX.Y.0) goes live, by the job
+  # `deploy-site`.
   site:
     name: public website (build, attach)
     # On a merge to main it waits for `candidate`, so the release candidate that merge made is
@@ -278,7 +278,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" site-*.tar.gz --clobber
-      # ADR 0111: only a minor or major release goes live (v0.4.0, v1.0.0; not v0.4.1 or a
+      # ADR 0113: only a minor or major release goes live (v0.4.0, v1.0.0; not v0.4.1 or a
       # candidate), as ADR 0108 does for the public images.
       - name: is this a minor or major release
         id: minor
@@ -288,33 +288,47 @@ jobs:
           else
             echo "publish=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.minor.outputs.publish == 'true'
         with:
+          name: site-dist
           path: site/dist
+          include-hidden-files: true   # .htaccess
+          retention-days: 1
 
-  # ADR 0111: GitHub Pages serves openplanner.nl. The environment `github-pages` accepts only
-  # tags vX.Y.Z, so nothing else can deploy even if this condition were wrong.
-  pages:
-    name: public website (publish to GitHub Pages)
+  # ADR 0113: openplanner.nl stays on the TransIP web hosting package; a `git push` to its
+  # repository deploys it. The environment `website` accepts only release tags v*.*.* and holds
+  # the remote, the host key and the deploy key. A missing one fails this job (ADR 0110 point
+  # 5), on the release tag and not on every merge.
+  deploy-site:
+    name: public website (deploy to the web host)
     needs: [site]
     if: ${{ !cancelled() && needs.site.result == 'success' && needs.site.outputs.publish == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    environment: website
     permissions:
-      pages: write      # publish the site
-      id-token: write   # the Pages deployment proves it comes from this workflow
+      contents: read
     steps:
-      - id: deploy
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: site-dist
+          path: site/dist
+      - name: deploy to the web host (git push; fails without the remote and the key)
+        env:
+          SITE_DEPLOY_REMOTE: ${{ vars.SITE_DEPLOY_REMOTE }}
+          SITE_DEPLOY_KNOWN_HOSTS: ${{ vars.SITE_DEPLOY_KNOWN_HOSTS }}
+          SITE_DEPLOY_DIR: ${{ vars.SITE_DEPLOY_DIR }}
+          SITE_DEPLOY_BRANCH: ${{ vars.SITE_DEPLOY_BRANCH }}
+          SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
+          SITE_DEPLOY_REQUIRED: ${{ github.repository == '3Corners-Labs/OpenPlanner' }}
+        run: scripts/deploy-site.sh site/dist "${GITHUB_REF_NAME} ${GITHUB_SHA::12}"
 
   # ADR 0051: same gate as in ci.yml, for the jobs that run only on main.
   deprecations:
     name: no deprecation warnings
-    needs: [zap-baseline, mutation, candidate, publish, tour, site, pages]
+    needs: [zap-baseline, mutation, candidate, publish, tour, site, deploy-site]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

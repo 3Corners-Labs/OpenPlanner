@@ -691,7 +691,7 @@
   },
   "footer": {
     "tagline": "Videoafspraken die in je contact center landen. Open source, privacy vanaf het ontwerp.",
-    "nocookies": "Deze website staat op GitHub Pages. Hij zet geen cookies, gebruikt geen trackers en laadt niets van andere partijen; je browser vraagt GitHub ook om de releaselijst.",
+    "nocookies": "Deze website staat op een webhostingpakket van TransIP in Nederland. Hij zet geen cookies, gebruikt geen trackers en laadt geen scripts, lettertypen of afbeeldingen van derden; je browser vraagt alleen GitHub om de releaselijst.",
     "license": "Broncode onder EUPL-1.2. Gemaakt door 3Corners en de OpenPlanner-bijdragers.",
     "links": [
       {
