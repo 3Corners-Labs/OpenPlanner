@@ -27,20 +27,29 @@
 #                                 from .env, else http://127.0.0.1:8000
 #   KC_HOSTNAME                   the address browsers reach Keycloak on (default loopback)
 #
+# With --database postgres (production, ADR 0106 point 4) Keycloak runs on its own PostgreSQL
+# container `idp-db`: the script also generates KC_DB_PASSWORD and writes the connection to
+# secrets/keycloak.env (KC_DB*, KC_HTTP_ENABLED: TLS ends at the proxy) and the container's own
+# secrets/idp-db.env. The choice is remembered in keycloak.env (KC_DB).
+#
 # A shell script, not a `python -m app.cli` command: it runs on the host before any container
 # exists, like scripts/install.sh, and the host has no Python of its own.
 #
-# Usage: scripts/render-keycloak-realm.sh [--dir CHECKOUT]
+# Usage: scripts/render-keycloak-realm.sh [--dir CHECKOUT] [--database h2|postgres]
 set -euo pipefail
 
 DIR=$(cd "$(dirname "$0")/.." && pwd)
+DATABASE=''
 while (($#)); do
   case $1 in
     --dir) DIR=$2; shift 2 ;;
-    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --database) DATABASE=${2:-}; shift 2 ;;
+    -h|--help) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+
+case $DATABASE in '' | h2 | postgres) ;; *) echo "--database must be h2 or postgres" >&2; exit 2 ;; esac
 
 TEMPLATE=$DIR/deploy/keycloak/realm.template.json
 SECRETS_DIR=$DIR/secrets
@@ -51,6 +60,7 @@ APP_ENV_FILE=$SECRETS_DIR/keycloak-app.env
 ADMIN_URL=http://idp:8080/admin/realms/openplanner
 GENERATED=(KC_BOOTSTRAP_ADMIN_PASSWORD KC_OPENPLANNER_CLIENT_SECRET KC_DIRECTORY_CLIENT_SECRET KC_SUPER_PASSWORD)
 KEYS=("${GENERATED[@]}" KC_OPENPLANNER_BASE_URL KC_HOSTNAME)
+DB_FILE=$SECRETS_DIR/idp-db.env
 
 log() { echo "render-keycloak-realm: $*" >&2; }
 secret() { head -c 48 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n'; }
@@ -79,6 +89,14 @@ generated=()
 for key in "${GENERATED[@]}"; do
   [[ -n ${!key} ]] || { declare "$key=$(secret)"; generated+=("$key"); }
 done
+# The database: the flag wins, else what an earlier run chose; H2 is the development default.
+[[ -n $DATABASE ]] || DATABASE=$(read_var "$ENV_FILE" KC_DB)
+[[ $DATABASE == postgres ]] || DATABASE=h2
+KC_DB_PASSWORD=$(read_var "$ENV_FILE" KC_DB_PASSWORD)
+if [[ $DATABASE == postgres && -z $KC_DB_PASSWORD ]]; then
+  KC_DB_PASSWORD=$(secret)
+  generated+=(KC_DB_PASSWORD)
+fi
 [[ -n $KC_OPENPLANNER_BASE_URL ]] || KC_OPENPLANNER_BASE_URL=$(read_var "$DIR/.env" PUBLIC_BASE_URL)
 [[ -n $KC_OPENPLANNER_BASE_URL ]] || KC_OPENPLANNER_BASE_URL=http://127.0.0.1:8000
 KC_OPENPLANNER_BASE_URL=${KC_OPENPLANNER_BASE_URL%/}
@@ -110,12 +128,26 @@ tmp=$(mktemp "$SECRETS_DIR/.keycloak.env.XXXXXX")
   printf '# Written by scripts/render-keycloak-realm.sh (ADR 0090). Holds secrets: mode 600,\n'
   printf '# never copied off this host. Re-run the script after a change to render the realm.\n'
   for key in "${KEYS[@]}"; do printf '%s=%s\n' "$key" "${!key}"; done
-  if ((HTTPS)); then
-    printf 'KC_HTTP_RELATIVE_PATH=/idp\nKC_PROXY_HEADERS=xforwarded\n'
+  if [[ $DATABASE == postgres ]]; then
+    printf 'KC_DB=postgres\nKC_DB_URL_HOST=idp-db\nKC_DB_URL_DATABASE=keycloak\n'
+    printf 'KC_DB_USERNAME=keycloak\nKC_DB_PASSWORD=%s\n' "$KC_DB_PASSWORD"
+    # `start` refuses plain http unless told; TLS ends at the proxy, which sets the headers.
+    printf 'KC_HTTP_ENABLED=true\n'
   fi
+  if ((HTTPS)); then
+    printf 'KC_HTTP_RELATIVE_PATH=/idp\n'
+  fi
+  if ((HTTPS)) || [[ $DATABASE == postgres ]]; then printf 'KC_PROXY_HEADERS=xforwarded\n'; fi
 } > "$tmp"
 chmod 600 "$tmp"
 mv "$tmp" "$ENV_FILE"
+
+if [[ $DATABASE == postgres ]]; then
+  tmp=$(mktemp "$SECRETS_DIR/.idp-db.env.XXXXXX")
+  printf '# Written by scripts/render-keycloak-realm.sh (ADR 0106 point 4): the container idp-db.\nPOSTGRES_USER=keycloak\nPOSTGRES_DB=keycloak\nPOSTGRES_PASSWORD=%s\n' "$KC_DB_PASSWORD" > "$tmp"
+  chmod 600 "$tmp"
+  mv "$tmp" "$DB_FILE"
+fi
 
 tmp=$(mktemp "$SECRETS_DIR/.keycloak-realm.json.XXXXXX")
 sed -e "s|\${KC_OPENPLANNER_CLIENT_SECRET}|$KC_OPENPLANNER_CLIENT_SECRET|g" \

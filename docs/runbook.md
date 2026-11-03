@@ -917,6 +917,22 @@ http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` wit
 *Credentials* → *Reset password*, tick *Temporary* so the next login asks for a new one. The
 CLI of ADR 0042 §10 creates no user and starts no session; the admin console is the only way.
 
+**Production mode (ADR 0106 point 4).** In `production` the installer runs Keycloak with
+`start` on its own PostgreSQL container `idp-db` (profile `idp-db`, volume `idp-db-data`, user
+and password in `secrets/idp-db.env`, the same password as `KC_DB_PASSWORD` in
+`secrets/keycloak.env`). The admin console stays on the host's loopback (`127.0.0.1:8080`,
+`/idp` there), the login is served by the proxy. Back the database up next to the application's:
+
+```bash
+docker compose --env-file .env.update exec -T idp-db pg_dump -U keycloak keycloak | gzip > idp-$(date +%F).sql.gz
+```
+
+Restore into an empty `idp-db`: stop `idp`, `gunzip -c idp-<date>.sql.gz | docker compose
+--env-file .env.update exec -T idp-db psql -U keycloak keycloak`, start `idp`. The dump holds
+accounts and password hashes: keep it on the host's backup volume, never copy it off. The
+updater's own rollback copy covers the application's database only; the Keycloak dump is taken
+by you (a nightly job on the host) until the updater does it (ADR 0106 step 5c).
+
 **Data.** The named volume `idp-data` holds the staff accounts and their password hashes:
 back it up with the database volume, and treat it as personal data (`docs/dataflow.md`).
 Deleting it and starting again re-imports the rendered realm, so `super` gets the first
