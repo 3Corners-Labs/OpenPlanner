@@ -20,6 +20,7 @@ from functools import partial
 import httpx
 import structlog
 
+from app.adapters import internal_ca
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable, set_slow_query_ms
 from app.adapters.db.jobs import SqlJobQueue
@@ -29,7 +30,6 @@ from app.adapters.db.text_overrides import CachedTextOverrides
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.event_sink import StdoutEventSink
 from app.adapters.http_trace import traced_transport
-from app.adapters.instance_probe import HttpxInstanceProbe
 from app.adapters.integrations import (
     Integrations,
     build_integrations,
@@ -42,7 +42,6 @@ from app.adapters.log_shipping import LogShipper, ship_settings
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
-from app.adapters.tls_probe import SslCertificateProbe
 from app.config import Settings, environment, loose_secret_files
 from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
@@ -247,7 +246,7 @@ async def run_worker(
     tls = TlsWatch(
         uow,
         clock,
-        SslCertificateProbe(),
+        internal_ca.certificate_probe(settings),
         SystemLog(uow, clock),
         public_base_url=settings.public_base_url,
         interval=lambda: timedelta(hours=live.settings.tls_check_interval_hours),
@@ -258,7 +257,7 @@ async def run_worker(
     address = AddressWatch(
         uow,
         clock,
-        HttpxInstanceProbe(transport=transport),
+        internal_ca.instance_probe(settings, transport),
         SystemLog(uow, clock),
         public_base_url=settings.public_base_url,
         webhook_base_url=settings.webhook_base_url,

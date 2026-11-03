@@ -429,6 +429,41 @@ docker compose --env-file .env.update exec web ls -l /srv/portal-certs
 docker compose --env-file .env.update logs proxy | grep 'portal certificate'
 ```
 
+### Internal certificate authority for a lab (ADR 0112)
+
+For a host without a public name (docker01: the name answers on the lab network only), Caddy
+can issue the certificates itself.
+
+1. `proxy.env`: `TLS_DOMAIN=<host>` and `TLS_INTERNAL=true` (no `ACME_EMAIL`); the installer
+   writes this with `--internal-ca`. `PUBLIC_BASE_URL` is `https://<host>`.
+2. Start the proxy (`docker compose --env-file .env.update up -d proxy`). The log says
+   `internal certificate authority` and then `internal CA root published`.
+3. **Install the root once per machine** that opens the portal. *Platform → Advanced settings →
+   System status → HTTPS certificate* offers *Download root certificate* (a public certificate,
+   no secret). macOS: open the file, add it to *Keychain Access* → *System*, set *Always
+   Trust*. Windows: double-click → *Install* → *Local Machine* → *Trusted Root Certification
+   Authorities*. iOS/Android: install the profile and enable full trust in the settings. Firefox
+   uses its own store (*Settings → Privacy & Security → Certificates → Import*) unless it is told
+   to use the system's.
+4. The host's own checks (certificate probe, round trip to the public address) trust the root
+   by themselves; System status says *in orde*, not *niet vertrouwd*.
+
+Where it lives: the authority's private key stays in the volume `proxy-data` of the proxy, and
+only the root certificate is copied to the volume `internal-ca`. Wiping `proxy-data` makes a new
+authority: every machine must then install the new root. Not for production.
+
+#### The bundled identity provider behind the proxy
+
+With `IDP_UPSTREAM=idp:8080` in `proxy.env` the proxy serves the bundled Keycloak under `/idp` on
+the same host name and certificate. Run `scripts/render-keycloak-realm.sh` after `PUBLIC_BASE_URL`
+is `https://<host>`: it writes `KC_HOSTNAME=https://<host>/idp`, `KC_HTTP_RELATIVE_PATH=/idp` and
+`KC_PROXY_HEADERS=xforwarded` for Keycloak, and the whole login (`OIDC_DISCOVERY_URL`,
+`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, the admin URL) into
+`secrets/keycloak-app.env`, which web and worker read after `.env`. Remove the same names from
+`.env` so one place holds them, recreate `idp`, `web` and `worker`, and log in at
+`https://<host>/idp/realms/openplanner`. Keycloak's admin console is then
+`https://<host>/idp/admin/` (user `admin`). Port 8780 is no longer needed.
+
 ### Test the certificate flow end to end (ADR 0064)
 
 On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab):

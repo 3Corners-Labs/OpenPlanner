@@ -136,12 +136,22 @@ def public_address(public_base_url: str) -> Address | None:
     return Address(parts.hostname, parts.port or HTTPS_PORT)
 
 
+RENEWAL_FAILING_FRACTION = 4
+"""A certificate with less than 1/4 of its lifetime left has missed Caddy's renewal at 1/3."""
+
+
 def judge(result: ProbeResult, host: str, now: datetime, warn_within: timedelta) -> Finding:
     """Return the finding for a probe's result.
 
     The handshake's verdict wins over anything read from the certificate, so a chain the host
     does not trust is ``untrusted`` even when the dates are fine; a trusted certificate that
     expires within ``warn_within`` is ``expiring``.
+
+    ``warn_within`` is capped at a quarter of the certificate's own lifetime. Caddy renews at a
+    third of the lifetime, so less than a quarter left means its renewal is failing, for a
+    90-day certificate (where the cap is above the 20-day default) and for the 12-hour
+    certificates of the internal authority (ADR 0112) alike; without the cap a short-lived
+    certificate would be ``expiring`` for its whole life.
     """
     if result.certificate is None or result.trust is None:
         return Finding.UNREACHABLE
@@ -154,6 +164,7 @@ def judge(result: ProbeResult, host: str, now: datetime, warn_within: timedelta)
         return Finding.NOT_YET_VALID
     if not certificate.covers(host):
         return Finding.NAME_MISMATCH
-    if certificate.not_after - now < warn_within:
+    lifetime = certificate.not_after - certificate.not_before
+    if certificate.not_after - now < min(warn_within, lifetime / RENEWAL_FAILING_FRACTION):
         return Finding.EXPIRING
     return Finding.OK
