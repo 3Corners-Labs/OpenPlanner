@@ -3,14 +3,21 @@
 import re
 from collections.abc import AsyncIterator
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 
+from app.admin import alerts
+from app.admin.address_view import FINDING_LABELS as ADDRESS_FINDING_LABELS
+from app.admin.audit_routes import REASON_LABELS
 from app.config import Settings
 from app.domain.alerts import QUEUE_WAIT_EVENT
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.calls import CallStatus
+from app.domain.integration_check import CHECK_EVENT
 from app.domain.storage import STORAGE_EVENT
+from app.i18n.formatting import placeholders
+from app.web.settings_labels import TLS_FINDING_LABELS
 from app.web.templates import HTML_CSP, SCRIPT_CSP
 from tests.admin.conftest import AGENT, AUDITOR, ORG_ADMIN, OUTSIDER, SUPER, Site, _running_site
 from tests.support.queue import own_queue, site_uow
@@ -268,3 +275,40 @@ async def test_the_alerts_link_counts_the_open_alerts_for_the_screen_reader_too(
     text = (await site.client.get("/admin/audit?lang=en")).text
 
     assert 'aria-label="Alerts, 2 open"' in text
+
+
+def test_every_alert_text_names_only_placeholders_the_page_provides() -> None:
+    """A text with a placeholder nobody fills (`{base}` once) fails the whole overview."""
+    keys = {
+        *alerts.OWN_TEXTS.values(),
+        *REASON_LABELS.values(),
+        *TLS_FINDING_LABELS.values(),
+        *ADDRESS_FINDING_LABELS.values(),
+        alerts.OTHER_TEXT,
+    }
+    for locale in ("nl", "en"):
+        catalogue = Path(f"app/i18n/locales/{locale}.po").read_text()
+        texts = dict(re.findall(r'msgid "([^"]+)"\nmsgstr "((?:[^"\\\\]|\\\\.)*)"', catalogue))
+        for key in keys:
+            used = placeholders(texts[key])
+            assert used <= alerts.ALERT_PARAMS, (locale, key, used)
+
+
+@pytest.mark.parametrize(
+    "code", ["webhooks.not_https", "webex.host_refused", "wxcc.branch.missing"]
+)
+async def test_a_failing_group_check_shows_as_an_alert_not_a_server_error(
+    site: Site, code: str
+) -> None:
+    """docker01, 2026-11-03: the finding's own text needs its parameters, which an alert does not
+    keep, and the overview answered 500 right after login."""
+    await _condition(site, CHECK_EVENT, Outcome.FAILURE, code, organisation="demo", group="demo")
+    await site.login_as(SUPER)
+
+    overview = await site.client.get("/admin/")
+    widget = await site.client.get("/admin/overview/w/alerts")
+
+    assert overview.status_code == 200
+    assert widget.status_code == 200
+    assert f"({code})" in widget.text
+    assert "Koppeling controleren" in widget.text
