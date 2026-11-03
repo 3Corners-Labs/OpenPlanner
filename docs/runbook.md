@@ -1735,6 +1735,13 @@ and a GitHub *pre-release* with the SBOM, about three minutes after the merge (i
 ZAP baseline only; the mutation test runs alongside and still fails the run). Nobody tags a
 candidate by hand: the tag check refuses an `-rc.` tag.
 
+A candidate's number follows `main`'s commit order. When the runs of two merges finish out of
+order (the later merge's ZAP baseline came first), the older merge's run finds its commit
+already inside a candidate and tags nothing: the Actions log says *no release candidate: a later
+merge is already a candidate*. `git tag --list 'v*-rc.*' --contains <sha>` shows which one.
+Without that check `v0.4.0-rc.179` (#480) was tagged after `v0.4.0-rc.176` (#481, its
+descendant) on 2026-11-03, and docker01 went back past the fix.
+
 Installations on the `rc` channel are offered candidates and releases alike, and move to the
 release when it comes. The superuser chooses the channel in the portal (`update_channel`, class
 C, settings page or `/admin/updates`; not usable in production, ADR 0067), and with
