@@ -1,7 +1,8 @@
 # 0111. The website is served by GitHub Pages and published at minor and major releases
 
-Status: accepted (2026-11-03), decided by the product owner in the conversation of
-2026-11-03. Supersedes ADR 0087 points 5 and 6 (deploy by `git push` to TransIP with a key in
+Status: partly superseded by ADR 0113 (2026-11-03): the hosting stays on TransIP, the `pages`
+job and `CNAME` go; the rule that only a minor or major release publishes stays. Accepted
+(2026-11-03), decided by the product owner in the conversation of 2026-11-03. Supersedes ADR 0087 points 5 and 6 (deploy by `git push` to TransIP with a key in
 the environment `website`) and ADR 0110 point 5 (a missing deploy configuration fails). Partly
 built: steps 1 and 2 in #475; step 3 is configuration in GitHub and DNS by an administrator.
 

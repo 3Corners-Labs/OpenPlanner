@@ -1445,41 +1445,62 @@ an SMTP 5xx), `channel_not_configured` (the organisation has no sender on that c
 `integration_not_ready` (the settings key is missing). The reminders page of a group warns
 when a rule's channel is not configured.
 
-## The public website, openplanner.nl (ADR 0087, ADR 0111)
+## The public website, openplanner.nl (ADR 0087, ADR 0113)
 
-The website is static: `site/` in the repository, built by `scripts/build_site.py` in the job
-`site` of `main.yml` on every merge to `main` and on every release tag. GitHub Pages serves it,
-apart from the application; the application never reads from it and it never calls the
-application. Only a minor or major release (`vX.Y.0`) publishes it, through the job `pages`
-(`actions/deploy-pages`); there is no key or secret. Between releases the page's script keeps
-the release list current from `api.github.com` (ADR 0110).
+The website is static: `site/` in the repository, built by `scripts/build_site.py` and
+built by the job `site` of `main.yml` on every merge to `main` and on every release tag, and
+deployed by the job `deploy-site` at a minor or major release (`vX.Y.0`) only. It is hosted on a TransIP web hosting package, apart from the application; the application
+never reads from it and it never calls the application. TransIP deploys what is pushed to the
+package's git repository, so the deploy is a `git push` (`scripts/deploy-site.sh`): the job
+clones that repository, replaces the site files with the build, commits `site: <tag or branch>
+<commit>` and pushes. The repository keeps every deployed version.
 
 | Event | What runs | Result |
 |---|---|---|
-| Merge to `main` | `site`, after the candidate job: build with the releases from GitHub, upload the artifact | the artifact `site` (fourteen days); the live site does not change |
+| Merge to `main` | `site`, after the candidate job: build with the releases from GitHub, upload the artifact | the artifact `site` (fourteen days); the live site does not change (its release list is read live, ADR 0110) |
 | Tag `vX.Y.Z` (patch) | the same after `publish`, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page; the live site does not change |
-| Tag `vX.Y.0` (minor or major) | the same, then `pages` | `site-X.Y.0.tar.gz` on the release, and the build live on openplanner.nl |
+| Tag `vX.Y.0` (minor or major) | the same, then `deploy-site` in the environment `website` | `site-X.Y.0.tar.gz` on the release, and the build pushed to TransIP; red when the environment lacks its remote or key |
 | Tag `vX.Y.Z` (also) | `tour` (`.github/workflows/tour.yml`): the e2e stack, `e2e/tour/tour.spec.ts`, the captions | `tour.webm`, `tour.jpg`, `tour.nl.vtt`, `tour.en.vtt`, `tour.json` and a still per main chapter (`tour-<chapter>.jpg`) on the release; the `site` job puts the newest one on the page, the stills as a gallery |
 | Release candidate (by hand) | *Actions → tour → Run workflow* with the `vX.Y.Z-rc.N` tag: candidates are tagged by `GITHUB_TOKEN` and start no workflow, so they are recorded only on request | the recording on that candidate; the next minor release puts it on the page |
 | Pull request, fork | nothing (`main.yml` only) | a local `make site` is the preview |
 
-### Once: GitHub Pages and the domain
+### Once: the deploy settings
 
-A repository administrator, once:
+A repository administrator, once. In the GitHub environment `website` (*Settings → Environments*;
+create it, with *Deployment branches and tags* limited to the tag pattern `v*.*.*`, so only a
+release can read the key; `.github/guardrails.json` holds this as the baseline, ADR 0109). Only
+the job `deploy-site` runs in it:
 
-1. *Settings → Pages*: source **GitHub Actions**; custom domain `openplanner.nl`; after the
-   certificate is issued, **Enforce HTTPS**.
-2. *Settings → Environments → github-pages*: deployment branches and tags limited to the tag
-   pattern `v*.*.*`, so only a release can publish. `.github/guardrails.json` holds this as the
-   baseline (ADR 0109).
-3. DNS at the registrar for `openplanner.nl`: `A` records `185.199.108.153`,
-   `185.199.109.153`, `185.199.110.153`, `185.199.111.153`; `AAAA` records
-   `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`;
-   `www` as a `CNAME` to `3corners-labs.github.io`. Check the addresses against GitHub's
-   documentation on custom domains before entering them. Verify the domain for the
-   organisation (*Organisation settings → Pages*) so no other account can claim it.
+| Name | Kind | Value |
+|---|---|---|
+| `SITE_DEPLOY_REMOTE` | variable | `openplannernl@openps.ssh.transip.me:auto.git` |
+| `SITE_DEPLOY_KNOWN_HOSTS` | variable | the output of `ssh-keyscan -t ed25519,rsa openps.ssh.transip.me`, after checking it against the fingerprints below |
+| `SITE_DEPLOY_KEY` | secret | the private key of a deploy-only pair: `ssh-keygen -t ed25519 -C openplanner-site-deploy -f site-deploy -N ""`; the public key `site-deploy.pub` goes on the TransIP package's SSH keys |
+| `SITE_DEPLOY_DIR` | variable | `www`: TransIP AutoGit serves the `www/` folder of the repository |
+| `SITE_DEPLOY_BRANCH` | variable | `main`: the *Git production branch* in TransIP's panel (AutoGit); a push to another branch is received but not deployed |
 
-`site/root/CNAME` names the domain in the build as well.
+Host key fingerprints of `openps.ssh.transip.me` as read on 2026-10-31; compare them with what
+TransIP publishes before trusting them:
+
+```text
+256  SHA256:0dGaYR9rj5YLPxqCTQgehcNaIjH+oIBkFPN6bBpZp24 (ED25519)
+3072 SHA256:j0TdSEUGqyqnH+qe8BPxA+1482UvW4bLrPOfFVRsvik (RSA)
+```
+
+In the real repository `deploy-site` fails without `SITE_DEPLOY_REMOTE`, `SITE_DEPLOY_KEY` or
+`SITE_DEPLOY_KNOWN_HOSTS` (ADR 0110 point 5), so a release whose site was not deployed is a red
+run; nothing is deployed half. A fork and a local run build and print a notice. The web root
+mirrors the build: a page removed from `site/` disappears from the host. If the environment is
+not configured when a minor release is tagged, set it and re-run the failed `deploy-site` job
+(the `site` artifact `site-dist` lives one day; after that re-run the whole `main.yml` run of the tag).
+
+TransIP AutoGit (panel: *Shared Hosting* → openplanner.nl → *Advanced* → *AutoGit*) deploys the
+production branch on every push: it needs `.autogit.yml` in the repository root, which the
+script writes from `site/deploy/autogit.yml`, and serves `www/`. It keeps the two newest
+releases. First push on 2026-11-01: deployed, `www` pointing at the release. HTTPS for
+openplanner.nl still has to be switched on in the panel (*SSL*, Let's Encrypt for the apex and
+`www`); until then port 443 answers with another domain's certificate and a placeholder page,
+and http redirects there.
 
 ### The recorded walkthrough (ADR 0087 step 3)
 
@@ -1504,20 +1525,26 @@ npm run tour:captions -- local
 `TOUR_PACE_MS` sets how long each screen rests (default 1800); a second local run needs another
 participant address (`TOUR_EMAIL`), since an address may hold only a few bookings per group.
 
-### Publishing between releases, rolling back
+### Rotating the deploy key
 
-The current `main` is not published without a release: the environment `github-pages` accepts
-only release tags, on purpose. To roll back, re-run the `pages` job of the previous minor
-release's run. Every release also carries `site-X.Y.Z.tar.gz`, and every run its artifact
-`site` (fourteen days).
+Make a new key pair, add the new public key on the TransIP package, replace `SITE_DEPLOY_KEY`,
+re-run the `deploy-site` job of the last minor release (it is idempotent), then remove the old public key
+from TransIP. Nothing else holds the key.
+
+### Rolling back
+
+Revert the last commit in the TransIP repository and push it, or re-run the whole `main.yml` run
+of the previous minor release tag. The build of every run is also its artifact `site` (fourteen days) and
+every release carries `site-X.Y.Z.tar.gz`.
 
 ### The web server
 
-GitHub Pages serves `openplanner.nl` over HTTPS and redirects `www`. It does not take our own
-response headers: the CSP (`default-src 'self'; connect-src https://api.github.com; img-src
-'self' data:; media-src 'self'`) and the referrer policy are meta tags in the page;
-`frame-ancestors`, HSTS and `X-Content-Type-Options` are GitHub's choice, not ours (ADR 0111).
-The site sets no cookie; the access log is GitHub's.
+Serve `openplanner.nl` and `www.openplanner.nl` (redirect `www` to the apex) over HTTPS only,
+with HSTS, and these headers, which the page also sets as meta tags where it can:
+`Content-Security-Policy: default-src 'self'; connect-src https://api.github.com; img-src 'self' data:; media-src 'self';
+frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`.
+On TransIP web hosting these go in an `.htaccess` in the web root (step 4 of ADR 0087). The site
+sets no cookie; its script asks `api.github.com` for the public release list (ADR 0110) and nothing else; the host's access log is TransIP's and is not shipped anywhere by us. The job `deploy-site` of `main.yml` fails when the environment `website` has no deploy remote or key (ADR 0110), so a release without its site shows as a red run.
 
 ## Management token key
 
@@ -1629,6 +1656,11 @@ A patch release has no audit job.
 3. sets the annotated tag `vX.Y.Z` on that commit with the message
    `vX.Y.Z: tagged on the instruction of <your login> on <date>` and pushes it; `main.yml`
    takes over.
+
+Before a minor or major release (`vX.Y.0`), the site goes live with the tag (ADR 0113), so read
+the README's opening and *What it does today* against `site/content/{nl,en}.json` (hero,
+features, enterprise) and correct the site in a PR before the release PR merges.
+`tests/scripts/test_site_matches_readme.py` already holds the quick start in line.
 
 Do **not** use "Draft a new release" on GitHub: `main.yml` creates the release itself after
 the image is signed, and a hand-made release would make that step fail.

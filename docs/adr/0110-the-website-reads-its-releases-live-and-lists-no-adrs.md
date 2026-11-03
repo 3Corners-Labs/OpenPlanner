@@ -1,7 +1,7 @@
 # 0110. The website reads its releases live, lists no ADRs, and a missing deploy fails
 
 Status: accepted (2026-11-02), decided by the product owner in the conversation of
-2026-11-02. Point 5 and step 4 superseded by ADR 0111 (2026-11-03: GitHub Pages, no deploy key). Supersedes ADR 0087 point 4 (release data only baked in) and point 9 (the roadmap
+2026-11-02. Point 5 and step 4 were superseded by ADR 0111 and are restored by ADR 0113 (2026-11-03: the deploy to TransIP fails without its configuration, on the release tag). Supersedes ADR 0087 point 4 (release data only baked in) and point 9 (the roadmap
 is the open ADR steps); amends ADR 0087 point 3 (one origin besides our own, for one request)
 and point 5 (a deploy without its configuration fails on the real repository). Partly built:
 steps 1 to 3 in this PR; step 4 is configuration in GitHub by a repository administrator.
