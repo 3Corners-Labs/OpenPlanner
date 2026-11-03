@@ -28,12 +28,13 @@
 #                      --own-certificate the files in certs/; same rules; with --internal-ca
 #                      TLS_INTERNAL=true instead (Caddy's own authority, for a lab or a network
 #                      without a public name; ADR 0112)
-#      the identity provider (ADR 0106 step 5): by default the bundled Keycloak in test and lab
+#      the identity provider (ADR 0106 step 5): by default the bundled Keycloak in every
 #                      mode (--idp bundled): the realm is rendered with generated secrets
 #                      (scripts/render-keycloak-realm.sh), the proxy serves it under /idp, and its
 #                      mail server is set at the first start. --idp own asks for the login of
-#                      your own provider, as before; production keeps own until its Keycloak
-#                      has a database of its own (ADR 0106 point 4)
+#                      your own provider, as before. Production runs Keycloak in production
+#                      mode on its own PostgreSQL container (idp-db, ADR 0106 point 4), and a
+#                      host that already has a login in .env keeps it
 #   4. .env.update     pull <image>:<version> -> digest -> cosign verify -> pin digest, profiles
 #                      and mode; with the HTTPS proxy the same for <image>-proxy:<version>
 #                      (ADR 0064 step 2: no host builds Caddy); without --version existing
@@ -153,15 +154,14 @@ parse_args() {
   ((TLS)) || ((!INTERNAL_CA)) || die "--internal-ca needs the HTTPS proxy; drop --no-tls"
   ((!OWN_CERT)) || ((!INTERNAL_CA)) || die "--own-certificate and --internal-ca exclude each other"
   [[ $MODE != production ]] || ((!INTERNAL_CA)) || warn "--internal-ca in production: browsers will not trust the certificate until its root is installed on every machine; use ACME or --own-certificate"
-  # ADR 0106 point 1: the bundled provider is the default. Production keeps `own` until its
-  # Keycloak runs with a database of its own (point 4, a later step).
+  # ADR 0106 point 1: the bundled provider is the default in every mode. A production host that
+  # already has a login of its own (in .env, or named in the environment of this run) keeps it,
+  # until --idp bundled says otherwise.
   IDP=${IDP:-$(value "$PIN_FILE" OPENPLANNER_IDP)}
   if [[ -z $IDP ]]; then
-    if [[ $MODE == production ]]; then IDP=own; else IDP=bundled; fi
+    if [[ $MODE == production && -n ${OIDC_DISCOVERY_URL:-$(value "$ENV_FILE" OIDC_DISCOVERY_URL)} ]]; then IDP=own; else IDP=bundled; fi
   fi
   case $IDP in bundled | own) ;; *) die "--idp must be bundled or own, not '$IDP'" ;; esac
-  [[ $MODE != production || $IDP != bundled ]] \
-    || die "--idp bundled in production waits for its own database (ADR 0106 point 4); use --idp own, or --mode test"
   REPOSITORY=${REPOSITORY:-$(value "$ENV_FILE" UPDATE_REPOSITORY)}
   REPOSITORY=${REPOSITORY:-3Corners-Labs/OpenPlanner}
   [[ $REPOSITORY =~ $REPOSITORY_RE ]] || die "--repository must be owner/name"
@@ -394,6 +394,8 @@ new_env() {
     printf '# Written by scripts/install.sh (%s mode). Every setting: .env.example.\n' "$MODE"
     printf '# Holds secrets: mode 600, never copied off this host. Keys: secrets/secrets.env.\n'
     put ENVIRONMENT "$environment"
+    # ADR 0106 point 4: with the bundled provider the second factor is asked for, in every mode.
+    [[ $IDP != bundled ]] || put ADMIN_MFA_REQUIRED true
     put PUBLIC_BASE_URL "$PUBLIC_BASE_URL"
     put FORWARDED_ALLOW_IPS "${FORWARDED_ALLOW_IPS:-}"
     [[ -z $OIDC_DISCOVERY_URL ]] && [[ -f $CONFIG_ENV ]] && printf '# The login (OIDC_*): secrets/config.env, from the configuration package; a value here wins.\n'
@@ -620,14 +622,16 @@ settings() {
 # with generated secrets; a changed public address replaces the one the earlier run kept.
 render_idp() {
   [[ $IDP == bundled ]] || return 0
-  local address kept=$DIR/secrets/keycloak.env
+  local address database=h2 kept=$DIR/secrets/keycloak.env
+  # Production: Keycloak's production mode on its own PostgreSQL (ADR 0106 point 4).
+  [[ $MODE != production ]] || database=postgres
   address=$(value "$ENV_FILE" PUBLIC_BASE_URL)
   if [[ -f $kept && -n $address && $(value "$kept" KC_OPENPLANNER_BASE_URL) != "${address%/}" ]]; then
     sed -i.bak "/^KC_OPENPLANNER_BASE_URL=/d; /^KC_HOSTNAME=/d" "$kept" && rm -f "$kept.bak"
   fi
   [[ -f $DIR/scripts/render-keycloak-realm.sh ]] || die "scripts/render-keycloak-realm.sh is missing from $DIR"
   log "rendering the bundled identity provider's realm"
-  "$BASH" "$DIR/scripts/render-keycloak-realm.sh" --dir "$DIR" || die "the realm could not be rendered"
+  "$BASH" "$DIR/scripts/render-keycloak-realm.sh" --dir "$DIR" --database "$database" || die "the realm could not be rendered"
   ((TLS)) || warn "the bundled identity provider without the HTTPS proxy answers on this host only (127.0.0.1:8080); logging in from another machine needs --tls-domain"
   log "first password of the portal user 'super': KC_SUPER_PASSWORD in $kept (changed at the first login)"
 }
@@ -747,6 +751,7 @@ pin_release() {
   # idp: the bundled Keycloak (ADR 0090); mailpit: the lab's mail catcher (ADR 0106 step 5); tls:
   # the proxy (ADR 0064). `dev` is for developers only: the development realm and Mailpit.
   [[ $IDP != bundled ]] || profiles=idp
+  [[ $IDP != bundled || $MODE != production ]] || profiles=idp,idp-db
   [[ $MODE != lab ]] || profiles=${profiles:+$profiles,}mailpit
   if ((TLS)); then profiles=${profiles:+$profiles,}tls; fi
   current=$(value "$PIN_FILE" OPENPLANNER_IMAGE)
@@ -777,6 +782,7 @@ pin_release() {
     printf 'OPENPLANNER_MODE=%s\n' "$MODE"
     printf 'OPENPLANNER_TLS=%s\n' "$TLS"
     printf 'OPENPLANNER_IDP=%s\n' "$IDP"
+    [[ $IDP != bundled || $MODE != production ]] || printf 'OPENPLANNER_IDP_START=start\n'
     [[ -z $profiles ]] || printf 'COMPOSE_PROFILES=%s\n' "$profiles"
     printf 'OPENPLANNER_IMAGE=%s\n' "$digest"
     [[ -z $proxy_digest ]] || printf 'OPENPLANNER_PROXY_IMAGE=%s\n' "$proxy_digest"

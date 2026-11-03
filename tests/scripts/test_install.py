@@ -208,7 +208,7 @@ def test_production_install_from_scratch(host: Host) -> None:
     assert host.settings(".env.update") == {
         "OPENPLANNER_MODE": "production",
         "OPENPLANNER_TLS": "1",
-        "OPENPLANNER_IDP": "own",  # production keeps its own provider (ADR 0106 point 4)
+        "OPENPLANNER_IDP": "own",  # a login named in the environment stays (ADR 0106 point 4)
         "COMPOSE_PROFILES": "tls",
         "OPENPLANNER_IMAGE": RELEASE,
         "OPENPLANNER_PROXY_IMAGE": PROXY_RELEASE,
@@ -965,11 +965,42 @@ def test_a_changed_public_address_moves_the_realm_along(host: Host) -> None:
     assert host.settings("secrets/keycloak.env")["KC_HOSTNAME"] == "https://nieuw.example.nl/idp"
 
 
-def test_the_bundled_provider_in_production_waits_for_its_own_database(host: Host) -> None:
-    result = host.run("--mode", "production", "--idp", "bundled", "--non-interactive", **PRODUCTION)
+def _production_bundled(host: Host) -> None:
+    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
+    result = host.run("--mode", "production", "--non-interactive", **settings)
+    assert result.returncode == 0, result.stderr
 
-    assert result.returncode == 1
-    assert "waits for its own database" in result.stderr
+
+def test_production_runs_the_bundled_keycloak_on_its_own_database(host: Host) -> None:
+    """ADR 0106 point 4: `start` on PostgreSQL, the second factor on, nothing asked."""
+    _production_bundled(host)
+
+    pins = host.settings(".env.update")
+    keycloak = host.settings("secrets/keycloak.env")
+    assert pins["OPENPLANNER_IDP"] == "bundled"
+    assert pins["OPENPLANNER_IDP_START"] == "start"
+    assert {"idp", "idp-db"} <= set(pins["COMPOSE_PROFILES"].split(","))
+    assert keycloak["KC_DB"] == "postgres"
+    assert keycloak["KC_DB_URL_HOST"] == "idp-db"
+    assert keycloak["KC_HTTP_ENABLED"] == "true"
+    assert host.settings("secrets/idp-db.env")["POSTGRES_PASSWORD"] == keycloak["KC_DB_PASSWORD"]
+    assert host.settings(".env")["ADMIN_MFA_REQUIRED"] == "true"
+
+
+def test_test_and_lab_keep_the_development_start_and_h2(host: Host) -> None:
+    result = host.run("--mode", "test", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert "OPENPLANNER_IDP_START" not in host.settings(".env.update")
+    assert "idp-db" not in host.settings(".env.update")["COMPOSE_PROFILES"]
+    assert "KC_DB" not in host.settings("secrets/keycloak.env")
+
+
+def test_a_production_host_with_its_own_login_keeps_it(host: Host) -> None:
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(".env.update")["OPENPLANNER_IDP"] == "own"
 
 
 def test_an_unknown_provider_choice_is_refused(host: Host) -> None:

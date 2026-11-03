@@ -28,7 +28,9 @@ FIXED = {
 }
 
 
-def render(directory: Path, env: str | None = None) -> subprocess.CompletedProcess[str]:
+def render(
+    directory: Path, env: str | None = None, *options: str
+) -> subprocess.CompletedProcess[str]:
     """Run the renderer against ``directory`` as the checkout, with an optional env file."""
     target = directory / "deploy/keycloak"
     target.mkdir(parents=True, exist_ok=True)
@@ -38,7 +40,7 @@ def render(directory: Path, env: str | None = None) -> subprocess.CompletedProce
     if env is not None:
         (secrets / "keycloak.env").write_text(env)
     return subprocess.run(  # noqa: S603 - fixed argv, no shell
-        [BASH, str(SCRIPT), "--dir", str(directory)], capture_output=True, text=True, check=False
+        [BASH, str(SCRIPT), "--dir", str(directory), *options], capture_output=True, text=True, check=False
     )
 
 
@@ -393,3 +395,61 @@ def test_a_value_the_installer_quoted_is_read_without_its_quotes(tmp_path: Path)
     assert read_env(tmp_path / "secrets/keycloak.env")["KC_HOSTNAME"] == (
         "https://docker01.example.nl/idp"
     )
+
+
+def test_postgres_gives_keycloak_its_own_database_and_a_private_password(tmp_path: Path) -> None:
+    """ADR 0106 point 4: ``start`` needs a database and plain http behind the proxy."""
+    result = render(tmp_path, None, "--database", "postgres")
+
+    assert result.returncode == 0, result.stderr
+    keycloak = read_env(tmp_path / "secrets/keycloak.env")
+    database = read_env(tmp_path / "secrets/idp-db.env")
+    assert keycloak["KC_DB"] == "postgres"
+    assert keycloak["KC_DB_URL_HOST"] == "idp-db"
+    assert keycloak["KC_HTTP_ENABLED"] == "true"
+    assert keycloak["KC_PROXY_HEADERS"] == "xforwarded"
+    assert database["POSTGRES_PASSWORD"] == keycloak["KC_DB_PASSWORD"] != ""
+    assert mode(tmp_path / "secrets/idp-db.env") == 0o600
+    assert keycloak["KC_DB_PASSWORD"] not in result.stderr
+
+
+def test_the_database_choice_and_its_password_are_remembered(tmp_path: Path) -> None:
+    render(tmp_path, None, "--database", "postgres")
+    first = read_env(tmp_path / "secrets/keycloak.env")["KC_DB_PASSWORD"]
+
+    again = render(tmp_path)
+
+    assert again.returncode == 0, again.stderr
+    assert read_env(tmp_path / "secrets/keycloak.env")["KC_DB_PASSWORD"] == first
+
+
+def test_h2_writes_no_database_file(tmp_path: Path) -> None:
+    render(tmp_path)
+
+    assert not (tmp_path / "secrets/idp-db.env").exists()
+    assert "KC_DB" not in read_env(tmp_path / "secrets/keycloak.env")
+
+
+def test_an_unknown_database_is_refused(tmp_path: Path) -> None:
+    assert render(tmp_path, None, "--database", "mysql").returncode == 2
+
+
+def test_the_idp_db_service_is_private_and_waited_for() -> None:
+    if shutil.which("docker") is None:
+        pytest.skip("docker is not installed")
+    result = subprocess.run(  # noqa: S603 - fixed argv, no shell
+        ["docker", "compose", "--profile", "idp", "--profile", "idp-db", "config", "--format", "json"],  # noqa: S607
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        pytest.skip("docker compose plugin is not installed")
+    compose = json.loads(result.stdout)
+    db = compose["services"]["idp-db"]
+
+    assert db["image"].startswith("postgres:")
+    assert "ports" not in db
+    assert compose["services"]["idp"]["depends_on"]["idp-db"]["condition"] == "service_healthy"
+    assert "idp-db-data" in compose["volumes"]
