@@ -61,7 +61,7 @@ def test_it_is_valid_shell_and_powershell_names_the_same_commands() -> None:
 
 
 def _tools_without_docker(tmp_path: Path) -> Path:
-    """Link the few real tools the script needs into a directory without docker (a runner has one)."""
+    """Link the real tools the script needs into a directory that has no docker."""
     tools = tmp_path / "tools"
     tools.mkdir()
     for name in ("dirname", "sort", "head", "grep", "sed", "cat"):
