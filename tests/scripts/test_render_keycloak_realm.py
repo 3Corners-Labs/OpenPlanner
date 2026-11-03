@@ -179,7 +179,7 @@ def test_the_application_half_carries_the_realm_s_directory_secret(tmp_path: Pat
     app = read_env(tmp_path / "secrets/keycloak-app.env")
     realm = json.loads((tmp_path / "secrets/keycloak-realm.json").read_text())
     client = next(c for c in realm["clients"] if c["clientId"] == "openplanner-directory")
-    assert app == {
+    assert {k: v for k, v in app.items() if k.startswith("KEYCLOAK_")} == {
         "KEYCLOAK_ADMIN_URL": "http://idp:8080/admin/realms/openplanner",
         "KEYCLOAK_DIRECTORY_CLIENT_ID": "openplanner-directory",
         "KEYCLOAK_DIRECTORY_CLIENT_SECRET": FIXED["KC_DIRECTORY_CLIENT_SECRET"],
@@ -376,4 +376,20 @@ def test_an_http_address_keeps_the_loopback_shape(tmp_path: Path) -> None:
     keycloak = read_env(tmp_path / "secrets/keycloak.env")
     app = read_env(tmp_path / "secrets/keycloak-app.env")
     assert "KC_HTTP_RELATIVE_PATH" not in keycloak
-    assert "OIDC_DISCOVERY_URL" not in app
+    assert app["OIDC_DISCOVERY_URL"] == (
+        "http://idp:8080/realms/openplanner/.well-known/openid-configuration"
+    )
+    assert app["OIDC_ISSUER"] == "http://127.0.0.1:8080/realms/openplanner"
+    assert app["OIDC_CLIENT_ID"] == "openplanner-admin"
+
+
+def test_a_value_the_installer_quoted_is_read_without_its_quotes(tmp_path: Path) -> None:
+    """install.sh writes KEY='value'; the address must not carry the quotes into the realm."""
+    (tmp_path / ".env").write_text("PUBLIC_BASE_URL='https://docker01.example.nl'\n")
+
+    result = render(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert read_env(tmp_path / "secrets/keycloak.env")["KC_HOSTNAME"] == (
+        "https://docker01.example.nl/idp"
+    )

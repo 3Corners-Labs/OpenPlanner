@@ -5,8 +5,9 @@
 # and renders deploy/keycloak/realm.template.json into secrets/keycloak-realm.json, which the
 # compose profile `idp` mounts. It also writes the application's half, secrets/keycloak-app.env
 # (KEYCLOAK_ADMIN_URL, KEYCLOAK_DIRECTORY_CLIENT_ID and _SECRET), which web and worker read, so
-# staff management works without copying a value by hand (ADR 0106). With an https address
-# (ADR 0112) Keycloak is served by the proxy under /idp, and the same file carries the login. The env files get mode
+# staff management works without copying a value by hand (ADR 0106). The same
+# file carries the login (OIDC_*, ADR 0106 step 5). With an https address (ADR 0112) Keycloak is
+# served by the proxy under /idp. The env files get mode
 # 600; the realm gets 644, because Keycloak reads it as its own user (uid 1000), which is
 # rarely the host user. The secrets directory is 700, so nobody else on the host gets past
 # it; the container reads the file through its bind mount. Nothing a value holds is ever printed:
@@ -61,6 +62,7 @@ read_var() {
   line=$(grep -m1 "^${key}=" "$file" || true)
   line=${line#*=}
   line=${line#\"}; line=${line%\"}
+  line=${line#\'}; line=${line%\'} # the installer writes KEY='value'
   printf '%s' "$line"
 }
 
@@ -92,6 +94,7 @@ if [[ $KC_OPENPLANNER_BASE_URL == https://* ]]; then
   DISCOVERY_URL=http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration
 else
   HTTPS=0
+  DISCOVERY_URL=http://idp:8080/realms/openplanner/.well-known/openid-configuration
 fi
 
 # A value goes into a JSON string through sed: only characters that need no escaping in either.
@@ -130,13 +133,12 @@ tmp=$(mktemp "$SECRETS_DIR/.keycloak-app.env.XXXXXX")
   printf 'KEYCLOAK_ADMIN_URL=%s\n' "$ADMIN_URL"
   printf 'KEYCLOAK_DIRECTORY_CLIENT_ID=openplanner-directory\n'
   printf 'KEYCLOAK_DIRECTORY_CLIENT_SECRET=%s\n' "$KC_DIRECTORY_CLIENT_SECRET"
-  if ((HTTPS)); then
-    printf '# https: the login itself, so nothing has to be copied into .env by hand (ADR 0112).\n'
-    printf 'OIDC_DISCOVERY_URL=%s\n' "$DISCOVERY_URL"
-    printf 'OIDC_ISSUER=%s/realms/openplanner\n' "$KC_HOSTNAME"
-    printf 'OIDC_CLIENT_ID=openplanner-admin\n'
-    printf 'OIDC_CLIENT_SECRET=%s\n' "$KC_OPENPLANNER_CLIENT_SECRET"
-  fi
+  # The login itself, so nothing has to be copied into .env by hand (ADR 0112, ADR 0106 step 5).
+  # Keycloak announces KC_HOSTNAME, not the idp:8080 it is fetched on (ADR 0097).
+  printf 'OIDC_DISCOVERY_URL=%s\n' "$DISCOVERY_URL"
+  printf 'OIDC_ISSUER=%s/realms/openplanner\n' "$KC_HOSTNAME"
+  printf 'OIDC_CLIENT_ID=openplanner-admin\n'
+  printf 'OIDC_CLIENT_SECRET=%s\n' "$KC_OPENPLANNER_CLIENT_SECRET"
 } > "$tmp"
 chmod 600 "$tmp"
 mv "$tmp" "$APP_ENV_FILE"

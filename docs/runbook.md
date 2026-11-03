@@ -841,13 +841,14 @@ scripts/render-keycloak-realm.sh
 docker compose --profile idp up -d idp
 ```
 
-The script generates every value that is missing, keeps the ones that exist, takes the
-portal's address from `PUBLIC_BASE_URL` in `.env` (the redirect URIs), and prints no value.
-`OIDC_CLIENT_SECRET` in `.env` must equal `KC_OPENPLANNER_CLIENT_SECRET`, and
-`OIDC_DISCOVERY_URL` points at `http://idp:8080/realms/openplanner/.well-known/openid-configuration`;
-the installer does both in step 2 of ADR 0090 (until then, by hand). Also set
-`OIDC_ISSUER` to `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public address, not
-the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097).
+`scripts/install.sh` runs this for you (`--idp bundled`, the default in `test` and `lab`, ADR 0106
+step 5): run the script by hand only to render again after a change of the public address. It
+generates every value that is missing, keeps the ones that exist, takes the portal's address
+from `PUBLIC_BASE_URL` in `.env` (the redirect URIs, and the https hostname of Keycloak), and
+prints no value. The login (`OIDC_DISCOVERY_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`,
+`OIDC_CLIENT_SECRET`) is written to `secrets/keycloak-app.env`, so nothing is copied into
+`.env`. `OIDC_ISSUER` is `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public
+address, not the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097).
 `python -m app.cli oidc-check` compares the two and names the issuer to set when they differ.
 When Keycloak itself sits behind a TLS proxy, set `KC_PROXY_HEADERS=xforwarded` (and let the
 proxy send `X-Forwarded-Proto`): otherwise Keycloak announces its token endpoint and key set as

@@ -48,14 +48,31 @@ Caddy.
 
 | `--mode` | `ENVIRONMENT` | Services | For |
 |---|---|---|---|
-| `production` | `prod` | web, worker, HTTPS proxy (Let's Encrypt) | real participants; public DNS name, ports 80 and 443 |
-| `test` | `test` | web, worker, HTTPS proxy (Let's Encrypt) | acceptance on its own public DNS name; `--no-tls` behind your own proxy |
-| `lab` | `test` | web, worker, Keycloak, Mailpit; HTTPS proxy with `--tls-domain` | internal demo and integration tests (as on docker01) |
+| `production` | `prod` | web, worker, HTTPS proxy (Let's Encrypt); your own identity provider | real participants; public DNS name, ports 80 and 443 |
+| `test` | `test` | web, worker, HTTPS proxy (Let's Encrypt), the bundled Keycloak under `/idp` | acceptance on its own public DNS name; `--no-tls` behind your own proxy |
+| `lab` | `test` | web, worker, the bundled Keycloak, Mailpit; HTTPS proxy with `--tls-domain` | internal demo and integration tests (as on docker01) |
 
 HTTPS is the standard shape (ADR 0064): `production` and `test` run the proxy unless `--no-tls`
 says a load balancer of your own does TLS; a `lab` runs it when `--tls-domain <host>` names a
 public DNS name. The script remembers the mode and that choice in `.env.update`, so later runs
 need neither.
+
+## The identity provider (ADR 0106 step 5)
+
+`--idp bundled|own` decides who the staff log in with. **`bundled`** (the default in `test` and
+`lab`) runs the Keycloak of ADR 0090: the installer renders its realm with generated secrets
+(`scripts/render-keycloak-realm.sh`), the proxy serves it under `https://<host>/idp`
+(`IDP_UPSTREAM` in `proxy.env`), `web` and `worker` read the login from `secrets/keycloak-app.env`
+(nothing is asked or copied into `.env`), and its mail server is set at the first start: Mailpit
+in a `lab`, the installation's `SMTP_*` otherwise. Staff are then managed in the portal
+(*Manage › Staff*). The first password of the user `super` is `KC_SUPER_PASSWORD` in
+`secrets/keycloak.env`; Keycloak asks for a new one and an authenticator at the first login.
+**`own`** asks for the login of your provider (PingFederate, Entra, ...), as before.
+
+`production` keeps `own` until its Keycloak has a database of its own (ADR 0106 point 4);
+`--idp bundled` there is refused. Without the HTTPS proxy the bundled provider answers on the
+host only (`127.0.0.1:8080`): logging in from another machine needs `--tls-domain`. The choice is
+remembered in `.env.update` (`OPENPLANNER_IDP`).
 
 ## Prerequisites
 
@@ -214,6 +231,8 @@ before `.env`, so `.env` wins; or remove `config.env` and answer the questions o
 | `--no-tls` | production, test: no HTTPS proxy; asks the public address and your proxy's address (`FORWARDED_ALLOW_IPS`) |
 | `--tls-domain HOST` | lab: run the HTTPS proxy for this host name (also sets it for the other modes) |
 | `--own-certificate` | `proxy.env` names `certs/fullchain.pem` and `certs/privkey.pem` instead of ACME (runbook, *Own certificate*); locks the portal's certificate source (`TLS_CERTIFICATE_SOURCE=own` in `.env`, ADR 0070) |
+| `--internal-ca` | `proxy.env` gets `TLS_INTERNAL=true`: Caddy's own certificate authority, for a lab without a public name (runbook, *Internal certificate authority for a lab*, ADR 0112); locks the portal's certificate source; refused with `--own-certificate`, warned in production |
+| `--idp bundled\|own` | the bundled Keycloak (default in `test` and `lab`) or your own provider (default in `production`); remembered (*The identity provider*) |
 | `--acme-staging` | with the HTTPS proxy: the first `proxy.env` points at Let's Encrypt's staging CA |
 | `--upgrade-docker` | also upgrade Docker Engine (restarts every container on the host) |
 | `--no-packages` | leave the host's packages alone; only check them |

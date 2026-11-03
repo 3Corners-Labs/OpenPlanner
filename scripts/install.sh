@@ -5,7 +5,7 @@
 #
 #   ./scripts/install.sh --mode production|test|lab [--version X.Y.Z] [--repository owner/name]
 #                        [--non-interactive] [--no-tls | --tls-domain HOST] [--own-certificate | --internal-ca]
-#                        [--acme-staging] [--no-updater] [--upgrade-docker] [--no-packages]
+#                        [--idp bundled|own] [--acme-staging] [--no-updater] [--upgrade-docker] [--no-packages]
 #                        [--configuration FILE --passphrase-file PATH]
 #
 #   0. host packages   Ubuntu/Debian: curl, flock, Compose plugin and cosign at their newest
@@ -28,6 +28,12 @@
 #                      --own-certificate the files in certs/; same rules; with --internal-ca
 #                      TLS_INTERNAL=true instead (Caddy's own authority, for a lab or a network
 #                      without a public name; ADR 0112)
+#      the identity provider (ADR 0106 step 5): by default the bundled Keycloak in test and lab
+#                      mode (--idp bundled): the realm is rendered with generated secrets
+#                      (scripts/render-keycloak-realm.sh), the proxy serves it under /idp, and its
+#                      mail server is set at the first start. --idp own asks for the login of
+#                      your own provider, as before; production keeps own until its Keycloak
+#                      has a database of its own (ADR 0106 point 4)
 #   4. .env.update     pull <image>:<version> -> digest -> cosign verify -> pin digest, profiles
 #                      and mode; with the HTTPS proxy the same for <image>-proxy:<version>
 #                      (ADR 0064 step 2: no host builds Caddy); without --version existing
@@ -77,6 +83,8 @@ DOCKER_KEYRING=$ROOT/etc/apt/keyrings/docker.asc
 MODE='' VERSION='' REPOSITORY='' INTERACTIVE=1 ACME_STAGING=0 UPDATER=1 PACKAGES=1 UPGRADE_DOCKER=0
 # TLS: '' decides by the pin file, then the mode; 1 runs the HTTPS proxy, 0 leaves TLS to your own.
 TLS='' OWN_CERT=0 INTERNAL_CA=0
+# ADR 0106 step 5: bundled | own; empty decides by the pin file, then the mode.
+IDP=''
 CERTS_DIR=$DIR/certs
 # --configuration FILE --passphrase-file PATH (ADR 0089 point 8); PACKAGE_DIR is the readable
 # copy made for the containers, removed on exit.
@@ -91,7 +99,7 @@ die() {
   (($# == 0)) || printf '%s\n' "$@" >&2
   exit 1
 }
-usage() { sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 compose() { docker compose --project-directory "$DIR" --env-file "$PIN_FILE" "$@"; }
 # A value from an env file, read as data (never sourced); the last occurrence wins, as in Compose.
 value() {
@@ -113,6 +121,7 @@ parse_args() {
       --tls-domain) TLS=1 TLS_DOMAIN=${2:?--tls-domain needs a host name} && shift ;;
       --own-certificate) OWN_CERT=1 ;;
       --internal-ca) INTERNAL_CA=1 ;;
+      --idp) IDP=${2:?--idp needs bundled or own} && shift ;;
       --no-updater) UPDATER=0 ;;
       --no-packages) PACKAGES=0 ;;
       --upgrade-docker) UPGRADE_DOCKER=1 ;;
@@ -144,6 +153,15 @@ parse_args() {
   ((TLS)) || ((!INTERNAL_CA)) || die "--internal-ca needs the HTTPS proxy; drop --no-tls"
   ((!OWN_CERT)) || ((!INTERNAL_CA)) || die "--own-certificate and --internal-ca exclude each other"
   [[ $MODE != production ]] || ((!INTERNAL_CA)) || warn "--internal-ca in production: browsers will not trust the certificate until its root is installed on every machine; use ACME or --own-certificate"
+  # ADR 0106 point 1: the bundled provider is the default. Production keeps `own` until its
+  # Keycloak runs with a database of its own (point 4, a later step).
+  IDP=${IDP:-$(value "$PIN_FILE" OPENPLANNER_IDP)}
+  if [[ -z $IDP ]]; then
+    if [[ $MODE == production ]]; then IDP=own; else IDP=bundled; fi
+  fi
+  case $IDP in bundled | own) ;; *) die "--idp must be bundled or own, not '$IDP'" ;; esac
+  [[ $MODE != production || $IDP != bundled ]] \
+    || die "--idp bundled in production waits for its own database (ADR 0106 point 4); use --idp own, or --mode test"
   REPOSITORY=${REPOSITORY:-$(value "$ENV_FILE" UPDATE_REPOSITORY)}
   REPOSITORY=${REPOSITORY:-3Corners-Labs/OpenPlanner}
   [[ $REPOSITORY =~ $REPOSITORY_RE ]] || die "--repository must be owner/name"
@@ -343,10 +361,6 @@ new_env() {
     lab)
       public_address "" "http://127.0.0.1:8000"
       smtp_default=mailpit
-      oidc_default=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration
-      # Keycloak announces KC_HOSTNAME, not the keycloak:8080 it is fetched on (ADR 0097).
-      IDP_ISSUER=${IDP_ISSUER:-http://127.0.0.1:8080/realms/openplanner}
-      OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-dev-only-openplanner-admin-secret}
       SMTP_PORT=${SMTP_PORT:-1025} SMTP_STARTTLS=${SMTP_STARTTLS:-false}
       ;;
   esac
@@ -354,7 +368,10 @@ new_env() {
   ((TLS)) || [[ $MODE == lab ]] \
     || ask FORWARDED_ALLOW_IPS "Address of your reverse proxy, for X-Forwarded-For (empty: none)" '' optional
   # The login: from the package's file when it holds one (ADR 0089 point 8), else asked.
-  if [[ -n $(value "$CONFIG_ENV" OIDC_DISCOVERY_URL) ]]; then
+  if [[ $IDP == bundled ]]; then
+    log "the login (OIDC_*) comes from the bundled identity provider (secrets/keycloak-app.env); not asked"
+    OIDC_DISCOVERY_URL='' OIDC_CLIENT_ID='' OIDC_CLIENT_SECRET=''
+  elif [[ -n $(value "$CONFIG_ENV" OIDC_DISCOVERY_URL) ]]; then
     log "the login (OIDC_*) comes from the configuration package; not asked"
     OIDC_DISCOVERY_URL='' OIDC_CLIENT_ID='' OIDC_CLIENT_SECRET=''
   else
@@ -593,8 +610,26 @@ settings() {
   fi
   bootstrap_keys "$fresh"
   check_env
+  render_idp
   ((TLS)) || return 0
   proxy_settings
+}
+
+# ADR 0106 step 5: the bundled identity provider. The realm and the application's half of it
+# (secrets/keycloak-app.env: the directory and the login) are rendered from the public address
+# with generated secrets; a changed public address replaces the one the earlier run kept.
+render_idp() {
+  [[ $IDP == bundled ]] || return 0
+  local address kept=$DIR/secrets/keycloak.env
+  address=$(value "$ENV_FILE" PUBLIC_BASE_URL)
+  if [[ -f $kept && -n $address && $(value "$kept" KC_OPENPLANNER_BASE_URL) != "${address%/}" ]]; then
+    sed -i.bak "/^KC_OPENPLANNER_BASE_URL=/d; /^KC_HOSTNAME=/d" "$kept" && rm -f "$kept.bak"
+  fi
+  [[ -f $DIR/scripts/render-keycloak-realm.sh ]] || die "scripts/render-keycloak-realm.sh is missing from $DIR"
+  log "rendering the bundled identity provider's realm"
+  "$BASH" "$DIR/scripts/render-keycloak-realm.sh" --dir "$DIR" || die "the realm could not be rendered"
+  ((TLS)) || warn "the bundled identity provider without the HTTPS proxy answers on this host only (127.0.0.1:8080); logging in from another machine needs --tls-domain"
+  log "first password of the portal user 'super': KC_SUPER_PASSWORD in $kept (changed at the first login)"
 }
 
 # ADR 0064: the proxy's own file. ACME by default; --own-certificate names the files in certs/.
@@ -627,6 +662,10 @@ proxy_settings() {
         ((!ACME_STAGING)) || put ACME_CA https://acme-staging-v02.api.letsencrypt.org/directory
       fi
     } | write_private "$PROXY_ENV"
+  fi
+  # ADR 0112: the proxy serves the bundled Keycloak under /idp.
+  if [[ $IDP == bundled && -z $(value "$PROXY_ENV" IDP_UPSTREAM) ]]; then
+    printf '# The bundled identity provider, under /idp on this host name (ADR 0112).\nIDP_UPSTREAM=idp:8080\n' >>"$PROXY_ENV"
   fi
   [[ -n $TLS_DOMAIN ]] || die "$PROXY_ENV needs TLS_DOMAIN"
   [[ -n $(value "$PROXY_ENV" ACME_EMAIL) || -n $(value "$PROXY_ENV" TLS_CERT_FILE) \
@@ -705,7 +744,10 @@ pinned_version() {
 pin_release() {
   local image digest profiles='' current proxy_digest='' proxy_current version
   image=$(image_name)
-  [[ $MODE != lab ]] || profiles=dev
+  # idp: the bundled Keycloak (ADR 0090); mailpit: the lab's mail catcher (ADR 0106 step 5); tls:
+  # the proxy (ADR 0064). `dev` is for developers only: the development realm and Mailpit.
+  [[ $IDP != bundled ]] || profiles=idp
+  [[ $MODE != lab ]] || profiles=${profiles:+$profiles,}mailpit
   if ((TLS)); then profiles=${profiles:+$profiles,}tls; fi
   current=$(value "$PIN_FILE" OPENPLANNER_IMAGE)
   proxy_current=$(value "$PIN_FILE" OPENPLANNER_PROXY_IMAGE)
@@ -734,6 +776,7 @@ pin_release() {
     printf '# Written by scripts/install.sh; the host updater replaces the image pins.\n'
     printf 'OPENPLANNER_MODE=%s\n' "$MODE"
     printf 'OPENPLANNER_TLS=%s\n' "$TLS"
+    printf 'OPENPLANNER_IDP=%s\n' "$IDP"
     [[ -z $profiles ]] || printf 'COMPOSE_PROFILES=%s\n' "$profiles"
     printf 'OPENPLANNER_IMAGE=%s\n' "$digest"
     [[ -z $proxy_digest ]] || printf 'OPENPLANNER_PROXY_IMAGE=%s\n' "$proxy_digest"
@@ -764,6 +807,40 @@ start() {
   compose up -d
   healthy || die "not healthy within ${HEALTH_TIMEOUT}s; see: docker compose --env-file .env.update logs web worker"
   log "web and worker are healthy"
+  idp_mail
+}
+
+# ADR 0106 step 5: the realm's mail server, for the invitations and password resets that Keycloak
+# itself sends. The lab's Mailpit, else the installation's own SMTP settings; the password goes to
+# the container through stdin, never through an argument.
+idp_mail() {
+  [[ $IDP == bundled ]] || return 0
+  local host port from user password starttls path json deadline=$((SECONDS + HEALTH_TIMEOUT))
+  host=$(value "$ENV_FILE" SMTP_HOST)
+  if [[ -z $host ]]; then
+    warn "no SMTP_HOST in $ENV_FILE: Keycloak cannot mail invitations until the realm has a mail server (docs/runbook.md, Bundled identity provider)"
+    return 0
+  fi
+  port=$(value "$ENV_FILE" SMTP_PORT) starttls=$(value "$ENV_FILE" SMTP_STARTTLS)
+  user=$(value "$ENV_FILE" SMTP_USERNAME) password=$(value "$ENV_FILE" SMTP_PASSWORD)
+  from=$(value "$ENV_FILE" MAIL_FROM)
+  from=${from##*<} from=${from%%>*} # "Name <address>" → address
+  from=${from:-noreply@openplanner.invalid}
+  path=$(value "$DIR/secrets/keycloak.env" KC_HTTP_RELATIVE_PATH)
+  json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+  json=$(printf '{"smtpServer":{"host":"%s","port":"%s","from":"%s","fromDisplayName":"OpenPlanner","starttls":"%s","ssl":"false","auth":"%s"%s}}' \
+    "$(json_escape "$host")" "${port:-587}" "$(json_escape "$from")" "${starttls:-true}" \
+    "$([[ -n $user ]] && echo true || echo false)" \
+    "$([[ -n $user ]] && printf ',"user":"%s","password":"%s"' "$(json_escape "$user")" "$(json_escape "$password")")")
+  until printf '%s' "$json" | compose exec -T idp sh -c "
+      /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080${path} --realm master \
+        --user admin --password \"\$KC_BOOTSTRAP_ADMIN_PASSWORD\" >/dev/null 2>&1 \
+      && cat >/tmp/op-smtp.json && /opt/keycloak/bin/kcadm.sh update realms/openplanner -f /tmp/op-smtp.json >/dev/null 2>&1
+      rc=\$?; rm -f /tmp/op-smtp.json; exit \$rc" >/dev/null 2>&1; do
+    ((SECONDS < deadline)) || { warn "the bundled identity provider did not take its mail server within ${HEALTH_TIMEOUT}s; set it in its console (docs/runbook.md)"; return 0; }
+    sleep 5
+  done
+  log "the bundled identity provider's mail server: $host (Keycloak mails invitations and resets itself)"
 }
 
 # 6. Host updater -------------------------------------------------------------------------------
