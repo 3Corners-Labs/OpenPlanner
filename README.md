@@ -54,7 +54,7 @@ its own groups, branding, texts and administrators.
 - The superuser connects log platforms (syslog, Splunk, Elastic, HTTP), picks the update
   channel and installs updates from the portal, and moves a whole configuration to a new
   installation as one encrypted package.
-- Closing a group at short notice suspends bookings and asks end users to pick a new time;
+- Closing a group at short notice suspends bookings and asks participants to pick a new time;
   maintenance mode shows a notice instead of the booking page.
 - A website can embed a group's calendar as a Web Component, styled through CSS tokens, on
   the origins its organisation allows (`docs/widget.md`, ADR 0035).
@@ -66,6 +66,11 @@ contact-center health checks with alerts to a Webex space and a fallback per gro
 subjects and routing attributes per group (ADR 0081), the rebooking assistant (ADR 0057),
 changes through the bot API (ADR 0023) and staff provisioning through SCIM (ADR 0046). What is
 built of every decision is in `docs/adr-status.md`.
+
+## Status
+
+This README describes version 0.4.0. What is built of each decision is in `docs/adr-status.md`;
+the release notes are in `CHANGELOG.md` and on the GitHub releases page.
 
 ## Quick start (demo)
 
@@ -91,8 +96,11 @@ without it the shape is the production one (web + worker).
 **Installing on a server** (production, test or lab): clone a release tag to
 `/home/<user>/openplanner` and run `./scripts/install.sh --mode production`. It installs the
 missing host packages, writes `.env` and `proxy.env`, pins the signed release, starts the stack
-with HTTPS from Let's Encrypt (ADR 0030) and installs the host updater (ADR 0029). Run it again
-to repair a host. See `docs/install.md`.
+with HTTPS (Let's Encrypt by default, your own certificate with `--own-certificate`, or the
+proxy's own certificate authority for a lab with `--internal-ca`; ADR 0030, 0064, 0112) and
+installs the host updater (ADR 0029). Run it again to repair a host. A Keycloak for staff can be
+bundled for test and lab installations (compose profile `idp`, ADR 0090, 0106). See
+`docs/install.md` and `docs/runbook.md`.
 
 Two containers share one SQLite volume: `web` (FastAPI, runs Alembic migrations on start) and
 `worker` (job loop). Both run as non-root with a read-only filesystem.

@@ -172,6 +172,47 @@ TOPICS = (
         ("/admin/organisations/{org}/texts", "/admin/organisations/{org}/texts/{text_locale}"),
         Permission.TEXTS_ORGANISATION_MANAGE,
     ),
+    # ADR 0033: topics for the screens that had none at v0.3.0.
+    HelpTopic("integrations", ("/admin/integrations",), Permission.INTEGRATIONS_MANAGE),
+    HelpTopic(
+        "api-clients",
+        ("/admin/api", "/admin/api/clients/new", "/admin/api/clients/{client_id}"),
+        Permission.API_CLIENTS_MANAGE,
+    ),
+    HelpTopic(
+        "holidays",
+        ("/admin/holidays", "/admin/holidays/{calendar}"),
+        Permission.HOLIDAYS_MANAGE,
+    ),
+    HelpTopic("updates", ("/admin/updates",), Permission.SYSTEM_UPDATE),
+    HelpTopic(
+        "group-staffing",
+        (
+            "/admin/groups/{slug}/staffing",
+            "/admin/groups/{slug}/staffing/{rule_id}",
+            "/admin/groups/{slug}/staffing/{rule_id}/split",
+            "/admin/groups/{slug}/exceptions",
+            "/admin/groups/{slug}/exceptions/{override_id}",
+            "/admin/groups/{slug}/holidays",
+        ),
+        Permission.SCHEDULE_MANAGE,
+    ),
+    HelpTopic(
+        "group-reminders-messages",
+        (
+            "/admin/groups/{slug}/reminders",
+            "/admin/groups/{slug}/reminders/{channel}/{minutes}",
+            "/admin/groups/{slug}/messages",
+            "/admin/groups/{slug}/messages/{text_locale}",
+        ),
+        Permission.REMINDERS_MANAGE,
+    ),
+    HelpTopic(
+        "organisation-holidays",
+        ("/admin/organisations/{org}/holidays",),
+        Permission.HOLIDAYS_ASSIGN,
+    ),
+    HelpTopic("rights", ("/admin/rights",), Permission.RIGHTS_VIEW),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

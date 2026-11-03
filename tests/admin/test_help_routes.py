@@ -16,30 +16,11 @@ SETTINGS = "/admin/groups/demo/settings"
 
 NOT_YET_DOCUMENTED: frozenset[str] = frozenset(
     {
-        "/admin/api",
-        "/admin/api/clients/new",
-        "/admin/api/clients/{client_id}",
         "/admin/groups/new",
         "/admin/groups/{slug}",
         "/admin/groups/{slug}/bookings/{booking_id}",
         "/admin/groups/{slug}/closure/bookings/{booking_id}/move",
-        "/admin/groups/{slug}/exceptions",
-        "/admin/groups/{slug}/exceptions/{override_id}",
-        "/admin/groups/{slug}/holidays",
-        "/admin/groups/{slug}/messages",
-        "/admin/groups/{slug}/messages/{text_locale}",
-        "/admin/groups/{slug}/reminders",
-        "/admin/groups/{slug}/reminders/{channel}/{minutes}",
-        "/admin/groups/{slug}/staffing",
-        "/admin/groups/{slug}/staffing/{rule_id}",
-        "/admin/groups/{slug}/staffing/{rule_id}/split",
-        "/admin/holidays",
-        "/admin/holidays/{calendar}",
-        "/admin/integrations",
         "/admin/organisations/{org}/closure",
-        "/admin/organisations/{org}/holidays",
-        "/admin/rights",
-        "/admin/updates",
     }
 )
 """Admin pages without a manual topic yet. Only shrinks: document a screen, remove it here."""

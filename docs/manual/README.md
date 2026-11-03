@@ -38,6 +38,14 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Texts for participants / teksten voor deelnemers | [Teksten voor deelnemers](nl/organisation-texts.md) | [Texts for participants](en/organisation-texts.md) |
 | Login: identity providers of an organisation / inloggen (ADR 0083) | [Inloggen: identity providers](nl/organisation-login.md) | [Login: identity providers](en/organisation-login.md) |
 | Log destinations / logbestemmingen (ADR 0085) | [Logbestemmingen](nl/logging.md) | [Log destinations](en/logging.md) |
+| Platform integrations / integraties van het platform | [Integraties](nl/integrations.md) | [Integrations](en/integrations.md) |
+| API clients / API-clients (ADR 0023) | [API-clients](nl/api-clients.md) | [API clients](en/api-clients.md) |
+| Holiday calendars / feestdagenkalenders (ADR 0025) | [Feestdagenkalenders](nl/holidays.md) | [Holiday calendars](en/holidays.md) |
+| Updates / updates (ADR 0029) | [Updates](nl/updates.md) | [Updates](en/updates.md) |
+| Staffing, exceptions and holidays of a team / bezetting, uitzonderingen en feestdagen van een team | [Bezetting, uitzonderingen en feestdagen van een team](nl/group-staffing.md) | [Staffing, exceptions and holidays of a team](en/group-staffing.md) |
+| Reminders and message texts of a team / herinneringen en berichtteksten van een team | [Herinneringen en berichtteksten van een team](nl/group-reminders-messages.md) | [Reminders and message texts of a team](en/group-reminders-messages.md) |
+| Holidays of an organisation / feestdagen van een organisatie | [Feestdagen van een organisatie](nl/organisation-holidays.md) | [Holidays of an organisation](en/organisation-holidays.md) |
+| My rights / mijn rechten | [Mijn rechten](nl/rights.md) | [My rights](en/rights.md) |
 
 ## Writing a topic
 

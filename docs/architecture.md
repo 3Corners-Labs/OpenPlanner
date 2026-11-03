@@ -117,6 +117,8 @@ flowchart TB
         volume[("data volume<br/>SQLite (WAL)")]
         certs[("portal-certs volume<br/>own key, CSR, chain")]
         mailpit["mailpit<br/>dev profile only"]
+        keycloak["keycloak (profile idp)<br/>bundled identity provider,<br/>ADR 0090 and 0106"]
+        idpdata[("idp-data volume")]
     end
 
     smtp[Mail provider]
@@ -130,6 +132,9 @@ flowchart TB
     worker <--> volume
     worker -- "SMTP, STARTTLS or TLS" --> smtp
     web -- "OIDC, https" --> idp
+    web -- "OIDC and directory API (ADR 0095)" --> keycloak
+    keycloak <--> idpdata
+    proxy -- "/idp route (ADR 0112)" --> keycloak
     web -- https --> cisco
     worker -- https --> cisco
     web -- "syslog+tls or https" --> logs
@@ -160,6 +165,12 @@ flowchart TB
   through the portal, the key never enters the database) and whose pair the entrypoint's
   watcher reloads Caddy with on change. Without the profile (`--no-tls`), a
   load balancer of the host does TLS and the source is not the portal's.
+- **Bundled identity provider and internal CA (ADR 0090, 0106, 0112).** With `--profile idp` a
+  Keycloak runs next to `web`; staff are managed in it from the portal (ADR 0095). In a lab
+  without a public name the proxy can issue its certificates from its own certificate authority
+  (`TLS_INTERNAL=true`, ADR 0112), publish the root for download on *System status*, and serve
+  Keycloak under `/idp` on the same https address. Step 6 of ADR 0112 (the installer writes
+  `IDP_UPSTREAM`) is not built.
 - **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The one
   exception is the bundled proxy to `web` on the `edge` network of one host. An own reverse proxy
   on another machine gets HTTPS from uvicorn (`WEB_TLS_CERT_FILE`, `WEB_TLS_KEY_FILE`, class B;
@@ -911,6 +922,44 @@ repository's `security-review` skill before the PR (`docs/skills.md`).
 | 0071 | A trial call on Webex ahead of the appointment |
 | 0072 | Direct calls per staffing block, live status for participant and agent, visible failures |
 | 0074 | Organisation text overrides: allow-listed participant-page and message texts per organisation and locale |
+| 0073 | Email deliverability: sender domain check, system mail headers |
+| 0075 | Browser-direct join link per group |
+| 0076 | Participant journey: trial call events, the page sent to |
+| 0077 | Terminology: participant, and organisation names for staff functions |
+| 0078 | Build work merges on green; decisions and releases wait for the product owner; audit before a minor release |
+| 0079 | The release is a workflow: release PR, audit and tag by dispatch |
+| 0080 | Page width: two classes, declared in the register |
+| 0081 | Subjects and routing attributes next to the group (accepted, not built) |
+| 0082 | Contact-center verification, health, alerts and a fallback per group (step 1 built) |
+| 0083 | Identity providers per organisation, chosen by email domain |
+| 0084 | Everything an admin creates can be changed, archived or deleted |
+| 0086 | The public address and the reverse proxy: visible, verified end to end |
+| 0087 | The public website: static, built from the repository |
+| 0088 | The decision gate judges the merge group too |
+| 0089 | Configuration package (SQLite export and import; the import side is replaced by ADR 0099) |
+| 0090 | A bundled identity provider (Keycloak) for test and lab installations |
+| 0091 | Every hop that carries personal data is encrypted, or a recorded exception |
+| 0092 | Uploads are validated by structure, not by a virus scanner |
+| 0093 | The management link is exchanged for a participant cookie |
+| 0094 | A cryptographic inventory, and key rotation without loss |
+| 0095 | Staff and roles of the bundled identity provider, managed in the portal |
+| 0096 | Overview widgets chosen by the admin (accepted, step 1 built) |
+| 0097 | The OIDC issuer is pinned |
+| 0098 | Admin sessions held on the server |
+| 0099 | Configuration as a JSON document with plan and apply (proposed, not built) |
+| 0100 | Admin login requires a second factor, shown by the identity provider |
+| 0101 | Sub-tabs on a side-navigation entry; Advanced settings in three |
+| 0102 | Retention: open closures, back-ups, and what remains after a purge |
+| 0103 | Self-describing log lines and a register of actions |
+| 0104 | The approval label counts only from an administrator |
+| 0105 | A Participants tab on the organisation |
+| 0106 | The bundled identity provider by default, user names under a platform suffix |
+| 0107 | Release tags come only from the release app |
+| 0108 | Public images for minor and major releases only (proposed, not built) |
+| 0109 | The guardrails are watched against a baseline |
+| 0110 | The website reads its releases live and lists no ADRs |
+| 0111 | The website is served by GitHub Pages and published at minor releases |
+| 0112 | An internal certificate authority for labs; the bundled identity provider behind the proxy |
 
 What is built of each decision is not kept here: it is in `docs/adr-status.md` (checked against the code) and in the *Build status* of the ADR itself.
 
@@ -936,7 +985,7 @@ What is built of each decision is not kept here: it is in `docs/adr-status.md` (
 | ADR 0048 | Live update progress: steps reported by the host updater, shown live on the updates page | done |
 | ADR 0052 | Releases and version numbers: rules, release PR plus tag, tag check in CI, commit in every image | done |
 | ADR 0031 | Audit log per role level with system events (job outcomes), filters, 90-day retention | done |
-| ADR 0033 | Manual and context-sensitive help: 20 topics in Dutch and English; 28 admin routes still without a topic | in progress |
+| ADR 0033 | Manual and context-sensitive help: 36 topics in Dutch and English; five admin pages still without one (new group, group overview, a booking, move during a closure, organisation closure) | in progress |
 | WP7b+ | Reusable holiday calendars (superuser), choice per organisation and group | done |
 | WP7c–d | Texts and reminders, encrypted channel settings (ADR 0022); organisation-wide text overrides (ADR 0074); global overrides and `.po` import/export | partly done |
 | WP8 | Purge sweep and alerting (sweep and backlog alert done), audit retention | partly done |
