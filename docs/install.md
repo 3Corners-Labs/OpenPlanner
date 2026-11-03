@@ -1,5 +1,7 @@
 # Installing OpenPlanner on a host
 
+> Kubernetes instead of a host? That is `docs/kubernetes.md` (trial, one replica, ADR 0114).
+
 One script installs, repairs and re-checks a host: `scripts/install.sh`. Run it after a fresh
 clone, after a manual change, or whenever something looks wrong; a second run changes nothing
 that is in order. This page explains what it does, where everything lives and what to do when it

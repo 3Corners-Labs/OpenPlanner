@@ -1,0 +1,8 @@
+apiVersion: v2
+name: openplanner
+description: "OpenPlanner on Kubernetes, one replica (ADR 0114), web and worker in one pod on one SQLite volume"
+type: application
+version: 0.1.0
+# The chart does not track the application's release; the image is chosen with image.tag (or
+# image.digest), see docs/kubernetes.md.
+appVersion: "0"
