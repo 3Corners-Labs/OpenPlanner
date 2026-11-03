@@ -841,13 +841,14 @@ scripts/render-keycloak-realm.sh
 docker compose --profile idp up -d idp
 ```
 
-The script generates every value that is missing, keeps the ones that exist, takes the
-portal's address from `PUBLIC_BASE_URL` in `.env` (the redirect URIs), and prints no value.
-`OIDC_CLIENT_SECRET` in `.env` must equal `KC_OPENPLANNER_CLIENT_SECRET`, and
-`OIDC_DISCOVERY_URL` points at `http://idp:8080/realms/openplanner/.well-known/openid-configuration`;
-the installer does both in step 2 of ADR 0090 (until then, by hand). Also set
-`OIDC_ISSUER` to `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public address, not
-the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097).
+`scripts/install.sh` runs this for you (`--idp bundled`, the default in `test` and `lab`, ADR 0106
+step 5): run the script by hand only to render again after a change of the public address. It
+generates every value that is missing, keeps the ones that exist, takes the portal's address
+from `PUBLIC_BASE_URL` in `.env` (the redirect URIs, and the https hostname of Keycloak), and
+prints no value. The login (`OIDC_DISCOVERY_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`,
+`OIDC_CLIENT_SECRET`) is written to `secrets/keycloak-app.env`, so nothing is copied into
+`.env`. `OIDC_ISSUER` is `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public
+address, not the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097).
 `python -m app.cli oidc-check` compares the two and names the issuer to set when they differ.
 When Keycloak itself sits behind a TLS proxy, set `KC_PROXY_HEADERS=xforwarded` (and let the
 proxy send `X-Forwarded-Proto`): otherwise Keycloak announces its token endpoint and key set as
@@ -915,6 +916,22 @@ http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` wit
 `KC_BOOTSTRAP_ADMIN_PASSWORD`, open realm `openplanner` → *Users* → `super` →
 *Credentials* → *Reset password*, tick *Temporary* so the next login asks for a new one. The
 CLI of ADR 0042 §10 creates no user and starts no session; the admin console is the only way.
+
+**Production mode (ADR 0106 point 4).** In `production` the installer runs Keycloak with
+`start` on its own PostgreSQL container `idp-db` (profile `idp-db`, volume `idp-db-data`, user
+and password in `secrets/idp-db.env`, the same password as `KC_DB_PASSWORD` in
+`secrets/keycloak.env`). The admin console stays on the host's loopback (`127.0.0.1:8080`,
+`/idp` there), the login is served by the proxy. Back the database up next to the application's:
+
+```bash
+docker compose --env-file .env.update exec -T idp-db pg_dump -U keycloak keycloak | gzip > idp-$(date +%F).sql.gz
+```
+
+Restore into an empty `idp-db`: stop `idp`, `gunzip -c idp-<date>.sql.gz | docker compose
+--env-file .env.update exec -T idp-db psql -U keycloak keycloak`, start `idp`. The dump holds
+accounts and password hashes: keep it on the host's backup volume, never copy it off. The
+updater's own rollback copy covers the application's database only; the Keycloak dump is taken
+by you (a nightly job on the host) until the updater does it (ADR 0106 step 5c).
 
 **Data.** The named volume `idp-data` holds the staff accounts and their password hashes:
 back it up with the database volume, and treat it as personal data (`docs/dataflow.md`).

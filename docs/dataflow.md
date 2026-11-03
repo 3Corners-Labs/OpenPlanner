@@ -180,7 +180,7 @@ not personal data; no purge job; kept until changed. The audit event holds count
 ## Admin login and audit (WP7a)
 
 ```
-admin ──browser (https)──> proxy ──> web /admin/login ──redirect──> identity provider (the bundled one is served by the proxy under /idp on the same host, ADR 0112; PingFederate; Keycloak in dev; the bundled Keycloak of a test or lab installation, ADR 0090, on the host's loopback with its accounts in the volume idp-data)
+admin ──browser (https)──> proxy ──> web /admin/login ──redirect──> identity provider (the bundled one is served by the proxy under /idp on the same host, ADR 0112; PingFederate; Keycloak in dev; the bundled Keycloak, ADR 0090, on the host's loopback with its accounts in the volume idp-data, or in production in the PostgreSQL volume idp-db-data, ADR 0106 point 4)
 identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
 web ──signed session cookie op_admin (a random session reference and the admin's UI choices, no name or role; ADR 0098)──> admin browser
 web ──SQL──> admin_sessions (sha256 of the reference, sub, provider, claims, login, last seen, end and reason; ADR 0098)
