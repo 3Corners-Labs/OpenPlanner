@@ -4616,6 +4616,9 @@ msgstr "Nu controleren"
 msgid "admin.check.never"
 msgstr "Deze groep is nog niet gecontroleerd."
 
+msgid "admin.check.help"
+msgstr "Zo lost u dit op"
+
 msgid "admin.check.last"
 msgstr "Laatst gecontroleerd: {at}"
 
@@ -4740,7 +4743,7 @@ msgid "admin.check.wxcc.schema.ok"
 msgstr "Het schema van de asset bevat de velden die OpenPlanner meestuurt."
 
 msgid "admin.check.wxcc.schema.refused"
-msgstr "Webex Contact Center weigert het work item: velden die ontbreken: {missing}; verplichte velden die OpenPlanner niet kent: {extra}. Pas het schema van de asset aan (runbook)."
+msgstr "Webex Contact Center weigert het work item omdat het dataschema van de asset niet past. Open in Control Hub Contact Center > Digital settings > Assets > de asset van deze groep en pas het Data schema aan: voeg deze velden toe (Viewable Yes, Required No): {missing}; zet Required op No bij: {extra}. Alleen bookingReference heeft Required Yes."
 
 msgid "admin.check.wxcc.schema.hidden"
 msgstr "Deze velden zijn niet zichtbaar voor agents: {fields}."
@@ -4809,7 +4812,7 @@ msgid "admin.check.wxcc.probe.failed"
 msgstr "WxCC meldde proef-work item {task} als mislukt ({seconds} s): de flow of de wachtrij weigert het."
 
 msgid "admin.check.wxcc.probe.no_events"
-msgstr "Proef-work item {task} is aangemaakt, maar binnen {seconds} s kwam geen task:new binnen: het abonnement staat uit of de webhook bereikt OpenPlanner niet. OpenPlanner heeft het item zelf beëindigd."
+msgstr "Proef-work item {task} is aangemaakt, maar binnen {seconds} s kwam geen task:new binnen: WxCC meldt niets terug aan OpenPlanner. Kijk bij het onderdeel Webhooks van deze controle naar het abonnement en het testbericht. OpenPlanner heeft het item zelf beëindigd."
 
 msgid "admin.check.wxcc.probe.not_ended"
 msgstr "Proef-work item {task} kwam binnen (task:new), maar de flow beëindigde het niet binnen {seconds} s: controleer de tak op kind == probe. OpenPlanner heeft het item zelf beëindigd."
