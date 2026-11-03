@@ -27,6 +27,13 @@ inputs:
       nobody consumes is a build warning).
     required: false
     default: ""
+  public-image:
+    description: >-
+      Registry name of the public package (ghcr.io/owner/repo-public) that receives the same
+      push as `image` (one digest, ADR 0108). Empty for everything but a minor or major
+      release; the rule lives in main.yml.
+    required: false
+    default: ""
   sbom-file:
     description: Where the CycloneDX SBOM is written, relative to the workspace.
     required: false
@@ -49,7 +56,9 @@ runs:
     - id: meta
       uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
       with:
-        images: ${{ inputs.image }}
+        images: |
+          ${{ inputs.image }}
+          ${{ inputs.public-image }}
         tags: ${{ inputs.tags }}
     - id: build
       uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -66,8 +75,13 @@ runs:
     - name: sign image (keyless)
       shell: bash
       env:
-        IMAGE_REF: ${{ inputs.image }}@${{ steps.build.outputs.digest }}
-      run: cosign sign --yes "$IMAGE_REF"
+        IMAGE_REFS: |
+          ${{ inputs.image }}@${{ steps.build.outputs.digest }}
+          ${{ inputs.public-image && format('{0}@{1}', inputs.public-image, steps.build.outputs.digest) || '' }}
+      run: |
+        while read -r ref; do
+          [ -z "$ref" ] || cosign sign --yes "$ref"
+        done <<< "$IMAGE_REFS"
     - name: SBOM (CycloneDX)
       uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
       with:
@@ -78,6 +92,11 @@ runs:
     - name: attest SBOM
       shell: bash
       env:
-        IMAGE_REF: ${{ inputs.image }}@${{ steps.build.outputs.digest }}
+        IMAGE_REFS: |
+          ${{ inputs.image }}@${{ steps.build.outputs.digest }}
+          ${{ inputs.public-image && format('{0}@{1}', inputs.public-image, steps.build.outputs.digest) || '' }}
         SBOM_FILE: ${{ inputs.sbom-file }}
-      run: cosign attest --yes --type cyclonedx --predicate "$SBOM_FILE" "$IMAGE_REF"
+      run: |
+        while read -r ref; do
+          [ -z "$ref" ] || cosign attest --yes --type cyclonedx --predicate "$SBOM_FILE" "$ref"
+        done <<< "$IMAGE_REFS"
