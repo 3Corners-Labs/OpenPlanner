@@ -60,6 +60,17 @@ def test_it_is_valid_shell_and_powershell_names_the_same_commands() -> None:
         assert word in ps1
 
 
+def _tools_without_docker(tmp_path: Path) -> Path:
+    """Link the few real tools the script needs into a directory without docker (a runner has one)."""
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    for name in ("dirname", "sort", "head", "grep", "sed", "cat"):
+        found = shutil.which(name)
+        assert found
+        (tools / name).symlink_to(found)
+    return tools
+
+
 def test_a_missing_docker_is_explained(tmp_path: Path) -> None:
     work = tmp_path / "repo"
     (work / "scripts").mkdir(parents=True)
@@ -68,7 +79,7 @@ def test_a_missing_docker_is_explained(tmp_path: Path) -> None:
         [BASH, str(work / "scripts" / "try.sh"), "down"],
         capture_output=True,
         text=True,
-        env={"PATH": "/usr/bin:/bin"},
+        env={"PATH": str(_tools_without_docker(tmp_path))},
         check=False,
     )
     assert result.returncode == 1
@@ -101,9 +112,9 @@ def test_an_unknown_command_fails(tmp_path: Path) -> None:
     assert "unknown command" in result.stderr
 
 
-@pytest.mark.parametrize("flag", ["up", "--no-open"])
-def test_up_writes_env_builds_and_gives_up_when_never_ready(tmp_path: Path, flag: str) -> None:
-    result, log = _run(tmp_path, flag)
+@pytest.mark.parametrize("args", [("up", "--no-open"), ("--no-open",)])
+def test_up_writes_env_and_builds(tmp_path: Path, args: tuple[str, ...]) -> None:
+    result, log = _run(tmp_path, *args)
     assert (tmp_path / "repo" / ".env").exists() or "in use" in result.stderr
     if "in use" in result.stderr:
         pytest.skip("a local port is taken on this machine")
