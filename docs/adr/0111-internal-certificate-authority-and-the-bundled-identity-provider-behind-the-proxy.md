@@ -91,10 +91,10 @@ default of `production`.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | | planned |
-| 1 | Proxy: `internal` source, `/idp` route, root published to `internal-ca`; compose; the host's checks trust it (`app/adapters/internal_ca.py`, `TLS_INTERNAL_CA_FILE`) | | planned |
-| 2 | Keycloak: render script derives `KC_HOSTNAME`, relative path, proxy headers and the login half in `keycloak-app.env` from an https address | | planned |
-| 3 | System status offers the root (`GET /admin/settings/tls/ca.crt`); runbook (install the root, the identity provider behind the proxy); `scripts/check-proxy.sh` pass 3 | | planned |
-| 4 | Installer `--internal-ca` | | planned |
+| 0 | ADR | #476 | in PR |
+| 1 | Proxy: `internal` source, `/idp` route, root published to `internal-ca`; compose; the host's checks trust it (`app/adapters/internal_ca.py`, `TLS_INTERNAL_CA_FILE`) | #476 | in PR |
+| 2 | Keycloak: render script derives `KC_HOSTNAME`, relative path, proxy headers and the login half in `keycloak-app.env` from an https address | #476 | in PR |
+| 3 | System status offers the root (`GET /admin/settings/tls/ca.crt`); runbook (install the root, the identity provider behind the proxy); `scripts/check-proxy.sh` pass 3 | #476 | in PR |
+| 4 | Installer `--internal-ca` | #476 | in PR |
 | 5 | docker01 on https | | planned |
 | 6 | `IDP_UPSTREAM` and the realm's mail server written by the installer (with ADR 0106 step 5) | | planned |
