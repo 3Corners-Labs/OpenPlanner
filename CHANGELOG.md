@@ -6,6 +6,11 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ### Features
 
+- Kubernetes trial (ADR 0114): a Helm chart in `deploy/helm/openplanner/` runs the signed images as
+  one pod (web and worker, one replica, `Recreate`) on one ReadWriteOnce volume, with secrets as
+  files, the cluster's ingress and the organisation's own login; `docs/kubernetes.md` covers
+  install, upgrade, backup and TransIP notes. Tested by rendering; the first run on a cluster is
+  open.
 - Try it on any computer (`docs/try-it.md`): `scripts/try.sh` (macOS, Linux, WSL, Git Bash) and
   `scripts/try.ps1` (Windows) check Docker, Compose and the ports, write `.env`, build and start the
   demo stack (web, worker, Mailpit, development Keycloak), wait until it is ready, load the demo

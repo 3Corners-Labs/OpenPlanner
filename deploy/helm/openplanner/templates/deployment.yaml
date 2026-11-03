@@ -1,0 +1,125 @@
+{{- $_ := required "existingSecret is required (docs/kubernetes.md)" .Values.existingSecret -}}
+{{- if and (eq .Values.forwardedAllowIps "") (not .Values.allowAnyForwarder) -}}
+{{- fail "forwardedAllowIps is required: the ingress controller's pod addresses (or set allowAnyForwarder: true knowingly)" -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "openplanner.labels" . | nindent 4 }}
+spec:
+  # One replica and Recreate, always: the database is one SQLite file with one writer, and a
+  # second pod, even during an update, must never open it (ADR 0114).
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "openplanner.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "openplanner.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: {{ include "openplanner.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Only web migrates the schema, as in docker-compose.yml.
+          command:
+            - sh
+            - -c
+            - |-
+              alembic upgrade head || exit 1
+              set -- --no-access-log --proxy-headers --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
+              if [ -n "${WEB_TLS_CERT_FILE:-}" ]; then
+                set -- "$@" --ssl-certfile "$WEB_TLS_CERT_FILE" --ssl-keyfile "$WEB_TLS_KEY_FILE"
+              fi
+              exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 "$@"
+          ports:
+            - {name: http, containerPort: 8000}
+          env:
+            {{- include "openplanner.env" . | nindent 12 }}
+            - name: FORWARDED_ALLOW_IPS
+              value: {{ if .Values.forwardedAllowIps }}{{ .Values.forwardedAllowIps | quote }}{{ else }}"*"{{ end }}
+            {{- if .Values.webTls.enabled }}
+            - {name: WEB_TLS_CERT_FILE, value: /web-tls/tls.crt}
+            - {name: WEB_TLS_KEY_FILE, value: /web-tls/tls.key}
+            {{- end }}
+          startupProbe:
+            httpGet: {path: /healthz, port: http, scheme: {{ if .Values.webTls.enabled }}HTTPS{{ else }}HTTP{{ end }}}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /readyz, port: http, scheme: {{ if .Values.webTls.enabled }}HTTPS{{ else }}HTTP{{ end }}}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http, scheme: {{ if .Values.webTls.enabled }}HTTPS{{ else }}HTTP{{ end }}}
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources.web | nindent 12 }}
+          securityContext:
+            {{- include "openplanner.securityContext" . | nindent 12 }}
+          volumeMounts:
+            {{- include "openplanner.mounts" . | nindent 12 }}
+            {{- if .Values.webTls.enabled }}
+            - {name: web-tls, mountPath: /web-tls, readOnly: true}
+            {{- end }}
+        - name: worker
+          image: {{ include "openplanner.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-m", "app.jobs.worker"]
+          env:
+            {{- include "openplanner.env" . | nindent 12 }}
+          livenessProbe:
+            exec:
+              command: ["python", "-m", "app.jobs.healthcheck"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources.worker | nindent 12 }}
+          securityContext:
+            {{- include "openplanner.securityContext" . | nindent 12 }}
+          volumeMounts:
+            {{- include "openplanner.mounts" . | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-data" .Release.Name) .Values.persistence.existingClaim }}
+        - name: tmp
+          emptyDir:
+            medium: Memory
+        - name: secrets
+          secret:
+            secretName: {{ .Values.existingSecret }}
+            defaultMode: 0400
+        {{- if .Values.webTls.enabled }}
+        - name: web-tls
+          secret:
+            secretName: {{ required "webTls.secretName is required with webTls.enabled" .Values.webTls.secretName }}
+            defaultMode: 0440
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

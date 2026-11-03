@@ -1,0 +1,7 @@
+OpenPlanner runs as ONE pod with web and worker on one volume. Do not scale it.
+
+  kubectl rollout status deployment/{{ .Release.Name }}
+  kubectl exec deploy/{{ .Release.Name }} -c web -- python -m app.cli version
+
+Open https://{{ .Values.ingress.host | default "<your host>" }}/admin/ . The update page of the
+portal does not apply here: update with `helm upgrade --set image.tag=<version>` (docs/kubernetes.md).

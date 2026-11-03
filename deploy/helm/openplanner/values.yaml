@@ -1,0 +1,77 @@
+# One replica, always (ADR 0114): the database is one SQLite file, so there is no replicas value.
+# Everything here is deployment configuration (class B, ADR 0042); the portal's settings are
+# not repeated.
+
+image:
+  # The public package of a minor or major release (ADR 0108); a private package needs
+  # imagePullSecrets.
+  repository: ghcr.io/3corners-labs/openplanner-public
+  # Required: the release, for example 0.4.0. A digest is better (image.digest overrides the tag).
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# Required: the address people use, with https (PUBLIC_BASE_URL).
+publicBaseUrl: ""
+
+# Required: the pod addresses uvicorn trusts X-Forwarded-For from, that is the ingress
+# controller's pods (CIDR or addresses, comma separated). `*` trusts every sender and is not
+# accepted unless allowAnyForwarder is true, because a client could then forge its address.
+forwardedAllowIps: ""
+allowAnyForwarder: false
+
+# Settings of the application that are not secret, as environment variables (.env.example lists
+# them): the login (OIDC_DISCOVERY_URL, OIDC_CLIENT_ID, OIDC_ISSUER), the mail server
+# (SMTP_HOST, SMTP_PORT, MAIL_FROM) and so on. ENVIRONMENT is prod.
+env:
+  ENVIRONMENT: prod
+
+# A Secret you create (docs/kubernetes.md) with these keys. Each is mounted read-only as a file
+# and handed over as <KEY>_FILE (ADR 0042 section 9), so no secret sits in the pod's environment.
+existingSecret: ""
+secretKeys:
+  - SETTINGS_ENCRYPTION_KEY
+  - MANAGEMENT_TOKEN_KEY
+  - SESSION_SECRET
+  - OIDC_CLIENT_SECRET
+
+persistence:
+  # The SQLite database and its backups. ReadWriteOnce block storage; never network file storage.
+  size: 5Gi
+  storageClass: ""
+  existingClaim: ""
+
+service:
+  port: 8000
+
+ingress:
+  enabled: true
+  className: ""
+  host: ""
+  annotations: {}
+  # The TLS Secret of the ingress (cert-manager fills it); empty serves plain HTTP at the edge.
+  tlsSecretName: ""
+
+# HTTPS between the ingress and the pod (ADR 0091 point 3): a kubernetes.io/tls Secret with
+# tls.crt and tls.key, mounted for uvicorn. The ingress must then speak HTTPS to the backend.
+webTls:
+  enabled: false
+  secretName: ""
+
+# Only the ingress controller's namespace may reach the pod, and the pod may reach out.
+networkPolicy:
+  enabled: false
+  ingressNamespaceLabels:
+    kubernetes.io/metadata.name: ingress-nginx
+
+resources:
+  web:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 768Mi}
+  worker:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 512Mi}
+
+nodeSelector: {}
+tolerations: []
