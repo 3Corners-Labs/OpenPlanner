@@ -143,7 +143,7 @@ def test_a_certificate_without_names_has_none(tmp_path: Path) -> None:
 async def test_an_extra_root_is_trusted_next_to_the_host_bundle(
     server: int, certificate: tuple[Path, Path]
 ) -> None:
-    """ADR 0111: the proxy's internal root joins the host's CAs instead of replacing them."""
+    """ADR 0112: the proxy's internal root joins the host's CAs instead of replacing them."""
     result = await SslCertificateProbe(extra_cafile=str(certificate[0])).probe("localhost", server)
 
     assert result.trust is Trust.TRUSTED

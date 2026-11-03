@@ -38,7 +38,7 @@ services:
       TLS_CERT_FILE: ${PROXY_CERT_FILE:-}
       TLS_KEY_FILE: ${PROXY_KEY_FILE:-}
       # Third pass: Caddy's internal authority, and a route to an upstream that is not there
-      # (ADR 0111), so a 502 on /idp/ proves the route without a Keycloak.
+      # (ADR 0112), so a 502 on /idp/ proves the route without a Keycloak.
       TLS_INTERNAL: ${PROXY_INTERNAL:-}
       IDP_UPSTREAM: ${PROXY_IDP_UPSTREAM:-}
     volumes:

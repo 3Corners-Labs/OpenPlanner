@@ -9,7 +9,7 @@
 # by the proxy before it reaches web (ASVS V4.1.3, V15.3.4; read from the wire); a
 # pair handed over through the portal-certs volume is served within the poll interval and ACME
 # applies again when it is withdrawn; then the same proxy serves an own certificate from files and
-# one issued by its internal authority (ADR 0111; the root is published, trusted by `tls-check`,
+# one issued by its internal authority (ADR 0112; the root is published, trusted by `tls-check`,
 # and /idp/ is routed),
 # and `tls-check` from the web container reads either certificate and judges it. Used by CI
 # and by `make proxy-check`. Needs docker with compose v2, curl and openssl.
@@ -303,7 +303,7 @@ round_trip ok own.crt
 tls_check untrusted "OpenPlanner own CA check"
 echo "pass 2 ok: own certificate from files, redirect, body limit, non-root, TLS versions, HSTS, round trip, tls-check"
 
-# Pass 3: Caddy's internal authority (ADR 0111). No ACME, no mailbox; the public root is
+# Pass 3: Caddy's internal authority (ADR 0112). No ACME, no mailbox; the public root is
 # published to the internal-ca volume, the app's checks trust it, and /idp/ is routed.
 unset PROXY_CERT_FILE PROXY_KEY_FILE
 export PROXY_INTERNAL=true PROXY_IDP_UPSTREAM=127.0.0.1:9

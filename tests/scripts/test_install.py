@@ -579,7 +579,7 @@ def test_own_certificate_without_the_proxy_is_refused(host: Host) -> None:
 
 
 def test_the_internal_ca_needs_no_mailbox_and_locks_the_portal_source(host: Host) -> None:
-    """ADR 0111: Caddy's own authority; ACME_EMAIL is not asked for."""
+    """ADR 0112: Caddy's own authority; ACME_EMAIL is not asked for."""
     settings = {k: v for k, v in PRODUCTION.items() if k != "ACME_EMAIL"}
 
     result = host.run("--mode", "test", "--internal-ca", "--non-interactive", **settings)

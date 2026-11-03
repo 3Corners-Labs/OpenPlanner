@@ -774,7 +774,7 @@ async def test_system_status_counts_open_bookings_on_the_previous_token_key(
 async def test_the_internal_root_is_offered_only_when_the_proxy_published_it(
     settings: Settings, admin_db: str, tmp_path: Path
 ) -> None:
-    """ADR 0111: a public certificate to download; no file, no link, 404."""
+    """ADR 0112: a public certificate to download; no file, no link, 404."""
     root = tmp_path / "root.crt"
     async with _running_site(
         settings.model_copy(update={"tls_internal_ca_file": root}), admin_db

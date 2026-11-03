@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM caddy:2.11.7-alpine
 # curl is not used (the health check uses busybox wget) and carries its own CVEs.
-# /internal-ca receives the public root of the internal authority (ADR 0111).
+# /internal-ca receives the public root of the internal authority (ADR 0112).
 # Caddy runs as uid 10001 on unprivileged ports (8080/8443, published as 80/443). The file
 # capability on the binary is removed: with cap_drop ALL and no-new-privileges the kernel
 # refuses to exec a binary that asks for a capability it cannot get.

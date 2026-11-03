@@ -187,7 +187,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/settings/tls/csr.pem": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "GET /admin/settings/tls/ca.crt": {
-        # ADR 0111: a public certificate, read like System status; no file in the matrix site.
+        # ADR 0112: a public certificate, read like System status; no file in the matrix site.
         "/admin/settings/tls/ca.crt": statuses(404, 403, 403, 403, 404, 403, 403),
     },
     "POST /admin/settings/tls/certificate": {

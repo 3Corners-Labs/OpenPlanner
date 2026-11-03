@@ -508,7 +508,7 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
             leaks[path] = found_leaks
     assert leaks == {}, "personal data on a list, overview, export or alert page (ADR 0063 §2)"
     # An image route has none to show; the certificate request download (ADR 0072) has no
-    # request waiting, and the internal root (ADR 0111) no file without the internal authority.
+    # request waiting, and the internal root (ADR 0112) no file without the internal authority.
     # All answer 404 on purpose and carry no personal data.
     no_content = ("/image", "/tls/csr.pem", "/tls/ca.crt")
     not_reached = {p: s for p, s in statuses.items() if s >= 400 and not p.endswith(no_content)}

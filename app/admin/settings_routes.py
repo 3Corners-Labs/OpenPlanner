@@ -449,7 +449,7 @@ async def download_request(request: Request, context: Manage) -> Response:
 
 @router.get("/settings/tls/ca.crt", response_class=PlainTextResponse)
 async def download_internal_root(request: Request, context: View) -> Response:
-    """Return the public root of the proxy's internal authority, to install once (ADR 0111).
+    """Return the public root of the proxy's internal authority, to install once (ADR 0112).
 
     A certificate, not a secret: anyone who can read System status may fetch it. The CA's key
     stays in the proxy's volume and is not reachable from here.

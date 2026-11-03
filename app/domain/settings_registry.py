@@ -440,7 +440,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "/internal-ca/root.crt",
         _B,
         T.SWITCHES,
-        "The public root certificate of the proxy's internal authority (ADR 0111). The host's own "
+        "The public root certificate of the proxy's internal authority (ADR 0112). The host's own "
         "certificate and address checks trust it when the file exists; the proxy writes it.",
     ),
     S(

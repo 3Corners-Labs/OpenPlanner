@@ -1,5 +1,5 @@
 #!/bin/sh
-# Start Caddy with one of four certificate sources (ADR 0030, ADR 0064, ADR 0070, ADR 0111), in
+# Start Caddy with one of four certificate sources (ADR 0030, ADR 0064, ADR 0070, ADR 0112), in
 # this order of precedence:
 #   operator files    TLS_CERT_FILE and TLS_KEY_FILE under /certs (proxy.env): Caddy serves the
 #                     files and manages nothing; renewal is the operator's, and the portal's
@@ -16,7 +16,7 @@
 # The Caddyfile cannot branch, so the `tls` line of the https site comes from TLS_DIRECTIVE,
 # which this script sets for `caddy run` and again for every `caddy reload`. Without a domain
 # Caddy would serve plain HTTP on 8443, so a missing or incomplete setting stops the container.
-# IDP_UPSTREAM (host:port) adds the route /idp/* to the bundled identity provider (ADR 0111).
+# IDP_UPSTREAM (host:port) adds the route /idp/* to the bundled identity provider (ADR 0112).
 set -eu
 
 PORTAL_DIR=${TLS_PORTAL_DIR:-/portal-certs} # the volume's mount point (tests point it elsewhere)
@@ -111,7 +111,7 @@ elif [ "${TLS_INTERNAL:-}" = true ]; then
   [ -w "$INTERNAL_CA_DIR" ] || fail "$INTERNAL_CA_DIR is not writable by uid 10001 (volume internal-ca)"
   export TLS_DIRECTIVE="tls internal"
   publish_root &
-  echo "internal certificate authority: browsers trust it once its root is installed (ADR 0111)"
+  echo "internal certificate authority: browsers trust it once its root is installed (ADR 0112)"
 else
   [ -n "${ACME_EMAIL:-}" ] \
     || fail "ACME_EMAIL is required (or TLS_CERT_FILE and TLS_KEY_FILE for an own certificate)"

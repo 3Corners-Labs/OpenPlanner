@@ -332,7 +332,7 @@ def test_the_otp_policy_is_the_one_every_authenticator_app_reads() -> None:
 
 
 def test_an_https_address_puts_keycloak_under_idp_and_writes_the_login(tmp_path: Path) -> None:
-    """ADR 0111: one host name, the proxy serves /idp; nothing is copied into .env by hand."""
+    """ADR 0112: one host name, the proxy serves /idp; nothing is copied into .env by hand."""
     (tmp_path / ".env").write_text("PUBLIC_BASE_URL=https://docker01.example.nl\n")
     env = "".join(f"{key}={value}\n" for key, value in FIXED.items())
 

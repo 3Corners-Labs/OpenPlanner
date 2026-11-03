@@ -189,7 +189,7 @@ def test_one_file_of_the_operators_pair_stops_the_container(bin_dir: Path, tmp_p
     assert outcome.logged == []
 
 
-# ADR 0111: the internal authority and the route to the bundled identity provider.
+# ADR 0112: the internal authority and the route to the bundled identity provider.
 
 
 def internal(tmp_path: Path, *, published: bool = True) -> dict[str, str]:

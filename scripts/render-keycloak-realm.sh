@@ -6,7 +6,7 @@
 # compose profile `idp` mounts. It also writes the application's half, secrets/keycloak-app.env
 # (KEYCLOAK_ADMIN_URL, KEYCLOAK_DIRECTORY_CLIENT_ID and _SECRET), which web and worker read, so
 # staff management works without copying a value by hand (ADR 0106). With an https address
-# (ADR 0111) Keycloak is served by the proxy under /idp, and the same file carries the login. The env files get mode
+# (ADR 0112) Keycloak is served by the proxy under /idp, and the same file carries the login. The env files get mode
 # 600; the realm gets 644, because Keycloak reads it as its own user (uid 1000), which is
 # rarely the host user. The secrets directory is 700, so nobody else on the host gets past
 # it; the container reads the file through its bind mount. Nothing a value holds is ever printed:
@@ -82,7 +82,7 @@ done
 KC_OPENPLANNER_BASE_URL=${KC_OPENPLANNER_BASE_URL%/}
 [[ -n $KC_HOSTNAME ]] || KC_HOSTNAME=http://127.0.0.1:8080
 
-# ADR 0111: with an https public address Keycloak is served by the proxy under /idp, on the same
+# ADR 0112: with an https public address Keycloak is served by the proxy under /idp, on the same
 # host name and certificate. The browser address, the relative path and the proxy header mode
 # follow from it; web and worker talk to Keycloak on the internal network, with the path.
 if [[ $KC_OPENPLANNER_BASE_URL == https://* ]]; then
@@ -131,7 +131,7 @@ tmp=$(mktemp "$SECRETS_DIR/.keycloak-app.env.XXXXXX")
   printf 'KEYCLOAK_DIRECTORY_CLIENT_ID=openplanner-directory\n'
   printf 'KEYCLOAK_DIRECTORY_CLIENT_SECRET=%s\n' "$KC_DIRECTORY_CLIENT_SECRET"
   if ((HTTPS)); then
-    printf '# https: the login itself, so nothing has to be copied into .env by hand (ADR 0111).\n'
+    printf '# https: the login itself, so nothing has to be copied into .env by hand (ADR 0112).\n'
     printf 'OIDC_DISCOVERY_URL=%s\n' "$DISCOVERY_URL"
     printf 'OIDC_ISSUER=%s/realms/openplanner\n' "$KC_HOSTNAME"
     printf 'OIDC_CLIENT_ID=openplanner-admin\n'

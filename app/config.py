@@ -495,7 +495,7 @@ class Settings(BaseSettings):
     # Class B (ADR 0086): the worker's round trip to the public address; off only for a network
     # that cannot reach its own public name from inside (NAT without hairpin).
     public_address_check_enabled: bool = True
-    # ADR 0111: the public root of the proxy's internal certificate authority. The certificate
+    # ADR 0112: the public root of the proxy's internal certificate authority. The certificate
     # probe and the round trip to the public address trust it when the file exists.
     tls_internal_ca_file: Path = Path("/internal-ca/root.crt")
     # ADR 0083: the host's switch for logins through organisation providers. Class B: it opens

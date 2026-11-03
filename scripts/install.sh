@@ -27,7 +27,7 @@
 #                      --tls-domain; ADR 0064): TLS_DOMAIN and ACME_EMAIL, or with
 #                      --own-certificate the files in certs/; same rules; with --internal-ca
 #                      TLS_INTERNAL=true instead (Caddy's own authority, for a lab or a network
-#                      without a public name; ADR 0111)
+#                      without a public name; ADR 0112)
 #   4. .env.update     pull <image>:<version> -> digest -> cosign verify -> pin digest, profiles
 #                      and mode; with the HTTPS proxy the same for <image>-proxy:<version>
 #                      (ADR 0064 step 2: no host builds Caddy); without --version existing
@@ -620,7 +620,7 @@ proxy_settings() {
         put TLS_CERT_FILE "$OWN_CERT_FILE"
         put TLS_KEY_FILE "$OWN_KEY_FILE"
       elif ((INTERNAL_CA)); then
-        printf "# Caddy's own certificate authority (ADR 0111): install its root once (System status).\n"
+        printf "# Caddy's own certificate authority (ADR 0112): install its root once (System status).\n"
         put TLS_INTERNAL true
       else
         put ACME_EMAIL "$ACME_EMAIL"

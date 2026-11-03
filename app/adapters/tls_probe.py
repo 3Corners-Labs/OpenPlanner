@@ -36,7 +36,7 @@ class SslCertificateProbe:
         timeout: Seconds for connection plus handshake.
         cafile: A CA bundle to trust instead of the host's (tests, a private CA).
         extra_cafile: A CA certificate to trust in addition to the host's bundle (the proxy's
-            internal authority, ADR 0111).
+            internal authority, ADR 0112).
     """
 
     def __init__(

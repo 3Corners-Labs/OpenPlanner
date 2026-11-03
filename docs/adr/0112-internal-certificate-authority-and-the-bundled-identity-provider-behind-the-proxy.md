@@ -1,4 +1,4 @@
-# 0111. An internal certificate authority for labs, and the bundled identity provider behind the proxy
+# 0112. An internal certificate authority for labs, and the bundled identity provider behind the proxy
 
 Status: proposed (2026-11-03), requested by the product owner. Amends ADR 0064 (two certificate
 sources become three), ADR 0090 step 2 (the bundled Keycloak is reached through the proxy) and

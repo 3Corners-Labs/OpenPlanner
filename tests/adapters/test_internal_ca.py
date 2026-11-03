@@ -1,4 +1,4 @@
-"""The host's trust in the proxy's internal certificate authority (ADR 0111)."""
+"""The host's trust in the proxy's internal certificate authority (ADR 0112)."""
 
 from pathlib import Path
 

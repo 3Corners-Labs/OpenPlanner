@@ -1,4 +1,4 @@
-"""The host's trust in the proxy's internal certificate authority (ADR 0111).
+"""The host's trust in the proxy's internal certificate authority (ADR 0112).
 
 With ``TLS_INTERNAL=true`` the proxy issues its certificates from Caddy's own authority and
 publishes only the public root to the volume ``internal-ca``. The certificate probe and the
