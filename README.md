@@ -2,7 +2,7 @@
 
 [openplanner.nl](https://openplanner.nl)
 
-**Video appointments with your team, booked in seconds, privacy by default.**
+**Video appointments that land in your contact center. Open source, privacy by default.**
 
 OpenPlanner is an open-source scheduler for Webex video meetings. Participants pick a free
 time on a branded booking page, confirm it by email, get a calendar invite, and join the call
