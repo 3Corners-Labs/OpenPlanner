@@ -3,7 +3,7 @@
 Status: accepted (2026-11-03), decided by the product owner in the conversation of
 2026-11-03. Supersedes ADR 0087 points 5 and 6 (deploy by `git push` to TransIP with a key in
 the environment `website`) and ADR 0110 point 5 (a missing deploy configuration fails). Partly
-built: steps 1 and 2 in #PR; step 3 is configuration in GitHub and DNS by an administrator.
+built: steps 1 and 2 in #475; step 3 is configuration in GitHub and DNS by an administrator.
 
 ## Context
 
@@ -49,9 +49,9 @@ None in the application. The deployment needs no setting: the domain lives in
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #PR | in PR |
-| 1 | Job `pages`, the `vX.Y.0` rule, `upload-pages-artifact` in `site`, `CNAME`; TransIP script, test, AutoGit file and `.htaccess` removed | #PR | in PR |
-| 2 | Runbook, threat model, data flow, footer text, guardrail baseline | #PR | in PR |
+| 0 | ADR | #475 | in PR |
+| 1 | Job `pages`, the `vX.Y.0` rule, `upload-pages-artifact` in `site`, `CNAME`; TransIP script, test, AutoGit file and `.htaccess` removed | #475 | in PR |
+| 2 | Runbook, threat model, data flow, footer text, guardrail baseline | #475 | in PR |
 | 3 | Pages source *GitHub Actions* and the custom domain, environment `github-pages` limited to tags, environment `website` deleted, DNS of openplanner.nl to GitHub Pages, domain verified for the organisation (an administrator) | | planned |
 
 ## Consequences
