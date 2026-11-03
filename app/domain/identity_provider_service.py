@@ -47,6 +47,7 @@ from app.domain.login_domains import (
     DomainClaim,
     DomainState,
     checked,
+    lookup_record,
     normalise_domain,
     refusal_of_claim,
     refusal_of_identity,
@@ -146,6 +147,8 @@ class IdentityProviderService:
         grace: Returns how long a lost record is tolerated (``idp_domain_grace_days``).
         routing: Returns ``ORGANISATION_IDPS_ENABLED``: whether logins go to organisation
             providers at all (step 3c).
+        production: ``ENVIRONMENT=prod``; outside it a domain under a test TLD needs no TXT
+            record (point 12).
     """
 
     def __init__(  # noqa: PLR0913
@@ -163,6 +166,7 @@ class IdentityProviderService:
         login_suffix: Callable[[], str] = lambda: DEFAULT_SUFFIX,
         grace: Callable[[], timedelta] = lambda: DEFAULT_GRACE,
         routing: Callable[[], bool] = lambda: False,
+        production: bool = True,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -177,6 +181,7 @@ class IdentityProviderService:
         self._login_suffix = login_suffix
         self._grace = grace
         self._routing = routing
+        self._production = production
 
     # --- reading -------------------------------------------------------------------------
 
@@ -462,9 +467,7 @@ class IdentityProviderService:
         async with self._uow.read() as tx:
             await _provider_of(tx, slug, key)
             claim = _claim_of(await tx.list_login_domains(_everything(), key), claim_id)
-        found = (
-            None if self._resolver is None else await self._resolver.txt_records(claim.record_name)
-        )
+        found = await lookup_record(claim, self._resolver, production=self._production)
         async with self._uow.locked() as tx:
             provider = await _provider_of(tx, slug, key)
             claim = _claim_of(await tx.list_login_domains(_everything(), key), claim_id)
@@ -583,7 +586,9 @@ class IdentityProviderService:
             raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "discovery_url")
         try:
             document = await self._discovery.fetch(draft.discovery_url)
-            return check_discovery(document, draft.discovery_url, draft.client_auth)
+            return check_discovery(
+                document, draft.discovery_url, draft.client_auth, strict_issuer=self._production
+            )
         except (IdentityError, DiscoveryRefusedError) as refused:
             reason = refused.code if isinstance(refused, IdentityError) else refused.reason
             await self._admin.record(

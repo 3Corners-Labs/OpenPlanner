@@ -18,9 +18,13 @@ from collections.abc import Collection, Iterable
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.identity import PLATFORM
+
+if TYPE_CHECKING:  # ports imports DomainClaim from here
+    from app.domain.ports import MailDomainResolver
 
 EMAIL_NOT_VERIFIED = "email_not_verified"
 """Refusal: an organisation provider's ID token lacks ``email_verified: true`` (point 15)."""
@@ -40,6 +44,9 @@ CHALLENGE_PREFIX = "openplanner-domain-verification="
 
 MIN_LABELS = 2
 """A name and a top-level label: a bare ``nl`` or ``internal`` is never claimed."""
+
+TEST_TLDS = frozenset({"test", "example", "invalid", "localhost"})
+"""Top-level domains reserved for tests (RFC 2606, RFC 6761): they never resolve in public DNS."""
 
 _LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 
@@ -220,3 +227,26 @@ def refusal_of_identity(
         c.provider == provider and c.state.routes and covers(c.domain, domain) for c in claims
     )
     return None if domain and owned else EMAIL_DOMAIN_MISMATCH
+
+
+def proven_without_dns(domain: str, *, production: bool) -> bool:
+    """Return whether ``domain`` counts as verified without a TXT lookup (point 12).
+
+    Only outside production, and only under a top-level domain reserved for tests, which can
+    never be registered by anyone: a lab or an end-to-end test with ``.test`` addresses works,
+    and no real domain ever skips the proof.
+    """
+    return not production and domain.rsplit(".", 1)[-1] in TEST_TLDS
+
+
+async def lookup_record(
+    claim: DomainClaim, resolver: "MailDomainResolver | None", *, production: bool
+) -> tuple[str, ...] | None:
+    """Return the TXT records that prove ``claim``, or ``None`` when the lookup failed.
+
+    A domain under a test TLD outside production answers with its own expected record
+    (``proven_without_dns``); without a resolver nothing is known.
+    """
+    if proven_without_dns(claim.domain, production=production):
+        return (claim.record_value,)
+    return None if resolver is None else await resolver.txt_records(claim.record_name)

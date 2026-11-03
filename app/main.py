@@ -457,6 +457,7 @@ def create_app(
             login_suffix=lambda: live().bundled_idp_login_suffix,
             grace=lambda: timedelta(days=live().idp_domain_grace_days),
             routing=lambda: settings.organisation_idps_enabled,
+            production=settings.environment == "prod",
         )
         app.state.idp_mapping_service = IdpMappingService(
             uow,

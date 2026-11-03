@@ -1,0 +1,11 @@
+{#- ADR 0083 point 13: a redirect from the address form to the provider would be blocked by the
+    CSP form-action 'self' (browsers apply it to redirects of a form post). A page that moves on
+    by itself (meta refresh, with a visible link) keeps the CSP strict, as the logout does. -#}
+{% extends "admin/_public.html" %}
+{% block title %}{{ _("admin.logging_in.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block admin_head %}<meta http-equiv="refresh" content="0;url={{ login_url }}">{% endblock %}
+{% block content %}
+<h1>{{ _("admin.logging_in.title") }}</h1>
+<p>{{ _("admin.logging_in.text") }}</p>
+<p><a class="button" href="{{ login_url }}">{{ _("admin.logging_in.continue") }}</a></p>
+{% endblock %}

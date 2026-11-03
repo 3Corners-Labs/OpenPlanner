@@ -778,6 +778,30 @@ request; registrations and domains stay as they are. The worker re-checks every 
 domain every `idp_domain_recheck_hours`; a record that disappears raises the system event
 `idp.domain_check` and, after `idp_domain_grace_days`, the domain stops routing.
 
+**Registering an organisation's provider.**
+1. In the portal: Organisations › *organisation* › Overview › Login › *Add*. Enter the
+   discovery URL and the client id, and choose the client authentication:
+   - `private_key_jwt` (default): give the organisation's IdP team the JWKS address shown on
+     the provider's page;
+   - otherwise `client_secret_basic` with their secret.
+
+   Give them the callback URL shown on the page too.
+2. Do a test login. It shows the claims and the rights they resolve to, without a session.
+   Then switch the provider on.
+3. Add the organisation's e-mail domains. Each shows a TXT record
+   (`_openplanner-challenge.<domain>` = `openplanner-domain-verification=<token>`); once the
+   organisation has published it, press *Verify*.
+4. Set `ORGANISATION_IDPS_ENABLED=true` on the host and restart `web` and `worker`. From then
+   on the login page asks for the address first.
+
+**Rotating the key** (`private_key_jwt`): *Rotate key* on the provider's page. The new key
+signs at once; the old one stays in the JWKS for 24 hours, so the IdP's cache can follow.
+
+**Outside production**, a domain under `.test`, `.example`, `.invalid` or `.localhost` counts as
+verified without a TXT record, and the issuer the discovery document announces is pinned even
+when it differs from the discovery address. Both serve a lab or the e2e test. Production keeps
+both checks strict.
+
 From the host, without the portal (ADR 0083 point 19):
 
 ```sh

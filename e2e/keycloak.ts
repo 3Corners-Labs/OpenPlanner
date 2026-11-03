@@ -25,9 +25,20 @@ export function requireKeycloak(): void {
   });
 }
 
+/**
+ * Answer the e-mail-first question (ADR 0083 point 13) when organisation providers route
+ * logins; a platform user name such as `super` goes to the platform provider.
+ */
+async function passIdentifierPage(page: Page, identifier: string): Promise<void> {
+  if (new URL(page.url()).pathname !== '/admin/login') return;
+  await page.locator('#identifier').fill(identifier);
+  await page.locator('#identifier').press('Enter');
+}
+
 /** Open `path`, sign in at Keycloak as `user` and wait until the portal answers. */
 export async function loginAs(page: Page, user: TestUser, path = '/admin/'): Promise<void> {
   await page.goto(path);
+  await passIdentifierPage(page, user);
   await expect(page).toHaveURL(new RegExp(`^${KEYCLOAK_URL}/`));
   await page.locator('#username').fill(user);
   await page.locator('#password').fill(PASSWORD);
@@ -59,4 +70,18 @@ export async function expectForbidden(page: Page, path: string): Promise<void> {
   const response = await page.goto(path);
   expect(response?.status()).toBe(403);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Geen toegang');
+}
+
+/**
+ * Sign in through the e-mail-first page with `identifier` at the realm the portal routes it to,
+ * as `user` with the development password.
+ */
+export async function loginByAddress(page: Page, identifier: string, user: string): Promise<void> {
+  await page.goto('/admin/login');
+  await page.locator('#identifier').fill(identifier);
+  await page.locator('#identifier').press('Enter');
+  await expect(page).toHaveURL(new RegExp(`^${KEYCLOAK_URL}/`));
+  await page.locator('#username').fill(user);
+  await page.locator('#password').fill(PASSWORD);
+  await page.locator('#password').press('Enter');
 }

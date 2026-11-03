@@ -27,7 +27,11 @@ A second realm, `andere` (`andere-realm.json`), stands in for an organisation's 
 provider. Its client `openplanner-admin` (secret `dev-only-andere-secret`) sends only the
 entitlement claim and the standard `email` claims, because an organisation provider resolves in
 entitlements mode only. Discovery: http://127.0.0.1:8080/realms/andere/.well-known/openid-configuration.
-Registering it in the portal comes with ADR 0083 step 2; until then the realm exists for tests.
+`e2e/tests/admin-org-idp.spec.ts` registers it in the portal for organisation `andere`
+(discovery `http://keycloak:8080/realms/andere/...` from the app container; the announced issuer
+`http://127.0.0.1:8080/realms/andere` is pinned outside production), verifies `andere.test`
+without DNS (a test TLD) and logs in as these users through the e-mail-first page; it needs
+`ORGANISATION_IDPS_ENABLED=true`, as the CI e2e stack sets.
 
 | User | Entitlements | Email | Purpose |
 |---|---|---|---|
