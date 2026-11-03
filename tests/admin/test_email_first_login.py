@@ -65,7 +65,8 @@ async def _log_in(site: Site, identifier: str) -> tuple[int, str]:
     start = await site.client.post(
         "/admin/login", data={"identifier": identifier}, headers=SAME_ORIGIN
     )
-    assert start.status_code == 303, start.text[:300]
+    assert start.status_code == 200, start.text[:300]
+    assert 'http-equiv="refresh"' in start.text
     done = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
     return done.status_code, done.text
 
@@ -129,7 +130,8 @@ async def test_the_platform_suffix_and_unknown_domains_go_to_the_platform(routed
         start = await routed.client.post(
             "/admin/login", data={"identifier": identifier}, headers=SAME_ORIGIN
         )
-        assert start.status_code == 303
+        assert start.status_code == 200
+        assert 'http-equiv="refresh"' in start.text
 
     assert [h for h in routed.idp.login_hints if h] == [
         "jan.jansen@demo.openplanner.internal",
@@ -229,3 +231,21 @@ async def test_system_status_lists_the_organisation_providers(routed: Site) -> N
     assert "Aan op deze host" in page
     assert "<code>gem-a</code>" in page
     assert "1 geverifieerd" in page
+
+
+async def test_the_address_form_moves_on_by_a_page_not_by_a_redirect(routed: Site) -> None:
+    """The CSP form-action 'self' blocks the redirect of a form post to another origin in a
+    browser (docker01 and the e2e run, 2026-11-03), so the answer is a page that moves on."""
+    adapter = _organisation_adapter(routed)
+
+    start = await routed.client.post(
+        "/admin/login", data={"identifier": ADDRESS}, headers=SAME_ORIGIN
+    )
+
+    assert start.status_code == 200
+    assert "location" not in start.headers
+    target = "https://idp.test/authorize?x=1"
+    assert f'content="0;url={target}"' in start.text
+    assert f'href="{target}"' in start.text
+    assert "form-action 'self'" in start.headers["content-security-policy"]
+    assert adapter.login_hints == [ADDRESS]

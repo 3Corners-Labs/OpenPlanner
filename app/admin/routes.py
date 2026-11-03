@@ -347,7 +347,9 @@ async def login_identifier(request: Request, locale: Locale, _: SameOrigin) -> R
     except IdentityError:
         return _message(request, locale, 503, "admin.login_failed.title", "admin.login_failed.text")
     save_login_start(request, start, next_url, key)
-    return RedirectResponse(start.url, status_code=303)
+    # Not a 303: browsers apply the CSP form-action to the redirect of a form post, so a redirect
+    # to the provider would be blocked. The page moves on by itself, as the logout does.
+    return render(templates, request, "admin/login_redirect.html", locale, {"login_url": start.url})
 
 
 @router.get("/callback", response_class=HTMLResponse)

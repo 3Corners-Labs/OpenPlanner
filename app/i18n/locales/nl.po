@@ -9662,3 +9662,12 @@ msgstr "Het certificaat komt van de interne certificaatautoriteit van de proxy (
 
 msgid "admin.settings.tls.internal_ca.download"
 msgstr "Rootcertificaat downloaden"
+
+msgid "admin.logging_in.title"
+msgstr "U gaat naar de inlogdienst"
+
+msgid "admin.logging_in.text"
+msgstr "U wordt doorgestuurd naar de inlogdienst van uw organisatie."
+
+msgid "admin.logging_in.continue"
+msgstr "Doorgaan naar de inlogdienst"
