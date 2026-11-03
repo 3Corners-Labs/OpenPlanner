@@ -283,6 +283,9 @@ def test_the_release_section_is_refreshed_live_from_github_only(dist: Path) -> N
     html, _ = _page(dist, "en")
     script = (SITE / "static" / "site.js").read_text(encoding="utf-8")
     assert "connect-src https://api.github.com;" in html
+    assert (SITE / "root" / ".htaccess").read_text().count(
+        "connect-src https://api.github.com;"
+    ) == 1
     assert "data-releases" in html
     assert script.count("fetch(") == 1
     assert 'credentials: "omit"' in script
@@ -317,9 +320,12 @@ def test_the_site_shows_the_applications_own_mark(dist: Path) -> None:
     assert html.count(slot.group(1)) == 4
 
 
-def test_the_web_root_names_its_domain_for_github_pages(dist: Path) -> None:
-    assert (dist / "CNAME").read_text().strip() == "openplanner.nl"
-    assert not (dist / ".htaccess").exists(), "GitHub Pages reads no .htaccess (ADR 0111)"
+def test_the_web_root_gets_its_server_configuration(dist: Path) -> None:
+    htaccess = (dist / ".htaccess").read_text()
+    assert "Content-Security-Policy" in htaccess
+    assert "Strict-Transport-Security" not in htaccess, (
+        "HSTS only once HTTPS works (ADR 0087 step 4)"
+    )
 
 
 def test_a_recording_counts_only_when_all_its_files_are_there(tmp_path: Path) -> None:

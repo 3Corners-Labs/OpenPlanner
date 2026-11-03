@@ -691,7 +691,7 @@
   },
   "footer": {
     "tagline": "Video appointments that land in your contact center. Open source, privacy by default.",
-    "nocookies": "This website is hosted on GitHub Pages. It sets no cookies, uses no trackers and loads nothing from other parties; your browser also asks GitHub for the release list.",
+    "nocookies": "This website is hosted on a web hosting package of TransIP in the Netherlands. It sets no cookies, uses no trackers and loads no scripts, fonts or images from third parties; your browser only asks GitHub for the release list.",
     "license": "Source code under EUPL-1.2. Made by 3Corners and the OpenPlanner contributors.",
     "links": [
       {
