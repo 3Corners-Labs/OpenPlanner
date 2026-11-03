@@ -83,9 +83,9 @@ uid 10001 and the read-only root filesystem (the image's own contract); the prob
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR accepted; TransIP facts read | this PR | in PR |
-| 1 | `deploy/helm/openplanner/` chart, rendering tests | this PR | in PR |
-| 2 | `docs/kubernetes.md`: install, upgrade, backup, TransIP notes; `docs/install.md` pointer | this PR | in PR |
+| 0 | ADR accepted; TransIP facts read | #495 | in PR |
+| 1 | `deploy/helm/openplanner/` chart, rendering tests | #495 | in PR |
+| 2 | `docs/kubernetes.md`: install, upgrade, backup, TransIP notes; `docs/install.md` pointer | #495 | in PR |
 | 3 | Trial on TransIP: ingress and certificates, volume snapshot, a real upgrade and a restore; findings written into `docs/kubernetes.md` (a person with a cluster) | | planned |
 | 4 | A deployment-shape setting (class B) that hides *Update now* and says "updated by your cluster" | | planned |
 | 5 | The chart published as an OCI artifact next to each release, signed (`helm install oci://ghcr.io/...`) | | planned |
