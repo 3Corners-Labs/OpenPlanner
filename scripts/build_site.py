@@ -237,6 +237,13 @@ def llms_text(contents: dict[str, dict[str, Any]], releases: Releases | None) ->
             f"- Latest release: {releases.latest.tag} ({releases.latest.date}): "
             f"{releases.latest.url}",
         ]
+    iv = en["involved"]
+    lines += ["", "## Get involved", "", iv["lead"], ""]
+    lines += [
+        f"- {path['title']}: {path['text']} "
+        + ", ".join(f"[{link['label']}]({link['href']})" for link in path["links"])
+        for path in iv["paths"]
+    ]
     lines += [
         "",
         "## Documentation",

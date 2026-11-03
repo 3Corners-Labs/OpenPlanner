@@ -21,6 +21,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <title>{{ c.meta.title }}</title>
 <link rel="canonical" href="https://openplanner.nl{{ c.path }}">
+<link rel="alternate" type="text/markdown" title="llms.txt" href="https://openplanner.nl/llms.txt">
 <link rel="alternate" hreflang="nl" href="https://openplanner.nl/">
 <link rel="alternate" hreflang="en" href="https://openplanner.nl/en/">
 <link rel="alternate" hreflang="x-default" href="https://openplanner.nl/">
@@ -66,7 +67,8 @@
     </nav>
     <div class="top__tools">
       <a class="lang" href="{{ c.other.path }}" lang="{{ c.other.lang }}" hreflang="{{ c.other.lang }}" aria-label="{{ c.other.aria }}">{{ c.other.label }}</a>
-      <a class="btn btn--ghost btn--small" href="https://github.com/3Corners-Labs/OpenPlanner"><svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>{{ c.nav_github }}</a>
+      <a class="btn btn--ghost btn--small btn--github" href="https://github.com/3Corners-Labs/OpenPlanner"><svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>{{ c.nav_github }}</a>
+      <a class="btn btn--primary btn--small" href="#get-involved">{{ c.nav_start }}</a>
     </div>
   </div>
 </header>
@@ -84,6 +86,10 @@
         <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md">{{ c.hero.cta_install }}</a>
         <a class="btn btn--ghost" href="https://github.com/3Corners-Labs/OpenPlanner">{{ c.hero.cta_source }}</a>
       </p>
+      <figure class="cmd">
+        <figcaption>{{ c.hero.command_label }}</figcaption>
+        <pre><code>{{ c.hero.command }}</code></pre>
+      </figure>
     </div>
     <div class="hero__art" aria-hidden="true">
       <div class="bigmark">{{ mark }}</div>
@@ -387,6 +393,8 @@
       </figcaption>
     </figure>
 
+    <details class="fold">
+    <summary>{{ e.fold }}</summary>
     <h3 class="sub">{{ e.arch_title }}</h3>
     <figure class="arch">
       <div class="arch__layers">
@@ -427,6 +435,7 @@
       {%- endfor %}
     </ol>
     <p class="small"><a href="{{ e.scale_link.href }}">{{ e.scale_link.label }}</a></p>
+    </details>
 
     <h3 class="sub">{{ e.security_title }}</h3>
     <ul class="grid2">
@@ -441,6 +450,8 @@
   <div class="wrap">
     <h2 id="standards-title">{{ c.standards.title }}</h2>
     <p class="lead">{{ c.standards.lead }}</p>
+    <details class="fold fold--light">
+    <summary>{{ c.standards.fold }}</summary>
     <div class="table-scroll">
       <table class="standards">
         <thead><tr><th scope="col">{{ c.standards.col_standard }}</th><th scope="col">{{ c.standards.col_what }}</th><th scope="col">{{ c.standards.col_status }}</th><th scope="col">{{ c.standards.col_proof }}</th></tr></thead>
@@ -456,6 +467,7 @@
         </tbody>
       </table>
     </div>
+    </details>
     <div class="twocol">
       <div>
         <h3>{{ c.standards.code_title }}</h3>
@@ -539,14 +551,23 @@
   </div>
 </section>
 
-<section class="section cta" aria-labelledby="cta-title">
-  <div class="wrap cta__box">
-    <h2 id="cta-title">{{ c.cta.title }}</h2>
-    <p>{{ c.cta.text }}</p>
-    <p class="actions">
-      <a class="btn btn--primary" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md">{{ c.cta.primary }}</a>
-      <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner#quick-start-demo">{{ c.cta.secondary }}</a>
-    </p>
+<section class="section cta" id="get-involved" aria-labelledby="involved-title">
+  <div class="wrap">
+    <h2 id="involved-title">{{ c.involved.title }}</h2>
+    <p class="lead">{{ c.involved.lead }}</p>
+    <ul class="paths">
+      {%- for path in c.involved.paths %}
+      <li class="path path--{{ path.key }}">
+        <h3>{{ path.title }}</h3>
+        <p>{{ path.text }}</p>
+        <p class="path__links">
+          {%- for link in path.links %}
+          <a class="btn{% if loop.first %} btn--primary{% else %} btn--ghost{% endif %}" href="{{ link.href }}">{{ link.label }}</a>
+          {%- endfor %}
+        </p>
+      </li>
+      {%- endfor %}
+    </ul>
   </div>
 </section>
 

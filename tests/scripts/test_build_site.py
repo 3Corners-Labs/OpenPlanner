@@ -120,8 +120,11 @@ def test_page_is_complete_for_its_locale(dist: Path, locale: str) -> None:
     assert html.count("<h1") == 1
     assert page.find("title")
     assert page.find("main")
-    hreflangs = {a["hreflang"] for a in page.find("link") if a.get("rel") == "alternate"}
-    assert hreflangs == {"nl", "en", "x-default"}
+    alternates = [a for a in page.find("link") if a.get("rel") == "alternate"]
+    assert {a["hreflang"] for a in alternates if "hreflang" in a} == {"nl", "en", "x-default"}
+    assert [a for a in alternates if a.get("type") == "text/markdown"][0]["href"].endswith(
+        "/llms.txt"
+    )
     canonical = [a for a in page.find("link") if a.get("rel") == "canonical"][0]["href"]
     assert canonical == (
         "https://openplanner.nl/" if locale == "nl" else "https://openplanner.nl/en/"
@@ -399,3 +402,14 @@ def test_the_architecture_plate_names_every_part_and_flow(dist: Path, locale: st
         assert flow.replace("'", "&#39;") in html
     planned = [n for n in plate["systems"] if n.get("planned")]
     assert html.count(plate["planned"]) == len(planned), "what is not built says so (point 8)"
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_page_offers_three_ways_in_and_a_start_command(dist: Path, locale: str) -> None:
+    html, _ = _page(dist, locale)
+    content = load_content(locale)
+    assert 'id="get-involved"' in html
+    assert [p["key"] for p in content["involved"]["paths"]] == ["try", "run", "help"]
+    assert 'href="#get-involved"' in html
+    assert "docker compose --profile dev up" in html
+    assert "good+first+issue" in html
