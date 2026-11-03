@@ -153,7 +153,8 @@ services:
   # Inbox at http://127.0.0.1:8025. Never part of the production shape.
   mailpit:
     image: axllent/mailpit:v1.32.0
-    profiles: [dev]
+    # The lab installs it with the bundled identity provider (ADR 0106 step 5); `dev` has both.
+    profiles: [dev, mailpit]
     ports:
       - "127.0.0.1:8025:8025"
     read_only: true

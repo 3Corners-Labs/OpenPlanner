@@ -63,7 +63,7 @@ Renovate (ADR 0051); the realm template is code.
 |---|---|---|---|
 | 0 | ADR proposed | #298 | merged |
 | 1 | Compose profile `idp`, realm template in `deploy/keycloak/`, `scripts/render-keycloak-realm.sh`, `secrets/keycloak.env`, runbook *Bundled identity provider* | #300 | merged |
-| 2 | Installer: default for `test` and `lab`, `--idp bundled\|own` for every mode, `docs/install.md` | | planned |
+| 2 | Installer: default for `test` and `lab`, `--idp bundled\|own` for every mode (production keeps `own` until ADR 0106 point 4), `docs/install.md` | – | planned |
 | 3 | `docs/runbook.md` (managing staff in the bundled Keycloak, resetting `super`), e2e against the template realm | | planned |
 
 ## Consequences
