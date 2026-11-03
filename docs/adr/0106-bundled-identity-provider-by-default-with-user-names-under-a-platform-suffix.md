@@ -142,6 +142,6 @@ identifiers and DNS labels, which is a format rule, not a preference.
 | 2 | Staff screen notice and System status check for an unconnected directory (point 3) | #429 | merged |
 | 3 | User names under the suffix: setting, invite form, adapter, scope check, `username` masked (points 5–8, 11) | #430 | merged |
 | 4 | Reserved suffix in the login routing and the provider registration; login label (points 9, 10) | #443, #453 | merged |
-| 5a | Installer: `--idp bundled\|own`, default `bundled` in `test` and `lab`; renders the realm, hands the login over in `secrets/keycloak-app.env`, `IDP_UPSTREAM`, profiles `idp` and `mailpit`, the realm's mail server (points 1 and 12, ADR 0112 point 6) | – | planned |
+| 5a | Installer: `--idp bundled\|own`, default `bundled` in `test` and `lab`; renders the realm, hands the login over in `secrets/keycloak-app.env`, `IDP_UPSTREAM`, profiles `idp` and `mailpit`, the realm's mail server (points 1 and 12, ADR 0112 point 6) | #483 | in PR |
 | 5b | Production: Keycloak `start` with `idp-db`, `KC_PROXY_HEADERS`, MFA on, the proxy route, the backup of its volumes; the installer's default becomes `bundled` in every mode (point 4) | | planned |
 | 6 | docker01 moved to the bundled provider (point 12): realm rendered, `idp` under the `dev` profile on port 8780, the old lab realm off, mail to Mailpit; users to re-invite; render-script mode fix in this PR | #455 | in PR |
