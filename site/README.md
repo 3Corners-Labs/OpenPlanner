@@ -1,7 +1,8 @@
 # openplanner.nl
 
 The public website (ADR 0087): one page per locale, static, built from this directory by
-`scripts/build_site.py` and published by the `site` job of `.github/workflows/main.yml`.
+`scripts/build_site.py` in the `site` job of `.github/workflows/main.yml`, and published to
+GitHub Pages by the `pages` job at every minor or major release (`vX.Y.0`, ADR 0111).
 
 - `content/nl.json`, `content/en.json`: every visible text and list, the hand-written roadmap
   and the footer disclaimer; both files have the same keys (a test checks it). The main page
@@ -11,6 +12,7 @@ The public website (ADR 0087): one page per locale, static, built from this dire
   enhancement; the page is complete without it).
 - `static/og-nl.png`, `static/og-en.png`: Open Graph images, rasterised from `og/*.svg` with
   `rsvg-convert -w 1200 -h 630 og/og-nl.svg -o static/og-nl.png`.
+- `root/CNAME`: the domain for GitHub Pages.
 - `static/media/`: the recorded walkthrough of the real interface and its stills (ADR 0087 step 3),
   downloaded from the newest release that carries them by the `site` job; not in git.
 

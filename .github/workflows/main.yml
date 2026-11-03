@@ -213,13 +213,12 @@ jobs:
     with:
       tag: ${{ github.ref_name }}
 
-  # ADR 0087: the public website, openplanner.nl. Built from site/ on every merge to main and
-  # on every release tag, with the releases and the roadmap baked in; the tarball goes on the
-  # release the tag made; the deploy is a git push to the web host's repository and runs only
-  # where the environment `website` holds the remote and the key, so a fork or a pull request
-  # never deploys.
+  # ADR 0087 and ADR 0111: the public website, openplanner.nl. Built from site/ on every merge
+  # to main and on every release tag, with the releases baked in; the tarball goes on the
+  # release the tag made. Only a minor or major release (vX.Y.0) publishes it, to GitHub Pages
+  # by the job `pages`; no key, no secret.
   site:
-    name: public website (build, attach, deploy)
+    name: public website (build, attach)
     # On a merge to main it waits for `candidate`, so the release candidate that merge made is
     # on the page. On a tag it waits for `publish`, whose first step refuses a tag that is not
     # on main or that was made by hand (ADR 0052, ADR 0059): such a tag then deploys nothing.
@@ -232,9 +231,10 @@ jobs:
         (github.ref_type == 'tag' && needs.publish.result == 'success')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    environment: website
     permissions:
       contents: write   # the site tarball on the release
+    outputs:
+      publish: ${{ steps.minor.outputs.publish }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -278,20 +278,43 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" site-*.tar.gz --clobber
-      - name: deploy to the web host (git push; fails without the remote and the key in the real repository)
-        env:
-          SITE_DEPLOY_REMOTE: ${{ vars.SITE_DEPLOY_REMOTE }}
-          SITE_DEPLOY_KNOWN_HOSTS: ${{ vars.SITE_DEPLOY_KNOWN_HOSTS }}
-          SITE_DEPLOY_DIR: ${{ vars.SITE_DEPLOY_DIR }}
-          SITE_DEPLOY_BRANCH: ${{ vars.SITE_DEPLOY_BRANCH }}
-          SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
-          SITE_DEPLOY_REQUIRED: ${{ github.repository == '3Corners-Labs/OpenPlanner' }}
-        run: scripts/deploy-site.sh site/dist "${GITHUB_REF_NAME} ${GITHUB_SHA::12}"
+      # ADR 0111: only a minor or major release goes live (v0.4.0, v1.0.0; not v0.4.1 or a
+      # candidate), as ADR 0108 does for the public images.
+      - name: is this a minor or major release
+        id: minor
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.0$ ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: steps.minor.outputs.publish == 'true'
+        with:
+          path: site/dist
+
+  # ADR 0111: GitHub Pages serves openplanner.nl. The environment `github-pages` accepts only
+  # tags vX.Y.Z, so nothing else can deploy even if this condition were wrong.
+  pages:
+    name: public website (publish to GitHub Pages)
+    needs: [site]
+    if: ${{ !cancelled() && needs.site.result == 'success' && needs.site.outputs.publish == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      pages: write      # publish the site
+      id-token: write   # the Pages deployment proves it comes from this workflow
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   # ADR 0051: same gate as in ci.yml, for the jobs that run only on main.
   deprecations:
     name: no deprecation warnings
-    needs: [zap-baseline, mutation, candidate, publish, tour, site]
+    needs: [zap-baseline, mutation, candidate, publish, tour, site, pages]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

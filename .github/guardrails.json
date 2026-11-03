@@ -32,19 +32,18 @@
         "protected_branches": false
       }
     },
-    "release": {
+    "github-pages": {
       "branches": [
-        "branch:main"
+        "tag:v*.*.*"
       ],
       "deployment_branch_policy": {
         "custom_branch_policies": true,
         "protected_branches": false
       }
     },
-    "website": {
+    "release": {
       "branches": [
-        "branch:main",
-        "tag:v*.*.*"
+        "branch:main"
       ],
       "deployment_branch_policy": {
         "custom_branch_policies": true,

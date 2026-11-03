@@ -140,7 +140,7 @@ make check
 - `docs/agent-api.md` — connecting a contact-center bot to the machine API.
 - `docs/authentication.md` — how admins, bots and participants prove who they are, and how that is withdrawn.
 - `docs/install.md` — installing and repairing a host with `scripts/install.sh`.
-- `site/` — the public website, openplanner.nl, built from the repository (ADR 0087).
+- `site/` — the public website, openplanner.nl, built from the repository and published to GitHub Pages at every minor or major release (ADR 0087, ADR 0111).
 - `docs/runbook.md` — operating the service.
 - `docs/asvs.md` — for each requirement of the ASVS 5.0.0 level 2 audit that was not fully accepted: where the measure is now, and whether the gap is closed, accepted on purpose or open.
 - `docs/assurance/` — checklists for the parties that must give evidence we cannot (identity provider, hosting, Cisco, data controller) and the scope for the penetration test.
