@@ -10,6 +10,9 @@
       "why": "the release app creates the release and candidate tags (ADR 0107)"
     }
   ],
+  "known_unseen": {
+    "rulesets/release tags/bypass_actors": "A read-only token sees the bypass actors through GraphQL without their mode (first audit runs, 2026-11-02). Every use of a bypass is still checked in the rule suites; only the release app's tag bypass is expected."
+  },
   "actions": {
     "allowed_actions": "all",
     "enabled": true,
@@ -29,19 +32,18 @@
         "protected_branches": false
       }
     },
-    "release": {
+    "github-pages": {
       "branches": [
-        "branch:main"
+        "tag:v*.*.*"
       ],
       "deployment_branch_policy": {
         "custom_branch_policies": true,
         "protected_branches": false
       }
     },
-    "website": {
+    "release": {
       "branches": [
-        "branch:main",
-        "tag:v*.*.*"
+        "branch:main"
       ],
       "deployment_branch_policy": {
         "custom_branch_policies": true,

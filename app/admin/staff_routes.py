@@ -42,6 +42,7 @@ from app.admin.staff_directory_routes import (
 from app.domain.audit import AuditFilter
 from app.domain.authorization import Permission, Role, scope_for
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.identity import PLATFORM
 from app.domain.scheduling import GroupSummary
 from app.domain.staff import StaffFilter, StaffMember, StaffStatus
 from app.web.authz_labels import ROLE_LABELS
@@ -88,6 +89,12 @@ class StaffView:
     refused: tuple[RefusedView, ...] = ()
     suspended: bool = False
     erased: bool = False
+    provider: str = ""
+    """The identity provider the person logs in through: a provider key, or the platform."""
+
+
+PLATFORM_VALUE = "platform"
+"""The filter's value for the platform provider, whose key is empty (ADR 0083 point 16)."""
 
 
 @dataclass(frozen=True)
@@ -103,6 +110,8 @@ class StaffFilterView:
     dormant: bool
     unrecognised: bool
     active: bool
+    providers: tuple[Option, ...] = ()
+    provider: str = ""
 
 
 def _dormant_after(request: Request) -> timedelta:
@@ -146,6 +155,7 @@ def _view(
         last_logout=(
             admin_moment(request, locale, member.last_logout_at) if member.last_logout_at else never
         ),
+        provider=member.provider or _("admin.staff.platform_provider"),
         dormant=not erased and member.is_dormant(now, _dormant_after(request)),
         suspended=member.status is StaffStatus.SUSPENDED,
         erased=erased,
@@ -168,9 +178,16 @@ def _narrow(
     in_scope: list[GroupSummary],
     dormant_before: datetime,
     unrecognised: str | None = None,
+    provider: str | None = None,
+    providers: frozenset[str] = frozenset(),
 ) -> StaffFilter:
-    """Turn the query parameters into a filter; unknown or out-of-scope values are ignored."""
+    """Turn the query parameters into a filter; unknown or out-of-scope values are ignored.
+
+    ``provider`` is ``platform`` or a provider key among ``providers`` (ADR 0083 point 16).
+    """
+    chosen = PLATFORM if provider == PLATFORM_VALUE else provider
     return StaffFilter(
+        provider=chosen if chosen in providers else None,
         organisation=organisation
         if organisation in {g.organisation_slug for g in in_scope}
         else None,
@@ -207,14 +224,24 @@ async def staff_list(
     role: str | None = None,
     dormant: str | None = None,
     unrecognised: str | None = None,
+    provider: str | None = None,
 ) -> HTMLResponse:
     """List the people who use the portal, within the viewer's scope."""
     _ = locale.gettext
     service = admin_service(request)
     now = request.app.state.clock.now()
     in_scope = await service.groups(context.principal, Permission.STAFF_VIEW)
+    providers = frozenset(m.provider for m in await service.staff(context.principal, StaffFilter()))
     narrow = _narrow(
-        organisation, group, role, dormant, in_scope, now - _dormant_after(request), unrecognised
+        organisation,
+        group,
+        role,
+        dormant,
+        in_scope,
+        now - _dormant_after(request),
+        unrecognised,
+        provider,
+        providers,
     )
     members = await service.staff(context.principal, narrow)
     names = _names(in_scope)
@@ -228,6 +255,11 @@ async def staff_list(
         dormant=narrow.dormant_before is not None,
         unrecognised=narrow.unrecognised,
         active=narrow != StaffFilter(),
+        providers=tuple(
+            Option(key or PLATFORM_VALUE, key or _("admin.staff.platform_provider"))
+            for key in sorted(providers)
+        ),
+        provider=(PLATFORM_VALUE if narrow.provider == PLATFORM else narrow.provider or ""),
     )
     directory = directory_service(request)
     manager = not scope_for(context.principal, Permission.STAFF_MANAGE).is_empty

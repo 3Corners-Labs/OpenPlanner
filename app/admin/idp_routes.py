@@ -407,6 +407,7 @@ async def _form_page(
             "jwks_url": _jwks_url(request),
             "callback_url": _callback_url(request),
             "done": done_message(request, locale.gettext),
+            "routing_off": routing_off(request),
             "test_failed": _test_failure(request, locale),
         },
     )
@@ -443,8 +444,18 @@ async def organisation_login(
             "limit": overview.limit,
             "room": len(overview.providers) < overview.limit,
             "done": done_message(request, locale.gettext),
+            "routing_off": routing_off(request),
         },
     )
+
+
+def routing_off(request: Request) -> bool:
+    """Whether the host has organisation providers switched off (``ORGANISATION_IDPS_ENABLED``).
+
+    The pages stay, so the superuser can prepare registrations and domains; they say that no
+    login goes to these providers yet (decided 2026-11-02, amending ADR 0083's settings).
+    """
+    return not request.app.state.settings.organisation_idps_enabled
 
 
 @router.get("/organisations/{org}/login/new", response_class=HTMLResponse)

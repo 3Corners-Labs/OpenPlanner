@@ -2,6 +2,7 @@
 
 import re
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from pydantic import SecretStr
@@ -768,3 +769,26 @@ async def test_system_status_counts_open_bookings_on_the_previous_token_key(
         assert "Lopende boekingen met een koppeling onder de vorige sleutel</dt><dd>1</dd>" in text
         assert "MANAGEMENT_TOKEN_KEY_PREVIOUS pas als dit aantal 0 is" in text
         assert "Versleutelde geheimen onder de vorige sleutel" not in text
+
+
+async def test_the_internal_root_is_offered_only_when_the_proxy_published_it(
+    settings: Settings, admin_db: str, tmp_path: Path
+) -> None:
+    """ADR 0112: a public certificate to download; no file, no link, 404."""
+    root = tmp_path / "root.crt"
+    async with _running_site(
+        settings.model_copy(update={"tls_internal_ca_file": root}), admin_db
+    ) as site:
+        await site.login_as(SUPER)
+        before_page = (await site.client.get("/admin/settings")).text
+        before = await site.client.get("/admin/settings/tls/ca.crt")
+        root.write_text("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n")
+        after_page = (await site.client.get("/admin/settings")).text
+        after = await site.client.get("/admin/settings/tls/ca.crt")
+
+    assert "ca.crt" not in before_page
+    assert before.status_code == 404
+    assert 'href="/admin/settings/tls/ca.crt"' in after_page
+    assert after.status_code == 200
+    assert after.headers["content-type"].startswith("application/x-x509-ca-cert")
+    assert "BEGIN CERTIFICATE" in after.text

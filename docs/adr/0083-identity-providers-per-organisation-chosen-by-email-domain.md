@@ -6,6 +6,10 @@ class A; a second identity provider was rejected as a fallback) and ADR 0046 (a 
 keyed by the IdP subject). Builds on ADR 0008 (encrypted integration secrets), ADR 0015 (fresh
 login), ADR 0049 (entitlements) and ADR 0073 (DNS lookups with `dnspython`). §7 refined by
 ADR 0097 (the stored issuer is pinned and compared exactly, with no trailing-slash tolerance).
+Amended on 2026-11-02 by the product owner: `ORGANISATION_IDPS_ENABLED=false` keeps the
+*Login* pages of the organisations visible with a notice that logins through them are off, so
+the superuser can prepare registrations and domains before the host switches them on; it still
+routes every login to the platform provider and ends organisation-provider sessions.
 
 ## Context
 
@@ -194,7 +198,7 @@ Each becomes a test in the step that builds it and a row in `docs/threat-model.m
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `ORGANISATION_IDPS_ENABLED` | B deployment | `false` | – | – | Kill switch: off hides the pages, routes every login to the platform provider and ends organisation-provider sessions. Class B because it opens a new trust boundary that the host team should agree to. |
+| `ORGANISATION_IDPS_ENABLED` | B deployment | `false` | – | – | Kill switch: off routes every login to the platform provider and ends organisation-provider sessions; the pages stay, with a notice (amended 2026-11-02). Class B because it opens a new trust boundary that the host team should agree to. |
 | `idp_max_per_organisation` | C platform | 2 | 1–5 | `settings.platform.manage` | Two allows moving from one IdP to the next without a gap. |
 | `idp_domain_recheck_hours` | C platform | 24 | 1–168 | `settings.platform.manage` | DNS re-check of verified domains (point 12). |
 | `idp_domain_grace_days` | C platform | 7 | 0–30 | `settings.platform.manage` | How long a missing TXT record is tolerated before the domain stops routing. |
@@ -215,8 +219,10 @@ overlap after a key rotation.
 | 2 | Registration: `identity_providers` and `identity_provider_keys` tables (migration 0079), the permissions `identity_providers.view` and `identity_providers.manage` with their matrix rows, the *Login* sub-tab of the organisation overview (ADR 0047 §7: a seventh top-level tab would need an ADR, so it sits in the second row with the other organisation-wide settings), the discovery check (`app/domain/identity_providers.py`, fetched through the guard by `app/adapters/discovery.py`), `client_secret_basic` (secret sealed, write-only) and `private_key_jwt` (EC P-256 per provider, `app/adapters/signing_keys.py`) with `GET /admin/jwks.json` and key rotation (24 h overlap), the guided test login through `/admin/callback` without a session, the audit events `idp.created`, `idp.updated`, `idp.enabled`, `idp.disabled`, `idp.deleted`, `idp.key_rotated` and `idp.test_login`, the setting `idp_max_per_organisation`, the manual topic `organisation-login` | #272 | merged |
 | 3a | Domain claims and TXT verification on the provider's page (migration 0088, `app/domain/login_domains.py`), `idp_domain_grace_days`, the reserved suffix of ADR 0106 point 9 | #443 | merged |
 | 3b | The re-check job of verified domains (`idp_domain_recheck_hours`), system events when a domain fails or lapses | #448 | merged |
-| 3c | The email-first login page (nl, en), routing with `login_hint`, RFC 9207 check, email-domain check at the callback, scope restriction in `resolve`, the session's provider checked per request, the kill switch | #453 | in PR |
-| 4 | Operations: `oidc-check --idp`, `idp disable`, staff directory filter, system events and the status on *System status*, logout and fresh login per provider | | planned |
+| 3c | The email-first login page (nl, en), routing with `login_hint`, RFC 9207 check, email-domain check at the callback, scope restriction in `resolve`, the session's provider checked per request, the kill switch | #453 | merged |
+| 4a | Logout and fresh login through the session's own provider (point 17); the provider pages say when the host switch is off | #462 | in PR |
+| 4b | Host tools: `oidc-check --idp <key>`, `idp disable <key>` (point 19) | | planned |
+| 4c | The provider in the staff directory (column and filter, point 16) and the organisation providers on *System status* | | planned |
 | 5 | Docs and tests end to end: threat model rows B1–B15, `docs/dataflow.md`, `docs/architecture.md` diagram, runbook (registering an IdP, the TXT record, key rotation), manual topic for the superuser, e2e login through the second realm | | planned |
 
 ## Consequences

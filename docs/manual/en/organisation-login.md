@@ -96,6 +96,11 @@ address (`email_verified`) on one of its own domains, and grants rights inside t
 organisation only. Switching the provider off ends the sessions that started through it at
 their next request.
 
+Someone logged in through this provider who must log in again for a change, or logs out, goes
+to this provider again, never to the address question. When the host switch is off, this page
+says so: you can prepare providers and domains, but everyone still logs in at the platform
+provider.
+
 1. Enter the domain (for example `gemeente.nl`) and choose **Add domain**.
 2. Have the organisation publish the TXT record shown in its DNS: name
    `_openplanner-challenge.<domain>`, value `openplanner-domain-verification=…`.

@@ -174,3 +174,58 @@ async def test_without_the_host_switch_the_login_goes_straight_to_the_platform(
     start = await site.client.get("/admin/login")
 
     assert start.status_code == 303
+
+
+async def test_a_fresh_login_and_the_logout_go_to_the_session_s_own_provider(
+    routed: Site,
+) -> None:
+    """ADR 0083 point 17: re-authentication never asks the address again nor switches."""
+    adapter = _organisation_adapter(routed)
+    await _log_in(routed, ADDRESS)
+
+    fresh = await routed.client.get("/admin/login", params={"next": "/admin/"})
+    logout = await routed.client.post("/admin/logout", headers=SAME_ORIGIN)
+
+    assert fresh.status_code == 303
+    assert adapter.login_hints == [ADDRESS, None]
+    assert "https://idp.test/logout" in logout.text
+    assert (adapter.logouts, routed.idp.logouts) == (1, 0)
+    assert [h for h in routed.idp.login_hints if h] == []
+
+
+async def test_the_pages_say_when_the_host_switch_is_off(site: Site) -> None:
+    await _route_domain(site)
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/organisations/demo/login")).text
+
+    assert "staan op deze host uit" in page
+
+
+async def test_the_staff_directory_names_and_filters_the_login_service(routed: Site) -> None:
+    """ADR 0083 point 16: the provider of each person, as a column and a filter."""
+    _organisation_adapter(routed)
+    await _log_in(routed, ADDRESS)
+    routed.client.cookies.clear()
+    await routed.login_as(SUPER)
+
+    everyone = (await routed.client.get("/admin/staff")).text
+    only = (await routed.client.get("/admin/staff", params={"provider": "gem-a"})).text
+    platform = (await routed.client.get("/admin/staff", params={"provider": "platform"})).text
+
+    assert "Inlogdienst" in everyone
+    assert 'name="provider"' in everyone
+    assert ">gem-a<" in only
+    assert ">Platform<" not in only.split("<tbody>", 1)[-1].split("</table>", 1)[0]
+    assert ">gem-a<" not in platform.split("<tbody>", 1)[-1].split("</table>", 1)[0]
+
+
+async def test_system_status_lists_the_organisation_providers(routed: Site) -> None:
+    await routed.login_as(SUPER)
+
+    page = (await routed.client.get("/admin/settings")).text
+
+    assert "Identity providers van organisaties" in page
+    assert "Aan op deze host" in page
+    assert "<code>gem-a</code>" in page
+    assert "1 geverifieerd" in page

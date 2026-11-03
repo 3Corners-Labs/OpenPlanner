@@ -13,6 +13,7 @@ import structlog
 from fastapi import Depends, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.adapters import internal_ca
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
@@ -48,7 +49,6 @@ from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_map
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail
 from app.adapters.signing_keys import EcSigningKeys
-from app.adapters.tls_probe import SslCertificateProbe
 from app.admin.routes import register_admin
 from app.admin.session import session_cookie_for
 from app.api import (
@@ -535,7 +535,7 @@ def create_app(
             TlsWatch(
                 uow,
                 clock,
-                certificate_probe or SslCertificateProbe(),
+                certificate_probe or internal_ca.certificate_probe(settings),
                 SystemLog(uow, clock),
                 public_base_url=settings.public_base_url,
                 interval=lambda: timedelta(hours=live().tls_check_interval_hours),

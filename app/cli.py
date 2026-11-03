@@ -8,6 +8,8 @@ Usage:
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
+    ``python -m app.cli wxcc-sample-flow --group SLUG [--queue VALUE=QUEUE] [--fallback-queue Q]``
+        print an importable Flow Designer flow for the group's work items (runbook section 3)
     ``python -m app.cli version``  the release and commit this image was built from (ADR 0052)
     ``python -m app.cli client-pseudonym ADDRESS``  the pseudonym security events use for an
         IP address the security team already has (ADR 0053); there is no way back
@@ -78,6 +80,7 @@ from pathlib import Path
 import httpx
 from cryptography.exceptions import InvalidTag
 
+from app.adapters import internal_ca
 from app.adapters.bootstrap import (
     DEFAULT_PATH,
     InitRefusedError,
@@ -146,11 +149,11 @@ from app.adapters.settings_report import (
     locked_keys,
 )
 from app.adapters.signing_keys import EcSigningKeys
-from app.adapters.tls_probe import SslCertificateProbe
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
+from app.adapters.wxcc_sample_flow import Route, sample_flow
 from app.config import Settings, environment
 from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
@@ -360,6 +363,76 @@ async def _wxcc_config_check(
         except IntegrationError as error:
             results = [CheckResult("WxCC configuration", None, False, f"failed: {error.code}")]
     return format_report(results), passed(results)
+
+
+async def _wxcc_names(
+    settings: Settings, channel: str, transport: httpx.AsyncBaseTransport | None
+) -> tuple[dict[str, str], tuple[str, str] | None]:
+    """Return every queue's id by name and the Work Item channel's (id, name), if WxCC answers.
+
+    Read only (``cjp:config_read``); nothing when WxCC cannot be read, so the flow keeps names.
+    """
+    if not settings.dispatch_configured or not settings.wxcc_api_base_url:
+        return {}, None
+    async with _service_app(settings, transport) as (http, tokens):
+        if tokens is None:  # pragma: no cover - dispatch_configured implies tokens
+            return {}, None
+        try:
+            token = await tokens.access_token()
+            _, host, org = await region_check(http, token, settings.wxcc_api_base_url)
+            if not host or not org:
+                return {}, None
+            config = await fetch_config(http, token, host, org)
+        except IntegrationError:
+            return {}, None
+    found = next((c for c in config.channels if c.name == channel), None)
+    return {q.name: q.id for q in config.queues}, (found.id, found.name) if found else None
+
+
+async def _wxcc_sample_flow(
+    settings: Settings,
+    slug: str,
+    queues: Sequence[str],
+    fallback: str | None,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> tuple[str, bool]:
+    """Return the sample flow for ``slug`` and every group sharing its business address.
+
+    One branch per routing value; a value's queue is its ``--queue VALUE=QUEUE`` or, by the
+    naming rule, the routing value itself. The default branch goes to ``fallback`` or to the
+    first branch's queue. Queue ids come from the organisation's configuration (read only);
+    a queue not found there stays a name that is chosen again in Flow Designer.
+    """
+    groups = await _groups(settings)
+    group = next((g for g in groups if g.slug == slug), None)
+    if group is None:
+        return f"no group '{slug}'\n", False
+    if not group.wxcc_channel or not group.wxcc_business_address:
+        return f"group '{slug}' has no WxCC channel and business address\n", False
+    chosen: dict[str, str] = {}
+    for item in queues:
+        value, sep, queue = item.partition("=")
+        if not sep or not value or not queue:
+            return f"--queue '{item}': use VALUE=QUEUE\n", False
+        chosen[value] = queue
+    values = [group.routing_value] + sorted(
+        {
+            g.routing_value
+            for g in groups
+            if g.wxcc_business_address == group.wxcc_business_address
+            and g.routing_value != group.routing_value
+        }
+    )
+    routes = [Route(value, chosen.get(value, value)) for value in values]
+    fallback = fallback or routes[0].queue
+    ids, found = await _wxcc_names(settings, group.wxcc_channel, transport)
+    if found is None:
+        sys.stderr.write("channel not found in WxCC: link the flow to it in Flow Designer\n")
+    flow = sample_flow(f"openplanner_{group.slug}", routes, fallback, ids, found)
+    unknown = sorted(({r.queue for r in routes} | {fallback}) - ids.keys())
+    if unknown:
+        sys.stderr.write(f"queue not found in WxCC, choose it in Flow Designer: {unknown}\n")
+    return json.dumps(flow, indent=2, ensure_ascii=False) + "\n", True
 
 
 @asynccontextmanager
@@ -574,7 +647,7 @@ async def _tls_probe(
         watch = TlsWatch(
             uow,
             clock,
-            probe or SslCertificateProbe(),
+            probe or internal_ca.certificate_probe(settings),
             SystemLog(uow, clock),
             public_base_url=settings.public_base_url,
             interval=timedelta(hours=settings.tls_check_interval_hours),
@@ -628,7 +701,7 @@ async def _address_checks(
         watch = AddressWatch(
             uow,
             clock,
-            probe or HttpxInstanceProbe(),
+            probe or internal_ca.instance_probe(settings),
             SystemLog(uow, clock),
             public_base_url=settings.public_base_url,
             webhook_base_url=settings.webhook_base_url,
@@ -1471,6 +1544,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
+    sample_cmd = commands.add_parser(
+        "wxcc-sample-flow", help="print an importable Flow Designer flow for a group's work items"
+    )
+    sample_cmd.add_argument("--group", required=True, help="the group's web address (slug)")
+    sample_cmd.add_argument(
+        "--queue", action="append", default=[], help="VALUE=QUEUE: the queue of a routing value"
+    )
+    sample_cmd.add_argument("--fallback-queue", help="queue of the default branch")
     purge_cmd = commands.add_parser(
         "purge-overdue", help="purge personal data past its purge moment (nightly sweep, now)"
     )
@@ -1675,6 +1756,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         report, passed_all = asyncio.run(_wxcc_config_check(Settings()))
         sys.stdout.write(report)
         return 0 if passed_all else 1
+    if args.command == "wxcc-sample-flow":
+        return _write(
+            asyncio.run(_wxcc_sample_flow(Settings(), args.group, args.queue, args.fallback_queue))
+        )
     if args.command == "register-webhooks":
         report = asyncio.run(_register_webhooks(Settings()))
         sys.stdout.write(report)

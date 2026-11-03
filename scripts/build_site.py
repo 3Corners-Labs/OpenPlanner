@@ -5,7 +5,7 @@ The site is one page per locale (``/`` Dutch, ``/en/`` English) rendered from
 static files, the brand mark from the application (one source for the logo, ADR 0060) and
 what search engines and AI crawlers read: ``sitemap.xml``, ``robots.txt``, ``llms.txt`` and the
 JSON-LD inside the page. Release data is baked in from a GitHub releases JSON handed over by
-the workflow; the visitor's browser never calls GitHub (ADR 0087 point 4).
+the workflow; the page's script refreshes it from GitHub in the visitor's browser (ADR 0110).
 
 Run ``make site`` (output in ``site/dist/``), or::
 
@@ -14,7 +14,6 @@ Run ``make site`` (output in ``site/dist/``), or::
 
 import argparse
 import json
-import re
 import shutil
 import sys
 from dataclasses import dataclass, field
@@ -28,7 +27,6 @@ from markupsafe import Markup
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 BRAND = ROOT / "app" / "web" / "static" / "brand"
-ADR_DIR = ROOT / "docs" / "adr"
 CHAPTERS = ROOT / "e2e" / "tour" / "chapters.json"
 LOCALES = ("nl", "en")
 ORIGIN = "https://openplanner.nl"
@@ -132,68 +130,6 @@ def recording(media: Path, chapters: Path = CHAPTERS) -> Recording | None:
     )
 
 
-@dataclass(frozen=True)
-class RoadmapItem:
-    """One decision with open build steps, from the issues labelled ``adr:NNNN`` (ADR 0078)."""
-
-    number: str
-    title: str
-    adr_url: str
-    issues_url: str
-    open_steps: int
-
-
-_ADR_LABEL = re.compile(r"^adr:(\d{4})$")
-
-
-def adr_titles(adr_dir: Path) -> dict[str, tuple[str, str]]:
-    """Map each ADR number to its title and file name, read from ``docs/adr/NNNN-*.md``."""
-    titles: dict[str, tuple[str, str]] = {}
-    for path in sorted(adr_dir.glob("[0-9][0-9][0-9][0-9]-*.md")):
-        first = path.read_text(encoding="utf-8").split("\n", 1)[0]
-        title = re.sub(r"^#\s*\d{4}\.\s*", "", first).strip()
-        titles[path.name[:4]] = (title, path.name)
-    return titles
-
-
-def parse_roadmap(raw: list[dict[str, Any]], adr_dir: Path) -> list[RoadmapItem]:
-    """Group the open ADR step issues by decision, newest decision first.
-
-    Args:
-        raw: The array ``GET /repos/{owner}/{repo}/issues?state=open`` returns. Pull requests
-            and issues without an ``adr:NNNN`` label (such as ``adr:drift``) are left out.
-        adr_dir: Where the ADR files are, for the titles.
-
-    Returns:
-        One item per decision with at least one open step.
-    """
-    counts: dict[str, int] = {}
-    for issue in raw:
-        if "pull_request" in issue or issue.get("state", "open") != "open":
-            continue
-        for label in issue.get("labels", []):
-            match = _ADR_LABEL.match(str(label.get("name", "")))
-            if match:
-                counts[match.group(1)] = counts.get(match.group(1), 0) + 1
-                break
-    titles = adr_titles(adr_dir)
-    items = []
-    for number in sorted(counts, reverse=True):
-        title, file = titles.get(number, (f"ADR {number}", ""))
-        items.append(
-            RoadmapItem(
-                number=number,
-                title=title,
-                adr_url=f"{REPOSITORY}/blob/main/docs/adr/{file}"
-                if file
-                else f"{REPOSITORY}/tree/main/docs/adr",
-                issues_url=f"{REPOSITORY}/issues?q=is%3Aissue+is%3Aopen+label%3Aadr%3A{number}",
-                open_steps=counts[number],
-            )
-        )
-    return items
-
-
 def brand_mark() -> Markup:
     """The application's mark (ADR 0060), inline so CSS can colour and animate its parts.
 
@@ -255,11 +191,7 @@ def structured_data(content: dict[str, Any], releases: Releases | None) -> list[
     return [software, faq]
 
 
-def llms_text(
-    contents: dict[str, dict[str, Any]],
-    releases: Releases | None,
-    roadmap: list[RoadmapItem] | None = None,
-) -> str:
+def llms_text(contents: dict[str, dict[str, Any]], releases: Releases | None) -> str:
     """``llms.txt``: the site in Markdown for AI tools, with the links that carry the facts.
 
     The format (llmstxt.org) is a title, a blockquote summary, sections of links. English
@@ -295,12 +227,8 @@ def llms_text(
     ]
     lines += ["", "## Automatic updates", ""]
     lines += [f"- {line}" for line in en["standards"]["update"]]
-    if roadmap:
-        lines += ["", "## Roadmap (decided, not built yet)", ""]
-        lines += [
-            f"- ADR {item.number} {item.title}: {item.open_steps} open steps ({item.issues_url})"
-            for item in roadmap
-        ]
+    lines += ["", "## Roadmap (decided, not built yet)", ""]
+    lines += [f"- {item['title']}: {item['text']}" for item in en["roadmap"]["items"]]
     if releases and releases.latest:
         lines += [
             "",
@@ -309,6 +237,13 @@ def llms_text(
             f"- Latest release: {releases.latest.tag} ({releases.latest.date}): "
             f"{releases.latest.url}",
         ]
+    iv = en["involved"]
+    lines += ["", "## Get involved", "", iv["lead"], ""]
+    lines += [
+        f"- {path['title']}: {path['text']} "
+        + ", ".join(f"[{link['label']}]({link['href']})" for link in path["links"])
+        for path in iv["paths"]
+    ]
     lines += [
         "",
         "## Documentation",
@@ -365,12 +300,11 @@ def build(
     releases: Releases | None,
     commit: str,
     base: str = "/",
-    roadmap: list[RoadmapItem] | None = None,
 ) -> list[Path]:
     """Render every locale into ``out`` and copy the static files. Returns the files written.
 
     ``base`` is the root the assets are linked from: ``/`` on the web server; a relative
-    root for a preview served from a sub-path. ``releases`` and ``roadmap`` are ``None`` in a
+    root for a preview served from a sub-path. ``releases`` is ``None`` in a
     local build without GitHub data; the page then links to GitHub instead.
     """
     env = Environment(
@@ -386,7 +320,7 @@ def build(
         shutil.rmtree(out)
     shutil.copytree(SITE / "static", out / "static")
     shutil.copytree(BRAND, out / "static" / "brand")
-    # Files for the web root itself (.htaccess): the host's configuration, not page content.
+    # Files for the web root itself (CNAME for GitHub Pages, ADR 0111), not page content.
     shutil.copytree(SITE / "root", out, dirs_exist_ok=True)
     written: list[Path] = []
     contents = {locale: load_content(locale) for locale in LOCALES}
@@ -401,7 +335,6 @@ def build(
             template.render(
                 c=content,
                 releases=releases,
-                roadmap=roadmap,
                 mark=brand_mark(),
                 commit=commit,
                 base=page_base,
@@ -415,7 +348,7 @@ def build(
     for name, text in (
         ("sitemap.xml", sitemap(built)),
         ("robots.txt", ROBOTS),
-        ("llms.txt", llms_text(contents, releases, roadmap)),
+        ("llms.txt", llms_text(contents, releases)),
     ):
         (out / name).write_text(text, encoding="utf-8")
         written.append(out / name)
@@ -423,14 +356,11 @@ def build(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line: output folder, GitHub releases and issues JSON, commit and asset root."""
+    """Command line: output folder, GitHub releases JSON, commit and asset root."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=SITE / "dist")
     parser.add_argument(
         "--releases", type=Path, help="JSON from GET /repos/{owner}/{repo}/releases"
-    )
-    parser.add_argument(
-        "--issues", type=Path, help="JSON from GET /repos/{owner}/{repo}/issues?state=open"
     )
     parser.add_argument("--commit", default="", help="the commit the site is built from")
     parser.add_argument(
@@ -441,11 +371,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.releases:
         with args.releases.open(encoding="utf-8") as handle:
             releases = parse_releases(json.load(handle))
-    roadmap = None
-    if args.issues:
-        with args.issues.open(encoding="utf-8") as handle:
-            roadmap = parse_roadmap(json.load(handle), ADR_DIR)
-    written = build(args.out, releases, args.commit, args.base, roadmap)
+    written = build(args.out, releases, args.commit, args.base)
     sys.stdout.write(f"built {len(written)} files into {args.out}\n")
     return 0
 

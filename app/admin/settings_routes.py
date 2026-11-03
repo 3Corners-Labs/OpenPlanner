@@ -61,6 +61,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
+from app.adapters import internal_ca
 from app.adapters.db.rotation import rotation_status
 from app.adapters.live_settings import LiveSettings
 from app.adapters.settings_report import SettingState
@@ -82,9 +83,11 @@ from app.domain.configuration_package import (
 )
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.identity_provider_service import IdentityProviderService
 from app.domain.key_rotation import RotationStatus
 from app.domain.log_destination_service import LogDestinationService
 from app.domain.log_destinations import State
+from app.domain.login_domains import DomainState
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
 from app.domain.own_certificate import (
     MAX_PEM_BYTES,
@@ -444,6 +447,23 @@ async def download_request(request: Request, context: Manage) -> Response:
     )
 
 
+@router.get("/settings/tls/ca.crt", response_class=PlainTextResponse)
+async def download_internal_root(request: Request, context: View) -> Response:
+    """Return the public root of the proxy's internal authority, to install once (ADR 0112).
+
+    A certificate, not a secret: anyone who can read System status may fetch it. The CA's key
+    stays in the proxy's volume and is not reachable from here.
+    """
+    root = internal_ca.root_file(request.app.state.settings)
+    if root is None:
+        raise RejectedRequest(404)
+    return PlainTextResponse(
+        root.read_text(encoding="ascii"),
+        media_type="application/x-x509-ca-cert",
+        headers={"content-disposition": 'attachment; filename="openplanner-internal-ca.crt"'},
+    )
+
+
 @router.post("/settings/tls/certificate", response_class=HTMLResponse)
 async def upload_certificate(
     request: Request, locale: Locale, _: SameOrigin, context: Change
@@ -630,6 +650,8 @@ async def _overview(
             "certificate": await _certificate(request, locale),
             "log_summary": await _log_summary(request, context),
             "directory": await _directory_status(request, locale),
+            "internal_ca": internal_ca.root_file(current) is not None,
+            "organisation_idps": await _organisation_idps(request),
             "rotation": await _rotation(request),
             "source": await _source_view(request, locale, states, manage=manage, errors=errors),
             "status": [
@@ -707,6 +729,47 @@ async def _directory_status(request: Request, locale: RequestLocale) -> Director
     state = await service.state()
     text = locale.gettext(_DIRECTORY_TEXTS[state], names=", ".join(service.missing))
     return DirectoryStatus(state, text)
+
+
+@dataclass(frozen=True)
+class ProviderStatus:
+    """One organisation provider on System status: where it belongs, its switch, its domains."""
+
+    organisation: str
+    key: str
+    enabled: bool
+    routing: int
+    failing: int
+    pending: int
+    lapsed: int
+
+
+@dataclass(frozen=True)
+class OrganisationIdps:
+    """The host switch and every organisation provider (ADR 0083 step 4)."""
+
+    switched_on: bool
+    providers: tuple[ProviderStatus, ...]
+
+
+async def _organisation_idps(request: Request) -> OrganisationIdps:
+    """Return the organisation providers' state for System status; counts, never secrets."""
+    service: IdentityProviderService = request.app.state.identity_provider_service
+    rows = []
+    for provider, claims in await service.platform_status():
+        states = [c.state for c in claims]
+        rows.append(
+            ProviderStatus(
+                provider.organisation,
+                provider.key,
+                provider.enabled,
+                states.count(DomainState.VERIFIED),
+                states.count(DomainState.FAILING),
+                states.count(DomainState.PENDING),
+                states.count(DomainState.LAPSED),
+            )
+        )
+    return OrganisationIdps(service.routing, tuple(rows))
 
 
 async def _log_summary(request: Request, context: AdminContext) -> LogSummary | None:

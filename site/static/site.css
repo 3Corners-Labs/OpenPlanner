@@ -115,7 +115,7 @@ ul, ol { padding: 0; margin: 0; }
 .hero { padding-block: clamp(3rem, 9vw, 7rem) var(--space); overflow: hidden; }
 .hero__grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: clamp(2rem, 6vw, 5rem); align-items: center; }
 .hero__copy .lead { max-width: 40rem; }
-@media (max-width: 56rem) { .hero__grid { grid-template-columns: 1fr; } .hero__art { order: -1; max-width: 14rem; } }
+@media (max-width: 56rem) { .hero__grid { grid-template-columns: 1fr; } .hero__art { display: none; } }
 
 /* The mark: the application's own mark.svg, inline (ADR 0060). Tiles and the open slot take
    the brand tokens; the open slot slides in and settles (ADR 0060 §7), never with reduced motion. */
@@ -324,10 +324,6 @@ ul, ol { padding: 0; margin: 0; }
 @media (max-width: 40rem) { .release-grid { grid-template-columns: 1fr; } }
 
 /* Closing call */
-.cta__box { padding: clamp(2rem, 5vw, 3.5rem); border-radius: var(--radius); background: var(--accent); color: var(--on-accent); }
-.cta__box h2, .cta__box p { color: inherit; }
-.cta__box .btn--primary { background: var(--on-accent); color: var(--accent-strong); border-color: var(--on-accent); }
-.cta__box .btn { border-color: var(--on-accent); color: var(--on-accent); background: transparent; }
 .cta__box .btn:hover { background: rgb(255 255 255 / .15); }
 
 /* Footer */
@@ -474,12 +470,10 @@ ul, ol { padding: 0; margin: 0; }
 
 /* Roadmap from the GitHub issues */
 .roadmap-list { list-style: none; margin-top: 1.25rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 2.5rem; }
-.roadmap-list li { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; gap: .75rem; align-items: baseline; padding: .6rem 0; border-top: 1px solid var(--border); }
-.roadmap-list__adr { font-family: var(--mono); font-weight: 700; font-size: .9rem; text-decoration: none; }
+.roadmap-list li { display: grid; gap: .25rem; padding: .75rem 0; border-top: 1px solid var(--border); }
 .roadmap-list__title { min-width: 0; }
-.roadmap-list__steps { font-size: .8rem; font-weight: 700; white-space: nowrap; color: var(--slot-text); }
+.roadmap-list__text { color: var(--muted); }
 @media (max-width: 56rem) { .roadmap-list { grid-template-columns: 1fr; } }
-@media (max-width: 30rem) { .roadmap-list li { grid-template-columns: 1fr auto; } .roadmap-list__title { grid-column: 1 / -1; grid-row: 2; } }
 
 /* Enterprise: architecture plate, pillars, scaling steps (on the dark band) */
 .section--dark .small { color: #b7c2cc; }
@@ -547,3 +541,30 @@ ul, ol { padding: 0; margin: 0; }
 .scale__state { display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: .15rem .55rem; border-radius: 999px; background: #14301d; color: #74d08e; }
 .scale__step--designed .scale__state { background: #33270e; color: #f2b84b; }
 @media (max-width: 56rem) { .scale { grid-template-columns: 1fr; } }
+
+/* Footer disclaimer */
+.foot__disclaimer { grid-column: 1 / -1; font-size: .85rem; color: var(--muted); margin: 0; max-width: 70ch; }
+
+/* Start command in the hero */
+.cmd { margin: 1.75rem 0 0; max-width: 40rem; }
+.cmd figcaption { font-size: .9rem; color: var(--muted); margin-bottom: .4rem; }
+.cmd pre { margin: 0; padding: .9rem 1.1rem; overflow-x: auto; border-radius: var(--radius-s); background: var(--surface); border: 1px solid var(--border); font-family: var(--mono); font-size: .88rem; line-height: 1.6; }
+
+/* Get involved: three ways in */
+.paths { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; margin-top: 2rem; }
+.path { display: flex; flex-direction: column; gap: .75rem; padding: 1.5rem; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+.path--help { border-color: var(--accent); border-width: 2px; }
+.path h3 { margin: 0; }
+.path p { margin: 0; color: var(--muted); }
+.path .path__links { margin-top: auto; padding-top: .5rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+@media (max-width: 56rem) { .paths { grid-template-columns: 1fr; } }
+
+/* Long detail folded away; the text stays in the page for readers and crawlers */
+.fold { margin-top: 2.5rem; border-top: 1px solid var(--border); }
+.fold > summary { cursor: pointer; padding: 1rem 0; font-weight: 700; font-size: 1.1rem; list-style: none; display: flex; align-items: center; gap: .6rem; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::before { content: "+"; display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border: 1px solid currentColor; border-radius: 50%; font-weight: 700; }
+.fold[open] > summary::before { content: "\2212"; }
+.fold > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.top__tools .btn--github { display: none; }
+@media (min-width: 72rem) { .top__tools .btn--github { display: inline-flex; } }

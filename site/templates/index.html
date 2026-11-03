@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.github.com; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="color-scheme" content="light dark">
@@ -21,6 +21,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <title>{{ c.meta.title }}</title>
 <link rel="canonical" href="https://openplanner.nl{{ c.path }}">
+<link rel="alternate" type="text/markdown" title="llms.txt" href="https://openplanner.nl/llms.txt">
 <link rel="alternate" hreflang="nl" href="https://openplanner.nl/">
 <link rel="alternate" hreflang="en" href="https://openplanner.nl/en/">
 <link rel="alternate" hreflang="x-default" href="https://openplanner.nl/">
@@ -66,7 +67,8 @@
     </nav>
     <div class="top__tools">
       <a class="lang" href="{{ c.other.path }}" lang="{{ c.other.lang }}" hreflang="{{ c.other.lang }}" aria-label="{{ c.other.aria }}">{{ c.other.label }}</a>
-      <a class="btn btn--ghost btn--small" href="https://github.com/3Corners-Labs/OpenPlanner"><svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>{{ c.nav_github }}</a>
+      <a class="btn btn--ghost btn--small btn--github" href="https://github.com/3Corners-Labs/OpenPlanner"><svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>{{ c.nav_github }}</a>
+      <a class="btn btn--primary btn--small" href="#get-involved">{{ c.nav_start }}</a>
     </div>
   </div>
 </header>
@@ -84,6 +86,10 @@
         <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md">{{ c.hero.cta_install }}</a>
         <a class="btn btn--ghost" href="https://github.com/3Corners-Labs/OpenPlanner">{{ c.hero.cta_source }}</a>
       </p>
+      <figure class="cmd">
+        <figcaption>{{ c.hero.command_label }}</figcaption>
+        <pre><code>{{ c.hero.command }}</code></pre>
+      </figure>
     </div>
     <div class="hero__art" aria-hidden="true">
       <div class="bigmark">{{ mark }}</div>
@@ -387,6 +393,8 @@
       </figcaption>
     </figure>
 
+    <details class="fold">
+    <summary>{{ e.fold }}</summary>
     <h3 class="sub">{{ e.arch_title }}</h3>
     <figure class="arch">
       <div class="arch__layers">
@@ -427,6 +435,7 @@
       {%- endfor %}
     </ol>
     <p class="small"><a href="{{ e.scale_link.href }}">{{ e.scale_link.label }}</a></p>
+    </details>
 
     <h3 class="sub">{{ e.security_title }}</h3>
     <ul class="grid2">
@@ -441,6 +450,8 @@
   <div class="wrap">
     <h2 id="standards-title">{{ c.standards.title }}</h2>
     <p class="lead">{{ c.standards.lead }}</p>
+    <details class="fold fold--light">
+    <summary>{{ c.standards.fold }}</summary>
     <div class="table-scroll">
       <table class="standards">
         <thead><tr><th scope="col">{{ c.standards.col_standard }}</th><th scope="col">{{ c.standards.col_what }}</th><th scope="col">{{ c.standards.col_status }}</th><th scope="col">{{ c.standards.col_proof }}</th></tr></thead>
@@ -456,6 +467,7 @@
         </tbody>
       </table>
     </div>
+    </details>
     <div class="twocol">
       <div>
         <h3>{{ c.standards.code_title }}</h3>
@@ -490,47 +502,40 @@
   <div class="wrap">
     <h2 id="roadmap-title">{{ c.roadmap.title }}</h2>
     <p class="lead">{{ c.roadmap.lead }}</p>
-    {%- if roadmap %}
-    {%- set total = roadmap | sum(attribute='open_steps') %}
-    <p class="small">{{ c.roadmap.total.replace("{n}", total | string).replace("{m}", roadmap | length | string) }}</p>
     <ul class="roadmap-list">
-      {%- for item in roadmap %}
+      {%- for item in c.roadmap['items'] %}
       <li>
-        <a class="roadmap-list__adr" href="{{ item.adr_url }}">ADR {{ item.number }}</a>
-        <span class="roadmap-list__title">{{ item.title }}</span>
-        <a class="roadmap-list__steps" href="{{ item.issues_url }}">{{ c.roadmap.step if item.open_steps == 1 else c.roadmap.steps.replace("{n}", item.open_steps | string) }}</a>
+        <strong class="roadmap-list__title">{{ item.title }}</strong>
+        <span class="roadmap-list__text">{{ item.text }}</span>
       </li>
       {%- endfor %}
     </ul>
-    {%- else %}
-    <p class="notice">{{ c.roadmap.no_data }}</p>
-    {%- endif %}
-    <p class="actions"><a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen+label%3Aadr%3A">{{ c.roadmap.all }}</a></p>
+    <p class="actions"><a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner/issues?q=is%3Aissue+is%3Aopen">{{ c.roadmap.all }}</a></p>
   </div>
 </section>
 
-<section class="section section--tint" id="releases" aria-labelledby="releases-title">
+<section class="section section--tint" id="releases" aria-labelledby="releases-title" data-releases>
   <div class="wrap">
     <h2 id="releases-title">{{ c.releases.title }}</h2>
     <p class="lead">{{ c.releases.lead }}</p>
     {%- if releases %}
     <div class="release-grid">
-      <div class="release release--latest">
+      <div class="release release--latest" data-release="latest">
         <p class="tag">{{ c.releases.latest }}</p>
         {%- if releases.latest %}
-        <p class="release__version"><a href="{{ releases.latest.url }}">{{ releases.latest.tag }}</a></p>
-        <p class="release__date"><time datetime="{{ releases.latest.date }}">{{ releases.latest.date }}</time></p>
+        <p class="release__version"><a href="{{ releases.latest.url }}" data-release-link>{{ releases.latest.tag }}</a></p>
+        <p class="release__date"><time datetime="{{ releases.latest.date }}" data-release-date>{{ releases.latest.date }}</time></p>
         {%- else %}<p>{{ c.releases.none }}</p>{%- endif %}
       </div>
-      <div class="release">
+      <div class="release" data-release="candidate">
         <p class="tag">{{ c.releases.candidate }}</p>
         {%- if releases.candidate %}
-        <p class="release__version"><a href="{{ releases.candidate.url }}">{{ releases.candidate.tag }}</a></p>
-        <p class="release__date"><time datetime="{{ releases.candidate.date }}">{{ releases.candidate.date }}</time></p>
+        <p class="release__version"><a href="{{ releases.candidate.url }}" data-release-link>{{ releases.candidate.tag }}</a></p>
+        <p class="release__date"><time datetime="{{ releases.candidate.date }}" data-release-date>{{ releases.candidate.date }}</time></p>
         {%- else %}<p>{{ c.releases.none }}</p>{%- endif %}
       </div>
     </div>
-    <ul class="release-list">
+    <ul class="release-list" data-release-list data-prerelease="{{ c.releases.prerelease }}">
       {%- for r in releases.recent %}
       <li><a href="{{ r.url }}">{{ r.tag }}</a> <time datetime="{{ r.date }}">{{ r.date }}</time>{% if r.prerelease %} <span class="tag">{{ c.releases.prerelease }}</span>{% endif %}</li>
       {%- endfor %}
@@ -546,14 +551,23 @@
   </div>
 </section>
 
-<section class="section cta" aria-labelledby="cta-title">
-  <div class="wrap cta__box">
-    <h2 id="cta-title">{{ c.cta.title }}</h2>
-    <p>{{ c.cta.text }}</p>
-    <p class="actions">
-      <a class="btn btn--primary" href="https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/install.md">{{ c.cta.primary }}</a>
-      <a class="btn" href="https://github.com/3Corners-Labs/OpenPlanner#quick-start-demo">{{ c.cta.secondary }}</a>
-    </p>
+<section class="section cta" id="get-involved" aria-labelledby="involved-title">
+  <div class="wrap">
+    <h2 id="involved-title">{{ c.involved.title }}</h2>
+    <p class="lead">{{ c.involved.lead }}</p>
+    <ul class="paths">
+      {%- for path in c.involved.paths %}
+      <li class="path path--{{ path.key }}">
+        <h3>{{ path.title }}</h3>
+        <p>{{ path.text }}</p>
+        <p class="path__links">
+          {%- for link in path.links %}
+          <a class="btn{% if loop.first %} btn--primary{% else %} btn--ghost{% endif %}" href="{{ link.href }}">{{ link.label }}</a>
+          {%- endfor %}
+        </p>
+      </li>
+      {%- endfor %}
+    </ul>
   </div>
 </section>
 
@@ -572,6 +586,7 @@
       <li><a href="{{ c.other.path }}" lang="{{ c.other.lang }}" hreflang="{{ c.other.lang }}">{{ c.other.label }}</a></li>
     </ul>
     <p class="foot__legal">{{ c.footer.nocookies }}<br>{{ c.footer.license }}</p>
+    <p class="foot__disclaimer">{{ c.footer.disclaimer }}</p>
   </div>
 </footer>
 </body>

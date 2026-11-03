@@ -28,7 +28,7 @@ def test_every_pass_runs_the_standards_through_edge_checks() -> None:
     assert "tls_version_checks" in edge
     assert "hsts_checks" in edge
     passes = len(re.findall(r"^edge_checks$", SCRIPT, re.MULTILINE))
-    assert passes == 3  # ACME, the portal's certificate, an own certificate from files
+    assert passes == 4  # ACME, the portal's certificate, own files, the internal authority
 
 
 def test_every_pass_asks_for_the_round_trip_through_the_proxy() -> None:

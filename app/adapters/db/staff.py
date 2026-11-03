@@ -37,6 +37,7 @@ from app.adapters.db.models import (
 from app.adapters.db.scope import scope_filter
 from app.domain.authorization import CustomRole, Role, RoleCatalogue, Scope
 from app.domain.entitlements import Directory, GroupRef, OrganisationRef
+from app.domain.identity import PLATFORM, QUALIFIED_PREFIX
 from app.domain.staff import (
     GrantHolders,
     Membership,
@@ -91,6 +92,11 @@ def _narrowed(narrow: StaffFilter) -> list[ColumnElement[bool]]:
         conditions.append(StaffRow.id == narrow.id)
     if narrow.unrecognised:
         conditions.append(exists().where(StaffRefusalRow.staff_id == StaffRow.id))
+    if narrow.provider == PLATFORM:
+        conditions.append(not_(StaffRow.subject.startswith(QUALIFIED_PREFIX, autoescape=True)))
+    elif narrow.provider is not None:
+        head = f"{QUALIFIED_PREFIX}{narrow.provider}:"
+        conditions.append(StaffRow.subject.startswith(head, autoescape=True))
     return conditions
 
 

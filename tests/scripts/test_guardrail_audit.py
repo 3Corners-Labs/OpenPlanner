@@ -252,3 +252,23 @@ def test_the_workflow_runs_hourly_in_the_audit_environment_and_posts() -> None:
     assert "scripts/guardrail-fetch.sh" in text
     assert "--post" in text
     assert "issues: write" in text
+
+
+def test_a_known_unseen_value_is_listed_but_closes_the_issue(tmp_path: Path) -> None:
+    """Who may bypass the tag ruleset is never visible to a read-only token (2026-11-02)."""
+    expected = baseline(tmp_path)
+    expected["known_unseen"] = {"rulesets/main/bypass_actors": "never visible"}
+    hidden_rules = [{**RULESET, "bypass_actors": None}]
+
+    findings = audit(expected, live(tmp_path, rulesets=hidden_rules))
+
+    assert not findings
+    assert findings.known_unseen == ["rulesets/main/bypass_actors"]
+    assert "Not checked, by design" in render(findings, TODAY)
+
+
+def test_the_repositorys_baseline_names_why_each_value_is_known_unseen() -> None:
+    known = json.loads(BASELINE.read_text())["known_unseen"]
+
+    assert list(known) == ["rulesets/release tags/bypass_actors"]
+    assert all(len(why) > 20 for why in known.values())

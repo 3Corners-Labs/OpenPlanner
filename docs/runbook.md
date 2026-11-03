@@ -429,6 +429,66 @@ docker compose --env-file .env.update exec web ls -l /srv/portal-certs
 docker compose --env-file .env.update logs proxy | grep 'portal certificate'
 ```
 
+### Internal certificate authority for a lab (ADR 0112)
+
+For a host without a public name (docker01: the name answers on the lab network only), Caddy
+can issue the certificates itself.
+
+1. `proxy.env`: `TLS_DOMAIN=<host>` and `TLS_INTERNAL=true` (no `ACME_EMAIL`); the installer
+   writes this with `--internal-ca`. `PUBLIC_BASE_URL` is `https://<host>`.
+2. Start the proxy (`docker compose --env-file .env.update up -d proxy`). The log says
+   `internal certificate authority` and then `internal CA root published`.
+3. **Install the root once per machine** that opens the portal. *Platform → Advanced settings →
+   System status → HTTPS certificate* offers *Download root certificate* (a public certificate,
+   no secret). macOS: open the file, add it to *Keychain Access* → *System*, set *Always
+   Trust*. Windows: double-click → *Install* → *Local Machine* → *Trusted Root Certification
+   Authorities*. iOS/Android: install the profile and enable full trust in the settings. Firefox
+   uses its own store (*Settings → Privacy & Security → Certificates → Import*) unless it is told
+   to use the system's.
+4. The host's own checks (certificate probe, round trip to the public address) trust the root
+   by themselves; System status says *in orde*, not *niet vertrouwd*.
+
+Where it lives: the authority's private key stays in the volume `proxy-data` of the proxy, and
+only the root certificate is copied to the volume `internal-ca`. Wiping `proxy-data` makes a new
+authority: every machine must then install the new root. Not for production.
+
+#### A lab that is not in DNS (docker01)
+
+Moving docker01 from plain http to this took these steps, all without root, because
+`.env.update` belongs to the host updater:
+
+1. `git fetch --tags && git merge --ff-only v<rc>` in the checkout, so compose has the volume
+   `internal-ca` and the `idp` service on the `edge` network.
+2. `proxy.env` with `TLS_DOMAIN`, `TLS_INTERNAL=true` and `IDP_UPSTREAM=idp:8080`.
+3. `docker-compose.override.yml`: `proxy` and `idp` under the profile the installer set
+   (`profiles: !override [dev]`), the proxy image pinned by hand
+   (`ghcr.io/3corners-labs/openplanner-proxy:<rc>`; the updater pins it only when
+   `.env.update` has it), the old `keycloak` under an inactive profile, and for `web` and
+   `worker` `extra_hosts: ["<host>:host-gateway"]`: the name resolves on the lab network only,
+   so without it the certificate and address checks cannot reach their own host.
+4. `.env`: `PUBLIC_BASE_URL=https://<host>`; remove `OIDC_DISCOVERY_URL`, `OIDC_ISSUER`,
+   `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` (the render script writes them to
+   `secrets/keycloak-app.env`); `TLS_CERTIFICATE_SOURCE=own`.
+5. `secrets/keycloak.env`: set `KC_OPENPLANNER_BASE_URL=https://<host>` (an existing value wins
+   over `PUBLIC_BASE_URL`), run `scripts/render-keycloak-realm.sh`, and recreate `idp`.
+6. An existing realm is not re-imported: set the redirect URI, web origin and post-logout URI of
+   client `openplanner-admin` to the https address with `kcadm.sh` (against
+   `http://localhost:8080/idp`).
+7. `docker compose --env-file .env.update up -d --force-recreate web worker proxy`.
+8. Verify with `oidc-check`, `tls-check` and `address-check` from `web`.
+
+#### The bundled identity provider behind the proxy
+
+With `IDP_UPSTREAM=idp:8080` in `proxy.env` the proxy serves the bundled Keycloak under `/idp` on
+the same host name and certificate. Run `scripts/render-keycloak-realm.sh` after `PUBLIC_BASE_URL`
+is `https://<host>`: it writes `KC_HOSTNAME=https://<host>/idp`, `KC_HTTP_RELATIVE_PATH=/idp` and
+`KC_PROXY_HEADERS=xforwarded` for Keycloak, and the whole login (`OIDC_DISCOVERY_URL`,
+`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, the admin URL) into
+`secrets/keycloak-app.env`, which web and worker read after `.env`. Remove the same names from
+`.env` so one place holds them, recreate `idp`, `web` and `worker`, and log in at
+`https://<host>/idp/realms/openplanner`. Keycloak's admin console is then
+`https://<host>/idp/admin/` (user `admin`). Port 8780 is no longer needed.
+
 ### Test the certificate flow end to end (ADR 0064)
 
 On a host with a public DNS name and ports 80 and 443 open (docker01 in the lab):
@@ -968,6 +1028,9 @@ Work Items is in beta; the organisation must be enabled by Cisco.
    an agent may see it for a moment. **To verify on the test tenant:** that the flow can read
    `kind` from the work item data; if it cannot, route the probe on a flow setting instead
    (the Case value stays `probe`).
+   **Sample flow.** `python -m app.cli wxcc-sample-flow --group <slug>` prints a flow with all of
+   this, ready to import in Flow Designer (Flows → Import); how, what it does (with diagram) and
+   what is still to confirm live is in [docs/wxcc-sample-flow.md](wxcc-sample-flow.md).
 4. **Queues** with channel type Work Item, the **multimedia profile** capacity for work items,
    and a **RONA** timeout.
 5. Set `WXCC_API_BASE_URL` to your region's API host.
@@ -1365,56 +1428,41 @@ an SMTP 5xx), `channel_not_configured` (the organisation has no sender on that c
 `integration_not_ready` (the settings key is missing). The reminders page of a group warns
 when a rule's channel is not configured.
 
-## The public website, openplanner.nl (ADR 0087)
+## The public website, openplanner.nl (ADR 0087, ADR 0111)
 
-The website is static: `site/` in the repository, built by `scripts/build_site.py` and
-published by the job `site` of `main.yml` on every merge to `main` and on every release tag.
-It is hosted on a TransIP web hosting package, apart from the application; the application
-never reads from it and it never calls the application. TransIP deploys what is pushed to the
-package's git repository, so the deploy is a `git push` (`scripts/deploy-site.sh`): the job
-clones that repository, replaces the site files with the build, commits `site: <tag or branch>
-<commit>` and pushes. The repository keeps every deployed version.
+The website is static: `site/` in the repository, built by `scripts/build_site.py` in the job
+`site` of `main.yml` on every merge to `main` and on every release tag. GitHub Pages serves it,
+apart from the application; the application never reads from it and it never calls the
+application. Only a minor or major release (`vX.Y.0`) publishes it, through the job `pages`
+(`actions/deploy-pages`); there is no key or secret. Between releases the page's script keeps
+the release list current from `api.github.com` (ADR 0110).
 
 | Event | What runs | Result |
 |---|---|---|
-| Merge to `main` | `site`, after the candidate job: build with the releases and the roadmap from GitHub, upload the artifact, push | the site on TransIP, with the candidate that merge made on it |
-| Tag `vX.Y.Z` | the same after `publish`, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page, and the site on TransIP with the new release on it |
+| Merge to `main` | `site`, after the candidate job: build with the releases from GitHub, upload the artifact | the artifact `site` (fourteen days); the live site does not change |
+| Tag `vX.Y.Z` (patch) | the same after `publish`, plus `gh release upload` | `site-X.Y.Z.tar.gz` on the release page; the live site does not change |
+| Tag `vX.Y.0` (minor or major) | the same, then `pages` | `site-X.Y.0.tar.gz` on the release, and the build live on openplanner.nl |
 | Tag `vX.Y.Z` (also) | `tour` (`.github/workflows/tour.yml`): the e2e stack, `e2e/tour/tour.spec.ts`, the captions | `tour.webm`, `tour.jpg`, `tour.nl.vtt`, `tour.en.vtt`, `tour.json` and a still per main chapter (`tour-<chapter>.jpg`) on the release; the `site` job puts the newest one on the page, the stills as a gallery |
-| Release candidate (by hand) | *Actions → tour → Run workflow* with the `vX.Y.Z-rc.N` tag: candidates are tagged by `GITHUB_TOKEN` and start no workflow, so they are recorded only on request | the recording on that candidate; the next merge to `main` puts it on the page |
+| Release candidate (by hand) | *Actions → tour → Run workflow* with the `vX.Y.Z-rc.N` tag: candidates are tagged by `GITHUB_TOKEN` and start no workflow, so they are recorded only on request | the recording on that candidate; the next minor release puts it on the page |
 | Pull request, fork | nothing (`main.yml` only) | a local `make site` is the preview |
 
-### Once: the deploy settings
+### Once: GitHub Pages and the domain
 
-In the GitHub environment `website` (*Settings → Environments*), so only the job `site` on
-`main` can read them:
+A repository administrator, once:
 
-| Name | Kind | Value |
-|---|---|---|
-| `SITE_DEPLOY_REMOTE` | variable | `openplannernl@openps.ssh.transip.me:auto.git` |
-| `SITE_DEPLOY_KNOWN_HOSTS` | variable | the output of `ssh-keyscan -t ed25519,rsa openps.ssh.transip.me`, after checking it against the fingerprints below |
-| `SITE_DEPLOY_KEY` | secret | the private key of a deploy-only pair: `ssh-keygen -t ed25519 -C openplanner-site-deploy -f site-deploy -N ""`; the public key `site-deploy.pub` goes on the TransIP package's SSH keys |
-| `SITE_DEPLOY_DIR` | variable | `www`: TransIP AutoGit serves the `www/` folder of the repository |
-| `SITE_DEPLOY_BRANCH` | variable | `main`: the *Git production branch* in TransIP's panel (AutoGit); a push to another branch is received but not deployed |
+1. *Settings → Pages*: source **GitHub Actions**; custom domain `openplanner.nl`; after the
+   certificate is issued, **Enforce HTTPS**.
+2. *Settings → Environments → github-pages*: deployment branches and tags limited to the tag
+   pattern `v*.*.*`, so only a release can publish. `.github/guardrails.json` holds this as the
+   baseline (ADR 0109).
+3. DNS at the registrar for `openplanner.nl`: `A` records `185.199.108.153`,
+   `185.199.109.153`, `185.199.110.153`, `185.199.111.153`; `AAAA` records
+   `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`;
+   `www` as a `CNAME` to `3corners-labs.github.io`. Check the addresses against GitHub's
+   documentation on custom domains before entering them. Verify the domain for the
+   organisation (*Organisation settings → Pages*) so no other account can claim it.
 
-Host key fingerprints of `openps.ssh.transip.me` as read on 2026-10-31; compare them with what
-TransIP publishes before trusting them:
-
-```text
-256  SHA256:0dGaYR9rj5YLPxqCTQgehcNaIjH+oIBkFPN6bBpZp24 (ED25519)
-3072 SHA256:j0TdSEUGqyqnH+qe8BPxA+1482UvW4bLrPOfFVRsvik (RSA)
-```
-
-Without `SITE_DEPLOY_REMOTE` or `SITE_DEPLOY_KEY` the job builds and uploads the artifact and
-prints a notice; it never deploys half. The web root mirrors the build: a page removed from
-`site/` disappears from the host.
-
-TransIP AutoGit (panel: *Shared Hosting* → openplanner.nl → *Advanced* → *AutoGit*) deploys the
-production branch on every push: it needs `.autogit.yml` in the repository root, which the
-script writes from `site/deploy/autogit.yml`, and serves `www/`. It keeps the two newest
-releases. First push on 2026-11-01: deployed, `www` pointing at the release. HTTPS for
-openplanner.nl still has to be switched on in the panel (*SSL*, Let's Encrypt for the apex and
-`www`); until then port 443 answers with another domain's certificate and a placeholder page,
-and http redirects there.
+`site/root/CNAME` names the domain in the build as well.
 
 ### The recorded walkthrough (ADR 0087 step 3)
 
@@ -1439,26 +1487,20 @@ npm run tour:captions -- local
 `TOUR_PACE_MS` sets how long each screen rests (default 1800); a second local run needs another
 participant address (`TOUR_EMAIL`), since an address may hold only a few bookings per group.
 
-### Rotating the deploy key
+### Publishing between releases, rolling back
 
-Make a new key pair, add the new public key on the TransIP package, replace `SITE_DEPLOY_KEY`,
-re-run the last `main.yml` run (the job `site` is idempotent), then remove the old public key
-from TransIP. Nothing else holds the key.
-
-### Rolling back
-
-Revert the last commit in the TransIP repository and push it, or re-run the `site` job of an
-earlier `main.yml` run. The build of every run is also its artifact `site` (fourteen days) and
-every release carries `site-X.Y.Z.tar.gz`.
+The current `main` is not published without a release: the environment `github-pages` accepts
+only release tags, on purpose. To roll back, re-run the `pages` job of the previous minor
+release's run. Every release also carries `site-X.Y.Z.tar.gz`, and every run its artifact
+`site` (fourteen days).
 
 ### The web server
 
-Serve `openplanner.nl` and `www.openplanner.nl` (redirect `www` to the apex) over HTTPS only,
-with HSTS, and these headers, which the page also sets as meta tags where it can:
-`Content-Security-Policy: default-src 'self'; img-src 'self' data:; media-src 'self';
-frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`.
-On TransIP web hosting these go in an `.htaccess` in the web root (step 4 of ADR 0087). The site
-sets no cookie; the host's access log is TransIP's and is not shipped anywhere by us.
+GitHub Pages serves `openplanner.nl` over HTTPS and redirects `www`. It does not take our own
+response headers: the CSP (`default-src 'self'; connect-src https://api.github.com; img-src
+'self' data:; media-src 'self'`) and the referrer policy are meta tags in the page;
+`frame-ancestors`, HSTS and `X-Content-Type-Options` are GitHub's choice, not ours (ADR 0111).
+The site sets no cookie; the access log is GitHub's.
 
 ## Management token key
 

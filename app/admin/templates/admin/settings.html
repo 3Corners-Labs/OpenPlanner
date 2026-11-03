@@ -15,6 +15,33 @@
   {% endif %}
   <h3 id="directory-heading">{{ _("admin.settings.directory.title") }}</h3>
   <p>{% if directory.state in ("unreachable", "incomplete") %}<span class="chip chip--warning">{{ _("admin.settings.directory.chip") }}</span> {% endif %}{{ directory.text }}</p>
+  <h3 id="org-idps-heading">{{ _("admin.settings.org_idps.title") }}</h3>
+  <p>{% if organisation_idps.switched_on %}{{ _("admin.settings.org_idps.on") }}{% else %}{{ _("admin.settings.org_idps.off") }}{% endif %}</p>
+  {% if organisation_idps.providers %}
+  <div class="table-scroll" role="region" aria-labelledby="org-idps-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.settings.org_idps.title") }}</caption>
+    <thead><tr>
+      <th scope="col">{{ _("admin.settings.org_idps.provider") }}</th>
+      <th scope="col">{{ _("admin.settings.org_idps.organisation") }}</th>
+      <th scope="col">{{ _("admin.settings.org_idps.state") }}</th>
+      <th scope="col">{{ _("admin.settings.org_idps.domains") }}</th>
+    </tr></thead>
+    <tbody>
+      {% for p in organisation_idps.providers %}
+      <tr>
+        <th scope="row"><a href="/admin/organisations/{{ p.organisation }}/login/{{ p.key }}"><code>{{ p.key }}</code></a></th>
+        <td>{{ p.organisation }}</td>
+        <td>{% if p.enabled %}{{ _("admin.idp.on") }}{% else %}{{ _("admin.idp.off") }}{% endif %}</td>
+        <td>{{ _("admin.settings.org_idps.counts", routing=p.routing, failing=p.failing, pending=p.pending, lapsed=p.lapsed) }}{% if p.failing or p.lapsed %} <span class="chip chip--warning">{{ _("admin.settings.directory.chip") }}</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="muted">{{ _("admin.settings.org_idps.none") }}</p>
+  {% endif %}
   {% if rotation.active %}
   <h3 id="keys-heading">{{ _("admin.settings.keys.title") }}</h3>
   <p>{{ _("admin.settings.keys.intro") }}</p>
@@ -70,6 +97,7 @@
   <p>{{ _("admin.settings.address.none") }}</p>
   {% endif %}
   <h3 id="tls-heading">{{ _("admin.settings.tls.title") }}</h3>
+  {% if internal_ca %}<p>{{ _("admin.settings.tls.internal_ca") }} <a href="/admin/settings/tls/ca.crt">{{ _("admin.settings.tls.internal_ca.download") }}</a></p>{% endif %}
   {% if certificate %}
   <dl class="facts" aria-labelledby="tls-heading">
     <div><dt>{{ _("admin.settings.tls.host") }}</dt><dd><code>{{ certificate.host }}</code></dd></div>

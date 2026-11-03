@@ -19,7 +19,6 @@ from scripts.build_site import (
     llms_text,
     load_content,
     parse_releases,
-    parse_roadmap,
     recording,
 )
 
@@ -121,8 +120,11 @@ def test_page_is_complete_for_its_locale(dist: Path, locale: str) -> None:
     assert html.count("<h1") == 1
     assert page.find("title")
     assert page.find("main")
-    hreflangs = {a["hreflang"] for a in page.find("link") if a.get("rel") == "alternate"}
-    assert hreflangs == {"nl", "en", "x-default"}
+    alternates = [a for a in page.find("link") if a.get("rel") == "alternate"]
+    assert {a["hreflang"] for a in alternates if "hreflang" in a} == {"nl", "en", "x-default"}
+    assert [a for a in alternates if a.get("type") == "text/markdown"][0]["href"].endswith(
+        "/llms.txt"
+    )
     canonical = [a for a in page.find("link") if a.get("rel") == "canonical"][0]["href"]
     assert canonical == (
         "https://openplanner.nl/" if locale == "nl" else "https://openplanner.nl/en/"
@@ -174,7 +176,6 @@ def test_script_sets_no_cookie_and_uses_no_storage() -> None:
         "localStorage",
         "sessionStorage",
         "indexedDB",
-        "fetch(",
         "XMLHttpRequest",
         "navigator.sendBeacon",
     ):
@@ -238,40 +239,59 @@ def test_the_latest_stable_release_is_found_behind_a_hundred_candidates() -> Non
     assert sum(r.tag == "v0.3.0" for r in releases.recent) <= 1
 
 
-def test_roadmap_groups_open_adr_steps_and_skips_the_rest(tmp_path: Path) -> None:
-    (tmp_path / "0085-log-destinations.md").write_text(
-        "# 0085. Log destinations in the portal\n\nbody"
-    )
-    issue = "https://github.com/3Corners-Labs/OpenPlanner/issues/"
-    raw = [
-        {"number": 1, "html_url": issue + "1", "labels": [{"name": "adr:0085"}], "state": "open"},
-        {"number": 2, "html_url": issue + "2", "labels": [{"name": "adr:0085"}], "state": "open"},
-        {"number": 3, "html_url": issue + "3", "labels": [{"name": "adr:0090"}], "state": "open"},
-        {"number": 4, "html_url": issue + "4", "labels": [{"name": "adr:drift"}], "state": "open"},
-        {"number": 5, "html_url": issue + "5", "labels": [{"name": "bug"}], "state": "open"},
-        {
-            "number": 6,
-            "html_url": issue + "6",
-            "labels": [{"name": "adr:0085"}],
-            "pull_request": {},
-        },
-    ]
-    roadmap = parse_roadmap(raw, tmp_path)
-    assert [(item.number, item.open_steps) for item in roadmap] == [("0090", 1), ("0085", 2)]
-    assert roadmap[1].title == "Log destinations in the portal"
-    assert roadmap[1].adr_url.endswith("/docs/adr/0085-log-destinations.md")
-    assert roadmap[0].title == "ADR 0090"
-    assert "label%3Aadr%3A0085" in roadmap[1].issues_url
+def _built_adrs() -> set[str]:
+    rows = (ROOT / "docs" / "adr-status.md").read_text(encoding="utf-8").splitlines()
+    return {
+        line[2:6]
+        for line in rows
+        if re.match(r"^\| \d{4} \|", line) and line.split("|")[3].strip().startswith("BUILT")
+    }
 
 
-def test_roadmap_is_on_the_page_and_in_llms_txt(tmp_path: Path) -> None:
-    (tmp_path / "adr").mkdir()
-    (tmp_path / "adr" / "0085-x.md").write_text("# 0085. Log destinations\n")
-    roadmap = parse_roadmap([{"labels": [{"name": "adr:0085"}], "state": "open"}], tmp_path / "adr")
+@pytest.mark.parametrize("locale", LOCALES)
+def test_roadmap_items_are_not_built_and_the_page_shows_no_adr_number(
+    locale: str, tmp_path: Path
+) -> None:
+    items = load_content(locale)["roadmap"]["items"]
+    assert items
+    assert {item["adr"] for item in items}.isdisjoint(_built_adrs())
     out = tmp_path / "out"
-    build(out, None, "", roadmap=roadmap)
-    assert "Log destinations" in (out / "index.html").read_text(encoding="utf-8")
-    assert "ADR 0085 Log destinations: 1 open steps" in (out / "llms.txt").read_text()
+    build(out, None, "")
+    html = (out / ("index.html" if locale == "nl" else "en/index.html")).read_text(encoding="utf-8")
+    body = re.sub(r"<(script|style)\b.*?</\1>", "", html, flags=re.S)
+    text = re.sub(r"<[^>]+>", " ", body)
+    assert not re.search(r"\bADR'?s?\b", text), "the main page lists no ADRs"
+    for item in items:
+        assert item["title"] in html
+
+
+def test_roadmap_is_in_llms_txt(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    build(out, None, "")
+    first = load_content("en")["roadmap"]["items"][0]["title"]
+    assert f"- {first}:" in (out / "llms.txt").read_text()
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_footer_carries_a_disclaimer(locale: str, dist: Path) -> None:
+    html, _ = _page(dist, locale)
+    assert "EUPL-1.2" in load_content(locale)["footer"]["disclaimer"]
+    assert 'class="foot__disclaimer"' in html
+
+
+def test_the_release_section_is_refreshed_live_from_github_only(dist: Path) -> None:
+    html, _ = _page(dist, "en")
+    script = (SITE / "static" / "site.js").read_text(encoding="utf-8")
+    assert "connect-src https://api.github.com;" in html
+    assert "data-releases" in html
+    assert script.count("fetch(") == 1
+    assert 'credentials: "omit"' in script
+    assert 'referrerPolicy: "no-referrer"' in script
+    assert "innerHTML" not in script.split("The live release list")[1].split("The interactive")[0]
+    assert set(re.findall(r"https://[\w.-]+", script.split("The live release list")[1])) <= {
+        "https://api.github.com",
+        "https://github.com",
+    }
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -297,12 +317,9 @@ def test_the_site_shows_the_applications_own_mark(dist: Path) -> None:
     assert html.count(slot.group(1)) == 4
 
 
-def test_the_web_root_gets_its_server_configuration(dist: Path) -> None:
-    htaccess = (dist / ".htaccess").read_text()
-    assert "Content-Security-Policy" in htaccess
-    assert "Strict-Transport-Security" not in htaccess, (
-        "HSTS only once HTTPS works (ADR 0087 step 4)"
-    )
+def test_the_web_root_names_its_domain_for_github_pages(dist: Path) -> None:
+    assert (dist / "CNAME").read_text().strip() == "openplanner.nl"
+    assert not (dist / ".htaccess").exists(), "GitHub Pages reads no .htaccess (ADR 0111)"
 
 
 def test_a_recording_counts_only_when_all_its_files_are_there(tmp_path: Path) -> None:
@@ -379,3 +396,14 @@ def test_the_architecture_plate_names_every_part_and_flow(dist: Path, locale: st
         assert flow.replace("'", "&#39;") in html
     planned = [n for n in plate["systems"] if n.get("planned")]
     assert html.count(plate["planned"]) == len(planned), "what is not built says so (point 8)"
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_page_offers_three_ways_in_and_a_start_command(dist: Path, locale: str) -> None:
+    html, _ = _page(dist, locale)
+    content = load_content(locale)
+    assert 'id="get-involved"' in html
+    assert [p["key"] for p in content["involved"]["paths"]] == ["try", "run", "help"]
+    assert 'href="#get-involved"' in html
+    assert "docker compose --profile dev up" in html
+    assert "good+first+issue" in html

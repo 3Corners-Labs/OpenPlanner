@@ -35,12 +35,20 @@ class SslCertificateProbe:
     Args:
         timeout: Seconds for connection plus handshake.
         cafile: A CA bundle to trust instead of the host's (tests, a private CA).
+        extra_cafile: A CA certificate to trust in addition to the host's bundle (the proxy's
+            internal authority, ADR 0112).
     """
 
-    def __init__(self, timeout: float = TIMEOUT_SECONDS, cafile: str | None = None) -> None:
+    def __init__(
+        self,
+        timeout: float = TIMEOUT_SECONDS,
+        cafile: str | None = None,
+        extra_cafile: str | None = None,
+    ) -> None:
         """Store the options."""
         self._timeout = timeout
         self._cafile = cafile
+        self._extra_cafile = extra_cafile
 
     async def probe(self, host: str, port: int) -> ProbeResult:
         """Return the trust verdict and the certificate; never raises."""
@@ -68,6 +76,8 @@ class SslCertificateProbe:
     async def _verified(self, host: str, port: int) -> tuple[Trust, bytes | None]:
         """Handshake with verification; a verification failure is a verdict, not an error."""
         context = ssl.create_default_context(cafile=self._cafile)
+        if self._extra_cafile is not None:
+            context.load_verify_locations(cafile=self._extra_cafile)
         try:
             return Trust.TRUSTED, await _handshake(host, port, context)
         except ssl.SSLCertVerificationError as exc:
