@@ -438,11 +438,12 @@ def test_an_unknown_database_is_refused(tmp_path: Path) -> None:
 
 
 def test_the_idp_db_service_is_private_and_waited_for() -> None:
-    if shutil.which("docker") is None:
+    docker = shutil.which("docker")
+    if docker is None:
         pytest.skip("docker is not installed")
     result = subprocess.run(  # noqa: S603 - fixed argv, no shell
         [
-            "docker",
+            docker,
             "compose",
             "--profile",
             "idp",
