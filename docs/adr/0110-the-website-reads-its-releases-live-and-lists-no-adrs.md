@@ -1,7 +1,7 @@
 # 0110. The website reads its releases live, lists no ADRs, and a missing deploy fails
 
 Status: accepted (2026-11-02), decided by the product owner in the conversation of
-2026-11-02. Supersedes ADR 0087 point 4 (release data only baked in) and point 9 (the roadmap
+2026-11-02. Point 5 and step 4 superseded by ADR 0111 (2026-11-03: GitHub Pages, no deploy key). Supersedes ADR 0087 point 4 (release data only baked in) and point 9 (the roadmap
 is the open ADR steps); amends ADR 0087 point 3 (one origin besides our own, for one request)
 and point 5 (a deploy without its configuration fails on the real repository). Partly built:
 steps 1 to 3 in this PR; step 4 is configuration in GitHub by a repository administrator.
@@ -80,7 +80,7 @@ releases the script asks for (enough to find the newest candidate and five recen
 | 2 | Roadmap as a hand-written list, ADR numbers off the page, `--issues` removed, test against `docs/adr-status.md` | #472 | in PR |
 | 3 | `SITE_DEPLOY_REQUIRED` in the `site` job; `deploy-site.sh` fails without its configuration on the real repository; test | #472 | in PR |
 | 3a | Disclaimer in the footer (nl, en) and in the README | #472 | in PR |
-| 4 | The deploy key and the variables in the environment `website` (ADR 0087 step 4; a repository administrator) | | planned |
+| 4 | The deploy key and the variables in the environment `website` | | follow-up: dropped, superseded by ADR 0111 |
 
 ## Consequences
 
