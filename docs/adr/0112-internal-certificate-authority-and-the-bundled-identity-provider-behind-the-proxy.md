@@ -34,12 +34,16 @@ front of `web`. Two things were still plain http:
    proxy's `/data`. Browsers do not trust the root until it is installed once per machine, so
    System status offers it for download (`GET /admin/settings/ca.crt`, `settings.platform.view`)
    whenever the file exists, and the runbook says how to install it.
-3. **The host's own checks trust that root.** The certificate probe (ADR 0064) and the round
+3. **The host's own checks trust that root, and `expiring` follows the lifetime.** The certificate probe (ADR 0064) and the round
    trip to the public address (ADR 0086) verify against `TLS_INTERNAL_CA_FILE` when the file
    exists (class B, default `/internal-ca/root.crt`). The probe then reports `ok` for the
    internal certificate instead of a lasting `untrusted`, while a name mismatch or an expiry
    still shows. An address with a certificate that does not chain to this root stays
-   `untrusted`.
+   `untrusted`. Caddy's internal certificates last 12 hours and are renewed at a third of
+   that, so `expiring` (ADR 0064 point 3) is now `tls_expiry_warning_days` *capped at a quarter
+   of the certificate's own lifetime*: unchanged for a 90-day certificate (a quarter is above
+   20 days), and 3 hours for a 12-hour one. Without the cap an internal certificate would be
+   `expiring` for its whole life.
 4. **The bundled Keycloak is served through the proxy under `/idp`.** With `IDP_UPSTREAM=idp:8080`
    in `proxy.env` the Caddyfile gets a second route, `handle /idp/*`, before the one to `web`
    (the entrypoint renders it like the `tls` line, since the Caddyfile cannot branch). Keycloak

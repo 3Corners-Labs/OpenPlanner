@@ -39,7 +39,7 @@ def trusted(days_left: int) -> ProbeResult:
         Certificate(
             HOST,
             "Let's Encrypt (R11)",
-            NOW - timedelta(days=30),
+            NOW - timedelta(days=90 - days_left),  # a 90-day certificate, as Let's Encrypt issues
             NOW + timedelta(days=days_left),
             (HOST,),
         ),
