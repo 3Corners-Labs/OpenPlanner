@@ -9662,3 +9662,6 @@ msgstr "Het certificaat komt van de interne certificaatautoriteit van de proxy (
 
 msgid "admin.settings.tls.internal_ca.download"
 msgstr "Rootcertificaat downloaden"
+
+msgid "admin.alerts.text.check"
+msgstr "De controle van de koppeling van deze groep vond een probleem ({code}). Open de groep en kies Koppeling controleren voor de uitleg."
