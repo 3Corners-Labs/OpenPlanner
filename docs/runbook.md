@@ -1640,6 +1640,11 @@ A patch release has no audit job.
    `vX.Y.Z: tagged on the instruction of <your login> on <date>` and pushes it; `main.yml`
    takes over.
 
+Before a minor or major release (`vX.Y.0`), the site goes live with the tag (ADR 0113), so read
+the README's opening and *What it does today* against `site/content/{nl,en}.json` (hero,
+features, enterprise) and correct the site in a PR before the release PR merges.
+`tests/scripts/test_site_matches_readme.py` already holds the quick start in line.
+
 Do **not** use "Draft a new release" on GitHub: `main.yml` creates the release itself after
 the image is signed, and a hand-made release would make that step fail.
 

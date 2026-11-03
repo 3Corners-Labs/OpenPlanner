@@ -4,8 +4,8 @@ Status: accepted (2026-11-03), decided by the product owner in the conversation 
 2026-11-03. Partly supersedes ADR 0111: the hosting by GitHub Pages is withdrawn; the rule that
 only a minor or major release publishes stays. Restores ADR 0087 points 5 and 6 (deploy by
 `git push` to TransIP with a key in the environment `website`) and ADR 0110 point 5 (a missing
-deploy configuration fails), with the changes below. Partly built: steps 1 and 2 in this PR;
-step 3 is configuration in GitHub and at TransIP by an administrator.
+deploy configuration fails), with the changes below. Partly built: steps 1 to 3a in this PR;
+step 4 is configuration in GitHub and at TransIP by an administrator.
 
 ## Context
 
@@ -50,6 +50,16 @@ is needed only when the text, the design or the recording changes.
    the visitor's browser talks to TransIP for the page and to GitHub for the release list, no
    cookie, no storage.
 
+7. **The site says what the README says.** "The README" is `README.md` on the repository's
+   front page. What OpenPlanner is, what it does and the quick start on the site
+   (`site/content/{nl,en}.json`) must match it at every release. Two checks hold this:
+   `tests/scripts/test_site_matches_readme.py` fails when the README's quick start commands,
+   its demo address or its installation guide are not on the site in both locales, so the
+   commands cannot drift; and the release checklist in the runbook has the person who tags a
+   minor or major release read the README's opening and *What it does today* against the
+   site's hero, features and enterprise sections (prose cannot be tested), before the tag.
+   A change to the README's quick start therefore needs the site texts in the same PR.
+
 ## Settings
 
 None in the application. The deployment is configured in the GitHub environment `website`:
@@ -67,7 +77,8 @@ forge's, not the application's, so no class A–D).
 | 0 | ADR | #485 | in PR |
 | 1 | Deploy script, its test, AutoGit file and `.htaccess` restored; `pages` replaced by `deploy-site` at `vX.Y.0`; `CNAME` removed | #485 | in PR |
 | 2 | Runbook, threat model, data flow, footer text, `site/README.md`, guardrail baseline (`website` limited to tags) | #485 | in PR |
-| 3 | Environment `website` with tags `v*.*.*`, the deploy key pair, the variables, the key on the TransIP package, AutoGit and HTTPS in the TransIP panel, the environment `github-pages` and the Pages settings removed (an administrator) | | planned |
+| 3a | The README check: test and release checklist step (point 7) | #485 | in PR |
+| 4 | Environment `website` with tags `v*.*.*`, the deploy key pair, the variables, the key on the TransIP package, AutoGit and HTTPS in the TransIP panel, the environment `github-pages` and the Pages settings removed (an administrator) | | planned |
 
 ## Consequences
 
