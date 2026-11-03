@@ -40,7 +40,10 @@ def render(
     if env is not None:
         (secrets / "keycloak.env").write_text(env)
     return subprocess.run(  # noqa: S603 - fixed argv, no shell
-        [BASH, str(SCRIPT), "--dir", str(directory), *options], capture_output=True, text=True, check=False
+        [BASH, str(SCRIPT), "--dir", str(directory), *options],
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
 
@@ -438,7 +441,17 @@ def test_the_idp_db_service_is_private_and_waited_for() -> None:
     if shutil.which("docker") is None:
         pytest.skip("docker is not installed")
     result = subprocess.run(  # noqa: S603 - fixed argv, no shell
-        ["docker", "compose", "--profile", "idp", "--profile", "idp-db", "config", "--format", "json"],  # noqa: S607
+        [
+            "docker",
+            "compose",
+            "--profile",
+            "idp",
+            "--profile",
+            "idp-db",
+            "config",
+            "--format",
+            "json",
+        ],  # noqa: S607
         cwd=REPO,
         capture_output=True,
         text=True,
