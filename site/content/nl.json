@@ -61,8 +61,8 @@
         "label": "na het gesprek zijn de persoonsgegevens verwijderd"
       }
     ],
-    "command": "git clone https://github.com/3Corners-Labs/OpenPlanner && cd OpenPlanner\ncp .env.example .env\ndocker compose --profile dev up --build -d\ndocker compose exec web python -m app.cli seed-demo",
-    "command_label": "Voor ontwikkelaars: draai het in vijf minuten op een laptop en open daarna http://127.0.0.1:8000/g/demo"
+    "command": "git clone https://github.com/3Corners-Labs/OpenPlanner && cd OpenPlanner\n./scripts/try.sh",
+    "command_label": "Draai het in vijf minuten op je eigen computer (Docker nodig; Windows: scripts\\try.ps1) en open daarna http://127.0.0.1:8000/g/demo"
   },
   "demo": {
     "title": "Boek zelf een gesprek",

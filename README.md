@@ -74,6 +74,20 @@ the release notes are in `CHANGELOG.md` and on the GitHub releases page.
 
 ## Quick start (demo)
 
+All you need is [Docker](https://docs.docker.com/get-docker/) (Docker Desktop on macOS and
+Windows, Docker Engine on Linux). The script checks it, builds the images, starts everything,
+waits until it is ready and loads the demo group; nothing is reachable from the network.
+
+```sh
+git clone https://github.com/3Corners-Labs/OpenPlanner && cd OpenPlanner
+./scripts/try.sh
+```
+
+On Windows without WSL: `powershell -ExecutionPolicy Bypass -File scripts\try.ps1`. Stop with
+`./scripts/try.sh down`, start over with empty data with `./scripts/try.sh reset`; the
+guide for every system and for troubleshooting is `docs/try-it.md`. Without the script, the
+same by hand:
+
 ```sh
 cp .env.example .env
 docker compose --profile dev up --build -d
