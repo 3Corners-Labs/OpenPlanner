@@ -82,13 +82,23 @@ jobs:
         run: |
           echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
           echo "proxy=${PROXY_IMAGE,,}" >> "$GITHUB_OUTPUT"
+      # A candidate's number follows main's commit order: a run that starts after a later
+      # merge was already tagged (its ZAP baseline finished first) gets no version, and the
+      # steps below are skipped. Otherwise rc.N+k would carry older code than rc.N and an
+      # installation on `rc` would go back (2026-11-03: rc.179 on #480 after rc.176 on #481).
       - id: candidate
         name: next candidate number
         run: |
+          set -euo pipefail
           version="$(python3 -m scripts.release_plan --candidate)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "::notice::release candidate $version"
+          if [ -n "$version" ]; then
+            echo "::notice::release candidate $version"
+          else
+            echo "::notice::no release candidate: a later merge is already a candidate"
+          fi
       - id: publish
+        if: steps.candidate.outputs.version != ''
         uses: ./.github/actions/publish-image
         with:
           image: ${{ steps.image.outputs.name }}
@@ -103,6 +113,7 @@ jobs:
             type=sha,format=long
             type=ref,event=branch
       - id: publish-proxy
+        if: steps.candidate.outputs.version != ''
         uses: ./.github/actions/publish-image
         with:
           image: ${{ steps.image.outputs.proxy }}
@@ -116,6 +127,7 @@ jobs:
       # ADR 0107: only the release app may create a `v*` tag (tag ruleset); its token lives for
       # this job only. The candidate's tag does not start main.yml again (see `on.push.tags`).
       - id: app
+        if: steps.candidate.outputs.version != ''
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
@@ -123,6 +135,7 @@ jobs:
           permission-contents: write
       # The tag comes after the images: a failed build leaves no tag and no pre-release.
       - name: tag and pre-release
+        if: steps.candidate.outputs.version != ''
         env:
           GH_TOKEN: ${{ github.token }}
           APP_TOKEN: ${{ steps.app.outputs.token }}
