@@ -72,6 +72,7 @@ from app.domain.job_plan import (
     plan_for_cancellation,
     plan_for_direct,
     plan_for_pending,
+    plan_for_suspension,
 )
 from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, Transaction, UnitOfWork
@@ -367,7 +368,8 @@ class BookingService:
         A pending booking before its ``confirm_by`` is confirmed: the meeting, reminders,
         task and purge are planned as for any booking, with the full confirmation mail. After
         ``confirm_by`` it lapses here, as the worker would. Any other booking is returned
-        unchanged, so a second click shows the booking (idempotent).
+        unchanged, so a second click shows the booking (idempotent). When a closure covers
+        the appointment, the booking is confirmed and put on hold in one step (ADR 0024).
 
         Raises:
             DomainError: ``booking_not_found`` or ``group_not_found``.
@@ -382,6 +384,20 @@ class BookingService:
                 return booking.expire(now)
             group = await self._group_by_id(tx, booking.group_id)
             confirmed = booking.confirm(now)
+            closure = covering(await tx.get_closures(group.id, now), booking.start)
+            if closure is not None:
+                # A closure declared after the booking was made (ADR 0024): confirming puts
+                # it on hold at once, as it would have been had it been confirmed before.
+                held = confirmed.suspend(_id(closure))
+                await tx.save_booking(held)
+                purge_at = closure.purge_at(
+                    booking.end, self._closure_retention(group.organisation_id)
+                )
+                jobs = plan_for_suspension(
+                    now=now, purge_at=purge_at, team_invite=group.sends_team_invite
+                )
+                await tx.replace_jobs(_id(booking), jobs)
+                return held
             await tx.save_booking(confirmed)
             await tx.replace_jobs(_id(booking), await self._booked_jobs(tx, group, confirmed))
             return confirmed
@@ -719,7 +735,7 @@ def _ensure_cancellable(booking: Booking, group: Group, now: datetime) -> None:
         raise DomainError(ErrorCode.BOOKING_LOCKED)
 
 
-def _id(entity: Booking | Slot) -> int:
+def _id(entity: Booking | Slot | Closure) -> int:
     """Return the ID of a stored entity; a missing ID is a programming error."""
     if entity.id is None:
         raise ValueError("entity has not been stored")
