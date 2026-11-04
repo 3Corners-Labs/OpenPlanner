@@ -24,10 +24,12 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, StaffDirectory, UnitOfWork
 from app.domain.staff_directory import (
     DirectoryError,
+    DirectoryRefusal,
     DirectoryState,
     DirectoryUser,
     NewStaffMember,
     StaffAction,
+    exceeds_own_rights,
     in_scope,
     plan_entitlements,
     refusal_of,
@@ -183,6 +185,8 @@ class StaffDirectoryService:
         superuser = Role.SUPERUSER in principal.roles
         for grant in grants:
             reason = refusal_of(scope, grant, superuser=superuser)
+            if reason is None and not superuser and exceeds_own_rights(principal, grant):
+                reason = DirectoryRefusal.ABOVE_OWN_RIGHTS
             if reason is not None:
                 raise DomainError(ErrorCode.STAFF_GRANT_REFUSED, "grant")
 

@@ -18,7 +18,19 @@ from collections.abc import Collection, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from app.domain.authorization import REACH, Grant, Reach, Role, Scope
+from app.domain.authorization import (
+    LEVELS,
+    MATRIX,
+    REACH,
+    Grant,
+    Level,
+    Principal,
+    Reach,
+    Role,
+    Scope,
+    Target,
+    decide,
+)
 from app.domain.entitlements import Directory, entitlement_value, parse_entitlements
 
 CREATED_EVENT = "staff.directory.created"
@@ -152,6 +164,35 @@ def refusal_of(scope: Scope, grant: Grant, *, superuser: bool) -> DirectoryRefus
     if not scope.contains(grant.organisation, grant.group):
         return DirectoryRefusal.OUT_OF_SCOPE
     return None
+
+
+def exceeds_own_rights(principal: Principal, grant: Grant) -> bool:
+    """Whether ``grant`` gives rights the acting admin does not hold at its target.
+
+    ``refusal_of`` looks at the target (scope and shape); this looks at the role: every
+    permission of the granted role must be one the admin holds on that same target, by the
+    matrix (a custom role of the admin is clipped to its permissions). Otherwise a role with
+    ``staff.manage`` could hand out a role with more (release audit v0.4.0). Global permissions
+    (platform views such as the log or the platform settings) are left out: they carry no
+    organisation's data, and the built-in auditor holds some an organisation admin does not,
+    yet an organisation admin may grant that role (ADR 0039).
+    """
+    role = _BUILT_IN.get(grant.role)
+    if role is None:
+        return True
+    for permission in MATRIX[role]:
+        level = LEVELS[permission]
+        if level is Level.GLOBAL:
+            continue
+        if level is Level.ORGANISATION and grant.organisation:
+            target = Target.for_organisation(grant.organisation)
+        elif level is Level.GROUP and grant.organisation and grant.group:
+            target = Target.for_group(grant.group, grant.organisation)
+        else:
+            continue  # a permission the grant's target cannot carry
+        if not decide(principal, permission, target).allowed:
+            return True
+    return False
 
 
 def in_scope(grant: Grant, scope: Scope) -> bool:
