@@ -166,6 +166,10 @@ def refusal_of(scope: Scope, grant: Grant, *, superuser: bool) -> DirectoryRefus
     return None
 
 
+_ANY_GROUP = "\x00any-group"
+"""A group slug no group can have (slugs hold no control characters)."""
+
+
 def exceeds_own_rights(principal: Principal, grant: Grant) -> bool:
     """Whether ``grant`` gives rights the acting admin does not hold at its target.
 
@@ -186,8 +190,11 @@ def exceeds_own_rights(principal: Principal, grant: Grant) -> bool:
             continue
         if level is Level.ORGANISATION and grant.organisation:
             target = Target.for_organisation(grant.organisation)
-        elif level is Level.GROUP and grant.organisation and grant.group:
-            target = Target.for_group(grant.group, grant.organisation)
+        elif level is Level.GROUP and grant.organisation:
+            # An organisation-wide grant carries the group permissions of every group in it.
+            # A group that no organisation has stands for "any group": only a role that reaches
+            # the whole organisation covers it, so a role limited to some groups cannot grant it.
+            target = Target.for_group(grant.group or _ANY_GROUP, grant.organisation)
         else:
             continue  # a permission the grant's target cannot carry
         if not decide(principal, permission, target).allowed:

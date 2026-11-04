@@ -3,7 +3,16 @@
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.authorization import CustomRole, Grant, Permission, Principal, Role
+from app.domain.authorization import (
+    LEVELS,
+    MATRIX,
+    CustomRole,
+    Grant,
+    Level,
+    Permission,
+    Principal,
+    Role,
+)
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.staff_directory import DirectoryState, DirectoryUser, NewStaffMember, StaffAction
 from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
@@ -393,3 +402,22 @@ async def test_an_organisation_admin_still_grants_the_roles_below_their_own(
         "group_admin@example.test",
         "auditor@example.test",
     }
+
+
+async def test_organisation_wide_grants_need_the_group_rights_they_carry(
+    uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
+) -> None:
+    # Release audit v0.4.0, third run, P1: a role with every organisation-level permission but
+    # none of the group-level ones must not mint an organisation admin, who holds those in
+    # every group of the organisation.
+    organisation_only = frozenset(
+        p for p in MATRIX[Role.ORG_ADMIN] if LEVELS[p] is not Level.GROUP
+    ) | {Permission.STAFF_MANAGE}
+    role = CustomRole(8, Role.ORG_ADMIN, organisation_only, "org-without-groups", "Org", "Org")
+    caller = Principal("c-2", "C", frozenset({Grant(role.key, "demo")}), frozenset({role}))
+
+    refused = await code_of(
+        service(uow, directory).invite(caller, NEW, [Grant("org_admin", "demo")])
+    )
+
+    assert refused is ErrorCode.STAFF_GRANT_REFUSED
