@@ -131,6 +131,27 @@ async def test_a_closure_leaves_an_unconfirmed_booking_to_its_deadline(
     assert uow.state.jobs[booking_id] == jobs
 
 
+async def test_confirming_inside_a_closure_puts_the_booking_on_hold(
+    closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    # Release audit v0.4.0 P1: the email link must not let an appointment proceed during an
+    # emergency closure that was declared after the booking was made.
+    receipt = await book_pending(bookings, SLOT_0900, "demo")
+    booking_id = receipt.booking.id or 0
+    await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY)
+
+    held = await bookings.confirm(receipt.management_token)
+
+    assert held.status is BookingStatus.SUSPENDED
+    assert held.closure_id is not None
+    assert _status(uow, booking_id) is BookingStatus.SUSPENDED
+    planned = _jobs(uow, booking_id)
+    assert JobType.SEND_SUSPENSION in planned
+    assert JobType.CREATE_VIDEO_ROOM not in planned
+    assert JobType.DISPATCH_WXCC_TASK not in planned
+    assert JobType.SEND_CONFIRMATION not in planned
+
+
 async def test_closed_group_offers_and_accepts_no_slots(
     closures: ClosureService, bookings: BookingService
 ) -> None:
