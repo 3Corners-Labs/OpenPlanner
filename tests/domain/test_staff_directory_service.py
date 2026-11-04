@@ -3,7 +3,7 @@
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.authorization import Grant
+from app.domain.authorization import CustomRole, Grant, Permission, Principal, Role
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.staff_directory import DirectoryState, DirectoryUser, NewStaffMember, StaffAction
 from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
@@ -351,3 +351,45 @@ async def test_a_taken_proposal_is_numbered_a_taken_typed_name_refused(
 
     assert taken is ErrorCode.STAFF_USER_NAME_IN_USE
     assert _created(directory).username == "nina.nieuw-2@demo.openplanner.internal"
+
+
+def _staff_manager_without_bookings() -> Principal:
+    """An admin of ``demo`` whose custom role holds staff.manage and staff.view, no bookings."""
+    role = CustomRole(
+        7,
+        Role.ORG_ADMIN,
+        frozenset({Permission.STAFF_MANAGE, Permission.STAFF_VIEW}),
+        "staff-manager",
+        "Personeelsbeheer",
+        "Staff manager",
+    )
+    return Principal("c-1", "C", frozenset({Grant(role.key, "demo")}), frozenset({role}))
+
+
+async def test_a_role_cannot_hand_out_more_than_it_holds(
+    uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
+) -> None:
+    # Release audit v0.4.0 P1: staff.manage alone must not mint an organisation admin, who
+    # can see the participants' data the caller may not.
+    caller = _staff_manager_without_bookings()
+
+    code = await code_of(service(uow, directory).invite(caller, NEW, [Grant("org_admin", "demo")]))
+
+    assert code is ErrorCode.STAFF_GRANT_REFUSED
+    assert not any(u.email == NEW.email for u in directory.users.values())
+
+
+async def test_an_organisation_admin_still_grants_the_roles_below_their_own(
+    uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
+) -> None:
+    for role, group in (("org_admin", None), ("group_admin", "demo"), ("auditor", None)):
+        grant = Grant(role, "demo", group)
+        await service(uow, directory).invite(
+            ORG_ADMIN, NewStaffMember(f"{role}@example.test", "A", "B"), [grant]
+        )
+
+    assert {u.email for u in directory.users.values()} >= {
+        "org_admin@example.test",
+        "group_admin@example.test",
+        "auditor@example.test",
+    }
