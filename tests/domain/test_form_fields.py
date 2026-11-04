@@ -84,7 +84,10 @@ def test_contact_details_and_free_text_are_always_pii(kind: FieldType) -> None:
         field("other_contact", type=kind, classification=Classification.NOT_PII)
 
 
-@pytest.mark.parametrize("key", ["ssn", "social security number", "medische_reden", "religion"])
+@pytest.mark.parametrize(
+    "key",
+    ["ssn", "social_security_number", "bsn", "burgerservicenummer", "medische_reden", "religion"],
+)
 def test_forbidden_terms_are_refused_in_keys(key: str) -> None:
     with pytest.raises(DomainError) as caught:
         field(key)

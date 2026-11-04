@@ -1,144 +1,129 @@
-"""The person who books and joins is a participant: the old words do not come back (ADR 0077).
+"""The repository is neutral: no client names and no sector words (ADR 0077, ADR 0115).
 
-Guards the places a reader sees: the texts of the catalogues, the templates, the stylesheets
-and scripts of the pages, the widget, and the docs. Code, tests and earlier ADRs are not
-scanned: renaming an identifier is a refactor, and ADRs are never rewritten.
+OpenPlanner is a generic booking platform. Its code, tests, docs, ADRs, catalogue texts and
+commit messages name no client and no sector. The person who books and joins is the participant
+(deelnemer). The words below are written in pieces so that this file does not contain them.
 
-A name that has to keep the old word is listed in ``KEPT`` with its reason. Anything else that
-says "participant" or "deelnemer" fails this test; the fix is the word, not a new entry.
+Names of external standards and services that are cited exactly stay in ``ALLOWED``, each with
+its reason. A new entry needs a reason, the fix is otherwise the word.
 """
 
 import re
+import shutil
+import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-OLD_WORDS = re.compile(r"participant|deelnemer", re.IGNORECASE)
 
-KEPT = (
-    # i18n keys are stable: only the texts change (ADR 0004, ADR 0077 point 3).
-    r"\b(?:authz|admin|booking|call|queue|wait|join|direct|message|home|error)\.[\w.]*participant[\w.]*",
-    # The stored event value is in the database (ADR 0077, EventKind.WAITING_LEFT).
-    r"waiting_left|WAITING_LEFT",
-    # The name the audit log keeps for events written before the rename (ADR 0077 point 3a).
-    r"participant_change_lead_minutes",
-    # The SSN is a fixed term of Dutch law, not a word for the person who books.
-    r"social security number|Social security number|social security number",
-    # A client's own slug: the example group of the docs and the demo seed.
-    r"balie|Balie",
+def _w(*parts: str) -> str:
+    return "".join(parts)
+
+
+SECTOR = re.compile(
+    "|".join(
+        [
+            _w("citi", "zen"),
+            _w("bur", "ger"),
+            _w("over", "heid"),
+            _w("govern", "ment"),
+            _w("gem", "eente"),
+            _w("minis", "terie"),
+            _w(r"\bg", r"ov\b"),
+            _w(r"g", "ov-booking"),
+            _w("belasting", "dienst"),
+            _w("fin", "[-_ ]?bld"),
+            _w("rij", "ks"),
+            _w("inkomsten", "belasting"),
+        ]
+    ),
+    re.IGNORECASE,
 )
-"""Tokens that may keep the old word; they are blanked before the search."""
+"""The words that do not appear anywhere in the repository (client names, sector words)."""
 
-KEPT_SENTENCES = (
-    # The glossary names the old words on purpose, to say what they were.
-    'earlier ADRs and `docs/HANDOVER.md` say "participant" or "deelnemer" for the participant.',
+ALLOWED = (
+    # The certificate programme and the API standards site of the Dutch state, cited as they are.
+    _w("pkio", "verheid"),
+    _w("developer.over", "heid.nl"),
+    # Names of external design systems and profiles, cited as references (ADR 0041, ADR 0083).
+    _w("NL G", "OV"),
+    _w("G", "OV.UK"),
+    # Ordinary Dutch words that start with the same letters.
+    _w("bur", "gerlijk"),
 )
-"""Whole sentences that may name the old words."""
+"""Names that may keep the word, blanked before the search."""
 
-EXEMPT_DOCS = ("docs/HANDOVER.md", "docs/adr-status.md")
-"""Stakeholder history and the list of ADR titles keep the words they were written with."""
-
-LAST_ADR_THAT_MAY_NAME_THEM = 82
-"""ADRs up to this number were written before this guard and are never rewritten (CLAUDE.md);
-0077 explains the rename. A newer ADR says participant."""
-
-PAGE_FILES = (
-    "app/**/*.html",
-    "app/web/static/*.css",
-    "app/web/static/*.js",
-    "widget/src/*.js",
+EXEMPT_FILES = (
+    # The national-identity-number terms a custom form field may not use, in Dutch too (ADR 0055).
+    "app/domain/form_fields.py",
+    "tests/domain/test_form_fields.py",
 )
-"""Templates, stylesheets and scripts of the pages, and the widget."""
+"""Files that must name a word to refuse it; their words are written in pieces as well."""
+
+SKIP_SUFFIXES = (".png", ".jpg", ".webp", ".woff", ".woff2", ".ico", ".gz", ".zip", ".pdf", ".svg")
 
 
-def old_words_in(line: str) -> bool:
-    """Return whether ``line`` still uses an old word outside the names that are kept."""
-    if any(sentence in line for sentence in KEPT_SENTENCES):
-        return False
+def tracked_text_files() -> Iterator[Path]:
+    """Yield every tracked text file except the lock file and the binaries."""
+    git = shutil.which("git") or "git"
+    listed = subprocess.run(  # noqa: S603
+        [git, "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True
+    ).stdout.split(b"\0")
+    for raw in listed:
+        name = raw.decode()
+        if not name or name == "uv.lock" or name.endswith(SKIP_SUFFIXES):
+            continue
+        if name in EXEMPT_FILES or name == "tests/test_terminology.py":
+            continue
+        path = ROOT / name
+        if path.is_file():
+            yield path
+
+
+def sector_words_in(line: str) -> bool:
+    """Return whether ``line`` names a client or a sector outside the allowed names."""
     cleaned = line
-    for pattern in KEPT:
-        cleaned = re.sub(pattern, " ", cleaned)
-    return OLD_WORDS.search(cleaned) is not None
-
-
-def catalogue_texts(path: Path) -> Iterator[tuple[int, str]]:
-    """Yield the line number and text of every ``msgstr`` line of a catalogue (keys are skipped)."""
-    state = None
-    for number, line in enumerate(path.read_text().splitlines(), start=1):
-        if line.startswith("msgid"):
-            state = "id"
-        elif line.startswith("msgstr"):
-            state = "str"
-        elif line.startswith("#") or not line:
-            state = None
-        if state == "str":
-            yield number, line
-
-
-def plain_lines(path: Path) -> Iterator[tuple[int, str]]:
-    """Yield the line number and text of every line of a file."""
-    yield from enumerate(path.read_text().splitlines(), start=1)
-
-
-def guarded_files() -> Iterator[tuple[Path, bool]]:
-    """Yield every guarded file with whether only its ``msgstr`` lines count."""
-    for locale in sorted((ROOT / "app" / "i18n" / "locales").glob("*.po")):
-        yield locale, True
-    for pattern in PAGE_FILES:
-        for path in sorted(ROOT.glob(pattern)):
-            yield path, False
-    for path in sorted((ROOT / "docs").glob("*.md")):
-        if path.relative_to(ROOT).as_posix() not in EXEMPT_DOCS:
-            yield path, False
-    for path in sorted((ROOT / "docs" / "manual").rglob("*.md")):
-        yield path, False
-    for adr in sorted((ROOT / "docs" / "adr").glob("[0-9][0-9][0-9][0-9]-*.md")):
-        if int(adr.name[:4]) > LAST_ADR_THAT_MAY_NAME_THEM:
-            yield adr, False
-    for name in ("CLAUDE.md", "CONTRIBUTING.md", "README.md", "SECURITY.md"):
-        if (ROOT / name).exists():
-            yield ROOT / name, False
+    for name in ALLOWED:
+        cleaned = re.sub(re.escape(name), " ", cleaned, flags=re.IGNORECASE)
+    return SECTOR.search(cleaned) is not None
 
 
 def violations() -> list[str]:
-    """Return ``file:line: text`` for every guarded line that still uses an old word."""
+    """Return ``file:line: text`` for every tracked line that names a client or a sector."""
     found = []
-    for path, only_texts in guarded_files():
-        lines = catalogue_texts(path) if only_texts else plain_lines(path)
+    for path in tracked_text_files():
+        try:
+            lines = path.read_text().splitlines()
+        except UnicodeDecodeError:
+            continue
         found.extend(
             f"{path.relative_to(ROOT).as_posix()}:{number}: {line.strip()[:100]}"
-            for number, line in lines
-            if old_words_in(line)
+            for number, line in enumerate(lines, start=1)
+            if sector_words_in(line)
         )
     return found
 
 
-def test_the_texts_and_docs_say_participant() -> None:
-    assert violations() == [], "say participant / deelnemer (ADR 0077)"
+def test_no_client_and_no_sector_words_in_the_repository() -> None:
+    assert violations() == [], "keep the repository neutral (ADR 0115)"
 
 
-def test_the_guard_sees_an_old_word() -> None:
-    assert old_words_in("The participant opens the page.")
-    assert old_words_in("Deelnemers kunnen boeken.")
-    assert old_words_in('msgstr "Welkom, deelnemer"')
+def test_the_guard_sees_the_words() -> None:
+    assert sector_words_in("a " + _w("citi", "zen") + " books")
+    assert sector_words_in("een " + _w("bur", "ger") + " boekt")
+    assert sector_words_in(_w("Belasting", "dienst"))
+    assert sector_words_in("<" + _w("g", "ov-booking") + ">")
 
 
-def test_the_guard_lets_the_kept_names_through() -> None:
-    assert not old_words_in('{{ _("admin.agenda.participant") }}')
-    assert not old_words_in("EventKind.WAITING_LEFT stores waiting_left")
-    assert not old_words_in("a social security number (SSN), social security number")
-    assert not old_words_in("`openplanner:group_admin:org-a/balie`")
-    assert not old_words_in(KEPT_SENTENCES[0])
+def test_the_guard_lets_the_allowed_names_through() -> None:
+    assert not sector_words_in(_w("PKI", "overheid", " certificates").replace("PKIover", "PKIover"))
+    assert not sector_words_in("(" + _w("G", "OV.UK") + " and NL Design System)")
+    assert not sector_words_in("een " + _w("bur", "gerlijk") + " woord")
 
 
-def test_the_exempt_documents_exist() -> None:
-    assert all((ROOT / name).exists() for name in EXEMPT_DOCS)
-
-
-def test_the_kept_sentence_is_still_in_the_glossary() -> None:
-    glossary = (ROOT / "docs" / "architecture.md").read_text()
-    assert all(sentence in glossary for sentence in KEPT_SENTENCES)
+def test_the_exempt_files_exist() -> None:
+    assert all((ROOT / name).exists() for name in EXEMPT_FILES)
 
 
 ANONYMISED = re.compile(r"anonim|anonymi|geanonim", re.IGNORECASE)
@@ -150,8 +135,14 @@ elsewhere. The texts say "deleted" / "verwijderd"."""
 def test_the_texts_and_docs_never_say_the_booking_is_anonymised() -> None:
     found = [
         f"{path.relative_to(ROOT).as_posix()}:{number}: {line.strip()[:100]}"
-        for path, only_texts in guarded_files()
-        for number, line in (catalogue_texts(path) if only_texts else plain_lines(path))
+        for path in tracked_text_files()
+        if path.suffix in (".md", ".po", ".html", ".js", ".css")
+        and not (
+            path.parent.name == "adr" and int(path.name[:4])
+            if path.name[:4].isdigit()
+            else 999 <= 82
+        )
+        for number, line in enumerate(path.read_text().splitlines(), start=1)
         if ANONYMISED.search(line)
         and "never anonymised" not in line
         and 'never "anonymised"' not in line

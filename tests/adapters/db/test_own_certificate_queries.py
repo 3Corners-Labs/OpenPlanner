@@ -16,9 +16,7 @@ HOST = "afspraak.example.nl"
 
 def stored(fingerprint: str = "ab" * 32, public_key: bytes = b"spki-1") -> OwnCertificate:
     return OwnCertificate(
-        Certificate(
-            HOST, "Acme Demo", NOW - timedelta(days=1), NOW + timedelta(days=90), (HOST,)
-        ),
+        Certificate(HOST, "Acme Demo", NOW - timedelta(days=1), NOW + timedelta(days=90), (HOST,)),
         fingerprint,
         "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n",
         public_key,

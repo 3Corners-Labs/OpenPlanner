@@ -8,9 +8,7 @@ from app.domain.calls import BROWSER_LINK_PARAMS, join_link
 from app.domain.scheduling import JoinClient
 from tests.support.domain import make_group
 
-SHORT = (
-    "https://acmevideotest.webex.com/acmevideotest/j.php?MTID=m142bcf67f73207da1acdf0c757ae77ca"
-)
+SHORT = "https://acmevideotest.webex.com/acmevideotest/j.php?MTID=m142bcf67f73207da1acdf0c757ae77ca"
 
 
 def test_a_group_opens_the_browser_unless_it_says_otherwise() -> None:

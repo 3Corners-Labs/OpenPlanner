@@ -201,9 +201,7 @@ def test_an_authorisation_decision_is_its_own_category_with_the_actors_kind_and_
 
     (record,) = _records(stream)
     assert record["event.category"] == "authz"
-    assert record["message"] == (
-        "Permission group.view on acme/balie: allowed yes (group)."
-    )
+    assert record["message"] == ("Permission group.view on acme/balie: allowed yes (group).")
     assert (record["actor.type"], record["actor.role"]) == ("user", "org_admin")
     assert record["labels.allowed"] == "true"
 

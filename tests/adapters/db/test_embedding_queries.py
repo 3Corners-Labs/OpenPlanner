@@ -8,9 +8,7 @@ from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.embedding import AllowedOrigins
 
-SITES = AllowedOrigins(
-    ("https://www.acme.nl", "https://werk.acme.nl", "http://localhost:5173")
-)
+SITES = AllowedOrigins(("https://www.acme.nl", "https://werk.acme.nl", "http://localhost:5173"))
 
 
 async def test_origins_round_trip_in_order_and_are_replaced_and_removed(

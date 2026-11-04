@@ -51,6 +51,10 @@ _CHECKED = frozenset({"on", "true", "1", "yes"})
 FORBIDDEN_TERMS = (
     "ssn",
     "social security",
+    # The Dutch terms for the same number: Dutch customers write them in their own language.
+    "bsn",
+    "burgerservicenummer",
+    "burgerservice",
     "sofinummer",
     "sofinr",
     "socialsecurity",

@@ -1,7 +1,7 @@
-"""The built ``<openplanner-booking>`` script (ADR 0035 §5): where it lives, its bytes, its SRI hash.
+"""The built ``<openplanner-booking>`` script (ADR 0035 §5): where it lives, its bytes, its hash.
 
-esbuild writes ``widget/dist/openplanner-booking.js`` in CI and in the image build; a checkout without
-a build has no bundle, and the script route then answers 404. The admin portal shows the
+esbuild writes ``widget/dist/openplanner-booking.js`` in CI and in the image build; a checkout
+without a build has no bundle, and the script route then answers 404. The admin portal shows the
 same hash in the snippet hosts copy, so a host can pin the script with ``integrity``.
 """
 

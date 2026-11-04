@@ -154,9 +154,7 @@ async def test_a_group_page_shows_the_path_groups_organisation_group(site: Site)
     crumbs = page.split('<nav class="breadcrumbs"', 1)[1].split("</nav>", 1)[0]
 
     assert _hrefs(crumbs) == ["/admin/groups", "/admin/organisations/demo"]
-    assert (
-        crumbs.index("Groepen") < crumbs.index("Demo-acme") < crumbs.index("Demo: videogesprek")
-    )
+    assert crumbs.index("Groepen") < crumbs.index("Demo-acme") < crumbs.index("Demo: videogesprek")
 
 
 async def test_a_group_admin_sees_the_organisation_in_the_path_without_a_link(site: Site) -> None:

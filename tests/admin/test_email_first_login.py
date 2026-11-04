@@ -26,9 +26,7 @@ async def _route_domain(site: Site) -> str:
     await site.login_as(SUPER)
     page_url = await register(site)
     await site.client.post(f"{page_url}/enable", data={"enabled": "on"}, headers=SAME_ORIGIN)
-    await site.client.post(
-        f"{page_url}/domains", data={"domain": "acme-a.nl"}, headers=SAME_ORIGIN
-    )
+    await site.client.post(f"{page_url}/domains", data={"domain": "acme-a.nl"}, headers=SAME_ORIGIN)
     page = (await site.client.get(page_url)).text
     token = page.split("openplanner-domain-verification=", 1)[1].split("<", 1)[0]
     claim_id = page.split("/domains/", 1)[1].split("/", 1)[0]

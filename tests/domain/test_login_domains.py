@@ -166,9 +166,7 @@ def test_an_organisation_provider_signs_in_only_its_own_verified_addresses() -> 
     assert refusal_of_identity("jan@acme.nl", True, "org-a", lapsed) == "email_domain_mismatch"
 
 
-@pytest.mark.parametrize(
-    "domain", ["andere.test", "acme.example", "x.invalid", "lab.localhost"]
-)
+@pytest.mark.parametrize("domain", ["andere.test", "acme.example", "x.invalid", "lab.localhost"])
 async def test_a_test_domain_needs_no_record_outside_production(domain: str) -> None:
     """Point 12: a lab with .test addresses works; the resolver is not even asked."""
     resolver = FakeTxtResolver()

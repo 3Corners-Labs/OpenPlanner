@@ -31,9 +31,7 @@ async def test_the_organisation_page_links_to_the_embedding_sub_tab(site: Site) 
 async def test_origins_are_saved_normalised_and_audited_with_counts(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    response = await _save(
-        site, "https://WWW.Acme.example/\r\n\r\nhttps://werk.acme.example"
-    )
+    response = await _save(site, "https://WWW.Acme.example/\r\n\r\nhttps://werk.acme.example")
 
     assert response.status_code == 303
     assert response.headers["location"] == f"{PAGE}?done=saved"
@@ -116,7 +114,9 @@ async def test_the_code_for_the_host_has_the_script_its_hash_and_each_embedded_g
 
     integrity = widget_bundle.load_bundle()
     assert integrity is not None
-    assert "/widget/v1/openplanner-booking.js&#34; integrity=&#34;" not in page  # one escape layer only
+    assert (
+        "/widget/v1/openplanner-booking.js&#34; integrity=&#34;" not in page
+    )  # one escape layer only
     assert f'integrity="{integrity.integrity}" crossorigin="anonymous"&gt;' in page
     assert '&lt;openplanner-booking organisation="demo" group="demo"&gt;' in page
 

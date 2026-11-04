@@ -71,7 +71,9 @@ def _config(
     )
 
 
-GROUP = GroupRouting("aangifte", "videoafspraak-prototype", "videoafspraak@example.video", "aangifte")
+GROUP = GroupRouting(
+    "aangifte", "videoafspraak-prototype", "videoafspraak@example.video", "aangifte"
+)
 
 
 def _by_name(results: list[CheckResult]) -> dict[str, CheckResult]:
