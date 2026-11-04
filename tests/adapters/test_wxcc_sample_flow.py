@@ -128,4 +128,4 @@ def test_the_flow_names_its_channel_and_a_valid_flow_name() -> None:
     assert flow["associatedChannels"] == [
         {"channelType": "workItem", "id": "ch-9", "name": "videoafspraak"}
     ]
-    assert flow["name"] == "openplanner_fin_bld_groep1"
+    assert flow["name"] == "openplanner_acme_groep1"
