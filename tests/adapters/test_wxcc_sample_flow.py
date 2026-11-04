@@ -123,7 +123,7 @@ def test_a_routing_value_twice_is_refused() -> None:
 
 def test_the_flow_names_its_channel_and_a_valid_flow_name() -> None:
     # Flow Designer refused the queues without the channel, and a name with a hyphen (2026-11-02).
-    flow = sample_flow("openplanner_fin-bld-groep1", ROUTES, "q", channel=("ch-9", "videoafspraak"))
+    flow = sample_flow("openplanner_acme-groep1", ROUTES, "q", channel=("ch-9", "videoafspraak"))
 
     assert flow["associatedChannels"] == [
         {"channelType": "workItem", "id": "ch-9", "name": "videoafspraak"}

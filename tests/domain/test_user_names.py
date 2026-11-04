@@ -17,7 +17,7 @@ from app.domain.user_names import (
     valid_suffix,
 )
 
-PLACES = Directory({}, (OrganisationRef("demo", "demo"), OrganisationRef("bd", "belastingdienst")))
+PLACES = Directory({}, (OrganisationRef("demo", "demo"), OrganisationRef("acme", "acme-idp")))
 
 
 @pytest.mark.parametrize(
@@ -69,7 +69,7 @@ def test_invalid_suffixes(value: str) -> None:
 
 
 def test_the_label_is_the_idp_key_of_the_first_grant_s_organisation() -> None:
-    assert organisation_label([Grant("org_admin", "bd")], PLACES) == "belastingdienst"
+    assert organisation_label([Grant("org_admin", "acme")], PLACES) == "acme-idp"
     assert organisation_label([Grant("agent", "demo", "team")], PLACES) == "demo"
 
 
