@@ -4,6 +4,8 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ## Unreleased
 
+## 0.4.0 (2026-11-04)
+
 ### Features
 
 - Kubernetes trial (ADR 0114): a Helm chart in `deploy/helm/openplanner/` runs the signed images as
