@@ -29,7 +29,7 @@ env:
   # renovate: datasource=python-version depName=python
   PYTHON_VERSION: "3.12"
   # renovate: datasource=node-version depName=node versioning=node
-  NODE_VERSION: "24"
+  NODE_VERSION: "26"
   # renovate: datasource=docker depName=ghcr.io/gitleaks/gitleaks
   GITLEAKS_VERSION: "v8.30.1"
   # renovate: datasource=docker depName=fsfe/reuse

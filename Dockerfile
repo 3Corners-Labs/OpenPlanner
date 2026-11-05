@@ -5,7 +5,7 @@ FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
 
 # The <openplanner-booking> Web Component (ADR 0035): bundled by esbuild here, never committed. Only
 # the bundle reaches the runtime image; node and node_modules stay in this stage.
-FROM node:22.23.3-bookworm-slim@sha256:3ed98443660ff48413b5af19ecefce3b9d50845a901a43420d47cc63a9fddbe9 AS widget
+FROM node:26.12.1-bookworm-slim@sha256:88e480776c6149ff1d098cd304f44bf18057fb5d284a3329b78162d29821e28c AS widget
 WORKDIR /widget
 COPY widget/package.json widget/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
