@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.28@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
 # Base images are pinned by tag; Renovate pins and updates their digests.
 
 FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
