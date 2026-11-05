@@ -18,6 +18,10 @@ publicBaseUrl: ""
 # Required: the pod addresses uvicorn trusts X-Forwarded-For from, that is the ingress
 # controller's pods (CIDR or addresses, comma separated). `*` trusts every sender and is not
 # accepted unless allowAnyForwarder is true, because a client could then forge its address.
+# On a dual-stack cluster, name the controller's pods in both families, and let the controller
+# see each visitor's own address over IPv6 as well (for example externalTrafficPolicy: Local on
+# its LoadBalancer Service); otherwise every visitor over IPv6 shares one rate limit, as on the
+# Docker host before its edge network became dual-stack (docs/runbook.md, Visitors over IPv6).
 forwardedAllowIps: ""
 allowAnyForwarder: false
 
