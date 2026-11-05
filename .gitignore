@@ -30,6 +30,10 @@ mutants/
 # Local gstack reports (security audits stay on the machine)
 .gstack/
 
+# Evidence and state of the verify-openplanner skill's runs (.claude/skills/verify-openplanner/);
+# stays on the machine, kept after its stack is removed.
+.verify-openplanner/
+
 # The widget bundle is built by esbuild in CI and in the image (ADR 0035).
 widget/node_modules/
 widget/dist/
