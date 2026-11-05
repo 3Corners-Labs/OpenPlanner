@@ -883,8 +883,9 @@ flowchart LR
   een fix moet uitkomen terwijl `main` al nieuwe functies bevat. Een patch bevat geen migratie,
   en elke migratie volgt expand en contract. Een upgradematrix in CI test migraties op gegevens
   van uitgebrachte versies. Elke release wordt publiek, updatevensters en lijnen komen in het
-  portaal, en een ondertekende bundel maakt offline levering mogelijk. Gebouwd is alleen stap 2:
-  een gewijzigde migratie maakt een minorrelease.
+  portaal, en een ondertekende bundel maakt offline levering mogelijk. Gebouwd zijn de
+  besluitteksten van stap 1 (in `CLAUDE.md`, `SECURITY.md` en het PR-sjabloon), stap 2 (een
+  gewijzigde migratie maakt een minorrelease) en het toelatingsbeleid van stap 9 voor Kubernetes.
 - **Wie bijwerkt, kiest de afnemer** (13.4, V-14). Het platformteam werkt handmatig bij, met of
   zonder superuser-account, of de superuser doet het in het portaal, los van het platformteam. Op
   Kubernetes werkt de route via het portaal nog niet (ADR 0114, stap 4).
@@ -1234,7 +1235,7 @@ van het besluit nog niet in de code staat; het overzicht zegt welke.
 | Levering en beheer | 0006 ondertekening, 0029 updates, 0030 HTTPS, 0048 live voortgang, 0050 installer, 0052 releases, 0059 kandidaten, 0064 HTTPS standaard, 0067 versiebeheer, 0070 certificaatbron, 0079 release als workflow, 0086 publiek adres, 0089 configuratiepakket, 0099 configuratie als JSON, 0108 publieke images, 0112 interne CA, 0114 Kubernetes | gebouwd; 0067, 0079, 0089, 0108, 0112, 0114 deels; 0099 niet gebouwd |
 | Schaal | 0036 schaalgrenzen en naden | niet gebouwd (de triggers zijn beleid) |
 | Website | 0087, 0110, 0111, 0113 | deels |
-| Na 0.4.0 | 0116 één editie, onderhoudslijnen en geteste upgradepaden | aanvaard op 5 november 2026; stap 2 gebouwd (een gewijzigde migratie maakt een minorrelease), stap 3 tot en met 9 niet |
+| Na 0.4.0 | 0116 één editie, onderhoudslijnen en geteste upgradepaden | aanvaard op 5 november 2026; gebouwd zijn de besluitteksten van stap 1 (#533), stap 2 (een gewijzigde migratie maakt een minorrelease) en het toelatingsbeleid van stap 9; de rest niet |
 
 ### 10.3 Open besluiten
 
@@ -1326,8 +1327,8 @@ Wat na 0.4.0 op de rol staat, zoals `README.md` en `docs/adr-status.md` het noem
 - De naden van ADR 0036 (rate-limitopslag als instelling, contracttest van het schrijfslot,
   back-upinterface, metingen), zodat de stap voorbij één host een adapterwijziging wordt.
 - Release- en updatemodellen voor drie exploitatievormen (ADR 0116, aanvaard op 5 november 2026,
-  stap 2 gebouwd): onderhoudslijnen, een upgradematrix, updatevensters en lijnen in het portaal,
-  publieke patches en een offline bundel.
+  stap 1, 2 en een deel van 9 gebouwd): onderhoudslijnen, een upgradematrix, updatevensters en
+  lijnen in het portaal, publieke patches en een offline bundel.
 - Gevraagd op 5 november 2026 (13.4): Genesys Engage via GMS en later Genesys Cloud CX achter de
   neutrale poort van ADR 0032 (O15), een rapportagescherm en een CSV-export (O16), meer
   berichtkanalen naar keuze van de deelnemer met validatie per kanaal (O17) en sms via SMPP
