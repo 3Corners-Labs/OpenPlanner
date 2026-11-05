@@ -4,6 +4,8 @@ Status: accepted (2026-11-02), requested by the product owner. Partly built: ste
 this build; step 2 is an administrator's act at the first release. Extends ADR 0006 (image
 publishing and signing), ADR 0052 (releases), ADR 0059 (release candidates) and ADR 0078
 (release audit).
+Note (2026-11-05): ADR 0116 point 10 amends point 1: every `vX.Y.Z` release goes to the public
+packages, release candidates stay private; the audit stays for `vX.Y.0`.
 
 ## Context
 

@@ -5,7 +5,8 @@ images), ADR 0012 (actions on explicit instruction) and ADR 0029 (updates from t
 Amended by ADR 0059 (point 1: CI tags a release candidate `vX.Y.Z-rc.N` on every merge),
 ADR 0078 (point 3: a minor or major release carries an independent audit first) and
 ADR 0079 (point 3: the release PR and the tag come from the `release` workflow; the
-dispatch is the instruction). The release PR is a decision and waits for `po:approved` (ADR
+dispatch is the instruction), ADR 0116 (point 6: from 1.0.0 the newest two minors are
+supported, maintenance lines `release/X.Y` are cut on demand; point 2: a migration raises MINOR). The release PR is a decision and waits for `po:approved` (ADR
 0078 point 1).
 
 ## Context

@@ -28,6 +28,6 @@
 - [ ] Screenshots for UI changes
 - [ ] i18n checked (nl/en)
 - [ ] Manual updated for every admin screen this PR adds or changes (`docs/manual/`, ADR 0033)
-- [ ] Migration reversible: yes / no / n.a.
+- [ ] Migration reversible: yes / no / n.a.; expand/contract (nothing dropped or renamed that the previous minor still uses; a patch has none, ADR 0116)
 - [ ] Docs updated (threat model, dataflow, runbook, ADR) where a flow changed
 - [ ] For every ADR this PR builds a step of: its *Build status* row, its Status line and its row in `docs/adr-status.md` say what is built now, not what is decided (ADR 0059)

@@ -5,6 +5,8 @@ candidates. Partly built: steps 1 to 3 in this PR; the trial on a cluster and th
 signal are open. Extends ADR 0036 (scaling envelope: still one writer on one SQLite file) and
 ADR 0108 (public images); sits beside ADR 0050 (the host installer) as a second way to run the
 same signed images.
+Note (2026-11-05): ADR 0116 point 9 withdraws the channel level `minor` of point 11 in favour of
+the line pin `update_line`; the rest of point 11 stands.
 
 ## Context
 
