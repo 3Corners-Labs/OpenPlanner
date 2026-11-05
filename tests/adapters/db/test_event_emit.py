@@ -1,6 +1,5 @@
 """Post-commit emit of audit events (ADR 0034, AU-1): once after commit, never after rollback."""
 
-from collections.abc import Sequence
 from datetime import timedelta
 
 import pytest
@@ -9,15 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import AuditEvent, Category, Outcome
 from app.domain.authorization import Scope
+from tests.fakes.event_sink import RecordingSink
 from tests.support.domain import NOW
-
-
-class RecordingSink:
-    def __init__(self) -> None:
-        self.batches: list[list[AuditEvent]] = []
-
-    def emit(self, events: Sequence[AuditEvent]) -> None:
-        self.batches.append(list(events))
 
 
 def _event(action: str) -> AuditEvent:

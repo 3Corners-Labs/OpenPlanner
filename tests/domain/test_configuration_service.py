@@ -16,34 +16,12 @@ from app.domain.configuration_package import (
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
+from tests.fakes.configuration_package import FakeTransfer
 from tests.fakes.persistence import InMemoryUnitOfWork
 
 NOW = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
 PASSPHRASE = "x" * MIN_PASSPHRASE_LENGTH
 SUMMARY = PackageSummary(1, NOW, "bron", "1.0.0", "abc", {"organisations": 2, "groups": 3}, 4)
-
-
-class FakeTransfer:
-    """A transfer that records what it was asked and answers from attributes."""
-
-    def __init__(self) -> None:
-        self.exported: list[str] = []
-        self.imported: list[tuple[bytes, str]] = []
-        self.busy = False
-
-    async def export(self, passphrase: str) -> bytes:
-        self.exported.append(passphrase)
-        return b"SQLite format 3\x00package"
-
-    async def inspect(self, package: bytes, passphrase: str) -> PackageSummary:
-        return SUMMARY
-
-    async def import_(self, package: bytes, passphrase: str) -> PackageSummary:
-        self.imported.append((package, passphrase))
-        return SUMMARY
-
-    async def in_use(self) -> bool:
-        return self.busy
 
 
 @pytest.fixture
@@ -53,7 +31,7 @@ def uow() -> InMemoryUnitOfWork:
 
 @pytest.fixture
 def transfer() -> FakeTransfer:
-    return FakeTransfer()
+    return FakeTransfer(SUMMARY)
 
 
 @pytest.fixture

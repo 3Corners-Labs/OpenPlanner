@@ -5,7 +5,6 @@ request while one is open, a downgrade disguised as an update, a restore outside
 and an updater report that claims success for the wrong version.
 """
 
-from collections.abc import Sequence
 from datetime import timedelta
 
 import pytest
@@ -21,7 +20,6 @@ from app.domain.updates import (
     HOST_ACTOR,
     RESTORE_WINDOW,
     VERSION_ACTION,
-    ListedRelease,
     Release,
     ReleaseCheck,
     UpdateAction,
@@ -33,26 +31,12 @@ from app.domain.updates import (
 )
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.fakes.releases import FakeReleases
 from tests.support.domain import DEMO_ORG_ADMIN, DEMO_SUPERUSER, NOW
 
 V1 = Version(1, 3, 0)
 V2 = Version(1, 4, 0)
 RELEASE = Release(V2, "https://github.com/acme/openplanner/releases/tag/v1.4.0")
-
-
-class FakeReleases:
-    def __init__(self, release: Release | None = RELEASE, *, more: Sequence[Release] = ()) -> None:
-        self.release = release
-        self.more = list(more)
-        self.error: IntegrationError | None = None
-        self.calls = 0
-
-    async def listing(self) -> list[ListedRelease]:
-        self.calls += 1
-        if self.error is not None:
-            raise self.error
-        found = [r for r in (self.release, *self.more) if r is not None]
-        return [ListedRelease(r.version, r.url, None, f"notes of {r.version}") for r in found]
 
 
 @pytest.fixture
@@ -67,7 +51,7 @@ def uow() -> InMemoryUnitOfWork:
 
 @pytest.fixture
 def releases() -> FakeReleases:
-    return FakeReleases()
+    return FakeReleases(RELEASE)
 
 
 def service(
