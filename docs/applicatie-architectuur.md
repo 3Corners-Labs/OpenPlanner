@@ -409,9 +409,10 @@ Drie eigenschappen bepalen hoe de applicatie in zo'n geheel past:
   tweede verwerkingsverantwoordelijke krijgt een eigen installatie (`docs/threat-model.md`,
   *Shared trust boundaries*).
 - **Gesloten naar buiten, open naar de eigen omgeving.** Deelnemerspagina's roepen geen derden
-  aan. Alles wat de installatie verlaat, staat in één tabel en gaat versleuteld of via een
-  vastgelegde uitzondering (ADR 0091). Adressen die een beheerder intypt, gaan door een uitgaande
-  bewaker.
+  aan. Alles wat de installatie verlaat, staat in één tabel in `docs/dataflow.md`. Elke
+  verbinding met persoonsgegevens is versleuteld of een vastgelegde uitzondering (ADR 0091). De
+  adressen van identity providers die een beheerder registreert, gaan door een uitgaande bewaker;
+  andere bestemmingen stelt alleen de superuser of de host in.
 - **Kleine, zelfstandige voetafdruk.** Twee processen en één bestand als database; geen
   afhankelijkheid van een message broker, cache of databaseserver. De prijs is dat de installatie
   op één host draait en niet horizontaal schaalt (ADR 0036, hoofdstuk 12).
@@ -634,7 +635,7 @@ de invoer voor de DPIA.
 | Direct bellen | `/g/{slug}/direct`, `/b/m/{ref}/wait` | deelnemer | plafond per groep |
 | Huisstijl | `/o/{slug}/theme.css`, `/o/{slug}/logo` | browser | toegestane tokens, gevalideerde uploads |
 | Widget-API | `/api/v1/widget/{org}/{group}/…` | website van de organisatie | CORS op toegestane origins, dezelfde limieten en honeypot |
-| Machine-API | `/api/agent/v1/…` | contactcenter-bot | uit tenzij ingeschakeld, client credentials, token van tien minuten, `RequireScope`, IP-allowlist |
+| Machine-API | `/api/agent/v1/…` | contactcenter-bot | uit tenzij ingeschakeld, client credentials, token van tien minuten, `RequireScope`, optionele IP-allowlist |
 | Instantie | `/api/v1/instance` | de worker, een beheerder | publiek, zonder cookie, leeslimiet |
 | Webhooks | `/webhooks/webex`, `/webhooks/wxcc` | Webex, Webex Contact Center | handtekening over de ruwe body, replay-sleutel, tijdvenster van 300 seconden; alleen met een geconfigureerd secret |
 | Beheerportaal | `/admin/…` | beheerders | OIDC-login, serversessie, één permissie per route, CSRF |
@@ -1126,18 +1127,18 @@ detectief (D) of correctief (C). Elke rij heeft een thuis in de code of de CI en
 | Laag | Control | Soort | Thuis | Besluit |
 |---|---|---|---|---|
 | Rand | TLS met automatisch vernieuwd of eigen certificaat; certificaat en publiek adres periodiek geproefd en getoond | P, D | `deploy/proxy/`, `tls_check`, `address_check` | ADR 0030, 0064, 0086 |
-| Rand | Elke hop met persoonsgegevens versleuteld, of een vastgelegde uitzondering (proxy naar `web` op één host) | P | `docs/dataflow.md`, `web_transport` | ADR 0091 |
+| Rand | Elke hop met persoonsgegevens versleuteld, of een vastgelegde uitzondering (proxy naar `web` op één host). Open rest van ADR 0091: een SMTP-configuratie zonder TLS van vóór die stap verstuurt nog; vanaf de volgende minor weigert ook het versturen | P | `docs/dataflow.md`, `web_transport` | ADR 0091 |
 | Rand | Responsheaders standaard dicht: CSP die alleen eigen scripts toelaat, en alleen op de pagina's die ze gebruiken, HSTS, frame-weigering, COOP, COEP, CORP, Permissions-Policy | P | `api/security_headers.py`, `web/templates.py` | dreigingsmodel |
 | Rand | Doorgestuurde headers alleen van de bekende proxy; een onbekende afzender is een event | P, D | `proxy_watch`, compose | ADR 0086 |
 | Verzoek | CSRF in drie lagen: Fetch Metadata, Origin-terugval, `SameSite=Lax` | P | `web/protection.py` | dreigingsmodel |
 | Verzoek | Rate limits (10 boekingen per IP per uur, 60 leesacties per minuut; instelbaar binnen grenzen) en honeypot; floods als securityevent | P, D | `web/protection.py`, `security_log` | ADR 0042 §7, 0053 |
 | Verzoek | Widget alleen vanaf toegestane origins; CORS zonder credentials | P | `widget_api`, `embedding` | ADR 0035 |
 | Verzoek | Uploads gevalideerd op structuur, metadata gestript, tekstalternatief verplicht; geen virusscanner (bewust) | P | `images` | ADR 0092 |
-| Verzoek | Adressen die een beheerder intypt gaan door de uitgaande bewaker: alleen https, publieke adressen, geen redirects, groottelimiet | P | `adapters/outbound.py` | ADR 0083 |
+| Verzoek | De adressen van identity providers die een beheerder registreert, gaan door de uitgaande bewaker: alleen https, publieke adressen, geen redirects, groottelimiet. Andere bestemmingen (sms, logbestemmingen, contactcenter) stelt alleen de superuser of de host in, met https of een versleuteld transport in productie | P | `adapters/outbound.py`, `docs/dataflow.md` | ADR 0083, 0091 |
 | Identiteit | OIDC met PKCE, state, nonce, alleen asymmetrische algoritmen, vastgepinde issuer, RP-initiated logout | P | `adapters/oidc.py` | ADR 0013, 0097 |
 | Identiteit | Serversessies: 8 uur, 60 minuten inactief, hooguit 5, verse login van 60 minuten voor wijzigingen, sessies beëindigen door beheerder en host | P, C | `admin_sessions` | ADR 0015, 0098 |
-| Identiteit | Bewijs van tweede factor in het ID-token (`acr`, `amr`) vereist | P | `mfa` | ADR 0100 |
-| Identiteit | Machine-API standaard uit, noodstop door de superuser, hash van secrets, tokens van 10 minuten, IP-allowlist, nooit persoonsgegevens | P | `api/agent/`, `api_access` | ADR 0023 |
+| Identiteit | Bewijs van tweede factor in het ID-token (`acr`, `amr`), vereist zodra `ADMIN_MFA_REQUIRED` of het beleid van een geregistreerde provider het vraagt; in productie met de meegeleverde Keycloak staat het aan | P | `mfa` | ADR 0100, 0106 |
+| Identiteit | Machine-API standaard uit, noodstop door de superuser, hash van secrets, tokens van 10 minuten, een optionele netwerk-allowlist per client, nooit persoonsgegevens | P | `api/agent/`, `api_access` | ADR 0023 |
 | Identiteit | Deelnemerslink ingewisseld voor een cookie; token nooit opgeslagen, alleen salt en hash, vergelijking in constante tijd | P | `tokens`, `participant_links` | ADR 0011, 0093 |
 | Autorisatie | Eén matrix, één permissie per route, scope in elke query, weigeringen vastgelegd; een test loopt elke rol over elk eindpunt met eigen en andermans groep | P, D | `authorization`, `admin/authz`, `db/scope` | ADR 0014, 0039 |
 | Autorisatie | Onderhoudsmodus: wijzigingen geweigerd behalve door de superuser voor integraties en updates | P | `maintenance` | ADR 0038 |
@@ -1151,7 +1152,7 @@ detectief (D) of correctief (C). Elke rij heeft een thuis in de code of de CI en
 | Observatie | Opslagbewaking, heartbeat, health, meldingen in het portaal | D | `storage`, `heartbeat`, `alerts` | ADR 0040, 0061 |
 | Levering | Images ondertekend met cosign (sleutelloos), SBOM geattesteerd, host-updater verifieert vóór elke start, pin op digest, automatisch terugdraaien | P, C | CI, `scripts/updater/` | ADR 0006, 0029 |
 | Levering | Containers niet-root, alleen-lezen, zonder capabilities, `no-new-privileges`; alleen `web` migreert | P | `docker-compose.yml`, `Dockerfile` | ADR 0002 |
-| Levering | Releasetags alleen door de release-app; beslis-PR's alleen met `po:approved` door een beheerder; guardrails hourly tegen een baseline bewaakt | P, D | `.github/`, `scripts/guardrail_audit.py` | ADR 0078, 0088, 0104, 0107, 0109 |
+| Levering | Releasetags alleen door de release-app; beslis-PR's alleen met `po:approved` door een beheerder; guardrails elk uur tegen een baseline bewaakt | P, D | `.github/`, `scripts/guardrail_audit.py` | ADR 0078, 0088, 0104, 0107, 0109 |
 | Toeleverketen | Afhankelijkheden vastgepind met hashes, Renovate wekelijks en security direct, deprecaties laten de build falen, licentiecontrole, `pip-audit`, `npm audit`, `gitleaks`, `trivy`, `grype` | P, D | CI, `docs/dependencies.md` | ADR 0051, 0054 |
 | Code | Lagen afgedwongen, `mypy --strict`, `bandit`, `semgrep` met eigen regels, kopieerdetectie, mutatietests, dekking per laag | P | CI, `pyproject.toml`, `.semgrep/` | ADR 0005, 0058 |
 
@@ -1411,4 +1412,4 @@ antwoord een open punt in HANDOVER §11 of een ADR.
 | Datum | Wijziging |
 |---|---|
 | 5 november 2026 | Concept 1: eerste volledige opzet tegen 0.4.0 |
-| 5 november 2026 | Concept 1a: feiten nagelopen tegen de code (annuleren tot de start, alle 23 taaksoorten, dagelijkse opruimtaken, Nederlandse menunamen, fakes per poort); ADR 0116 van na de release en risico R-13 toegevoegd |
+| 5 november 2026 | Concept 1a: feiten nagelopen tegen de code (annuleren tot de start, alle 23 taaksoorten, dagelijkse opruimtaken, Nederlandse menunamen, fakes per poort); ADR 0116 van na de release en risico R-13 toegevoegd; na de security-review de controls in 3.5 en 9.1 preciezer (uitgaande bewaker, versleutelde hops, tweede factor, netwerk-allowlist) |
