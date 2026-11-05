@@ -21,17 +21,6 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 3Corners Internetworking Services BV and the OpenPlanner contributors"
 SPDX-License-Identifier = "EUPL-1.2"
 
-# The verify-openplanner skill (.claude/skills/verify-openplanner/): written for this repository
-# after the method of the create-verification-skill generator of pstack (MIT, Copyright (c) 2026
-# Lauren Tan, https://github.com/cursor/plugins). None of its text is copied; the feature files
-# share only the generator's four section names (Sub-features, How to get to it (user POV),
-# Driving it with <harness>, Gotchas), so the skill is EUPL-1.2 like the rest.
-[[annotations]]
-path = ".claude/skills/verify-openplanner/**"
-precedence = "aggregate"
-SPDX-FileCopyrightText = "2026 3Corners Internetworking Services BV and the OpenPlanner contributors"
-SPDX-License-Identifier = "EUPL-1.2"
-
 # docs/assurance/ and docs/asvs.md: checklists and evidence that cite OWASP ASVS 5.0.0 requirement IDs
 # (CC BY-SA 4.0) and describe each requirement in our own words; no requirement text is copied.
 # EUPL-1.2 like the rest. The two JSON files pin the IDs the tests check those documents against.
