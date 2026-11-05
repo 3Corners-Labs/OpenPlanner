@@ -26,16 +26,20 @@ _FEATURE = re.compile(r"^feat(\([^)]*\))?:")
 _CANDIDATE_TAG = re.compile(r"^v(\d+\.\d+\.\d+)-rc\.(\d+)$")
 
 
-def next_version(current: str, messages: Sequence[str]) -> str | None:
+def next_version(
+    current: str, messages: Sequence[str], migrations_changed: bool = False
+) -> str | None:
     """Return the version after ``current`` that ``messages`` call for.
 
     Args:
         current: The last released version, ``MAJOR.MINOR.PATCH``.
         messages: Full commit messages (subject and body) since that release.
+        migrations_changed: Whether ``migrations/versions/`` changed since that release.
 
     Returns:
-        A breaking change raises MAJOR (MINOR before 1.0), a ``feat`` raises MINOR, anything
-        else raises PATCH; ``None`` when there are no commits.
+        A breaking change raises MAJOR (MINOR before 1.0), a ``feat`` or a changed migration
+        raises MINOR (a patch carries no migration, ADR 0116 point 4), anything else raises
+        PATCH; ``None`` when there are no commits.
     """
     if not messages:
         return None
@@ -44,7 +48,7 @@ def next_version(current: str, messages: Sequence[str]) -> str | None:
     feature = any(_FEATURE.match(message) for message in messages)
     if breaking and major >= 1:
         return f"{major + 1}.0.0"
-    if breaking or feature:
+    if breaking or feature or migrations_changed:
         return f"{major}.{minor + 1}.0"
     return f"{major}.{minor}.{patch + 1}"
 
@@ -60,13 +64,16 @@ def _numbers(version: str) -> tuple[int, ...]:
     return tuple(int(part) for part in version.split("."))
 
 
-def candidate_base(current: str, project: str, messages: Sequence[str]) -> str | None:
+def candidate_base(
+    current: str, project: str, messages: Sequence[str], migrations_changed: bool = False
+) -> str | None:
     """Return the release a candidate on ``main`` is a candidate of (ADR 0059 point 1).
 
     Args:
         current: The last released version.
         project: ``project.version`` in ``pyproject.toml`` on ``main``.
         messages: Commit messages since the last release.
+        migrations_changed: Whether ``migrations/versions/`` changed since the last release.
 
     Returns:
         ``project`` when a release PR already raised it above ``current`` (the product owner
@@ -75,7 +82,7 @@ def candidate_base(current: str, project: str, messages: Sequence[str]) -> str |
     """
     if _numbers(project) > _numbers(current):
         return project
-    return next_version(current, messages)
+    return next_version(current, messages, migrations_changed)
 
 
 def candidate_version(base: str, tags: Sequence[str]) -> str:
@@ -138,6 +145,11 @@ def messages_since(ref: str) -> list[str]:
     return [message.strip() for message in log.split("\0") if message.strip()]
 
 
+def migrations_changed_since(ref: str) -> bool:
+    """Return whether a migration file was added, changed or removed from ``ref`` to ``HEAD``."""
+    return bool(git("diff", "--name-only", f"{ref}..HEAD", "--", "migrations/versions").strip())
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Print the release proposal for the current checkout, or its release candidate."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -148,8 +160,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     last = last_release()
     messages = messages_since(last)
     project = project_version(Path("pyproject.toml"))
+    migrations = migrations_changed_since(last)
     if args.candidate:
-        base = candidate_base(last.removeprefix("v"), project, messages)
+        base = candidate_base(last.removeprefix("v"), project, messages, migrations)
         if base is None:
             sys.stderr.write("nothing merged since the last release; no candidate\n")
             return 1
@@ -160,9 +173,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         tags = git("tag", "--list", f"v{base}-rc.*").split()
         sys.stdout.write(candidate_version(base, tags) + "\n")
         return 0
-    proposal = next_version(last.removeprefix("v"), messages)
+    proposal = next_version(last.removeprefix("v"), messages, migrations)
     out = [f"last release   {last}", f"pyproject      {project}"]
-    out += [f"commits since  {len(messages)}"]
+    out += [
+        f"commits since  {len(messages)}",
+        f"migrations     {'changed' if migrations else 'unchanged'}",
+    ]
     out += [f"  {message.splitlines()[0]}" for message in messages]
     out += [f"next version   {proposal or 'none: nothing to release'}"]
     sys.stdout.write("\n".join(out) + "\n")

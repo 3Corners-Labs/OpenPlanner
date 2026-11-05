@@ -3,7 +3,7 @@
 Status: accepted (2026-11-05, the product owner's approval of the proposal in the conversation,
 `po:approved` on #519; the three decisions of the research note §10 are taken as recommended:
 window `N-1` with public patch releases, the line mechanics now with one dry run, one edition
-with services sold). Not built. Amends ADR 0052
+with services sold). Partly built: step 2 (the rules in code); the rest is open. Amends ADR 0052
 (point 6: a support window and maintenance lines; point 2: a migration raises MINOR), ADR 0108
 (point 1: every `vX.Y.Z` release is public), ADR 0067 (point 1: auto-apply in production
 inside a window) and ADR 0114 (point 11: the channel level `minor` is withdrawn in favour of a
@@ -153,7 +153,7 @@ not of the product); the 24 h of the updater's backup (ADR 0029); the ring order
 |---|---|---|---|
 | 0 | ADR proposed, with `docs/research/release-and-update-models.md` | #519 | merged 2026-11-05 |
 | 1 | Decision texts: `SECURITY.md` support window; amendments noted in ADR 0052, 0067, 0108, 0114; CLAUDE.md migration rule; PR template question on expand/contract | #533 | in PR #533 |
-| 2 | Rules in code: `release_pr.py` refuses PATCH with a migration; import-linter contract for self-contained migrations | | planned |
+| 2 | Rules in code: `release_plan.py` and `release_pr.py` give MINOR (and refuse a typed patch) when `migrations/versions/` changed since the last release; `tests/test_migrations_self_contained.py` (a test, not an import-linter contract: `migrations/` is outside the root package) | #534 | in PR #534 |
 | 3 | Upgrade fixture and matrix: `seed --upgrade-fixture`, fixture attached to every release, matrix job with downgrade-and-start-the-released-image and the duration budget | | planned |
 | 4 | Lines: candidates on `release/X.Y` in `main.yml`, the release workflow on a line, the tag check, ruleset for `release/*`, label `backport:X.Y` and the cherry-pick PR; one dry run on the current line | | planned |
 | 5 | Portal and updater: `update_line`, `update_window` with `apply_after`, auto-apply in production with a window, support status from `support.json`, `MIN_UPGRADE_FROM` check; manual topic *Updates* | | planned |

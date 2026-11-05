@@ -1638,7 +1638,8 @@ product.
 ### Step 1: the release PR (one click)
 
 *Run workflow* on `main` with `step = release-pr`. Leave `version` empty for the number the
-rules of ADR 0052 give (breaking → MAJOR, from 1.0; `feat` → MINOR; anything else → PATCH),
+rules of ADR 0052 give (breaking → MAJOR, from 1.0; `feat` or a changed migration → MINOR,
+ADR 0116; anything else → PATCH),
 or type a higher one, for example `1.0.0` for the first production release. Tick `dry_run`
 to see the result first: the run's summary shows the diff and the PR body, and nothing is
 opened.

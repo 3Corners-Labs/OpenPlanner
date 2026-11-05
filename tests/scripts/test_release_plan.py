@@ -8,6 +8,7 @@ from scripts.release_plan import (
     candidate_base,
     candidate_version,
     main,
+    migrations_changed_since,
     next_version,
     project_version,
     superseded_by,
@@ -120,3 +121,40 @@ def test_candidate_run_on_an_older_commit_than_the_last_candidate_prints_nothing
     commit_all(git, "fix: next merge")
     assert main(["--candidate"]) == 0
     assert capsys.readouterr().out == "0.3.1-rc.2\n"
+
+
+def test_a_changed_migration_makes_a_minor_release_whatever_the_commit_types() -> None:
+    """A patch carries no migration (ADR 0116 point 4)."""
+    assert next_version("0.4.0", ["fix: backfill"], migrations_changed=True) == "0.5.0"
+    assert next_version("1.4.2", ["fix: backfill"], migrations_changed=True) == "1.5.0"
+    assert next_version("0.4.0", ["fix: backfill"], migrations_changed=False) == "0.4.1"
+    assert candidate_base("0.4.0", "0.4.0", ["fix: a"], migrations_changed=True) == "0.5.0"
+
+
+def test_migrations_changed_since_looks_at_the_migration_directory_only(git: Git) -> None:
+    Path("start.txt").write_text("s")
+    commit_all(git, "chore: start")
+    git("tag", "-a", "v0.4.0", "-m", "v0.4.0")
+    Path("other.txt").write_text("x")
+    commit_all(git, "fix: not a migration")
+    assert migrations_changed_since("v0.4.0") is False
+
+    Path("migrations/versions").mkdir(parents=True)
+    Path("migrations/versions/0001_x.py").write_text("revision = '0001'\n")
+    commit_all(git, "fix: adds a migration")
+    assert migrations_changed_since("v0.4.0") is True
+
+
+def test_the_release_plan_proposes_minor_when_a_fix_brought_a_migration(
+    git: Git, capsys: pytest.CaptureFixture[str]
+) -> None:
+    Path("pyproject.toml").write_text('[project]\nversion = "0.4.0"\n')
+    commit_all(git, "chore: start")
+    git("tag", "-a", "v0.4.0", "-m", "v0.4.0")
+    Path("migrations/versions").mkdir(parents=True)
+    Path("migrations/versions/0001_x.py").write_text("revision = '0001'\n")
+    commit_all(git, "fix: backfill a column")
+
+    assert main([]) == 0
+
+    assert "next version   0.5.0" in capsys.readouterr().out
