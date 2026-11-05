@@ -59,11 +59,30 @@ webTls:
   enabled: false
   secretName: ""
 
-# Only the ingress controller's namespace may reach the pod, and the pod may reach out.
+# Only the ingress controller's namespace may reach the pod; with egress, the pod reaches only the
+# cluster DNS and the destinations listed (docs/kubernetes.md, Outbound traffic).
 networkPolicy:
   enabled: false
-  ingressNamespaceLabels:
-    kubernetes.io/metadata.name: ingress-nginx
+  # Required with enabled: the labels of the ingress controller's namespace, for example
+  # kubernetes.io/metadata.name: traefik. No default on purpose: an empty selector admits every
+  # namespace, and a guessed controller that is not there blocks every visitor.
+  ingressNamespaceLabels: {}
+  egress:
+    # Off: the pod may reach any address. On: the cluster DNS and the list below only, which is
+    # how a cluster enforces the outbound list of docs/dataflow.md (Outbound connections and the
+    # hop to web).
+    enabled: false
+    # The cluster DNS that names are resolved through (port 53, UDP and TCP).
+    dns:
+      namespaceLabels:
+        kubernetes.io/metadata.name: kube-system
+      podLabels:
+        k8s-app: kube-dns
+    # Required with enabled: every outbound destination as an address range with its TCP ports,
+    # for example {cidr: 198.51.100.7/32, ports: [587]} for the mail server. A network policy
+    # matches addresses, not host names. Include the installation's own public address with
+    # port 443: the worker checks the certificate and the round trip through it.
+    to: []
 
 resources:
   web:
