@@ -424,12 +424,13 @@ def test_participant_actions_are_part_of_the_matrix() -> None:
 
     conditions = {action.key: action.condition for action in PARTICIPANT_ACTIONS}
 
+    # ADR 0069: moving closes at the group's change deadline, cancelling at the start.
     assert conditions == {
         "participant.availability_view": "public",
         "participant.book": "public",
         "participant.booking_view": "management_link",
-        "participant.booking_change": "management_link_before_deadline",
-        "participant.booking_cancel": "management_link_before_deadline",
+        "participant.booking_change": "management_link_before_change_deadline",
+        "participant.booking_cancel": "management_link_before_start",
         "participant.suspended_booking_change": "management_link_while_suspended",
     }
 

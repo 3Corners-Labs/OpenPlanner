@@ -390,7 +390,7 @@ def _page_context(
 async def manage_page(
     request: Request, public_ref: str, locale: Locale, status: str | None = None
 ) -> HTMLResponse:
-    """Show a booking; read-only once its change deadline has passed."""
+    """Show a booking: movable until its change deadline, cancellable until its start (ADR 0069)."""
     details = await _details(request, public_ref)
     context = _page_context(details, locale, public_ref, status, _clock(request).now())
     return await participant_page(request, locale, "manage.html", details.group, context)

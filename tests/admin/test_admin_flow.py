@@ -281,7 +281,9 @@ async def test_matrix_page(site: Site) -> None:
 
     assert "Koppelingen en geheimen beheren" in text
     assert "Deelnemers (zonder inloggen)" in text
-    assert "Met de beheerlink, tot de taak naar de wachtrij gaat" in text
+    # ADR 0069: moving and cancelling each have their own deadline.
+    assert "Met de beheerlink, tot het aantal minuten voor de start dat de groep instelt" in text
+    assert "Met de beheerlink, tot de start<" in text
 
 
 async def test_matrix_page_marks_the_bounds_and_shows_the_auditor(site: Site) -> None:

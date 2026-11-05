@@ -39,8 +39,10 @@ never a role's name, and clip a custom role to its bounds again::
 ``Scope`` that the database adapter applies to listings. Both are derived from ``MATRIX``,
 so what a list shows is exactly what a route allows.
 
-Participants never log in. Their rights depend on holding a management link and on the change
-deadline; ``PARTICIPANT_ACTIONS`` documents them next to the admin matrix.
+Participants never log in. Their rights depend on holding a management link and on two moments
+of ADR 0069: moving closes at the group's change deadline (``Group.change_deadline``) and
+cancelling at the start (``Group.cancel_deadline``); ``PARTICIPANT_ACTIONS`` documents them next
+to the admin matrix.
 
 Machines (contact-center bots, ADR 0023) never get a role either. An API client holds OAuth
 scopes (``API_SCOPES``) within one organisation, optionally narrowed to some of its groups;
@@ -527,8 +529,9 @@ PARTICIPANT_ACTIONS: tuple[ParticipantAction, ...] = (
     ParticipantAction("participant.availability_view", "public"),
     ParticipantAction("participant.book", "public"),
     ParticipantAction("participant.booking_view", "management_link"),
-    ParticipantAction("participant.booking_change", "management_link_before_deadline"),
-    ParticipantAction("participant.booking_cancel", "management_link_before_deadline"),
+    # ADR 0069: moving closes at the group's change deadline, cancelling at the start.
+    ParticipantAction("participant.booking_change", "management_link_before_change_deadline"),
+    ParticipantAction("participant.booking_cancel", "management_link_before_start"),
     # ADR 0024: a booking on hold can be moved or cancelled until it is resolved.
     ParticipantAction("participant.suspended_booking_change", "management_link_while_suspended"),
 )
