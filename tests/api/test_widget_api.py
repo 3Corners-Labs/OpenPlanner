@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import (
+    AuditEventRow,
     BookingRow,
     GroupRow,
     OrganisationOriginRow,
@@ -268,6 +269,40 @@ async def test_slot_exhaustion_from_a_host_page_hits_the_same_rate_limit(
     assert third.json()["error"] == "rate_limited"
     assert third.headers["retry-after"] == "60"
     assert third.headers["access-control-allow-origin"] == SITE
+
+
+async def _rate_limit_events(settings: Settings) -> list[tuple[str, str]]:
+    engine = create_engine(settings.database_url)
+    async with AsyncSession(engine) as session:
+        rows = await session.scalars(
+            select(AuditEventRow).where(AuditEventRow.action == "request.rate_limited")
+        )
+        found = [(row.reason, row.detail) for row in rows]
+    await engine.dispose()
+    return found
+
+
+async def test_a_rate_limit_hit_is_a_security_event_of_the_widget(
+    demo_settings: Settings,
+) -> None:
+    """ADR 0053: the widget answers its own 429, so it records the hit as the pages do.
+
+    slowapi's own line of the hit is not logged (it carries the address and the path), so
+    without the event a flood on the widget would leave no trace at all.
+    """
+    await _embed(demo_settings)
+    limited = demo_settings.model_copy(
+        update={"rate_limit_enabled": True, "rate_limit_reads": "1/minute"}
+    )
+    async with app_client(limited, FixedClock(NOW)) as client:
+        statuses = [
+            (await client.get(f"{BASE}/", headers={"origin": SITE})).status_code for _ in range(3)
+        ]
+
+    assert statuses == [200, 429, 429]
+    ((reason, detail),) = await _rate_limit_events(demo_settings)
+    assert reason == "too_many_requests"
+    assert detail.startswith("surface:widget,client:")
 
 
 async def test_the_api_is_in_the_openapi_spec(site: httpx.AsyncClient) -> None:
