@@ -9,14 +9,14 @@ and salt the domain needs to count; the caller reduces them to numbers.
 from datetime import datetime
 from typing import cast
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.models import BookingRow, SlotRow
 from app.adapters.db.sealed import SEALED
 from app.config import Settings
-from app.domain.booking import HOLDS_PLACE
+from app.domain.booking import HOLDS_PLACE, BookingStatus
 from app.domain.key_rotation import BookingCredential, RotationStatus, bookings_on_previous_key
 from app.keys import (
     management_token_key,
@@ -26,6 +26,9 @@ from app.keys import (
 )
 
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
+_HELD = [BookingStatus.SUSPENDED.value, BookingStatus.AWAITING_REBOOK.value]
+"""Statuses whose booking is written to after its slot is over: on hold under a closure (ADR
+0024) and awaiting a new time (ADR 0044). Their retention runs from other moments."""
 
 
 async def records_not_current(engine: AsyncEngine, box: SecretBox) -> int:
@@ -40,15 +43,23 @@ async def records_not_current(engine: AsyncEngine, box: SecretBox) -> int:
 
 
 async def open_booking_credentials(engine: AsyncEngine, now: datetime) -> list[BookingCredential]:
-    """Return salt and token hash of every booking that still holds a place and has not ended.
+    """Return salt and token hash of every booking that can still be sent a message with its link.
 
-    Those are the bookings that can still be sent a message with their link (ADR 0094 point 4).
+    That is a booking that holds a place and has not ended, and one on hold under a closure or
+    awaiting a new time, whatever its original slot (ADR 0094 point 4). Without the held ones the
+    counter reaches zero while reminders and closure updates still derive tokens under a key
+    that may then be removed, and their links stop matching.
     """
     async with engine.connect() as connection:
         rows = await connection.execute(
             select(BookingRow.management_token_salt, BookingRow.management_token_hash)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
-            .where(BookingRow.status.in_(_HOLDS_PLACE), SlotRow.end > now)
+            .where(
+                or_(
+                    and_(BookingRow.status.in_(_HOLDS_PLACE), SlotRow.end > now),
+                    and_(BookingRow.status.in_(_HELD), BookingRow.pii_purged_at.is_(None)),
+                )
+            )
         )
         return [BookingCredential(salt, token_hash) for salt, token_hash in rows]
 

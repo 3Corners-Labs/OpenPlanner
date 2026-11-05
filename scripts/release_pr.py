@@ -30,7 +30,13 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from scripts.release_plan import git, last_release, messages_since, next_version
+from scripts.release_plan import (
+    git,
+    last_release,
+    messages_since,
+    migrations_changed_since,
+    next_version,
+)
 
 VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 _PYPROJECT_VERSION = re.compile(r'^(version = ")[^"]+(")$', re.M)
@@ -60,28 +66,39 @@ def needs_audit(version: str) -> bool:
     return parse_version(version)[2] == 0
 
 
-def plan(previous: str, messages: Sequence[str], requested: str | None) -> str:
+def plan(
+    previous: str,
+    messages: Sequence[str],
+    requested: str | None,
+    migrations_changed: bool = False,
+) -> str:
     """Return the version to release.
 
     Args:
         previous: The last release tag, ``vX.Y.Z``.
         messages: The commit messages since that release.
         requested: A version the product owner typed, or ``None`` for the rules of ADR 0052.
+        migrations_changed: Whether ``migrations/versions/`` changed since that release.
 
     Returns:
         ``requested`` when it is a version above the last release, else the version the
-        commits call for.
+        commits call for (MINOR at least when a migration changed, ADR 0116 point 4).
 
     Raises:
-        ValueError: ``requested`` is no version or not above the last release, or nothing was
-            merged since the last release.
+        ValueError: ``requested`` is no version or not above the last release, is a patch
+            although a migration changed, or nothing was merged since the last release.
     """
     last = previous.removeprefix("v")
     if requested:
         if parse_version(requested) <= parse_version(last):
             raise ValueError(f"{requested} is not above the last release {previous}")
+        if migrations_changed and parse_version(requested)[2] != 0:
+            raise ValueError(
+                f"{requested} is a patch, but a migration changed since {previous}; "
+                "a patch carries no migration (ADR 0116 point 4)"
+            )
         return requested
-    proposed = next_version(last, messages)
+    proposed = next_version(last, messages, migrations_changed)
     if proposed is None:
         raise ValueError(f"nothing merged since {previous}; nothing to release")
     return proposed
@@ -254,7 +271,12 @@ def _today() -> str:
 
 def _plan(args: argparse.Namespace) -> None:
     previous = last_release()
-    version = plan(previous, messages_since(previous), args.version or None)
+    version = plan(
+        previous,
+        messages_since(previous),
+        args.version or None,
+        migrations_changed_since(previous),
+    )
     for key, value in (
         ("version", version),
         ("previous", previous),

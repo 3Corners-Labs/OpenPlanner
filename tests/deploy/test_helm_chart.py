@@ -1,5 +1,6 @@
 """The Helm chart of the Kubernetes trial (ADR 0114): what it renders, and what it refuses."""
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -20,17 +21,21 @@ REQUIRED = {
 }
 
 
-def _template(**overrides: str) -> subprocess.CompletedProcess[str]:
+def _template(
+    json_values: dict[str, object] | None = None, **overrides: str
+) -> subprocess.CompletedProcess[str]:
     values = {**REQUIRED, **overrides}
     args = [arg for key, value in values.items() for arg in ("--set", f"{key}={value}")]
+    for key, value in (json_values or {}).items():
+        args += ["--set-json", f"{key}={json.dumps(value)}"]
     assert HELM
     return subprocess.run(  # noqa: S603
         [HELM, "template", "t", str(CHART), *args], capture_output=True, text=True, check=False
     )
 
 
-def _docs(**overrides: str) -> dict[str, dict]:  # type: ignore[type-arg]
-    result = _template(**overrides)
+def _docs(json_values: dict[str, object] | None = None, **overrides: str) -> dict[str, dict]:  # type: ignore[type-arg]
+    result = _template(json_values, **overrides)
     assert result.returncode == 0, result.stderr
     return {d["kind"]: d for d in yaml.safe_load_all(result.stdout) if d}
 
@@ -116,3 +121,72 @@ def test_a_missing_required_value_fails_the_render(missing: str) -> None:
 def test_trusting_every_forwarder_must_be_said_aloud() -> None:
     assert _template(forwardedAllowIps="").returncode != 0
     assert _template(forwardedAllowIps="", allowAnyForwarder="true").returncode == 0
+
+
+POLICY_ON = {"networkPolicy.enabled": "true"}
+INGRESS_NAMESPACE = {
+    "networkPolicy.ingressNamespaceLabels": {"kubernetes.io/metadata.name": "edge"}
+}
+MAIL_SERVER = {"cidr": "198.51.100.7/32", "ports": [587, 465]}
+PROVIDER = {"cidr": "203.0.113.0/24", "ports": [443]}
+
+
+def _policy(**json_values: object) -> dict:  # type: ignore[type-arg]
+    return _docs({**INGRESS_NAMESPACE, **json_values}, **POLICY_ON)["NetworkPolicy"]["spec"]
+
+
+def test_the_network_policy_names_the_ingress_namespace_or_refuses() -> None:
+    # An empty selector would admit every namespace, and a guessed controller blocks everyone.
+    result = _template(**POLICY_ON)
+    assert result.returncode != 0
+    assert "networkPolicy.ingressNamespaceLabels is required" in result.stderr
+
+
+def test_without_egress_the_policy_guards_the_way_in_only() -> None:
+    spec = _policy()
+    assert spec["policyTypes"] == ["Ingress"]
+    assert "egress" not in spec
+    allowed = spec["ingress"][0]["from"][0]["namespaceSelector"]["matchLabels"]
+    assert allowed == {"kubernetes.io/metadata.name": "edge"}
+
+
+def test_egress_allows_the_cluster_dns_and_the_listed_destinations_only() -> None:
+    spec = _policy(
+        **{"networkPolicy.egress.enabled": True, "networkPolicy.egress.to": [MAIL_SERVER, PROVIDER]}
+    )
+    assert spec["policyTypes"] == ["Ingress", "Egress"]
+    dns, mail, provider = spec["egress"]
+    assert dns["to"] == [
+        {
+            "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+            "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}},
+        }
+    ]
+    assert dns["ports"] == [{"port": 53, "protocol": "UDP"}, {"port": 53, "protocol": "TCP"}]
+    assert mail == {
+        "to": [{"ipBlock": {"cidr": "198.51.100.7/32"}}],
+        "ports": [{"port": 587, "protocol": "TCP"}, {"port": 465, "protocol": "TCP"}],
+    }
+    assert provider["ports"] == [{"port": 443, "protocol": "TCP"}]
+
+
+@pytest.mark.parametrize(
+    ("values", "message"),
+    [
+        ({"networkPolicy.egress.to": []}, "networkPolicy.egress.to is required"),
+        ({"networkPolicy.egress.to": [{"ports": [443]}]}, "needs a cidr"),
+        ({"networkPolicy.egress.to": [{"cidr": "203.0.113.0/24"}]}, "needs ports"),
+        (
+            {"networkPolicy.egress.to": [PROVIDER], "networkPolicy.egress.dns.podLabels": None},
+            "networkPolicy.egress.dns",
+        ),
+    ],
+)
+def test_egress_refuses_to_guess_where_the_pod_may_go(
+    values: dict[str, object], message: str
+) -> None:
+    result = _template(
+        {**INGRESS_NAMESPACE, "networkPolicy.egress.enabled": True, **values}, **POLICY_ON
+    )
+    assert result.returncode != 0
+    assert message in result.stderr

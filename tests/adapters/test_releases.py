@@ -194,3 +194,63 @@ async def test_the_channel_decides_what_the_check_calls_the_latest(
         assert overview.newest.version == latest  # the newest on this channel
         assert [item.version for item in overview.offered][0] == latest
         assert len(uow.state.release_listing) == 2
+
+
+def _candidate(number: int) -> dict[str, object]:
+    return {
+        **LATEST,
+        "html_url": f"https://github.com/acme/openplanner/releases/tag/v1.5.0-rc.{number}",
+        "tag_name": f"v1.5.0-rc.{number}",
+        "prerelease": True,
+        "body": "",
+    }
+
+
+async def test_a_page_of_candidates_is_completed_with_the_latest_release() -> None:
+    # Audit v0.4.0 P2 (#514): thirty candidates after a release push it off the first page.
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        if request.url.path.endswith("/releases/latest"):
+            return httpx.Response(200, json=LATEST)
+        return httpx.Response(200, json=[_candidate(n) for n in range(30, 0, -1)])
+
+    listing = await _releases(handler).listing()
+
+    assert RELEASE in listing
+    assert sum(item.version.is_candidate for item in listing) == 30
+    assert seen == ["/repos/acme/openplanner/releases", "/repos/acme/openplanner/releases/latest"]
+
+
+async def test_a_page_with_a_release_is_one_request() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        return httpx.Response(200, json=[_candidate(2), LATEST])
+
+    await _releases(handler).listing()
+
+    assert seen == ["/repos/acme/openplanner/releases"]
+
+
+async def test_candidates_without_any_release_stay_candidates() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/releases/latest"):
+            return httpx.Response(404, json={"message": "Not Found"})
+        return httpx.Response(200, json=[_candidate(1)])
+
+    listing = await _releases(handler).listing()
+
+    assert [str(item.version) for item in listing] == ["1.5.0-rc.1"]
+
+
+async def test_a_failing_latest_request_fails_the_check() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/releases/latest"):
+            return httpx.Response(500)
+        return httpx.Response(200, json=[_candidate(1)])
+
+    with pytest.raises(IntegrationError):
+        await _releases(handler).listing()
