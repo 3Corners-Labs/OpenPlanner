@@ -3,7 +3,8 @@
 Status: accepted (2026-11-05, the product owner's approval of the proposal in the conversation,
 `po:approved` on #519; the three decisions of the research note §10 are taken as recommended:
 window `N-1` with public patch releases, the line mechanics now with one dry run, one edition
-with services sold). Partly built: step 2 (the rules in code); the rest is open. Amends ADR 0052
+with services sold). Partly built: step 2 (the rules in code) and the admission policy of step 9
+(`docs/kubernetes.md`, #536); the rest is open. Amends ADR 0052
 (point 6: a support window and maintenance lines; point 2: a migration raises MINOR), ADR 0108
 (point 1: every `vX.Y.Z` release is public), ADR 0067 (point 1: auto-apply in production
 inside a window) and ADR 0114 (point 11: the channel level `minor` is withdrawn in favour of a
@@ -161,6 +162,7 @@ not of the product); the 24 h of the updater's backup (ADR 0029); the ring order
 | 7 | Offline bundle: `release-bundle` job, `install.sh --bundle`, `UPDATE_SOURCE`, `UPDATE_INDEX_URL`, offline verification proven on a disconnected VM, runbook | | planned |
 | 8 | Background data migrations: the job kind, progress on `/admin/updates`, `data_migration_pending` | | planned |
 | 9 | Docs and contracts: runbook *Move an installation*, *Backups per model*, *Rings and windows*; `docs/dataflow.md`; editions and support table in the README and on the website; admission policy in `docs/kubernetes.md` | | planned |
+| 9a | The admission policy of step 9: `docs/kubernetes.md` *Signed images only* (a `ClusterImagePolicy` for the production identity, not yet run on a cluster) | #536 | merged 2026-11-05 |
 
 ## Consequences
 

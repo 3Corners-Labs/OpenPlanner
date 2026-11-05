@@ -81,7 +81,8 @@ yearly review. Commands are for the host, not the application.
 - [ ] Network time synchronisation is on (`timedatectl`).
 - [ ] The data volume, `data/backups` and the snapshots are encrypted at rest.
 - [ ] The host firewall allows inbound 80 and 443 only, and outbound only the hosts of the table
-  in `docs/dataflow.md`.
+  in `docs/dataflow.md`. On Kubernetes, the chart's `networkPolicy.egress` holds that list
+  (`docs/kubernetes.md`, *Outbound traffic*).
 - [ ] `web` is not published on a public interface (runbook *Address and proxy*).
 - [ ] The host updater timer is on and a `cosign verify` of the running digests passed.
 - [ ] The log destination is configured and a test event arrived.
