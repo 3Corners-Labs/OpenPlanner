@@ -30,9 +30,10 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 3Corners Internetworking Services BV and the OpenPlanner contributors"
 SPDX-License-Identifier = "EUPL-1.2"
 
-# The code-quality rubric, the parallel-review pattern and the setup and gate checks of the
-# security review are adapted in our own words from Cursor's thermos plugin
-# (https://github.com/cursor/plugins, MIT); no text is copied. EUPL-1.2 like the rest.
+# The code-quality rubric, the parallel-review pattern and the setup, gate and safeguard checks
+# of the security review are adapted in our own words from the thermos plugin in
+# https://github.com/cursor/plugins (thermos/LICENSE: MIT, Copyright (c) 2026 Cursor; read at
+# commit 2776ddd2); no text is copied. EUPL-1.2 like the rest.
 [[annotations]]
 path = [".claude/skills/code-quality-review/**", ".claude/skills/pre-pr-review/**", ".claude/skills/security-review/**"]
 precedence = "aggregate"

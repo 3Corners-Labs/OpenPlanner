@@ -125,12 +125,12 @@ on the pull request as the early signal and again in the merge queue, where it j
 request in the group by its own commit and reads the labels through the API (ADR 0088); a
 decision cannot reach `main` through the queue without the label, also when it is stacked on an
 ADR branch that was closed. The label counts only when an administrator of the repository set
-it last, and a push by anyone else takes it off again (ADR 0104). The PR template asks the eight review questions from `CLAUDE.md`; answer all of them.
+it last, and a push by anyone else takes it off again (ADR 0104). The PR template lists the review questions; answer all of them.
 New ADRs start from `docs/adr/template.md`, including its *Settings* section (ADR 0042). A new ADR also gets its *Build status* table and its row in `docs/adr-status.md`; the PR that builds a step of an ADR updates both (ADR 0059).
 Every open row of a *Build status* table has an issue `ADR NNNN step S: …` (label `adr:NNNN`, kept by `scripts/adr_issues.py`); a build PR sets its row to `in PR #N` and closes the issue with `Closes #N` in its description, and a weekly report issue `ADR drift <date>` lists what no longer agrees (ADR 0078).
-Run the `pre-pr-review` skill (`.claude/skills/pre-pr-review/`) before opening the PR. It runs
-the `security-review` and `code-quality-review` skills and writes the sections for the
-description.
+Run the `pre-pr-review` skill (`.claude/skills/pre-pr-review/`, see `docs/skills.md`) before
+opening the PR. `tests/test_terminology.py` reads tracked files only: stage new files before you
+run it.
 
 `main` merges through a merge queue (squash): the queue builds `main` with the queued pull
 requests on top and merges only when that build is green, so two pull requests that pass on
