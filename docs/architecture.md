@@ -3,6 +3,8 @@
 How OpenPlanner is built: context, containers, code structure, domain model, runtime flows,
 security and quality assurance. The *why* behind each choice is in the ADRs (`docs/adr/`);
 the stakeholder design is in `docs/HANDOVER.md` (Dutch).
+The application architecture for architects who fit OpenPlanner into a landscape is
+`docs/applicatie-architectuur.md` (Dutch); it refers here for the detailed views.
 
 Status: October 2026, after work package 3 (first demo slice). Parts drawn with a **dashed
 border** are designed but not built yet; the roadmap at the end says when.
@@ -155,6 +157,9 @@ flowchart TB
   on its own, or serves an own certificate from `./certs`; port 80 only redirects. It runs as
   uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
   fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
+  `edge` is dual-stack, so Docker forwards visitors over IPv6 to the proxy with NAT and their
+  own address reaches the rate limits; web listens on IPv4 only, so the proxy reaches it from
+  that one trusted address.
   The worker probes the public address every few hours and shows the certificate's issuer,
   expiry and one finding on *System status*; a failing one is a system event. On the same cycle
   it asks the public address for `/api/v1/instance` with a nonce it stored first, and judges the

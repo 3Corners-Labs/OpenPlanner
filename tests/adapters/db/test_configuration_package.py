@@ -249,3 +249,30 @@ async def test_the_transfer_adapter_round_trips(
     assert (await transfer.inspect(package, PASSPHRASE)).environment == ("OIDC_DISCOVERY_URL",)
     assert transfer.work_dir == _path(database_url).parent / "transfer"
     assert list(transfer.work_dir.glob("*")) == []  # temporary copies are removed
+
+
+async def test_import_rechecks_the_installation_inside_its_own_write_lock(
+    engine: AsyncEngine, database_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Release audit v0.4.0 P2 (#516): a booking committed after the service's first check but
+    # before the write lock must stop the import, or its data attaches to imported IDs.
+    await _source(engine)
+    package = _export(_path(database_url), tmp_path)
+    target_url = migrated_database(tmp_path, monkeypatch, "target")
+    target = create_engine(target_url)
+    try:
+        group = await seed_group(target, slug="oud")
+        async with AsyncSession(target) as session, session.begin():
+            session.add(
+                SlotRow(group_id=group, start=NOW, end=NOW, capacity_snapshot=1, kind="scheduled")
+            )
+
+        with pytest.raises(DomainError) as refused:
+            import_package(_path(target_url), package, PASSPHRASE, TARGET_BOX, tmp_path / "work")
+
+        assert refused.value.code is ErrorCode.CONFIGURATION_INSTALLATION_IN_USE
+        with closing(sqlite3.connect(_path(target_url))) as db:
+            slugs = [r[0] for r in db.execute("SELECT slug FROM groups")]
+        assert slugs == ["oud"]  # nothing was replaced
+    finally:
+        await target.dispose()

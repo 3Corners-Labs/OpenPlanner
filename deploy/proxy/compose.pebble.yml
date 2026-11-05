@@ -1,6 +1,7 @@
 # Test overlay for scripts/check-proxy.sh (ADR 0030, ADR 0064): Let's Encrypt's test CA
-# (Pebble) instead of the real one, on loopback ports, with the app in development mode; the
-# second pass serves an own certificate from the same mounted directory. Never for production.
+# (Pebble) instead of the real one, on loopback ports and the gateway of a probe network (a
+# visitor over IPv6), with the app in development mode; the second pass serves an own
+# certificate from the same mounted directory. Never for production.
 services:
   web:
     environment:
@@ -49,3 +50,6 @@ services:
     ports: !override
       - "127.0.0.1:18080:8080"
       - "127.0.0.1:18443:8443"
+      # A visitor over IPv6 (ipv6_client_check): the gateway of the probe network the script
+      # makes, an address on this machine only.
+      - "[${PROBE6_ADDRESS:?set by scripts/check-proxy.sh}]:18444:8443"

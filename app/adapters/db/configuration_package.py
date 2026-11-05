@@ -339,6 +339,13 @@ def _replace_configuration(db: sqlite3.Connection) -> None:
     """Empty and refill every configuration table from the attached ``package`` schema."""
     db.execute("BEGIN IMMEDIATE")
     try:
+        # The service checked before this lock: a booking, slot or closure committed since then
+        # would otherwise end up attached to imported identifiers (ADR 0089 point 5).
+        if any(
+            db.execute(f"SELECT 1 FROM main.{table} LIMIT 1").fetchone() is not None  # noqa: S608  # nosec B608 - registry names
+            for table in IN_USE_TABLES
+        ):
+            raise DomainError(ErrorCode.CONFIGURATION_INSTALLATION_IN_USE, "package")
         db.execute("PRAGMA defer_foreign_keys = ON")
         tables = sorted(CONFIGURATION_TABLES)
         plans: list[tuple[str, str]] = []

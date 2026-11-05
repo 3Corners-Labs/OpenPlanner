@@ -99,20 +99,31 @@ class TrialCallService:
                 group, booking, TrialState.AVAILABLE, calls_left=view.calls_left, failed=True
             )
         trial = TrialCall(meeting, request.end)
+        replaced: TrialCall | None = None
         async with self._uow.locked() as tx:
             current, _ = await self._load(tx, management_token)
             if trial_state(current, group, now) is not TrialState.AVAILABLE:
                 stored = False
             else:
+                replaced = current.trial
                 await tx.save_trial_call(_id(current), trial)
+                # Pinned to this trial: a cleanup that finds another trial leaves it alone.
                 await tx.add_jobs(
                     _id(current),
-                    [PlannedJob(JobType.DELETE_TRIAL_CALL, trial.expires_at + CLEANUP_DELAY, None)],
+                    [
+                        PlannedJob(
+                            JobType.DELETE_TRIAL_CALL,
+                            trial.expires_at + CLEANUP_DELAY,
+                            trial.expires_at,
+                        )
+                    ],
                 )
                 stored = True
         if not stored:
             await self._video_delete(meeting.id, group)
         else:
+            if replaced is not None:  # its cleanup job no longer finds it: remove it here
+                await self._video_delete(replaced.meeting.id, group)
             await self._integration.record(_id(booking), EventKind.TRIAL_CREATED)
         async with self._uow.read() as tx:
             booking, group = await self._load(tx, management_token)

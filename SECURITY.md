@@ -9,7 +9,10 @@ We acknowledge within 5 working days.
 
 ## Supported versions
 
-Only the latest released version receives security fixes until the first production release.
+Until the first production release (1.0.0) only the latest released version receives security
+fixes. From 1.0.0 the newest minor and the one before it do (ADR 0116); a longer window is an
+extended maintenance line, agreed per installation. Security fixes are never behind a payment:
+they are on `main` and on every supported line, and free for everyone.
 Security fixes are released on the day they are merged (ADR 0052); `/admin/updates` shows the
 running version and commit, and `git tag --contains <commit>` tells which releases hold a fix.
 

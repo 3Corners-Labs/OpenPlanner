@@ -208,6 +208,39 @@ proxy other than the bundled one and web serves no TLS (the unencrypted hop of A
 `FORWARDED_ALLOW_IPS` in `.env`, restart `web`, run `address-check`: the finding returns to
 `ok` and the count stops growing (it starts at zero after the restart).
 
+**Visitors over IPv6 (the bundled proxy).** With an `AAAA` record, a visitor over IPv6 must reach
+the app with their own address too, or all of them share one booking limit and one caller
+pseudonym (ADR 0053). Docker forwards the published ports 80 and 443 to the proxy with NAT, which
+keeps the visitor's address, only for an address family the proxy's network has. For the other
+family its userland proxy (`docker-proxy`) accepts the connection and opens a new one from the
+bridge's own address, and that address is what the proxy puts in `X-Forwarded-For` (seen on a
+dual-stack host on 5 November 2026: every visitor over IPv6 arrived as `172.31.240.8`). So the
+`edge` network in `docker-compose.yml` is dual-stack, with a unique local IPv6 subnet that nothing
+outside the host routes to. Web still sees the proxy at `172.31.240.2` alone: it listens on IPv4
+only, so `FORWARDED_ALLOW_IPS` does not change. On the host:
+
+- **Docker Engine 27 or newer, with `ip6tables` on** (the default from 27). With an older engine,
+  or `"ip6tables": false` in `/etc/docker/daemon.json`, the userland proxy takes over again and
+  every visitor over IPv6 arrives from the bridge's IPv6 address; the installer warns about both.
+- **The network has IPv6:** `docker network inspect openplanner_edge -f '{{.EnableIPv6}}'` says
+  `true`. On a host installed before the network became dual-stack, Compose 2.31 recreates it at
+  the next `up -d`; Compose 2.29 kept the IPv4-only one until
+  `docker compose --env-file .env.update down` and `up -d`. The installer does that itself when
+  it finds one (a few seconds offline).
+- **The forwarding is NAT:** `sudo ip6tables -t nat -S DOCKER | grep 'dport 443'` shows a `DNAT`
+  rule to the proxy's IPv6 address on `edge`. No such rule means the userland proxy does the
+  work and the addresses are lost.
+
+A kernel booted with `ipv6.disable=1` cannot make a dual-stack network at all. There the installer
+writes `OPENPLANNER_EDGE_IPV6=false` to `.env.update` and `edge` stays IPv4 only; such a host is
+not reachable over IPv6 anyway. The other way round, the containers on `edge` (web, the proxy, the
+bundled identity provider) now also have an IPv6 route out through the host, with NAT. They still
+prefer IPv4 for a name that has both (RFC 6724: with only a unique local IPv6 address of their
+own, IPv4 comes first), but an egress firewall on the host must cover IPv6 as well
+(`docs/assurance/hosting.md`, V13.2.5). CI asserts a visitor's IPv6 address on the wire to web
+(`scripts/check-proxy.sh`, `ipv6_client_check`). With a reverse proxy of your own, the same holds
+for its network: it must see and pass on the visitor's address for IPv4 and IPv6 alike.
+
 ### TLS from a proxy on another machine to web (ADR 0091 point 3)
 
 With the bundled proxy the hop to `web` is plain HTTP on the `edge` network of one host, a
@@ -576,7 +609,9 @@ certificate source or domain:
    security options* parts. Expected: 100% on *HTTPS* and *Application security options*; IPv6
    and DNSSEC depend on the host's network and the registrar. A part below 100% is a finding:
    fix it, or write the reason in the record below. Do not paste the report's link into a public
-   place.
+   place. With an `AAAA` record, also check the three points of *Visitors over IPv6* in
+   *Address and proxy* above: internet.nl sees that the site answers over IPv6, not whether the
+   app sees each visitor's own address.
 4. Add a row to the record.
 
 **TLS audit** (date, address, who ran it, score per part, findings and what was done):
@@ -2408,7 +2443,7 @@ caller by pseudonym (`client:<16 hex>`), never by IP address:
 
 | Entry | Means | What to do |
 |---|---|---|
-| *Te veel verzoeken*, `too_many_requests` (`surface:web`, `surface:agent` or `surface:links`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
+| *Te veel verzoeken*, `too_many_requests` (`surface:web`, `surface:widget`, `surface:agent` or `surface:links`) | one caller went over a rate limit | many from one caller: a scanner or bot, block it at the proxy or firewall; from `many` callers: a distributed attack |
 | *Verzoek geweigerd*, `honeypot` | a bot filled in the hidden field of the booking form | nothing for one; a stream: consider Turnstile (feature flag) |
 | *Verzoek geweigerd*, `cross_site` / `origin_mismatch` | a form post from another site (CSRF attempt), or a proxy that rewrites `Origin` | check the proxy if it comes from all callers |
 | *Inloggen*, outcome denied, `invalid_state` / `invalid_token` / `nonce_mismatch` | a failed admin login | one: an expired login tab; many from one caller: an attack on the login |
