@@ -1,9 +1,9 @@
 # Claude Code skills per work package
 
-Which skill to use when. "Repo" means `.claude/skills/`; the others come from gstack or the
-engineering plugin. Claude Code names the skill it is about to use. Skills that merge or deploy
-are excluded: Claude Code merges only on an explicit instruction of the product owner, with
-green CI, and never through a skill (ADR 0012).
+Which skill to use when. "Repo" means `.claude/skills/`; the others come from gstack, the
+engineering plugin or Claude Code itself. Claude Code names the skill it is about to use. Skills
+that merge or deploy are excluded: Claude Code merges only on an explicit instruction of the
+product owner, with green CI, and never through a skill (ADR 0012).
 
 ## Every work package
 
@@ -13,9 +13,19 @@ green CI, and never through a skill (ADR 0012).
 | Before coding | `/plan-eng-review` | Check the design against the architecture rules before writing code |
 | While coding | `/freeze app/<module>` (optional) | Keep edits inside the module being built |
 | Bug or failing test | `/investigate` | Find the root cause before fixing |
-| Before the PR | `security-review` (repo), then `/review` | Five review questions and abuse cases; then a pre-landing diff review |
+| Before the PR | `pre-pr-review` (repo) | Runs `security-review` and `code-quality-review` in parallel and `/code-review` for correctness; one set of sections for the PR description, with the eight review questions, the abuse cases and the quality verdict |
 | End | `/context-save` | Hand over to the next session |
 | Release of a minor or major version | `/codex review` via `make release-audit` | Independent review of everything since the last release by a second model, pasted into the release PR (ADR 0078). Since ADR 0079 the `audit` job of the `release` workflow runs it and writes the section; the laptop form is the fallback (`docs/runbook.md`, *Releasing a version*) |
+
+## Repo skills
+
+One skill per review concern, and one skill that runs them together.
+
+| Skill | What it does |
+|---|---|
+| `pre-pr-review` | Runs the two skills below in parallel subagents and `/code-review` (level `high`) in the main thread, checks every finding against the code, deduplicates, and writes the PR sections |
+| `security-review` | The eight review questions of the PR template, the PII, authorisation and configurability rules, the change's impact on developer setup and feature gates, and the abuse cases |
+| `code-quality-review` | Structure and maintainability against the architecture rules: missed simplification, one home per concern, logic in its layer, ad-hoc branching, files past 1,000 lines, types and boundaries |
 
 ## Per work package
 
@@ -34,3 +44,16 @@ green CI, and never through a skill (ADR 0012).
 
 - `/land-and-deploy`, `/ship`: they merge or push past the PR. We stop at an opened PR.
 - `/design-consultation`, `/design-shotgun`: the design system is fixed (NLDS, HANDOVER B12).
+
+## Evaluated, not adopted (2026-11-05)
+
+- **ponytail** (an always-on "smallest change" mode): its rules contradict configurable by
+  default (ADR 0042), the ports rule and the docstring rule, and its hooks inject them into
+  every session and every subagent.
+- **pstack** (Cursor's engineering-method pack): a second way of working next to gstack. Its
+  shipping playbooks merge pull requests and its comment reviewer removes docstrings. Only its
+  `create-verification-skill` generator is worth running, once, to write a repo verify skill.
+- **thermo-nuclear** (Cursor's thermos plugin): its code-quality rubric and its parallel-review
+  pattern live on, adapted, in `code-quality-review` and `pre-pr-review`. Its deep audit
+  overlaps `security-review` and `/code-review`; its checks on developer setup and gate leaks
+  moved into `security-review`.

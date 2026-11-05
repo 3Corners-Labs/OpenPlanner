@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: Run before opening any PR in this repo. Answers the seven review questions, walks the abuse cases, and checks the PII, authorisation and configurability rules from CLAUDE.md against the diff. Use when asked to "review this PR", "security check", or before any `gh pr create`.
+description: Security review of the current branch against main. Answers the eight review questions, checks the PII, authorisation and configurability rules from CLAUDE.md, the change's impact on developer setup and feature gates, and walks the abuse cases. `pre-pr-review` runs it before every PR; use it on its own for a "security check" or "security review".
 ---
 
 # Security review (repo skill)
@@ -9,21 +9,27 @@ Review the diff of the current branch against `main` (`git diff main...HEAD`, pl
 changes). Read every changed file in full, not only the hunks. Report findings; do not fix them
 in this step.
 
-## 1. Seven review questions
+Trace a finding end to end before you report it. When the other side of it (the caller, the
+template, the job, the adapter) is in the repository, read it instead of writing "this is fine if
+X handles it". Rate severity honestly: an inflated high costs the review its trust.
+
+## 1. Eight review questions
 
 Answer each with file:line references. "None" is a valid answer only after checking.
 
-1. Which endpoint or job is new or changed, and is `require_scope` on it? Public endpoints
-   (`/g/...`, `/api/v1/...`, `/b/{token}`, health) are exempt from `require_scope` but must be
-   rate-limited where `CLAUDE.md` says so.
+1. Which endpoint or job is new or changed, and does every admin route depend on exactly one
+   `RequirePermission(Permission.…)` (the `require_scope` of CLAUDE.md)? Public endpoints
+   (`/g/...`, `/api/v1/...`, `/b/{token}`, health) are exempt from it but must be rate-limited
+   where `CLAUDE.md` says so.
 2. Which input comes from outside (HTTP body, query, path, headers, webhook, IdP claims, env),
    and where is it validated (Pydantic model, domain check)?
-3. Can PII (`name, email, phone, note, guest_join_url, host_join_url`) reach a log call,
-   exception message, URL, job payload, audit event or outbound payload? Outbound to WxCC may
-   carry only first name and host join URL.
+3. Can PII (the fields of `DATA_FIELDS` in `app/domain/privacy.py`) or a provider link from
+   `DERIVED_FIELDS` reach a log call, exception message, URL, job payload, audit event or
+   outbound payload? An outbound payload to the contact center carries only what CLAUDE.md's
+   privacy rules list, and `app/adapters/wxcc.py` is the one place that builds it.
 4. Which test would fail if this change were wrong? Name it. If none, that is a finding.
-5. Is a dependency added? Check license (MIT/BSD/Apache-2.0/PSF, else ADR), maintenance, and
-   that `uv.lock` changed accordingly.
+5. Is a dependency added? Check license (MIT/BSD/Apache-2.0/PSF, else ADR), maintenance, that
+   `uv.lock` changed accordingly and that `docs/dependencies.md` records the review.
 6. Which settings does this add or change, and which tunable value stays hard-coded? See
    section 3 for the check; answer with a table: key, class A–D, default, bounds, permission.
 
@@ -39,6 +45,9 @@ Answer each with file:line references. "None" is a valid answer only after check
      is a finding (medium); cross-object pages are lists that link to the object's tab;
    - a `return` key or legacy redirect resolves only through the register, never to a URL taken
      from the request (high if it does).
+8. Does this change name a client or a sector anywhere: code, tests, docs, texts, commit
+   messages or the branch name (ADR 0115)? `tests/test_terminology.py` reads tracked files
+   only, so stage new files before you run it.
 
 ## 2. Rule checks
 
@@ -78,7 +87,22 @@ Scan the diff for tunable values and classify each one:
   sizes, PII field names, crypto parameters, the 300 s webhook window and protocol constants.
   The PR still names them under question 6.
 
-## 4. Abuse cases
+## 4. Change impact
+
+- **Developer and host setup.** A new, renamed or removed environment variable, a changed port or
+  service in `docker-compose.yml`, or a new step someone must take to run or deploy (a script, a
+  manual install, a new secret): check that `.env.example`, the installer, `docs/runbook.md` and
+  the generated `docs/settings.md` follow, and that the PR says what changes for a running
+  deployment (finding: medium). A dependency added through `uv` is not a setup change.
+- **Gate leaks.** Behaviour meant to sit behind a permission, an entitlement (ADR 0049), a
+  setting or kill switch, a superuser-only mode or a test-only path must not be reachable without
+  it. Name the gate for each new route, job and template branch (finding: high when gated
+  behaviour leaks).
+- **Intended breakage.** A change that deliberately removes a safeguard or changes behaviour is
+  not a finding when its scope is tight and the PR says so. Report it anyway when the PR seems
+  unaware of the full effect.
+
+## 5. Abuse cases
 
 Walk `docs/threat-model.md` for every touched flow. For each abuse case (slot exhaustion by
 bots, token guessing, rescheduling into another group's slot, PII through error messages, and
@@ -91,9 +115,10 @@ A Markdown section ready to paste into the PR description:
 
 ```
 ### Security review
-**Q1–Q7:** ...
+**Q1–Q8:** ...
 **Settings:** table, or "none" after checking
 **Rule checks:** pass / findings
+**Change impact:** setup, gates, intended breakage, or "none" after checking
 **Abuse cases:** ...
 **Findings:** numbered, with severity (high/medium/low) and file:line
 ```
