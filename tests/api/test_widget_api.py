@@ -20,6 +20,7 @@ from app.adapters.db.models import (
     OrganisationRow,
     OrganisationTextRow,
 )
+from app.api.widget_schemas import MAX_BODY_BYTES
 from app.config import Settings
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
@@ -198,7 +199,9 @@ async def test_the_honeypot_and_malformed_bodies_are_refused(site: httpx.AsyncCl
     extra = await _book(site, ssn="123456789")
     start = await _book(site, start="vrijdag")
     raw = await site.post(f"{BASE}/bookings", content=b"{not json", headers={"origin": SITE})
-    large = await site.post(f"{BASE}/bookings", content=b" " * 5000, headers={"origin": SITE})
+    large = await site.post(
+        f"{BASE}/bookings", content=b" " * (MAX_BODY_BYTES + 1), headers={"origin": SITE}
+    )
 
     assert honeypot.status_code == 400
     assert (extra.status_code, start.status_code, raw.status_code) == (422, 422, 422)
@@ -350,3 +353,19 @@ async def test_the_group_introduction_uses_the_organisations_own_text(
         body = (await client.get(f"{BASE}/?lang=en", headers={"origin": SITE})).json()
 
     assert body["intro"] == "Pick a time (30)."
+
+
+async def test_the_body_budget_fits_the_longest_form_the_schema_accepts(
+    site: httpx.AsyncClient,
+) -> None:
+    # Release audit v0.4.0 P2 (#518): four 1,000-character answers plus contact details are
+    # more than the old 4,096 bytes and must not be refused for their size.
+    answers = {f"vraag_{n}": "x" * 1000 for n in range(4)}
+    fifteen = {f"vraag_{n}": "é" * 1000 for n in range(15)}
+
+    four = await _book(site, answers=answers)
+    longest = await _book(site, answers=fifteen)
+
+    assert four.status_code != 413
+    assert longest.status_code != 413
+    assert MAX_BODY_BYTES > 4096

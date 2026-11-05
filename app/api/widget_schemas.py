@@ -15,6 +15,15 @@ MAX_KEY_LENGTH = 40
 MAX_ANSWER_LENGTH = 1001
 """One more than a long text allows, so the domain refuses it rather than this cut it short."""
 
+_FIXED_CHARS = 40 + 6 * 300
+"""The start, and the six contact strings of ``WidgetBookingRequest`` at their longest."""
+_ANSWER_CHARS = MAX_ANSWERS * (MAX_KEY_LENGTH + MAX_ANSWER_LENGTH)
+"""All answers at their longest, keys included."""
+MAX_BODY_BYTES = (_FIXED_CHARS + _ANSWER_CHARS) * 4 + 2048
+"""The largest booking body read before parsing: every string at its limit, UTF-8 at four bytes
+a character (what a browser sends), and 2 KiB for quotes, keys and braces. It follows the
+model's limits, so a form the schema accepts is never refused for its size (about 72 KB)."""
+
 
 class WidgetError(BaseModel):
     """A refusal: a stable code and, for a contact input, the field it concerns."""

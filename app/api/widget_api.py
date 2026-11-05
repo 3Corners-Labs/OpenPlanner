@@ -45,6 +45,7 @@ from app.api.labels import slot_label
 from app.api.maintenance import WidgetMaintenance, retry_after
 from app.api.slot_picker import PickerView, picker, slot_value
 from app.api.widget_schemas import (
+    MAX_BODY_BYTES,
     WidgetAvailability,
     WidgetBooking,
     WidgetBookingRequest,
@@ -78,8 +79,6 @@ from app.web.slot_values import parse_start
 log = structlog.get_logger()
 
 PREFIX = "/api/v1/widget"
-MAX_BODY_BYTES = 4096
-"""A booking is four short strings; anything larger is refused before parsing."""
 
 PREFLIGHT_MAX_AGE = "600"
 
