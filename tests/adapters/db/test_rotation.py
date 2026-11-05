@@ -67,3 +67,42 @@ async def test_only_open_bookings_report_their_link(engine: AsyncEngine) -> None
     credentials = await open_booking_credentials(engine, NOW)
 
     assert [c.salt for c in credentials] == ["open"]
+
+
+async def test_held_bookings_report_their_link_after_their_slot_has_passed(
+    engine: AsyncEngine,
+) -> None:
+    # Release audit v0.4.0 P2 (#508): a booking on hold under a closure and one awaiting a new
+    # time keep receiving messages with a link after the original slot is over (ADR 0024, 0044).
+    group = await seed_group(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        past = SlotRow(
+            group_id=group,
+            start=NOW - timedelta(days=2),
+            end=NOW - timedelta(days=2) + timedelta(hours=1),
+            capacity_snapshot=3,
+        )
+        session.add(past)
+        await session.flush()
+        for status, salt in (
+            ("suspended", "held"),
+            ("awaiting_rebook", "rebook"),
+            ("confirmed", "over"),
+            ("cancelled", "cancelled"),
+        ):
+            session.add(
+                BookingRow(
+                    slot_id=past.id,
+                    group_id=group,
+                    status=status,
+                    locale="nl",
+                    management_token_hash=hash_token(derive_token(OLD, salt)),
+                    management_token_salt=salt,
+                    public_ref=f"ref-{salt}",
+                    created_at=NOW,
+                )
+            )
+
+    credentials = await open_booking_credentials(engine, NOW)
+
+    assert sorted(c.salt for c in credentials) == ["held", "rebook"]
