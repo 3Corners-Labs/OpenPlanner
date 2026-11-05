@@ -13,9 +13,9 @@ this one fixes the scope, runs them, and merges what they find.
 This is the one definition of both. `security-review` and `code-quality-review` use it when they
 run on their own.
 
-- **Read-only.** The review changes no file, no commit or branch, and no staged content. `git
-  fetch` is allowed; check the tree with `git --no-optional-locks status`, which leaves the index
-  alone. Fixing comes after the review (section 4).
+- **Read-only.** The review changes no file, no commit or branch, and no staged content.
+  `git fetch` is allowed; check the tree with `git --no-optional-locks status`, which leaves the
+  index alone. Fixing comes after the review (section 4).
 - Run `git fetch origin`, then take `origin/main...HEAD`: the branch since it left `main`. Never
   the local `main`; worktrees share it and it goes stale.
 - Add the working tree: `git diff HEAD` for uncommitted changes, and
