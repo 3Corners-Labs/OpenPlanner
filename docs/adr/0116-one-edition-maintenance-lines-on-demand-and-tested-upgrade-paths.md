@@ -1,6 +1,9 @@
 # 0116. One edition, maintenance lines on demand, and tested upgrade paths
 
-Status: proposed (2026-11-05), requested by the product owner. Not built. Amends ADR 0052
+Status: accepted (2026-11-05, the product owner's approval of the proposal in the conversation,
+`po:approved` on #519; the three decisions of the research note §10 are taken as recommended:
+window `N-1` with public patch releases, the line mechanics now with one dry run, one edition
+with services sold). Not built. Amends ADR 0052
 (point 6: a support window and maintenance lines; point 2: a migration raises MINOR), ADR 0108
 (point 1: every `vX.Y.Z` release is public), ADR 0067 (point 1: auto-apply in production
 inside a window) and ADR 0114 (point 11: the channel level `minor` is withdrawn in favour of a
