@@ -374,3 +374,20 @@ async def test_deleting_a_trial_meeting_that_is_not_there_does_nothing(setup: Se
 
     assert setup.video.deleted == []
     assert setup.events(bid) == []
+
+
+async def test_a_cleanup_bound_to_an_older_trial_leaves_the_newer_one(setup: Setup) -> None:
+    # Release audit v0.4.0 P2 (#500): the job reloads the booking, which now holds a newer trial.
+    from app.domain.booking import MeetingRef, TrialCall
+
+    bid = await setup.booking()
+    async with setup.uow.locked() as tx:
+        await tx.save_trial_call(
+            bid, TrialCall(MeetingRef("trial-2", "https://x/2"), NOW + timedelta(minutes=40))
+        )
+
+    older = NOW + timedelta(minutes=30)
+    await setup.runner(FakeQueue([job(bid, JobType.DELETE_TRIAL_CALL, pinned=older)])).run_due()
+
+    assert setup.video.deleted == []
+    assert setup.uow.state.bookings[bid].trial is not None
