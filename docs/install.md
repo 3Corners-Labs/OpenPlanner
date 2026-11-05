@@ -21,7 +21,7 @@ wherever the checkout is, and writes that path into the updater's configuration.
 | `~/openplanner/secrets/secrets.env` | installer (or `app.cli init`) | the bootstrap keys `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`, `SESSION_SECRET` (ADR 0042 §9); back it up apart from the database | 600, directory 700 |
 | `~/openplanner/secrets/config.env` | installer, with `--configuration` | the login (`OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_SCOPES`) from a configuration package (ADR 0089); Compose reads it before `.env`, so a value in `.env` wins | 600 |
 | `~/openplanner/proxy.env` | installer (with the HTTPS proxy) | `TLS_DOMAIN`, `ACME_EMAIL` (or the own certificate's files) for the HTTPS proxy, no secrets | 600 |
-| `~/openplanner/.env.update` | installer, host updater | `OPENPLANNER_IMAGE` and, with the HTTPS proxy, `OPENPLANNER_PROXY_IMAGE` (pinned digests), `COMPOSE_PROFILES`, `OPENPLANNER_TLS`, `OPENPLANNER_MODE` | 644 |
+| `~/openplanner/.env.update` | installer, host updater | `OPENPLANNER_IMAGE` and, with the HTTPS proxy, `OPENPLANNER_PROXY_IMAGE` (pinned digests), `COMPOSE_PROFILES`, `OPENPLANNER_TLS`, `OPENPLANNER_MODE`; `OPENPLANNER_EDGE_IPV6=false` only on a kernel without IPv6 | 644 |
 | `~/openplanner/.env.bak.<time>` | installer, when it repaired `.env` | the `.env` as it was before | 600 |
 | `~/openplanner/docker-compose.override.yml` | you, optional | host-specific additions, such as a published port on a lab host | |
 | `/usr/local/sbin/openplanner-update` | installer | the host updater (`scripts/updater/openplanner-update.sh`) | 755 |
@@ -94,6 +94,9 @@ remembered in `.env.update` (`OPENPLANNER_IDP`).
   `read:packages`.
 - Production only: a DNS name (`A`/`AAAA`) pointing at the host, ports 80 and 443 open from the
   internet, and a `CAA` record (if any) that allows `letsencrypt.org`.
+- With an `AAAA` record: Docker Engine 27 or newer with `ip6tables` on (its default), so that
+  visitors over IPv6 keep their address; the script warns otherwise (runbook, *Visitors over
+  IPv6*). The host needs no IPv6 address for the rest; a kernel without IPv6 is fine too.
 
 Everything else the script installs or brings up to date:
 
@@ -259,6 +262,8 @@ before `.env`, so `.env` wins; or remove `config.env` and answer the questions o
 | updater, units, drop-in or `updater.env` missing or changed | installs them again from the checkout |
 | an HTTPS proxy running where `--no-tls` was chosen (restarts for ever without `proxy.env`) | removes it |
 | the HTTPS proxy runs but its image is not pinned (installed before ADR 0064 step 2, when the host built it) | pulls and verifies the proxy image at the version of the pinned application image and pins it; the proxy restarts on the released image |
+| the `edge` network has no IPv6 (made before it became dual-stack; Compose 2.29 kept it, 2.31 recreates it itself), or has IPv6 on a kernel without it | `docker compose down` (volumes stay), then the start makes it again; a few seconds offline (runbook, *Visitors over IPv6*) |
+| a kernel booted with `ipv6.disable=1` | writes `OPENPLANNER_EDGE_IPV6=false` to `.env.update`, so `edge` stays IPv4 only; a later run on a kernel with IPv6 drops it again |
 | `PUBLIC_BASE_URL` or the OIDC URL on `http` in production, a missing OIDC client secret, `ENVIRONMENT` not matching the mode | stops with the list; nothing is pulled or started. The login is checked as Compose sees it: `.env`, else `secrets/config.env`, so a `.env` without `OIDC_*` is in order when `config.env` holds them |
 | a release that does not pass `cosign verify` (either image) | stops; the running version stays |
 
@@ -311,6 +316,8 @@ git fetch --depth 1 origin tag v0.3.0 && git checkout -f v0.3.0
 | `run as the operator account, not as root` | run it without `sudo`; it calls `sudo` itself |
 | `cannot reach Docker as <user>` / `now in the docker group` | log out and in again, run it again |
 | `Docker Compose ... is too old` | run it again without `--no-packages`, or upgrade the Compose plugin |
+| warning: `Docker Engine ... forwards visitors over IPv6 without NAT` | the engine is older than 27: run it again with `--upgrade-docker` at a quiet moment. Until then every visitor over IPv6 shares one address in the rate limits (runbook, *Visitors over IPv6*) |
+| warning: `daemon.json switches ip6tables off` | remove `"ip6tables": false` from `/etc/docker/daemon.json` and restart Docker (`sudo systemctl restart docker`, which restarts every container on this host) |
 | `cannot find the latest release` | pass `--version`, or put a token in `UPDATE_CHECK_TOKEN` (`.env`) for a private repository |
 | `cannot pull ghcr.io/...` | `docker login ghcr.io -u <github user>` with a `read:packages` token, run it again (the updater gets a copy of this login) |
 | the portal reports *signature invalid* for a release that CI signed (`cosign verify` on the host says `no signatures found`) | the host's cosign is older than the one CI signs with (cosign 3 writes OCI bundles that cosign 2 cannot read; this hit docker01 at v0.3.0). Run the installer first, which upgrades cosign: `git fetch --tags && git checkout vX.Y.Z && ./scripts/install.sh`, then "Update now" again |

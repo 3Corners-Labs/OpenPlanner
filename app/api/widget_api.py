@@ -23,6 +23,9 @@ origin. ``WidgetRoute`` wraps every group route:
 - Allowed origins get ``Access-Control-Allow-Origin`` on every answer, errors included,
   never ``*`` and never with credentials: the widget sends no cookies.
 - Errors are JSON codes (``WidgetError``); they never echo input.
+- A rate-limit hit gets ``429 rate_limited`` from this wrapper, not from the HTML handler, so
+  the wrapper also records it as the security event ``request.rate_limited`` (``surface:widget``,
+  ADR 0053).
 - During maintenance (ADR 0038) the group routes answer ``503 maintenance`` with
   ``Retry-After``, by the rule in ``app.api.maintenance``; ``/texts`` and the preflight stay open.
 """
@@ -45,6 +48,7 @@ from app.api.labels import slot_label
 from app.api.maintenance import WidgetMaintenance, retry_after
 from app.api.slot_picker import PickerView, picker, slot_value
 from app.api.widget_schemas import (
+    MAX_BODY_BYTES,
     WidgetAvailability,
     WidgetBooking,
     WidgetBookingRequest,
@@ -65,21 +69,24 @@ from app.domain.embedding_service import EmbeddingService, WidgetAccess
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import UNKNOWN_FIELD
 from app.domain.scheduling import Group
-from app.domain.security_log import DATABASE_ERROR, DATABASE_FAILED
+from app.domain.security_log import (
+    DATABASE_ERROR,
+    DATABASE_FAILED,
+    RATE_LIMITED,
+    TOO_MANY_REQUESTS,
+)
 from app.domain.services import BookingService, ContactInput
 from app.web.closure_labels import closure_view
 from app.web.errors import status_for
 from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow_group_from_path
 from app.web.protection import booking_limit, limiter, read_limit
-from app.web.security_events import report_failure
+from app.web.security_events import report, report_failure
 from app.web.slot_values import parse_start
 
 log = structlog.get_logger()
 
 PREFIX = "/api/v1/widget"
-MAX_BODY_BYTES = 4096
-"""A booking is four short strings; anything larger is refused before parsing."""
 
 PREFLIGHT_MAX_AGE = "600"
 
@@ -243,6 +250,7 @@ class WidgetRoute(APIRoute):
                 response = problem("database_unavailable", 503)
                 response.headers["retry-after"] = "60"
             except RateLimitExceeded:
+                await report(request, RATE_LIMITED, TOO_MANY_REQUESTS, detail="surface:widget")
                 response = problem("rate_limited", 429)
                 response.headers["retry-after"] = "60"
             except WidgetMaintenance:

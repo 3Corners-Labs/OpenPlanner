@@ -83,6 +83,8 @@ class Host:
             "HEALTH_TIMEOUT": "30",
             "FAKE_HOST_DIR": str(self.fakes),
             "FAKE_PIN_FILE": str(self.file(".env.update")),
+            # A kernel with IPv6, whatever the machine that runs the tests has.
+            "KERNEL_IPV6": str(self.root / "proc-sys-net-ipv6"),
             **settings,
         }
         return subprocess.run(  # noqa: S603 - fixed argv, no shell
@@ -120,7 +122,7 @@ class Host:
 @pytest.fixture
 def host(tmp_path: Path) -> Host:
     host = Host(tmp_path)
-    for directory in ("bin", "fakes", "staged", "home/operator/.docker"):
+    for directory in ("bin", "fakes", "staged", "home/operator/.docker", "proc-sys-net-ipv6"):
         (tmp_path / directory).mkdir(parents=True)
     shutil.copytree(REPO / "scripts" / "updater", host.checkout / "scripts" / "updater")
     shutil.copy(REPO / "scripts" / "install.sh", host.checkout / "scripts" / "install.sh")
@@ -183,6 +185,79 @@ def test_an_old_compose_is_refused(host: Host) -> None:
 
     assert result.returncode == 1
     assert "Docker Compose 2.20.2 is too old" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("engine", "daemon", "warning"),
+    [
+        ("26.1.3", None, "Docker Engine 26.1.3 forwards visitors over IPv6 without NAT"),
+        ("29.1.3", '{"mtu": 1450, "ip6tables" : false}\n', "daemon.json switches ip6tables off"),
+        ("29.1.3", '{"mtu": 1450}\n', None),
+        ("27.0.1", None, None),
+    ],
+)
+def test_a_docker_that_hides_the_address_of_visitors_over_ipv6_is_named(
+    host: Host, engine: str, daemon: str | None, warning: str | None
+) -> None:
+    """Without NAT for IPv6 the host works, but visitors over IPv6 share one rate limit."""
+    host.given("engine-version", f"{engine}\n")
+    if daemon is not None:
+        (host.staged / "etc/docker").mkdir(parents=True)
+        (host.staged / "etc/docker/daemon.json").write_text(daemon)
+
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    if warning:
+        assert warning in result.stderr
+        assert "share one address in the rate limits" in result.stderr
+    else:
+        assert "over IPv6" not in result.stderr
+
+
+def test_a_kernel_without_ipv6_keeps_the_edge_network_ipv4_only(host: Host) -> None:
+    """A kernel booted with ipv6.disable=1 cannot make the dual-stack edge network."""
+    host.given("edge-ipv6", "false\n")
+    host.given("engine-version", "26.1.3\n")  # no IPv6 visitors to warn about
+
+    result = host.run(
+        "--mode",
+        "production",
+        "--non-interactive",
+        KERNEL_IPV6=str(host.root / "no-such-directory"),
+        **PRODUCTION,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert host.settings(".env.update")["OPENPLANNER_EDGE_IPV6"] == "false"
+    assert "the kernel has no IPv6" in result.stdout
+    assert "over IPv6" not in result.stderr
+    assert not any(command.endswith(" down") for command in host.commands())
+
+
+def test_an_edge_network_from_before_ipv6_is_recreated_before_the_start(host: Host) -> None:
+    """Compose 2.29 kept a network whose settings changed (2.31 recreates it): the script does."""
+    host.given("edge-ipv6", "false\n")
+
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert "OPENPLANNER_EDGE_IPV6" not in host.settings(".env.update")
+    commands = host.commands()
+    down = [i for i, command in enumerate(commands) if command.endswith(" down")]
+    started = commands.index(next(c for c in commands if c.endswith(" up -d")))
+    assert len(down) == 1
+    assert down[0] < started
+    assert "recreating it" in result.stdout
+    assert not any(" down -v" in command for command in commands)  # the volumes stay
+
+
+def test_an_edge_network_that_fits_the_host_is_left_alone(host: Host) -> None:
+    result = host.run("--mode", "production", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("network inspect -f {{.EnableIPv6}} openplanner_edge")
+    assert not any(command.endswith(" down") for command in host.commands())
 
 
 def test_production_install_from_scratch(host: Host) -> None:

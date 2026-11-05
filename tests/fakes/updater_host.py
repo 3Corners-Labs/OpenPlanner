@@ -13,6 +13,9 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
   ``maintenance``;
   ``pull-proxy`` and ``cosign-proxy`` fail only for the proxy image, ADR 0064).
 - ``compose-version``: what ``docker compose version --short`` prints (default 2.40.3).
+- ``engine-version``: what ``docker version --format {{.Server.Version}}`` prints (default 29.1.3).
+- ``edge-ipv6``: whether the project's ``edge`` network has IPv6, as ``docker network inspect``
+  says (default ``true``).
 - ``latest``: the tag of the latest GitHub release (default none: the API call fails).
 - ``images``: the images on the host, one ``repository:tag`` per line, or ``repository@digest``
   for one without a tag; ``docker image ls`` lists them, ``docker rmi`` only records the call.
@@ -37,6 +40,8 @@ import time
 from pathlib import Path
 
 WORKER = "worker-container-id"
+WEB = "web-container-id"
+PROJECT = "openplanner"
 CONFIG_ENV = (
     "OIDC_DISCOVERY_URL=https://idp.example.nl/.well-known/openid-configuration\n"
     "OIDC_CLIENT_ID=openplanner-admin\n"
@@ -125,6 +130,8 @@ def _compose(args: list[str]) -> int:
         command = command[command.index("web") + 1 :]  # the options before the service
     if command == ["ps", "-q", "worker"]:
         print(WORKER)
+    elif command == ["ps", "-a", "-q", "web"]:
+        print(WEB)
     elif command == ["ps", "-q", "proxy"]:
         print(PROXY)
     elif command[:2] == ["alembic", "current"]:
@@ -163,6 +170,13 @@ def _docker(args: list[str]) -> int:
         return _compose(args)
     elif args[0] == "info":
         return _failing("docker-info")
+    elif args[0] == "version":
+        print(next(iter(_lines("engine-version")), "29.1.3"))
+    elif args[:2] == ["network", "inspect"] and args[-1] == f"{PROJECT}_edge":
+        print(next(iter(_lines("edge-ipv6")), "true"))
+    elif args[0] == "inspect" and any("com.docker.compose.project" in arg for arg in args):
+        print(PROJECT)
+        return 0
     if args[0] == "pull":
         return _failing("pull") or (_is_proxy(args[-1]) and _failing("pull-proxy"))
     if args[0] == "rmi":

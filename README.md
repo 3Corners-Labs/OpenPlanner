@@ -156,6 +156,9 @@ make check
 
 - `docs/architecture.md` — architecture with diagrams: context, containers, layers, domain
   model, runtime flows, security, quality assurance.
+- `docs/applicatie-architectuur.md` — the application architecture in Dutch, for architects who
+  fit OpenPlanner into their landscape: positioning, building blocks, extension points,
+  controls, questions to the environment (a stakeholder document, like `docs/HANDOVER.md`).
 - `docs/manual/` — the admin manual, screen by screen (also shown in the portal).
 - `docs/widget.md` — embedding the calendar on your website, and its styling tokens.
 - `docs/logging.md` — log levels, the record, the trace points and where the lines go.
