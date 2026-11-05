@@ -448,7 +448,7 @@ LAYERS = (
         ),
         5,
         36,
-        note="<b>Tests</b><br>Elke poort heeft een fake in de tests, meestal in tests/fakes/.",
+        note="<b>Tests</b><br>Elke poort heeft een fake in tests/fakes/.",
         arrow_in="implementeert",
         is_ports=True,
     ),
@@ -740,5 +740,5 @@ SHARED_PARTS = (
 
 PLATE3_FOOTNOTE = (
     "Fouten van buiten worden korte codes (IntegrationError) met hooguit de reden van de "
-    "provider; antwoordbodies komen nooit in logs. Elke poort heeft een fake in de tests."
+    "provider; antwoordbodies komen nooit in logs. Elke poort heeft een fake in tests/fakes/."
 )
