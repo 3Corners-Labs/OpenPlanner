@@ -26,12 +26,18 @@ lint:
 	$(UV) ruff format --check .
 	$(UV) ruff check .
 
-# The host's shell scripts (the root-run updater among them) and the git hooks. The pinned
-# shellcheck from PyPI, so CI and every laptop run the same version without Docker.
+# The host's shell scripts (the root-run updater among them), the git hooks and the shell
+# scripts that repo skills ship (.claude/skills/<skill>/scripts/*.sh). The shell expands the
+# skill pattern, so a file name stays one argument and is never read as code (make's wildcard
+# would paste it into the command as text); `set --` drops the pattern only when nothing
+# matches, so a dangling link still reaches shellcheck and fails. tests/test_makefile.py holds
+# the target to this. The pinned shellcheck from PyPI, so CI and every laptop run the same
+# version without Docker.
 # renovate: datasource=pypi depName=shellcheck-py
 SHELLCHECK_VERSION := 0.11.0.1
 shellcheck:
-	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh deploy/proxy/*.sh .githooks/*
+	set -- .claude/skills/*/scripts/*.sh; [ -e "$$1" ] || [ -L "$$1" ] || set --; \
+	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh deploy/proxy/*.sh .githooks/* "$$@"
 
 type:
 	$(UV) mypy
