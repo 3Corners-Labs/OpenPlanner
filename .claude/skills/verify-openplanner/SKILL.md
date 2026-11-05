@@ -74,6 +74,12 @@ Then it:
 
 Ready means `doctor: usable` at the end of `up`, not merely a process that answers.
 
+On a machine that is far over its CPU count (a load average in the hundreds, for example while
+several worktrees run `make check`), the migrations take many minutes, web's own health check
+(5 seconds) times out, and `up` stops with `container openplanner-verify-web-1 is unhealthy`.
+That is the machine, not the change: run `down`, wait until `uptime` shows a normal load, then
+`up` again. Do not stop other sessions' processes to make room.
+
 | Service | Address | Change with |
 |---|---|---|
 | web (participant pages, admin portal) | http://127.0.0.1:8010 | `VERIFY_WEB_PORT` |

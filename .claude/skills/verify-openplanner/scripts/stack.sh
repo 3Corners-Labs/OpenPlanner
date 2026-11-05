@@ -296,7 +296,9 @@ doctor_checks() {
   esac
 
   got=$(get "http://127.0.0.1:$WEB_PORT/api/v1/instance" 2>/dev/null | sed -n 's/.*"instance_id":"\([^"]*\)".*/\1/p' || true)
-  if [ -n "$got" ] && [ "$got" = "$(state INSTANCE_ID)" ]; then
+  if [ -z "$(state INSTANCE_ID)" ]; then
+    bad instance "no installation id was recorded: up did not finish; run down, then up"
+  elif [ -n "$got" ] && [ "$got" = "$(state INSTANCE_ID)" ]; then
     pass instance "http://127.0.0.1:$WEB_PORT answers the installation recorded at up ($got)"
   else
     bad instance "http://127.0.0.1:$WEB_PORT answers installation '${got:-none}', expected '$(state INSTANCE_ID)': not this run's stack"
