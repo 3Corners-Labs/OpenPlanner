@@ -848,7 +848,7 @@ flowchart LR
 ```
 
 Per work package the plan is reviewed (`/plan-eng-review`) and the diff is checked with the
-repository's `security-review` skill before the PR (`docs/skills.md`).
+repository's `pre-pr-review` skill before the PR (`docs/skills.md`).
 
 ## 11. Decisions
 
