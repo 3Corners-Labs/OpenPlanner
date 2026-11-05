@@ -8,6 +8,7 @@ provider's reason, ADR 0065 style), never the body and never a stack trace.
 """
 
 import ssl
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -30,28 +31,38 @@ class HttpxInstanceProbe:
     Args:
         timeout: Seconds for the whole request.
         transport: A transport to use instead of the network (tests).
+        transport_factory: Builds the transport for each probe, or ``None`` for the default one
+            (the proxy's internal root appears after this process started, ADR 0112).
     """
 
     def __init__(
         self,
         timeout: float = TIMEOUT_SECONDS,
         transport: httpx.AsyncBaseTransport | None = None,
+        transport_factory: Callable[[], httpx.AsyncBaseTransport | None] | None = None,
     ) -> None:
         """Store the options."""
         self._timeout = timeout
         self._transport = transport
+        self._transport_factory = transport_factory
 
     async def probe(self, url: str, nonce: str) -> InstanceReply:
         """Return what ``url`` answered; never raises."""
         target = f"{url.rstrip('/')}{INSTANCE_PATH}"
         try:
+            transport = self._transport
+            if transport is None and self._transport_factory is not None:
+                transport = self._transport_factory()
             async with httpx.AsyncClient(
                 timeout=self._timeout,
                 follow_redirects=False,
-                transport=self._transport,
+                transport=transport,
                 trust_env=False,
             ) as client:
                 response = await client.get(target, params={"probe": nonce})
+        except (OSError, ssl.SSLError) as exc:  # the published root cannot be read or parsed
+            log.warning("address.probe_trust_failed", error=type(exc).__name__)
+            return InstanceReply(error="tls")
         except httpx.TimeoutException:
             return InstanceReply(error="timeout")
         except httpx.ConnectError as exc:

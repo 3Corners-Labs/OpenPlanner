@@ -24,18 +24,36 @@ def root_file(settings: Settings) -> Path | None:
 
 
 def certificate_probe(settings: Settings) -> SslCertificateProbe:
-    """Return the certificate probe that also trusts the internal root, when there is one."""
-    root = root_file(settings)
-    return SslCertificateProbe(extra_cafile=str(root) if root else None)
+    """Return the certificate probe that also trusts the internal root, when there is one.
+
+    The file is looked up at each probe: on a fresh installation the proxy publishes it only
+    after web and worker are up, and a probe that decided once would stay untrusting.
+    """
+
+    def root() -> str | None:
+        found = root_file(settings)
+        return str(found) if found else None
+
+    return SslCertificateProbe(extra_cafile=root)
 
 
 def instance_probe(
     settings: Settings, transport: httpx.AsyncBaseTransport | None = None
 ) -> HttpxInstanceProbe:
-    """Return the address probe; a given ``transport`` (tests) wins over the internal root."""
-    root = root_file(settings)
-    if transport is None and root is not None:
+    """Return the address probe; a given ``transport`` (tests) wins over the internal root.
+
+    Without a given transport the internal root is looked up at each probe, for the same
+    reason as in ``certificate_probe``.
+    """
+    if transport is not None:
+        return HttpxInstanceProbe(transport=transport)
+
+    def with_root() -> httpx.AsyncBaseTransport | None:
+        root = root_file(settings)
+        if root is None:
+            return None
         context = ssl.create_default_context()
         context.load_verify_locations(cafile=str(root))
-        transport = httpx.AsyncHTTPTransport(verify=context)
-    return HttpxInstanceProbe(transport=transport)
+        return httpx.AsyncHTTPTransport(verify=context)
+
+    return HttpxInstanceProbe(transport_factory=with_root)
