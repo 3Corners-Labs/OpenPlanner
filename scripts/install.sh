@@ -72,6 +72,9 @@ READY_URL=http://127.0.0.1:8000/readyz
 HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-300}
 # not a pin: the oldest Compose that reads env_file with path/required; packages stay newest
 COMPOSE_MIN=2.24.0
+# The kernel's IPv6 settings, missing when it was booted with ipv6.disable=1 (tests point it
+# elsewhere). Such a kernel cannot make the dual-stack edge network of docker-compose.yml.
+KERNEL_IPV6=${KERNEL_IPV6:-/proc/sys/net/ipv6}
 VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-rc\.[0-9]{1,4})?$'
 RELEASE_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
 REPOSITORY_RE='^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
@@ -304,6 +307,25 @@ preflight() {
     die "prerequisites not met:" "${problems[@]/#/  - }"
   fi
   log "prerequisites in order (installation directory $DIR)"
+  ipv6_forwarding
+}
+
+# Visitors over IPv6 keep their address only where Docker forwards them to the proxy with NAT
+# (ip6tables, on by default from Docker Engine 27; network edge in docker-compose.yml). Without it
+# the host still works and they share one address in the rate limits, so this only warns.
+ipv6_forwarding() {
+  local engine
+  if [[ ! -d $KERNEL_IPV6 ]]; then
+    log "the kernel has no IPv6 (ipv6.disable=1): the edge network stays IPv4 only"
+    return 0
+  fi
+  ((TLS)) || return 0
+  engine=$(docker version --format '{{.Server.Version}}' 2>/dev/null) || return 0
+  if ! version_at_least "$engine" 27.0.0; then
+    warn "Docker Engine $engine forwards visitors over IPv6 without NAT, so they share one address in the rate limits; run again with --upgrade-docker"
+  elif grep -Eq '"ip6tables"[[:space:]]*:[[:space:]]*false' "$ROOT/etc/docker/daemon.json" 2>/dev/null; then
+    warn "$ROOT/etc/docker/daemon.json switches ip6tables off, so visitors over IPv6 share one address in the rate limits; remove that line and restart Docker"
+  fi
 }
 
 # 2 and 3. Settings files -----------------------------------------------------------------------
@@ -784,6 +806,7 @@ pin_release() {
     printf 'OPENPLANNER_IDP=%s\n' "$IDP"
     [[ $IDP != bundled || $MODE != production ]] || printf 'OPENPLANNER_IDP_START=start\n'
     [[ -z $profiles ]] || printf 'COMPOSE_PROFILES=%s\n' "$profiles"
+    [[ -d $KERNEL_IPV6 ]] || printf 'OPENPLANNER_EDGE_IPV6=false\n'
     printf 'OPENPLANNER_IMAGE=%s\n' "$digest"
     [[ -z $proxy_digest ]] || printf 'OPENPLANNER_PROXY_IMAGE=%s\n' "$proxy_digest"
   } >"$PIN_FILE.tmp"
@@ -806,10 +829,26 @@ healthy() {
   return 1
 }
 
+# The edge network has IPv6 unless the kernel has none (docker-compose.yml). Compose 2.31 recreates
+# a network whose settings changed; 2.29 kept the IPv4-only edge network of before without a word,
+# so a stale one is removed with the stack.
+edge_network() {
+  local web project have wanted=true
+  [[ -d $KERNEL_IPV6 ]] || wanted=false
+  web=$(compose ps -a -q web 2>/dev/null) || return 0
+  [[ -n $web ]] || return 0
+  project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$web") || return 0
+  have=$(docker network inspect -f '{{.EnableIPv6}}' "${project}_edge" 2>/dev/null) || return 0
+  [[ $have != "$wanted" ]] || return 0
+  log "the edge network has IPv6 $have, this host wants $wanted: recreating it (docker compose down, then up)"
+  compose down
+}
+
 start() {
   log "starting (docker compose --env-file .env.update up -d)"
   # Without the tls profile a proxy started by hand earlier would restart for ever.
   ((TLS)) || compose --profile tls rm --stop --force proxy >/dev/null 2>&1 || true
+  edge_network
   compose up -d
   healthy || die "not healthy within ${HEALTH_TIMEOUT}s; see: docker compose --env-file .env.update logs web worker"
   log "web and worker are healthy"

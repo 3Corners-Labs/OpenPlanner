@@ -80,7 +80,8 @@ async def test_a_delete_job_is_planned_after_the_trial_call_closes(setup: Setup)
         j for j in setup.uow.state.jobs[setup.booking_id] if j.type is JobType.DELETE_TRIAL_CALL
     ]
     assert [j.run_at for j in deletes] == [NOW + timedelta(minutes=35)]
-    assert deletes[0].pinned_start is None  # does nothing about the start: it only cleans up
+    # Pinned to the trial it belongs to (its closing time), never to the appointment's start.
+    assert deletes[0].pinned_start == NOW + timedelta(minutes=30)
 
 
 async def test_opening_again_reuses_the_open_trial_call(setup: Setup) -> None:
@@ -238,3 +239,25 @@ async def test_a_trial_link_that_is_not_https_is_never_followed(setup: Setup, li
 
     assert await setup.service.join_link(setup.token) is None
     assert EventKind.TRIAL_JOINED not in setup.events()  # nothing was followed
+
+
+async def test_a_second_trial_removes_the_expired_one_and_binds_its_own_cleanup(
+    setup: Setup,
+) -> None:
+    # Release audit v0.4.0 P2 (#500): the first cleanup job must not delete the newer trial,
+    # and the first room must not be left behind.
+    await setup.service.open(setup.token)
+    first = setup.uow.state.bookings[setup.booking_id].trial
+    assert first is not None
+    setup.clock.advance(timedelta(minutes=31))  # expired, but before its cleanup at minute 35
+
+    await setup.service.open(setup.token)
+
+    second = setup.uow.state.bookings[setup.booking_id].trial
+    assert second is not None
+    assert second.meeting.id != first.meeting.id
+    assert setup.video.deleted == [(first.meeting.id, HOST)]
+    cleanup = [
+        j for j in setup.uow.state.jobs[setup.booking_id] if j.type is JobType.DELETE_TRIAL_CALL
+    ]
+    assert [j.pinned_start for j in cleanup] == [first.expires_at, second.expires_at]
