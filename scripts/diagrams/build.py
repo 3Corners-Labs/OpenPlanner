@@ -23,11 +23,44 @@ OUT = Path("docs/diagrams")
 NAME = "openplanner-architectuur"
 DRAWIO = os.environ.get("DRAWIO", "/Applications/draw.io.app/Contents/MacOS/draw.io")
 CHROME = os.environ.get("CHROME", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+EXPORT_SECONDS = 120
+"""How long one draw.io export may run: seconds normally, so this much means draw.io hangs."""
+PNG_END = b"\x00\x00\x00\x00IEND\xaeB`\x82"
+"""The IEND chunk that closes every PNG."""
 
 
 def run(*args: str) -> None:
     """Run a tool and stop the build when it fails."""
     subprocess.run(args, check=True, capture_output=True)  # noqa: S603 - fixed tool, own paths
+
+
+def complete(path: Path) -> bool:
+    """Return whether ``path`` is a whole PNG (up to IEND) or a whole PDF (up to ``%%EOF``)."""
+    if not path.is_file():
+        return False
+    data = path.read_bytes()
+    if path.suffix == ".png":
+        return data.endswith(PNG_END)
+    return data.rstrip().endswith(b"%%EOF")
+
+
+def export(output: Path, source: Path, *options: str) -> None:
+    """Export ``source`` with draw.io to ``output``; stop the build unless the file is whole.
+
+    draw.io 29 on macOS can hit a fatal error while it shuts down, after the file is written,
+    and then spin instead of exiting. After ``EXPORT_SECONDS`` the process is stopped: a whole
+    file is kept with a note on stderr, anything else stops the build.
+    """
+    output.unlink(missing_ok=True)
+    args = (DRAWIO, *options, "-o", str(output), str(source))
+    try:
+        subprocess.run(args, check=True, capture_output=True, timeout=EXPORT_SECONDS)  # noqa: S603
+    except subprocess.TimeoutExpired:
+        if not complete(output):
+            raise
+        print(f"draw.io did not exit after writing {output}; stopped it", file=sys.stderr)
+    if not complete(output):
+        raise RuntimeError(f"draw.io wrote no complete {output}")
 
 
 def main() -> int:
@@ -42,9 +75,9 @@ def main() -> int:
 
     images = [OUT / f"plaat-{i}.png" for i in (1, 2, 3)]
     for i, image in enumerate(images, start=1):
-        run(DRAWIO, *"-x -f png -s 2 -b 20 -p".split(), str(i), "-o", str(image), str(source))
+        export(image, source, *"-x -f png -s 2 -b 20 -p".split(), str(i))
     plates_pdf = OUT / f"{NAME}-platen.pdf"
-    run(DRAWIO, *"-x -f pdf -a --crop -b 20 -o".split(), str(plates_pdf), str(source))
+    export(plates_pdf, source, *"-x -f pdf -a --crop -b 20".split())
 
     with tempfile.TemporaryDirectory() as tmp:
         page = Path(tmp) / "print.html"

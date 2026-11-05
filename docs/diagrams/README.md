@@ -2,7 +2,8 @@
 
 Shareable views of OpenPlanner as built (Dutch, for stakeholders). All files here are generated;
 edit `scripts/diagrams/content.py` and run `make diagrams` (needs the draw.io desktop app and
-Chrome locally).
+Chrome locally). draw.io 29 on macOS sometimes hangs after it has written an export; the build
+stops it after two minutes and keeps the file when it is complete.
 
 | File | What |
 |---|---|
@@ -19,4 +20,7 @@ The plates:
 3. **Integraties en adapters** — per external system: port, adapter, connection and the data
    that goes there and back.
 
-`tests/scripts/test_diagrams.py` checks that every block, tag and port on the plates exists.
+`tests/scripts/test_diagrams.py` checks that every block, tag and port on the plates exists and
+that every port of `app/domain/ports.py` is on plate 2, so a new port fails until it is added to
+`content.py`. `tests/test_terminology.py` reads the text of the Word file as well (ADR 0115); the
+PNGs and PDFs come from the same source.
