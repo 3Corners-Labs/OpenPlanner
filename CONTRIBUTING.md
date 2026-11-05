@@ -96,8 +96,8 @@ tests/         mirrors app/; fakes for ports live in tests/fakes/.
   back to Dutch; the switcher picks it up automatically. Add the locale to `e2e/pages.json`.
 - Every HTML page is rendered through `app.web.templates.render`, which applies the locale,
   the language switcher, CSP and caching headers. Do not build HTML responses elsewhere.
-- Never put PII (`name, email, phone, note, guest_join_url, host_join_url`) in logs, errors,
-  URLs or job payloads. The semgrep rules in `.semgrep/` and the masking test catch the obvious
+- Never put PII (any name in `PII_FIELDS` of `app/logging.py`, built from
+  `app/domain/privacy.py`) in logs, errors, URLs or job payloads. The semgrep rules in `.semgrep/` and the masking test catch the obvious
   cases, not all of them.
 - A new or changed admin screen comes with its manual topic in `docs/manual/nl` and
   `docs/manual/en` (ADR 0033, how-to in `docs/manual/README.md`). Participant pages explain

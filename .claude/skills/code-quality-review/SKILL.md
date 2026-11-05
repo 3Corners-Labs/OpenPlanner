@@ -5,15 +5,15 @@ description: Strict maintainability review of a change in this repo. Looks for t
 
 # Code quality review (repo skill)
 
-Review the scope you are handed. On your own, use the default scope of `pre-pr-review` §1:
-`origin/main...HEAD` after `git fetch origin`, plus uncommitted changes and untracked new files.
-The question is structure and maintainability: does the change leave the codebase simpler or
+Review the scope you are handed; on your own, take the scope of `pre-pr-review` §1. Its
+read-only rule holds either way. The question is structure and maintainability: does the change
+leave the codebase simpler or
 messier? Correctness and security have their own reviewers (`/code-review`, `security-review`).
 Read every changed file in full, and the code around each change: its callers, the module it
 lands in, and the existing helpers for the same job. Code the scope does not touch is in scope
 only where the change leaves it inconsistent, such as another copy of the rule the change
 alters or a caller it should have moved too; report it under the finding that causes it. Report
-findings; do not fix them, and change no file and no git state.
+findings; do not fix them.
 
 Aim high. "This could be tidier" is not the bar. For every meaningful change, look for the
 reframing that makes branches, flags, helpers or whole layers disappear, so that the result looks
