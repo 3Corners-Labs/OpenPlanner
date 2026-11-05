@@ -50,6 +50,7 @@ class GitHubReleases:
         """Store the collaborators."""
         self._http = http
         self._url = f"{API_BASE}/repos/{repository}/releases?per_page={LISTED}"
+        self._latest_url = f"{API_BASE}/repos/{repository}/releases/latest"
         self._pages = f"https://github.com/{repository}/releases/"
         self._token = token
 
@@ -60,28 +61,51 @@ class GitHubReleases:
             IntegrationError: ``unauthorized``, ``rate_limited``, ``server_error``,
                 ``rejected_<status>`` or ``unreachable``.
         """
-        headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
-        if self._token:
-            headers["Authorization"] = f"Bearer {self._token}"
-        try:
-            response = await self._http.get(self._url, headers=headers)
-        except httpx.HTTPError as exc:
-            log.warning("integration.unreachable", error=type(exc).__name__)
-            raise IntegrationError("unreachable", retryable=True) from exc
-        if response.status_code == 404:  # no release published yet
+        response = await self._get(self._url)
+        if response is None:  # no release published yet
             return []
-        if response.status_code != 200:
-            raise http_failure(response)
         data = response.json()
         if not isinstance(data, list):
             log.warning("updates.release_ignored", reason="not_a_list")
             return []
-        return [
+        found = [
             listed
             for item in data
             if isinstance(item, dict) and not item.get("draft")
             if (listed := self._release(item)) is not None
         ]
+        if any(not item.version.is_candidate for item in found):
+            return found
+        # A candidate comes with every merge, so after LISTED of them the newest page holds no
+        # release at all and an installation on the release channel would never see one.
+        return [*found, *await self._latest_release()]
+
+    async def _latest_release(self) -> list[ListedRelease]:
+        """Return GitHub's latest published release (never a pre-release), if there is one."""
+        response = await self._get(self._latest_url)
+        data = response.json() if response is not None else None
+        listed = self._release(data) if isinstance(data, dict) and not data.get("draft") else None
+        return [listed] if listed is not None else []
+
+    async def _get(self, url: str) -> httpx.Response | None:
+        """Return the answer of ``url``; ``None`` for a 404 (nothing published).
+
+        Raises:
+            IntegrationError: as ``listing`` does.
+        """
+        headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+        try:
+            response = await self._http.get(url, headers=headers)
+        except httpx.HTTPError as exc:
+            log.warning("integration.unreachable", error=type(exc).__name__)
+            raise IntegrationError("unreachable", retryable=True) from exc
+        if response.status_code == 404:
+            return None
+        if response.status_code != 200:
+            raise http_failure(response)
+        return response
 
     def _release(self, data: dict[str, Any]) -> ListedRelease | None:
         """Return one release of the list, if it is a usable one."""
