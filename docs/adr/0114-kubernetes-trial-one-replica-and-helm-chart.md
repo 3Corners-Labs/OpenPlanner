@@ -101,6 +101,7 @@ uid 10001 and the read-only root filesystem (the image's own contract); the prob
 | 0 | ADR accepted; TransIP facts read | #495 | in PR |
 | 1 | `deploy/helm/openplanner/` chart, rendering tests | #495 | in PR |
 | 2 | `docs/kubernetes.md`: install, upgrade, backup, TransIP notes; `docs/install.md` pointer | #495 | in PR |
+| 2a | Outbound rules in the NetworkPolicy (`networkPolicy.egress`), no ingress-nginx default (retired in March 2026); `docs/kubernetes.md`: *Signed images only* (the admission policy of ADR 0116 step 9), *Outbound traffic*, backups on the volume and snapshots instead of a copy to a laptop, TransIP notes from its published facts (PROXY protocol, snapshot class, no dual-stack, open questions) | | planned |
 | 3 | Trial on TransIP: ingress and certificates, volume snapshot, a real upgrade and a restore; findings written into `docs/kubernetes.md` (a person with a cluster) | | planned |
 | 4 | A deployment-shape setting (class B) that replaces *Update now* by what the channel offers and the `helm upgrade` command; the third channel level `minor` (class C, domain, portal, manual) | | planned |
 | 5 | The chart published as an OCI artifact for every candidate and release, signed, package set to Public once (`helm install oci://ghcr.io/...`); the chart's `appVersion` and default tag follow the release | | planned |
