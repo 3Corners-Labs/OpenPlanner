@@ -3,6 +3,8 @@
 How OpenPlanner is built: context, containers, code structure, domain model, runtime flows,
 security and quality assurance. The *why* behind each choice is in the ADRs (`docs/adr/`);
 the stakeholder design is in `docs/HANDOVER.md` (Dutch).
+The application architecture for architects who fit OpenPlanner into a landscape is
+`docs/applicatie-architectuur.md` (Dutch); it refers here for the detailed views.
 
 Status: October 2026, after work package 3 (first demo slice). Parts drawn with a **dashed
 border** are designed but not built yet; the roadmap at the end says when.
