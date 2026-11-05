@@ -87,7 +87,10 @@ PARTICIPANT_LABELS: dict[str, str] = {
 CONDITION_LABELS: dict[str, str] = {
     "public": "authz.condition.public",
     "management_link": "authz.condition.management_link",
-    "management_link_before_deadline": "authz.condition.management_link_before_deadline",
+    "management_link_before_change_deadline": (
+        "authz.condition.management_link_before_change_deadline"
+    ),
+    "management_link_before_start": "authz.condition.management_link_before_start",
     "management_link_while_suspended": "authz.condition.management_link_while_suspended",
 }
 

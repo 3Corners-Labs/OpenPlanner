@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Betreft | OpenPlanner 0.4.0 (tag `v0.4.0`, uitgebracht op 4 november 2026) |
-| Stand | Concept 1a van 5 november 2026, beschreven tegen de code van `v0.4.0` en `docs/adr-status.md` (gecontroleerd tegen de code op 3 november 2026). Besluiten van na de release staan in 10.2 en 13.1 |
+| Stand | Concept 1b van 5 november 2026, beschreven tegen de code van `v0.4.0` en `docs/adr-status.md` (gecontroleerd tegen de code op 3 november 2026). Besluiten van na de release staan in 10.2 en 13.1, de antwoorden van de productowner in 13.4 |
 | Taal | Nederlands, als stakeholderdocument naast `docs/HANDOVER.md`. Code, ADR's en de overige documentatie zijn Engels |
 | Lezers | Architecten en ontwikkelaars van een organisatie die OpenPlanner in haar landschap inpast, beheerders, en het productteam |
 | Bron van waarheid | De code op `main`, de ADR's en `docs/adr-status.md`. Dit document beschrijft en verwijst; het beslist niets |
@@ -56,9 +56,9 @@ Voor inpassing in een landschap levert een omgeving vijf dingen. Dat zijn een we
 keuzeboom die naar de groepspagina linkt, een identity provider voor beheerders, een
 mailprovider, een contactcenter of de eigen wachtrij, en hosting met logplatform en back-up.
 Hoofdstuk 13 zet de vragen op een rij die de omgeving moet beantwoorden voordat de inpassing kan
-worden ontworpen. De voornaamste open punten zijn de eigenaar van hosting en back-up (O7), wie de
-pentest en het toegankelijkheidsonderzoek uitvoert (O10) en de niet gebouwde
-leveranciersneutraliteit van het contactcenterkoppelvlak (ADR 0032).
+worden ontworpen. De antwoorden van 5 november 2026 staan in 13.4. De voornaamste open punten
+zijn nu de leveranciersneutraliteit van het contactcenterkoppelvlak, nodig voor Genesys (ADR
+0032, O15), het rapportagescherm (O16) en de menselijke review per PR (O10).
 
 ## 1. Inleiding en doelen
 
@@ -238,13 +238,13 @@ in ADR 0086 (standaardentabel) en `docs/runbook.md`.
 Uitspraken in dit document die niet uit de code volgen, staan hier als aanname. Een aanname die
 onjuist blijkt, verandert het hoofdstuk dat haar gebruikt.
 
-| ID | Aanname | Gebruikt in | Bevestigen door |
+| ID | Aanname | Gebruikt in | Bevestigen door, of stand |
 |---|---|---|---|
 | A-1 | Het volume blijft in de orde van 80 boekingen per werkdag met pieken van 20 per minuut, zoals het ontwerp aannam | 2.3, 7, 12 | de organisatie die inpast |
-| A-2 | Eén installatie bedient één verwerkingsverantwoordelijke; organisaties binnen die installatie delen de superuser, de database en de sleutels | 3.5, 9 | privacyofficer (DPIA) |
-| A-3 | De organisatie beschikt over een OIDC-identity provider, of aanvaardt de meegeleverde Keycloak | 3.3, 8.5 | identity-beheer (O3) |
-| A-4 | Het contactcenter is Webex Contact Center, of het team gebruikt de eigen wachtrij; een ander platform vraagt de bouw van ADR 0032 | 3.3, 6.2, 12 | contactcenterbeheer |
-| A-5 | De host levert versleutelde opslag, back-up en herstel buiten de applicatie om (O7) | 7, 9.3 | hostingpartij |
+| A-2 | Eén installatie bedient één verwerkingsverantwoordelijke; organisaties binnen die installatie delen de superuser, de database en de sleutels | 3.5, 9 | herzien op 5 november 2026 (V-13): de applicatie is multi-tenant en de hoster bepaalt de indeling; wat organisaties delen, blijft gelden |
+| A-3 | De organisatie beschikt over een OIDC-identity provider, of aanvaardt de meegeleverde Keycloak | 3.3, 8.5 | beantwoord op 5 november 2026 (V-2): standaard de meegeleverde Keycloak, daarna elke OIDC-provider per organisatie |
+| A-4 | Het contactcenter is Webex Contact Center, of het team gebruikt de eigen wachtrij; een ander platform vraagt de bouw van ADR 0032 | 3.3, 6.2, 12 | beantwoord op 5 november 2026 (V-3): ook Genesys, dus ADR 0032 is nodig (O15) |
+| A-5 | De host levert versleutelde opslag, back-up en herstel buiten de applicatie om (O7) | 7, 9.3 | beantwoord voor zelf hosten op 5 november 2026 (V-7): het platformteam van de afnemer |
 
 ## 3. Context, koppelvlakken en demarcatie
 
@@ -331,7 +331,7 @@ vandaag is.
 | Videomeeting aanmaken en volgen | Webex Meetings API via een Service App, namens de host van de groep | uit, in (webhooks) | HTTPS, webhooks met HMAC-SHA1 en replay-sleutel | Groepsnaam en tijden; terug: meeting-id, deelnamelink, gebeurtenissen | `VideoProvider`, `adapters/webex_meetings.py` | Beperkt: poort bestaat, contract is Webex-vormig; tweede platform vraagt een eigen ADR | 0017, 0010 |
 | Gesprek bij een medewerker brengen | Webex Contact Center, Create Task API v2, taakevents via subscription | uit, in | HTTPS, webhooks met HMAC-SHA256 binnen 300 s | Referentie, voornaam, startlabel, groepsnaam, hostlink, soort en de routeringswaarde van de groep | `ContactCenterDispatcher`, `adapters/wxcc.py` | Beperkt: ontwerp voor neutraliteit in ADR 0032, niet gebouwd | 0018, 0021, 0032 |
 | Eigen wachtrij | OpenPlanner zelf: medewerkers claimen afspraken in het portaal | intern | n.v.t. | Afspraken binnen de zichttermijn, pseudoniem van wie claimt | `DispatchKind.OPENPLANNER_QUEUE`, `domain/own_queue.py` | n.v.t. | 0043 |
-| Beheerders authenticeren | OIDC-provider van het platform en per organisatie een eigen provider, gekozen op e-maildomein; meegeleverde Keycloak voor test en lab | in | OIDC code flow met PKCE, `private_key_jwt` of client secret | Claims: identiteit, e-mail, entitlements (rol en bereik), bewijs van tweede factor | `IdentityProvider`, `adapters/oidc.py`, `adapters/idp_registry.py` | Ja: elke OIDC-provider met asymmetrische handtekening | 0013, 0083, 0097, 0100 |
+| Beheerders authenticeren | Standaard de meegeleverde Keycloak in elke installatiemodus op een host (ADR 0106), op Kubernetes een eigen provider; daarnaast per organisatie elke OIDC-provider, gekozen op het domeinsuffix van gebruikersnaam of e-mailadres (ADR 0083) | in | OIDC code flow met PKCE, `private_key_jwt` of client secret | Claims: identiteit, e-mail, entitlements (rol en bereik), bewijs van tweede factor | `IdentityProvider`, `adapters/oidc.py`, `adapters/idp_registry.py` | Ja: elke OIDC-provider met asymmetrische handtekening | 0013, 0083, 0097, 0100, 0106 |
 | Medewerkers beheren in de provider | Admin REST API van de meegeleverde Keycloak | uit | HTTPS | Naam, gebruikersnaam, rollen | `StaffDirectory`, `adapters/keycloak_directory.py` | Beperkt: alleen Keycloak; SCIM 2.0 is ontworpen (ADR 0046), niet gebouwd | 0095, 0046 |
 | Logregels en events afleveren | syslog (TLS, TCP, UDP), Splunk HEC, Elastic `_bulk`, HTTP NDJSON | uit | per soort | Gemaskeerde regels en audit-, systeem- en securityevents | `LogDestinationSender`, `adapters/log_senders.py` | Ja: nieuwe bestemming is één sender | 0034, 0085 |
 | Releases opzoeken en images ophalen | GitHub releases API; GHCR via de host-updater met cosign | uit | HTTPS | Versienummers; images en handtekeningen | `ReleaseSource`, `adapters/releases.py`; `scripts/updater/` | Beperkt: GitHub-vormig | 0029, 0059, 0067 |
@@ -422,6 +422,12 @@ Drie eigenschappen bepalen hoe de applicatie in zo'n geheel past:
   draaien dezelfde ondertekende images; wat verschilt is wie bijwerkt, binnen welk venster, en
   wie de back-up draagt. Het gedeelde model raakt de regel over één verwerkingsverantwoordelijke
   hierboven (R-13).
+- **De afnemer kiest het model.** De applicatie is multi-tenant; de partij die haar afneemt,
+  bepaalt hoeveel organisaties en groepen een installatie draagt. Wie bijwerkt en bewaakt, kiest
+  de afnemer ook: het platformteam, met of zonder superuser-account, of de superuser in het
+  portaal. Beheerders loggen op een host standaard in bij de meegeleverde Keycloak, en daarna bij
+  elke OIDC-provider per organisatie. OpenPlanner volgt standaarden en niet één leverancier
+  (13.4).
 
 Wat de omgeving aan OpenPlanner levert en wat zij terugkrijgt, staat als vragenlijst in 13.3.
 
@@ -877,8 +883,12 @@ flowchart LR
   een fix moet uitkomen terwijl `main` al nieuwe functies bevat. Een patch bevat geen migratie,
   en elke migratie volgt expand en contract. Een upgradematrix in CI test migraties op gegevens
   van uitgebrachte versies. Elke release wordt publiek, updatevensters en lijnen komen in het
-  portaal, en een ondertekende bundel maakt offline levering mogelijk. Gebouwd is alleen stap 2:
-  een gewijzigde migratie maakt een minorrelease.
+  portaal, en een ondertekende bundel maakt offline levering mogelijk. Gebouwd zijn de
+  besluitteksten van stap 1 (in `CLAUDE.md`, `SECURITY.md` en het PR-sjabloon), stap 2 (een
+  gewijzigde migratie maakt een minorrelease) en het toelatingsbeleid van stap 9 voor Kubernetes.
+- **Wie bijwerkt, kiest de afnemer** (13.4, V-14). Het platformteam werkt handmatig bij, met of
+  zonder superuser-account, of de superuser doet het in het portaal, los van het platformteam. Op
+  Kubernetes werkt de route via het portaal nog niet (ADR 0114, stap 4).
 
 ### 7.5 Configuratie in vier klassen
 
@@ -943,10 +953,10 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 
 | Wil je toevoegen | Uitbreidpunt | Vandaag | Zonder wijziging van de domeinservices | Besluit |
 |---|---|---|---|---|
-| Een berichtkanaal | `ChannelKind` + `MessageSender` | e-mail, sms; WhatsApp als waarde met toestemmingsregel, zonder adapter | ja | ADR 0009 |
-| Een sms-gateway | `SmsProvider` + `SMS_GATEWAYS` | Webex Connect | ja | ADR 0028 |
+| Een berichtkanaal | `ChannelKind` + `MessageSender` | e-mail, sms; WhatsApp als waarde met toestemmingsregel, zonder adapter. Gevraagd: RCS, WhatsApp, Signal en iMessage naar keuze van de deelnemer, elk gevalideerd (O17) | per kanaal ja; de keuze door de deelnemer en de validatie per kanaal raken het domein | ADR 0009, 0056 |
+| Een sms-gateway | `SmsProvider` + `SMS_GATEWAYS` | Webex Connect; gevraagd: gateways via de open standaard SMPP (O18) | ja | ADR 0028 |
 | Een logbestemming | `DestinationKind` + `build_sender` | syslog, Splunk HEC, Elastic, HTTP NDJSON | ja | ADR 0085 |
-| Een contactcenterplatform | `ContactCenterDispatcher` | Webex Contact Center; de poort is neutraal van naam, het contract en de groepsvelden zijn WxCC-vormig | nee: ADR 0032 beschrijft de neutrale vorm (soort per organisatie, routering per groep, descriptor per adapter), niet gebouwd | ADR 0032 |
+| Een contactcenterplatform | `ContactCenterDispatcher` | Webex Contact Center; de poort is neutraal van naam, het contract en de groepsvelden zijn WxCC-vormig; gevraagd: Genesys Engage via GMS nu en Genesys Cloud CX later (O15) | nee: ADR 0032 beschrijft de neutrale vorm (soort per organisatie, routering per groep, descriptor per adapter), niet gebouwd | ADR 0032 |
 | Een videoplatform | `VideoProvider` | Webex Meetings | beperkt: poort bestaat, contract volgt Webex; tweede platform vraagt een ADR naar het model van 0032 | ADR 0017 |
 | Een wachtrijgedrag | `DispatchKind` | contactcenter, eigen wachtrij | een derde soort raakt het domein (regels voor zicht en claim) | ADR 0043 |
 | Een identity provider | registratie in het portaal, geen code | elke OIDC-provider met asymmetrische handtekening; keuze op e-maildomein met DNS-bewijs | ja | ADR 0083 |
@@ -971,6 +981,8 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
    (`message.<doel>.<kanaal>.<blok>`) en de placeholders aan de toegestane lijst.
 4. Laat de privacyofficer de verwerker beoordelen vóór een groep het kanaal kan inschakelen (voor
    WhatsApp staat die voorwaarde in ADR 0009).
+5. Laat de deelnemer het kanaal bevestigen, zoals de bevestiging per e-mail van ADR 0056, en geef
+   de plaats vrij als binnen de termijn geen reactie komt (13.4, V-15).
 
 **Een nieuwe sms-gateway** (een adapter):
 
@@ -1063,6 +1075,9 @@ Er is geen noodlogin en geen rolwisselaar.
 - **Back-ups.** De terugdraaikopie van een update leeft 24 uur op het datavolume. Herstel uit een
   oudere kopie eindigt altijd met `purge-overdue`, omdat de kopie gegevens kan bevatten die op
   het levende systeem al weg waren. Disaster recovery is van de host (O7).
+- **Rol van 3Corners.** Bij zelf hosten is de afnemer verwerkingsverantwoordelijke en heeft
+  3Corners geen toegang tot gegevens (13.4, V-10). Ondersteuning loopt via de gemaskeerde logs en
+  het bewijsrapport.
 
 ### 8.7 Logging, audit en rapportage
 
@@ -1096,7 +1111,8 @@ flowchart LR
 - **Rapportage over afspraken** bestaat uit de overzichtwidgets met grafieken (zonder
   persoonsgegevens), het retentie-overzicht, de auditexport (CSV, binnen het bereik van de
   beheerder), de dagtellingen en het bewijsrapport. Er is geen BI-koppeling; wie meer wil, leest
-  de events in het logplatform (8.3).
+  de events in het logplatform (8.3). Gevraagd zijn een rapportagescherm in het portaal en een
+  export als CSV (13.4, O16).
 
 ### 8.8 Tijd en tijdzones
 
@@ -1185,7 +1201,8 @@ bewijzen. Elke eis staat in precies één checklist; een test bewaakt dat.
 | `pentest-scope.md` | Pentester | Wat te testen |
 
 De checklists worden herhaald bij elke hoofdrelease, bij een wissel van identity provider of
-host, en jaarlijks.
+host, en jaarlijks. De afnemer regelt de pentest en het toegankelijkheidsonderzoek zelf (13.4,
+V-11); `pentest-scope.md` is de invoer voor hun pentester.
 
 ## 10. Architectuurbesluiten (ADR's)
 
@@ -1218,7 +1235,7 @@ van het besluit nog niet in de code staat; het overzicht zegt welke.
 | Levering en beheer | 0006 ondertekening, 0029 updates, 0030 HTTPS, 0048 live voortgang, 0050 installer, 0052 releases, 0059 kandidaten, 0064 HTTPS standaard, 0067 versiebeheer, 0070 certificaatbron, 0079 release als workflow, 0086 publiek adres, 0089 configuratiepakket, 0099 configuratie als JSON, 0108 publieke images, 0112 interne CA, 0114 Kubernetes | gebouwd; 0067, 0079, 0089, 0108, 0112, 0114 deels; 0099 niet gebouwd |
 | Schaal | 0036 schaalgrenzen en naden | niet gebouwd (de triggers zijn beleid) |
 | Website | 0087, 0110, 0111, 0113 | deels |
-| Na 0.4.0 | 0116 één editie, onderhoudslijnen en geteste upgradepaden | aanvaard op 5 november 2026; stap 2 gebouwd (een gewijzigde migratie maakt een minorrelease), stap 3 tot en met 9 niet |
+| Na 0.4.0 | 0116 één editie, onderhoudslijnen en geteste upgradepaden | aanvaard op 5 november 2026; gebouwd zijn de besluitteksten van stap 1 (#533), stap 2 (een gewijzigde migratie maakt een minorrelease) en het toelatingsbeleid van stap 9; de rest niet |
 
 ### 10.3 Open besluiten
 
@@ -1278,7 +1295,7 @@ pentest, toegankelijkheidsonderzoek).
 | ID | Risico of schuld | Gevolg | Beheersing of besluit | Eigenaar |
 |---|---|---|---|---|
 | R-1 | Eén host, één SQLite-bestand: geen horizontale schaal en geen hoge beschikbaarheid | Een hostuitval is uitval tot herstel; de eis "RTO onder 15 minuten" is niet haalbaar in deze vorm | ADR 0036 noemt de triggers en het pad (Postgres, meer `web`-replica's); de drie naden (rate-limitopslag, contracttest schrijfslot, back-upinterface) en de metingen zijn niet gebouwd | productowner |
-| R-2 | Het contactcenterkoppelvlak is WxCC-vormig tot in groep, taak en webhook | Een tweede platform raakt domein, schema, taken en beheer | ADR 0032 (ontwerp klaar, niet gebouwd); bouwstappen CC-0 tot en met CC-6 | productowner |
+| R-2 | Het contactcenterkoppelvlak is WxCC-vormig tot in groep, taak en webhook | Genesys Engage via GMS en later Genesys Cloud CX zijn gevraagd (V-3); elk raakt nu domein, schema, taken en beheer | ADR 0032 aannemen en bouwen (CC-0 tot en met CC-5), daarna per Genesys-variant een adapter met een eigen ADR (CC-6, O15) | productowner |
 | R-3 | Het videokoppelvlak is niet leveranciersneutraal | Een tweede videoplatform vraagt een ADR en een aanpassing van het contract van `VideoProvider` | Hetzelfde patroon als ADR 0032; nog geen besluit | productowner |
 | R-4 | Kubernetes alleen door rendering getest | De eerste echte run kan verrassingen geven; updates uit het portaal werken daar niet | ADR 0114 stappen 3 en 4 | hostingpartij |
 | R-5 | Hosting, back-up, herstelproef en verwerkingsverantwoordelijke zijn niet belegd (O7) | Zonder eigenaar geen aantoonbaar herstel en geen DPIA | Checklists in `docs/assurance/`; go-live-checklist | opdrachtgever |
@@ -1310,8 +1327,12 @@ Wat na 0.4.0 op de rol staat, zoals `README.md` en `docs/adr-status.md` het noem
 - De naden van ADR 0036 (rate-limitopslag als instelling, contracttest van het schrijfslot,
   back-upinterface, metingen), zodat de stap voorbij één host een adapterwijziging wordt.
 - Release- en updatemodellen voor drie exploitatievormen (ADR 0116, aanvaard op 5 november 2026,
-  stap 2 gebouwd): onderhoudslijnen, een upgradematrix, updatevensters en lijnen in het portaal,
-  publieke patches en een offline bundel.
+  stap 1, 2 en een deel van 9 gebouwd): onderhoudslijnen, een upgradematrix, updatevensters en
+  lijnen in het portaal, publieke patches en een offline bundel.
+- Gevraagd op 5 november 2026 (13.4): Genesys Engage via GMS en later Genesys Cloud CX achter de
+  neutrale poort van ADR 0032 (O15), een rapportagescherm en een CSV-export (O16), meer
+  berichtkanalen naar keuze van de deelnemer met validatie per kanaal (O17) en sms via SMPP
+  (O18).
 
 ### 13.2 Stappenplan voor inpassing in een omgeving
 
@@ -1353,6 +1374,31 @@ antwoord een open punt in HANDOVER §11 of een ADR.
 | V-14 | Wijzigingsbeheer | Wie keurt updates goed en wanneer; welk kanaal (release of kandidaat) per installatie; past de onderhoudsmodus in de afspraken over servicevensters? Welk updatevenster en welke onderhoudslijn zijn nodig (ADR 0116, nog niet gebouwd)? | beheer | 7.4 |
 | V-15 | Kanalen later | Is een chatkanaal met toestemming (WhatsApp) gewenst, en keurt de privacyofficer de verwerker goed? | dienstverlening, privacyofficer | 8.3, ADR 0009 |
 
+### 13.4 Antwoorden van 5 november 2026
+
+De productowner beantwoordde de vragen op 5 november 2026. De antwoorden gaan over de
+positionering van het product en niet over één afnemer. Hoe een omgeving OpenPlanner inricht,
+kiest de partij die de applicatie afneemt. Antwoorden die een besluit of bouwwerk vragen, staan
+als open punt O15 tot en met O18 in HANDOVER §11.
+
+| ID | Antwoord | Gevolg voor de architectuur |
+|---|---|---|
+| V-1 | Een link per onderwerp vanuit de keuzeboom, en daarnaast de widget op de website. | Beide routes van 3.3 blijven nodig. Een organisatie die inbedt, registreert haar toegestane origins (ADR 0035). |
+| V-2 | Standaard de meegeleverde Keycloak, waarin de organisatie medewerkers en rollen volledig zelf beheert. Daarna elke OIDC-provider per organisatie, gekozen op het domeinsuffix van gebruikersnaam of e-mailadres. Standaarden gaan boven één leverancier. | Bevestigt ADR 0083 en 0106. Claimnamen (O3) zijn alleen nodig voor een eigen provider; een koppeling voor één leverancier komt er niet. |
+| V-3 | Alle vier: Webex Contact Center, Genesys Engage via GMS, de eigen wachtrij en de agenda-uitnodiging aan een teamadres. Van Genesys worden beide varianten ondersteund: nu Engage via GMS, later ook Genesys Cloud CX. | Een tweede contactcenterplatform maakt ADR 0032 een voorwaarde, met per Genesys-variant een adapter en een eigen ADR (O15). |
+| V-4 | De bestaande Webex-site van de afnemer, met hostaccounts per groep. | Een eigen site met afgedwongen beleid (ADR 0045) is niet nodig. Het meetingbeleid ligt bij de Webex-beheerder van de afnemer. |
+| V-5 | De SMTP-server van de afnemer. | Elke organisatie mailt vanaf haar eigen afzender; de controle van ADR 0073 laat zien of SPF, DKIM en DMARC kloppen. |
+| V-6 | Webex Connect, en daarnaast gateways op basis van een open standaard. | De open standaard tussen applicatie en aggregator is SMPP. Een SMPP-adapter dekt de meeste aanbieders en vraagt een ADR (O18). |
+| V-7 | Het platform van de afnemer. | Bij zelf hosten liggen hosting, back-up en herstel bij het platformteam van de afnemer. Dat beantwoordt O7 voor dit model. |
+| V-8 | De SIEM van de afnemer en het logplatform van de hostingpartij. | Twee logbestemmingen met elk een eigen filter: audit en security naar de SIEM, de operationele regels naar het platform (ADR 0085). |
+| V-9 | Bij zelf hosten bewaakt het platformteam van de afnemer de installatie volledig. | `/healthz`, `/readyz` en de heartbeat zijn hun meetpunten. Meldingen buiten het portaal (ADR 0082) blijven gewenst. |
+| V-10 | De afnemer is verwerkingsverantwoordelijke; 3Corners heeft geen toegang tot gegevens. | Dan is 3Corners in deze opzet geen verwerker, zolang ondersteuning zonder toegang tot gegevens kan; de privacyofficer van de afnemer bevestigt dat in de DPIA. Ondersteuning loopt via de gemaskeerde logs en het bewijsrapport, die geen persoonsgegevens bevatten. |
+| V-11 | De afnemer regelt de pentest en het toegankelijkheidsonderzoek. | `docs/assurance/pentest-scope.md` is de invoer voor hun pentester. Open blijft de menselijke review per PR (O10); bouwwerk merget nu op groen (ADR 0078). |
+| V-12 | Een rapportagescherm in het portaal, de events in de SIEM of BI-omgeving van de afnemer, en een export als CSV. | Het scherm en de export zijn nieuw bouwwerk zonder persoonsgegevens, met een plek in de beheerstructuur van ADR 0047 (O16). |
+| V-13 | De applicatie is multi-tenant. De hoster bepaalt hoe hij organisaties en groepen indeelt, en dus hoeveel organisaties een installatie draagt. | Een keuze van de afnemer. 3.5 en R-8 beschrijven wat organisaties in één installatie delen: superuser, database en sleutels. |
+| V-14 | Dat kiest de afnemer. Het platformteam werkt handmatig bij, met of zonder superuser-account, of de superuser doet het in het portaal, los van het platformteam. | Op een host bestaan beide routes (7.4); op Kubernetes alleen die van het platformteam, tot ADR 0114 stap 4. Het zijn deploymentmodellen van de afnemer, geen vaste rol van 3Corners. |
+| V-15 | Op termijn meer kanalen: e-mail, sms, RCS, WhatsApp, Signal en iMessage, naar keuze van de deelnemer, één of meer. Elk kanaal wordt gevalideerd zoals de e-mail, en een plaats komt vrij als de deelnemer niet binnen een termijn reageert. | Een uitbreiding van ADR 0009 en 0056 (O17). Per kanaal: een adapter, toestemming, een verwerkersbeoordeling en een bevestigingsronde. |
+
 ## 14. Begrippen en afkortingen
 
 | Begrip of afkorting | Betekenis |
@@ -1362,6 +1408,7 @@ antwoord een open punt in HANDOVER §11 of een ADR.
 | Agent, medewerker | De persoon die het videogesprek voert; een organisatie kan een ander woord tonen |
 | ASVS | OWASP Application Security Verification Standard, versie 5.0.0 |
 | Bezettingsblok | Een tijdvak met een aantal medewerkers; nul betekent gesloten |
+| BI | Business intelligence: rapportage en analyse op verzamelde gegevens |
 | CI | Continuous integration: de controles die elke wijziging doorloopt |
 | C4 | Diagrammodel met de niveaus context, containers, componenten en code |
 | CSP, HSTS | Content Security Policy en HTTP Strict Transport Security, responsheaders |
@@ -1371,6 +1418,7 @@ antwoord een open punt in HANDOVER §11 of een ADR.
 | DPIA | Gegevensbeschermingseffectbeoordeling; `docs/dataflow.md` is de invoer |
 | ECS | Elastic Common Schema, de veldnamen van het eventschema |
 | Eigen wachtrij | De wachtrij in OpenPlanner waarin medewerkers afspraken claimen (ADR 0043) |
+| GMS | Genesys Mobile Services, een API-laag van Genesys Engage voor onder meer callback |
 | Groep (group) | Een team met één wachtrij en een eigen pagina `/g/{slug}` |
 | HMAC, AES-GCM, HKDF | Cryptografische primitieven voor tokens, verzegelde secrets en sleutelafleiding |
 | IdP | Identity provider: het systeem waar beheerders inloggen |
@@ -1382,9 +1430,12 @@ antwoord een open punt in HANDOVER §11 of een ADR.
 | Poort, adapter | Een Protocol in het domein en zijn implementatie op een extern systeem |
 | Proefgesprek (trial call) | Een echte Webex-meeting waarin de deelnemer vooraf camera en microfoon test |
 | Purge | Het verwijderen van de persoonsgegevens van een afspraak |
+| RCS | Rich Communication Services, de opvolger van sms in de berichtenapp van de telefoon |
 | SBOM | Software bill of materials (CycloneDX) per image |
 | Scope | Het bereik waarbinnen een permissie geldt; de SQL-adapter filtert erop |
+| SIEM | Security information and event management: het systeem waarin het securityteam events verzamelt en bewaakt |
 | Slot | Een tijdvak dat ontstaat bij de eerste afspraak, met een capaciteitssnapshot |
+| SMPP | Short Message Peer-to-Peer, het open protocol tussen applicaties en sms-aggregators |
 | Superuser | De beheerder van de hele installatie |
 | UTC | De tijdzone waarin alles wordt opgeslagen |
 | WAL | Write-ahead logging, de SQLite-modus waarin lezers nooit wachten |
@@ -1413,3 +1464,4 @@ antwoord een open punt in HANDOVER §11 of een ADR.
 |---|---|
 | 5 november 2026 | Concept 1: eerste volledige opzet tegen 0.4.0 |
 | 5 november 2026 | Concept 1a: feiten nagelopen tegen de code (annuleren tot de start, alle 23 taaksoorten, dagelijkse opruimtaken, Nederlandse menunamen, fakes per poort); ADR 0116 van na de release en risico R-13 toegevoegd; na de security-review de controls in 3.5 en 9.1 preciezer (uitgaande bewaker, versleutelde hops, tweede factor, netwerk-allowlist) |
+| 5 november 2026 | Concept 1b: de antwoorden van de productowner op V-1 tot en met V-15 in 13.4, verwerkt in 2.6, 3.3, 3.5, 7.4, 8.2, 8.3, 8.6, 8.7, 9.3, 12 en 13.1; open punten O15 tot en met O18 in HANDOVER §11 |

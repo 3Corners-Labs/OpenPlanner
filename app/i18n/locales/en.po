@@ -992,8 +992,11 @@ msgstr "Anyone"
 msgid "authz.condition.management_link"
 msgstr "With the management link from the confirmation"
 
-msgid "authz.condition.management_link_before_deadline"
-msgstr "With the management link, until the task goes to the queue"
+msgid "authz.condition.management_link_before_change_deadline"
+msgstr "With the management link, until the number of minutes before the start that the group sets"
+
+msgid "authz.condition.management_link_before_start"
+msgstr "With the management link, until the start"
 
 msgid "admin.to_portal"
 msgstr "To the administration portal"
@@ -1125,7 +1128,7 @@ msgid "admin.field.dispatch_lead_minutes"
 msgstr "Send to the queue (minutes before)"
 
 msgid "admin.field.dispatch_lead_minutes_hint"
-msgstr "From this moment the participant can no longer change the appointment. 0 to 60."
+msgstr "How many minutes before the start the appointment goes to the contact center as a task, 0 to 60. The participant can still cancel after that, until the start."
 
 msgid "admin.field.dispatch_kind"
 msgstr "How appointments reach {agents}"
@@ -2548,7 +2551,7 @@ msgid "authz.participant.suspended_booking_change"
 msgstr "Move or cancel an appointment on hold"
 
 msgid "authz.condition.management_link_while_suspended"
-msgstr "with the management link, while the appointment is on hold"
+msgstr "With the management link, while the appointment is on hold"
 
 msgid "admin.tab.closure"
 msgstr "Emergency closure"

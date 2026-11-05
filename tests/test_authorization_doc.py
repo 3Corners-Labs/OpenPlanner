@@ -2,11 +2,24 @@
 
 from pathlib import Path
 
+import pytest
+
 from app.i18n import Translator, load_catalogues
 from app.web.authz_report import render_markdown
 from tests.fakes.overrides import DictOverrides
 
 DOC = Path(__file__).resolve().parents[1] / "docs" / "authorization.md"
+
+# ADR 0069: the participant moves until the group's lead before the start, cancels until the start.
+MOVE_UNTIL = {"nl": "minuten voor de start", "en": "minutes before the start"}
+CANCEL_UNTIL = {"nl": "tot de start", "en": "until the start"}
+
+
+def _participant_conditions(markdown: str) -> dict[str, str]:
+    """Return the condition column of the participant table, by action key."""
+    section = markdown.split("## Participants", 1)[1].split("\n## ", 1)[0]
+    rows = [line.split("|") for line in section.splitlines() if "(`participant." in line]
+    return {cells[1].split("`")[1]: cells[2].strip() for cells in rows}
 
 
 def test_published_matrix_matches_the_code() -> None:
@@ -16,6 +29,18 @@ def test_published_matrix_matches_the_code() -> None:
         "docs/authorization.md is out of date: run `python -m app.cli authz-matrix > "
         "docs/authorization.md`"
     )
+
+
+@pytest.mark.parametrize("locale", ["nl", "en"])
+def test_the_participant_table_gives_moving_and_cancelling_their_own_deadline(locale: str) -> None:
+    conditions = _participant_conditions(render_markdown(Translator(load_catalogues()), locale))
+    move = conditions["participant.booking_change"]
+    cancel = conditions["participant.booking_cancel"]
+
+    assert move != cancel
+    assert MOVE_UNTIL[locale] in move
+    assert CANCEL_UNTIL[locale] in cancel
+    assert CANCEL_UNTIL[locale] not in move
 
 
 def test_the_term_changes_no_rights_document() -> None:
