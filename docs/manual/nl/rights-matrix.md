@@ -44,9 +44,11 @@ Elk recht geldt op één niveau:
 ## Deelnemers en koppelingen
 
 Onder de matrix staat wat deelnemers kunnen zonder in te loggen: met de link uit hun
-bevestigingsmail kunnen ze hun afspraak bekijken, en tot de wijzigingstermijn verzetten of
-annuleren. Daaronder staan de rechten van gekoppelde systemen, zoals een bot van het
-contactcenter. Die rechten kent de superuser per koppeling toe.
+bevestigingsmail kunnen ze hun afspraak bekijken, verplaatsen tot het aantal minuten voor de
+start dat de groep instelt (**Verplaatsen door de deelnemer tot** in de
+[groepsinstellingen](group-settings.md)) en annuleren tot de start. Daaronder staan de rechten
+van gekoppelde systemen, zoals een bot van het contactcenter. Die rechten kent de superuser per
+koppeling toe.
 
 ## Wijzigingen van rollen
 

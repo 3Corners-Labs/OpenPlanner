@@ -600,10 +600,11 @@ flowchart LR
     answered -->|no| lapse["cancelled at confirm_by,<br/>lapse mail, purge + 24h"]
     book(["confirmed"]) --> confirm["create video room<br/>send confirmation<br/>now"]
     confirm --> remind["reminders<br/>per group rule<br/>e.g. T-24h"]
-    remind --> kind{"dispatch kind<br/>(ADR 0043)"}
-    kind -->|contact center| dispatch["T-dispatch lead<br/>WxCC task created,<br/>booking read-only"]
-    kind -->|own queue| claim["read-only N working days ahead;<br/>visible in the queue,<br/>an agent claims it"]
-    dispatch --> meeting(["call<br/>from start to finish"])
+    remind --> lock["T-change lead<br/>moving closes, cancelling<br/>stays open (ADR 0069)"]
+    lock --> kind{"dispatch kind<br/>(ADR 0043)"}
+    kind -->|contact center| dispatch["T-dispatch lead<br/>WxCC task created"]
+    kind -->|own queue| claim["visible in the queue,<br/>an agent claims it"]
+    dispatch --> meeting(["call from start to finish;<br/>no change from the start"])
     claim --> meeting
     meeting --> purge["slot end + 24h<br/>purge PII"]
 

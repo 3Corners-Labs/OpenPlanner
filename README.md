@@ -136,7 +136,7 @@ make check
 | `GET /g/{slug}` | Booking page of a group: month calendar and the free times of a day. |
 | `GET/POST /g/{slug}/book` | Contact form and booking. |
 | `GET /b/{token}` | The link from an email: checks the token, sets a participant cookie and redirects to `/b/m/{ref}` (ADR 0093). |
-| `GET /b/m/{ref}` | Management page; read-only from the dispatch moment. |
+| `GET /b/m/{ref}` | Management page: move until the group's change deadline (`participant_change_lead_minutes` before the start), cancel until the start (ADR 0069); read-only from the start. |
 | `GET/POST /b/m/{ref}/confirm` | Confirm the booking (ADR 0056). |
 | `GET/POST /b/m/{ref}/cancel`, `/b/m/{ref}/reschedule` | Cancel or move the appointment. |
 | `GET/POST /b/m/{ref}/test` | Trial call on Webex before the appointment (ADR 0071). |
