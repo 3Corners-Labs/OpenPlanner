@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Betreft | OpenPlanner 0.4.0 (tag `v0.4.0`, uitgebracht op 4 november 2026) |
-| Stand | Concept 1 van 5 november 2026, beschreven tegen de code van `v0.4.0` en `docs/adr-status.md` (gecontroleerd tegen de code op 3 november 2026) |
+| Stand | Concept 1a van 5 november 2026, beschreven tegen de code van `v0.4.0` en `docs/adr-status.md` (gecontroleerd tegen de code op 3 november 2026). Besluiten van na de release staan in 10.2 en 13.1 |
 | Taal | Nederlands, als stakeholderdocument naast `docs/HANDOVER.md`. Code, ADR's en de overige documentatie zijn Engels |
 | Lezers | Architecten en ontwikkelaars van een organisatie die OpenPlanner in haar landschap inpast, beheerders, en het productteam |
 | Bron van waarheid | De code op `main`, de ADR's en `docs/adr-status.md`. Dit document beschrijft en verwijst; het beslist niets |
@@ -40,15 +40,17 @@ Eén installatie bedient meer organisaties, elk met eigen groepen, huisstijl, te
 beheerders. De bedrijfsregels staan in een framework-vrije domeinlaag achter *poorten*; elk
 extern systeem (video, contactcenter, mail, sms, identity provider, logplatform, releases) zit
 achter een eigen *adapter*. Een nieuw kanaal, een nieuwe sms-gateway of een nieuwe logbestemming
-is daardoor een nieuwe adapter plus een registratie, zonder wijziging van het domein.
+is daardoor een nieuwe soort, een adapter en een registratie, zonder wijziging van de
+domeinservices.
 
-De architectuur is vastgelegd in 115 genummerde besluiten (ADR's) met per besluit een bouwstatus
-die tegen de code wordt gecontroleerd. Beveiliging en privacy zijn ontwerpuitgangspunten. Eén
-autorisatiematrix bepaalt alle rechten. Persoonsgegevens staan alleen op de afspraak en komen
-niet in logs, taken, foutmeldingen of berichten naar het contactcenter. Een CI-pijplijn die niet
-te omzeilen is, bewaakt elke wijziging. Wat de applicatie zelf niet kan aantonen (identity
-provider, hosting, leverancier van video en contactcenter, verwerkingsverantwoordelijke) staat
-als checklist in `docs/assurance/`.
+De architectuur van 0.4.0 is vastgelegd in 115 genummerde besluiten (ADR's) met per besluit een
+bouwstatus die tegen de code wordt gecontroleerd. Daarna kwam ADR 0116 over de release- en
+updatemodellen. Beveiliging en privacy zijn ontwerpuitgangspunten. Eén autorisatiematrix bepaalt
+alle rechten. Persoonsgegevens staan alleen op de afspraak en komen niet in logs, taken,
+foutmeldingen of berichten naar het contactcenter. Een CI-pijplijn die niet te omzeilen is,
+bewaakt elke wijziging. Wat de applicatie zelf niet kan aantonen (identity provider, hosting,
+leverancier van video en contactcenter, verwerkingsverantwoordelijke) staat als checklist in
+`docs/assurance/`.
 
 Voor inpassing in een landschap levert een omgeving vijf dingen. Dat zijn een website met
 keuzeboom die naar de groepspagina linkt, een identity provider voor beheerders, een
@@ -86,7 +88,7 @@ naar de primaire plek.
 
 - **arc42** (versie 8, open sjabloon van Starke en Hruschka) bepaalt de hoofdstukindeling:
   doelen, randvoorwaarden, context, oplossingsstrategie, bouwblokken, gedrag, deployment,
-  concepten, besluiten, kwaliteit, risico's, begrippen. Het is de meest gebruikte open indeling
+  concepten, besluiten, kwaliteit, risico's, begrippen. Het is een veelgebruikte open indeling
   voor software-architectuurdocumentatie en legt geen methode of notatie op.
 - **C4-model** (Simon Brown) bepaalt de diagramniveaus: systeemcontext (C1), containers (C2),
   componenten (C3). Code-niveau (C4) hoort niet in dit document.
@@ -112,6 +114,7 @@ verwijzing of de consequentie aan.
 | Technische architectuur | `docs/architecture.md` | en | Diagrammen per laag, sequentiediagrammen, toestandsdiagrammen, modulekaart |
 | Platen | `docs/diagrams/`, `scripts/diagrams/content.py` | nl | Bouwblokken B1 tot en met B17, componenten per laag, integraties |
 | Besluiten | `docs/adr/`, `docs/adr-status.md` | en | Elk besluit met context, keuze, instellingen, gevolgen en bouwstatus |
+| Onderzoek | `docs/research/` | en | Onderbouwing van grotere keuzes, zoals de release- en updatemodellen van ADR 0116 |
 | Gegevens en privacy | `docs/dataflow.md` | en | Elke gegevensstroom en uitgaande verbinding; invoer voor de DPIA |
 | Dreigingen | `docs/threat-model.md` | en | STRIDE per keten, misbruikgevallen met test |
 | Gegenereerd uit de code | `docs/authorization.md`, `docs/settings.md`, `docs/admin-map.md`, `docs/logging.md`, `docs/api.md` | en | Rechtenmatrix, instellingen, beheerstructuur, logacties, API; CI faalt als zij afwijken |
@@ -323,10 +326,10 @@ vandaag is.
 
 | Capability | Realisatie 0.4.0 | Richting | Protocol | Wat erover gaat | Poort en adapter | Vervangbaar | ADR |
 |---|---|---|---|---|---|---|---|
-| E-mail versturen | SMTP-server van de organisatie; terugval op `SMTP_HOST` van de installatie | uit | SMTP met STARTTLS of TLS | Voornaam, e-mailadres, datum, team, beheerlink, `.ics` | `MessageSender`, `adapters/smtp.py` | Ja: elke SMTP-server |
+| E-mail versturen | SMTP-server van de organisatie; terugval op `SMTP_HOST` van de installatie | uit | SMTP met STARTTLS of TLS | Voornaam, e-mailadres, datum, team, beheerlink, `.ics` | `MessageSender`, `adapters/smtp.py` | Ja: elke SMTP-server | 0009, 0022 |
 | Sms versturen | Webex Connect | uit | HTTPS | Telefoonnummer, voornaam, datum, tijd, team, beheerlink | `MessageSender`, `adapters/webex_connect_sms.py`, registry `SMS_GATEWAYS` | Ja: nieuwe gateway is één adapter | 0022, 0028 |
 | Videomeeting aanmaken en volgen | Webex Meetings API via een Service App, namens de host van de groep | uit, in (webhooks) | HTTPS, webhooks met HMAC-SHA1 en replay-sleutel | Groepsnaam en tijden; terug: meeting-id, deelnamelink, gebeurtenissen | `VideoProvider`, `adapters/webex_meetings.py` | Beperkt: poort bestaat, contract is Webex-vormig; tweede platform vraagt een eigen ADR | 0017, 0010 |
-| Gesprek bij een medewerker brengen | Webex Contact Center, Create Task API v2, taakevents via subscription | uit, in | HTTPS, webhooks met HMAC-SHA256 binnen 300 s | Referentie, voornaam, startlabel, groepsnaam, hostlink, soort, routeringsvariabelen | `ContactCenterDispatcher`, `adapters/wxcc.py` | Beperkt: ontwerp voor neutraliteit in ADR 0032, niet gebouwd | 0018, 0021, 0032 |
+| Gesprek bij een medewerker brengen | Webex Contact Center, Create Task API v2, taakevents via subscription | uit, in | HTTPS, webhooks met HMAC-SHA256 binnen 300 s | Referentie, voornaam, startlabel, groepsnaam, hostlink, soort en de routeringswaarde van de groep | `ContactCenterDispatcher`, `adapters/wxcc.py` | Beperkt: ontwerp voor neutraliteit in ADR 0032, niet gebouwd | 0018, 0021, 0032 |
 | Eigen wachtrij | OpenPlanner zelf: medewerkers claimen afspraken in het portaal | intern | n.v.t. | Afspraken binnen de zichttermijn, pseudoniem van wie claimt | `DispatchKind.OPENPLANNER_QUEUE`, `domain/own_queue.py` | n.v.t. | 0043 |
 | Beheerders authenticeren | OIDC-provider van het platform en per organisatie een eigen provider, gekozen op e-maildomein; meegeleverde Keycloak voor test en lab | in | OIDC code flow met PKCE, `private_key_jwt` of client secret | Claims: identiteit, e-mail, entitlements (rol en bereik), bewijs van tweede factor | `IdentityProvider`, `adapters/oidc.py`, `adapters/idp_registry.py` | Ja: elke OIDC-provider met asymmetrische handtekening | 0013, 0083, 0097, 0100 |
 | Medewerkers beheren in de provider | Admin REST API van de meegeleverde Keycloak | uit | HTTPS | Naam, gebruikersnaam, rollen | `StaffDirectory`, `adapters/keycloak_directory.py` | Beperkt: alleen Keycloak; SCIM 2.0 is ontworpen (ADR 0046), niet gebouwd | 0095, 0046 |
@@ -412,6 +415,12 @@ Drie eigenschappen bepalen hoe de applicatie in zo'n geheel past:
 - **Kleine, zelfstandige voetafdruk.** Twee processen en één bestand als database; geen
   afhankelijkheid van een message broker, cache of databaseserver. De prijs is dat de installatie
   op één host draait en niet horizontaal schaalt (ADR 0036, hoofdstuk 12).
+- **Drie exploitatievormen.** Na 0.4.0 legt ADR 0116 drie vormen vast. Privé: in het datacenter
+  van een klant, mogelijk zonder internet. Toegewijd: één installatie per klant, gehost door de
+  leverancier. Mogelijk gedeeld: één installatie met meer klanten als organisaties. Alle drie
+  draaien dezelfde ondertekende images; wat verschilt is wie bijwerkt, binnen welk venster, en
+  wie de back-up draagt. Het gedeelde model raakt de regel over één verwerkingsverantwoordelijke
+  hierboven (R-13).
 
 Wat de omgeving aan OpenPlanner levert en wat zij terugkrijgt, staat als vragenlijst in 13.3.
 
@@ -450,7 +459,7 @@ elkaar verwijzen. De kolom *stand* volgt `docs/adr-status.md` en is nieuwer dan 
 | Kern | B5 | Afspraken en tokens | Boeken, bevestigen, verzetten en annuleren in één transactie onder het schrijfslot; capaciteitssnapshot op het slot; beheertoken afgeleid van salt en serversleutel | gebouwd; bevestigen per e-mail deels (ADR 0056) |
 | Kern | B6 | Berichten en herinneringen | Vaste lay-outs met bewerkbare tekstblokken, herinneringsregels per groep, e-mail met `.ics`, sms; afzenderdomeincontrole | gebouwd |
 | Kern | B7 | Gespreksregie | Meeting namens de host van de groep, werkitem naar het contactcenter op T-dispatch of claim in de eigen wachtrij, ondertekende webhooks terug, tijdlijn en gespreksstatus per afspraak | gebouwd; neutraliteit niet (ADR 0032) |
-| Kern | B8 | Privacy en retentie | `purge_pii` op afloop plus 24 uur met drie bewuste uitstelregels, nachtelijke veegronde, retentie-overzicht, dagtellingen na de purge | gebouwd |
+| Kern | B8 | Privacy en retentie | `purge_pii` op afloop plus 24 uur met drie bewuste uitstelregels, dagelijkse veegronde, retentie-overzicht, dagtellingen na de purge | gebouwd |
 | Beheer | B9 | Beheerportaal | Scope, object, tabblad uit één navigatieregister; organisaties, groepen, bezetting, teksten, kanalen, huisstijl, agenda, planner, wachtrij, overzicht met widgets, handleiding in het portaal | gebouwd; onderdelen deels (ADR 0033, 0047, 0096) |
 | Beheer | B10 | Autorisatie en audit | Eén matrix, 46 permissies op drie niveaus, vijf vaste rollen en eigen rollen binnen grenzen, scope in elke query, audit van weigeringen, logins en wijzigingen, CSV-export | gebouwd |
 | Beheer | B11 | Machine-API | `/api/agent/v1` voor contactcenter-bots: client credentials, opake tokens van tien minuten, scopes per client, standaard uit, geen persoonsgegevens | stap 1 gebouwd; wijzigen via bevestiging door de deelnemer niet (ADR 0023) |
@@ -534,8 +543,8 @@ map*) is de volledige lijst. Elke module heeft een docstring die haar verantwoor
 
 Elke poort is een `Protocol` in `app/domain/ports.py`. De domeinservices kennen alleen de poort;
 `app/main.py` en `app/jobs/worker.py` steken de adapter erin. Tests vervangen elke adapter door
-een fake uit `tests/fakes/`; de in-memory unit of work heeft hetzelfde commit- en rollbackgedrag
-als de SQL-versie.
+een fake. De gedeelde fakes staan in `tests/fakes/`, een paar staan in de test die ze gebruikt.
+De in-memory unit of work heeft hetzelfde commit- en rollbackgedrag als de SQL-versie.
 
 ```mermaid
 flowchart LR
@@ -552,7 +561,7 @@ flowchart LR
         cc["wxcc: WxccTasks"]
         oidc["oidc: OidcIdentityProvider<br/>idp_registry: één per organisatieprovider"]
         kc["keycloak_directory: KeycloakDirectory"]
-        logs["log_senders: Syslog · SplunkHec · Elastic · Http"]
+        logs["log_senders: Syslog · Splunk · Elastic · Http"]
         rel["releases: GitHubReleases"]
         clock["clock: SystemClock"]
     end
@@ -580,17 +589,17 @@ flowchart LR
 | `VideoProvider` | Meetings aanmaken en verwijderen | `webex_meetings.py` | `integrations` |
 | `ContactCenterDispatcher` | Werkitems aanmaken en beëindigen | `wxcc.py` | `integrations` |
 | `IntegrationChecker`, `ProbeRegistry` | De integratieketen van een groep controleren, de proefmeeting en haar events onthouden | `group_check.py`, `db/probes.py` | `integrations` |
-| `RequestLog` | Elke aanroep naar een provider als systeemevent | via `db` | `integrations` |
-| `IdentityProvider` | Beheerderslogin via OIDC | `oidc.py`, `idp_registry.py` | `identity`, `identity_providers` |
+| `RequestLog` | Elke aanroep naar een provider als systeemevent | `RequestEvents` in `app/domain/request_log.py` | niet nodig: de poort is optioneel |
+| `IdentityProvider` | Beheerderslogin via OIDC | `oidc.py`, `idp_registry.py` | `identity` |
 | `DiscoveryFetcher`, `SigningKeys` | Discovery-document ophalen via de uitgaande bewaker; sleutelpaar per provider voor `private_key_jwt` | `discovery.py`, `signing_keys.py` | `identity_providers` |
 | `StaffDirectory` | Medewerkers beheren in de meegeleverde provider | `keycloak_directory.py` | `staff_directory` |
-| `EventSink` | Vastgelegde events naar de logstroom na commit | `event_sink.py` (stdout) | in tests een lijst |
+| `EventSink` | Vastgelegde events naar de logstroom na commit | `event_sink.py` (stdout) | in de test (`RecordingSink`) |
 | `LogDestinationSender` | Batches logregels naar één bestemming | `log_senders.py` | `log_destinations` |
-| `ReleaseSource` | Gepubliceerde releases opzoeken | `releases.py` (GitHub) | `updater_host` |
+| `ReleaseSource` | Gepubliceerde releases opzoeken | `releases.py` (GitHub) | in de test (`FakeReleases`) |
 | `CertificateProbe`, `InstanceProbe` | TLS-handshake met het publieke adres; de rondgang naar `/api/v1/instance` | `tls_probe.py`, `instance_probe.py` | `tls`, `instance` |
 | `MailDomainResolver` | TXT-records opzoeken | `mail_dns.py` | `dns` |
-| `PemReader`, `CertificateVolume` | Geüploade certificaatketen en sleutel lezen; de map die de proxy leest | `certificate_pem.py`, `certificate_volume.py` | in tests een map |
-| `ConfigurationTransfer` | Configuratiepakketten lezen en schrijven | `db/configuration_package.py` | in tests een map |
+| `PemReader`, `CertificateVolume` | Geüploade certificaatketen en sleutel lezen; de map die de proxy leest | `certificate_pem.py`, `certificate_volume.py` | `tls` |
+| `ConfigurationTransfer` | Configuratiepakketten lezen en schrijven | `db/configuration_package.py` | in de test (`FakeTransfer`) |
 
 ### 5.5 Gegevens op hoofdlijnen
 
@@ -643,7 +652,7 @@ flowchart LR
     bevestig --> meeting["meeting aanmaken<br/>namens de host van de groep"]
     meeting --> bericht["bevestiging met .ics,<br/>herinneringen per groepsregel,<br/>proefgesprek mogelijk"]
     bericht --> dispatch{"dispatchsoort<br/>van de groep"}
-    dispatch -- "contactcenter" --> werkitem["T-dispatch: werkitem<br/>naar de wachtrij,<br/>afspraak alleen-lezen"]
+    dispatch -- "contactcenter" --> werkitem["T-dispatch: werkitem<br/>naar de wachtrij<br/>van het contactcenter"]
     dispatch -- "eigen wachtrij" --> claim["zichtbaar in de eigen wachtrij,<br/>een medewerker claimt"]
     werkitem --> gesprek["gesprek in Webex<br/>deelnemer in de browser,<br/>medewerker als cohost"]
     claim --> gesprek
@@ -663,7 +672,9 @@ Wat vast ligt:
   en verwijderen de meeting. De deelnemer kan annuleren tot de start en verzetten tot de termijn
   van de groep (standaard 60 minuten, ADR 0069).
 - **De dispatch** gebeurt op `dispatch_lead_minutes` vóór de start (standaard vijf minuten).
-  Vanaf dat moment is de afspraak voor de deelnemer alleen-lezen.
+  Verzetten kan dan niet meer, want de wijzigingstermijn is nooit korter dan de dispatch.
+  Annuleren blijft mogelijk tot de start; het werkitem wordt dan als geannuleerd gemarkeerd en
+  beëindigd (ADR 0021).
 - **Terugkoppeling** van Webex en het contactcenter komt als ondertekende webhook binnen en wordt
   een gebeurtenis op de tijdlijn van de afspraak; de agenda in het portaal toont de
   gespreksstatus per dag.
@@ -673,7 +684,7 @@ Wat vast ligt:
 | | Contactcenter (`contact_center`) | Eigen wachtrij (`openplanner_queue`) |
 |---|---|---|
 | Wie verdeelt | De wachtrij van het contactcenter, op het startmoment | Medewerkers met het recht `queue.work`, die een afspraak claimen |
-| Wat OpenPlanner stuurt | Een werkitem met referentie, voornaam, startlabel, groepsnaam, hostlink, soort en routeringsvariabelen | Niets naar buiten; optioneel een agenda-uitnodiging aan het teamadres |
+| Wat OpenPlanner stuurt | Een werkitem met referentie, voornaam, startlabel, groepsnaam, hostlink, soort en de routeringswaarde van de groep; onderwerpen en attributen volgen met ADR 0081 | Niets naar buiten; optioneel een agenda-uitnodiging aan het teamadres |
 | Wat terugkomt | Taakevents (aangemaakt, verbonden, beëindigd, mislukt) via webhook | Claims en vrijgaven in het portaal, pseudoniem van wie claimde |
 | Inrichting bij de organisatie | Een flow in het contactcenter die op de groep routeert; `wxcc-config-check` leest de keten na, `wxcc-sample-flow` levert een importeerbare flow | Geen |
 | Wanneer kiezen | Het team werkt in het contactcenter en wil de verdeling daar | Het team heeft geen contactcenter, of wil zelf kiezen |
@@ -691,14 +702,15 @@ het schrijfslot, voert ze uit en doet daarna zijn bewakingswerk.
 | Soort werk | Taken (`JobType`) of bewaking | Regel |
 |---|---|---|
 | Gesprek | `create_video_room`, `delete_video_room`, `delete_trial_call`, `dispatch_wxcc_task`, `end_wxcc_task` | Idempotent: een afspraak die haar meeting of taak al heeft, wordt overgeslagen |
-| Berichten aan de deelnemer | `send_confirm_request`, `send_confirm_reminder`, `send_confirmation`, `send_change`, `send_reminder`, `send_cancellation`, `send_unconfirmed_lapsed` | Tekstblokken uit de taalketen; kanaal uit de herinneringsregel; overslaan als het kanaal niet bereikbaar is |
+| Bevestigen en vervallen | `send_confirm_request`, `send_confirm_reminder`, `expire_unconfirmed`, `send_unconfirmed_lapsed` | Een afspraak die niet vóór `confirm_by` is bevestigd, vervalt en de deelnemer krijgt bericht (ADR 0056) |
+| Berichten aan de deelnemer | `send_confirmation`, `send_change`, `send_reminder`, `send_cancellation` | Tekstblokken uit de taalketen; kanaal uit de herinneringsregel; overslaan als het kanaal niet bereikbaar is |
 | Noodsluiting en herboeken | `send_suspension`, `send_closure_update`, `send_reinstatement`, `send_rebook_request`, `send_rebook_reminder`, `send_rebook_lapsed`, `lapse_rebook` | ADR 0024, 0044, 0057 |
 | Eigen wachtrij | `send_team_invite`, `send_team_cancel` | Agenda-uitnodiging als `REQUEST` aan het teamadres (ADR 0043) |
 | Verwijderen | `purge_pii` | Afloop plus 24 uur, annulering plus 24 uur, of een van de drie uitstelregels (8.6) |
 | Uitvoering | elke taak | Retry na 1, 5 en 15 minuten, daarna mislukt; een claim ouder dan tien minuten wordt overgenomen (worker gecrasht); `pinned_start` laat een taak stil stoppen als de afspraak veranderde |
-| Bewaking per lus | opslag (vrije ruimte, databasegrootte, pagina's teruggeven), heartbeat, wachttijd in eigen wachtrijen, leeftijd van update-back-ups | Grenzen als instelling; een overschrijding is een systeemevent en een melding in het portaal |
+| Per lus en elk uur | opslag meten (vrije ruimte, databasegrootte), heartbeat, wachttijd in eigen wachtrijen; elk uur vrije pagina's teruggeven en verlopen beheersessies en update-back-ups van meer dan een dag verwijderen | Grenzen als instelling; een overschrijding is een systeemevent en een melding in het portaal |
 | Bewaking op interval | releasecheck, certificaatproef, rondgang naar het publieke adres, TXT-records van logindomeinen, afzenderdomeinen | Intervallen als instelling van klasse C |
-| Nachtelijk | retentieveegronde (`retention_sweep`), samenvoegen van oude afspraken tot dagtellingen, wissen van gearchiveerde groepen | Alarm als een afspraak 48 uur na haar retentiemoment nog gegevens heeft |
+| Dagelijks | retentieveegronde (`retention_sweep`), oude afspraakrijen samenvoegen tot dagtellingen, gearchiveerde groepen wissen waar niets meer naar verwijst, medewerkersrecords zonder login na de bewaartermijn wissen | Alarm als een afspraak 48 uur na haar retentiemoment nog gegevens heeft; de termijnen zijn instellingen |
 | Logverzending | één `LogShipper` per proces | Wachtrij per bestemming, batches, backoff; levering loopt nooit in een verzoek of taak |
 
 ### 6.4 Beheerketen: inloggen, autoriseren, vastleggen
@@ -742,11 +754,11 @@ organisatieprovider.
 | Persistentie | SQLAlchemy 2 async, aiosqlite, SQLite WAL, Alembic | Eén bestand, geen databaseserver, transacties en een schrijfslot; migraties altijd omkeerbaar | ADR 0002 |
 | Validatie en instellingen | Pydantic v2, pydantic-settings | Invoer aan de grens gevalideerd; klasse A en B uit de omgeving | ADR 0042 |
 | Sjablonen | Jinja2, server-rendered | Werkt zonder JavaScript; geen SPA | ADR 0016 |
-| HTTP-client | httpx | Eén client voor OIDC, Webex, het contactcenter, sms, logbestemmingen; één tracepunt per uitgaande aanroep | ADR 0085 |
+| HTTP-client | httpx | Eén client voor OIDC, Webex, het contactcenter, sms en logbestemmingen; één tracepunt per uitgaande aanroep | `CLAUDE.md`, ADR 0085 |
 | Logging | structlog, JSON | Eén eventschema, PII-masker als processor | ADR 0040, 0103 |
 | Cryptografie | `cryptography` (AES-256-GCM, HKDF), PyJWT, hmac uit de standaardbibliotheek | De-factostandaarden; parameters zijn constanten | ADR 0008, 0011, 0094 |
 | Taal | Babel, gettext-catalogi | Standaard voor meertaligheid in Python | ADR 0004 |
-| Rate limiting | slowapi, `limits` | Gevestigd framework, centraal geplaatst | ADR 0053 |
+| Rate limiting | slowapi, `limits` | Gevestigd framework, centraal geplaatst, grenzen als instelling | `CLAUDE.md`, ADR 0042 §7 |
 | Widget | Vanilla JavaScript, esbuild | Geen framework te onderhouden; één ES-module met SRI-hash | ADR 0035 |
 | TLS-rand | Caddy met ACME | Automatische vernieuwing, eigen image in `deploy/proxy/` | ADR 0030, 0064 |
 | Identity provider (meegeleverd) | Keycloak | Open source, OIDC, beheer via REST; in productie op eigen PostgreSQL | ADR 0090, 0106 |
@@ -858,6 +870,14 @@ flowchart LR
   onderhoudsmodus eromheen (ADR 0029, 0038, 0048).
 - **Op Kubernetes** is een update `helm upgrade`; de updater en de knop in het portaal doen daar
   nog niets (ADR 0114, stap 4).
+- **Na 0.4.0** legt ADR 0116 het release- en updatemodel vast. Er is één editie: alles is
+  EUPL-1.2 en gratis, en beveiligingsfixes staan nooit achter een betaling. Vanaf 1.0.0 krijgen
+  de nieuwste twee minors beveiligingsfixes. Een onderhoudslijn `release/X.Y` ontstaat alleen als
+  een fix moet uitkomen terwijl `main` al nieuwe functies bevat. Een patch bevat geen migratie,
+  en elke migratie volgt expand en contract. Een upgradematrix in CI test migraties op gegevens
+  van uitgebrachte versies. Elke release wordt publiek, updatevensters en lijnen komen in het
+  portaal, en een ondertekende bundel maakt offline levering mogelijk. Gebouwd is alleen stap 2:
+  een gewijzigde migratie maakt een minorrelease.
 
 ### 7.5 Configuratie in vier klassen
 
@@ -884,9 +904,9 @@ reizen nooit mee.
 | Wat | Waar | Voor wie |
 |---|---|---|
 | Systeemstatus: versie, adres en proxy, certificaat, worker, opslag, sleutelrotatie, back-upleeftijd, logbestemmingen | *Platform › Geavanceerde instellingen* | superuser, auditor |
-| Overzicht met widgets en meldingen (eigen rol, afspraken van vandaag als aantallen, wachtrij, lopende taken, systeemstatus, recente wijzigingen) | *Monitor › Overzicht* | elke beheerder, binnen bereik |
-| Audit log met filters en CSV-export; systeemevents per niveau; diagnosemodus per groep | *Monitor › Audit log* | beheerder, auditor |
-| Retentie-overzicht: afspraken die nog gegevens dragen, achterstand | *Monitor › Retentie* | organisatiebeheerder, auditor |
+| Overzicht met widgets en meldingen (eigen rol, afspraken van vandaag als aantallen, wachtrij, lopende taken, systeemstatus, recente wijzigingen) | *Bewaken › Overzicht* | elke beheerder, binnen bereik |
+| Auditlog met filters en CSV-export; systeemevents per niveau; diagnosemodus per groep | *Bewaken › Auditlog* | beheerder, auditor |
+| Retentie-overzicht: afspraken die nog gegevens dragen, achterstand | *Bewaken › Bewaartermijnen* | organisatiebeheerder, auditor |
 | Logbestemmingen met tellers en reden per bestemming | *Platform › Logbestemmingen* | superuser |
 | Probleemoplossing per afspraak: verzoeken, versies, retries, de worker | de afspraak in de agenda | planner, beheerder |
 | Koppeling controleren per groep, met een proefmeeting en een proefwerkitem | tabblad van de groep | wie de groep mag bewerken |
@@ -920,7 +940,7 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 
 ### 8.2 Uitbreidpunten in 0.4.0
 
-| Wil je toevoegen | Uitbreidpunt | Vandaag | Vervangbaar zonder domeinwijziging | Besluit |
+| Wil je toevoegen | Uitbreidpunt | Vandaag | Zonder wijziging van de domeinservices | Besluit |
 |---|---|---|---|---|
 | Een berichtkanaal | `ChannelKind` + `MessageSender` | e-mail, sms; WhatsApp als waarde met toestemmingsregel, zonder adapter | ja | ADR 0009 |
 | Een sms-gateway | `SmsProvider` + `SMS_GATEWAYS` | Webex Connect | ja | ADR 0028 |
@@ -969,7 +989,8 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 2. Daarna is een platform één adapter plus descriptor, opgenomen fixtures en een eigen ADR voor
    API, authenticatie en webhooks (CC-6 in `docs/backlog-architecture-gaps.md`).
 3. De privacyregel voor uitgaande berichten (alleen referentie, voornaam, startlabel, groepsnaam,
-   hostlink, soort en routeringscodes) krijgt per adapter een test op de opgenomen payload.
+   hostlink, soort en routeringscodes uit een gesloten lijst) krijgt per adapter een test op de
+   opgenomen payload.
 
 **Een nieuwe logbestemming** (bijvoorbeeld een OpenTelemetry-collector):
 
@@ -1011,9 +1032,9 @@ Rechten komen uit één matrix (ADR 0014) met 46 permissies op drie niveaus: por
 en groep. Er zijn vijf vaste rollen (superuser, organisatiebeheerder, groepsbeheerder, compliance
 en privacy, agent) en eigen rollen die de superuser binnen vaste grenzen afleidt van een sjabloon
 (ADR 0039). De rol en het bereik komen in één claimwaarde mee (ADR 0049), of via een mapping van
-claims. Een organisatie kan een eigen OIDC-provider registreren; de login wordt op het
-e-maildomein gekozen na een DNS-bewijs en blijft beperkt tot die organisatie (ADR 0083). Er is
-geen noodlogin en geen rolwisselaar.
+claims. De superuser kan per organisatie een eigen OIDC-provider registreren. De login wordt dan
+op het e-maildomein gekozen na een DNS-bewijs en blijft beperkt tot die organisatie (ADR 0083).
+Er is geen noodlogin en geen rolwisselaar.
 
 ### 8.6 Privacy en retentie
 
@@ -1026,7 +1047,7 @@ geen noodlogin en geen rolwisselaar.
   uitstelregels zijn bewust. Een opgeschorte afspraak (noodsluiting) blijft tot 30 dagen na het
   einde van de sluiting, met een maximum per instelling. Een afspraak die wacht op een nieuwe
   tijd blijft tot `rebook_by` plus 24 uur, en een onbevestigde afspraak tot `confirm_by` plus 24
-  uur. Een nachtelijke veegronde vangt wat de taak miste en slaat alarm na 48 uur. Na de purge
+  uur. Een dagelijkse veegronde vangt wat de taak miste en slaat alarm na 48 uur. Na de purge
   blijft een rij zonder gegevens voor aantallen; de tekst zegt "verwijderd", nooit iets anders
   (ADR 0102).
 - **Nergens anders.** Niet in logs (masker als processor plus een semgrep-regel), niet in
@@ -1035,8 +1056,9 @@ geen noodlogin en geen rolwisselaar.
   nooit persoonsgegevens. De beheerpagina van de deelnemer toont geen contactgegevens, zodat een
   doorgestuurde link alleen de afspraak prijsgeeft.
 - **Naar buiten** gaan alleen: naar mail en sms wat de deelnemer zelf leest; naar het
-  contactcenter referentie, voornaam, startlabel, groepsnaam, hostlink, soort en routeringscodes;
-  naar Webex groepsnaam en tijden. `docs/dataflow.md` is de invoer voor de DPIA.
+  contactcenter referentie, voornaam, startlabel, groepsnaam, hostlink, soort en de
+  routeringswaarde van de groep; naar Webex groepsnaam en tijden. `docs/dataflow.md` is de invoer
+  voor de DPIA.
 - **Back-ups.** De terugdraaikopie van een update leeft 24 uur op het datavolume. Herstel uit een
   oudere kopie eindigt altijd met `purge-overdue`, omdat de kopie gegevens kan bevatten die op
   het levende systeem al weg waren. Disaster recovery is van de host (O7).
@@ -1105,7 +1127,7 @@ detectief (D) of correctief (C). Elke rij heeft een thuis in de code of de CI en
 |---|---|---|---|---|
 | Rand | TLS met automatisch vernieuwd of eigen certificaat; certificaat en publiek adres periodiek geproefd en getoond | P, D | `deploy/proxy/`, `tls_check`, `address_check` | ADR 0030, 0064, 0086 |
 | Rand | Elke hop met persoonsgegevens versleuteld, of een vastgelegde uitzondering (proxy naar `web` op één host) | P | `docs/dataflow.md`, `web_transport` | ADR 0091 |
-| Rand | Responsheaders standaard dicht: CSP zonder scripts (behalve de kleine scripts op live pagina's), HSTS, frame-weigering, COOP, COEP, CORP, Permissions-Policy | P | `api/security_headers.py`, `web/templates.py` | dreigingsmodel |
+| Rand | Responsheaders standaard dicht: CSP die alleen eigen scripts toelaat, en alleen op de pagina's die ze gebruiken, HSTS, frame-weigering, COOP, COEP, CORP, Permissions-Policy | P | `api/security_headers.py`, `web/templates.py` | dreigingsmodel |
 | Rand | Doorgestuurde headers alleen van de bekende proxy; een onbekende afzender is een event | P, D | `proxy_watch`, compose | ADR 0086 |
 | Verzoek | CSRF in drie lagen: Fetch Metadata, Origin-terugval, `SameSite=Lax` | P | `web/protection.py` | dreigingsmodel |
 | Verzoek | Rate limits (10 boekingen per IP per uur, 60 leesacties per minuut; instelbaar binnen grenzen) en honeypot; floods als securityevent | P, D | `web/protection.py`, `security_log` | ADR 0042 §7, 0053 |
@@ -1173,8 +1195,8 @@ een bouwstatustabel. Een PR die een stap bouwt, werkt die tabel bij; `docs/adr-s
 overzicht en wordt tegen de code gecontroleerd (een test faalt als de statusregel en het
 overzicht verschillen). Een PR die een besluit wijzigt, is een *beslissing* en wacht op de
 beslispoort. Die opent alleen met het label `po:approved` van een beheerder van de repository
-(ADR 0078, 0088, 0104). Bouwwerk merget zodra alle controles groen zijn. Vóór een hoofdversie
-beoordeelt een tweede model alles sinds de vorige release (ADR 0079).
+(ADR 0078, 0088, 0104). Bouwwerk merget zodra alle controles groen zijn. Vóór elke release
+`vX.Y.0` beoordeelt een tweede model alles sinds de vorige release (ADR 0078, 0079).
 
 ### 10.2 Besluiten per thema en hun bouwstand
 
@@ -1183,7 +1205,7 @@ van het besluit nog niet in de code staat; het overzicht zegt welke.
 
 | Thema | Besluiten | Stand op 0.4.0 |
 |---|---|---|
-| Fundament en werkwijze | 0001 ADR's, 0002 runtime, 0005 modulariteit, 0012 merge op instructie, 0051 afhankelijkheden, 0054 licentie, 0058 twee banen, 0078 soorten PR, 0088 beslispoort, 0104 label, 0107 tags, 0109 guardrails, 0115 neutraal | gebouwd; 0058, 0078 deels |
+| Fundament en werkwijze | 0001 ADR's, 0002 runtime, 0003 licentie-uitzondering certifi, 0005 modulariteit, 0012 merge op instructie, 0051 afhankelijkheden, 0054 licentie, 0058 twee banen, 0078 soorten PR, 0088 beslispoort, 0104 label, 0107 tags, 0109 guardrails, 0115 neutraal | beleid: 0001, 0005, 0012; deels: 0002, 0058, 0078; de rest gebouwd |
 | Domein en afspraak | 0011 tokens, 0019 direct bellen, 0024 noodsluiting, 0025 feestdagen, 0026 plafond, 0027 bezettingsblokken, 0043 eigen wachtrij, 0044 planner, 0055 formuliervelden, 0056 bevestigen, 0057 herboeken, 0066 per e-mailadres, 0069 wijzigingstermijn, 0071 proefgesprek, 0072 direct bellen per blok, 0075 deelnamelink, 0076 reis van de deelnemer, 0084 wijzigbaar en verwijderbaar | gebouwd; 0027, 0043, 0056, 0057, 0066, 0072, 0075, 0076 deels |
 | Berichten en teksten | 0004 i18n, 0009 kanalen, 0022 kanalen per organisatie, 0028 sms-gateway, 0073 afleverbaarheid, 0074 organisatieteksten, 0077 terminologie | gebouwd; 0004, 0073, 0077 deels |
 | Video en contactcenter | 0007 en 0018 werkitems, 0010 live status, 0017 Webex Meetings, 0021 beëindigen, 0032 neutraal contactcenter, 0045 Webex-site, 0065 reden van Webex, 0068 probleemoplossing, 0081 onderwerpen en routering, 0082 verificatie en terugval | gebouwd; 0032, 0045, 0081 niet gebouwd; 0082 deels |
@@ -1195,6 +1217,7 @@ van het besluit nog niet in de code staat; het overzicht zegt welke.
 | Levering en beheer | 0006 ondertekening, 0029 updates, 0030 HTTPS, 0048 live voortgang, 0050 installer, 0052 releases, 0059 kandidaten, 0064 HTTPS standaard, 0067 versiebeheer, 0070 certificaatbron, 0079 release als workflow, 0086 publiek adres, 0089 configuratiepakket, 0099 configuratie als JSON, 0108 publieke images, 0112 interne CA, 0114 Kubernetes | gebouwd; 0067, 0079, 0089, 0108, 0112, 0114 deels; 0099 niet gebouwd |
 | Schaal | 0036 schaalgrenzen en naden | niet gebouwd (de triggers zijn beleid) |
 | Website | 0087, 0110, 0111, 0113 | deels |
+| Na 0.4.0 | 0116 één editie, onderhoudslijnen en geteste upgradepaden | aanvaard op 5 november 2026; stap 2 gebouwd (een gewijzigde migratie maakt een minorrelease), stap 3 tot en met 9 niet |
 
 ### 10.3 Open besluiten
 
@@ -1231,7 +1254,7 @@ pentest, toegankelijkheidsonderzoek).
 | Merge queue (volledige baan) | Alles hierboven plus de autorisatiematrix over elke rol en elk eindpunt, `hadolint`, `trivy`, `schemathesis`, SBOM met `grype`, Playwright (toetsenbord, axe, Lighthouse) voor elke pagina in elke taal | axe 0, Lighthouse ≥ 95 |
 | Beslis-PR | Beslispoort | label `po:approved` van een beheerder |
 | Merge naar `main` | OWASP ZAP-baseline tegen de gestarte container, `mutmut` op domein en i18n, kandidaat-image bouwen, ondertekenen, SBOM attesteren | mutatiescore ≥ 80 % |
-| Hoofdrelease | Release-audit door een tweede model in de release-PR | `Verdict: pass`, anders geen tag |
+| Release `vX.Y.0` | Release-audit door een tweede model in de release-PR | `Verdict: pass`, anders geen tag |
 | Elk uur, wekelijks | Guardrail-audit tegen de baseline; Renovate; `freshness` (geen update-PR ouder dan 14 dagen); ADR-drift | afwijking is een issue |
 
 ### 11.3 Testarchitectuur
@@ -1263,8 +1286,9 @@ pentest, toegankelijkheidsonderzoek).
 | R-8 | Organisaties binnen één installatie delen superuser, database, sleutels en Service App | Een fout of compromis bij de superuser raakt elke organisatie | Vertrouwensgrenzen in het dreigingsmodel; een tweede verwerkingsverantwoordelijke krijgt een eigen installatie | privacyofficer |
 | R-9 | `httpx` kende in 2026 een stille periode in onderhoud | Een kwetsbaarheid zonder patch zou de hele uitgaande laag raken | Gemarkeerd als *watch* in `docs/dependencies.md`; één client, dus één vervangpunt | productteam |
 | R-10 | Een deel van de besluiten is deels gebouwd (zie 10.2) | Een lezer van een ADR kan meer verwachten dan er draait | Bouwstatus per ADR en `docs/adr-status.md`; de vraag "wat draait op de testhost" wordt uit de code beantwoord | productteam |
-| R-11 | De platen in `docs/diagrams/` dateren van 27 oktober 2026 | B2 staat er als gepland, nieuwere poorten en bouwblokken ontbreken | `make diagrams` na een wijziging van `scripts/diagrams/content.py`; dit document is nieuwer | productteam |
+| R-11 | De platen in `docs/diagrams/` dateren van 27 oktober 2026 | B2 staat er als gepland en nieuwere poorten ontbreken. De gegenereerde bestanden tonen bovendien nog de term voor de deelnemer van vóór ADR 0077 (gecontroleerd in plaat 1 en het Word-bestand); de neutraliteitstest slaat afbeeldingen, PDF's en Word-bestanden over | `make diagrams` vanuit de neutrale bron `scripts/diagrams/content.py`, met B2 als gebouwd; dit document is nieuwer | productteam |
 | R-12 | De geschiedenis van de repository is op 4 november 2026 herschreven (ADR 0115) | Oudere clones, images van eerdere releases en externe verwijzingen wijzen naar commits die niet meer bestaan | Eenmalig, vastgelegd; iedereen begint van een verse clone | productteam |
+| R-13 | ADR 0116 noemt een mogelijk gedeeld model: één installatie met meer klanten als organisaties. Het dreigingsmodel zegt dat een tweede verwerkingsverantwoordelijke een eigen installatie krijgt | Zolang niet is vastgelegd wie in een gedeelde installatie verwerkingsverantwoordelijke is, spreken de twee elkaar tegen | Een besluit nemen voordat het gedeelde model wordt aangeboden; zie V-13 | productowner, privacyofficer |
 
 ## 13. Transitie en roadmap
 
@@ -1284,6 +1308,9 @@ Wat na 0.4.0 op de rol staat, zoals `README.md` en `docs/adr-status.md` het noem
 - Kubernetes: eerste echte run en updates (ADR 0114).
 - De naden van ADR 0036 (rate-limitopslag als instelling, contracttest van het schrijfslot,
   back-upinterface, metingen), zodat de stap voorbij één host een adapterwijziging wordt.
+- Release- en updatemodellen voor drie exploitatievormen (ADR 0116, aanvaard op 5 november 2026,
+  stap 2 gebouwd): onderhoudslijnen, een upgradematrix, updatevensters en lijnen in het portaal,
+  publieke patches en een offline bundel.
 
 ### 13.2 Stappenplan voor inpassing in een omgeving
 
@@ -1315,14 +1342,14 @@ antwoord een open punt in HANDOVER §11 of een ADR.
 | V-4 | Video | Welke Webex-site en welke hostaccounts per groep; is een toegewijde site met meetingbeleid gewenst (ADR 0045)? Ondertiteling of tolk (O8)? | integratiebeheer | 3.3, 8.9 |
 | V-5 | Mail | Welke SMTP-server per organisatie, welk afzenderdomein, staan SPF, DKIM en DMARC goed? | mailbeheer | B6, ADR 0073 |
 | V-6 | Sms | Welke sms-gateway: Webex Connect of een andere (dan een adapter)? | contactcenterbeheer | 8.3, ADR 0028 |
-| V-7 | Hosting | Eigen host met de installer, Kubernetes, of een hostingpartij? Welke zones, welke uitgaande verbindingen zijn toegestaan (tabel in `docs/dataflow.md`), eigen proxy of de meegeleverde, welke certificaatbron? Wie is eigenaar van back-up en herstelproef (O7)? | hosting | 7, R-1, R-4, R-5 |
+| V-7 | Hosting | Welke exploitatievorm: privé, toegewijd of gedeeld (ADR 0116)? Eigen host met de installer, Kubernetes, of een hostingpartij? Welke zones, welke uitgaande verbindingen zijn toegestaan (tabel in `docs/dataflow.md`), eigen proxy of de meegeleverde, welke certificaatbron? Wie is eigenaar van back-up en herstelproef (O7)? | hosting | 7, R-1, R-4, R-5 |
 | V-8 | Logging | Welk logplatform of SIEM, welk transport (syslog TLS, Splunk, Elastic, HTTP), welke bewaartermijnen, wie leest de audit- en securityevents? | security operations | 8.7 |
 | V-9 | Monitoring | Wie bewaakt `/healthz`, `/readyz`, de heartbeat en de meldingen in het portaal, en hoe worden meldingen buiten het portaal bezorgd (ADR 0082 noemt een Webex-ruimte, niet gebouwd)? | beheer | 7.6 |
 | V-10 | Privacy | Wie is verwerkingsverantwoordelijke, wie doet de DPIA op `docs/dataflow.md`, welke verwerkersovereenkomsten (Cisco, mail, sms, hosting)? Zijn de drie uitstelregels van de retentie aanvaard? | privacyofficer | 8.6, `docs/assurance/dpia-input.md` |
 | V-11 | Toetsing | Wie voert de pentest en het toegankelijkheidsonderzoek uit, en wie is de menselijke reviewer (O10)? | opdrachtgever | 9, 11 |
 | V-12 | Rapportage | Welke rapportage over afspraken is nodig buiten het portaal, en volstaan de events in het logplatform en de dagtellingen? | dienstverlening | 8.7 |
-| V-13 | Meer organisaties | Hoeveel organisaties komen in één installatie, en vallen zij onder één verwerkingsverantwoordelijke? Welke huisstijl per organisatie (O5)? | opdrachtgever | 3.5, R-8 |
-| V-14 | Wijzigingsbeheer | Wie keurt updates goed en wanneer; welk kanaal (release of kandidaat) per installatie; past de onderhoudsmodus in de afspraken over servicevensters? | beheer | 7.4 |
+| V-13 | Meer organisaties | Hoeveel organisaties komen in één installatie, en vallen zij onder één verwerkingsverantwoordelijke? Welke huisstijl per organisatie (O5)? | opdrachtgever, privacyofficer | 3.5, R-8, R-13 |
+| V-14 | Wijzigingsbeheer | Wie keurt updates goed en wanneer; welk kanaal (release of kandidaat) per installatie; past de onderhoudsmodus in de afspraken over servicevensters? Welk updatevenster en welke onderhoudslijn zijn nodig (ADR 0116, nog niet gebouwd)? | beheer | 7.4 |
 | V-15 | Kanalen later | Is een chatkanaal met toestemming (WhatsApp) gewenst, en keurt de privacyofficer de verwerker goed? | dienstverlening, privacyofficer | 8.3, ADR 0009 |
 
 ## 14. Begrippen en afkortingen
@@ -1370,11 +1397,12 @@ antwoord een open punt in HANDOVER §11 of een ADR.
 |---|---|---|---|
 | OpenPlanner repository, `main` op tag `v0.4.0` | 3Corners en de bijdragers | 4 november 2026 | 5 november 2026 |
 | `docs/adr-status.md` | idem | gecontroleerd tegen de code op 3 november 2026 | 5 november 2026 |
+| `docs/adr/0116-one-edition-maintenance-lines-on-demand-and-tested-upgrade-paths.md` | idem | 5 november 2026 | 5 november 2026 |
 | `docs/architecture.md`, `docs/HANDOVER.md`, `docs/dataflow.md`, `docs/threat-model.md`, `docs/asvs.md`, `docs/cryptography.md`, `docs/authentication.md`, `docs/dependencies.md`, `docs/install.md`, `docs/kubernetes.md`, `docs/assurance/` | idem | stand `v0.4.0` | 5 november 2026 |
 | `docs/diagrams/` en `scripts/diagrams/content.py` | idem | 27 oktober 2026 | 5 november 2026 |
-| arc42-sjabloon | Dr. Gernot Starke, Dr. Peter Hruschka, arc42.org | versie 8 | 5 november 2026 |
-| C4-model | Simon Brown, c4model.com | 2025 | 5 november 2026 |
-| ISO/IEC/IEEE 42010 | ISO | 2022 | 5 november 2026 |
+| arc42-sjabloon | Dr. Gernot Starke, Dr. Peter Hruschka, arc42.org | versie 8 | niet geraadpleegd voor dit concept; te controleren |
+| C4-model | Simon Brown, c4model.com | geen versienummer | niet geraadpleegd voor dit concept; te controleren |
+| ISO/IEC/IEEE 42010 | ISO, IEC, IEEE | 2022 | niet geraadpleegd voor dit concept; te controleren |
 | OWASP ASVS | OWASP | 5.0.0, 2025 | via `docs/asvs.md` |
 | WCAG | W3C | 2.2, 2023 | via `CLAUDE.md` |
 
@@ -1383,3 +1411,4 @@ antwoord een open punt in HANDOVER §11 of een ADR.
 | Datum | Wijziging |
 |---|---|
 | 5 november 2026 | Concept 1: eerste volledige opzet tegen 0.4.0 |
+| 5 november 2026 | Concept 1a: feiten nagelopen tegen de code (annuleren tot de start, alle 23 taaksoorten, dagelijkse opruimtaken, Nederlandse menunamen, fakes per poort); ADR 0116 van na de release en risico R-13 toegevoegd |
