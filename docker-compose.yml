@@ -67,6 +67,8 @@ services:
     # below). Behind a proxy of your own, FORWARDED_ALLOW_IPS in .env replaces it: the address
     # as this container sees the proxy. A proxy on another machine also gets HTTPS from web when
     # WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE are set (ADR 0091 point 3); the healthcheck follows.
+    # Web listens on IPv4 only (--host 0.0.0.0): the proxy reaches it over IPv4 although edge is
+    # dual-stack, so that one address stays the only one trusted.
     networks: [default, edge]
     volumes:
       - data:/srv/data
@@ -129,6 +131,8 @@ services:
     # Only the edge network: web trusts X-Forwarded-For from this address alone, so the proxy
     # must reach web over edge and nowhere else. The bundled identity provider joins edge too
     # (IDP_UPSTREAM=idp:8080 in proxy.env, ADR 0112).
+    # Its IPv6 address on edge is dynamic: Docker forwards visitors over IPv6 to it, and nothing
+    # trusts it (web sees the proxy over IPv4 only).
     networks:
       edge:
         ipv4_address: 172.31.240.2
@@ -250,12 +254,21 @@ services:
 
 networks:
   # Between the TLS proxy and web. Fixed so web can trust exactly the proxy's address.
+  # Dual-stack, so a visitor over IPv6 keeps their address: Docker forwards ports 80 and 443 to
+  # the proxy's IPv6 address with NAT (ip6tables, on by default since Docker Engine 27). On an
+  # IPv4-only network Docker's userland proxy takes those connections and opens new ones over
+  # IPv4, and every IPv6 visitor arrives from the bridge's own address, sharing one rate limit.
+  # The IPv6 subnet is a unique local one (RFC 4193): nothing outside the host routes to it.
+  # A kernel without IPv6 (booted with ipv6.disable=1) cannot make this network; there the
+  # installer writes OPENPLANNER_EDGE_IPV6=false to .env.update and edge stays IPv4 only.
   edge:
+    enable_ipv6: ${OPENPLANNER_EDGE_IPV6:-true}
     ipam:
       config:
         - subnet: 172.31.240.0/28
           # Dynamic addresses (web) come from the upper half, so the proxy's fixed one is free.
           ip_range: 172.31.240.8/29
+        - subnet: fdf2:d3f5:96ab::/64
 
 volumes:
   data:
