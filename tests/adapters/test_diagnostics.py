@@ -17,41 +17,19 @@ from app.adapters.diagnostics import (
     probes,
     run_checks,
 )
-from app.adapters.webex_auth import ServiceAppConfig, WebexTokens
 from tests.fakes.clock import FixedClock
-from tests.fakes.tokens import MemoryTokenStore
+from tests.fakes.tokens import ACCESS_TOKEN, webex_client, webex_tokens
 
 WEBEX = "https://webexapis.com/v1"
 WXCC = "https://api.wxcc-eu1.cisco.com"
-SECRET_TOKEN = "access-token-value-never-printed"  # noqa: S105 - test value
 BODY_WITH_PII = {"items": [{"hostEmail": "host@example.nl", "title": "Ada Lovelace"}]}
 
 
 CLOCK = FixedClock(datetime(2026, 10, 24, 12, 0, tzinfo=UTC))
 
 
-def _client(
-    route: Callable[[httpx.Request], httpx.Response],
-) -> tuple[WebexTokens, httpx.AsyncClient]:
-    http = httpx.AsyncClient(transport=httpx.MockTransport(route))
-    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), CLOCK)
-    return tokens, http
-
-
-def _tokens(
-    handler: Callable[[httpx.Request], httpx.Response],
-) -> tuple[WebexTokens, httpx.AsyncClient]:
-    def route(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/v1/access_token":
-            return httpx.Response(200, json={"access_token": SECRET_TOKEN, "expires_in": 3600})
-        assert request.headers["authorization"] == f"Bearer {SECRET_TOKEN}"
-        return handler(request)
-
-    return _client(route)
-
-
 async def _check(handler: Callable[[httpx.Request], httpx.Response]) -> list[CheckResult]:
-    tokens, http = _tokens(handler)
+    tokens, http = webex_tokens(handler, CLOCK)
     return await run_checks(http, tokens, probes(WEBEX, WXCC), CLOCK)
 
 
@@ -108,7 +86,7 @@ async def test_refused_refresh_token_skips_the_api_calls() -> None:
         assert request.url.path == "/v1/access_token", "no API call without a token"
         return httpx.Response(400, json={"error": "invalid_grant"})
 
-    tokens, http = _client(route)
+    tokens, http = webex_client(route, CLOCK)
 
     results = await run_checks(http, tokens, probes(WEBEX, WXCC), CLOCK)
 
@@ -120,7 +98,7 @@ async def test_unreachable_host_is_reported_without_details() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("name resolution failed for secret-host")
 
-    tokens, http = _tokens(handler)
+    tokens, http = webex_tokens(handler, CLOCK)
 
     results = await run_checks(http, tokens, probes(WEBEX, None), FixedClock(datetime.now(UTC)))
 
@@ -140,7 +118,7 @@ async def test_a_401_retries_once_with_a_fresh_token() -> None:
         calls.append(request.url.path)
         return httpx.Response(401 if len(calls) == 1 else 200, json={})
 
-    tokens, http = _tokens(handler)
+    tokens, http = webex_tokens(handler, CLOCK)
 
     results = await run_checks(http, tokens, probes(WEBEX, None)[:1], FixedClock(datetime.now(UTC)))
 
@@ -162,7 +140,7 @@ def test_report_has_status_and_hint_but_no_token_or_body() -> None:
     assert "cjp:config_read" in report
     assert "FAIL" in report
     assert "OK" in report
-    assert SECRET_TOKEN not in report
+    assert ACCESS_TOKEN not in report
     assert "Ada" not in report
     assert "host@" not in report
 

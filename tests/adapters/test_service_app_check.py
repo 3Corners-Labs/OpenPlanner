@@ -1,5 +1,7 @@
 """The Service App check behind ``wxcc-check`` and the button on Koppelingen (ADR 0082)."""
 
+from datetime import UTC, datetime
+
 import httpx
 
 from app.adapters.diagnostics import CheckResult
@@ -8,7 +10,12 @@ from app.adapters.service_app_check import (
     results_from_report,
     service_app_check,
 )
-from tests.adapters.test_diagnostics import CLOCK, WEBEX, WXCC, _tokens
+from tests.fakes.clock import FixedClock
+from tests.fakes.tokens import webex_tokens
+
+WEBEX = "https://webexapis.com/v1"
+WXCC = "https://api.wxcc-eu1.cisco.com"
+CLOCK = FixedClock(datetime(2026, 10, 24, 12, 0, tzinfo=UTC))
 
 LINES = [
     CheckResult("token refresh", None, True, "ok"),
@@ -33,7 +40,7 @@ async def test_the_probes_run_and_the_region_check_follows_a_working_token() -> 
             return httpx.Response(400 if request.url.path == "/v2/tasks" else 404)
         return httpx.Response(200, json={"data": [], "items": []})
 
-    tokens, http = _tokens(handler)
+    tokens, http = webex_tokens(handler, CLOCK)
 
     results = await service_app_check(http, tokens, WEBEX, WXCC, CLOCK)
 

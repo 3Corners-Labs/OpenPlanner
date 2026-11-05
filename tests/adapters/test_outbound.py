@@ -1,7 +1,5 @@
 """The outbound guard for addresses typed in the portal (ADR 0083 point 8, abuse case B8)."""
 
-from collections.abc import Callable
-
 import httpx
 import pytest
 
@@ -11,17 +9,7 @@ from app.adapters.outbound import (
     guarded_request,
     is_public,
 )
-
-
-def resolver(*addresses: str) -> Callable[[str, int], list[str]]:
-    def resolve(host: str, port: int) -> list[str]:
-        return list(addresses)
-
-    return resolve
-
-
-def mock(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+from tests.fakes.outbound import mock, resolver
 
 
 @pytest.mark.parametrize(

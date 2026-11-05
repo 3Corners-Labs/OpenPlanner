@@ -13,10 +13,11 @@ from structlog.testing import capture_logs
 from app.adapters.db.engine import create_engine
 from app.domain.backup_age import BACKUP_LIFETIME
 from app.domain.retention_sweep import SweepResult
-from app.domain.storage import MIB, StorageLimits, StorageUsage
+from app.domain.storage import StorageLimits
 from app.jobs.housekeeping import Housekeeping
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.fakes.storage import Disk
 from tests.support.database import migrated_database
 
 
@@ -30,15 +31,6 @@ async def engine(database_url: str) -> AsyncIterator[AsyncEngine]:
     engine = create_engine(database_url)
     yield engine
     await engine.dispose()
-
-
-class Disk:
-    """A data volume whose free percentage the test sets."""
-
-    free_percent: float = 50
-
-    def __call__(self) -> StorageUsage:
-        return StorageUsage(int(self.free_percent * MIB), 100 * MIB, 3 * MIB)
 
 
 class Setup:

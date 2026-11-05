@@ -13,7 +13,7 @@ from app.domain.storage import StorageLimits
 from app.jobs.housekeeping import Housekeeping
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.jobs.test_housekeeping import Disk
+from tests.fakes.storage import Disk
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
 

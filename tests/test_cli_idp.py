@@ -16,7 +16,7 @@ from app.config import Settings
 from app.domain.identity_providers import ClientAuth, OrganisationProvider
 from app.domain.login_domains import DomainClaim, DomainState
 from tests.adapters.db.conftest import seed_group
-from tests.adapters.test_oidc_check import DISCOVERY, _transport
+from tests.fakes.oidc_provider import DISCOVERY, oidc_provider
 from tests.support.database import migrated_database
 
 NOW = datetime(2026, 11, 2, 12, 0, tzinfo=UTC)
@@ -80,7 +80,7 @@ async def test_the_check_reads_discovery_and_keys_and_lists_the_domains(
 ) -> None:
     seen: list[httpx.Request] = []
 
-    report, ok = await _idp_check(configured, "org-a", _transport(seen), _public)
+    report, ok = await _idp_check(configured, "org-a", oidc_provider(seen), _public)
 
     assert "OK    outbound guard" in report
     assert "OK    discovery" in report
@@ -98,14 +98,14 @@ async def test_the_check_shows_the_guard_refusing_a_private_address(
     configured: Settings,
 ) -> None:
     """B8: the provider's address resolves to a private network."""
-    report, ok = await _idp_check(configured, "org-a", _transport([]), _private)
+    report, ok = await _idp_check(configured, "org-a", oidc_provider([]), _private)
 
     assert "FAIL  outbound guard" in report
     assert not ok
 
 
 async def test_an_unknown_key_is_said(configured: Settings) -> None:
-    report, ok = await _idp_check(configured, "nope", _transport([]), _public)
+    report, ok = await _idp_check(configured, "nope", oidc_provider([]), _public)
 
     assert (report, ok) == ("no identity provider with key 'nope'\n", False)
 
