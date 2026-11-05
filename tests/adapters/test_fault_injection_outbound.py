@@ -27,6 +27,7 @@ from app.domain.security_log import SecurityLog
 from tests.adapters.test_oidc import CLIENT, MAPPING, REDIRECT
 from tests.adapters.test_webex_meetings import REQUEST
 from tests.fakes.clock import FixedClock
+from tests.fakes.outbound import resolver
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.fakes.tokens import MemoryTokenStore, authorized_client
 from tests.support.certificates import make_pair
@@ -37,9 +38,8 @@ LOOPBACK = "127.0.0.1"
 PII = ("ada@example.org", "Lovelace", "+31612345678")
 
 
-def lab_resolver(_host: str, _port: int) -> list[str]:
-    """Resolve every name to the local TLS server."""
-    return [LOOPBACK]
+lab_resolver = resolver(LOOPBACK)
+"""Resolves every name to the local TLS server."""
 
 
 @pytest.fixture
