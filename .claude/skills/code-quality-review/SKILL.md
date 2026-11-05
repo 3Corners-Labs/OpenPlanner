@@ -9,8 +9,10 @@ Review the diff of the current branch against `main` (`git diff main...HEAD`, pl
 changes) for structure and maintainability. Correctness and security have their own reviewers
 (`/code-review`, `security-review`); the question here is whether the change leaves the codebase
 simpler or messier. Read every changed file in full, and the code around each change: its
-callers, the module it lands in, and the existing helpers for the same job. Report findings; do
-not fix them in this step.
+callers, the module it lands in, and the existing helpers for the same job. Code the diff does
+not touch is in scope only where the change leaves it inconsistent, such as another copy of the
+rule the diff changes or a caller the diff should have moved too; report it under the finding
+that causes it. Report findings; do not fix them in this step.
 
 Aim high. "This could be tidier" is not the bar. For every meaningful change, look for the
 reframing that makes branches, flags, helpers or whole layers disappear, so that the result looks
@@ -25,7 +27,9 @@ judge only whether the change uses them the way the rest of the code does.
   `tests/fakes/`; persistence through the `Transaction` Protocol.
 - A setting with a class, default and bounds for every tunable value, declared in
   `app/domain/settings_registry.py` (ADR 0042). A new hard-coded threshold is the finding, never
-  the setting.
+  the setting. Fixed rules stay constants (WCAG targets, PII fields, crypto parameters, protocol
+  limits such as the 254-character address of RFC 5321); for those, a second copy of the same
+  constant is the finding (check 2).
 - A Google-style docstring on every module, class and public function.
 - One entry in the navigation register `app/web/navigation.py` per admin screen (ADR 0047), one
   permission per admin route through `RequirePermission(Permission.…)`, and every HTML response
@@ -59,7 +63,8 @@ judge only whether the change uses them the way the rest of the code does.
    reason in the PR: ask whether the new code should be its own module first. The same holds
    when a file already past 1,000 lines grows by more than about 50 lines of logic. A declarative
    register (settings, logged actions, models, navigation entries) that grows by entries is not a
-   finding; logic added to one is. Split a function that does several unrelated jobs by job,
+   finding; logic added to one is. Declarations (a dataclass, a Protocol method, an enum member)
+   count as entries; function bodies and branches count as logic. Split a function that does several unrelated jobs by job,
    never by line count, and never into helpers that only exist to make it shorter.
 6. **Types and boundaries.** Flag `Any`, `cast()`, `# type: ignore`, an `Optional` that no path
    sets to `None`, and `dict[str, Any]` handed across a layer where a dataclass, Pydantic model or
@@ -77,17 +82,20 @@ judge only whether the change uses them the way the rest of the code does.
    more state than the job needs.
 9. **Tests that survive a refactor.** Tests mirror the source tree and assert what a caller can
    observe. Flag a test that pins internals (a private helper, the call order of fakes), so that
-   a change preserving behaviour would break it, and set-up copied between test files instead of
-   shared through a fixture.
+   a change preserving behaviour would break it; a test whose name promises a behaviour its
+   assertions never observe; and set-up copied between test files instead of shared through a
+   fixture.
 
 ## Severity
 
 - **high**, a blocker unless the PR gives a convincing reason: a clear structural regression; a
   visible simplification that would delete much of the change's incidental complexity is left
   unused; a second home for an existing concern; a business rule in the wrong layer; a file pushed
-  past 1,000 lines; special-case branching that tangles a shared flow.
-- **medium:** an extraction missed at the second use; loose types across a boundary; a thin
-  wrapper; a file past 1,000 lines grown further; a test that pins internals.
+  past 1,000 lines; special-case branching that tangles a shared flow; state that can be left
+  half applied in a way that loses or corrupts data.
+- **medium:** an extraction missed at the second use, in code or in test set-up; loose types
+  across a boundary; a thin wrapper; a file past 1,000 lines grown further; a test that pins
+  internals or never observes what its name promises; half-applied state that a retry repairs.
 - **low:** local readability, a name that hides intent. Report low findings only when there is
   nothing higher, and at most five.
 
