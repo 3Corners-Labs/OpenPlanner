@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Betreft | OpenPlanner 0.4.0 (tag `v0.4.0`, uitgebracht op 4 november 2026) |
-| Stand | Concept 1b van 5 november 2026, beschreven tegen de code van `v0.4.0` en `docs/adr-status.md` (gecontroleerd tegen de code op 3 november 2026). Besluiten van na de release staan in 10.2 en 13.1, de antwoorden van de productowner in 13.4 |
+| Stand | Concept 1c van 5 november 2026, beschreven tegen de code van `v0.4.0` en `docs/adr-status.md` (gecontroleerd tegen de code op 3 november 2026). Besluiten van na de release staan in 10.2 en 13.1, de antwoorden van de productowner in 13.4 |
 | Taal | Nederlands, als stakeholderdocument naast `docs/HANDOVER.md`. Code, ADR's en de overige documentatie zijn Engels |
 | Lezers | Architecten en ontwikkelaars van een organisatie die OpenPlanner in haar landschap inpast, beheerders, en het productteam |
 | Bron van waarheid | De code op `main`, de ADR's en `docs/adr-status.md`. Dit document beschrijft en verwijst; het beslist niets |
@@ -454,8 +454,8 @@ De tien keuzes die de vorm van de applicatie bepalen, elk met het besluit eracht
 
 De platen in `docs/diagrams/` verdelen de applicatie in zeventien bouwblokken (B1 tot en met B17)
 in vier families. Dit document gebruikt dezelfde nummers, zodat plaat, register en tekst naar
-elkaar verwijzen. De kolom *stand* volgt `docs/adr-status.md` en is nieuwer dan de platen (stand
-27 oktober 2026 op de platen): B2 is sindsdien gebouwd.
+elkaar verwijzen. De kolom *stand* volgt `docs/adr-status.md`; de platen tonen de stand van 5
+november 2026 (#547).
 
 | Familie | Blok | Naam | Verantwoordelijkheid in één zin | Stand 0.4.0 |
 |---|---|---|---|---|
@@ -1304,7 +1304,7 @@ pentest, toegankelijkheidsonderzoek).
 | R-8 | Organisaties binnen één installatie delen superuser, database, sleutels en Service App | Een fout of compromis bij de superuser raakt elke organisatie | Vertrouwensgrenzen in het dreigingsmodel; een tweede verwerkingsverantwoordelijke krijgt een eigen installatie | privacyofficer |
 | R-9 | `httpx` kende in 2026 een stille periode in onderhoud | Een kwetsbaarheid zonder patch zou de hele uitgaande laag raken | Gemarkeerd als *watch* in `docs/dependencies.md`; één client, dus één vervangpunt | productteam |
 | R-10 | Een deel van de besluiten is deels gebouwd (zie 10.2) | Een lezer van een ADR kan meer verwachten dan er draait | Bouwstatus per ADR en `docs/adr-status.md`; de vraag "wat draait op de testhost" wordt uit de code beantwoord | productteam |
-| R-11 | De platen in `docs/diagrams/` dateren van 27 oktober 2026 | B2 staat er als gepland en nieuwere poorten ontbreken. De gegenereerde bestanden tonen bovendien nog de term voor de deelnemer van vóór ADR 0077 (gecontroleerd in plaat 1 en het Word-bestand); de neutraliteitstest slaat afbeeldingen, PDF's en Word-bestanden over | `make diagrams` vanuit de neutrale bron `scripts/diagrams/content.py`, met B2 als gebouwd; dit document is nieuwer | productteam |
+| R-11 | De platen in `docs/diagrams/` liepen achter op de code en droegen nog de term voor de deelnemer van vóór ADR 0077 | Opgelost op 5 november 2026 (#547): de platen tonen de stand van die dag, met B2 als gebouwd en alle 23 poorten | `tests/scripts/test_diagrams.py` faalt nu als een poort op plaat 2 ontbreekt, en de neutraliteitstest leest ook Word-bestanden; PDF's leest hij niet, die komen uit dezelfde bron | productteam |
 | R-12 | De geschiedenis van de repository is op 4 november 2026 herschreven (ADR 0115) | Oudere clones, images van eerdere releases en externe verwijzingen wijzen naar commits die niet meer bestaan | Eenmalig, vastgelegd; iedereen begint van een verse clone | productteam |
 | R-13 | ADR 0116 noemt een mogelijk gedeeld model: één installatie met meer klanten als organisaties. Het dreigingsmodel zegt dat een tweede verwerkingsverantwoordelijke een eigen installatie krijgt | Zolang niet is vastgelegd wie in een gedeelde installatie verwerkingsverantwoordelijke is, spreken de twee elkaar tegen | Een besluit nemen voordat het gedeelde model wordt aangeboden; zie V-13 | productowner, privacyofficer |
 
@@ -1451,7 +1451,7 @@ als open punt O15 tot en met O18 in HANDOVER §11.
 | `docs/adr-status.md` | idem | gecontroleerd tegen de code op 3 november 2026 | 5 november 2026 |
 | `docs/adr/0116-one-edition-maintenance-lines-on-demand-and-tested-upgrade-paths.md` | idem | 5 november 2026 | 5 november 2026 |
 | `docs/architecture.md`, `docs/HANDOVER.md`, `docs/dataflow.md`, `docs/threat-model.md`, `docs/asvs.md`, `docs/cryptography.md`, `docs/authentication.md`, `docs/dependencies.md`, `docs/install.md`, `docs/kubernetes.md`, `docs/assurance/` | idem | stand `v0.4.0` | 5 november 2026 |
-| `docs/diagrams/` en `scripts/diagrams/content.py` | idem | 27 oktober 2026 | 5 november 2026 |
+| `docs/diagrams/` en `scripts/diagrams/content.py` | idem | 5 november 2026 (#547) | 5 november 2026 |
 | arc42-sjabloon | Dr. Gernot Starke, Dr. Peter Hruschka, arc42.org | versie 8 | niet geraadpleegd voor dit concept; te controleren |
 | C4-model | Simon Brown, c4model.com | geen versienummer | niet geraadpleegd voor dit concept; te controleren |
 | ISO/IEC/IEEE 42010 | ISO, IEC, IEEE | 2022 | niet geraadpleegd voor dit concept; te controleren |
@@ -1465,3 +1465,4 @@ als open punt O15 tot en met O18 in HANDOVER §11.
 | 5 november 2026 | Concept 1: eerste volledige opzet tegen 0.4.0 |
 | 5 november 2026 | Concept 1a: feiten nagelopen tegen de code (annuleren tot de start, alle 23 taaksoorten, dagelijkse opruimtaken, Nederlandse menunamen, fakes per poort); ADR 0116 van na de release en risico R-13 toegevoegd; na de security-review de controls in 3.5 en 9.1 preciezer (uitgaande bewaker, versleutelde hops, tweede factor, netwerk-allowlist) |
 | 5 november 2026 | Concept 1b: de antwoorden van de productowner op V-1 tot en met V-15 in 13.4, verwerkt in 2.6, 3.3, 3.5, 7.4, 8.2, 8.3, 8.6, 8.7, 9.3, 12 en 13.1; open punten O15 tot en met O18 in HANDOVER §11 |
+| 5 november 2026 | Concept 1c: de platen zijn bijgewerkt (#547); risico R-11, paragraaf 5.1 en bijlage A volgen |
