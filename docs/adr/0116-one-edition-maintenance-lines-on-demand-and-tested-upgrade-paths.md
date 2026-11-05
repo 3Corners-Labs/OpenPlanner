@@ -148,7 +148,7 @@ not of the product); the 24 h of the updater's backup (ADR 0029); the ring order
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed, with `docs/research/release-and-update-models.md` | #NNN | in PR |
+| 0 | ADR proposed, with `docs/research/release-and-update-models.md` | #519 | in PR #519 |
 | 1 | Decision texts: `SECURITY.md` support window; amendments noted in ADR 0052, 0067, 0108, 0114; CLAUDE.md migration rule; PR template question on expand/contract | | planned |
 | 2 | Rules in code: `release_pr.py` refuses PATCH with a migration; import-linter contract for self-contained migrations | | planned |
 | 3 | Upgrade fixture and matrix: `seed --upgrade-fixture`, fixture attached to every release, matrix job with downgrade-and-start-the-released-image and the duration budget | | planned |
