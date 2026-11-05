@@ -318,3 +318,12 @@ def test_tag_check_finds_the_release_and_refuses_an_existing_tag(
 
     assert main(["tag-check", "--version", "0.4.0", "--branch", "main"]) == 1
     assert "exists already" in capsys.readouterr().err
+
+
+def test_plan_refuses_a_patch_that_carries_a_migration() -> None:
+    """A patch carries no migration (ADR 0116 point 4); a higher number is the way out."""
+    assert plan("v0.4.0", ["fix: a"], None, migrations_changed=True) == "0.5.0"
+    assert plan("v0.4.0", ["fix: a"], "0.5.0", migrations_changed=True) == "0.5.0"
+    with pytest.raises(ValueError, match="carries no migration"):
+        plan("v0.4.0", ["fix: a"], "0.4.1", migrations_changed=True)
+    assert plan("v0.4.0", ["fix: a"], "0.4.1", migrations_changed=False) == "0.4.1"
