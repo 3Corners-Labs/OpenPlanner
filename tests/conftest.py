@@ -1,5 +1,6 @@
-"""Shared fixtures: isolated settings per test and an in-process HTTP client."""
+"""Shared fixtures: isolated settings per test, an in-process HTTP client and a mail server."""
 
+import smtplib
 import sys
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
@@ -17,6 +18,7 @@ from app.domain.event_schema import detail_problem
 from app.domain.log_events import lookup
 from app.domain.ports import Clock
 from app.main import create_app
+from tests.fakes.smtp import FakeSmtpServer
 
 APP = str(Path(__file__).resolve().parents[1] / "app") + "/"
 READ_BACK = APP + "adapters/db/"
@@ -105,3 +107,12 @@ async def app_client(
 async def client(settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
     async with app_client(settings) as client:
         yield client
+
+
+@pytest.fixture
+def smtp_server(monkeypatch: pytest.MonkeyPatch) -> FakeSmtpServer:
+    """Connect ``smtplib.SMTP`` and ``smtplib.SMTP_SSL`` to a fake server for one test."""
+    server = FakeSmtpServer()
+    monkeypatch.setattr(smtplib, "SMTP", server.connect)
+    monkeypatch.setattr(smtplib, "SMTP_SSL", server.connect_tls)
+    return server

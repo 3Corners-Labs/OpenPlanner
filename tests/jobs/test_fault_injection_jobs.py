@@ -17,10 +17,10 @@ from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import BACKOFF, JobRunner
 from tests.adapters.test_fault_injection_outbound import PII
+from tests.fakes.jobs import FakeQueue, job
 from tests.fakes.messaging import RefusingSender
 from tests.fakes.tokens import authorized_client
 from tests.jobs.test_call_jobs import WIRED, Setup, _uow
-from tests.jobs.test_runner import FakeQueue, job
 from tests.support.domain import TEST_TOKEN_KEY
 
 
