@@ -766,6 +766,18 @@ booking body and the `Origin` header.
 | Information disclosure | A cached answer of one origin served to another | `Cache-Control: no-store` and `Vary: Origin` on every answer | `tests/api/test_widget_api.py::test_the_group_comes_with_its_form_and_texts_for_an_allowed_origin` |
 | Tampering | A booking through the widget while maintenance mode is on (ADR 0038) | The maintenance rule closes the group, availability and booking routes (`503 maintenance`), as it closes `/g/{slug}`; a test fails when a public route is neither closed nor explicitly open | `tests/api/test_widget_api.py::test_during_maintenance_the_group_routes_close_but_texts_and_preflight_stay_open`, `tests/api/test_maintenance_pages.py::test_every_public_route_is_closed_or_explicitly_open` |
 
+## Flow: islands, the scripts that enhance an admin or participant page (ADR 0118)
+
+A page may load an own, same-origin script that enhances server-rendered content; the page is
+complete without it. The scripts are listed in `docs/islands.md`.
+
+| Abuse case | Control | Test |
+|---|---|---|
+| Script injection through text from outside the page (a group name, a subject, a label) | Scripts set text with `textContent` and never build markup or code from a string; Jinja escapes the server's output; the content security policy allows only `script-src 'self'`, no inline script, no `eval` | `tests/web/test_static.py::test_a_script_never_turns_text_into_markup_or_code`, the semgrep rule `no-script-markup-sink` (cases in `.semgrep/rules.js`, run by `make semgrep` and CI), `tests/admin/test_overview_routes.py` for the policy |
+| An uploaded file used as a script source, because `'self'` trusts the same origin | Uploads are served with the exact media type, `nosniff` and `default-src 'none'`, from a closed list of types with no active content (the uploads section above) | `tests/api/test_brand_assets.py` (media type, `nosniff`), `tests/api/test_health.py` (default `default-src 'none'`) |
+| A script grows into a second framework or a pile of code on a page | A budget of 30 KB per script and 100 KB in all, gzipped; every script has an entry in `docs/islands.md` | `tests/web/test_static.py` (size and listing tests) |
+| Data the person may not see reaches the browser and is hidden there | Scope and suppression happen on the server; ADR 0118 point 8; reports follow ADR 0117 | The scope and suppression tests of each report step |
+
 ## Flow: widget script on host websites (ADR 0035, EM-3)
 
 Public: `GET /widget/v1/openplanner-booking.js`, loaded by host pages as a module script.
