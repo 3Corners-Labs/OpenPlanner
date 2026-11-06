@@ -161,7 +161,9 @@ class StaffDirectoryService:
         """Split a person's readable grants into those in and outside ``scope``."""
         parsed = parse_entitlements(user.entitlements, self._settings().prefix, places)
         inside = tuple(sorted((g for g in parsed.grants if in_scope(g, scope)), key=_key))
-        unread = len(user.entitlements) - len(parsed.grants) - parsed.ignored
+        # Values of another installation (``parsed.ignored``) are access elsewhere too: this
+        # admin may not disable the whole account while they exist.
+        unread = len(user.entitlements) - len(parsed.grants)
         elsewhere = len(inside) < len(parsed.grants) or unread > 0
         if not scope.everything and any(g.role == Role.SUPERUSER.value for g in parsed.grants):
             return ManagedPerson(user, (), True)  # superusers are the superuser's alone
