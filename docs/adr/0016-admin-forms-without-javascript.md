@@ -5,6 +5,8 @@ Status: accepted (2026-10-23)
 script (`update-progress.js`, ADR 0048; the generic `live-region.js`, ADR 0072 §6, on the
 queue, the claimed booking and the agenda day view) with `SCRIPT_CSP` (`script-src 'self'`) on
 that page only; HTMX is not used.
+§1–2 further amended by ADR 0118 (proposed): the rule becomes *every task works without JavaScript;
+pages may add interactive islands*, with the limits of that ADR; HTMX stays unused.
 
 ## Context
 
