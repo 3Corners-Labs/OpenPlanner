@@ -611,6 +611,8 @@ class BookingService:
         """
         if start.tzinfo is None:
             raise ValueError("start must be timezone-aware")
+        if group.is_archived:  # ADR 0084: archiving can pass while a booking awaits a new time
+            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
         now = self._clock.now()
         earliest, latest = booking_window(group, now)
         if not earliest <= start <= latest:
