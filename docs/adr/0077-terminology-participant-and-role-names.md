@@ -1,7 +1,7 @@
 # 0077. Terminology: "participant", and organisation names for staff functions
 
-Status: accepted (2026-10-31), partly built: everything is merged except the regenerated diagrams
-(step 2f), which need the draw.io app. Requested
+Status: accepted (2026-10-31), built: every step is merged, the regenerated diagrams (step 2f,
+#547) last. Requested
 by the product owner, who accepted it on 2026-10-31 together with the recommendations of
 Q12 and Q13. Extends ADR 0004 (texts), ADR 0039 (roles) and ADR 0074 (organisation text
 overrides, PR #168). Changes no right: ADR 0014 stays as it is.
@@ -249,7 +249,7 @@ Nothing is open at the time of acceptance. A new question gets a row here, not a
 | 2d-2 | Code: api and web layers, `app/api/participant.py` → `participant.py` | #212 | merged |
 | 2d-3 | Code: admin, adapters, jobs, scripts, e2e and the rest of the tests; the diagram source | #244 | merged |
 | 2e | Docs that name renamed files and tests | #247 | merged |
-| 2f | `docs/diagrams` regenerated with `make diagrams` (needs the draw.io desktop app) | | planned |
+| 2f | `docs/diagrams` regenerated with `make diagrams` (needs the draw.io desktop app); the guard reads Word files | #547 | merged |
 | 3 | Guard test `tests/test_terminology.py` | #256 | merged |
 | 4a-1 | The agent term per organisation and group: words, editors, scope of the portal, mails and pages (points 8, 9, 11, 12, 13) | #257 | merged |
 | 4a-2 | Display names of `org_admin` and `group_admin` per organisation (points 10, 11, 13) | #259 | merged |

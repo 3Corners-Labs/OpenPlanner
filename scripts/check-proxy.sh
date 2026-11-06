@@ -6,7 +6,9 @@
 # standards of ADR 0086 hold (TLS 1.2 and 1.3 only with AEAD suites, HSTS of at least a year and
 # none on port 80, and the app's round trip through the proxy is `ok`, or `proxy_not_trusted` with
 # a wrong FORWARDED_ALLOW_IPS); a forged X-Forwarded-For/-Proto/-Host from the visitor is replaced
-# by the proxy before it reaches web (ASVS V4.1.3, V15.3.4; read from the wire); a
+# by the proxy before it reaches web (ASVS V4.1.3, V15.3.4; read from the wire); a visitor over
+# IPv6 reaches web with their own address, not one the whole of IPv6 shares (the dual-stack edge
+# network of docker-compose.yml); a
 # pair handed over through the portal-certs volume is served within the poll interval and ACME
 # applies again when it is withdrawn; then the same proxy serves an own certificate from files and
 # one issued by its internal authority (ADR 0112; the root is published, trusted by `tls-check`,
@@ -17,15 +19,24 @@ set -eu
 
 project=openplanner-proxy-check
 certs="$(mktemp -d)"
+# A visitor over IPv6 (ipv6_client_check): the proxy is also published on the gateway address of
+# a probe network made below, without masquerading, so a request from that address keeps it.
+probe6_network=$project-ipv6
+probe6_subnet=fdf2:d3f5:96ab:1::/64
+probe6=fdf2:d3f5:96ab:1::1
 compose() {
-  PEBBLE_CERTS="$certs" docker compose -p "$project" \
+  PEBBLE_CERTS="$certs" PROBE6_ADDRESS="$probe6" docker compose -p "$project" \
     -f docker-compose.yml -f deploy/proxy/compose.pebble.yml --profile tls "$@"
 }
 cleanup() {
   compose down -v >/dev/null 2>&1 || true
+  docker network rm "$probe6_network" >/dev/null 2>&1 || true
   rm -rf "$certs"
 }
 trap cleanup EXIT
+docker network rm "$probe6_network" >/dev/null 2>&1 || true # left by an interrupted run
+docker network create --ipv6 --subnet "$probe6_subnet" --gateway "$probe6" \
+  -o com.docker.network.bridge.enable_ip_masquerade=false "$probe6_network" >/dev/null
 
 # One source for the Pebble version: the compose overlay, which Renovate updates (ADR 0051).
 pebble_image="$(sed -n 's|^ *image: *\(ghcr.io/letsencrypt/pebble:[^ ]*\)$|\1|p' deploy/proxy/compose.pebble.yml)"
@@ -182,12 +193,10 @@ while time.time() < end:
             print(line.decode("latin-1"), flush=True)
 '
 
-forged_header_check() { # a forged X-Forwarded-* is replaced at the edge (ASVS V4.1.3, V15.3.4)
-  # The visitor claims to be 203.0.113.7 (a documentation address, RFC 5737), to have used http
-  # and to be asking for another host. Caddy has no trusted_proxies, so it must replace all
-  # three. The only place that shows what web is given is the wire between proxy and web: a
-  # sniffer in web's network namespace prints the X-Forwarded-* lines of that request, so the
-  # app needs no hook and no address is ever stored or logged.
+on_the_wire() { # on_the_wire REQUEST: the X-Forwarded-* lines web is given while REQUEST runs
+  # The only place that shows what web is given is the wire between proxy and web: a sniffer in
+  # web's network namespace prints the X-Forwarded-* lines, so the app needs no hook and no
+  # address is ever stored or logged.
   web="$(compose ps -q web)"
   image="$(docker inspect -f '{{.Config.Image}}' "$web")"
   sniffer="$(docker run -d --rm --network "container:$web" --cap-add NET_RAW --user 0 \
@@ -196,12 +205,23 @@ forged_header_check() { # a forged X-Forwarded-* is replaced at the edge (ASVS V
     docker logs "$sniffer" 2>&1 | grep -q '^ready$' && break
     sleep 1
   done
+  "$1" >&2
+  sleep 2
+  docker logs "$sniffer" 2>&1 | tr -d '\r'
+  docker stop "$sniffer" >/dev/null 2>&1 || true
+}
+
+forged_request() { # the visitor claims another address, scheme and host
   # shellcheck disable=SC2086
   curl -sk $resolve -o /dev/null -H 'X-Forwarded-For: 203.0.113.7' -H 'X-Forwarded-Proto: http' \
     -H 'X-Forwarded-Host: forged.example' https://booking.test:18443/healthz
-  sleep 2
-  seen="$(docker logs "$sniffer" 2>&1 | tr -d '\r')"
-  docker stop "$sniffer" >/dev/null 2>&1 || true
+}
+
+forged_header_check() { # a forged X-Forwarded-* is replaced at the edge (ASVS V4.1.3, V15.3.4)
+  # The visitor claims to be 203.0.113.7 (a documentation address, RFC 5737), to have used http
+  # and to be asking for another host. Caddy has no trusted_proxies, so it must replace all
+  # three; the sniffer shows what web is given.
+  seen="$(on_the_wire forged_request)"
   echo "$seen" | sed 's/^/  on the wire to web: /'
   forwarded_for="$(echo "$seen" | grep -i '^x-forwarded-for:' || true)"
   [ -n "$forwarded_for" ] || fail "the sniffer saw no proxied request, so the forged header could not be judged"
@@ -211,6 +231,40 @@ forged_header_check() { # a forged X-Forwarded-* is replaced at the edge (ASVS V
     || fail "the proxy kept the visitor's value next to its own (not a single address): $forwarded_for"
   echo "$seen" | grep -qi '^x-forwarded-proto: https$' || fail "web does not receive X-Forwarded-Proto: https from the proxy"
   ! echo "$seen" | grep -qi 'forged.example' || fail "web receives the X-Forwarded-Host the visitor forged"
+}
+
+# One request to the proxy from the address given as the first argument, port 18444. Only the
+# proxy's answer matters here, not its certificate.
+ipv6_client_code='
+import socket, ssl, sys
+context = ssl.create_default_context()
+context.check_hostname = False
+context.verify_mode = ssl.CERT_NONE
+with socket.create_connection((sys.argv[1], 18444), timeout=10) as raw:
+    with context.wrap_socket(raw, server_hostname="booking.test") as tls:
+        tls.sendall(b"GET /healthz HTTP/1.1\r\nHost: booking.test\r\nConnection: close\r\n\r\n")
+        tls.recv(64)
+'
+
+ipv6_request() { # a request from the probe address, made in the host's network namespace
+  # From a container on the host network, so that on Docker Desktop too the request comes from
+  # the machine that runs Docker, where the probe network's gateway address lives.
+  docker run --rm --network host --entrypoint python "$image" -I -c "$ipv6_client_code" "$probe6" \
+    || echo "the request over IPv6 to [$probe6]:18444 failed"
+}
+
+ipv6_client_check() { # a visitor over IPv6 keeps their address (docker-compose.yml, network edge)
+  # The request comes from the probe network's gateway address to the port published there.
+  # Docker must forward it to the proxy with NAT, so the proxy sees that address and puts it in
+  # X-Forwarded-For. Docker's userland proxy (an edge network without IPv6, ip6tables off, Docker
+  # Engine before 27) opens a new connection from the edge bridge instead, and every visitor over
+  # IPv6 would share that one address in the rate limits.
+  seen="$(on_the_wire ipv6_request)"
+  echo "$seen" | sed 's/^/  on the wire to web, a visitor over IPv6: /'
+  forwarded_for="$(echo "$seen" | grep -i '^x-forwarded-for:' | sed 's/^[^:]*: *//' || true)"
+  [ -n "$forwarded_for" ] || fail "no request over IPv6 reached web, so the visitor's address could not be judged"
+  [ "$forwarded_for" = "$probe6" ] \
+    || fail "a visitor over IPv6 at $probe6 reaches web as $forwarded_for: Docker's userland proxy hides the address (edge network without IPv6, or ip6tables off)"
 }
 
 edge_checks() { # redirect, machine paths, body limit, non-root, standards: the same in every pass
@@ -243,9 +297,10 @@ compose up -d --build --wait proxy
 wait_for_proxy
 issuer | grep -q 'Pebble' || fail "no certificate from the ACME CA ($(issuer))"
 edge_checks
+ipv6_client_check
 round_trip ok pebble
 tls_check untrusted Pebble
-echo "pass 1 ok: certificate obtained over ACME, redirect, body limit, non-root, TLS versions, HSTS, round trip, tls-check"
+echo "pass 1 ok: certificate obtained over ACME, redirect, body limit, non-root, TLS versions, HSTS, a visitor's IPv6 address, round trip, tls-check"
 
 # A proxy address the app does not trust: the app must say so, not report ok (ADR 0086 point 2).
 # In a subshell: an assignment in front of a shell function would outlive the call.

@@ -94,6 +94,12 @@ class CallJobs:
         if job.type is JobType.DELETE_VIDEO_ROOM:
             await self._calls.delete_meeting(booking, group)
         elif job.type is JobType.DELETE_TRIAL_CALL:
+            if job.pinned_start is not None and (
+                booking.trial is None or booking.trial.expires_at != job.pinned_start
+            ):
+                # Bound to an older trial that was replaced: the newer one has its own cleanup.
+                log.info("job.skipped", job_id=job.id, reason=STALE)
+                return STALE
             await self._calls.delete_trial_call(booking, group)
         elif job.type is JobType.END_WXCC_TASK:
             await self._calls.end_task(booking)

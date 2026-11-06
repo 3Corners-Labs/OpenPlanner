@@ -43,8 +43,9 @@ Each permission applies at one level:
 ## Participants and integrations
 
 Below the matrix is what participants can do without logging in: with the link in their
-confirmation email they can view their booking, and move or cancel it until the change
-deadline.
+confirmation email they can view their booking, move it until the number of minutes before the
+start that the group sets (**Participant can move until** in the
+[group settings](group-settings.md)), and cancel it until the start.
 Below that are the rights of connected systems, such as a contact-center bot. The superuser
 grants those per integration.
 

@@ -385,6 +385,9 @@ data. A refused change is audited with its permission and target only, never the
 proxy ──ACME (https)──> Let's Encrypt: TLS_DOMAIN, ACME_EMAIL (operator), public key
 Let's Encrypt ──HTTP-01 / TLS-ALPN-01──> proxy (ports 80/443): challenge token only
 visitor ──https──> proxy ──http, edge network──> web (X-Forwarded-For set by the proxy)
+   over IPv4 and IPv6 alike: Docker forwards both to the proxy with NAT (the dual-stack edge
+   network), so X-Forwarded-For is the visitor's own address; web only compares it in memory
+   (rate limits) and keeps nothing but its pseudonym (ADR 0053); the hop to web stays IPv4
    own proxy on another machine ──https (WEB_TLS_CERT_FILE/KEY_FILE)──> web (ADR 0091 point 3)
 worker ──TLS handshake, no request──> proxy (public name, port 443): reads the public certificate
        ──> certificate_checks (issuer, names, validity, finding; no personal data; ADR 0064)

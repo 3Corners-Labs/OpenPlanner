@@ -4,6 +4,8 @@ Status: accepted (2026-10-30), requested by the product owner. Amends ADR 0059 (
 6: the channel and auto-apply move from class B to class C; the updater's identity follows the
 installer mode) and ADR 0029 (a chosen version instead of "the latest"; the history comes from
 the audit log). Extends ADR 0031 and 0040 (audit filter by subject) and ADR 0048. Partly built; see `docs/adr-status.md` for what is built.
+Note (2026-11-05): ADR 0116 point 9 lets auto-apply be used in production when an
+`update_window` is set, and adds `update_line` and `update_window` next to the settings here.
 
 ## Context
 

@@ -96,9 +96,9 @@ tests/         mirrors app/; fakes for ports live in tests/fakes/.
   back to Dutch; the switcher picks it up automatically. Add the locale to `e2e/pages.json`.
 - Every HTML page is rendered through `app.web.templates.render`, which applies the locale,
   the language switcher, CSP and caching headers. Do not build HTML responses elsewhere.
-- Never put PII (`name, email, phone, note, guest_join_url, host_join_url`) in logs, errors,
-  URLs or job payloads. The semgrep rules in `.semgrep/` and the masking test catch the obvious
-  cases, not all of them.
+- Never put PII (any name in `PII_FIELDS` of `app/logging.py`) in logs, errors, URLs or job
+  payloads. The semgrep rules in `.semgrep/` and the masking test catch the obvious cases, not
+  all of them.
 - A new or changed admin screen comes with its manual topic in `docs/manual/nl` and
   `docs/manual/en` (ADR 0033, how-to in `docs/manual/README.md`). Participant pages explain
   themselves in the page, through `_()`, and never link to the manual.
@@ -125,10 +125,12 @@ on the pull request as the early signal and again in the merge queue, where it j
 request in the group by its own commit and reads the labels through the API (ADR 0088); a
 decision cannot reach `main` through the queue without the label, also when it is stacked on an
 ADR branch that was closed. The label counts only when an administrator of the repository set
-it last, and a push by anyone else takes it off again (ADR 0104). The PR template asks the seven review questions from `CLAUDE.md`; answer all of them.
+it last, and a push by anyone else takes it off again (ADR 0104). The PR template lists the review questions; answer all of them.
 New ADRs start from `docs/adr/template.md`, including its *Settings* section (ADR 0042). A new ADR also gets its *Build status* table and its row in `docs/adr-status.md`; the PR that builds a step of an ADR updates both (ADR 0059).
 Every open row of a *Build status* table has an issue `ADR NNNN step S: …` (label `adr:NNNN`, kept by `scripts/adr_issues.py`); a build PR sets its row to `in PR #N` and closes the issue with `Closes #N` in its description, and a weekly report issue `ADR drift <date>` lists what no longer agrees (ADR 0078).
-Run the `security-review` skill (`.claude/skills/security-review/`) before opening the PR.
+Run the `pre-pr-review` skill (`.claude/skills/pre-pr-review/`, see `docs/skills.md`) before
+opening the PR. `tests/test_terminology.py` reads tracked files only: stage new files before you
+run it.
 
 `main` merges through a merge queue (squash): the queue builds `main` with the queued pull
 requests on top and merges only when that build is green, so two pull requests that pass on

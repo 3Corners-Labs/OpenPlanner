@@ -50,6 +50,14 @@ the `http.request` and `outbound.request` trace points carry what is safe instea
 request lines of httpx (full URL) and the statement lines of the SQL driver (bound values).
 Libraries never log below `warning` (see *Levels*).
 
+A library line keeps its own text, so the mask cannot reach into it. The lines that name the
+client address and the raw path are therefore never written, at any level
+(`REQUEST_LINES` in `app/logging.py`): slowapi's `ratelimit … (<address>) exceeded at
+endpoint: <path>` on a rate-limit hit, which the security event `request.rate_limited` records
+with a pseudonym instead (ADR 0053), and uvicorn's `<address> - "WebSocket <path>" 403` for a
+WebSocket request, which this application has no routes for. slowapi's other warnings (rate
+limit storage unreachable) carry no request data and still come through.
+
 Audit, system and security events are on the same stream after their transaction commits,
 marked `log_type: "audit"` (`docs/audit-events.md`), in the same shape; their sentence also
 says the outcome and the organisation when the template does not. Diagnostic events (ADR 0040
@@ -73,7 +81,10 @@ and the lines closer to the data. The audit line bypasses the level, so a quiet 
 drops the trail.
 
 `LOG_LEVEL` governs our own loggers only: `openplanner.*` (including the trace logger),
-the structlog loggers of the app and `uvicorn.error`. Every other logger (`httpcore`,
+the structlog loggers of the app and `uvicorn.error`, the last down to `info` (its start-up and
+error lines): below that, uvicorn writes the address of every connection, and the websockets
+library, which uvicorn hands the same logger, writes a WebSocket request's line and every
+header, cookies included. Every other logger (`httpcore`,
 `aiosqlite`, `sqlalchemy`, a library added later) lets nothing below `warning` through, at any
 `LOG_LEVEL`, after a live level change, and even if the library sets its own logger to
 `DEBUG`: libraries log at DEBUG what they handle (bound SQL values, response headers), and a

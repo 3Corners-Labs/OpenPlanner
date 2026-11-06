@@ -17,9 +17,12 @@ register's sentence with those fields filled in ("Disk space is low: 6% free ...
 the PII mask, so the sentence carries only masked values. A line of a library's own logger is
 ``library.<logger>`` in category ``operations`` and keeps its own text (ADR 0103 point 8).
 
-``LOG_LEVEL`` governs our own loggers only (``OWN_LOGGERS``). Every other stdlib logger stays at
-WARNING at any level, TRACE included, so a library's DEBUG lines (bound SQL values, response
-headers) never reach the stream, the tap or log shipping (ASVS V16.2.5).
+``LOG_LEVEL`` governs our own loggers only (``OWN_LOGGERS``), ``uvicorn.error`` down to INFO.
+Every other stdlib logger stays at WARNING at any level, TRACE included, so a library's DEBUG
+lines (bound SQL values, response headers) never reach the stream, the tap or log shipping
+(ASVS V16.2.5). A library line that names the client address and the raw path in its own text
+(``REQUEST_LINES``: slowapi's rate-limit hit, uvicorn's WebSocket request) is dropped at any
+level.
 
 ``TRACE`` (ADR 0085 part 2) sits below ``DEBUG``. Trace lines come only from the fixed points
 in ``TRACE_POINTS``, through ``tracer.trace(point, **fields)``: a point takes its registered
@@ -344,10 +347,15 @@ class _TapStream:
         return getattr(self._inner, name)
 
 
-OWN_LOGGERS = ("openplanner", "uvicorn.error")
-"""The stdlib loggers that follow ``LOG_LEVEL`` (and their children): ours, including the trace
-logger ``openplanner.trace``, and uvicorn's start-up and error lines. structlog loggers do not
-go through the stdlib and follow the level through their own filter."""
+OWN_LOGGERS: Mapping[str, int] = {"openplanner": TRACE, "uvicorn.error": logging.INFO}
+"""The stdlib loggers that follow ``LOG_LEVEL`` (and their children), each down to its floor.
+
+Ours, including the trace logger ``openplanner.trace``, follow it all the way down. uvicorn's
+start-up and error lines follow it down to INFO only: below that, uvicorn writes the address of
+every connection on ``uvicorn.error`` (TRACE), and it hands that same logger to the websockets
+library, which writes the request line and every header of a WebSocket request, cookies
+included, at DEBUG. structlog loggers do not go through the stdlib and follow the level through
+their own filter. A fixed protection (ASVS V16.2.5), not a setting."""
 FOREIGN_LEVEL = logging.WARNING
 """The lowest level any other logger gets through, whatever ``LOG_LEVEL`` says.
 
@@ -356,13 +364,16 @@ A fixed protection (ASVS V16.2.5), not a setting: libraries log at DEBUG what th
 """
 
 
-def _is_own(name: str) -> bool:
-    """Return whether the stdlib logger ``name`` is one of ``OWN_LOGGERS`` or below one."""
-    return any(name == own or name.startswith(f"{own}.") for own in OWN_LOGGERS)
+def _floor(name: str) -> int:
+    """Return the lowest level the stdlib logger ``name`` gets through (``OWN_LOGGERS``)."""
+    for own, floor in OWN_LOGGERS.items():
+        if name == own or name.startswith(f"{own}."):
+            return floor
+    return FOREIGN_LEVEL
 
 
 class _ForeignLevelFilter(logging.Filter):
-    """Drop a record of a logger that is not ours when it is below ``FOREIGN_LEVEL``.
+    """Drop a record below the floor of its logger: ``FOREIGN_LEVEL`` for one that is not ours.
 
     The root logger's level only decides for loggers without a level of their own; this filter
     on the handler also holds when a library sets its own logger to DEBUG, or when
@@ -371,7 +382,37 @@ class _ForeignLevelFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         """Return whether the record may be written."""
-        return record.levelno >= FOREIGN_LEVEL or _is_own(record.name)
+        return record.levelno >= _floor(record.name)
+
+
+REQUEST_LINES: Mapping[str, tuple[str, ...]] = {
+    "slowapi": ("ratelimit ",),
+    "uvicorn.error": ('%s - "WebSocket ',),
+}
+"""Library lines that carry the request in their own text: never written, at any level.
+
+Keyed by logger, then by the start of the line's message template (``record.msg``, before the
+values go in). slowapi writes ``ratelimit 2 per 1 minute (<client address>) exceeded at
+endpoint: <path>`` at WARNING on every rate-limit hit; the 429 handlers record the hit as the
+security event ``request.rate_limited`` with a pseudonym instead (ADR 0053). uvicorn writes
+``<client address> - "WebSocket <path>?<query>" 403`` at INFO for a WebSocket request, which this
+application has no routes for. The path is the raw one: ``/b/{token}`` carries the management
+token (ADR 0011). A library line keeps its own text (ADR 0103 point 8), so the PII mask cannot
+reach into it; the line goes instead. A fixed protection, not a setting.
+"""
+
+
+class _RequestLineFilter(logging.Filter):
+    """Drop a library line of ``REQUEST_LINES``, which names the client address and raw path.
+
+    On the handler, like ``_ForeignLevelFilter``, so the stream, the tap and log shipping never
+    see the line, whatever level the library logs it at.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return whether the record may be written."""
+        starts = REQUEST_LINES.get(record.name)
+        return not (starts and isinstance(record.msg, str) and record.msg.startswith(starts))
 
 
 _CONFIGURED: list[tuple[TextIO, Envelope | None]] = []
@@ -403,6 +444,7 @@ def configure_logging(
     """
     chosen = stream or sys.stdout
     _CONFIGURED[:] = [(chosen, envelope)]
+    numeric = logging.getLevelNamesMapping()[level]
     out: TextIO = _TapStream(chosen)  # type: ignore[assignment]
     shared: list[Processor] = [
         structlog.contextvars.merge_contextvars,
@@ -423,28 +465,30 @@ def configure_logging(
         processors=[*shared, *finalize],
         # structlog's filtering logger knows no level below DEBUG; trace lines take the
         # stdlib route (``tracer``), which the root logger's level filters.
-        wrapper_class=structlog.make_filtering_bound_logger(
-            max(logging.getLevelNamesMapping()[level], logging.DEBUG)
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(max(numeric, logging.DEBUG)),
         logger_factory=structlog.WriteLoggerFactory(file=out),
         cache_logger_on_first_use=False,
     )
 
     handler = logging.StreamHandler(out)
     handler.addFilter(_ForeignLevelFilter())
+    handler.addFilter(_RequestLineFilter())
     handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             foreign_pre_chain=[*shared, _logger_name, _stdlib_extra],
             processors=[structlog.stdlib.ProcessorFormatter.remove_processors_meta, *finalize],
         )
     )
-    # The level is for our own loggers only; the root, and so every other library, stays at
-    # WARNING (V16.2.5). An allowlist: a library added tomorrow is covered without a line here.
+    # The level is for our own loggers only, each down to its floor; the root, and so every
+    # other library, stays at WARNING (V16.2.5). An allowlist: a library added tomorrow is
+    # covered without a line here. uvicorn checks its logger's own level before it writes a
+    # connection's address, and websockets before it writes headers, so the floor on the
+    # logger keeps those lines from being made at all; the filter on the handler holds anyway.
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(FOREIGN_LEVEL)
-    for own in OWN_LOGGERS:
-        logging.getLogger(own).setLevel(level)
+    for own, floor in OWN_LOGGERS.items():
+        logging.getLogger(own).setLevel(max(numeric, floor))
 
     # uvicorn installs its own plain-text handlers; route them through ours instead.
     for name in ("uvicorn", "uvicorn.error"):

@@ -8,7 +8,7 @@ the HTML that draw.io renders (``<b>``, ``<br>``, ``&amp;``); the document build
 from dataclasses import dataclass
 from enum import StrEnum
 
-AS_OF = "27 oktober 2026"
+AS_OF = "5 november 2026"
 TITLE = "Bouwblokken van OpenPlanner"
 SUBTITLE = (
     "Architectuur van de groepsafsprakenservice voor het contactcenter, zoals gebouwd. "
@@ -94,33 +94,34 @@ BLOCKS = (
         "B1",
         Family.PARTICIPANT,
         "Deelnemersportaal",
-        "groepspagina /g/slug, maandkalender, beheerpagina /b/token, join-pagina",
-        "Groepspagina /g/{slug}, maandkalender als progressive enhancement, beheerpagina "
-        "/b/{token} voor verzetten en annuleren, join-pagina. Werkt zonder JavaScript en zonder "
-        "muis.",
-        "api/booking_pages · participant · slot_picker · join_pages · web/static/calendar.js",
-        "0020",
+        "groepspagina /g/slug, maandkalender, beheerpagina, proefgesprek, join-pagina",
+        "Groepspagina /g/{slug} met de formuliervelden van de groep, maandkalender als progressive "
+        "enhancement, beheerpagina /b/m/{ref} voor verzetten en annuleren (de link uit de mail "
+        "wordt ingewisseld voor een cookie), proefgesprek en join-pagina. Werkt zonder JavaScript "
+        "en zonder muis.",
+        "api/booking_pages · participant · slot_picker · link_session · trial_pages · join_pages · "
+        "web/static/calendar.js",
+        "0020 · 0069 · 0071 · 0093",
     ),
     Block(
         "B2",
         Family.PARTICIPANT,
         "Widget",
         "Web Component, dezelfde tokens",
-        "Dezelfde boekflow als Web Component in Shadow DOM, gestyled via --booking-*-tokens en "
-        "part. Gepland (WP3c).",
-        "widget/",
-        "0020",
-        planned=True,
+        "Dezelfde boekflow als Web Component <openplanner-booking> in Shadow DOM, gestyled via "
+        "--booking-*-tokens en part; werkt alleen op de websites die de organisatie toestaat.",
+        "widget/ · api/widget_api · widget_script · domain/embedding_service",
+        "0020 · 0035",
     ),
     Block(
         "B3",
         Family.PARTICIPANT,
         "Direct videobellen",
-        "nu bellen, plafond per groep, plek in de rij",
-        "'Nu bellen' per groep: meeting en work item direct, plafond op open gesprekken, plek in "
-        "de rij en gebruikelijke wachttijd uit eigen data.",
-        "api/direct_pages · domain/direct_queue",
-        "0019 · 0026",
+        "nu bellen per blok, plafond, plek in de rij",
+        "'Nu bellen' per bezettingsblok: meeting en work item direct, plafond op open gesprekken, "
+        "plek in de rij en gebruikelijke wachttijd uit eigen data, live status in de wachtruimte.",
+        "api/direct_pages · domain/direct_queue · direct_leave · web/static/live-region.js",
+        "0019 · 0026 · 0072",
     ),
     Block(
         "B4",
@@ -136,11 +137,13 @@ BLOCKS = (
         "B5",
         Family.CORE,
         "Boekingen &amp; tokens",
-        "boeken, verzetten, annuleren",
+        "boeken, bevestigen, verzetten, annuleren",
         "Boeken, verzetten en annuleren in één transactie onder schrijfslot; capaciteit-snapshot "
-        "op het slot; beheertoken afgeleid uit salt en serversleutel, alleen de hash opgeslagen.",
-        "domain/booking · services · tokens · adapters/db/uow",
-        "0011",
+        "op het slot; eigen formuliervelden per groep; een bevestiging per mail houdt de plek "
+        "vast; maximum per e-mailadres; beheertoken afgeleid uit salt en serversleutel, alleen de "
+        "hash opgeslagen.",
+        "domain/booking · services · tokens · form_fields · adapters/db/uow",
+        "0011 · 0055 · 0056 · 0066",
     ),
     Block(
         "B6",
@@ -148,41 +151,47 @@ BLOCKS = (
         "Berichten &amp; herinneringen",
         "mail, SMS, .ics, teksten",
         "Bevestiging, wijziging, herinneringen per groepsregel en annulering via mail en SMS. "
-        "Vaste lay-outs met bewerkbare tekstblokken; .ics-bijlage zonder persoonsgegevens.",
+        "Vaste lay-outs met bewerkbare tekstblokken per organisatie en groep; .ics-bijlage zonder "
+        "persoonsgegevens; controle van het afzenderdomein (SPF, DKIM, DMARC).",
         "domain/channels · messaging_service · message_texts · jobs/messages · calendar · "
-        "adapters/smtp · sms · senders",
-        "0009 · 0022 · 0028",
+        "adapters/smtp · sms · senders · mail_dns",
+        "0009 · 0022 · 0028 · 0073 · 0074",
     ),
     Block(
         "B7",
         Family.CORE,
         "Gespreksregie",
-        "meeting, work item, tijdlijn",
+        "meeting, work item, tijdlijn, controle",
         "Meeting aanmaken namens de host van de groep, work item naar WxCC op T-dispatch, "
-        "ondertekende webhooks terug, tijdlijn en gespreksstatus per boeking.",
+        "ondertekende webhooks terug, tijdlijn en gespreksstatus per boeking met de reden van de "
+        "provider; groepscontrole met een proef-work item.",
         "domain/calls · call_service · integration · jobs/calls · adapters/webex_meetings · "
-        "wxcc · webhooks",
-        "0017 · 0018 · 0021",
+        "wxcc · webhooks · group_check",
+        "0017 · 0018 · 0021 · 0065 · 0068 · 0082",
     ),
     Block(
         "B8",
         Family.CORE,
         "Privacy &amp; retentie",
-        "purge_pii op einde + 24 u; noodsluiting max. 30 d",
-        "purge_pii op slot-einde + 24 u of annulering + 24 u; bij noodsluiting uiterlijk 30 "
-        "dagen na het einde. Nachtelijke sweep en alarm volgen in WP8.",
-        "domain/job_plan · jobs/runner · logging",
-        "0024",
+        "purge_pii op einde + 24 u; noodsluiting max. 30 d; nachtelijke sweep",
+        "purge_pii op slot-einde + 24 u of annulering + 24 u. Bewust later bij een noodsluiting "
+        "(30 dagen na het einde, een open sluiting begrensd) en bij wachten op een nieuw tijdstip "
+        "of op een bevestiging per mail. Een nachtelijke sweep verwijdert achterblijvers en geeft "
+        "alarm.",
+        "logging · domain/privacy · retention · retention_sweep · job_plan · jobs/runner · "
+        "housekeeping",
+        "0024 · 0044 · 0056 · 0102",
     ),
     Block(
         "B9",
         Family.ADMIN,
         "Beheerportaal",
-        "groepen, teksten, kanalen, agenda",
-        "Groepen, bezetting, teksten, kanalen, branding, agenda en tijdlijn. Server-rendered "
-        "formulieren zonder JavaScript.",
-        "admin/*_routes · forms · pages · templates/admin",
-        "0016",
+        "groepen, teksten, kanalen, agenda, instellingen",
+        "Groepen, bezetting, teksten, kanalen, branding, agenda, tijdlijn en instellingen, "
+        "geordend als scope → object → tab vanuit één navigatieregister, met de handleiding in het "
+        "portaal. Server-rendered formulieren zonder JavaScript.",
+        "admin/*_routes · forms · pages · web/navigation · templates/admin",
+        "0016 · 0033 · 0042 · 0047",
     ),
     Block(
         "B10",
@@ -190,10 +199,10 @@ BLOCKS = (
         "Autorisatie &amp; audit",
         "één matrix, scopes, audit_events",
         "Eén matrix rol × permissie × niveau; elke route één permissie; queries gefilterd op "
-        "Scope; weigeringen, logins en wijzigingen in audit_events; docs/authorization.md "
-        "gegenereerd.",
-        "domain/authorization · audit · admin/authz · web/authz_report",
-        "0014 · 0015",
+        "Scope; weigeringen, logins en wijzigingen in audit_events en als regel naar het "
+        "logplatform; docs/authorization.md gegenereerd.",
+        "domain/authorization · audit · admin/authz · web/authz_report · adapters/event_sink",
+        "0014 · 0015 · 0031 · 0034",
     ),
     Block(
         "B11",
@@ -201,19 +210,23 @@ BLOCKS = (
         "Machine-API",
         "/api/agent/v1, client credentials",
         "/api/agent/v1 voor contactcenter-bots: client credentials, opake tokens van 10 minuten, "
-        "scopes per client, standaard uit, geen persoonsgegevens.",
+        "scopes per client, IP-allowlist, standaard uit, geen persoonsgegevens; ook export en "
+        "import van het configuratiepakket.",
         "api/agent/ · domain/api_access · api_clients",
-        "0023",
+        "0023 · 0089",
     ),
     Block(
         "B17",
         Family.ADMIN,
         "Inlog (OIDC)",
-        "PKCE, nonce, verse login",
-        "Beheerderslogin via PingFederate (Keycloak in dev) met PKCE, state en nonce; sessie van "
-        "8 uur; wijzigingen vragen een login van hooguit 60 minuten.",
-        "adapters/oidc · admin/session",
-        "0013 · 0015",
+        "IdP per organisatie, PKCE, verse login",
+        "Beheerderslogin via OIDC met PKCE, state en nonce, bij de identity provider van de "
+        "organisatie (gekozen op e-maildomein) of de meegeleverde Keycloak, die ook het personeel "
+        "in het portaal laat beheren; tweede factor via de provider (instelbaar); sessies op de "
+        "server, 8 uur; wijzigingen vragen een login van hooguit 60 minuten.",
+        "adapters/oidc · discovery · idp_registry · keycloak_directory · admin/session · "
+        "domain/identity_providers",
+        "0013 · 0015 · 0083 · 0095 · 0098 · 0100 · 0106",
     ),
     Block(
         "B12",
@@ -221,8 +234,8 @@ BLOCKS = (
         "Taakplanner",
         "jobs-tabel, worker",
         "Eigen jobs-tabel, gevuld in de boekingstransactie; worker claimt onder schrijfslot, retry "
-        "na 1, 5, 15 min; pinned_start maakt jobs idempotent.",
-        "adapters/db/jobs · jobs/worker · runner · healthcheck",
+        "na 1, 5, 15 min; pinned_start maakt jobs idempotent; dagelijks onderhoud in de worker.",
+        "adapters/db/jobs · jobs/worker · runner · housekeeping · healthcheck",
         "0002",
     ),
     Block(
@@ -231,9 +244,11 @@ BLOCKS = (
         "Opslag",
         "SQLite WAL, Alembic, versleutelde secrets",
         "SQLite in WAL-modus op een gedeeld volume, Alembic-migraties (alleen web migreert), "
-        "integratiesecrets AES-256-GCM versleuteld en alleen-schrijven.",
-        "adapters/db/ · crypto · db/credentials · migrations/",
-        "0008",
+        "integratiesecrets AES-256-GCM versleuteld en alleen-schrijven, met sleutel-id en rotatie "
+        "zonder verlies; configuratiepakket voor export en import van alle instellingen.",
+        "adapters/db/ · crypto · db/credentials · db/sealed · db/configuration_package · "
+        "migrations/",
+        "0008 · 0089 · 0094",
     ),
     Block(
         "B14",
@@ -249,27 +264,30 @@ BLOCKS = (
         "B15",
         Family.PLATFORM,
         "Rand &amp; beveiliging",
-        "TLS, headers, CSRF, rate limits",
-        "Caddy met automatisch vernieuwde certificaten, strikte CSP en HSTS, CSRF via Fetch "
-        "Metadata, rate limits en honeypot.",
-        "deploy/proxy · web/protection · api/security_headers",
-        "0030",
+        "TLS-proxy, certificaten, headers, rate limits",
+        "Caddy als TLS-proxy; certificaatbron in het portaal (ACME, eigen certificaat via CSR, "
+        "interne CA voor labs); certificaat en publiek adres gecontroleerd op Systeemstatus; "
+        "strikte CSP en HSTS, CSRF via Fetch Metadata, rate limits en honeypot.",
+        "deploy/proxy · web/protection · api/security_headers · adapters/tls_probe · "
+        "instance_probe · certificate_volume",
+        "0030 · 0064 · 0070 · 0086 · 0112",
     ),
     Block(
         "B16",
         Family.PLATFORM,
         "Updates &amp; levering",
         "release-check, host-updater, cosign",
-        "Ondertekende images (cosign) met SBOM; worker kijkt elk uur naar releases; superuser "
-        "vraagt update aan; host-updater verifieert, maakt backup en rolt terug bij een ongezonde "
-        "start.",
+        "Ondertekende images (cosign) met SBOM; de worker kijkt naar releases (standaard elk uur); "
+        "de superuser kiest kanaal en automatisch bijwerken en vraagt een update aan; de "
+        "host-updater verifieert, maakt een backup en rolt terug bij een ongezonde start.",
         "domain/updates · update_service · adapters/releases · scripts/updater/",
-        "0006 · 0029",
+        "0006 · 0029 · 0067",
     ),
 )
 
-# Plate 1 shows one extra platform box that is not a numbered building block.
-LOGGING_BOX = ("Logging &amp; health", "structlog JSON, PII-masker, /healthz")
+# Plate 1: what runs where, and one extra platform box that is not a numbered building block.
+SYSTEM_NOTE = "één VM · containers proxy · web · worker, optioneel idp · SQLite-volume"
+LOGGING_BOX = ("Logging &amp; health", "structlog JSON, PII-masker, logbestemmingen, /healthz")
 
 ACTORS = (
     ("Deelnemer", "boekt, wijzigt, belt in", True),
@@ -282,9 +300,11 @@ ACTORS = (
 EXTERNALS = (
     ("Mailprovider", "SMTP per organisatie · B6"),
     ("SMS-gateway", "vandaag Webex Connect · B6"),
+    ("DNS", "TXT-controle afzenderdomein · B6"),
     ("Webex Meetings", "meeting + webhooks · B7"),
     ("Webex Contact Center", "work item, taakevents · B7"),
-    ("Identity provider", "PingFederate / Keycloak · B17"),
+    ("Identity provider", "per organisatie of meegeleverde Keycloak · B17"),
+    ("Logplatform", "syslog, Splunk, Elastic of HTTP"),
     ("Let's Encrypt", "ACME-certificaten · B15"),
     ("GitHub / GHCR", "releases, ondertekende images · B16"),
 )
@@ -331,14 +351,25 @@ LAYERS = (
                 "Deelnemerspagina's",
                 "api/booking_pages · participant · slot_picker",
             ),
-            C(Family.PARTICIPANT, "B1 B7", "Join-pagina", "api/join_pages"),
+            C(Family.PARTICIPANT, "B1 B7", "Join-pagina", "api/join_pages · trial_pages"),
+            C(Family.PARTICIPANT, "B2", "Widget-API", "api/widget_api · widget_script"),
             C(Family.PARTICIPANT, "B3", "Direct bellen", "api/direct_pages"),
             C(Family.CORE, "B7", "Webhooks in", "api/webhooks"),
             C(Family.ADMIN, "B11", "Machine-API", "api/agent/ (token, RequireScope)"),
             C(Family.ADMIN, "B9 B10", "Beheerportaal", "admin/*_routes · authz · session"),
-            C(Family.PLATFORM, "B12 B6 B8", "Worker", "jobs/worker · runner · messages · calls"),
-            C(Family.PLATFORM, "B16", "Operator-CLI", "cli (authz-matrix, wxcc-check, update)"),
-            C(Family.PLATFORM, "", "Health", "api/health · jobs/healthcheck"),
+            C(
+                Family.PLATFORM,
+                "B12 B6 B8",
+                "Worker",
+                "jobs/worker · runner · housekeeping · messages · calls",
+            ),
+            C(
+                Family.PLATFORM,
+                "B16",
+                "Operator-CLI",
+                "cli (closure, settings, backup-db, wxcc-check …)",
+            ),
+            C(Family.PLATFORM, "", "Health", "api/health · instance · jobs/healthcheck"),
         ),
         5,
         62,
@@ -351,7 +382,12 @@ LAYERS = (
             C(Family.PLATFORM, "B14", "render()", "templates · locale · branding"),
             C(Family.PLATFORM, "B15", "Bescherming", "protection (CSRF, rate limit)"),
             C(Family.PLATFORM, "", "Foutpagina's", "error_pages · errors"),
-            C(Family.ADMIN, "B10", "Labels &amp; rapport", "authz_labels · authz_report"),
+            C(
+                Family.ADMIN,
+                "B9 B10",
+                "Navigatie &amp; labels",
+                "navigation · authz_labels · authz_report",
+            ),
             C(Family.CORE, "B7 B4", "Weergavelabels", "call_labels · closure_labels · slot_values"),
         ),
         5,
@@ -364,12 +400,22 @@ LAYERS = (
         (
             C(Family.PLATFORM, "B13", "db", "uow · engine · models · scope-filter"),
             C(Family.PLATFORM, "B12", "Jobqueue", "db/jobs"),
-            C(Family.PLATFORM, "B13", "Secrets", "crypto · db/credentials (AES-GCM)"),
+            C(Family.PLATFORM, "B13", "Secrets", "crypto · db/credentials · db/sealed (AES-GCM)"),
             C(Family.CORE, "B6", "Mail", "smtp"),
             C(Family.CORE, "B6", "SMS", "senders · sms · webex_connect_sms"),
+            C(Family.CORE, "B6", "DNS", "mail_dns (dnspython)"),
             C(Family.CORE, "B7", "Webex Meetings", "webex_meetings · webex_auth"),
             C(Family.CORE, "B7", "WxCC", "wxcc · wxcc_config · webhooks"),
-            C(Family.ADMIN, "B17", "OIDC", "oidc (httpx + PyJWT)"),
+            C(Family.CORE, "B7", "Controle", "group_check · service_app_check · diagnostics"),
+            C(Family.ADMIN, "B17", "OIDC", "oidc · discovery · idp_registry · signing_keys"),
+            C(Family.ADMIN, "B17", "Personeel", "keycloak_directory (admin-API)"),
+            C(
+                Family.PLATFORM,
+                "B15",
+                "TLS &amp; adres",
+                "tls_probe · instance_probe · certificate_volume",
+            ),
+            C(Family.PLATFORM, "", "Logbestemmingen", "event_sink · log_shipping · log_senders"),
             C(Family.PLATFORM, "B16", "Releases", "releases · db/backup · db/updates"),
             C(Family.PLATFORM, "", "Klok", "clock"),
         ),
@@ -384,15 +430,23 @@ LAYERS = (
             C(None, "", name)
             for name in (
                 "Transaction · UnitOfWork",
+                "ConfigurationTransfer",
                 "MessageSender · SenderDirectory",
+                "MailDomainResolver",
                 "VideoProvider",
                 "ContactCenterDispatcher",
-                "IdentityProvider",
+                "IntegrationChecker · ProbeRegistry",
+                "RequestLog",
+                "IdentityProvider · StaffDirectory",
+                "DiscoveryFetcher · SigningKeys",
+                "CertificateProbe · InstanceProbe",
+                "PemReader · CertificateVolume",
+                "EventSink · LogDestinationSender",
                 "ReleaseSource",
                 "Clock",
             )
         ),
-        4,
+        5,
         36,
         note="<b>Tests</b><br>Elke poort heeft een fake in tests/fakes/.",
         arrow_in="implementeert",
@@ -404,7 +458,10 @@ LAYERS = (
         tuple(
             C(fam, tag, name)
             for fam, tag, name in (
+                (Family.PARTICIPANT, "B2", "EmbeddingService"),
+                (Family.PARTICIPANT, "B1", "TrialCallService"),
                 (Family.CORE, "B5", "BookingService"),
+                (Family.CORE, "B5", "FormService"),
                 (Family.CORE, "B4", "PlanningService"),
                 (Family.CORE, "B4", "HolidayService"),
                 (Family.CORE, "B4", "ClosureService"),
@@ -414,8 +471,12 @@ LAYERS = (
                 (Family.CORE, "B7", "IntegrationService"),
                 (Family.ADMIN, "B9 B10", "AdminService"),
                 (Family.ADMIN, "B9", "OrganisationService"),
+                (Family.ADMIN, "B9", "SettingsService"),
                 (Family.ADMIN, "B11", "ApiAccessService"),
+                (Family.ADMIN, "B17", "IdentityProviderService"),
                 (Family.PLATFORM, "B14", "BrandingService"),
+                (Family.PLATFORM, "B15", "CertificateSourceService"),
+                (Family.PLATFORM, "", "LogDestinationService"),
                 (Family.PLATFORM, "B16", "UpdateService"),
             )
         ),
@@ -429,14 +490,14 @@ LAYERS = (
         "Domeinregels",
         "app.domain",
         (
-            C(Family.ADMIN, "B10", "authorization", "rol × permissie × niveau"),
+            C(Family.ADMIN, "B10", "authorization · audit", "rol × permissie × niveau"),
             C(Family.CORE, "B4", "availability · scheduling", "slots, tijdzones, zomertijd"),
             C(Family.CORE, "B4", "holidays · closure"),
             C(Family.CORE, "B5", "booking · tokens", "HMAC-salt, sha256(token)"),
-            C(Family.CORE, "B8 B12", "job_plan", "pinned_start, purge_pii"),
+            C(Family.CORE, "B12", "job_plan", "pinned_start, purge_pii"),
+            C(Family.CORE, "B8", "privacy · retention", "PII-velden, bewaartermijnen"),
             C(Family.CORE, "B6", "channels · message_texts"),
             C(Family.CORE, "B7 B3", "calls · direct_queue"),
-            C(Family.ADMIN, "B10", "audit"),
             C(Family.PLATFORM, "B16", "updates"),
             C(Family.NONE, "", "errors", "foutcodes"),
         ),
@@ -446,6 +507,10 @@ LAYERS = (
 )
 
 I18N_NOTE = "negotiation · translator · po · dates (Babel); importeert niets uit de rest van app/"
+OUTSIDE_NOTE = (
+    "SMTP · SMS-gateway · DNS · Webex Meetings · WxCC · IdP · logplatform · GitHub · publiek "
+    "adres (zie plaat 3)"
+)
 
 
 @dataclass(frozen=True)
@@ -492,6 +557,18 @@ LANES = (
         "201; antwoordbody wordt nooit gelogd",
     ),
     Lane(
+        ("MailDomainResolver",),
+        Family.CORE,
+        "B6",
+        "DNS",
+        "mail_dns (dnspython)",
+        "DNS TXT-query<br>resolver van de host, 5 s",
+        "DNS",
+        "afzenderdomein van het kanaal",
+        "TXT-vragen voor SPF, DKIM-selector en DMARC van het afzenderdomein",
+        "TXT-records, of geen antwoord; uitkomst op Kanalen",
+    ),
+    Lane(
         ("VideoProvider",),
         Family.CORE,
         "B7",
@@ -500,33 +577,47 @@ LANES = (
         "HTTPS REST /v1/meetings<br>Service App, OAuth refresh-token",
         "Webex Meetings",
         "namens de host van de groep",
-        "groepsnaam en tijden; verwijderen bij annuleren",
+        "groepsnaam en tijden, ook proefgesprekken; verwijderen bij annuleren",
         "meeting-id, join-link · webhooks gestart, host/gast binnen, beëindigd "
         "(HMAC-SHA1, replay-sleutel)",
     ),
     Lane(
-        ("ContactCenterDispatcher",),
+        ("ContactCenterDispatcher", "IntegrationChecker"),
         Family.CORE,
         "B7",
         "WxCC",
-        "wxcc · webex_auth",
-        "Create Task v2 · Task Messages v2 · End Task v1<br>Service App, scopes cjp:task_*",
+        "wxcc · webex_auth · group_check",
+        "Create Task v2 · Task Messages v2 · End/Get Task v1<br>Service App, scopes cjp:*",
         "Webex Contact Center",
         "flow routeert op openplannerGroup",
-        "work item: referentie, voornaam, start, groep, meetinglink, soort",
-        "task-id · taakevents via subscription (HMAC-SHA256, ±300 s)",
+        "work item: referentie, voornaam, start, groep, meetinglink, soort; proef-work item bij de "
+        "groepscontrole",
+        "task-id, taakstatus · taakevents via subscription (HMAC-SHA256, ±300 s)",
     ),
     Lane(
-        ("IdentityProvider",),
+        ("IdentityProvider", "DiscoveryFetcher", "SigningKeys", "StaffDirectory"),
         Family.ADMIN,
         "B17",
         "OIDC",
-        "oidc (httpx + PyJWT)",
-        "authorization code + PKCE S256<br>client_secret_basic, JWKS",
+        "oidc · discovery · signing_keys · keycloak_directory (httpx + PyJWT)",
+        "authorization code + PKCE S256<br>client_secret_basic of private_key_jwt, JWKS",
         "Identity provider",
-        "PingFederate; dev: Keycloak",
-        "redirect met state, nonce, code_challenge",
+        "per organisatie (e-maildomein); meegeleverde Keycloak",
+        "redirect met state, nonce, code_challenge; personeel via de admin-API van de "
+        "meegeleverde Keycloak",
         "ID-token → claims → Principal via ClaimMapping",
+    ),
+    Lane(
+        ("EventSink", "LogDestinationSender"),
+        Family.PLATFORM,
+        "",
+        "Logbestemmingen",
+        "event_sink · log_shipping · log_senders",
+        "syslog (RFC 5424, TLS) · HTTPS POST<br>Splunk HEC, Elastic _bulk, NDJSON",
+        "Logplatform",
+        "per bestemming ingesteld door de superuser",
+        "gemaskeerde JSON-regels; audit-, systeem- en beveiligingsevents ook op stdout",
+        "alleen status en reden, nooit een antwoordbody",
     ),
     Lane(
         ("ReleaseSource",),
@@ -534,22 +625,22 @@ LANES = (
         "B16",
         "Releases",
         "releases",
-        "HTTPS GET /releases/latest<br>optioneel read-only token",
+        "HTTPS GET /releases<br>optioneel read-only token",
         "GitHub / GHCR",
         "releases en ondertekende images",
-        "elk uur vanuit de worker",
-        "versietag en releasepagina; pull + cosign-controle door de host-updater",
+        "vanuit de worker, standaard elk uur",
+        "versies met releasenotes; pull + cosign-controle door de host-updater",
     ),
     Lane(
-        ("Transaction", "UnitOfWork"),
+        ("Transaction", "UnitOfWork", "ConfigurationTransfer"),
         Family.PLATFORM,
         "B13 B12",
         "Database",
-        "db/uow · engine · models · jobs",
+        "db/uow · engine · models · jobs · configuration_package",
         "aiosqlite, WAL<br>BEGIN IMMEDIATE voor schrijven",
         "SQLite-volume",
         "gedeeld door web en worker",
-        "queries gefilterd op Scope",
+        "queries gefilterd op Scope; configuratiepakket onder een wachtwoordzin",
         "domeinobjecten; PII alleen in bookings",
     ),
     Lane(
@@ -562,22 +653,34 @@ LANES = (
         "Contactcenter-bot",
         "WxCC AI Agent",
         "JSON zonder persoonsgegevens",
-        "vraagt vrije tijden per groep",
+        "vraagt vrije tijden per groep; configuratiepakket met een eigen scope",
         port_note="geen poort (ingang)",
         incoming=True,
     ),
     Lane(
-        (),
+        ("CertificateVolume", "PemReader"),
         Family.PLATFORM,
         "B15",
-        "Proxy",
-        "deploy/proxy (Caddy)",
-        "ACME HTTP-01<br>eigen proxy.env, geen app-secrets",
+        "Certificaten",
+        "certificate_volume · certificate_pem · internal_ca · deploy/proxy (Caddy)",
+        "ACME HTTP-01 door Caddy<br>eigen proxy.env, geen app-secrets",
         "Let's Encrypt",
-        "certificaat voor TLS_DOMAIN",
+        "of eigen certificaat (CSR), interne CA voor labs",
         "aanvraag en vernieuwing",
-        "certificaat in volume proxy-data",
-        port_note="geen poort (rand)",
+        "ACME-certificaat in volume proxy-data; eigen sleutel en keten in portal-certs, de "
+        "sleutel nooit in de database",
+    ),
+    Lane(
+        ("CertificateProbe", "InstanceProbe"),
+        Family.PLATFORM,
+        "B15",
+        "Probes",
+        "tls_probe · instance_probe",
+        "TLS-handshake · HTTPS GET /api/v1/instance<br>CA-bundel van de host, geen redirect",
+        "Publiek adres",
+        "OpenPlanner zelf, via DNS en proxy",
+        "client hello; verzoek met nonce, zoals een browser",
+        "certificaat (uitgever, verloop) en instance-id; uitkomst op Systeemstatus",
     ),
 )
 
@@ -615,9 +718,9 @@ SHARED_PARTS = (
     SharedPart(
         Family.PLATFORM,
         "Secrets",
-        "crypto.py · db/credentials",
-        "AES-256-GCM met HKDF-sleutel, recordnaam als associated data, alleen-schrijven in het "
-        "portaal",
+        "crypto.py · db/credentials · db/sealed",
+        "AES-256-GCM met HKDF-sleutel, recordnaam als associated data, sleutel-id per waarde en "
+        "rekey bij rotatie; alleen-schrijven in het portaal",
     ),
     SharedPart(
         Family.CORE,
@@ -628,13 +731,14 @@ SHARED_PARTS = (
     SharedPart(
         Family.CORE,
         "Diagnose",
-        "diagnostics.py · wxcc_config.py",
+        "diagnostics.py · wxcc_config.py · group_check.py",
         "wxcc-check probeert elke call onschadelijk; wxcc-config-check leest de keten asset → "
-        "flow → queue",
+        "flow → queue; de groepscontrole volgt een proef-work item (ProbeRegistry); elk verzoek "
+        "staat in het verzoeklog (RequestLog)",
     ),
 )
 
 PLATE3_FOOTNOTE = (
-    "Fouten van buiten worden korte codes (IntegrationError); antwoorden van providers komen nooit "
-    "in logs. Elke poort heeft een fake in tests/fakes/."
+    "Fouten van buiten worden korte codes (IntegrationError) met hooguit de reden van de "
+    "provider; antwoordbodies komen nooit in logs. Elke poort heeft een fake in tests/fakes/."
 )

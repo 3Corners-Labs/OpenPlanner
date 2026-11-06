@@ -992,8 +992,11 @@ msgstr "Iedereen"
 msgid "authz.condition.management_link"
 msgstr "Met de beheerlink uit de bevestiging"
 
-msgid "authz.condition.management_link_before_deadline"
-msgstr "Met de beheerlink, tot de taak naar de wachtrij gaat"
+msgid "authz.condition.management_link_before_change_deadline"
+msgstr "Met de beheerlink, tot het aantal minuten voor de start dat de groep instelt"
+
+msgid "authz.condition.management_link_before_start"
+msgstr "Met de beheerlink, tot de start"
 
 msgid "admin.to_portal"
 msgstr "Naar het beheerportaal"
@@ -1125,7 +1128,7 @@ msgid "admin.field.dispatch_lead_minutes"
 msgstr "Doorzetten naar de wachtrij (minuten vooraf)"
 
 msgid "admin.field.dispatch_lead_minutes_hint"
-msgstr "Vanaf dit moment is de afspraak alleen-lezen voor de deelnemer. 0 tot 60."
+msgstr "Hoeveel minuten voor de start de afspraak als taak naar het contactcenter gaat, 0 tot 60. De deelnemer kan daarna nog annuleren, tot de start."
 
 msgid "admin.field.dispatch_kind"
 msgstr "Hoe afspraken bij {agents} komen"
@@ -2548,7 +2551,7 @@ msgid "authz.participant.suspended_booking_change"
 msgstr "Opgeschorte afspraak verzetten of annuleren"
 
 msgid "authz.condition.management_link_while_suspended"
-msgstr "met de beheerlink, zolang de afspraak opgeschort is"
+msgstr "Met de beheerlink, zolang de afspraak opgeschort is"
 
 msgid "admin.tab.closure"
 msgstr "Noodsluiting"

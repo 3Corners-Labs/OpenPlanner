@@ -1,0 +1,60 @@
+# Verification stack of the verify-openplanner skill (SKILL.md in this folder): the development
+# shape of docker-compose.yml (web, worker, Mailpit, Keycloak) under a project name of its own, on
+# ports of its own, with the settings of .env.example and nothing from the checkout's .env or
+# secrets/, so it runs next to a developer's own stack without touching it.
+#
+# Only scripts/stack.sh uses this file. It passes the four variables below in --env-file, so a
+# missing one stops compose instead of falling back to a port another stack holds.
+#
+# What differs from `docker compose --profile dev up`, and why:
+# - image openplanner:verify, so building this checkout never retags a developer's openplanner:local;
+# - env_file is .env.example only: the documented development settings, and never a real Webex
+#   or SMTP credential from a local .env;
+# - web leaves the edge network: its fixed subnet is taken by any other stack of this repository,
+#   and the verification stack runs without the TLS proxy;
+# - web drops the ./web-tls bind mount, so nothing is created in the checkout;
+# - Keycloak imports realms rendered by stack.sh, which name this stack's web port as the
+#   redirect address, and announces itself on this stack's Keycloak port.
+
+services:
+  web:
+    image: openplanner:verify
+    env_file: !override
+      - path: .env.example
+        required: true
+    environment:
+      PUBLIC_BASE_URL: http://127.0.0.1:${VERIFY_WEB_PORT:?set by stack.sh}
+      OIDC_ISSUER: http://127.0.0.1:${VERIFY_KC_PORT:?set by stack.sh}/realms/openplanner
+      INSTALLATION_NAME: verify
+    networks: !override
+      - default
+    volumes: !override
+      - data:/srv/data
+      - internal-ca:/internal-ca:ro
+      - portal-certs:/srv/portal-certs
+    ports: !override
+      - "127.0.0.1:${VERIFY_WEB_PORT:?set by stack.sh}:8000"
+
+  worker:
+    image: openplanner:verify
+    env_file: !override
+      - path: .env.example
+        required: true
+    environment:
+      # The worker writes the links in every email, so it needs the same address as web.
+      PUBLIC_BASE_URL: http://127.0.0.1:${VERIFY_WEB_PORT:?set by stack.sh}
+      OIDC_ISSUER: http://127.0.0.1:${VERIFY_KC_PORT:?set by stack.sh}/realms/openplanner
+      INSTALLATION_NAME: verify
+
+  mailpit:
+    ports: !override
+      - "127.0.0.1:${VERIFY_MAIL_PORT:?set by stack.sh}:8025"
+
+  keycloak:
+    environment:
+      KC_HOSTNAME: http://127.0.0.1:${VERIFY_KC_PORT:?set by stack.sh}
+    volumes: !override
+      - ${VERIFY_SCRATCH:?set by stack.sh}/openplanner-realm.json:/opt/keycloak/data/import/openplanner-realm.json:ro
+      - ${VERIFY_SCRATCH:?set by stack.sh}/andere-realm.json:/opt/keycloak/data/import/andere-realm.json:ro
+    ports: !override
+      - "127.0.0.1:${VERIFY_KC_PORT:?set by stack.sh}:8080"

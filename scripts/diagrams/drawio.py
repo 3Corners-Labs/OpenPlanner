@@ -17,10 +17,12 @@ from scripts.diagrams.content import (
     LANES,
     LAYERS,
     LOGGING_BOX,
+    OUTSIDE_NOTE,
     PLATE1_FOOTNOTE,
     PLATE3_FOOTNOTE,
     PLATES,
     SHARED_PARTS,
+    SYSTEM_NOTE,
     Block,
     Family,
     Layer,
@@ -168,8 +170,7 @@ def plate_overview() -> Page:
         140,
         1030,
         750,
-        f'<b style="font-size:16px">OpenPlanner</b>  <font color="{MUTED}">één VM · containers '
-        "proxy · web · worker · SQLite-volume</font>",
+        f'<b style="font-size:16px">OpenPlanner</b>  <font color="{MUTED}">{SYSTEM_NOTE}</font>',
         "rounded=1;arcSize=2;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=14;"
         f"spacingTop=8;strokeColor={ACCENT};strokeWidth=2.5;fillColor=#f6f8fb;fontColor={ACCENT};"
         f"fontSize=14;{FONT}",
@@ -227,12 +228,16 @@ def plate_overview() -> Page:
         )
         if uses:
             page.edge(actor, system, style="exitX=1;exitY=0.5;entryX=0;")
+    # The external systems stay level with the OpenPlanner box (y 160 to 890), so every arrow
+    # runs straight; more than seven get lower boxes and a smaller step.
+    ext_height = 74 if len(EXTERNALS) <= 7 else 66
+    ext_step = min(110.0, (890 - 160 - ext_height) / max(len(EXTERNALS) - 1, 1))
     for i, (name, sub) in enumerate(EXTERNALS):
         ext = page.box(
             1370,
-            160 + i * 110,
+            160 + i * ext_step,
             200,
-            74,
+            ext_height,
             label(Family.EXTERNAL, "", name, sub),
             block_style(Family.EXTERNAL),
         )
@@ -309,10 +314,12 @@ def plate_components() -> Page:
             page.edge(previous, band, layer.arrow_in, "dashed=1;endFill=0;")
         else:
             page.edge(previous, band, layer.arrow_in)
+        # A side box is centred on its band, so the arrow between them runs straight.
+        side_y = y + (height - 80) / 2
         if layer.label == "Web":
             i18n = page.box(
                 1300,
-                y,
+                side_y,
                 260,
                 80,
                 label(Family.PLATFORM, "B14", "app.i18n (onafhankelijk)", I18N_NOTE),
@@ -322,15 +329,10 @@ def plate_components() -> Page:
         if layer.label == "Adapters":
             ext = page.box(
                 1300,
-                y,
+                side_y,
                 260,
                 80,
-                label(
-                    Family.EXTERNAL,
-                    "",
-                    "Naar buiten",
-                    "SMTP · SMS-gateway · Webex Meetings · WxCC · IdP · GitHub (zie plaat 3)",
-                ),
+                label(Family.EXTERNAL, "", "Naar buiten", OUTSIDE_NOTE),
                 block_style(Family.EXTERNAL, size=11),
             )
             page.edge(
@@ -341,6 +343,7 @@ def plate_components() -> Page:
         bands.append(band)
         y += height + 40
     page.edge(bands[0], bands[4], "roept aan", "exitX=0;exitY=0.85;entryX=0;entryY=0.5;dashed=1;")
+    page.height = max(page.height, int(y) + 20)
     return page
 
 
@@ -410,7 +413,10 @@ def plate_integrations() -> Page:
             f'style="font-size:10px">{part.note}</font>',
             block_style(part.family, size=11),
         )
-    page.text(40, y + 190, 1500, 20, f'<font color="{MUTED}">{PLATE3_FOOTNOTE}</font>', size=11)
+    rows = -(-len(SHARED_PARTS) // 3)
+    footnote_y = y + rows * 92 + 6
+    page.text(40, footnote_y, 1500, 20, f'<font color="{MUTED}">{PLATE3_FOOTNOTE}</font>', size=11)
+    page.height = max(page.height, footnote_y + 80)
     return page
 
 

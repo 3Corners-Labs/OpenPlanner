@@ -14,9 +14,10 @@ from app.adapters.webex_auth import (
     http_failure,
 )
 from app.domain.audit import Category
-from app.domain.ports import IntegrationError, RequestRecord
+from app.domain.ports import IntegrationError
 from app.domain.security_log import SecurityLog
 from tests.fakes.clock import FixedClock
+from tests.fakes.integrations import FakeRequestLog
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.fakes.tokens import MemoryTokenStore
 from tests.support.domain import NOW
@@ -246,20 +247,7 @@ async def test_a_new_bootstrap_token_replaces_the_stored_tokens(webex: FakeWebex
     assert "new-bootstrap-refresh" not in json.dumps(store.values[CREDENTIAL_NAME])
 
 
-class Recorded:
-    """``RequestLog`` that keeps what it was given (ADR 0068)."""
-
-    def __init__(self, error: Exception | None = None) -> None:
-        self.records: list[RequestRecord] = []
-        self.error = error
-
-    async def record(self, record: RequestRecord) -> None:
-        if self.error is not None:
-            raise self.error
-        self.records.append(record)
-
-
-def _reporting(handler: object, log: Recorded) -> AuthorizedClient:
+def _reporting(handler: object, log: FakeRequestLog) -> AuthorizedClient:
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))  # type: ignore[arg-type]
     return AuthorizedClient(
         http, WebexTokens(CONFIG, http, MemoryTokenStore(), FixedClock(NOW)), log
@@ -277,7 +265,7 @@ def _api(status: int, body: dict[str, object] | None = None, tracking: str = "")
 
 
 async def test_every_request_is_reported_without_query_or_body() -> None:
-    log = Recorded()
+    log = FakeRequestLog()
     client = _reporting(_api(204, tracking="ROUTER_1"), log)
 
     await client.request(
@@ -298,7 +286,7 @@ async def test_every_request_is_reported_without_query_or_body() -> None:
 
 
 async def test_a_refusal_is_reported_with_its_code_and_the_tracking_id_of_the_body() -> None:
-    log = Recorded()
+    log = FakeRequestLog()
     client = _reporting(_api(400, {"message": "bad", "trackingId": "ROUTER_2"}), log)
 
     with pytest.raises(IntegrationError):
@@ -314,7 +302,7 @@ async def test_an_unreachable_platform_is_reported_with_status_zero() -> None:
             return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
         raise httpx.ConnectError("down")
 
-    log = Recorded()
+    log = FakeRequestLog()
     with pytest.raises(IntegrationError):
         await _reporting(down, log).request("POST", "https://webexapis.com/v1/meetings")
 
@@ -322,7 +310,7 @@ async def test_an_unreachable_platform_is_reported_with_status_zero() -> None:
 
 
 async def test_a_failing_request_log_never_fails_the_request() -> None:
-    client = _reporting(_api(200), Recorded(RuntimeError("database locked")))
+    client = _reporting(_api(200), FakeRequestLog(RuntimeError("database locked")))
 
     response = await client.request("GET", "https://webexapis.com/v1/meetings")
 

@@ -1,4 +1,8 @@
-"""Fake Webex and WxCC adapters: record what they were asked, answer or fail on demand."""
+"""Fakes of the integration ports: they record what they were asked, answer or fail on demand.
+
+The Webex and WxCC adapters (video, dispatch, probes, checks) and the request log those
+adapters report every call to (ADR 0068).
+"""
 
 from collections.abc import Sequence
 from datetime import datetime
@@ -14,7 +18,7 @@ from app.domain.calls import (
     WorkItem,
 )
 from app.domain.checks import Finding
-from app.domain.ports import IntegrationError
+from app.domain.ports import IntegrationError, RequestRecord
 from app.domain.scheduling import Group
 
 
@@ -125,3 +129,16 @@ class FakeChecker:
         if self.error is not None:
             raise self.error
         return self.findings
+
+
+class FakeRequestLog:
+    """``RequestLog`` that keeps every record it was given; with ``error`` it raises (ADR 0068)."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.records: list[RequestRecord] = []
+        self.error = error
+
+    async def record(self, record: RequestRecord) -> None:
+        if self.error is not None:
+            raise self.error
+        self.records.append(record)

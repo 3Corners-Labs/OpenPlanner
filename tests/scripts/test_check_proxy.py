@@ -2,7 +2,8 @@
 
 The script needs Docker and runs in CI (step *proxy check*). This test keeps its shape honest
 without Docker: the TLS-version and HSTS checks belong to ``edge_checks``, which every pass
-calls, every pass also runs the round trip, and the wrong proxy address is tried once.
+calls, every pass also runs the round trip, the wrong proxy address is tried once, and the first
+pass checks that a visitor over IPv6 keeps their address.
 """
 
 import re
@@ -10,7 +11,8 @@ from pathlib import Path
 
 from app.api.security_headers import SECURITY_HEADERS
 
-SCRIPT = (Path(__file__).parents[2] / "scripts/check-proxy.sh").read_text()
+REPO = Path(__file__).parents[2]
+SCRIPT = (REPO / "scripts/check-proxy.sh").read_text()
 FORUM_MINIMUM_HSTS_SECONDS = 31536000
 """One year, the Forum Standaardisatie minimum the script asserts."""
 
@@ -63,11 +65,14 @@ def test_every_pass_sends_a_forged_forwarded_header_and_looks_at_the_wire() -> N
     """V4.1.3, V15.3.4: what the visitor forges must not be what web receives from the proxy."""
     assert "forged_header_check" in _body("edge_checks")
     body = _body("forged_header_check")
+    request = _body("forged_request")
+    wire = _body("on_the_wire")
 
-    assert "X-Forwarded-For: 203.0.113.7" in body  # a documentation address (RFC 5737)
-    assert "X-Forwarded-Proto: http" in body
-    assert "--network" in body  # the sniffer joins web's network namespace
-    assert "NET_RAW" in body
+    assert "on_the_wire forged_request" in body
+    assert "X-Forwarded-For: 203.0.113.7" in request  # a documentation address (RFC 5737)
+    assert "X-Forwarded-Proto: http" in request
+    assert "--network" in wire  # the sniffer joins web's network namespace
+    assert "NET_RAW" in wire
     # A control first: no header on the wire would also pass a "not forged" test.
     assert body.index("saw no proxied request") < body.index(
         "receives the X-Forwarded-For the visitor forged"
@@ -84,3 +89,23 @@ def test_the_sniffer_prints_only_the_forwarded_headers() -> None:
     compile(code, "sniffer", "exec")
     assert 'startswith(b"x-forwarded-")' in code
     assert "print(line" in code
+
+
+def test_a_visitor_over_ipv6_must_reach_web_with_their_own_address() -> None:
+    """The dual-stack edge network: Docker's NAT keeps the address, its userland proxy does not."""
+    body = _body("ipv6_client_check")
+
+    assert "on_the_wire ipv6_request" in body
+    assert re.search(r"^edge_checks\nipv6_client_check$", SCRIPT, re.MULTILINE)  # in pass 1
+    # A control first: no request on the wire would also leave no shared address to find.
+    assert body.index("no request over IPv6 reached web") < body.index(
+        '[ "$forwarded_for" = "$probe6" ]'
+    )
+    # With masquerading, every request would come from the edge bridge, as through the userland
+    # proxy, and the check could not tell the two apart.
+    assert "enable_ip_masquerade=false" in SCRIPT
+    overlay = (REPO / "deploy/proxy/compose.pebble.yml").read_text()
+    assert '"[${PROBE6_ADDRESS:?set by scripts/check-proxy.sh}]:18444:8443"' in overlay
+    match = re.search(r"^ipv6_client_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
+    assert match, "the IPv6 client program is not in the script"
+    compile(match.group(1), "ipv6 client", "exec")
