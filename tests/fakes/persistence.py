@@ -489,8 +489,7 @@ class InMemoryTransaction:
     async def erasable_groups(self, archived_before: datetime) -> list[Group]:
         def referenced(group_id: int) -> bool:
             return (
-                any(s.group_id == group_id for s in self.state.slots.values())
-                or any(b.group_id == group_id for b in self.state.bookings.values())
+                any(b.group_id == group_id for b in self.state.bookings.values())
                 or any(c.group_id == group_id for c in self.state.closures.values())
                 or any(a.group_id == group_id for a in self.state.acceptances.values())
                 or any(
@@ -510,6 +509,8 @@ class InMemoryTransaction:
 
     async def delete_group(self, group_id: int) -> None:
         del self.state.groups[group_id]
+        for key in [k for k, s in self.state.slots.items() if s.group_id == group_id]:
+            del self.state.slots[key]
         for table in (self.state.rules, self.state.overrides, self.state.reminder_rules):
             table.pop(group_id, None)
 

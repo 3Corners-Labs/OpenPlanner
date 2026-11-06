@@ -76,7 +76,7 @@ they leave the system only to the mail server and to GitHub respectively.
 org admin ──POST /admin/groups/{slug}/settings/archive (name typed back)──> web
 web ──SQL──> groups.archived_at = now; audit group.delete, detail archived (slug, actor)
 participant ──GET /g/{slug}──> web ──> 404 (same page as an unknown slug)
-worker (daily) ──SQL──> groups archived ≥ group_erase_after_days ago with no booking, slot,
+worker (daily) ──SQL──> groups archived ≥ group_erase_after_days ago with no booking,
                          closure, acceptance or API client ──> system event group.erased ──>
                          DELETE groups (cascade: staffing, exceptions, reminders, texts,
                          form fields, holidays, settings)

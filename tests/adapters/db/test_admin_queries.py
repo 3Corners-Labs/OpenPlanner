@@ -5,10 +5,10 @@ from dataclasses import replace
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.models import ScheduleRuleRow, SlotRow
+from app.adapters.db.models import BookingRow, ScheduleRuleRow, SlotRow
 from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import (
@@ -393,15 +393,10 @@ async def test_an_archived_group_is_erasable_once_nothing_refers_to_it(
         assert group is not None
         await tx.save_group(replace(group, archived_at=NOW))
         start = NOW + timedelta(days=1)
-        slot = await tx.add_slot(Slot(None, group.id, start, start + timedelta(minutes=30), 1))
+        await tx.add_slot(Slot(None, group.id, start, start + timedelta(minutes=30), 1))
 
     async with uow.read() as tx:
-        blocked = await tx.erasable_groups(NOW)
         too_early = await tx.erasable_groups(NOW - timedelta(seconds=1))
-
-    async with engine.begin() as connection:
-        await connection.execute(delete(SlotRow).where(SlotRow.id == slot.id))
-    async with uow.read() as tx:
         due = [g.slug for g in await tx.erasable_groups(NOW)]
 
     async with uow.locked() as tx:
@@ -416,9 +411,55 @@ async def test_an_archived_group_is_erasable_once_nothing_refers_to_it(
             )
         ).all()
 
-    assert blocked == []
     assert too_early == []
     assert due == ["demo"]
     assert gone is None
     assert others == ["andere-team"]
     assert rules == []
+
+
+async def test_a_slot_nothing_books_neither_keeps_nor_survives_an_erased_group(
+    engine: AsyncEngine,
+) -> None:
+    """Release audit v0.4.0 P2 (#505): purge and rollup leave slots behind; a booking blocks."""
+    await seed_demo(engine)
+    uow = SqlUnitOfWork(engine)
+    start = NOW + timedelta(days=1)
+    async with uow.locked() as tx:
+        group = await tx.get_group("demo")
+        other = await tx.get_group("andere-team")
+        assert group is not None
+        assert other is not None
+        await tx.save_group(replace(group, archived_at=NOW))
+        orphan = await tx.add_slot(Slot(None, group.id, start, start + timedelta(minutes=30), 1))
+        kept_other = await tx.add_slot(
+            Slot(None, other.id, start, start + timedelta(minutes=30), 1)
+        )
+    async with engine.begin() as connection:
+        await connection.execute(
+            insert(BookingRow).values(
+                slot_id=orphan.id,
+                group_id=group.id,
+                status="cancelled",
+                locale="nl",
+                management_token_hash="h",
+                management_token_salt="s",
+                public_ref="ref-1",
+                created_at=NOW,
+            )
+        )
+
+    async with uow.read() as tx:
+        blocked = await tx.erasable_groups(NOW)
+    async with engine.begin() as connection:  # the purge deletes the booking, not the slot
+        await connection.execute(delete(BookingRow))
+    async with uow.read() as tx:
+        due = [g.slug for g in await tx.erasable_groups(NOW)]
+    async with uow.locked() as tx:
+        await tx.delete_group(group.id)
+    async with engine.connect() as connection:
+        left = set((await connection.execute(select(SlotRow.id))).scalars())
+
+    assert blocked == []
+    assert due == ["demo"]
+    assert left == {kept_other.id}
