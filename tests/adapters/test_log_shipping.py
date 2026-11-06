@@ -13,7 +13,7 @@ from app.adapters.db.log_destinations import LogTarget
 from app.adapters.log_shipping import LogShipper, Pipeline, ShipSettings, probe_line
 from app.domain.audit import Outcome
 from app.domain.event_schema import SCHEMA
-from app.domain.log_destinations import HEALTH_EVENT, Reason, State
+from app.domain.log_destinations import HEALTH_EVENT, DeliveryError, Reason, State
 from app.logging import configure_logging, set_line_tap
 from tests.domain.test_log_destinations import destination
 from tests.fakes.clock import FixedClock
@@ -110,6 +110,25 @@ async def test_a_failed_batch_is_kept_and_sent_first_when_the_platform_is_back()
         "unreachable",
         State.OK,
     )
+
+
+async def test_only_the_lines_a_partial_failure_names_are_kept_for_the_next_attempt() -> None:
+    # Release audit v0.4.0 P2 (#509): the platform took some lines, refused one for good and
+    # asked for one again; neither the taken nor the refused one may be sent twice.
+    sender = FakeSender()
+    sender.failures = [DeliveryError(Reason.SERVER, 429, retry=(1,), rejected=1)]
+    p = pipeline(sender)
+    for n in range(3):
+        offer(p, line(f"m{n}"))
+
+    assert await p.flush_once() is State.FAILING
+    status = p.status()
+    assert (status.sent, status.dropped, status.queued) == (1, 1, 1)
+    assert await p.flush_once() is State.OK
+
+    assert [json.loads(x)["message"] for x in sender.lines] == ["m1"]
+    status = p.status()
+    assert (status.sent, status.dropped, status.queued, status.state) == (2, 1, 0, State.OK)
 
 
 async def test_the_wait_doubles_up_to_the_maximum_and_resets_on_success() -> None:

@@ -141,7 +141,7 @@ class HttpBase:
         """Return the request body and its content type."""
         raise NotImplementedError
 
-    def _check(self, response: httpx.Response) -> None:
+    def _check(self, response: httpx.Response, lines: Sequence[str]) -> None:
         """Raise unless the platform accepted the batch (subclasses look deeper)."""
 
     async def send(self, lines: Sequence[str]) -> None:
@@ -164,7 +164,7 @@ class HttpBase:
             raise DeliveryError(reason_for(exc)) from None
         if not 200 <= response.status_code < 300:
             raise _status_error(response.status_code)
-        self._check(response)
+        self._check(response, lines)
 
     async def aclose(self) -> None:
         """Close the client."""
@@ -234,14 +234,47 @@ class ElasticSender(HttpBase):
         )
         return "".join(f"{action}\n{line}\n" for line in lines).encode(), "application/x-ndjson"
 
-    def _check(self, response: httpx.Response) -> None:
-        """A bulk answer can be 200 with item errors; those lines will never be accepted."""
+    def _check(self, response: httpx.Response, lines: Sequence[str]) -> None:
+        """A bulk answer can be 200 with item errors; sort the lines by what each one got.
+
+        A line with a 2xx item status was taken; one refused with 408, 429 or 5xx is sent again;
+        any other status will never be accepted. When the answer cannot be matched to the lines
+        the whole batch is dropped, as before.
+        """
         try:
-            errors = response.json().get("errors")
+            answer = response.json()
         except ValueError:
             return
-        if errors is True:
+        if not isinstance(answer, dict) or answer.get("errors") is not True:
+            return
+        statuses = _item_statuses(answer.get("items"), len(lines))
+        if statuses is None:
             raise DeliveryError(Reason.REFUSED, response.status_code, drop=True)
+        retry = tuple(n for n, status in enumerate(statuses) if _transient(status))
+        refused = [s for s in statuses if not 200 <= s < 300 and not _transient(s)]
+        if retry:
+            code = statuses[retry[0]]
+            raise DeliveryError(Reason.SERVER, code, retry=retry, rejected=len(refused))
+        raise DeliveryError(Reason.REFUSED, refused[0], retry=(), rejected=len(refused))
+
+
+def _transient(status: int) -> bool:
+    """Return whether a refused line may be accepted later."""
+    return status in (408, 429) or status >= 500
+
+
+def _item_statuses(items: object, expected: int) -> list[int] | None:
+    """Return the status of each bulk item in order, or ``None`` if they cannot be read."""
+    if not isinstance(items, list) or len(items) != expected:
+        return None
+    statuses = []
+    for item in items:
+        detail = next(iter(item.values()), None) if isinstance(item, dict) else None
+        status = detail.get("status") if isinstance(detail, dict) else None
+        if not isinstance(status, int):
+            return None
+        statuses.append(status)
+    return statuses
 
 
 class HttpSender(HttpBase):
