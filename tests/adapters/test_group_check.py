@@ -16,7 +16,6 @@ import pytest
 from app.adapters import group_check
 from app.adapters.diagnostics import CheckResult
 from app.adapters.group_check import CheckerConfig, PlatformChecker
-from app.adapters.webex_auth import ServiceAppConfig, WebexTokens
 from app.adapters.webhook_registration import WEBEX_EVENTS
 from app.adapters.wxcc_config import parse_flow
 from app.domain.calls import EventKind
@@ -26,7 +25,7 @@ from app.domain.scheduling import JoinClient
 from tests.adapters.test_wxcc_config import FLOW_DOC, _config
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeProbes
-from tests.fakes.tokens import MemoryTokenStore
+from tests.fakes.tokens import webex_client
 from tests.support.domain import make_group
 
 BASE = "https://op.example.nl"
@@ -143,9 +142,8 @@ class Platforms:
 
 
 def _checker(platforms: Platforms, config: CheckerConfig = CONFIG) -> PlatformChecker:
-    http = httpx.AsyncClient(transport=httpx.MockTransport(platforms))
     clock = FixedClock(NOW)
-    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), clock)
+    tokens, http = webex_client(platforms, clock)
     return PlatformChecker(http, tokens, config, clock)
 
 
@@ -589,9 +587,8 @@ def _probing(
     dispatcher: FakeDispatcher | None = None,
     timeout: timedelta = timedelta(seconds=30),
 ) -> tuple[PlatformChecker, FakeDispatcher]:
-    http = httpx.AsyncClient(transport=httpx.MockTransport(platforms))
     clock = FixedClock(NOW)
-    tokens = WebexTokens(ServiceAppConfig("c", "s", "r"), http, MemoryTokenStore(), clock)
+    tokens, http = webex_client(platforms, clock)
     dispatcher = dispatcher or FakeDispatcher()
     checker = PlatformChecker(
         http,

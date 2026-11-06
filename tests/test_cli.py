@@ -27,11 +27,10 @@ from app.cli import (
 )
 from app.config import Settings
 from tests.adapters.db.conftest import seed_group
+from tests.fakes.tokens import ACCESS_TOKEN
 from tests.support.database import migrated_database
 
 ORG = "11111111-2222-3333-4444-555555555555"
-
-ACCESS_TOKEN = "access-token-never-printed"  # noqa: S105 - test value
 
 
 @pytest.fixture

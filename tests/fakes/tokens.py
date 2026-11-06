@@ -60,12 +60,6 @@ def webex_tokens(
 def authorized_client(
     handler: Callable[[httpx.Request], httpx.Response],
 ) -> AuthorizedClient:
-    """Return a client whose token endpoint always answers and whose API calls go to ``handler``."""
-
-    def route(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/v1/access_token":
-            return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
-        return handler(request)
-
-    tokens, http = webex_client(route, FixedClock(datetime(2026, 1, 1, 8, 0, tzinfo=UTC)))
+    """Return a client on ``webex_tokens``: its API calls carry the bearer and go to ``handler``."""
+    tokens, http = webex_tokens(handler, FixedClock(datetime(2026, 1, 1, 8, 0, tzinfo=UTC)))
     return AuthorizedClient(http, tokens)
