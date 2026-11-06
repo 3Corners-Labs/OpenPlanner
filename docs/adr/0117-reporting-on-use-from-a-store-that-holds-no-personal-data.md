@@ -208,9 +208,8 @@ read only by staff and by API clients; there is no participant-facing statistics
       inline style attribute, only classes (CSP, ADR 0016).
     - Axes, units and *as of* are text. The busiest-hours view is a table with a shade and the number in
       every cell, so shade is never the only signal.
-    - No script, no polling: the pages are static HTML from the rollup, refreshed by reload. The
-      shared `live-region.js` of ADR 0072 §6 is not used; reports are not live (the live queue
-      remains the live part).
+    - The **baseline** needs no script: static HTML and SVG from the rollup, refreshed by reload. Points 19
+      and 20 add interactivity and a live wallboard as enhancements on top of that baseline, never instead of it.
     - Print stylesheet and an `@media print` table-only fallback; reduced motion has nothing to
       reduce because nothing moves.
 11. **Where it lives (ADR 0047).** Placement is decided here because a new top-level entry needs an
@@ -313,6 +312,51 @@ read only by staff and by API clients; there is no participant-facing statistics
     fact flow and the retention matrix gets the three tables; `docs/threat-model.md` gets the abuse cases
     below, each with a test; `docs/reporting.md` and `docs/reporting-api.md` as in points 6 and 13.
 
+19. **Interactive charts as progressive enhancement.** One small vanilla script,
+    `app/web/static/report-charts.js` (no library, no build step beyond the repo's own, no framework: the
+    stack rule stays), loaded with the script CSP on report pages only, as `live-region.js` is (ADR 0072
+    §6). It adds to the server-rendered SVG: hover and keyboard focus on every data point with a tooltip
+    (also reachable with arrow keys, text from the table beside the chart, set with `textContent`), series
+    toggles as real buttons with `aria-pressed`, a crosshair, *download as SVG/PNG*, and drill-down that is
+    an ordinary link to the same page with a narrower filter (server rendered, suppression applied). Ranges
+    and cuts stay GET forms and links, so every state has a URL and works without the script. Rules: the
+    page is complete and correct with JavaScript off (a Playwright run with scripts disabled for every
+    report page and locale); axe with scripts on; no chart gets its data from anywhere but the page. A
+    charting library (canvas or WebGL output is not readable by assistive technology, needs a dependency
+    review and in some cases a looser CSP) and embedding a BI product (it would bypass scope, suppression
+    and audit) are refused here; a customer who wants a full BI front end feeds it from the API of point 13,
+    and `docs/reporting-api.md` carries a worked example.
+20. **Wallboard.** A live display of one group's or organisation's day, for a screen in the team's room.
+    - **Home (ADR 0047):** not a new entry: it is the report family `view=wallboard` of the *Usage* page, with
+      a full-screen layout variant (`layout=kiosk`, no menu) that goes through `app.web.templates.render`.
+    - **Content:** tiles of large type with a text label each: waiting now, connected now, longest wait now,
+      calls today, no-shows so far today, bookings per hour today as a bar strip, utilisation of the current
+      and the next blocks, dispatch failures in the last hour. Counts only; no name, reference or link.
+    - **Live data:** the tiles read the same bounded, indexed live state as the queue screen (the current
+      blocks only, no scan) and today's earlier hours from `usage_hour`. They poll the shared fragment mechanism
+      of ADR 0072 §6 with `live-region.js` every `reporting_wallboard_refresh_seconds`; no WebSocket, no
+      server-sent events, no second polling mechanism, no write on the poll path.
+    - **Honesty about age:** every tile states *as of hh:mm:ss*; after three failed polls the whole board says
+      in text and colour that its data is old since that time and stops showing numbers as current. A board
+      that silently freezes is worse than none.
+    - **Alerts:** a wait over `reporting_wallboard_wait_alert_minutes` shows the tile with the words *long wait*
+      (not colour alone) and is announced once through the polite live region; no sound, no flashing, and
+      `prefers-reduced-motion` and `prefers-contrast` are honoured. Text sizes scale with the screen and meet
+      4.5:1 at the sizes used.
+    - **Suppression:** historic and ratio tiles go through `suppress()`. The live counts (waiting, connected,
+      longest wait) are operational state without identity, shown exactly, and only to a viewer who may
+      also see the queue (`queue.view`) in that scope.
+    - **Who can open it:** a signed-in staff member with `reports.wallboard.view` (level group) and the scope.
+      For a screen that nobody sits at, an organisation admin may create a **display link** per group or
+      organisation (D `reporting_wallboard_display_links_enabled`, default off): a random 32-byte token
+      shown once, stored only as `sha256(token)`, expiring after at most `reporting_wallboard_link_max_days`,
+      revocable, listed with its last use, every creation, use of a new device and revocation an audit
+      event (permission `reports.wallboard.link.manage`, level organisation). The first request with the token
+      sets a read-only kiosk session cookie (`Secure; HttpOnly; SameSite=Lax`) and redirects to the same page
+      without the token in the URL, so the token is not left in history, logs or a referrer; the cookie opens
+      the wallboard of that scope only, no other admin route, and never the *Team* view. The link grants the
+      same figures as the permission and is therefore a decision of the organisation, not the platform.
+
 ### Abuse cases (each gets a test)
 
 | # | Case | Control | Test that fails if it breaks |
@@ -325,6 +369,9 @@ read only by staff and by API clients; there is no participant-facing statistics
 | R6 | Monitoring individuals (team load) | Off by default, own permission, threshold, no ranking, folding on removal | Team screen refused when the setting is off; a staff member under the threshold is `< 5` |
 | R7 | Formula injection in a CSV cell | Same escaping as the audit export; cut codes, not free text | Cell starting with `=`, `+`, `-`, `@` is prefixed |
 | R8 | Personal data entering through the backfill or a fact field added later | One allow-list, review question 3 on every step that adds a fact | Test on the fact builder and on the log event `usage.fact` |
+| R10 | A display link leaks or is reused after it should have ended | Hash only, shown once, expiry, revocation, token removed from the URL by redirect, kiosk cookie opens one scope and only the wallboard, audited | Revoked or expired link refused; token absent from the logs and from the redirect target; kiosk cookie refused on every other admin route and on *Team* |
+| R11 | A frozen wallboard showing old numbers as current | *As of* on every tile, stale state after three failed polls | Fake clock and failing poll: the board switches to the old-data state in text |
+| R12 | Script injection through a chart label, tooltip or series name | Labels only from codes and the i18n catalogue, `textContent`, script CSP on report pages only, no data from outside the page | A label containing markup is shown as text; the CSP header on a report page and absent elsewhere |
 | R9 | A stale or tampered rollup silently showing wrong figures | `as_of`, lag warning on *System status*, idempotent watermark | Rollup run twice gives the same table; crash between batches loses and doubles nothing |
 
 ## Settings
@@ -347,6 +394,10 @@ read only by staff and by API clients; there is no participant-facing statistics
 | `reporting_digest_late_hours` | C platform | 24 | 1–72 | `settings.platform.manage` | Latest a missed digest is still sent |
 | `reporting_digest_max_subscriptions` | C platform | 20 | 1–200 | `settings.platform.manage` | Per organisation |
 | `reporting_usage_events_to_log` | C platform | off | on/off | `settings.platform.manage` | Facts also to the log destinations (point 15) |
+| `reporting_wallboard_refresh_seconds` | C platform | 10 | 5–120 | `settings.platform.manage` | Poll interval of the wallboard through the shared fragment mechanism |
+| `reporting_wallboard_wait_alert_minutes` | D organisation | 5 | 1–60 | `settings.organisation.manage` | A wait beyond it is marked *long wait* |
+| `reporting_wallboard_display_links_enabled` | D organisation | off | on/off | `settings.organisation.manage` | Allows display links for unattended screens (point 20) |
+| `reporting_wallboard_link_max_days` | C platform | 30 | 1–90 | `settings.platform.manage` | Longest life of a display link |
 
 No class A or B setting: nothing here is needed before the database works, tied to the host, or a
 kill switch of a protection.
@@ -377,6 +428,9 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | | planned |
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | | planned |
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | | planned |
+| 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
+| 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
+| 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
 
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:
@@ -387,6 +441,7 @@ per step:
 - **Steps 5–7:** endpoint or job (Q1): `/admin/reports`, `/admin/.../usage/*`, `require_permission` on each; PII risk (Q3): a screen cut that rebuilds a small cell; the *Team* screen; failing test (Q4): matrix sweep; suppression property test; setting-off refusal.
 - **Steps 8–9:** endpoint or job (Q1): export routes, `/api/v1/reports/usage`; PII risk (Q3): CSV cell content; API token reaching another group; failing test (Q4): limit and audit tests; cross-group API test; formula test.
 - **Steps 10:** endpoint or job (Q1): job `reports.digest`, subscription forms; PII risk (Q3): an address or a figure in a job payload or a log; failing test (Q4): no-attachment, no-address-in-payload, permission-at-send tests.
+- **Steps 12–14:** endpoint or job (Q1): `view=wallboard`, display-link routes and the kiosk session (`require_permission` or the kiosk cookie on one route); PII risk (Q3): a chart label or tooltip, a token in a URL or log; failing test (Q4): JS-off page test, label-as-text test, revoked-link and redirect tests, stale-board test.
 - **Steps 11:** endpoint or job (Q1): no route; PII risk (Q3): the `usage.fact` log event; failing test (Q4): masked-stream test.
 
 ## Consequences
@@ -404,6 +459,10 @@ per step:
 - Screens that are static HTML and SVG with a table beside each chart keep the admin without a
   script framework and within WCAG 2.2 AA, at the cost of no interactive zoom or tooltips; an analyst
   who wants those uses the CSV or the API in their own tool.
+- Interactive charts and the wallboard are enhancements on a complete baseline, so a browser without scripts,
+  a screen reader and a print-out still get every number. They add one small script of our own, a
+  second place where untrusted text could reach the page (R12), and a token-based way to open a
+  screen that nobody signs in at, which the organisation must choose to allow (R10).
 - Parquet, OData and a database view for BI tools are refused; if a customer needs one, a new ADR weighs the
   dependency and the surface against the API.
 - The group page still has ten tabs until ADR 0047 step 4, and this ADR adds none; the *Usage* sub-tab
