@@ -1,38 +1,57 @@
-"""The bundled proxy's body limits leave room for configuration imports (ADR 0089, issue 504)."""
+"""The bundled proxy's body limits leave room for configuration imports (ADR 0089, issue 504).
+
+Caddy applies every ``request_body`` whose matcher fits and the smallest limit wins, so the test
+works out the effective limit per path from the Caddyfile instead of looking for lines.
+"""
 
 import re
+from fnmatch import fnmatchcase
 from pathlib import Path
+
+from app.config import AGENT_API_PREFIX, Settings
 
 REPO = Path(__file__).parents[2]
 CADDYFILE = (REPO / "deploy/proxy/Caddyfile").read_text()
-IMPORT_PATH = "/admin/settings/package/import"
-CEILING_MB = 512  # upper bound of configuration_package_max_mb in app/config.py
+UNITS = {"KB": 1000, "MB": 1000**2, "KiB": 1024, "MiB": 1024**2}
+IMPORT_PATHS = ("/admin/settings/package/import", f"{AGENT_API_PREFIX}/configuration")
 
 
-def _limits() -> list[tuple[str, int]]:
-    """Return (matcher, megabytes-or-kilobytes as bytes) of every request_body block."""
-    found = []
-    for matcher, size, unit in re.findall(
-        r"request_body\s*(@\w+)?\s*\{\s*max_size\s+(\d+)(KB|MiB)", CADDYFILE
-    ):
-        found.append((matcher, int(size) * (1024 if unit == "KB" else 1024 * 1024)))
+def _ceiling() -> int:
+    """Return the largest package the settings allow, in bytes."""
+    field = Settings.model_fields["configuration_package_max_mb"]
+    upper = next(m.le for m in field.metadata if hasattr(m, "le"))
+    return int(upper) * 1024 * 1024
+
+
+def _matchers() -> dict[str, tuple[bool, list[str]]]:
+    """Return each named path matcher as (negated, patterns)."""
+    found = {}
+    for name, negated, patterns in re.findall(r"^\t(@\w+) (not )?path ([^\n]+)$", CADDYFILE, re.M):
+        found[name] = (bool(negated), patterns.split())
     return found
 
 
-def test_the_import_path_has_its_own_limit_at_the_settings_ceiling() -> None:
-    matchers = re.findall(rf"(@\w+)\s+path\s+{re.escape(IMPORT_PATH)}\s*$", CADDYFILE, re.M)
-    assert matchers, "the import path needs a named matcher"
-    limits = dict(_limits())
-    assert limits.get(matchers[0], 0) >= CEILING_MB * 1024 * 1024
+def _limit(path: str) -> int | None:
+    """Return the effective body limit in bytes for ``path``: the smallest that matches."""
+    matchers = _matchers()
+    sizes = []
+    for name, size, unit in re.findall(r"request_body (@\w+) \{\s*max_size (\d+)(\w+)", CADDYFILE):
+        negated, patterns = matchers[name]
+        hit = any(fnmatchcase(path, pattern) for pattern in patterns)
+        if hit != negated:
+            sizes.append(int(size) * UNITS[unit])
+    return min(sizes) if sizes else None
 
 
-def test_no_other_limit_applies_to_the_import_path() -> None:
-    # Every smaller limit must exclude the import path, or it would still win.
-    for matcher, size in _limits():
-        if size >= CEILING_MB * 1024 * 1024:
-            continue
-        if matcher:
-            assert re.search(rf"{matcher}\s+(not\s+path|path)", CADDYFILE)
-        else:
-            raise AssertionError("an unmatched small limit would cap the import path")
-    assert re.search(r"not\s+path\s+[^\n]*" + re.escape(IMPORT_PATH), CADDYFILE)
+def test_both_import_paths_take_a_package_of_the_settings_ceiling() -> None:
+    for path in IMPORT_PATHS:
+        limit = _limit(path)
+        assert limit is not None
+        assert limit >= _ceiling(), path
+
+
+def test_other_paths_keep_the_small_limits() -> None:
+    assert _limit("/g/demo") == 64 * 1000
+    assert _limit("/b/token") == 64 * 1000
+    assert _limit("/admin/settings/other") == 1000**2
+    assert _limit(f"{AGENT_API_PREFIX}/bookings") == 1000**2

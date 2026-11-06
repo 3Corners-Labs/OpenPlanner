@@ -49,13 +49,14 @@ http://{$TLS_DOMAIN}:8080 {
 	request_body @public {
 		max_size 64KB
 	}
-	# A configuration package (ADR 0089) is larger than any form: the import gets the ceiling of
-	# configuration_package_max_mb (512 MiB) here; the app enforces the configured limit.
-	@package path /admin/settings/package/import
+	# A configuration package (ADR 0089) is larger than any form. The portal import and the agent
+	# API import get the ceiling of configuration_package_max_mb (512 MiB) here; the app enforces
+	# the configured limit. Caddy applies every matching limit, so @other must list all paths.
+	@package path /admin/settings/package/import /api/agent/v1/configuration
 	request_body @package {
 		max_size 512MiB
 	}
-	@other not path /g/* /b/* /admin/settings/package/import
+	@other not path /g/* /b/* /admin/settings/package/import /api/agent/v1/configuration
 	request_body @other {
 		max_size 1MB
 	}
