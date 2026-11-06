@@ -168,6 +168,13 @@ async def test_elastic_with_only_permanent_item_errors_keeps_nothing() -> None:
     assert (error.reason, error.code, error.retry, error.rejected) == (Reason.REFUSED, 400, (), 2)
 
 
+async def test_elastic_with_errors_flagged_but_every_item_taken_is_a_success() -> None:
+    _, transport = recording(body={"errors": True, "items": [_item(201), _item(200)]})
+    sender = sender_for(DestinationKind.ELASTIC, transport)
+
+    await sender.send([LINE, AUDIT])
+
+
 @pytest.mark.parametrize("items", [[], [_item(201)], ["x", "y"], None])
 async def test_elastic_drops_the_batch_when_the_item_statuses_cannot_be_read(
     items: object,

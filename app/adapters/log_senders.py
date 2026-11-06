@@ -255,6 +255,8 @@ class ElasticSender(HttpBase):
         if retry:
             code = statuses[retry[0]]
             raise DeliveryError(Reason.SERVER, code, retry=retry, rejected=len(refused))
+        if not refused:  # errors: true, yet every item was taken: nothing is left to deliver
+            return
         raise DeliveryError(Reason.REFUSED, refused[0], retry=(), rejected=len(refused))
 
 
@@ -271,7 +273,7 @@ def _item_statuses(items: object, expected: int) -> list[int] | None:
     for item in items:
         detail = next(iter(item.values()), None) if isinstance(item, dict) else None
         status = detail.get("status") if isinstance(detail, dict) else None
-        if not isinstance(status, int):
+        if type(status) is not int:
             return None
         statuses.append(status)
     return statuses
