@@ -1,4 +1,3 @@
-from collections.abc import Collection
 from dataclasses import replace
 from datetime import datetime, timedelta
 
@@ -18,9 +17,10 @@ from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from app.domain.system_log import EventRetention, SystemLog
 from app.i18n import Translator, load_catalogues
-from app.jobs.messages import MESSAGE_KINDS, MessageComposer
+from app.jobs.messages import MessageComposer
 from app.jobs.runner import BACKOFF, JobRunner
 from tests.fakes.clock import FixedClock
+from tests.fakes.jobs import FakeQueue, job
 from tests.fakes.messaging import RecordingSender, RefusingSender
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.closures import NOTICES
@@ -42,36 +42,6 @@ def merge_context(_logger: WrappedLogger, _method: str, event_dict: EventDict) -
     return {**event_dict, "trace_id": context.trace_id, "group": context.group}
 
 
-class FakeQueue:
-    def __init__(self, jobs: list[ClaimedJob]) -> None:
-        self.jobs = jobs
-        self.requested_types: set[JobType] = set()
-        self.done: list[int] = []
-        self.retried: list[tuple[int, datetime, str]] = []
-        self.failed: list[tuple[int, str]] = []
-
-    async def claim_due(
-        self,
-        now: datetime,
-        types: Collection[JobType],
-        channels: Collection[ChannelKind],
-        limit: int = 20,
-    ) -> list[ClaimedJob]:
-        self.requested_types = set(types)
-        claimed = [j for j in self.jobs if j.type in types]
-        self.jobs = []
-        return claimed
-
-    async def complete(self, job_id: int) -> None:
-        self.done.append(job_id)
-
-    async def retry(self, job_id: int, run_at: datetime, error: str) -> None:
-        self.retried.append((job_id, run_at, error))
-
-    async def fail(self, job_id: int, error: str) -> None:
-        self.failed.append((job_id, error))
-
-
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = State()
@@ -83,13 +53,6 @@ def uow() -> InMemoryUnitOfWork:
 @pytest.fixture
 def composer() -> MessageComposer:
     return MessageComposer(Translator(load_catalogues()), TEST_TOKEN_KEY, "http://localhost")
-
-
-def job(
-    booking_id: int, type_: JobType, attempts: int = 1, pinned: datetime | None = SLOT_0900
-) -> ClaimedJob:
-    channel = ChannelKind.EMAIL if type_ in MESSAGE_KINDS else None
-    return ClaimedJob(1, booking_id, type_, channel, pinned, attempts)
 
 
 async def booking_id(uow: InMemoryUnitOfWork) -> int:

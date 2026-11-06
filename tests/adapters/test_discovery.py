@@ -5,8 +5,8 @@ import pytest
 
 from app.adapters.discovery import GuardedDiscoveryFetcher
 from app.domain.ports import IdentityError
-from tests.adapters.test_outbound import mock, resolver
 from tests.fakes.identity_providers import DISCOVERY_URL, discovery_document
+from tests.fakes.outbound import mock, resolver
 
 PUBLIC = resolver("8.8.8.8")
 

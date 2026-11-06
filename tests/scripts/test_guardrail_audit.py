@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.adr_issues import Issue
 from scripts.guardrail_audit import (
     BASELINE,
     SECTIONS,
@@ -17,6 +18,7 @@ from scripts.guardrail_audit import (
     render,
     unexpected_bypasses,
 )
+from tests.fakes.gh import FakeGh
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "guardrail-audit.yml"
@@ -198,14 +200,7 @@ def test_differences_name_missing_and_extra_keys() -> None:
 
 
 def test_post_keeps_the_report_as_one_issue(tmp_path: Path) -> None:
-    calls: list[list[str]] = []
-
-    def fake(args: list[str]) -> str:
-        calls.append(list(args))
-        if args[:2] == ["issue", "list"]:
-            return '[{"number": 4, "title": "Guardrail drift 2026-11-01"}]'
-        return "[]"
-
+    fake = FakeGh(issues=[Issue(4, "Guardrail drift 2026-11-01", "OPEN", frozenset())])
     path = tmp_path / "baseline.json"
     expected = baseline(tmp_path)
     expected["organisation"] = {"two_factor_requirement_enabled": False}
@@ -217,7 +212,7 @@ def test_post_keeps_the_report_as_one_issue(tmp_path: Path) -> None:
     )
 
     assert code == 0
-    assert calls[-1][:5] == ["issue", "edit", "4", "--title", "Guardrail drift 2026-11-02"]
+    assert fake.calls[-1][:5] == ["issue", "edit", "4", "--title", "Guardrail drift 2026-11-02"]
 
 
 def test_an_unreadable_baseline_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

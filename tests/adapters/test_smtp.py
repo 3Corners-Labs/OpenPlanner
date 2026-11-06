@@ -1,15 +1,15 @@
 import smtplib
 import socket
 import ssl
-from email.message import EmailMessage
-from typing import Any
 
 import pytest
 
-from app.adapters import smtp as smtp_module
 from app.adapters.smtp import SmtpConfig, SmtpMailSender, build_email
 from app.domain.channels import ChannelKind
 from app.domain.ports import Attachment, IntegrationError, OutboundMessage
+from tests.fakes.smtp import FakeSmtpServer, Step
+
+pytestmark = pytest.mark.usefixtures("smtp_server")  # no test here reaches a real mail server
 
 MESSAGE = OutboundMessage(
     channel=ChannelKind.EMAIL,
@@ -21,41 +21,10 @@ MESSAGE = OutboundMessage(
 )
 
 
-class FakeSMTP:
-    instances: list["FakeSMTP"] = []
-
-    def __init__(self, host: str, port: int, timeout: float) -> None:
-        self.host, self.port, self.timeout = host, port, timeout
-        self.calls: list[str] = []
-        self.sent: list[EmailMessage] = []
-        FakeSMTP.instances.append(self)
-
-    def __enter__(self) -> "FakeSMTP":
-        return self
-
-    def __exit__(self, *args: Any) -> None:
-        self.calls.append("quit")
-
-    def starttls(self, context: Any) -> None:
-        self.calls.append("starttls")
-
-    def login(self, username: str, password: str) -> None:
-        self.calls.append(f"login:{username}")
-
-    def send_message(self, message: EmailMessage) -> None:
-        self.sent.append(message)
-
-
-@pytest.fixture(autouse=True)
-def fake_smtp(monkeypatch: pytest.MonkeyPatch) -> None:
-    FakeSMTP.instances = []
-    monkeypatch.setattr(smtp_module.smtplib, "SMTP", FakeSMTP)
-
-
-async def test_sends_multipart_mail_with_attachment() -> None:
+async def test_sends_multipart_mail_with_attachment(smtp_server: FakeSmtpServer) -> None:
     await SmtpMailSender(SmtpConfig("mailpit", 1025, "Team <noreply@example.nl>")).send(MESSAGE)
 
-    smtp = FakeSMTP.instances[0]
+    smtp = smtp_server.connections[0]
     assert (smtp.host, smtp.port) == ("mailpit", 1025)
     assert smtp.calls == ["quit"]
     email = smtp.sent[0]
@@ -65,12 +34,12 @@ async def test_sends_multipart_mail_with_attachment() -> None:
     assert {"text/plain", "text/html", "text/calendar"} <= set(parts)
 
 
-async def test_starttls_and_login_when_configured() -> None:
+async def test_starttls_and_login_when_configured(smtp_server: FakeSmtpServer) -> None:
     config = SmtpConfig("smtp", 587, "noreply@example.nl", True, "user", "secret")
 
     await SmtpMailSender(config).send(MESSAGE)
 
-    assert FakeSMTP.instances[0].calls == ["starttls", "login:user", "quit"]
+    assert smtp_server.connections[0].calls == ["starttls", "login:user", "quit"]
     assert "secret" not in repr(config)
 
 
@@ -99,33 +68,28 @@ def test_every_message_is_marked_auto_submitted_and_reply_to_only_when_given_adr
     assert with_reply["Auto-Submitted"] == "auto-generated"
 
 
-async def test_the_configured_reply_address_reaches_the_message() -> None:
+async def test_the_configured_reply_address_reaches_the_message(
+    smtp_server: FakeSmtpServer,
+) -> None:
     config = SmtpConfig("mailpit", 1025, "noreply@example.nl", reply_to="afspraken@example.nl")
 
     await SmtpMailSender(config).send(MESSAGE)
 
-    assert FakeSMTP.instances[0].sent[0]["Reply-To"] == "afspraken@example.nl"
-
-
-class FakeSMTPSSL(FakeSMTP):
-    def __init__(self, host: str, port: int, timeout: float, context: Any) -> None:
-        super().__init__(host, port, timeout)
-        self.calls.append("tls")
+    assert smtp_server.connections[0].sent[0]["Reply-To"] == "afspraken@example.nl"
 
 
 async def test_implicit_tls_connects_securely_and_skips_starttls(
-    monkeypatch: pytest.MonkeyPatch,
+    smtp_server: FakeSmtpServer,
 ) -> None:
-    monkeypatch.setattr(smtp_module.smtplib, "SMTP_SSL", FakeSMTPSSL)
     test_pw = "secret"  # gitleaks:allow (test value)
     config = SmtpConfig("smtp", 465, "noreply@example.nl", True, "user", test_pw, implicit_tls=True)
 
     await SmtpMailSender(config).send(MESSAGE)
 
-    assert FakeSMTP.instances[0].calls == ["tls", "login:user", "quit"]
+    assert smtp_server.connections[0].calls == ["tls", "login:user", "quit"]
 
 
-FAILURES: list[tuple[str, Exception, str, bool]] = [
+FAILURES: list[tuple[Step, Exception, str, bool]] = [
     ("connect", ConnectionRefusedError(61, "refused"), "unreachable", True),
     ("connect", socket.gaierror(8, "unknown host"), "unreachable", True),
     ("connect", TimeoutError("timed out"), "unreachable", True),
@@ -150,27 +114,9 @@ FAILURES: list[tuple[str, Exception, str, bool]] = [
     ("step", "failure", "code", "retryable"), FAILURES, ids=[f[2] for f in FAILURES]
 )
 async def test_failures_are_reported_as_codes_without_details(
-    monkeypatch: pytest.MonkeyPatch, step: str, failure: Exception, code: str, retryable: bool
+    smtp_server: FakeSmtpServer, step: Step, failure: Exception, code: str, retryable: bool
 ) -> None:
-    class FailingSMTP(FakeSMTP):
-        def __init__(self, host: str, port: int, timeout: float) -> None:
-            if step == "connect":
-                raise failure
-            super().__init__(host, port, timeout)
-
-        def starttls(self, context: Any) -> None:
-            if step == "starttls":
-                raise failure
-
-        def login(self, username: str, password: str) -> None:
-            if step == "login":
-                raise failure
-
-        def send_message(self, message: EmailMessage) -> None:
-            if step == "send":
-                raise failure
-
-    monkeypatch.setattr(smtp_module.smtplib, "SMTP", FailingSMTP)
+    smtp_server.fail(step, failure)
     config = SmtpConfig("smtp", 587, "noreply@example.nl", True, "user", "pw")
 
     with pytest.raises(IntegrationError) as error:

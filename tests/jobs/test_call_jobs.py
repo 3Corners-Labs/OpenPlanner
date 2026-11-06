@@ -17,8 +17,8 @@ from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo
+from tests.fakes.jobs import FakeQueue, job
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.jobs.test_runner import FakeQueue, job
 from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book, make_group, window
 
 WIRED = {

@@ -1,6 +1,5 @@
 """Open build steps become issues, finished ones close them, and drift is reported (ADR 0078)."""
 
-import json
 from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
@@ -21,6 +20,7 @@ from scripts.adr_issues import (
     plan,
     render,
 )
+from tests.fakes.gh import FakeGh, pr_state
 from tests.scripts.conftest import fake_program, script_path
 
 ADR = """# 0099. An example
@@ -189,10 +189,6 @@ def test_an_action_says_what_it_does() -> None:
 # --- drift -------------------------------------------------------------------
 
 
-def pr_state(number: int) -> str:
-    return {1: "MERGED", 2: "OPEN", 3: "CLOSED"}.get(number, "UNKNOWN")
-
-
 def test_no_drift_renders_an_empty_report() -> None:
     found = drift([step("2", "planned")], {"0099": "PARTIAL"}, [], pr_state)
 
@@ -262,38 +258,6 @@ def test_the_report_is_markdown_with_one_section_per_check() -> None:
 
 
 # --- the gh layer ------------------------------------------------------------
-
-
-class FakeGh:
-    """Answers `gh` reads from canned data and records every call."""
-
-    def __init__(self, labels: Sequence[str] = (), issues: Sequence[Issue] = ()) -> None:
-        self.labels = list(labels)
-        self.issues = list(issues)
-        self.calls: list[list[str]] = []
-
-    def __call__(self, args: Sequence[str]) -> str:
-        self.calls.append(list(args))
-        match list(args[:2]):
-            case ["label", "list"]:
-                return json.dumps([{"name": n} for n in self.labels])
-            case ["issue", "list"]:
-                return json.dumps(
-                    [
-                        {
-                            "number": i.number,
-                            "title": i.title,
-                            "state": i.state,
-                            "labels": [{"name": n} for n in i.labels],
-                        }
-                        for i in self.issues
-                    ]
-                )
-            case ["issue", "create"]:
-                return "https://github.com/o/r/issues/42\n"
-            case ["pr", "view"]:
-                return json.dumps({"state": pr_state(int(args[2]))})
-        return ""
 
 
 def test_the_github_layer_reads_labels_issues_and_pr_states() -> None:

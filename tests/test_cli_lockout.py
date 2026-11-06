@@ -14,7 +14,7 @@ from app.cli import CLI_ACTOR, _closure_lift, _closure_start, _oidc_check, main
 from app.config import Settings
 from app.domain.authorization import Grant
 from tests.adapters.db.conftest import seed_group
-from tests.adapters.test_oidc_check import _transport
+from tests.fakes.oidc_provider import oidc_provider
 from tests.support.database import migrated_database
 
 NOTICES = {"nl": "Storing bij de aanbieder.", "en": "Outage at our provider."}
@@ -183,7 +183,7 @@ async def test_oidc_check_prints_findings_and_the_mapping_with_its_source(
     seen: list[httpx.Request] = []
     configured = _oidc(settings, oidc_role_claim="memberOf")
 
-    report, ok = await _oidc_check(configured, _transport(seen))
+    report, ok = await _oidc_check(configured, oidc_provider(seen))
 
     assert ok, report
     assert "OK    discovery" in report
@@ -198,7 +198,7 @@ async def test_oidc_check_prints_findings_and_the_mapping_with_its_source(
 
 
 async def test_oidc_check_fails_on_a_broken_provider(settings: Settings) -> None:
-    report, ok = await _oidc_check(_oidc(settings), _transport([], discovery_status=500))
+    report, ok = await _oidc_check(_oidc(settings), oidc_provider([], discovery_status=500))
 
     assert not ok
     assert "FAIL  discovery" in report
