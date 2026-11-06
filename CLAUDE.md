@@ -14,7 +14,7 @@ Lightweight group-booking platform: organisations offer sessions to groups of pa
 - Python 3.12, FastAPI, SQLAlchemy 2.x (async), Alembic, Pydantic v2.
 - Database: SQLite in WAL mode (`DATABASE_URL=sqlite+aiosqlite:///data/booking.db`). Postgres is not a target (decided 2026-10-23); changing that needs an ADR. No raw SQL outside `app/adapters/db/`.
 - Jobs: own `jobs` table + worker loop in `app/jobs/`. No Celery, Redis, APScheduler.
-- Admin UI: Jinja2, server-rendered HTML forms that work without JavaScript (ADR 0016). A live part of a page (queue, agenda, update progress) uses the shared small scripts under `app/web/static/` (`live-region.js`, ADR 0072 §6) with the script CSP on that page only; never a second polling mechanism, never HTMX, no SPA framework.
+- Admin UI: Jinja2, server-rendered pages; every task and number works without JavaScript, and a page may add *islands* (own same-origin scripts that enhance server-rendered content, `script-src 'self'`, no front-end package without its own ADR, one live-update mechanism `live-region.js`, never HTMX, no SPA framework, the server decides what the browser may see); details in ADR 0118 and `docs/islands.md`.
 - Widget: one Web Component in vanilla JS under `widget/`, bundled with esbuild in CI only. No React/Vue. Shadow DOM; all colours, spacing, radius and font read from `--booking-*` CSS custom properties with NL Design System defaults; `font-family: inherit`; interactive elements exposed via `part="..."`. The host site styles the widget only through those tokens and parts; document them in `docs/widget.md`. No inline styles, no `!important`.
 - HTTP client: `httpx`. Logging: `structlog` (JSON). Settings: classes A and B from env through `pydantic-settings`, or `X_FILE` for the bootstrap secrets (ADR 0042 §9); classes C and D in the database, edited in the portal and lockable from env (ADR 0042); no config files with secrets in the repository.
 - Containers: `web`, `worker`. One `docker-compose.yml` for dev and prod shape.
@@ -51,7 +51,7 @@ Per PR (ADR 0058: all of these run in the merge queue before anything reaches `m
 - `gitleaks`.
 - `hadolint` on the Dockerfile; `trivy` on the built image (CVE + misconfiguration); image runs as non-root with a read-only filesystem.
 - `schemathesis` against the generated OpenAPI spec.
-- Playwright: keyboard-only booking flow (no mouse), `axe-core` zero violations (WCAG 2.2 AA), Lighthouse accessibility ≥ 95, for every page in `e2e/pages.json` in every locale.
+- Playwright: keyboard-only booking flow (no mouse), `axe-core` zero violations (WCAG 2.2 AA), Lighthouse accessibility ≥ 95, for every page in `e2e/pages.json` in every locale; for a page marked `island` also scripts off, a keyboard run of every interaction, 320 px and 400 % zoom, forced-colors and reduced-motion, no CSP console errors (ADR 0118 §10).
 - Alembic migration applied up and down on a fresh database.
 - CycloneDX SBOM generated and scanned with `grype`.
 On merge to `main`:
