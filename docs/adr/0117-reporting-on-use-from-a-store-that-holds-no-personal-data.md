@@ -365,7 +365,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | this PR | in PR |
+| 0 | ADR proposed | #558 | in PR #558 |
 | 1 | Domain only: `app/domain/usage.py` (fact kinds, allow-list `USAGE_FIELDS`, metric table, buckets, `suppress()`), `privacy.py` list and test, `docs/reporting.md` generated; no database | | planned |
 | 2 | Migration (five tables, expand-only), `record_usage` on `Transaction`, settings and registry entries, facts for booking create, confirm, expire, cancel, move, outcome, suspend/resume | | planned |
 | 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | | planned |
