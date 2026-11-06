@@ -126,11 +126,11 @@ class AdminSessionService:
             await tx.touch_admin_session(id_hash, now)
         return replace(found, last_seen_at=now), True
 
-    async def reject(self, sid: str | None) -> None:
-        """End the live session behind ``sid`` because its provider no longer vouches for it.
+    async def end(self, sid: str | None, reason: EndReason) -> None:
+        """End the live session behind ``sid`` (a no-op for an unknown or ended one).
 
-        Audited as ``rejected`` (the system chose it); an unknown or ended session is a no-op.
-        Switching the provider on again later therefore never revives the reference.
+        A reason the system chooses (``AUDITED_REASONS``, such as ``rejected`` when the provider
+        no longer vouches for the session) is audited with the subject; the others are not.
         """
         if not sid:
             return
@@ -139,14 +139,7 @@ class AdminSessionService:
         async with self._uow.locked() as tx:
             found = await tx.get_admin_session(id_hash)
             if found is not None and found.ended_at is None:
-                await self._end(tx, found, EndReason.REJECTED, now)
-
-    async def end(self, sid: str | None, reason: EndReason) -> None:
-        """End the session behind ``sid`` (a no-op for an unknown or ended one)."""
-        if not sid:
-            return
-        async with self._uow.locked() as tx:
-            await tx.end_admin_session(hash_sid(sid), reason, self._clock.now())
+                await self._end(tx, found, reason, now)
 
     async def end_all(self, reason: EndReason, actor: str) -> int:
         """End every live session with ``reason`` and audit it once; return how many ended.
