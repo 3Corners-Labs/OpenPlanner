@@ -192,7 +192,7 @@ class Settings(BaseSettings):
     # many and only useful while a failure is fresh, so they go earlier than the rest.
     integration_request_retention_days: int = Field(default=30, ge=1, le=365)
     # ADR 0084 step 3 (class C): an archived group is erased by the worker this many days
-    # after it was archived, once no booking, slot, closure or API client refers to it.
+    # after it was archived, once no booking, closure or API client refers to it.
     group_erase_after_days: int = Field(default=30, ge=1, le=365)
     # ADR 0068 (class C): a pending job this many minutes past its planned time counts as
     # overdue in a group's "Koppeling controleren".
