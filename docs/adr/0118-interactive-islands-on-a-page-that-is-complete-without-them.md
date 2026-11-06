@@ -160,7 +160,7 @@ never C or D). The refresh interval of live fragments stays the existing `QUEUE_
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; the Status line of ADR 0016; the admin-UI and Playwright lines of `CLAUDE.md`; the row in `docs/adr-status.md` | #559 | in PR #559 |
+| 0 | ADR proposed; the Status line of ADR 0016; the admin-UI and Playwright lines of `CLAUDE.md`; the row in `docs/adr-status.md` | #559 | merged |
 | 1 | `docs/islands.md` with the four existing scripts; the test that every script is listed and the size pytest (extend `tests/web/test_static.py`); the semgrep rule on `innerHTML` and friends; the XSS abuse case; the upload content-type test; the CLAUDE.md detail moves there (already short since step 0) | #560 | in PR #560: `docs/islands.md`, listing, size and markup-sink tests in `tests/web/test_static.py`, rule `no-script-markup-sink` with `.semgrep/rules.js` run by `make semgrep` and CI, threat-model flow; uploads were already covered by `tests/api/test_brand_assets.py` |
 | 2 | Playwright gates for pages marked `island`: scripts off, keyboard map, 320 px and zoom, forced colours, reduced motion, CSP console; `e2e/pages.json` flag | | planned |
 | 3 | `live-region.js` rules of point 4 (stale marker, pause control, announce only on change) and their tests | | planned |
