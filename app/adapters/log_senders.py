@@ -88,7 +88,7 @@ def _status_error(status: int) -> DeliveryError:
         return DeliveryError(Reason.REFUSED, status)
     if status in _HOPELESS:
         return DeliveryError(Reason.REFUSED, status, drop=True)
-    if status >= 500 or status in (408, 429):
+    if _transient(status):
         return DeliveryError(Reason.SERVER, status)
     return DeliveryError(Reason.REFUSED, status)
 
