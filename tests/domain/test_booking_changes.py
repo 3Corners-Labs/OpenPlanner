@@ -6,7 +6,7 @@ import pytest
 from app.domain import booking_changes
 from app.domain.booking import BookingStatus, ChangeReason
 from app.domain.channels import ChannelKind
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import PURGE_AFTER, JobType, PlannedJob, is_stale
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
@@ -99,6 +99,24 @@ async def test_the_participant_chooses_a_new_time_without_a_deadline(
     old = uow.state.bookings[receipt.booking.id or 0]
     assert old.status is BookingStatus.CANCELLED
     assert not any(j.type is JobType.LAPSE_REBOOK for j in uow.state.jobs[old.id or 0])
+
+
+async def test_a_booking_awaiting_a_new_time_cannot_move_into_an_archived_group(
+    uow: InMemoryUnitOfWork, bookings: BookingService
+) -> None:
+    # Release audit v0.4.0 P2 (#517): archiving passes while the last booking awaits a new time,
+    # and an already open reschedule form must not place a confirmed booking afterwards.
+    receipt = await book(bookings, SLOT_0900, "demo")
+    booking_id = receipt.booking.id or 0
+    await _request(uow, booking_id)
+    uow.state.groups[1] = replace(uow.state.groups[1], archived_at=NOW)
+    bookings_before = dict(uow.state.bookings)
+
+    with pytest.raises(DomainError) as caught:
+        await bookings.reschedule(receipt.management_token, SLOT_0930 + timedelta(days=7))
+
+    assert caught.value.code is ErrorCode.GROUP_NOT_FOUND
+    assert uow.state.bookings == bookings_before  # nothing placed, the old one untouched
 
 
 async def test_the_participant_can_cancel_a_request_to_rebook(
