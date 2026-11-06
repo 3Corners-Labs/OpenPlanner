@@ -109,8 +109,13 @@ def judge(session: AdminSession, now: datetime, policy: SessionPolicy) -> EndRea
 
 
 def seen_due(session: AdminSession, now: datetime, policy: SessionPolicy) -> bool:
-    """Return whether ``last_seen_at`` is due to be written again."""
-    return now - session.last_seen_at >= policy.seen_interval
+    """Return whether ``last_seen_at`` is due to be written again.
+
+    The interval is capped at half the idle limit, so activity is always written well before
+    the session could be judged idle, whatever the two settings say (fixed rule, not a setting).
+    """
+    interval = min(policy.seen_interval, policy.idle / 2)
+    return now - session.last_seen_at >= interval
 
 
 def over_limit(active: list[AdminSession], max_sessions: int) -> list[AdminSession]:
