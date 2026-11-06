@@ -248,6 +248,12 @@ def _sid(request: Request) -> str | None:
     return value if isinstance(value, str) and 0 < len(value) <= 128 else None
 
 
+LIVE_POLL_HEADER = "x-live-poll"
+"""Request header the page scripts set on their automatic polls (``live-region.js``,
+``update-progress.js``): such a request is no sign of activity. A client that forges it only
+stops its own session from being kept alive."""
+
+
 async def load_login(request: Request, service: AdminSessionService, policy: SessionPolicy) -> bool:
     """Look the session up once for this request; return whether activity was just written.
 
@@ -255,7 +261,8 @@ async def load_login(request: Request, service: AdminSessionService, policy: Ses
     longer opens a session is dropped from the cookie. A failing register raises, so there is
     no access (ADR 0098 point 14).
     """
-    found, written = await service.resolve(_sid(request), policy)
+    passive = request.headers.get(LIVE_POLL_HEADER) == "1"
+    found, written = await service.resolve(_sid(request), policy, passive=passive)
     request.state.admin_login = found
     if found is None:
         request.session.pop(_SID, None)
