@@ -346,7 +346,7 @@ Functions that can use much time, memory or disk, and what stops them.
 | Public bookings and reads | 10 bookings per hour and 60 reads per minute per address, 20 unknown links per hour | `docs/settings.md`, `app/domain/settings_registry.py` |
 | Machine API | 10 token requests and 120 calls per minute per client; a range of at most 62 days | `app/api/agent/routes.py`, `docs/settings.md` |
 | Webhooks | Body up to 64 KB, 600 per minute | `app/api/webhooks.py`, `tests/api/test_webhooks.py` |
-| Public form bodies | 64 KB on public paths, 1 MB elsewhere (the configuration import up to 512 MB), slow-client timeouts at the proxy | `deploy/proxy/Caddyfile`, `scripts/check-proxy.sh` |
+| Public form bodies | 64 KB on public paths, 1 MB elsewhere (the configuration import up to 512 MiB), slow-client timeouts at the proxy | `deploy/proxy/Caddyfile`, `scripts/check-proxy.sh` |
 | Security events | One event per kind and caller per window, at most `SECURITY_EVENT_MAX_SOURCES` windows | `app/domain/security_log.py`, `tests/domain/test_security_log.py` |
 
 ## Widget review

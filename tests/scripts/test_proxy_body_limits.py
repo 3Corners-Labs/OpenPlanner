@@ -13,7 +13,7 @@ def _limits() -> list[tuple[str, int]]:
     """Return (matcher, megabytes-or-kilobytes as bytes) of every request_body block."""
     found = []
     for matcher, size, unit in re.findall(
-        r"request_body\s*(@\w+)?\s*\{\s*max_size\s+(\d+)(KB|MB)", CADDYFILE
+        r"request_body\s*(@\w+)?\s*\{\s*max_size\s+(\d+)(KB|MiB)", CADDYFILE
     ):
         found.append((matcher, int(size) * (1024 if unit == "KB" else 1024 * 1024)))
     return found
