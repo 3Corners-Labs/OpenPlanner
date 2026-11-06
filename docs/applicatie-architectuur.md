@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Betreft | OpenPlanner 0.4.0 (tag `v0.4.0`, uitgebracht op 4 november 2026) |
-| Stand | Concept 1c van 5 november 2026, beschreven tegen de code van `v0.4.0` en `docs/adr-status.md` (gecontroleerd tegen de code op 3 november 2026). Besluiten van na de release staan in 10.2 en 13.1, de antwoorden van de productowner in 13.4 |
+| Stand | Concept 1d van 5 november 2026, beschreven tegen de code van `v0.4.0` en `docs/adr-status.md` (gecontroleerd tegen de code op 3 november 2026). Besluiten van na de release staan in 10.2 en 13.1, de antwoorden van de productowner in 13.4 |
 | Taal | Nederlands, als stakeholderdocument naast `docs/HANDOVER.md`. Code, ADR's en de overige documentatie zijn Engels |
 | Lezers | Architecten en ontwikkelaars van een organisatie die OpenPlanner in haar landschap inpast, beheerders, en het productteam |
 | Bron van waarheid | De code op `main`, de ADR's en `docs/adr-status.md`. Dit document beschrijft en verwijst; het beslist niets |
@@ -550,8 +550,9 @@ map*) is de volledige lijst. Elke module heeft een docstring die haar verantwoor
 
 Elke poort is een `Protocol` in `app/domain/ports.py`. De domeinservices kennen alleen de poort;
 `app/main.py` en `app/jobs/worker.py` steken de adapter erin. Tests vervangen elke adapter door
-een fake. De gedeelde fakes staan in `tests/fakes/`, een paar staan in de test die ze gebruikt.
-De in-memory unit of work heeft hetzelfde commit- en rollbackgedrag als de SQL-versie.
+een fake uit `tests/fakes/`. `tests/test_fakes.py` faalt als een poort daar geen fake heeft, of
+als een test er zelf een definieert. De in-memory unit of work heeft hetzelfde commit- en
+rollbackgedrag als de SQL-versie.
 
 ```mermaid
 flowchart LR
@@ -573,7 +574,7 @@ flowchart LR
         clock["clock: SystemClock"]
     end
     subgraph fakes [tests/fakes]
-        f["persistence · messaging · integrations · identity ·<br/>identity_providers · staff_directory · log_destinations ·<br/>clock · dns · tls · instance · tokens · updater_host"]
+        f["persistence · messaging · integrations · identity ·<br/>identity_providers · staff_directory · log_destinations ·<br/>clock · dns · tls · instance · tokens · updater_host ·<br/>event_sink · releases · configuration_package"]
     end
     uow -.implementeert.-> ports
     smtp -.-> ports
@@ -596,17 +597,17 @@ flowchart LR
 | `VideoProvider` | Meetings aanmaken en verwijderen | `webex_meetings.py` | `integrations` |
 | `ContactCenterDispatcher` | Werkitems aanmaken en beëindigen | `wxcc.py` | `integrations` |
 | `IntegrationChecker`, `ProbeRegistry` | De integratieketen van een groep controleren, de proefmeeting en haar events onthouden | `group_check.py`, `db/probes.py` | `integrations` |
-| `RequestLog` | Elke aanroep naar een provider als systeemevent | `RequestEvents` in `app/domain/request_log.py` | niet nodig: de poort is optioneel |
+| `RequestLog` | Elke aanroep naar een provider als systeemevent | `RequestEvents` in `app/domain/request_log.py` | `integrations` (`FakeRequestLog`) |
 | `IdentityProvider` | Beheerderslogin via OIDC | `oidc.py`, `idp_registry.py` | `identity` |
 | `DiscoveryFetcher`, `SigningKeys` | Discovery-document ophalen via de uitgaande bewaker; sleutelpaar per provider voor `private_key_jwt` | `discovery.py`, `signing_keys.py` | `identity_providers` |
 | `StaffDirectory` | Medewerkers beheren in de meegeleverde provider | `keycloak_directory.py` | `staff_directory` |
-| `EventSink` | Vastgelegde events naar de logstroom na commit | `event_sink.py` (stdout) | in de test (`RecordingSink`) |
+| `EventSink` | Vastgelegde events naar de logstroom na commit | `event_sink.py` (stdout) | `event_sink` |
 | `LogDestinationSender` | Batches logregels naar één bestemming | `log_senders.py` | `log_destinations` |
-| `ReleaseSource` | Gepubliceerde releases opzoeken | `releases.py` (GitHub) | in de test (`FakeReleases`) |
+| `ReleaseSource` | Gepubliceerde releases opzoeken | `releases.py` (GitHub) | `releases` |
 | `CertificateProbe`, `InstanceProbe` | TLS-handshake met het publieke adres; de rondgang naar `/api/v1/instance` | `tls_probe.py`, `instance_probe.py` | `tls`, `instance` |
 | `MailDomainResolver` | TXT-records opzoeken | `mail_dns.py` | `dns` |
 | `PemReader`, `CertificateVolume` | Geüploade certificaatketen en sleutel lezen; de map die de proxy leest | `certificate_pem.py`, `certificate_volume.py` | `tls` |
-| `ConfigurationTransfer` | Configuratiepakketten lezen en schrijven | `db/configuration_package.py` | in de test (`FakeTransfer`) |
+| `ConfigurationTransfer` | Configuratiepakketten lezen en schrijven | `db/configuration_package.py` | `configuration_package` |
 
 ### 5.5 Gegevens op hoofdlijnen
 
@@ -1277,8 +1278,9 @@ pentest, toegankelijkheidsonderzoek).
 
 ### 11.3 Testarchitectuur
 
-- **Domein** met fakes: elke poort heeft een fake; de in-memory unit of work gedraagt zich als de
-  SQL-versie. Mutatietests bewaken dat de tests meer dan het blijde pad raken.
+- **Domein** met fakes: elke poort heeft een fake in `tests/fakes/`, en een test bewaakt dat; de
+  in-memory unit of work gedraagt zich als de SQL-versie. Mutatietests bewaken dat de tests meer
+  dan het blijde pad raken.
 - **Adapters** met contracttests op opgenomen fixtures; nooit een stub in `app/`.
 - **Autorisatie** uitputtend: elke rol × elk beheereindpunt × eigen en andermans groep; plus een
   test dat de scope en de enkele beslissing nooit verschillen.
@@ -1466,3 +1468,4 @@ als open punt O15 tot en met O18 in HANDOVER §11.
 | 5 november 2026 | Concept 1a: feiten nagelopen tegen de code (annuleren tot de start, alle 23 taaksoorten, dagelijkse opruimtaken, Nederlandse menunamen, fakes per poort); ADR 0116 van na de release en risico R-13 toegevoegd; na de security-review de controls in 3.5 en 9.1 preciezer (uitgaande bewaker, versleutelde hops, tweede factor, netwerk-allowlist) |
 | 5 november 2026 | Concept 1b: de antwoorden van de productowner op V-1 tot en met V-15 in 13.4, verwerkt in 2.6, 3.3, 3.5, 7.4, 8.2, 8.3, 8.6, 8.7, 9.3, 12 en 13.1; open punten O15 tot en met O18 in HANDOVER §11 |
 | 5 november 2026 | Concept 1c: de platen zijn bijgewerkt (#547); risico R-11, paragraaf 5.1 en bijlage A volgen |
+| 5 november 2026 | Concept 1d: elke fake staat in `tests/fakes/` (#549); paragraaf 5.4 en 11.3 volgen |
