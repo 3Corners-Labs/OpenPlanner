@@ -49,7 +49,14 @@ http://{$TLS_DOMAIN}:8080 {
 	request_body @public {
 		max_size 64KB
 	}
-	request_body {
+	# A configuration package (ADR 0089) is larger than any form: the import gets the ceiling of
+	# configuration_package_max_mb (512 MB) here; the app enforces the configured limit.
+	@package path /admin/settings/package/import
+	request_body @package {
+		max_size 512MB
+	}
+	@other not path /g/* /b/* /admin/settings/package/import
+	request_body @other {
 		max_size 1MB
 	}
 	# Caddy sets X-Forwarded-For to the visitor's address and drops any value the client sent
