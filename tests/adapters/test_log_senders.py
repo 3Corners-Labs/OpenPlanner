@@ -138,6 +138,60 @@ async def test_elastic_defaults_the_data_stream_and_drops_a_batch_with_item_erro
     assert (caught.value.reason, caught.value.drop) == (Reason.REFUSED, True)
 
 
+def _item(status: int) -> dict[str, object]:
+    return {"create": {"status": status}}
+
+
+async def test_elastic_retries_only_the_lines_a_bulk_answer_refused_for_now() -> None:
+    # Release audit v0.4.0 P2 (#509): HTTP 200 with errors: true and 429/503 per item.
+    body = {"errors": True, "items": [_item(201), _item(429), _item(400), _item(503)]}
+    _, transport = recording(body=body)
+    sender = sender_for(DestinationKind.ELASTIC, transport)
+
+    with pytest.raises(DeliveryError) as caught:
+        await sender.send([LINE, AUDIT, LINE, AUDIT])
+
+    error = caught.value
+    assert (error.reason, error.code, error.drop) == (Reason.SERVER, 429, False)
+    assert (error.retry, error.rejected) == ((1, 3), 1)
+
+
+async def test_elastic_with_only_permanent_item_errors_keeps_nothing() -> None:
+    body = {"errors": True, "items": [_item(201), _item(400), _item(409)]}
+    _, transport = recording(body=body)
+    sender = sender_for(DestinationKind.ELASTIC, transport)
+
+    with pytest.raises(DeliveryError) as caught:
+        await sender.send([LINE, AUDIT, LINE])
+
+    error = caught.value
+    assert (error.reason, error.code, error.retry, error.rejected) == (Reason.REFUSED, 400, (), 2)
+
+
+async def test_elastic_with_errors_flagged_but_every_item_taken_is_a_success() -> None:
+    _, transport = recording(body={"errors": True, "items": [_item(201), _item(200)]})
+    sender = sender_for(DestinationKind.ELASTIC, transport)
+
+    await sender.send([LINE, AUDIT])
+
+
+@pytest.mark.parametrize("items", [[], [_item(201)], ["x", "y"], None])
+async def test_elastic_drops_the_batch_when_the_item_statuses_cannot_be_read(
+    items: object,
+) -> None:
+    _, transport = recording(body={"errors": True, "items": items})
+    sender = sender_for(DestinationKind.ELASTIC, transport)
+
+    with pytest.raises(DeliveryError) as caught:
+        await sender.send([LINE, AUDIT])
+
+    assert (caught.value.reason, caught.value.drop, caught.value.retry) == (
+        Reason.REFUSED,
+        True,
+        None,
+    )
+
+
 # --- generic HTTP ------------------------------------------------------------------------
 
 

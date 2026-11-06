@@ -132,14 +132,28 @@ class DeliveryError(Exception):
         code: The platform's status code, for the page; never a body.
         drop: The platform will never accept this batch (it is malformed for it), so the
             sender discards it instead of retrying it forever and blocking every later line.
+        retry: Set when the platform answered per line (a bulk answer): the positions in the
+            batch of the lines to send again. The others were taken or refused for good.
+            ``None`` means the failure concerns the batch as a whole.
+        rejected: With ``retry``, how many lines the platform refused for good.
     """
 
-    def __init__(self, reason: Reason, code: int | None = None, *, drop: bool = False) -> None:
-        """Store the reason, the optional code and whether the batch is hopeless."""
+    def __init__(  # noqa: PLR0913
+        self,
+        reason: Reason,
+        code: int | None = None,
+        *,
+        drop: bool = False,
+        retry: tuple[int, ...] | None = None,
+        rejected: int = 0,
+    ) -> None:
+        """Store the reason, the optional code and what is to happen to the batch."""
         super().__init__(reason.value)
         self.reason = reason
         self.code = code
         self.drop = drop
+        self.retry = retry
+        self.rejected = rejected
 
 
 @dataclass(frozen=True)
