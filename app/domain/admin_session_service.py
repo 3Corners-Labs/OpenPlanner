@@ -99,9 +99,12 @@ class AdminSessionService:
         return sid
 
     async def resolve(
-        self, sid: str | None, policy: SessionPolicy
+        self, sid: str | None, policy: SessionPolicy, *, passive: bool = False
     ) -> tuple[AdminSession | None, bool]:
         """Return the live session behind ``sid`` and whether this request wrote activity.
+
+        A ``passive`` request (a page polling for itself, nobody acting) validates the session
+        but never writes activity, so an unattended page cannot keep a session from going idle.
 
         A session that has run out is ended with its reason and audited. When the register
         cannot be read the error propagates: no session means no access (fail closed).
@@ -120,7 +123,7 @@ class AdminSessionService:
                 async with self._uow.locked() as tx:
                     await self._end(tx, found, reason, now)
             return None, False
-        if not seen_due(found, now, policy):
+        if passive or not seen_due(found, now, policy):
             return found, False
         async with self._uow.locked() as tx:
             await tx.touch_admin_session(id_hash, now)
