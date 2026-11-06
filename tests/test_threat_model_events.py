@@ -194,6 +194,10 @@ FLOWS: dict[str, Flow] = {
     "## Flow: widget script on host websites (ADR 0035, EM-3)": Flow(
         no_event="a static script file; the booking it posts is refused by the booking flow"
     ),
+    "## Flow: islands, the scripts that enhance an admin or participant page (ADR 0118)": Flow(
+        no_event="static script files and CI gates; a refused request on a page is logged by the "
+        "flow that serves it, and nothing is refused by the scripts themselves"
+    ),
     "## Flow: allowed origins for embedding (ADR 0035, EM-1)": Flow(ADMIN),
     "## Flow: video meetings, work items and direct calls (WP5/WP6)": Flow(
         (PUBLIC, WEBHOOK, JOB, DENIED, CHANGE)
