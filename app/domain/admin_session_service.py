@@ -126,6 +126,21 @@ class AdminSessionService:
             await tx.touch_admin_session(id_hash, now)
         return replace(found, last_seen_at=now), True
 
+    async def reject(self, sid: str | None) -> None:
+        """End the live session behind ``sid`` because its provider no longer vouches for it.
+
+        Audited as ``rejected`` (the system chose it); an unknown or ended session is a no-op.
+        Switching the provider on again later therefore never revives the reference.
+        """
+        if not sid:
+            return
+        now = self._clock.now()
+        id_hash = hash_sid(sid)
+        async with self._uow.locked() as tx:
+            found = await tx.get_admin_session(id_hash)
+            if found is not None and found.ended_at is None:
+                await self._end(tx, found, EndReason.REJECTED, now)
+
     async def end(self, sid: str | None, reason: EndReason) -> None:
         """End the session behind ``sid`` (a no-op for an unknown or ended one)."""
         if not sid:

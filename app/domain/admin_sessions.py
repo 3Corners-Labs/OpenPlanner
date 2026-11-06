@@ -36,9 +36,12 @@ class EndReason(StrEnum):
     RESTORE = "restore"
     SECRET_ROTATED = "secret_rotated"  # noqa: S105  # nosec B105 - a reason name, not a secret
     CLI = "cli"
+    REJECTED = "rejected"
 
 
-AUDITED_REASONS = frozenset({EndReason.IDLE, EndReason.EXPIRED, EndReason.LIMIT})
+AUDITED_REASONS = frozenset(
+    {EndReason.IDLE, EndReason.EXPIRED, EndReason.LIMIT, EndReason.REJECTED}
+)
 """Reasons the system chooses, so that nobody else audits them."""
 
 

@@ -28,7 +28,7 @@ from typing import Annotated
 import structlog
 from fastapi import Depends, Request
 
-from app.admin.session import current_login, load_login, login_age
+from app.admin.session import current_login, load_login, login_age, reject_session
 from app.domain.admin import AdminService, Authorization
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.admin_sessions import SessionPolicy
@@ -171,6 +171,8 @@ async def load_principal(request: Request) -> None:
     principal = None
     if claims is not None:
         principal = await login_service(request).principal_for(claims)
+        if principal is None:
+            await reject_session(request, session_service(request))
     if principal is not None:
         # ADR 0042 step 5: the admin's own organisation's time format and zone apply.
         live = getattr(request.app.state, "live_settings", None)
