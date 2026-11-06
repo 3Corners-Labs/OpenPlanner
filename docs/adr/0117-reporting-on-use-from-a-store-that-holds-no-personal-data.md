@@ -360,8 +360,21 @@ read only by staff and by API clients; there is no participant-facing statistics
       runbook to mask it too); the cookie opens
       the wallboard of that scope only, no other admin route, and never the *Team* view. The kiosk session lives as long as its link would
       have (never longer than `reporting_wallboard_link_max_days`), dies with a revocation within one poll,
-      and an organisation may bind it to an address range (D `reporting_wallboard_link_networks`, empty by
-      default, CIDR list) so a stolen cookie is useless outside the building. The link grants the
+      and two optional address checks keep a stolen cookie useless elsewhere, both applied at the exchange
+      and again on **every request that carries the cookie** (every poll), not only at the start:
+      (1) an **ACL** of CIDR ranges, a default per organisation (D `reporting_wallboard_link_networks`,
+      empty means any) that a link may narrow when it is created; (2) a **pin**: with *pin to the first
+      address* chosen on the link, the address seen at the one-time exchange is stored on the link
+      (IPv4 as `/32`, IPv6 as `/64` because privacy addresses rotate) and the session works only from it.
+      Both can be used together (the pin must also lie inside the ACL). The address is the client
+      address as the trusted proxy chain resolves it, the same helper the rate limiter uses (ADR 0086),
+      never a raw `X-Forwarded-For` value. A request from another address is refused with a plain
+      message (*this screen is not allowed from this network; ask for a new link*), the link stays valid
+      for the right address, and one deduplicated audit event `wallboard.session_refused` plus an alert to
+      the organisation admins records it (address range, no more). A screen whose address changes (DHCP
+      lease, moved cable) simply needs a new link, which is the point of a pin. The stored range is an
+      address of staff equipment, not of a participant; it lives only on the link row, is shown to the
+      organisation admin on the link list, and is deleted with the link; it never goes in a log line. The link grants the
       same figures as the permission and is therefore a decision of the organisation, not the platform.
 
 ### Abuse cases (each gets a test)
@@ -376,7 +389,7 @@ read only by staff and by API clients; there is no participant-facing statistics
 | R6 | Monitoring individuals (team load) | Off by default, own permission, threshold, no ranking, folding on removal | Team screen refused when the setting is off; a staff member under the threshold is `< 5` |
 | R7 | Formula injection in a CSV cell | Same escaping as the audit export; cut codes, not free text | Cell starting with `=`, `+`, `-`, `@` is prefixed |
 | R8 | Personal data entering through the backfill or a fact field added later | One allow-list, review question 3 on every step that adds a fact | Test on the fact builder and on the log event `usage.fact` |
-| R10 | A display link leaks or is reused after it should have ended | Hash only, shown once, one-time use, expiry, revocation, optional network binding, token removed from the URL by redirect and masked in logs, kiosk cookie opens one scope and only the wallboard, audited | Revoked, expired or already used link refused; cookie refused from another network; token absent from the logs and from the redirect target; kiosk cookie refused on every other admin route and on *Team* |
+| R10 | A display link leaks or is reused after it should have ended | Hash only, shown once, one-time use, expiry, revocation, optional ACL and pin checked on every request, token removed from the URL by redirect and masked in logs, kiosk cookie opens one scope and only the wallboard, audited | Revoked, expired or already used link refused; cookie refused from another network and from another address than the pinned one (v4 `/32`, v6 `/64`), on a poll as well as at the start; spoofed `X-Forwarded-For` ignored; token absent from the logs and from the redirect target; kiosk cookie refused on every other admin route and on *Team* |
 | R11 | A frozen wallboard showing old numbers as current | *As of* on every tile, stale state after three failed polls | Fake clock and failing poll: the board switches to the old-data state in text |
 | R12 | Script injection through a chart label, tooltip or series name | Labels only from codes and the i18n catalogue, `textContent`, script CSP on report pages only, no data from outside the page | A label containing markup is shown as text; the CSP header on a report page and absent elsewhere |
 | R9 | A stale or tampered rollup silently showing wrong figures | `as_of`, lag warning on *System status*, idempotent watermark | Rollup run twice gives the same table; crash between batches loses and doubles nothing |
@@ -404,7 +417,8 @@ read only by staff and by API clients; there is no participant-facing statistics
 | `reporting_wallboard_refresh_seconds` | C platform | 10 | 5–120 | `settings.platform.manage` | Poll interval of the wallboard through the shared fragment mechanism |
 | `reporting_wallboard_wait_alert_minutes` | D organisation | 5 | 1–60 | `settings.organisation.manage` | A wait beyond it is marked *long wait* |
 | `reporting_wallboard_display_links_enabled` | D organisation | off | on/off | `settings.organisation.manage` | Allows display links for unattended screens (point 20) |
-| `reporting_wallboard_link_networks` | D organisation | empty (any) | up to 20 CIDR ranges | `settings.organisation.manage` | Optional: the kiosk session works only from these networks |
+| `reporting_wallboard_link_networks` | D organisation | empty (any) | up to 20 CIDR ranges | `settings.organisation.manage` | Default ACL for display links; a link may narrow it |
+| `reporting_wallboard_link_pin_default` | D organisation | off | on/off | `settings.organisation.manage` | Whether *pin to the first address* is ticked by default when a link is created (always changeable per link) |
 | `reporting_wallboard_link_max_days` | C platform | 30 | 1–90 | `settings.platform.manage` | Longest life of a display link |
 
 No class A or B setting: nothing here is needed before the database works, tied to the host, or a
