@@ -351,10 +351,17 @@ read only by staff and by API clients; there is no participant-facing statistics
       organisation (D `reporting_wallboard_display_links_enabled`, default off): a random 32-byte token
       shown once, stored only as `sha256(token)`, expiring after at most `reporting_wallboard_link_max_days`,
       revocable, listed with its last use, every creation, use of a new device and revocation an audit
-      event (permission `reports.wallboard.link.manage`, level organisation). The first request with the token
-      sets a read-only kiosk session cookie (`Secure; HttpOnly; SameSite=Lax`) and redirects to the same page
-      without the token in the URL, so the token is not left in history, logs or a referrer; the cookie opens
-      the wallboard of that scope only, no other admin route, and never the *Team* view. The link grants the
+      event (permission `reports.wallboard.link.manage`, level organisation). The link is **one-time**: the first
+      request consumes it (compared with `hmac.compare_digest`, rate limited by the common limiter) and
+      a second use is refused, so a link that leaks later is worthless; a replaced screen needs a new link. The
+      first request sets a read-only kiosk session cookie (`Secure; HttpOnly; SameSite=Lax`) and redirects to the same page
+      without the token in the URL, so the token is not left in history or a referrer, and the log processor masks that path segment (the
+      first request is the one place a token is in a URL; the proxy's access log is documented in the
+      runbook to mask it too); the cookie opens
+      the wallboard of that scope only, no other admin route, and never the *Team* view. The kiosk session lives as long as its link would
+      have (never longer than `reporting_wallboard_link_max_days`), dies with a revocation within one poll,
+      and an organisation may bind it to an address range (D `reporting_wallboard_link_networks`, empty by
+      default, CIDR list) so a stolen cookie is useless outside the building. The link grants the
       same figures as the permission and is therefore a decision of the organisation, not the platform.
 
 ### Abuse cases (each gets a test)
@@ -369,7 +376,7 @@ read only by staff and by API clients; there is no participant-facing statistics
 | R6 | Monitoring individuals (team load) | Off by default, own permission, threshold, no ranking, folding on removal | Team screen refused when the setting is off; a staff member under the threshold is `< 5` |
 | R7 | Formula injection in a CSV cell | Same escaping as the audit export; cut codes, not free text | Cell starting with `=`, `+`, `-`, `@` is prefixed |
 | R8 | Personal data entering through the backfill or a fact field added later | One allow-list, review question 3 on every step that adds a fact | Test on the fact builder and on the log event `usage.fact` |
-| R10 | A display link leaks or is reused after it should have ended | Hash only, shown once, expiry, revocation, token removed from the URL by redirect, kiosk cookie opens one scope and only the wallboard, audited | Revoked or expired link refused; token absent from the logs and from the redirect target; kiosk cookie refused on every other admin route and on *Team* |
+| R10 | A display link leaks or is reused after it should have ended | Hash only, shown once, one-time use, expiry, revocation, optional network binding, token removed from the URL by redirect and masked in logs, kiosk cookie opens one scope and only the wallboard, audited | Revoked, expired or already used link refused; cookie refused from another network; token absent from the logs and from the redirect target; kiosk cookie refused on every other admin route and on *Team* |
 | R11 | A frozen wallboard showing old numbers as current | *As of* on every tile, stale state after three failed polls | Fake clock and failing poll: the board switches to the old-data state in text |
 | R12 | Script injection through a chart label, tooltip or series name | Labels only from codes and the i18n catalogue, `textContent`, script CSP on report pages only, no data from outside the page | A label containing markup is shown as text; the CSP header on a report page and absent elsewhere |
 | R9 | A stale or tampered rollup silently showing wrong figures | `as_of`, lag warning on *System status*, idempotent watermark | Rollup run twice gives the same table; crash between batches loses and doubles nothing |
@@ -397,6 +404,7 @@ read only by staff and by API clients; there is no participant-facing statistics
 | `reporting_wallboard_refresh_seconds` | C platform | 10 | 5–120 | `settings.platform.manage` | Poll interval of the wallboard through the shared fragment mechanism |
 | `reporting_wallboard_wait_alert_minutes` | D organisation | 5 | 1–60 | `settings.organisation.manage` | A wait beyond it is marked *long wait* |
 | `reporting_wallboard_display_links_enabled` | D organisation | off | on/off | `settings.organisation.manage` | Allows display links for unattended screens (point 20) |
+| `reporting_wallboard_link_networks` | D organisation | empty (any) | up to 20 CIDR ranges | `settings.organisation.manage` | Optional: the kiosk session works only from these networks |
 | `reporting_wallboard_link_max_days` | C platform | 30 | 1–90 | `settings.platform.manage` | Longest life of a display link |
 
 No class A or B setting: nothing here is needed before the database works, tied to the host, or a
