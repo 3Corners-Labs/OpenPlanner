@@ -71,6 +71,18 @@ def test_last_seen_is_written_only_after_the_interval() -> None:
     assert seen_due(_session(), NOW + timedelta(minutes=5), POLICY)
 
 
+def test_the_write_interval_stays_below_the_idle_limit() -> None:
+    """A seen interval longer than the idle limit must not let a busy session go idle."""
+    policy = SessionPolicy(
+        lifetime=timedelta(hours=8),
+        idle=timedelta(minutes=15),
+        seen_interval=timedelta(hours=1),
+        max_sessions=3,
+    )
+    assert seen_due(_session(), NOW + timedelta(minutes=7, seconds=30), policy)
+    assert not seen_due(_session(), NOW + timedelta(minutes=7), policy)
+
+
 def test_over_the_limit_the_oldest_last_seen_goes_first() -> None:
     active = [_session(id_hash=str(n), last_seen_at=NOW + timedelta(minutes=n)) for n in range(4)]
 

@@ -49,7 +49,8 @@ class SessionPolicy:
     Attributes:
         lifetime: Absolute lifetime from the login (``admin_session_hours``).
         idle: Idle limit (``admin_idle_minutes``).
-        seen_interval: How often ``last_seen_at`` is written (``staff_last_seen_interval_seconds``).
+        seen_interval: Wanted write interval of ``last_seen_at``
+            (``staff_last_seen_interval_seconds``); ``write_interval`` is the one in force.
         max_sessions: Sessions per person (``admin_max_sessions_per_person``).
     """
 
@@ -57,6 +58,15 @@ class SessionPolicy:
     idle: timedelta
     seen_interval: timedelta
     max_sessions: int
+
+    @property
+    def write_interval(self) -> timedelta:
+        """Return how often activity is really written: ``seen_interval``, at most half of ``idle``.
+
+        The settings' bounds overlap (idle from 15 minutes, interval up to an hour); capping here
+        keeps activity written well before a session could be judged idle (fixed rule).
+        """
+        return min(self.seen_interval, self.idle / 2)
 
 
 @dataclass(frozen=True)
@@ -109,8 +119,8 @@ def judge(session: AdminSession, now: datetime, policy: SessionPolicy) -> EndRea
 
 
 def seen_due(session: AdminSession, now: datetime, policy: SessionPolicy) -> bool:
-    """Return whether ``last_seen_at`` is due to be written again."""
-    return now - session.last_seen_at >= policy.seen_interval
+    """Return whether ``last_seen_at`` is due to be written again (``policy.write_interval``)."""
+    return now - session.last_seen_at >= policy.write_interval
 
 
 def over_limit(active: list[AdminSession], max_sessions: int) -> list[AdminSession]:
