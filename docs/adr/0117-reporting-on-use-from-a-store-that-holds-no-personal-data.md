@@ -381,15 +381,13 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:
 
-| Step | New or changed endpoint or job (Q1) | Where PII could reach (Q3) | Test that fails if wrong (Q4) |
-|---|---|---|---|
-| 1 | none | none: pure functions | allow-list test, `suppress()` properties |
-| 2–3 | no route; transactions write facts | a fact field that is not allow-listed | fact-builder test per kind, mirror of `DATA_FIELDS` |
-| 4 | job `usage_rollup`, CLI `usage-backfill` | backfill reading a purgeable column | rollup idempotence; backfill reads none of `PURGED_FIELDS` |
-| 5–7 | `/admin/reports`, `/admin/.../usage/*`, `require_permission` on each | a screen cut that rebuilds a small cell; the *Team* screen | matrix sweep; suppression property test; setting-off refusal |
-| 8–9 | export routes, `/api/v1/reports/usage` | CSV cell content; API token reaching another group | limit and audit tests; cross-group API test; formula test |
-| 10 | job `reports.digest`, subscription forms | an address or a figure in a job payload or a log | no-attachment, no-address-in-payload, permission-at-send tests |
-| 11 | no route | the `usage.fact` log event | masked-stream test |
+- **Steps 1:** endpoint or job (Q1): none; PII risk (Q3): none: pure functions; failing test (Q4): allow-list test, `suppress()` properties.
+- **Steps 2–3:** endpoint or job (Q1): no route; transactions write facts; PII risk (Q3): a fact field that is not allow-listed; failing test (Q4): fact-builder test per kind, mirror of `DATA_FIELDS`.
+- **Steps 4:** endpoint or job (Q1): job `usage_rollup`, CLI `usage-backfill`; PII risk (Q3): backfill reading a purgeable column; failing test (Q4): rollup idempotence; backfill reads none of `PURGED_FIELDS`.
+- **Steps 5–7:** endpoint or job (Q1): `/admin/reports`, `/admin/.../usage/*`, `require_permission` on each; PII risk (Q3): a screen cut that rebuilds a small cell; the *Team* screen; failing test (Q4): matrix sweep; suppression property test; setting-off refusal.
+- **Steps 8–9:** endpoint or job (Q1): export routes, `/api/v1/reports/usage`; PII risk (Q3): CSV cell content; API token reaching another group; failing test (Q4): limit and audit tests; cross-group API test; formula test.
+- **Steps 10:** endpoint or job (Q1): job `reports.digest`, subscription forms; PII risk (Q3): an address or a figure in a job payload or a log; failing test (Q4): no-attachment, no-address-in-payload, permission-at-send tests.
+- **Steps 11:** endpoint or job (Q1): no route; PII risk (Q3): the `usage.fact` log event; failing test (Q4): masked-stream test.
 
 ## Consequences
 
