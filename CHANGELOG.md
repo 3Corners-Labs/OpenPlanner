@@ -4,6 +4,8 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ## Unreleased
 
+## 0.5.0 (2026-11-06)
+
 ## 0.4.0 (2026-11-04)
 
 ### Features
