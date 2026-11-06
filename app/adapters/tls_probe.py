@@ -9,6 +9,7 @@ the TLS client hello; no request reaches the application behind the proxy.
 
 import asyncio
 import ssl
+from collections.abc import Callable
 from contextlib import suppress
 
 import structlog
@@ -36,14 +37,15 @@ class SslCertificateProbe:
         timeout: Seconds for connection plus handshake.
         cafile: A CA bundle to trust instead of the host's (tests, a private CA).
         extra_cafile: A CA certificate to trust in addition to the host's bundle (the proxy's
-            internal authority, ADR 0112).
+            internal authority, ADR 0112), or a function that returns its path at probe time:
+            the proxy publishes the file after this process started.
     """
 
     def __init__(
         self,
         timeout: float = TIMEOUT_SECONDS,
         cafile: str | None = None,
-        extra_cafile: str | None = None,
+        extra_cafile: str | Callable[[], str | None] | None = None,
     ) -> None:
         """Store the options."""
         self._timeout = timeout
@@ -76,8 +78,9 @@ class SslCertificateProbe:
     async def _verified(self, host: str, port: int) -> tuple[Trust, bytes | None]:
         """Handshake with verification; a verification failure is a verdict, not an error."""
         context = ssl.create_default_context(cafile=self._cafile)
-        if self._extra_cafile is not None:
-            context.load_verify_locations(cafile=self._extra_cafile)
+        extra = self._extra_cafile() if callable(self._extra_cafile) else self._extra_cafile
+        if extra is not None:
+            context.load_verify_locations(cafile=extra)
         try:
             return Trust.TRUSTED, await _handshake(host, port, context)
         except ssl.SSLCertVerificationError as exc:

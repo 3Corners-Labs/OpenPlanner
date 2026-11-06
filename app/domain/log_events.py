@@ -223,6 +223,16 @@ _OPERATIONS = (
         "Check `PUBLIC_BASE_URL`, DNS and the proxy; *System status* shows the finding.",
     ),
     _e(
+        "address.probe_trust_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The public address probe could not load its trusted root: {error}.",
+        "The proxy's published internal root (ADR 0112) could not be read or parsed, so the "
+        "round trip of *System status* (ADR 0086) answered `tls` instead of checking the address.",
+        "Check the volume `internal-ca` and its file `root.crt`; the proxy writes it.",
+    ),
+    _e(
         "address.proxy_event_failed",
         _OPS,
         "warning",
