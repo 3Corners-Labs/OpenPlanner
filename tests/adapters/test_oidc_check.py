@@ -7,7 +7,8 @@ import pytest
 
 from app.adapters.diagnostics import passed
 from app.adapters.oidc_check import OidcTarget, check_oidc
-from tests.fakes.oidc_provider import DISCOVERY, oidc_provider, provider_metadata, signing_key
+from tests.fakes.identity_providers import discovery_document
+from tests.fakes.oidc_provider import DISCOVERY, ISSUER, oidc_provider, signing_key
 
 TARGET = OidcTarget(
     discovery_url=DISCOVERY,
@@ -54,7 +55,7 @@ async def test_an_unreachable_discovery_fails_and_stops() -> None:
 
 
 async def test_a_provider_that_signs_only_symmetrically_fails() -> None:
-    metadata = provider_metadata(id_token_signing_alg_values_supported=["HS256", "none"])
+    metadata = discovery_document(ISSUER, id_token_signing_alg_values_supported=["HS256", "none"])
 
     results = await _check(oidc_provider([], metadata))
 
@@ -125,7 +126,10 @@ async def test_the_issuer_is_compared_exactly_with_the_one_the_login_pins(
 async def test_an_issuer_announced_elsewhere_than_the_discovery_url_names_fails_without_pin() -> (
     None
 ):
-    metadata = provider_metadata(issuer="https://login.example.nl/realms/openplanner")
+    metadata = {
+        **discovery_document(ISSUER),
+        "issuer": "https://login.example.nl/realms/openplanner",
+    }
 
     results = await _check(oidc_provider([], metadata))
 
@@ -135,8 +139,8 @@ async def test_an_issuer_announced_elsewhere_than_the_discovery_url_names_fails_
 
 
 async def test_plain_http_back_channel_endpoints_fail_in_production_only() -> None:
-    metadata = provider_metadata(
-        token_endpoint="http://idp.example.nl/token", jwks_uri="http://idp.example.nl/jwks"
+    metadata = discovery_document(
+        ISSUER, token_endpoint="http://idp.example.nl/token", jwks_uri="http://idp.example.nl/jwks"
     )
 
     results = await _check(oidc_provider([], metadata))
@@ -155,11 +159,14 @@ async def test_plain_http_back_channel_endpoints_fail_in_production_only() -> No
 async def test_http_back_channel_on_an_internal_discovery_address_is_expected() -> None:
     """ADR 0112: web reaches the bundled provider on the internal http address."""
     internal = "http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration"
-    metadata = provider_metadata(
-        issuer="https://afspraak.example.nl/idp/realms/openplanner",
-        token_endpoint="http://idp:8080/idp/realms/openplanner/protocol/openid-connect/token",
-        jwks_uri="http://idp:8080/idp/realms/openplanner/protocol/openid-connect/certs",
-    )
+    metadata = {
+        **discovery_document(
+            ISSUER,
+            token_endpoint="http://idp:8080/idp/realms/openplanner/protocol/openid-connect/token",
+            jwks_uri="http://idp:8080/idp/realms/openplanner/protocol/openid-connect/certs",
+        ),
+        "issuer": "https://afspraak.example.nl/idp/realms/openplanner",
+    }
 
     def route(request: httpx.Request) -> httpx.Response:
         if str(request.url) == internal:
@@ -193,7 +200,7 @@ async def test_a_missing_client_secret_fails_in_production() -> None:
 
 
 async def test_a_provider_without_s256_only_warns() -> None:
-    metadata = provider_metadata(code_challenge_methods_supported=["plain"])
+    metadata = discovery_document(ISSUER, code_challenge_methods_supported=["plain"])
 
     results = await _check(oidc_provider([], metadata))
 
