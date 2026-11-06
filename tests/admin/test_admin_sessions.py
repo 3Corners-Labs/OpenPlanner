@@ -3,6 +3,7 @@
 import base64
 import json
 from datetime import timedelta
+from pathlib import Path
 
 import structlog
 
@@ -223,7 +224,16 @@ async def test_automatic_polling_does_not_keep_the_session_alive(site: Site) -> 
 
 async def test_a_click_after_a_poll_still_counts_as_activity(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
+    poll = {"x-live-poll": "1"}
     site.clock.advance(timedelta(minutes=31))
+    assert (await site.client.get("/admin/rights", headers=poll)).status_code == 200
+    site.clock.advance(timedelta(minutes=9))
     assert (await site.client.get("/admin/rights")).status_code == 200
     site.clock.advance(timedelta(minutes=31))
-    assert (await site.client.get("/admin/rights", headers={"x-live-poll": "1"})).status_code == 200
+    assert (await site.client.get("/admin/rights", headers=poll)).status_code == 200
+
+
+def test_both_page_pollers_mark_their_requests_as_automatic() -> None:
+    static = Path(__file__).resolve().parents[2] / "app" / "web" / "static"
+    for script in ("live-region.js", "update-progress.js"):
+        assert "X-Live-Poll" in (static / script).read_text(encoding="utf-8"), script
