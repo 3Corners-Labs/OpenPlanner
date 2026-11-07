@@ -1205,7 +1205,8 @@ _AUDIT = (
         "outcome",
         "",
         "An admin session ended: {reason}.",
-        "A session ended by expiry, idle time or the session limit (ADR 0098).",
+        "A session ended by expiry, idle time, the session limit or because its provider "
+        "rejected it (ADR 0098, 0083).",
     ),
     _e(
         "admin.sessions_ended_all",

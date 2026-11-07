@@ -211,6 +211,23 @@ async def test_the_cache_directive_is_left_out_on_purpose(site: Site) -> None:
     assert '"cache"' not in final.headers["clear-site-data"]
 
 
+async def test_a_session_whose_provider_rejects_it_ends_for_good(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    service = app.state.login_service
+    live = service.principal_for
+
+    async def rejected(*_: object, **__: object) -> None:
+        return None
+
+    service.principal_for = rejected
+    assert (await site.client.get("/admin/rights", follow_redirects=False)).status_code == 303
+
+    service.principal_for = live  # the provider is switched on again
+    assert (await site.client.get("/admin/rights", follow_redirects=False)).status_code == 303
+    assert (ORG_ADMIN.subject, "admin.session_ended", "rejected") in await _audit(site)
+
+
 async def test_automatic_polling_does_not_keep_the_session_alive(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     poll = {"x-live-poll": "1"}

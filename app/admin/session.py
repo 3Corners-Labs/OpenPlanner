@@ -269,6 +269,21 @@ async def load_login(request: Request, service: AdminSessionService, policy: Ses
     return written
 
 
+async def reject_session(request: Request, service: AdminSessionService) -> None:
+    """End the session on the server and drop its reference when its provider rejects it.
+
+    Rejects covers a provider that is switched off or deleted, and claims that no longer
+    resolve to any role.
+
+    The reference is gone from the cookie too, so a provider switched on again later does not
+    authenticate the same browser without a new login (ADR 0083 point 17).
+    """
+    sid = _sid(request)
+    request.state.admin_login = None
+    request.session.pop(_SID, None)
+    await service.end(sid, EndReason.REJECTED)
+
+
 def current_session(request: Request) -> AdminSession | None:
     """Return the live session of this request, or ``None`` before ``load_login`` or without."""
     found: AdminSession | None = getattr(request.state, "admin_login", None)

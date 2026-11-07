@@ -151,7 +151,7 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 |---|---|---|---|---|---|
 | `admin.login` | `info`, outcome | `roles` | Admin {actor} signed in. | An admin signed in; the subject is the identity provider's, never a name. | Nothing. |
 | `admin.logout` | outcome | – | Admin {actor} signed out. | An admin ended their session. | Nothing. |
-| `admin.session_ended` | outcome | – | An admin session ended: {reason}. | A session ended by expiry, idle time or the session limit (ADR 0098). | Nothing. |
+| `admin.session_ended` | outcome | – | An admin session ended: {reason}. | A session ended by expiry, idle time, the session limit or because its provider rejected it (ADR 0098, 0083). | Nothing. |
 | `admin.sessions_ended_all` | outcome | – | All admin sessions were ended. | The superuser or the host ended every session at once. | Nothing; the audit log shows who did it. |
 | `admin.sessions_ended_by_admin` | outcome | – | An admin's sessions were ended by another admin. | A staff manager signed someone out everywhere. | Nothing; the audit log shows who did it. |
 | `admin.sessions_ended_by_self` | outcome | – | Admin {actor} ended their other sessions. | An admin signed out their other devices. | Nothing. |
