@@ -41,7 +41,7 @@ jobs:
       github.event_name == 'pull_request_target'
       && github.event.action == 'synchronize'
       && contains(github.event.pull_request.labels.*.name, 'po:approved')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     # `pull-requests: write` only takes the label off; this job checks out and runs nothing.
     permissions:
@@ -74,7 +74,7 @@ jobs:
     # Runs also when the withdrawal was skipped (most events) or failed; a skipped gate would
     # count as a passed required check.
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     concurrency:
       group: decision-gate-${{ github.event.pull_request.number || github.ref }}
