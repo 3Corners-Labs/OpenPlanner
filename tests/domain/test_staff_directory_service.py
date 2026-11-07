@@ -195,6 +195,20 @@ async def test_a_person_who_also_works_elsewhere_is_not_disabled_by_one_organisa
     assert not directory.users["kc-both"].enabled
 
 
+async def test_an_entitlement_of_another_installation_counts_as_working_elsewhere(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    directory = FakeStaffDirectory(
+        [person("kc-foreign", f"{P}:agent:demo/demo", "other:agent:demo/demo")]
+    )
+
+    assert (
+        await code_of(service(uow, directory).set_enabled(ORG_ADMIN, "kc-foreign", False))
+        is ErrorCode.NOT_PERMITTED
+    )
+    assert directory.users["kc-foreign"].enabled
+
+
 async def test_disabling_and_enabling_a_person_in_scope(
     uow: InMemoryUnitOfWork, directory: FakeStaffDirectory
 ) -> None:

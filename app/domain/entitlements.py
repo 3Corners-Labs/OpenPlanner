@@ -165,7 +165,7 @@ class ParsedEntitlements:
     grants: frozenset[Grant] = frozenset()
     refused: tuple[Refusal, ...] = ()
     ignored: int = 0
-    """Values without the prefix: not ours, not a problem."""
+    """Values without the prefix: not read here; staff management counts them as elsewhere."""
 
 
 def parse_entitlements(

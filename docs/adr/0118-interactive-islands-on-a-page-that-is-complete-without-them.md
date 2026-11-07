@@ -1,6 +1,7 @@
 # 0118. Interactive islands on a page that is complete without them
 
-Status: proposed (2026-11-06), requested by the product owner. Not built. Amends ADR 0016 §1–2
+Status: proposed (2026-11-06), requested by the product owner. Partly built: step 1 only (see
+*Build status*). Amends ADR 0016 §1–2
 (admin forms without JavaScript) and the admin-UI and Playwright lines of `CLAUDE.md`; extends
 ADR 0072 §6 (`live-region.js`), ADR 0048 and ADR 0061 §5 (`app/web/charts.py`). It stands on its own
 and can merge before or after ADR 0117 (reporting), which is its first intended user: see also
@@ -159,8 +160,8 @@ never C or D). The refresh interval of live fragments stays the existing `QUEUE_
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; the Status line of ADR 0016; the admin-UI and Playwright lines of `CLAUDE.md`; the row in `docs/adr-status.md` | #559 | in PR #559 |
-| 1 | `docs/islands.md` with the four existing scripts; the test that every script is listed and the size pytest (extend `tests/web/test_static.py`); the semgrep rule on `innerHTML` and friends; the XSS abuse case; the upload content-type test; the CLAUDE.md detail moves there | | planned |
+| 0 | ADR proposed; the Status line of ADR 0016; the admin-UI and Playwright lines of `CLAUDE.md`; the row in `docs/adr-status.md` | #559 | merged |
+| 1 | `docs/islands.md` with the four existing scripts; the test that every script is listed and the size pytest (extend `tests/web/test_static.py`); the semgrep rule on `innerHTML` and friends; the XSS abuse case; the upload content-type test; the CLAUDE.md detail moves there (already short since step 0) | #560 | in PR #560: `docs/islands.md`, listing, size and markup-sink tests in `tests/web/test_static.py`, rule `no-script-markup-sink` with `.semgrep/rules.js` run by `make semgrep` and CI, threat-model flow; uploads were already covered by `tests/api/test_brand_assets.py` |
 | 2 | Playwright gates for pages marked `island`: scripts off, keyboard map, 320 px and zoom, forced colours, reduced motion, CSP console; `e2e/pages.json` flag | | planned |
 | 3 | `live-region.js` rules of point 4 (stale marker, pause control, announce only on change) and their tests | | planned |
 | 4 | The first new island (`op-chart` of ADR 0117 step 12) built to this ADR, with its entry and manual pass | | planned |

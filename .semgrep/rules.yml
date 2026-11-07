@@ -22,3 +22,23 @@ rules:
       - metavariable-regex:
           metavariable: $KEY
           regex: ^(name|first_name|last_name|email|phone|note|form_answers|answers|guest_join_url|host_join_url|trial_join_url|username)$
+
+  - id: no-script-markup-sink
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      A script must not turn text into markup or code (ADR 0118 point 9). Set text with
+      textContent and build elements with createElement; a label from outside the page is
+      never trusted.
+    pattern-either:
+      - pattern: $EL.innerHTML = $VALUE
+      - pattern: $EL.outerHTML = $VALUE
+      - pattern: $EL.innerHTML += $VALUE
+      - pattern: $EL.srcdoc = $VALUE
+      - pattern: $RANGE.createContextualFragment(...)
+      - pattern: Function(...)
+      - pattern: new Function(...)
+      - pattern: $EL.insertAdjacentHTML(...)
+      - pattern: document.write(...)
+      - pattern: document.writeln(...)
+      - pattern: eval(...)

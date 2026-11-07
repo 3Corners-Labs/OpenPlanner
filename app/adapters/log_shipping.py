@@ -201,7 +201,16 @@ class Pipeline:
         try:
             await self._sender.send(self._inflight)
         except DeliveryError as failed:
-            if failed.drop:  # the platform will never accept this batch: do not block the rest
+            if failed.retry is not None:  # a bulk answer: keep only the lines to send again
+                kept = [self._inflight[n] for n in failed.retry]
+                taken = len(self._inflight) - len(kept) - failed.rejected
+                self._status = replace(
+                    self._status,
+                    sent=self._status.sent + taken,
+                    dropped=self._status.dropped + failed.rejected,
+                )
+                self._inflight = kept
+            elif failed.drop:  # the platform will never accept this batch: do not block the rest
                 self._status = replace(
                     self._status, dropped=self._status.dropped + len(self._inflight)
                 )

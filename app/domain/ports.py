@@ -989,13 +989,13 @@ class Transaction(Protocol):
     async def erasable_groups(self, archived_before: datetime) -> list[Group]:
         """Return the archived groups the worker may erase (ADR 0084 step 3).
 
-        Archived at or before ``archived_before``, and referred to by no booking, slot,
+        Archived at or before ``archived_before``, and referred to by no booking,
         closure, shortfall acceptance or API client any more.
         """
         ...
 
     async def delete_group(self, group_id: int) -> None:
-        """Erase the group's row; its settings, texts, staffing and rules go with it."""
+        """Erase the group's slots and row; its settings, texts, staffing and rules go with it."""
         ...
 
     async def count_future_bookings(self, group_id: int, now: datetime) -> int:

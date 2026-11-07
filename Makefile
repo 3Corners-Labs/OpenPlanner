@@ -81,6 +81,7 @@ migrations:
 
 semgrep:
 	uvx semgrep --test --config .semgrep/rules.yml .semgrep/rules.py
+	uvx semgrep --test --config .semgrep/rules.yml .semgrep/rules.js
 	uvx semgrep scan --error --config p/python --config p/owasp-top-ten --config p/secrets --metrics=off --config .semgrep/rules.yml app/
 
 # renovate: datasource=npm depName=jscpd

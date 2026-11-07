@@ -15,3 +15,22 @@ def test_the_no_pii_in_log_call_rule_lists_every_pii_field() -> None:
 
     assert found is not None, "the $KEY regex of no-pii-in-log-call moved"
     assert set(found.group(1).split("|")) == set(PII_FIELDS)
+
+
+def test_the_script_sink_rule_has_a_case_for_every_sink() -> None:
+    """The rule for scripts (ADR 0118 point 9) and its examples cover the same sinks."""
+    rule = RULES.read_text().split("id: no-script-markup-sink", 1)[1]
+    cases = (RULES.parent / "rules.js").read_text()
+
+    for sink in (
+        "innerHTML",
+        "outerHTML",
+        "srcdoc",
+        "createContextualFragment",
+        "insertAdjacentHTML",
+        "document.write",
+        "eval",
+        "Function",
+    ):
+        assert sink in rule, sink
+        assert sink in cases, sink

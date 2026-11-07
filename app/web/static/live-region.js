@@ -97,7 +97,12 @@
       if (!url) {
         return;
       }
-      fetch(url, { credentials: "same-origin", cache: "no-store", redirect: "manual" })
+      fetch(url, {
+        credentials: "same-origin",
+        cache: "no-store",
+        redirect: "manual",
+        headers: { "X-Live-Poll": "1" },
+      })
         .then(handle)
         .then(function (again) {
           if (again) {

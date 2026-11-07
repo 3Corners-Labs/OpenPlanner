@@ -979,12 +979,13 @@ class SqlTransaction(
     async def erasable_groups(self, archived_before: datetime) -> list[Group]:
         """Return the archived groups nothing refers to any more (ADR 0084 step 3).
 
-        The five tables with ``ON DELETE RESTRICT`` on ``groups`` decide: a row in any of them
-        keeps the group. Bookings and slots leave through the purge job, closures end, API
-        client grants are the superuser's to remove.
+        The tables with ``ON DELETE RESTRICT`` on ``groups`` decide: a row in any of them keeps
+        the group. Bookings leave through the purge job, closures end, API client grants are the
+        superuser's to remove. Slots do not count: purge and rollup delete bookings but never
+        their slots, and a slot nothing books is no reason to keep the group (``delete_group``
+        removes it).
         """
         referenced = [
-            select(SlotRow.id).where(SlotRow.group_id == GroupRow.id),
             select(BookingRow.id).where(BookingRow.group_id == GroupRow.id),
             select(ClosureRow.id).where(ClosureRow.group_id == GroupRow.id),
             select(ShortfallAcceptanceRow.group_id).where(
@@ -1004,7 +1005,12 @@ class SqlTransaction(
         return [_group(row) for row in rows]
 
     async def delete_group(self, group_id: int) -> None:
-        """Erase the group's row; the schema's cascades take the rest."""
+        """Erase the group's slots and row; the schema's cascades take the rest.
+
+        Only called for a group ``erasable_groups`` returned, so no booking refers to its slots
+        (``bookings.slot_id`` is RESTRICT: one that did would fail loudly instead of going).
+        """
+        await self._session.execute(delete(SlotRow).where(SlotRow.group_id == group_id))
         await self._session.execute(delete(GroupRow).where(GroupRow.id == group_id))
 
     async def count_future_bookings(self, group_id: int, now: datetime) -> int:

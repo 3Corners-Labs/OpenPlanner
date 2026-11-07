@@ -456,8 +456,8 @@ class BookingService:
 
         Raises:
             DomainError: ``booking_not_found``, ``booking_locked``, ``booking_not_active``
-                (also while it awaits confirmation), ``same_slot``, or any error of ``book``
-                for the new start.
+                (also while it awaits confirmation), ``same_slot``, ``group_not_found`` (the
+                group was archived meanwhile), or any error of ``book`` for the new start.
         """
         async with self._uow.locked() as tx:
             old = await self._booking(tx, management_token)
@@ -608,9 +608,15 @@ class BookingService:
         ``pending`` places it awaiting confirmation with its own ``confirm_by`` (a participant's
         new booking, or a moved one that was still pending, ADR 0056); otherwise it is placed
         confirmed and keeps ``confirmed_at`` of the booking it replaces.
+
+        Raises:
+            DomainError: ``group_not_found`` for an archived group (ADR 0084), the window,
+                schedule, closure, capacity and address errors of a booking.
         """
         if start.tzinfo is None:
             raise ValueError("start must be timezone-aware")
+        if group.is_archived:  # ADR 0084: archiving can pass while a booking awaits a new time
+            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
         now = self._clock.now()
         earliest, latest = booking_window(group, now)
         if not earliest <= start <= latest:
