@@ -3,11 +3,12 @@
 # ports of its own, with the settings of .env.example and nothing from the checkout's .env or
 # secrets/, so it runs next to a developer's own stack without touching it.
 #
-# Only scripts/stack.sh uses this file. It passes the four variables below in --env-file, so a
+# Only scripts/stack.sh uses this file. It passes the five variables below in --env-file, so a
 # missing one stops compose instead of falling back to a port another stack holds.
 #
 # What differs from `docker compose --profile dev up`, and why:
-# - image openplanner:verify, so building this checkout never retags a developer's openplanner:local;
+# - image openplanner:verify-<project>-<run id> (VERIFY_IMAGE), so building this checkout never
+#   retags a developer's openplanner:local, nor the image of a stack running in another worktree;
 # - env_file is .env.example only: the documented development settings, and never a real Webex
 #   or SMTP credential from a local .env;
 # - web leaves the edge network: its fixed subnet is taken by any other stack of this repository,
@@ -18,7 +19,7 @@
 
 services:
   web:
-    image: openplanner:verify
+    image: ${VERIFY_IMAGE:?set by stack.sh}
     env_file: !override
       - path: .env.example
         required: true
@@ -36,7 +37,7 @@ services:
       - "127.0.0.1:${VERIFY_WEB_PORT:?set by stack.sh}:8000"
 
   worker:
-    image: openplanner:verify
+    image: ${VERIFY_IMAGE:?set by stack.sh}
     env_file: !override
       - path: .env.example
         required: true

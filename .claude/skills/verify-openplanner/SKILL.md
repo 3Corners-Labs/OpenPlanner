@@ -63,7 +63,9 @@ Then it:
    participant) and points `.verify-openplanner/current` at it;
 2. renders the dev realms of `dev/keycloak/` with this stack's web port as redirect address;
 3. records the commit and a fingerprint of the files the image is built from (the allow-list in
-   `.dockerignore`), then builds `openplanner:verify` (log: `build.log`; a first build takes a
+   `.dockerignore`, plus the `Dockerfile` and `.dockerignore` themselves), then builds
+   `openplanner:verify-<project>-<run id>`, a tag of its own so that stacks of other worktrees
+   never retag it (log: `build.log`; a first build takes a
    few minutes, later ones use the cache);
 4. starts web, worker, Mailpit and Keycloak as compose project `openplanner-verify` with
    `compose.verify.yml` on top of `docker-compose.yml`, and waits until web and worker are
@@ -184,8 +186,8 @@ Proof standards:
 `down` writes `logs/`, removes the containers, network and volumes of project
 `openplanner-verify` (and nothing else: it never stops containers by name), deletes the run's
 `scratch/` (the rendered realms), clears `.verify-openplanner/current`, and then confirms that
-the run folder still exists and how many files it holds. The image `openplanner:verify` stays
-for the next build (`docker image rm openplanner:verify` removes it). Run `down` after a failed
+the run folder still exists and how many files it holds. It also removes the run's image tag; the
+build cache stays for the next build. Run `down` after a failed
 `up` or journey too, before trying again. When no run is recorded but the project still has
 containers (its `current` file was lost), `down` removes the containers, networks and volumes
 that carry the project's compose label, and only those. Delete old run folders yourself when you

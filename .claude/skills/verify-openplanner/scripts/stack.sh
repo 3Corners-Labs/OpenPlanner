@@ -2,7 +2,7 @@
 # The verification stack of the verify-openplanner skill (../SKILL.md): this checkout built and
 # started next to any other stack on the machine, driven by journey.mjs, removed again by `down`.
 #
-#   stack.sh up        build this checkout as openplanner:verify, start web, worker, Mailpit and
+#   stack.sh up        build this checkout as openplanner:verify-<project>-<run id>, start web, worker, Mailpit and
 #                      Keycloak on ports of their own, load the demo groups, then run doctor
 #   stack.sh doctor    read-only: is the running stack ours, built from this checkout, usable?
 #   stack.sh compose   docker compose with this stack's project, files and ports, for example
@@ -22,7 +22,6 @@ REPO=$(git -C "$SKILL_DIR" rev-parse --show-toplevel)
 OVERRIDE="$SKILL_DIR/compose.verify.yml"
 EVIDENCE_ROOT=${VERIFY_EVIDENCE_ROOT:-$REPO/.verify-openplanner}
 CURRENT="$EVIDENCE_ROOT/current"
-IMAGE=openplanner:verify
 READY_TIMEOUT=${VERIFY_READY_TIMEOUT:-600}
 DEMO_NAME="Demo: videogesprek"
 # A booking-link token in a URL path (/b/<token>); /b/m/<reference> does not match.
@@ -61,6 +60,7 @@ load_run() {
   WEB_PORT=$(state VERIFY_WEB_PORT)
   KC_PORT=$(state VERIFY_KC_PORT)
   MAIL_PORT=$(state VERIFY_MAIL_PORT)
+  IMAGE=$(state VERIFY_IMAGE)
 }
 
 # docker compose for this stack only: own project name, the override, the run's ports.
@@ -107,8 +107,9 @@ check_ports() {
 }
 
 # A hash of what the image is built from: the paths .dockerignore lets into the build context
-# (an allow-list), as committed plus local changes and untracked files. Docs or skill edits
-# outside those paths leave it unchanged, so doctor only calls a build stale when it is.
+# (an allow-list) plus the Dockerfile and .dockerignore themselves, which no allow-list names but
+# which decide the build, as committed plus local changes and untracked files. Docs or skill
+# edits outside those paths leave it unchanged, so doctor only calls a build stale when it is.
 fingerprint() {
   local line
   local -a paths
@@ -122,6 +123,7 @@ fingerprint() {
     esac
   done <"$REPO/.dockerignore"
   [ "${#paths[@]}" -gt 0 ] || fail ".dockerignore names no '!' paths any more; update fingerprint in stack.sh"
+  paths+=(Dockerfile .dockerignore)
   {
     git -C "$REPO" ls-tree -r HEAD -- "${paths[@]}"
     git -C "$REPO" diff HEAD --binary -- "${paths[@]}"
@@ -187,6 +189,9 @@ cmd_up() {
 
   RUN_ID=$(date -u +%Y%m%d-%H%M%S)
   RUN_DIR="$EVIDENCE_ROOT/$RUN_ID"
+  # One tag per project and run: stacks of other worktrees build at the same time, and a shared
+  # tag could be moved to their image between this build and the inspect that records its id.
+  IMAGE="openplanner:verify-$PROJECT-$RUN_ID"
   mkdir -p "$RUN_DIR/scratch"
   # Recorded first, so `down` can remove whatever a failed start leaves behind.
   cat >"$RUN_DIR/stack.env" <<ENV
@@ -195,6 +200,7 @@ VERIFY_PROJECT=$PROJECT
 VERIFY_WEB_PORT=$WEB_PORT
 VERIFY_KC_PORT=$KC_PORT
 VERIFY_MAIL_PORT=$MAIL_PORT
+VERIFY_IMAGE=$IMAGE
 VERIFY_STATE=starting
 PARTICIPANT_FIRST_NAME=Proefdeelnemer
 PARTICIPANT_LAST_NAME=Run-$RUN_ID
@@ -204,6 +210,7 @@ ENV
 VERIFY_WEB_PORT=$WEB_PORT
 VERIFY_KC_PORT=$KC_PORT
 VERIFY_MAIL_PORT=$MAIL_PORT
+VERIFY_IMAGE=$IMAGE
 VERIFY_SCRATCH=$RUN_DIR/scratch
 ENV
   printf '%s\n' "$RUN_ID" >"$CURRENT"
@@ -411,11 +418,13 @@ cmd_down() {
     || fail "compose down failed; see $RUN_DIR/logs/compose-down.log"
   [ -z "$(project_containers)" ] || fail "containers of project $PROJECT remain; see docker ps -a"
   rm -rf "$RUN_DIR/scratch"
+  # Only this run's tag; the layers stay in the build cache for the next build.
+  docker image rm "$IMAGE" >/dev/null 2>&1 || true
   set_state VERIFY_STATE down
   set_state STOPPED_AT "$(date -u +%FT%TZ)"
   rm -f "$CURRENT"
   [ -d "$RUN_DIR" ] || fail "the evidence of run $RUN_ID is gone: $RUN_DIR"
-  say "Removed project $PROJECT (containers, network, volumes); the image $IMAGE stays for the next build."
+  say "Removed project $PROJECT (containers, network, volumes); its image tag $IMAGE is removed, the build cache stays for the next build."
   say "Evidence kept: $RUN_DIR ($(find "$RUN_DIR" -type f | wc -l | tr -d ' ') files)"
 }
 
