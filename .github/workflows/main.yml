@@ -44,7 +44,7 @@ jobs:
   mutation:
     name: mutation score >= 80% on app/domain and app/i18n
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60   # took 22 to 30+ minutes at v0.5.1 (the first run hit the old limit of 30)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
