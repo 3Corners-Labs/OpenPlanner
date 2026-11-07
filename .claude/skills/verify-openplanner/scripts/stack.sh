@@ -2,8 +2,9 @@
 # The verification stack of the verify-openplanner skill (../SKILL.md): this checkout built and
 # started next to any other stack on the machine, driven by journey.mjs, removed again by `down`.
 #
-#   stack.sh up        build this checkout as openplanner:verify-<project>-<run id>, start web, worker, Mailpit and
-#                      Keycloak on ports of their own, load the demo groups, then run doctor
+#   stack.sh up        build this checkout as openplanner:verify-<project>-<run id>, start web,
+#                      worker, Mailpit and Keycloak on ports of their own, load the demo groups,
+#                      then run doctor
 #   stack.sh doctor    read-only: is the running stack ours, built from this checkout, usable?
 #   stack.sh compose   docker compose with this stack's project, files and ports, for example
 #                      `stack.sh compose logs --tail 50 worker`
@@ -61,6 +62,12 @@ load_run() {
   KC_PORT=$(state VERIFY_KC_PORT)
   MAIL_PORT=$(state VERIFY_MAIL_PORT)
   IMAGE=$(state VERIFY_IMAGE)
+  if [ -z "$IMAGE" ]; then
+    # A run that an earlier version of this script started: it used the one fixed tag, and its
+    # compose.env lacks the variable the override now requires, so down and doctor could not run.
+    IMAGE=openplanner:verify
+    printf 'VERIFY_IMAGE=%s\n' "$IMAGE" >>"$RUN_DIR/compose.env"
+  fi
 }
 
 # docker compose for this stack only: own project name, the override, the run's ports.
@@ -400,6 +407,7 @@ save_logs() {
 }
 
 cmd_down() {
+  local image_note
   check_docker
   if ! load_run; then
     PROJECT=${VERIFY_PROJECT:-openplanner-verify}
@@ -419,12 +427,16 @@ cmd_down() {
   [ -z "$(project_containers)" ] || fail "containers of project $PROJECT remain; see docker ps -a"
   rm -rf "$RUN_DIR/scratch"
   # Only this run's tag; the layers stay in the build cache for the next build.
-  docker image rm "$IMAGE" >/dev/null 2>&1 || true
+  if docker image rm "$IMAGE" >"$RUN_DIR/logs/image-rm.log" 2>&1; then
+    image_note="its image tag $IMAGE is removed"
+  else
+    image_note="its image tag $IMAGE stays (see $RUN_DIR/logs/image-rm.log)"
+  fi
   set_state VERIFY_STATE down
   set_state STOPPED_AT "$(date -u +%FT%TZ)"
   rm -f "$CURRENT"
   [ -d "$RUN_DIR" ] || fail "the evidence of run $RUN_ID is gone: $RUN_DIR"
-  say "Removed project $PROJECT (containers, network, volumes); its image tag $IMAGE is removed, the build cache stays for the next build."
+  say "Removed project $PROJECT (containers, network, volumes); $image_note, the build cache stays for the next build."
   say "Evidence kept: $RUN_DIR ($(find "$RUN_DIR" -type f | wc -l | tr -d ' ') files)"
 }
 
