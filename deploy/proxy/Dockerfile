@@ -3,7 +3,7 @@
 # Base image pinned by tag; Renovate pins and updates its digest.
 # The release binary of the official image lags behind Go security fixes, so Caddy is rebuilt
 # with the builder image's current Go toolchain and patched dependencies. Drop each replace
-# once Caddy's own go.mod carries that version or later: golang.org/x/net v0.60.0, and
+# once Caddy's own go.mod carries that version or later: golang.org/x/net v0.62.0 (CVE-2026-78661, DoS in x/net/html), and
 # github.com/go-jose/go-jose/v4 v4.1.6 (CVE-2026-116587, DoS when parsing JWKs with RSA keys).
 # The build fetches modules from proxy.golang.org and verifies them against sum.golang.org,
 # which now and then fails with a transient HTTP/2 stream error. The build is therefore tried
@@ -14,7 +14,7 @@ FROM caddy:2.11.7-builder-alpine AS build
 RUN --mount=type=cache,target=/go/pkg/mod \
     attempt=1; \
     until xcaddy build v2.11.7 \
-        --replace golang.org/x/net=golang.org/x/net@v0.60.0 \
+        --replace golang.org/x/net=golang.org/x/net@v0.62.0 \
         --replace github.com/go-jose/go-jose/v4=github.com/go-jose/go-jose/v4@v4.1.6 \
         --output /out/caddy; do \
       if [ "$attempt" -ge 3 ]; then echo "xcaddy build failed after $attempt attempts" >&2; exit 1; fi; \
