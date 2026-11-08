@@ -41,7 +41,7 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
-from app.domain.contact_center import ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -805,12 +805,12 @@ class InMemoryTransaction:
         booking = self.state.bookings[booking_id]
         self.state.bookings[booking_id] = replace(booking, claim=None)
 
-    async def get_booking_by_task(self, task_id: str) -> Booking | None:
+    async def get_booking_by_task(self, task_id: str, kind: ContactCenterKind) -> Booking | None:
         return next(
             (
                 b
                 for b in self.state.bookings.values()
-                if b.contact_center_task and b.contact_center_task.id == task_id
+                if b.contact_center_task == ContactCenterTaskRef(task_id, kind)
             ),
             None,
         )
