@@ -25,6 +25,7 @@ from app.domain.calls import (
     apply_event,
     new_status,
 )
+from app.domain.contact_center import ContactCenterKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobSummary
 from app.domain.ports import REASON_LIMIT, Clock, ProbeRegistry, Transaction, UnitOfWork
@@ -35,6 +36,16 @@ WEBHOOK_MEMORY = timedelta(days=30)
 
 WEBEX_SOURCE = "webex"
 WXCC_SOURCE = "wxcc"
+
+
+def event_source(provider: ContactCenterKind) -> str:
+    """Return the source under which a platform's event keys are remembered.
+
+    Webex Contact Center keeps ``wxcc``, the source of the keys stored before ADR 0032, so a
+    replay across the upgrade is still recognised; another platform gets ``cc:{kind}``.
+    """
+    return WXCC_SOURCE if provider is ContactCenterKind.WEBEX_CC else f"cc:{provider.value}"
+
 
 REQUEST_LIMIT = 100
 """How many of a booking's request events its page lists (the newest; ADR 0068)."""
@@ -158,8 +169,12 @@ class IntegrationService:
         detail: str = "",
         *,
         event_key: str = "",
+        provider: ContactCenterKind = ContactCenterKind.WEBEX_CC,
     ) -> EventOutcome:
         """Record a work item event once per ``event_key``; ``UNKNOWN`` for foreign tasks.
+
+        The task is looked up at ``provider`` only (ADR 0032 point 6): a task id of one
+        platform never finds a booking whose task is at another.
 
         A ``task:new`` of a booking's task is ``IGNORED``: the dispatch job recorded the
         creation when it got the id. An unknown task may be the group check's probe (ADR
@@ -167,11 +182,11 @@ class IntegrationService:
         event, a replayed or redelivered WxCC event is ``DUPLICATE`` (ADR 0082 point 5).
         """
         async with self._uow.locked() as tx:
-            booking = await tx.get_booking_by_task(task_id)
+            booking = await tx.get_booking_by_task(task_id, provider)
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED
-                if not await _claim(tx, WXCC_SOURCE, event_key, at):
+                if not await _claim(tx, event_source(provider), event_key, at):
                     return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
                 return EventOutcome.RECORDED

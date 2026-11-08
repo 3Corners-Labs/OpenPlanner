@@ -18,7 +18,12 @@ from app.domain.calls import (
 )
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
-from app.domain.integration import WEBHOOK_MEMORY, EventOutcome, IntegrationService
+from app.domain.integration import (
+    WEBHOOK_MEMORY,
+    EventOutcome,
+    IntegrationService,
+    event_source,
+)
 from app.domain.job_plan import JobStatus, JobType, PlannedJob
 from app.domain.request_log import REQUEST_EVENT
 from tests.fakes.clock import FixedClock
@@ -464,3 +469,8 @@ async def test_a_bookings_task_new_is_ignored_and_a_probes_events_are_noted(
     )
     assert uow.state.booking_events.get(123, []) == []  # nothing on the booking's timeline
     assert await probes.events("probe-task") == (EventKind.TASK_CREATED, EventKind.TASK_ENDED)
+
+
+def test_wxcc_keeps_its_event_source_across_the_rename() -> None:
+    """ADR 0032: event keys stored before the neutral route still match a replay after it."""
+    assert event_source(ContactCenterKind.WEBEX_CC) == "wxcc"

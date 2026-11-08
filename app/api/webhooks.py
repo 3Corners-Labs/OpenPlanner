@@ -1,14 +1,17 @@
-"""Inbound webhooks from Webex and WxCC (ADR 0010, 0017, 0018).
+"""Inbound webhooks from Webex and the contact-center platforms (ADR 0010, 0017, 0018, 0032).
 
 Authenticated by signature, not by an admin session: the secret is configured per
 installation (``WEBEX_WEBHOOK_SECRET``, ``WXCC_WEBHOOK_SECRET``); without it the endpoint
-does not exist (404). The body is size-capped and verified before it is parsed. Unknown
-meetings, tasks and event types, and events seen before (replays), are acknowledged and
-ignored, so the platforms do not retry. Every verified webhook is noted as its platform's latest
-inbound event, for *Koppelingen* and *System status* (ADR 0082 point 5).
+does not exist (404). A contact-center platform's check and parsing come from its adapter
+(``contact_centers.INBOUND``); a kind without an adapter is a 404 too. The body is size-capped
+and verified before it is parsed. Unknown meetings, tasks and event types, and events seen
+before (replays), are acknowledged and ignored, so the platforms do not retry. Every verified
+webhook is noted as its platform's latest inbound event, for *Koppelingen* and *System status*
+(ADR 0082 point 5).
 
-    POST /webhooks/webex   meetings started/ended, participants joined/left
-    POST /webhooks/wxcc    task:new, task:connected, task:ended, task:failed
+    POST /webhooks/webex                   meetings started/ended, participants joined/left
+    POST /webhooks/contact-center/{kind}   task created/connected/ended/failed
+    POST /webhooks/wxcc                    alias of /webhooks/contact-center/webex_cc
 """
 
 import json
@@ -18,8 +21,10 @@ import structlog
 from fastapi import APIRouter, Request
 from starlette.responses import Response
 
-from app.adapters.webhooks import parse_webex, parse_wxcc, verify_webex, verify_wxcc
+from app.adapters.contact_centers import INBOUND, inbound
+from app.adapters.webhooks import InboundWebhook, parse_webex, verify_webex
 from app.domain.connection_health import InboundEvent, Platform
+from app.domain.contact_center import ContactCenterKind
 from app.domain.integration import EventOutcome, IntegrationService
 from app.domain.integration_health import IntegrationHealthService
 from app.domain.ports import Clock
@@ -98,38 +103,63 @@ async def webex(request: Request) -> Response:
     return Response(status_code=204)
 
 
+@router.post("/contact-center/{kind}")
+@limiter.limit(WEBHOOK_LIMIT)
+async def contact_center(request: Request, kind: str) -> Response:
+    """Record a task event of the contact-center platform ``kind`` (ADR 0032 point 6).
+
+    A kind without an adapter is a 404, like a platform without a secret.
+    """
+    handling = inbound(kind)
+    if handling is None:
+        return Response(status_code=404)
+    return await _contact_center(request, handling)
+
+
 @router.post("/wxcc")
 @limiter.limit(WEBHOOK_LIMIT)
 async def wxcc(request: Request) -> Response:
-    """Record a WxCC task event."""
-    secret = request.app.state.settings.wxcc_webhook_secret
+    """Record a WxCC task event: the alias of ``/contact-center/webex_cc`` (ADR 0032 point 6).
+
+    Kept until the WxCC subscriptions are registered at the new address (runbook).
+    """
+    return await _contact_center(request, INBOUND[ContactCenterKind.WEBEX_CC])
+
+
+async def _contact_center(request: Request, handling: InboundWebhook) -> Response:
+    """Verify, parse and record one contact-center webhook with its platform's handling."""
+    secret = getattr(request.app.state.settings, handling.signing_setting)
     if secret is None:
         return Response(status_code=404)
     body = await _body(request)
     if body is None:
         return Response(status_code=413)
     clock: Clock = request.app.state.clock
-    if not verify_wxcc(
-        body,
-        request.headers.get("x-webexcc-signature"),
-        request.headers.get("x-webexcc-timestamp"),
-        secret.get_secret_value(),
-        clock.now(),
-    ):
-        log.warning("webhook.rejected", source="wxcc")
-        await _record_rejection(request, "wxcc")
+    if not handling.verify(body, request.headers, secret.get_secret_value(), clock.now()):
+        log.warning("webhook.rejected", source=handling.source)
+        await _record_rejection(request, handling.source)
         return Response(status_code=401)
     payload = _json_object(body)
-    if payload is None:  # pragma: no cover - verify_wxcc already requires an object
+    if payload is None:  # pragma: no cover - every verifier reads the body as an object
         return Response(status_code=400)
-    event = parse_wxcc(payload)
+    event = handling.parse(payload)
     outcome = EventOutcome.IGNORED
     if event is not None:
         outcome = await _service(request).record_task_event(
-            event.target_id, event.kind, clock.now(), event.detail, event_key=event.event_key
+            event.target_id,
+            event.kind,
+            clock.now(),
+            event.detail,
+            event_key=event.event_key,
+            provider=handling.kind,
         )
-        log.info("webhook.wxcc", kind=event.kind.value, outcome=outcome.value)
-    await _note(request, Platform.WXCC, str(payload.get("type", ""))[:64], outcome)
+        log.info(
+            "webhook.contact_center",
+            platform=handling.kind.value,
+            kind=event.kind.value,
+            outcome=outcome.value,
+        )
+    await _note(request, handling.platform, handling.event_type(payload), outcome)
     return Response(status_code=204)
 
 

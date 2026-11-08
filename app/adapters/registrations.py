@@ -36,6 +36,8 @@ from app.domain.ports import IntegrationError
 MAX_PAGES = 10
 API_ID = re.compile(r"[A-Za-z0-9_=-]{1,256}")
 INACTIVE = frozenset({"inactive", "disabled", "suspended"})
+WXCC_PATHS = ("/webhooks/wxcc", "/webhooks/contact-center/webex_cc")
+"""Where OpenPlanner receives WxCC events: the old address and its ADR 0032 successor."""
 
 
 class State(StrEnum):
@@ -222,7 +224,7 @@ def _classify_wxcc(items: Iterable[dict[str, Any]], target: str | None) -> list[
         types = item.get("eventTypes")
         event_types = [str(t) for t in types] if isinstance(types, list) else []
         status = str(item.get("status") or "")
-        ours = _path(url).endswith("/webhooks/wxcc") or _named(item)
+        ours = _path(url).endswith(WXCC_PATHS) or _named(item)
         if not ours:
             reason = Reason.FOREIGN
         elif url != target:

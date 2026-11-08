@@ -241,3 +241,18 @@ async def test_a_dispatch_job_keeps_the_value_the_previous_image_reads(
             .all()
         )
     assert "dispatch_wxcc_task" in types  # this image writes the old value (ADR 0116 §5)
+
+
+async def test_a_task_id_is_found_only_at_its_own_platform(engine: AsyncEngine) -> None:
+    """ADR 0032 point 6: a row whose task is at another platform is not a WxCC task."""
+    uow, booking_id = await _booking_with_task(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(
+                wxcc_task_id=None, contact_center_task_id="t-1", contact_center_kind="elsewhere"
+            )
+        )
+    async with uow.read() as tx:
+        assert await tx.get_booking_by_task("t-1", WEBEX_CC) is None

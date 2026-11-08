@@ -16,11 +16,14 @@ email addresses in the payloads are ignored.
 import hashlib
 import hmac
 import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
 from app.domain.calls import EventKind
+from app.domain.connection_health import Platform
+from app.domain.contact_center import ContactCenterKind
 
 MAX_SKEW = timedelta(seconds=300)
 
@@ -163,3 +166,61 @@ def _wxcc_key(payload: dict[str, Any], task_id: str) -> str:
         return ""
     parts = ("wxcc", str(payload.get("type")), task_id, event_id)
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class InboundWebhook:
+    """How one contact-center platform's webhooks are checked and read (ADR 0032 point 6).
+
+    The route ``/webhooks/contact-center/{kind}`` is the same for every platform; what differs
+    is here, defined by the platform's adapter and listed in ``contact_centers.INBOUND``.
+
+    Attributes:
+        kind: The platform.
+        platform: The connection whose latest inbound event the webhook is noted as.
+        source: Short code for logs, security events and deduplication (``wxcc`` stays the
+            code of Webex Contact Center, so its stored event keys keep matching).
+        signing_setting: The ``Settings`` field holding the webhook secret; without it the
+            endpoint does not exist.
+        verify: ``(body, headers, secret, now)`` → authentic, untampered and within 300 s.
+        parse: The verified JSON object → the event, or ``None`` when OpenPlanner ignores it.
+        event_type: The verified JSON object → its event type, codes only, for the note.
+    """
+
+    kind: ContactCenterKind
+    platform: Platform
+    source: str
+    signing_setting: str
+    verify: Callable[[bytes, Mapping[str, str], str, datetime], bool]
+    parse: Callable[[dict[str, Any]], ParsedEvent | None]
+    event_type: Callable[[dict[str, Any]], str]
+
+
+def _verify_wxcc_headers(
+    body: bytes, headers: Mapping[str, str], secret: str, now: datetime
+) -> bool:
+    """Check a WxCC webhook by its ``X-WebexCC-Signature`` and ``X-WebexCC-Timestamp``."""
+    return verify_wxcc(
+        body,
+        headers.get("x-webexcc-signature"),
+        headers.get("x-webexcc-timestamp"),
+        secret,
+        now,
+    )
+
+
+def _wxcc_type(payload: dict[str, Any]) -> str:
+    """Return a WxCC event's type (codes only, capped)."""
+    return str(payload.get("type", ""))[:64]
+
+
+WXCC_INBOUND = InboundWebhook(
+    kind=ContactCenterKind.WEBEX_CC,
+    platform=Platform.WXCC,
+    source="wxcc",
+    signing_setting="wxcc_webhook_secret",
+    verify=_verify_wxcc_headers,
+    parse=parse_wxcc,
+    event_type=_wxcc_type,
+)
+"""Webex Contact Center's webhooks: ``/webhooks/contact-center/webex_cc`` and ``/webhooks/wxcc``."""

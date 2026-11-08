@@ -84,6 +84,54 @@ async def test_wxcc_event_is_recorded(
     assert (await _status(database_url, booking_id))[1] is TaskState.CONNECTED
 
 
+async def test_the_neutral_route_records_a_wxcc_event_like_the_alias(
+    client: httpx.AsyncClient, booking_id: int, database_url: str
+) -> None:
+    """ADR 0032 point 6: ``/webhooks/contact-center/webex_cc``, with ``/webhooks/wxcc`` as alias."""
+    body = wxcc_body("task:connected", at=NOW)
+    headers = {"x-webexcc-signature": sign(body), "x-webexcc-timestamp": timestamp(body)}
+
+    with structlog.testing.capture_logs() as logs:
+        response = await client.post(
+            "/webhooks/contact-center/webex_cc", content=body, headers=headers
+        )
+
+    assert response.status_code == 204
+    _, task, events = await _status(database_url, booking_id)
+    assert task is TaskState.CONNECTED
+    logged = [e for e in logs if e["event"] == "webhook.contact_center"]
+    assert [(e["platform"], e["kind"], e["outcome"]) for e in logged] == [
+        ("webex_cc", "task_connected", "recorded")
+    ]
+    # The alias shares the event keys: the same event delivered there is a duplicate.
+    again = await client.post("/webhooks/wxcc", content=body, headers=headers)
+    assert again.status_code == 204
+    assert (await _status(database_url, booking_id))[2] == events
+
+
+async def test_a_platform_without_an_adapter_does_not_exist(client: httpx.AsyncClient) -> None:
+    body = wxcc_body("task:connected", at=NOW)
+    headers = {"x-webexcc-signature": sign(body), "x-webexcc-timestamp": timestamp(body)}
+
+    for kind in ("genesys", "WEBEX_CC", "webex_cc%2F..", "wxcc"):
+        response = await client.post(
+            f"/webhooks/contact-center/{kind}", content=body, headers=headers
+        )
+        assert response.status_code == 404, kind
+
+
+async def test_a_forged_event_on_the_neutral_route_is_refused(client: httpx.AsyncClient) -> None:
+    body = wxcc_body("task:connected", at=NOW)
+
+    response = await client.post(
+        "/webhooks/contact-center/webex_cc",
+        content=body,
+        headers={"x-webexcc-signature": "0" * 64, "x-webexcc-timestamp": timestamp(body)},
+    )
+
+    assert response.status_code == 401
+
+
 async def test_webex_event_is_recorded(
     client: httpx.AsyncClient, booking_id: int, database_url: str
 ) -> None:
@@ -186,6 +234,8 @@ async def test_without_a_secret_the_endpoints_do_not_exist(
 ) -> None:
     async with app_client(settings.model_copy(update={"database_url": database_url})) as client:
         assert (await client.post("/webhooks/wxcc", content=b"{}")).status_code == 404
+        neutral = await client.post("/webhooks/contact-center/webex_cc", content=b"{}")
+        assert neutral.status_code == 404
         assert (await client.post("/webhooks/webex", content=b"{}")).status_code == 404
 
 
