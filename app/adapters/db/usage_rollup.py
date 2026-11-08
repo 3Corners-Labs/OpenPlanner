@@ -11,11 +11,20 @@ from collections.abc import Sequence
 from datetime import datetime
 
 import structlog
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import and_, delete, exists, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
-from app.adapters.db.models import UsageEventRow, UsageHourRow, UsageRollupStateRow
-from app.domain.booking import BookingKind
+from app.adapters.db.models import (
+    BookingRow,
+    GroupRow,
+    SlotRow,
+    UsageBackfillRow,
+    UsageEventRow,
+    UsageHourRow,
+    UsageRollupStateRow,
+)
+from app.domain.booking import BookingKind, BookingStatus
 from app.domain.channels import ChannelKind
 from app.domain.scheduling import DispatchKind
 from app.domain.usage import (
@@ -26,11 +35,29 @@ from app.domain.usage import (
     UsageFact,
     UsageOutcome,
 )
+from app.domain.usage_backfill import BackfillBooking
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 
 log = structlog.get_logger()
 
 _STATE_ID = 1
+
+BACKFILL_COLUMNS = (
+    "id",
+    "group_id",
+    "status",
+    "locale",
+    "created_at",
+    "cancelled_at",
+    "closure_id",
+    "change_reason",
+    "rescheduled_from_id",
+    "confirm_by",
+    "confirmed_at",
+)
+"""The ``bookings`` columns the backfill reads: none of ``privacy.PURGED_FIELDS`` (a test checks
+it). The slot's start and kind and the group's organisation and dispatch kind come from their
+own tables."""
 
 _CUTS = (
     "booking_kind",
@@ -119,7 +146,12 @@ class UsageRollupQueries:
         pending = await self._session.scalar(
             select(func.count()).select_from(UsageEventRow).where(UsageEventRow.id > last)
         )
-        return UsageState(last, state.rolled_at if state is not None else None, pending or 0)
+        return UsageState(
+            last,
+            state.rolled_at if state is not None else None,
+            pending or 0,
+            state.backfilled_at if state is not None else None,
+        )
 
     async def add_usage_cells(self, cells: Sequence[UsageCell]) -> None:
         """Add each cell to the row of its hour and cut, or insert it as a new row.
@@ -189,3 +221,90 @@ class UsageRollupQueries:
             delete(UsageHourRow).where(UsageHourRow.bucket_hour < hours_before)
         )
         return UsagePruned(events.rowcount or 0, hours.rowcount or 0)  # type: ignore[attr-defined]
+
+    async def find_unbackfilled(self, after_id: int, limit: int) -> list[BackfillBooking]:
+        """Return up to ``limit`` booking rows after ``after_id`` that are not yet facts.
+
+        Reads only ``BACKFILL_COLUMNS`` of the booking, plus its slot and group; never a
+        purgeable column. ``was_moved`` says whether another booking replaced this one.
+        """
+        later = aliased(BookingRow)
+        moved = exists(select(later.id).where(later.rescheduled_from_id == BookingRow.id))
+        rows = await self._session.execute(
+            select(
+                *(getattr(BookingRow, name) for name in BACKFILL_COLUMNS),
+                SlotRow.start,
+                SlotRow.kind,
+                GroupRow.organisation_id,
+                GroupRow.dispatch_kind,
+                moved.label("was_moved"),
+            )
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .join(GroupRow, GroupRow.id == BookingRow.group_id)
+            .outerjoin(UsageBackfillRow, UsageBackfillRow.booking_id == BookingRow.id)
+            .where(BookingRow.id > after_id, UsageBackfillRow.booking_id.is_(None))
+            .order_by(BookingRow.id)
+            .limit(limit)
+        )
+        return [
+            BackfillBooking(
+                id=r.id,
+                organisation_id=r.organisation_id,
+                group_id=r.group_id,
+                dispatch_kind=DispatchKind(r.dispatch_kind),
+                kind=BookingKind(r.kind),
+                locale=r.locale,
+                status=BookingStatus(r.status),
+                created_at=r.created_at,
+                start=r.start,
+                confirmed_at=r.confirmed_at,
+                confirm_by=r.confirm_by,
+                cancelled_at=r.cancelled_at,
+                closure_id=r.closure_id,
+                change_reason=r.change_reason,
+                rescheduled_from_id=r.rescheduled_from_id,
+                was_moved=bool(r.was_moved),
+            )
+            for r in rows
+        ]
+
+    async def mark_backfilled(self, booking_ids: Sequence[int], at: datetime | None) -> None:
+        """Record bookings as done; with ``at`` also record the backfill as complete."""
+        if booking_ids:
+            await self._session.execute(
+                insert(UsageBackfillRow), [{"booking_id": i} for i in booking_ids]
+            )
+        if at is not None:
+            state = await self._session.get(UsageRollupStateRow, _STATE_ID)
+            if state is None:
+                self._session.add(
+                    UsageRollupStateRow(id=_STATE_ID, last_event_id=0, backfilled_at=at)
+                )
+            else:
+                state.backfilled_at = at
+        await self._session.flush()
+
+    async def usage_cutoff(self, now: datetime) -> datetime:
+        """Return the hour live facts start from, decided once and kept.
+
+        The hour of the first ``booking.created`` fact, or the hour of ``now`` when there is
+        none yet. It is stored with the first backfill, so a later run uses the same hour
+        although the backfill has by then written facts of older hours.
+        """
+        state = await self._session.get(UsageRollupStateRow, _STATE_ID)
+        if state is not None and state.backfill_cutoff is not None:
+            return state.backfill_cutoff
+        first = await self._session.scalar(
+            select(func.min(UsageEventRow.bucket_hour)).where(
+                UsageEventRow.kind == FactKind.BOOKING_CREATED.value
+            )
+        )
+        cutoff = first if first is not None else now.replace(minute=0, second=0, microsecond=0)
+        if state is None:
+            self._session.add(
+                UsageRollupStateRow(id=_STATE_ID, last_event_id=0, backfill_cutoff=cutoff)
+            )
+        else:
+            state.backfill_cutoff = cutoff
+        await self._session.flush()
+        return cutoff

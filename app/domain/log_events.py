@@ -299,6 +299,25 @@ _OPERATIONS = (
         _CHECK_HOST,
     ),
     _e(
+        "usage.backfill_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The usage backfill of old bookings failed: {error}.",
+        "The first-start backfill of ADR 0117 did not run; the next worker start tries again, "
+        "or run `python -m app.cli usage-backfill`.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "usage.backfilled",
+        _OPS,
+        "info",
+        "bookings facts",
+        "{bookings} old bookings turned into {facts} usage facts.",
+        "The worker's first start after the upgrade made facts of the existing bookings "
+        "(ADR 0117 point 5).",
+    ),
+    _e(
         "usage.rolled_up",
         _OPS,
         "info",

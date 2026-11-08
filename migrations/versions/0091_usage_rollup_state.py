@@ -1,7 +1,8 @@
 """The rollup's watermark and the backfill's record (ADR 0117 step 4).
 
-``usage_rollup_state`` is one row: the id of the last fact the worker rolled into ``usage_hour``
-and when it did. The rollup advances it in the same transaction as the counts, so a crash
+``usage_rollup_state`` is one row: the id of the last fact the worker rolled into ``usage_hour``,
+when it did, when the backfill of old bookings was completed, and the hour from which live
+facts exist (the backfill never repeats what live code wrote). The rollup advances it in the same transaction as the counts, so a crash
 neither double-counts nor loses a fact. ``usage_backfill`` holds one row per booking already
 turned into facts by ``python -m app.cli usage-backfill`` (idempotence); it holds a booking id
 and nothing else, and a booking row goes with its row. Both are expand-only and hold no
@@ -33,6 +34,8 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), autoincrement=False, nullable=False),
         sa.Column("last_event_id", sa.Integer(), nullable=False),
         sa.Column("rolled_at", sa.DateTime(), nullable=True),
+        sa.Column("backfilled_at", sa.DateTime(), nullable=True),
+        sa.Column("backfill_cutoff", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_usage_rollup_state")),
     )
     op.create_table(

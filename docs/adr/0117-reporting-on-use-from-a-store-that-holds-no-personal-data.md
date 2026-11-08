@@ -1,7 +1,8 @@
 # 0117. Reporting on use, from a store that holds no personal data
 
 Status: accepted (2026-11-06, PR #558), requested by the product owner (open point O16). Partly built:
-steps 1 (the domain) and 2 (the store and the booking facts) are merged; the rest is planned.
+steps 1 (the domain), 2 (the store and the booking facts) and 4 (rollup, retention, backfill, lag)
+are merged; the rest is planned.
 Extends
 ADR 0102 (what remains after a purge; step 4 is its first statistics table), ADR 0014
 (authorisation), ADR 0023 (machine API), ADR 0047 (admin structure), ADR 0042 (settings) and
@@ -444,7 +445,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 1 | Domain only: `app/domain/usage.py` (fact kinds, allow-list `USAGE_FIELDS`, metric table, buckets, `suppress()`), `privacy.py` list and test, `docs/reporting.md` generated; no database | #592 | merged |
 | 2 | Migration (five tables, expand-only), `record_usage` on `Transaction`, settings and registry entries, facts for booking create, confirm, expire, cancel, move, outcome, suspend/resume | #597 | merged |
 | 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | | planned |
-| 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | | planned |
+| 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | PR_NUMBER4 | merged |
 | 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | | planned |
 | 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | | planned |
 | 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | | planned |
@@ -486,6 +487,17 @@ matched to one booking by group, hour and locale (the review of step 2 found it,
 Call durations (step 3) are not in the booking row and stay exact for the mean. The host CLI's own
 closure and cancel commands write facts whatever `reporting_enabled` says (it reads the portal value
 only in the web and the worker process).
+
+**Step 4 notes (no change of a decision):** migration 0091 adds `usage_rollup_state` (the watermark, the
+time of the last run, the backfill's completion and cutoff) and `usage_backfill` (one booking id per
+booking already done). The cells and the watermark are stored in one transaction. `usage_hour` has no
+unique index over its cut columns (a NULL is never equal to a NULL in one): the rollup is the only writer,
+under the write lock. The rollup maps the booking facts only; the kinds no step writes yet are listed in
+`usage_rollup.UNMAPPED`. The backfill makes facts from the columns the purge leaves: it never invents what
+the row cannot say (call durations, suspension times), derives who cancelled (documented), and stops at the
+cutoff, the hour live facts start from, so nothing is made twice. Settings added: `reporting_event_retention_days`
+(C, 35, 7 to 90), `reporting_retention_months` (C, 25, 13 to 60), `reporting_rollup_interval_minutes`
+(C, 15, 5 to 240). The rollup lag is on *System status*; the dropped-fact count stays a log line.
 
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:

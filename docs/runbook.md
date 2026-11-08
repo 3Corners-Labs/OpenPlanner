@@ -2464,6 +2464,35 @@ after its original appointment (`closure_max_retention_days`, ADR 0102), like th
 the command reads the organisation's portal value, so it needs the same database as the
 worker.
 
+## Usage reporting: the rollup and the backfill (ADR 0117)
+
+Every booking change writes a small fact without personal data; the worker adds the facts to the
+hourly figures the reports read, every `reporting_rollup_interval_minutes` (class C, default 15).
+*System status* shows **Usage reporting**: the facts waiting and when the worker last finished. A
+warning there means facts have waited four intervals: the worker is behind or not running, and the
+reports show older figures.
+
+| Look for | Meaning | Fix |
+|---|---|---|
+| log `usage.rollup_failed` (error) | the run could not finish; the facts wait and the next interval tries again | read the log around it; repeated failures point at the database or a full volume |
+| log `usage.fact_dropped` (warning, `kind` only) | a booking change committed but its fact could not be written | one is harmless; many point at the database |
+| log `usage.backfill_failed` | the first-start backfill of old bookings did not run | restart the worker, or run the command below |
+| log `usage.rolled_up` | facts rolled up, facts and hourly rows pruned | none |
+
+The worker makes facts of the bookings that existed before reporting once, at its first start after
+the upgrade. To see it done, or to run it again, inside the `web` container:
+
+```bash
+docker compose exec web python -m app.cli usage-backfill
+```
+
+It prints how many bookings it looked at and how many facts it wrote, and is safe to run again: a
+booking already done is not done twice, and nothing a live fact already covers is repeated. It reads
+only columns the purge leaves. `REPORTING_ENABLED` off makes it do nothing. Who cancelled, in an old
+booking, is derived (a planner's reason means the planner, a closure the closure, else the
+participant); call durations, the queue method and suspensions have no time on the row and start on
+the day the release is installed.
+
 ## Widget on a host website (ADR 0035)
 
 A web editor reports that `<openplanner-booking>` says the calendar "is not available here".

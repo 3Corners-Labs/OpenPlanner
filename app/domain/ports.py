@@ -94,6 +94,7 @@ from app.domain.updates import (
     UpdateRequest,
 )
 from app.domain.usage import StaffFact, UsageCell, UsageFact
+from app.domain.usage_backfill import BackfillBooking
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 from app.domain.worker_check import WorkerHeartbeat
 
@@ -1944,6 +1945,10 @@ class UsageStore(Protocol):
     facts, and only the worker's rollup, retention and the System status card use these.
     """
 
+    async def record_usage(self, fact: UsageFact | StaffFact) -> bool:
+        """Write one usage fact in a savepoint (the same method as ``Transaction``'s)."""
+        ...
+
     async def read_usage_events(self, after_id: int, limit: int) -> UsageBatch:
         """Return up to ``limit`` facts after ``after_id``, oldest first."""
         ...
@@ -1958,6 +1963,18 @@ class UsageStore(Protocol):
 
     async def advance_usage_watermark(self, last_event_id: int, at: datetime) -> None:
         """Move the watermark and the time of the last run, in the same transaction as the cells."""
+        ...
+
+    async def find_unbackfilled(self, after_id: int, limit: int) -> list[BackfillBooking]:
+        """Return up to ``limit`` booking rows after ``after_id`` not yet turned into facts."""
+        ...
+
+    async def mark_backfilled(self, booking_ids: Sequence[int], at: datetime | None) -> None:
+        """Record bookings as done; with ``at`` also record the backfill as completed then."""
+        ...
+
+    async def usage_cutoff(self, now: datetime) -> datetime:
+        """Return the hour live facts start from, or the hour of ``now`` when there are none."""
         ...
 
     async def prune_usage(self, events_before: datetime, hours_before: datetime) -> UsagePruned:

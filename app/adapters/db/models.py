@@ -950,6 +950,8 @@ class UsageRollupStateRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
     last_event_id: Mapped[int] = mapped_column(Integer)
     rolled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    backfilled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    backfill_cutoff: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class UsageBackfillRow(Base):

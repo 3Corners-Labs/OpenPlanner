@@ -18,6 +18,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 
 from app.domain.usage import (
+    MOVE_REASON,
     ActorClass,
     FactKind,
     StaffFact,
@@ -26,9 +27,6 @@ from app.domain.usage import (
     UsageOutcome,
     duration_bucket,
 )
-
-_MOVE = "move"
-"""The ``reason_code`` of a ``booking.created`` fact that replaces a moved booking."""
 
 _Rule = Callable[[UsageFact], list[UsageCell]]
 
@@ -63,7 +61,7 @@ def _cell(
 
 def _created(fact: UsageFact) -> list[UsageCell]:
     """Volume, lead time, queue method and locale; a booking made by a move is none of them."""
-    if fact.reason_code == _MOVE:
+    if fact.reason_code == MOVE_REASON:
         return []
     return [
         _cell(fact, "U1"),
@@ -195,11 +193,13 @@ class UsageState:
         last_event_id: The watermark: the last fact rolled into ``usage_hour``.
         rolled_at: When the rollup last finished a run; ``None`` if it never has.
         pending: Facts written after the watermark.
+        backfilled_at: When the backfill of old bookings was completed; ``None`` before.
     """
 
     last_event_id: int
     rolled_at: datetime | None
     pending: int
+    backfilled_at: datetime | None = None
 
 
 @dataclass(frozen=True)

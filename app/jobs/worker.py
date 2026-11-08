@@ -72,6 +72,7 @@ from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.system_log import SystemLog
 from app.domain.tls_check import TlsWatch
 from app.domain.update_service import UpdateService
+from app.domain.usage_backfill_service import UsageBackfill
 from app.domain.usage_rollup_service import UsageRollup
 from app.domain.worker_check import WorkerHeartbeat, heartbeat_due
 from app.i18n import Translator, load_catalogues
@@ -275,6 +276,7 @@ async def run_worker(
         lambda: live.settings.reporting_event_retention_days,
         lambda: live.settings.reporting_retention_months,
     )
+    backfill = UsageBackfill(uow, clock, lambda: live.settings.reporting_enabled)
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
         uow,
@@ -335,6 +337,7 @@ async def run_worker(
         dispatch_enabled=wired.dispatcher is not None,
         release_check=settings.update_repository is not None,
     )
+    await _backfill_usage(backfill)
     try:
         while not stop.is_set():
             if await is_reachable(engine):
@@ -508,3 +511,14 @@ async def _main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(_main())
+
+
+async def _backfill_usage(backfill: UsageBackfill) -> None:
+    """Run the usage backfill once after the upgrade; a failure is logged, never fatal."""
+    try:
+        run = await backfill.run_once()
+    except Exception as exc:  # e.g. schema not migrated yet; the next start tries again
+        log.warning("usage.backfill_failed", error=type(exc).__name__)
+    else:
+        if run.bookings:
+            log.info("usage.backfilled", bookings=run.bookings, facts=run.facts)
