@@ -212,7 +212,21 @@ de oude en de nieuwe waarde; een geweigerde wijziging ook.
 
 ## Configuratiepakket
 
-Een configuratiepakket bevat alle instellingen van deze installatie: organisaties, teams,
+**Als JSON-document.** Het bovenste blok van dit tabblad exporteert de hele configuratie, of
+leest een document in. Een document is een JSON-bestand dat u met de hand kunt aanpassen:
+objecten worden met hun eigen sleutel genoemd, nooit met nummers, dus het blijft geldig tussen
+versies, en het gepubliceerde schema (`docs/configuration-schema/v1.json`) laat een editor
+veldnamen aanvullen en een typefout signaleren. Kies **Document exporteren**, met of zonder
+geheimen (verzegeld met een wachtwoord van minstens 16 tekens, herhaald). Om er een in te
+lezen kiest u het bestand en **Plan tonen**: u ziet per object of het wordt aangemaakt,
+gewijzigd of verwijderd en welke velden, nooit de waarden, en elke weigering die het stopt.
+Pas dan schrijft **Plan toepassen** alles in één keer, of niets als een onderdeel mislukt. Een
+document met verzegelde geheimen vraagt opnieuw om zijn wachtwoord. Een document in de stand
+*replace* verwijdert wat het niet noemt; lees het plan dus zorgvuldig. Het document van één
+organisatie staat onder **Overzicht → Configuratie** van die organisatie. Elke toegepaste
+wijziging staat in het auditlog, zonder waarden, en u moet recent hebben ingelogd.
+
+**Als SQLite-pakket (tot het wordt uitgefaseerd).** Een configuratiepakket bevat alle instellingen van deze installatie: organisaties, teams,
 openingstijden en uitzonderingen, herinneringen, teksten, formuliervelden, contactopties,
 feestdagkalenders, scenario's voor sluiting, huisstijl, mail- en sms-kanalen, identity
 providers, API-clients, rollen en de platforminstellingen, met hun geheimen. Afspraken,

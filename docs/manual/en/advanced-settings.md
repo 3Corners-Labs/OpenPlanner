@@ -202,7 +202,20 @@ the old and the new value; a refused change is recorded too.
 
 ## Configuration package
 
-A configuration package holds every setting of this installation: organisations, teams,
+**As a JSON document.** The top block of this tab exports the whole configuration, or reads a
+document in. A document is a JSON file you can edit by hand: objects are named by their own
+keys, never by numbers, so it stays valid across versions, and the published schema
+(`docs/configuration-schema/v1.json`) lets an editor complete field names and flag a typo.
+Choose **Export document**, with or without secrets (sealed under a passphrase of at least 16
+characters, repeated). To read one in, choose the file and **Show plan**: you see for each
+object whether it is created, changed or deleted and which fields, never their values, and any
+refusal that stops it. Only then does **Apply plan** write everything in one go, or nothing if
+any part fails. A document holding sealed secrets asks for its passphrase again. A document in
+*replace* mode deletes what it does not list, so read its plan carefully. The organisation's
+own document is on **Overview → Configuration** of that organisation. Every applied change is
+in the audit log, without values, and you must have logged in recently.
+
+**As a SQLite package (until it is retired).** A configuration package holds every setting of this installation: organisations, teams,
 opening hours and exceptions, reminders, texts, form fields, contact options, holiday
 calendars, closure scenarios, branding, email and SMS channels, identity providers, API
 clients, roles and the platform settings, with their secrets. Bookings, slots, the audit log

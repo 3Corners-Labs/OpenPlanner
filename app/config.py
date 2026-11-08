@@ -231,6 +231,9 @@ class Settings(BaseSettings):
     # ADR 0099 (class C, platform): an apply whose plan holds more changes is refused, a guard
     # against a mistaken `replace` document.
     configuration_apply_max_changes: int = Field(default=500, ge=1, le=10_000)
+    # ADR 0099 (class C, platform): how long the portal keeps an uploaded document after its plan
+    # is shown, so the apply button works on exactly the reviewed document, in minutes.
+    configuration_review_minutes: int = Field(default=30, ge=5, le=240)
     # ADR 0040, part 4 (class C, platform; env until the settings registry of ADR 0042): how
     # long each category of audit event is kept. Admin actions 2 years (product owner,
     # 2026-10-29), security 1 year, debug events 7 days; system events above. Diagnostic mode

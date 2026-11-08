@@ -49,6 +49,10 @@ ALERT_WINDOW = timedelta(hours=1)
 """The period ``planner_changes_alert_per_hour`` counts over (fixed: it is per hour)."""
 
 
+CONFIRMED_BY_STAFF = "booking.confirmed_by_staff"
+"""The audit detail of a planner confirming for the participant (ADR 0056 point 11)."""
+
+
 class PlannerService:
     """Application service for a planner's changes to existing bookings.
 
@@ -134,6 +138,31 @@ class PlannerService:
             )
             await self._audit(tx, principal, authorization, "planner.move", booking_id)
         return receipt.booking
+
+    async def confirm(self, principal: Principal, slug: str, booking_id: int) -> Booking:
+        """Confirm a pending booking on the participant's behalf (ADR 0056 point 11).
+
+        For example when the participant phones. The participant gets the same full
+        confirmation as by their own link; the confirmation is audited as
+        ``booking.confirmed_by_staff``. After ``confirm_by`` the booking lapses instead.
+
+        Raises:
+            DomainError: ``not_permitted``, ``booking_not_found`` or ``booking_not_pending``.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            booking = await tx.get_booking(booking_id)
+            if booking is None or booking.group_id != group.id:  # never another group's booking
+                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+            if not booking.awaits_confirmation:
+                raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
+            now = self._clock.now()
+            result = await self._bookings.confirm_in(tx, booking, group, now, ActorClass.PLANNER)
+            if result.lapsed_unconfirmed:  # past confirm_by: lapsed, the caller says so
+                return result
+            await self._audit(tx, principal, authorization, CONFIRMED_BY_STAFF, booking_id)
+        return result
 
     async def cancel(
         self, principal: Principal, slug: str, booking_id: int, reason: ChangeReason
@@ -279,16 +308,19 @@ class PlannerService:
         )
 
     async def _candidates(self, tx: Transaction, group: Group, start: datetime) -> list[Booking]:
-        """Return the last-made changeable bookings of the slot, as many as its shortfall."""
+        """Return the changeable ones of the slot's last-made bookings (up to its shortfall)."""
         slot = await self._slot(tx, group, start)
         now = self._clock.now()
         if slot is None or not slot.open_shortfall or slot.start < now:
             raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
-        confirmed = await tx.find_confirmed_bookings(
+        # The last-made places are chosen among every booking in the slot, pending ones too
+        # (ADR 0044 §5, ADR 0056 point 11); of those, the ones a planner may change are asked.
+        # A pending booking among them is left to its own confirmation or lapse.
+        holding = await tx.find_agenda_bookings(
             group.id, slot.start, slot.start + timedelta(seconds=1)
         )
-        changeable = [b for b in confirmed if booking_changes.planner_may_change(b, group, now)]
-        return last_made(changeable, slot.open_shortfall)
+        last = last_made(holding, slot.open_shortfall)
+        return [b for b in last if booking_changes.planner_may_change(b, group, now)]
 
     async def _changeable(self, tx: Transaction, group: Group, booking_id: int) -> Booking:
         """Return the group's booking ``booking_id`` if a planner may change it now."""

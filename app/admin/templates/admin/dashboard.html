@@ -9,8 +9,12 @@
   </div>
   <div class="page-header__actions">
     <a class="button button--secondary" href="/admin/">{{ icon("refresh") }}<span>{{ _("admin.overview.refresh") }}</span></a>
+    {#- ADR 0096 §2, §6: the overview carries Refresh and its two layout controls, nothing else. -#}
+    <a class="button button--secondary" href="/admin/overview/add">{{ icon("plus") }}<span>{{ _("admin.layout.add.title") }}</span></a>
+    <a class="button button--secondary" href="/admin/overview/edit">{{ icon("sliders") }}<span>{{ _("admin.layout.edit.title") }}</span></a>
   </div>
 </div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% if live %}
 {#- The page's one polite live region (ADR 0061 §4): refreshes of the widgets and new pop-ups are read out here, never per widget. -#}
 <p class="visually-hidden" aria-live="polite" id="overview-announce" data-live-announce></p>

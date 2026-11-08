@@ -1218,6 +1218,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=10_000,
     ),
     S(
+        "configuration_review_minutes",
+        K.INT,
+        30,
+        _C,
+        T.OPERATIONS,
+        "Minutes the portal keeps an uploaded configuration document after its plan (ADR 0099).",
+        minimum=5,
+        maximum=240,
+    ),
+    S(
         "audit_export_max_days",
         K.INT,
         366,

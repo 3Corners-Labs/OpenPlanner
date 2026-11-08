@@ -1,0 +1,62 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.configuration.plan.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% if org_header %}{% include "admin/_organisation_header.html" %}{% else %}{% include "admin/_settings_header.html" %}{% endif %}
+<section class="card" id="plan" aria-labelledby="plan-heading">
+  <h2 id="plan-heading">{{ _("admin.configuration.plan.title") }}</h2>
+  {% if plan.refusals %}
+  <div class="alert alert--error" role="alert">
+    <p>{{ _("admin.configuration.plan.refused", count=plan.refusals | length) }}</p>
+    <ul>
+      {% for refusal in plan.refusals %}
+      <li><code>{{ refusal.path }}</code>{% if refusal.field %} · <code>{{ refusal.field }}</code>{% endif %}: {{ refusal.message }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% for warning in plan.warnings %}
+  <div class="alert alert--warning" role="status"><p>{{ _(warning, count=plan.deletes) }}</p></div>
+  {% endfor %}
+  {% if plan.changes %}
+  <p>{{ _("admin.configuration.plan.summary", count=plan.changes | length) }}</p>
+  <div class="table-scroll" role="region" aria-label="{{ _('admin.configuration.plan.title') }}" tabindex="0">
+    <table class="data-table">
+      <caption class="visually-hidden">{{ _("admin.configuration.plan.title") }}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{{ _("admin.configuration.plan.action") }}</th>
+          <th scope="col">{{ _("admin.configuration.plan.kind") }}</th>
+          <th scope="col">{{ _("admin.configuration.plan.path") }}</th>
+          <th scope="col">{{ _("admin.configuration.plan.fields") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for change in plan.changes %}
+        <tr>
+          <td><span class="chip{% if change.action == 'delete' %} chip--danger{% elif change.action == 'create' %} chip--success{% endif %}">{{ change.label }}</span></td>
+          <td><code>{{ change.kind }}</code></td>
+          <td><code>{{ change.path }}</code></td>
+          <td>{{ change.fields }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif not plan.refusals %}
+  <p class="empty-state">{{ _("admin.configuration.plan.nothing") }}</p>
+  {% endif %}
+  {% if plan.can_apply and review_id %}
+  <form method="post" action="{{ document.prefix }}/apply" novalidate>
+    <input type="hidden" name="token" value="{{ review_id }}">
+    {% if needs_seal %}
+    <div class="field">
+      <label for="apply-passphrase">{{ _("admin.configuration.upload.passphrase") }}</label>
+      <input id="apply-passphrase" name="passphrase" type="password" autocomplete="off">
+    </div>
+    {% endif %}
+    <button type="submit" class="button{% if plan.deletes %} button--danger{% endif %}">{{ _("admin.configuration.plan.apply") }}</button>
+  </form>
+  {% endif %}
+  <p><a href="{{ document.home }}">{{ _("admin.configuration.plan.back") }}</a></p>
+</section>
+{% endblock %}

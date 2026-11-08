@@ -28,6 +28,7 @@ from typing import Annotated
 import structlog
 from fastapi import Depends, Request
 
+from app.admin.return_to import return_path
 from app.admin.session import current_login, load_login, login_age, reject_session
 from app.domain.admin import AdminService, Authorization
 from app.domain.admin_session_service import AdminSessionService
@@ -46,6 +47,7 @@ from app.domain.authorization import (
 from app.domain.event_context import bind_actor_role, bind_level
 from app.domain.login_service import LoginService
 from app.domain.maintenance_service import MaintenanceService
+from app.domain.overview_layout import OverviewLayoutService
 from app.domain.ports import Clock
 from app.domain.roles import RoleService
 from app.domain.scheduling import GroupSummary
@@ -202,6 +204,18 @@ async def _note_activity(request: Request, principal: Principal) -> None:
         await admin_service(request).record_seen(principal)
 
 
+def overview_layout_service(request: Request) -> OverviewLayoutService:
+    """Return the application's service for the admins' own overview layouts (ADR 0096)."""
+    service: OverviewLayoutService = request.app.state.overview_layout_service
+    return service
+
+
+def overview_layout(request: Request) -> tuple[str, ...] | None:
+    """Return the signed-in admin's own layout as ``load_top_counts`` read it, or ``None``."""
+    stored: tuple[str, ...] | None = getattr(request.state, "overview_layout", None)
+    return stored
+
+
 def can_function(principal: Principal) -> Callable[..., bool]:
     """Return ``can(permission, group=None, organisation=None)`` for templates (same matrix).
 
@@ -227,20 +241,6 @@ def can_function(principal: Principal) -> Callable[..., bool]:
         return not scope_for(principal, permission).is_empty
 
     return can
-
-
-def return_path(request: Request) -> str:
-    """Return the page to come back to after a fresh login or a profile-menu choice.
-
-    A GET returns to itself. A POST returns to the page that sent the form (the referer
-    path); every receiver passes it through ``safe_next``, so a forged referer cannot leave
-    the portal.
-    """
-    if request.method == "GET":
-        return request.url.path
-    referer = request.headers.get("referer", "")
-    path = referer.split("://", 1)[-1].partition("/")[2]
-    return f"/{path.split('?', 1)[0]}" if path else "/admin/"
 
 
 class RequirePermission:

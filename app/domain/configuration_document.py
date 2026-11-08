@@ -15,9 +15,11 @@ import copy
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from typing import cast
 
+from app.domain.configuration_package import filename_slug
 from app.domain.configuration_schema import Collection, FieldSpec, FieldType, Format, Kind, Shape
 from app.domain.configuration_tree import Action, Entity, path_of
 from app.domain.configuration_values import (
@@ -37,6 +39,20 @@ _SHA256 = re.compile(r"[0-9a-f]{64}")
 _SEALED_KEYS = frozenset({"sealed"})
 _BINARY_KEYS = frozenset({"media_type", "sha256", "data"})
 _SCALARS = (str, int, float, bool)
+
+
+DOCUMENT_FILENAME = "openplanner-configuration-{installation}-{date}.json"
+"""The download name of an exported document."""
+
+
+def document_filename(installation: str, exported_at: datetime) -> str:
+    """Return the download name of a document exported on ``exported_at``.
+
+    The installation name is turned into a slug (see ``filename_slug``).
+    """
+    return DOCUMENT_FILENAME.format(
+        installation=filename_slug(installation), date=exported_at.strftime("%Y%m%d")
+    )
 
 
 class Mode(StrEnum):

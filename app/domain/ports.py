@@ -23,6 +23,7 @@ from app.domain.booking import (
     Booking,
     BookingStatus,
     Claim,
+    Contact,
     MeetingRef,
     Slot,
     SlotUsage,
@@ -1513,6 +1514,10 @@ class Transaction(Protocol):
         """Persist changes to an existing booking (status, cancelled_at)."""
         ...
 
+    async def save_contact(self, booking_id: int, contact: Contact) -> None:
+        """Replace the participant's details on a booking (ADR 0056 point 10)."""
+        ...
+
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         """Delete the booking's pending jobs and store ``jobs`` instead (CLAUDE.md)."""
         ...
@@ -1728,6 +1733,15 @@ class Transaction(Protocol):
         """Return the group's confirmed scheduled bookings with lower <= start < upper.
 
         ``upper=None`` means no upper bound. For the domain's own use, not for listings.
+        """
+        ...
+
+    async def find_agenda_bookings(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[Booking]:
+        """Return the group's scheduled bookings in the agenda (``IN_AGENDA``) in [lower, upper).
+
+        Confirmed ones and those awaiting the participant's confirmation (ADR 0056 point 11).
         """
         ...
 

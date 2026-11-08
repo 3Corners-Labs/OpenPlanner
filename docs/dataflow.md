@@ -105,10 +105,10 @@ filter matches on it. The list and the rule are constants, not settings.
 
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
-| Email | `bookings.email` | booking form | as above | mail provider (WP4) |
-| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
-| Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
+| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
+| Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4) |
+| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
+| Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055); correction page, which shows the participant their own answers, all of them (`Purpose.PARTICIPANT_SELF`, ADR 0056 point 10) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
 | An organisation's own contact-center connection (ADR 0032 point 9) | one sealed record `contact-center:{organisation id}` in `integration_credentials`: kind, API host, client id; client secret, refresh token and the generated webhook secret | the superuser on organisation → *Kanalen*; the webhook secret is made by the server | until removed, or the organisation is deleted (deleted in the same transaction) | no personal data; the secrets are write-only and never shown. Dispatch through it follows in CC-4b |
 | A group's contact-center routing (ADR 0032) | `group_contact_center` (`kind`, `routing_value`, `attributes`: codes from the platform's descriptor); for WxCC also, and still read, `groups.wxcc_routing_value`, `wxcc_business_address`, `wxcc_channel` | the group's settings | as long as the group | no personal data; the values go to the contact center in each task |
 | Subject and routing attributes (ADR 0081) | `bookings.subject_code`, `bookings.routing_answers` (codes); the group's list and mapping in `groups.routing`; the codes a block offers in `schedule_rules.subjects`, `schedule_overrides.subjects` | booking form: the subject question and the switched-on routing questions, answered with one of a closed list of codes | not personal data, purged with the booking all the same (`privacy.ROUTING_FIELDS` in `PURGED_FIELDS`, ADR 0081); reporting by subject (ADR 0117) must copy the code into its fact before the purge | no. Shown in the agenda, on the booking page and in the own queue; the mapped codes leave the system only as routing variables in the contact-center task (`flowSettings`), next to the first name and the host join URL |
@@ -383,7 +383,7 @@ superuser ──POST /admin/maintenance/on|off (reason code, expected end)──
 host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
 operator ──MAINTENANCE_MODE (environment)──> web (no database read)
 admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
-participant ──GET/POST /g/{slug}…, /b/m/{public_ref}/cancel|reschedule──> web ──503 maintenance page (no write)
+participant ──GET/POST /g/{slug}…, /b/m/{public_ref}/cancel|details|reschedule──> web ──503 maintenance page (no write)
 bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error": "maintenance"} (no write)
 ```
 
@@ -469,6 +469,23 @@ A package holds no participant data: the state tables (`bookings` with every PII
 `slots`, `jobs`, `booking_events`, `call_status`, `audit_events`, `staff`, …) are emptied and
 the file is vacuumed. It holds every integration secret of the platform, sealed under the
 passphrase only. The temporary copies never outlive the request.
+
+## Configuration document (ADR 0099)
+
+```
+admin ──POST …/configuration/export (secrets? passphrase)──> web ──read configuration tree, keep what the admin may change, seal secrets under scrypt(passphrase)──> JSON document ──download──> admin
+admin ──POST …/configuration/plan (document, passphrase)──> web ──parse, open sealed values, plan against the tree──> plan page (paths, field names, no values)
+web ──keep the uploaded document (still sealed) in process memory, one per admin and scope, CONFIGURATION_REVIEW_MINUTES──> token in the apply form
+admin ──POST …/configuration/apply (token, passphrase)──> web ──plan again in the write lock, write all or nothing, one audit event per change──> configuration tables
+web ──guarded GET──> a new or moved identity provider's /.well-known/openid-configuration (issuer only, before the lock)
+host ──python -m app.cli config export --format json|plan|apply──> the same service, actor system:cli
+```
+
+A document holds configuration only: no participant data, no state tables, no staff, and the
+secrets sealed under the passphrase alone, so a document exported without secrets holds none.
+It holds business addresses (a group's video host and invitation address, alert targets,
+contact blocks). The uploaded document lives in the web process's memory until it is applied,
+discarded or lapsed; it is written nowhere, and the passphrase is kept nowhere.
 
 ## Residual data after a purge (WP-A3, PI-08)
 

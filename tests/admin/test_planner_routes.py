@@ -18,6 +18,7 @@ from tests.support.domain import (
     FRIDAY_0900,
     TEST_TOKEN_KEY,
     book_confirmed,
+    book_pending,
     participant,
 )
 
@@ -290,3 +291,51 @@ async def test_malformed_bulk_ids_are_rejected(site: Site) -> None:
     )
 
     assert response.status_code == 400
+
+
+async def _book_pending(site: Site) -> int:
+    bookings = BookingService(_uow(site), site.clock, TEST_TOKEN_KEY)
+    receipt = await book_pending(
+        bookings, FRIDAY_0900, "demo", contact=participant(next(_PARTICIPANTS))
+    )
+    return receipt.booking.id or 0
+
+
+async def test_a_pending_booking_shows_as_not_confirmed_and_can_be_confirmed(site: Site) -> None:
+    """ADR 0056 point 11: text and icon, a filter, and confirming for the participant."""
+    pending = await _book_pending(site)
+    confirmed = await _book(site)
+    await site.login_as(GROUP_ADMIN)
+
+    day = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+    only = (await site.client.get(f"{AGENDA}?day=2026-01-02&status=pending")).text
+
+    assert "Niet bevestigd, uiterlijk" in day
+    assert "Geannuleerd" not in day  # a pending booking is not a cancelled one
+    assert "(waarvan 1 niet bevestigd)" in day
+    assert f'action="{AGENDA}/bookings/{pending}/confirm"' in day
+    assert f'action="{AGENDA}/bookings/{confirmed}/confirm"' not in day
+    assert f"/bookings/{pending}" in only
+    assert f"/bookings/{confirmed}" not in only
+
+    response = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {"day": "2026-01-02"})
+    again = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {"day": "2026-01-02"})
+
+    assert response.status_code == 303
+    assert "done=confirmed_by_staff" in response.headers["location"]
+    assert "done=not_pending" in again.headers["location"]
+    assert (await _status(site, pending))[0] is BookingStatus.CONFIRMED
+
+
+async def test_confirming_after_the_deadline_says_it_lapsed(site: Site) -> None:
+    pending = await _book_pending(site)
+    async with _uow(site).read() as tx:
+        booking = await tx.get_booking(pending)
+    assert booking is not None
+    assert booking.confirm_by is not None
+    site.clock.advance(booking.confirm_by - site.clock.now() + timedelta(minutes=1))
+    await site.login_as(GROUP_ADMIN)
+
+    response = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {})
+
+    assert "done=confirm_lapsed" in response.headers["location"]
