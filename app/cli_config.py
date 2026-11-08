@@ -15,10 +15,7 @@ from pathlib import Path
 import httpx
 
 from app.adapters.clock import SystemClock
-from app.adapters.configuration_context import locked_settings, rule_context
-from app.adapters.configuration_discovery import issuer_fetcher
-from app.adapters.configuration_json import JsonCodec
-from app.adapters.configuration_seal import PassphraseSealing
+from app.adapters.configuration_context import document_service
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.discovery import GuardedDiscoveryFetcher
@@ -79,22 +76,12 @@ def _service(
     engine = create_engine(settings.database_url)
     clock = SystemClock()
     uow = SqlUnitOfWork(engine, secret_box(settings))
-    service = ConfigurationDocumentService(
+    service = document_service(
         uow,
         clock,
         AdminService(uow, clock),
-        JsonCodec(),
-        PassphraseSealing(),
-        installation=settings.installation_name,
-        app_version=settings.app_version,
-        context=lambda: rule_context(settings),
-        locked=locked_settings,
-        max_bytes=lambda: settings.configuration_package_max_mb * 1024 * 1024,
-        max_changes=lambda: settings.configuration_apply_max_changes,
-        issuer_of=issuer_fetcher(
-            GuardedDiscoveryFetcher(http, allow_private=settings.environment != "prod"),
-            production=settings.environment == "prod",
-        ),
+        settings=lambda: settings,
+        discovery=GuardedDiscoveryFetcher(http, allow_private=settings.environment != "prod"),
     )
     return service, engine
 

@@ -13,8 +13,8 @@ from dataclasses import replace
 
 from app.domain.authorization import Permission
 from app.domain.configuration_changes import ChangeAction, MayChange
-from app.domain.configuration_plan import permissions_of, target_for
-from app.domain.configuration_schema import Anchor, Format, Kind
+from app.domain.configuration_plan import permissions_of, placement, target_for
+from app.domain.configuration_schema import Format, Kind
 from app.domain.configuration_tree import Entity
 
 
@@ -54,25 +54,19 @@ def _filter(
     for collection in kind.collections:
         members: list[Entity] = []
         for child in entity.children.get(collection.name, ()):
-            place = _place(collection.kind, child, organisation, group, base)
+            here = placement(collection.kind, child.key, child.fields, organisation, group, base)
             container = collection.kind.anchor is not None
-            own = frozenset() if place[2] is None or container else frozenset({place[2]})
-            if _allowed(own, place[0], place[1], may):
-                members.append(_filter(child, collection.kind, *place, may))
+            own = (
+                frozenset()
+                if here.permission is None or container
+                else frozenset({here.permission})
+            )
+            if _allowed(own, here.organisation, here.group, may):
+                members.append(
+                    _filter(
+                        child, collection.kind, here.organisation, here.group, here.permission, may
+                    )
+                )
         if members:
             children[collection.name] = tuple(members)
     return replace(entity, fields=fields, children=children)
-
-
-def _place(
-    kind: Kind, entity: Entity, organisation: str | None, group: str | None, base: Permission | None
-) -> tuple[str | None, str | None, Permission | None]:
-    """Return the organisation, group and permission that apply to an object and below it."""
-    if kind.anchor is Anchor.ORGANISATION:
-        organisation = entity.key[0]
-    elif kind.anchor is Anchor.GROUP:
-        group = entity.key[0]
-    if kind.organisation_field is not None:
-        owner = entity.fields.get(kind.organisation_field)
-        organisation = owner if isinstance(owner, str) else organisation
-    return organisation, group, kind.permission or base

@@ -8,6 +8,7 @@
   {{ error_message(document.error, "error-document") }}
   <h3 id="document-export-heading">{{ _("admin.configuration.export.title") }}</h3>
   <form method="post" action="{{ document.prefix }}/export" novalidate aria-labelledby="document-export-heading">
+    {% if document.can_seal %}
     <div class="field field--checkbox">
       <input id="document-secrets" name="secrets" type="checkbox" value="yes" aria-describedby="document-secrets-hint">
       <label for="document-secrets">{{ _("admin.configuration.export.secrets") }}</label>
@@ -21,6 +22,7 @@
       <label for="document-passphrase-repeat">{{ _("admin.settings.package.passphrase_repeat") }}</label>
       <input id="document-passphrase-repeat" name="passphrase_repeat" type="password" autocomplete="new-password">
     </div>
+    {% endif %}
     <button type="submit" class="button">{{ _("admin.configuration.export.button") }}</button>
   </form>
   <h3 id="document-upload-heading">{{ _("admin.configuration.upload.title") }}</h3>

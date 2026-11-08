@@ -469,6 +469,23 @@ A package holds no participant data: the state tables (`bookings` with every PII
 the file is vacuumed. It holds every integration secret of the platform, sealed under the
 passphrase only. The temporary copies never outlive the request.
 
+## Configuration document (ADR 0099)
+
+```
+admin ──POST …/configuration/export (secrets? passphrase)──> web ──read configuration tree, keep what the admin may change, seal secrets under scrypt(passphrase)──> JSON document ──download──> admin
+admin ──POST …/configuration/plan (document, passphrase)──> web ──parse, open sealed values, plan against the tree──> plan page (paths, field names, no values)
+web ──keep the uploaded document (still sealed) in process memory, one per admin and scope, CONFIGURATION_REVIEW_MINUTES──> token in the apply form
+admin ──POST …/configuration/apply (token, passphrase)──> web ──plan again in the write lock, write all or nothing, one audit event per change──> configuration tables
+web ──guarded GET──> a new or moved identity provider's /.well-known/openid-configuration (issuer only, before the lock)
+host ──python -m app.cli config export --format json|plan|apply──> the same service, actor system:cli
+```
+
+A document holds configuration only: no participant data, no state tables, no staff, and the
+secrets sealed under the passphrase alone, so a document exported without secrets holds none.
+It holds business addresses (a group's video host and invitation address, alert targets,
+contact blocks). The uploaded document lives in the web process's memory until it is applied,
+discarded or lapsed; it is written nowhere, and the passphrase is kept nowhere.
+
 ## Residual data after a purge (WP-A3, PI-08)
 
 A purge sets the personal columns of a booking to NULL. SQLite would leave the old values in the

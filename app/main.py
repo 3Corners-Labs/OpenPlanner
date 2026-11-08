@@ -18,10 +18,7 @@ from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, a
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
-from app.adapters.configuration_context import rule_context
-from app.adapters.configuration_discovery import issuer_fetcher
-from app.adapters.configuration_json import JsonCodec
-from app.adapters.configuration_seal import PassphraseSealing
+from app.adapters.configuration_context import document_service
 from app.adapters.db.backup import database_path
 from app.adapters.db.configuration_package import (
     SqliteConfigurationTransfer,
@@ -88,7 +85,6 @@ from app.domain.call_service import CallService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
-from app.domain.configuration_document_service import ConfigurationDocumentService
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_service import ContactService
@@ -543,22 +539,13 @@ def create_app(
         )
         # ADR 0099: the configuration as a JSON document, planned and applied in the portal;
         # the discovery document of a new or moved identity provider is fetched through the guard.
-        app.state.configuration_documents = ConfigurationDocumentService(
+        app.state.configuration_documents = document_service(
             uow,
             clock,
             app.state.admin_service,
-            JsonCodec(),
-            PassphraseSealing(),
-            installation=settings.installation_name or "",
-            app_version=settings.app_version or "",
-            context=lambda: rule_context(live()),
+            settings=live,
+            discovery=discovery_fetcher or GuardedDiscoveryFetcher(http, allow_private=lab),
             locked=app.state.live_settings.locked,
-            max_bytes=lambda: live().configuration_package_max_mb * 1024 * 1024,
-            max_changes=lambda: live().configuration_apply_max_changes,
-            issuer_of=issuer_fetcher(
-                discovery_fetcher or GuardedDiscoveryFetcher(http, allow_private=lab),
-                production=settings.environment == "prod",
-            ),
         )
         app.state.reviewed_documents = ReviewedDocuments()
         app.state.certificate_status = CertificateStatus(uow)

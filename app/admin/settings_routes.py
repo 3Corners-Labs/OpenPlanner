@@ -68,7 +68,7 @@ from app.adapters.settings_report import SettingState
 from app.admin.address_view import address_view
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.backup_view import backup_view
-from app.admin.configuration_routes import DOCUMENT_KEY, document_block
+from app.admin.configuration_view import DOCUMENT_KEY, document_block
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
@@ -342,19 +342,19 @@ def data_field_rows(locale: RequestLocale) -> list[DataFieldRow]:
 @router.get("/settings", response_class=HTMLResponse)
 async def advanced_settings(request: Request, locale: Locale, context: View) -> HTMLResponse:
     """Show System status: the environment, the certificate and the data fields."""
-    return await _overview(request, locale, context, Tab.STATUS)
+    return await render_tab(request, locale, context, Tab.STATUS)
 
 
 @router.get("/settings/values", response_class=HTMLResponse)
 async def setting_values(request: Request, locale: Locale, context: View) -> HTMLResponse:
     """Show every portal setting by topic with its value and source."""
-    return await _overview(request, locale, context, Tab.VALUES)
+    return await render_tab(request, locale, context, Tab.VALUES)
 
 
 @router.get("/settings/package", response_class=HTMLResponse)
 async def configuration_package(request: Request, locale: Locale, context: Manage) -> HTMLResponse:
     """Show the export and import of the configuration package (ADR 0089)."""
-    return await _overview(request, locale, context, Tab.PACKAGE)
+    return await render_tab(request, locale, context, Tab.PACKAGE)
 
 
 LoginChange = Annotated[
@@ -375,7 +375,7 @@ async def try_login_mapping(
     try:
         values = validate_mapping({key: form.text(key) for key in LOGIN_KEYS})
     except DomainError as error:
-        return await _overview(
+        return await render_tab(
             request, locale, context, Tab.VALUES, (error.field or "", error), 422
         )
     save_login_trial(request, context.principal.subject, values, request.app.state.clock.now())
@@ -403,7 +403,7 @@ async def change_topic(
             await _service(request).change(context.principal, spec.key, raw, hours=hours)
         except DomainError as error:
             raise_refusal(error)
-            return await _overview(request, locale, context, Tab.VALUES, (spec.key, error), 422)
+            return await render_tab(request, locale, context, Tab.VALUES, (spec.key, error), 422)
         changed += 1
     anchor = topic_anchor(Topic(topic))[1:] if topic in {t.value for t in Topic} else ""
     return redirect_done(VALUES_URL, "saved" if changed else "unchanged", anchor=anchor)
@@ -426,7 +426,7 @@ async def change_setting(
             await _service(request).change(context.principal, key, form.text("value"), hours=hours)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, _tab(key), (key, error), 422)
+        return await render_tab(request, locale, context, _tab(key), (key, error), 422)
     return redirect_done(_home(key), "saved", anchor=_anchor(key))
 
 
@@ -439,7 +439,7 @@ async def reset_setting(
         await _service(request).reset(context.principal, key)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, _tab(key), (key, error), 409)
+        return await render_tab(request, locale, context, _tab(key), (key, error), 409)
     if key == SOURCE_KEY:
         await (await _source(request)).sync(SOURCES[0])  # back to the default: ACME
     return redirect_done(_home(key), "saved", anchor=_anchor(key))
@@ -454,7 +454,7 @@ async def request_certificate(
         await (await _source(request)).generate_csr(context.principal)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, Tab.STATUS, (CSR_KEY, error), 422)
+        return await render_tab(request, locale, context, Tab.STATUS, (CSR_KEY, error), 422)
     return redirect_done(URL, "csr_generated", anchor="tls-heading")
 
 
@@ -501,7 +501,7 @@ async def upload_certificate(
     except DomainError as error:
         raise_refusal(error)
         refusal = (error.field or "chain", error)
-        return await _overview(request, locale, context, Tab.STATUS, refusal, 422)
+        return await render_tab(request, locale, context, Tab.STATUS, refusal, 422)
     return redirect_done(URL, "certificate_uploaded", anchor="tls-heading")
 
 
@@ -514,7 +514,7 @@ async def remove_certificate(
         removed = await (await _source(request)).remove(context.principal)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, Tab.STATUS, (REMOVE_KEY, error), 409)
+        return await render_tab(request, locale, context, Tab.STATUS, (REMOVE_KEY, error), 409)
     return redirect_done(
         URL, "certificate_removed" if removed else "unchanged", anchor="tls-heading"
     )
@@ -540,7 +540,7 @@ async def adopt_setting(
         await _service(request).adopt(context.principal, key)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, _tab(key), (key, error), 409)
+        return await render_tab(request, locale, context, _tab(key), (key, error), 409)
     return redirect_done(_home(key), "adopted", anchor=_anchor(key))
 
 
@@ -557,7 +557,7 @@ async def export_package(
         package = await _packages(request).export(context.principal.subject, passphrase)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
+        return await render_tab(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
     current: Settings = request.app.state.settings
     name = package_filename(current.installation_name, request.app.state.clock.now())
     return Response(
@@ -586,7 +586,7 @@ async def import_package(
         )
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
+        return await render_tab(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
     return redirect_done(
         PACKAGE_URL,
         "package_imported",
@@ -639,7 +639,7 @@ def _anchor(key: str) -> str:
     return f"setting-{key}" if key in BY_KEY else ""
 
 
-async def _overview(
+async def render_tab(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
@@ -709,7 +709,9 @@ async def _overview(
             "login_form": _login_form(context, current, live, errors, locale),
         }
     else:
-        values["document"] = document_block(request, Scope(), errors.get(DOCUMENT_KEY))
+        values["document"] = document_block(
+            current, Scope(), can_seal=True, error=errors.get(DOCUMENT_KEY)
+        )
         values["package"] = {
             "error": errors.get(PACKAGE_KEY),
             "min_length": MIN_PASSPHRASE_LENGTH,

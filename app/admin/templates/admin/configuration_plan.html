@@ -57,6 +57,6 @@
     <button type="submit" class="button{% if plan.deletes %} button--danger{% endif %}">{{ _("admin.configuration.plan.apply") }}</button>
   </form>
   {% endif %}
-  <p><a href="{{ '/admin/settings/package' if document.platform else document.prefix }}">{{ _("admin.configuration.plan.back") }}</a></p>
+  <p><a href="{{ document.home }}">{{ _("admin.configuration.plan.back") }}</a></p>
 </section>
 {% endblock %}

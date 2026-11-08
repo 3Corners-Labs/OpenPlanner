@@ -10,11 +10,21 @@ the kinds and fields are the document's own words, which the admin edits in thei
 from dataclasses import dataclass
 
 from app.admin.forms import CODE_MESSAGES
+from app.config import Settings
 from app.domain.configuration_changes import ChangeAction
+from app.domain.configuration_document import Scope
+from app.domain.configuration_package import MIN_PASSPHRASE_LENGTH
 from app.domain.configuration_plan import Plan
 from app.domain.configuration_v1_names import PLATFORM_SECRET_KIND
 from app.domain.configuration_v1_platform import WEBEX_SERVICE_APP
 from app.i18n import BoundGettext
+
+DOCUMENT_KEY = "document"
+"""The error key of the document block (a refusal of an export, a plan or an apply)."""
+PLATFORM_HOME = "/admin/settings/package"
+"""The platform's page of the block: the package tab of Advanced settings."""
+PLATFORM_PREFIX = "/admin/settings/configuration"
+"""Where the platform's export, plan and apply are posted."""
 
 CLAIM_FIELDS = frozenset({"idp_key", "claim_value"})
 """The fields that decide who matches an entitlement: a change locks people out until the
@@ -96,4 +106,48 @@ def plan_view(plan: Plan, _: BoundGettext) -> PlanView:
         warnings.append("admin.configuration.warning.webex")
     return PlanView(
         changes, refusals, tuple(warnings), deletes, plan.digest, bool(changes) and plan.ok
+    )
+
+
+def organisation_home(org: str) -> str:
+    """Return the page of organisation ``org``'s configuration block."""
+    return f"/admin/organisations/{org}/configuration"
+
+
+@dataclass(frozen=True)
+class DocumentBlock:
+    """What the export and upload forms of the block need.
+
+    Attributes:
+        prefix: Where the forms post (``/export``, ``/plan`` and ``/apply`` follow).
+        home: The page the block sits on, where an apply returns to.
+        error: The refusal in words, if the last action was refused.
+        min_length: The shortest passphrase a sealed export takes.
+        max_mb: The largest document accepted.
+        platform: Whether this is the platform's block (else an organisation's).
+        can_seal: Whether the admin may export with secrets (platform rights only).
+    """
+
+    prefix: str
+    home: str
+    error: str | None
+    min_length: int
+    max_mb: int
+    platform: bool
+    can_seal: bool
+
+
+def document_block(
+    settings: Settings, scope: Scope, *, can_seal: bool, error: str | None = None
+) -> DocumentBlock:
+    """Return the block for ``scope``; the one place that tells the two scopes apart."""
+    home = PLATFORM_HOME if scope.is_platform else organisation_home(str(scope.organisation))
+    return DocumentBlock(
+        PLATFORM_PREFIX if scope.is_platform else home,
+        home,
+        error,
+        MIN_PASSPHRASE_LENGTH,
+        settings.configuration_package_max_mb,
+        scope.is_platform,
+        can_seal,
     )

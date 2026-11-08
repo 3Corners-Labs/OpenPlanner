@@ -24,13 +24,19 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission
-from app.admin.configuration_view import plan_view
+from app.adapters.configuration_json import MEDIA_TYPE
+from app.admin.authz import AdminContext, RequirePermission, can_function
+from app.admin.configuration_view import (
+    DOCUMENT_KEY,
+    document_block,
+    plan_view,
+)
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, organisation_header
 from app.admin.pages import page as _page
 from app.admin.reviewed_documents import ReviewedDocuments
-from app.admin.uploads import read_uploads
+from app.admin.settings_routes import Tab, render_tab
+from app.admin.uploads import read_upload
 from app.config import Settings
 from app.domain.authorization import Permission
 from app.domain.configuration_document import Scope, document_filename
@@ -40,13 +46,9 @@ from app.web.locale import RequestLocale
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
-DOCUMENT_KEY = "document"
-"""The error key of the document block (a refusal of an export, a plan or an apply)."""
-MIN_PASSPHRASE_LENGTH = 16
-"""The shortest passphrase an export accepts, as the service enforces it (ADR 0008)."""
 UPLOAD_FIELDS = ("passphrase",)
 """The text field that comes with an uploaded document."""
-MEDIA_TYPE = "application/json"
+PLAN_TEMPLATE = "admin/configuration_plan.html"
 
 PlatformChange = Annotated[
     AdminContext, Depends(RequirePermission(Permission.SETTINGS_PLATFORM_MANAGE, fresh=True))
@@ -63,8 +65,6 @@ OrganisationChange = Annotated[
         )
     ),
 ]
-PLATFORM_URL = "/admin/settings/package"
-PLATFORM_PREFIX = "/admin/settings/configuration"
 
 
 def _service(request: Request) -> ConfigurationDocumentService:
@@ -84,26 +84,6 @@ def _actor(context: AdminContext) -> Actor:
     return Actor(context.principal.subject, context.principal)
 
 
-def organisation_url(org: str) -> str:
-    """Return the page of organisation ``org``'s configuration block."""
-    return f"/admin/organisations/{org}/configuration"
-
-
-def document_block(request: Request, scope: Scope, error: str | None = None) -> dict[str, object]:
-    """Return what the document block of a page needs: the form targets, the limits, the error."""
-    current: Settings = request.app.state.settings
-    prefix = (
-        PLATFORM_PREFIX if scope.is_platform else f"{organisation_url(str(scope.organisation))}"
-    )
-    return {
-        "prefix": prefix,
-        "error": error,
-        "min_length": MIN_PASSPHRASE_LENGTH,
-        "max_mb": current.configuration_package_max_mb,
-        "platform": scope.is_platform,
-    }
-
-
 # --- the organisation's page ------------------------------------------------------------
 
 
@@ -112,7 +92,9 @@ async def organisation_configuration(
     request: Request, locale: Locale, org: str, context: OrganisationView
 ) -> HTMLResponse:
     """Show the organisation's block: export a document, upload one to plan."""
-    return await _organisation_page(request, locale, context, org)
+    return await _render(
+        request, locale, context, Scope(org), "admin/organisation_configuration.html"
+    )
 
 
 @router.post("/organisations/{org}/configuration/export")
@@ -199,36 +181,40 @@ async def _plan(
 ) -> Response:
     """Plan the uploaded document; keep it for the apply and show the plan."""
     current: Settings = request.app.state.settings
-    uploads = await read_uploads(
-        request, (DOCUMENT_KEY,), current.configuration_package_max_mb * 1024 * 1024, UPLOAD_FIELDS
+    upload = await read_upload(
+        request, DOCUMENT_KEY, current.configuration_package_max_mb * 1024 * 1024, UPLOAD_FIELDS
     )
-    data = uploads.files[DOCUMENT_KEY]
     try:
-        if not data:
+        if not upload.data:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, DOCUMENT_KEY)
         plan = await _service(request).plan(
-            _actor(context), data, uploads.values.get("passphrase", "").strip() or None, scope=scope
+            _actor(context),
+            upload.data,
+            upload.values.get("passphrase", "").strip() or None,
+            scope=scope,
         )
     except DomainError as error:
         raise_refusal(error)
         return await _fail(request, locale, context, scope, error, 422)
-    clock = request.app.state.clock
     entry = _reviewed(request).keep(
         context.principal.subject,
         scope,
-        data,
+        upload.data,
         plan.digest,
-        clock.now(),
+        request.app.state.clock.now(),
         current.configuration_review_minutes,
     )
-    view = plan_view(plan, locale.gettext)
-    return _render(
+    return await _render(
         request,
         locale,
         context,
         scope,
-        "admin/configuration_plan.html",
-        {"plan": view, "token": entry.token, "needs_passphrase": b"sealed" in data},
+        PLAN_TEMPLATE,
+        {
+            "plan": plan_view(plan, locale.gettext),
+            "token": entry.token,
+            "needs_passphrase": plan.sealed,
+        },
     )
 
 
@@ -237,14 +223,12 @@ async def _apply(
 ) -> Response:
     """Apply the document that was reviewed, if it is the one the token names."""
     form = await read_form(request, locale)
+    subject = context.principal.subject
     reviewed = _reviewed(request)
-    entry = reviewed.find(
-        context.principal.subject, scope, form.text("token"), request.app.state.clock.now()
-    )
+    entry = reviewed.find(subject, scope, form.text("token"), request.app.state.clock.now())
     if entry is None:
-        return await _fail(
-            request, locale, context, scope, DomainError(ErrorCode.CONFIGURATION_PLAN_STALE), 409
-        )
+        stale = DomainError(ErrorCode.CONFIGURATION_PLAN_STALE)
+        return await _fail(request, locale, context, scope, stale, 409)
     try:
         result = await _service(request).apply(
             _actor(context),
@@ -256,25 +240,17 @@ async def _apply(
     except DomainError as error:
         raise_refusal(error)
         if error.code is ErrorCode.CONFIGURATION_PLAN_STALE:
-            reviewed.discard(context.principal.subject, scope)
+            reviewed.discard(subject, scope)
         return await _fail(request, locale, context, scope, error, 409)
+    reviewed.discard(subject, scope)
     if not result.applied:
-        reviewed.discard(context.principal.subject, scope)
-        return _render(
-            request,
-            locale,
-            context,
-            scope,
-            "admin/configuration_plan.html",
-            {
-                "plan": plan_view(result.plan, locale.gettext),
-                "token": "",
-                "needs_passphrase": False,
-            },
-            422,
-        )
-    reviewed.discard(context.principal.subject, scope)
-    home = PLATFORM_URL if scope.is_platform else organisation_url(str(scope.organisation))
+        shown = {
+            "plan": plan_view(result.plan, locale.gettext),
+            "token": "",
+            "needs_passphrase": False,
+        }
+        return await _render(request, locale, context, scope, PLAN_TEMPLATE, shown, 422)
+    home = document_block(request.app.state.settings, scope, can_seal=False).home
     return redirect_done(home, "configuration_applied", len(result.plan.changes))
 
 
@@ -289,66 +265,54 @@ async def _fail(
     error: DomainError,
     status: int,
 ) -> Response:
-    """Show the block of the scope's page again with the refusal in words."""
-    message = locale.gettext(CODE_MESSAGES.get(error.code, "error.invalid_request"))
+    """Show the scope's page again with the refusal; the platform's is the package tab."""
     if scope.is_platform:
-        from app.admin.settings_routes import Tab, _overview  # noqa: PLC0415, PLC2701 - cycle
-
-        return await _overview(request, locale, context, Tab.PACKAGE, (DOCUMENT_KEY, error), status)
-    return await _organisation_page(
-        request, locale, context, str(scope.organisation), message, status
-    )
-
-
-async def _organisation_page(
-    request: Request,
-    locale: RequestLocale,
-    context: AdminContext,
-    org: str,
-    error: str | None = None,
-    status: int = 200,
-) -> HTMLResponse:
-    """Render the organisation's block."""
-    organisation = await request.app.state.settings_service.organisation(context.principal, org)
-    response = _page(
+        return await render_tab(
+            request, locale, context, Tab.PACKAGE, (DOCUMENT_KEY, error), status
+        )
+    message = locale.gettext(CODE_MESSAGES.get(error.code, "error.invalid_request"))
+    return await _render(
         request,
         locale,
+        context,
+        scope,
         "admin/organisation_configuration.html",
-        context.principal,
-        {
-            "organisation": organisation,
-            "org_header": organisation_header(
-                request, locale, context.principal, organisation.name, organisation.slug
-            ),
-            "document": document_block(request, Scope(org), error),
-            "done": done_message(request, locale.gettext),
-        },
+        error=message,
+        status=status,
     )
-    response.status_code = status
-    return response
 
 
-def _render(
+async def _render(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
     scope: Scope,
     template: str,
-    values: dict[str, object],
+    values: dict[str, object] | None = None,
     status: int = 200,
+    *,
+    error: str | None = None,
 ) -> HTMLResponse:
-    """Render a page of the document block under the header of the scope's object."""
+    """Render a page of the block under the header of the scope's object."""
+    can_seal = can_function(context.principal)(Permission.SETTINGS_PLATFORM_MANAGE)
     shared: dict[str, object] = {
-        "document": document_block(request, scope),
-        "scope": scope,
-        "done": None,
+        "document": document_block(
+            request.app.state.settings, scope, can_seal=can_seal, error=error
+        ),
+        "done": done_message(request, locale.gettext),
+        # The platform pages use the settings header, which reads these.
         "refused": None,
         "unknown_error": None,
         "org_header": None,
     }
     if not scope.is_platform:
-        slug = str(scope.organisation)
-        shared["org_header"] = organisation_header(request, locale, context.principal, slug, slug)
-    response = _page(request, locale, template, context.principal, {**shared, **values})
+        organisation = await request.app.state.settings_service.organisation(
+            context.principal, str(scope.organisation)
+        )
+        shared["organisation"] = organisation
+        shared["org_header"] = organisation_header(
+            request, locale, context.principal, organisation.name, organisation.slug
+        )
+    response = _page(request, locale, template, context.principal, {**shared, **(values or {})})
     response.status_code = status
     return response

@@ -230,3 +230,16 @@ async def test_a_plan_page_is_not_cached_and_holds_no_value(site: Site) -> None:
 
     assert "Geheimnaam" not in response.text
     assert "no-store" in response.headers.get("cache-control", "")
+
+
+async def test_an_organisation_admin_is_not_offered_the_secrets_they_may_not_export(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    org = (await site.client.get(ORGANISATION)).text
+    await site.login_as(SUPER)
+    org_as_superuser = (await site.client.get(ORGANISATION)).text
+
+    assert 'name="secrets"' not in org
+    assert 'name="passphrase_repeat"' not in org
+    assert 'name="secrets"' in org_as_superuser

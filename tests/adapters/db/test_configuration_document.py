@@ -208,3 +208,17 @@ async def test_an_organisation_admin_exports_what_they_may_change_and_no_integra
     # Branding is held back from the organisation admin (ADR 0039), so a document of theirs
     # cannot carry it: applying it elsewhere would be refused for the same reason.
     assert not {"theme_tokens", "accent_color", "display_name"} & set(mine)
+
+
+async def test_a_plan_says_whether_the_document_held_sealed_secrets(
+    source: AsyncEngine, target: AsyncEngine
+) -> None:
+    box = SecretBox(b"a" * 32)
+    with_secrets = await service(source, box).export(HOST, Scope(), PASSPHRASE, secrets=True)
+    without = await service(source, box).export(HOST, Scope(), None, secrets=False)
+
+    sealed = await service(target, SecretBox(b"b" * 32)).plan(HOST, with_secrets, PASSPHRASE)
+    plain = await service(target, SecretBox(b"b" * 32)).plan(HOST, without, None)
+
+    assert sealed.sealed
+    assert not plain.sealed
