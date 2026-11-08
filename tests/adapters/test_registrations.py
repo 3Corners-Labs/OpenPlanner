@@ -303,3 +303,18 @@ async def test_the_stored_report_round_trips_without_secrets() -> None:
     assert WEBHOOK_SECRET_VALUE not in str(stored)
     assert FOREIGN_TOKEN not in str(stored)
     assert listing_from_report(stored) == listing
+
+
+async def test_a_subscription_at_the_neutral_address_is_openplanners() -> None:
+    """ADR 0032 point 6: ``/webhooks/contact-center/webex_cc`` is ours, whatever its name."""
+    neutral = {
+        "id": "sub-neutral",
+        "name": "Task events",
+        "destinationUrl": f"{OLD_TUNNEL}/webhooks/contact-center/webex_cc",
+        "eventTypes": ["task:new", "task:connected", "task:ended", "task:failed"],
+    }
+
+    listing = await _list(Recorder(wxcc=[neutral]))
+
+    [found] = [r for r in listing.registrations if r.id == "sub-neutral"]
+    assert (found.state, found.reason) == (State.STALE, Reason.OTHER_TARGET)

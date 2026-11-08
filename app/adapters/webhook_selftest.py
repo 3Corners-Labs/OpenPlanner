@@ -24,7 +24,7 @@ from typing import Any
 import httpx
 
 from app.adapters.diagnostics import CheckResult
-from app.adapters.webhooks import event_body, sign_webex, sign_wxcc
+from app.adapters.webhooks import WXCC_INBOUND, event_body, sign_webex, sign_wxcc
 
 SELFTEST_PREFIX = "openplanner-selftest-"
 
@@ -100,7 +100,11 @@ async def self_test(
         body = event_body({"type": "task:ended", "comciscotimestamp": stamp, "data": data})
         key = wxcc_secret if signed and wxcc_secret else secrets.token_hex(16)
         headers = sign_wxcc(body, key, stamp)
-        results.append(await _deliver(http, f"{base}/webhooks/wxcc", "wxcc", signed, body, headers))
+        results.append(
+            await _deliver(
+                http, f"{base}{WXCC_INBOUND.registered_path}", "wxcc", signed, body, headers
+            )
+        )
     return results
 
 

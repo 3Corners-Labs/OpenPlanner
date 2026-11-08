@@ -16,11 +16,17 @@ email addresses in the payloads are ignored.
 import hashlib
 import hmac
 import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from pydantic import SecretStr
+
+from app.config import Settings
 from app.domain.calls import EventKind
+from app.domain.connection_health import Platform
+from app.domain.contact_center import ContactCenterKind
 
 MAX_SKEW = timedelta(seconds=300)
 
@@ -163,3 +169,90 @@ def _wxcc_key(payload: dict[str, Any], task_id: str) -> str:
         return ""
     parts = ("wxcc", str(payload.get("type")), task_id, event_id)
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class InboundWebhook:
+    """How one contact-center platform's webhooks are checked and read (ADR 0032 point 6).
+
+    The route ``/webhooks/contact-center/{kind}`` is the same for every platform; what differs
+    is here, defined by the platform's adapter and listed in ``contact_centers.INBOUND``.
+
+    Attributes:
+        kind: The platform.
+        platform: The connection whose latest inbound event the webhook is noted as.
+        source: Short code for logs, security events and the event keys that recognise a
+            replay (``wxcc`` stays the code of Webex Contact Center, so the keys stored before
+            ADR 0032 keep matching).
+        secret: Reads the webhook secret from the settings; without it the endpoint does not
+            exist.
+        verify: ``(body, headers, secret, now)`` → authentic, untampered and within 300 s.
+        parse: The verified JSON object → the event, or ``None`` when OpenPlanner ignores it.
+        event_type: The verified JSON object → its event type, codes only, for the note.
+        alias: An older address that still works and where OpenPlanner still registers, until
+            the subscriptions move (CC-4); ``None`` for a platform without one.
+    """
+
+    kind: ContactCenterKind
+    platform: Platform
+    source: str
+    secret: Callable[[Settings], SecretStr | None]
+    verify: Callable[[bytes, Mapping[str, str], str, datetime], bool]
+    parse: Callable[[dict[str, Any]], ParsedEvent | None]
+    event_type: Callable[[dict[str, Any]], str]
+    alias: str | None = None
+
+    @property
+    def path(self) -> str:
+        """Return the platform's address: ``/webhooks/contact-center/{kind}``."""
+        return f"{CONTACT_CENTER_PATH}/{self.kind.value}"
+
+    @property
+    def registered_path(self) -> str:
+        """Return where OpenPlanner registers its subscription: the alias while there is one."""
+        return self.alias or self.path
+
+    @property
+    def paths(self) -> tuple[str, ...]:
+        """Return every address that is OpenPlanner's for this platform."""
+        return (self.path,) if self.alias is None else (self.path, self.alias)
+
+
+CONTACT_CENTER_PATH = "/webhooks/contact-center"
+"""The prefix of every contact-center platform's webhook address (ADR 0032 point 6)."""
+
+
+def _verify_wxcc_headers(
+    body: bytes, headers: Mapping[str, str], secret: str, now: datetime
+) -> bool:
+    """Check a WxCC webhook by its ``X-WebexCC-Signature`` and ``X-WebexCC-Timestamp``."""
+    return verify_wxcc(
+        body,
+        headers.get("x-webexcc-signature"),
+        headers.get("x-webexcc-timestamp"),
+        secret,
+        now,
+    )
+
+
+def _wxcc_type(payload: dict[str, Any]) -> str:
+    """Return a WxCC event's type (codes only, capped)."""
+    return str(payload.get("type", ""))[:64]
+
+
+def _wxcc_secret(settings: Settings) -> SecretStr | None:
+    """Return the WxCC subscription secret (``WXCC_WEBHOOK_SECRET``)."""
+    return settings.wxcc_webhook_secret
+
+
+WXCC_INBOUND = InboundWebhook(
+    kind=ContactCenterKind.WEBEX_CC,
+    platform=Platform.WXCC,
+    source="wxcc",
+    secret=_wxcc_secret,
+    verify=_verify_wxcc_headers,
+    parse=parse_wxcc,
+    event_type=_wxcc_type,
+    alias="/webhooks/wxcc",
+)
+"""Webex Contact Center's webhooks: ``/webhooks/contact-center/webex_cc`` and ``/webhooks/wxcc``."""
