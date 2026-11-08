@@ -297,7 +297,7 @@ The readiness checklist (§5) uses existing data and adds no thresholds.
 | 4 | Group page: six tabs with sub-tabs (*Agenda* › *Queue*, *Planning* › *Exceptions*, *Holidays*, *Messages* › *Texts*, *Contact*), contact moved to `/contact` with a 308 from the old path, the check a section of *Settings* | #594 | merged |
 | 5 | Lists: *Groups* with search and organisation filter, path *Groups › organisation › group* | #219 | merged |
 | 5 | Lists: readiness checklist on the group and organisation overview, active closures as a filter on *Overview* (old `/admin/closures` 308s there), search/filter/count on API clients, count on the audit log | #600 | merged |
-| 6 | ADR 0042 registry `topic` and the settings test: a settings screen declares its topics (`Screen.topics`; `topic_home`, `topic_anchor` in `app/web/navigation.py`), both settings pages render their sections from that declaration, *Settings topics* in `docs/admin-map.md`, test `tests/web/test_settings_topics.py` | #PRNUM | merged |
+| 6 | ADR 0042 registry `topic` and the settings test: a settings screen declares its topics (`Screen.topics`; `topic_home`, `topic_anchor` in `app/web/navigation.py`), both settings pages render their sections from that declaration, *Settings topics* in `docs/admin-map.md`, test `tests/web/test_settings_topics.py` | #602 | merged |
 | – | §5 `return` keys ("back to …" after fixing something elsewhere) | | follow-up: not in the build order; the readiness checklist links straight to the fixing tab and the tab row leads back, so no page needs it yet |
 
 ## Open points
