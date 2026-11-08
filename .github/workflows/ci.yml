@@ -267,7 +267,20 @@ jobs:
       - name: container logs
         if: always()
         run: docker logs app
+      # The action downloads syft from github.com on every run, and that download has failed
+      # with a 504 four times in a row on 2026-11-08 while the release was reachable. One retry
+      # keeps a transient download error from dropping a PR out of the merge queue; a second
+      # failure still fails the job, so the SBOM and the grype scan below are never skipped.
       - name: SBOM (CycloneDX)
+        id: sbom
+        continue-on-error: true
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: openplanner:ci
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+      - name: SBOM (CycloneDX), retry
+        if: steps.sbom.outcome == 'failure'
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: openplanner:ci
