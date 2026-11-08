@@ -348,6 +348,8 @@ def _manage_context(
         "trial_offered": group.trial_call_enabled and group.video_enabled,
         "deadline": _moment(deadline, group, locale),
         "notice": locale.gettext(STATUS_NOTICES[status]) if status in STATUS_NOTICES else None,
+        # ADR 0060 §7: the footer mark settles once when the booking has just been confirmed.
+        "footer_motion": "settle" if status == "confirmed" else "",
     }
 
 

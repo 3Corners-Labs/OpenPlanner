@@ -5,7 +5,8 @@
 # touches Docker: it only stores requests, and this script talks to it through
 # `python -m app.cli` inside the web container.
 #
-#   update   pull <image>:<version> -> digest -> cosign verify -> record previous digest and
+#   update   pull <image>:<version> -> digest -> cosign verify -> upgrade path (the new image's
+#            MIN_UPGRADE_FROM, ADR 0116) -> record previous digest and
 #            Alembic revision -> maintenance on -> backup -> pin digest -> up -> healthy?
 #              yes: report succeeded, maintenance off
 #              no:  restore backup, end all admin sessions, pin previous digest, up ->
@@ -77,6 +78,7 @@ PROXY=0
 # patterns before use, and the state file is read with sed, never sourced.
 VERSION_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-rc\.[0-9]{1,4})?$'
 REVISION_RE='^[0-9A-Za-z_]{1,32}$'
+STOP_RE='^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
 IMAGE_RE='^[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?(@sha256:[0-9a-f]{64})?$'
 state() { sed -n "s/^$1=//p" "$STATE_FILE"; }
 # Replaces only the image pins: the installer keeps COMPOSE_PROFILES, OPENPLANNER_TLS and
@@ -204,7 +206,7 @@ prune_images() { # remove our releases that neither run nor are kept for a resto
 }
 
 do_update() { # do_update ID TARGET FROM
-  local id=$1 target=$2 from=$3 previous previous_proxy digest proxy_digest='' revision
+  local id=$1 target=$2 from=$3 previous previous_proxy digest proxy_digest='' revision stop
   local backup="request-$1"
   previous=$(pinned)
   previous_proxy=$(pinned_proxy)
@@ -217,6 +219,20 @@ do_update() { # do_update ID TARGET FROM
   step "$id" verifying
   if ! verified "$digest" || { ((PROXY)) && ! verified "$proxy_digest"; }; then
     report "$id" failed signature_invalid
+    return
+  fi
+  # ADR 0116 point 6: the new image's MIN_UPGRADE_FROM, read from its configuration (nothing
+  # of it runs yet); the running application says whether this database is new enough.
+  stop=$(docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$digest" 2>/dev/null \
+    | sed -n 's/^MIN_UPGRADE_FROM=//p')
+  # A stop applies only to a target above it (the stop itself is where older databases go
+  # first), so a running version from before the check is never asked for a command it does
+  # not have on the way to the stop.
+  if [[ -n $stop ]] && { ! [[ $stop =~ $STOP_RE ]] \
+    || { [[ $stop != "${target%%-*}" ]] \
+      && [[ $(printf '%s\n%s\n' "$stop" "${target%%-*}" | sort -V | head -n 1) == "$stop" ]] \
+      && ! app upgrade-path-check --image-version "$target" --stop "$stop" >/dev/null; }; }; then
+    report "$id" failed upgrade_path_required
     return
   fi
   step "$id" backing_up

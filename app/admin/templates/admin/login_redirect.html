@@ -2,9 +2,12 @@
     CSP form-action 'self' (browsers apply it to redirects of a form post). A page that moves on
     by itself (meta refresh, with a visible link) keeps the CSP strict, as the logout does. -#}
 {% extends "admin/_public.html" %}
+{% from "_brand.html" import brand_mark %}
 {% block title %}{{ _("admin.logging_in.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block admin_head %}<meta http-equiv="refresh" content="0;url={{ login_url }}">{% endblock %}
 {% block content %}
+{#- ADR 0060 §7: the open tile loops while the browser moves on to the provider (CSS only). -#}
+{{ brand_mark("logging-in__mark", 48, "loading") }}
 <h1>{{ _("admin.logging_in.title") }}</h1>
 <p>{{ _("admin.logging_in.text") }}</p>
 <p><a class="button" href="{{ login_url }}">{{ _("admin.logging_in.continue") }}</a></p>

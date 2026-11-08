@@ -46,6 +46,7 @@ REASON_LABELS: dict[str, str] = {
     "restore_failed": "admin.updates.reason.restore_failed",
     "version_mismatch": "admin.updates.reason.version_mismatch",
     "updater_error": "admin.updates.reason.updater_error",
+    "upgrade_path_required": "admin.updates.reason.upgrade_path_required",
 }
 
 OTHER_REASON = "admin.updates.reason.other"

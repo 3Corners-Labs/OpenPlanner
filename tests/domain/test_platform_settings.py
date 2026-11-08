@@ -255,8 +255,11 @@ async def test_the_store_reads_the_sealed_secrets() -> None:
     assert store.current.secrets == {"update_check_token": "ghp_x"}
 
 
-def test_production_never_applies_candidates_or_auto_apply_from_the_portal() -> None:
-    """ADR 0067: production follows releases on a superuser's click, whatever is stored."""
+def test_production_never_applies_candidates_from_the_portal() -> None:
+    """ADR 0067: production follows releases; ADR 0116 lets auto-apply be stored there.
+
+    Whether it takes effect depends on ``update_window`` (``auto_apply_effective``).
+    """
     channel, auto = BY_KEY["update_channel"], BY_KEY["update_auto_apply"]
     portal = PortalValues(5, {"update_channel": "rc", "update_auto_apply": True})
 
@@ -270,9 +273,21 @@ def test_production_never_applies_candidates_or_auto_apply_from_the_portal() -> 
         Source.DEFAULT,
         True,
     )
-    assert (auto_in_prod.value, auto_in_prod.portal_ignored) == (False, True)
+    assert (auto_in_prod.value, auto_in_prod.source) == (True, Source.PORTAL)
     # The release channel and auto-apply off are fine in production.
     fine = PortalValues(6, {"update_channel": "release", "update_auto_apply": False})
     assert resolve(channel, "release", None, fine, production=True).source is Source.PORTAL
     assert not usable(channel, "rc", production=True)
     assert usable(channel, "rc")
+
+
+def test_the_update_line_and_window_must_have_their_format() -> None:
+    """ADR 0116 point 9: a stored line or window the code cannot read is ignored and flagged."""
+    line, window = BY_KEY["update_line"], BY_KEY["update_window"]
+
+    assert usable(line, "1.4")
+    assert usable(line, "")
+    assert not usable(line, "1.4.0")
+    assert usable(window, "mon 02:00-04:00, sat 01:00-05:00")
+    assert not usable(window, "mon 02:00-02:10")
+    assert not usable(window, "every night")
