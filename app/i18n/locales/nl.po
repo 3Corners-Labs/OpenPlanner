@@ -10574,3 +10574,387 @@ msgstr "Wacht op een nieuwe tijd"
 
 msgid "reports.status.pending_confirmation"
 msgstr "Wacht op bevestiging"
+
+msgid "reports.view.volume"
+msgstr "Volume"
+
+msgid "reports.view.queue"
+msgstr "Wachtrij en gesprekken"
+
+msgid "reports.view.capacity"
+msgstr "Capaciteit"
+
+msgid "reports.view.channels"
+msgstr "Kanalen"
+
+msgid "reports.views.label"
+msgstr "Rapport"
+
+msgid "reports.empty"
+msgstr "Voor dit rapport is in deze periode nog niets vastgelegd. Kies een andere periode, of kom terug als de groep is gebruikt."
+
+msgid "reports.unavailable"
+msgstr "niet beschikbaar"
+
+msgid "reports.mean"
+msgstr "Gemiddelde"
+
+msgid "reports.mean.seconds"
+msgstr "{n} s"
+
+msgid "reports.mean.early"
+msgstr "{value} te vroeg"
+
+msgid "reports.mean.late"
+msgstr "{value} te laat"
+
+msgid "reports.bucket.early"
+msgstr "{range} te vroeg"
+
+msgid "reports.chart.table"
+msgstr "{title}: dezelfde cijfers als tabel"
+
+msgid "reports.chart.gap"
+msgstr "Aantal verborgen ({hidden})"
+
+msgid "reports.chart.desc.column"
+msgstr "Kolomgrafiek: {title}. Dezelfde cijfers staan in de tabel eronder. Een aantal onder het minimum wordt niet getekend en staat als {hidden}."
+
+msgid "reports.chart.desc.stacked"
+msgstr "Gestapelde kolomgrafiek: {title}. Dezelfde cijfers staan in de tabel eronder. Een aantal onder het minimum wordt niet getekend en staat als {hidden}."
+
+msgid "reports.chart.desc.line"
+msgstr "Lijngrafiek: {title}. Dezelfde cijfers staan in de tabel eronder. Een dag met een aantal onder het minimum onderbreekt de lijn en staat als {hidden}."
+
+msgid "reports.chart.unit.calls"
+msgstr "gesprekken"
+
+msgid "reports.chart.unit.slots"
+msgstr "momenten"
+
+msgid "reports.chart.unit.percent"
+msgstr "procent"
+
+msgid "reports.chart.unit.messages"
+msgstr "berichten"
+
+msgid "reports.chart.unit.trials"
+msgstr "proefgesprekken"
+
+msgid "reports.dispatch.contact_center"
+msgstr "Contactcenter"
+
+msgid "reports.dispatch.openplanner_queue"
+msgstr "Eigen wachtrij"
+
+msgid "reports.kind.scheduled"
+msgstr "Gepland"
+
+msgid "reports.kind.direct"
+msgstr "Direct gesprek"
+
+msgid "reports.channel.email"
+msgstr "E-mail"
+
+msgid "reports.channel.sms"
+msgstr "SMS"
+
+msgid "reports.channel.whatsapp"
+msgstr "WhatsApp"
+
+msgid "reports.purpose.confirmation"
+msgstr "Bevestiging"
+
+msgid "reports.purpose.reminder"
+msgstr "Herinnering"
+
+msgid "reports.purpose.change"
+msgstr "Wijziging"
+
+msgid "reports.purpose.cancellation"
+msgstr "Annulering"
+
+msgid "reports.failure.task_failed"
+msgstr "Taak niet aangemaakt"
+
+msgid "reports.failure.meeting_failed"
+msgstr "Vergadering niet aangemaakt"
+
+msgid "reports.failure.integration_error"
+msgstr "Fout in de koppeling"
+
+msgid "reports.rebook.proposed_planner"
+msgstr "Voorgesteld na vraag van de planner"
+
+msgid "reports.rebook.proposed_assistant"
+msgstr "Voorgesteld door de assistent"
+
+msgid "reports.fill.empty"
+msgstr "Leeg"
+
+msgid "reports.fill.under_half"
+msgstr "Minder dan half vol"
+
+msgid "reports.fill.under_full"
+msgstr "Meer dan half, niet vol"
+
+msgid "reports.fill.full"
+msgstr "Vol"
+
+msgid "reports.shortfall.open"
+msgstr "Nog steeds te weinig bezetting"
+
+msgid "reports.shortfall.accepted"
+msgstr "Te weinig, geaccepteerd door een planner"
+
+msgid "reports.shortfall.resolved"
+msgstr "Opgelost"
+
+msgid "reports.trial.created"
+msgstr "Proefgesprek aangemaakt"
+
+msgid "reports.trial.joined"
+msgstr "Link gevolgd"
+
+msgid "reports.trial.entered"
+msgstr "In de vergadering gekomen"
+
+msgid "reports.trial.failed"
+msgstr "Mislukt"
+
+msgid "reports.locale.nl"
+msgstr "Nederlands"
+
+msgid "reports.locale.en"
+msgstr "Engels"
+
+msgid "reports.weekday.0"
+msgstr "Maandag"
+
+msgid "reports.weekday.1"
+msgstr "Dinsdag"
+
+msgid "reports.weekday.2"
+msgstr "Woensdag"
+
+msgid "reports.weekday.3"
+msgstr "Donderdag"
+
+msgid "reports.weekday.4"
+msgstr "Vrijdag"
+
+msgid "reports.weekday.5"
+msgstr "Zaterdag"
+
+msgid "reports.weekday.6"
+msgstr "Zondag"
+
+msgid "reports.queue.mix.title"
+msgstr "Hoe boekingen bij medewerkers komen"
+
+msgid "reports.queue.mix.method"
+msgstr "Wachtrijmethode"
+
+msgid "reports.queue.task_wait.title"
+msgstr "Wachttijd tot een gesprek verbindt"
+
+msgid "reports.queue.task_wait.bucket"
+msgstr "Wachttijd"
+
+msgid "reports.queue.punctuality.title"
+msgstr "Wanneer de gastheer binnenkwam, ten opzichte van de start"
+
+msgid "reports.queue.punctuality.bucket"
+msgstr "Gastheer ten opzichte van de start"
+
+msgid "reports.queue.guest_wait.title"
+msgstr "Deelnemer wacht op de gastheer"
+
+msgid "reports.queue.guest_wait.bucket"
+msgstr "Wachttijd in de vergadering"
+
+msgid "reports.queue.length.title"
+msgstr "Hoe lang gesprekken duren"
+
+msgid "reports.queue.length.bucket"
+msgstr "Gespreksduur"
+
+msgid "reports.queue.calls_ended"
+msgstr "Afgeronde gesprekken"
+
+msgid "reports.queue.participants_per_call"
+msgstr "Personen per gesprek (gemiddeld)"
+
+msgid "reports.queue.direct.title"
+msgstr "Directe gesprekken"
+
+msgid "reports.queue.direct.created"
+msgstr "Gestart"
+
+msgid "reports.queue.direct.left"
+msgstr "Weggegaan tijdens het wachten"
+
+msgid "reports.queue.direct.not_picked_up"
+msgstr "Niet op tijd opgepakt"
+
+msgid "reports.queue.direct.abandoned"
+msgstr "Aandeel dat wegging tijdens het wachten"
+
+msgid "reports.queue.abandon_wait.title"
+msgstr "Wachttijd voor het weggaan"
+
+msgid "reports.queue.abandon_wait.bucket"
+msgstr "Wachttijd bij het weggaan"
+
+msgid "reports.queue.claims.title"
+msgstr "Eigen wachtrij: oppakken"
+
+msgid "reports.queue.claims.claimed"
+msgstr "Opgepakt"
+
+msgid "reports.queue.claims.released"
+msgstr "Teruggegeven"
+
+msgid "reports.queue.claims.per_claim"
+msgstr "Teruggegeven per keer oppakken"
+
+msgid "reports.queue.claim_wait.title"
+msgstr "Tijd tot een boeking wordt opgepakt"
+
+msgid "reports.queue.claim_wait.bucket"
+msgstr "Tijd tot oppakken"
+
+msgid "reports.queue.failures.title"
+msgstr "Fouten bij het doorzetten"
+
+msgid "reports.queue.failures.code"
+msgstr "Fout"
+
+msgid "reports.queue.peak.title"
+msgstr "Directe gesprekken tegelijk, hoogste per dag"
+
+msgid "reports.queue.peak.series"
+msgstr "Hoogste aantal tegelijk"
+
+msgid "reports.queue.peak.highest"
+msgstr "Hoogste in de periode"
+
+msgid "reports.queue.rebook.title"
+msgstr "Voorgestelde nieuwe tijden"
+
+msgid "reports.queue.rebook.proposed_by"
+msgstr "Voorgesteld"
+
+msgid "reports.queue.rebook.result"
+msgstr "Wat er van de voorstellen kwam"
+
+msgid "reports.queue.rebook.accepted"
+msgstr "Geaccepteerd"
+
+msgid "reports.queue.rebook.expired"
+msgstr "Verlopen"
+
+msgid "reports.queue.rebook.conversion"
+msgstr "Geaccepteerd van de voorgestelde"
+
+msgid "reports.queue.rebook_wait.title"
+msgstr "Tijd tot een voorstel wordt geaccepteerd"
+
+msgid "reports.queue.rebook_wait.bucket"
+msgstr "Tijd tot accepteren"
+
+msgid "reports.capacity.utilisation.title"
+msgstr "Bezettingsgraad per dag"
+
+msgid "reports.capacity.utilisation.series"
+msgstr "Bezettingsgraad (procent)"
+
+msgid "reports.capacity.utilisation.total"
+msgstr "Bezettingsgraad in de periode"
+
+msgid "reports.capacity.slots"
+msgstr "Momenten die begonnen zijn"
+
+msgid "reports.capacity.idle.series"
+msgstr "Plaatsen niet geboekt"
+
+msgid "reports.capacity.idle.total"
+msgstr "Plaatsen niet geboekt in de periode"
+
+msgid "reports.capacity.days.title"
+msgstr "Momenten, bezetting en vrije plaatsen per dag"
+
+msgid "reports.capacity.fill.title"
+msgstr "Hoe vol de momenten waren"
+
+msgid "reports.capacity.fill.class"
+msgstr "Vulling"
+
+msgid "reports.capacity.heat.title"
+msgstr "Drukste dagen en uren"
+
+msgid "reports.capacity.heat.hour"
+msgstr "Uur"
+
+msgid "reports.capacity.heat.range"
+msgstr "De drukste uren worden getoond voor een periode van minstens {n} dagen."
+
+msgid "reports.capacity.heat.none"
+msgstr "Er is geen boeking geplaatst in een groep die groot genoeg is om per uur te tonen."
+
+msgid "reports.capacity.heat.left_out"
+msgstr "{n} groep(en) zijn te klein om per uur te tonen en vallen buiten deze tabel."
+
+msgid "reports.capacity.heat.rule"
+msgstr "Uren worden alleen getoond voor een groep met minstens {n} boekingen in de periode. Uren zijn lokaal voor elke groep. In elke cel staat het getal; de tint helpt alleen het oog."
+
+msgid "reports.capacity.shortfall.title"
+msgstr "Blokken met te weinig bezetting"
+
+msgid "reports.capacity.shortfall.state"
+msgstr "Stand"
+
+msgid "reports.channels.messages.title"
+msgstr "Berichten verstuurd en mislukt"
+
+msgid "reports.channels.sent"
+msgstr "Verstuurd"
+
+msgid "reports.channels.failed"
+msgstr "Mislukt"
+
+msgid "reports.channels.failure_rate"
+msgstr "Aandeel dat mislukte"
+
+msgid "reports.channels.purpose"
+msgstr "Doel"
+
+msgid "reports.channels.channel"
+msgstr "Kanaal"
+
+msgid "reports.channels.by_channel.title"
+msgstr "Berichten per kanaal"
+
+msgid "reports.channels.by_purpose.title"
+msgstr "Berichten per doel"
+
+msgid "reports.channels.locales.title"
+msgstr "Boekingen per taal"
+
+msgid "reports.channels.locales.locale"
+msgstr "Taal"
+
+msgid "reports.channels.locales.left_out"
+msgstr "{n} groep(en) zijn te klein om per taal te tonen en vallen buiten deze tabel."
+
+msgid "reports.channels.trial.title"
+msgstr "Proefgesprekken"
+
+msgid "reports.channels.trial.step"
+msgstr "Stap"
+
+msgid "reports.channels.trial.joined_share"
+msgstr "Link gevolgd, van de aangemaakte"
+
+msgid "reports.channels.trial.entered_share"
+msgstr "In de vergadering, van wie de link volgde"

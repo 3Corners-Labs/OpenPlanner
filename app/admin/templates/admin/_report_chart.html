@@ -1,0 +1,87 @@
+{#- A chart of a usage report and, directly after it, the same numbers as a table (ADR 0117 point 10). Expects a ChartView: ``chart`` (ReportChart), ``geometry`` (ReportGeometry) and ``head`` (the first column's header). The drawing is role="img" with a name and a description; colours and patterns come from classes, never from style attributes; a hidden count is a gap marker and reads "< n" in the table. A chart whose cells are all hidden draws nothing and leaves the table. -#}
+{% macro report_chart(cv) %}
+{% set c = cv.chart %}
+{% set g = cv.geometry %}
+<figure class="rchart">
+  <figcaption id="{{ c.chart_id }}-caption" class="visually-hidden">{{ c.title }}</figcaption>
+  {% if c.has_values %}
+  <div class="rchart__frame" role="region" aria-labelledby="{{ c.chart_id }}-caption" tabindex="0">
+    <svg class="rchart__svg rchart--{{ c.kind.value }}" viewBox="0 0 {{ g.width }} {{ g.height }}" role="img" focusable="false" aria-labelledby="{{ c.chart_id }}-title {{ c.chart_id }}-desc">
+      <title id="{{ c.chart_id }}-title">{{ c.title }}</title>
+      <desc id="{{ c.chart_id }}-desc">{{ c.description }}</desc>
+      {% if g.patterns %}
+      <defs>
+        {% for i in g.patterns %}
+        {% if i == 1 %}
+        <pattern id="{{ c.chart_id }}-p1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="rchart__pattern-bg" width="6" height="6"/><line class="rchart__pattern-ink rchart__s2" x1="0" y1="0" x2="0" y2="6"/></pattern>
+        {% elif i == 2 %}
+        <pattern id="{{ c.chart_id }}-p2" width="6" height="6" patternUnits="userSpaceOnUse"><rect class="rchart__pattern-bg" width="6" height="6"/><circle class="rchart__pattern-dot rchart__s3" cx="3" cy="3" r="1.5"/></pattern>
+        {% else %}
+        <pattern id="{{ c.chart_id }}-p3" width="6" height="6" patternUnits="userSpaceOnUse"><rect class="rchart__pattern-bg" width="6" height="6"/><line class="rchart__pattern-ink rchart__s4" x1="0" y1="0" x2="6" y2="6"/><line class="rchart__pattern-ink rchart__s4" x1="6" y1="0" x2="0" y2="6"/></pattern>
+        {% endif %}
+        {% endfor %}
+      </defs>
+      {% endif %}
+      {% for item in g.legend %}
+      {% if c.kind.value == "line" %}
+      <line class="rchart__line rchart__s{{ item.series + 1 }}" x1="{{ item.x }}" y1="14" x2="{{ item.x + 20 }}" y2="14"/>
+      {{ marker_shape(item.series, item.x + 10, 14) }}
+      {% else %}
+      <rect class="rchart__bar rchart__s{{ item.series + 1 }}{% if item.series == 0 %} rchart__bar--solid{% endif %}"{% if item.series > 0 %} fill="url(#{{ c.chart_id }}-p{{ item.series }})"{% endif %} x="{{ item.x }}" y="7" width="20" height="14"/>
+      {% endif %}
+      <text class="rchart__legend" x="{{ item.label.x }}" y="{{ item.label.y }}">{{ item.label.text }}</text>
+      {% endfor %}
+      {% if g.gap_legend %}
+      <rect class="rchart__gap" x="{{ g.gap_legend_x }}" y="7" width="20" height="14"/>
+      <text class="rchart__legend" x="{{ g.gap_legend.x }}" y="{{ g.gap_legend.y }}">{{ g.gap_legend.text }}</text>
+      {% endif %}
+      <text class="rchart__unit" x="{{ g.unit.x }}" y="{{ g.unit.y }}">{{ g.unit.text }}</text>
+      {% for line in g.grid %}
+      <line class="rchart__grid" x1="{{ g.plot_left }}" y1="{{ line.y }}" x2="{{ g.plot_right }}" y2="{{ line.y }}"/>
+      <text class="rchart__tick" x="{{ line.label.x }}" y="{{ line.label.y }}" text-anchor="end">{{ line.label.text }}</text>
+      {% endfor %}
+      <line class="rchart__axis" x1="{{ g.plot_left }}" y1="{{ g.plot_bottom }}" x2="{{ g.plot_right }}" y2="{{ g.plot_bottom }}"/>
+      {% for col in g.columns %}
+      <rect class="rchart__bar rchart__s{{ col.series + 1 }}{% if col.series == 0 %} rchart__bar--solid{% endif %}"{% if col.series > 0 %} fill="url(#{{ c.chart_id }}-p{{ col.series }})"{% endif %} x="{{ col.x }}" y="{{ col.y }}" width="{{ col.width }}" height="{{ col.height }}"><title>{{ col.title }}</title></rect>
+      {% endfor %}
+      {% for run in g.runs %}
+      <polyline class="rchart__line rchart__s{{ run.series + 1 }}" points="{{ run.points }}"/>
+      {% endfor %}
+      {% for m in g.markers %}{{ marker_shape(m.series, m.x, m.y, m) }}{% endfor %}
+      {% for gap in g.gaps %}
+      <rect class="rchart__gap" x="{{ gap.x }}" y="{{ gap.y }}" width="{{ gap.width }}" height="{{ gap.height }}"><title>{{ gap.title }}</title></rect>
+      {% endfor %}
+      {% for label in g.categories %}
+      <text class="rchart__tick" x="{{ label.x }}" y="{{ label.y }}" text-anchor="{{ label.anchor }}"{% if label.rotate %} transform="rotate({{ label.rotate }} {{ label.x }} {{ label.y }})"{% endif %}>{{ label.text }}</text>
+      {% endfor %}
+    </svg>
+  </div>
+  {% endif %}
+  <div class="table-scroll" role="region" aria-labelledby="{{ c.chart_id }}-table-caption" tabindex="0">
+    <table class="data-table">
+      <caption id="{{ c.chart_id }}-table-caption" class="visually-hidden">{{ _("reports.chart.table", title=c.title) }}</caption>
+      <thead>
+        <tr><th scope="col">{{ cv.head }}</th>{% for s in c.series %}<th scope="col">{{ s.label }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for name, values in c.rows() %}
+        <tr><th scope="row">{{ name }}</th>{% for v in values %}<td>{% if v is none %}<span class="muted">{{ c.hidden_label }}</span>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+      {% if c.total_label %}
+      <tfoot><tr><th scope="row">{{ c.total_label }}</th><td colspan="{{ c.series|length }}">{% if c.total is none %}<span class="muted">{{ c.hidden_label }}</span>{% else %}{{ c.total }}{% endif %}</td></tr></tfoot>
+      {% endif %}
+    </table>
+  </div>
+</figure>
+{% endmacro %}
+{#- The marker of a line's point: circle, square, triangle or diamond by series. In the legend (no ``m``) it has no hover text. -#}
+{% macro marker_shape(series, x, y, m=none) -%}
+{%- set cls = "rchart__marker rchart__s" ~ (series + 1) -%}
+{%- if series == 0 -%}<circle class="{{ cls }}" cx="{{ x }}" cy="{{ y }}" r="4">{% if m %}<title>{{ m.title }}</title>{% endif %}</circle>
+{%- elif series == 1 -%}<rect class="{{ cls }}" x="{{ x - 4 }}" y="{{ y - 4 }}" width="8" height="8">{% if m %}<title>{{ m.title }}</title>{% endif %}</rect>
+{%- elif m -%}<polygon class="{{ cls }}" points="{{ m.points }}"><title>{{ m.title }}</title></polygon>
+{%- elif series == 2 -%}<polygon class="{{ cls }}" points="{{ x }},{{ y - 5 }} {{ x + 5 }},{{ y + 4 }} {{ x - 5 }},{{ y + 4 }}"/>
+{%- else -%}<polygon class="{{ cls }}" points="{{ x }},{{ y - 5 }} {{ x + 5 }},{{ y }} {{ x }},{{ y + 5 }} {{ x - 5 }},{{ y }}"/>
+{%- endif -%}
+{%- endmacro %}

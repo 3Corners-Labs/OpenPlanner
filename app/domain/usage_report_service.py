@@ -1,7 +1,10 @@
 """The use cases of the usage reports: who may read what, and the tables they get (ADR 0117).
 
     authorise (``reports.view``, audited on denial) ─► the groups in the reader's scope
-    ─► the hourly cells of those groups ─► ``volume_report`` (small cells hidden)
+    ─► the hourly cells of those groups ─► the report builder (small cells hidden)
+
+The builders are ``volume_report``, ``queue_report``, ``capacity_report`` and
+``channels_report``; all four read through the same ``_load`` and so through the same scope.
 
 Every read takes the ``Scope`` that the permission gives (ADR 0014); the adapter filters by it,
 so a report never reads a group outside it. The threshold that hides small cells is the
@@ -21,12 +24,16 @@ from app.domain.ports import Clock, UsageUnitOfWork
 from app.domain.usage import UsageCell
 from app.domain.usage_report import (
     MAX_DAYS,
+    DayStatusCount,
     ReportGroup,
     VolumeReport,
     created_in_range,
     headline_count,
     volume_report,
 )
+from app.domain.usage_report_capacity import CapacityReport, capacity_report
+from app.domain.usage_report_channels import ChannelsReport, channels_report
+from app.domain.usage_report_queue import QueueReport, queue_report
 from app.domain.usage_suppress import effective_threshold
 
 DEFAULT_DAYS = 28
@@ -38,8 +45,8 @@ _MARGIN = timedelta(days=1)
 
 
 @dataclass(frozen=True)
-class UsageVolume:
-    """A *Volume* report and what it is about.
+class UsageScreen[R]:
+    """A report and what it is about.
 
     Attributes:
         report: The tables, small cells hidden.
@@ -49,11 +56,29 @@ class UsageVolume:
         group: The one group of a group page, or ``None`` on the organisation's page.
     """
 
-    report: VolumeReport
+    report: R
     groups: tuple[ReportGroup, ...]
     organisation_slug: str
     organisation_name: str
     group: ReportGroup | None
+
+
+UsageVolume = UsageScreen[VolumeReport]
+"""The *Volume* screen's report."""
+
+
+@dataclass(frozen=True)
+class _Loaded:
+    """What every report reads before it builds its tables."""
+
+    groups: list[ReportGroup]
+    first: date
+    last: date
+    cells: list[UsageCell]
+    before: list[DayStatusCount]
+    as_of: datetime | None
+    threshold: int
+    now: datetime
 
 
 @dataclass(frozen=True)
@@ -95,16 +120,15 @@ class UsageReportService:
         """Return the small-cell threshold that applies to one organisation's figures."""
         return effective_threshold(self._platform_min(), self._organisation_min(organisation_id))
 
-    async def volume(
+    async def _load(
         self,
         principal: Principal,
-        *,
-        organisation_slug: str | None = None,
-        group_slug: str | None = None,
-        first_day: date | None = None,
-        last_day: date | None = None,
-    ) -> UsageVolume:
-        """Return the *Volume* report of one group, or of an organisation's groups in scope.
+        organisation_slug: str | None,
+        group_slug: str | None,
+        first_day: date | None,
+        last_day: date | None,
+    ) -> _Loaded:
+        """Authorise, then read the groups in scope and their hourly cells for the range.
 
         Without a range the report covers the last ``DEFAULT_DAYS`` days up to today; days are
         whole group-local days.
@@ -142,20 +166,127 @@ class UsageReportService:
             cells = await tx.read_usage_cells(scope, ids, lower, upper)
             before = await tx.read_day_status_counts(scope, ids, first, last)
             state = await tx.usage_state()
-        report = volume_report(
-            cells,
+        return _Loaded(
             groups,
             first,
             last,
-            threshold=self._threshold(organisation_id),
-            now=self._clock.now(),
-            as_of=state.rolled_at,
-            before_reporting=before,
+            cells,
+            before,
+            state.rolled_at,
+            self._threshold(organisation_id),
+            self._clock.now(),
         )
+
+    @staticmethod
+    def _screen[R](report: R, loaded: _Loaded, group_slug: str | None) -> UsageScreen[R]:
+        """Wrap ``report`` with the groups it adds up."""
+        groups = loaded.groups
         one = groups[0] if group_slug is not None else None
-        return UsageVolume(
+        return UsageScreen(
             report, tuple(groups), groups[0].organisation_slug, groups[0].organisation_name, one
         )
+
+    async def volume(
+        self,
+        principal: Principal,
+        *,
+        organisation_slug: str | None = None,
+        group_slug: str | None = None,
+        first_day: date | None = None,
+        last_day: date | None = None,
+    ) -> UsageVolume:
+        """Return the *Volume* report of one group, or of an organisation's groups in scope.
+
+        Raises:
+            DomainError: As ``_load``.
+        """
+        loaded = await self._load(principal, organisation_slug, group_slug, first_day, last_day)
+        report = volume_report(
+            loaded.cells,
+            loaded.groups,
+            loaded.first,
+            loaded.last,
+            threshold=loaded.threshold,
+            now=loaded.now,
+            as_of=loaded.as_of,
+            before_reporting=loaded.before,
+        )
+        return self._screen(report, loaded, group_slug)
+
+    async def queue(
+        self,
+        principal: Principal,
+        *,
+        organisation_slug: str | None = None,
+        group_slug: str | None = None,
+        first_day: date | None = None,
+        last_day: date | None = None,
+    ) -> UsageScreen[QueueReport]:
+        """Return the *Queue and calls* report (Q1 to Q9, U8, U11).
+
+        Raises:
+            DomainError: As ``_load``.
+        """
+        loaded = await self._load(principal, organisation_slug, group_slug, first_day, last_day)
+        report = queue_report(
+            loaded.cells,
+            loaded.groups,
+            loaded.first,
+            loaded.last,
+            threshold=loaded.threshold,
+            as_of=loaded.as_of,
+        )
+        return self._screen(report, loaded, group_slug)
+
+    async def capacity(
+        self,
+        principal: Principal,
+        *,
+        organisation_slug: str | None = None,
+        group_slug: str | None = None,
+        first_day: date | None = None,
+        last_day: date | None = None,
+    ) -> UsageScreen[CapacityReport]:
+        """Return the *Capacity* report (C1 to C5).
+
+        Raises:
+            DomainError: As ``_load``.
+        """
+        loaded = await self._load(principal, organisation_slug, group_slug, first_day, last_day)
+        report = capacity_report(
+            loaded.cells,
+            loaded.groups,
+            loaded.first,
+            loaded.last,
+            threshold=loaded.threshold,
+            as_of=loaded.as_of,
+        )
+        return self._screen(report, loaded, group_slug)
+
+    async def channels(
+        self,
+        principal: Principal,
+        *,
+        organisation_slug: str | None = None,
+        group_slug: str | None = None,
+        first_day: date | None = None,
+        last_day: date | None = None,
+    ) -> UsageScreen[ChannelsReport]:
+        """Return the *Channels* report (M1, M2, T1).
+
+        Raises:
+            DomainError: As ``_load``.
+        """
+        loaded = await self._load(principal, organisation_slug, group_slug, first_day, last_day)
+        report = channels_report(
+            loaded.cells,
+            loaded.groups,
+            loaded.first,
+            loaded.last,
+            threshold=loaded.threshold,
+            as_of=loaded.as_of,
+        )
+        return self._screen(report, loaded, group_slug)
 
     async def _require_organisation(
         self, principal: Principal, scope: Scope, organisation_slug: str
