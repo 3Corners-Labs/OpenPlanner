@@ -23,6 +23,16 @@ import { adminPageVariants } from '../pages';
 
 requireKeycloak();
 
+// Every test here signs in, most as super. End that admin session when the test is done: a
+// person keeps at most admin_max_sessions_per_person sessions (5 by default) and a new sign-in
+// ends the one idle longest, so this sweep's hundreds of sign-ins would otherwise end the session
+// of a test still running in another worker (admin-branding.spec.ts lost its save that way).
+// The context's own request API carries the session cookie and, unlike a fetch in the page, is
+// not held by the page's content security policy (no connect-src).
+test.afterEach(async ({ page }) => {
+  await page.request.post('/admin/logout', { maxRedirects: 0 }).catch(() => undefined);
+});
+
 const WIDTHS = { phone: 375, tablet: 768, desktop: 1280 } as const;
 
 for (const [name, width] of Object.entries(WIDTHS)) {
