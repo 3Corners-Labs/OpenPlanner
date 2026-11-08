@@ -97,3 +97,7 @@ def test_the_sealed_form_is_base64() -> None:
     token = base64.b64encode(b"sealed-bytes").decode()
 
     assert Sealed(token).token == token
+
+
+def test_a_sealed_token_is_not_printed() -> None:
+    assert "c2VhbGVk" not in repr(Sealed("c2VhbGVk"))

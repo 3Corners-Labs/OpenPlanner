@@ -787,3 +787,32 @@ def test_walking_a_tree_yields_every_object_with_its_address() -> None:
         (("s", "b", "a"), "tag"),
     ]
     assert [address for address, _ in walk(root, "tag")] == [("s", "b", "a")]
+
+
+def test_naming_an_unchanged_secret_still_needs_its_permission() -> None:
+    current = installation(shop("s", box("b", password=Secret("same"))))
+
+    allowed = plan_with_values(current, password=Secret("same"))
+    probe = plan_with_values(current, password=Secret("same"), _may=Recorder(Permission.GROUP_EDIT))
+
+    assert allowed.changes == ()
+    assert [r.code for r in probe.refusals] == [ErrorCode.NOT_PERMITTED]
+
+
+def test_replace_in_an_organisation_scope_deletes_below_the_top_level_too() -> None:
+    current = installation(shop("s", box("a"), box("b")))
+    data = {
+        "mode": "replace",
+        "scope": {"organisation": "s"},
+        "shops": [{"slug": "s", "boxes": [{"slug": "a"}]}],
+    }
+
+    assert kinds(plan(data, current)) == [("box", ("s", "b"), ChangeAction.DELETE)]
+
+
+def test_the_plan_hash_follows_what_the_plan_does() -> None:
+    data = {"shops": [{"slug": "s", "boxes": [{"slug": "b", "name": "Other"}]}]}
+    one = plan(data, installation(shop("s", box("b"))))
+    elsewhere = plan(data, installation(shop("s", box("b", name="Other")), shop("t")))
+
+    assert one.digest != elsewhere.digest

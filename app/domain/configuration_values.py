@@ -36,7 +36,7 @@ class Sealed:
             object's natural key and the field name as associated data.
     """
 
-    token: str
+    token: str = field(repr=False)
 
 
 class Secret:

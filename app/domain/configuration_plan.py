@@ -158,8 +158,14 @@ class _Planner:
         )
         for rule in self._document.schema.integrity:
             self._refusals.extend(rule(resolution))
-        digest = hashlib.sha256(f"{self._document.digest}:{settings_version}".encode()).hexdigest()
-        return Plan(tuple(self._writes) + tuple(self._deletes), tuple(self._refusals), digest)
+        changes = tuple(self._writes) + tuple(self._deletes)
+        effect = "\n".join(
+            f"{c.action.value} {c.kind} {'/'.join(c.address)} {','.join(c.fields)}" for c in changes
+        )
+        digest = hashlib.sha256(
+            f"{self._document.digest}:{settings_version}:{effect}".encode()
+        ).hexdigest()
+        return Plan(changes, tuple(self._refusals), digest)
 
     def _refuse(self, path: str, code: ErrorCode, field: str | None = None) -> None:
         """Record one refusal."""
@@ -184,7 +190,9 @@ class _Planner:
         if self._document.mode is Mode.REPLACE and coll.shape is not Shape.SINGLE:
             listed = {wanted.key for wanted in desired}
             for key, entity in existing.items():
-                if key in listed or not self._in_scope(coll.kind, key, None, entity):
+                if key in listed or (
+                    place.root and not self._in_scope(coll.kind, key, None, entity)
+                ):
                     continue
                 if self._delete(coll, entity, path_of(place.path, coll.name, key), place):
                     result.pop(key, None)
@@ -263,6 +271,15 @@ class _Planner:
                 self._refuse(path, error.code, error.field)
         names = [name for name in given if create or _changed(kind, current, name, merged)]
         here = self._place(kind, wanted, merged, place)
+        unchanged = tuple(
+            name
+            for name in given
+            if kind.field(name).type is FieldType.SECRET and name not in names
+        )
+        if unchanged and not create:
+            # Naming a secret is a probe whether it is right: ask for its screen's permission
+            # even when it is the same, so a refusal never tells who may not manage it.
+            self._authorise_named(kind, wanted, here, unchanged, merged)
         if create or names:
             action = ChangeAction.CREATE if create else ChangeAction.UPDATE
             self._emit(kind, wanted, here, action, tuple(names), merged)
@@ -348,6 +365,29 @@ class _Planner:
             self._deletes.append(change)
         else:
             self._writes.append(change)
+
+    def _authorise_named(
+        self,
+        kind: Kind,
+        wanted: Entity,
+        here: _Place,
+        names: tuple[str, ...],
+        values: dict[str, Value],
+    ) -> None:
+        """Check the permission of fields a document names without changing them."""
+        self._authorise(
+            Change(
+                kind=kind.name,
+                key=wanted.key,
+                address=here.address,
+                path=wanted.path,
+                action=ChangeAction.UPDATE,
+                fields=names,
+                permissions=_permissions(kind, here.permission, ChangeAction.UPDATE, names),
+                organisation=here.organisation,
+                group=here.group,
+            )
+        )
 
     def _authorise(self, change: Change) -> None:
         """Refuse the change when the actor lacks any permission its screens require."""

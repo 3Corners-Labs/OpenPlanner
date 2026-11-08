@@ -6,6 +6,7 @@ knowing what either was read from (ADR 0099 point 6). The tree holds no behaviou
 from JSON is ``configuration_document``, comparing two of them is ``configuration_plan``.
 """
 
+from collections import deque
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -71,9 +72,9 @@ def walk(root: Entity, kind: str | None = None) -> Iterator[tuple[Address, Entit
         root: The tree to walk (the root itself is not yielded).
         kind: Only the objects of this kind, when given.
     """
-    pending: list[tuple[Address, Entity]] = [((), root)]
+    pending: deque[tuple[Address, Entity]] = deque([((), root)])
     while pending:
-        address, entity = pending.pop(0)
+        address, entity = pending.popleft()
         for children in entity.children.values():
             for child in children:
                 here = (*address, *child.key)

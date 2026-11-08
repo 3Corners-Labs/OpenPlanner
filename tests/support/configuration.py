@@ -242,7 +242,7 @@ def format_with_box(new_box: Kind, *integrity: IntegrityRule) -> Format:
     return Format("test/v1", root, integrity=integrity)
 
 
-def plan_with_values(current: Entity, **values: Value) -> Plan:
+def plan_with_values(current: Entity, _may: Any = allow, **values: Value) -> Plan:
     """Plan an update of box ``b`` whose fields hold already opened values (secrets, files).
 
     A document read from JSON holds sealed secrets; the adapter opens them before planning.
@@ -256,7 +256,7 @@ def plan_with_values(current: Entity, **values: Value) -> Plan:
         replace(document, root=replace(document.root, children={"shops": (shops,)})),
         current,
         usage=Usage(),
-        may_change=allow,
+        may_change=_may,
         context=RuleContext(),
         settings_version=1,
     )
