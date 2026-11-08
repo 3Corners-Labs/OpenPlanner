@@ -13,9 +13,10 @@ report over groups in different time zones adds the days they each call the same
 """
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 from app.domain.booking import BookingStatus
@@ -25,7 +26,7 @@ from app.domain.usage import (
     UsageCell,
     UsageOutcome,
 )
-from app.domain.usage_suppress import suppress_line
+from app.domain.usage_suppress import suppress_line, suppress_table
 
 PROVISIONAL = timedelta(hours=24)
 """The most recent day is marked provisional: its outcomes are not final yet (ADR 0117 point 6)."""
@@ -35,6 +36,30 @@ MAX_DAYS = 400
 
 UNKNOWN = "unknown"
 """The code of an actor the backfill could not name."""
+
+
+class RangedReport(Protocol):
+    """What every report family has: its range, its freshness and the threshold it applied."""
+
+    @property
+    def first_day(self) -> date:
+        """The first day of the range."""
+        ...
+
+    @property
+    def last_day(self) -> date:
+        """The last day of the range."""
+        ...
+
+    @property
+    def as_of(self) -> datetime | None:
+        """When the rollup last ran."""
+        ...
+
+    @property
+    def threshold(self) -> int:
+        """The small-cell threshold that was applied."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -164,13 +189,112 @@ def headline_count(total: int, threshold: int) -> int | None:
     return suppress_line([total], threshold).cells[0]
 
 
-def _table(counts: Counter[str], codes: Sequence[str], threshold: int) -> CountTable:
+def count_table(counts: Counter[str], codes: Sequence[str], threshold: int) -> CountTable:
     """Return ``counts`` for ``codes`` in that order, small cells hidden and complemented."""
     view = suppress_line([counts.get(code, 0) for code in codes], threshold)
     return CountTable(
         tuple(CountRow(code, shown) for code, shown in zip(codes, view.cells, strict=True)),
         view.total,
     )
+
+
+@dataclass(frozen=True)
+class GridTable:
+    """A table of two cuts with the totals that may be shown.
+
+    Attributes:
+        rows: The row codes.
+        columns: The column codes.
+        cells: A count per row and column, ``None`` where hidden.
+        row_totals: Each row's total, ``None`` where it may not be shown.
+        column_totals: Each column's total, likewise.
+        total: The grand total, likewise.
+    """
+
+    rows: tuple[str, ...]
+    columns: tuple[str, ...]
+    cells: tuple[tuple[int | None, ...], ...]
+    row_totals: tuple[int | None, ...]
+    column_totals: tuple[int | None, ...]
+    total: int | None
+
+
+def grid_table(
+    counts: Counter[tuple[str, str]], rows: Sequence[str], columns: Sequence[str], threshold: int
+) -> GridTable:
+    """Return ``counts`` as a two-way table with suppression along both axes."""
+    view = suppress_table([[counts.get((r, c), 0) for c in columns] for r in rows], threshold)
+    return GridTable(
+        tuple(rows), tuple(columns), view.cells, view.row_totals, view.col_totals, view.grand_total
+    )
+
+
+def zones_of(groups: Sequence[ReportGroup]) -> dict[int, ZoneInfo]:
+    """Return each group's time zone by group id: where its days and hours begin."""
+    return {g.group_id: ZoneInfo(g.timezone) for g in groups}
+
+
+def local_cells(
+    cells: Sequence[UsageCell], zones: dict[int, ZoneInfo], first_day: date, last_day: date
+) -> Iterator[tuple[UsageCell, datetime]]:
+    """Yield the cells of the given groups whose group-local day lies in the range.
+
+    Each cell comes with its hour in the group's own time zone, from which a caller takes the
+    day, the weekday or the hour. A cell of a group that is not in ``zones`` is left out, so a
+    report never adds up a group the reader did not ask for.
+    """
+    for cell in cells:
+        zone = zones.get(cell.group_id)
+        if zone is None:
+            continue
+        local = cell.bucket_hour.astimezone(zone)
+        if first_day <= local.date() <= last_day:
+            yield cell, local
+
+
+@dataclass(frozen=True)
+class Distribution:
+    """A duration spread over the fixed buckets, with its exact mean.
+
+    Attributes:
+        table: The count per bucket code (``str(code)``), small cells hidden.
+        mean_seconds: The exact mean in whole seconds, shown only when the total may be shown.
+    """
+
+    table: CountTable
+    mean_seconds: int | None
+
+
+UNSIGNED_BUCKETS: tuple[str, ...] = tuple(str(b) for b in range(len(BUCKET_LABELS)))
+"""The bucket codes of a duration: 0 (under a minute) to 9 (over seven days)."""
+
+SIGNED_BUCKETS: tuple[str, ...] = tuple(
+    str(b) for b in range(-len(BUCKET_LABELS), len(BUCKET_LABELS))
+)
+"""The bucket codes of a signed duration, from the earliest (-10) to the latest (9)."""
+
+
+def distribution(
+    cells: Sequence[UsageCell], codes: Sequence[str], threshold: int, *, drop_empty: bool = False
+) -> Distribution:
+    """Return the buckets of ``cells`` (all of one metric) and the exact mean.
+
+    A bucket is a hidden cell below the threshold; the mean needs the whole table's total to be
+    shown, so a mean never points at a small group. With ``drop_empty`` a bucket nobody is in
+    leaves the table (the signed set has twenty); the rest is suppressed as usual.
+    """
+    counts: Counter[str] = Counter()
+    seconds = calls = 0
+    for cell in cells:
+        if cell.bucket is None:
+            continue
+        counts[str(cell.bucket)] += cell.count
+        seconds += cell.sum_value
+        calls += cell.count
+    wanted = [c for c in codes if counts.get(c, 0) > 0] if drop_empty else list(codes)
+    table = count_table(counts, wanted, threshold)
+    mean = round(seconds / calls) if table.total is not None and calls else None
+    return Distribution(table, mean)
 
 
 def volume_report(
@@ -230,13 +354,15 @@ def volume_report(
         DayRow(d, shown, d >= last_provisional)
         for d, shown in zip(day_list, series.cells, strict=True)
     )
-    lead_table = _table(lead, [str(b) for b in range(len(BUCKET_LABELS))], threshold)
+    lead_table = count_table(lead, [str(b) for b in range(len(BUCKET_LABELS))], threshold)
     mean = (
         round(lead_seconds / lead_count / 60)
         if lead_table.total is not None and lead_count
         else None
     )
-    confirmation = _table(confirm, ["confirmed", UsageOutcome.EXPIRED_UNCONFIRMED.value], threshold)
+    confirmation = count_table(
+        confirm, ["confirmed", UsageOutcome.EXPIRED_UNCONFIRMED.value], threshold
+    )
     confirmed_shown, lapsed_shown = (r.count for r in confirmation.rows)
     conversion = None
     if (
@@ -257,15 +383,15 @@ def volume_report(
         threshold=threshold,
         days=days,
         created_total=series.total,
-        outcomes=_table(outcomes, [o.value for o in UsageOutcome], threshold),
+        outcomes=count_table(outcomes, [o.value for o in UsageOutcome], threshold),
         lead_time=lead_table,
         lead_mean_minutes=mean,
-        participant_cancellations=_table(
+        participant_cancellations=count_table(
             cancels, [str(b) for b in range(len(BUCKET_LABELS))], threshold
         ),
-        reschedules=_table(moved, [*(a.value for a in ActorClass), UNKNOWN], threshold),
+        reschedules=count_table(moved, [*(a.value for a in ActorClass), UNKNOWN], threshold),
         confirmation=confirmation,
         conversion_percent=conversion,
-        closure=_table(closure, ["suspended", "resumed"], threshold),
-        before_reporting=_table(statuses, [s.value for s in BookingStatus], threshold),
+        closure=count_table(closure, ["suspended", "resumed"], threshold),
+        before_reporting=count_table(statuses, [s.value for s in BookingStatus], threshold),
     )
