@@ -5,7 +5,7 @@ waar elke groep bij hoort. Een organisatiebeheerder ziet de groepen van de eigen
 een groepsbeheerder of medewerker alleen de eigen groepen, de superuser alles.
 
 De lijst is een ingang: de naam van een groep opent de pagina van die groep met haar
-tabbladen (overzicht, instellingen, bezetting, agenda, wachtrij, noodsluiting). De naam van
+tabbladen (overzicht, agenda, planning, berichten, instellingen, noodsluiting). De naam van
 de organisatie opent de pagina van de organisatie, als u die mag openen. Op de pagina van
 een groep staat bovenaan het pad **Groepen › organisatie › groep**, zodat u altijd ziet waar u
 bent. Wijzigen gebeurt alleen op de pagina van de groep zelf, nooit in de lijst.
@@ -35,3 +35,21 @@ uw rol mag zien.
 
 Met **Nieuwe groep** (organisatiebeheerders en de superuser) maakt u een groep aan in een van
 uw organisaties. Daarna stelt u op de pagina van de groep de bezetting, teksten en kanalen in.
+
+## Klaar om te boeken
+
+Het tabblad **Overzicht** van een groep begint met de checklist **Klaar om te boeken**: wat nog
+ontbreekt voordat de groep afspraken kan aannemen. Elke regel zegt in woorden *Klaar*,
+*Ontbreekt*, *Standaardteksten* of *Niet nodig*, en linkt naar het tabblad waar u het regelt, als u dat tabblad mag
+openen.
+
+- **Bezetting voor de komende weken**: minstens één tijdblok in de week dat nog niet is
+  afgelopen.
+- **Berichtteksten**: ontbreekt nooit, want er zijn standaardteksten. *Klaar* als de groep eigen
+  teksten heeft, anders *Standaardteksten*.
+- **Kanaal om berichten te versturen**: de organisatie heeft een mailserver of sms-gateway die
+  klaar is om te versturen.
+- **Controle van de koppeling zonder fouten**: de laatste controle onder *Instellingen* vond geen
+  fout. *Niet nodig* voor een groep zonder Webex-host of koppeling met het contactcenter.
+
+De checklist wordt berekend elke keer dat u de pagina opent; er wordt niets voor opgeslagen.

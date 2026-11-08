@@ -25,7 +25,7 @@ A suspended booking can only be handled through the group it belongs to: the boo
 the URL is checked against the authorised group, so one group's admin cannot reach another's.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 
@@ -56,6 +56,8 @@ from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scenario_service import usable_scenario
 from app.domain.scheduling import Group, GroupSummary, Organisation
 from app.domain.services import BookingService
+from app.domain.usage import ActorClass, FactKind
+from app.domain.usage_recording import record_closure_change
 
 
 @dataclass(frozen=True)
@@ -178,6 +180,21 @@ class ClosureService:
             suspended = await tx.list_suspended_bookings(self._scope(principal), group.id)
             ahead = await tx.find_confirmed_bookings(group.id, now, None)
         return ClosureOverview(closures[0] if closures else None, suspended, len(ahead))
+
+    async def active(self, groups: Sequence[Group]) -> frozenset[str]:
+        """Return the slugs of ``groups`` that are closed now.
+
+        For the overview's filter *active closures* (ADR 0047 §4). The caller passes the groups
+        already in the reader's scope; that a group is closed is public on its booking page, so
+        no further permission is needed to say so.
+        """
+        now = self._clock.now()
+        closed = set()
+        async with self._uow.read() as tx:
+            for group in groups:
+                if covering(await tx.get_closures(group.id, now), now) is not None:
+                    closed.add(group.slug)
+        return frozenset(closed)
 
     async def close_group(self, principal: Principal, slug: str, closure: ClosureInput) -> int:
         """Close the group and suspend the confirmed bookings inside the closure.
@@ -369,7 +386,9 @@ class ClosureService:
         async with self._uow.locked() as tx:
             group = await _group(tx, slug)
             booking = await _suspended(tx, group, booking_id)
-            receipt = await self._bookings.relocate(tx, booking, group, new_start)
+            receipt = await self._bookings.relocate(
+                tx, booking, group, new_start, actor=ActorClass.CLOSURE
+            )
             await self._audit(tx, principal, authorization, slug, "booking.move")
         return receipt.booking
 
@@ -512,6 +531,7 @@ class ClosureService:
         bookings = await tx.find_confirmed_bookings(group.id, closure.starts_at, closure.ends_at)
         for booking in bookings:
             await tx.save_booking(booking.suspend(closure_id))
+            await record_closure_change(tx, FactKind.BOOKING_SUSPENDED, booking, group, now)
             jobs = plan_for_suspension(
                 now=now,
                 purge_at=closure.purge_at(booking.end, self._retention_of(group.organisation_id)),
@@ -560,6 +580,7 @@ class ClosureService:
         if booking.contact is None:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
         await tx.save_booking(booking.reinstate())
+        await record_closure_change(tx, FactKind.BOOKING_RESUMED, booking, group, now)
         jobs = plan_for_booking(
             start=booking.start,
             end=booking.end,
@@ -576,7 +597,9 @@ class ClosureService:
     async def _cancel(self, tx: Transaction, group: Group, booking: Booking) -> None:
         """Cancel ``booking`` with the cancellation mail, the team's withdrawal and the purge."""
         now = self._clock.now()
-        await booking_changes.cancel(tx, booking, now, team_invite=group.sends_team_invite)
+        await booking_changes.cancel(
+            tx, booking, group, now, actor=ActorClass.CLOSURE, team_invite=group.sends_team_invite
+        )
 
     async def _closure_bookings(
         self, tx: Transaction, principal: Principal, group: Group, closure: Closure

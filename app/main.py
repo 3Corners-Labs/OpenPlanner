@@ -117,6 +117,7 @@ from app.domain.ports import (
 )
 from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
+from app.domain.readiness import ReadinessService
 from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
 from app.domain.scenario_service import ScenarioService
@@ -296,7 +297,10 @@ def create_app(
         app.state.http = http  # ADR 0082: the Service App check runs the probes from here
         # ADR 0034: committed audit events also go to stdout for the log platform.
         uow = SqlUnitOfWork(
-            app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
+            app.state.engine,
+            secret_box(settings),
+            StdoutEventSink(settings.event_envelope),
+            usage_enabled=lambda: live().reporting_enabled,  # ADR 0117, read at each write
         )
         # ADR 0068: every request to Webex and WxCC becomes a system event of the booking.
         request_log = RequestEvents(uow, clock, settings.app_version)
@@ -581,6 +585,7 @@ def create_app(
         app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
+        app.state.readiness_service = ReadinessService(uow, clock, app.state.admin_service)
         app.state.scenario_service = ScenarioService(uow, clock, app.state.admin_service)
         app.state.embedding_service = EmbeddingService(
             uow,

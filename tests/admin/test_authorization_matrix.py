@@ -822,7 +822,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # Emergency closure of a whole organisation: organisation admins and the superuser.
     # ADR 0047 §4: the old closures list redirects permanently to the organisation's tab.
-    "GET /admin/closures": {"/admin/closures": statuses(308, 308, 403, 308, 403, 403, 403)},
+    # ADR 0047 §4, step 5: the old closures list is the overview's filter *active closures*.
+    "GET /admin/closures": {"/admin/closures": statuses(308, 308, 308, 308, 308, 308, 403)},
     "GET /admin/organisations/{org}/closure": {
         "/admin/organisations/demo/closure": statuses(200, 200, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/closure": statuses(200, 403, 403, 200, 403, 403, 403),
@@ -1105,14 +1106,19 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/queue/{booking_id}/release": {
         "/admin/groups/demo/queue/999999/release": statuses(404, 404, 404, 403, 403, 404, 403),
     },
-    # A group's own contact block: closure.manage, like the rest of its closure page.
-    "GET /admin/groups/{slug}/closure/contacts": {
-        "/admin/groups/demo/closure/contacts": statuses(200, 200, 200, 403, 403, 403, 403),
-        "/admin/groups/andere-team/closure/contacts": statuses(200, 403, 403, 200, 403, 403, 403),
+    # A group's own contact block (*Messages › Contact*, ADR 0047 step 4): closure.manage,
+    # like the rest of its closure page; the old path redirects with the same permission.
+    "GET /admin/groups/{slug}/contact": {
+        "/admin/groups/demo/contact": statuses(200, 200, 200, 403, 403, 403, 403),
+        "/admin/groups/andere-team/contact": statuses(200, 403, 403, 200, 403, 403, 403),
     },
-    "POST /admin/groups/{slug}/closure/contacts": {
-        "/admin/groups/demo/closure/contacts": statuses(303, 303, 303, 403, 403, 403, 403),
-        "/admin/groups/andere-team/closure/contacts": statuses(303, 403, 403, 303, 403, 403, 403),
+    "POST /admin/groups/{slug}/contact": {
+        "/admin/groups/demo/contact": statuses(303, 303, 303, 403, 403, 403, 403),
+        "/admin/groups/andere-team/contact": statuses(303, 403, 403, 303, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/closure/contacts": {
+        "/admin/groups/demo/closure/contacts": statuses(308, 308, 308, 403, 403, 403, 403),
+        "/admin/groups/andere-team/closure/contacts": statuses(308, 403, 403, 308, 403, 403, 403),
     },
 }
 

@@ -100,7 +100,7 @@ hour before), at once after "Check now", or within a minute after "Update now".
 | 1 | `main.yml`: candidate version, image, tag, pre-release; publish without waiting for mutation; `release_plan --candidate`; runbook | #131 | merged 2026-10-30 |
 | 2 | `Version` with `rc`, channel `rc` in the release adapter, `UPDATE_CHANNEL` and `UPDATE_AUTO_APPLY`, auto request in the worker, updater and installer `--channel`, `/admin/updates` shows the channel | #132 | merged 2026-10-30 |
 | 3 | docker01 on `rc` with auto-apply; first candidate seen live | #140 | live on the test host 2026-10-30: `v0.4.0-rc.5` (runbook, *Test host on the rc channel*) |
-| fix | a candidate's number follows `main`'s commit order: a run whose commit an existing candidate already contains tags nothing (`release_plan --candidate`, `main.yml`); after `rc.179` (#480) came after `rc.176` (#481) on 2026-11-03 | #491 | in PR #491 |
+| fix | a candidate's number follows `main`'s commit order: a run whose commit an existing candidate already contains tags nothing (`release_plan --candidate`, `main.yml`); after `rc.179` (#480) came after `rc.176` (#481) on 2026-11-03 | #491 | merged |
 
 ## Consequences
 

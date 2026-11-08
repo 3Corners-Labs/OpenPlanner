@@ -1200,6 +1200,24 @@ fieldset.card {
   white-space: normal;
 }
 
+/* The readiness checklist of an overview tab (ADR 0047 §5): one line per item, the status in
+   words in a chip, then the link to the tab that fixes it. */
+.checklist {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checklist__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 24px;
+}
+
 .link-with-icon {
   display: inline-flex;
   align-items: center;

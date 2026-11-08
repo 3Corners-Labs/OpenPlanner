@@ -41,6 +41,7 @@ from app.domain import staff
 from app.domain.admin import (
     AMBIGUOUS_CLAIMS_EVENT,
     ANONYMOUS,
+    AUDIT_LOG_LIMIT,
     ENTITLEMENT_MISMATCH_EVENT,
     ENTITLEMENT_REFUSED_EVENT,
     LOGIN_EVENT,
@@ -664,7 +665,7 @@ async def _audit_page(
     zone = ZoneInfo(settings_for(request).admin_timezone)
     in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
     narrow = query.narrow({g.group.slug for g in in_scope}, zone)
-    events = await service.audit_log(context.principal, narrow)
+    events = await service.audit_log(context.principal, narrow, AUDIT_LOG_LIMIT)
     response = _page(
         request,
         locale,
@@ -672,6 +673,7 @@ async def _audit_page(
         context.principal,
         {
             "events": audit_views(request, locale, context.principal, events),
+            "limit": AUDIT_LOG_LIMIT,
             "filters": _filter_view(narrow, in_scope, zone, locale.gettext),
             "export_error": locale.gettext(EXPORT_REFUSALS[error]) if error else None,
             "diagnostics": await _diagnostics_view(request, locale, context),

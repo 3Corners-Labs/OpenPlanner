@@ -497,6 +497,10 @@ class ScheduleRule:
             and (self.valid_to is None or day <= self.valid_to)
         )
 
+    def applies_from(self, day: date) -> bool:
+        """Return whether this rule still opens the group on ``day`` or a later day."""
+        return self.valid_to is None or self.valid_to >= day
+
     def _validity_overlaps(self, other: "ScheduleRule") -> bool:
         """Return whether both rules can apply on a common date."""
         starts_before_other_ends = (

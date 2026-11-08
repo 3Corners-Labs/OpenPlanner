@@ -5147,9 +5147,6 @@ msgstr "Dit team heeft geen eigen blok. De standaard van de organisatie geldt ({
 msgid "admin.group_contacts.none"
 msgstr "Dit team heeft geen eigen blok en de organisatie heeft geen standaard ingesteld."
 
-msgid "admin.group_contacts.back"
-msgstr "Terug naar de sluiting van dit team"
-
 msgid "admin.group_contacts.preview_lead"
 msgstr "Zo zien deelnemers het blok dat nu voor dit team geldt: het eigen blok of anders de standaard van de organisatie."
 
@@ -8005,8 +8002,6 @@ msgstr "Geen"
 msgid "admin.groups.public_page"
 msgstr "Openbare pagina"
 
-msgid "admin.groups.search_active"
-msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
 
 msgid "term.agent"
 msgstr "medewerker"
@@ -9375,6 +9370,9 @@ msgstr "Gebruik voor de inlognaam alleen kleine letters, cijfers, punten en stre
 msgid "admin.form.error.staff_user_name_in_use"
 msgstr "Deze inlognaam is al in gebruik. Kies een andere."
 
+msgid "settings.field.reporting_enabled.label"
+msgstr "Gebruiksrapportages worden gevuld"
+
 msgid "settings.field.overview_live_enabled.label"
 msgstr "Overzicht ververst zichzelf"
 
@@ -9686,3 +9684,90 @@ msgstr "Doorgaan naar de inlogdienst"
 
 msgid "admin.alerts.text.check"
 msgstr "De controle van de koppeling van deze groep vond een probleem ({code}). Open de groep en kies Koppeling controleren voor de uitleg."
+
+msgid "admin.tab.planning"
+msgstr "Planning"
+
+msgid "admin.tab.group_messages"
+msgstr "Berichten"
+
+
+msgid "admin.readiness.title"
+msgstr "Klaar om te boeken"
+
+msgid "admin.readiness.ready"
+msgstr "Alles is ingesteld om afspraken aan te nemen."
+
+msgid "admin.readiness.missing"
+msgstr "Nog te regelen voordat afspraken kunnen worden aangenomen: {count}."
+
+msgid "admin.readiness.staffing"
+msgstr "Bezetting voor de komende weken"
+
+msgid "admin.readiness.texts"
+msgstr "Berichtteksten"
+
+
+
+msgid "admin.readiness.channels"
+msgstr "Kanaal om berichten te versturen (e-mail of sms)"
+
+msgid "admin.readiness.check"
+msgstr "Controle van de koppeling zonder fouten"
+
+msgid "admin.readiness.branding"
+msgstr "Eigen huisstijl"
+
+msgid "admin.readiness.contact"
+msgstr "Contactalternatieven voor een sluiting"
+
+msgid "admin.readiness.state.done"
+msgstr "Klaar"
+
+msgid "admin.readiness.state.missing"
+msgstr "Ontbreekt"
+
+msgid "admin.readiness.state.not_needed"
+msgstr "Niet nodig"
+
+msgid "admin.dashboard.filter"
+msgstr "Groepen filteren"
+
+msgid "admin.dashboard.only_closed"
+msgstr "Alleen groepen met een actieve noodsluiting"
+
+msgid "admin.dashboard.closed_count"
+msgstr "Groepen met een actieve noodsluiting: {count} van {total}"
+
+msgid "admin.dashboard.closed"
+msgstr "Noodsluiting actief"
+
+msgid "admin.dashboard.no_closed"
+msgstr "Geen enkele groep heeft nu een actieve noodsluiting."
+
+msgid "admin.api.filter"
+msgstr "API-clients filteren"
+
+msgid "admin.api.search"
+msgstr "Zoeken op naam of client-id"
+
+msgid "admin.api.count"
+msgstr "Aantal clients: {count}"
+
+msgid "admin.api.count_of"
+msgstr "Clients die passen: {count} van {total}"
+
+msgid "admin.api.no_match"
+msgstr "Geen client past bij dit filter."
+
+msgid "admin.audit.count"
+msgstr "Gebeurtenissen: {count}"
+
+msgid "admin.audit.count_newest"
+msgstr "De nieuwste {count} gebeurtenissen. Verfijn het filter of exporteer voor meer."
+
+msgid "admin.readiness.state.defaults"
+msgstr "Standaardteksten"
+
+msgid "admin.list.search_active"
+msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
