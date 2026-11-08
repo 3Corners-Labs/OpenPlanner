@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta
 
 from app.domain.authorization import Principal
 from app.domain.booking import Booking
+from app.domain.call_usage import record_call_event
 from app.domain.calls import (
     JOIN_CLOSES_AFTER,
     JOIN_OPENS_BEFORE,
@@ -152,6 +153,9 @@ class MeetingStatusService:
             before = await tx.get_call_status(booking_id) or new_status(booking_id)
             after = apply_polled(before, polled, now)
             for kind in polled_events(before, after):
+                await record_call_event(
+                    tx, booking_id, kind, before, after, now, POLLED, booking=booking
+                )
                 await tx.add_booking_event(
                     BookingEvent(booking_id, now, kind, POLLED, version=self._version)
                 )

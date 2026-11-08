@@ -5,8 +5,12 @@ file differs, so the published definitions are the ones the code uses, as for
 ``docs/settings.md``.
 """
 
+from app.domain.call_facts import FAILURE_CODES, LEAVE_REASONS
+from app.domain.message_usage import PURPOSES
 from app.domain.privacy import USAGE_FIELDS
+from app.domain.slot_close import OUTCOME_RULE
 from app.domain.usage import BUCKET_LABELS, FACT_HOUR, METRIC_VERSION, METRICS
+from app.domain.usage_rollup import FILL_CLASSES, feed_rows
 from app.domain.usage_suppress import MIN_CELL_SIZE_FLOOR
 
 _INTRO = f"""# Reporting on use
@@ -36,6 +40,33 @@ def render_markdown() -> str:
     parts.append("\n## Facts and the hour they are keyed on\n\n")
     parts.append("| Fact | Hour from |\n|---|---|\n")
     parts.extend(f"| `{kind.value}` | {source.value} |\n" for kind, source in FACT_HOUR.items())
+    parts.append("\n## How a fact becomes a cell\n\n")
+    parts.append(
+        "One row per metric a fact kind feeds. The count of a cell is always the number of facts; "
+        "the figure is what the metric adds up. A word in `reason_code` is the metric's own "
+        "state, not the fact's reason.\n\n"
+    )
+    parts.append("| Fact | Metric | Figure | Cut by | Only when |\n|---|---|---|---|---|\n")
+    parts.extend(
+        f"| `{r.kind.value}` | {r.metric} | {r.figure} | {r.cuts} | {r.condition} |\n"
+        for r in feed_rows()
+    )
+    parts.append("\n## Closed lists\n\n")
+    parts.append(
+        "A `reason_code` of a fact is always one of these; a free text never becomes one.\n\n"
+    )
+    parts.append(
+        f"- Failure codes (`call.failed` is `task.`, `meeting.` or `integration.` plus one of): "
+        f"{', '.join(f'`{c}`' for c in sorted(FAILURE_CODES))}\n"
+    )
+    left = ", ".join(f"`{c}`" for c in sorted(LEAVE_REASONS))
+    parts.append(f"- Why a participant left a direct call: {left}\n")
+    purposes = ", ".join(f"`{c}`" for c in sorted(set(PURPOSES.values())))
+    parts.append(f"- Purpose of a message: {purposes}\n")
+    parts.append("- Shortfall of a slot: `open`, `accepted`, `resolved`\n")
+    parts.append(f"- Fill of a closed slot: {', '.join(f'`{c}`' for c in FILL_CLASSES)}\n")
+    parts.append("\n## How an outcome is derived\n\n")
+    parts.append(OUTCOME_RULE.strip() + "\n")
     parts.append("\n## Duration buckets\n\n")
     parts.append(
         "The same ten buckets for every duration; a signed duration (a host who was early) "

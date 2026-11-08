@@ -28,8 +28,11 @@ wanneer een boeking verandert, één klein gegeven per wijziging.
 - **Boekingen gemaakt per dag**: nieuwe boekingen, zonder de boekingen die zijn ontstaan door een
   andere te verplaatsen.
 - **Hoe boekingen eindigden**: geannuleerd door de deelnemer, door de planner, na een sluiting of
-  door het systeem, en niet op tijd bevestigd. *Afgerond* en *niet verschenen* blijven voorlopig
-  leeg: de dienst legt ze nog nergens vast.
+  door het systeem, en niet op tijd bevestigd. *Afgerond* en *niet verschenen* worden twee uur na
+  de afspraak uit het videogesprek afgeleid: een deelnemer die samen met de gespreksleider in de
+  vergadering is gezien, is afgerond; een deelnemer die nooit is gezien in een vergadering die was
+  aangemaakt, is niet verschenen. Meldt het platform niet wie er binnenkwam, dan telt een afspraak
+  als geen van beide.
 - **Hoe ver vooruit boekingen worden gemaakt**: de tijd tussen het boeken en de afspraak, in vaste
   klassen, met het gemiddelde. Tijden worden op het kwartier bijgehouden.
 - **Annuleringen door deelnemers**: hoeveel tijd er nog was voor de afspraak.

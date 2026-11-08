@@ -27,8 +27,10 @@ changes, one small record per change.
 
 - **Bookings created per day**: new bookings, without those made by moving another one.
 - **How bookings ended**: cancelled by the participant, by the planner, after a closure or by the
-  system, and not confirmed in time. *Completed* and *no show* stay empty for now: nothing in the
-  service records them yet.
+  system, and not confirmed in time. *Completed* and *no show* are worked out two hours after the
+  appointment from the video call: a participant who was seen in the meeting with the host is
+  completed, one who was never seen in a meeting that was set up is a no show. Where the platform
+  does not report who joined, an appointment is counted as neither.
 - **How far ahead bookings are made**: the time between making the booking and its appointment,
   in fixed ranges, with the mean. Times are kept to the quarter hour.
 - **Cancellations by participants**: how much time was left before the appointment.
