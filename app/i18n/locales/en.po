@@ -11387,3 +11387,6 @@ msgstr "Release the proposed time"
 
 msgid "audit.job.send_proposal_released"
 msgstr "Send notice of a released proposal"
+
+msgid "settings.field.reporting_usage_events_to_log.label"
+msgstr "Also send usage facts to the log destinations"

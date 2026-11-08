@@ -125,6 +125,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_RETENTION_MONTHS` | int | `25` | 13–60 | `settings.platform.manage` | Months the hourly usage rollup is kept; 25 gives two full years and the running one (ADR 0117). |
 | `REPORTING_ROLLUP_INTERVAL_MINUTES` | int | `15` | 5–240 | `settings.platform.manage` | Minutes between two rollups of usage facts into the hourly table; System status warns when the rollup is four times this behind (ADR 0117). |
 | `REPORTING_MIN_CELL_SIZE` | int | `5` | 3–20 | `settings.platform.manage` | The smallest count a usage report shows; a smaller cell reads < n and its sum and mean are hidden. Never below 3 (ADR 0117 point 8). |
+| `REPORTING_USAGE_EVENTS_TO_LOG` | bool | `false` | — | `settings.platform.manage` | Also write every usage fact as the log line usage.fact for the log destinations: counts and codes only, no personal data (ADR 0117 point 15). |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |

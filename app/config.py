@@ -254,6 +254,9 @@ class Settings(BaseSettings):
     # an organisation may raise it to for its own view (class D, never lower).
     reporting_min_cell_size: int = Field(default=5, ge=3, le=20)
     reporting_org_min_cell_size: int = Field(default=3, ge=3, le=50)
+    # ADR 0117 point 15 (class C, platform): also write every non-team usage fact as the log line
+    # usage.fact for the log destinations; no personal data. Off by default.
+    reporting_usage_events_to_log: bool = False
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)

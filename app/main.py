@@ -329,6 +329,7 @@ def create_app(
             secret_box(settings),
             StdoutEventSink(settings.event_envelope),
             usage_enabled=lambda: live().reporting_enabled,  # ADR 0117, read at each write
+            usage_to_log=lambda: live().reporting_usage_events_to_log,  # point 15, read live
         )
         # ADR 0068: every request to Webex and WxCC becomes a system event of the booking.
         request_log = RequestEvents(uow, clock, settings.app_version)

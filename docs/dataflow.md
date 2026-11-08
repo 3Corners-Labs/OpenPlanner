@@ -650,6 +650,14 @@ insert is rolled back to its savepoint and dropped with a log line that names th
 value, so reporting never fails a participant's action; `reporting_enabled` (class C) off writes
 nothing. Nothing in this path reads a purged column.
 
+With `reporting_usage_events_to_log` (class C, off by default) each committed non-team fact is also
+written as one structured line after the commit:
+
+    committed fact ─► usage.fact line (allow-listed codes, UTC hour, duration bucket) ─► stdout ─► log destinations (ADR 0085)
+
+The line holds no personal data, so the masking processor has nothing to mask; the customer's
+retention of it is theirs.
+
 ## Planned flows
 
 Purge sweep (retention): the worker's daily housekeeping reads the bookings that still hold
