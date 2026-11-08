@@ -1,6 +1,6 @@
 # 0085. Log destinations in the portal (syslog, Splunk, Elastic) and a trace level
 
-Status: accepted (2026-10-31) by the product owner; partly built: step 1 (the `TRACE` level and the trace points) is merged, step 2 (the destination model, the service, the queue and sender, the rights and the migration, #295) is merged, step 3 (the four adapters and the wiring in web and worker, #296) is merged, step 4 (the screen, #297) is merged, step 5 (the kill switch, runbook, data flow and threat model) is in PR (#299). Amends ADR 0034
+Status: accepted (2026-10-31) by the product owner; built: step 1 (the `TRACE` level and the trace points) is merged, step 2 (the destination model, the service, the queue and sender, the rights and the migration, #295) is merged, step 3 (the four adapters and the wiring in web and worker, #296) is merged, step 4 (the screen, #297) is merged, step 5 (the kill switch, runbook, data flow and threat model) is merged (#299). Amends ADR 0034
 point 4 (shipping is the host's job only) and extends ADR 0040 (levels) and ADR 0042 (`LOG_LEVEL`
 with expiry). ADR 0008 (encrypted integration secrets) and ADR 0047 (one home per screen)
 apply. §10 (diagnostic events and trace lines may go to a destination that opts in, switched on
@@ -157,8 +157,8 @@ oldest on a full queue (a request is never blocked by logging).
 | 1 | `TRACE` level, `tracer.trace()`, the trace points, `TRACE_LEVEL_MAX_HOURS`, `SQL_SLOW_MS`, `docs/logging.md` | #266 | merged |
 | 2 | Domain: `LogDestinationSender` Protocol, destination model and validation, service, queue and sender with drop and backoff, counters, system event; `logging.manage` and `logging.view` in the matrix; migration 0080; the line tap. Not yet started in web or worker: step 3 wires it with the adapters | #295 | merged |
 | 3 | Adapters: `syslog` (TLS, TCP, UDP), `splunk_hec`, `elastic`, `http`; the shipper and the line tap run in web and worker; contract tests against recorded shapes and local receivers (TCP, TLS with its own authority, UDP) | #296 | merged |
-| 4 | Admin: *Log destinations* list and page (`/admin/logging`), *Send test line*, a row on *System status*; manual topic (nl, en); `docs/admin-map.md` regenerated | #297 | in PR |
-| 5 | `LOG_SHIPPING_ENABLED` kill switch (class B) for the senders and the test line, with a notice on the screen; runbook section rewritten (portal route first, host route kept, failure table); `docs/dataflow.md`, `docs/threat-model.md` (abuse cases L1–L9), `docs/architecture.md` | #299 | in PR |
+| 4 | Admin: *Log destinations* list and page (`/admin/logging`), *Send test line*, a row on *System status*; manual topic (nl, en); `docs/admin-map.md` regenerated | #297 | merged |
+| 5 | `LOG_SHIPPING_ENABLED` kill switch (class B) for the senders and the test line, with a notice on the screen; runbook section rewritten (portal route first, host route kept, failure table); `docs/dataflow.md`, `docs/threat-model.md` (abuse cases L1–L9), `docs/architecture.md` | #299 | merged |
 
 ## Consequences
 

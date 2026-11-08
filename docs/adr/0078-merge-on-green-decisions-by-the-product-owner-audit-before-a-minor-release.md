@@ -4,7 +4,7 @@ Status: accepted (2026-10-31, `po:approved` on #177), requested by the product o
 ADR 0012 (point 1: who asks for a merge), ADR 0058 (point 5: who adds a pull request to the
 queue) and ADR 0052 (point 3: a release of a new minor or major version gets an audit first).
 Keeps ADR 0059 (release candidates on every merge) as it is. Amended by ADR 0088 (point 3: the
-gate judges the merge group too). Partly built; see *Build status*. §4 amended by ADR 0079 (the
+gate judges the merge group too). Built; step 5 was the release `v0.4.0` with its audit (#511, `Verdict: pass`); see *Build status*. §4 amended by ADR 0079 (the
 audit runs as a job of the `release` workflow; the release tag is set by the workflow
 dispatch). Step 3 done on 2026-11-02: `decision gate` is a required check in the ruleset of
 `main`, which has no bypass. Point 3 amended by ADR 0104 (only a label set by an administrator
@@ -129,7 +129,7 @@ is a decision that needs the label.
 | 2 | `make release-audit` (Codex CLI over the diff since the last release) and the `## Release audit` check on a `vX.Y.0` tag in `main.yml`; runbook step | #177 | merged 2026-10-31 |
 | 3 | The product owner adds `decision gate` to the required checks of `main` and the label `po:approved` exists; Claude Code enables auto-merge on the pull requests it opens from then on | GitHub setting | built 2026-11-02: ruleset `main` without bypass, *decision gate* required; ADR 0104 limits the label to administrators (#414) |
 | 4 | Issues per open *Build status* row on the merge of an ADR, and the weekly drift report (point 6): `scripts/adr_issues.py`, `.github/workflows/adr-drift.yml` | #180 | merged 2026-10-31 |
-| 5 | First minor release under this ADR (`v0.4.0`) with its audit section | | planned; prepared by ADR 0079 (#183): the `audit` job of `release.yml` runs the review and writes the section, the product owner sets the verdict |
+| 5 | First minor release under this ADR (`v0.4.0`) with its audit section | #511 | merged |
 | 6 | The gate runs in the merge queue and judges every pull request in the group by its own commit (ADR 0088); the skipped `merge_group` job let #266 carry ADR 0085 onto `main` on 2026-10-31 | #284 | merged 2026-10-31 |
 
 ## Consequences

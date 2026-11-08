@@ -13,15 +13,29 @@ import pytest
 
 from scripts.decision_gate import (
     LABEL,
+    UNBUILT_LIMIT,
     adr_changed_decision,
     approval,
+    blocks,
     decision_part,
+    first_step_built,
+    is_policy,
     main,
     parse_pull,
     pull_request_number,
     reasons,
+    unbuilt,
 )
 from tests.scripts.conftest import Git, commit_all
+
+
+def with_first_step(text: str) -> str:
+    """Return an ADR whose pull request also builds its first step (ADR 0119)."""
+    return text.replace(
+        "| 0 | ADR proposed | #1 | in PR |",
+        "| 0 | ADR proposed | #6 | merged |\n| 1 | The rule, built | #6 | merged |",
+    )
+
 
 ADMIN = "owner"
 """An administrator of the repository in these tests."""
@@ -281,7 +295,7 @@ def queue(git: Git, adr: Path) -> Path:
     (adr.parents[2] / "app.py").write_text("x = 2\n")
     commit_all(git, "feat: build (#5)")
     new = adr.with_name("0100-new.md")
-    new.write_text(ADR.replace("0099", "0100"))
+    new.write_text(with_first_step(ADR.replace("0099", "0100")))
     commit_all(git, "docs(adr): a new decision (#6)")
     return new
 
@@ -437,3 +451,121 @@ def test_nothing_cancels_a_withdrawal() -> None:
     assert "--admins" in text
     assert 'label-events.sh" "$NUMBER"' in text
     assert 'label-events.sh" "$number"' in text
+
+
+# --- ADR 0119: a design merges with its build, and a brake on unbuilt ADRs -----------------
+
+
+def overview(*unbuilt_numbers: str) -> str:
+    """Return a ``docs/adr-status.md`` listing the given ADRs as NOT BUILT and one as BUILT."""
+    rows = [f"| {n} | T | NOT BUILT | e | everything |" for n in unbuilt_numbers]
+    return "\n".join(
+        [
+            "| ADR | Title | Built? | Evidence | What is missing |",
+            *rows,
+            "| 0001 | T | BUILT | e | – |",
+        ]
+    )
+
+
+def test_the_first_build_step_counts_only_when_it_is_in() -> None:
+    assert not first_step_built(ADR)
+    assert first_step_built(with_first_step(ADR))
+    assert not first_step_built(
+        with_first_step(ADR).replace("built | #6 | merged", "built | | planned")
+    )
+    assert not first_step_built(ADR.split("## Build status")[0])
+
+
+def test_a_policy_adr_needs_no_build_step() -> None:
+    assert is_policy(ADR.replace("Status: proposed", "Status: accepted; policy, nothing to build;"))
+    assert not is_policy(ADR)
+    assert not is_policy(ADR.replace("Status: proposed", "Status: proposed; amends the CSP policy"))
+
+
+def test_the_overview_gives_the_unbuilt_adrs() -> None:
+    assert unbuilt(overview("0032", "0045")) == {"0032", "0045"}
+    assert unbuilt("| 0002 | T | NOT BUILT (policy part: document only) | e | x |") == {"0002"}
+
+
+def test_a_new_adr_without_its_first_step_is_blocked_even_when_approved() -> None:
+    path = "docs/adr/0120-new.md"
+    texts = {path: (None, ADR), "docs/adr-status.md": (None, overview())}
+    found = blocks([path], lambda p: texts.get(p, (None, None)))
+
+    assert found == [
+        "ADR 0120 is new but its first build step is not in this pull request "
+        "(its Build status row must say merged)"
+    ]
+
+
+def test_a_new_adr_with_its_first_step_or_as_policy_passes() -> None:
+    path = "docs/adr/0120-new.md"
+    for text in (
+        with_first_step(ADR),
+        ADR.replace("Status: proposed", "Status: policy, nothing to build"),
+    ):
+        texts = {path: (None, text), "docs/adr-status.md": (None, overview("0032"))}
+        assert blocks([path], lambda p, t=texts: t.get(p, (None, None))) == []
+
+
+def test_no_new_adr_while_too_many_have_nothing_built() -> None:
+    path = "docs/adr/0120-new.md"
+    waiting = tuple(f"00{n:02d}" for n in range(10, 10 + UNBUILT_LIMIT))
+    texts = {
+        path: (None, with_first_step(ADR)),
+        "docs/adr-status.md": (None, overview(*waiting, "0120")),
+    }
+    found = blocks([path], lambda p: texts.get(p, (None, None)))
+
+    assert len(found) == 1
+    assert f"{UNBUILT_LIMIT} ADRs have nothing built" in found[0]
+    assert "0120" not in found[0].split("(")[1]
+
+
+def test_changing_an_existing_adr_is_never_blocked() -> None:
+    path = "docs/adr/0099-example.md"
+    texts = {
+        path: (ADR, ADR.replace("1. The rule.", "2.")),
+        "docs/adr-status.md": (None, overview("1", "2", "3")),
+    }
+
+    assert blocks([path], lambda p: texts.get(p, (None, None))) == []
+
+
+def test_the_gate_blocks_a_new_adr_without_its_build_in_a_real_repository(
+    git: Git, adr: Path, admins: list[str], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    adr.with_name("0100-new.md").write_text(ADR.replace("0099", "0100"))
+    commit_all(git, "docs(adr): design only")
+    events = events_file(tmp_path / "e", labelled(ADMIN))
+
+    assert main(["--base", "main", "--head", "work", *admins, "--events", events]) == 1
+    assert "must say merged) (ADR 0119)" in capsys.readouterr().out
+
+
+def test_a_renamed_adr_is_not_a_new_decision() -> None:
+    old, new = "docs/adr/0099-exmaple.md", "docs/adr/0099-example.md"
+    texts = {old: (ADR, None), new: (None, ADR), "docs/adr-status.md": (None, overview())}
+
+    assert blocks([old, new], lambda p: texts.get(p, (None, None))) == []
+
+
+def test_relabelling_unbuilt_adrs_in_the_same_pull_request_does_not_loosen_the_brake() -> None:
+    path = "docs/adr/0120-new.md"
+    waiting = tuple(f"00{n:02d}" for n in range(10, 10 + UNBUILT_LIMIT))
+    texts = {
+        path: (None, with_first_step(ADR)),
+        "docs/adr-status.md": (overview(*waiting), overview()),
+    }
+
+    assert len(blocks([path], lambda p: texts.get(p, (None, None)))) == 1
+
+
+def test_the_adr_that_introduces_the_brake_is_not_held_by_it() -> None:
+    """In the merge queue the gate runs from the PR's own copy; ADR 0119 must pass it."""
+    path = "docs/adr/0119-new.md"
+    waiting = tuple(f"00{n:02d}" for n in range(10, 10 + UNBUILT_LIMIT))
+    texts = {path: (None, with_first_step(ADR)), "docs/adr-status.md": (None, overview(*waiting))}
+
+    assert blocks([path], lambda p: texts.get(p, (None, None))) == []

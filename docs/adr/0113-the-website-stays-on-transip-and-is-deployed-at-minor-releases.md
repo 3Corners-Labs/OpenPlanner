@@ -74,10 +74,10 @@ forge's, not the application's, so no class A–D).
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #485 | in PR |
-| 1 | Deploy script, its test, AutoGit file and `.htaccess` restored; `pages` replaced by `deploy-site` at `vX.Y.0`; `CNAME` removed | #485 | in PR |
-| 2 | Runbook, threat model, data flow, footer text, `site/README.md`, guardrail baseline (`website` limited to tags) | #485 | in PR |
-| 3a | The README check: test and release checklist step (point 7) | #485 | in PR |
+| 0 | ADR | #485 | merged |
+| 1 | Deploy script, its test, AutoGit file and `.htaccess` restored; `pages` replaced by `deploy-site` at `vX.Y.0`; `CNAME` removed | #485 | merged |
+| 2 | Runbook, threat model, data flow, footer text, `site/README.md`, guardrail baseline (`website` limited to tags) | #485 | merged |
+| 3a | The README check: test and release checklist step (point 7) | #485 | merged |
 | 4 | Environment `website` with tags `v*.*.*`, the deploy key pair, the variables, the key on the TransIP package, AutoGit and HTTPS in the TransIP panel, the environment `github-pages` and the Pages settings removed (an administrator) | | planned |
 
 ## Consequences

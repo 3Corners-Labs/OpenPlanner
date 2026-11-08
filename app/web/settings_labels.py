@@ -41,6 +41,7 @@ SETTING_LABELS: dict[str, str] = {
     ),
     "audit_retention_days": "settings.field.audit_retention_days.label",
     "booking_row_retention_days": "settings.field.booking_row_retention_days.label",
+    "reporting_enabled": "settings.field.reporting_enabled.label",
     "security_event_retention_days": "settings.field.security_event_retention_days.label",
     "diagnostic_event_retention_days": "settings.field.diagnostic_event_retention_days.label",
     "diagnostic_mode_hours": "settings.field.diagnostic_mode_hours.label",

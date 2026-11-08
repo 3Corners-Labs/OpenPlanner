@@ -98,6 +98,7 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/queue/live": "/admin/groups/demo/queue/live",
     "/admin/groups/{slug}/queue/{booking_id}/live": QUEUE_ITEM_LIVE,
     "/admin/groups/{slug}/closure": "/admin/groups/demo/closure",
+    "/admin/groups/{slug}/contact": "/admin/groups/demo/contact",
     "/admin/groups/{slug}/closure/contacts": "/admin/groups/demo/closure/contacts",
     "/admin/groups/{slug}/closure/scenarios": "/admin/groups/demo/closure/scenarios",
     "/admin/groups/{slug}/closure/scenarios/{scenario_id}": (

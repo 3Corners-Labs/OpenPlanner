@@ -1,14 +1,16 @@
 # Reminders and message texts
 
-Two tabs of a group decide what participants receive around their appointment:
+A group's **Messages** tab decides what participants receive around their appointment:
 
 - **Reminders**: when a reminder is sent, and by which channel.
 - **Message texts**: what the messages say.
+- **Contact**: how participants reach the group otherwise during a closure (see *A team's
+  contact options*).
 
-Open them through **Groups → group → Reminders** or **Message texts**. Before you save, the
+Open them through **Groups → group → Messages** and pick the part in the second row. Before you save, the
 portal may ask you to log in again.
 
-| Tab | Who may change it |
+| Part | Who may change it |
 |---|---|
 | Reminders | organisation admins and the superuser, and a custom role with the right to manage reminders |
 | Message texts | group admins, organisation admins and the superuser, and a custom role with the right to manage texts |

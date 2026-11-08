@@ -1,6 +1,8 @@
 # 0117. Reporting on use, from a store that holds no personal data
 
-Status: proposed (2026-11-06), requested by the product owner (open point O16). Not built. Extends
+Status: accepted (2026-11-06, PR #558), requested by the product owner (open point O16). Partly built:
+steps 1 (the domain) and 2 (the store and the booking facts) are merged; the rest is planned.
+Extends
 ADR 0102 (what remains after a purge; step 4 is its first statistics table), ADR 0014
 (authorisation), ADR 0023 (machine API), ADR 0047 (admin structure), ADR 0042 (settings) and
 ADR 0009 (messages). Relates to ADR 0019, 0024, 0043, 0044, 0056, 0057, 0069, 0072, 0081 and 0085.
@@ -438,9 +440,9 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #558 | in PR #558 |
-| 1 | Domain only: `app/domain/usage.py` (fact kinds, allow-list `USAGE_FIELDS`, metric table, buckets, `suppress()`), `privacy.py` list and test, `docs/reporting.md` generated; no database | | planned |
-| 2 | Migration (five tables, expand-only), `record_usage` on `Transaction`, settings and registry entries, facts for booking create, confirm, expire, cancel, move, outcome, suspend/resume | | planned |
+| 0 | ADR proposed | #558 | merged |
+| 1 | Domain only: `app/domain/usage.py` (fact kinds, allow-list `USAGE_FIELDS`, metric table, buckets, `suppress()`), `privacy.py` list and test, `docs/reporting.md` generated; no database | #592 | merged |
+| 2 | Migration (five tables, expand-only), `record_usage` on `Transaction`, settings and registry entries, facts for booking create, confirm, expire, cancel, move, outcome, suspend/resume | #597 | merged |
 | 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | | planned |
 | 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | | planned |
 | 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | | planned |
@@ -453,6 +455,37 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
 | 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
+
+**Build order (agreed with the product owner, 2026-11-08):** 1, 2, 4, 5, then 3, then 6 to 14. The
+*Volume* screen of step 5 needs only the booking facts of step 2, so the first visible screen comes
+after four PRs; the metrics that need call facts (U8, U11 and the call metrics) follow with step 3.
+
+**Step 1 notes (no change of a decision):** the domain adds the fact kind `booking.slotted` (one
+fact per booking placed in a slot, keyed on the slot start) so that the busiest-hours table (C4)
+needs no second hour on `booking.created`; the hour source is declared per fact kind, which the
+generated `docs/reporting.md` lists; a booking created by a move carries `reason_code` `move`
+instead of a field `is_move`, which keeps the allow-list of point 2 as written. The property tests
+of `suppress_table` found that a total must also be hidden when its line has exactly one hidden
+cell and no other cell to hide with it; the building block now does that.
+
+**Step 2 notes (no change of a decision):** migration 0090 creates `usage_events`, `usage_hour` and
+`usage_staff_hour`; the two digest tables (subscriptions, run records) come with step 10 in their own
+expand-only migration, because nothing reads them before then. There are no foreign keys and no unique
+index over the cut columns: statistics outlive their group, and the rollup of step 4 is the only
+writer under the write lock. Only `reporting_enabled` (class C) is added now; each other setting of
+the table arrives in the step that reads it (retention, interval and cell size in steps 4 and 5).
+Facts are written for a booking placed (`booking.created` and `booking.slotted`; a move places again,
+so C4 counts placements), confirmed, cancelled by a participant, planner, closure or the system,
+unconfirmed and lapsed, moved, suspended and resumed. **A booking that ended `completed` or `no_show`
+has no producer: nothing in the application sets those statuses**, so U2 and U3 show cancellations and
+lapses only until step 3 derives them from the call facts; the PO is told. The count of dropped facts
+is a log line (`usage.fact_dropped`, kind only) for now; *System status* shows it with the rollup lag
+in step 4. Lead, hold and cancel times in a booking fact are kept to the quarter hour: the booking row
+keeps its exact creation and start times for two years, so an exact lead time would let a fact be
+matched to one booking by group, hour and locale (the review of step 2 found it, abuse case R3).
+Call durations (step 3) are not in the booking row and stay exact for the mean. The host CLI's own
+closure and cancel commands write facts whatever `reporting_enabled` says (it reads the portal value
+only in the web and the worker process).
 
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:
