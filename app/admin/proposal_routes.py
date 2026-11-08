@@ -5,7 +5,8 @@ the other planner actions (``planner_routes``):
 
     GET/POST .../agenda/bookings/{id}/propose        one booking: the assistant's time or
                                                      another free one ─► 303 agenda, "proposed"
-    GET/POST .../agenda/slot-propose?start=          review a short slot's excess bookings:
+    GET/POST .../agenda/slot-propose?start=          review a short slot's excess bookings
+             (or ?day=&days=1..7: a day or a week)
                                                      keep, change or untick each proposal, or
                                                      ask to rebook; sent in one transaction
                                                      ─► 303 agenda; a changed slot shows again
@@ -15,7 +16,7 @@ the other planner actions (``planner_routes``):
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Request
 from starlette.responses import HTMLResponse, Response
@@ -40,9 +41,9 @@ from app.admin.planner_routes import (
     planner_of,
     reason_field,
 )
-from app.domain.booking import ChangeReason
+from app.domain.booking import ChangeReason, stored_id
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.planner_service import ProposalRow
+from app.domain.planner_service import ProposalRow, ReviewScope
 from app.domain.scheduling import Group
 from app.i18n.dates import format_clock, format_day, local_day
 from app.web.errors import FormError, status_for
@@ -97,12 +98,15 @@ def _reason(form: FormData) -> ChangeReason | None:
     return ChangeReason(choice) if choice is not None else None
 
 
-def _choice(form: FormData, name: str) -> datetime | None | str:
-    """Return the chosen start, ``None`` to ask to rebook, or ``"bad"`` for a forged value."""
+def _choice(form: FormData, name: str) -> datetime | None:
+    """Return the chosen start, or ``None`` to ask to rebook; a forged value is a 400."""
     raw = form.text(name)
     if raw == ASK:
         return None
-    return parse_start(raw) or "bad"
+    chosen = parse_start(raw)
+    if chosen is None:
+        raise RejectedRequest(400)
+    return chosen
 
 
 # --- one booking ----------------------------------------------------------------------------
@@ -163,13 +167,11 @@ async def propose(
     form = await read_form(request, locale)
     chosen = _choice(form, "start")
     reason = _reason(form)
-    if chosen == "bad":
-        raise RejectedRequest(400)
     if reason is None:
         return await _single_response(request, locale, context, booking_id, form, 422)
     group = context.group.group
     try:
-        if isinstance(chosen, datetime):
+        if chosen is not None:
             held = await planner_of(request).propose(
                 context.principal, slug, booking_id, chosen, reason
             )
@@ -188,34 +190,65 @@ async def propose(
     return redirect_done(agenda_url(slug, day), done, 1)
 
 
-# --- review a short slot ---------------------------------------------------------------------
+# --- review a short slot, day or week --------------------------------------------------------
+
+
+def _scope(start: str, day: str, days: str) -> ReviewScope:
+    """Return the review's scope from the query or the form; anything else is a 400."""
+    moment = parse_start(start)
+    if moment is not None:
+        return ReviewScope.slot(moment)
+    try:
+        first = date.fromisoformat(day)
+        return ReviewScope.period(first, int(days or "1"))
+    except (ValueError, DomainError):
+        raise RejectedRequest(400) from None
+
+
+def _scope_fields(scope: ReviewScope) -> dict[str, str]:
+    """Return the hidden fields that carry ``scope`` from the page to its POST."""
+    if scope.start is not None:
+        return {"start": scope.start.isoformat()}
+    return {"day": scope.day.isoformat() if scope.day else "", "days": str(scope.days)}
+
+
+def _scope_label(scope: ReviewScope, group: Group, code: str) -> str:
+    """Return what the review covers, as the page names it."""
+    tz = group.tz
+    if scope.start is not None:
+        day = format_day(local_day(scope.start, tz), code)
+        return f"{day}, {format_clock(scope.start, tz, code)}"
+    first = scope.first_day(group)
+    if scope.days == 1:
+        return format_day(first, code)
+    return f"{format_day(first, code)} – {format_day(first + timedelta(days=scope.days - 1), code)}"
 
 
 async def _review_response(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
-    start: datetime,
+    scope: ReviewScope,
     form: FormData,
     status: int = 200,
 ) -> HTMLResponse:
-    """Render the review page of a short slot's proposals, fresh from the agenda."""
+    """Render the review page of the proposals in ``scope``, fresh from the agenda."""
     group = context.group.group
     tz, code = group.tz, locale.code
     try:
-        rows = await planner_of(request).slot_proposals(context.principal, group.slug, start)
+        rows = await planner_of(request).review_proposals(context.principal, group.slug, scope)
     except DomainError as error:
         raise_refusal(error)
         raise
     shown = [
         ReviewRow(
-            row.booking.id or 0,
+            stored_id(row.booking),
             row.booking.reference,
             row.booking.contact.first_name if row.booking.contact else "–",
             f"{format_day(local_day(row.booking.start, tz), code)}, "
             f"{format_clock(row.booking.start, tz, code)}",
-            _time_field(row, group, form, locale, f"start_{row.booking.id}"),
-            not form.values or form.checked(f"include_{row.booking.id}"),
+            _time_field(row, group, form, locale, f"start_{stored_id(row.booking)}"),
+            not form.values or form.checked(f"include_{stored_id(row.booking)}"),
         )
         for row in rows
     ]
@@ -225,12 +258,12 @@ async def _review_response(
         context,
         "admin/planner_slot_propose.html",
         {
-            "start": start.isoformat(),
-            "when": f"{format_day(local_day(start, tz), code)}, {format_clock(start, tz, code)}",
+            "scope": _scope_fields(scope),
+            "when": _scope_label(scope, group, code),
             "rows": shown,
             "ids": ",".join(str(r.id) for r in shown),
             "reason": reason_field(form, locale.gettext),
-            "back": agenda_url(group.slug, local_day(start, tz)),
+            "back": agenda_url(group.slug, scope.first_day(group)),
             "errors": form.errors,
         },
         status,
@@ -239,41 +272,42 @@ async def _review_response(
 
 @router.get("/groups/{slug}/agenda/slot-propose", response_class=HTMLResponse)
 async def slot_propose_form(
-    request: Request, locale: Locale, slug: str, context: ManageBookings, start: str = ""
+    request: Request,
+    locale: Locale,
+    slug: str,
+    context: ManageBookings,
+    start: str = "",
+    day: str = "",
+    days: str = "",
 ) -> HTMLResponse:
-    """Show the assistant's proposals for the last-made bookings of a short slot."""
-    moment = parse_start(start)
-    if moment is None:
-        raise RejectedRequest(400)
-    return await _review_response(request, locale, context, moment, FormData({}, locale.gettext))
+    """Show the assistant's proposals for one short slot (``start``) or for days (``day``)."""
+    scope = _scope(start, day, days)
+    return await _review_response(request, locale, context, scope, FormData({}, locale.gettext))
 
 
 @router.post("/groups/{slug}/agenda/slot-propose", response_class=HTMLResponse)
 async def slot_propose(
     request: Request, locale: Locale, slug: str, _: SameOrigin, context: ManageBookings
 ) -> Response:
-    """Send the reviewed proposals of the slot in one transaction (ADR 0057 point 5)."""
+    """Send the reviewed proposals in one transaction (ADR 0057 point 5)."""
     form = await read_form(request, locale)
-    moment = parse_start(form.text("start"))
+    scope = _scope(form.text("start"), form.text("day"), form.text("days"))
     ids = confirmed_ids(form.text("ids"))
-    if moment is None or ids is None:
+    if ids is None:
         raise RejectedRequest(400)
-    choices: dict[int, datetime | None] = {}
-    for booking_id in sorted(ids):
-        if not form.checked(f"include_{booking_id}"):
-            continue
-        chosen = _choice(form, f"start_{booking_id}")
-        if chosen == "bad":
-            raise RejectedRequest(400)
-        choices[booking_id] = chosen if isinstance(chosen, datetime) else None
+    choices = {
+        booking_id: _choice(form, f"start_{booking_id}")
+        for booking_id in sorted(ids)
+        if form.checked(f"include_{booking_id}")
+    }
     reason = _reason(form)
     if not choices:
         form.errors.append(FormError(None, locale.gettext("admin.proposal.none_chosen")))
     if reason is None or not choices:
-        return await _review_response(request, locale, context, moment, form, 422)
+        return await _review_response(request, locale, context, scope, form, 422)
     try:
-        sent = await planner_of(request).propose_slot(
-            context.principal, slug, moment, reason, choices
+        sent = await planner_of(request).send_review(
+            context.principal, slug, scope, reason, choices
         )
     except DomainError as error:
         raise_refusal(error)
@@ -282,9 +316,9 @@ async def slot_propose(
         form.refusal(error)
         fresh = FormData({"reason": reason.value}, locale.gettext)
         fresh.errors.extend(form.errors)
-        return await _review_response(request, locale, context, moment, fresh, 409)
+        return await _review_response(request, locale, context, scope, fresh, 409)
     group = context.group.group
-    return redirect_done(agenda_url(slug, local_day(moment, group.tz)), "proposals_sent", sent)
+    return redirect_done(agenda_url(slug, scope.first_day(group)), "proposals_sent", sent)
 
 
 # --- withdraw, or confirm on the participant's behalf --------------------------------------

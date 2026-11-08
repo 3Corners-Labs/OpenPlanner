@@ -13,22 +13,24 @@ from app.domain import booking_changes
 from app.domain.booking import BookingStatus, ChangeReason
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
-from app.domain.planner_service import PlannerService
+from app.domain.planner_service import PlannerService, ReviewScope
 from app.domain.reschedule_proposal import (
     HeldProposal,
     ProposalOutcome,
     proposal_deadline,
     proposal_reminder,
 )
+from app.domain.scheduling import ScheduleRule, TimeWindow
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import AUDITOR, GROUP_ADMIN
-from tests.support.domain import NOW, SLOT_0900, SLOT_0930, book_another
+from tests.support.admin import AUDITOR, GROUP_ADMIN, SUPER
+from tests.support.domain import NOW, SLOT_0900, SLOT_0930, book_another, window
 
 NEXT_0900 = SLOT_0900 + timedelta(days=7)
 NEXT_0930 = SLOT_0930 + timedelta(days=7)
 CONFIRM_BY = NOW + timedelta(hours=48)
+SCOPE = ReviewScope.slot(SLOT_0900)
 
 
 async def _book(bookings: BookingService, start=SLOT_0900) -> tuple[int, str]:
@@ -316,13 +318,11 @@ async def test_a_booking_that_goes_ahead_gets_no_suggestions(bookings: BookingSe
 # --- the planner's review (step 3) ----------------------------------------------------------
 
 
-def _short(uow: InMemoryUnitOfWork) -> None:
-    """Staff Mondays with one agent, so a slot with two bookings is one short."""
-    from app.domain.scheduling import ScheduleRule
-    from tests.support.domain import window
-
+def _short(uow: InMemoryUnitOfWork, *windows: TimeWindow) -> None:
+    """Staff Mondays with ``windows`` (one agent 09:00-10:00 by default)."""
+    rules = [ScheduleRule(weekday=0, window=w) for w in windows or (window(capacity=1),)]
     for group_id in uow.state.groups:
-        uow.state.rules[group_id] = [ScheduleRule(weekday=0, window=window(capacity=1))]
+        uow.state.rules[group_id] = rules
 
 
 async def test_the_agenda_counts_a_held_proposal_like_a_pending_booking(
@@ -347,7 +347,7 @@ async def test_the_review_proposes_the_last_made_booking_with_the_free_times(
     last, _token = await _book(bookings)
     _short(uow)
 
-    (row,) = await planner.slot_proposals(GROUP_ADMIN, "demo", SLOT_0900)
+    (row,) = await planner.review_proposals(GROUP_ADMIN, "demo", ReviewScope.slot(SLOT_0900))
 
     assert row.booking.id == last
     assert row.proposed == NEXT_0900  # same time of day, a week on
@@ -360,15 +360,15 @@ async def test_sending_the_review_holds_asks_and_audits_each_booking(
 ) -> None:
     first, _ = await _book(bookings)
     second, _ = await _book(bookings)
-    from app.domain.scheduling import ScheduleRule
-    from tests.support.domain import window
+    # 09:00 loses its agents, 09:30 keeps two: the 09:00 bookings move.
+    _short(uow, window(capacity=0, closes="09:30"), window(opens="09:30", capacity=2))
 
-    uow.state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=0, closes="09:30"))] + [
-        ScheduleRule(weekday=0, window=window(opens="09:30", closes="10:00", capacity=2))
-    ]
-
-    sent = await planner.propose_slot(
-        GROUP_ADMIN, "demo", SLOT_0900, ChangeReason.STAFFING, {first: NEXT_0930, second: None}
+    sent = await planner.send_review(
+        GROUP_ADMIN,
+        "demo",
+        ReviewScope.slot(SLOT_0900),
+        ChangeReason.STAFFING,
+        {first: NEXT_0930, second: None},
     )
 
     assert sent == 2
@@ -395,12 +395,20 @@ async def test_a_review_of_a_changed_slot_sends_nothing(
     await _book(bookings, NEXT_0900)  # the proposed slot fills up meanwhile
 
     with pytest.raises(DomainError) as caught:
-        await planner.propose_slot(
-            GROUP_ADMIN, "demo", SLOT_0900, ChangeReason.STAFFING, {last: NEXT_0900}
+        await planner.send_review(
+            GROUP_ADMIN,
+            "demo",
+            ReviewScope.slot(SLOT_0900),
+            ChangeReason.STAFFING,
+            {last: NEXT_0900},
         )
     with pytest.raises(DomainError) as other:
-        await planner.propose_slot(
-            GROUP_ADMIN, "demo", SLOT_0900, ChangeReason.STAFFING, {999: NEXT_0930}
+        await planner.send_review(
+            GROUP_ADMIN,
+            "demo",
+            ReviewScope.slot(SLOT_0900),
+            ChangeReason.STAFFING,
+            {999: NEXT_0930},
         )
 
     assert caught.value.code is ErrorCode.SLOT_CHANGED
@@ -436,13 +444,65 @@ async def test_the_planner_withdraws_or_confirms_a_proposal(
     assert {"planner.withdraw", "planner.confirm_proposal"} <= details
 
 
-async def test_another_groups_booking_cannot_be_withdrawn_through_this_group(
+async def test_another_groups_booking_cannot_be_reached_through_this_group(
     planner: PlannerService, bookings: BookingService
 ) -> None:
     booking_id, _ = await _book(bookings)
     await planner.propose(GROUP_ADMIN, "demo", booking_id, NEXT_0900, ChangeReason.STAFFING)
 
-    with pytest.raises(DomainError) as caught:
-        await planner.withdraw(GROUP_ADMIN, "demo-twee", booking_id)
+    with pytest.raises(DomainError) as withdrawn:
+        await planner.withdraw(SUPER, "demo-twee", booking_id)
+    with pytest.raises(DomainError) as confirmed:
+        await planner.confirm_proposal(SUPER, "demo-twee", booking_id)
 
-    assert caught.value.code in {ErrorCode.BOOKING_NOT_FOUND, ErrorCode.NOT_PERMITTED}
+    assert withdrawn.value.code is ErrorCode.BOOKING_NOT_FOUND
+    assert confirmed.value.code is ErrorCode.BOOKING_NOT_FOUND
+
+
+async def test_a_slot_without_a_free_agent_is_not_proposed(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    await _book(bookings)
+    last, _ = await _book(bookings)
+    await _book(bookings, NEXT_0900)
+    _short(uow)  # one agent: next Monday 09:00 already has its one booking
+
+    with pytest.raises(DomainError) as single:
+        await planner.propose(GROUP_ADMIN, "demo", last, NEXT_0900, ChangeReason.STAFFING)
+    with pytest.raises(DomainError) as bulk:
+        await planner.send_review(
+            GROUP_ADMIN,
+            "demo",
+            ReviewScope.slot(SLOT_0900),
+            ChangeReason.STAFFING,
+            {last: NEXT_0900},
+        )
+
+    assert single.value.code is ErrorCode.SLOT_FULL
+    assert bulk.value.code is ErrorCode.SLOT_CHANGED
+    assert uow.state.proposals == {}
+
+
+async def test_a_day_review_covers_every_short_slot_and_shares_no_last_place(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    await _book(bookings)
+    late_nine, _ = await _book(bookings)
+    await _book(bookings, SLOT_0930)
+    late_half, _ = await _book(bookings, SLOT_0930)
+    _short(uow)
+
+    rows = await planner.review_proposals(
+        GROUP_ADMIN, "demo", ReviewScope.period(SLOT_0900.date(), 1)
+    )
+
+    assert {r.booking.id for r in rows} == {late_nine, late_half}
+    proposed = [r.proposed for r in rows]
+    assert len(set(proposed)) == len(proposed)  # one agent per slot: never the same slot
+
+
+def test_a_review_covers_at_most_a_week() -> None:
+    with pytest.raises(DomainError) as caught:
+        ReviewScope.period(SLOT_0900.date(), 8)
+
+    assert caught.value.code is ErrorCode.INVALID_RANGE

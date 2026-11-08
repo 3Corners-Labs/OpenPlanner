@@ -1472,7 +1472,7 @@ class Transaction(Protocol):
         """
         ...
 
-    async def list_open_proposals(
+    async def find_open_proposals(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[HeldProposal]:
         """Return the group's open proposals for a slot with lower <= start < upper (ADR 0057).

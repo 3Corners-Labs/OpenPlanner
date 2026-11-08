@@ -441,3 +441,25 @@ async def test_the_waiting_list_withdraws_or_confirms_a_proposal(site: Site) -> 
     assert (await _status(site, withdrawn))[0] is BookingStatus.AWAITING_REBOOK
     assert "done=proposal_confirmed_by_staff" in moved.headers["location"]
     assert (await _status(site, confirmed))[0] is BookingStatus.CANCELLED  # moved to a new one
+
+
+async def test_a_short_day_is_reviewed_at_once(site: Site) -> None:
+    await _book(site)
+    site.clock.advance(timedelta(minutes=1))
+    newest = await _book(site)
+    await _staff_friday(site, 1)
+    await site.login_as(GROUP_ADMIN)
+
+    agenda = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+    week = (await site.client.get(f"{AGENDA}/week?week=2026-01-02")).text
+    review = await site.client.get(f"{AGENDA}/slot-propose", params={"day": "2026-01-02"})
+    too_long = await site.client.get(
+        f"{AGENDA}/slot-propose", params={"day": "2026-01-02", "days": "8"}
+    )
+
+    assert f"{AGENDA}/slot-propose?day=2026-01-02" in agenda
+    assert "/agenda/slot-propose?day=2025-12-29&amp;days=7" in week
+    assert review.status_code == 200
+    assert f"OP-{newest:06d} · Ada" in review.text
+    assert 'name="day" value="2026-01-02"' in review.text
+    assert too_long.status_code == 400

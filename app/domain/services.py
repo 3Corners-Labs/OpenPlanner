@@ -80,7 +80,7 @@ from app.domain.job_plan import (
 )
 from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.rebooking import DEFAULT_REACH, Reach, may_take, suggested
+from app.domain.rebooking import DEFAULT_REACH, Reach, may_take, search_window, suggested
 from app.domain.reschedule_proposal import HeldProposal
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
 from app.domain.routing import RoutingChoice
@@ -287,13 +287,10 @@ class BookingService:
             proposal = await tx.get_open_proposal(_id(booking))
             reach = value_for(self._reach, group.organisation_id)
             old_day = booking.start.astimezone(group.tz).date()
-            first_day = max(
-                group.today(self._clock.now()), old_day - timedelta(days=reach.search_days)
-            )
-            last_day = old_day + timedelta(days=reach.search_days)
-            if first_day > last_day:
+            window = search_window(group, [old_day], reach, self._clock.now())
+            if window is None:
                 return []
-            free = await self._free_slots(tx, group, first_day, last_day, booking.subject)
+            free = await self._free_slots(tx, group, *window, booking.subject)
         held = {proposal.start} if proposal is not None else set()
         return suggested(group, booking.start, [s.start for s in free], reach, held)
 

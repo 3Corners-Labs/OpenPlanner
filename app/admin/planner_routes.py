@@ -449,7 +449,7 @@ async def slot_rebook(
         else:
             group = context.group.group
             day = agenda_url(slug, local_day(moment, group.tz))
-            return redirect_done(day, "rebook_requested", len(done))
+            return redirect_done(day, "rebook_requested", done)
     try:
         candidates = await planner.slot_candidates(context.principal, slug, moment)
     except DomainError as error:

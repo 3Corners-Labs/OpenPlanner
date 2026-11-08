@@ -11339,3 +11339,9 @@ msgstr "The proposed time is confirmed for the participant. The participant gets
 
 msgid "admin.done.proposal_gone"
 msgstr "This proposal is no longer open."
+
+msgid "admin.agenda.day_propose"
+msgstr "Propose new times for this day"
+
+msgid "admin.agenda.week_propose"
+msgstr "Propose new times for this week"

@@ -158,7 +158,10 @@ request lapses.
 A slot with a shortfall also offers **Propose new times**. For each appointment (the most
 recently made, as many as the shortfall) you see the proposed time. For each you can choose
 another time, let the participant choose, or untick it. Everything goes at once; when a chosen
-time no longer fits, OpenPlanner sends nothing and shows the list again.
+time no longer fits, OpenPlanner sends nothing and shows the list again. With **Propose new times
+for this day** (day view) or **for this week** (week view) you review every slot with a shortfall
+at once; the assistant never gives two appointments the same last place. OpenPlanner never
+proposes a time without a free agent.
 
 In **Awaiting a new time** a proposal shows the proposed time and until when it is held. After a
 phone call you can choose **Confirm for the participant** there; the participant then gets the

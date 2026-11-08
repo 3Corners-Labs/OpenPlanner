@@ -165,7 +165,9 @@ Bij een tijdslot met een tekort staat ook **Nieuwe tijden voorstellen**. U ziet 
 (de laatst gemaakte, zoveel als het tekort) de voorgestelde tijd. Per afspraak kunt u een
 andere tijd kiezen, de deelnemer zelf laten kiezen of de afspraak uitvinken. Alles gaat in één
 keer; past een gekozen tijd intussen niet meer, dan verstuurt OpenPlanner niets en toont het de
-lijst opnieuw.
+lijst opnieuw. Met **Nieuwe tijden voorstellen voor deze dag** (dagoverzicht) of **voor deze week**
+(weekoverzicht) beoordeelt u alle tijdsloten met een tekort in één keer; de assistent geeft twee
+afspraken nooit dezelfde laatste plek. Een tijd zonder vrije medewerker stelt OpenPlanner niet voor.
 
 In **Wacht op nieuwe tijd** staat bij een voorstel de voorgestelde tijd en tot wanneer die wordt
 vastgehouden. Na een telefoongesprek kunt u daar **Bevestigen namens deelnemer** kiezen; de

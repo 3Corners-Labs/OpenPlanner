@@ -271,7 +271,7 @@ async def test_asking_to_rebook_frees_the_place_and_tells_the_participant(
     assert waiting.status is BookingStatus.AWAITING_REBOOK
     assert waiting.rebook_by == SLOT_0900 + timedelta(days=14)
     assert (JobType.SEND_REBOOK_REQUEST, ChannelKind.SMS) in _messages(uow, booking_id)
-    assert [b.id for b in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
+    assert [w.booking.id for w in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
     (event,) = [e for e in uow.state.audit if e.action == "bookings.manage"]
     assert (event.detail, event.booking_id) == ("planner.rebook,reason:staffing", booking_id)
 
@@ -319,7 +319,8 @@ async def test_a_bulk_request_takes_the_last_made_bookings_as_many_as_short(
     )
 
     assert [b.id for b in candidates] == [ids[1]]  # the newest one
-    assert [b.id for b in done] == [ids[1]]
+    assert done == 1
+    assert uow.state.bookings[ids[1]].status is BookingStatus.AWAITING_REBOOK
     assert uow.state.bookings[ids[0]].status is BookingStatus.CONFIRMED
     with pytest.raises(DomainError, match="slot_unavailable"):  # no shortfall left
         await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)

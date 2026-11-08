@@ -11352,3 +11352,9 @@ msgstr "De voorgestelde tijd is bevestigd namens de deelnemer. De deelnemer krij
 
 msgid "admin.done.proposal_gone"
 msgstr "Dit voorstel staat niet meer open."
+
+msgid "admin.agenda.day_propose"
+msgstr "Nieuwe tijden voorstellen voor deze dag"
+
+msgid "admin.agenda.week_propose"
+msgstr "Nieuwe tijden voorstellen voor deze week"

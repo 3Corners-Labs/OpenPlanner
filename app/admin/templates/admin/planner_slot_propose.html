@@ -9,7 +9,7 @@
     <h2 id="slot-heading">{{ _("admin.proposal.slot_title", when=when) }}</h2>
     <p class="card__lead">{{ _("admin.proposal.slot_lead", count=rows|length) }}</p>
   </div>
-  <input type="hidden" name="start" value="{{ start }}">
+  {% for name, value in scope.items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
   <input type="hidden" name="ids" value="{{ ids }}">
   {% for row in rows %}
   <fieldset class="fieldset">
