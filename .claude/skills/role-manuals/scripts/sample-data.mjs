@@ -17,11 +17,11 @@
  * address is raised to the portal's ceiling first (30 an hour, as a superuser would before a busy
  * day) and the default stays at 18 bookings.
  */
-import { assertOurs, launchBrowser, loadRun } from '../../verify-openplanner/scripts/stack-client.mjs';
+import { assertOurs, blankTokens, launchBrowser, loadRun } from '../../verify-openplanner/scripts/stack-client.mjs';
 import { clock, loadState, nextWeekday } from './evidence.mjs';
 import {
-  Run, UI, bookAndConfirm, book, chooseReason, confirmCancel, confirmMove, formOf, freeTimes, openCancel, openManageLink,
-  openMove, openPlannerForm, pickNewMoment,
+  A, Run, book, bookAndConfirm, confirmCancel, confirmMove, formOf, freeTimes, openCancel, openManageLink, openMove,
+  openPlannerForm, pick, pickNewMoment,
 } from './story.mjs';
 import { fail, hiddenTerms, openWorkspace } from './workspace.mjs';
 
@@ -35,7 +35,6 @@ const NAMES = [
 /** Times tried in this order on a day, so a few slots fill up to their staffing. */
 const PREFERRED = ['09:30', '11:00', '14:00', '10:00', '13:30', '15:00', '09:00', '16:00'];
 const RATE_LIMIT = '30';
-const BOOKING_LIMIT = 'Afspraken per IP-adres';
 
 /** The made-up participant `index`, with an address at voorbeeld.nl. */
 function person(index) {
@@ -48,16 +47,16 @@ function person(index) {
 async function raiseBookingLimit(run) {
   const page = await run.staff('super');
   await page.goto('/admin/settings/values#topic-rate_limits');
-  const field = page.getByLabel(BOOKING_LIMIT);
+  const field = page.getByLabel(A.bookingLimit);
   const before = (await field.inputValue()).trim();
   const wanted = before ? before.replace(/^\d+/, RATE_LIMIT) : `${RATE_LIMIT}/hour`;
   if (before !== wanted) {
     await field.fill(wanted);
-    await formOf(field).getByRole('button', { name: UI.save }).click();
+    await formOf(field).getByRole('button', { name: A.save }).click();
     await page.waitForLoadState('load');
   }
   await page.goto('/admin/settings/values#topic-rate_limits');
-  const after = await page.getByLabel(BOOKING_LIMIT).inputValue();
+  const after = await page.getByLabel(A.bookingLimit).inputValue();
   if (!after.startsWith(RATE_LIMIT)) throw new Error(`the booking limit is still ${after}`);
   return `stond op "${before}", gezet op "${after}"`;
 }
@@ -81,9 +80,9 @@ async function moveByLink(run, key, day) {
 
 /** The planner cancels a booking in the agenda, for unforeseen circumstances. */
 async function plannerCancel(run, key) {
-  const page = await openPlannerForm(run, run.booking(key), UI.cancel, UI.cancelHeading);
-  await chooseReason(page, /^Onvoorziene/);
-  await page.getByRole('button', { name: UI.plannerCancel }).click();
+  const page = await openPlannerForm(run, run.booking(key), A.cancelLink, A.cancelHeading);
+  await pick(page, A.reason, A.reasonUnforeseen);
+  await page.getByRole('button', { name: A.plannerCancel }).click();
   await page.waitForLoadState('load');
   run.bookings[key].status = 'cancelled_by_planner';
   run.save();
@@ -92,14 +91,14 @@ async function plannerCancel(run, key) {
 /** The planner moves a booking to a later free time on the same day. */
 async function plannerMove(run, key) {
   const booking = run.booking(key);
-  const page = await openPlannerForm(run, booking, UI.move, UI.moveHeading);
-  const select = page.getByLabel(UI.newSlot);
+  const page = await openPlannerForm(run, booking, A.moveLink, A.moveHeading);
+  const select = page.getByLabel(A.newSlot);
   // Each option: the start in UTC as its value, `5 jan 2026, 09:00` (local) as its text.
   const options = await select.evaluate((s) => [...s.options].filter((o) => o.value).map((o) => ({ value: o.value, local: o.text.trim().slice(-5) })));
   const later = options.find((o) => o.value.startsWith(`${booking.day}T`) && o.local > booking.time);
   if (!later) throw new Error(`no later free time on ${booking.day} to move ${key} to`);
   await select.selectOption(later.value);
-  await page.getByRole('button', { name: UI.plannerMove }).click();
+  await page.getByRole('button', { name: A.plannerMove }).click();
   await page.waitForLoadState('load');
   Object.assign(run.bookings[key], { status: 'moved_by_planner', moved_to: later.local });
   run.save();
@@ -168,7 +167,7 @@ async function main() {
       }
     }
     const summary = Object.entries(counts).map(([k, n]) => `${n} ${k}`).join(', ');
-    run.notePrep('4', '4', `Voorbeeldgegevens geladen via de echte paden, op de dag van de opname: ${summary}. Verzonnen `
+    run.notePrep('4', `Voorbeeldgegevens geladen via de echte paden, op de dag van de opname: ${summary}. Verzonnen `
       + 'deelnemers (@voorbeeld.nl), op de werkdagen vanaf de derde werkdag na vandaag; vandaag en de twee dagen van het '
       + `verhaal bleven vrij. Boekingslimiet per adres als \`super\` via **Geavanceerde instellingen → Instellingen** (${limit}).`);
     console.log(`sample-data.mjs: ${summary}`);
@@ -178,4 +177,10 @@ async function main() {
   return 0;
 }
 
-process.exit(await main());
+try {
+  process.exit(await main());
+} catch (error) {
+  // A failed step may name a page address: blank booking-link tokens before it reaches the terminal.
+  console.error(`sample-data.mjs: ${blankTokens(String(error.stack ?? error))}`);
+  process.exit(1);
+}

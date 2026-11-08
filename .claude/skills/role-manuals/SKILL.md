@@ -104,35 +104,41 @@ The scripts are in `scripts/` and run from the root of the checkout; `<ws>` is t
    below possible and are the contract for help in context (see *Context-driven help*).
 4. **Capture.** Start a fresh stack with `verify-openplanner` (`stack.sh up`), then
    `node .../sample-data.mjs <ws>` and `node .../capture.mjs <ws>` (`--only <ids>` repeats some,
-   `--log-only` rewrites the evidence log). Both drive the stack through the client of
-   `verify-openplanner` (`scripts/stack-client.mjs`): they refuse an installation the run did
-   not start, sign in as the development users and never keep a token or a password. The capture
+   `--log-only` rewrites the evidence log from the state, also after the stack is down). Both
+   drive the stack through the client of `verify-openplanner` (`scripts/stack-client.mjs`) and
+   the interface texts of its `scripts/labels.json`: they refuse an installation the run did not
+   start, sign in as the development users and never keep a token or a password. The capture
    covers what `redact.js` lists, compares every screenshot with `img/previous/`
    (`evidence/diff.json`, `evidence/diff/`) and writes `evidence/log.md`. The wide overviews
    (agenda, week, rights matrix, audit log) are captured 1440 px wide so their tables are whole.
    What needs Webex Meetings is captured on a test installation that has it; until then the build
    shows "Schermafdruk volgt", and a shot taken without it gets the note from `without_webex` in
    its caption.
-5. **Build.** `node .../build.mjs <ws>` writes `build/<name>.docx`, `.html` and a tagged `.pdf`
-   with bookmarks (`--no-pdf` skips the PDF), and `build/help-index.json`.
-6. **Check.** `uv run python .../check.py <ws>` writes `evidence/check.md` and exits with 1 on a
-   blocking finding: a marker whose screen, permission or shot does not exist, a task whose role
-   lacks the permission in the matrix, a term of `do_not_name`, or the product name when it is
-   hidden. It also lists bold labels that are no text of the software. Look at rendered pages
+5. **Build.** `node .../build.mjs <ws>` is the one parse of the sources. It writes
+   `build/<name>.docx`, `.html` and a tagged `.pdf` with bookmarks (`--no-pdf` skips the PDF),
+   `build/manuals.json` (per manual its role, tasks and figures) and `build/help-index.json`. It
+   builds nothing when a source breaks a rule: a task marker without its heading, a figure that is
+   no `img/<id>.png`, or, after the variables are filled in, a term of `do_not_name` or the
+   hidden product name.
+6. **Check.** `uv run python .../check.py <ws>` reads `build/manuals.json` and writes
+   `evidence/check.md`; it exits with 1 on a blocking finding: a task whose screen, permission or
+   shot does not exist, or whose role lacks the permission in `MATRIX`. It also lists bold labels
+   of the sources that are no text of the software. Look at rendered pages
    (the Read tool shows PDF pages). Run a reader test with `anthropic-skills:doc-coauthoring`
    (its reader-testing stage) before people test.
 7. **Maintain by machine.** On every release run `.claude/skills/role-manuals/scripts/update.sh
-   <ws>` from the checkout. It starts a fresh stack under a compose project of its own
-   (`openplanner-manuals-<checksum of the checkout>`, ports 8020, 8100 and 8045; `VERIFY_PROJECT`
-   and `VERIFY_*_PORT` override them), so it never meets or removes the stack of another session,
-   and refuses while a stack of this checkout is up. It keeps
-   the previous screenshots in `img/previous/`, loads the sample data, captures every id again,
-   runs `check.py --since <commit of the last passing run> --fix` (a label the catalogue only
-   renamed is written into the sources, inside bold labels only; a removed label, a changed help
-   topic or a changed template is reported with the sections that use it), records the new
-   version for the title pages, moves the baseline commit only when the check passed, builds
-   everything and stops the stack. A person reads `evidence/check.md`, looks at the differences
-   and rewrites what the new version changed in the way people work.
+   <ws>` from the checkout. It first refuses a workspace inside a checkout. It starts a fresh
+   stack under a compose project of its own (`openplanner-manuals-<checksum of the checkout>`,
+   ports 8020, 8100 and 8045; `VERIFY_PROJECT` and `VERIFY_*_PORT` override them), so it never
+   meets or removes the stack of another session, and refuses while a stack of this checkout is
+   up. It keeps the previous screenshots in `img/previous/`, loads the sample data, captures
+   every id again, builds once without PDF, and runs `check.py --since <commit of the last passing
+   run> --fix`: a label the catalogue only renamed is written into the sources, inside bold
+   labels only; a removed label, a changed help topic or a changed template is reported with the
+   sections that use it. It records the new version for the title pages, moves the baseline commit
+   only when the check passed, builds everything and stops the stack. A person reads
+   `evidence/check.md`, looks at the differences and rewrites what the new version changed in the
+   way people work.
 
 ## Build
 

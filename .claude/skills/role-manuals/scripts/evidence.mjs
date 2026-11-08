@@ -76,7 +76,18 @@ const KIND = {
   'version-field': 'versieveld',
 };
 
-const PREP_ORDER = ['1', '2', '2b', '3', '4', 'shortage'];
+/**
+ * The preparation of the story and the changes it makes on the way, in the order the log and the
+ * shot list describe them: key (the step records it with Run.notePrep), label, who and what.
+ */
+export const PREPARATION = [
+  { key: '1', who: '`orgadmin`', what: 'de groep `demo` op de **eigen wachtrij** (groepsinstellingen)' },
+  { key: '2', who: '`super`', what: "de voettekst met de productnaam op de deelnemerspagina's uit, via de instelling die daarvoor bestaat" },
+  { key: '2b', who: '`orgadmin`', what: 'de onderwerpvraag van de demovulling uit het boekingsformulier, zodat het formulier alleen de tolkvraag toont' },
+  { key: '3', who: '`groupadmin`', what: 'vandaag een **afwijkende bezetting** met een eigen tijdblok, zodat er vandaag geboekt kan worden (opname `pl-05`)' },
+  { key: '4', who: '`sample-data.mjs`', what: 'voorbeeldgegevens: verzonnen deelnemers boeken, bevestigen, verplaatsen en annuleren op de werkdagen na vandaag, en de planner verplaatst en annuleert er een paar; de rapporten volgen met de telling van de worker (elk kwartier)' },
+  { key: 'shortage', label: 'tekort', who: '`groupadmin`', what: 'tijdens het verhaal de bezetting van de tweede dag omlaag, zodat een tijdslot een tekort krijgt (opname `pl-13`)' },
+];
 
 /** Write the evidence log from the state, the shot list and the workspace's notes. */
 export function writeLog({ ws, stack, state, steps, hidden }) {
@@ -124,9 +135,9 @@ export function writeLog({ ws, stack, state, steps, hidden }) {
     '',
   ];
   const prep = state.prep ?? {};
-  const rank = (key) => (PREP_ORDER.includes(key) ? PREP_ORDER.indexOf(key) : PREP_ORDER.length);
-  for (const key of Object.keys(prep).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))) {
-    lines.push(`- **${prep[key].label}** (${prep[key].at}): ${hidden.product ? maskProduct(prep[key].text) : prep[key].text}`);
+  for (const { key, label } of PREPARATION.filter((p) => prep[p.key])) {
+    const text = hidden.product ? maskProduct(prep[key].text) : prep[key].text;
+    lines.push(`- **${label ?? key}** (${prep[key].at}): ${text}`);
   }
   lines.push('');
   const bookings = Object.entries(state.bookings ?? {});

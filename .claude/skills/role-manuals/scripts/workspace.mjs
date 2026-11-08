@@ -7,15 +7,19 @@
  * book, what it does not want named) live only there, in variables.json and sources/.
  * check.py applies the same guard in Python.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 /** The software's own name, hidden in text and screenshots when `hide_product_name` is set. */
 export const PRODUCT_NAME = 'OpenPlanner';
 
-/** Throw when `dir` lies inside a checkout of the software (its catalogue or this skill marks one). */
+/**
+ * Throw when `dir` lies inside a checkout of the software (its catalogue or this skill marks
+ * one). Symbolic links are followed first, so a link into a checkout is refused as well.
+ */
 export function guardOutsideCheckout(dir) {
-  for (let at = dir; ; at = dirname(at)) {
+  const real = existsSync(dir) ? realpathSync(dir) : dir;
+  for (let at = real; ; at = dirname(at)) {
     if (existsSync(join(at, 'app', 'i18n', 'locales', 'nl.po')) || existsSync(join(at, '.claude', 'skills', 'role-manuals'))) {
       throw new Error(`${dir} lies inside the checkout ${at}; keep the workspace outside it (role-manuals SKILL.md)`);
     }
@@ -26,8 +30,8 @@ export function guardOutsideCheckout(dir) {
 /** Resolve and guard the workspace named by `arg`, read its variables and name its folders. */
 export function openWorkspace(arg) {
   if (!arg || arg.startsWith('-')) throw new Error('give the workspace folder as the first argument (role-manuals SKILL.md)');
-  const dir = resolve(arg);
-  guardOutsideCheckout(dir);
+  guardOutsideCheckout(resolve(arg));
+  const dir = realpathSync(resolve(arg));
   const file = join(dir, 'variables.json');
   if (!existsSync(file)) throw new Error(`${file} is missing; set the workspace up first (role-manuals SKILL.md)`);
   const evidence = join(dir, 'evidence');

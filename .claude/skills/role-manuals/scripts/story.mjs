@@ -9,13 +9,14 @@
  * clock is never shifted.
  */
 import {
-  NL, SUBJECT, chooseDay, escapeRe, linksIn, login, mailFor, mailMessage, manageLinkIn, waitForMail,
-  waitH1, waitStatus,
+  DEMO_GROUP, LABEL, NL, SUBJECT, agendaRow, chooseDay, confirmLinkIn, escapeRe, login, mailFor, mailMessage,
+  manageLinkIn,
+  referenceOf, waitForMail, waitH1, waitStatus,
 } from '../../verify-openplanner/scripts/stack-client.mjs';
-import { clock, nextWeekday, saveState, stamp } from './evidence.mjs';
+import { PREPARATION, clock, nextWeekday, saveState, stamp } from './evidence.mjs';
 import { EMAIL_WIDTH, Email, MOBILE, SCALE, VIEWPORT, Viewport, WIDE, shoot } from './shots.mjs';
 
-export const GROUP = 'demo';
+export const GROUP = DEMO_GROUP;
 export const ORG = 'demo';
 
 /** The made-up participants of the story; their addresses never leave Mailpit. */
@@ -37,20 +38,8 @@ export const ROLES = {
   auditor: 'compliance en privacy (`auditor`)',
 };
 
-/** Admin texts the story waits for or fills in (app/i18n/locales/nl.po); participant texts are NL. */
-export const UI = {
-  save: 'Opslaan',
-  details: /^Details/,
-  move: /^Verplaatsen/,
-  cancel: /^Annuleren/,
-  moveHeading: /^Afspraak .* verplaatsen/,
-  cancelHeading: /^Afspraak .* annuleren/,
-  newSlot: /^Nieuw tijdslot/,
-  reason: 'Reden',
-  plannerMove: 'Verplaatsen',
-  plannerCancel: 'Afspraak annuleren',
-  exceptionForm: 'Afwijkende bezetting toevoegen',
-};
+/** The portal's texts the story waits for or fills in (labels.json of verify-openplanner). */
+export const A = LABEL.admin;
 
 /** A step that cannot be captured on this installation; the reason goes into the log. */
 export class Skip extends Error {}
@@ -112,10 +101,11 @@ export class Run {
     return this.bookings[key];
   }
 
-  /** Record a preparation step or a story change for the log, under its Dutch `label`. */
-  notePrep(key, label, text) {
+  /** Record what a step of PREPARATION did, for the log. */
+  notePrep(key, text) {
+    if (!PREPARATION.some((p) => p.key === key)) throw new Error(`no preparation step ${key}`);
     this.state.prep ??= {};
-    this.state.prep[key] = { label, at: stamp(), text };
+    this.state.prep[key] = { at: stamp(), text };
     this.save();
   }
 
@@ -134,7 +124,7 @@ export class Run {
   async context(key, { mobile = false, width = null } = {}) {
     if (!this.contexts.has(key)) {
       const viewport = width ? { width, height: 400 } : { ...(mobile ? MOBILE : VIEWPORT) };
-      this.contexts.set(key, await this.browser.newContext({
+      const context = await this.browser.newContext({
         baseURL: this.stack.web,
         locale: 'nl-NL',
         timezoneId: 'Europe/Amsterdam',
@@ -144,7 +134,11 @@ export class Run {
         hasTouch: mobile,
         colorScheme: 'light',
         reducedMotion: 'reduce',
-      }));
+      });
+      // A busy machine makes the local stack slow; a step fails on a missing element, not on a slow one.
+      context.setDefaultTimeout(30_000);
+      context.setDefaultNavigationTimeout(90_000);
+      this.contexts.set(key, context);
     }
     return this.contexts.get(key);
   }
@@ -234,8 +228,6 @@ export class Run {
 
 // ---- Participant actions -------------------------------------------------------------------
 
-const referenceOf = (page) => new URL(page.url()).pathname.split('/')[3];
-
 /** The ids of every message to `person` so far. */
 export const seenMail = async (run, person) => new Set((await mailFor(run.stack, person.email)).map((m) => m.ID));
 
@@ -293,9 +285,7 @@ export async function book(run, key, person, day, label) {
 /** Open the link of the confirm request email and keep the reference; return the email. */
 export async function confirmByLink(run, page, person, seen, key) {
   const request = await waitForMail(run.stack, seen, SUBJECT.confirmRequest, person.email);
-  const confirm = linksIn(run.stack, request).urls.find((u) => u.endsWith('/confirm'));
-  if (!confirm) throw new Error('the confirm request holds no /confirm link');
-  await page.goto(confirm);
+  await page.goto(confirmLinkIn(run.stack, request));
   await waitH1(page, NL.confirm);
   Object.assign(run.bookings[key], { reference: referenceOf(page), confirm_request_mail: request.ID });
   run.save();
@@ -361,49 +351,29 @@ export async function confirmCancel(page) {
 
 // ---- Planner actions -----------------------------------------------------------------------
 
-/** The agenda row of `firstName` whose header starts at `timeLabel`. */
-export async function agendaRow(page, firstName, timeLabel) {
-  const row = page.getByRole('row').filter({ hasText: firstName })
-    .filter({ has: page.locator('th', { hasText: new RegExp(`^${escapeRe(timeLabel)}–`) }) });
-  await row.first().waitFor({ timeout: 15_000 });
-  return row.first();
-}
-
-/** Open the planner's form behind `link` (UI.move, UI.cancel, ...) on a booking's agenda row. */
+/** Open the planner's form behind `link` (A.moveLink, A.cancelLink, ...) on a booking's agenda row. */
 export async function openPlannerForm(run, booking, link, heading) {
   const page = await run.staff('groupadmin');
   await page.goto(`/admin/groups/${GROUP}/agenda?day=${booking.day}`);
-  await (await agendaRow(page, booking.name.split(' ')[0], booking.time)).getByRole('link', { name: link }).click();
+  const row = await agendaRow(page, booking.name.split(' ')[0], booking.time);
+  await row.first().getByRole('link', { name: link }).click();
   await page.getByRole('heading', { name: heading }).first().waitFor({ timeout: 15_000 });
   return page;
 }
 
-/** Choose a slot in the planner's move form, preferring one that holds `prefer`; return it. */
-export async function chooseSlot(page, prefer = '11:00') {
-  const select = page.getByLabel(UI.newSlot);
-  if ((await select.count()) && (await select.first().evaluate((e) => e.tagName)) === 'SELECT') {
-    const options = (await select.first().evaluate((s) => [...s.options].map((o) => o.text))).filter((o) => o.trim());
-    const chosen = options.find((o) => o.includes(prefer)) ?? options[0];
-    if (chosen) await select.first().selectOption({ label: chosen });
-    return chosen ?? '';
-  }
-  const radio = page.getByRole('radio').filter({ hasText: new RegExp(escapeRe(prefer)) });
-  if (await radio.count()) {
-    await radio.first().check();
-    return prefer;
-  }
-  return '';
-}
-
-/** Choose the reason that matches `pattern` in a planner form (a list or radio buttons). */
-export async function chooseReason(page, pattern) {
-  const reason = page.getByLabel(UI.reason);
-  if ((await reason.count()) && (await reason.first().evaluate((e) => e.tagName)) === 'SELECT') {
-    const label = await reason.first().evaluate((s, source) => [...s.options].find((o) => new RegExp(source).test(o.text))?.text, pattern.source);
-    if (label) await reason.first().selectOption({ label });
-  }
-  const radio = page.getByRole('radio', { name: pattern });
-  if (await radio.count()) await radio.first().check();
+/**
+ * Choose the option of the list labelled `label` whose text matches `match` (the first, or the
+ * first that `prefer` also matches); return its text. Throws when none does, so a renamed option
+ * fails the step by name instead of leaving the form as it was.
+ */
+export async function pick(page, label, match, prefer = null) {
+  const select = page.getByLabel(label);
+  const options = (await select.evaluate((s) => [...s.options].map((o) => ({ value: o.value, text: o.text.trim() }))))
+    .filter((o) => o.value && (typeof match === 'string' ? o.text.includes(match) : match.test(o.text)));
+  const chosen = options.find((o) => prefer && o.text.includes(prefer)) ?? options[0];
+  if (!chosen) throw new Error(`no option matching ${match} in the list "${label}"`);
+  await select.selectOption(chosen.value);
+  return chosen.text;
 }
 
 /** The form that holds `locator`. */

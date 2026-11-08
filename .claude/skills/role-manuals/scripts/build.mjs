@@ -8,8 +8,11 @@
  *
  * Input:  sources/*.md (front matter + the Markdown subset of the style guide), img/*.png,
  *         variables.json (product name, help desk, software version, accent colour, font).
- * Output: build/<name>.docx, build/<name>.html, build/<name>.pdf, and build/help-index.json,
- *         the contract for help in context (per task: screen, permission, shots, title, anchor).
+ * Output: build/<name>.docx, build/<name>.html, build/<name>.pdf; build/manuals.json (per manual its
+ *         role, tasks and figures, which check.py checks) and build/help-index.json, the contract for
+ *         help in context (per task: screen, permission, shots, title, anchor). Nothing is built when
+ *         a source breaks a rule: a task marker without its heading, a figure that is no
+ *         img/<id>.png, or a term this organisation does not show (after its variables are filled in).
  * docx and marked come from ../package.json (npm ci there); the PDF is printed by the Chrome that
  * the verification stack's client starts (Playwright from e2e/).
  */
@@ -21,7 +24,7 @@ import * as docx from 'docx';
 import { marked } from 'marked';
 
 import { launchBrowser } from '../../verify-openplanner/scripts/stack-client.mjs';
-import { fail, openWorkspace } from './workspace.mjs';
+import { fail, hiddenTerms, openWorkspace } from './workspace.mjs';
 
 const {
   AlignmentType, BorderStyle, Document, ExternalHyperlink, Footer, HeadingLevel, ImageRun,
@@ -78,12 +81,23 @@ function substitute(text, file) {
   });
 }
 
-/** A link target the manuals may carry: https, mailto, an anchor or a relative path. */
+/**
+ * A link target the manuals may carry: https, mailto, an anchor or a relative path. Control
+ * characters and spaces are taken out first, as a browser does, so they hide no other scheme.
+ */
 function safeHref(href, file) {
-  if (/^(https:|mailto:|#)/i.test(href) || !/^[a-z][a-z0-9+.-]*:/i.test(href)) return href;
+  const clean = String(href).replace(/[\u0000-\u0020\u007f]/g, '');
+  if (/^(https:|mailto:|#)/i.test(clean) || !/^[a-z][a-z0-9+.-]*:/i.test(clean)) return clean;
   console.warn(`${file}: link ${href} dropped (only https, mailto, anchors and relative links)`);
   return null;
 }
+
+/** A figure must be a screenshot of the workspace: img/<id>.png, nothing else on disk. */
+const FIGURE = /^img\/[a-z0-9][a-z0-9-]*\.png$/;
+const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/** The 1-based line of every match of `pattern` in `text`, in order. */
+const linesOf = (text, pattern) => [...text.matchAll(pattern)].map((m) => text.slice(0, m.index).split('\n').length);
 
 const ENTITIES = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
 const unescape = (s) => String(s ?? '').replace(/&(amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e]);
@@ -125,17 +139,25 @@ function parseTask(text) {
   return attrs;
 }
 
-/** Build the block model of one document; figures are numbered in reading order. */
-function parseDocument(body, file) {
+/**
+ * Build the block model of one source: the blocks, its figures in reading order, and its tasks.
+ * A task marker belongs to the heading right after it; that heading keeps the task and gets its
+ * anchor here, once. Whatever breaks a rule is returned in `errors` with its line.
+ */
+function parseDocument(text, body, file) {
+  const errors = [];
+  const markerLines = linesOf(text, /<!--\s*task:/g);
   let figureNo = 0;
   const figure = (tok) => {
     figureNo += 1;
     const id = path.basename(tok.href, '.png');
+    if (!FIGURE.test(tok.href)) errors.push(`${file}: afbeelding ${tok.href} is geen img/<id>.png`);
     const note = (VARS.without_webex || {})[id];
+    const source = FIGURE.test(tok.href) ? path.join(ws.dir, tok.href) : null;
     return {
-      type: 'figure', src: tok.href, file: path.join(ws.dir, tok.href), exists: fs.existsSync(path.join(ws.dir, tok.href)),
+      type: 'figure', id, src: tok.href, file: source, exists: Boolean(source && fs.existsSync(source)),
       alt: unescape(tok.text), caption: unescape(tok.title || '') + (note ? ` (testopname zonder Webex Meetings: ${note})` : ''),
-      num: figureNo,
+      num: figureNo, line: linesOf(text, new RegExp(`\\(${tok.href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'))[0] ?? 0,
     };
   };
   const blocks = (tokens) => {
@@ -165,8 +187,7 @@ function parseDocument(body, file) {
         }
         case 'html': {
           if (/<!--\s*pagebreak\s*-->/.test(t.raw)) out.push({ type: 'pagebreak' });
-          const task = t.raw.match(/<!--\s*task:\s*([\s\S]*?)-->/);
-          if (task) out.push({ type: 'task', attrs: parseTask(task[1]) });
+          for (const task of t.raw.matchAll(/<!--\s*task:\s*([\s\S]*?)-->/g)) out.push({ type: 'task', attrs: parseTask(task[1]) });
           break;
         }
         case 'code': out.push({ type: 'code', text: t.text }); break;
@@ -177,13 +198,41 @@ function parseDocument(body, file) {
   };
   const model = blocks(marked.lexer(body));
   const figures = [];
-  const walk = (bl) => bl.forEach((b) => {
+  const tasks = [];
+  const used = new Set();
+  let markerNo = 0;
+  const resolve = (list) => list.forEach((b, i) => {
+    if (b.type === 'heading' && b.level > 1) {
+      let id = slug(plain(b.inline)) || 'kop';
+      while (used.has(id)) id += '-x';
+      used.add(id);
+      b.id = id;
+      if (b.task) tasks.push({ ...b.task, title: plain(b.inline), anchor: id });
+    }
+    if (b.type === 'task') {
+      const line = markerLines[markerNo++] ?? 0;
+      const next = list[i + 1];
+      if (next?.type === 'heading' && next.level > 1) next.task = { line, ...b.attrs };
+      else errors.push(`${file}:${line}: taakkoppeling zonder kop (niveau 2 of dieper) direct eronder`);
+    }
     if (b.type === 'figure') figures.push(b);
-    if (b.type === 'list') b.items.forEach((it) => walk(it.blocks));
-    if (b.type === 'callout') walk(b.blocks);
+    if (b.type === 'list') b.items.forEach((it) => resolve(it.blocks));
+    if (b.type === 'callout') resolve(b.blocks);
   });
-  walk(model);
-  return { model, figures };
+  resolve(model);
+  return { model, figures, tasks, errors };
+}
+
+/** The lines of `text` that name a term this organisation does not show, or the hidden product name. */
+function namedTerms(text, file) {
+  const { product, terms } = hiddenTerms(VARS);
+  const hidden = [...(product ? [product] : []), ...terms];
+  const errors = [];
+  text.split('\n').forEach((line, n) => {
+    const shown = line.replace(/<!--[\s\S]*?-->/g, '').toLowerCase();
+    for (const term of hidden) if (shown.includes(term.toLowerCase())) errors.push(`${file}:${n + 1}: noemt "${term}"`);
+  });
+  return errors;
 }
 
 const isWarning = (label) => /let op|belangrijk|waarschuwing/i.test(label || '');
@@ -418,7 +467,6 @@ function wordDocument(meta, model, figures) {
 // HTML renderer (screen and print; the PDF is printed from it).
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 function htmlInline(inl) {
   return inl.map((r) => {
@@ -431,29 +479,15 @@ function htmlInline(inl) {
   }).join('');
 }
 
-/** The HTML page of one manual; every task marker is filed in `index` under its next heading. */
-function htmlDocument(meta, model, figures, index) {
+/** The HTML page of one manual. */
+function htmlDocument(meta, model, figures) {
   const toc = [];
-  let pendingTask = null;
-  const used = new Set();
-  const anchor = (text) => {
-    let id = slug(text) || 'kop';
-    while (used.has(id)) id += '-x';
-    used.add(id);
-    return id;
-  };
   const render = (blocks) => blocks.map((b) => {
     switch (b.type) {
       case 'heading': {
         if (b.level === 1) return '';
-        const text = plain(b.inline);
-        const id = anchor(text);
-        toc.push({ level: b.level, text, id });
-        if (pendingTask) {
-          index.push({ ...pendingTask, title: text, anchor: id });
-          pendingTask = null;
-        }
-        return `<h${b.level} id="${id}">${htmlInline(b.inline)}</h${b.level}>`;
+        toc.push({ level: b.level, text: plain(b.inline), id: b.id });
+        return `<h${b.level} id="${b.id}">${htmlInline(b.inline)}</h${b.level}>`;
       }
       case 'para': return `<p>${htmlInline(b.inline)}</p>`;
       case 'list': {
@@ -476,7 +510,6 @@ function htmlDocument(meta, model, figures, index) {
         return `<figure class="figure${narrow}"><img src="../${esc(b.src)}" alt="${esc(b.alt)}" width="${Math.round(width / 2)}" height="${Math.round(height / 2)}">${caption}</figure>`;
       }
       case 'pagebreak': return '<div class="pagina" aria-hidden="true"></div>';
-      case 'task': pendingTask = b.attrs; return '';
       case 'code': return `<pre><code>${esc(b.text)}</code></pre>`;
       default: return '';
     }
@@ -563,22 +596,25 @@ const FOOTER = (title) => '<div style="font-family:Arial,sans-serif;font-size:8p
 
 // ---------------------------------------------------------------------------------------------
 
-/** Build one source into Word and HTML; return its HTML file and its entries for the help index. */
-async function build(file) {
+/** Read and parse one source with the workspace's variables filled in. */
+function parse(file) {
   const name = path.basename(file, '.md');
-  const [rawMeta, rawBody] = splitFrontMatter(fs.readFileSync(file, 'utf8'));
-  const meta = Object.fromEntries(Object.entries(rawMeta).map(([k, v]) => [k, substitute(v, name)]));
-  const body = substitute(rawBody, name);
+  const text = substitute(fs.readFileSync(file, 'utf8'), name);
+  const [meta, body] = splitFrontMatter(text);
   meta.title ||= (body.match(/^#\s+(.+)$/m) || [])[1] || name;
-  const { model, figures } = parseDocument(body, name);
+  const doc = parseDocument(text, body, `${name}.md`);
+  return { name, meta, ...doc, errors: [...doc.errors, ...namedTerms(text, `${name}.md`)] };
+}
+
+/** Write one manual as Word and HTML; return its HTML file. */
+async function render(doc) {
   fs.mkdirSync(ws.build, { recursive: true });
-  fs.writeFileSync(path.join(ws.build, `${name}.docx`), await Packer.toBuffer(wordDocument(meta, model, figures)));
-  const index = [];
-  const html = path.join(ws.build, `${name}.html`);
-  fs.writeFileSync(html, htmlDocument(meta, model, figures, index));
-  const missing = figures.filter((f) => !f.exists).map((f) => path.basename(f.src, '.png'));
-  console.log(`${name}: ${figures.length} afbeeldingen, ${missing.length} volgen${missing.length ? ` (${missing.join(', ')})` : ''}`);
-  return { html, title: meta.title, entries: index.map((e) => ({ file: name, role: meta.role, html: `${name}.html#${e.anchor}`, ...e })) };
+  fs.writeFileSync(path.join(ws.build, `${doc.name}.docx`), await Packer.toBuffer(wordDocument(doc.meta, doc.model, doc.figures)));
+  const html = path.join(ws.build, `${doc.name}.html`);
+  fs.writeFileSync(html, htmlDocument(doc.meta, doc.model, doc.figures));
+  const missing = doc.figures.filter((f) => !f.exists).map((f) => f.id);
+  console.log(`${doc.name}: ${doc.figures.length} afbeeldingen, ${missing.length} volgen${missing.length ? ` (${missing.join(', ')})` : ''}`);
+  return { html, title: doc.meta.title };
 }
 
 /** Print each HTML manual to a tagged PDF with bookmarks, A4, a footer with title and page. */
@@ -605,10 +641,22 @@ async function printPdfs(built) {
 const named = argv.slice(1).filter((a) => !a.startsWith('--'));
 const files = named.length ? named.map((a) => path.resolve(a))
   : fs.readdirSync(ws.sources).filter((f) => f.endsWith('.md')).sort().map((f) => path.join(ws.sources, f));
+const docs = files.map(parse);
+const errors = docs.flatMap((d) => d.errors);
+if (errors.length) {
+  console.error(`build.mjs: niets gebouwd; ${errors.length} fout(en):\n${errors.map((e) => `  ${e}`).join('\n')}`);
+  process.exit(1);
+}
 const built = [];
-for (const f of files) built.push(await build(f));
+for (const doc of docs) built.push(await render(doc));
 if (!named.length) {
-  const index = built.flatMap((b) => b.entries);
+  // What check.py checks against the matrix, the help topics and the shot list, from this one parse.
+  const manuals = docs.map((d) => ({
+    file: d.name, role: d.meta.role ?? '', tasks: d.tasks, figures: d.figures.map((f) => ({ id: f.id, line: f.line })),
+  }));
+  fs.writeFileSync(path.join(ws.build, 'manuals.json'), `${JSON.stringify(manuals, null, 2)}\n`);
+  // The contract for help in context: per task its screen, permission, shots, manual and anchor.
+  const index = docs.flatMap((d) => d.tasks.map(({ line, ...task }) => ({ file: d.name, role: d.meta.role, html: `${d.name}.html#${task.anchor}`, ...task })));
   fs.writeFileSync(path.join(ws.build, 'help-index.json'), `${JSON.stringify(index, null, 2)}\n`);
   console.log(`help-index: ${index.length} taken op ${new Set(index.map((e) => e.screen)).size} schermen`);
 }

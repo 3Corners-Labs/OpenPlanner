@@ -21,44 +21,35 @@ export const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.
 /** Where stack.sh keeps its runs (VERIFY_EVIDENCE_ROOT, as stack.sh reads it). */
 export const EVIDENCE_ROOT = process.env.VERIFY_EVIDENCE_ROOT || join(REPO, '.verify-openplanner');
 
-/** Dutch interface texts of the mapped paths, by catalogue key (app/i18n/locales/nl.po). */
-export const NL = {
-  groupName: 'Demo: videogesprek', // the demo seed, app/adapters/db/seed.py
-  formTitle: 'Uw gegevens', // book.title
-  firstName: 'Voornaam', // form.first_name
-  lastName: 'Achternaam', // form.last_name
-  email: 'E-mailadres', // form.email
-  phone: 'Telefoonnummer', // form.phone
-  submit: 'Afspraak maken', // form.submit
-  bookedTitle: 'Bevestig uw afspraak', // booked.title
-  bookedText: 'We hebben u een e-mail gestuurd', // booked.text
-  confirm: 'Afspraak bevestigen', // confirm.title, confirm.submit
-  confirmed: 'Uw afspraak is bevestigd', // manage.notice.confirmed
-  manageTitle: 'Uw afspraak', // manage.title
-  move: 'Afspraak verplaatsen', // manage.reschedule, reschedule.title
-  moveConfirmTitle: 'Nieuw moment bevestigen', // reschedule.confirm_title
-  moveSubmit: 'Verplaatsen', // reschedule.submit
-  moved: 'Uw afspraak is verplaatst', // manage.notice.rescheduled
-  cancel: 'Afspraak annuleren', // cancel.title
-  cancelSubmit: 'Ja, annuleren', // cancel.confirm
-  cancelledNotice: 'Uw afspraak is geannuleerd', // manage.notice.cancelled
-  dashboard: 'Overzicht', // admin.dashboard.title
-  yourGroups: 'Uw groepen', // admin.dashboard.groups
-  adminMenu: 'Beheermenu', // admin.nav.label
-  logout: 'Uitloggen', // admin.logout
-  loggedOut: 'U bent uitgelogd', // admin.logged_out.title
-  forbidden: 'Geen toegang', // admin.forbidden.title
-  noRole: 'U heeft geen rol in het beheerportaal', // admin.no_role.text
-  agendaCancelled: 'Geannuleerd', // admin.agenda.cancelled
-};
+/**
+ * The interface texts the scripts drive, from labels.json (one home, checked against the
+ * catalogue by tests/test_skill_labels.py). NL: the participant pages and the portal basics, as
+ * text. SUBJECT: email subjects, as patterns. LABEL: every group as handles: an exact text as a
+ * string, a prefix or part as an anchored pattern, a template as a function of its placeholders.
+ */
+const LABELS = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'labels.json'), 'utf8'));
+const quoteRe = (text) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-/** Subjects of the participant's emails (message.<kind>.subject in nl.po). */
-export const SUBJECT = {
-  confirmRequest: /^Bevestig uw afspraak met /, // message.confirm_request.subject
-  confirmation: /^Bevestiging van uw videogesprek/, // message.confirmation.subject
-  change: /^Uw videogesprek is verplaatst/, // message.change.subject
-  cancellation: /is geannuleerd$/, // message.cancellation.subject
-};
+function handle(entry) {
+  if (entry.template) return (values) => entry.template.replace(/\{(\w+)\}/g, (all, key) => values[key] ?? all);
+  if (entry.pattern) return new RegExp(entry.pattern);
+  if (entry.match === 'prefix') return new RegExp(`^${quoteRe(entry.text)}`);
+  if (entry.match === 'contains') return new RegExp(quoteRe(entry.text));
+  return entry.text;
+}
+
+const groupOf = (name, make) => Object.fromEntries(Object.entries(LABELS[name]).map(([key, entry]) => [key, make(entry)]));
+
+export const NL = groupOf('participant', (entry) => entry.text);
+export const SUBJECT = groupOf('subject', (entry) => new RegExp(entry.pattern));
+export const LABEL = Object.fromEntries(Object.keys(LABELS).filter((g) => typeof LABELS[g] === 'object').map((g) => [g, groupOf(g, handle)]));
+/** The plain texts of a group, for checks that look for them in a page's text. */
+export const textsOf = (group) => Object.values(LABELS[group]).map((entry) => entry.text);
+/** The plain text of one label. */
+export const textOf = (group, key) => LABELS[group][key].text;
+
+/** The slug of the demo group of the seed. */
+export const DEMO_GROUP = 'demo';
 
 /** A booking-link token in a URL path; /b/m/<reference> does not match. */
 export const TOKEN_PATH = /\/b\/[A-Za-z0-9_-]{20,}/g;
@@ -234,6 +225,31 @@ export function manageLinkIn(run, message) {
   const url = linksIn(run, message).urls.find((u) => !u.slice(u.indexOf('/b/') + 3).includes('/'));
   if (!url) throw new Error(`email "${message.Subject}" has no management link`);
   return url;
+}
+
+/** The /confirm link of a confirmation request email. */
+export function confirmLinkIn(run, message) {
+  const url = linksIn(run, message).urls.find((u) => u.endsWith('/confirm'));
+  if (!url) throw new Error(`email "${message.Subject}" has no /confirm link`);
+  return url;
+}
+
+/** The booking reference in a /b/m/<reference> address. */
+export const referenceOf = (page) => new URL(page.url()).pathname.split('/')[3];
+
+/** `text` with booking-link tokens and the run's test passwords blanked: safe for evidence. */
+export function safeText(run, text) {
+  let out = blankTokens(text);
+  for (const password of run.passwords) out = out.split(password).join('<password>');
+  return out;
+}
+
+/** The agenda row of `firstName` whose row header starts at `timeLabel` ("HH:MM"). */
+export async function agendaRow(page, firstName, timeLabel, timeout = 15_000) {
+  const row = page.getByRole('row').filter({ hasText: firstName })
+    .filter({ has: page.locator('th', { hasText: new RegExp(`^${escapeRe(timeLabel)}–`) }) });
+  await row.first().waitFor({ timeout });
+  return row;
 }
 
 /**

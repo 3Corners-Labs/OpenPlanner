@@ -5,7 +5,7 @@
  */
 import { clock, hhmm } from './evidence.mjs';
 import { Full, Region, Top } from './shots.mjs';
-import { GROUP, NotYet, ORG, ROLES, Skip, screen, step, webex } from './story.mjs';
+import { A, GROUP, NotYet, ORG, ROLES, Skip, screen, step, webex } from './story.mjs';
 
 const QUEUE_ROWS = 'table.data-table tbody tr';
 const clean = (text) => text.replace(/\s+/g, ' ').trim();
@@ -20,7 +20,7 @@ function queueWindow(run) {
 async function openQueue(run) {
   const page = await run.staff('agent');
   await page.goto(`/admin/groups/${GROUP}/queue`);
-  await page.getByRole('heading', { name: 'Wachtende afspraken' }).waitFor({ timeout: 15_000 });
+  await page.getByRole('heading', { name: A.queueHeading }).waitFor({ timeout: 15_000 });
   return page;
 }
 
@@ -41,7 +41,7 @@ export const agent = [
   step('mw-01-overzicht', '**Overzicht** zoals een medewerker het ziet (wachtrij vooraan)', async (run, id) => {
     const page = await run.staff('agent');
     await page.goto('/admin/');
-    await page.getByRole('heading', { name: 'Wachtrij in mijn groepen' }).waitFor({ timeout: 15_000 });
+    await page.getByRole('heading', { name: A.queueWidget }).waitFor({ timeout: 15_000 });
     await run.shot(page, id, {
       role: ROLES.agent,
       visible: 'Het overzicht van de medewerker: vooraan "Wachtrij in mijn groepen" met per groep het aantal wachtende '
@@ -60,11 +60,11 @@ export const agent = [
   }),
   step('mw-03-opgepakt', 'na **Volgende oppakken**: de opgepakte afspraak met **Deelnemen aan het gesprek**', async (run, id) => {
     const page = await needQueue(run);
-    await page.getByRole('button', { name: 'Volgende oppakken' }).click();
-    await page.getByRole('heading', { name: /^U heeft .* opgepakt/ }).first().waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: A.claimNext }).click();
+    await page.getByRole('heading', { name: A.claimed }).first().waitFor({ timeout: 15_000 });
     run.state.claimed = page.url();
     run.save();
-    const canJoin = (await page.getByRole('link', { name: /Deelnemen aan het gesprek/ }).count()) > 0;
+    const canJoin = (await page.getByRole('link', { name: A.join }).count()) > 0;
     await run.shot(page, id, {
       role: ROLES.agent,
       visible: 'Na "Volgende oppakken": "U heeft … opgepakt" met tijd en deelnemer, de status van de deelnemer, en de knop '
@@ -75,7 +75,7 @@ export const agent = [
     const page = await needQueue(run);
     if (!run.state.claimed) throw new Skip('er is geen opgepakte afspraak (mw-03)');
     await page.goto(run.state.claimed);
-    await page.getByRole('button', { name: 'Vrijgeven' }).first().click();
+    await page.getByRole('button', { name: A.release }).first().click();
     await page.waitForLoadState('load');
     await page.locator(QUEUE_ROWS).first().waitFor({ timeout: 15_000 });
     await run.shot(page, id, {
@@ -126,7 +126,7 @@ export const admin = [
     path: '/admin/',
     visible: 'Het overzicht van de applicatiebeheerder: widgets Meldingen, Wachtrij in mijn groepen, Afspraken vandaag per '
       + 'groep, Recente configuratiewijzigingen, Lopende taken en Systeemstatus.',
-    crop: (page) => new Top(page.getByRole('region', { name: 'Systeemstatus' })),
+    crop: (page) => new Top(page.getByRole('region', { name: A.systemStatus })),
   }),
   screen({
     id: 'bh-02-organisatie',
@@ -162,7 +162,7 @@ export const admin = [
     visible: 'Organisaties → Demo-acme → Deelnemers → Huisstijl: het voorbeeld van een kaart zoals deelnemers hem zien, en '
       + 'het formulier met naam in de kop, kop, accentkleur, kleuren, tekstgrootte, regelafstand, afronding, schaduw en '
       + 'Opslaan.',
-    crop: (page) => new Top(page.getByRole('button', { name: 'Opslaan' }), 32),
+    crop: (page) => new Top(page.getByRole('button', { name: A.save }), 32),
     notes: ['Daaronder volgen Logo, Lettertypen en Themabestand (uploads), weggesneden.'],
   }),
   screen({
@@ -196,7 +196,7 @@ export const admin = [
     path: `/admin/groups/${GROUP}/settings`,
     visible: 'Groepen → demo → Instellingen: de algemene instellingen van de groep, met bij "Hoe afspraken bij medewerkers '
       + 'komen" de eigen wachtrij gekozen en de velden van de eigen wachtrij.',
-    crop: (page) => new Top(page.locator('details').filter({ hasText: /Medewerkers mogen zelf/ }), 24),
+    crop: (page) => new Top(page.locator('details').filter({ hasText: A.pickOwn }), 24),
     notes: ['Bijgesneden onder de laatste velden van de eigen wachtrij en het telefoonnummer; daaronder volgen de '
       + 'koppelingen, de koppeling met de identiteitsprovider, het boekingsformulier en archiveren.'],
   }),
@@ -225,12 +225,12 @@ export const admin = [
     visible: 'Medewerkers: de knop Medewerker uitnodigen, de lijst "Uitgenodigd, nog niet ingelogd" (twee '
       + 'ontwikkelaccounts), de filters en de tabel Medewerkers met naam, rollen, organisatie, groepen, inlogdienst en '
       + 'laatste login, actief en afgemeld.',
-    crop: (page) => new Top(page.getByRole('table', { name: 'Medewerkers' })),
+    crop: (page) => new Top(page.getByRole('table', { name: A.staffTable })),
   }),
   step('bh-13-medewerker', 'de pagina van één medewerker', async (run, id) => {
     const page = await run.staff('orgadmin');
     await page.goto('/admin/staff');
-    await page.getByRole('link', { name: /Mo Medewerker/ }).first().click();
+    await page.getByRole('link', { name: A.staffMember }).first().click();
     await page.waitForLoadState('load');
     await run.shot(page, id, {
       role: ROLES.orgadmin,
@@ -255,7 +255,7 @@ export const admin = [
     visible: 'Rechtenmatrix → Rollen aanpassen → Nieuwe rol: "Nieuwe rol maken" (kopie van Organisatiebeheerder) met de '
       + 'namen in het Nederlands en Engels, de waarde in de identity provider, de uitleg over het toekennen, en het begin '
       + 'van de lijst Rechten; niet opgeslagen.',
-    crop: (page) => new Top(page.getByRole('button', { name: 'Rol maken' })),
+    crop: (page) => new Top(page.getByRole('button', { name: A.createRole })),
     notes: ['Niet opgeslagen.'],
   }),
   screen({
@@ -312,9 +312,9 @@ export const admin = [
   step('bh-22-integraties', '**Integraties** (`super`): alleen het deel van Webex Meetings', async (run, id) => {
     const page = await run.staff('super');
     await page.goto('/admin/integrations');
-    const section = page.getByRole('region', { name: 'Webex Service App' });
+    const section = page.getByRole('region', { name: A.webexServiceApp });
     if (!(await section.count())) throw new Skip('geen onderdeel Webex Service App op de pagina Koppelingen');
-    const keep = section.locator('dt').filter({ hasText: 'Verversingstoken geldig tot' }).locator('xpath=..');
+    const keep = section.locator('dt').filter({ hasText: A.refreshUntil }).locator('xpath=..');
     await run.shot(page, id, {
       role: ROLES.super,
       visible: 'Koppelingen (in het menu Platform), alleen het onderdeel "Webex Service App": de koppeling met Webex voor de '

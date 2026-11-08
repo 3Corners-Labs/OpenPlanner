@@ -1,38 +1,40 @@
 /**
- * The preparation of the story (shot-list.md, "Voorbereiding"): the group on its own queue, the
+ * The preparation of the story (PREPARATION in evidence.mjs): the group on its own queue, the
  * product footer off, the seed's subject question off, and today a staffing exception of its own
  * block (pl-05) with one booking in it, for the queue of the agent.
  */
 import { until } from '../../verify-openplanner/scripts/stack-client.mjs';
 import { clock, dutchDate, hhmm } from './evidence.mjs';
 import { Full } from './shots.mjs';
-import { GROUP, ORG, PEOPLE, ROLES, Skip, UI, VIEWER, action, bookAndConfirm, formOf, step } from './story.mjs';
+import { A, GROUP, ORG, PEOPLE, ROLES, Skip, VIEWER, action, bookAndConfirm, formOf, pick, step } from './story.mjs';
 
-const ROUTING = 'Hoe afspraken bij medewerkers komen';
-const OWN_QUEUE = 'Eigen wachtrij';
-const SUBJECT_QUESTION_OFF = 'Waar gaat uw vraag over? uitzetten';
-const selected = (select) => select.evaluate((s) => s.options[s.selectedIndex].text);
+const selected = (page, label) => page.getByLabel(label).evaluate((s) => s.options[s.selectedIndex].text.trim());
+/** Today's block must hold at least one slot, from about an hour from now (the lead time). */
+const MIN_BLOCK_MINUTES = 30;
+
+/** Save the form of the field labelled `label` and wait for the page that follows. */
+async function saveFormOf(page, label) {
+  await formOf(page.getByLabel(label)).getByRole('button', { name: A.save }).click();
+  await page.waitForLoadState('load');
+}
 
 /** As orgadmin, put group demo on the own queue (and record what was there). */
 async function ownQueue(run) {
   const page = await run.staff('orgadmin');
   await page.goto(`/admin/groups/${GROUP}/settings`);
-  const before = await selected(page.getByLabel(ROUTING));
-  const visibleFrom = await page.getByLabel(/^Zichtbaar in de wachtrij/).inputValue();
+  const before = await selected(page, A.routing);
+  const visibleFrom = await page.getByLabel(A.queueVisible).inputValue();
   run.state.queue_visible_minutes = Number(visibleFrom);
-  if (before.startsWith(OWN_QUEUE)) {
-    run.notePrep('1', '1', `Groep \`demo\` stond al op de eigen wachtrij ("${before}"); niets gewijzigd. `
+  if (A.ownQueue.test(before)) {
+    run.notePrep('1', `Groep \`demo\` stond al op de eigen wachtrij ("${before}"); niets gewijzigd. `
       + `Zichtbaar in de wachtrij: ${visibleFrom} minuten vooraf.`);
     return;
   }
-  const select = page.getByLabel(ROUTING);
-  await select.selectOption(await select.evaluate((s, own) => [...s.options].find((o) => o.text.startsWith(own)).value, OWN_QUEUE));
-  await formOf(select).getByRole('button', { name: UI.save }).click();
-  await page.waitForLoadState('load');
+  const after = await pick(page, A.routing, A.ownQueue);
+  await saveFormOf(page, A.routing);
   await page.goto(`/admin/groups/${GROUP}/settings`);
-  const after = await selected(page.getByLabel(ROUTING));
-  if (!after.startsWith(OWN_QUEUE)) throw new Error(`the group still says ${after}`);
-  run.notePrep('1', '1', `Als \`orgadmin\`, **Groepen → demo → Instellingen**, veld "${ROUTING}": stond op "${before}", `
+  if (!A.ownQueue.test(await selected(page, A.routing))) throw new Error('the group is not on its own queue after saving');
+  run.notePrep('1', `Als \`orgadmin\`, **Groepen → demo → Instellingen**, veld "${A.routing}": stond op "${before}", `
     + `gezet op "${after}" en opgeslagen. "Zichtbaar in de wachtrij" bleef ${visibleFrom} minuten vooraf (standaard).`);
 }
 
@@ -40,22 +42,20 @@ async function ownQueue(run) {
 async function footerOff(run) {
   const page = await run.staff('super');
   await page.goto(`/admin/organisations/${ORG}/settings`);
-  const before = await selected(page.getByLabel(/Afspraken via/));
-  if (before !== 'Uit') {
-    const select = page.getByLabel(/Afspraken via/);
-    await select.selectOption({ label: 'Uit' });
-    await formOf(select).getByRole('button', { name: UI.save }).click();
-    await page.waitForLoadState('load');
+  const before = await selected(page, A.footer);
+  if (before !== A.off) {
+    await pick(page, A.footer, A.off);
+    await saveFormOf(page, A.footer);
   }
   await page.goto(`/admin/organisations/${ORG}/settings`);
-  const after = await selected(page.getByLabel(/Afspraken via/));
-  if (after !== 'Uit') throw new Error(`PRODUCT_FOOTER still ${after}`);
+  const after = await selected(page, A.footer);
+  if (after !== A.off) throw new Error(`PRODUCT_FOOTER still ${after}`);
   const check = await run.participant(VIEWER, { fresh: true });
   await until('the group page without the product footer', async () => {
     await check.goto(`/g/${GROUP}`);
     return !(await check.locator('.product-footer').count());
   }, 30_000);
-  run.notePrep('2', '2', 'Als `super`, **Organisaties → Demo-acme → Overzicht → Instellingen**, onderdeel Weergave, '
+  run.notePrep('2', 'Als `super`, **Organisaties → Demo-acme → Overzicht → Instellingen**, onderdeel Weergave, '
     + 'instelling `PRODUCT_FOOTER` (klasse D, het label noemt de productnaam): '
     + `stond op "${before}", gezet op "${after}" en opgeslagen. Daarna toont \`/g/demo\` geen voettekst meer, en het `
     + 'HTML-deel van de e-mails ook niet (zelfde instelling).');
@@ -63,44 +63,40 @@ async function footerOff(run) {
 
 /**
  * The demo seed asks "Waar gaat uw vraag over?", a choice the manuals do not describe; like the
- * footer, a real setting takes it away (the button "Uitzetten" on the booking form's questions),
- * so the form in the screenshots holds the interpreter question only and every booking of the
- * story needs no answer to it.
+ * footer, a real setting takes it away (the button "… uitzetten" on the booking form's
+ * questions, which posts at once), so the form in the screenshots holds the interpreter question
+ * only and no booking of the story needs an answer to it.
  */
 async function subjectQuestionOff(run) {
   const page = await run.staff('orgadmin');
+  const off = A.retireField({ label: A.subjectQuestion });
   await page.goto(`/admin/groups/${GROUP}/settings/form`);
-  const button = page.getByRole('button', { name: SUBJECT_QUESTION_OFF });
+  const button = page.getByRole('button', { name: off });
   if (!(await button.count())) {
-    run.notePrep('2b', '2b', 'De vraag "Waar gaat uw vraag over?" stond al uit; niets gewijzigd.');
+    run.notePrep('2b', `De vraag "${A.subjectQuestion}" stond al uit; niets gewijzigd.`);
     return;
   }
   await button.click();
   await page.waitForLoadState('load');
-  const confirm = page.getByRole('button', { name: /^(Uitzetten|Ja)/ });
-  if ((await confirm.count()) && page.url().includes('settings/form') && (await confirm.first().isVisible())) {
-    await confirm.first().click();
-    await page.waitForLoadState('load');
-  }
   await page.goto(`/admin/groups/${GROUP}/settings/form`);
-  if (await page.getByRole('button', { name: SUBJECT_QUESTION_OFF }).count()) throw new Error('the question is still on');
-  run.notePrep('2b', '2b', 'Als `orgadmin`, **Groepen → demo → Instellingen → Boekingsformulier**, bij de eigen vraag '
-    + '"Waar gaat uw vraag over?" (keuzelijst uit de demovulling) op **Uitzetten** gedrukt: de handleidingen beschrijven '
+  if (await page.getByRole('button', { name: off }).count()) throw new Error('the question is still on');
+  run.notePrep('2b', 'Als `orgadmin`, **Groepen → demo → Instellingen → Boekingsformulier**, bij de eigen vraag '
+    + `"${A.subjectQuestion}" (keuzelijst uit de demovulling) op **Uitzetten** gedrukt: de handleidingen beschrijven `
     + 'die demovraag niet; net als bij de voettekst haalt een echte instelling haar weg in plaats van een balk. '
     + 'De vraag "Ik wil graag een tolk" bleef aan.');
 }
 
-/** Fill the form "Afwijkende bezetting toevoegen" for an own block of `agents` agents. */
+/** Fill and send the form "Afwijkende bezetting toevoegen": an own block of `agents` agents. */
 export async function addException(page, { date, from, to, agents }) {
   await page.goto(`/admin/groups/${GROUP}/exceptions`);
-  const form = page.getByRole('form', { name: UI.exceptionForm });
-  await form.getByLabel('Datum').fill(dutchDate(date));
-  await form.getByRole('radio', { name: 'Eigen tijdblok' }).check();
-  await form.getByLabel(/^Van/).fill(from);
-  await form.getByLabel(/^Tot/).fill(to);
-  await form.getByLabel(/^Aantal medewerkers/).fill(String(agents));
-  await form.getByLabel('Aanbod').selectOption({ label: 'Afspraken' });
-  await form.getByRole('button', { name: UI.exceptionForm }).click();
+  const form = page.getByRole('form', { name: A.exceptionForm });
+  await form.getByLabel(A.date).fill(dutchDate(date));
+  await form.getByRole('radio', { name: A.ownBlock }).check();
+  await form.getByLabel(A.from).fill(from);
+  await form.getByLabel(A.to).fill(to);
+  await form.getByLabel(A.capacity).fill(String(agents));
+  await pick(form, A.offer, A.offerScheduled);
+  await form.getByRole('button', { name: A.exceptionButton }).click();
   await page.waitForLoadState('load');
 }
 
@@ -112,16 +108,18 @@ async function todaysException(run, id) {
     const now = clock();
     const start = Math.ceil((Math.floor(now.minutes) + 65) / 30) * 30;
     const end = Math.min(start + 180, 23 * 60 + 30);
-    if (end - start < 60) throw new Skip('te laat op de dag voor een tijdblok van vandaag; draai het verhaal eerder op de dag');
+    if (end - start < MIN_BLOCK_MINUTES) {
+      throw new Skip('te laat op de dag voor een tijdblok van vandaag; draai het verhaal eerder op de dag');
+    }
     block = { date: now.day, from: hhmm(start), to: hhmm(end) };
     await addException(page, { ...block, agents: 2 });
     run.state.today_block = block;
-    run.notePrep('3', '3', `Als \`groupadmin\`, **Groepen → demo → Planning → Afwijkende bezetting**: datum ${dutchDate(block.date)}, `
-      + `soort "Eigen tijdblok", ${block.from}–${block.to}, 2 medewerkers, aanbod "Afspraken", label leeg; `
-      + `**${UI.exceptionForm}**. Dit is ook opname ${id}.`);
+    run.notePrep('3', `Als \`groupadmin\`, **Groepen → demo → Planning → Afwijkende bezetting**: datum ${dutchDate(block.date)}, `
+      + `soort "${A.ownBlock}", ${block.from}–${block.to}, 2 medewerkers, aanbod "${A.offerScheduled}", label leeg; `
+      + `**${A.exceptionButton}**. Dit is ook opname ${id}.`);
   }
   await page.goto(`/admin/groups/${GROUP}/exceptions`);
-  if (!(await page.getByRole('region', { name: 'Komende afwijkende bezetting' }).getByText(block.from).count())) {
+  if (!(await page.getByRole('region', { name: A.upcomingExceptions }).getByText(block.from).count())) {
     throw new Error("today's exception is not listed");
   }
   await run.shot(page, id, {

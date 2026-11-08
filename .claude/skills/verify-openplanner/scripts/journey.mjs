@@ -30,8 +30,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  NL, SUBJECT, HAS_TOKEN, assertOurs, blankTokens, chooseDay, escapeRe, h1, launchBrowser, linksIn,
-  loadRun, login, mailFor, mailMessage, manageLinkIn, statusText, until, waitForMail,
+  DEMO_GROUP, HAS_TOKEN, NL, SUBJECT, agendaRow, assertOurs, chooseDay, confirmLinkIn, h1, launchBrowser,
+  linksIn, loadRun, login, mailFor, mailMessage, manageLinkIn, referenceOf, safeText, statusText, until, waitForMail,
+  waitH1,
+  waitStatus,
 } from './stack-client.mjs';
 
 function fail(message) {
@@ -51,10 +53,9 @@ function saveState(run, state) {
 
 /** Text with booking-link tokens, test passwords and this run's participant values replaced. */
 function redact(run, text) {
-  let out = blankTokens(text);
+  let out = safeText(run, text);
   const { email, last, first } = run.participant;
   const values = [[email, '<email>'], [last, '<last_name>'], [first, '<first_name>']];
-  for (const password of run.passwords) values.push([password, '<password>']);
   for (const [value, label] of values) {
     if (value) out = out.split(value).join(label);
   }
@@ -155,8 +156,8 @@ async function booking({ page, rec, run }) {
   const { participant } = run;
   const seen = new Set((await mailFor(run)).map((m) => m.ID));
 
-  await page.goto('/g/demo');
-  await until(`h1 "${NL.groupName}"`, async () => (await h1(page)) === NL.groupName);
+  await page.goto(`/g/${DEMO_GROUP}`);
+  await waitH1(page, NL.groupName);
   await rec.step(page, 'group-page', `h1 "${NL.groupName}" with the month calendar`);
 
   const day = await chooseDay(page);
@@ -166,7 +167,7 @@ async function booking({ page, rec, run }) {
   await rec.step(page, 'day-times', `day ${day}: ${await page.locator('#times .time-button').count()} free times, first ${label}`);
 
   await time.click();
-  await until(`h1 "${NL.formTitle}"`, async () => (await h1(page)) === NL.formTitle);
+  await waitH1(page, NL.formTitle);
   await rec.step(page, 'form', `h1 "${NL.formTitle}" for ${label} on ${day}`);
 
   await page.getByLabel(NL.firstName).fill(participant.first);
@@ -180,14 +181,13 @@ async function booking({ page, rec, run }) {
 
   await page.getByLabel(NL.email).fill(participant.email);
   await page.getByRole('button', { name: NL.submit }).click();
-  await until(`h1 "${NL.bookedTitle}"`, async () => (await h1(page)) === NL.bookedTitle);
+  await waitH1(page, NL.bookedTitle);
   if (!(await statusText(page)).includes(NL.bookedText)) throw new Error(`no status "${NL.bookedText}"`);
   await rec.step(page, 'check-your-email', `h1 "${NL.bookedTitle}", status "${NL.bookedText}"`);
 
   const request = await waitForMail(run, seen, SUBJECT.confirmRequest);
   const requestLinks = linksIn(run, request);
-  const confirmUrl = requestLinks.urls.find((url) => url.endsWith('/confirm'));
-  if (!confirmUrl) throw new Error(`email "${request.Subject}" has no /confirm link`);
+  const confirmUrl = confirmLinkIn(run, request);
   rec.email('confirm-request-email', request, requestLinks.shown);
 
   await page.goto(confirmUrl);
@@ -195,11 +195,11 @@ async function booking({ page, rec, run }) {
     /^\/b\/m\/[\w-]+\/confirm$/.test(new URL(page.url()).pathname) && (await h1(page)) === NL.confirm);
   // ADR 0093: the token is traded for a cookie; the address that stays holds none.
   if (HAS_TOKEN.test(new URL(page.url()).pathname)) throw new Error('the confirm page address still holds the token');
-  const reference = new URL(page.url()).pathname.split('/')[3];
+  const reference = referenceOf(page);
   await rec.step(page, 'confirm-page', `the emailed link led to /b/m/${reference}/confirm (no token in the address)`);
 
   await page.getByRole('button', { name: NL.confirm }).click();
-  await until(`status "${NL.confirmed}"`, async () => (await statusText(page)).includes(NL.confirmed));
+  await waitStatus(page, NL.confirmed);
   await rec.step(page, 'confirmed', `status "${NL.confirmed}" on /b/m/${reference}`);
 
   const confirmation = await waitForMail(run, seen, SUBJECT.confirmation);
@@ -226,7 +226,7 @@ async function manage({ page, rec, run }) {
   await rec.step(page, 'manage-page', `the emailed link led to /b/m/${state.booking.reference}, h1 "${NL.manageTitle}"`);
 
   await page.getByRole('link', { name: NL.move }).click();
-  await until(`h1 "${NL.move}"`, async () => (await h1(page)) === NL.move);
+  await waitH1(page, NL.move);
   await rec.step(page, 'reschedule-page', `h1 "${NL.move}" with the slot picker`);
 
   const day = await chooseDay(page);
@@ -237,23 +237,23 @@ async function manage({ page, rec, run }) {
   const start = await times.nth(index).getAttribute('value');
   const label = (await times.nth(index).innerText()).trim();
   await times.nth(index).click();
-  await until(`h1 "${NL.moveConfirmTitle}"`, async () => (await h1(page)) === NL.moveConfirmTitle);
+  await waitH1(page, NL.moveConfirmTitle);
   await rec.step(page, 'reschedule-confirm', `h1 "${NL.moveConfirmTitle}": from ${state.booking.time} on ${state.booking.day} to ${label} on ${day}`);
 
   await page.getByRole('button', { name: NL.moveSubmit }).click();
-  await until(`status "${NL.moved}"`, async () => (await statusText(page)).includes(NL.moved));
+  await waitStatus(page, NL.moved);
   // A move makes a new booking with a reference of its own; the address shows it.
-  const reference = new URL(page.url()).pathname.split('/')[3];
+  const reference = referenceOf(page);
   await rec.step(page, 'moved', `status "${NL.moved}"; the booking is now /b/m/${reference}`);
   const change = await waitForMail(run, seen, SUBJECT.change);
   rec.email('change-email', change, linksIn(run, change).shown);
 
   await page.getByRole('link', { name: NL.cancel }).click();
-  await until(`h1 "${NL.cancel}"`, async () => (await h1(page)) === NL.cancel);
+  await waitH1(page, NL.cancel);
   await rec.step(page, 'cancel-page', `h1 "${NL.cancel}"`);
 
   await page.getByRole('button', { name: NL.cancelSubmit }).click();
-  await until(`status "${NL.cancelledNotice}"`, async () => (await statusText(page)).includes(NL.cancelledNotice));
+  await waitStatus(page, NL.cancelledNotice);
   await rec.step(page, 'cancelled', `status "${NL.cancelledNotice}"`);
   const cancellation = await waitForMail(run, seen, SUBJECT.cancellation);
   rec.email('cancellation-email', cancellation, linksIn(run, cancellation, false).shown);
@@ -265,7 +265,7 @@ async function manage({ page, rec, run }) {
 async function agenda({ page, rec, run, browser }) {
   const { booking: current } = loadState(run);
   if (!current) throw new Error('precondition: a booking of this run (run the booking journey first)');
-  const path = `/admin/groups/demo/agenda?day=${current.day}`;
+  const path = `/admin/groups/${DEMO_GROUP}/agenda?day=${current.day}`;
 
   await login(page, run, 'groupadmin', path);
   // The login keeps only the path; open the day again.
@@ -273,10 +273,7 @@ async function agenda({ page, rec, run, browser }) {
   await until('the agenda day heading', () => page.locator('#agenda-heading').isVisible());
   // The row header reads "<start>–<end>"; match the start, since a moved booking's old row may end
   // at the new start.
-  const row = page
-    .getByRole('row')
-    .filter({ hasText: run.participant.first })
-    .filter({ has: page.locator('th', { hasText: new RegExp(`^${escapeRe(current.time)}–`) }) });
+  const row = await agendaRow(page, run.participant.first, current.time);
   await until(`one agenda row at ${current.time} for this run's participant`, async () => (await row.count()) === 1);
   const cancelled = (await row.getByText(NL.agendaCancelled, { exact: true }).count()) > 0;
   if (cancelled !== (current.status === 'cancelled')) {
@@ -290,7 +287,7 @@ async function agenda({ page, rec, run, browser }) {
     const outsider = await other.newPage();
     await login(outsider, run, 'outsider');
     const response = await outsider.goto(path);
-    await until(`h1 "${NL.forbidden}"`, async () => (await h1(outsider)) === NL.forbidden);
+    await waitH1(outsider, NL.forbidden);
     if (response?.status() !== 403) throw new Error(`the outsider got status ${response?.status()}, not 403`);
     await rec.step(outsider, 'outsider-refused', `outsider (organisation andere) gets 403 "${NL.forbidden}" on the demo agenda`);
   } finally {
@@ -305,7 +302,7 @@ async function adminLogin({ page, rec, run }) {
   await rec.step(page, 'keycloak-sign-in', `/admin/ sends an anonymous visitor to ${run.keycloak}/realms/openplanner`);
 
   await login(page, run, 'groupadmin');
-  await until(`h1 "${NL.dashboard}"`, async () => (await h1(page)) === NL.dashboard);
+  await waitH1(page, NL.dashboard);
   const groups = page.getByRole('list', { name: NL.yourGroups }).getByRole('listitem');
   if ((await groups.count()) !== 1 || !(await groups.first().innerText()).includes(NL.groupName)) {
     throw new Error(`"${NL.yourGroups}" does not list exactly "${NL.groupName}"`);
@@ -316,7 +313,7 @@ async function adminLogin({ page, rec, run }) {
   await page.getByRole('button', { name: NL.logout }).click();
   await until('the Keycloak logout page', () => page.url().startsWith(`${run.keycloak}/`) && page.url().includes('/logout'));
   await page.locator('#kc-logout').click();
-  await until(`h1 "${NL.loggedOut}"`, async () => (await h1(page)) === NL.loggedOut);
+  await waitH1(page, NL.loggedOut);
   await rec.step(page, 'logged-out', `h1 "${NL.loggedOut}" after the Keycloak logout`);
 
   await page.goto('/admin/');
@@ -324,7 +321,7 @@ async function adminLogin({ page, rec, run }) {
   await rec.step(page, 'sign-in-again', 'after logging out, /admin/ asks for a sign-in again');
 
   await login(page, run, 'norole');
-  await until(`h1 "${NL.forbidden}"`, async () => (await h1(page)) === NL.forbidden);
+  await waitH1(page, NL.forbidden);
   const links = await page.getByRole('navigation', { name: NL.adminMenu }).getByRole('link').count();
   if (!(await page.getByText(NL.noRole).isVisible()) || links !== 0) {
     throw new Error(`norole sees ${links} menu links or no "${NL.noRole}"`);

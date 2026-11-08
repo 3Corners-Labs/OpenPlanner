@@ -12,20 +12,20 @@
  */
 
 /** Return the boxes to cover: {kind, label, context, x, y, w, h} in CSS pixels of the viewport. */
-export function detect({ product, terms, versionFields }) {
+export function detect({ product, terms, versionFields, versionTexts }) {
   const esc = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const NAME = product ? new RegExp(esc(product), 'gi') : null;
   const TERMS = terms.length
     ? new RegExp(`[\\p{L}\\p{N}_-]*(?:${terms.map(esc).join('|')})[\\p{L}\\p{N}_-]*`, 'giu')
     : null;
   const VERSION = new RegExp([
-    'Geen releaseversie \\(ontwikkelversie\\)', '\\bGeen release\\b', '\\b[Vv]ersie onbekend\\b',
     'sha256:[0-9a-f]{12,64}', '(?<![\\w.])v?\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.]+)?(?![\\w.])',
     '(?<![\\w.])v\\d+\\.\\d+(?![\\w.])',
     '(?<![0-9A-Za-z])(?=[0-9a-f]*\\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,64}(?![0-9A-Za-z])',
     '(?<![\\w-])dev(?![\\w-])',
   ].join('|'), 'g');
-  const patterns = [[NAME, 'product'], [TERMS, 'term'], [VERSION, 'version']].filter(([re]) => re);
+  const NO_VERSION = versionTexts.length ? new RegExp(versionTexts.map(esc).join('|'), 'gi') : null;
+  const patterns = [[NAME, 'product'], [TERMS, 'term'], [VERSION, 'version'], [NO_VERSION, 'version']].filter(([re]) => re);
   const hits = (re, text) => { re.lastIndex = 0; return re.test(text || ''); };
   const named = (text) => Boolean(TERMS) && hits(TERMS, text);
   const clean = (text) => (text || '').replace(/\s+/g, ' ').trim();

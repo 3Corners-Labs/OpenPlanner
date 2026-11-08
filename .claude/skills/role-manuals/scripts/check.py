@@ -5,20 +5,22 @@ Usage, from the checkout (the app's own modules and babel come from its environm
     uv run python .claude/skills/role-manuals/scripts/check.py <workspace> [--since <commit>]
         [--fix]
 
-Writes ``evidence/check.md`` in the workspace and exits with 1 when a blocking finding is left:
+Writes ``evidence/check.md`` in the workspace and exits with 1 when a blocking finding is left.
+It checks what needs the software's own Python; the sources are parsed once, by ``build.mjs``,
+which also refuses a manual that names a term the organisation does not show. Run that first:
+it writes ``build/manuals.json``, the tasks and figures this check reads.
 
-1. Task markers (``<!-- task: screen=...; permission=...; shots=... -->``): the screen is a help
-   topic of the portal or a participant page, the permission exists, and a role of the manual
-   holds it in the authorisation matrix (``app.domain.authorization.MATRIX``).
-2. Screenshots: every image and shot id is in the shot list (``evidence/shots.json``, written by
-   ``capture.mjs``); which files still have to follow.
-3. Labels: every bold label is a text of the software (the ``nl`` catalogue, read as the app reads
-   it).
-4. Terms the organisation does not want named (``do_not_name``) and, when hidden, the product name.
-5. Since a commit: labels the software renamed or removed and where the manuals use them (a
+1. Tasks: the screen of each task is a help topic of the portal or a participant page, the
+   permission exists, and a role of the manual holds it in the authorisation matrix
+   (``app.domain.authorization.MATRIX``).
+2. Screenshots: every figure and shot of a task is in the shot list (``evidence/shots.json``,
+   written by ``capture.mjs``); which files still have to follow.
+3. Labels: every bold label of the sources is a text of the software (the ``nl`` catalogue, read
+   as the app reads it).
+4. Since a commit: labels the software renamed or removed and where the manuals use them (a
    removed one blocks), help topics and templates that changed. ``--fix`` writes a renamed label
    into the sources, inside bold labels only.
-6. Screenshots that differ from the previous capture (``img/previous/``): ``capture.mjs``
+5. Screenshots that differ from the previous capture (``img/previous/``): ``capture.mjs``
    compares them and writes ``evidence/diff.json`` and a picture of each difference in
    ``evidence/diff/``.
 """
@@ -38,9 +40,6 @@ sys.path.insert(0, str(REPO))
 
 from app.domain.authorization import MATRIX, PARTICIPANT_ACTIONS, Permission, Role  # noqa: E402
 from app.i18n.po import load_catalogues  # noqa: E402
-
-PRODUCT_NAME = "OpenPlanner"
-"""The software's own name; hidden in the manuals when ``hide_product_name`` is set."""
 
 PARTICIPANT_SCREENS = frozenset(
     {
@@ -70,10 +69,10 @@ STRUCTURAL = re.compile(
 )
 """Bold words that structure the text and are no label of the software."""
 
-TASK = re.compile(r"<!--\s*task:\s*(.*?)-->")
 BOLD = re.compile(r"\*\*(.+?)\*\*")
 BOLD_SPAN = re.compile(r"\*\*((?:(?!\n\s*\n).)+?)\*\*", re.DOTALL)
-IMAGE = re.compile(r"!\[[^\]]*\]\(img/([^)\s]+)\.png")
+COMMIT = re.compile(r"[0-9a-f]{7,40}")
+"""A commit as ``--since`` takes it: an abbreviated or full hash, never an option."""
 
 
 @dataclass
@@ -221,17 +220,6 @@ class Catalogue:
         return "onbekend"
 
 
-def front_matter(text: str) -> dict[str, str]:
-    """Return the flat front matter of a source file."""
-    match = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
-    meta = {}
-    for line in (match.group(1) if match else "").splitlines():
-        key, sep, value = line.partition(":")
-        if sep:
-            meta[key.strip()] = value.strip().strip('"')
-    return meta
-
-
 def manual_roles(role: str, config: dict[str, list[str]]) -> list[str] | None:
     """Return the matrix roles of a manual's ``role``, or None for the participants' manual."""
     for word, roles in config.items():
@@ -240,64 +228,50 @@ def manual_roles(role: str, config: dict[str, list[str]]) -> list[str] | None:
     return None
 
 
-def check_markers(path: Path, text: str, ctx: dict, report: Report) -> None:
-    """Check the task markers, images and hidden terms of one source."""
-    meta = front_matter(text)
-    roles = manual_roles(meta.get("role", ""), ctx["roles"])
-    for number, line in enumerate(text.splitlines(), 1):
-        where = f"{path.name}:{number}"
-        for marker in TASK.finditer(line):
-            ctx["tasks"] += 1
-            attrs = {
-                k.strip(): v.strip()
-                for k, _, v in (p.partition("=") for p in marker.group(1).split(";"))
-                if k.strip()
-            }
-            screen, permission = attrs.get("screen", ""), attrs.get("permission", "")
-            if screen not in ctx["topics"] and screen not in PARTICIPANT_SCREENS:
-                report.add(
-                    "Koppelingen", f"{where}: scherm `{screen}` bestaat niet.", blocking=True
-                )
-            if permission not in ctx["codes"]:
-                report.add(
-                    "Koppelingen", f"{where}: recht `{permission}` bestaat niet.", blocking=True
-                )
-            elif roles is None and permission not in ctx["participant"]:
-                report.add(
-                    "Koppelingen",
-                    f"{where}: `{permission}` is geen recht van deelnemers.",
-                    blocking=True,
-                )
-            elif roles and not any(permission in ctx["rights"].get(r, set()) for r in roles):
-                report.add(
-                    "Koppelingen",
-                    f"{where}: de rol {meta.get('role')} heeft `{permission}` niet.",
-                    blocking=True,
-                )
-            for shot in filter(None, (s.strip() for s in attrs.get("shots", "").split(","))):
-                ctx["used"].add(shot)
-                if shot not in ctx["shots"]:
-                    report.add(
-                        "Koppelingen",
-                        f"{where}: schermafdruk `{shot}` staat niet in de opnamelijst.",
-                        blocking=True,
-                    )
-        for shot in IMAGE.findall(line):
+def check_tasks(manual: dict, ctx: dict, report: Report) -> None:
+    """Check the tasks and figures of one manual (from build/manuals.json)."""
+    roles = manual_roles(manual["role"], ctx["roles"])
+    for task in manual["tasks"]:
+        where = f"{manual['file']}.md:{task['line']}"
+        ctx["tasks"] += 1
+        screen, permission = task.get("screen", ""), task.get("permission", "")
+        if screen not in ctx["topics"] and screen not in PARTICIPANT_SCREENS:
+            report.add("Koppelingen", f"{where}: scherm `{screen}` bestaat niet.", blocking=True)
+        if permission not in ctx["codes"]:
+            report.add("Koppelingen", f"{where}: recht `{permission}` bestaat niet.", blocking=True)
+        elif roles is None and permission not in ctx["participant"]:
+            report.add(
+                "Koppelingen",
+                f"{where}: `{permission}` is geen recht van deelnemers.",
+                blocking=True,
+            )
+        elif roles and not any(permission in ctx["rights"].get(r, set()) for r in roles):
+            report.add(
+                "Koppelingen",
+                f"{where}: de rol {manual['role']} heeft `{permission}` niet.",
+                blocking=True,
+            )
+        for shot in task.get("shots", []):
             ctx["used"].add(shot)
             if shot not in ctx["shots"]:
                 report.add(
-                    "Schermafdrukken",
-                    f"{where}: `{shot}` staat niet in de opnamelijst.",
+                    "Koppelingen",
+                    f"{where}: schermafdruk `{shot}` staat niet in de opnamelijst.",
                     blocking=True,
                 )
-        if not line.lstrip().startswith("<!--"):
-            low = line.lower()
-            for term in ctx["hidden"]:
-                if term.lower() in low:
-                    report.add("Niet te noemen", f"{where}: `{term}`.", blocking=True)
-    if not TASK.search(text) and not path.name.startswith("00-"):
+    for figure in manual["figures"]:
+        ctx["used"].add(figure["id"])
+        if figure["id"] not in ctx["shots"]:
+            report.add(
+                "Schermafdrukken",
+                f"{manual['file']}.md:{figure['line']}: `{figure['id']}` "
+                "staat niet in de opnamelijst.",
+                blocking=True,
+            )
+    if not manual["tasks"] and not manual["file"].startswith("00-"):
         report.add(
-            "Koppelingen", f"{path.name}: geen taakkoppelingen (nodig voor contextgedreven hulp)."
+            "Koppelingen",
+            f"{manual['file']}.md: geen taakkoppelingen (nodig voor contextgedreven hulp).",
         )
 
 
@@ -316,7 +290,9 @@ def check_labels(
                 report.add("Schermteksten (deel van een langere tekst)", f"{where}: **{label}**")
 
 
-def since(commit: str, sources: dict[Path, str], fix: bool, report: Report) -> None:
+def since(
+    commit: str, sources: dict[Path, str], manuals: list[dict], fix: bool, report: Report
+) -> None:
     """Report what the software changed since ``commit`` and where the manuals use it."""
     old, new = catalogue_at(commit), catalogue_at(None)
     new_values = {normalise(v) for v in new.values() if v}
@@ -357,10 +333,10 @@ def since(commit: str, sources: dict[Path, str], fix: bool, report: Report) -> N
     for topic in topics:
         slug = Path(topic).stem
         hits = [
-            f"{p.name} › {m.group(0)[:60]}"
-            for p, t in sources.items()
-            for m in TASK.finditer(t)
-            if f"screen={slug};" in m.group(1).replace(" ", "") + ";"
+            f"{m['file']}.md:{t['line']} › {t['title']}"
+            for m in manuals
+            for t in m["tasks"]
+            if t.get("screen") == slug
         ]
         report.add(
             section,
@@ -416,9 +392,10 @@ def main() -> int:
     shots_file = ws.evidence / "shots.json"
     if not shots_file.exists():
         sys.exit(f"check.py: {shots_file} is missing; run capture.mjs {ws.root} --list first")
-    hidden = [t for t in config.get("do_not_name", []) if t]
-    if config.get("hide_product_name"):
-        hidden.append(PRODUCT_NAME)
+    manuals_file = ws.root / "build" / "manuals.json"
+    if not manuals_file.exists():
+        sys.exit(f"check.py: {manuals_file} is missing; run build.mjs {ws.root} first")
+    manuals = json.loads(manuals_file.read_text())
     ctx: dict = {
         "shots": {s["id"] for s in json.loads(shots_file.read_text())},
         "topics": {p.stem for p in (REPO / "docs" / "manual" / "nl").glob("*.md")},
@@ -429,14 +406,14 @@ def main() -> int:
             word: [Role(r).value for r in roles]
             for word, roles in {**DEFAULT_ROLES, **config.get("roles", {})}.items()
         },
-        "hidden": hidden,
         "used": set(),
         "tasks": 0,
     }
     catalogue = Catalogue(catalogue_at(None), config.get("extra_screen_texts", []))
     verdicts: dict[str, int] = {}
+    for manual in manuals:
+        check_tasks(manual, ctx, report)
     for path, text in sources.items():
-        check_markers(path, text, ctx, report)
         if not path.name.startswith("00-"):
             check_labels(path, text, catalogue, verdicts, report)
     missing = sorted(
@@ -455,8 +432,10 @@ def main() -> int:
         "Gecontroleerd: " + ", ".join(f"{n} {v}" for v, n in sorted(verdicts.items())) + ".",
     )
     commit = args.since or config.get("commit")
+    if commit and not COMMIT.fullmatch(commit):
+        sys.exit(f"check.py: {commit!r} is no commit hash")
     if commit:
-        since(commit, sources, args.fix, report)
+        since(commit, sources, manuals, args.fix, report)
     visual_changes(ws, report)
     out = ws.evidence / "check.md"
     out.parent.mkdir(parents=True, exist_ok=True)

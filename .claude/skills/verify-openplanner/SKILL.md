@@ -15,8 +15,10 @@ Three files do the work:
 - `scripts/stack.sh`: `up`, `doctor`, `compose`, `down` for the stack;
 - `scripts/journey.mjs`: the journeys that drive it, with Playwright from `e2e/`;
 - `scripts/stack-client.mjs`: the client they share with the `role-manuals` skill: the run
-  record, the instance guard, the development users, Mailpit, the slot picker and the `NL` and
-  `SUBJECT` handles;
+  record, the instance guard, the development users, Mailpit, the slot picker and the shared
+  waits and helpers;
+- `scripts/labels.json`: every interface text the scripts of both skills drive, by catalogue key,
+  checked against the catalogue by `tests/test_skill_labels.py`;
 - `features/`: the map, one file per feature with its handles, its proof and its traps. Read
   `features/README.md` before you drive anything.
 
@@ -229,9 +231,10 @@ the test host or in production, so they stay unverified until a run there covers
 
 The map is the maintained source for what this skill proves. When a change alters a mapped path
 (a route, a label or catalogue text, an email subject, the demo seed), update the feature file
-and the handles in `stack-client.mjs` (`NL`, `SUBJECT`) in the same PR, and run the journeys again.
-The `role-manuals` skill drives more screens with the same client; its admin texts are in its
-`story.mjs` and `steps-*.mjs`, and `capture.mjs <workspace> --only <id>` proves one again.
+and the texts in `scripts/labels.json` in the same PR, and run the journeys again. CI holds every
+text there against the catalogue (`tests/test_skill_labels.py`), so a pull request that renames a
+text the scripts use fails until its label is updated. The `role-manuals` skill drives more screens
+with the same client and labels; `capture.mjs <workspace> --only <id>` proves one again.
 A new user-facing flow gets its own feature file, a line in `features/README.md` and a journey.
 If the seed lacks a precondition a journey needs, the journey fails and the reason goes under
 that feature's *Gotchas*; never weaken a journey to make it pass.

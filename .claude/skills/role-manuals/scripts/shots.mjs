@@ -5,7 +5,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { blankTokens } from '../../verify-openplanner/scripts/stack-client.mjs';
+import { LABEL, blankTokens, textOf, textsOf } from '../../verify-openplanner/scripts/stack-client.mjs';
 import { describe, detect, drawBoxes, emailBottom, envBarBottom, pageFacts, removeBoxes } from './redact.js';
 import { PRODUCT_NAME } from './workspace.mjs';
 
@@ -17,15 +17,12 @@ export const EMAIL_WIDTH = 700;
 export const GREY = 'rgb(208, 208, 208)';
 /** CSS pixels around a box, so the anti-aliased edges of the glyphs are covered too. */
 export const PAD = 2;
-/** Version fields whose whole value is covered (rule 3 of redact.js). */
-const VERSION_FIELDS = ['Commit', 'Nieuwste versie'];
+/** Version fields whose whole value is covered, and texts that say there is no version (rule 3 of redact.js). */
+const VERSION_FIELDS = [LABEL.admin.commit, LABEL.admin.latest];
+const VERSION_TEXTS = [textOf('admin', 'noReleaseBuild'), textOf('admin', 'versionUnknown')];
 
 /** Texts that show because the installation has no Webex Meetings (logged per capture). */
-export const NO_VIDEO_PHRASES = [
-  'Geen meeting', 'Meeting klaar', 'Videolink mislukt', 'Videolink wordt klaargezet',
-  'Het videogesprek wordt nog klaargezet', 'Het videogesprek kon niet worden klaargezet',
-  'Niet opgepakt', 'Deelnemer nog niet in het gesprek',
-];
+export const NO_VIDEO_PHRASES = textsOf('noVideo');
 
 /** `text` with the product name replaced, for the log (the log is read like the manuals). */
 export const maskProduct = (text) => String(text ?? '').replace(new RegExp(PRODUCT_NAME, 'gi'), '[productnaam]');
@@ -71,6 +68,7 @@ export class Top {
 
   async clip(page, size) {
     const end = this.until ? await box(this.until) : null;
+    if (this.until && !end) throw new Error(`the end of the cut, ${this.until}, is not on the page`);
     if (end) {
       return [{ x: 0, y: 0, width: size.width, height: Math.min(size.height, end.y + end.height + this.margin) },
         [`van boven tot onder ${await describeTarget(this.until)} (+${this.margin} px)`]];
@@ -156,7 +154,7 @@ export async function shoot(page, { id, img, hidden, crop = new Viewport(), role
   try {
     if (crop.stretch) await stretch(page);
     facts = await page.evaluate(pageFacts, NO_VIDEO_PHRASES);
-    boxes = await page.evaluate(detect, { ...hidden, versionFields: VERSION_FIELDS });
+    boxes = await page.evaluate(detect, { ...hidden, versionFields: VERSION_FIELDS, versionTexts: VERSION_TEXTS });
     [clip, crops] = await crop.clip(page, page.viewportSize() ?? old);
     if (clip.y < 1 && new URL(page.url(), 'http://x').pathname.startsWith('/admin')) {
       const bar = await page.evaluate(envBarBottom);

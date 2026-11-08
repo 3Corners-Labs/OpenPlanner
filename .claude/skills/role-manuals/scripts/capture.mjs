@@ -22,9 +22,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { assertOurs, blankTokens, launchBrowser, loadRun } from '../../verify-openplanner/scripts/stack-client.mjs';
+import { LABEL, assertOurs, launchBrowser, loadRun, safeText } from '../../verify-openplanner/scripts/stack-client.mjs';
 import { compareWithPrevious } from './compare.mjs';
-import { clock, loadState, stamp, writeLog } from './evidence.mjs';
+import { PREPARATION, clock, loadState, stamp, writeLog } from './evidence.mjs';
 import { agent, admin, needsWebex } from './steps-staff.mjs';
 import { participant } from './steps-participant.mjs';
 import { planner, plannerScreens } from './steps-planner.mjs';
@@ -54,12 +54,7 @@ function writeShotList(ws) {
     '',
     '## Voorbereiding (het verhaal doet dit zelf en legt het vast in het bewijslog)',
     '',
-    '1. Als `orgadmin`: de groep `demo` op de **eigen wachtrij** (groepsinstellingen).',
-    '2. Als `super`: de voettekst met de productnaam op de deelnemerspagina\'s uit, via de instelling die daarvoor bestaat.',
-    '3. Als `groupadmin`: vandaag een **afwijkende bezetting** met een eigen tijdblok, zodat er vandaag geboekt kan '
-      + 'worden (opname `pl-05`).',
-    '4. Voorbeeldgegevens met `sample-data.mjs`: verzonnen deelnemers boeken, bevestigen, verplaatsen en annuleren op de '
-      + 'werkdagen na vandaag; de planner verplaatst en annuleert er een paar. De rapporten volgen met de telling van de worker (elk kwartier).',
+    ...PREPARATION.map((p) => `- **${p.label ?? p.key}**, ${p.who}: ${p.what}.`),
     '',
   ];
   for (const [prefix, heading] of ROLE_SECTIONS) {
@@ -110,11 +105,12 @@ async function portalVersion(run) {
   const facts = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('dt')]
     .map((d) => [d.innerText.trim(), (d.nextElementSibling || {}).innerText || ''])));
   await page.goto('/admin/');
-  const overview = await page.evaluate(() => {
-    const li = [...document.querySelectorAll('li')].find((l) => /^\s*Versie/.test(l.innerText));
+  const overview = await page.evaluate((label) => {
+    const li = [...document.querySelectorAll('li')].find((l) => l.innerText.trim().startsWith(label));
     return li ? li.innerText.replace(/\s+/g, ' ').trim() : '';
-  });
-  return { running: (facts['Draait nu'] ?? '?').trim(), commit: (facts.Commit ?? '?').trim(), channel: (facts.Kanaal ?? '?').trim(), overview };
+  }, LABEL.admin.statusVersion);
+  const fact = (label) => (facts[label] ?? '?').trim();
+  return { running: fact(LABEL.admin.running), commit: fact(LABEL.admin.commit), channel: fact(LABEL.admin.channel), overview };
 }
 
 async function main() {
@@ -157,7 +153,7 @@ async function main() {
   state.started ??= stamp();
   console.log(`capture.mjs: installation ${stack.instance} (run ${stack.id}, commit ${stack.build.commit.slice(0, 12)}) at ${stack.web}`);
 
-  const safe = (text) => stack.passwords.reduce((out, p) => out.split(p).join('<password>'), blankTokens(text));
+  const safe = (text) => safeText(stack, text);
   const browser = await launchBrowser({ headless: !args.headed });
   const run = new Run({ ws, stack, browser, state, hidden });
   let failures = 0;
