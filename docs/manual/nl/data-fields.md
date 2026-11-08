@@ -24,7 +24,10 @@ het toevoegen is gemarkeerd als *geen persoonsgegevens* (zie
 ## Waar persoonsgegevens worden getoond
 
 - **De afspraakpagina** in de agenda van een team (achter *Details*) toont de antwoorden op de
-  vragen van het team, voor rollen die afspraken mogen bekijken.
+  vragen van het team, voor rollen die afspraken mogen bekijken. De voor- en achternaam, het
+  e-mailadres en het telefoonnummer toont ze pas na **Contactgegevens tonen**, en elke keer
+  legt het auditlog vast wie ze bekeek, zonder de gegevens zelf (zie
+  [Agenda van de groep](group-agenda.md)).
 - **De wachtrij** toont de voornaam van de deelnemer die aan de beurt is, en de opgepakte afspraak
   toont de koppeling om aan het gesprek deel te nemen, voor medewerkers die de wachtrij
   bedienen.

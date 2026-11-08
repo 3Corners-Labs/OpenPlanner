@@ -28,7 +28,7 @@ een nieuwe groep aan.
 
 De naam van de groep zoals deelnemers en medewerkers hem zien: op de afsprakenpagina, in
 bevestigingen en herinneringen, en in de taak bij het contactcenter. Kies een naam die een
-deelnemer herkent, bijvoorbeeld "Vergunningen" in plaats van een interne teamcode.
+deelnemer herkent, bijvoorbeeld "Klantenservice" in plaats van een interne teamcode.
 
 <!-- field: timezone -->
 ### Tijdzone

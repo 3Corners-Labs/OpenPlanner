@@ -60,7 +60,7 @@ def routing_summary(
 ) -> str:
     """Return the participant's subject and attributes as one line for staff (ADR 0081).
 
-    ``Taxes · Preferred language: English``. A subject no longer in the group's list shows its
+    ``Billing · Preferred language: English``. A subject no longer in the group's list shows its
     code; an empty string without a choice.
     """
     if choice is None:

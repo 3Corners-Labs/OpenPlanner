@@ -114,7 +114,7 @@ test('the walkthrough, recorded', async ({ browser }) => {
   await page.getByLabel('Voornaam').pressSequentially('Sam', { delay: 80 });
   await page.getByLabel('Achternaam').pressSequentially('Jansen', { delay: 80 });
   await page.getByLabel('E-mailadres').pressSequentially(EMAIL, { delay: 40 });
-  await page.getByRole('radio', { name: 'Toeslagen' }).check();
+  await page.getByRole('radio', { name: 'Algemene vraag' }).check();
   await show(page, page.getByRole('button', { name: 'Afspraak maken' }), PACE / 2);
   await shot('form');
   await page.getByRole('button', { name: 'Afspraak maken' }).click();

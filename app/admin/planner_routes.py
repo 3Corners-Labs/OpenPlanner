@@ -117,11 +117,13 @@ def _agenda(slug: str, day: date) -> str:
     return f"/admin/groups/{slug}/agenda?day={day.isoformat()}"
 
 
-async def _changeable(request: Request, context: AdminContext, booking_id: int) -> Booking:
+async def _changeable(
+    request: Request, context: AdminContext, booking_id: int, *, rebook: bool = False
+) -> Booking:
     """Return the booking if it may still be changed; refusals become the HTTP error."""
     try:
         return await _planner(request).booking(
-            context.principal, context.group.group.slug, booking_id
+            context.principal, context.group.group.slug, booking_id, rebook=rebook
         )
     except DomainError as error:
         raise_refusal(error)
@@ -319,6 +321,32 @@ async def cancel(
     return await _reason_post(request, locale, context, booking_id, CANCEL)
 
 
+# --- confirm on the participant's behalf (ADR 0056 point 11) ----------------------------------
+
+
+@router.post("/groups/{slug}/agenda/bookings/{booking_id}/confirm")
+async def confirm(
+    request: Request,
+    locale: Locale,
+    slug: str,
+    booking_id: int,
+    _: SameOrigin,
+    context: ManageBookings,
+) -> Response:
+    """Confirm a booking awaiting confirmation for the participant, for example on the phone."""
+    group = context.group.group
+    try:
+        booking = await _planner(request).confirm(context.principal, slug, booking_id)
+    except DomainError as error:
+        raise_refusal(error)
+        if error.code is ErrorCode.BOOKING_NOT_FOUND:
+            raise
+        clock: Clock = request.app.state.clock
+        return redirect_done(_agenda(slug, group.today(clock.now())), "not_pending")
+    done = "confirm_lapsed" if booking.lapsed_unconfirmed else "confirmed_by_staff"
+    return redirect_done(_agenda(slug, local_day(booking.start, group.tz)), done)
+
+
 # --- ask to rebook ------------------------------------------------------------------------
 
 
@@ -327,7 +355,7 @@ async def rebook_form(
     request: Request, locale: Locale, slug: str, booking_id: int, context: ManageBookings
 ) -> HTMLResponse:
     """Ask for the reason before asking the participant to choose a new time."""
-    booking = await _changeable(request, context, booking_id)
+    booking = await _changeable(request, context, booking_id, rebook=True)
     form = FormData({}, locale.gettext)
     return _reason_response(request, locale, context, booking, form, REBOOK)
 

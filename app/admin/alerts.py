@@ -28,8 +28,8 @@ from starlette.responses import RedirectResponse
 from app.admin.address_view import FINDING_LABELS as ADDRESS_FINDING_LABELS
 from app.admin.audit_routes import REASON_LABELS
 from app.admin.authz import AdminContext, RequirePermission, session_principal
-from app.admin.forms import safe_next
 from app.admin.pages import admin_moment
+from app.admin.return_to import safe_next
 from app.admin.session import close_alert, session_alert_prefs, session_closed_alerts
 from app.admin.top_bar import COUNTS_ATTRIBUTE
 from app.domain.alerts import (

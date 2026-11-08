@@ -22,7 +22,7 @@ from enum import StrEnum
 from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterTaskRef
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.form_fields import Answers, normalise_email, normalise_phone
+from app.domain.form_fields import Answers, mailto_href, normalise_email, normalise_phone
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import PhoneMode
 
@@ -106,6 +106,11 @@ class Contact:
     def name(self) -> str:
         """The full name, for the planner's booking page and personal messages."""
         return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def mailto(self) -> str:
+        """The ``mailto:`` link to the address, for the planner's booking page (ADR 0044 §2)."""
+        return mailto_href(self.email)
 
 
 class BookingKind(StrEnum):
@@ -399,3 +404,8 @@ HOLDS_PLACE = frozenset(
     {BookingStatus.CONFIRMED, BookingStatus.SUSPENDED, BookingStatus.PENDING_CONFIRMATION}
 )
 """Statuses that take a place in their slot (counted against its capacity)."""
+
+IN_AGENDA = frozenset({BookingStatus.CONFIRMED, BookingStatus.PENDING_CONFIRMATION})
+"""Statuses the planner's agenda counts in a slot: confirmed, and those awaiting the
+participant's confirmation, marked as such (ADR 0056 point 11). A booking on hold (ADR 0024)
+waits for a new time and is not in the agenda's slot."""

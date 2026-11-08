@@ -12,12 +12,16 @@ import json
 import os
 from pathlib import Path
 
+import httpx
+from sqlalchemy.ext.asyncio import AsyncEngine
+
 from app.adapters.clock import SystemClock
-from app.adapters.configuration_context import locked_settings, rule_context
-from app.adapters.configuration_json import JsonCodec
-from app.adapters.configuration_seal import PassphraseSealing
+from app.adapters.configuration_context import document_service
+from app.adapters.db.backup import database_path
+from app.adapters.db.configuration_package import SqliteConfigurationTransfer
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.discovery import GuardedDiscoveryFetcher
 from app.adapters.integrations import secret_box
 from app.config import Settings
 from app.domain.admin import AdminService
@@ -29,6 +33,7 @@ from app.domain.configuration_document_service import (
 )
 from app.domain.configuration_json_schema import json_schema
 from app.domain.configuration_plan import Plan
+from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.configuration_v1 import V1
 from app.domain.errors import DomainError, ErrorCode
 
@@ -42,13 +47,22 @@ def add_arguments(
 ) -> None:
     """Add the options of the document commands to the parsers of ``config``."""
     export_cmd.add_argument(
-        "--format", choices=("sqlite", "json"), default="sqlite", help="the file format"
+        "--format",
+        choices=("json",),
+        default="json",
+        help="the file format; the SQLite package is no longer written (ADR 0099 step 4)",
     )
     export_cmd.add_argument(
-        "--no-secrets", action="store_true", help="json only: leave every secret out"
+        "--no-secrets", action="store_true", help="leave every secret out (no passphrase needed)"
+    )
+    export_cmd.add_argument(
+        "--passphrase-file",
+        type=Path,
+        metavar="PATH",
+        help="a file whose first line is the passphrase that seals the secrets",
     )
     for sub in (export_cmd, plan_cmd, apply_cmd):
-        sub.add_argument("--organisation", metavar="SLUG", help="json only: one organisation")
+        sub.add_argument("--organisation", metavar="SLUG", help="one organisation")
     for sub in (plan_cmd, apply_cmd):
         sub.add_argument("path", type=Path, help="the configuration document")
         sub.add_argument(
@@ -65,25 +79,46 @@ def passphrase_from(path: Path | None) -> str | None:
         return handle.readline().rstrip("\r\n")
 
 
-def _service(settings: Settings) -> tuple[ConfigurationDocumentService, object]:
-    """Build the service on the installation's database; return it with the engine."""
+def _service(
+    settings: Settings, http: httpx.AsyncClient
+) -> tuple[ConfigurationDocumentService, AsyncEngine]:
+    """Build the service on the installation's database; return it with the engine.
+
+    ``http`` is the client the guarded discovery fetch of a new or moved provider uses.
+    """
     engine = create_engine(settings.database_url)
     clock = SystemClock()
     uow = SqlUnitOfWork(engine, secret_box(settings))
-    service = ConfigurationDocumentService(
+    service = document_service(
         uow,
         clock,
         AdminService(uow, clock),
-        JsonCodec(),
-        PassphraseSealing(),
-        installation=settings.installation_name,
-        app_version=settings.app_version,
-        context=lambda: rule_context(settings),
-        locked=locked_settings,
-        max_bytes=lambda: settings.configuration_package_max_mb * 1024 * 1024,
-        max_changes=lambda: settings.configuration_apply_max_changes,
+        settings=lambda: settings,
+        discovery=GuardedDiscoveryFetcher(http, allow_private=settings.environment != "prod"),
     )
     return service, engine
+
+
+def package_service(
+    settings: Settings, http: httpx.AsyncClient
+) -> tuple[ConfigurationPackageService, AsyncEngine, SqliteConfigurationTransfer]:
+    """Build the service that reads a SQLite package; return it with the engine and the adapter.
+
+    A package is converted to a document and applied by the same service as any document.
+    """
+    documents, engine = _service(settings, http)
+    clock = SystemClock()
+    transfer = SqliteConfigurationTransfer(
+        database_path(settings.database_url), secret_box(settings), now=clock.now
+    )
+    service = ConfigurationPackageService(
+        transfer,
+        documents,
+        clock,
+        AdminService(SqlUnitOfWork(engine), clock),
+        max_bytes=lambda: settings.configuration_package_max_mb * 1024 * 1024,
+    )
+    return service, engine, transfer
 
 
 def _report(plan: Plan) -> str:
@@ -100,7 +135,18 @@ def _report(plan: Plan) -> str:
 async def run(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
     """Run ``config export --format json``, ``config plan`` or ``config apply``."""
     scope = Scope(args.organisation) if args.organisation else Scope()
-    service, engine = _service(settings)
+    async with httpx.AsyncClient(timeout=10.0) as http:
+        return await _run(settings, args, scope, *_service(settings, http))
+
+
+async def _run(
+    settings: Settings,
+    args: argparse.Namespace,
+    scope: Scope,
+    service: ConfigurationDocumentService,
+    engine: AsyncEngine,
+) -> tuple[str, int]:
+    """Run the command on a built service; dispose the engine at the end."""
     try:
         passphrase = passphrase_from(args.passphrase_file)
         if args.action == "export":
@@ -121,7 +167,7 @@ async def run(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
     except DomainError as error:
         return f"Refused ({error.code.value}).\n", 2
     finally:
-        await engine.dispose()  # type: ignore[attr-defined]
+        await engine.dispose()
 
 
 def _read_limited(path: Path, settings: Settings) -> bytes:

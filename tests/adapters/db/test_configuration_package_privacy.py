@@ -1,4 +1,6 @@
-"""What ADR 0089 promises about personal data and secrets in a configuration package (WP-B2).
+"""What ADR 0089 promises about personal data and secrets in a SQLite configuration package.
+
+The package is no longer written (ADR 0099); the promise matters for the ones still read.
 
 The package is an installation export for the superuser: it holds every organisation, so there
 is no "other tenant" to keep out. It promises two things, and this file tests exactly those:
@@ -14,7 +16,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.configuration_package import environment_values, export_package
+from app.adapters.db.configuration_package import environment_values
 from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.models import Base
 from app.adapters.db.seed import seed_demo
@@ -27,6 +29,7 @@ from tests.fakes.clock import FixedClock
 from tests.support.configuration_package import NOW, PASSPHRASE, SOURCE_BOX, database_path
 from tests.support.domain import NOW as DOMAIN_NOW
 from tests.support.domain import SLOT_0900, TEST_TOKEN_KEY, book_confirmed
+from tests.support.legacy_package import export_package
 
 PERSON = ContactInput(
     first_name="Zqpackfirst", last_name="Zqpacklast", email="zqpack@example.org", phone="0612345678"

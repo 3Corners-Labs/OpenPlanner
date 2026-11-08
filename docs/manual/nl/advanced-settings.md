@@ -212,30 +212,36 @@ de oude en de nieuwe waarde; een geweigerde wijziging ook.
 
 ## Configuratiepakket
 
-Een configuratiepakket bevat alle instellingen van deze installatie: organisaties, teams,
-openingstijden en uitzonderingen, herinneringen, teksten, formuliervelden, contactopties,
-feestdagkalenders, scenario's voor sluiting, huisstijl, mail- en sms-kanalen, identity
-providers, API-clients, rollen en de platforminstellingen, met hun geheimen. Afspraken,
-tijdsloten, het auditlog en medewerkers gaan niet mee. Zo zet u een nieuwe installatie (test
-of productie) in één keer op, zonder elk wachtwoord en elke sleutel opnieuw in te voeren.
+**Als JSON-document.** Het bovenste blok van dit tabblad exporteert de hele configuratie, of
+leest een document in. Een document is een JSON-bestand dat u met de hand kunt aanpassen:
+objecten worden met hun eigen sleutel genoemd, nooit met nummers, dus het blijft geldig tussen
+versies, en het gepubliceerde schema (`docs/configuration-schema/v1.json`) laat een editor
+veldnamen aanvullen en een typefout signaleren. Kies **Document exporteren**, met of zonder
+geheimen (verzegeld met een wachtwoord van minstens 16 tekens, herhaald). Om er een in te
+lezen kiest u het bestand en **Plan tonen**: u ziet per object of het wordt aangemaakt,
+gewijzigd of verwijderd en welke velden, nooit de waarden, en elke weigering die het stopt.
+Pas dan schrijft **Plan toepassen** alles in één keer, of niets als een onderdeel mislukt. Een
+document met verzegelde geheimen vraagt opnieuw om zijn wachtwoord. Een document in de stand
+*replace* verwijdert wat het niet noemt; lees het plan dus zorgvuldig. Het document van één
+organisatie staat onder **Overzicht → Configuratie** van die organisatie. Elke toegepaste
+wijziging staat in het auditlog, zonder waarden, en u moet recent hebben ingelogd.
 
-**Exporteren.** Kies een wachtwoordzin van minstens 16 tekens en herhaal die. U krijgt een
-bestand `openplanner-configuratie-….sqlite`. De geheimen in het bestand zijn versleuteld met
-de wachtwoordzin; die wordt nergens bewaard. Zonder de wachtwoordzin is het pakket waardeloos,
-met de wachtwoordzin bevat het elk geheim van het platform. Bewaar bestand en wachtwoordzin
-dus gescheiden, en niet langer dan nodig.
+**Als oud SQLite-pakket (nog één release gelezen).** Eerdere versies exporteerden de hele
+configuratie als SQLite-bestand. Die export is vervallen: gebruik hierboven **Document
+exporteren**. Een bestaand pakket kunt u nog één keer toepassen: kies het bestand in het
+SQLite-blok, vul de wachtwoordzin in en vink aan dat de configuratie van het platform wordt
+vervangen. Het pakket wordt omgezet in een document dat de configuratie van het platform
+vervangt, en dat document wordt net als elk ander gepland en toegepast, met uw rechten per
+wijziging. Wat in gebruik is, wordt nooit verwijderd: een team met afspraken, een actieve
+sluiting, een geaccepteerd tekort of API-toegang laat de hele import weigeren, met de reden op
+het scherm, en er wordt niets geschreven. Het pakket moet van dezelfde versie van OpenPlanner
+zijn. Medewerkers en het auditlog blijven. Na de import gelden de instellingen binnen tien
+seconden. De bootstrap-sleutels van de server (`SETTINGS_ENCRYPTION_KEY` en de andere twee)
+gaan nooit mee: elke installatie houdt haar eigen sleutels.
 
-**Importeren.** Kies het bestand, vul de wachtwoordzin in en vink aan dat alle configuratie
-van deze installatie wordt vervangen. Dat kan alleen in een installatie zonder afspraken,
-tijdsloten of actieve sluiting: een nieuwe installatie dus. Medewerkers en het auditlog
-blijven. Het pakket moet van dezelfde versie van OpenPlanner zijn; is dat niet zo, exporteer
-dan opnieuw vanaf een installatie met deze versie. Na de import gelden de instellingen binnen
-tien seconden. De bootstrap-sleutels van de server (`SETTINGS_ENCRYPTION_KEY` en de andere
-twee) gaan nooit mee: elke installatie houdt haar eigen sleutels.
-
-Elke export en import staat in het auditlog, zonder wachtwoordzin en zonder waarden. U moet
-kort geleden zijn ingelogd. De grootste toegestane pakketgrootte is de platforminstelling
-*Maximale grootte van een configuratiepakket*.
+Elke toegepaste wijziging en elke import staat in het auditlog, zonder wachtwoordzin en zonder
+waarden. U moet kort geleden zijn ingelogd. Het grootste toegestane bestand is de
+platforminstelling *Maximale grootte van een configuratiepakket*.
 
 **Via de API.** Een pipeline kan hetzelfde doen zonder de portal: een API-client met het
 recht *Configuratiepakket exporteren en importeren* (`configuration:transfer`, te geven op

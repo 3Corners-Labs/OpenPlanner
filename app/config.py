@@ -231,6 +231,9 @@ class Settings(BaseSettings):
     # ADR 0099 (class C, platform): an apply whose plan holds more changes is refused, a guard
     # against a mistaken `replace` document.
     configuration_apply_max_changes: int = Field(default=500, ge=1, le=10_000)
+    # ADR 0099 (class C, platform): how long the portal keeps an uploaded document after its plan
+    # is shown, so the apply button works on exactly the reviewed document, in minutes.
+    configuration_review_minutes: int = Field(default=30, ge=5, le=240)
     # ADR 0040, part 4 (class C, platform; env until the settings registry of ADR 0042): how
     # long each category of audit event is kept. Admin actions 2 years (product owner,
     # 2026-10-29), security 1 year, debug events 7 days; system events above. Diagnostic mode
@@ -293,6 +296,14 @@ class Settings(BaseSettings):
     # settings registry).
     planner_rebook_days: int = Field(default=14, ge=1, le=30)
     planner_rebook_reminder_days: int = Field(default=3, ge=1, le=29)
+    # ADR 0057: a proposed new time is held this many hours (never beyond the proposed slot's
+    # change deadline), with one reminder this many hours before its deadline (0 = none); the
+    # assistant looks this many days around the original day and this many minutes around its
+    # time of day. Class D organisation (ADR 0042, settings registry).
+    reschedule_proposal_confirm_hours: int = Field(default=48, ge=4, le=168)
+    reschedule_proposal_reminder_hours: int = Field(default=12, ge=0, le=72)
+    reschedule_search_days: int = Field(default=14, ge=1, le=60)
+    reschedule_time_tolerance_minutes: int = Field(default=60, ge=0, le=240)
     # ADR 0102: the most personal data of a booking on hold is kept after the end of its original
     # slot, also while the closure has no end, and how many days before it the administrators
     # are told. Class D organisation (ADR 0042, settings registry); the maximum has no off value.
@@ -582,6 +593,10 @@ class Settings(BaseSettings):
             return "STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT"
         if self.planner_rebook_reminder_days >= self.planner_rebook_days:
             return "PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS"
+        if self.reschedule_proposal_reminder_hours >= self.reschedule_proposal_confirm_hours:
+            return (
+                "RESCHEDULE_PROPOSAL_REMINDER_HOURS must be below RESCHEDULE_PROPOSAL_CONFIRM_HOURS"
+            )
         if self.integration_down_failure_percent < self.integration_degraded_failure_percent:
             return (
                 "INTEGRATION_DOWN_FAILURE_PERCENT must not be below "

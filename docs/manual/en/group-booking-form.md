@@ -79,8 +79,8 @@ after the appointment or after cancelling.
 Choice lists only. Put each choice on its own line, as key, Dutch text and English text,
 separated by a semicolon:
 
-    rent; Huurtoeslag; Rent benefit
-    care; Zorgtoeslag; Healthcare benefit
+    general; Algemene vraag; General question
+    request; Aanvraag; Request
 
 At most 30 choices, each with its own key.
 

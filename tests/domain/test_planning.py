@@ -48,13 +48,13 @@ async def test_org_admin_creates_a_group_in_their_organisation(
     planning: PlanningService, uow: InMemoryUnitOfWork
 ) -> None:
     group = await planning.create_group(
-        ORG_ADMIN, NewGroup("demo", "Vergunningen", "vergunningen", "Europe/Amsterdam", 20)
+        ORG_ADMIN, NewGroup("demo", "Klantenservice", "klantenservice", "Europe/Amsterdam", 20)
     )
 
     assert group.id not in (0, None)
-    assert (group.organisation_id, group.slug, group.slot_minutes) == (1, "vergunningen", 20)
+    assert (group.organisation_id, group.slug, group.slot_minutes) == (1, "klantenservice", 20)
     assert audit_rows(uow) == [
-        ("o-1", "group.create", Outcome.SUCCESS, "", "vergunningen"),
+        ("o-1", "group.create", Outcome.SUCCESS, "", "klantenservice"),
     ]
     assert uow.state.audit[0].organisation == "demo"
 

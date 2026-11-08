@@ -19,6 +19,13 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+
+SCRYPT_N = 2**16
+SCRYPT_R = 8
+SCRYPT_P = 1
+SALT_BYTES = 16
+"""The passphrase key derivation (ADR 0089 point 3, ADR 0099 point 8): crypto parameters, fixed."""
 
 NONCE_BYTES = 12
 KEY_ID_BYTES = 8
@@ -85,3 +92,11 @@ class SecretBox:
     def is_current(self, nonce: bytes) -> bool:
         """Return whether a stored nonce says its value is sealed under the current key."""
         return nonce[NONCE_BYTES:] == self._current_id
+
+
+def passphrase_box(passphrase: str, salt: bytes) -> "SecretBox":
+    """Return the box whose key is scrypt of ``passphrase`` and ``salt`` (document and package)."""
+    key = Scrypt(salt=salt, length=32, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P).derive(
+        passphrase.encode()
+    )
+    return SecretBox(key)

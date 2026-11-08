@@ -115,15 +115,15 @@ class OverviewLayoutService:
         """The most widgets a layout may hold now."""
         return self._maximum()
 
+    async def stored(self, subject: str) -> Layout | None:
+        """Return ``subject``'s own layout, or ``None`` when the role's default applies."""
+        async with self._uow.read() as tx:
+            return await tx.get_overview_layout(subject)
+
     async def layout(self, subject: str, default: Layout, allowed: Sequence[str]) -> Layout:
         """Return what ``subject``'s overview shows (``effective``)."""
         async with self._uow.read() as tx:
             return effective(await tx.get_overview_layout(subject), default, allowed)
-
-    async def is_own(self, subject: str) -> bool:
-        """Whether ``subject`` has a layout of their own (else the role's default applies)."""
-        async with self._uow.read() as tx:
-            return await tx.get_overview_layout(subject) is not None
 
     async def add(self, subject: str, key: str, default: Layout, allowed: Sequence[str]) -> None:
         """Add ``key`` at the end of ``subject``'s layout (``add``).
@@ -166,6 +166,8 @@ class OverviewLayoutService:
         async with self._uow.locked() as tx:
             current = effective(await tx.get_overview_layout(subject), default, allowed)
             changed = step(current)
+            if changed == current:
+                return  # nothing moved (the first up, the last down): keep what is stored
             if not set(changed) <= self._known:
                 raise _refuse("widget")
             if not await tx.save_overview_layout(subject, changed, self._clock.now()):

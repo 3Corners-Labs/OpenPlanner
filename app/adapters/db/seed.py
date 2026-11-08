@@ -39,12 +39,13 @@ from app.adapters.db.models import (
 )
 from app.adapters.db.seed_usage import usage_example_cells
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.booking import Booking, BookingStatus, Contact, Slot
+from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact, Slot
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.form_fields import Classification, FieldDefinition, FieldType, FormDefinition
 from app.domain.images import ImageFile, ImageText
 from app.domain.ports import Transaction
+from app.domain.reschedule_proposal import HeldProposal
 from app.domain.scheduling import Group, PhoneMode
 from app.domain.tokens import derive_token, hash_token, new_token_salt
 
@@ -97,8 +98,8 @@ EXAMPLE_CONTACTS = ContactBlock(
 # A made-up participant: the booking on hold exists only in development and test databases.
 EXAMPLE_PARTICIPANT = Contact.create(
     first_name="Voorbeeld",
-    last_name="Inwoner",
-    email="inwoner@example.org",
+    last_name="Deelnemer",
+    email="deelnemer@example.org",
     phone=None,
     phone_mode=PhoneMode.OPTIONAL,
 )
@@ -137,10 +138,14 @@ class ClosureExamples:
         suspended_booking: The management page of a booking on hold (a new link each run).
         pending_confirm: The confirm page of a demo booking that awaits confirmation
             (ADR 0056), for the page checks; never confirmed by them.
+        correct_details: The page where that booking's participant corrects their details
+            (ADR 0056 point 10), for the page checks; never sent by them.
         pending_flow_chromium: Another such confirm page, which the keyboard flow confirms in
             Chromium; the flow runs in each browser, and each confirms its own booking.
         pending_flow_firefox: The same for Firefox.
         pending_flow_webkit: The same for WebKit.
+        proposal_page: The page where a participant takes a proposed new time (ADR 0057), of
+            a booking awaiting a new time with an open proposal; never confirmed by the checks.
         trial_page: The trial call page of that booking. It shows the page's "not available
             for this appointment" state; its other states are covered by the API tests.
         journeys: The participant's journey per e2e browser (``BROWSERS``), new each run.
@@ -150,9 +155,11 @@ class ClosureExamples:
     planned_closure: str
     suspended_booking: str
     pending_confirm: str
+    correct_details: str
     pending_flow_chromium: str
     pending_flow_firefox: str
     pending_flow_webkit: str
+    proposal_page: str
     trial_page: str
     journeys: dict[str, JourneyExample]
 
@@ -177,10 +184,10 @@ DEMO_FORM_FIELDS = (
         type=FieldType.CHOICE,
         labels={"nl": "Waar gaat uw vraag over?", "en": "What is your question about?"},
         hints={"nl": "Dan bereidt de medewerker zich voor.", "en": "So the agent can prepare."},
-        options=("toeslagen", "belastingen", "anders"),
+        options=("algemeen", "aanvraag", "anders"),
         option_labels={
-            "toeslagen": {"nl": "Toeslagen", "en": "Benefits"},
-            "belastingen": {"nl": "Belastingen", "en": "Taxes"},
+            "algemeen": {"nl": "Algemene vraag", "en": "General question"},
+            "aanvraag": {"nl": "Aanvraag", "en": "Request"},
             "anders": {"nl": "Iets anders", "en": "Something else"},
         },
         classification=Classification.NOT_PII,
@@ -258,6 +265,7 @@ async def seed_closure_examples(
         if created:
             await tx.add_usage_cells(usage_example_cells(demo.organisation_id, demo.id, now))
         pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
+        proposed = await _proposed_booking(tx, demo, now, token_key)
         journey_group = await seeded_group(tx, JOURNEY_GROUP_SLUG)
         journeys = {
             browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
@@ -267,9 +275,11 @@ async def seed_closure_examples(
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
         suspended_booking=f"/b/{token}",
         pending_confirm=f"/b/{pending[0]}/confirm",
+        correct_details=f"/b/{pending[0]}/details",
         pending_flow_chromium=f"/b/{pending[1]}/confirm",
         pending_flow_firefox=f"/b/{pending[2]}/confirm",
         pending_flow_webkit=f"/b/{pending[3]}/confirm",
+        proposal_page=f"/b/{proposed}/proposal",
         trial_page=f"/b/{token}/test",
         journeys=journeys,
     )
@@ -328,12 +338,13 @@ async def store_example_booking(
 ) -> tuple[str, Booking]:
     """Store an example booking of the made-up participant at ``start``; return its token and it.
 
-    Each booking gets its own address, so repeated seeds stay under the address limit
-    (ADR 0066) when an e2e flow moves or rebooks one.
+    Each booking gets its own address, the made-up participant's with part of the salt, so
+    repeated seeds stay under the address limit (ADR 0066) when an e2e flow moves or rebooks one.
     """
     end = start + timedelta(minutes=group.slot_minutes)
     salt = new_token_salt()
     token = derive_token(token_key, salt)
+    local, _, domain = EXAMPLE_PARTICIPANT.email.partition("@")
     booking = await tx.add_booking(
         Booking(
             id=None,
@@ -342,7 +353,7 @@ async def store_example_booking(
             start=start,
             end=end,
             status=status,
-            contact=replace(EXAMPLE_PARTICIPANT, email=f"voorbeeld-{salt[:8].lower()}@example.org"),
+            contact=replace(EXAMPLE_PARTICIPANT, email=f"{local}-{salt[:8].lower()}@{domain}"),
             locale="nl",
             token_hash=hash_token(token),
             created_at=now,
@@ -422,6 +433,35 @@ async def _pending_booking(
         token_key,
         status=BookingStatus.PENDING_CONFIRMATION,
         confirm_by=now + timedelta(days=1),
+    )
+    return token
+
+
+async def _proposed_booking(tx: Transaction, group: Group, now: datetime, token_key: bytes) -> str:
+    """Store a demo booking awaiting a new time with a proposal held for it (ADR 0057).
+
+    It was on the next weekday at 14:00; 14:30 that day is proposed and held for two days.
+    Return its token.
+    """
+    start = _next_weekday(group, now, time(14))
+    token, booking = await store_example_booking(
+        tx, group, start, now, token_key, status=BookingStatus.CONFIRMED
+    )
+    await tx.save_booking(
+        booking.request_rebook(ChangeReason.STAFFING, start + timedelta(days=14), now)
+    )
+    new_start = start + timedelta(minutes=group.slot_minutes)
+    new_end = new_start + timedelta(minutes=group.slot_minutes)
+    await tx.add_proposal(
+        HeldProposal(
+            None,
+            booking.id or 0,
+            await _slot(tx, group, new_start, new_end),
+            new_start,
+            new_end,
+            now + timedelta(days=2),
+            now,
+        )
     )
     return token
 

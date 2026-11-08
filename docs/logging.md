@@ -195,6 +195,7 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | Action | Level | Fields | Message | Meaning | What to do |
 |---|---|---|---|---|---|
 | `alert.delivery_failed` | outcome | `target`, `kind`, `alert` | An alert ({alert}) could not be delivered to target {target} ({kind}): {reason}. | Sending an alert to an email address or a Webex space failed (ADR 0082 point 9); it is retried after 1, 5 and 15 minutes and then at the repeat interval. Never an alert itself. | `no_sender`: set up the mail channel or the bot token. `unauthorized`: paste a new bot token. `rejected_404`: the bot is not in the space, or the room id is wrong. |
+| `booking.details_corrected` | outcome | `booking_id`, `fields` | Details corrected: booking {booking_id}, fields {fields}. | The participant corrected name, phone or answers on the management page (ADR 0056 point 10); the event names the fields, never their values. | Nothing. |
 | `booking_rows.rollup` | `info`, outcome | `days`, `rows`, `skipped` | {rows} old booking rows merged into {days} daily counts. | Booking rows past their retention became daily counts and were deleted (ADR 0102). | Nothing. |
 | `closure.retention_notice` | outcome | – | A closure is near its maximum retention. | An open-ended closure is close to `closure_max_retention_days` (ADR 0102). | End or shorten the closure. |
 | `diagnostics.brake` | outcome | – | Diagnostic mode was switched off: the disk is nearly full. | The emergency brake of ADR 0040 point 13. | Free disk space on the host. |
@@ -333,7 +334,7 @@ Three kinds of action are generated, not listed:
 - **a machine API scope** (`availability:read`, `configuration:transfer`): a client of the machine API used, or was denied, that
   scope (ADR 0023).
 - **a worker job**, `job.<type>`: the outcome of one job, shown on the booking's timeline;
-  the types are `create_video_room`, `delete_video_room`, `delete_trial_call`, `send_confirmation`, `send_change`, `send_reminder`, `send_cancellation`, `dispatch_wxcc_task`, `end_wxcc_task`, `purge_pii`, `send_suspension`, `send_closure_update`, `send_reinstatement`, `send_rebook_request`, `send_rebook_reminder`, `send_rebook_lapsed`, `lapse_rebook`, `send_confirm_request`, `send_confirm_reminder`, `expire_unconfirmed`, `send_unconfirmed_lapsed`, `send_team_invite`, `send_team_cancel`.
+  the types are `create_video_room`, `delete_video_room`, `delete_trial_call`, `send_confirmation`, `send_change`, `send_reminder`, `send_cancellation`, `dispatch_wxcc_task`, `end_wxcc_task`, `purge_pii`, `send_suspension`, `send_closure_update`, `send_reinstatement`, `send_rebook_request`, `send_rebook_reminder`, `send_rebook_lapsed`, `lapse_rebook`, `send_confirm_request`, `send_confirm_reminder`, `expire_unconfirmed`, `send_unconfirmed_lapsed`, `send_team_invite`, `send_team_cancel`, `send_reschedule_proposal`, `send_proposal_reminder`, `expire_proposal`, `send_proposal_released`.
 
 ## Where the lines go
 

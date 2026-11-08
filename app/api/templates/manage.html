@@ -37,7 +37,19 @@
 </div>
 <ul class="actions">
   <li><a class="button" href="/b/m/{{ ref }}/confirm">{{ _("manage.pending.confirm") }}</a></li>
+  {% if correctable %}<li><a href="/b/m/{{ ref }}/details">{{ _("manage.details") }}</a></li>{% endif %}
   {% if cancellable %}<li><a href="/b/m/{{ ref }}/cancel">{{ _("manage.cancel") }}</a></li>{% endif %}
+</ul>
+{% elif awaiting_rebook and proposal_label %}
+<div class="notice notice--warning">
+  <h2>{{ _("manage.proposal.title") }}</h2>
+  <p>{{ _("manage.suspended.text") }}</p>
+  <p>{{ _("manage.proposal.text", slot=proposal_label, deadline=proposal_by) }}</p>
+</div>
+<ul class="actions">
+  <li><a class="button" href="/b/m/{{ ref }}/proposal">{{ _("manage.proposal.confirm") }}</a></li>
+  <li><a class="button button--secondary" href="/b/m/{{ ref }}/reschedule">{{ _("manage.proposal.other") }}</a></li>
+  <li><a href="/b/m/{{ ref }}/cancel">{{ _("manage.cancel") }}</a></li>
 </ul>
 {% elif awaiting_rebook %}
 <div class="notice notice--warning">
@@ -53,6 +65,7 @@
 <p>{{ _("manage.deadline", deadline=deadline) }}</p>
 <ul class="actions">
   <li><a class="button button--secondary" href="/b/m/{{ ref }}/reschedule">{{ _("manage.reschedule") }}</a></li>
+  {% if correctable %}<li><a href="/b/m/{{ ref }}/details">{{ _("manage.details") }}</a></li>{% endif %}
   <li><a href="/b/m/{{ ref }}/cancel">{{ _("manage.cancel") }}</a></li>
 </ul>
 {% elif cancellable %}

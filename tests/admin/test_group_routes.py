@@ -31,8 +31,8 @@ async def test_org_admin_creates_a_group_and_lands_on_it(site: Site) -> None:
         "/admin/groups",
         data={
             "organisation": "demo",
-            "name": "Vergunningen",
-            "slug": "vergunningen",
+            "name": "Klantenservice",
+            "slug": "klantenservice",
             "timezone": "Europe/Amsterdam",
             "slot_minutes": "20",
         },
@@ -40,7 +40,7 @@ async def test_org_admin_creates_a_group_and_lands_on_it(site: Site) -> None:
     )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/admin/groups/vergunningen?done=created"
+    assert response.headers["location"] == "/admin/groups/klantenservice?done=created"
     page = (await site.client.get(response.headers["location"])).text
     assert 'role="status"' in page
     assert "De groep is aangemaakt" in page
@@ -562,6 +562,25 @@ async def test_changes_need_a_recent_login(site: Site) -> None:
     assert post.status_code == 303
     assert post.headers["location"] == f"/admin/login?next={GROUP}/staffing"
     assert overview.status_code == 200
+
+
+async def test_a_recent_login_comes_back_with_the_view_query_only(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    await _stay_active_for_an_hour(site)
+
+    form = await site.client.get(f"{GROUP}/staffing?day=2026-11-10&q=jansen")
+    post = await site.client.post(
+        f"{GROUP}/staffing",
+        data={},
+        headers={
+            **SAME_ORIGIN,
+            "referer": f"http://testserver{GROUP}/staffing?day=2026-11-10&token=fake",
+        },
+    )
+
+    kept = f"/admin/login?next={GROUP}/staffing%3Fday%3D2026-11-10"
+    assert form.headers["location"] == kept
+    assert post.headers["location"] == kept
 
 
 async def test_forged_referer_cannot_leave_the_portal(site: Site) -> None:

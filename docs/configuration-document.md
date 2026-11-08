@@ -62,6 +62,19 @@ flags a typo. The planner is the authority: it also checks everything the admin 
   without secrets leaves them out; applying a document that omits a secret keeps the stored one.
 - **Files** (logo, fonts, closure images) are inline: media type, SHA-256 and base64 bytes.
 
+## In the portal
+
+The superuser works on *Advanced settings › Configuration package*, an organisation admin (and
+the superuser) on *Organisations › organisation › Overview › Configuration*. **Export document**
+downloads the scope's configuration, leaving out what the admin could not change themselves;
+with *Include secrets* they are sealed under a passphrase typed twice. **Show plan** reads an
+uploaded file and lists, per object, the action and the field names (never values), the
+refusals, and warnings for deletions, a changed claim value and a replaced Webex Service App
+token. **Apply plan** then writes exactly the reviewed document, or nothing. Every one of these
+needs a recent login. A group's contact center is `contact_center {kind, routing_value,
+attributes}` whatever the platform; for Webex Contact Center `attributes` holds
+`business_address` and `channel`.
+
 ## Commands on the host
 
 ```bash

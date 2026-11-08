@@ -60,6 +60,11 @@ DONE_MESSAGES: dict[str, str] = {
     "diagnostics_off": "admin.done.diagnostics_off",
     "released": "admin.done.released",
     "saved": "admin.done.saved",
+    # ADR 0096: the admin's own overview layout.
+    "widget_added": "admin.done.widget_added",
+    "widget_moved": "admin.done.widget_moved",
+    "widget_removed": "admin.done.widget_removed",
+    "layout_reset": "admin.done.layout_reset",
     "unchanged": "admin.done.unchanged",
     "field_retired": "admin.done.field_retired",
     "added": "admin.done.added",
@@ -79,6 +84,9 @@ DONE_MESSAGES: dict[str, str] = {
     "contact_center_registered": "admin.done.contact_center_registered",
     "contact_center_saved_not_ready": "admin.done.contact_center_saved_not_ready",
     "contact_center_not_registered": "admin.done.contact_center_not_registered",
+    "confirmed_by_staff": "admin.done.confirmed_by_staff",
+    "not_pending": "admin.done.not_pending",
+    "confirm_lapsed": "admin.done.confirm_lapsed",
     "idp_domain_claimed": "admin.done.idp_domain_claimed",
     "idp_domain_verified": "admin.done.idp_domain_verified",
     "idp_domain_not_found_yet": "admin.done.idp_domain_not_found_yet",
@@ -106,6 +114,7 @@ DONE_MESSAGES: dict[str, str] = {
     "fallback_ended": "admin.done.fallback_ended",
     "certificate_uploaded": "admin.done.certificate_uploaded",
     "package_imported": "admin.done.package_imported",
+    "configuration_applied": "admin.done.configuration_applied",
     "certificate_removed": "admin.done.certificate_removed",
     "certificate_checked": "admin.done.certificate_checked",
     "csr_generated": "admin.done.csr_generated",
@@ -277,9 +286,6 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",
-    ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: (
-        "admin.form.error.configuration_installation_in_use"
-    ),
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
     ErrorCode.SCENARIO_NAME_TAKEN: "admin.form.error.scenario_name_taken",
     ErrorCode.ALERT_TARGET_TAKEN: "admin.form.error.alert_target_taken",
@@ -586,23 +592,6 @@ def done_message(request: Request, _: BoundGettext) -> str | None:
     raw = request.query_params.get("count", "")
     count = int(raw) if raw.isdigit() and len(raw) <= 6 else 0
     return _(DONE_MESSAGES[key], count=count) if key in DONE_MESSAGES else None
-
-
-def safe_next(value: str | None) -> str:
-    """Return ``value`` if it is an admin path on this site; otherwise the dashboard.
-
-    For every "return to" target that arrives with a request (login, re-login, the update
-    banner's snooze), so none can send the admin off the portal.
-    """
-    if (
-        value
-        and value.startswith("/admin")
-        and not value.startswith("//")
-        and "\\" not in value
-        and "://" not in value
-    ):
-        return value
-    return "/admin/"
 
 
 def redirect_done(
