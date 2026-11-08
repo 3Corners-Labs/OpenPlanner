@@ -183,6 +183,9 @@ async def test_full_booking_flow(site: httpx.AsyncClient) -> None:
     assert confirmed.headers["location"] == f"{base}?status=confirmed"
     page = await site.get(confirmed.headers["location"])
     assert "Uw afspraak is bevestigd" in page.text
+    # ADR 0060 §7: the footer mark settles once on the confirmation, by CSS alone.
+    assert 'class="brand-mark product-footer__mark brand-mark--settle"' in page.text
+    assert "brand-mark--settle" not in pending.text
     assert "vrijdag 2 januari 2026, 09:00–09:30" in page.text
     assert "Bevestigd" in page.text
     assert f'href="{base}/reschedule"' in page.text
