@@ -76,6 +76,7 @@
   {% if can("audit.export") %}<p><a href="/admin/audit/export.csv{% if filters.query %}?{{ filters.query }}{% endif %}" download>{{ _("admin.audit.export") }}</a></p>{% endif %}
 </form>
 {{ error_message(export_error) }}
+<p role="status">{% if events | length >= limit %}{{ _("admin.audit.count_newest", count=events | length) }}{% else %}{{ _("admin.audit.count", count=events | length) }}{% endif %}</p>
 {% if events %}
 {% set caption = _("admin.audit.title") %}{% include "admin/_audit_table.html" %}
 {% else %}

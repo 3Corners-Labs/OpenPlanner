@@ -17,8 +17,10 @@ beperkt tot die organisatie. Alleen de superuser kan een organisatie aanmaken.
 
 ## Tabbladen
 
-- **Overzicht**: de groepen van de organisatie waar u rechten op heeft, en het profiel (naam,
-  webadres, standaardtaal). De superuser wijzigt naam en taal met **Naam en taal wijzigen**;
+- **Overzicht**: de checklist **Klaar om te boeken** (een kanaal dat kan versturen, een eigen
+  huisstijl en contactalternatieven voor een sluiting; elke regel linkt naar het tabblad waar u
+  het regelt, als u dat mag openen), de groepen van de organisatie waar u rechten op heeft, en
+  het profiel (naam, webadres, standaardtaal). De superuser wijzigt naam en taal met **Naam en taal wijzigen**;
   het webadres ligt vast. Onder dit tabblad staan drie onderdelen:
   - **Instellingen**: tijdnotatie, tijdzone en termijnen van de organisatie
     ([uitleg](organisation-settings.md)).

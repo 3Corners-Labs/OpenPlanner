@@ -250,15 +250,26 @@ jobs:
           APP_REF: ${{ steps.public.outputs.app }}@${{ steps.publish.outputs.digest }}
           PROXY_REF: ${{ steps.public.outputs.proxy }}@${{ steps.publish-proxy.outputs.digest }}
         run: scripts/public-release-notes.sh "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$APP_REF" "$PROXY_REF" > release-notes.md
-      - name: attach the SBOMs to the release
+      # ADR 0116 point 7: the released image writes the upgrade fixture (generated data only),
+      # which the upgrade matrix of later PRs takes through their migrations and back. The
+      # matrix uses only fixtures this job uploaded (uploader github-actions[bot], checksum).
+      - name: upgrade fixture of this release
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.name }}@${{ steps.publish.outputs.digest }}
+          VERSION: ${{ steps.image.outputs.version }}
+        run: scripts/upgrade-matrix.sh fixture "$IMAGE_REF" "$VERSION"
+      - name: attach the SBOMs and the upgrade fixture to the release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.image.outputs.version }}
           # ADR 0116: a patch from a line is never GitHub's latest release.
           LATEST: ${{ steps.where.outputs.latest }}
         run: |
           notes=()
           [ ! -s release-notes.md ] || notes=(--notes-file release-notes.md)
-          gh release create "$GITHUB_REF_NAME" --latest="$LATEST" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes "${notes[@]}"
+          gh release create "$GITHUB_REF_NAME" --latest="$LATEST" sbom.cdx.json sbom-proxy.cdx.json \
+            "upgrade-fixture-$VERSION.sqlite" "upgrade-fixture-$VERSION.sqlite.sha256" \
+            --verify-tag --generate-notes "${notes[@]}"
 
   # ADR 0087 step 3: the recorded walkthrough, attached to every release.
   tour:

@@ -147,3 +147,11 @@ see it again when you return to the overview, and after signing in again the fil
 everything. While a choice is active the button has a coloured background, also when only the icon
 fits on a smaller screen. For now the filter works on the overview; the other lists have their own
 filters.
+
+## Groups with an emergency closure
+
+Below the widgets are the groups in your reach. **Only groups with an active emergency
+closure** narrows that list to the groups that are closed now, with their number. A closed
+group carries the label **Emergency closure active**; whoever may manage the closure goes
+straight to the group's **Emergency closure** tab through that label. A closure that starts
+later does not count yet. The old address of the closures list leads to this filter.

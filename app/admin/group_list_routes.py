@@ -9,14 +9,15 @@ and a value outside them is ignored and never echoed (``docs/threat-model.md``).
     GET /admin/groups   group.view   the groups in the admin's scope
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
-from app.admin.forms import Option, done_message
+from app.admin.forms import done_message
+from app.admin.list_search import ORGANISATION_PARAM, QUERY_PARAM, ListFilter, narrow
 from app.admin.pages import Locale, page
 from app.admin.shortfalls import ShortfallView, agenda_service, shortfall_view
 from app.domain.agenda_service import ShortfallSummary
@@ -25,12 +26,6 @@ from app.domain.scheduling import GroupSummary
 from app.web.locale import RequestLocale
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
-
-MAX_QUERY_LENGTH = 100
-"""Longest search text the list reads; a group name is shorter, the rest is cut off."""
-
-QUERY_PARAM = "q"
-ORGANISATION_PARAM = "org"
 
 
 @dataclass(frozen=True)
@@ -47,46 +42,31 @@ class GroupRowView:
 
 
 @dataclass(frozen=True)
-class GroupFilterView:
-    """The filter form: what was typed or chosen, and the organisations to choose from.
+class GroupFilterView(ListFilter):
+    """The list's filter (``app.admin.list_search``) with the archived toggle of ADR 0084."""
 
-    The search text only narrows the rows. The page never shows it again, so a personal-data
-    value typed into the address bar is not reflected (ADR 0063 §3).
-    """
-
-    query: str
-    organisation: str
-    organisations: list[Option]
     archived: bool = False
-    """ADR 0084: the archived groups instead of the ones in use."""
 
     @property
     def active(self) -> bool:
         """Whether anything narrows the list."""
-        return bool(self.query or self.organisation or self.archived)
+        return super().active or self.archived
 
 
-def narrow(
-    groups: list[GroupSummary], query: str, organisation: str
+def narrow_groups(
+    groups: list[GroupSummary], query: str, organisation: str, *, archived: bool = False
 ) -> tuple[list[GroupSummary], GroupFilterView]:
-    """Return the groups that match ``query`` and ``organisation``, and the checked filter.
-
-    ``organisation`` counts only when it is the organisation of one of ``groups``; any other
-    value is dropped. ``query`` is cut to ``MAX_QUERY_LENGTH`` and matched case-insensitively
-    against the name and the slug.
-    """
-    organisations = {g.organisation_slug: g.organisation_name for g in groups}
-    chosen = organisation if organisation in organisations else ""
-    text = query[:MAX_QUERY_LENGTH].strip()
-    needle = text.casefold()
-    rows = [
-        g
-        for g in groups
-        if (not chosen or g.organisation_slug == chosen)
-        and (not needle or needle in g.group.name.casefold() or needle in g.group.slug)
-    ]
-    options = [Option(slug, name) for slug, name in organisations.items()]
-    return rows, GroupFilterView(text, chosen, options)
+    """Return the groups matching ``query`` (name or slug) and ``organisation``, and the filter."""
+    rows, found = narrow(
+        groups,
+        query,
+        organisation,
+        organisation_of=lambda g: (g.organisation_slug, g.organisation_name),
+        fields=lambda g: (g.group.name, g.group.slug),
+    )
+    return rows, GroupFilterView(
+        found.searching, found.organisation, found.organisations, archived=archived
+    )
 
 
 @router.get("/groups", response_class=HTMLResponse)
@@ -99,12 +79,12 @@ async def groups(
     principal = context.principal
     archived = request.query_params.get(ARCHIVED_PARAM) == "1"
     found = await admin_service(request).groups(principal, archived=archived)
-    rows, filters = narrow(
+    rows, filters = narrow_groups(
         found,
         request.query_params.get(QUERY_PARAM, ""),
         request.query_params.get(ORGANISATION_PARAM, ""),
+        archived=archived,
     )
-    filters = replace(filters, archived=archived)
     summaries = await agenda_service(request).summaries(principal)
     opens_organisations = can_function(principal)(Permission.ORGANISATION_VIEW)
     return page(
