@@ -99,7 +99,8 @@ picked up go to the contact center after all. Whoever manages the group's appoin
 end the fallback in the queue. The participant notices nothing: the link, the lobby and the rules
 for cancelling and moving stay the same.
 
-Choose this only if the team knows the queue and can work it.
+Choose this only if the team knows the queue and can work it. What the team sees and how it
+ends is in [Setting up the contact center](contact-center-setup.md), step 10.
 
 <!-- field: fallback_space_room_id -->
 ### The team's Webex space (fallback)
@@ -107,7 +108,9 @@ Choose this only if the team knows the queue and can work it.
 Optional. The id of the team's Webex space. During a fallback the organisation's bot (see *Alerts
 to administrators* on Channels) posts a message there, and for each appointment that lands in the
 queue the start time, the first name and a link to the queue. Never the link to the call: only
-whoever picks the appointment up gets that.
+whoever picks the appointment up gets that. Those messages stay in Webex after OpenPlanner has
+deleted the appointment's data; see [Setting up the contact center](contact-center-setup.md),
+steps 10 and 11.
 
 <!-- field: participant_change_lead_minutes -->
 ### Participant can move until (minutes ahead)
@@ -185,7 +188,8 @@ choices to the contact center as codes. You set that up on a screen of its own: 
 
 Leave these fields empty while the integration is not set up. Appointments then still work, but
 without a video meeting or a contact-centre task. The values come from the administrator of
-Webex and Webex Contact Center.
+Webex and Webex Contact Center. The whole set-up, step by step, is in
+[Setting up the contact center](contact-center-setup.md).
 
 <!-- field: video_host_email -->
 ### Webex host
@@ -228,7 +232,8 @@ event comes back, the result names what is missing (subscription, webhook or the
 the flow).
 
 The address of the *digital channel asset* in Webex Contact Center that receives this group's
-tasks. Several groups can share an address; the routing value then picks the queue.
+tasks. Several groups can share an address; the routing value then picks the queue. How to set
+up the asset: [Setting up the contact center](contact-center-setup.md), step 3.
 
 <!-- field: wxcc_control_hub -->
 ### Where to find it in Control Hub
@@ -313,7 +318,7 @@ was created but no *task:new* came back, look at the **Webhooks** part of the sa
 ### WxCC work item channel
 
 The name of the work item channel in Webex Contact Center, as the contact-centre administrator
-set it up.
+set it up ([Setting up the contact center](contact-center-setup.md), step 2).
 
 <!-- field: wxcc_routing_value -->
 ### Routing value for the WxCC flow

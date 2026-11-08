@@ -220,6 +220,9 @@ TOPICS = (
         Permission.HOLIDAYS_ASSIGN,
     ),
     HelpTopic("rights", ("/admin/rights",), Permission.RIGHTS_VIEW),
+    # ADR 0082 point 14: the step-by-step set-up of the contact center; no route of its own, it
+    # is linked from the group's contact-center fields and from the alert targets.
+    HelpTopic("contact-center-setup", (), Permission.GROUP_EDIT),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

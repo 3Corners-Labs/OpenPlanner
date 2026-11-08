@@ -250,7 +250,7 @@ import-linter enforces these arrows in CI (ADR 0005):
 flowchart LR
     subgraph domain [app.domain]
         service[BookingService · AdminService · ApiAccessService · UpdateService]
-        ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider ·<br/>ReleaseSource · LogDestinationSender"}}
+        ports{{"ports.py<br/>Clock · Transaction · UnitOfWork ·<br/>MessageSender · VideoProvider ·<br/>ContactCenterDispatcher · IdentityProvider ·<br/>ReleaseSource · LogDestinationSender ·<br/>AlertSender"}}
         service --> ports
     end
 
@@ -263,6 +263,7 @@ flowchart LR
     idpad[adapters.oidc<br/>OidcIdentityProvider]
     releasead[adapters.releases<br/>GitHubReleases]
     logad[adapters.log_senders<br/>Syslog · Splunk · Elastic · Http]
+    alertad[adapters.alert_senders<br/>EmailAlertSender · WebexSpaceSender]
 
     clock -.implements.-> ports
     uow -.implements.-> ports
@@ -273,6 +274,7 @@ flowchart LR
     idpad -.implements.-> ports
     releasead -.implements.-> ports
     logad -.implements.-> ports
+    alertad -.implements.-> ports
 
 ```
 
@@ -604,8 +606,11 @@ flowchart LR
     confirm --> remind["reminders<br/>per group rule<br/>e.g. T-24h"]
     remind --> lock["T-change lead<br/>moving closes, cancelling<br/>stays open (ADR 0069)"]
     lock --> kind{"dispatch kind<br/>(ADR 0043)"}
-    kind -->|contact center| dispatch["T-dispatch lead<br/>WxCC task created"]
-    kind -->|own queue| claim["visible in the queue,<br/>an agent claims it"]
+    kind -->|contact center| due{"T-dispatch lead:<br/>group in fallback?<br/>(ADR 0082)"}
+    due -->|no| dispatch["WxCC task created"]
+    due -->|"yes: job skips<br/>(reason fallback)"| claim
+    dispatch -->|"fails for good after the retries,<br/>dispatch_fallback = own_queue"| claim
+    kind -->|own queue| claim["visible in the queue,<br/>an agent claims it<br/>(fallback: flagged Terugval)"]
     dispatch --> meeting(["call from start to finish;<br/>no change from the start"])
     claim --> meeting
     meeting --> purge["slot end + 24h<br/>purge PII"]
@@ -676,6 +681,35 @@ flowchart LR
 Web and worker each run one shipper. It reads the enabled destinations (with their opened
 credentials) every 15 seconds, so a change in the portal reaches both without a restart, and
 reports its counters every 30 seconds. Delivery never runs in a request or a job.
+
+### Health, alerts and the fallback (ADR 0082)
+
+```mermaid
+flowchart LR
+    events[("system events<br/>audit_events")]
+    req["integration.request<br/>(OpenPlanner's own calls)"] --> watch["IntegrationHealthWatch<br/>health per organisation<br/>and platform"]
+    check["group check:<br/>probe work item"] -->|"failed: wxcc.probe.*"| watch
+    recon["TaskReconciler:<br/>read_task on stale tasks"] -->|"integration.webhooks_missing"| events
+    watch -->|"integration.health"| events
+    watch -->|"WxCC down, or ok again"| fb["FallbackService.sweep<br/>(per group, dispatch_fallback)"]
+    job["dispatch job failed for good"] --> fbq["FallbackService:<br/>booking to the own queue"]
+    fb -->|"dispatch.fallback on, off"| events
+    other["failed jobs, worker heartbeat,<br/>certificates, storage, ..."] --> events
+    events --> rules{"ALERT_RULES:<br/>open alerts"}
+    rules --> portal["portal: banner, pop-ups,<br/>overview (ADR 0061)"]
+    rules --> notifier["AlertNotifier (worker)<br/>once per streak, again after<br/>alert_repeat_hours"]
+    notifier --> senders{{"AlertSenders: one AlertSender<br/>per target"}}
+    senders -->|email| mail["EmailAlertSender<br/>organisation's mail channel"]
+    senders -->|webex_space| bot["WebexSpaceSender<br/>bot token, POST /v1/messages"]
+    notifier -.->|"delivery failed"| failed["alert.delivery_failed<br/>(never an alert itself)"]
+    fb --> poster["BotSpacePoster: team space<br/>group in fallback, queue link"]
+    fbq --> poster2["BotSpacePoster: one line<br/>start time, first name, queue link<br/>(never the host join link)"]
+```
+
+The health is derived only from requests OpenPlanner made itself and from its own checks, never
+from an inbound webhook, so a crafted webhook cannot start or end a fallback. An alert carries
+codes, slugs, times, a count, the version and a portal link; the only participant field that
+leaves is the first name in the team's own Webex space during a fallback (`docs/dataflow.md`).
 
 ### Maintenance mode (ADR 0038)
 
@@ -938,7 +972,7 @@ repository's `pre-pr-review` skill before the PR (`docs/skills.md`).
 | 0079 | The release is a workflow: release PR, audit and tag by dispatch |
 | 0080 | Page width: two classes, declared in the register |
 | 0081 | Subjects and routing attributes next to the group (accepted, not built) |
-| 0082 | Contact-center verification, health, alerts and a fallback per group (step 1 built) |
+| 0082 | Contact-center verification, health, alerts and a fallback per group (built) |
 | 0083 | Identity providers per organisation, chosen by email domain |
 | 0084 | Everything an admin creates can be changed, archived or deleted |
 | 0086 | The public address and the reverse proxy: visible, verified end to end |

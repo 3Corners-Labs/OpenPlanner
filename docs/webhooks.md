@@ -119,7 +119,15 @@ attributes and `workItemData` are ignored. A `404` is a task WxCC does not know.
 with `kind: "probe"`, `bookingReference: "probe-<12 hex>"`, `firstName: "Probe"`, the group's
 name and the probe meeting's link (or `https://openplanner.invalid/probe`). The flow's Case
 on `kind == probe` ends it; otherwise OpenPlanner ends it with End Task after
-`INTEGRATION_PROBE_TIMEOUT_SECONDS`.
+`INTEGRATION_PROBE_TIMEOUT_SECONDS`. Its `task:new` and `task:ended` are noted for the check
+only (see *Inbound: WxCC subscription*); a probe never appears in the own queue, the agenda or
+the overview, and a failed probe (`wxcc.probe.*`) makes the organisation's WxCC health `down`.
+The set-up of the flow branch for the organisation's administrator is step 5 of the manual
+topic *Contactcenter inrichten* (`docs/manual/nl/contact-center-setup.md`).
+
+**Fallback** (ADR 0082 point 11): while a group is in fallback, its due dispatch jobs send no
+Create Task request at all (they skip with reason `fallback`); when the fallback ends, bookings
+not yet claimed get a fresh dispatch job and the usual request above.
 
 ## Webhook addresses
 
