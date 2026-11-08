@@ -194,7 +194,7 @@ async def test_the_queue_widget_counts_the_waiting_participant_and_the_agent_sig
     assert 'aria-label="Wachtrij van Demo: videogesprek"' in text
     assert '<td class="widget-table__number">1</td>' in text  # waiting, and the agent signed in
     assert "3 min" in text
-    assert "<th scope=\"col\" class=\"widget-table__number\">Niet opgepakt</th>" in text
+    assert '<th scope="col" class="widget-table__number">Niet opgepakt</th>' in text
     assert '<td class="widget-table__number">0</td>' in text  # nobody past the group's limit
     assert "Ada" not in text
     assert "ada@example.org" not in text
