@@ -1,0 +1,62 @@
+{% extends "admin/usage_base.html" %}
+{% from "admin/_usage_tables.html" import cell, count_table, figure, nothing_yet with context %}
+{% from "admin/_report_chart.html" import report_chart with context %}
+{% block report %}
+{% if report.empty %}
+{{ nothing_yet() }}
+{% else %}
+<section class="card" aria-labelledby="utilisation-heading">
+  <h2 id="utilisation-heading">{{ _("reports.capacity.utilisation.title") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("reports.capacity.slots") }}</dt><dd>{{ cell(report.slots, report.threshold) }}</dd></div>
+    <div><dt>{{ _("reports.capacity.utilisation.total") }}</dt><dd>{{ figure(report.utilisation_percent, "%") }}</dd></div>
+    <div><dt>{{ _("reports.capacity.idle.total") }}</dt><dd>{{ figure(report.idle) }}</dd></div>
+  </dl>
+  {{ report_chart(charts.utilisation) }}
+</section>
+<section class="card" aria-labelledby="days-heading">
+  <h2 id="days-heading">{{ _("reports.capacity.days.title") }}</h2>
+  <div class="table-scroll" role="region" aria-labelledby="days-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("reports.capacity.days.title") }}</caption>
+    <thead><tr><th scope="col">{{ _("reports.created.day") }}</th><th scope="col">{{ _("reports.capacity.slots") }}</th><th scope="col">{{ _("reports.capacity.utilisation.series") }}</th><th scope="col">{{ _("reports.capacity.idle.series") }}</th></tr></thead>
+    <tbody>
+      {% for row in report.days %}
+      <tr><th scope="row">{{ row.day.isoformat() }}</th><td>{{ cell(row.slots, report.threshold) }}</td><td>{{ figure(row.utilisation_percent, "%") }}</td><td>{{ figure(row.idle) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+<section class="card" aria-labelledby="fill-heading">
+  <h2 id="fill-heading">{{ _("reports.capacity.fill.title") }}</h2>
+  {{ report_chart(charts.fill) }}
+</section>
+<section class="card" aria-labelledby="heat-heading">
+  <h2 id="heat-heading">{{ _("reports.capacity.heat.title") }}</h2>
+  {% set heat = report.heat %}
+  {% if not heat.offered %}
+  <p class="empty-state">{{ _("reports.capacity.heat.range", n=7) }}</p>
+  {% elif not heat.hours %}
+  <p class="empty-state">{{ _("reports.capacity.heat.none") }}</p>
+  {% else %}
+  <div class="table-scroll" role="region" aria-labelledby="heat-heading" tabindex="0">
+  <table class="data-table heat-table">
+    <caption class="visually-hidden">{{ _("reports.capacity.heat.title") }}</caption>
+    <thead><tr><th scope="col">{{ _("reports.capacity.heat.hour") }}</th>{% for d in range(7) %}<th scope="col">{{ label("weekdays", d|string) }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for h in heat.hours %}
+      {% set i = loop.index0 %}
+      <tr><th scope="row">{{ "%02d:00"|format(h) }}</th>{% for v in heat.cells[i] %}<td class="heat--{{ heat.levels[i][loop.index0] }}">{{ cell(v, report.threshold) }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+    <tfoot><tr><th scope="row">{{ _("reports.total") }}</th>{% for t in heat.column_totals %}<td>{{ cell(t, report.threshold) }}</td>{% endfor %}</tr></tfoot>
+  </table>
+  </div>
+  {% endif %}
+  {% if heat.groups_left_out %}<p class="muted">{{ _("reports.capacity.heat.left_out", n=heat.groups_left_out) }}</p>{% endif %}
+  <p class="muted">{{ _("reports.capacity.heat.rule", n=5 * report.threshold) }}</p>
+</section>
+{{ count_table("shortfall", _("reports.capacity.shortfall.title"), _("reports.capacity.shortfall.state"), report.shortfall, "shortfall", report.threshold, _("reports.total")) }}
+{% endif %}
+{% endblock %}
