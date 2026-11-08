@@ -35,16 +35,6 @@ WEBHOOK_MEMORY = timedelta(days=30)
 """How long a Webex event key is remembered; older keys are forgotten on the next event."""
 
 WEBEX_SOURCE = "webex"
-WXCC_SOURCE = "wxcc"
-
-
-def event_source(provider: ContactCenterKind) -> str:
-    """Return the source under which a platform's event keys are remembered.
-
-    Webex Contact Center keeps ``wxcc``, the source of the keys stored before ADR 0032, so a
-    replay across the upgrade is still recognised; another platform gets ``cc:{kind}``.
-    """
-    return WXCC_SOURCE if provider is ContactCenterKind.WEBEX_CC else f"cc:{provider.value}"
 
 
 REQUEST_LIMIT = 100
@@ -169,12 +159,14 @@ class IntegrationService:
         detail: str = "",
         *,
         event_key: str = "",
-        provider: ContactCenterKind = ContactCenterKind.WEBEX_CC,
+        provider: ContactCenterKind,
+        source: str,
     ) -> EventOutcome:
         """Record a work item event once per ``event_key``; ``UNKNOWN`` for foreign tasks.
 
         The task is looked up at ``provider`` only (ADR 0032 point 6): a task id of one
-        platform never finds a booking whose task is at another.
+        platform never finds a booking whose task is at another. ``source`` is the platform's
+        code from its adapter, under which its event keys are remembered.
 
         A ``task:new`` of a booking's task is ``IGNORED``: the dispatch job recorded the
         creation when it got the id. An unknown task may be the group check's probe (ADR
@@ -186,7 +178,7 @@ class IntegrationService:
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED
-                if not await _claim(tx, event_source(provider), event_key, at):
+                if not await _claim(tx, source, event_key, at):
                     return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
                 return EventOutcome.RECORDED

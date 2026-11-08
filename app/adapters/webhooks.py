@@ -21,6 +21,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from pydantic import SecretStr
+
+from app.config import Settings
 from app.domain.calls import EventKind
 from app.domain.connection_health import Platform
 from app.domain.contact_center import ContactCenterKind
@@ -178,22 +181,45 @@ class InboundWebhook:
     Attributes:
         kind: The platform.
         platform: The connection whose latest inbound event the webhook is noted as.
-        source: Short code for logs, security events and deduplication (``wxcc`` stays the
-            code of Webex Contact Center, so its stored event keys keep matching).
-        signing_setting: The ``Settings`` field holding the webhook secret; without it the
-            endpoint does not exist.
+        source: Short code for logs, security events and the event keys that recognise a
+            replay (``wxcc`` stays the code of Webex Contact Center, so the keys stored before
+            ADR 0032 keep matching).
+        secret: Reads the webhook secret from the settings; without it the endpoint does not
+            exist.
         verify: ``(body, headers, secret, now)`` → authentic, untampered and within 300 s.
         parse: The verified JSON object → the event, or ``None`` when OpenPlanner ignores it.
         event_type: The verified JSON object → its event type, codes only, for the note.
+        alias: An older address that still works and where OpenPlanner still registers, until
+            the subscriptions move (CC-4); ``None`` for a platform without one.
     """
 
     kind: ContactCenterKind
     platform: Platform
     source: str
-    signing_setting: str
+    secret: Callable[[Settings], SecretStr | None]
     verify: Callable[[bytes, Mapping[str, str], str, datetime], bool]
     parse: Callable[[dict[str, Any]], ParsedEvent | None]
     event_type: Callable[[dict[str, Any]], str]
+    alias: str | None = None
+
+    @property
+    def path(self) -> str:
+        """Return the platform's address: ``/webhooks/contact-center/{kind}``."""
+        return f"{CONTACT_CENTER_PATH}/{self.kind.value}"
+
+    @property
+    def registered_path(self) -> str:
+        """Return where OpenPlanner registers its subscription: the alias while there is one."""
+        return self.alias or self.path
+
+    @property
+    def paths(self) -> tuple[str, ...]:
+        """Return every address that is OpenPlanner's for this platform."""
+        return (self.path,) if self.alias is None else (self.path, self.alias)
+
+
+CONTACT_CENTER_PATH = "/webhooks/contact-center"
+"""The prefix of every contact-center platform's webhook address (ADR 0032 point 6)."""
 
 
 def _verify_wxcc_headers(
@@ -214,13 +240,19 @@ def _wxcc_type(payload: dict[str, Any]) -> str:
     return str(payload.get("type", ""))[:64]
 
 
+def _wxcc_secret(settings: Settings) -> SecretStr | None:
+    """Return the WxCC subscription secret (``WXCC_WEBHOOK_SECRET``)."""
+    return settings.wxcc_webhook_secret
+
+
 WXCC_INBOUND = InboundWebhook(
     kind=ContactCenterKind.WEBEX_CC,
     platform=Platform.WXCC,
     source="wxcc",
-    signing_setting="wxcc_webhook_secret",
+    secret=_wxcc_secret,
     verify=_verify_wxcc_headers,
     parse=parse_wxcc,
     event_type=_wxcc_type,
+    alias="/webhooks/wxcc",
 )
 """Webex Contact Center's webhooks: ``/webhooks/contact-center/webex_cc`` and ``/webhooks/wxcc``."""

@@ -805,9 +805,7 @@ class InMemoryTransaction:
         booking = self.state.bookings[booking_id]
         self.state.bookings[booking_id] = replace(booking, claim=None)
 
-    async def get_booking_by_task(
-        self, task_id: str, kind: ContactCenterKind = ContactCenterKind.WEBEX_CC
-    ) -> Booking | None:
+    async def get_booking_by_task(self, task_id: str, kind: ContactCenterKind) -> Booking | None:
         return next(
             (
                 b

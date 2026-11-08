@@ -37,6 +37,8 @@ log = structlog.get_logger()
 
 MAX_BODY_BYTES = 64 * 1024
 WEBHOOK_LIMIT = "600/minute"
+CONTACT_CENTER_SCOPE = "webhooks.contact_center"
+"""One limit for the contact-center route and its alias, so the alias adds no second budget."""
 
 
 async def _body(request: Request) -> bytes | None:
@@ -104,7 +106,7 @@ async def webex(request: Request) -> Response:
 
 
 @router.post("/contact-center/{kind}")
-@limiter.limit(WEBHOOK_LIMIT)
+@limiter.shared_limit(WEBHOOK_LIMIT, scope=CONTACT_CENTER_SCOPE)
 async def contact_center(request: Request, kind: str) -> Response:
     """Record a task event of the contact-center platform ``kind`` (ADR 0032 point 6).
 
@@ -117,18 +119,18 @@ async def contact_center(request: Request, kind: str) -> Response:
 
 
 @router.post("/wxcc")
-@limiter.limit(WEBHOOK_LIMIT)
+@limiter.shared_limit(WEBHOOK_LIMIT, scope=CONTACT_CENTER_SCOPE)
 async def wxcc(request: Request) -> Response:
     """Record a WxCC task event: the alias of ``/contact-center/webex_cc`` (ADR 0032 point 6).
 
-    Kept until the WxCC subscriptions are registered at the new address (runbook).
+    Kept until the WxCC subscriptions are registered at the new address (ADR 0032 CC-4).
     """
     return await _contact_center(request, INBOUND[ContactCenterKind.WEBEX_CC])
 
 
 async def _contact_center(request: Request, handling: InboundWebhook) -> Response:
     """Verify, parse and record one contact-center webhook with its platform's handling."""
-    secret = getattr(request.app.state.settings, handling.signing_setting)
+    secret = handling.secret(request.app.state.settings)
     if secret is None:
         return Response(status_code=404)
     body = await _body(request)
@@ -152,6 +154,7 @@ async def _contact_center(request: Request, handling: InboundWebhook) -> Respons
             event.detail,
             event_key=event.event_key,
             provider=handling.kind,
+            source=handling.source,
         )
         log.info(
             "webhook.contact_center",

@@ -1226,9 +1226,7 @@ class Transaction(Protocol):
         """Return the booking whose open trial call (ADR 0071) is the meeting ``meeting_id``."""
         ...
 
-    async def get_booking_by_task(
-        self, task_id: str, kind: ContactCenterKind = ContactCenterKind.WEBEX_CC
-    ) -> Booking | None:
+    async def get_booking_by_task(self, task_id: str, kind: ContactCenterKind) -> Booking | None:
         """Return the booking whose contact-center task is ``task_id`` at platform ``kind``."""
         ...
 

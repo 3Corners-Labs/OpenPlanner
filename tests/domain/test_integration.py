@@ -22,7 +22,6 @@ from app.domain.integration import (
     WEBHOOK_MEMORY,
     EventOutcome,
     IntegrationService,
-    event_source,
 )
 from app.domain.job_plan import JobStatus, JobType, PlannedJob
 from app.domain.request_log import REQUEST_EVENT
@@ -32,6 +31,7 @@ from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.admin import GROUP_ADMIN, OUTSIDER
 from tests.support.domain import NOW, SLOT_0900, webex_routing
 from tests.support.integration import GROUP, make_booking
+from tests.support.webhooks import WXCC
 
 # --- what leaves OpenPlanner -------------------------------------------------------------
 
@@ -162,9 +162,10 @@ async def test_events_are_correlated_by_meeting_and_task(
     recorded, unknown = EventOutcome.RECORDED, EventOutcome.UNKNOWN
     started = EventKind.MEETING_STARTED
     assert await service.record_meeting_event("meeting-1_I_42", started, NOW) is recorded
-    assert await service.record_task_event("task-1", EventKind.TASK_CONNECTED, NOW) is recorded
+    connected = EventKind.TASK_CONNECTED
+    assert await service.record_task_event("task-1", connected, NOW, **WXCC) is recorded
     assert await service.record_meeting_event("unknown", started, NOW) is unknown
-    assert await service.record_task_event("unknown", EventKind.TASK_ENDED, NOW) is unknown
+    assert await service.record_task_event("unknown", EventKind.TASK_ENDED, NOW, **WXCC) is unknown
 
     assert [e.kind for e in uow.state.booking_events[123]] == [
         EventKind.MEETING_STARTED,
@@ -177,7 +178,9 @@ async def test_events_are_correlated_by_meeting_and_task(
 async def test_failure_reasons_are_kept_as_detail(
     service: IntegrationService, uow: InMemoryUnitOfWork
 ) -> None:
-    await service.record_task_event("task-1", EventKind.TASK_FAILED, NOW, "ENTRY_POINT_NOT_FOUND")
+    await service.record_task_event(
+        "task-1", EventKind.TASK_FAILED, NOW, "ENTRY_POINT_NOT_FOUND", **WXCC
+    )
 
     assert uow.state.booking_events[123][0].detail == "ENTRY_POINT_NOT_FOUND"
 
@@ -456,10 +459,10 @@ async def test_a_bookings_task_new_is_ignored_and_a_probes_events_are_noted(
     await probes.open("probe-task", NOW)
     service = IntegrationService(uow, clock, AdminService(uow, clock), probes=probes)
 
-    ignored = await service.record_task_event("task-1", EventKind.TASK_CREATED, NOW)
-    noted = await service.record_task_event("probe-task", EventKind.TASK_CREATED, NOW)
-    ended = await service.record_task_event("probe-task", EventKind.TASK_ENDED, NOW)
-    unknown = await service.record_task_event("someone-else", EventKind.TASK_ENDED, NOW)
+    ignored = await service.record_task_event("task-1", EventKind.TASK_CREATED, NOW, **WXCC)
+    noted = await service.record_task_event("probe-task", EventKind.TASK_CREATED, NOW, **WXCC)
+    ended = await service.record_task_event("probe-task", EventKind.TASK_ENDED, NOW, **WXCC)
+    unknown = await service.record_task_event("someone-else", EventKind.TASK_ENDED, NOW, **WXCC)
 
     assert (ignored, noted, ended, unknown) == (
         EventOutcome.IGNORED,
@@ -469,8 +472,3 @@ async def test_a_bookings_task_new_is_ignored_and_a_probes_events_are_noted(
     )
     assert uow.state.booking_events.get(123, []) == []  # nothing on the booking's timeline
     assert await probes.events("probe-task") == (EventKind.TASK_CREATED, EventKind.TASK_ENDED)
-
-
-def test_wxcc_keeps_its_event_source_across_the_rename() -> None:
-    """ADR 0032: event keys stored before the neutral route still match a replay after it."""
-    assert event_source(ContactCenterKind.WEBEX_CC) == "wxcc"

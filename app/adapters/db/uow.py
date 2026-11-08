@@ -1419,9 +1419,7 @@ class SqlTransaction(
             .values(claimed_at=None, claimed_by=None)
         )
 
-    async def get_booking_by_task(
-        self, task_id: str, kind: ContactCenterKind = ContactCenterKind.WEBEX_CC
-    ) -> Booking | None:
+    async def get_booking_by_task(self, task_id: str, kind: ContactCenterKind) -> Booking | None:
         """Return the booking whose task is ``task_id`` at platform ``kind`` (either column)."""
         return await self._booking_where(has_task(task_id, kind))
 

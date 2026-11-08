@@ -4,10 +4,11 @@
 each one a state:
 
 - ``current``: points at ``WEBHOOK_BASE_URL``, for a resource and host account OpenPlanner uses.
-- ``stale``: OpenPlanner's (target path ``/webhooks/webex`` or ``/webhooks/wxcc``, or named
-  "OpenPlanner ...") but no longer right: another address (an old tunnel), no ``hostEmail``
-  filter, a host account no group uses, an event OpenPlanner does not use, inactive, or a
-  duplicate. Only stale registrations are ever deleted.
+- ``stale``: OpenPlanner's (target path ``/webhooks/webex``, ``/webhooks/wxcc`` or
+  ``/webhooks/contact-center/webex_cc``, or named "OpenPlanner ...") but no longer right:
+  another address (an old tunnel), no ``hostEmail`` filter, a host account no group uses, an
+  event OpenPlanner does not use, inactive, or a duplicate. Only stale registrations are ever
+  deleted.
 - ``foreign``: someone else's; shown with the target's origin only and never touched.
 
 Webex is always listed with ``ownedBy=org``: without it Webex hides org-owned webhooks.
@@ -31,13 +32,12 @@ import httpx
 
 from app.adapters.webex_auth import AuthorizedClient
 from app.adapters.webhook_registration import WEBEX_EVENTS, WXCC_EVENT_TYPES
+from app.adapters.webhooks import WXCC_INBOUND
 from app.domain.ports import IntegrationError
 
 MAX_PAGES = 10
 API_ID = re.compile(r"[A-Za-z0-9_=-]{1,256}")
 INACTIVE = frozenset({"inactive", "disabled", "suspended"})
-WXCC_PATHS = ("/webhooks/wxcc", "/webhooks/contact-center/webex_cc")
-"""Where OpenPlanner receives WxCC events: the old address and its ADR 0032 successor."""
 
 
 class State(StrEnum):
@@ -224,7 +224,7 @@ def _classify_wxcc(items: Iterable[dict[str, Any]], target: str | None) -> list[
         types = item.get("eventTypes")
         event_types = [str(t) for t in types] if isinstance(types, list) else []
         status = str(item.get("status") or "")
-        ours = _path(url).endswith(WXCC_PATHS) or _named(item)
+        ours = _path(url).endswith(WXCC_INBOUND.paths) or _named(item)
         if not ours:
             reason = Reason.FOREIGN
         elif url != target:

@@ -30,7 +30,7 @@ from typing import Any
 import httpx
 from starlette.types import ASGIApp
 
-from app.adapters.webhooks import event_body, sign_webex, sign_wxcc
+from app.adapters.webhooks import WXCC_INBOUND, event_body, sign_webex, sign_wxcc
 
 
 class SimulatedEvent(StrEnum):
@@ -134,7 +134,7 @@ async def play(
             return Played(event, PlayOutcome.NO_SECRET)
         stamp = int(now.timestamp() * 1000)
         body = event_body(wxcc_payload(event, task_id, stamp))
-        path, headers = "/webhooks/wxcc", sign_wxcc(body, wxcc_secret, stamp)
+        path, headers = WXCC_INBOUND.registered_path, sign_wxcc(body, wxcc_secret, stamp)
     else:
         sent, target = TRIAL_EVENTS.get(event, event), meeting_id
         if event in TRIAL_EVENTS:

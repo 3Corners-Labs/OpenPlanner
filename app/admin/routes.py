@@ -30,6 +30,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.integrations import Integrations
 from app.adapters.service_app_check import SERVICE_APP_REPORT
+from app.adapters.webhooks import WXCC_INBOUND
 from app.admin import (
     agenda_routes,
     alert_routes,
@@ -775,7 +776,7 @@ async def integrations(
         wxcc=ContactCenterKind.WEBEX_CC in wired.dispatchers,
         webex_webhook=f"{base}/webhooks/webex",
         webex_secret=settings.webex_webhook_secret is not None,
-        wxcc_webhook=f"{base}/webhooks/wxcc",
+        wxcc_webhook=f"{base}{WXCC_INBOUND.registered_path}",
         wxcc_secret=settings.wxcc_webhook_secret is not None,
     )
     groups = await admin_service(request).groups(context.principal)
