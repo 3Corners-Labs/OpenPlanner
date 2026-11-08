@@ -44,7 +44,7 @@
     {% if scope_filter is defined %}{% include "admin/_scope_filter.html" %}{% endif %}
     <div class="admin-topbar__end">
       {% for link in top_links %}
-      <a class="admin-topbar__link" href="{{ link.href }}"{% if link.aria_label %} aria-label="{{ link.aria_label }}"{% endif %}{% if link.current %} aria-current="page"{% endif %}>{{ icon(link.icon) }}<span class="admin-topbar__label">{{ link.label }}</span>{% if link.count %}<span class="chip chip--accent">{{ link.count }}</span>{% endif %}</a>
+      <a class="admin-topbar__link" href="{{ link.href }}"{% if link.current %} aria-current="page"{% endif %}>{{ icon(link.icon) }}<span class="admin-topbar__label">{{ link.label }}</span>{% if link.count %} <span class="chip chip--accent">{{ link.count }}</span><span class="visually-hidden"> {{ link.count_words }}</span>{% endif %}</a>
       {% endfor %}
       <details class="admin-profile">
         <summary>

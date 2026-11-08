@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +23,7 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
+from tests.admin.test_alert_routes import _disk_full
 from tests.support.admin_site import site_uow
 from tests.support.queue import own_queue
 
@@ -36,6 +38,7 @@ class TopLink:
     label: str
     count: str | None
     aria_label: str | None
+    name: str
 
 
 def _top_bar(page: str) -> list[TopLink]:
@@ -54,6 +57,7 @@ def _top_bar(page: str) -> list[TopLink]:
                 label.group(1) if label else "",
                 count.group(1) if count else None,
                 aria.group(1) if aria else None,
+                " ".join(re.sub(r"<[^>]+>", " ", inner).split()),
             )
         )
     return links
@@ -130,7 +134,8 @@ async def test_the_tasks_link_counts_running_and_failed_jobs_for_the_screen_read
 
     assert active > 0
     assert tasks.count == str(active)
-    assert tasks.aria_label == f"Tasks, {active} running or failed"
+    assert tasks.aria_label is None
+    assert tasks.name == f"Tasks {active} running or failed"
 
 
 async def test_the_count_speaks_dutch_too(site: Site) -> None:
@@ -143,7 +148,8 @@ async def test_the_count_speaks_dutch_too(site: Site) -> None:
         if link.label == "Taken"
     )
 
-    assert tasks.aria_label == f"Taken, {active} lopend of mislukt"
+    assert tasks.aria_label is None
+    assert tasks.name == f"Taken {active} lopend of mislukt"
 
 
 async def test_a_link_without_a_count_has_no_count_and_no_aria_label(site: Site) -> None:
@@ -207,3 +213,24 @@ def test_no_template_or_route_offers_a_role_switcher() -> None:
 def test_the_check_finds_a_role_switcher() -> None:
     assert ROLE_SWITCHER.search('<select name="role_switcher">')
     assert ROLE_SWITCHER.search("def switch_role(request):")
+
+
+@pytest.mark.parametrize(
+    ("lang", "label", "suffix"), [("nl", "Meldingen", "open"), ("en", "Alerts", "open")]
+)
+async def test_open_alerts_name_the_link_with_its_visible_text_first(
+    site: Site, lang: str, label: str, suffix: str
+) -> None:
+    """WCAG 2.5.3: the accessible name contains the visible text, so no aria-label replaces it."""
+    await _disk_full(site)
+    await site.login_as(SUPER)
+
+    alerts = next(
+        link
+        for link in _top_bar((await site.client.get(f"/admin/?lang={lang}")).text)
+        if link.href == "/admin/#widget-alerts"
+    )
+
+    assert alerts.count is not None
+    assert alerts.aria_label is None
+    assert alerts.name == f"{label} {alerts.count} {suffix}"

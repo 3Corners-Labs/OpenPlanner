@@ -4357,8 +4357,8 @@ msgstr "Tasks"
 msgid "admin.nav.alerts"
 msgstr "Alerts"
 
-msgid "admin.topbar.tasks.count"
-msgstr "{label}, {count} running or failed"
+msgid "admin.topbar.tasks.count_words"
+msgstr "running or failed"
 
 msgid "admin.scope.label"
 msgstr "Scope"
@@ -9563,8 +9563,8 @@ msgstr "Queue wait"
 msgid "admin.audit.reason.wait_over_warning"
 msgstr "Participants wait longer than the set limit."
 
-msgid "admin.topbar.alerts.count"
-msgstr "{label}, {count} open"
+msgid "admin.topbar.alerts.count_words"
+msgstr "open"
 
 msgid "settings.field.idp_domain_grace_days.label"
 msgstr "Grace for a missing domain record (days)"
