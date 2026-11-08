@@ -2507,7 +2507,10 @@ worker.
 
 ## Usage reporting: the rollup and the backfill (ADR 0117)
 
-Every booking change writes a small fact without personal data; the worker adds the facts to the
+Every booking change, call event, queue claim, message and rebooking request writes a small fact
+without personal data, and the worker closes each slot two hours after it ended (its capacity, its
+shortfall and how its bookings ended; a no-show is a participant who was never seen in the
+meeting, so it needs the platform's webhooks or the agenda open); the worker adds the facts to the
 hourly figures the reports read, every `reporting_rollup_interval_minutes` (class C, default 15).
 *System status* shows **Usage reporting**: the facts waiting and when the worker last finished. A
 warning there means facts have waited four intervals: the worker is behind or not running, and the
@@ -2519,6 +2522,9 @@ reports show older figures.
 | log `usage.fact_dropped` (warning, `kind` only) | a booking change committed but its fact could not be written | one is harmless; many point at the database |
 | log `usage.backfill_failed` | the first-start backfill of old bookings did not run | restart the worker, or run the command below |
 | log `usage.rolled_up` | facts rolled up, facts and hourly rows pruned | none |
+| log `usage.slots_failed` (error) | the closing of ended slots (capacity, shortfall, outcomes) failed; the next interval tries again | read the log around it; repeated failures point at the database |
+| log `usage.slots_closed` | slots that ended two hours ago were closed for the reports | none |
+| log `usage.message_failed` (warning) | a message went out but its fact was not written | one is harmless; many point at the database |
 
 The worker makes facts of the bookings that existed before reporting once, at its first start after
 the upgrade. To see it done, or to run it again, inside the `web` container:

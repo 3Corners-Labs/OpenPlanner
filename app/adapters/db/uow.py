@@ -34,6 +34,7 @@ from app.adapters.crypto import SecretBox
 from app.adapters.db.admin_sessions import AdminSessionQueries
 from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
+from app.adapters.db.call_status_rows import call_status_of
 from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.contact_center_rows import (
     has_task,
@@ -113,6 +114,7 @@ from app.adapters.db.updates import UpdateQueries
 from app.adapters.db.usage import UsageQueries
 from app.adapters.db.usage_reports import UsageReportQueries
 from app.adapters.db.usage_rollup import UsageRollupQueries
+from app.adapters.db.usage_slots import UsageSlotQueries
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.audit import (
@@ -144,10 +146,8 @@ from app.domain.branding import Branding, FontFile, FontRef, FontRole, HeaderSty
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
-    CallState,
     CallStatus,
     EventKind,
-    TaskState,
     new_status,
 )
 from app.domain.channel_settings import (
@@ -428,6 +428,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
         rebook_by=row.rebook_by,
+        rebook_requested_at=row.rebook_requested_at,
         confirm_by=row.confirm_by,
         confirmed_at=row.confirmed_at,
         claim=Claim(row.claimed_at, row.claimed_by)
@@ -459,22 +460,7 @@ def _contacts_column(block: ContactBlock | None) -> str | None:
     return contacts_json(block) if block else None
 
 
-def _call_status(row: CallStatusRow) -> CallStatus:
-    """Map a call status row."""
-    return CallStatus(
-        booking_id=row.booking_id,
-        call=CallState(row.call),
-        task=TaskState(row.task),
-        participants=row.participants,
-        host_joined=row.host_joined,
-        host_joined_at=row.host_joined_at,
-        started_at=row.started_at,
-        ended_at=row.ended_at,
-        task_created_at=row.task_created_at,
-        connected_at=row.connected_at,
-        updated_at=row.updated_at,
-        fallback=row.fallback,
-    )
+_call_status = call_status_of
 
 
 def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
@@ -504,6 +490,7 @@ class SqlTransaction(
     RollupQueries,
     UsageQueries,
     UsageRollupQueries,
+    UsageSlotQueries,
     UsageReportQueries,
     StaffQueries,
     MaintenanceQueries,
@@ -1558,6 +1545,8 @@ class SqlTransaction(
                 connected_at=status.connected_at,
                 updated_at=status.updated_at,
                 fallback=status.fallback,
+                peak_participants=status.peak_participants,
+                guest_joined_at=status.guest_joined_at,
             )
         )
         await self._session.flush()
@@ -1913,6 +1902,7 @@ class SqlTransaction(
                 closure_id=booking.closure_id,
                 change_reason=booking.change_reason.value if booking.change_reason else None,
                 rebook_by=booking.rebook_by,
+                rebook_requested_at=booking.rebook_requested_at,
                 confirmed_at=booking.confirmed_at,
             )
         )

@@ -53,6 +53,7 @@ class FactKind(StrEnum):
     CALL_CREATED = "call.created"
     CALL_CONNECTED = "call.connected"
     CALL_HOST_JOINED = "call.host_joined"
+    CALL_GUEST_WAITED = "call.guest_waited"
     CALL_ENDED = "call.ended"
     CALL_WAITING_LEFT = "call.waiting_left"
     CALL_NOT_PICKED_UP = "call.not_picked_up"
@@ -96,9 +97,10 @@ FACT_HOUR: dict[FactKind, HourSource] = {
     FactKind.CALL_CREATED: HourSource.EVENT,
     FactKind.CALL_CONNECTED: HourSource.EVENT,
     FactKind.CALL_HOST_JOINED: HourSource.EVENT,
+    FactKind.CALL_GUEST_WAITED: HourSource.EVENT,
     FactKind.CALL_ENDED: HourSource.EVENT,
     FactKind.CALL_WAITING_LEFT: HourSource.EVENT,
-    FactKind.CALL_NOT_PICKED_UP: HourSource.EVENT,
+    FactKind.CALL_NOT_PICKED_UP: HourSource.SLOT_START,
     FactKind.CALL_FAILED: HourSource.EVENT,
     FactKind.QUEUE_CLAIMED: HourSource.EVENT,
     FactKind.QUEUE_RELEASED: HourSource.EVENT,
@@ -181,7 +183,9 @@ class UsageFact:
         actor_class: Who caused the change, as a class.
         reason_code: A code from a closed list; ``move`` marks a booking created by a move.
         value_seconds: A duration in seconds; signed for a host that was early (Q3).
-        participants: How many people took part in a call.
+        participants: How many people took part in a call (the most seen at once, metric U11);
+            on the ``call.created`` of a direct call, the direct calls waiting or connected in
+            the group right after it (metric Q9, the peak of the hour).
         capacity: The capacity snapshot of a slot.
         booked: The bookings of a slot that count (confirmed, completed, no show).
     """
@@ -538,7 +542,7 @@ METRICS: tuple[Metric, ...] = (
         "Q4",
         "Participant wait in the meeting",
         "`host_joined_at - max(slot.start, guest_joined_at)` when positive.",
-        (_F.CALL_HOST_JOINED,),
+        (_F.CALL_GUEST_WAITED,),
         _SUM,
     ),
     Metric(
@@ -553,7 +557,7 @@ METRICS: tuple[Metric, ...] = (
         "Abandoned direct calls",
         "`waiting_left / direct calls created`, with the wait at the moment of leaving in "
         "buckets; and the count not picked up within `not_picked_up_minutes`.",
-        (_F.CALL_WAITING_LEFT, _F.CALL_NOT_PICKED_UP),
+        (_F.CALL_CREATED, _F.CALL_WAITING_LEFT, _F.CALL_NOT_PICKED_UP),
         _COUNT,
     ),
     Metric(

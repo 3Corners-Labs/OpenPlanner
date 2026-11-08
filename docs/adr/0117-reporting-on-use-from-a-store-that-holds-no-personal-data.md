@@ -1,8 +1,9 @@
 # 0117. Reporting on use, from a store that holds no personal data
 
 Status: accepted (2026-11-06, PR #558), requested by the product owner (open point O16). Partly built:
-steps 1 (the domain), 2 (the store and the booking facts), 4 (rollup, retention, backfill, lag) and 5
-(permission, navigation, query layer, the *Volume* screen) are merged; the rest is planned.
+steps 1 (the domain), 2 (the store and the booking facts), 3 (the call, queue, message, rebooking and
+slot facts), 4 (rollup, retention, backfill, lag) and 5 (permission, navigation, query layer, the
+*Volume* screen) are merged; the rest is planned.
 Extends
 ADR 0102 (what remains after a purge; step 4 is its first statistics table), ADR 0014
 (authorisation), ADR 0023 (machine API), ADR 0047 (admin structure), ADR 0042 (settings) and
@@ -444,7 +445,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 0 | ADR proposed | #558 | merged |
 | 1 | Domain only: `app/domain/usage.py` (fact kinds, allow-list `USAGE_FIELDS`, metric table, buckets, `suppress()`), `privacy.py` list and test, `docs/reporting.md` generated; no database | #592 | merged |
 | 2 | Migration (five tables, expand-only), `record_usage` on `Transaction`, settings and registry entries, facts for booking create, confirm, expire, cancel, move, outcome, suspend/resume | #597 | merged |
-| 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | | planned |
+| 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | PR_NUMBER3 | merged |
 | 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | #608 | merged |
 | 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | #619 | merged |
 | 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | | planned |
@@ -526,6 +527,69 @@ empty** (nothing records them) and U8 and U11 wait for step 3. The settings `rep
 3 to 20) and `reporting_org_min_cell_size` (D, 3, 3 to 50; the larger of the two applies) are added. Not
 done here, with reason: hour cuts and the group-total rule belong to the screens that cut by hour and by
 subject (steps 6 and 7); the *Volume* screen has none.
+
+**Step 3 notes (one change to the catalogue, no change of a decision):** the facts of point 6 now have
+their producers, each written in the transaction of the change it describes (`Transaction.record_usage`,
+which never fails the action) and each pure builder in its own module.
+
+- *Calls and trial calls.* `app/domain/call_facts.py` turns a timeline event and the call status before and
+  after it into facts; `call_usage.record_call_event` loads what it needs and is called just before the event
+  is written at the three places that append one: `IntegrationService._record` (webhooks and jobs),
+  `MeetingStatusService._poll` and `BookingService.leave_direct`. A fact follows a *change of the status*, so
+  a replayed webhook (deduplicated by its key) or a repeated poll writes nothing twice; a trial step counts
+  once per booking (the booking's earlier events are read), a trial failure every time. A failure reaches the
+  fact only as `task.`, `meeting.` or `integration.` plus a code of the closed list `FAILURE_CODES`
+  (`rejected_403` is `rejected`); a provider's text, however it was formed, becomes `other`. Durations are
+  exact seconds. A work item that is created twice (a fallback to the own queue that ends in a contact-center
+  task) counts as two `call.created`; the rare case is accepted.
+- *Q4, the guest's wait.* A new fact kind `call.guest_waited` carries `host_joined_at - max(start,
+  guest_joined_at)` when positive, for scheduled calls; Q4 now lists it instead of `call.host_joined`
+  (the metric had no data before, so `METRIC_VERSION` stays 1). `CallStatus` gains `guest_joined_at` and
+  `peak_participants` (the most people seen, kept when the meeting ends, which U11 needs); the poll cannot
+  tell who came first when it sees both at once and then claims no wait.
+- *Q9.* The `participants` field of the `call.created` fact of a direct call carries the direct calls waiting
+  or connected in the group right after it; the peak of an hour is the maximum of these. The allow-list is
+  unchanged.
+- *Queue.* `QueueService._claim` and `release` write `queue.claimed` (seconds from the booking becoming
+  visible, `queue_visible_from_minutes` before the start or its creation, to the claim) and
+  `queue.released`. No agent, not even a pseudonym, is in the fact; a team member's `StaffFact` stays step 7.
+- *Messages.* The job runner writes `message.sent` after a successful send and `message.failed` when it gives
+  up (a retry that works is one `message.sent`), in a transaction of its own, with the channel kind and a
+  purpose from the closed list `message_usage.PURPOSES`; never a recipient, a text or the sender's answer.
+  The team's calendar invite is no message to a participant and writes nothing. A failure to write is logged
+  as `usage.message_failed` and never changes the job.
+- *Rebooking.* `rebook.proposed` (planner-asked; the reason is the planner's fixed reason; the assistant of
+  ADR 0057 is not built, its facts will carry the actor class `system`), `rebook.accepted` when the
+  participant moves a booking that awaits a new time (the quarter hours since the request; migration 0099
+  adds `bookings.rebook_requested_at`, a request made before it has no time) and `rebook.expired` when it
+  lapses. A planner moving a waiting booking is no acceptance. The accepted fact has no proposer, so the
+  planner-asked and assistant-proposed split of U8 is on the proposed count only until the assistant exists.
+- *Slots and outcomes.* A worker pass (`slot_close_service.SlotCloser`, on the rollup's interval, so no new
+  setting) closes every slot that ended two hours ago (`CLOSE_DELAY`, fixed on purpose: late reports) and
+  writes, keyed on the slot start and in one transaction with its watermark
+  (`usage_rollup_state.slots_closed_until`): `slot.closed` (capacity snapshot, bookings that count),
+  `slot.shortfall` (`open`, or `accepted` by a planner at those counts, from the staffing as it is when the
+  slot closes), `booking.outcome` and `call.not_picked_up`. A planner's bulk request that ends a slot's
+  shortfall writes `slot.shortfall` `resolved`; a shortfall that disappears any other way is not seen, so
+  `resolved` is a lower bound. The first pass after the upgrade only sets the watermark: earlier slots are not
+  closed afterwards. Slots exist only when they had a booking, so hours nobody booked are not in C1 to C3.
+- *Outcome rule.* Nothing sets a booking's status `completed` or `no_show`, and this step does not add a
+  writer: the outcome is derived from the call (the table is in `docs/reporting.md`). A scheduled booking is
+  `completed` when the participant was seen and the host joined, `no_show` when the participant was not seen
+  in a meeting that was observed, and has no outcome when no meeting was made or it failed, or the
+  participant came and nobody received them (that is `call.not_picked_up`). A direct call is `completed` or
+  nothing. `no_show` means *no join was observed*: where the platform's webhooks are not set up and nobody
+  opened the agenda, a join cannot be seen. The ADR text of U3 should be read with that. `completed` and
+  `no_show` cannot be backfilled, and slots that ended before the upgrade stay without them.
+- *Not picked up.* A confirmed booking that reached staff (a work item, a fallback, or an own queue) and
+  that no host joined and no agent claimed within the group's `not_picked_up_minutes` of its start; written
+  once per booking by the slot closing.
+- *Rollup.* Every fact kind now has a feed (a test checks it); the feeds read `figure` and `tag` as well as
+  the cuts, so C1 is two cells (`booked`, `capacity` in `reason_code`), C2 a fill class, M1 `<purpose>.sent`
+  or `.failed`; `docs/reporting.md` lists them. Migration 0099 is expand-only (`call_status.peak_participants`,
+  `call_status.guest_joined_at`, `bookings.rebook_requested_at`, `usage_rollup_state.slots_closed_until`).
+- *Settings.* None added. The hard-coded values are `CLOSE_DELAY` (two hours), `BATCH_SLOTS` (200, a bound on
+  the write lock) and the closed code lists above.
 
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:
