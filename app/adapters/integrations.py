@@ -7,7 +7,7 @@ video meetings and work items; bookings keep working. Without a settings key the
 
 import hashlib
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 
 import httpx
@@ -23,9 +23,10 @@ from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTok
 from app.adapters.webex_meetings import WebexMeetings
 from app.adapters.wxcc import WxccTasks
 from app.config import Settings
+from app.domain.contact_center import ContactCenterKind
 from app.domain.ports import (
     Clock,
-    ContactCenterDispatcher,
+    ContactCenterDispatchers,
     IntegrationChecker,
     RequestLog,
     VideoProvider,
@@ -38,11 +39,14 @@ log = structlog.get_logger()
 
 @dataclass(frozen=True)
 class Integrations:
-    """The configured integration adapters (``None`` when not configured)."""
+    """The configured integration adapters (``None`` or empty when not configured).
+
+    ``dispatchers`` holds one dispatcher per contact-center platform (ADR 0032 point 5).
+    """
 
     tokens: WebexTokens | None = None
     video: VideoProvider | None = None
-    dispatcher: ContactCenterDispatcher | None = None
+    dispatchers: ContactCenterDispatchers = field(default_factory=dict)
     checker: IntegrationChecker | None = None
 
 
@@ -140,4 +144,7 @@ def build_integrations(
         probe_timeout=probe_timeout
         or (lambda: timedelta(seconds=settings.integration_probe_timeout_seconds)),
     )
-    return Integrations(tokens, video, dispatcher, checker)
+    dispatchers: ContactCenterDispatchers = (
+        {ContactCenterKind.WEBEX_CC: dispatcher} if dispatcher else {}
+    )
+    return Integrations(tokens, video, dispatchers, checker)

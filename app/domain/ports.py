@@ -2,7 +2,8 @@
 
 Adapters in ``app.adapters`` implement them; tests use the fakes in ``tests/fakes``.
 External systems still to come with their work package: ``VideoProvider`` (WP5, including
-live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007),
+live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007; one per
+``ContactCenterKind``, ADR 0032),
 ``IdentityProvider`` (WP7).
 """
 
@@ -33,11 +34,11 @@ from app.domain.calls import (
     BookingEvent,
     BookingOverview,
     CallStatus,
+    ContactCenterTask,
     EventKind,
     MeetingRequest,
     MeetingStatus,
     TaskSnapshot,
-    WorkItem,
 )
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
@@ -51,6 +52,7 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -94,7 +96,10 @@ from app.domain.updates import (
     SupportLine,
     UpdateRequest,
 )
-from app.domain.usage import StaffFact, UsageFact
+from app.domain.usage import StaffFact, UsageCell, UsageFact
+from app.domain.usage_backfill import BackfillBooking
+from app.domain.usage_report import DayStatusCount, ReportGroup
+from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -297,7 +302,7 @@ REASON_LIMIT = 300
 
 
 class IntegrationError(Exception):
-    """A call to Webex or WxCC failed; ``code`` says why, ``retryable`` whether to try again.
+    """A call to a platform failed; ``code`` says why, ``retryable`` whether to try again.
 
     The code is a short machine key (``unauthorized``, ``rate_limited``, ``server_error``,
     ``rejected``); it never contains response bodies, which could hold personal data.
@@ -385,30 +390,34 @@ class IntegrationChecker(Protocol):
 
 
 class ContactCenterDispatcher(Protocol):
-    """Creates and ends work items in Webex Contact Center (ADR 0018, 0021)."""
+    """Creates and ends tasks at one contact-center platform (ADR 0018, 0021, 0032).
 
-    async def create_task(self, item: WorkItem) -> str:
-        """Create the work item and return the task id.
+    The application holds one per ``ContactCenterKind`` (``ContactCenterDispatchers``) and
+    picks it by the group's routing, as it picks a ``MessageSender`` per ``ChannelKind``.
+    """
+
+    async def create_task(self, task: ContactCenterTask) -> str:
+        """Create the task and return its id at the platform.
 
         Raises:
-            IntegrationError: If WxCC refuses or cannot be reached.
+            IntegrationError: If the platform refuses or cannot be reached.
         """
         ...
 
     async def end_task(self, task_id: str) -> None:
-        """End the task (End Task API; needs ``cjp:user``).
+        """End the task.
 
         Raises:
-            IntegrationError: If WxCC refuses (``rejected_403`` without the scope) or cannot be
-                reached.
+            IntegrationError: If the platform refuses (``rejected_403`` without the scope) or
+                cannot be reached.
         """
         ...
 
     async def mark_cancelled(self, task_id: str, reference: str) -> None:
-        """Tell the agent the booking was cancelled (Task Messages API, ``cjp:task_write``).
+        """Tell the agent the booking was cancelled, with the booking reference only.
 
         Raises:
-            IntegrationError: If WxCC refuses or cannot be reached.
+            IntegrationError: If the platform refuses or cannot be reached.
         """
         ...
 
@@ -419,9 +428,13 @@ class ContactCenterDispatcher(Protocol):
         never the task's attributes. A task the platform does not know is ``TaskState.NONE``.
 
         Raises:
-            IntegrationError: If WxCC refuses or cannot be reached.
+            IntegrationError: If the platform refuses or cannot be reached.
         """
         ...
+
+
+ContactCenterDispatchers = Mapping[ContactCenterKind, ContactCenterDispatcher]
+"""The configured dispatcher per platform (ADR 0032 point 5); empty without a contact center."""
 
 
 class ProbeRegistry(Protocol):
@@ -1202,8 +1215,8 @@ class Transaction(Protocol):
         """Forget the trial call's meeting and link; the count stays."""
         ...
 
-    async def save_task_id(self, booking_id: int, task_id: str) -> None:
-        """Store the booking's WxCC task id."""
+    async def save_task(self, booking_id: int, task: ContactCenterTaskRef) -> None:
+        """Store the booking's contact-center task: its id and the platform that holds it."""
         ...
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
@@ -1215,7 +1228,7 @@ class Transaction(Protocol):
         ...
 
     async def get_booking_by_task(self, task_id: str) -> Booking | None:
-        """Return the booking whose WxCC task has ``task_id``."""
+        """Return the booking whose contact-center task has ``task_id``."""
         ...
 
     async def claim_booking(self, booking_id: int, claim: Claim) -> bool:
@@ -2004,6 +2017,85 @@ class Transaction(Protocol):
 
     async def list_log_destination_status(self, scope: Scope) -> list[DestinationStatus]:
         """Return the status every process reported, for a scope that matches everything."""
+        ...
+
+
+class UsageStore(Protocol):
+    """What the rollup, the backfill and the usage reports read and write (ADR 0117).
+
+    Kept apart from ``Transaction``, which only gained ``record_usage``: the web path writes
+    facts, and only the worker's rollup, retention and backfill, the System status card and the
+    reports (filtered by the reader's ``Scope``, ADR 0117 point 11) use these.
+    """
+
+    async def record_usage(self, fact: UsageFact | StaffFact) -> bool:
+        """Write one usage fact in a savepoint (the same method as ``Transaction``'s)."""
+        ...
+
+    async def list_report_groups(self, scope: Scope) -> list[ReportGroup]:
+        """Return the groups inside ``scope``, archived ones too, by organisation and name."""
+        ...
+
+    async def read_usage_cells(
+        self, scope: Scope, group_ids: Sequence[int], first_hour: datetime, last_hour: datetime
+    ) -> list[UsageCell]:
+        """Return the hourly cells of ``group_ids`` in ``scope`` in the half-open hour range."""
+        ...
+
+    async def read_day_status_counts(
+        self, scope: Scope, group_ids: Sequence[int], first_day: date, last_day: date
+    ) -> list[DayStatusCount]:
+        """Return the day counts from before reporting of ``group_ids`` in ``scope``."""
+        ...
+
+    async def read_usage_events(self, after_id: int, limit: int) -> UsageBatch:
+        """Return up to ``limit`` facts after ``after_id``, oldest first."""
+        ...
+
+    async def usage_state(self) -> UsageState:
+        """Return the watermark, the time of the last run and how many facts wait."""
+        ...
+
+    async def add_usage_cells(self, cells: Sequence[UsageCell]) -> None:
+        """Add ``cells`` to the hourly table: a cell of an existing hour and cut adds to its row."""
+        ...
+
+    async def advance_usage_watermark(self, last_event_id: int, at: datetime) -> None:
+        """Move the watermark and the time of the last run, in the same transaction as the cells."""
+        ...
+
+    async def find_unbackfilled(self, after_id: int, limit: int) -> list[BackfillBooking]:
+        """Return up to ``limit`` booking rows after ``after_id`` not yet turned into facts."""
+        ...
+
+    async def mark_backfilled(self, booking_ids: Sequence[int]) -> None:
+        """Record bookings as turned into facts."""
+        ...
+
+    async def complete_backfill(self, at: datetime) -> None:
+        """Record that every booking has been looked at."""
+        ...
+
+    async def usage_cutoff(self, now: datetime) -> datetime:
+        """Return the hour live facts start from, or the hour of ``now`` when there are none."""
+        ...
+
+    async def prune_usage(
+        self, events_before: datetime, hours_before: datetime, limit: int
+    ) -> UsagePruned:
+        """Delete at most ``limit`` rolled-up facts before ``events_before`` and old hourly rows."""
+        ...
+
+
+class UsageUnitOfWork(Protocol):
+    """Opens transactions that carry the rollup's ``UsageStore``."""
+
+    def locked(self) -> AbstractAsyncContextManager[UsageStore]:
+        """Open a write transaction."""
+        ...
+
+    def read(self) -> AbstractAsyncContextManager[UsageStore]:
+        """Open a read transaction."""
         ...
 
 

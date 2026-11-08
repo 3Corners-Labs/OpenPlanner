@@ -10,6 +10,7 @@ from app.domain.audit import SYSTEM_ACTOR, Outcome, Source
 from app.domain.authorization import Principal
 from app.domain.booking import BookingStatus, ChangeReason
 from app.domain.channels import ChannelKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
 from app.domain.job_plan import JobType
 from app.domain.planner_service import ALERT_ACTION, PlannerService
@@ -184,7 +185,10 @@ async def test_a_dispatched_booking_is_not_changed(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     booking_id = await _book(bookings)
-    uow.state.bookings[booking_id] = replace(uow.state.bookings[booking_id], wxcc_task_id="t-1")
+    uow.state.bookings[booking_id] = replace(
+        uow.state.bookings[booking_id],
+        contact_center_task=ContactCenterTaskRef("t-1", ContactCenterKind.WEBEX_CC),
+    )
 
     with pytest.raises(DomainError, match="planner_too_late"):
         await planner.move(GROUP_ADMIN, "demo", booking_id, SLOT_0930)

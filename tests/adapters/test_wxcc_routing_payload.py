@@ -10,7 +10,7 @@ from datetime import timedelta
 
 from app.adapters.wxcc import ROUTING_KEY, task_body
 from app.domain.booking import Booking, BookingStatus, Contact, MeetingRef
-from app.domain.calls import work_item
+from app.domain.calls import contact_center_task
 from app.domain.form_fields import Answers
 from app.domain.routing import (
     ATTRIBUTE_VALUES,
@@ -22,7 +22,7 @@ from app.domain.routing import (
     Subject,
 )
 from app.domain.scheduling import PhoneMode
-from tests.support.domain import NOW, SLOT_0900, make_group
+from tests.support.domain import NOW, SLOT_0900, make_group, webex_routing
 
 ROUTING = GroupRouting(
     (
@@ -40,8 +40,7 @@ GROUP = make_group(
     slug="demo",
     name="Demo",
     video_host_email="host@example.nl",
-    wxcc_business_address="openplanner@example.biz",
-    wxcc_channel="openplanner-video",
+    contact_center=webex_routing("openplanner@example.biz", "openplanner-video"),
     routing=ROUTING,
 )
 CONTACT = Contact.create(
@@ -69,7 +68,7 @@ BOOKING = Booking(
 
 
 def _body() -> dict[str, object]:
-    item = work_item(BOOKING, GROUP, start_label="5 jan 2026, 09:00")
+    item = contact_center_task(BOOKING, GROUP, start_label="5 jan 2026, 09:00")
     return task_body(item, "alias-1", 1767600000000)
 
 
@@ -119,7 +118,7 @@ def test_no_other_booking_field_or_label_reaches_the_payload() -> None:
 
 def test_the_routing_key_of_openplanner_cannot_be_overwritten() -> None:
     # The mapping refuses the reserved name, and the body puts the group's value last anyway.
-    item = work_item(BOOKING, GROUP, start_label="x")
+    item = contact_center_task(BOOKING, GROUP, start_label="x")
     forced = type(item)(**{**item.__dict__, "variables": ((ROUTING_KEY, "other"),)})
     assert task_body(forced, "a", 1)["flowSettings"] == {ROUTING_KEY: "demo"}
 
@@ -127,5 +126,44 @@ def test_the_routing_key_of_openplanner_cannot_be_overwritten() -> None:
 def test_a_booking_without_a_choice_sends_only_the_group() -> None:
     from dataclasses import replace
 
-    item = work_item(replace(BOOKING, routing=None), GROUP, start_label="x")
+    item = contact_center_task(replace(BOOKING, routing=None), GROUP, start_label="x")
     assert task_body(item, "a", 1)["flowSettings"] == {ROUTING_KEY: "demo"}
+
+
+def test_the_recorded_payload_holds_only_the_allowed_fields() -> None:
+    """ADR 0032 point 8 as amended by ADR 0081 §6: every value in the request is one of the
+    allowed fields, the group's routing attributes or a mapped routing variable."""
+    body = _body()
+    assert set(body) == {
+        "origin",
+        "destination",
+        "channelType",
+        "channel",
+        "flowSettings",
+        "channelParams",
+    }
+
+    def leaves(value: object) -> list[str]:
+        if isinstance(value, dict):
+            return [leaf for v in value.values() for leaf in leaves(v)]
+        return [str(value)]
+
+    allowed = {
+        BOOKING.reference,
+        "Ada",
+        "5 jan 2026, 09:00",
+        GROUP.name,
+        "https://site.webex.com/meet/abc",
+        "scheduled",
+        "openplanner@example.biz",
+        "openplanner-video",
+        "businessAddress",
+        "workItem",
+        "work-item-form",
+        "alias-1",
+        "1767600000000",
+        "demo",
+        "MOVE",
+        "en",
+    }
+    assert set(leaves(body)) <= allowed

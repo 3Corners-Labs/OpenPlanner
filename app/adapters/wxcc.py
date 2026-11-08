@@ -1,5 +1,9 @@
 """``ContactCenterDispatcher`` on the WxCC Create Task API v2, work items (ADR 0018, 0021).
 
+The adapter of ``ContactCenterKind.WEBEX_CC`` (ADR 0032): ``DESCRIPTOR`` describes the group
+routing WxCC needs (business address and channel, both required, and a routing value of at most
+512 bytes), and ``task_body`` maps the neutral ``ContactCenterTask`` to Create Task v2.
+
 The work item goes to the group's business address and channel; the flow behind the entry
 point chooses the queue from ``flowSettings.openplannerGroup``. The routing variables of
 ADR 0081 (mapped subject and attribute codes) go next to it in ``flowSettings``, where the
@@ -20,18 +24,41 @@ and ``workItemData`` are never read. A 404 is a task WxCC does not know (``TaskS
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import quote
 
 from app.adapters.webex_auth import AuthorizedClient
-from app.domain.calls import TaskSnapshot, TaskState, WorkItem
+from app.domain import calls
+from app.domain.calls import ContactCenterTask, TaskSnapshot, TaskState
+from app.domain.contact_center import (
+    AttributeSpec,
+    ContactCenterKind,
+    ContactCenterRouting,
+    ProviderDescriptor,
+)
 from app.domain.ports import Clock, IntegrationError
 
 ROUTING_KEY = "openplannerGroup"
 
-PROBE_KIND = "probe"
-"""``kind`` of the group check's probe work item (ADR 0082 point 2); the flow's Case branch on
-it ends the probe before an agent sees it. Fixed on purpose: the flow and OpenPlanner agree."""
+BUSINESS_ADDRESS = "business_address"
+"""Routing attribute: the business address of the work item asset (ADR 0018)."""
+CHANNEL = "channel"
+"""Routing attribute: the name of the work item channel."""
+
+DESCRIPTOR = ProviderDescriptor(
+    kind=ContactCenterKind.WEBEX_CC,
+    label_key="admin.contact_center.webex_cc",
+    attributes=(
+        AttributeSpec(BUSINESS_ADDRESS, 255, True, "admin.field.wxcc_business_address"),
+        AttributeSpec(CHANNEL, 255, True, "admin.field.wxcc_channel"),
+    ),
+    routing_value_max_length=512,
+)
+"""What a group needs for WxCC (ADR 0032 point 4); the limits are WxCC's (``flowSettings``
+values up to 512 bytes), fixed by the platform and so constants, not settings."""
+
+PROBE_KIND = calls.PROBE_KIND
+"""``kind`` of the group check's probe work item (ADR 0082 point 2), defined in the domain."""
 
 TASK_STATES: dict[str, TaskState] = {
     "new": TaskState.QUEUED,
@@ -67,13 +94,51 @@ REQUIRED_FIELDS = frozenset({"bookingReference"})
 and ``kind``."""
 
 
-def task_body(item: WorkItem, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
-    """Return the Create Task v2 request for ``item``."""
+class WxccMapping(NamedTuple):
+    """A group's WxCC attributes; either may be missing while the routing is incomplete."""
+
+    channel: str | None
+    business_address: str | None
+
+    @property
+    def complete(self) -> tuple[str, str] | None:
+        """The channel and business address when both are set, else ``None``."""
+        if self.channel and self.business_address:
+            return self.channel, self.business_address
+        return None
+
+
+def wxcc_mapping(routing: ContactCenterRouting | None) -> WxccMapping | None:
+    """Return the WxCC attributes of ``routing``; ``None`` without one or for another platform.
+
+    The one place that checks the kind and reads the WxCC attributes of a routing.
+    """
+    if routing is None or routing.kind is not ContactCenterKind.WEBEX_CC:
+        return None
+    return WxccMapping(routing.attribute(CHANNEL), routing.attribute(BUSINESS_ADDRESS))
+
+
+def channel_and_address(routing: ContactCenterRouting | None) -> tuple[str, str] | None:
+    """Return the channel and business address of a WxCC routing that has both, else ``None``."""
+    mapping = wxcc_mapping(routing)
+    return mapping.complete if mapping else None
+
+
+def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
+    """Return the Create Task v2 request for ``item``, a task of a complete WxCC routing.
+
+    Raises:
+        IntegrationError: ``not_ready`` (not retryable) when the routing lacks an attribute.
+    """
+    pair = channel_and_address(item.routing)
+    if pair is None:
+        raise IntegrationError("not_ready", retryable=False)
+    channel, address = pair
     return {
         "origin": {"id": item.reference, "name": item.first_name},
-        "destination": {"id": item.business_address, "type": "businessAddress"},
+        "destination": {"id": address, "type": "businessAddress"},
         "channelType": "workItem",
-        "channel": item.channel,
+        "channel": channel,
         "flowSettings": {**dict(item.variables), ROUTING_KEY: item.routing_value},
         "channelParams": {
             "type": "work-item-form",
@@ -123,10 +188,10 @@ class WxccTasks:
         self._base = base_url.rstrip("/")
         self._clock = clock
 
-    async def create_task(self, item: WorkItem) -> str:
+    async def create_task(self, task: ContactCenterTask) -> str:
         """Create the work item and return its task id."""
         timestamp = int(self._clock.now().timestamp() * 1000)
-        body = task_body(item, str(uuid.uuid4()), timestamp)
+        body = task_body(task, str(uuid.uuid4()), timestamp)
         response = await self._client.request(
             "POST", f"{self._base}/v2/tasks", json=body, ok=(200, 201, 202)
         )

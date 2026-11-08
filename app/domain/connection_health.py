@@ -35,6 +35,7 @@ from enum import StrEnum
 
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.calls import EventKind, TaskState
+from app.domain.contact_center import ContactCenterTaskRef
 
 HEALTH_EVENT = "integration.health"
 """System event of a health transition: a failure for degraded or down, a success for ok."""
@@ -294,10 +295,13 @@ def health_event(before: HealthEntry | None, after: HealthEntry, now: datetime) 
 
 @dataclass(frozen=True)
 class StaleTask:
-    """A booking whose task a webhook should have moved by now (no personal data)."""
+    """A booking whose task a webhook should have moved by now (no personal data).
+
+    ``task`` names the platform that holds it (ADR 0032); that platform's dispatcher reads it.
+    """
 
     booking_id: int
-    task_id: str
+    task: ContactCenterTaskRef
     state: TaskState
     organisation: str | None
     group: str | None = None

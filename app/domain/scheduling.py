@@ -1,11 +1,12 @@
 """Group configuration and opening hours.
 
-A ``Group`` is a team (a WxCC queue) participants book with. Its staffing comes from weekly
-``ScheduleRule``s; a ``ScheduleOverride`` replaces all rules on one date (holiday, illness,
-extra session). Every window (a staffing block, ADR 0027) carries a capacity: the number of
-agents, and so how many appointments may start at the same time. That is a single number
-because the WxCC queue assigns the actual agent (HANDOVER B5). A window with 0 agents (lunch,
-outside office hours) offers nothing, exactly like a gap, but says that it is deliberate.
+A ``Group`` is a team (a contact-center queue) participants book with. Its staffing comes from
+weekly ``ScheduleRule``s; a ``ScheduleOverride`` replaces all rules on one date (holiday,
+illness, extra session). Every window (a staffing block, ADR 0027) carries a capacity: the
+number of agents, and so how many appointments may start at the same time. That is a single
+number because the contact-center queue assigns the actual agent (HANDOVER B5). A window with 0
+agents (lunch, outside office hours) offers nothing, exactly like a gap, but says that it is
+deliberate.
 
     rules (weekly)      overrides (per date)
           │                     │
@@ -24,6 +25,7 @@ from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.domain.branding import Branding
+from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.routing import SUBJECT_CODE, GroupRouting, offers
 
@@ -42,13 +44,6 @@ MAX_LABEL_LENGTH = 50
 
 MAX_EMAIL_LENGTH = 254
 _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,189}\.[^@\s]{2,63}$")
-
-INTEGRATION_TEXT_LIMITS = {
-    "wxcc_business_address": 255,
-    "wxcc_channel": 255,
-    "wxcc_routing_value": 512,
-}
-"""Maximum lengths (WxCC limits: flowSettings values up to 512 bytes)."""
 
 DEFAULT_NOT_PICKED_UP_MINUTES = 10
 MAX_NOT_PICKED_UP_MINUTES = 120
@@ -128,7 +123,7 @@ class DispatchKind(StrEnum):
     """How a group's bookings reach its staff (ADR 0043)."""
 
     CONTACT_CENTER = "contact_center"
-    """A task in the contact-center queue at the dispatch lead (WxCC today, ADR 0007)."""
+    """A task in the contact-center queue at the dispatch lead (ADR 0007, 0032)."""
     OPENPLANNER_QUEUE = "openplanner_queue"
     """OpenPlanner's own queue: agents sign in and pick up a booking."""
 
@@ -212,7 +207,7 @@ class Organisation:
 
 @dataclass(frozen=True)
 class Group:
-    """A bookable team, mapped to one WxCC queue.
+    """A bookable team, mapped to one contact-center queue.
 
     Attributes:
         slug: URL identifier of the standalone page ``/g/{slug}``.
@@ -223,15 +218,15 @@ class Group:
         phone_mode: Whether the form hides, offers or requires a phone number.
         video_host_email: Licensed Webex host on whose behalf meetings are scheduled
             (ADR 0017); without it the group has no video meetings.
-        wxcc_business_address: Business address of the WxCC work item asset (ADR 0018).
-        wxcc_channel: Name of the WxCC work item channel.
-        wxcc_routing_value: Passed to the WxCC flow to choose the queue; the slug when empty.
+        contact_center: The group's routing at its contact-center platform (ADR 0032): the
+            platform, the routing value (the slug when empty) and the platform's attributes,
+            validated against its descriptor; ``None`` when nothing is configured.
         not_picked_up_minutes: After this long without an agent a call counts as not
             picked up (signal for O2).
         direct_call_max_concurrent: How many direct calls may be open (waiting or with an
             agent) at once, typically the number of agents for direct calls; ``None`` leaves
-            it to WxCC (ADR 0026).
-        dispatch_lead_minutes: How long before the start the WxCC task is created
+            it to the contact center (ADR 0026).
+        dispatch_lead_minutes: How long before the start the contact-center task is created
             (``job_plan.dispatch_moment``). At most ``min_notice_minutes``, so a booking is
             never dispatched the moment it is made. Used only with
             ``DispatchKind.CONTACT_CENTER``.
@@ -290,9 +285,7 @@ class Group:
     horizon_days: int = 60
     phone_mode: PhoneMode = PhoneMode.OPTIONAL
     video_host_email: str | None = None
-    wxcc_business_address: str | None = None
-    wxcc_channel: str | None = None
-    wxcc_routing_value: str | None = None
+    contact_center: ContactCenterRouting | None = None
     not_picked_up_minutes: int = DEFAULT_NOT_PICKED_UP_MINUTES
     direct_call_max_concurrent: int | None = None
     dispatch_lead_minutes: int = DEFAULT_DISPATCH_LEAD_MINUTES
@@ -361,12 +354,6 @@ class Group:
         invite = self.calendar_invite_address
         if invite is not None and (len(invite) > MAX_EMAIL_LENGTH or not _EMAIL.fullmatch(invite)):
             raise _invalid("calendar_invite_address")
-        for name, limit in INTEGRATION_TEXT_LIMITS.items():
-            value = getattr(self, name)
-            if value is not None and (
-                not value.strip() or len(value) > limit or _CONTROL_CHARS.search(value)
-            ):
-                raise _invalid(name)
         if not 1 <= self.not_picked_up_minutes <= MAX_NOT_PICKED_UP_MINUTES:
             raise _invalid("not_picked_up_minutes")
         cap = self.direct_call_max_concurrent
@@ -380,17 +367,17 @@ class Group:
 
     @property
     def dispatch_enabled(self) -> bool:
-        """Whether this group's bookings are sent to WxCC as work items."""
+        """Whether this group's bookings are sent to the contact center as tasks."""
         return (
             self.dispatch_kind is DispatchKind.CONTACT_CENTER
-            and self.wxcc_business_address is not None
-            and self.wxcc_channel is not None
+            and self.contact_center is not None
+            and self.contact_center.complete
         )
 
     @property
     def routing_value(self) -> str:
-        """The value the WxCC flow routes on: the configured one, or the slug."""
-        return self.wxcc_routing_value or self.slug
+        """The value the contact center's flow routes on: the configured one, or the slug."""
+        return self.contact_center.value_for(self.slug) if self.contact_center else self.slug
 
     @property
     def tz(self) -> ZoneInfo:
@@ -403,7 +390,7 @@ class Group:
 
     @property
     def dispatch_lead(self) -> timedelta:
-        """How long before the start the WxCC task is created."""
+        """How long before the start the contact-center task is created."""
         return timedelta(minutes=self.dispatch_lead_minutes)
 
     @property

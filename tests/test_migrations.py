@@ -563,3 +563,76 @@ def test_existing_destinations_keep_the_decisions_and_events_get_an_empty_role(
         assert [r[0] for r in downgraded] == ["audit,system", ""]
         columns = {r[1] for r in database.execute("PRAGMA table_info(audit_events)")}
     assert "actor_role" not in columns
+
+
+def test_the_wxcc_routing_task_and_job_get_neutral_places_and_survive_a_downgrade(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    """ADR 0032 CC-1 as an ADR 0116 expand step: copied forward, old values untouched."""
+    import json
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0096")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO organisations (id, name, slug) VALUES (1, 'Acme', 'acme');
+            INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+                min_notice_minutes, horizon_days, phone_mode, wxcc_business_address,
+                wxcc_channel, wxcc_routing_value, idp_key)
+                VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional',
+                        'team@example.biz', 'video', 'team-1', 'team'),
+                       (2, 1, 'Half', 'half', 'Europe/Amsterdam', 30, 60, 60, 'optional',
+                        'half@example.biz', NULL, NULL, 'half'),
+                       (3, 1, 'None', 'none', 'Europe/Amsterdam', 30, 60, 60, 'optional',
+                        NULL, NULL, NULL, 'none');
+            INSERT INTO slots (id, group_id, start, "end", capacity_snapshot)
+                VALUES (1, 1, '2026-01-05 08:00:00', '2026-01-05 08:30:00', 2);
+            INSERT INTO bookings (id, slot_id, group_id, status, locale, management_token_hash,
+                management_token_salt, created_at, consents, public_ref, wxcc_task_id)
+                VALUES (1, 1, 1, 'confirmed', 'nl', 'h1', 's', '2026-01-01 08:00:00', '',
+                        'ref-1', 'task-1'),
+                       (2, 1, 1, 'confirmed', 'nl', 'h2', 's', '2026-01-01 08:00:00', '',
+                        'ref-2', NULL);
+            INSERT INTO jobs (booking_id, type, run_at, status)
+                VALUES (1, 'dispatch_wxcc_task', '2026-01-05 07:55:00', 'pending'),
+                       (2, 'purge_pii', '2026-01-06 08:30:00', 'pending');
+            """
+        )
+        database.commit()
+
+    command.upgrade(alembic_config, "head")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        routings = database.execute(
+            "SELECT group_id, kind, routing_value, attributes FROM group_contact_center "
+            "ORDER BY group_id"
+        ).fetchall()
+        tasks = database.execute(
+            "SELECT contact_center_task_id, contact_center_kind, wxcc_task_id FROM bookings "
+            "ORDER BY id"
+        ).fetchall()
+        jobs = database.execute("SELECT type FROM jobs ORDER BY booking_id").fetchall()
+    assert [(g, k, r, json.loads(a)) for g, k, r, a in routings] == [
+        (1, "webex_cc", "team-1", {"business_address": "team@example.biz", "channel": "video"}),
+        (2, "webex_cc", None, {"business_address": "half@example.biz"}),
+    ]
+    assert tasks == [("task-1", "webex_cc", "task-1"), (None, None, None)]
+    assert jobs == [("dispatch_wxcc_task",), ("purge_pii",)]  # the previous image reads it
+
+    command.downgrade(alembic_config, "0096")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        groups = database.execute(
+            "SELECT wxcc_business_address, wxcc_channel, wxcc_routing_value FROM groups ORDER BY id"
+        ).fetchall()
+        task = database.execute("SELECT wxcc_task_id FROM bookings WHERE id = 1").fetchone()
+        jobs = database.execute("SELECT type FROM jobs ORDER BY booking_id").fetchall()
+        tables = {r[0] for r in database.execute("SELECT name FROM sqlite_master")}
+    assert groups == [
+        ("team@example.biz", "video", "team-1"),
+        ("half@example.biz", None, None),
+        (None, None, None),
+    ]
+    assert task == ("task-1",)
+    assert jobs == [("dispatch_wxcc_task",), ("purge_pii",)]
+    assert "group_contact_center" not in tables

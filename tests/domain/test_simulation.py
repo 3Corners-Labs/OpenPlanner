@@ -8,23 +8,39 @@ import pytest
 from app.domain.admin import AdminService
 from app.domain.booking import MeetingRef, TrialCall
 from app.domain.calls import EventKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
 from app.domain.scheduling import Group
-from app.domain.simulation import SIMULATED_LINK, SimulationService
+from app.domain.simulation import SIMULATED_LINK, SIMULATED_PLATFORM, SimulationService
 from app.domain.trial_call import TrialState, trial_state
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, two_organisations
-from tests.support.domain import NOW
+from tests.support.domain import NOW, webex_routing
 from tests.support.integration import make_booking
 
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = two_organisations()
-    state.bookings[123] = make_booking()  # group 1 = demo
+    # Group 1 (demo) dispatches to Webex Contact Center: the stand-in task is that platform's.
+    state.groups[1] = replace(state.groups[1], contact_center=webex_routing())
+    state.bookings[123] = make_booking()
     return InMemoryUnitOfWork(state)
+
+
+async def test_a_group_without_a_contact_center_gets_a_task_of_the_simulated_platform(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    # The simulator plays WxCC's events, so its stand-in task is a WxCC task.
+    uow.state.groups[1] = replace(uow.state.groups[1], contact_center=None)
+
+    ids = await _service(uow).prepare(ORG_ADMIN, "demo", 123)
+
+    assert uow.state.bookings[123].contact_center_task == ContactCenterTaskRef(
+        str(ids.task_id), SIMULATED_PLATFORM
+    )
 
 
 def _service(uow: InMemoryUnitOfWork, *, enabled: bool = True) -> SimulationService:
@@ -41,7 +57,9 @@ async def test_prepare_gives_a_booking_stand_in_ids_and_audits_it(uow: InMemoryU
     assert ids.meeting_id == "simulated-meeting-123"
     assert ids.task_id == "simulated-task-123"
     assert booking.meeting == MeetingRef("simulated-meeting-123", SIMULATED_LINK)
-    assert booking.wxcc_task_id == "simulated-task-123"
+    assert booking.contact_center_task == ContactCenterTaskRef(
+        "simulated-task-123", ContactCenterKind.WEBEX_CC
+    )
     timeline = [(e.kind, e.detail) for e in uow.state.booking_events[123]]
     assert timeline == [
         (EventKind.MEETING_CREATED, "simulated"),
@@ -55,7 +73,11 @@ async def test_prepare_gives_a_booking_stand_in_ids_and_audits_it(uow: InMemoryU
 
 async def test_real_platform_ids_are_never_overwritten(uow: InMemoryUnitOfWork) -> None:
     real = MeetingRef("real-meeting", "https://site.webex.com/j.php?MTID=m1")
-    uow.state.bookings[123] = replace(make_booking(), meeting=real, wxcc_task_id="real-task")
+    uow.state.bookings[123] = replace(
+        make_booking(),
+        meeting=real,
+        contact_center_task=ContactCenterTaskRef("real-task", ContactCenterKind.WEBEX_CC),
+    )
 
     ids = await _service(uow).prepare(ORG_ADMIN, "demo", 123)
 

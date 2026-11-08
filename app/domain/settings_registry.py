@@ -1072,6 +1072,61 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "and hides the report screens (ADR 0117). A feature switch, not a protection.",
     ),
     S(
+        "reporting_event_retention_days",
+        K.INT,
+        35,
+        _C,
+        T.RETENTION,
+        "Days a usage fact stays as the outbox of the rollup and the source for a rebuild "
+        "(ADR 0117).",
+        minimum=7,
+        maximum=90,
+    ),
+    S(
+        "reporting_retention_months",
+        K.INT,
+        25,
+        _C,
+        T.RETENTION,
+        "Months the hourly usage rollup is kept; 25 gives two full years and the running one "
+        "(ADR 0117).",
+        minimum=13,
+        maximum=60,
+    ),
+    S(
+        "reporting_rollup_interval_minutes",
+        K.INT,
+        15,
+        _C,
+        T.RETENTION,
+        "Minutes between two rollups of usage facts into the hourly table; System status warns "
+        "when the rollup is four times this behind (ADR 0117).",
+        minimum=5,
+        maximum=240,
+    ),
+    S(
+        "reporting_min_cell_size",
+        K.INT,
+        5,
+        _C,
+        T.RETENTION,
+        "The smallest count a usage report shows; a smaller cell reads < n and its sum and "
+        "mean are hidden. Never below 3 (ADR 0117 point 8).",
+        minimum=3,
+        maximum=20,
+    ),
+    S(
+        "reporting_org_min_cell_size",
+        K.INT,
+        3,
+        _D,
+        T.RETENTION,
+        "The smallest count the organisation's own usage reports show. It can only raise the "
+        "platform value; the larger of the two applies (ADR 0117 point 8).",
+        minimum=3,
+        maximum=50,
+    ),
+    S(
         "security_event_retention_days",
         K.INT,
         365,

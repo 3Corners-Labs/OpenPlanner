@@ -19,6 +19,7 @@ from fastapi import Request
 from starlette.responses import RedirectResponse
 
 from app.admin.authz import AccessDenied
+from app.admin.routing_inputs import ROUTING_MESSAGE, ROUTING_TARGETS
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.theme import TOKENS, TokenKind
 from app.i18n import BoundGettext
@@ -169,6 +170,8 @@ FIELD_MESSAGES: dict[str, str] = {
     "wxcc_business_address": "admin.form.error.integration_text",
     "wxcc_channel": "admin.form.error.integration_text",
     "wxcc_routing_value": "admin.form.error.integration_text",
+    # ADR 0032: the routing's own refusals, linked to the settings form's inputs (FIELD_TARGET).
+    **dict.fromkeys(ROUTING_TARGETS, ROUTING_MESSAGE),
     "offer": "admin.form.error.choice",
     "embedding_enabled": "admin.form.error.choice",
     "trial_call_enabled": "admin.form.error.choice",
@@ -258,6 +261,7 @@ FIELD_TARGET: dict[str, str] = {
     "window": "closes",
     "schedule_rules": "opens",
     "schedule_overrides": "day",
+    **ROUTING_TARGETS,
 }
 """Schedule-level refusals are linked to the input the admin most likely needs to change."""
 

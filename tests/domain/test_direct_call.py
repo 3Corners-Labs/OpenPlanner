@@ -80,7 +80,7 @@ async def test_direct_call_starts_now_in_its_own_slot() -> None:
     assert [j.type for j in jobs] == [
         JobType.CREATE_VIDEO_ROOM,
         JobType.SEND_CONFIRMATION,
-        JobType.DISPATCH_WXCC_TASK,
+        JobType.DISPATCH_CONTACT_CENTER_TASK,
         JobType.PURGE_PII,
     ]
     assert all(j.run_at == MONDAY_0915 for j in jobs[:3])

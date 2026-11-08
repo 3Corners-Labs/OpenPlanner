@@ -37,6 +37,10 @@ env:
   REUSE_VERSION: "6.3.0"
   # renovate: datasource=docker depName=publiccodeyml/libpubliccode
   PUBLICCODE_PARSER_VERSION: "v5.5.1"
+  # renovate: datasource=docker depName=anchore/syft
+  SYFT_VERSION: "v1.54.0"
+  # renovate: datasource=docker depName=anchore/grype
+  GRYPE_VERSION: "v0.121.2"
 
 jobs:
   python:
@@ -267,19 +271,20 @@ jobs:
       - name: container logs
         if: always()
         run: docker logs app
+      # syft and grype run from their published images. The anchore actions download the
+      # binaries from github.com release assets on every run, and those downloads timed out
+      # (504) on every merge-queue run on 2026-11-08, which kept every PR out of main. The
+      # SBOM and the scan are unchanged: CycloneDX JSON, fail on high, fixed findings only.
       - name: SBOM (CycloneDX)
-        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
-        with:
-          image: openplanner:ci
-          format: cyclonedx-json
-          output-file: sbom.cdx.json
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          "anchore/syft:${SYFT_VERSION}" docker:openplanner:ci -o cyclonedx-json
+          > sbom.cdx.json
       - name: grype
-        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
-        with:
-          sbom: sbom.cdx.json
-          fail-build: true
-          severity-cutoff: high
-          only-fixed: true
+        run: >-
+          docker run --rm -v "$PWD:/work:ro"
+          "anchore/grype:${GRYPE_VERSION}" sbom:/work/sbom.cdx.json
+          --fail-on high --only-fixed
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom

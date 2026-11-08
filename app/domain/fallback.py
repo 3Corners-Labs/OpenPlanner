@@ -102,7 +102,7 @@ class FallbackService:
         Returns:
             Whether the booking went to the queue instead of the contact center.
         """
-        if not group.fallback_active or booking.wxcc_task_id:
+        if not group.fallback_active or booking.contact_center_task:
             return False
         await self._queue(booking, group, CONTACT_CENTER_DOWN)
         return True
@@ -207,7 +207,7 @@ class FallbackService:
             for booking in waiting:
                 await tx.add_jobs(
                     _stored(booking),
-                    [PlannedJob(JobType.DISPATCH_WXCC_TASK, now, booking.start)],
+                    [PlannedJob(JobType.DISPATCH_CONTACT_CENTER_TASK, now, booking.start)],
                 )
         for booking in waiting:
             await self._integration.record(_stored(booking), EventKind.FALLBACK_ENDED)
