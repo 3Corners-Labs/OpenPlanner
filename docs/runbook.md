@@ -2220,12 +2220,20 @@ together they are every secret of the platform. Both commands are audited as `sy
 
 A new host does all of this in one go: `./scripts/install.sh --mode production
 --configuration PACKAGE --passphrase-file PATH` (ADR 0089 point 8; `docs/install.md`,
-*Installing from a configuration package*). It writes the login to `secrets/config.env`, which
-Compose reads before `.env` (a value in `.env` wins), leaves the identity provider's questions
-out, and imports the package once web is healthy. Running it again with the two options writes
-`config.env` again and imports again, which is refused once the installation is in use; a run
-without them leaves `config.env` as it is. Removing `config.env` and running the installer
-again asks the login questions as before.
+*Installing from a SQLite configuration package*). It writes the login to `secrets/config.env`,
+which Compose reads before `.env` (a value in `.env` wins), leaves the identity provider's
+questions out, and imports the package once web is healthy (converted to a replacing document
+and applied by the rules of the portal, ADR 0099 point 14). Running it again with the two
+options writes `config.env` again and imports again; a run without them leaves `config.env`
+as it is. Removing `config.env` and running the installer again asks the login questions as
+before.
+
+The same command installs from a JSON document: `./scripts/install.sh --mode production
+--configuration DOCUMENT.json` (add `--passphrase-file PATH` when it holds sealed secrets;
+`docs/install.md`, *Installing from a configuration document*). The installer plans it in the
+web container, prints the plan and its hash, and applies it with `--plan-hash` once web is
+healthy; a plan with a refusal stops it with nothing applied. A document carries no login, so
+the identity provider is asked for as usual.
 
 ## Guardrail drift (ADR 0109)
 

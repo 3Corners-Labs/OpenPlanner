@@ -6,7 +6,7 @@
 #   ./scripts/install.sh --mode production|test|lab [--version X.Y.Z] [--repository owner/name]
 #                        [--non-interactive] [--no-tls | --tls-domain HOST] [--own-certificate | --internal-ca]
 #                        [--idp bundled|own] [--acme-staging] [--no-updater] [--upgrade-docker] [--no-packages]
-#                        [--configuration FILE --passphrase-file PATH]
+#                        [--configuration FILE [--passphrase-file PATH]]
 #
 #   0. host packages   Ubuntu/Debian: curl, flock, Compose plugin and cosign at their newest
 #                      version on every run; Docker Engine from Docker's own repository when
@@ -40,16 +40,20 @@
 #                      (ADR 0064 step 2: no host builds Caddy); without --version existing
 #                      pins stay
 #   5. start           docker compose --env-file .env.update up -d, wait for health
-#                      with --configuration: then the package is copied into web and imported
-#                      (every organisation, group, channel, provider and integration); a refusal
-#                      (installation in use, another revision) stops the script
+#                      with --configuration: then the file is copied into web and applied
+#                      (every organisation, group, channel, provider and integration). A JSON
+#                      document (ADR 0099) is planned first and applied with the hash of that
+#                      plan; an old SQLite package (ADR 0089) is converted to a replacing
+#                      document and applied. A refusal (a rule, a right, another revision, a
+#                      wrong passphrase) stops the script
 #   6. host updater    /usr/local/sbin, systemd units, /etc/openplanner/updater.env pointing at
 #                      this directory, a drop-in that opens only this directory under /home
 #
 # Running it again is safe: it repairs what is missing and changes nothing that is in order.
 # Non-interactive runs take every answer from environment variables of the same name as the
-# setting (PUBLIC_BASE_URL, TLS_DOMAIN, OIDC_CLIENT_SECRET, ...), and the package's two paths
-# from OPENPLANNER_CONFIGURATION and OPENPLANNER_PASSPHRASE_FILE.
+# setting (PUBLIC_BASE_URL, TLS_DOMAIN, OIDC_CLIENT_SECRET, ...), and the configuration file's two
+# paths from OPENPLANNER_CONFIGURATION and OPENPLANNER_PASSPHRASE_FILE. A document needs the
+# passphrase only when it holds sealed secrets, a SQLite package always.
 set -Eeuo pipefail
 
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -61,8 +65,9 @@ PIN_FILE=$DIR/.env.update
 SECRETS_FILE=$DIR/secrets/secrets.env
 # The login from a configuration package (ADR 0089 point 8); Compose reads it before .env.
 CONFIG_ENV=$DIR/secrets/config.env
-# Where the package is copied for the web container, and its name inside the container.
+# Where the package or document is copied for the web container, and its name inside the container.
 PACKAGE_IN_WEB=/srv/data/configuration-package.sqlite
+DOCUMENT_IN_WEB=/srv/data/configuration-document.json
 # The keys `python -m app.cli init` generates (app/adapters/bootstrap.py); a test keeps them equal.
 BOOTSTRAP_KEYS=(SETTINGS_ENCRYPTION_KEY MANAGEMENT_TOKEN_KEY SESSION_SECRET)
 UPDATER_STATE=/var/lib/openplanner-updater
@@ -90,9 +95,11 @@ TLS='' OWN_CERT=0 INTERNAL_CA=0
 # ADR 0106 step 5: bundled | own; empty decides by the pin file, then the mode.
 IDP=''
 CERTS_DIR=$DIR/certs
-# --configuration FILE --passphrase-file PATH (ADR 0089 point 8); PACKAGE_DIR is the readable
-# copy made for the containers, removed on exit.
+# --configuration FILE --passphrase-file PATH (ADR 0089 point 8, ADR 0099); PACKAGE_DIR is the
+# readable copy made for the containers, removed on exit. CONFIG_KIND is what FILE is, found by
+# its content: sqlite (an ADR 0089 package) or document (JSON, ADR 0099).
 CONFIGURATION=${OPENPLANNER_CONFIGURATION:-} PASSPHRASE_FILE=${OPENPLANNER_PASSPHRASE_FILE:-} PACKAGE_DIR=''
+CONFIG_KIND=''
 OWN_CERT_FILE=/certs/fullchain.pem OWN_KEY_FILE=/certs/privkey.pem
 
 log() { printf '==> %s\n' "$*"; }
@@ -170,12 +177,34 @@ parse_args() {
   [[ $REPOSITORY =~ $REPOSITORY_RE ]] || die "--repository must be owner/name"
   # ADR 0089 point 8: a package is read with its passphrase, which never travels on a command
   # line (ps, shell history) or in this script's output; it comes from a file, like the CLI's.
-  [[ -z $CONFIGURATION && -z $PASSPHRASE_FILE || -n $CONFIGURATION && -n $PASSPHRASE_FILE ]] \
-    || die "--configuration and --passphrase-file go together (or OPENPLANNER_CONFIGURATION and OPENPLANNER_PASSPHRASE_FILE)"
+  # A JSON document (ADR 0099) needs one only when it holds sealed secrets.
+  [[ -z $CONFIGURATION && -n $PASSPHRASE_FILE ]] \
+    && die "--configuration and --passphrase-file go together (or OPENPLANNER_CONFIGURATION and OPENPLANNER_PASSPHRASE_FILE)"
   [[ -z $CONFIGURATION ]] || [[ -f $CONFIGURATION && -r $CONFIGURATION ]] \
-    || die "cannot read the configuration package $CONFIGURATION"
+    || die "cannot read the configuration file $CONFIGURATION"
   [[ -z $PASSPHRASE_FILE ]] || [[ -f $PASSPHRASE_FILE && -r $PASSPHRASE_FILE ]] \
     || die "cannot read the passphrase file $PASSPHRASE_FILE (its first line is the passphrase)"
+  [[ -z $CONFIGURATION ]] || config_kind
+  if [[ $CONFIG_KIND == sqlite && -z $PASSPHRASE_FILE ]]; then
+    die "--configuration and --passphrase-file go together (a SQLite package is opened with its passphrase)"
+  fi
+  if [[ $CONFIG_KIND == document && -z $PASSPHRASE_FILE ]] && grep -q '"sealed"' "$CONFIGURATION"; then
+    die "the configuration document holds sealed secrets: give --passphrase-file (its first line is the passphrase)"
+  fi
+}
+
+# What --configuration names, by its content: a SQLite package starts with the SQLite header
+# (ADR 0089), a document is JSON, so its first character that is not white space is a brace.
+config_kind() {
+  local start
+  if [[ $(head -c 15 "$CONFIGURATION") == 'SQLite format 3' ]]; then
+    CONFIG_KIND=sqlite
+    return 0
+  fi
+  start=$(head -c 4096 "$CONFIGURATION")
+  [[ $start =~ ^[[:space:]]*\{ ]] \
+    || die "$CONFIGURATION is neither a configuration document (JSON) nor a SQLite configuration package"
+  CONFIG_KIND=document
 }
 
 # 0. Host packages ------------------------------------------------------------------------------
@@ -606,14 +635,55 @@ import_package() {
   compose exec -T web rm -f "$PACKAGE_IN_WEB" || warn "could not remove $PACKAGE_IN_WEB from the web container"
   if ((code)); then
     case $report in
-      *configuration_installation_in_use*) die "the configuration package was refused: this installation is in use (bookings, slots or an active closure); a package goes into a new installation only" "  $report" ;;
       *configuration_package_version*) die "the configuration package was refused: it was exported from another version of OpenPlanner; export it again from an installation on this version" "  $report" ;;
       *configuration_passphrase_wrong*) die "the configuration package was refused: wrong passphrase" ;;
+      *not_permitted* | *configuration_object_in_use* | *discovery_refused* | *integration_not_ready*)
+        die "the configuration package was refused by the rules of the configuration document it converts to (ADR 0099 point 14)" "  $report" ;;
       *) die "the configuration package was refused (exit $code)" "${report:+  $report}" ;;
     esac
   fi
   printf '%s\n' "$report" | sed 's/^/    /'
   log "configuration imported; web and worker reload the settings within ten seconds"
+}
+
+# 5b. After health: a configuration document (ADR 0099) into web, planned, then applied with the
+# hash of that plan, the copy removed whatever the outcome. The passphrase, when the document
+# holds sealed secrets, goes in on standard input, never on the command line.
+document_cli() {
+  if [[ -n $PASSPHRASE_FILE ]]; then
+    compose exec -T web python -m app.cli config "$@" --passphrase-file /dev/stdin <"$PASSPHRASE_FILE"
+  else
+    compose exec -T web python -m app.cli config "$@" </dev/null
+  fi
+}
+
+apply_document() {
+  local plan report hash code=0
+  log "planning the configuration document"
+  compose cp "$CONFIGURATION" "web:$DOCUMENT_IN_WEB"
+  plan=$(document_cli plan "$DOCUMENT_IN_WEB") || code=$?
+  if ((code)); then
+    compose exec -T web rm -f "$DOCUMENT_IN_WEB" || warn "could not remove $DOCUMENT_IN_WEB from the web container"
+    case $plan in
+      *configuration_passphrase_wrong*) die "the configuration document was refused: wrong passphrase" ;;
+      *configuration_passphrase_short*) die "the configuration document holds sealed secrets: give --passphrase-file" ;;
+      *) die "the configuration document was refused; nothing was applied (exit $code)" "${plan:+$(printf '%s\n' "$plan" | sed 's/^/    /')}" ;;
+    esac
+  fi
+  printf '%s\n' "$plan" | sed 's/^/    /'
+  hash=$(sed -n 's/^plan hash //p' <<<"$plan")
+  if [[ ! $hash =~ ^[0-9a-f]{64}$ ]]; then
+    compose exec -T web rm -f "$DOCUMENT_IN_WEB" || warn "could not remove $DOCUMENT_IN_WEB from the web container"
+    die "the plan of the configuration document has no hash; nothing was applied"
+  fi
+  log "applying the configuration document (plan $hash)"
+  report=$(document_cli apply "$DOCUMENT_IN_WEB" --plan-hash "$hash") || code=$?
+  compose exec -T web rm -f "$DOCUMENT_IN_WEB" || warn "could not remove $DOCUMENT_IN_WEB from the web container"
+  if ((code)); then
+    die "the configuration document was refused; nothing was applied (exit $code)" "${report:+$(printf '%s\n' "$report" | sed 's/^/    /')}"
+  fi
+  printf '%s\n' "$report" | sed 's/^/    /'
+  log "configuration applied; web and worker reload the settings within ten seconds"
 }
 
 settings() {
@@ -945,8 +1015,9 @@ main() {
   parse_args "$@"
   ensure_packages
   preflight
-  if [[ -n $CONFIGURATION ]]; then
+  if [[ $CONFIG_KIND == sqlite ]]; then
     # The package is read by the pinned image, so the release comes first (ADR 0089 point 8).
+    # A document carries no login, so it needs none of this: the login is asked for as usual.
     pin_release
     package_copy
     package_env
@@ -956,7 +1027,10 @@ main() {
     pin_release
   fi
   start
-  [[ -z $CONFIGURATION ]] || import_package
+  case $CONFIG_KIND in
+    sqlite) import_package ;;
+    document) apply_document ;;
+  esac
   if ((UPDATER)); then
     install_updater
   else
