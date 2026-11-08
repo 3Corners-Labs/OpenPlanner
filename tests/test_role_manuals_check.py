@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -75,7 +76,12 @@ def test_a_manual_maps_to_its_roles_by_a_word_of_its_role() -> None:
     assert check.manual_roles("Deelnemers", roles) is None
 
 
-def _built_workspace(root: Path, variables: dict, sources: dict[str, str] | None = None) -> Path:
+def _built_workspace(
+    root: Path,
+    variables: dict,
+    sources: dict[str, str] | None = None,
+    bold: list[dict] | None = None,
+) -> Path:
     """Write a workspace and a build/manuals.json current for it, as build.mjs writes one."""
     for folder in ("sources", "evidence", "build"):
         (root / folder).mkdir(exist_ok=True)
@@ -90,7 +96,7 @@ def _built_workspace(root: Path, variables: dict, sources: dict[str, str] | None
             "role": "",
             "tasks": [],
             "figures": [],
-            "bold": [],
+            "bold": bold or [],
         }
         for path in sorted((root / "sources").glob("*.md"))
     ]
@@ -102,7 +108,7 @@ def _built_workspace(root: Path, variables: dict, sources: dict[str, str] | None
 
 
 def test_a_current_build_is_read_with_its_inputs(tmp_path: Path) -> None:
-    """The variables, the sources and the manuals come back from one read of each."""
+    """The variables, the sources and the manuals of a current build come back."""
     root = _built_workspace(tmp_path, {"product": "de dienst"}, {"10-planner": "# Planner\n"})
     inputs = check.load_inputs(check.Workspace(root))
     assert inputs.config == {"product": "de dienst"}
@@ -110,8 +116,19 @@ def test_a_current_build_is_read_with_its_inputs(tmp_path: Path) -> None:
     assert list(inputs.sources.values()) == ["# Planner\n"]
 
 
-@pytest.mark.parametrize("change", ["added", "removed", "edited", "variables", "old format"])
-def test_a_build_of_other_inputs_is_refused(tmp_path: Path, change: str) -> None:
+@pytest.mark.parametrize(
+    ("change", "named"),
+    [
+        ("added", "20-medewerker"),
+        ("removed", "10-planner"),
+        ("edited", "10-planner"),
+        ("variables", "variables.json"),
+        ("old format", "another build.mjs"),
+    ],
+)
+def test_a_build_of_other_inputs_is_refused_naming_what_changed(
+    tmp_path: Path, change: str, named: str
+) -> None:
     """A source added, removed or edited, edited variables or an older build file is refused."""
     root = _built_workspace(tmp_path, {"product": "de dienst"}, {"10-planner": "# Planner\n"})
     sources = root / "sources"
@@ -125,8 +142,25 @@ def test_a_build_of_other_inputs_is_refused(tmp_path: Path, change: str) -> None
         (root / "variables.json").write_text(json.dumps({"product": "iets anders"}))
     else:
         (root / "build" / "manuals.json").write_text("[]")
-    with pytest.raises(SystemExit, match="build again"):
+    with pytest.raises(SystemExit, match=re.escape(named)):
         check.load_inputs(check.Workspace(root))
+
+
+def test_a_value_of_the_variables_is_a_known_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The organisation's word for the service, in bold, is no unknown screen text."""
+    root = _built_workspace(
+        tmp_path,
+        {"product": "Acme-planner"},
+        {"10-planner": "**Acme-planner** en **Bestaat-niet-knop**\n"},
+        bold=[{"text": "Acme-planner", "line": 1}, {"text": "Bestaat-niet-knop", "line": 1}],
+    )
+    monkeypatch.setattr(sys, "argv", ["check.py", str(root)])
+    assert check.main() == 0
+    report = (root / "evidence" / "check.md").read_text()
+    assert "**Bestaat-niet-knop** komt niet voor in de software" in report
+    assert "**Acme-planner**" not in report
 
 
 def test_only_a_commit_hash_is_passed_to_git(

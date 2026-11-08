@@ -133,8 +133,8 @@ The scripts are in `scripts/` and run from the root of the checkout; `<ws>` is t
    checkout and a source that breaks a rule in seconds, before any stack runs. It starts a fresh
    stack under a compose project of its own (`openplanner-manuals-<checksum of the checkout>`,
    ports 8020, 8100 and 8045; `VERIFY_PROJECT` and `VERIFY_*_PORT` override them), so it never
-   meets or removes the stack of another session, and refuses while a stack of this checkout is
-   up. It keeps the previous screenshots in `img/previous/`, loads the sample data, captures
+   meets or removes a stack of another compose project, and refuses while a stack of this
+   checkout is up (one run per checkout at a time). It keeps the previous screenshots in `img/previous/`, loads the sample data, captures
    every id again and runs `check.py --since <commit of the last passing run> --fix`: a label the
    catalogue only renamed is written into the sources, inside bold
    labels only; a removed label, a changed help topic or a changed template is reported with the

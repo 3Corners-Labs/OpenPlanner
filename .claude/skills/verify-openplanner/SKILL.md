@@ -96,7 +96,9 @@ That is the machine, not the change: run `down`, wait until `uptime` shows a nor
 Isolation: its own project name, volumes, image tag and ports, and no `edge` network (another
 stack of this repository holds that fixed subnet), so a developer's stack on 8000, 8080 and
 8025 keeps running untouched. One run per checkout at a time; a second worktree that runs one at
-the same time sets `VERIFY_PROJECT` and the three ports to other values.
+the same time sets `VERIFY_PROJECT` and the three ports to other values. With `VERIFY_PROJECT`
+set, `down` refuses a recorded run of another project, so a script that names its project never
+removes the stack of another session.
 
 ## Doctor
 

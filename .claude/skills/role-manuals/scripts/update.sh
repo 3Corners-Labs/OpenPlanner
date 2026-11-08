@@ -33,12 +33,11 @@ VERIFY_KC_PORT="${VERIFY_KC_PORT:-8100}"
 VERIFY_MAIL_PORT="${VERIFY_MAIL_PORT:-8045}"
 export VERIFY_PROJECT VERIFY_WEB_PORT VERIFY_KC_PORT VERIFY_MAIL_PORT
 
-# A stack this script did not start is never stopped by it: it refuses while this checkout has a
-# run, and the trap stops a stack only when the recorded run is one of this script's compose
-# project. So an up that refuses (another session's stack under an inherited VERIFY_PROJECT, or
-# a run another session recorded in the meantime) is never followed by a down that removes it.
-evidence_root="${VERIFY_EVIDENCE_ROOT:-$repo/.verify-openplanner}"
-current="$evidence_root/current"
+# The stack of another compose project is never stopped by it: it refuses while this checkout has
+# a run, the trap stops nothing until a run is recorded, and stack.sh down, given this script's
+# VERIFY_PROJECT, refuses a recorded run of any other project. One run per checkout at a time:
+# two runs of this script in one checkout share a project and are not supported.
+current="${VERIFY_EVIDENCE_ROOT:-$repo/.verify-openplanner}/current"
 if [ -e "$current" ]; then
   echo "update.sh: a verification stack is already up; stop it first ($stack down)" >&2
   exit 2
@@ -48,7 +47,6 @@ fi
 # shellcheck disable=SC2329
 stop_stack() {
   [ -e "$current" ] || return 0
-  grep -qx "VERIFY_PROJECT=$VERIFY_PROJECT" "$evidence_root/$(cat "$current")/stack.env" 2>/dev/null || return 0
   (cd "$repo" && "$stack" down) >/dev/null 2>&1 || true
 }
 trap stop_stack EXIT
