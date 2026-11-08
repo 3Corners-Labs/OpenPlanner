@@ -603,6 +603,25 @@ _OPERATIONS = (
         "destination.",
     ),
     _e(
+        "queue.unpicked_found",
+        _OPS,
+        "info",
+        "bookings",
+        "{bookings} own-queue bookings were not picked up in time.",
+        "Nobody claimed these bookings `not_picked_up_minutes` after their start; each is a "
+        "`queue.not_picked_up` system event (ADR 0043 point 8).",
+        "None; the bookings show as not picked up in the queue, the agenda and the overview.",
+    ),
+    _e(
+        "queue.unpicked_watch_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The not-picked-up check did not run: {error}.",
+        "The worker could not look for own-queue bookings nobody claimed in time (ADR 0043).",
+        _CHECK_HOST,
+    ),
+    _e(
         "queue.wait_watch_failed",
         _OPS,
         "warning",
@@ -1829,6 +1848,17 @@ _AUDIT = (
         "Storage check: {outcome} ({reason}); {free_percent}% free, database {database_mb} MB.",
         "The worker's disk check changed grade (ADR 0040 point 3).",
         "On failure: free disk space on the host.",
+    ),
+    _e(
+        "queue.not_picked_up",
+        _SYS,
+        "outcome",
+        "minutes",
+        "Not picked up: {outcome} ({reason}); nobody claimed the booking {minutes} minutes after "
+        "its start.",
+        "A booking in an own queue was still unclaimed `not_picked_up_minutes` after its start "
+        "(ADR 0043 point 8); recorded once per booking.",
+        "Look at the group's queue and staffing; the participant may still be waiting.",
     ),
     _e(
         "queue.wait",

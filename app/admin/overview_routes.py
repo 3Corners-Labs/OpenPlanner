@@ -204,6 +204,8 @@ class QueueRow:
     staff_available: int
     wait_state: str = ""
     wait_tone: str = ""
+    not_picked_up: int = 0
+    """Bookings nobody claimed in time (ADR 0043 point 8)."""
 
 
 @dataclass(frozen=True)
@@ -372,6 +374,7 @@ async def _queue(request: Request, locale: RequestLocale, principal: Principal) 
                 s.staff_available,
                 state,
                 tone,
+                not_picked_up=s.not_picked_up,
             )
         )
     return WidgetView(item, list(rows[: item.default_rows]), len(rows))

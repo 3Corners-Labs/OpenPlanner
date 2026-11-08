@@ -1535,6 +1535,8 @@ class SqlTransaction(
                 connected_at=status.connected_at,
                 updated_at=status.updated_at,
                 fallback=status.fallback,
+                lobby_since=status.lobby_since,
+                not_picked_up_at=status.not_picked_up_at,
                 peak_participants=status.peak_participants,
                 guest_joined_at=status.guest_joined_at,
             )

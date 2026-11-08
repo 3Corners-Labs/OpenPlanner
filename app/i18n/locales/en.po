@@ -6743,6 +6743,9 @@ msgstr "Waiting"
 msgid "admin.overview.widget.queue.longest_wait"
 msgstr "Longest wait"
 
+msgid "admin.overview.widget.queue.not_picked_up"
+msgstr "Not picked up"
+
 msgid "admin.overview.widget.queue.staff"
 msgstr "Signed in"
 

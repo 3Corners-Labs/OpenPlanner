@@ -24,5 +24,7 @@ def call_status_of(row: CallStatusRow) -> CallStatus:
         updated_at=row.updated_at,
         fallback=row.fallback,
         peak_participants=row.peak_participants,
+        lobby_since=row.lobby_since,
+        not_picked_up_at=row.not_picked_up_at,
         guest_joined_at=row.guest_joined_at,
     )

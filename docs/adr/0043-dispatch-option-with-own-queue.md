@@ -214,6 +214,17 @@ Built in step 3 (the calendar invite, point 9) with these choices:
   answers. `SEQUENCE` is the minute of sending, so it always rises.
 - **No invite for direct calls**: they start at once.
 
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Dispatch kind per group and the change deadline | #88 | merged |
+| 2 | The own queue: role `agent`, claim, release, not picked up in the queue | #89 | merged |
+| 3 | The calendar invite (point 9) | #90 | merged |
+| – | Automatic refresh of the queue (`queue_refresh_seconds`, through ADR 0072) | #155 | merged |
+| 4 | The follow-ups of step 2: the lobby join time (`call_status.lobby_since`, migration 0101), so "pick up next" takes who waited longest (point 6); the system event `queue.not_picked_up` once per booking and the count on the overview's queue widget (point 8) | #628 | merged |
+| – | Point 1's check that `contact_center` needs an organisation connection (waits for ADR 0032 CC-4) | – | planned |
+
 ## Consequences
 
 - New port `BookingDispatcher` and adapters `app/adapters/dispatch_contact_center.py` and

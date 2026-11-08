@@ -1,5 +1,6 @@
-"""The wait watch: a warning alert when participants wait too long in an own queue (OV-7).
+"""The queue watches of the worker: waits too long (OV-7) and bookings not picked up (ADR 0043).
 
+**Wait watch.**
 The worker measures every own queue each loop. A group whose longest wait goes above its
 organisation's ``queue_wait_warning_minutes`` gets one system event ``queue.wait`` (failure)
 at the group, which is the alert (``app.domain.alerts``); going back under it records one
@@ -12,21 +13,33 @@ The watch remembers the groups it reported; after a restart it reads the open ``
 alerts first, so a queue that emptied while the worker was down is closed.
 
 Only a duration and a slug leave: never who waits.
+
+**Not-picked-up watch** (ADR 0043 point 8). A booking in an own queue that nobody claimed
+``not_picked_up_minutes`` after its start gets one system event ``queue.not_picked_up`` at the
+booking (so at its group). ``CallStatus.not_picked_up_at`` and the event are written in one
+locked transaction, so the event is recorded exactly once, also across restarts. The event
+carries the minutes the group allows, never who waits.
+
+    every own queue ─► unclaimed past its limit, not reported yet? ─► mark ─► system event
 """
 
 from collections.abc import Awaitable, Callable
-from datetime import timedelta
+from dataclasses import replace
+from datetime import datetime, timedelta
 
 from app.domain.alerts import QUEUE_WAIT_EVENT, QUEUE_WAIT_OVER
 from app.domain.audit import Outcome
 from app.domain.authorization import Scope
-from app.domain.own_queue import summarise
-from app.domain.ports import Clock, UnitOfWork
+from app.domain.own_queue import QueueEntry, summarise
+from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.queue_service import load_entries
 from app.domain.scheduling import GroupSummary
 from app.domain.system_log import SystemLog
 
 MINUTE = timedelta(minutes=1)
+NOT_PICKED_UP_EVENT = "queue.not_picked_up"
+"""The system event of a booking nobody claimed in time (ADR 0043 point 8)."""
+NOT_PICKED_UP_REASON = "not_picked_up"
 
 
 class QueueWaitWatch:
@@ -95,3 +108,64 @@ class QueueWaitWatch:
         else:
             over.discard(slug)
         return True
+
+
+class NotPickedUpWatch:
+    """Records each own-queue booking nobody took in time, once (ADR 0043 point 8).
+
+    Args:
+        uow: Opens database transactions.
+        clock: Current time.
+        system_log: Where the events go.
+    """
+
+    def __init__(self, uow: UnitOfWork, clock: Clock, system_log: SystemLog) -> None:
+        """Store the collaborators."""
+        self._uow = uow
+        self._clock = clock
+        self._system_log = system_log
+
+    async def check(self) -> int:
+        """Mark and record every booking newly not picked up; return how many.
+
+        The candidates are found under a read; only when there are any is the write lock taken,
+        and each is checked again inside it before its mark and its event are written together.
+        """
+        now = self._clock.now()
+        async with self._uow.read() as tx:
+            due = await _due(tx, now)
+        if not due:
+            return 0
+        async with self._uow.locked() as tx:
+            still = await _due(tx, now)
+            for booking_id, entry, minutes in still:
+                await tx.save_call_status(replace(entry.status, not_picked_up_at=now))
+                await self._system_log.record_in(
+                    tx,
+                    NOT_PICKED_UP_EVENT,
+                    Outcome.FAILURE,
+                    booking_id=booking_id,
+                    reason=NOT_PICKED_UP_REASON,
+                    detail=f"minutes:{minutes}",
+                )
+            return len(still)
+
+
+async def _due(tx: Transaction, now: datetime) -> list[tuple[int, QueueEntry, int]]:
+    """Return the own-queue bookings not picked up in time and not reported yet."""
+    everything = Scope(everything=True)
+    due = []
+    for summary in await tx.list_groups(everything):
+        group = summary.group
+        if not group.queue_open:
+            continue
+        limit = timedelta(minutes=group.not_picked_up_minutes)
+        for entry in await load_entries(tx, everything, group, now):
+            booking_id = entry.booking.id
+            if (
+                booking_id is not None
+                and entry.status.not_picked_up_at is None
+                and entry.not_picked_up(now, limit)
+            ):
+                due.append((booking_id, entry, group.not_picked_up_minutes))
+    return due
