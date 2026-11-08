@@ -17,9 +17,10 @@ from zoneinfo import ZoneInfo
 from fastapi import Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse
 
-from app.admin.authz import can_function, return_path, session_principal
+from app.admin.authz import can_function, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
+from app.admin.return_to import page_path
 from app.admin.session import (
     THEMES,
     current_session,
@@ -265,12 +266,13 @@ ALERT_POPUP_LABELS = {
 def back_href(request: Request) -> str:
     """Return the current page as the "return to" target of the profile menu's forms.
 
-    The path is ``return_path`` (a GET returns to itself, a page rendered by a POST to the page
+    The path is ``page_path`` (a GET returns to itself, a page rendered by a POST to the page
     that sent the form) and the query is filtered like a link's (``kept_query``), so typed
-    input is never echoed; ``preference_routes`` still checks the value with ``safe_next``.
+    input is never echoed into the form; ``preference_routes`` still checks the value with
+    ``safe_next``.
     """
     query = urlencode(kept_query(request))
-    path = return_path(request)
+    path = page_path(request)
     return f"{path}?{query}" if query else path
 
 

@@ -549,6 +549,25 @@ async def test_changes_need_a_recent_login(site: Site) -> None:
     assert overview.status_code == 200
 
 
+async def test_a_recent_login_comes_back_with_the_view_query_only(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    await _stay_active_for_an_hour(site)
+
+    form = await site.client.get(f"{GROUP}/staffing?day=2026-11-10&q=jansen")
+    post = await site.client.post(
+        f"{GROUP}/staffing",
+        data={},
+        headers={
+            **SAME_ORIGIN,
+            "referer": f"http://testserver{GROUP}/staffing?day=2026-11-10&token=0123456789abcdef",
+        },
+    )
+
+    kept = f"/admin/login?next={GROUP}/staffing%3Fday%3D2026-11-10"
+    assert form.headers["location"] == kept
+    assert post.headers["location"] == kept
+
+
 async def test_forged_referer_cannot_leave_the_portal(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
     await _stay_active_for_an_hour(site)

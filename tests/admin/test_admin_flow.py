@@ -18,6 +18,25 @@ from tests.support.admin_site import audit_events
 from tests.support.principals import legacy_claims
 
 
+async def _sign_in_with_next(site: Site, next_url: str) -> str:
+    """Start a login with ``next_url``, complete it, and return where the callback sends."""
+    await site.client.get("/admin/login", params={"next": next_url})
+    site.idp.next_principal = GROUP_ADMIN
+    response = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+    return response.headers["location"]
+
+
+async def _login_through(site: Site, page: str) -> tuple[str, str]:
+    """Open ``page`` without a session, sign in, and return (login location, final location)."""
+    sent = await site.client.get(page)
+    assert sent.status_code == 303
+    login = sent.headers["location"]
+    await site.client.get(login)
+    site.idp.next_principal = SUPER
+    back = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+    return login, back.headers["location"]
+
+
 async def test_login_redirects_to_the_identity_provider(site: Site) -> None:
     response = await site.client.get("/admin/login", params={"next": "/admin/rights"})
 
@@ -104,16 +123,24 @@ async def test_a_login_without_a_second_factor_under_record_goes_on_and_is_recor
 
 
 @pytest.mark.parametrize(
-    "next_url",
-    ["https://evil.example/", "//evil.example/admin", "/g/demo", "/admin\\@evil", "javascript:x"],
+    ("next_url", "expected"),
+    [
+        ("https://evil.example/", "/admin/"),
+        ("//evil.example/admin", "/admin/"),
+        ("/g/demo", "/admin/"),
+        ("/admin\\@evil", "/admin/"),
+        ("javascript:x", "/admin/"),
+        # A query does not loosen the guard: it is checked on the whole value first.
+        ("/admin/x?y=https://evil.example/", "/admin/"),
+        ("/admin/x?y=\\evil", "/admin/"),
+        ("//evil.example/admin?view=queue", "/admin/"),
+        ("/admin?//evil.example", "/admin"),
+    ],
 )
-async def test_next_cannot_leave_the_admin_portal(site: Site, next_url: str) -> None:
-    await site.client.get("/admin/login", params={"next": next_url})
-    site.idp.next_principal = GROUP_ADMIN
+async def test_next_cannot_leave_the_admin_portal(site: Site, next_url: str, expected: str) -> None:
+    landed = await _sign_in_with_next(site, next_url)
 
-    response = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
-
-    assert response.headers["location"] == "/admin/"
+    assert landed == expected
 
 
 async def test_session_has_an_absolute_lifetime(site: Site) -> None:
@@ -332,17 +359,6 @@ async def test_admin_login_disabled_without_identity_provider(settings) -> None:
     assert "Beheer niet beschikbaar" in response.text
 
 
-async def _login_through(site: Site, page: str) -> tuple[str, str]:
-    """Open ``page`` without a session, sign in, and return (login location, final location)."""
-    sent = await site.client.get(page)
-    assert sent.status_code == 303
-    login = sent.headers["location"]
-    await site.client.get(login)
-    site.idp.next_principal = SUPER
-    back = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
-    return login, back.headers["location"]
-
-
 async def test_the_query_of_the_page_survives_the_login(site: Site) -> None:
     _, landed = await _login_through(site, "/admin/groups/demo/usage?view=queue&from=2026-11-01")
 
@@ -350,12 +366,9 @@ async def test_the_query_of_the_page_survives_the_login(site: Site) -> None:
 
 
 async def test_a_next_with_a_query_survives_the_login(site: Site) -> None:
-    await site.client.get("/admin/login", params={"next": "/admin/groups/demo/usage?view=queue"})
-    site.idp.next_principal = GROUP_ADMIN
+    landed = await _sign_in_with_next(site, "/admin/groups/demo/usage?view=queue")
 
-    response = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
-
-    assert response.headers["location"] == "/admin/groups/demo/usage?view=queue"
+    assert landed == "/admin/groups/demo/usage?view=queue"
 
 
 @pytest.mark.parametrize(
@@ -367,6 +380,9 @@ async def test_a_next_with_a_query_survives_the_login(site: Site) -> None:
         # Free text (a search, an address) is not carried: no personal data into a URL.
         ("/admin/staff?q=jan%40voorbeeld.nl&view=all", "/admin/staff?view=all"),
         ("/admin/staff?q=Jan+Jansen", "/admin/staff"),
+        ("/admin/staff?q=jansen&view=all", "/admin/staff?view=all"),
+        # A confirmation is shown once, never again after the login.
+        ("/admin/groups/demo?done=saved&count=3", "/admin/groups/demo"),
         # A value that names another site stays a query value under /admin, never a target.
         ("/admin/groups/demo?next=https://evil.example/", "/admin/groups/demo"),
     ],
@@ -377,7 +393,7 @@ async def test_the_kept_query_holds_no_token_and_no_free_text(
     login, landed = await _login_through(site, page)
 
     assert landed == kept
-    for secret in ("0123456789abcdef", "abc", "voorbeeld", "Jansen", "evil"):
+    for secret in ("0123456789abcdef", "abc", "voorbeeld", "ansen", "evil", "saved"):
         if secret not in kept:
             assert secret not in login
             assert secret not in landed
@@ -392,19 +408,15 @@ async def test_a_long_query_is_dropped_whole(site: Site) -> None:
 
 
 @pytest.mark.parametrize(
-    "next_url",
+    ("next_url", "kept"),
     [
-        "/admin/x?y=https://evil.example/",
-        "/admin?//evil.example",
-        "/admin/x?y=\\evil",
-        "//evil.example/admin?view=queue",
+        ("/admin/#widget-alerts", "/admin/#widget-alerts"),
+        ("/admin/x?view=queue#widget-tasks", "/admin/x?view=queue#widget-tasks"),
+        ("/admin/x#<script>", "/admin/x"),
+        ("/admin/x?q=Jan+Jansen#top", "/admin/x#top"),
     ],
 )
-async def test_a_query_does_not_loosen_the_redirect_guard(site: Site, next_url: str) -> None:
-    await site.client.get("/admin/login", params={"next": next_url})
-    site.idp.next_principal = GROUP_ADMIN
-
-    response = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
-
-    assert response.headers["location"] in ("/admin/", next_url.split("?")[0])
-    assert "evil" not in response.headers["location"]
+async def test_a_plain_anchor_comes_back_and_nothing_else(
+    site: Site, next_url: str, kept: str
+) -> None:
+    assert await _sign_in_with_next(site, next_url) == kept
