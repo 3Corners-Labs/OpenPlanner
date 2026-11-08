@@ -17,6 +17,12 @@ requireKeycloak();
 
 const GROUP = '/admin/groups/demo/usage';
 
+/** Sign in, then open `path`: the sign-in redirect returns to the page without its query. */
+async function openAs(page: Page, path: string): Promise<void> {
+  await loginAs(page, 'super', GROUP);
+  await page.goto(path);
+}
+
 /** Every chart of the page is followed, inside its figure, by a table. */
 async function expectTablesAfterCharts(page: Page): Promise<void> {
   const figures = page.locator('figure.rchart');
@@ -36,7 +42,7 @@ async function expectTablesAfterCharts(page: Page): Promise<void> {
 }
 
 test('the families are reachable with the keyboard and the current one is marked', async ({ page }) => {
-  await loginAs(page, 'super', `${GROUP}?view=queue`);
+  await openAs(page, `${GROUP}?view=queue`);
 
   const links = page.getByRole('navigation', { name: 'Rapport' }).getByRole('link');
   await expect(links).toHaveCount(4);
@@ -50,7 +56,7 @@ test('the families are reachable with the keyboard and the current one is marked
 });
 
 test('a chart frame and its table can be reached and scrolled with the keyboard', async ({ page }) => {
-  await loginAs(page, 'super', `${GROUP}?view=queue`);
+  await openAs(page, `${GROUP}?view=queue`);
 
   const frame = page.locator('.rchart__frame').first();
   await tabTo(page, frame);
@@ -61,7 +67,7 @@ test('a chart frame and its table can be reached and scrolled with the keyboard'
 for (const view of ['queue', 'capacity', 'channels']) {
   test(`${view}: 320 px wide (400 % zoom) the page needs no horizontal scroll of its own`, async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 700 });
-    await loginAs(page, 'super', `${GROUP}?view=${view}`);
+    await openAs(page, `${GROUP}?view=${view}`);
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow).toBe(false);
@@ -71,7 +77,7 @@ for (const view of ['queue', 'capacity', 'channels']) {
 
   test(`${view}: forced colours and reduced motion`, async ({ page }) => {
     await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
-    await loginAs(page, 'super', `${GROUP}?view=${view}`);
+    await openAs(page, `${GROUP}?view=${view}`);
 
     await expect(page.locator('main')).toBeVisible();
     await expectNoAxeViolations(page);
