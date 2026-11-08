@@ -185,6 +185,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_WINDOW` | string | `""` | — | `settings.platform.manage` | When automatic updates happen, in `admin_timezone`: up to 7 ranges such as `mon 02:00-04:00, sat 01:00-05:00`, each at least 30 minutes (ADR 0116 point 9); empty is any time. A superuser's click is immediate. |
 | `UPDATE_CHECK_MINUTES` | int | `60` | 5–1440 | `settings.platform.manage` | Minutes between two release checks by the worker (ADR 0067); "Check now" on the updates page asks for one ahead of time. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
+| `CONTACT_REVEALS_ALERT_PER_HOUR` | int | `20` | 5–500 | `settings.platform.manage` | Requests for participants' contact details by one person per hour above which a system event warns (ADR 0044 §2). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the participant's waiting page (ADR 0072). |
 | `OVERVIEW_LIVE_ENABLED` | bool | `true` | — | `settings.platform.manage` | Lets the overview's widgets refresh themselves and pop up new alerts; off, the page shows what it loaded with and a Refresh link (ADR 0061 §3, §4). |
 | `OVERVIEW_POLL_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of a live widget on the overview (ADR 0061 §4). |

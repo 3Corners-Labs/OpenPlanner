@@ -27,10 +27,11 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from app.domain import booking_changes
+from app.domain.activity_alert import ActivityAlert
 from app.domain.admin import AdminService, Authorization, require
 from app.domain.agenda import AgendaSlot, ShortfallAcceptance
 from app.domain.agenda_service import agenda_days
-from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
+from app.domain.audit import AuditEvent, Outcome, Source
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.booking import Booking, BookingStatus, ChangeReason
 from app.domain.booking_changes import ProposalTiming
@@ -49,11 +50,16 @@ from app.domain.slot_close import shortfall_resolved
 from app.domain.tunable import value_for, value_of
 from app.domain.usage import ActorClass
 
-ALERT_ACTION = "planner.changes_alert"
-"""System event key of the warning about many changes by one planner."""
+CHANGES_ALERT = ActivityAlert(
+    "planner.changes_alert",
+    "too_many_changes",
+    "changes",
+    frozenset({Permission.BOOKINGS_MANAGE.value}),
+)
+"""The warning above ``planner_changes_alert_per_hour`` changes by one planner in an hour."""
 
-ALERT_WINDOW = timedelta(hours=1)
-"""The period ``planner_changes_alert_per_hour`` counts over (fixed: it is per hour)."""
+ALERT_ACTION = CHANGES_ALERT.action
+"""System event key of the warning about many changes by one planner."""
 
 
 CONFIRMED_BY_STAFF = "booking.confirmed_by_staff"
@@ -434,21 +440,8 @@ class PlannerService:
                 booking_id,
             )
         )
-        count = await tx.count_audit_events(principal.subject, {action}, now - ALERT_WINDOW)
-        if count == value_of(self._alert_per_hour) + 1:
-            await tx.add_audit_event(
-                AuditEvent(
-                    now,
-                    SYSTEM_ACTOR,
-                    ALERT_ACTION,
-                    Outcome.FAILURE,
-                    "too_many_changes",
-                    organisation,
-                    group,
-                    f"actor:{principal.subject},changes:{count}",
-                    Source.SYSTEM,
-                )
-            )
+        threshold = value_of(self._alert_per_hour)
+        await CHANGES_ALERT.check(tx, now, principal.subject, threshold, organisation, group)
 
 
 def _ids(bookings: list[Booking]) -> list[int]:

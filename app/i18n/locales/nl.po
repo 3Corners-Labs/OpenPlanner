@@ -2620,6 +2620,9 @@ msgstr "opgeschorte afspraak verzet"
 msgid "audit.event.planner_changes_alert"
 msgstr "Veel wijzigingen door één planner"
 
+msgid "audit.event.contact_reveals_alert"
+msgstr "Veel verzoeken om contactgegevens door één persoon"
+
 msgid "admin.audit.detail.planner_move"
 msgstr "afspraak verplaatst door een planner"
 
@@ -2637,6 +2640,9 @@ msgstr "tekort geaccepteerd"
 
 msgid "admin.audit.detail.changes"
 msgstr "wijzigingen in het afgelopen uur: {count}"
+
+msgid "admin.audit.detail.reveals"
+msgstr "verzoeken om contactgegevens in het afgelopen uur: {count}"
 
 msgid "admin.audit.detail.reason"
 msgstr "reden: {value}"
@@ -6349,6 +6355,9 @@ msgstr "Tekorten vooruitkijken (dagen)"
 
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Waarschuwing bij wijzigingen per planner per uur"
+
+msgid "settings.field.contact_reveals_alert_per_hour.label"
+msgstr "Waarschuwing bij verzoeken om contactgegevens per persoon per uur"
 
 msgid "admin.settings.problem.dev_placeholder"
 msgstr "bevat een plaatsvervanger voor ontwikkeling; productie weigert die."

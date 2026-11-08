@@ -261,6 +261,31 @@ async def test_old_system_events_are_deleted_admin_actions_kept(engine: AsyncEng
     ]
 
 
+async def test_audit_events_are_counted_per_actor_since_a_moment_and_by_detail(
+    engine: AsyncEngine,
+) -> None:
+    uow = SqlUnitOfWork(engine)
+    viewed = "booking.contact_viewed"
+    async with uow.locked() as tx:
+        for minutes, actor, outcome, detail in (
+            (-90, "g-1", Outcome.SUCCESS, viewed),  # more than an hour ago
+            (-30, "g-1", Outcome.SUCCESS, viewed),
+            (-20, "g-1", Outcome.DENIED, ""),  # a refused request under the same action
+            (-10, "g-2", Outcome.SUCCESS, viewed),  # someone else
+            (0, "g-1", Outcome.SUCCESS, viewed),
+        ):
+            at = NOW + timedelta(minutes=minutes)
+            event = AuditEvent(at, actor, "bookings.view", outcome, "", "demo", "demo", detail)
+            await tx.add_audit_event(event)
+    since = NOW - timedelta(hours=1)
+
+    async with uow.read() as tx:
+        every = await tx.count_audit_events("g-1", {"bookings.view"}, since)
+        shown = await tx.count_audit_events("g-1", {"bookings.view"}, since, detail=viewed)
+
+    assert (every, shown) == (3, 2)
+
+
 def test_every_listing_query_requires_a_scope() -> None:
     # ADR 0014: a new list_* method without a Scope parameter fails this test.
     listings = [name for name in dir(Transaction) if name.startswith("list_")]

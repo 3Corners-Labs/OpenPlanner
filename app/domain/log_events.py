@@ -1445,6 +1445,18 @@ _AUDIT = (
         "Check the entitlement values at the identity provider.",
     ),
     _e(
+        "booking.contact_reveals_alert",
+        _SYS,
+        "outcome",
+        "",
+        "Many requests for contact details by one person.",
+        "One person asked for participants' contact details more than "
+        "`contact_reveals_alert_per_hour` times within an hour (ADR 0044 §2); the detail names "
+        "the actor and the count. The requests were not refused.",
+        "Ask the person whether the requests were theirs; if not, use *End all sessions* on their "
+        "page under Staff and look up the bookings in the audit log.",
+    ),
+    _e(
         "booking_rows.rollup",
         _SYS,
         "info outcome",
@@ -1713,8 +1725,11 @@ _AUDIT = (
         _SYS,
         "outcome",
         "",
-        "Planners were told about changes.",
-        "The alert about changed bookings went out (ADR 0044).",
+        "Many changes by one planner.",
+        "One planner changed bookings more than `planner_changes_alert_per_hour` times within an "
+        "hour (ADR 0044); the detail names the actor and the count. The changes were not refused.",
+        "Ask the planner whether the changes were theirs; if not, use *End all sessions* on their "
+        "page under Staff and look up the bookings in the audit log.",
     ),
     _e(
         "public_address",

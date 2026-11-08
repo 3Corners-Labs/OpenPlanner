@@ -1,27 +1,38 @@
 """The participant's contact details on the booking page: on request, audited (ADR 0044 §2)."""
 
 from dataclasses import fields
+from datetime import timedelta
 
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.audit import AuditEvent, Outcome
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.authorization import Principal
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.participant_contact import CONTACT_VIEWED, ParticipantContactService
+from app.domain.participant_contact import (
+    CONTACT_VIEWED,
+    REVEALS_ALERT,
+    ParticipantContactService,
+)
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM
+from tests.support.admin import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OTHER_TEAM
 from tests.support.domain import book
 
 ADA_VALUES = ("Ada", "Lovelace", "ada@example.org", "612345678")
 """Ada's name, address and the digits of her number: none of them may reach an audit event."""
 
 
+def _service(
+    uow: InMemoryUnitOfWork, clock: FixedClock, alert_per_hour: int = 20
+) -> ParticipantContactService:
+    return ParticipantContactService(uow, clock, AdminService(uow, clock), alert_per_hour)
+
+
 @pytest.fixture
 def contacts(uow: InMemoryUnitOfWork, clock: FixedClock) -> ParticipantContactService:
-    return ParticipantContactService(uow, clock, AdminService(uow, clock))
+    return _service(uow, clock)
 
 
 async def _book(bookings: BookingService, slug: str = "demo") -> int:
@@ -106,3 +117,82 @@ async def test_after_the_purge_there_is_nothing_to_show_and_nothing_is_audited(
 
     assert await contacts.reveal(GROUP_ADMIN, "demo", booking_id) is None
     assert _views(uow) == []
+
+
+# --- the hourly alert (contact_reveals_alert_per_hour) -------------------------------------
+
+
+def _alerts(uow: InMemoryUnitOfWork) -> list[AuditEvent]:
+    return [e for e in uow.state.audit if e.action == REVEALS_ALERT.action]
+
+
+async def test_the_request_past_the_hourly_limit_raises_one_system_event_and_still_shows(
+    uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
+) -> None:
+    contacts = _service(uow, clock, alert_per_hour=2)
+    booking_id = await _book(bookings)
+
+    shown = [await contacts.reveal(GROUP_ADMIN, "demo", booking_id) for _ in range(4)]
+
+    assert None not in shown
+    (alert,) = _alerts(uow)
+    assert (alert.actor, alert.source, alert.outcome, alert.reason) == (
+        SYSTEM_ACTOR,
+        Source.SYSTEM,
+        Outcome.FAILURE,
+        "too_many_contact_reveals",
+    )
+    assert (alert.organisation, alert.group, alert.booking_id) == ("demo", "demo", None)
+    counted = {"bookings.view", REVEALS_ALERT.action}
+    assert [e.detail for e in uow.state.audit if e.action in counted] == [
+        CONTACT_VIEWED,
+        CONTACT_VIEWED,
+        CONTACT_VIEWED,
+        "actor:g-1,reveals:3",
+        CONTACT_VIEWED,
+    ]
+
+
+async def test_requests_older_than_an_hour_no_longer_count(
+    uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
+) -> None:
+    contacts = _service(uow, clock, alert_per_hour=1)
+    booking_id = await _book(bookings)
+
+    await contacts.reveal(GROUP_ADMIN, "demo", booking_id)
+    clock.advance(timedelta(hours=1, seconds=1))
+    await contacts.reveal(GROUP_ADMIN, "demo", booking_id)
+
+    assert _alerts(uow) == []
+
+
+async def test_only_shown_contact_details_count_not_a_refused_request(
+    uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
+) -> None:
+    contacts = _service(uow, clock, alert_per_hour=1)
+    booking_id = await _book(bookings)
+    other = await _book(bookings, "andere-team")
+
+    with pytest.raises(DomainError):
+        await contacts.reveal(GROUP_ADMIN, "andere-team", other)
+    await contacts.reveal(GROUP_ADMIN, "demo", booking_id)
+
+    assert [(e.action, e.outcome) for e in uow.state.audit if e.actor == "g-1"] == [
+        ("bookings.view", Outcome.DENIED),
+        ("bookings.view", Outcome.SUCCESS),
+    ]
+    assert _alerts(uow) == []
+
+
+async def test_each_person_is_counted_on_their_own(
+    uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
+) -> None:
+    contacts = _service(uow, clock, alert_per_hour=1)
+    booking_id = await _book(bookings)
+
+    await contacts.reveal(GROUP_ADMIN, "demo", booking_id)
+    await contacts.reveal(ORG_ADMIN, "demo", booking_id)
+    assert _alerts(uow) == []
+
+    await contacts.reveal(ORG_ADMIN, "demo", booking_id)
+    assert [e.detail for e in _alerts(uow)] == ["actor:o-1,reveals:2"]

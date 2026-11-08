@@ -637,7 +637,7 @@ def create_app(
         app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
         # ADR 0044 §2: the participant's contact details on the booking page, on request.
         app.state.participant_contact_service = ParticipantContactService(
-            uow, clock, app.state.admin_service
+            uow, clock, app.state.admin_service, lambda: live().contact_reveals_alert_per_hour
         )
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)

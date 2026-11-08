@@ -1737,6 +1737,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1000,
     ),
     S(
+        "contact_reveals_alert_per_hour",
+        K.INT,
+        20,
+        _C,
+        T.PLANNER,
+        "Requests for participants' contact details by one person per hour above which a system "
+        "event warns (ADR 0044 §2).",
+        minimum=5,
+        maximum=500,
+    ),
+    S(
         "queue_refresh_seconds",
         K.INT,
         10,

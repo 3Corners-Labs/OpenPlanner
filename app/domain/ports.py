@@ -1635,9 +1635,13 @@ class Transaction(Protocol):
         ...
 
     async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime
+        self, actor: str, actions: Collection[str], since: datetime, *, detail: str | None = None
     ) -> int:
-        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
+        """Return how many of ``actor``'s events with one of ``actions`` happened since then.
+
+        With ``detail``, only the events with exactly that detail count (for example the
+        requests for contact details among the ``bookings.view`` events, not the refusals).
+        """
         ...
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
