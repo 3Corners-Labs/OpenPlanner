@@ -8830,6 +8830,27 @@ msgstr "The package is larger than the largest configuration package allowed."
 msgid "admin.form.error.configuration_installation_in_use"
 msgstr "This installation is in use: it has bookings, slots or an active closure. A package can only be imported into a new installation."
 
+msgid "admin.form.error.configuration_format_unsupported"
+msgstr "This configuration document uses a format this version of OpenPlanner does not know."
+
+msgid "admin.form.error.configuration_unknown_field"
+msgstr "The document contains a field that does not exist. Check the name at the path shown."
+
+msgid "admin.form.error.configuration_object_exists"
+msgstr "This object already exists, while the document asks to create it."
+
+msgid "admin.form.error.configuration_object_missing"
+msgstr "This object does not exist, while the document asks to change it."
+
+msgid "admin.form.error.configuration_out_of_scope"
+msgstr "The document names something outside the organisation it applies to."
+
+msgid "admin.form.error.configuration_object_in_use"
+msgstr "This object is still used by bookings, slots or an active closure and cannot be deleted."
+
+msgid "admin.form.error.configuration_capacity_below_booked"
+msgstr "The capacity is lower than the number of places already booked."
+
 msgid "admin.settings.package.title"
 msgstr "Configuration package"
 

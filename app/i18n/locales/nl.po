@@ -8842,6 +8842,27 @@ msgstr "Het pakket is groter dan de maximale grootte van een configuratiepakket.
 msgid "admin.form.error.configuration_installation_in_use"
 msgstr "Deze installatie is in gebruik: er zijn afspraken, tijdsloten of een actieve sluiting. Een pakket kan alleen in een nieuwe installatie worden geïmporteerd."
 
+msgid "admin.form.error.configuration_format_unsupported"
+msgstr "Dit configuratiedocument heeft een formaat dat deze versie van OpenPlanner niet kent."
+
+msgid "admin.form.error.configuration_unknown_field"
+msgstr "Het document bevat een veld dat niet bestaat. Controleer de naam op het genoemde pad."
+
+msgid "admin.form.error.configuration_object_exists"
+msgstr "Dit object bestaat al, terwijl het document het wil aanmaken."
+
+msgid "admin.form.error.configuration_object_missing"
+msgstr "Dit object bestaat niet, terwijl het document het wil wijzigen."
+
+msgid "admin.form.error.configuration_out_of_scope"
+msgstr "Het document noemt iets buiten de organisatie waarvoor het geldt."
+
+msgid "admin.form.error.configuration_object_in_use"
+msgstr "Dit object wordt nog gebruikt door afspraken, tijdsloten of een actieve sluiting en kan niet worden verwijderd."
+
+msgid "admin.form.error.configuration_capacity_below_booked"
+msgstr "De capaciteit is lager dan het aantal plaatsen dat al is geboekt."
+
 msgid "admin.settings.package.title"
 msgstr "Configuratiepakket"
 
