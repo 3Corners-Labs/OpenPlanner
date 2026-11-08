@@ -31,11 +31,10 @@ from tests.admin.conftest import GROUP_ADMIN, SUPER, Site
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.staff_directory import FakeStaffDirectory
 from tests.support.admin_site import post_form, site_app, site_uow
-from tests.support.domain import NOW, TEST_TOKEN_KEY, book_confirmed
+from tests.support.domain import FRIDAY_0900, NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.organisation_providers import NEW_PROVIDER, organisation_claims
 
 # The demo group is open on weekdays; the clock starts on Thursday 1 January 2026.
-TODAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # Friday 09:00 Amsterdam: the queue
 NEXT_WEEK_0900 = datetime(2026, 1, 9, 8, 0, tzinfo=UTC)  # the planner's pages
 NEXT_WEEK_0930 = datetime(2026, 1, 9, 8, 30, tzinfo=UTC)  # awaiting a new time
 CLOSED_DAY_0900 = datetime(2026, 1, 16, 8, 0, tzinfo=UTC)  # on hold by a closure
@@ -238,7 +237,7 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
         )
         return receipt.booking.id or 0
 
-    found.queued_id = await book(1, TODAY_0900)
+    found.queued_id = await book(1, FRIDAY_0900)  # the queue, once the clock is there
     found.booking_id = await book(2, NEXT_WEEK_0900)
     await book(3, NEXT_WEEK_0900)  # two in one slot, one agent next week: a shortfall
     waiting_id = await book(4, NEXT_WEEK_0930)
@@ -298,7 +297,7 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
     assert destination.status_code == 303, destination.text
     assert destination.headers["location"].startswith("/admin/logging/1?")
 
-    site.clock.advance(TODAY_0900 - site.clock.now() - timedelta(minutes=5))
+    site.clock.advance(FRIDAY_0900 - site.clock.now() - timedelta(minutes=5))
     await site.login_as(SUPER)  # the session of yesterday has expired
     picked = await post_form(site, "/admin/groups/demo/queue/next", {})
     assert picked.status_code == 303, picked.text

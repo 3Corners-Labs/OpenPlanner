@@ -24,8 +24,8 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeVideo
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.admin import GROUP_ADMIN, OUTSIDER
-from tests.support.domain import SLOT_0900
-from tests.support.integration import ADA, GROUP
+from tests.support.domain import ADA_CONTACT, SLOT_0900
+from tests.support.integration import GROUP
 
 WINDOW = timedelta(seconds=30)
 DAY = date(2026, 1, 5)
@@ -42,7 +42,7 @@ def _booking(number: int = 1, **changes: object) -> Booking:
         start=SLOT_0900,
         end=SLOT_0900 + timedelta(minutes=30),
         status=BookingStatus.CONFIRMED,
-        contact=ADA,
+        contact=ADA_CONTACT,
         locale="nl",
         token_hash=f"h{number}",
         created_at=SLOT_0900 - timedelta(days=1),

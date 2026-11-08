@@ -23,15 +23,34 @@ def _is_test_module(name: str) -> bool:
     return any(part.startswith("test_") for part in name.split("."))
 
 
+def _plugins(node: ast.AST) -> list[tuple[int, str]]:
+    """Return the modules a ``pytest_plugins`` assignment names, with its line; else nothing."""
+    if not isinstance(node, ast.Assign | ast.AnnAssign) or node.value is None:
+        return []
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+    if not any(
+        isinstance(target, ast.Name) and target.id == "pytest_plugins" for target in targets
+    ):
+        return []
+    values = node.value.elts if isinstance(node.value, ast.List | ast.Tuple) else [node.value]
+    return [
+        (node.lineno, v.value)
+        for v in values
+        if isinstance(v, ast.Constant) and isinstance(v.value, str)
+    ]
+
+
 def _imported(source: str, module: str) -> list[tuple[int, str]]:
     """Return each name that the source of ``module`` imports, with its line, wherever it stands.
 
     A relative import is resolved against the package of ``module``; ``from package import name``
-    also yields ``package.name``, because ``name`` may be a module.
+    also yields ``package.name``, because ``name`` may be a module. A module named in
+    ``pytest_plugins`` counts too: pytest imports it, and its fixtures reach every test.
     """
     package = module.split(".")[:-1]
     found: list[tuple[int, str]] = []
     for node in ast.walk(ast.parse(source)):
+        found += _plugins(node)
         if isinstance(node, ast.Import):
             found += [(node.lineno, alias.name) for alias in node.names]
         elif isinstance(node, ast.ImportFrom):
@@ -52,12 +71,13 @@ def test_every_form_of_import_is_found() -> None:
             "from . import test_e",
             "def later():",
             "    from tests.api.test_f import helper",
+            'pytest_plugins = ["tests.api.test_h"]',
         ]
     )
 
     found = {name for _, name in _imported(source, "tests.api.test_g") if _is_test_module(name)}
 
-    assert {f"tests.api.test_{letter}" for letter in "abcdef"} <= found
+    assert {f"tests.api.test_{letter}" for letter in "abcdefh"} <= found
 
 
 def test_no_module_under_tests_imports_a_test_module() -> None:

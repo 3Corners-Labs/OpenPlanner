@@ -23,6 +23,10 @@ NEW_PROVIDER = {
 """Provider ``org-a`` as the registration form sends it."""
 PLATFORM_DISCOVERY = "https://login.platform.example/.well-known/openid-configuration"
 """The discovery address of the platform's own identity provider."""
+OTHER_ISSUER = "https://login.org-b.example"
+"""The issuer of a second provider, ``org-b``."""
+OTHER_DISCOVERY = f"{OTHER_ISSUER}/.well-known/openid-configuration"
+"""The discovery address of ``OTHER_ISSUER``."""
 ORGANISATIONS = (Organisation(1, "Demo-acme", "demo"), Organisation(2, "Andere", "andere"))
 """The organisations of the identity provider domain tests: ``demo`` and ``andere``."""
 

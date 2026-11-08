@@ -3,9 +3,8 @@
 The site is ``Site`` of ``tests/admin/conftest.py``: the app in-process with the demo data.
 """
 
-from typing import Any
-
 import httpx
+from fastapi import FastAPI
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import Outcome
@@ -13,7 +12,7 @@ from app.domain.authorization import Scope
 from tests.admin.conftest import SAME_ORIGIN, Site
 
 
-def site_app(site: Site) -> Any:
+def site_app(site: Site) -> FastAPI:
     """Return the application the site runs."""
     return site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
 

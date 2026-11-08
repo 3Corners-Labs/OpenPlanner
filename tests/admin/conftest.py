@@ -173,7 +173,8 @@ async def marked(
     """The demo site with the marker bookings of ``tests.support.privacy_sweep``.
 
     It runs release ``RELEASED`` while a newer one is known, so every page carries the update
-    banner (ADR 0029).
+    banner (ADR 0029). It starts its own site on ``admin_db``, so a test asks for ``marked`` or
+    for ``site``, not both.
     """
     # Imported here: the sweep logs in as the admins above, so its module imports this one.
     from tests.support.privacy_sweep import RELEASED, mark

@@ -2,23 +2,15 @@
 
 from dataclasses import replace
 
-from app.domain.booking import Booking, BookingStatus, Contact
-from app.domain.scheduling import Organisation, PhoneMode, ScheduleRule
+from app.domain.booking import Booking, BookingStatus
+from app.domain.scheduling import Organisation, ScheduleRule
 from tests.fakes.persistence import State
-from tests.support.domain import NOW, SLOT_0900, SLOT_0930, make_group, window
+from tests.support.domain import ADA_CONTACT, NOW, SLOT_0900, SLOT_0930, make_group, window
 
 NOTICES = {
     "nl": "Door een storing zijn wij gesloten.",
     "en": "We are closed because of an outage.",
 }
-
-_ADA = Contact.create(
-    first_name="Ada",
-    last_name="Lovelace",
-    email="ada@example.org",
-    phone=None,
-    phone_mode=PhoneMode.OPTIONAL,
-)
 
 
 def confirmed_booking(**overrides: object) -> Booking:
@@ -30,7 +22,7 @@ def confirmed_booking(**overrides: object) -> Booking:
         start=SLOT_0900,
         end=SLOT_0930,
         status=BookingStatus.CONFIRMED,
-        contact=_ADA,
+        contact=ADA_CONTACT,
         locale="nl",
         token_hash="h" * 64,
         created_at=NOW,

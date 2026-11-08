@@ -10,7 +10,8 @@ from datetime import UTC, date, datetime, time
 from typing import Any
 
 from app.domain.authorization import Role
-from app.domain.scheduling import DispatchKind, Group, Offer, TimeWindow
+from app.domain.booking import Contact
+from app.domain.scheduling import DispatchKind, Group, Offer, PhoneMode, TimeWindow
 from app.domain.services import BookingReceipt, BookingService, ContactInput
 from tests.support.principals import principal
 
@@ -26,6 +27,14 @@ FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)
 ADA = ContactInput(
     first_name="Ada", last_name="Lovelace", email="ada@example.org", phone="06 1234 5678"
 )
+ADA_CONTACT = Contact.create(
+    first_name="Ada",
+    last_name="Lovelace",
+    email="ada@example.org",
+    phone=None,
+    phone_mode=PhoneMode.OPTIONAL,
+)
+"""Ada as a booking stores her, without a phone number."""
 DEMO_SUPERUSER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 DEMO_ORG_ADMIN = principal(
     "o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset()

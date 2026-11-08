@@ -25,8 +25,6 @@ from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import AUDITOR, ORG_ADMIN, SUPER
 from tests.support.organisation_providers import PLATFORM_DISCOVERY, draft
 
-pytest_plugins = ["tests.domain.test_identity_provider_service"]
-
 
 @pytest.fixture
 def dns() -> FakeTxtResolver:

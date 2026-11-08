@@ -32,10 +32,13 @@ from tests.fakes.identity_providers import (
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.admin import AUDITOR, ORG_ADMIN, OUTSIDER, SUPER
 from tests.support.domain import NOW
-from tests.support.organisation_providers import ORGANISATIONS, PLATFORM_DISCOVERY, draft
-
-OTHER_ISSUER = "https://login.org-b.example"
-OTHER_DISCOVERY = f"{OTHER_ISSUER}/.well-known/openid-configuration"
+from tests.support.organisation_providers import (
+    ORGANISATIONS,
+    OTHER_DISCOVERY,
+    OTHER_ISSUER,
+    PLATFORM_DISCOVERY,
+    draft,
+)
 
 
 @pytest.fixture
@@ -49,23 +52,6 @@ def uow() -> InMemoryUnitOfWork:
     state.organisations = {o.id: o for o in ORGANISATIONS}
     state.organisation_slugs = {o.id: o.slug for o in ORGANISATIONS}
     return InMemoryUnitOfWork(state)
-
-
-@pytest.fixture
-def discovery() -> FakeDiscoveryFetcher:
-    fetcher = FakeDiscoveryFetcher()
-    fetcher.documents[OTHER_DISCOVERY] = discovery_document(OTHER_ISSUER)
-    return fetcher
-
-
-@pytest.fixture
-def keys() -> FakeSigningKeys:
-    return FakeSigningKeys()
-
-
-@pytest.fixture
-def changed() -> list[str]:
-    return []
 
 
 @pytest.fixture
