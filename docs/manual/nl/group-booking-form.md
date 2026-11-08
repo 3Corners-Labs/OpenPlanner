@@ -1,6 +1,6 @@
 # Boekingsformulier van een team
 
-Het formulier vraagt een inwoner altijd om voornaam, achternaam en e-mailadres. Of het ook een
+Het formulier vraagt een deelnemer altijd om voornaam, achternaam en e-mailadres. Of het ook een
 telefoonnummer vraagt, stelt u in bij de [instellingen van het team](group-settings.md). Heeft
 het team meer nodig, bijvoorbeeld een klantnummer of het onderwerp van het gesprek? Dan voegt u
 hier eigen velden toe. U opent het scherm via **team → Instellingen → Boekingsformulier → Vragen beheren**. Een organisatiebeheerder of superuser kan het wijzigen.
@@ -34,7 +34,7 @@ keuzes bij een keuzelijst, de grenzen bij een getal of datum). De soort bepaalt 
 gecontroleerd wordt. U kunt geen eigen controle schrijven.
 
 - **Korte tekst**: tot 100 tekens.
-- **Vrij tekstveld**: tot 1000 tekens. Dit is altijd een persoonsgegeven, omdat een inwoner er
+- **Vrij tekstveld**: tot 1000 tekens. Dit is altijd een persoonsgegeven, omdat een deelnemer er
   alles in kan schrijven.
 - **E-mailadres** en **telefoonnummer**: gecontroleerd zoals de vaste velden; altijd een
   persoonsgegeven. Een telefoonnummer zonder landcode lezen we als een nummer uit het land dat
@@ -43,7 +43,7 @@ gecontroleerd wordt. U kunt geen eigen controle schrijven.
   zoals een klantnummer, is een korte tekst.
 - **Datum**: met grenzen in dagen vanaf de dag van boeken.
 - **Postcode (Nederland)**: vier cijfers en twee letters, bewaard als `1234 AB`.
-- **Keuzelijst**: de inwoner kiest uit uw keuzes; er wordt nooit vrije tekst bewaard.
+- **Keuzelijst**: de deelnemer kiest uit uw keuzes; er wordt nooit vrije tekst bewaard.
 - **Vinkje**: aangevinkt of niet. Is het vinkje verplicht, dan moet het aangevinkt zijn,
   bijvoorbeeld voor toestemming.
 
@@ -54,7 +54,7 @@ nieuw veld toe.
 ## Vraag en toelichting
 
 Elke vraag heeft een tekst in het Nederlands en in het Engels. Een toelichting is optioneel;
-die staat onder de vraag. De inwoner ziet de taal van de pagina, en anders het Nederlands.
+die staat onder de vraag. De deelnemer ziet de taal van de pagina, en anders het Nederlands.
 
 <!-- field: classification -->
 ## Persoonsgegeven
@@ -81,8 +81,8 @@ afspraak, 24 uur na de afspraak of na het annuleren.
 Alleen bij een keuzelijst. Zet elke keuze op een eigen regel, als sleutel, Nederlandse tekst en
 Engelse tekst, gescheiden door een puntkomma:
 
-    huur; Huurtoeslag; Rent benefit
-    zorg; Zorgtoeslag; Healthcare benefit
+    algemeen; Algemene vraag; General question
+    aanvraag; Aanvraag; Request
 
 Hoogstens 30 keuzes, elk met een eigen sleutel.
 
@@ -95,7 +95,7 @@ in de afgelopen 30 dagen toe. Leeg is geen grens.
 
 ## Volgorde en uitzetten
 
-Met **Omhoog** en **Omlaag** zet u de velden in de volgorde waarin de inwoner ze ziet. Met
+Met **Omhoog** en **Omlaag** zet u de velden in de volgorde waarin de deelnemer ze ziet. Met
 **Uitzetten** verdwijnt een veld van het formulier. Antwoorden die al gegeven zijn blijven bij de
 afspraak staan tot ze worden gewist, en tellen vanaf dat moment als persoonsgegeven.
 

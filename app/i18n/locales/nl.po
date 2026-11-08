@@ -1088,7 +1088,7 @@ msgid "admin.field.slug"
 msgstr "Webadres"
 
 msgid "admin.field.slug_hint"
-msgstr "Wordt /g/<webadres>. Leeg laten maakt het uit de naam; hoofdletters, spaties en accenten worden omgezet, bijvoorbeeld Vergunningen Loket → vergunningen-loket."
+msgstr "Wordt /g/<webadres>. Leeg laten maakt het uit de naam; hoofdletters, spaties en accenten worden omgezet, bijvoorbeeld Klantenservice Noord → klantenservice-noord."
 
 msgid "admin.field.slug_fixed"
 msgstr "Het webadres verandert niet, zodat links op websites blijven werken."
@@ -6474,7 +6474,7 @@ msgid "admin.form_fields.title"
 msgstr "Boekingsformulier"
 
 msgid "admin.form_fields.lead"
-msgstr "Extra vragen die inwoners beantwoorden als ze een afspraak maken. Vraag alleen wat het team echt nodig heeft."
+msgstr "Extra vragen die deelnemers beantwoorden als ze een afspraak maken. Vraag alleen wat het team echt nodig heeft."
 
 msgid "admin.form_fields.settings_lead"
 msgstr "Extra vragen op het formulier, met controles en een markering voor persoonsgegevens."
@@ -6606,7 +6606,7 @@ msgid "admin.form_fields.options"
 msgstr "Keuzes"
 
 msgid "admin.form_fields.options_hint"
-msgstr "Alleen bij een keuzelijst. Eén keuze per regel: sleutel; Nederlands; Engels. Bijvoorbeeld: huur; Huurtoeslag; Rent benefit"
+msgstr "Alleen bij een keuzelijst. Eén keuze per regel: sleutel; Nederlands; Engels. Bijvoorbeeld: algemeen; Algemene vraag; General question"
 
 msgid "admin.form_fields.minimum"
 msgstr "Ondergrens"

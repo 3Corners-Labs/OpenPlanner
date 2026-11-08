@@ -97,8 +97,8 @@ EXAMPLE_CONTACTS = ContactBlock(
 # A made-up participant: the booking on hold exists only in development and test databases.
 EXAMPLE_PARTICIPANT = Contact.create(
     first_name="Voorbeeld",
-    last_name="Inwoner",
-    email="inwoner@example.org",
+    last_name="Deelnemer",
+    email="deelnemer@example.org",
     phone=None,
     phone_mode=PhoneMode.OPTIONAL,
 )
@@ -180,10 +180,10 @@ DEMO_FORM_FIELDS = (
         type=FieldType.CHOICE,
         labels={"nl": "Waar gaat uw vraag over?", "en": "What is your question about?"},
         hints={"nl": "Dan bereidt de medewerker zich voor.", "en": "So the agent can prepare."},
-        options=("toeslagen", "belastingen", "anders"),
+        options=("algemeen", "aanvraag", "anders"),
         option_labels={
-            "toeslagen": {"nl": "Toeslagen", "en": "Benefits"},
-            "belastingen": {"nl": "Belastingen", "en": "Taxes"},
+            "algemeen": {"nl": "Algemene vraag", "en": "General question"},
+            "aanvraag": {"nl": "Aanvraag", "en": "Request"},
             "anders": {"nl": "Iets anders", "en": "Something else"},
         },
         classification=Classification.NOT_PII,

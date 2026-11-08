@@ -37,7 +37,7 @@ from tests.support.domain import (
 def uow() -> InMemoryUnitOfWork:
     state = State()
     state.groups[1] = make_group(id=1, slug="aangifte")
-    state.groups[2] = make_group(id=2, slug="toeslagen", phone_mode=PhoneMode.REQUIRED)
+    state.groups[2] = make_group(id=2, slug="helpdesk", phone_mode=PhoneMode.REQUIRED)
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     state.rules[2] = [ScheduleRule(weekday=1, window=window(capacity=1))]  # Tuesdays
     state.reminder_rules[1] = [ReminderRule(ChannelKind.EMAIL, minutes_before=24 * 60)]
@@ -179,7 +179,7 @@ async def test_invalid_contact_stores_nothing(
 async def test_group_phone_mode_is_applied(service: BookingService) -> None:
     with pytest.raises(DomainError, match="phone"):
         await service.book(
-            group_slug="toeslagen",
+            group_slug="helpdesk",
             start=TUESDAY_0900,
             contact=ContactInput(first_name="Ada", last_name="Lovelace", email="ada@example.org"),
             locale="en",
@@ -269,7 +269,7 @@ async def test_reschedule_into_the_same_slot(service: BookingService) -> None:
 async def test_reschedule_into_another_groups_slot_is_refused(
     service: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
-    # Abuse case: the Tuesday slot exists only for group "toeslagen".
+    # Abuse case: the Tuesday slot exists only for group "helpdesk".
     old = await book(service)
 
     with pytest.raises(DomainError, match="slot_unavailable"):
@@ -599,8 +599,8 @@ async def test_the_limit_counts_only_this_group_and_the_future(
 ) -> None:
     service = _limit_service(uow, 1)
     await book(service)
-    uow.state.groups[2] = make_group(id=2, slug="toeslagen", max_bookings_per_email=1)
-    await service.book(group_slug="toeslagen", start=TUESDAY_0900, contact=ADA, locale="nl")
+    uow.state.groups[2] = make_group(id=2, slug="helpdesk", max_bookings_per_email=1)
+    await service.book(group_slug="helpdesk", start=TUESDAY_0900, contact=ADA, locale="nl")
 
     with pytest.raises(DomainError, match="booking_limit_reached"):
         await book(service, SLOT_0930)

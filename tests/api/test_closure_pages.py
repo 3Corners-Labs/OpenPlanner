@@ -119,7 +119,7 @@ async def test_a_booking_on_hold_shows_the_contact_options_above_its_actions(
     assert "<p><strong>Storing bij het loket</strong></p>" in page
     assert PHONE_LINK in page
     assert page.index(PHONE_LINK) < page.index(f'href="{base}/reschedule"')
-    assert "inwoner@example.org" not in page  # the page never shows contact details
+    assert "@example.org" not in page  # the page never shows the participant's email address
 
 
 async def test_the_closure_page_names_the_day_the_details_are_deleted_by(

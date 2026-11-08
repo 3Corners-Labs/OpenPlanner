@@ -1088,7 +1088,7 @@ msgid "admin.field.slug"
 msgstr "Web address"
 
 msgid "admin.field.slug_hint"
-msgstr "Becomes /g/<web address>. Leave empty to make it from the name; capitals, spaces and accents are converted, for example Permits Desk → permits-desk."
+msgstr "Becomes /g/<web address>. Leave empty to make it from the name; capitals, spaces and accents are converted, for example Customer Service North → customer-service-north."
 
 msgid "admin.field.slug_fixed"
 msgstr "The web address does not change, so links on websites keep working."
@@ -6606,7 +6606,7 @@ msgid "admin.form_fields.options"
 msgstr "Choices"
 
 msgid "admin.form_fields.options_hint"
-msgstr "Choice lists only. One choice per line: key; Dutch; English. For example: rent; Huurtoeslag; Rent benefit"
+msgstr "Choice lists only. One choice per line: key; Dutch; English. For example: general; Algemene vraag; General question"
 
 msgid "admin.form_fields.minimum"
 msgstr "Lower limit"
