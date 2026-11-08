@@ -5,27 +5,19 @@ Two admin downloads write an audit event when they are opened: the audit log exp
 ADR 0049 point 17). The admin cookie is ``SameSite=Lax``, so it travels on a top-level
 navigation from any site: without a guard, a link on another site makes a signed-in admin's
 browser download the file and puts an export in their name in the audit log. Both depend on
-``SameOrigin``, like every form post of the portal. The sweep at the end opens every admin
-``GET`` and keeps ``AUDITED_DOWNLOADS`` complete.
+``SameOrigin``, like every form post of the portal. ``AUDITED_DOWNLOADS`` lists them, and the
+privacy sweep (``tests/admin/test_privacy_sweep.py``) keeps that list complete.
 """
 
-from collections import Counter
+from urllib.parse import quote
 
 import pytest
 
 from app.domain.audit import Outcome
-from app.domain.audit_export import EXPORT_EVENT
-from app.domain.idp_mapping import EXPORTED_EVENT
 from app.domain.security_log import CROSS_SITE, REQUEST_REJECTED
 from tests.admin.conftest import SUPER, Site
 from tests.support.admin_site import audit_events
-from tests.support.authorization_matrix import GET_PATHS
-
-AUDITED_DOWNLOADS = {
-    "/admin/audit/export.csv": EXPORT_EVENT,
-    "/admin/idp-mapping/export.txt": EXPORTED_EVENT,
-}
-"""Every admin ``GET`` that writes an audit event when opened, with that event's action."""
+from tests.support.downloads import AUDITED_DOWNLOADS
 
 
 @pytest.mark.parametrize("path", AUDITED_DOWNLOADS)
@@ -61,28 +53,32 @@ async def test_a_download_from_the_portal_or_the_address_bar_goes_ahead_and_is_a
     assert (SUPER.subject, AUDITED_DOWNLOADS[path], Outcome.SUCCESS) in events
 
 
-async def _written(site: Site, path: str, fetch_site: str) -> list[str]:
-    """Return the actions a ``GET`` of ``path`` adds to the audit log, refusals left out.
-
-    A refusal (``denied``) records what the browser asked for, not something the admin did.
-    """
-    before = Counter(await audit_events(site))
-    await site.client.get(path, headers={"sec-fetch-site": fetch_site})
-    added = Counter(await audit_events(site)) - before
-    return sorted(action for _, action, outcome, _ in added.elements() if outcome != Outcome.DENIED)
-
-
-@pytest.mark.matrix
-@pytest.mark.parametrize("path", GET_PATHS)
-async def test_no_admin_get_writes_an_audit_event_when_another_site_asks_for_it(
-    site: Site, path: str
+@pytest.mark.parametrize(
+    ("download", "page"),
+    [
+        ("/admin/audit/export.csv?level=warning", "/admin/audit?level=warning"),
+        ("/admin/idp-mapping/export.txt", "/admin/idp-mapping"),
+    ],
+)
+async def test_a_download_after_the_session_ended_returns_to_its_page_after_the_login(
+    site: Site, download: str, page: str
 ) -> None:
-    # The superuser opens every admin page. From another site nothing is written; from the
-    # portal only the listed downloads write their event, so a new one joins the list (and the
-    # threat model's table of GET routes with an effect) and gets the guard.
-    await site.login_as(SUPER)
+    # The button on a page left open past the session. The login does not replay the download:
+    # its last hop would come from the identity provider, cross-site, and be refused. The admin
+    # is back on the page, with its view, and asks again.
+    button = {"sec-fetch-site": "same-origin", "referer": f"http://testserver{page}"}
 
-    assert await _written(site, path, "cross-site") == []
-    assert await _written(site, path, "same-origin") == (
-        [AUDITED_DOWNLOADS[path]] if path in AUDITED_DOWNLOADS else []
-    )
+    response = await site.client.get(download, headers=button)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/admin/login?next={quote(page, safe='/')}"
+
+
+async def test_a_typed_download_without_a_session_returns_to_the_overview_after_the_login(
+    site: Site,
+) -> None:
+    # Without a page that asked for it, the login lands on the overview, never on the download.
+    response = await site.client.get("/admin/audit/export.csv", headers={"sec-fetch-site": "none"})
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/login?next=/admin/"

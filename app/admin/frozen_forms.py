@@ -23,6 +23,7 @@ from starlette.routing import Match
 
 from app.admin.authz import RequirePermission
 from app.domain.authorization import Principal, decide_in_maintenance
+from app.web.route_dependencies import dependency_calls
 
 BAR_ID = "maintenance-bar"
 """The id of the maintenance bar (``_maintenance.html``), which says why buttons are disabled."""
@@ -53,13 +54,8 @@ def requirement_for(routes: Iterable[object], path: str) -> RequirePermission | 
         match, _ = route.matches(scope)
         if match is not Match.FULL:
             continue
-        stack = list(route.dependant.dependencies)
-        while stack:
-            dependency = stack.pop()
-            if isinstance(dependency.call, RequirePermission):
-                return dependency.call
-            stack.extend(dependency.dependencies)
-        return None
+        calls = dependency_calls(route)
+        return next((call for call in calls if isinstance(call, RequirePermission)), None)
     return None
 
 

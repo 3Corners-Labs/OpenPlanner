@@ -786,7 +786,8 @@ async def export(
     """Download exactly the current filter as CSV (ADR 0040, part 3); the export is audited.
 
     Because opening it writes an audit event, a request another site makes is refused
-    (``SameOrigin``, ASVS V3.5.3): a link elsewhere cannot export in an admin's name.
+    (``SameOrigin``, ASVS V3.5.3): a link on another site cannot make a signed-in admin's
+    browser export.
     """
     service = admin_service(request)
     settings = settings_for(request)

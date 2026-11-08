@@ -47,7 +47,8 @@ groepsbeheerders niet.
 - Elke export komt zelf in het auditlog, met het aantal regels.
 - De download start alleen vanuit het portaal zelf: met de knop, of met een adres dat u intypt
   of als bladwijzer bewaart. Een link ernaar op een andere website (ook mail of chat in de
-  browser) geeft een foutmelding, zodat niemand een export op uw naam in het log kan zetten.
+  browser) geeft een foutmelding, zodat een andere website geen export op uw naam in het log
+  kan zetten.
 
 Een export bevat de identificatie (subject) van beheerders. Bewaar het bestand volgens het
 beleid van uw organisatie.

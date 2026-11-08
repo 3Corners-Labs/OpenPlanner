@@ -102,10 +102,10 @@ No form carries a CSRF token. Three independent layers stand in the way of a cro
    `POST`, `fetch` or subresource request, only on top-level `GET` navigations. This is the
    layer that protects a browser that sends neither header below.
 2. **Fetch Metadata** (`require_same_origin`, `app/web/protection.py`). Every state-changing
-   route, admin and public, depends on it (`SameOrigin`), and so does every admin `GET` that
-   writes an audit event (the two downloads in the table below). `Sec-Fetch-Site` is sent by
-   every current browser and cannot be set by a page; only `same-origin` and `none` pass,
-   anything else is a `403` and a security event (ADR 0053).
+   route, admin and public, depends on it (`SameOrigin`), and so do the two audited downloads
+   (`GET`, the table below). `Sec-Fetch-Site` is sent by every current browser and cannot be
+   set by a page; only `same-origin` and `none` pass, anything else is a `403` and a security
+   event (ADR 0053).
 3. **`Origin` comparison.** Only when `Sec-Fetch-Site` is absent, the `Origin` header is
    compared with this site. It is not trusted when `Sec-Fetch-Site` is present, because the
    referrer policy of some pages makes browsers send `Origin: null` for same-origin posts.
@@ -118,12 +118,13 @@ cookie, which it has only when the caller already holds it, and a browser that d
 withholds it from cross-site requests (layer 1). Refusing these requests would break health
 probes and tests without closing a path. The behaviour is pinned by
 `tests/admin/test_admin_flow.py::test_a_post_without_fetch_metadata_and_without_origin_is_let_through`.
-On the two audited downloads, which are `GET`s, the exception reaches further: a browser that
-sends no `Sec-Fetch-Site` sends no `Origin` on a navigation either, and `SameSite=Lax` sends
-the cookie on one, so a link on another site still works in such a browser. Every browser since
-Chrome 76, Firefox 90 and Safari 16.4 (March 2023) sends `Sec-Fetch-Site`; what the link
-achieves in an older one is a file in the admin's own browser and an export line in their name,
-never the file in the attacker's hands.
+On the two audited downloads, which are `GET`s, two cases still download. A browser that sends
+no `Sec-Fetch-Site` sends no `Origin` on a navigation either, and `SameSite=Lax` sends the
+cookie on one, so a link on another site still works in such a browser; every browser since
+Chrome 76, Firefox 90 and Safari 16.4 (March 2023) sends `Sec-Fetch-Site`. And a link the admin
+opens from another program, such as a desktop mail or chat client, arrives as `none`, the
+admin's own navigation. Either way the file stays in the admin's own browser and the attacker
+never sees it; what is left is an export line the admin did not mean.
 Where `SameSite` is not enough because the cookie is not involved, there is nothing to
 forge: the public forms act on a link or on a booking the caller creates, and the bot API
 uses a bearer token that a page cannot attach (no CORS headers).
@@ -136,20 +137,26 @@ carries no cookie.
 
 No `GET` changes a booking, a setting or a right. The routes below do something besides
 returning a page; each is deliberate. An admin `GET` that writes an audit event refuses a
-request another site makes (`SameOrigin`), so a link elsewhere cannot write an event in a
-signed-in admin's name; `tests/admin/test_audited_downloads.py` opens every admin `GET` from
-another site and from the portal, so a new one cannot miss the guard or this table.
+request another site makes, so a link elsewhere cannot make a signed-in admin's browser write
+an event in their name. The downloads depend on `SameOrigin` (a `403` and a security event).
+The contact details count only from the booking page itself (`from_this_page`), which also
+refuses an address that was typed, bookmarked or shared, because what they show is personal
+data. The one exception is the login callback, which the identity provider sends cross-site by
+protocol. The privacy sweep (`tests/admin/test_privacy_sweep.py`) opens every admin `GET`
+route on real objects and fails when one writes an audit event and is not a listed download
+(`tests/support/downloads.py`); an effect behind a query parameter, like the contact details,
+needs a test of its own.
 
 | Route | Effect | Why it is acceptable |
 |---|---|---|
 | `GET /b/m/{ref}/confirm`, `/cancel`, `/wait/leave` | None; shows a button. The `POST` confirms, cancels or leaves (ADR 0056). | Mail scanners and link previewers that follow the link change nothing. |
 | `GET /b/m/{ref}/join`, `/join/go` | Writes a join-page or join-click event on the booking's timeline (ADR 0072). | Evidence for troubleshooting, no change to the booking. |
 | `GET /b/m/{ref}/test/go`, `/wait/status` | Redirect into the open trial meeting; status poll. | Read-only. |
-| `GET /admin/login`, `/admin/callback` | Start and finish an OIDC login. | The callback is a `GET` by the protocol; `state` and `nonce` bind it to the browser that started it. |
+| `GET /admin/login`, `/admin/callback` | Start and finish an OIDC login; the callback writes the audit event `admin.login`. | The callback is a `GET` by the protocol and arrives cross-site from the identity provider; `state` and `nonce` bind it to the browser that started it. |
 | `GET /admin/preferences` | Stores theme, menu width and alert choices in the caller's own session cookie, then redirects to `next`. | Only own presentation preferences; `next` is checked (see below); a third-party link can at worst change a theme. |
 | `GET /admin/groups/{slug}/bookings/{id}?contact=show` | Shows the participant's contact details and writes the audit event `booking.contact_viewed` (ADR 0044 §2). | Reading, accounted for; only the button on the booking page itself counts (`from_this_page`), so a shared, bookmarked, crafted or prefetched address, or a link to it on another page of the portal, shows and writes nothing. |
 | `GET /admin/updates/progress`, `/…/live` fragments | Poll status. | Read-only. |
-| `GET /admin/audit/export.csv` | Writes the audit event `audit.export` (ADR 0040); a refusal over a limit is audited too. | Reading, accounted for. `SameOrigin`: a request another site makes (`cross-site`, `same-site`) gets a `403` and a `request.rejected` security event, and no file and no export event; the link on the audit page (`same-origin`) and an address typed, bookmarked or opened from another program (`none`, which no page can set) download. The file holds no participant data, so the address itself may be reused. |
+| `GET /admin/audit/export.csv` | Writes the audit event `audit.export` (ADR 0040); a refusal over a limit is audited too. | Reading, accounted for. `SameOrigin`: a request another site makes (`cross-site`, `same-site`) gets a `403` and a `request.rejected` security event, and no file and no export event; the link on the audit page (`same-origin`) and an address typed, bookmarked or opened from another program (`none`, which no page can set) download, as the admin's own navigation (the residue is under *CSRF in three layers*). The file holds no participant data, so unlike the contact details its address may be reused. A login does not replay it: the admin comes back to the audit page (see *Redirects*). |
 | `GET /admin/idp-mapping/export.txt` | Writes the audit event `idp_mapping.exported` (ADR 0049 point 17). | As the audit export: `SameOrigin`, and the file holds entitlement values, no personal data. |
 | `GET /api/agent/v1/configuration` | Writes an audit event with the detail `configuration.export` and the API client as actor (ADR 0099). | The machine API takes a bearer token in the `Authorization` header, which a browser never adds by itself, so a link on another site carries none (no CORS). |
 
@@ -160,7 +167,7 @@ from a request without a check.
 
 | Redirect | Target decided by | Control |
 |---|---|---|
-| After admin login or re-login, update snooze, preferences (`next`) | The request (`next` parameter; for a page opened without a session, its own path and query) | `safe_next`: must start with `/admin`, no `//`, no `\`, no `://`; else `/admin/`. The guard runs on the whole value; its query then keeps only the view parameters of the allow-list `RETURN_QUERY_PARAMS` (`app/admin/return_to.py`: dates, tabs, closed-list filters, slugs; value of letters, digits and `_.:-`; at most 8), so no `q` (typed text), no `done`/`count`, no token or code reaches the login URL or the session; an anchor comes back only as a plain name. Login and re-login use the same `return_path`. `test_next_cannot_leave_the_admin_portal`, `test_the_kept_query_holds_no_token_and_no_free_text`, `test_a_long_query_is_dropped_whole`, `test_a_recent_login_comes_back_with_the_view_query_only` |
+| After admin login or re-login, update snooze, preferences (`next`) | The request (`next` parameter; for a page opened without a session, its own path and query; for a form post or an audited download, the page that asked for it, so a login never replays an action) | `safe_next`: must start with `/admin`, no `//`, no `\`, no `://`; else `/admin/`. The guard runs on the whole value; its query then keeps only the view parameters of the allow-list `RETURN_QUERY_PARAMS` (`app/admin/return_to.py`: dates, tabs, closed-list filters, slugs; value of letters, digits and `_.:-`; at most 8), so no `q` (typed text), no `done`/`count`, no token or code reaches the login URL or the session; an anchor comes back only as a plain name. Login and re-login use the same `return_path`. `test_next_cannot_leave_the_admin_portal`, `test_the_kept_query_holds_no_token_and_no_free_text`, `test_a_long_query_is_dropped_whole`, `test_a_recent_login_comes_back_with_the_view_query_only` |
 | `GET /admin/login` to the IdP | The IdP's `authorization_endpoint` from the pinned discovery document (ADR 0097); organisation providers: the endpoint stored at registration | Issuer compared exactly; only `https` (or `http` in development) |
 | Logout to the IdP's `end_session_endpoint` | Same discovery document | `post_logout_redirect_uri` is built by us; interstitial page keeps CSP `form-action 'self'` |
 | `GET /b/m/{ref}/join/go`, `/test/go` | The join link of the Webex meeting, kept on the booking | `join_link` refuses anything but `https` and applies the group's client setting (ADR 0075); the value is written by the Webex adapter, never by a request |
@@ -311,7 +318,7 @@ package (ADR 0089) moves settings between installations.
 | Denial of service: a distributed attack fills memory or the audit table with security events (ADR 0053) | One event per kind and caller per window; at most `SECURITY_EVENT_MAX_SOURCES` windows, further callers count as `many` | `tests/domain/test_security_log.py::test_beyond_the_bound_further_clients_count_as_many`, `tests/api/test_security_events.py::test_a_rate_limit_flood_is_one_event_per_caller` |
 | CSV injection: an exported cell runs as a formula in Excel (ADR 0040) | Cells starting with `=`, `+`, `-`, `@`, tab or CR get a leading `'` | `tests/domain/test_audit_export.py::test_a_formula_becomes_text` |
 | An admin exports events outside their scope, or exports without trace | Export behind `audit.export`, scoped in SQL like the page; every export (and refusal) is an audit event | `tests/admin/test_audit_routes.py::test_the_export_is_the_current_filter_inside_the_scope`, `test_the_group_admin_may_view_but_not_export`, `test_every_export_is_itself_an_audit_event` |
-| Repudiation (abuse: a link on another site writes an export in an admin's name) | A crafted link makes a signed-in admin's browser open the audit export or the identity provider mapping export (`SameSite=Lax` sends the cookie on a top-level navigation): the file downloads unasked and the audit log names an export the admin never asked for. The attacker cannot read the file | Both downloads depend on `SameOrigin`: `cross-site` and `same-site` get a `403` and a `request.rejected` security event, no file and no export event; the sweep opens every admin `GET` as the superuser from another site (nothing written but refusals) and from the portal (only these two write their event) | `tests/admin/test_audited_downloads.py::test_a_download_another_site_asks_for_is_refused_and_not_audited`, `test_a_download_from_the_portal_or_the_address_bar_goes_ahead_and_is_audited`, `test_no_admin_get_writes_an_audit_event_when_another_site_asks_for_it` |
+| Repudiation (abuse: a link on another site writes an export in an admin's name) | A crafted link makes a signed-in admin's browser open the audit export or the identity provider mapping export (`SameSite=Lax` sends the cookie on a top-level navigation): the file downloads unasked and the audit log names an export the admin never asked for. The attacker cannot read the file | Both downloads depend on `SameOrigin`: `cross-site` and `same-site` get a `403` and a `request.rejected` security event, no file and no export event. After a login an export is not replayed (the identity provider's redirect back to it would arrive cross-site); the admin returns to the page that asked for it. The privacy sweep opens every admin `GET` route on real objects and fails on one that writes an audit event and is not a listed download. Residue, accepted: a browser without Fetch Metadata, and a link opened from another program (`none`), still download (*CSRF in three layers*) | `tests/admin/test_audited_downloads.py::test_a_download_another_site_asks_for_is_refused_and_not_audited`, `test_a_download_from_the_portal_or_the_address_bar_goes_ahead_and_is_audited`, `test_a_download_after_the_session_ended_returns_to_its_page_after_the_login`, `tests/admin/test_privacy_sweep.py::test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept` |
 | Denial of service through a huge export | At most `AUDIT_EXPORT_MAX_ROWS` rows and `AUDIT_EXPORT_MAX_DAYS` days; refused, never streamed without bound | `test_an_export_over_the_row_limit_is_refused_and_audited`, `test_an_export_over_the_period_limit_is_refused_on_the_page` |
 | Debug detail leaks personal data or fills the disk (ADR 0040) | Debug events carry codes and ids only (same `AuditEvent`); only the superuser switches the mode; it ends after `DIAGNOSTIC_MODE_HOURS`; at storage grade critical the brake ends every mode; 7-day retention; never shipped | `tests/domain/test_diagnostics.py`, `tests/jobs/test_housekeeping.py::test_at_grade_critical_the_brake_ends_diagnostic_mode`, `tests/adapters/test_event_sink.py::test_diagnostic_events_never_leave_the_installation` |
 | PII in logs through a library at DEBUG or TRACE (`aiosqlite` bound values, `httpcore` response headers, a library added later) | `configure_logging` is an allowlist: `LOG_LEVEL` governs `openplanner.*`, the structlog loggers and `uvicorn.error` only, the last down to INFO (below that uvicorn writes every connection's address, and the websockets library, which uvicorn hands the same logger, writes a WebSocket request's line and every header, cookies included); every other logger stays at WARNING at any level, after a live level change and when the library sets its own level (root level plus a handler filter), so the stream, the tap and log shipping never see it; `sql.slow` carries statement type and table only; engines are built with `hide_parameters` | `tests/test_logging.py::test_the_real_engine_logs_no_bound_value_at_any_level`, `test_a_foreign_logger_stays_at_warning_at_every_level`, `test_our_own_loggers_follow_the_level_and_the_trace_points_work` |

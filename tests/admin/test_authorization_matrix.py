@@ -18,7 +18,7 @@ from app.domain.authorization import Principal
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
 from tests.admin.conftest import SAME_ORIGIN, Site
-from tests.support.authorization_matrix import EXPECTED, GET_PATHS, ROLES
+from tests.support.authorization_matrix import EXPECTED, ROLES
 from tests.support.routes import all_routes, scoped_routes
 
 CASES = [
@@ -145,6 +145,9 @@ async def maintenance_on(site: Site) -> None:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     service: MaintenanceService = app.state.maintenance_service
     await service.switch_on_host("host-cli", MaintenanceReason.OTHER)
+
+
+GET_PATHS = [p for key, routes in EXPECTED.items() if key.startswith("GET ") for p in routes]
 
 
 @pytest.mark.matrix

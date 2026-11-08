@@ -46,7 +46,7 @@ admins cannot.
 - Every export is itself an entry in the audit log, with the number of rows.
 - The download only starts from the portal itself: the button, or an address you type in or
   bookmark. A link to it on another website (also mail or chat in the browser) gets an error
-  page instead, so nobody can put an export in your name in the log.
+  page instead, so another website cannot put an export in your name in the log.
 
 An export contains the identifiers (subjects) of admins. Keep the file according to your
 organisation's policy.

@@ -1,9 +1,9 @@
-"""Request protection for public HTML forms: same-origin checks and rate limits.
+"""Request protection for HTML forms and audited downloads: same-origin checks and rate limits.
 
 Forms carry no CSRF token. The primary signal is Fetch Metadata: browsers send
 ``Sec-Fetch-Site`` with every request and pages cannot forge it. Only when it is missing
-(older browsers) is ``Origin`` compared instead. A cross-site POST is refused
-(``RejectedRequest``) and becomes a security event (ADR 0053).
+(older browsers) is ``Origin`` compared instead. A cross-site POST, or a cross-site GET of an
+audited download, is refused (``RejectedRequest``) and becomes a security event (ADR 0053).
 
 Rate limits use slowapi, keyed by client IP (behind a proxy, uvicorn's ``--proxy-headers``
 supplies the real address). slowapi buckets per request path, so links that match no booking
@@ -67,7 +67,12 @@ def from_this_page(request: Request) -> bool:
 
 
 def require_same_origin(request: Request) -> None:
-    """FastAPI dependency: refuse POSTs that a browser marks as cross-site.
+    """FastAPI dependency: refuse a request that a browser marks as cross-site.
+
+    Every form post depends on it, and so do the audited downloads, the admin ``GET`` routes
+    that write an audit event when they are opened (ASVS V3.5.3). ``none`` passes: typed,
+    bookmarked or opened from another program, a navigation the person made themselves. A
+    ``GET`` that shows personal data asks more (``from_this_page``): only its own page counts.
 
     ``Origin`` is not trusted when ``Sec-Fetch-Site`` is present: some referrer policies make
     browsers send ``Origin: null`` even for same-origin form posts.

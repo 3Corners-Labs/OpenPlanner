@@ -1266,6 +1266,3 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/andere-team/closure/contacts": statuses(308, 403, 403, 308, 403, 403, 403),
     },
 }
-
-GET_PATHS = [p for key, routes in EXPECTED.items() if key.startswith("GET ") for p in routes]
-"""Every concrete path of every admin ``GET`` route, for the sweeps over all of them."""

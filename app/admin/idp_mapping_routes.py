@@ -243,8 +243,7 @@ async def export_idp_mapping(
 ) -> Response:
     """Download the values as a text file, one per line; the download is audited.
 
-    Because opening it writes an audit event, a request another site makes is refused
-    (``SameOrigin``, ASVS V3.5.3): a link elsewhere cannot export in an admin's name.
+    So, like the audit log export, it refuses a request another site makes (``SameOrigin``).
     """
     document = await idp_mapping_service(request).export(context.principal)
     clock: Clock = request.app.state.clock
