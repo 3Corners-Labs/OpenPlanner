@@ -43,6 +43,8 @@ import subprocess  # noqa: S404 - runs git with fixed arguments only
 import sys
 from collections.abc import Callable, Iterable, Mapping, Sequence
 
+from scripts.adr_tables import CODE_STATES, TableError, overview_rows, state_of, table_rows
+
 LABEL = "po:approved"
 """The product owner's approval; any collaborator can set it, only an administrator's counts."""
 
@@ -56,6 +58,7 @@ DECISION_FILES = frozenset(
         "Makefile",
         "app/domain/authorization.py",
         "scripts/decision_gate.py",
+        "scripts/adr_tables.py",
         "scripts/release-audit.sh",
         "scripts/check-release-audit.sh",
     }
@@ -73,11 +76,7 @@ UNBUILT_LIMIT = 3
 """ADR 0119: a new ADR is refused while this many ADRs or more have nothing built yet. Fixed on
 purpose, like the decision paths: changing it is itself a decision."""
 
-DONE_STATES = ("merged", "built", "live")
-"""The *Build status* states that say a step's code is in (ADR 0059 point 7)."""
-
 _NEW_ADR = re.compile(r"^docs/adr/(\d{4})-[^/]+\.md$")
-_OVERVIEW_ROW = re.compile(r"^\| (\d{4}) \| .+? \| (.+?) \| .+? \| .+? \|$")
 
 _PULL_REQUEST = re.compile(r"\(#(\d+)\)$|^Merge pull request #(\d+) ")
 """The pull request number in a squash commit's subject or a merge commit's subject."""
@@ -148,35 +147,36 @@ def first_step_built(adr: str) -> bool:
 
     Returns:
         ``True`` when the first row after step 0 (the ADR itself) says ``merged``, ``built``
-        or ``live``: the pull request that adds the ADR also builds that step (ADR 0119).
+        or ``live``: the pull request that adds the ADR also builds that step (ADR 0119). An
+        unknown state counts as not built: the gate fails closed.
     """
-    table = _BUILD_STATUS.search(adr)
-    if table is None:
+    steps = [cells for cells in table_rows(adr) or [] if cells[0] != "0"]
+    if not steps:
         return False
-    for line in table.group(0).splitlines():
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if not line.startswith("|") or len(cells) < 4 or cells[0] in {"Step", "0"}:
-            continue
-        if set(cells[0]) == {"-"}:
-            continue
-        return cells[-1].startswith(DONE_STATES)
-    return False
+    try:
+        return state_of(steps[0]) in CODE_STATES
+    except TableError:
+        return False
+
+
+POLICY_MARK = "policy, nothing to build"
+"""The words a Status line carries for a rule with no code (ADR 0119); a looser match on
+"policy" alone would let any ADR that mentions a policy skip its build step."""
+
+FIRST_ADR_UNDER_THE_BRAKE = 120
+"""The brake binds the ADRs after 0119, the one that introduces it: in the merge queue the
+gate runs from the group's own copy, so without this the introducing PR would block itself."""
 
 
 def is_policy(adr: str) -> bool:
     """Return whether an ADR's Status line says it is a rule with nothing to build."""
     status = _STATUS.search(adr)
-    return status is not None and "policy" in status.group(0).lower()
+    return status is not None and POLICY_MARK in " ".join(status.group(0).lower().split())
 
 
 def unbuilt(overview: str) -> set[str]:
     """Return the numbers of the ADRs that ``docs/adr-status.md`` lists as NOT BUILT."""
-    found = set()
-    for line in overview.splitlines():
-        row = _OVERVIEW_ROW.match(line.strip())
-        if row and row.group(2).startswith("NOT BUILT"):
-            found.add(row.group(1))
-    return found
+    return {row.number for row in overview_rows(overview) if row.built.startswith("NOT BUILT")}
 
 
 def blocks(paths: Iterable[str], texts: Texts) -> list[str]:
@@ -195,6 +195,7 @@ def blocks(paths: Iterable[str], texts: Texts) -> list[str]:
     """
     found = []
     new = {}
+    removed = set()
     for path in sorted(paths):
         match = _NEW_ADR.match(path)
         if match is None:
@@ -202,6 +203,10 @@ def blocks(paths: Iterable[str], texts: Texts) -> list[str]:
         before, after = texts(path)
         if before is None and after is not None:
             new[match.group(1)] = after
+        elif before is not None and after is None:
+            removed.add(match.group(1))
+    for number in removed & set(new):
+        del new[number]  # a renamed file keeps its number: not a new decision
     for number, text in new.items():
         if not is_policy(text) and not first_step_built(text):
             found.append(
@@ -209,9 +214,11 @@ def blocks(paths: Iterable[str], texts: Texts) -> list[str]:
                 "(its Build status row must say merged)"
             )
     if new:
-        overview = texts(OVERVIEW)[1] or ""
-        waiting = sorted(unbuilt(overview) - set(new))
-        if len(waiting) >= UNBUILT_LIMIT:
+        before, after = texts(OVERVIEW)
+        # The base counts too: a pull request cannot relabel unbuilt ADRs to slip under the limit.
+        waiting = sorted((unbuilt(before or "") | unbuilt(after or "")) - set(new))
+        braked = any(int(number) >= FIRST_ADR_UNDER_THE_BRAKE for number in new)
+        if braked and len(waiting) >= UNBUILT_LIMIT:
             found.append(
                 f"{len(waiting)} ADRs have nothing built ({', '.join(waiting)}); a new ADR "
                 f"waits until fewer than {UNBUILT_LIMIT} are left"

@@ -8,6 +8,7 @@ import pytest
 from scripts.release_pr import (
     AUDIT_HEADING,
     VERDICT_OPEN,
+    adr_progress,
     bump_lock,
     bump_publiccode,
     bump_pyproject,
@@ -110,7 +111,7 @@ def _template_headings() -> list[str]:
 
 
 def test_the_body_answers_every_section_of_the_pr_template() -> None:
-    body = pr_body("0.4.0", "v0.3.0", ["feat: a", "fix: b"], "cyberbeuk", "2026-11-02")
+    body = pr_body("0.4.0", "v0.3.0", ["feat: a", "fix: b"], "cyberbeuk", "2026-11-02", "")
 
     for heading in _template_headings():
         assert heading in body, heading
@@ -123,8 +124,8 @@ def test_the_body_answers_every_section_of_the_pr_template() -> None:
 
 
 def test_a_minor_release_body_carries_an_open_audit_section_a_patch_does_not() -> None:
-    minor = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02")
-    patch = pr_body("0.4.1", "v0.4.0", ["fix: a"], "po", "2026-11-02")
+    minor = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", "")
+    patch = pr_body("0.4.1", "v0.4.0", ["fix: a"], "po", "2026-11-02", "")
 
     assert AUDIT_HEADING in minor
     assert VERDICT_OPEN in minor
@@ -134,7 +135,7 @@ def test_a_minor_release_body_carries_an_open_audit_section_a_patch_does_not() -
 
 
 def test_the_audit_section_is_added_or_replaced_and_ends_open() -> None:
-    body = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02")
+    body = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", "")
 
     first = with_audit(body, "## Findings\n\nP1: a bug in x.py:3\nP2: a nit\n")
 
@@ -291,7 +292,7 @@ def test_prepare_edits_the_four_files_and_writes_the_body(
 
 def test_audit_writes_the_findings_into_the_body_file(released: Path) -> None:
     body, findings = released / "body.md", released / "findings.md"
-    body.write_text(pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02"))
+    body.write_text(pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", ""))
     findings.write_text("P2: a nit\n")
 
     assert main(["audit", "--body", str(body), "--findings", str(findings)]) == 0
@@ -331,8 +332,6 @@ def test_plan_refuses_a_patch_that_carries_a_migration() -> None:
 
 def test_the_release_pr_lists_the_adrs_this_release_finishes() -> None:
     """ADR 0119: the product owner reads which decisions became built, and what is still open."""
-    from scripts.release_pr import adr_progress
-
     before = "\n".join(
         [
             "| 0001 | One | BUILT | e | – |",
@@ -350,4 +349,4 @@ def test_the_release_pr_lists_the_adrs_this_release_finishes() -> None:
     assert "Still open (2): 0003, 0004; of these nothing built yet: 0003, 0004." in section
     body = pr_body("0.6.0", "v0.5.0", ["feat: a"], "po", "2026-11-08", section)
     assert section in body
-    assert "## ADRs" not in pr_body("0.6.0", "v0.5.0", ["feat: a"], "po", "2026-11-08")
+    assert "## ADRs" not in pr_body("0.6.0", "v0.5.0", ["feat: a"], "po", "2026-11-08", "")

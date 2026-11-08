@@ -8,44 +8,16 @@ every *Build status* table uses the agreed states.
 
 import re
 from collections import Counter
-from dataclasses import dataclass
 from pathlib import Path
+
+from scripts.adr_tables import STATES, Row, drift_problem, overview_rows, table_rows
 
 ROOT = Path(__file__).resolve().parents[1]
 ADR_DIR = ROOT / "docs" / "adr"
 STATUS_FILE = ROOT / "docs" / "adr-status.md"
 
-CATEGORIES = ("BUILT", "PARTIAL", "NOT BUILT", "POLICY", "SUPERSEDED")
-"""The words a *Built?* cell starts with; a note may follow in brackets."""
-
 FIRST_ADR_WITH_BUILD_TABLE = 59
 """ADR 0059 point 7: from here on every ADR carries its own *Build status* table."""
-
-STATES = ("planned", "in PR", "merged", "built", "live", "follow-up", "superseded")
-"""What a *Build status* row may start its state with (ADR 0059 point 7, ADR 0119)."""
-
-ROW = re.compile(r"^\| (\d{4}) \| (.+?) \| (.+?) \| (.+?) \| (.+?) \|$")
-
-
-@dataclass(frozen=True)
-class Row:
-    """One ADR's line in the overview."""
-
-    number: str
-    title: str
-    built: str
-    evidence: str
-    missing: str
-
-    @property
-    def category(self) -> str:
-        """The word the *Built?* cell starts with."""
-        return next(c for c in CATEGORIES if self.built.startswith(c))
-
-
-def parse_rows(text: str) -> list[Row]:
-    """Return the ADR rows of the overview table."""
-    return [Row(*m.groups()) for line in text.splitlines() if (m := ROW.match(line.strip()))]
 
 
 def status_paragraph(adr: Path) -> str:
@@ -70,44 +42,9 @@ def status_problem(row: Row, status: str) -> str | None:
     return None
 
 
-OPEN_STATES = ("planned", "follow-up")
-DONE_STATES = ("merged", "built", "live")
-
-
-def drift_problem(row: Row, rows: list[list[str]]) -> str | None:
-    """Return how an overview row contradicts its ADR's *Build status* table (ADR 0119).
-
-    The overview used to drift from the tables for weeks, reported only in a weekly issue; it
-    is now a test of every pull request, so ``docs/adr-status.md`` can be trusted as it is.
-    """
-    steps = [cells for cells in rows if cells[0] != "0"]
-    if row.category == "BUILT":
-        open_steps = [c[0] for c in steps if c[-1].startswith(OPEN_STATES)]
-        if open_steps:
-            return f"listed as BUILT but step {', '.join(open_steps)} is still open"
-    if row.category == "NOT BUILT":
-        done = [c[0] for c in steps if c[-1].startswith(DONE_STATES)]
-        if done:
-            return f"listed as NOT BUILT but step {', '.join(done)} is merged"
-    return None
-
-
 def build_status_rows(adr: Path) -> list[list[str]] | None:
     """Return the rows (cells) of the ADR's *Build status* table, or ``None`` without one."""
-    found = re.search(r"^## Build status\n(.*?)(?=^## |\Z)", adr.read_text(), re.M | re.S)
-    if found is None:
-        return None
-    rows = []
-    for line in found.group(1).splitlines():
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if (
-            line.startswith("|")
-            and len(cells) >= 4
-            and cells[0] != "Step"
-            and set(cells[0]) != {"-"}
-        ):
-            rows.append(cells)
-    return rows
+    return table_rows(adr.read_text())
 
 
 def state_problem(cells: list[str]) -> str | None:
@@ -122,7 +59,7 @@ def state_problem(cells: list[str]) -> str | None:
 
 ADRS = sorted(ADR_DIR.glob("0[0-9][0-9][0-9]-*.md"))
 TEXT = STATUS_FILE.read_text()
-ROWS = parse_rows(TEXT)
+ROWS = overview_rows(TEXT)
 
 
 def test_there_are_adrs_and_rows() -> None:
@@ -192,7 +129,7 @@ def test_the_overview_agrees_with_every_build_status_table() -> None:
     problems = {
         row.number: problem
         for row in ROWS
-        if (problem := drift_problem(row, build_status_rows(by_number[row.number]) or []))
+        if (problem := drift_problem(row.category, build_status_rows(by_number[row.number]) or []))
     }
 
     assert problems == {}
@@ -214,11 +151,17 @@ def test_the_drift_check_finds_what_it_is_meant_to() -> None:
     built = Row("0001", "t", "BUILT", "e", "–")
     not_built = Row("0003", "t", "NOT BUILT", "e", "x")
 
-    assert drift_problem(built, [["1", "w", "#5", "merged"], ["2", "w", "", "follow-up"]])
-    assert drift_problem(not_built, [["0", "ADR", "#4", "merged"], ["1", "w", "#5", "merged"]])
-    assert drift_problem(built, [["0", "ADR", "#4", "merged"], ["1", "w", "#5", "built"]]) is None
+    assert drift_problem(built.category, [["1", "w", "#5", "merged"], ["2", "w", "", "follow-up"]])
+    assert drift_problem(
+        not_built.category, [["0", "ADR", "#4", "merged"], ["1", "w", "#5", "merged"]]
+    )
     assert (
-        drift_problem(not_built, [["0", "ADR", "#4", "merged"], ["1", "w", "", "planned"]]) is None
+        drift_problem(built.category, [["0", "ADR", "#4", "merged"], ["1", "w", "#5", "built"]])
+        is None
+    )
+    assert (
+        drift_problem(not_built.category, [["0", "ADR", "#4", "merged"], ["1", "w", "", "planned"]])
+        is None
     )
     superseded = Row("0062", "t", "SUPERSEDED by ADR 0096", "e", "x")
     assert status_problem(superseded, "superseded by adr 0096 (2026-11-08)") is None
@@ -241,4 +184,4 @@ def test_the_checks_find_what_they_are_meant_to() -> None:
     assert state_problem(["1", "what", "", "in PR"])
     assert state_problem(["1", "what", "#5", "in PR"]) is None
     assert state_problem(["1", "what", "", "planned"]) is None
-    assert parse_rows("| 0001 | T | BUILT | e | – |") == [Row("0001", "T", "BUILT", "e", "–")]
+    assert overview_rows("| 0001 | T | BUILT | e | – |") == [Row("0001", "T", "BUILT", "e", "–")]

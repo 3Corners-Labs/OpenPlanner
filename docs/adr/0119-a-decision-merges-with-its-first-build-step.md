@@ -30,13 +30,14 @@ The tools to see this existed, and still nobody acted on them:
 1. **A new ADR merges together with its first build step.** The decision gate
    (`scripts/decision_gate.py`) refuses a pull request that adds an ADR unless the first row
    after step 0 in that ADR's *Build status* table says `merged`, `built` or `live`, which means
-   the same pull request builds it. An ADR whose Status line says *policy* has nothing to build
-   and is exempt. The block stands even with `po:approved`: a design without its build is
+   the same pull request builds it. An ADR whose Status line says `policy, nothing to build` is exempt. The block stands even with `po:approved`: a design without its build is
    exactly what the label must not let through.
 2. **A brake on unbuilt decisions.** The gate refuses a pull request that adds an ADR while
    three or more ADRs are listed NOT BUILT in `docs/adr-status.md` (`UNBUILT_LIMIT`). First
    build, or have the product owner withdraw or supersede, then design more. The limit is a
-   constant in the gate on purpose: changing it is itself a decision.
+   constant in the gate on purpose: changing it is itself a decision. The brake binds ADR 0120
+   and later: in the merge queue the gate runs from the pull request's own copy, so the pull
+   request that introduces the brake would otherwise block itself.
 3. **A row never waits for a pull request on `main`.** The pull request that builds a step
    writes its row as `merged` with its own number. That becomes true the moment it merges, and
    a closed pull request never reaches `main`. `tests/test_adr_status.py` fails on any `in PR`
@@ -48,14 +49,17 @@ The tools to see this existed, and still nobody acted on them:
 5. **Two new words.** The category SUPERSEDED (an ADR whose decision another ADR took over;
    its Status line says so) and the row state `superseded (ADR NNNN)`. Such a row closes its
    issue like a done row.
-6. **Orphaned issues are closed.** When a step is split or renamed (row 4 becomes 4a and 4b),
+6. **One reader of the tables.** `scripts/adr_tables.py` holds the states, the categories,
+   the parsing of both tables and the drift rule; the gate, the issue sync, the release PR and
+   the status test import it, so the checks cannot disagree. It is a gate file.
+7. **Orphaned issues are closed.** When a step is split or renamed (row 4 becomes 4a and 4b),
    the sync of `scripts/adr_issues.py` closes the old issue with a comment instead of leaving it
    open forever.
-7. **Visible where the product owner looks.** The release PR lists which ADRs became BUILT
+8. **Visible where the product owner looks.** The release PR lists which ADRs became BUILT
    since the last release and how many still have open work (`scripts/release_pr.py`). The
    version picker marks a candidate that is design only; that part is built in its own pull
    request.
-8. **One-time reconciliation.** In this pull request all 51 stale `in PR` rows become `merged`
+9. **One-time reconciliation.** In this pull request all 51 stale `in PR` rows become `merged`
    (every pull request they name is merged; checked on 2026-11-08). 0074, 0080, 0100 and 0115
    become PARTIAL. 0085, 0078, 0079 and 0108 become BUILT: the audited release `v0.4.0`
    (#511) and the anonymous pull of the public images are the evidence. 0062 and the Pages
@@ -73,8 +77,8 @@ the gate and the test, and changing them is a decision (ADR 0078).
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR accepted | #NNN | merged |
-| 1 | Gate blocks (points 1 and 2), tests on the overview and rows (points 3 to 5), orphan sync (point 6), release PR list (point 7), reconciliation (point 8), template and CLAUDE.md | #NNN | merged |
-| 2 | Version picker marks a design-only candidate (point 7) | | planned |
+| 1 | Gate blocks (points 1 and 2), tests on the overview and rows (points 3 to 5), `scripts/adr_tables.py` (point 6), orphan sync (point 7), release PR list (point 8), reconciliation (point 9), template and CLAUDE.md | #NNN | merged |
+| 2 | Version picker marks a design-only candidate (point 8) | | planned |
 
 ## Consequences
 
