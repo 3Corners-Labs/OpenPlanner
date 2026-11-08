@@ -1071,12 +1071,12 @@ _OPERATIONS = (
         _CHECK_HOST,
     ),
     _e(
-        "webhook.wxcc",
+        "webhook.contact_center",
         _OPS,
         "info",
-        "kind outcome",
-        "Webex Contact Center reported {kind}: {outcome}.",
-        "A verified webhook of Webex Contact Center was processed.",
+        "platform kind outcome",
+        "Contact center {platform} reported {kind}: {outcome}.",
+        "A verified webhook of a contact-center platform was processed (ADR 0032).",
     ),
     _e(
         "widget.invalid_request",

@@ -4,6 +4,7 @@ import sqlite3
 
 import pytest
 
+from app.adapters import contact_centers
 from app.adapters.contact_centers import (
     DESCRIPTORS,
     attributes_from_json,
@@ -71,3 +72,26 @@ def test_an_imported_routing_the_descriptor_refuses_fails_the_import(
         _check_contact_center_rows(_package(row))
 
     assert error.value.code is ErrorCode.CONFIGURATION_PACKAGE_INVALID
+
+
+def test_every_platform_has_a_descriptor_and_a_webhook_handling() -> None:
+    """Adding a platform adds both; one without the other is a broken registration."""
+    assert set(contact_centers.INBOUND) == set(contact_centers.DESCRIPTORS)
+    for kind, handling in contact_centers.INBOUND.items():
+        assert handling.kind is kind
+        assert handling.path == f"/webhooks/contact-center/{kind.value}"
+        assert contact_centers.inbound(kind.value) is handling
+
+
+def test_wxcc_keeps_its_old_address_and_its_event_source() -> None:
+    """ADR 0032: event keys stored before the neutral route still match; the alias is ours."""
+    wxcc = contact_centers.INBOUND[ContactCenterKind.WEBEX_CC]
+    assert wxcc.source == "wxcc"
+    assert wxcc.registered_path == "/webhooks/wxcc"
+    assert wxcc.paths == ("/webhooks/contact-center/webex_cc", "/webhooks/wxcc")
+
+
+def test_an_unknown_or_malformed_kind_has_no_handling() -> None:
+    assert contact_centers.inbound("genesys") is None
+    assert contact_centers.inbound("WEBEX_CC") is None
+    assert contact_centers.inbound("") is None
