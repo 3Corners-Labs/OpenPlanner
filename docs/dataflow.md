@@ -109,6 +109,7 @@ filter matches on it. The list and the rule are constants, not settings.
 | Email | `bookings.email` | booking form | as above | mail provider (WP4) |
 | Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
+| Subject and routing attributes (ADR 0081) | `bookings.subject_code`, `bookings.routing_answers` (codes); the group's list and mapping in `groups.routing`; the codes a block offers in `schedule_rules.subjects`, `schedule_overrides.subjects` | booking form: the subject question and the switched-on routing questions, answered with one of a closed list of codes | not personal data, purged with the booking all the same (`privacy.ROUTING_FIELDS` in `PURGED_FIELDS`, ADR 0081); reporting by subject (ADR 0117) must copy the code into its fact before the purge | no. Shown in the agenda, on the booking page and in the own queue; the mapped codes leave the system only as routing variables in the contact-center task (`flowSettings`), next to the first name and the host join URL |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
 | Video join URLs | `bookings.guest_join_url`, `host_join_url`, `trial_join_url` | video provider (WP5) | as above | guest URL to the participant, host URL to WxCC |
 | Provider links | `bookings.video_room_id`, `trial_room_id`, `wxcc_task_id` | video provider, WxCC | as above (deleted by the purge, ADR 0102 point 11) | no. Each is the key to a meeting or work item at Cisco that holds the participant's name and email address |
@@ -578,11 +579,6 @@ value, so reporting never fails a participant's action; `reporting_enabled` (cla
 nothing. Nothing in this path reads a purged column.
 
 ## Planned flows
-
-Subjects and routing attributes (ADR 0081, not built): the participant's chosen subject and the
-switched-on attributes (preferred language, channel preference) are stored on the booking as codes
-from a closed list and leave the system only as routing variables in the contact-center task,
-next to the first name and the host join URL; purged with the booking.
 
 Purge sweep (retention): the worker's daily housekeeping reads the bookings that still hold
 personal data past their purge moment (times and status only), sets the PII columns of each to NULL

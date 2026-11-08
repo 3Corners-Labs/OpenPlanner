@@ -2,6 +2,7 @@
 {% block title %}{{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
+{% include "admin/_readiness.html" %}
 <section class="card" aria-labelledby="settings-heading">
   <div class="card__header">
     <h2 id="settings-heading">{{ _("admin.group.settings") }}</h2>

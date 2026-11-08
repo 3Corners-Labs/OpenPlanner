@@ -14,6 +14,7 @@ from typing import Protocol
 
 from app.domain.admin_sessions import AdminSession, EndReason
 from app.domain.agenda import ShortfallAcceptance
+from app.domain.alert_model import AlertTarget, DeliveryState, RenderedAlert
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, Scope
@@ -43,7 +44,6 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.configuration_package import PackageSummary
-from app.domain.alert_model import AlertTarget, DeliveryState, RenderedAlert
 from app.domain.connection_health import (
     HealthEntry,
     InboundEvent,
@@ -68,6 +68,7 @@ from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, Pa
 from app.domain.participant_links import LinkSession
 from app.domain.public_address import AddressCheck, AddressKind, InstanceReply
 from app.domain.retention import DueBooking, RetentionFacts
+from app.domain.routing import GroupRouting
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
     Group,
@@ -1008,6 +1009,13 @@ class Transaction(Protocol):
 
     async def save_group_contact_block(self, group_id: int, block: ContactBlock | None) -> None:
         """Store or, with ``None``, remove the group's own contact block."""
+        ...
+
+    async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
+        """Store the group's subjects, routing attributes and mapping (ADR 0081).
+
+        Its own write, so saving the other settings never touches the routing.
+        """
         ...
 
     async def add_group(self, group: Group) -> Group:

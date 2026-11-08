@@ -16,8 +16,10 @@ Groups list narrowed to that organisation. Only the superuser can create an orga
 
 ## Tabs
 
-- **Overview**: the organisation's groups you have rights on, and the profile (name, web
-  address, default language). The superuser changes the name and language with **Change name
+- **Overview**: the checklist **Ready for bookings** (a channel that can send, own branding
+  and alternative contact options for a closure; each line links to the tab that fixes it,
+  when you may open it), the organisation's groups you have rights on, and the profile (name,
+  web address, default language). The superuser changes the name and language with **Change name
   and language**; the web address is fixed. This tab has three sections:
   - **Settings**: the organisation's time format, time zone and periods
     ([more](organisation-settings.md)).

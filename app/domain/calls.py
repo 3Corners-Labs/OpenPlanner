@@ -327,7 +327,11 @@ class MeetingRequest:
 
 @dataclass(frozen=True)
 class WorkItem:
-    """What WxCC receives for a booking: reference, first name and meeting link only."""
+    """What WxCC receives for a booking: reference, first name and meeting link only.
+
+    ``variables`` are the routing variables of ADR 0081: the mapped codes of the participant's
+    subject and attributes, ``{name: value}``, never a label, a form answer or another field.
+    """
 
     reference: str
     first_name: str = field(repr=False)
@@ -338,6 +342,7 @@ class WorkItem:
     business_address: str
     channel: str
     routing_value: str
+    variables: tuple[tuple[str, str], ...] = ()
 
 
 def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
@@ -382,4 +387,5 @@ def work_item(booking: Booking, group: Group, *, start_label: str) -> WorkItem:
         business_address=group.wxcc_business_address,
         channel=group.wxcc_channel,
         routing_value=group.routing_value,
+        variables=tuple(sorted(group.routing.variables(booking.routing).items())),
     )

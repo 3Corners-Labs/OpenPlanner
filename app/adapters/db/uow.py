@@ -85,6 +85,14 @@ from app.adapters.db.public_address import PublicAddressQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
+from app.adapters.db.routing_json import (
+    choice_from_columns,
+    choice_json,
+    routing_from_json,
+    routing_json,
+    subjects_column,
+    subjects_from_column,
+)
 from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
@@ -149,6 +157,7 @@ from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, Plann
 from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
 from app.domain.privacy import PURGED_FIELDS
+from app.domain.routing import GroupRouting
 from app.domain.scheduling import (
     DispatchKind,
     Group,
@@ -237,6 +246,7 @@ def _group(row: GroupRow) -> Group:
         calendar_invite_address=row.calendar_invite_address,
         idp_key=row.idp_key or row.slug,
         archived_at=row.archived_at,
+        routing=routing_from_json(row.routing),
     )
 
 
@@ -246,7 +256,14 @@ def _override(row: ScheduleOverrideRow) -> ScheduleOverride:
         return ScheduleOverride(day=row.day, window=None, id=row.id)
     return ScheduleOverride(
         day=row.day,
-        window=TimeWindow(row.opens, row.closes, row.capacity, row.label, Offer(row.offer)),
+        window=TimeWindow(
+            row.opens,
+            row.closes,
+            row.capacity,
+            row.label,
+            Offer(row.offer),
+            subjects_from_column(row.subjects),
+        ),
         id=row.id,
     )
 
@@ -265,7 +282,14 @@ def _rule(row: ScheduleRuleRow) -> ScheduleRule:
     """Map a weekly rule row."""
     return ScheduleRule(
         weekday=row.weekday,
-        window=TimeWindow(row.opens, row.closes, row.capacity, row.label, Offer(row.offer)),
+        window=TimeWindow(
+            row.opens,
+            row.closes,
+            row.capacity,
+            row.label,
+            Offer(row.offer),
+            subjects_from_column(row.subjects),
+        ),
         valid_from=row.valid_from,
         valid_to=row.valid_to,
         id=row.id,
@@ -281,6 +305,7 @@ def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
         "capacity": rule.window.capacity,
         "label": rule.window.label,
         "offer": rule.window.offer.value,
+        "subjects": subjects_column(rule.window.subjects),
         "valid_from": rule.valid_from,
         "valid_to": rule.valid_to,
     }
@@ -296,6 +321,7 @@ def _override_columns(override: ScheduleOverride) -> dict[str, Any]:
         "capacity": window.capacity if window else None,
         "label": window.label if window else None,
         "offer": window.offer.value if window else Offer.SCHEDULED.value,
+        "subjects": subjects_column(window.subjects) if window else None,
     }
 
 
@@ -376,6 +402,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         claim=Claim(row.claimed_at, row.claimed_by)
         if row.claimed_at is not None and row.claimed_by is not None
         else None,
+        routing=choice_from_columns(row.subject_code, row.routing_answers),
     )
 
 
@@ -969,6 +996,12 @@ class SqlTransaction(
         )
         if block is not None:
             self._session.add(GroupContactsRow(group_id=group_id, body=contacts_json(block)))
+
+    async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
+        """Store the group's routing (ADR 0081); the other settings stay as they are."""
+        await self._session.execute(
+            update(GroupRow).where(GroupRow.id == group_id).values(routing=routing_json(routing))
+        )
 
     async def add_group(self, group: Group) -> Group:
         """Insert a group and return it with its ID; its IdP value starts as its slug."""
@@ -1722,6 +1755,8 @@ class SqlTransaction(
             rescheduled_from_id=booking.rescheduled_from_id,
             confirm_by=booking.confirm_by,
             confirmed_at=booking.confirmed_at,
+            subject_code=booking.routing.subject if booking.routing else None,
+            routing_answers=choice_json(booking.routing),
         )
         self._session.add(row)
         await self._session.flush()

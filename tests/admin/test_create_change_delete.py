@@ -64,6 +64,11 @@ CREATABLES: dict[str, Creatable] = {
         change="/admin/groups/{slug}/settings/form/{key}",
         delete="/admin/groups/{slug}/settings/form/{key}/retire",
     ),
+    # ADR 0081: a subject's code is fixed; its labels change and it is removed.
+    "/admin/groups/{slug}/settings/routing/subjects": Creatable(
+        change="/admin/groups/{slug}/settings/routing/subjects/{code}",
+        delete="/admin/groups/{slug}/settings/routing/subjects/{code}/remove",
+    ),
     "/admin/groups/{slug}/reminders": Creatable(
         change="/admin/groups/{slug}/reminders/{channel}/{minutes}",
         delete="/admin/groups/{slug}/reminders/{channel}/{minutes}/delete",

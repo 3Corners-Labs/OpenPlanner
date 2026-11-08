@@ -559,6 +559,48 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             303, 403, 403, 303, 403, 403, 403
         ),
     },
+    # ADR 0081: subjects and routing are part of the group's settings (group.edit). An empty add
+    # and removing an unknown subject are refused (422); other unknown items redirect (303).
+    "GET /admin/groups/{slug}/settings/routing": {
+        "/admin/groups/demo/settings/routing": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/settings/routing": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/settings/routing/subjects": {
+        "/admin/groups/demo/settings/routing/subjects": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/settings/routing/subjects": statuses(
+            422, 403, 403, 422, 403, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/settings/routing/subjects/{code}": {
+        "/admin/groups/demo/settings/routing/subjects/nope": statuses(
+            303, 303, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/settings/routing/subjects/{code}": {
+        "/admin/groups/demo/settings/routing/subjects/nope": statuses(
+            303, 303, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/settings/routing/subjects/{code}/move": {
+        "/admin/groups/demo/settings/routing/subjects/nope/move": statuses(
+            303, 303, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/settings/routing/subjects/{code}/remove": {
+        "/admin/groups/andere-team/settings/routing/subjects/nope/remove": statuses(
+            422, 403, 403, 422, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/settings/routing/attributes": {
+        "/admin/groups/demo/settings/routing/attributes": statuses(
+            303, 303, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/settings/routing/mapping/{source}": {
+        "/admin/groups/demo/settings/routing/mapping/subject": statuses(
+            303, 303, 403, 403, 403, 403, 403
+        ),
+    },
     # "Koppeling controleren": whoever edits the group's settings (incl. routing) may check them.
     "POST /admin/groups/{slug}/check": {
         "/admin/groups/demo/check": statuses(303, 303, 403, 403, 403, 403, 403),
@@ -822,7 +864,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # Emergency closure of a whole organisation: organisation admins and the superuser.
     # ADR 0047 §4: the old closures list redirects permanently to the organisation's tab.
-    "GET /admin/closures": {"/admin/closures": statuses(308, 308, 403, 308, 403, 403, 403)},
+    # ADR 0047 §4, step 5: the old closures list is the overview's filter *active closures*.
+    "GET /admin/closures": {"/admin/closures": statuses(308, 308, 308, 308, 308, 308, 403)},
     "GET /admin/organisations/{org}/closure": {
         "/admin/organisations/demo/closure": statuses(200, 200, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/closure": statuses(200, 403, 403, 200, 403, 403, 403),

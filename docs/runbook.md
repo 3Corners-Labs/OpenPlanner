@@ -1643,7 +1643,7 @@ repository:
 | Name | Kind | What | Why |
 |---|---|---|---|
 | `RELEASE_APP_CLIENT_ID` | variable in the environment `release` | the client ID of the release app (ADR 0107) | the release jobs take a short-lived token from the app: a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow, and only the app may create a `v*` tag |
-| `RELEASE_APP_PRIVATE_KEY` | secret in the environment `release` | a private key of the release app (PEM) | as above; the environment `release` may only be used from `main` |
+| `RELEASE_APP_PRIVATE_KEY` | secret in the environment `release` | a private key of the release app (PEM) | as above; the environment `release` may only be used from `main` and the maintenance lines `release/[0-9]*` |
 | `OPENAI_API_KEY` | secret | an OpenAI API key | the audit job (`openai/codex-action`); the key stays in the action's proxy and never reaches the review process |
 | `RELEASE_RUNNER` | variable, optional | the label of a self-hosted runner | default `ubuntu-24.04`; see *Self-hosted runner* below |
 
@@ -1789,6 +1789,50 @@ git push --delete origin v0.3.0 && git tag -d v0.3.0
 
 Once a release has been published, never move or reuse its tag: installations may already run
 it. Fix forward with the next number.
+
+### Maintenance lines (ADR 0116 point 3)
+
+A security fix normally ships as the next patch from `main`. When `main` already holds a
+`feat` since the last minor `vX.Y.0`, a patch from `main` would carry that feature (and make
+itself a minor). Then the fix ships from a **maintenance line** `release/X.Y`, cut from the newest release of the minor (`vX.Y.0`, or a later patch that
+still came from `main`). A line takes fixes only: every candidate and release on it is a patch `X.Y.Z` with
+`Z > 0`, and a `feat` or a migration on a line fails its candidate job (a patch carries no
+migration, point 4).
+
+| Step | How | What runs |
+|---|---|---|
+| Cut the line (once per minor, only when needed) | *Run workflow* on `main`, `step = cut-line`, `version = X.Y` (tick `dry_run` first) | `scripts/release_line.py cut` checks that a release of X.Y exists, the line does not, and `main` holds a `feat` since its newest release; the release app pushes `release/X.Y` and the label `backport:X.Y` is created |
+| Fix | the usual PR to `main`, merged through the queue; add the label `backport:X.Y` (before or after the merge) | `backport.yml` cherry-picks the merge commit onto `backport/X.Y/pr-N` and opens the PR against `release/X.Y` with auto-merge, so the line's merge queue runs the full lane; when the cherry-pick does not apply it comments on the PR, and a Claude Code session makes the backport by hand (`git cherry-pick -x`) |
+| Candidate | the merge on the line | `main.yml` tags `vX.Y.Z-rc.N` from `scripts/release_plan.py --candidate --branch release/X.Y` and publishes it as on `main` (no mutation run: the fix ran it on `main`) |
+| Release | *Run workflow* on `release/X.Y`, `step = release-pr`, then `step = tag` on `release/X.Y` | the release PR goes to the line (a patch, no audit); the tag sits on the line's merge commit; `main.yml` accepts a tag on `main` or a patch tag on its own line (`scripts/release_line.py tag-allowed`); a line's release is never GitHub's *Latest* release and never moves `:latest` |
+| Changelog | the next release PR on `main` | `release_pr.py prepare` takes over the released sections of every `origin/release/X.Y` that `main` lacks, in version order |
+
+Two rulesets cover `release/[0-9]*`, both in `.github/guardrails.json`, which the hourly
+guardrail audit compares with GitHub. `release lines` has the rules of `main` (pull request,
+merge queue, the same required checks, no force push, no deletion) and, like `main`, no
+bypass; a test fails when its rules drift from `main`'s. `release line creation` only
+restricts creating a line, and its bypass lets the release app (and administrators) do that.
+The environment `release` allows `main` and `release/[0-9]*`, so a line's candidate, release
+and tag jobs get the app's token. A release PR's branch `release/vX.Y.Z` matches neither. To
+apply them from the baseline (administrator, after the PR that changed them merged):
+
+```bash
+for name in "release lines" "release line creation"; do
+  jq --arg name "$name" '.rulesets[$name] | {name: $name, target, enforcement, conditions, bypass_actors,
+    rules: (.rules | to_entries | map({type: .key} + (if (.value | length) > 0 then {parameters: .value} else {} end)))}' \
+    .github/guardrails.json | gh api -X POST repos/3Corners-Labs/OpenPlanner/rulesets --input -
+done
+gh api -X POST repos/3Corners-Labs/OpenPlanner/environments/release/deployment-branch-policies -f name='release/[0-9]*' -f type=branch
+```
+
+A line's candidates are signed by `main.yml` on `refs/heads/release/X.Y`. A test or lab host's
+updater trusts `main` and release tags only (`scripts/install.sh`), so it does not install a
+line candidate offered on the `rc` channel; line candidates are tried on a host that pins one
+by hand, and the line's release tag installs everywhere as usual.
+
+A line lives as long as its minor is in the support window (`N-1` from 1.0.0, `SECURITY.md`),
+or longer as a paid extended line. Deleting a line means an administrator switches the
+ruleset `release lines` off for it, as on `main` (it has no bypass); its tags stay.
 
 ### Release candidates (ADR 0059)
 

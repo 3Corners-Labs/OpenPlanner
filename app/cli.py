@@ -3,6 +3,10 @@
 Usage:
     ``python -m app.cli seed-demo``     create the demo organisations and groups
     ``python -m app.cli seed-closures``  add the closure examples (e2e pages); not in production
+    ``python -m app.cli seed --upgrade-fixture [--bookings N]``  fill a migrated, empty database
+        with the generated data of the upgrade fixture (ADR 0116 point 7); not in production
+    ``python -m app.cli upgrade-check [--save STATE] [--compare STATE]``  read the state of the
+        database for the upgrade matrix; with ``--compare`` exit 1 on a broken invariant
     ``python -m app.cli authz-matrix``  print the authorisation matrix (docs/authorization.md)
     ``python -m app.cli admin-map``  print the admin structure (docs/admin-map.md, ADR 0047)
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
@@ -107,6 +111,12 @@ from app.adapters.db.rotation import rotation_status
 from app.adapters.db.sealed import rekey_database
 from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.db.upgrade_fixture import (
+    FixtureState,
+    compare_states,
+    inspect_fixture,
+    seed_upgrade_fixture,
+)
 from app.adapters.diagnostics import CheckResult, format_report, passed, run_checks
 from app.adapters.evidence import (
     address_section,
@@ -235,6 +245,59 @@ async def _seed_closures(settings: Settings) -> tuple[str, bool]:
     finally:
         await engine.dispose()
     return json.dumps(dataclasses.asdict(examples), indent=2) + "\n", True
+
+
+async def _seed_upgrade_fixture(settings: Settings, bookings: int) -> tuple[str, bool]:
+    """Fill the migrated, empty database with the upgrade fixture (ADR 0116 point 7).
+
+    Refused in production: the fixture is made-up data for a throwaway database, and refused
+    on a database that already has organisations, so it never mixes with real data.
+    """
+    if settings.environment == "prod":
+        return (
+            "seed --upgrade-fixture writes made-up data; it runs only outside production\n",
+            False,
+        )
+    engine = create_engine(settings.database_url)
+    try:
+        async with SqlUnitOfWork(engine).read() as tx:
+            if await tx.list_organisations(Scope(everything=True)):
+                return "seed --upgrade-fixture needs an empty database\n", False
+        await seed_upgrade_fixture(
+            engine,
+            SystemClock().now(),
+            management_token_key(settings),
+            version=settings.app_version,
+            commit=settings.app_commit,
+            bookings=bookings,
+        )
+    finally:
+        await engine.dispose()
+    return f"upgrade fixture written ({bookings} extra bookings)\n", True
+
+
+UPGRADE_CHECK_AHEAD = timedelta(days=3650)
+"""The upgrade check claims jobs as if this far ahead, so every pending job is due."""
+
+
+def _upgrade_check(
+    state: FixtureState, save: Path | None, compare: Path | None
+) -> tuple[str, bool]:
+    """Report a database's state; save it, and compare it with an earlier one (ADR 0116).
+
+    The state comes from ``inspect_fixture`` at ``now + UPGRADE_CHECK_AHEAD``.
+    """
+    if save is not None:
+        save.write_text(json.dumps(state.to_json(), indent=2) + "\n")
+    lines = [f"revision {state.revision}, {state.rows.get('bookings', 0)} bookings"]
+    lines += [f"unknown setting {key} (renamed or dropped)" for key in state.settings_unknown]
+    findings = (
+        compare_states(FixtureState.from_json(json.loads(compare.read_text())), state)
+        if compare is not None
+        else []
+    )
+    lines += [f"FAIL {finding}" for finding in findings]
+    return "\n".join(lines) + "\n", not findings
 
 
 @asynccontextmanager
@@ -1541,6 +1604,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("seed-demo", help="create the demo organisations and groups")
     commands.add_parser("seed-closures", help="add the closure examples (not in production)")
+    seed_cmd = commands.add_parser("seed", help="generated data sets (not in production)")
+    seed_cmd.add_argument(
+        "--upgrade-fixture", action="store_true", required=True, help="the upgrade fixture"
+    )
+    seed_cmd.add_argument(
+        "--bookings", type=int, default=0, help="extra generated bookings (duration budget)"
+    )
+    check_cmd = commands.add_parser("upgrade-check", help="state of a database for the matrix")
+    check_cmd.add_argument("--save", type=Path, help="write the state as JSON")
+    check_cmd.add_argument("--compare", type=Path, help="an earlier state; exit 1 on a finding")
     commands.add_parser("authz-matrix", help="print the authorisation matrix as Markdown")
     commands.add_parser("admin-map", help="print the admin structure as Markdown")
     commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
@@ -1748,6 +1821,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _write(asyncio.run(_webhooks_health(Settings())))
     if args.command == "seed-closures":
         return _write(asyncio.run(_seed_closures(Settings())))
+    if args.command == "seed":
+        return _write(asyncio.run(_seed_upgrade_fixture(Settings(), args.bookings)))
+    if args.command == "upgrade-check":
+        state = asyncio.run(
+            inspect_fixture(Settings().database_url, SystemClock().now() + UPGRADE_CHECK_AHEAD)
+        )
+        return _write(_upgrade_check(state, args.save, args.compare))
     if args.command == "authz-matrix":
         sys.stdout.write(render_markdown(Translator(load_catalogues())))
         return 0

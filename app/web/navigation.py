@@ -584,6 +584,9 @@ OBJECTS = (
                 (
                     f"{_GROUP}/settings/form",
                     f"{_GROUP}/settings/form/{{key}}",
+                    # ADR 0081 point 7: subjects and routing, next to the booking form.
+                    f"{_GROUP}/settings/routing",
+                    f"{_GROUP}/settings/routing/subjects/{{code}}",
                     f"{_GROUP}/settings/archive",
                 ),
             ),
@@ -656,6 +659,18 @@ _HOMES = _homes()
 def home_of(route_path: str) -> Home | None:
     """Return where the route template ``route_path`` lives, or ``None`` if it has no home."""
     return _HOMES.get(route_path)
+
+
+def screen(key: str) -> Screen:
+    """Return the screen of the register called ``key`` (an entry, tab or sub-tab).
+
+    Raises:
+        KeyError: When no screen has that key; a caller names keys of the register only.
+    """
+    found = next((s for _, s in screens() if s.key == key), None)
+    if found is None:
+        raise KeyError(key)
+    return found
 
 
 def entry(key: str) -> Screen | None:

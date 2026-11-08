@@ -3,8 +3,9 @@
 Status: accepted (2026-11-05, the product owner's approval of the proposal in the conversation,
 `po:approved` on #519; the three decisions of the research note §10 are taken as recommended:
 window `N-1` with public patch releases, the line mechanics now with one dry run, one edition
-with services sold). Partly built: step 2 (the rules in code) and the admission policy of step 9
-(`docs/kubernetes.md`, #536); the rest is open. Amends ADR 0052
+with services sold). Partly built: step 1 (the decision texts, #533), step 2 (the rules in code, #534), step 3 (the
+upgrade fixture and matrix, #593), step 4 (maintenance lines, #596) and the admission policy of
+step 9 (`docs/kubernetes.md`, #536); steps 5–9 are open. Amends ADR 0052
 (point 6: a support window and maintenance lines; point 2: a migration raises MINOR), ADR 0108
 (point 1: every `vX.Y.Z` release is public), ADR 0067 (point 1: auto-apply in production
 inside a window) and ADR 0114 (point 11: the channel level `minor` is withdrawn in favour of a
@@ -155,8 +156,8 @@ not of the product); the 24 h of the updater's backup (ADR 0029); the ring order
 | 0 | ADR proposed, with `docs/research/release-and-update-models.md` | #519 | merged 2026-11-05 |
 | 1 | Decision texts: `SECURITY.md` support window; amendments noted in ADR 0052, 0067, 0108, 0114; CLAUDE.md migration rule; PR template question on expand/contract | #533 | merged |
 | 2 | Rules in code: `release_plan.py` and `release_pr.py` give MINOR (and refuse a typed patch) when `migrations/versions/` changed since the last release; `tests/test_migrations_self_contained.py` (a test, not an import-linter contract: `migrations/` is outside the root package) | #534 | merged |
-| 3 | Upgrade fixture and matrix: `seed --upgrade-fixture`, fixture attached to every release, matrix job with downgrade-and-start-the-released-image and the duration budget | | planned |
-| 4 | Lines: candidates on `release/X.Y` in `main.yml`, the release workflow on a line, the tag check, ruleset for `release/*`, label `backport:X.Y` and the cherry-pick PR; one dry run on the current line | | planned |
+| 3 | Upgrade fixture and matrix: `seed --upgrade-fixture`, fixture attached to every release, matrix job with downgrade-and-start-the-released-image and the duration budget (`app/adapters/db/upgrade_fixture.py`, `upgrade-check`, `scripts/upgrade-matrix.sh`, `scripts/upgrade_window.py`, `main.yml` *upgrade fixture of this release*, `ci.yml` job `upgrade-matrix`); the matrix has nothing to run until the first release after this step carries a fixture | #593 | merged |
+| 4 | Lines: candidates on `release/X.Y` in `main.yml`, the release workflow on a line, the tag check, ruleset for `release/*`, label `backport:X.Y` and the cherry-pick PR; one dry run on the current line (`scripts/release_line.py`, `release_plan.Target`, `release.yml` step `cut-line`, `backport.yml`, the rulesets `release lines` and `release line creation` in `guardrails.json`, runbook *Maintenance lines*; a line starts at the newest release of its minor, not always `vX.Y.0`; the cherry-pick PR is opened by the workflow `backport.yml` with the release app, and a cherry-pick that does not apply is left to a Claude Code session; a line's release is never the latest; the dry run on line 0.5 is in the PR; the rulesets and the environment policy are applied live after the merge) | #596 | merged |
 | 5 | Portal and updater: `update_line`, `update_window` with `apply_after`, auto-apply in production with a window, support status from `support.json`, `MIN_UPGRADE_FROM` check; manual topic *Updates* | | planned |
 | 6 | Public patch images: `main.yml` pushes every `vX.Y.Z` to the public packages | | planned |
 | 7 | Offline bundle: `release-bundle` job, `install.sh --bundle`, `UPDATE_SOURCE`, `UPDATE_INDEX_URL`, offline verification proven on a disconnected VM, runbook | | planned |

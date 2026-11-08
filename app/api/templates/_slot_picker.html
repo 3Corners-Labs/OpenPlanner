@@ -6,6 +6,7 @@
 <details class="filter"{% if f.active or f.invalid_range %} open{% endif %}>
   <summary>{{ _("picker.filter.title") }}</summary>
   <form method="get" action="{{ f.action }}" class="filter__form">
+    {% if f.subject %}<input type="hidden" name="subject" value="{{ f.subject }}">{% endif %}
     <fieldset class="filter__days">
       <legend>{{ _("picker.filter.days") }}</legend>
       <div class="filter__options">
@@ -41,6 +42,7 @@
 <div class="quick-pick">
   <p><strong>{% if f.active %}{{ _("picker.first_fitting") }}{% else %}{{ _("picker.first") }}{% endif %}</strong> {{ picker.first.label }}</p>
   <form method="{{ method }}" action="{{ action }}">
+    {% if f.subject %}<input type="hidden" name="subject" value="{{ f.subject }}">{% endif %}
     <button type="submit" class="button" name="start" value="{{ picker.first.value }}">{{ _("picker.first_choose") }}</button>
   </form>
 </div>
@@ -89,6 +91,7 @@
     <h2 id="times-heading" tabindex="-1">{{ picker.times.heading }}</h2>
     <p class="times__count">{{ picker.times.count }}</p>
     <form method="{{ method }}" action="{{ action }}">
+      {% if f.subject %}<input type="hidden" name="subject" value="{{ f.subject }}">{% endif %}
       {% for part in picker.times.groups %}
       <fieldset>
         <legend>{{ part.heading }}</legend>

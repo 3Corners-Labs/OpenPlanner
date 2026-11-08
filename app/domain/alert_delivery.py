@@ -16,20 +16,18 @@ counts, the version and a link into the portal (ADR 0082 point 10). Never a part
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.domain.admin import AdminService, record_change, require
-from app.domain.alerts import ALERT_RULES, Alert, AlertLevel, open_alerts
-from app.domain.audit import SYSTEM_ACTOR, AuditEvent, AuditFilter, Outcome, Source
-from app.domain.authorization import Permission, Principal, Scope
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.alert_model import (
-    AlertChannelKind,
     AlertTarget,
     DeliveryState,
     RenderedAlert,
 )
+from app.domain.alerts import ALERT_RULES, Alert, AlertLevel, open_alerts
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, AuditFilter, Outcome, Source
+from app.domain.authorization import Permission, Principal, Scope
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import AlertSenders, Clock, IntegrationError, Transaction, UnitOfWork
 from app.domain.tunable import value_of
 
@@ -50,9 +48,7 @@ def takes(target: AlertTarget, alert: Alert) -> bool:
     return alert.level.rank >= AlertLevel(target.min_level).rank
 
 
-def due(
-    alert: Alert, state: DeliveryState | None, now: datetime, repeat: timedelta
-) -> bool:
+def due(alert: Alert, state: DeliveryState | None, now: datetime, repeat: timedelta) -> bool:
     """Return whether ``alert`` must be sent now to the target ``state`` belongs to.
 
     A new streak or a higher level (a new token) is sent at once; the same one again only after

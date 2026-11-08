@@ -1,0 +1,137 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% from "_error_message.html" import error_message %}
+{% block title %}{{ _("admin.routing.title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<section class="card" id="subjects" aria-labelledby="subjects-heading">
+  <div class="card__header">
+    <h2 id="subjects-heading">{{ _("admin.routing.subjects.title") }}</h2>
+    <p class="card__lead">{{ _("admin.routing.subjects.lead") }}</p>
+  </div>
+  {% if rows %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.routing.subjects.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.routing.subject.label") }}</th>
+        <th scope="col">{{ _("admin.routing.subject.code") }}</th>
+        <th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <th scope="row"><a href="/admin/groups/{{ summary.group.slug }}/settings/routing/subjects/{{ row.code }}">{{ row.label }}</a></th>
+        <td><code>{{ row.code }}</code>{% if row.bound %} <span class="chip">{{ _("admin.routing.subject.bound") }}</span>{% endif %}</td>
+        <td>
+          {% if not row.first %}
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/routing/subjects/{{ row.code }}/move">
+            <input type="hidden" name="direction" value="up">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.form_fields.up_label", label=row.label) }}">{{ _("admin.form_fields.up") }}</button>
+          </form>
+          {% endif %}
+          {% if not row.last %}
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/routing/subjects/{{ row.code }}/move">
+            <input type="hidden" name="direction" value="down">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.form_fields.down_label", label=row.label) }}">{{ _("admin.form_fields.down") }}</button>
+          </form>
+          {% endif %}
+          {% if not row.bound %}
+          <form class="inline-form" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/routing/subjects/{{ row.code }}/remove">
+            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.routing.subject.remove_label", label=row.label) }}">{{ _("admin.routing.subject.remove") }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.routing.subjects.none") }}</p>
+  {% endif %}
+  <p><a href="/admin/groups/{{ summary.group.slug }}/settings#routing">{{ _("admin.routing.back") }}</a></p>
+</section>
+{% if can_add %}
+<form class="card" id="add-subject" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/routing/subjects" novalidate aria-labelledby="add-subject-heading">
+  <div class="card__header">
+    <h2 id="add-subject-heading">{{ _("admin.routing.subject.add") }}</h2>
+    <p class="card__lead">{{ _("admin.routing.subject.add_lead", count=limit) }}</p>
+  </div>
+  <div class="form-grid">
+    {% for f in subject_fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.routing.subject.add_button") }}</button>
+  </div>
+</form>
+{% else %}
+<section class="card"><p>{{ _("admin.routing.subject.limit_reached", count=limit) }}</p></section>
+{% endif %}
+<form class="card" id="attributes" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/routing/attributes" novalidate aria-labelledby="attributes-heading">
+  <div class="card__header">
+    <h2 id="attributes-heading">{{ _("admin.routing.attributes.title") }}</h2>
+    <p class="card__lead">{{ _("admin.routing.attributes.lead") }}</p>
+  </div>
+  <fieldset class="form-section">
+    <legend class="visually-hidden">{{ _("admin.routing.attributes.title") }}</legend>
+    {% for a in attributes %}
+    <div class="choice__option">
+      <input type="checkbox" id="attribute_{{ a.value }}" name="attribute_{{ a.value }}" value="yes"{% if a.on %} checked{% endif %} aria-describedby="attribute_{{ a.value }}-hint">
+      <label for="attribute_{{ a.value }}">{{ a.label }}</label>
+    </div>
+    <p id="attribute_{{ a.value }}-hint" class="hint">{{ a.help }} {{ _("admin.routing.attributes.values", values=a["values"]) }}</p>
+    {% endfor %}
+  </fieldset>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+  </div>
+</form>
+<section class="card" id="mapping" aria-labelledby="mapping-heading">
+  <div class="card__header">
+    <h2 id="mapping-heading">{{ _("admin.routing.mapping.title") }}</h2>
+    <p class="card__lead">{{ _("admin.routing.mapping.lead") }}</p>
+  </div>
+  {% if mappings %}
+  {% for m in mappings %}
+  <form class="form-section" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/routing/mapping/{{ m.source }}" novalidate aria-labelledby="mapping-{{ m.source }}-heading">
+    <h3 id="mapping-{{ m.source }}-heading">{{ m.label }}</h3>
+    <div class="field{% if m.error %} field--error{% endif %}">
+      <label for="variable_{{ m.source }}">{{ _("admin.routing.mapping.variable") }}</label>
+      <p id="variable_{{ m.source }}-hint" class="hint">{{ _("admin.routing.mapping.variable_hint") }}</p>
+      {{ error_message(m.error, "variable_" ~ m.source ~ "-error") }}
+      <input type="text" id="variable_{{ m.source }}" name="variable_{{ m.source }}" value="{{ m.variable }}" maxlength="64" autocomplete="off" spellcheck="false"
+        aria-describedby="variable_{{ m.source }}-hint{% if m.error %} variable_{{ m.source }}-error{% endif %}"{% if m.error %} aria-invalid="true"{% endif %}>
+    </div>
+    <div class="table-scroll">
+    <table class="data-table">
+      <caption class="visually-hidden">{{ _("admin.routing.mapping.values", source=m.label) }}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{{ _("admin.routing.mapping.code") }}</th>
+          <th scope="col">{{ _("admin.routing.mapping.value") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in m.codes %}
+        <tr>
+          <th scope="row"><label for="value_{{ m.source }}_{{ c.code }}">{{ c.label }}</label> <code>{{ c.code }}</code></th>
+          <td><input type="text" id="value_{{ m.source }}_{{ c.code }}" name="value_{{ m.source }}_{{ c.code }}" value="{{ c.value }}" maxlength="64" autocomplete="off" spellcheck="false"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="button button--secondary">{{ _("admin.routing.mapping.save", source=m.label) }}</button>
+    </div>
+  </form>
+  {% endfor %}
+  {% else %}
+  <p class="empty-state">{{ _("admin.routing.mapping.none") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

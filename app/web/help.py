@@ -121,6 +121,15 @@ TOPICS = (
         ("/admin/groups/{slug}/settings/form", "/admin/groups/{slug}/settings/form/{key}"),
         Permission.GROUP_EDIT,
     ),
+    # ADR 0081: subjects, routing questions and the mapping to the contact center.
+    HelpTopic(
+        "group-routing",
+        (
+            "/admin/groups/{slug}/settings/routing",
+            "/admin/groups/{slug}/settings/routing/subjects/{code}",
+        ),
+        Permission.GROUP_EDIT,
+    ),
     HelpTopic(
         "closure-scenarios",
         tuple(
