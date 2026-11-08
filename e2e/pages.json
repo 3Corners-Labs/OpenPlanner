@@ -166,6 +166,55 @@
       ]
     },
     {
+      "name": "group usage queue and calls",
+      "path": "/admin/groups/demo/usage?view=queue",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation usage queue and calls",
+      "path": "/admin/organisations/demo/usage?view=queue",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "group usage capacity",
+      "path": "/admin/groups/demo/usage?view=capacity",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "organisation usage capacity",
+      "path": "/admin/organisations/demo/usage?view=capacity",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "group usage channels",
+      "path": "/admin/groups/demo/usage?view=channels",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "organisation usage channels",
+      "path": "/admin/organisations/demo/usage?view=channels",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
       "name": "organisation page",
       "path": "/admin/organisations/demo",
       "user": "super",
