@@ -30,8 +30,6 @@ RETURN_QUERY_PARAMS = frozenset(
         "year",
         "weekday",
         "to",
-        "date_from",
-        "date_to",
         "page",
     }
 )
