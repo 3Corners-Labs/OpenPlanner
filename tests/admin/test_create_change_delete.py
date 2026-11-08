@@ -42,6 +42,8 @@ ALERT_TARGET_REPLACED = Gap("ADR 0082 point 9: an alert target is removed and ad
 PERMANENT_HOLIDAY_RANGE = Gap("ADR 0084 context: the Dutch holidays are dates, each removed alone")
 
 CREATABLES: dict[str, Creatable] = {
+    # ADR 0096: a widget added to the own overview is moved or removed on *Edit overview*.
+    "/admin/overview/add": Creatable(change="/admin/overview/edit", delete="/admin/overview/edit"),
     # ADR 0084 step 4: an empty organisation is deleted from its edit form.
     "/admin/organisations": Creatable(
         change="/admin/organisations/{org}",

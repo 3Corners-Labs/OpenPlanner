@@ -100,3 +100,8 @@ def test_an_acceptance_lapses_when_the_counts_change() -> None:
     assert not more_bookings.accepted
     assert not fewer_agents.accepted
     assert fewer_agents.open_shortfall == 2
+
+
+def test_a_closed_slot_is_no_shortfall() -> None:
+    """Its bookings are on hold or still awaiting confirmation (ADR 0056 point 2)."""
+    assert _slot(SLOT_0900, 0, 2, closed=True).shortfall == 0

@@ -26,11 +26,13 @@ from app.domain.configuration_changes import (
     RuleContext,
 )
 from app.domain.configuration_document import Document, Mode, Scope, parse_document, to_json
+from app.domain.configuration_package import MIN_PASSPHRASE_LENGTH
 from app.domain.configuration_plan import Plan, plan_document
 from app.domain.configuration_schema import Format
-from app.domain.configuration_tree import Entity
+from app.domain.configuration_tree import Entity, any_field
 from app.domain.configuration_v1 import FORMATS, V1
-from app.domain.configuration_values import Json
+from app.domain.configuration_values import Json, Sealed
+from app.domain.configuration_visibility import visible_to
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, UnitOfWork
 
@@ -169,7 +171,7 @@ class ConfigurationDocumentService:
     ) -> bytes:
         """Write the configuration of ``scope`` as a document; audited.
 
-        With ``secrets`` the passphrase seals them (at least 16 characters); without, every
+        With ``secrets`` the passphrase seals them (see ``MIN_PASSPHRASE_LENGTH``); without, every
         secret is left out and no passphrase is needed.
 
         Raises:
@@ -177,7 +179,7 @@ class ConfigurationDocumentService:
                 secrets are wanted and the installation has no settings key.
         """
         self._may_export(actor, scope, secrets=secrets)
-        if secrets and (passphrase is None or len(passphrase) < 16):
+        if secrets and (passphrase is None or len(passphrase) < MIN_PASSPHRASE_LENGTH):
             raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")
         async with self._uow.read() as tx:
             snapshot = await tx.read_configuration(self._clock.now(), self._locked())
@@ -187,7 +189,7 @@ class ConfigurationDocumentService:
             format=V1.name,
             mode=Mode.MERGE,
             scope=scope,
-            root=_confined(snapshot.root, scope),
+            root=visible_to(_confined(snapshot.root, scope), V1, actor.may_change),
             digest="",
             schema=V1,
             meta={
@@ -228,10 +230,13 @@ class ConfigurationDocumentService:
                 ``configuration_package_*`` and ``configuration_passphrase_*``,
                 ``configuration_out_of_scope``.
         """
-        document = self._read(data, passphrase, scope)
+        document = self._read(data, scope)
+        sealed = any_field(document.root, lambda value: isinstance(value, Sealed))
         async with self._uow.read() as tx:
             snapshot = await tx.read_configuration(self._clock.now(), self._locked())
-        return self._plan(actor, document, snapshot)
+        return replace(
+            self._plan(actor, self._sealing.open(document, passphrase), snapshot), sealed=sealed
+        )
 
     async def apply(
         self,
@@ -252,7 +257,7 @@ class ConfigurationDocumentService:
                 for a plan with deletions or no longer the plan's;
                 ``configuration_too_many_changes``.
         """
-        document = self._read(data, passphrase, scope)
+        document = self._sealing.open(self._read(data, scope), passphrase)
         async with self._uow.read() as tx:
             first = self._plan(
                 actor, document, await tx.read_configuration(self._clock.now(), self._locked())
@@ -296,8 +301,8 @@ class ConfigurationDocumentService:
         """Refuse an export the actor may not make (ADR 0099 point 11).
 
         A document of the platform, or any with secrets, needs the platform's manage
-        permission; one of an organisation, that organisation's. The view of single kinds
-        by narrower roles comes with the portal (step 3).
+        permission; one of an organisation, that organisation's. What the actor may not manage
+        is left out of the document (``visible_to``).
         """
         if scope.is_platform or secrets:
             allowed = actor.may_change(Permission.SETTINGS_PLATFORM_MANAGE, Target.everything())
@@ -309,12 +314,12 @@ class ConfigurationDocumentService:
         if not allowed:
             raise DomainError(ErrorCode.NOT_PERMITTED)
 
-    def _read(self, data: bytes, passphrase: str | None, scope: Scope | None) -> Document:
-        """Decode, parse, confine and open a document."""
+    def _read(self, data: bytes, scope: Scope | None) -> Document:
+        """Decode, parse and confine a document; its sealed secrets are still sealed."""
         document = parse_document(self._codec.decode(data, self._max_bytes()), self._formats)
         if scope is not None and document.scope != scope:
             raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "scope")
-        return self._sealing.open(document, passphrase)
+        return document
 
     def _plan(self, actor: Actor, document: Document, snapshot: ConfigurationSnapshot) -> Plan:
         """Plan ``document`` against a snapshot of the configuration."""

@@ -11,6 +11,7 @@
       <a href="?day={{ next_day }}">{{ _("admin.agenda.next") }}</a>
       <a href="{{ week_href }}">{{ _("admin.agenda.view_week") }}</a>
       <a href="?day={{ this_day }}">{{ _("admin.agenda.refresh") }}</a>
+      {% if only_pending %}<a href="?day={{ this_day }}">{{ _("admin.agenda.filter_all") }}</a>{% else %}<a href="?day={{ this_day }}&amp;status={{ pending_filter }}">{{ _("admin.agenda.filter_pending") }}</a>{% endif %}
       {% if manage %}<a href="/admin/groups/{{ summary.group.slug }}/agenda/waiting">{{ _("admin.agenda.waiting_list") }}</a>{% endif %}
     </nav>
   </div>

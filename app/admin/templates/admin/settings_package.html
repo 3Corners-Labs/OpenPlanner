@@ -4,6 +4,7 @@
 {% block content %}
 {% include "admin/_settings_header.html" %}
 {% if manage %}
+{% include "admin/_configuration_document.html" %}
 <section class="card" id="package" aria-labelledby="package-heading">
   <h2 id="package-heading">{{ _("admin.settings.package.title") }}</h2>
   <p>{{ _("admin.settings.package.intro") }}</p>

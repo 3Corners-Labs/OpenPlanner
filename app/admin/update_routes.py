@@ -31,10 +31,10 @@ from app.admin.forms import (
     raise_refusal,
     read_form,
     redirect_done,
-    safe_next,
 )
 from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import page as _page
+from app.admin.return_to import safe_next
 from app.domain.audit import AuditEntry
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode

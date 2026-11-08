@@ -11,12 +11,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+from app.domain.booking import Contact
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import (
     LONG_TEXT_MAX_LENGTH,
+    AnswerValue,
     FieldDefinition,
     FieldType,
     FormDefinition,
+    Purpose,
 )
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
 from app.domain.routing import GroupRouting
@@ -119,6 +122,17 @@ class ContactForm:
             )
         fields += [_custom(field, locale.code, self.today) for field in self.form.fields]
         return [_with(f, values.get(f.name, ""), by_field.get(f.name)) for f in fields]
+
+    def correction_fields(
+        self, locale: RequestLocale, errors: list[FormError], values: Mapping[str, str]
+    ) -> list[FieldView]:
+        """Return the inputs a participant may correct (ADR 0056 point 10).
+
+        The booking form's fields without the routing questions (the subject stays) and without
+        the email address, which cannot change: another address is another booking.
+        """
+        skip = {f.name for f in routing_fields(self.group.routing, locale)} | {"email"}
+        return [f for f in self.fields(locale, errors, values) if f.name not in skip]
 
     def errors(self, error: DomainError, locale: RequestLocale) -> list[FormError]:
         """Return the messages for ``error``; a refused answer names its field's label."""
@@ -250,3 +264,26 @@ def contact_input(values: Mapping[str, str]) -> ContactInput:
         values.get("phone") or None,
         answers,
     )
+
+
+def contact_values(contact: Contact) -> dict[str, str]:
+    """Return a booking's contact as the form's input values, to prefill a correction.
+
+    The answers are read for the participant's own view (``Purpose.PARTICIPANT_SELF``).
+    """
+    values = {
+        "first_name": contact.first_name,
+        "last_name": contact.last_name,
+        "phone": contact.phone or "",
+    }
+    answers = contact.answers.visible(Purpose.PARTICIPANT_SELF) if contact.answers else {}
+    for key, value in answers.items():
+        values[f"{ANSWER_PREFIX}{key}"] = _input_value(value)
+    return values
+
+
+def _input_value(value: AnswerValue) -> str:
+    """Return a stored answer as the form input's value (a ticked checkbox is ``on``)."""
+    if isinstance(value, bool):
+        return "on" if value else ""
+    return str(value)

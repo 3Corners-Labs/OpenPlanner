@@ -1861,6 +1861,15 @@ _AUDIT = (
         "Look at the group's queue and staffing; the participant may still be waiting.",
     ),
     _e(
+        "booking.details_corrected",
+        _SYS,
+        "outcome",
+        "booking_id fields",
+        "Details corrected: booking {booking_id}, fields {fields}.",
+        "The participant corrected name, phone or answers on the management page (ADR 0056 "
+        "point 10); the event names the fields, never their values.",
+    ),
+    _e(
         "queue.wait",
         _SYS,
         "outcome",

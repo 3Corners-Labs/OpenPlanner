@@ -88,6 +88,19 @@ a staffing change you see whether it causes a shortfall.
 
 Solve a shortfall by raising the staffing again, or by changing bookings (below).
 
+## Unconfirmed appointments
+
+A new appointment waits until the participant confirms it with the link in the email. The day
+view and the appointment itself then show **Not confirmed, at the latest** with the moment the
+appointment lapses if nobody confirms. Such an appointment holds its place: the slot says how many
+of its appointments are not confirmed yet, and they count towards shortfalls. **Not confirmed
+only** shows just these appointments; **All appointments** shows everything again.
+
+When the participant calls, someone with the right **Change bookings** can choose **Confirm for
+participant**. The participant then gets the same confirmation with all details as after
+confirming themselves, and the audit log records who confirmed. After the lapse moment that is no
+longer possible.
+
 ## Changing bookings
 
 With the right **Change bookings** (group admins, organisation admins and a custom Planner

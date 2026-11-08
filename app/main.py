@@ -18,6 +18,7 @@ from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, a
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
+from app.adapters.configuration_context import document_service
 from app.adapters.contact_center_connections import sealed_connections
 from app.adapters.db.backup import database_path
 from app.adapters.db.configuration_package import (
@@ -51,6 +52,7 @@ from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_map
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
 from app.adapters.signing_keys import EcSigningKeys
+from app.admin.reviewed_documents import ReviewedDocuments
 from app.admin.routes import register_admin
 from app.admin.session import session_cookie_for
 from app.api import (
@@ -537,6 +539,17 @@ def create_app(
             app.state.admin_service,
             max_bytes=lambda: live().configuration_package_max_mb * 1024 * 1024,
         )
+        # ADR 0099: the configuration as a JSON document, planned and applied in the portal;
+        # the discovery document of a new or moved identity provider is fetched through the guard.
+        app.state.configuration_documents = document_service(
+            uow,
+            clock,
+            app.state.admin_service,
+            settings=live,
+            discovery=discovery_fetcher or GuardedDiscoveryFetcher(http, allow_private=lab),
+            locked=app.state.live_settings.locked,
+        )
+        app.state.reviewed_documents = ReviewedDocuments()
         app.state.certificate_status = CertificateStatus(uow)
         # ADR 0086: the round trip to the public address, the endpoint it asks and the watch on
         # forwarded headers from a peer that is not trusted.

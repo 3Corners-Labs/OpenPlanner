@@ -5,10 +5,11 @@ A fixed list of rules, keyed by route template, decides what closes while mainte
 machine API, and a test checks that every public route is either closed or explicitly open, so
 no route can forget it.
 
-    closed    /g/{slug} (and /book, /direct), /b/{token}/cancel, /b/{token}/reschedule,
+    closed    /g/{slug} (and /book, /direct), /b/{token}/cancel, /b/{token}/details,
+              /b/{token}/reschedule,
               /b/{token}/test, /b/{token}/wait/leave, and under the reference of ADR 0093
-              /b/m/{ref}/cancel, /b/m/{ref}/reschedule, /b/m/{ref}/test (and /test/go),
-              /b/m/{ref}/wait/leave
+              /b/m/{ref}/cancel, /b/m/{ref}/details, /b/m/{ref}/reschedule, /b/m/{ref}/test
+              (and /test/go), /b/m/{ref}/wait/leave
               ─► 503 + Retry-After: the maintenance page instead of the form or the write
     open      the booking page /b/{token} and /b/m/{ref}, the closure page /g/{slug}/closure
               (ADR 0037), waiting and join pages, health, brand assets, webhooks (they record what
@@ -50,11 +51,13 @@ GROUP_ROUTES = frozenset({"/g/{slug}", "/g/{slug}/book", "/g/{slug}/direct"})
 BOOKING_ROUTES = frozenset(
     {
         "/b/{token}/cancel",
+        "/b/{token}/details",
         "/b/{token}/reschedule",
         "/b/{token}/test",
         "/b/{token}/test/go",
         "/b/{token}/wait/leave",
         "/b/m/{public_ref}/cancel",
+        "/b/m/{public_ref}/details",
         "/b/m/{public_ref}/reschedule",
         "/b/m/{public_ref}/test",
         "/b/m/{public_ref}/test/go",
@@ -63,7 +66,8 @@ BOOKING_ROUTES = frozenset(
 )
 """Participant routes under a management link that close (both the form and the write). The trial
 call (ADR 0071) schedules a meeting at Webex, which is a write, so its page closes too, and
-stopping a direct call (ADR 0019 point 4) cancels a booking like ``/cancel`` does."""
+stopping a direct call (ADR 0019 point 4) cancels a booking like ``/cancel`` does; correcting the
+details (ADR 0056 point 10) changes the booking too."""
 
 WIDGET_ROUTES = frozenset(
     {

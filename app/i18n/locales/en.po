@@ -8814,6 +8814,9 @@ msgstr "Largest configuration package (MB)"
 msgid "settings.field.configuration_apply_max_changes.label"
 msgstr "Most changes in one configuration document"
 
+msgid "settings.field.configuration_review_minutes.label"
+msgstr "Minutes an uploaded configuration document is kept after its plan"
+
 msgid "admin.done.package_imported"
 msgstr "The configuration package has been imported: {count} organisation(s). The processes pick up the new settings within ten seconds."
 
@@ -10265,6 +10268,98 @@ msgstr "This database is too old for that version: update to the version named i
 msgid "settings.field.overview_max_widgets.label"
 msgstr "Most widgets on an own overview"
 
+msgid "admin.layout.add.title"
+msgstr "Add widget"
+
+msgid "admin.layout.add.lead"
+msgstr "Choose what you want to see on your overview. You only see widgets your rights allow and that are not on it yet."
+
+msgid "admin.layout.add.available"
+msgstr "Available widgets"
+
+msgid "admin.layout.add.button"
+msgstr "Add"
+
+msgid "admin.layout.add.button_for"
+msgstr "Add {title}"
+
+msgid "admin.layout.add.none"
+msgstr "Every widget you may see is already on your overview."
+
+msgid "admin.layout.add.full"
+msgstr "Your overview has the maximum of {maximum} widgets. Remove one first."
+
+msgid "admin.layout.count"
+msgstr "On your overview: {count} of at most {maximum}."
+
+msgid "admin.layout.edit.title"
+msgstr "Edit overview"
+
+msgid "admin.layout.edit.lead"
+msgstr "Put the widgets in the order that fits your work, or remove one. Only you see this layout."
+
+msgid "admin.layout.edit.order"
+msgstr "Order"
+
+msgid "admin.layout.edit.own"
+msgstr "This is your own layout."
+
+msgid "admin.layout.edit.default"
+msgstr "This is the default layout of your role."
+
+msgid "admin.layout.edit.up"
+msgstr "Up"
+
+msgid "admin.layout.edit.up_for"
+msgstr "Move {title} up"
+
+msgid "admin.layout.edit.down"
+msgstr "Down"
+
+msgid "admin.layout.edit.down_for"
+msgstr "Move {title} down"
+
+msgid "admin.layout.edit.remove"
+msgstr "Remove"
+
+msgid "admin.layout.edit.remove_for"
+msgstr "Remove {title}"
+
+msgid "admin.layout.edit.empty"
+msgstr "Your overview has no widgets."
+
+msgid "admin.layout.reset.title"
+msgstr "Restore default layout"
+
+msgid "admin.layout.reset.lead"
+msgstr "Removes your own layout; you then see the default layout of your role again."
+
+msgid "admin.layout.reset.button"
+msgstr "Restore default layout"
+
+msgid "admin.layout.back"
+msgstr "Back to the overview"
+
+msgid "admin.layout.error.widget"
+msgstr "This widget cannot be chosen here. Reload the page and try again."
+
+msgid "admin.layout.error.full"
+msgstr "Your overview already has the maximum number of widgets. Remove one first."
+
+msgid "admin.layout.error.staff"
+msgstr "Your layout could not be saved. Log in again and try once more."
+
+msgid "admin.done.widget_added"
+msgstr "The widget is on your overview."
+
+msgid "admin.done.widget_moved"
+msgstr "The order has been changed."
+
+msgid "admin.done.widget_removed"
+msgstr "The widget has been removed."
+
+msgid "admin.done.layout_reset"
+msgstr "You see the default layout of your role again."
 msgid "admin.field.dispatch_fallback"
 msgstr "Fallback when the contact center fails"
 
@@ -10643,6 +10738,32 @@ msgstr "A client ID consists of letters, digits and . _ : - without spaces."
 
 msgid "admin.form.error.cc_secret"
 msgstr "Enter the secret as one line without spaces."
+msgid "admin.done.confirmed_by_staff"
+msgstr "The appointment was confirmed for the participant. The participant gets the confirmation with all details."
+
+msgid "admin.done.not_pending"
+msgstr "This appointment is not (or no longer) awaiting confirmation."
+
+msgid "admin.agenda.pending"
+msgstr "Not confirmed, at the latest {until}"
+
+msgid "admin.agenda.confirm"
+msgstr "Confirm for participant"
+
+msgid "admin.agenda.filter_pending"
+msgstr "Not confirmed only"
+
+msgid "admin.agenda.filter_all"
+msgstr "All appointments"
+
+msgid "admin.done.confirm_lapsed"
+msgstr "This appointment had already lapsed: nobody confirmed it in time. The participant is told so."
+
+msgid "admin.agenda.slot_staffing_pending"
+msgstr "{Agents}: {agents}, bookings: {booked} (of which {pending} not confirmed)"
+
+msgid "admin.audit.detail.booking_confirmed_by_staff"
+msgstr "Appointment confirmed for the participant"
 
 msgid "reports.view.volume"
 msgstr "Volume"
@@ -11027,3 +11148,114 @@ msgstr "Followed the link, of those made"
 
 msgid "reports.channels.trial.entered_share"
 msgstr "Entered the meeting, of those who followed the link"
+
+msgid "admin.tab.configuration"
+msgstr "Configuration"
+
+msgid "admin.done.configuration_applied"
+msgstr "The configuration document was applied: {count} change(s). The processes pick up the new settings within ten seconds."
+
+msgid "admin.configuration.title"
+msgstr "Configuration document"
+
+msgid "admin.configuration.intro_platform"
+msgstr "Export the configuration of the platform and all organisations as a JSON file, or read a file in. You see what changes first; only then is it applied."
+
+msgid "admin.configuration.intro_organisation"
+msgstr "Export this organisation's configuration as a JSON file, or read a file in. You see what changes first; only then is it applied."
+
+msgid "admin.configuration.export.title"
+msgstr "Export"
+
+msgid "admin.configuration.export.secrets"
+msgstr "Include secrets, sealed with a passphrase"
+
+msgid "admin.configuration.export.secrets_hint"
+msgstr "Without secrets the file needs no passphrase. With secrets the passphrase is at least {length} characters; keep it safe, it cannot be recovered."
+
+msgid "admin.configuration.export.button"
+msgstr "Export document"
+
+msgid "admin.configuration.upload.title"
+msgstr "Upload and plan"
+
+msgid "admin.configuration.upload.intro"
+msgstr "Choose a configuration document (JSON, at most {max_mb} MB). You get a plan to read; nothing changes yet."
+
+msgid "admin.configuration.upload.file"
+msgstr "Configuration document"
+
+msgid "admin.configuration.upload.passphrase"
+msgstr "Document passphrase (only for sealed secrets)"
+
+msgid "admin.configuration.upload.button"
+msgstr "Show plan"
+
+msgid "admin.configuration.plan.title"
+msgstr "Plan"
+
+msgid "admin.configuration.plan.summary"
+msgstr "This document changes {count} object(s):"
+
+msgid "admin.configuration.plan.refused"
+msgstr "The document cannot be applied: {count} reason(s)."
+
+msgid "admin.configuration.plan.action"
+msgstr "Action"
+
+msgid "admin.configuration.plan.kind"
+msgstr "Kind"
+
+msgid "admin.configuration.plan.path"
+msgstr "Place in the document"
+
+msgid "admin.configuration.plan.fields"
+msgstr "Fields"
+
+msgid "admin.configuration.plan.nothing"
+msgstr "The document changes nothing: the configuration already is as described."
+
+msgid "admin.configuration.plan.apply"
+msgstr "Apply plan"
+
+msgid "admin.configuration.plan.back"
+msgstr "Back to the configuration"
+
+msgid "admin.configuration.action.create"
+msgstr "Create"
+
+msgid "admin.configuration.action.update"
+msgstr "Update"
+
+msgid "admin.configuration.action.delete"
+msgstr "Delete"
+
+msgid "admin.configuration.warning.deletes"
+msgstr "Note: this plan deletes {count} object(s). That cannot be undone."
+
+msgid "admin.configuration.warning.claims"
+msgstr "Note: this plan changes a claim value (the key of an organisation or group, or a role's claim value). People who match the old value lose access until the identity provider sends the new value."
+
+msgid "admin.configuration.warning.webex"
+msgstr "Note: this plan replaces the tokens of the Webex Service App. The installation the document came from can no longer connect."
+
+msgid "details.title"
+msgstr "Change your details"
+
+msgid "details.email"
+msgstr "Email address"
+
+msgid "details.email_hint"
+msgstr "You cannot change the email address here. To use another address, cancel this appointment and make a new one."
+
+msgid "details.save"
+msgstr "Save changes"
+
+msgid "details.back"
+msgstr "Back to your appointment"
+
+msgid "manage.details"
+msgstr "Change your details"
+
+msgid "manage.notice.details"
+msgstr "Your details have been changed."

@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from app.config import Settings
+from app.domain.configuration_document import document_filename
 from app.domain.configuration_package import package_filename
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
 from tests.support.configuration_package import PACKAGE_PASSPHRASE
@@ -66,6 +67,22 @@ async def test_the_configuration_package_download_has_a_safe_filename(site: Site
 
     assert response.status_code == 200
     assert SAFE_FILENAME.fullmatch(_filename(response.headers["content-disposition"]))
+
+
+async def test_the_configuration_document_download_has_a_safe_filename(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    response = await site.client.post(
+        "/admin/settings/configuration/export", data={}, headers=SAME_ORIGIN
+    )
+
+    assert response.status_code == 200
+    assert SAFE_FILENAME.fullmatch(_filename(response.headers["content-disposition"]))
+
+
+def test_the_document_filename_is_safe_for_the_default_installation() -> None:
+    assert SAFE_FILENAME.fullmatch(document_filename("", EXPORTED))
+    assert SAFE_FILENAME.fullmatch(document_filename("Docker 01/ä", EXPORTED))
 
 
 def test_the_package_filename_is_safe_for_the_default_installation() -> None:
