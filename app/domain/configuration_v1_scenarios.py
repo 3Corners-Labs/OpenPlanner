@@ -8,12 +8,13 @@ those of ``ClosureScenario`` (name, notices and headings), of the contact block,
 images (``ImageFile.from_upload``, which strips metadata, and ``ImageText``).
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 
+from app.domain import configuration_v1_names as names
 from app.domain.authorization import Permission
 from app.domain.closure import heading_field, notice_field
 from app.domain.configuration_changes import IntegrityRule, RuleContext
-from app.domain.configuration_checks import contacts_check
+from app.domain.configuration_checks import contacts_check, text_map
 from app.domain.configuration_schema import (
     Collection,
     Kind,
@@ -28,26 +29,10 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.images import ImageFile, ImageText, alt_field
 from app.domain.scenarios import MAX_NAME_LENGTH, ClosureScenario
 
-ORGANISATION_SCENARIO_KIND = "organisation_scenario"
-GROUP_SCENARIO_KIND = "group_scenario"
-IMAGE_KIND = "scenario_image"
+ORGANISATION_SCENARIO_KIND = names.ORGANISATION_SCENARIO_KIND
+GROUP_SCENARIO_KIND = names.GROUP_SCENARIO_KIND
+IMAGE_KIND = names.SCENARIO_IMAGE_KIND
 """The kind names, which other slices read by name."""
-
-
-def _texts(value: Value, field_of: Callable[[str], str], fallback: str) -> dict[str, str]:
-    """Return a JSON object of texts per locale; refuse anything else.
-
-    Raises:
-        DomainError: ``invalid_configuration`` naming ``fallback``, or the locale's field.
-    """
-    if not isinstance(value, dict):
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, fallback)
-    texts: dict[str, str] = {}
-    for locale, item in value.items():
-        if not isinstance(item, str):
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, field_of(locale))
-        texts[locale] = item
-    return texts
 
 
 def _scenario_check(
@@ -65,8 +50,8 @@ def _scenario_check(
         0,
         None,
         name if isinstance(name, str) else "",
-        _texts(merged.get("notices"), notice_field, "notices"),
-        _texts(merged.get("headings", {}), heading_field, "headings"),
+        text_map(merged.get("notices"), "notices", field_of=notice_field),
+        text_map(merged.get("headings", {}), "headings", field_of=heading_field),
     )
     return {
         **merged,
@@ -96,7 +81,7 @@ def _image_check(
     Raises:
         DomainError: ``invalid_configuration`` with ``alt_<locale>``.
     """
-    alts = _texts(merged.get("alts", {}), alt_field, "alts")
+    alts = text_map(merged.get("alts", {}), "alts", field_of=alt_field)
     text_alternative = ImageText(alts, merged.get("decorative") is True)
     return {**merged, "alts": dict(text_alternative.alts)}
 

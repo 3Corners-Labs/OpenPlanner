@@ -3,7 +3,17 @@
 import pytest
 
 from app.domain.configuration_changes import RuleContext
-from app.domain.configuration_checks import contacts_check, setting_value
+from app.domain.configuration_checks import (
+    contacts_check,
+    effective_idp_key,
+    int_setting,
+    setting_value,
+    strings_of,
+    text_map,
+    text_of,
+    text_setting,
+    utc_moment,
+)
 from app.domain.contacts import (
     ContactBlock,
     ContactKind,
@@ -133,3 +143,45 @@ def test_a_secret_setting_is_not_a_plain_value() -> None:
         setting_value(BY_KEY["smtp_password"], "hunter2")
 
     assert error.value.code is ErrorCode.SETTING_INVALID
+
+
+def test_the_small_readers_of_a_field_never_fail_on_what_is_not_there() -> None:
+    values = {"a": "text", "b": 5, "c": ["x", 1, "y"], "d": "not a list"}
+
+    assert (text_of(values, "a"), text_of(values, "b"), text_of(values, "zz")) == ("text", "", "")
+    assert strings_of(values, "c") == ["x", "y"]
+    assert strings_of(values, "d") == strings_of(values, "zz") == []
+    assert effective_idp_key({"idp_key": "own"}, "slug") == "own"
+    assert effective_idp_key({"idp_key": None}, "slug") == "slug"
+
+
+def test_a_moment_is_read_with_its_offset_and_written_in_utc() -> None:
+    assert utc_moment("2027-01-01T12:00:00+01:00", "when") == "2027-01-01T11:00:00+00:00"
+    for bad in ("2027-01-01T12:00:00", "next year"):
+        with pytest.raises(DomainError) as error:
+            utc_moment(bad, "when")
+        assert error.value.field == "when"
+
+
+def test_a_map_of_texts_names_the_field_that_is_wrong() -> None:
+    assert text_map({"nl": "een"}, "notices") == {"nl": "een"}
+    with pytest.raises(DomainError) as whole:
+        text_map(["nl"], "notices", code=ErrorCode.INVALID_FORM_FIELD)
+    with pytest.raises(DomainError) as one:
+        text_map({"nl": 1}, "notices", field_of=lambda locale: f"notice_{locale}")
+    with pytest.raises(DomainError) as key:
+        text_map({1: "x"}, "notices", field_of=lambda locale: f"notice_{locale}")
+
+    assert (whole.value.code, whole.value.field) == (ErrorCode.INVALID_FORM_FIELD, "notices")
+    assert one.value.field == "notice_nl"
+    assert key.value.field == "notices"
+
+
+def test_a_limit_comes_from_the_context_and_else_from_the_registry() -> None:
+    limit = "idp_max_per_organisation"
+
+    assert int_setting(CONTEXT, limit) == 2
+    assert int_setting(RuleContext(settings={limit: 4}), limit) == 4
+    assert int_setting(RuleContext(settings={limit: True}), limit) == 2
+    assert text_setting(CONTEXT, "time_format") == "24h"
+    assert text_setting(RuleContext(settings={"time_format": "12h"}), "time_format") == "12h"

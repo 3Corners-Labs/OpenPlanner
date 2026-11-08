@@ -11,6 +11,7 @@ password is never sent to a host it was not entered for (ADR 0028).
 
 from collections.abc import Mapping
 
+from app.domain import configuration_v1_names as names
 from app.domain.authorization import Permission
 from app.domain.channel_settings import (
     SmsProvider,
@@ -23,12 +24,13 @@ from app.domain.channel_settings import (
 )
 from app.domain.channels import ChannelKind
 from app.domain.configuration_changes import IntegrityRule, RuleContext
+from app.domain.configuration_checks import text_of
 from app.domain.configuration_schema import Collection, Kind, Shape, integer, secret, text
 from app.domain.configuration_values import Secret, Value
 from app.domain.errors import DomainError, ErrorCode
 
-EMAIL_KIND = "email_channel"
-SMS_KIND = "sms_channel"
+EMAIL_KIND = names.EMAIL_CHANNEL_KIND
+SMS_KIND = names.SMS_CHANNEL_KIND
 """The kind names, which other slices read by name."""
 
 _TABLE = "channel_settings"
@@ -40,12 +42,6 @@ def _blank_to_none(values: Mapping[str, Value], name: str) -> str | None:
     """Return an optional text field, ``None`` when it is absent or blank (as the form does)."""
     value = values.get(name)
     return value if isinstance(value, str) and value.strip() else None
-
-
-def _text(values: Mapping[str, Value], name: str) -> str:
-    """Return a text field, or the empty text when it is not one."""
-    value = values.get(name)
-    return value if isinstance(value, str) else ""
 
 
 def _checked_secret(
@@ -82,16 +78,16 @@ def _smtp(values: Mapping[str, Value]) -> SmtpSettings:
         DomainError: ``invalid_configuration`` naming the field.
     """
     try:
-        security = SmtpSecurity(_text(values, "security"))
+        security = SmtpSecurity(text_of(values, "security"))
     except ValueError:
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "smtp_security") from None
     port = values.get("port")
     return SmtpSettings(
-        host=_text(values, "host"),
+        host=text_of(values, "host"),
         port=port if isinstance(port, int) else 0,
         security=security,
         username=_blank_to_none(values, "username"),
-        sender_address=_text(values, "sender_address"),
+        sender_address=text_of(values, "sender_address"),
         sender_name=_blank_to_none(values, "sender_name"),
         reply_to_address=_blank_to_none(values, "reply_to_address"),
         dkim_selector=_blank_to_none(values, "dkim_selector"),
@@ -151,14 +147,14 @@ def _sms(values: Mapping[str, Value]) -> SmsSettings:
         DomainError: ``invalid_configuration`` naming the field.
     """
     try:
-        provider = SmsProvider(_text(values, "provider"))
+        provider = SmsProvider(text_of(values, "provider"))
     except ValueError:
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "sms_provider") from None
     return SmsSettings(
         provider=provider,
-        api_base_url=_text(values, "api_base_url"),
-        sender_id=_text(values, "sender_id"),
-        country_code=_text(values, "country_code"),
+        api_base_url=text_of(values, "api_base_url"),
+        sender_id=text_of(values, "sender_id"),
+        country_code=text_of(values, "country_code"),
     )
 
 

@@ -11,6 +11,7 @@ written form is the stored form, so a document and the database hold the same ob
 from collections.abc import Mapping
 from typing import Any
 
+from app.domain.configuration_checks import invalid, text_map
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.routing import Attribute, GroupRouting, RouteVariable, Subject
 
@@ -39,47 +40,35 @@ def routing_from_json(data: object) -> GroupRouting:
             or the part the routing itself refuses (``subject_code``, ``mapping`` …).
     """
     if not isinstance(data, Mapping) or not set(data) <= _KEYS:
-        raise _invalid()
+        raise invalid("routing")
     subjects = tuple(_subject(item) for item in _list(data.get("subjects", [])))
     attributes = tuple(_attribute(item) for item in _list(data.get("attributes", [])))
     mapping = data.get("mapping", {})
     if not isinstance(mapping, Mapping):
-        raise _invalid()
+        raise invalid("routing")
     variables = tuple((_text(source), _variable(body)) for source, body in mapping.items())
     return GroupRouting(subjects, attributes, variables)
-
-
-def _invalid() -> DomainError:
-    """Return the refusal of a routing object of the wrong shape."""
-    return DomainError(ErrorCode.INVALID_CONFIGURATION, "routing")
 
 
 def _list(value: object) -> list[Any]:
     """Return a JSON array, or refuse."""
     if not isinstance(value, list):
-        raise _invalid()
+        raise invalid("routing")
     return value
 
 
 def _text(value: object) -> str:
     """Return a JSON text, or refuse."""
     if not isinstance(value, str):
-        raise _invalid()
+        raise invalid("routing")
     return value
-
-
-def _texts(value: object) -> dict[str, str]:
-    """Return a JSON object of texts, or refuse."""
-    if not isinstance(value, Mapping):
-        raise _invalid()
-    return {_text(key): _text(item) for key, item in value.items()}
 
 
 def _subject(item: object) -> Subject:
     """Read one subject: its code and its labels per locale."""
     if not isinstance(item, Mapping) or set(item) != {"code", "labels"}:
-        raise _invalid()
-    return Subject(_text(item["code"]), tuple(sorted(_texts(item["labels"]).items())))
+        raise invalid("routing")
+    return Subject(_text(item["code"]), tuple(sorted(text_map(item["labels"], "routing").items())))
 
 
 def _attribute(item: object) -> Attribute:
@@ -93,6 +82,6 @@ def _attribute(item: object) -> Attribute:
 def _variable(body: object) -> RouteVariable:
     """Read the variable one source maps to."""
     if not isinstance(body, Mapping) or not {"name"} <= set(body) <= {"name", "values"}:
-        raise _invalid()
-    values = _texts(body.get("values", {}))
+        raise invalid("routing")
+    values = text_map(body.get("values", {}), "routing")
     return RouteVariable(_text(body["name"]), tuple(sorted(values.items())))

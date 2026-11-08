@@ -17,10 +17,17 @@ verified).
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
-from datetime import UTC, datetime
 
+from app.domain import configuration_v1_names as names
 from app.domain.authorization import Permission
 from app.domain.configuration_changes import IntegrityRule, Refusal, Resolution, RuleContext
+from app.domain.configuration_checks import (
+    int_setting,
+    invalid,
+    text_of,
+    text_setting,
+    utc_moment,
+)
 from app.domain.configuration_schema import (
     Collection,
     Kind,
@@ -50,27 +57,13 @@ from app.domain.login_domains import (
 )
 from app.domain.mfa import MfaPolicy
 
-PROVIDER_KIND = "identity_provider"
-KEY_KIND = "identity_provider_key"
-DOMAIN_KIND = "identity_provider_domain"
+PROVIDER_KIND = names.PROVIDER_KIND
+KEY_KIND = names.PROVIDER_KEY_KIND
+DOMAIN_KIND = names.PROVIDER_DOMAIN_KIND
 """The kind names, which other slices read by name."""
-
-DEFAULT_MAX_PER_ORGANISATION = 2
-"""``idp_max_per_organisation`` when the context does not carry it (the setting's default)."""
 
 MAX_KID_LENGTH = 64
 MAX_MFA_LENGTH = 1100
-
-
-def _invalid(field: str) -> DomainError:
-    """Return the refusal for ``field``."""
-    return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
-
-
-def _str(values: Mapping[str, Value], name: str) -> str:
-    """Return a text field, or the empty text when it is not one."""
-    value = values.get(name)
-    return value if isinstance(value, str) else ""
 
 
 def _provider_check(
@@ -85,28 +78,28 @@ def _provider_check(
         DomainError: ``invalid_configuration`` naming the field.
     """
     draft = ProviderDraft.create(
-        key=_str(merged, "key"),
-        name=_str(merged, "name"),
-        discovery_url=_str(merged, "discovery_url"),
-        client_id=_str(merged, "client_id"),
-        client_auth=_str(merged, "client_auth"),
-        scopes=_str(merged, "scopes"),
-        entitlement_claim=_str(merged, "entitlement_claim"),
-        entitlement_prefix=_str(merged, "entitlement_prefix"),
-        mfa_policy=_str(merged, "mfa_policy"),
-        mfa_amr_values=_str(merged, "mfa_amr_values"),
-        mfa_acr_values=_str(merged, "mfa_acr_values"),
+        key=text_of(merged, "key"),
+        name=text_of(merged, "name"),
+        discovery_url=text_of(merged, "discovery_url"),
+        client_id=text_of(merged, "client_id"),
+        client_auth=text_of(merged, "client_auth"),
+        scopes=text_of(merged, "scopes"),
+        entitlement_claim=text_of(merged, "entitlement_claim"),
+        entitlement_prefix=text_of(merged, "entitlement_prefix"),
+        mfa_policy=text_of(merged, "mfa_policy"),
+        mfa_amr_values=text_of(merged, "mfa_amr_values"),
+        mfa_acr_values=text_of(merged, "mfa_acr_values"),
         allow_http=not context.production,
     )
     stored = merged.get("client_secret")
     given = stored is not None and (current is None or stored != current.get("client_secret"))
     if draft.client_auth.needs_secret:
         if stored is None:
-            raise _invalid("client_secret")
+            raise invalid("client_secret")
         if isinstance(stored, Secret):
             validate_secret(stored.reveal())
     elif given:
-        raise _invalid("client_secret")
+        raise invalid("client_secret")
     return {
         **merged,
         "name": draft.name,
@@ -125,15 +118,7 @@ def _provider_check(
 def _moment(values: Mapping[str, Value], name: str) -> str | None:
     """Return the time field as UTC ISO text, ``None`` when absent; refuse anything else."""
     value = values.get(name)
-    if value is None:
-        return None
-    try:
-        parsed = datetime.fromisoformat(str(value))
-    except ValueError:
-        raise _invalid(name) from None
-    if parsed.tzinfo is None:
-        raise _invalid(name)
-    return parsed.astimezone(UTC).isoformat()
+    return None if value is None else utc_moment(value, name)
 
 
 def _signing_key_check(
@@ -148,9 +133,9 @@ def _signing_key_check(
     if not isinstance(jwk, dict) or not all(
         isinstance(k, str) and isinstance(v, str) for k, v in jwk.items()
     ):
-        raise _invalid("public_jwk")
+        raise invalid("public_jwk")
     if current is None and merged.get("private_key") is None:
-        raise _invalid("private_key")
+        raise invalid("private_key")
     created, retired = _moment(merged, "created_at"), _moment(merged, "retired_at")
     return {**merged, "created_at": created, "retired_at": retired}
 
@@ -163,7 +148,7 @@ def _domain_check(
     Raises:
         DomainError: ``idp_domain_invalid`` with ``domain``.
     """
-    domain = _str(merged, "domain")
+    domain = text_of(merged, "domain")
     if normalise_domain(domain) != domain:
         raise DomainError(ErrorCode.IDP_DOMAIN_INVALID, "domain")
     return merged
@@ -266,10 +251,7 @@ def _provider_keys_unique(resolution: Resolution) -> Iterable[Refusal]:
 
 def _providers_per_organisation(resolution: Resolution) -> Iterable[Refusal]:
     """Refuse a new provider beyond ``idp_max_per_organisation`` (default 2) of its organisation."""
-    limit = resolution.context.settings.get(
-        "idp_max_per_organisation", DEFAULT_MAX_PER_ORGANISATION
-    )
-    maximum = limit if isinstance(limit, int) else DEFAULT_MAX_PER_ORGANISATION
+    maximum = int_setting(resolution.context, "idp_max_per_organisation")
     known = _known_addresses(resolution, PROVIDER_KIND)
     counted: dict[str, int] = defaultdict(int)
     for address, entity in walk(resolution.resulting, PROVIDER_KIND):
@@ -284,7 +266,7 @@ def _domains(resolution: Resolution) -> Iterable[Refusal]:
     The reserved suffix is the platform's ``bundled_idp_login_suffix``; the limit is
     ``MAX_DOMAINS_PER_PROVIDER`` (ADR 0083 point 11). Only domains this plan adds are refused.
     """
-    suffix = resolution.context.settings.get("bundled_idp_login_suffix")
+    suffix = text_setting(resolution.context, "bundled_idp_login_suffix")
     known = _known_addresses(resolution, DOMAIN_KIND)
     owners: dict[str, int] = defaultdict(int)
     per_provider: dict[Address, int] = defaultdict(int)
@@ -296,7 +278,7 @@ def _domains(resolution: Resolution) -> Iterable[Refusal]:
         if address in known or not entity.path:
             continue
         code = None
-        if isinstance(suffix, str) and suffix and reserved(domain, suffix):
+        if suffix and reserved(domain, suffix):
             code = ErrorCode.IDP_DOMAIN_RESERVED
         elif owners[domain] > 1:
             code = ErrorCode.IDP_DOMAIN_TAKEN

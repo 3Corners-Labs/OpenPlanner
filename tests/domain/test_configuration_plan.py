@@ -28,14 +28,11 @@ from tests.support.configuration import (
     installation,
     plan,
     plan_with_values,
+    refusals,
     shop,
 )
 
 B = ("s", "b")
-
-
-def codes(result: object) -> list[tuple[str, ErrorCode, str | None]]:
-    return [(r.path, r.code, r.field) for r in result.refusals]  # type: ignore[attr-defined]
 
 
 def kinds(result: object) -> list[tuple[str, tuple[str, ...], ChangeAction]]:
@@ -87,7 +84,7 @@ def test_a_new_object_is_created_with_its_defaults_and_names_only_what_the_docum
 def test_a_new_object_must_state_what_has_no_default() -> None:
     result = plan({"shops": [{"slug": "s", "boxes": [{"slug": "n"}]}]})
 
-    assert codes(result) == [("shops[s].boxes[n]", ErrorCode.INVALID_CONFIGURATION, "name")]
+    assert refusals(result) == [("shops[s].boxes[n]", ErrorCode.INVALID_CONFIGURATION, "name")]
     assert not result.ok
 
 
@@ -131,8 +128,10 @@ def test_create_refuses_an_object_that_exists_and_update_one_that_does_not() -> 
     )
     updated = plan({"shops": [{"slug": "s", "boxes": [{"slug": "n", "action": "update"}]}]})
 
-    assert codes(created) == [("shops[s].boxes[b]", ErrorCode.CONFIGURATION_OBJECT_EXISTS, None)]
-    assert codes(updated) == [("shops[s].boxes[n]", ErrorCode.CONFIGURATION_OBJECT_MISSING, None)]
+    assert refusals(created) == [("shops[s].boxes[b]", ErrorCode.CONFIGURATION_OBJECT_EXISTS, None)]
+    assert refusals(updated) == [
+        ("shops[s].boxes[n]", ErrorCode.CONFIGURATION_OBJECT_MISSING, None)
+    ]
 
 
 def test_create_and_update_work_when_they_should() -> None:
@@ -167,7 +166,7 @@ def test_a_document_cannot_name_children_of_an_object_it_deletes() -> None:
         ]
     }
 
-    assert codes(plan(data)) == [
+    assert refusals(plan(data)) == [
         ("shops[s].boxes[b].labels", ErrorCode.INVALID_CONFIGURATION, None)
     ]
 
@@ -222,7 +221,7 @@ def test_a_child_cannot_be_updated_below_a_parent_that_does_not_exist() -> None:
         ]
     }
 
-    assert codes(plan(data)) == [
+    assert refusals(plan(data)) == [
         ("shops[s].boxes[n].labels[L]", ErrorCode.CONFIGURATION_OBJECT_MISSING, None)
     ]
 
@@ -383,7 +382,7 @@ def test_the_platform_cannot_be_deleted_but_its_children_can_change() -> None:
     gone = plan({"platform": {"action": "delete"}})
     changed = plan({"platform": {"switch": {"enabled": True}, "settings": {"limit": 3}}})
 
-    assert codes(gone) == [("platform", ErrorCode.INVALID_CONFIGURATION, None)]
+    assert refusals(gone) == [("platform", ErrorCode.INVALID_CONFIGURATION, None)]
     assert kinds(changed) == [
         ("setting", ("limit",), ChangeAction.CREATE),
         ("switch", (), ChangeAction.CREATE),
@@ -476,7 +475,7 @@ def test_a_change_the_actor_may_not_make_is_a_refusal_not_a_silent_skip() -> Non
 
     result = plan(data, may_change=Recorder(Permission.GROUP_EDIT))
 
-    assert codes(result) == [("shops[s].boxes[b]", ErrorCode.NOT_PERMITTED, None)]
+    assert refusals(result) == [("shops[s].boxes[b]", ErrorCode.NOT_PERMITTED, None)]
     assert not result.ok
 
 
@@ -488,7 +487,7 @@ def test_deleting_asks_for_the_delete_permission() -> None:
         may_change=recorder,
     )
 
-    assert codes(result) == [("shops[s].boxes[b]", ErrorCode.NOT_PERMITTED, None)]
+    assert refusals(result) == [("shops[s].boxes[b]", ErrorCode.NOT_PERMITTED, None)]
     assert recorder.asked == [(Permission.GROUP_DELETE, Target.for_organisation("s"))]
 
 
@@ -522,7 +521,7 @@ def test_an_organisation_document_cannot_name_anything_outside_its_organisation(
 
     result = plan(data)
 
-    assert codes(result) == [
+    assert refusals(result) == [
         ("platform", ErrorCode.CONFIGURATION_OUT_OF_SCOPE, None),
         ("shops[t]", ErrorCode.CONFIGURATION_OUT_OF_SCOPE, None),
         ("clients[c]", ErrorCode.CONFIGURATION_OUT_OF_SCOPE, None),
@@ -538,7 +537,7 @@ def test_a_client_cannot_be_moved_into_the_scope_from_another_organisation() -> 
     )
     data = {"scope": {"organisation": "s"}, "clients": [{"client_id": "c", "organisation": "s"}]}
 
-    assert codes(plan(data, current)) == [
+    assert refusals(plan(data, current)) == [
         ("clients[c]", ErrorCode.CONFIGURATION_OUT_OF_SCOPE, None)
     ]
 
@@ -563,7 +562,7 @@ def test_something_that_outside_facts_refer_to_is_not_deleted() -> None:
         {"shops": [{"slug": "s", "boxes": [{"slug": "b", "action": "delete"}]}]}, usage=usage
     )
 
-    assert codes(result) == [("shops[s].boxes[b]", ErrorCode.CONFIGURATION_OBJECT_IN_USE, None)]
+    assert refusals(result) == [("shops[s].boxes[b]", ErrorCode.CONFIGURATION_OBJECT_IN_USE, None)]
 
 
 def test_deleting_a_parent_checks_everything_it_would_take_with_it() -> None:
@@ -573,7 +572,7 @@ def test_deleting_a_parent_checks_everything_it_would_take_with_it() -> None:
     refused = plan(data, usage=usage)
     free = plan(data)
 
-    assert codes(refused) == [("shops[s]", ErrorCode.CONFIGURATION_OBJECT_IN_USE, None)]
+    assert refusals(refused) == [("shops[s]", ErrorCode.CONFIGURATION_OBJECT_IN_USE, None)]
     assert kinds(free) == [("shop", ("s",), ChangeAction.DELETE)]
     assert free.changes[0].permissions == {Permission.ORGANISATION_DELETE}
 
@@ -588,7 +587,7 @@ def test_replace_refuses_to_delete_what_is_in_use_too() -> None:
         usage=usage,
     )
 
-    assert codes(result) == [("shops[s].boxes[b]", ErrorCode.CONFIGURATION_OBJECT_IN_USE, None)]
+    assert refusals(result) == [("shops[s].boxes[b]", ErrorCode.CONFIGURATION_OBJECT_IN_USE, None)]
 
 
 def test_every_refusal_is_collected_not_only_the_first() -> None:
@@ -632,7 +631,7 @@ def test_a_rule_of_the_kind_runs_on_the_fields_as_they_will_be_and_may_normalise
     assert created.changes[0].values.get("slug") is None
     assert seen[0][0]["slug"] == "n"
     assert seen[0][1] is None
-    assert codes(refused) == [("shops[s].boxes[b]", ErrorCode.INVALID_CONFIGURATION, "name")]
+    assert refusals(refused) == [("shops[s].boxes[b]", ErrorCode.INVALID_CONFIGURATION, "name")]
     assert seen[1][1] is not None
     assert seen[1][1]["name"] == "Box"
 
@@ -662,7 +661,7 @@ def test_a_rule_of_a_field_runs_only_on_what_the_document_names() -> None:
 
     assert untouched.changes[0].fields == ("name",)
     assert normalised.changes[0].values["note"] == "FINE"
-    assert codes(refused) == [("shops[s].boxes[b]", ErrorCode.INVALID_CONFIGURATION, "note")]
+    assert refusals(refused) == [("shops[s].boxes[b]", ErrorCode.INVALID_CONFIGURATION, "note")]
     assert calls == ["fine", "no"]
 
 
@@ -693,7 +692,7 @@ def test_a_rule_across_objects_sees_what_would_result() -> None:
     refused = plan(data, fmt=fmt)
 
     assert ok.ok
-    assert codes(refused) == [("shops", ErrorCode.INVALID_CONFIGURATION, "name")]
+    assert refusals(refused) == [("shops", ErrorCode.INVALID_CONFIGURATION, "name")]
     resolution = seen[-1]
     assert [c.address for c in resolution.changes] == [("s", "n"), ("s", "m")]
     assert resolution.current.children["shops"][0].children["boxes"][0].key == ("b",)

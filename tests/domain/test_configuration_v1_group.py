@@ -19,6 +19,7 @@ from app.domain.configuration_schema import (
     text,
 )
 from app.domain.configuration_tree import Entity
+from app.domain.configuration_v1_calendars import INTEGRITY as CALENDAR_INTEGRITY
 from app.domain.configuration_v1_group import (
     GROUP,
     GROUP_TEXT,
@@ -29,7 +30,7 @@ from app.domain.configuration_v1_group import (
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.routing_codec import routing_from_json, routing_to_json
 from app.domain.scheduling import PhoneMode
-from tests.support.configuration import Recorder, entity, parse, plan
+from tests.support.configuration import Recorder, entity, parse, plan, refusals
 from tests.support.configuration_columns import uncovered_columns
 
 NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
@@ -74,7 +75,7 @@ ROOT = Kind(
         Collection("organisations", ORGANISATION, Shape.ENTITIES),
     ),
 )
-FORMAT = Format("test/v1", ROOT, integrity=INTEGRITY)
+FORMAT = Format("test/v1", ROOT, integrity=(*INTEGRITY, *CALENDAR_INTEGRITY))
 
 RULE = {
     "weekday": 0,
@@ -142,11 +143,6 @@ def world(*organisations: Entity, calendars: tuple[Entity, ...] = ()) -> Entity:
 def group_change(result: Plan) -> Change:
     """Return the one change of a group in a plan."""
     return next(change for change in result.changes if change.kind == "group")
-
-
-def refusals(result: Plan) -> list[tuple[str, ErrorCode, str | None]]:
-    """Return what stops a plan as (path, code, field)."""
-    return [(r.path, r.code, r.field) for r in result.refusals]
 
 
 # --- settings ---------------------------------------------------------------------------
@@ -797,6 +793,58 @@ def test_a_holiday_calendar_that_closes_the_slots_day_counts_as_a_cut_in_staffin
     )
     assert kept_open.ok
     assert nobody_booked.ok
+
+
+def holiday_on(day: str) -> dict[str, Any]:
+    """A platform document that gives calendar ``nl`` the holiday ``day``."""
+    return {"platform": {"holiday_calendars": [{"slug": "nl", "days": {day: "Feestdag"}}]}}
+
+
+def test_a_holiday_added_to_a_calendar_cuts_the_staffing_of_a_group_the_plan_does_not_touch() -> (
+    None
+):
+    own = team(schedule_rules=[RULE], holiday_source="own", holiday_calendars=["nl"])
+    current = world(org("acme", own), calendars=(calendar("nl"),))
+
+    closed = planned(holiday_on("2026-11-09"), current, usage=slots(1))
+    elsewhere = planned(holiday_on("2026-11-10"), current, usage=slots(1))
+    nobody_booked = planned(holiday_on("2026-11-09"), current, usage=slots(0))
+
+    assert refusals(closed) == [
+        (
+            "organisations[acme].groups[team]",
+            ErrorCode.CONFIGURATION_CAPACITY_BELOW_BOOKED,
+            "schedule_rules",
+        )
+    ]
+    assert elsewhere.ok
+    assert nobody_booked.ok
+
+
+def test_choosing_a_calendar_for_the_organisation_cuts_the_staffing_of_its_groups() -> None:
+    current = world(
+        org("acme", team(schedule_rules=[RULE])), calendars=(calendar("nl", "2026-11-09"),)
+    )
+
+    chosen = planned(
+        {"organisations": [{"slug": "acme", "holiday_calendars": ["nl"]}]}, current, usage=slots(1)
+    )
+
+    assert refusals(chosen)[0][1:] == (
+        ErrorCode.CONFIGURATION_CAPACITY_BELOW_BOOKED,
+        "schedule_rules",
+    )
+
+
+def test_a_group_that_cannot_be_built_is_a_refusal_not_a_skipped_check() -> None:
+    broken = team(schedule_rules=[RULE], slot_minutes=7)
+    current = world(org("acme", broken), calendars=(calendar("nl"),))
+
+    result = planned(holiday_on("2026-11-09"), current, usage=slots(1))
+
+    assert refusals(result) == [
+        ("organisations[acme].groups[team]", ErrorCode.INVALID_CONFIGURATION, "slot_minutes")
+    ]
 
 
 # --- structure ----------------------------------------------------------------------------

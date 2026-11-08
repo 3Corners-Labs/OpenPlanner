@@ -21,6 +21,10 @@ from app.domain.configuration_changes import (
 )
 from app.domain.configuration_schema import Collection, Kind, Shape, text
 from app.domain.configuration_tree import walk
+from app.domain.configuration_v1_names import (
+    ORGANISATION_ALERT_TARGET_KIND,
+    PLATFORM_ALERT_TARGET_KIND,
+)
 from app.domain.configuration_values import Value
 from app.domain.errors import DomainError, ErrorCode
 
@@ -62,8 +66,8 @@ def _kind(name: str, permission: Permission) -> Kind:
     )
 
 
-PLATFORM_ALERT_TARGET = _kind("platform_alert_target", Permission.SETTINGS_PLATFORM_MANAGE)
-ORGANISATION_ALERT_TARGET = _kind("organisation_alert_target", Permission.INTEGRATIONS_MANAGE)
+PLATFORM_ALERT_TARGET = _kind(PLATFORM_ALERT_TARGET_KIND, Permission.SETTINGS_PLATFORM_MANAGE)
+ORGANISATION_ALERT_TARGET = _kind(ORGANISATION_ALERT_TARGET_KIND, Permission.INTEGRATIONS_MANAGE)
 
 PLATFORM_ALERT_TARGETS = Collection("alert_targets", PLATFORM_ALERT_TARGET, Shape.MAP)
 ORGANISATION_ALERT_TARGETS = Collection("alert_targets", ORGANISATION_ALERT_TARGET, Shape.MAP)

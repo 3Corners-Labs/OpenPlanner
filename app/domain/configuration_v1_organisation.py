@@ -11,14 +11,12 @@ theme tokens, ``Logo`` and ``FontFile``, ``parse_origins``, ``clean_override``,
 ``check_term_pair``, ``contacts_check`` and ``setting_value``. The rules across objects
 (``INTEGRITY``) read what a document would leave: they refuse an idp key that two
 organisations would share, a deleted organisation an API client still names, a settings
-combination the environment's rules forbid, a half-set agent term and a calendar that does not
-exist.
+combination the environment's rules forbid and a half-set agent term.
 """
 
 from collections.abc import Iterable, Mapping
-from typing import Final
 
-from app.domain.agent_term import TERM_KEYS, check_term_pair
+from app.domain.agent_term import TERM_KEYS
 from app.domain.authorization import Permission
 from app.domain.branding import (
     DEFAULT_ACCENT,
@@ -35,7 +33,16 @@ from app.domain.configuration_changes import (
     Resolution,
     RuleContext,
 )
-from app.domain.configuration_checks import contacts_check, setting_value
+from app.domain.configuration_checks import (
+    combination_refusal,
+    contacts_check,
+    effective_idp_key,
+    int_setting,
+    invalid,
+    setting_entry_check,
+    term_pair_refusals,
+    text_override_check,
+)
 from app.domain.configuration_schema import (
     Anchor,
     Collection,
@@ -48,30 +55,27 @@ from app.domain.configuration_schema import (
     text,
 )
 from app.domain.configuration_tree import Entity, path_of, walk
+from app.domain.configuration_v1_names import (
+    API_CLIENT_KIND,
+    ORGANISATION_FONT_KIND,
+    ORGANISATION_KIND,
+    ORGANISATION_LOGO_KIND,
+    ORGANISATION_SETTING_KIND,
+    ORGANISATION_TEXT_KIND,
+)
 from app.domain.configuration_values import Binary, Value
 from app.domain.embedding import MAX_ORIGIN_LENGTH, parse_origins
 from app.domain.entitlements import is_idp_key
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import RESERVED_SLUGS, check_name_and_slug, is_slug
-from app.domain.settings_registry import BY_KEY, SettingClass
+from app.domain.settings_registry import BY_KEY, SettingClass, SettingSpec
 from app.domain.settings_service import editable
 from app.domain.text_overrides import clean_override
 from app.domain.theme import Theme
 
-DEFAULT_MAX_ORIGINS: Final = 20
-"""The limit of ``embedding_max_origins`` (class C) when the context does not carry it."""
-
-DEFAULT_MAX_FONT_UNPACKED_BYTES: Final = 2_000_000
-"""The default of ``max_font_unpacked_bytes`` (class C) when the context does not carry it."""
-
 _BRANDING_FIELDS = ("display_name", "accent_color", "theme_tokens", "header_style")
 _LOCALE_LENGTH = 8
 _KEY_LENGTH = 64
-
-
-def _invalid(field: str) -> DomainError:
-    """Return the refusal that names ``field``."""
-    return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
 
 
 # --- fields of the organisation ------------------------------------------------------------
@@ -80,25 +84,25 @@ def _invalid(field: str) -> DomainError:
 def _check_display_name(value: Value, context: RuleContext) -> Value:
     """Return the display name as ``Branding`` stores it (trimmed, empty is none)."""
     if not isinstance(value, str):
-        raise _invalid("display_name")
+        raise invalid("display_name")
     return Branding(display_name=value).display_name
 
 
 def _check_accent(value: Value, context: RuleContext) -> Value:
     """Return the accent colour upper-cased, if it has the contrast the pages need."""
     if not isinstance(value, str):
-        raise _invalid("accent_color")
+        raise invalid("accent_color")
     return Branding(accent_color=value).accent_color
 
 
 def _check_theme(value: Value, context: RuleContext) -> Value:
     """Return the theme tokens as the portal stores them; an unknown token is refused."""
     if not isinstance(value, dict):
-        raise _invalid("theme_tokens")
+        raise invalid("theme_tokens")
     tokens: dict[str, str] = {}
     for name, token in value.items():
         if not isinstance(token, str):
-            raise _invalid(name.replace("-", "_"))
+            raise invalid(name.replace("-", "_") if len(name) <= _KEY_LENGTH else "theme_tokens")
         tokens[name] = token
     return dict(Theme.of(tokens).values)
 
@@ -108,12 +112,11 @@ def _check_origins(value: Value, context: RuleContext) -> Value:
     if not isinstance(value, list) or any(
         not isinstance(item, str) or "\n" in item or "\r" in item for item in value
     ):
-        raise _invalid("origins")
-    limit = context.settings.get("embedding_max_origins", DEFAULT_MAX_ORIGINS)
+        raise invalid("origins")
     parsed = parse_origins(
         "\n".join(str(item) for item in value),
         allow_local_http=not context.production,
-        limit=limit if isinstance(limit, int) else DEFAULT_MAX_ORIGINS,
+        limit=int_setting(context, "embedding_max_origins"),
     )
     return list(parsed.origins)
 
@@ -121,11 +124,11 @@ def _check_origins(value: Value, context: RuleContext) -> Value:
 def _check_calendars(value: Value, context: RuleContext) -> Value:
     """Return the chosen calendar slugs without repeats; each must look like a slug."""
     if not isinstance(value, list):
-        raise _invalid("holiday_calendars")
+        raise invalid("holiday_calendars")
     chosen: list[str] = []
     for item in value:
         if not isinstance(item, str) or not is_slug(item):
-            raise _invalid("holiday_calendars")
+            raise invalid("holiday_calendars")
         if item not in chosen:
             chosen.append(item)
     return list(chosen)
@@ -158,10 +161,10 @@ def _check_organisation(
     if current is None and slug in RESERVED_SLUGS:
         raise DomainError(ErrorCode.SLUG_TAKEN, "slug")
     if fields.get("default_locale", "nl") not in context.locales:
-        raise _invalid("default_locale")
+        raise invalid("default_locale")
     idp_key = fields.get("idp_key")
     if idp_key is not None and not (isinstance(idp_key, str) and is_idp_key(idp_key)):
-        raise _invalid("idp_key")
+        raise invalid("idp_key")
     if _touched(fields, current):
         branding = Branding(
             display_name=_optional_text(fields.get("display_name")),
@@ -171,42 +174,30 @@ def _check_organisation(
         )
         failing = branding.contrast_failure()
         if failing is not None:
-            raise _invalid(failing)
+            raise invalid(failing)
     return fields
 
 
 # --- the collections of the organisation ---------------------------------------------------
 
 
-def _check_setting(
-    merged: Mapping[str, Value], current: Mapping[str, Value] | None, context: RuleContext
-) -> dict[str, Value]:
-    """Check one class D setting: a known, editable key and a value within the portal bounds."""
-    fields: dict[str, Value] = dict(merged)
-    key = str(fields["key"])
+def _setting_spec(key: str) -> SettingSpec | None:
+    """Return the registry entry of a class D setting a document may set, else ``None``."""
     spec = BY_KEY.get(key)
     if spec is None or spec.class_ is not SettingClass.ORGANISATION or not editable(spec):
-        raise DomainError(ErrorCode.SETTING_NOT_EDITABLE, key if spec is not None else "key")
-    fields["value"] = setting_value(spec, fields["value"], production=context.production)
-    return fields
+        return None
+    return spec
 
 
-def _check_text(
-    merged: Mapping[str, Value], current: Mapping[str, Value] | None, context: RuleContext
-) -> dict[str, Value]:
-    """Check one text override: a locale of the installation, a key on the allow-list."""
-    fields: dict[str, Value] = dict(merged)
-    if fields["locale"] not in context.locales:
-        raise _invalid("locale")
-    # The names other roles carry (ADR 0077) are not known here; the adapter's apply checks them.
-    fields["text"] = clean_override(str(fields["key"]), str(fields["text"]))
-    return fields
+_check_setting = setting_entry_check(_setting_spec)
+_check_text = text_override_check(clean_override)
+# The names other roles carry (ADR 0077) are not known here; the adapter's apply checks them.
 
 
 def _check_logo(value: Value, context: RuleContext) -> Value:
     """Return the logo with the media type its bytes show; refuse what is not an image."""
     if not isinstance(value, Binary):
-        raise _invalid("logo")
+        raise invalid("logo")
     logo = Logo.from_upload(value.data)
     return Binary(logo.media_type, logo.data)
 
@@ -218,19 +209,16 @@ def _check_font(
     fields: dict[str, Value] = dict(merged)
     data = fields["data"]
     if not isinstance(data, Binary):
-        raise _invalid("font")
-    ceiling = context.settings.get("max_font_unpacked_bytes", DEFAULT_MAX_FONT_UNPACKED_BYTES)
+        raise invalid("font")
     FontFile.from_upload(
-        FontRole(str(fields["role"])),
-        data.data,
-        ceiling if isinstance(ceiling, int) else DEFAULT_MAX_FONT_UNPACKED_BYTES,
+        FontRole(str(fields["role"])), data.data, int_setting(context, "max_font_unpacked_bytes")
     )
     fields["data"] = Binary("font/woff2", data.data)
     return fields
 
 
 ORGANISATION_SETTING = Kind(
-    "organisation_setting",
+    ORGANISATION_SETTING_KIND,
     key=("key",),
     permission=Permission.SETTINGS_ORGANISATION_MANAGE,
     tables=frozenset({"organisation_settings"}),
@@ -241,7 +229,7 @@ ORGANISATION_SETTING = Kind(
 )
 
 ORGANISATION_TEXT = Kind(
-    "organisation_text",
+    ORGANISATION_TEXT_KIND,
     key=("locale", "key"),
     permission=Permission.TEXTS_ORGANISATION_MANAGE,
     tables=frozenset({"organisation_texts"}),
@@ -255,7 +243,7 @@ ORGANISATION_TEXT = Kind(
 )
 
 ORGANISATION_LOGO = Kind(
-    "organisation_logo",
+    ORGANISATION_LOGO_KIND,
     permission=Permission.BRANDING_MANAGE,
     tables=frozenset({"organisation_logos"}),
     fields=(binary("data", check=_check_logo),),
@@ -263,7 +251,7 @@ ORGANISATION_LOGO = Kind(
 )
 
 ORGANISATION_FONT = Kind(
-    "organisation_font",
+    ORGANISATION_FONT_KIND,
     key=("role",),
     permission=Permission.BRANDING_MANAGE,
     tables=frozenset({"organisation_fonts"}),
@@ -276,7 +264,7 @@ ORGANISATION_FONT = Kind(
 )
 
 ORGANISATION = Kind(
-    "organisation",
+    ORGANISATION_KIND,
     key=("slug",),
     permission=Permission.ORGANISATION_MANAGE,
     delete_permission=Permission.ORGANISATION_DELETE,
@@ -376,7 +364,7 @@ def _organisation_path(slug: str) -> str:
 
 def _organisations(entity: Entity) -> Iterable[tuple[str, Entity]]:
     """Yield the organisations below ``entity`` with their slugs."""
-    for address, found in walk(entity, "organisation"):
+    for address, found in walk(entity, ORGANISATION_KIND):
         yield address[-1], found
 
 
@@ -384,9 +372,8 @@ def _idp_keys_are_unique(resolution: Resolution) -> Iterable[Refusal]:
     """Refuse an idp key that two organisations would share (the slug counts when it is none)."""
     owners: dict[str, list[str]] = {}
     for slug, found in _organisations(resolution.resulting):
-        effective = found.fields.get("idp_key") or slug
-        owners.setdefault(str(effective), []).append(slug)
-    touched = {change.key[0] for change in resolution.changes if change.kind == "organisation"}
+        owners.setdefault(effective_idp_key(found.fields, slug), []).append(slug)
+    touched = {c.key[0] for c in resolution.changes if c.kind == ORGANISATION_KIND}
     for slugs in owners.values():
         if len(slugs) > 1:
             for slug in slugs:
@@ -397,60 +384,45 @@ def _idp_keys_are_unique(resolution: Resolution) -> Iterable[Refusal]:
 def _deleted_organisations_have_no_clients(resolution: Resolution) -> Iterable[Refusal]:
     """Refuse to delete an organisation while the result still has an API client of it."""
     named = {
-        found.fields.get("organisation") for _, found in walk(resolution.resulting, "api_client")
+        found.fields.get("organisation") for _, found in walk(resolution.resulting, API_CLIENT_KIND)
     }
     for change in resolution.deletions:
-        if change.kind == "organisation" and change.key[0] in named:
+        if change.kind == ORGANISATION_KIND and change.key[0] in named:
             yield Refusal(change.path, ErrorCode.ORGANISATION_HAS_API_CLIENTS)
 
 
 def _settings_do_not_combine_badly(resolution: Resolution) -> Iterable[Refusal]:
     """Refuse class D values that break a cross-field rule of the settings (ADR 0042)."""
-    check = resolution.context.combination_problem
-    if check is None:
-        return
-    changed = {c.organisation for c in resolution.changes if c.kind == "organisation_setting"}
-    changed |= {c.organisation for c in resolution.deletions if c.kind == "organisation_setting"}
+    changed = {
+        c.organisation
+        for c in (*resolution.changes, *resolution.deletions)
+        if c.kind == ORGANISATION_SETTING_KIND
+    }
     for slug, found in _organisations(resolution.resulting):
         if slug not in changed:
             continue
         values = {e.key[0]: e.fields["value"] for e in found.children.get("settings", ())}
-        problem = check(values)
-        if problem is not None:
-            where = path_of(_organisation_path(slug), "settings", ())
-            yield Refusal(where, ErrorCode.SETTING_COMBINATION, problem)
+        where = path_of(_organisation_path(slug), "settings", ())
+        refusal = combination_refusal(resolution, values, where)
+        if refusal is not None:
+            yield refusal
 
 
 def _agent_terms_come_in_pairs(resolution: Resolution) -> Iterable[Refusal]:
     """Refuse a locale where only one of the two words of the agent term would be set."""
-    touched = {
-        (c.organisation, c.key[0], c.path)
-        for c in (*resolution.changes, *resolution.deletions)
-        if c.kind == "organisation_text" and c.key[1] in TERM_KEYS
-    }
-    texts_of = {
-        slug: {e.key: str(e.fields["text"]) for e in found.children.get("texts", ())}
-        for slug, found in _organisations(resolution.resulting)
-    }
-    for slug, locale, path in sorted(touched, key=lambda item: (str(item[0]), item[1], item[2])):
-        texts = texts_of.get(str(slug), {})
-        words: dict[str, str | None] = {key: texts.get((locale, key)) for key in TERM_KEYS}
-        try:
-            check_term_pair(words)
-        except DomainError as error:
-            yield Refusal(path, error.code, error.field)
-
-
-def _calendars_exist(resolution: Resolution) -> Iterable[Refusal]:
-    """Refuse a chosen holiday calendar that the result does not have."""
-    known = {address[-1] for address, _ in walk(resolution.resulting, "holiday_calendar")}
-    resulting = dict(_organisations(resolution.resulting))
-    for change in resolution.changes:
-        if change.kind != "organisation" or "holiday_calendars" not in change.fields:
+    paths: dict[tuple[str, str], str] = {}
+    for c in (*resolution.changes, *resolution.deletions):
+        if c.kind == ORGANISATION_TEXT_KIND and c.key[1] in TERM_KEYS:
+            paths[(str(c.organisation), c.key[0])] = c.path
+    for slug, found in _organisations(resolution.resulting):
+        locales = {locale for owner, locale in paths if owner == slug}
+        if not locales:
             continue
-        chosen = resulting[change.key[0]].fields.get("holiday_calendars")
-        if isinstance(chosen, list) and any(slug not in known for slug in chosen):
-            yield Refusal(change.path, ErrorCode.HOLIDAY_CALENDAR_NOT_FOUND, "holiday_calendars")
+
+        def blame(locale: str, key: str, slug: str = slug) -> str:
+            return paths.get((slug, locale), "")
+
+        yield from term_pair_refusals(found.children.get("texts", ()), blame, locales=locales)
 
 
 INTEGRITY: tuple[IntegrityRule, ...] = (
@@ -458,6 +430,5 @@ INTEGRITY: tuple[IntegrityRule, ...] = (
     _deleted_organisations_have_no_clients,
     _settings_do_not_combine_badly,
     _agent_terms_come_in_pairs,
-    _calendars_exist,
 )
-"""The rules across objects this slice owns."""
+"""The rules across objects this slice owns (the calendar rules are the platform slice's)."""

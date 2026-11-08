@@ -13,12 +13,13 @@ from app.domain.configuration_document import parse_document, to_json
 from app.domain.configuration_plan import Plan
 from app.domain.configuration_schema import Collection, Format, Kind, Shape, text
 from app.domain.configuration_tree import Entity
+from app.domain.configuration_v1_calendars import INTEGRITY as CALENDAR_INTEGRITY
 from app.domain.configuration_v1_organisation import INTEGRITY, ORGANISATION
 from app.domain.configuration_values import Value
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.text_overrides import EDITABLE_BY_KEY
 from tests.fakes.woff2 import make_woff2
-from tests.support.configuration import Recorder
+from tests.support.configuration import Recorder, refusals
 from tests.support.configuration import plan as engine_plan
 from tests.support.configuration_columns import uncovered_columns
 from tests.support.images import png
@@ -50,7 +51,7 @@ ROOT = Kind(
         Collection("api_clients", CLIENT, Shape.ENTITIES),
     ),
 )
-FORMAT = Format("test/v1", ROOT, integrity=INTEGRITY)
+FORMAT = Format("test/v1", ROOT, integrity=(*INTEGRITY, *CALENDAR_INTEGRITY))
 
 DEFAULTS: dict[str, Value] = {
     "name": "Acme",
@@ -89,10 +90,6 @@ def plan(data: Mapping[str, Any], current: Entity | None = None, **kw: Any) -> P
 
 def only(slug: str = "acme", **body: Any) -> dict[str, Any]:
     return {"organisations": [{"slug": slug, **body}]}
-
-
-def refusals(result: Plan) -> list[tuple[str, ErrorCode, str | None]]:
-    return [(r.path, r.code, r.field) for r in result.refusals]
 
 
 def binary(data: bytes, media_type: str) -> dict[str, str]:
@@ -402,7 +399,7 @@ def test_a_class_d_setting_is_read_as_the_registry_types_it() -> None:
     ("key", "value", "code", "field"),
     [
         ("rate_limit_bookings", "5/hour", ErrorCode.SETTING_NOT_EDITABLE, "rate_limit_bookings"),
-        ("no_such_setting", 1, ErrorCode.SETTING_NOT_EDITABLE, "key"),
+        ("no_such_setting", 1, ErrorCode.SETTING_NOT_EDITABLE, "no_such_setting"),
         ("staff_dormant_after_days", 1, ErrorCode.SETTING_INVALID, "staff_dormant_after_days"),
         ("staff_dormant_after_days", "30", ErrorCode.SETTING_INVALID, "staff_dormant_after_days"),
     ],
@@ -587,3 +584,12 @@ def test_the_usage_facts_of_the_engine_still_guard_a_delete() -> None:
         refusals(plan(only(action="delete"), usage=usage))[0][1]
         is ErrorCode.CONFIGURATION_OBJECT_IN_USE
     )
+
+
+def test_a_long_theme_token_name_is_not_echoed_into_a_refusal() -> None:
+    long = "x" * 200
+    short = plan(only(theme_tokens={"shadow": 5}))
+    echoed = plan(only(theme_tokens={long: 5}))
+
+    assert refusals(short)[0][2] == "shadow"
+    assert refusals(echoed)[0][2] == "theme_tokens"

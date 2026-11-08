@@ -11,7 +11,7 @@ behind, and an enabled client is not deleted.
 
 import re
 from collections.abc import Iterator, Mapping
-from datetime import UTC, datetime
+from datetime import datetime, timedelta
 from typing import cast
 
 from app.domain.api_clients import MAX_NAME_LENGTH, ClientDraft, is_client_id
@@ -23,17 +23,14 @@ from app.domain.configuration_changes import (
     Resolution,
     RuleContext,
 )
+from app.domain.configuration_checks import invalid, strings_of, utc_moment
 from app.domain.configuration_schema import Kind, boolean, secret, strings, text
 from app.domain.configuration_tree import Entity, walk
+from app.domain.configuration_v1_names import API_CLIENT_KIND, GROUP_KIND, ORGANISATION_KIND
 from app.domain.configuration_values import Json, Secret, Value
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import ErrorCode
 
 _HASH = re.compile(r"[0-9a-f]{64}")
-
-
-def _invalid(field: str, code: ErrorCode = ErrorCode.INVALID_CONFIGURATION) -> DomainError:
-    """Return the refusal that names ``field``."""
-    return DomainError(code, field)
 
 
 def _hash_check(value: Value, context: RuleContext) -> Value:
@@ -45,29 +42,27 @@ def _hash_check(value: Value, context: RuleContext) -> Value:
         DomainError: ``invalid_configuration`` naming ``secret_hash``.
     """
     if isinstance(value, Secret) and not _HASH.fullmatch(value.reveal()):
-        raise _invalid("secret_hash")
+        raise invalid("secret_hash")
     return value
 
 
+MAX_SECRET_DAYS = 365
+"""The longest a client's secret lives: the longest lifetime the portal offers (ADR 0023)."""
+
+
 def _expiry_check(value: Value, context: RuleContext) -> Value:
-    """Check when the secret expires: an ISO date and time with an offset; return it in UTC.
+    """Check when the secret expires: an ISO date and time with an offset, at most a year away.
+
+    Returned in UTC. The portal issues a secret for 90, 180 or 365 days; a document may carry
+    an earlier expiry (an export) but never one beyond that.
 
     Raises:
         DomainError: ``invalid_configuration`` naming ``secret_expires_at``.
     """
-    try:
-        moment = datetime.fromisoformat(str(value))
-    except ValueError:
-        raise _invalid("secret_expires_at") from None
-    if moment.tzinfo is None:
-        raise _invalid("secret_expires_at")
-    return moment.astimezone(UTC).isoformat()
-
-
-def _strings(fields: Mapping[str, Value], name: str) -> list[str]:
-    """Return the texts of a list field (empty when it is absent)."""
-    found = fields.get(name)
-    return [str(x) for x in found] if isinstance(found, list) else []
+    text_value = utc_moment(value, "secret_expires_at")
+    if datetime.fromisoformat(text_value) > context.now + timedelta(days=MAX_SECRET_DAYS):
+        raise invalid("secret_expires_at")
+    return text_value
 
 
 def _check_client(
@@ -79,17 +74,19 @@ def _check_client(
     once by the portal, never by a document.
     """
     if not is_client_id(str(view["client_id"])):
-        raise _invalid("client_id")
+        raise invalid("client_id")
     if current is None:
         for name in ("secret_hash", "secret_expires_at"):
             if view.get(name) is None:
-                raise _invalid(name)
+                raise invalid(name)
+        if datetime.fromisoformat(str(view["secret_expires_at"])) <= ctx.now:
+            raise invalid("secret_expires_at")
     draft = ClientDraft.create(
         name=str(view["name"]),
         organisation=str(view["organisation"]),
-        groups=_strings(view, "groups"),
-        scopes=_strings(view, "scopes"),
-        networks=_strings(view, "networks"),
+        groups=strings_of(view, "groups"),
+        scopes=strings_of(view, "scopes"),
+        networks=strings_of(view, "networks"),
     )
     return {
         **view,
@@ -101,7 +98,7 @@ def _check_client(
 
 
 API_CLIENT = Kind(
-    "api_client",
+    API_CLIENT_KIND,
     key=("client_id",),
     permission=Permission.API_CLIENTS_MANAGE,
     tables=frozenset({"api_clients", "api_client_groups"}),
@@ -125,16 +122,16 @@ API_CLIENT = Kind(
 
 def _organisation_rules(resolution: Resolution) -> Iterator[Refusal]:
     """A client's organisation exists and its groups are groups of that organisation."""
-    organisations = {address[0] for address, _ in walk(resolution.resulting, "organisation")}
+    organisations = {address[0] for address, _ in walk(resolution.resulting, ORGANISATION_KIND)}
     groups: dict[str, set[str]] = {}
-    for address, _ in walk(resolution.resulting, "group"):
+    for address, _ in walk(resolution.resulting, GROUP_KIND):
         groups.setdefault(address[0], set()).add(address[-1])
     for address, client in walk(resolution.resulting, API_CLIENT.name):
         path = f"api_clients[{address[0]}]"
         organisation = str(client.fields.get("organisation"))
         if organisation not in organisations:
             yield Refusal(path, ErrorCode.ORGANISATION_NOT_FOUND, "organisation")
-        elif not set(_strings(client.fields, "groups")) <= groups.get(organisation, set()):
+        elif not set(strings_of(client.fields, "groups")) <= groups.get(organisation, set()):
             yield Refusal(path, ErrorCode.INVALID_CONFIGURATION, "groups")
 
 

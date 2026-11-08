@@ -17,7 +17,7 @@ from app.domain.configuration_v1_login import (
 )
 from app.domain.configuration_values import Secret
 from app.domain.errors import ErrorCode
-from tests.support.configuration import Recorder, entity, parse
+from tests.support.configuration import Recorder, entity, parse, refusals
 from tests.support.configuration_columns import uncovered_columns
 from tests.support.configuration_parts import installation, organisation, plan_opened, stub_format
 
@@ -54,10 +54,6 @@ def current_provider(key: str = "acme-sso", **overrides: Any) -> Entity:
 
 def current(*providers: Entity, org: str = "acme") -> Entity:
     return installation(organisation(org, identity_providers=providers))
-
-
-def refusals(result: Any) -> list[tuple[str, ErrorCode, str | None]]:
-    return [(r.path, r.code, r.field) for r in result.refusals]
 
 
 def test_a_provider_is_created_with_the_defaults_of_the_portal_form() -> None:

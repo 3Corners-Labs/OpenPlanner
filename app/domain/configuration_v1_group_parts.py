@@ -12,8 +12,9 @@ from datetime import date, time
 from typing import cast
 
 from app.domain.channels import ChannelKind, ReminderRule
+from app.domain.configuration_checks import invalid, text_map
 from app.domain.configuration_values import Json, Value, canonical_json
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import ErrorCode
 from app.domain.form_fields import Classification, FieldDefinition, FormDefinition
 from app.domain.form_fields import FieldType as FormFieldType
 from app.domain.messaging_service import MAX_REMINDER_RULES
@@ -26,20 +27,9 @@ from app.domain.scheduling import (
 )
 
 
-def invalid(field: str, code: ErrorCode = ErrorCode.INVALID_CONFIGURATION) -> DomainError:
-    """Return the refusal that names ``field``."""
-    return DomainError(code, field)
-
-
 def items_of(value: Value | None) -> list[dict[str, Json]]:
     """Return the objects of a list field (empty when it is absent)."""
     return cast("list[dict[str, Json]]", value if isinstance(value, list) else [])
-
-
-def strings_of(fields: Mapping[str, Value], name: str) -> list[str]:
-    """Return the texts of a list field (empty when it is absent)."""
-    found = fields.get(name)
-    return [str(x) for x in found] if isinstance(found, list) else []
 
 
 def same_item(item: Mapping[str, Json], others: Iterable[Mapping[str, Json]]) -> bool:
@@ -197,15 +187,6 @@ def check_reminders(
     return rules
 
 
-def _texts(value: Json, field: str) -> dict[str, str]:
-    """Return a JSON object of texts, or refuse naming ``field``."""
-    if not isinstance(value, dict) or not all(
-        isinstance(k, str) and isinstance(v, str) for k, v in value.items()
-    ):
-        raise invalid(field, ErrorCode.INVALID_FORM_FIELD)
-    return dict(cast("dict[str, str]", value))
-
-
 def _definition(raw: Mapping[str, Json]) -> FieldDefinition:
     """Build a form field from its item, which runs every check of the form screen."""
     options = raw.get("option_labels", {})
@@ -214,14 +195,16 @@ def _definition(raw: Mapping[str, Json]) -> FieldDefinition:
     return FieldDefinition.create(
         key=str(raw["key"]),
         type=FormFieldType(str(raw["type"])),
-        labels=_texts(raw["labels"], "label"),
+        labels=text_map(raw["labels"], "label", code=ErrorCode.INVALID_FORM_FIELD),
         required=bool(raw.get("required", False)),
         classification=Classification(str(raw.get("classification", "pii"))),
         options=cast("list[str]", raw.get("options", [])),
         minimum=cast("int | None", raw.get("minimum")),
         maximum=cast("int | None", raw.get("maximum")),
-        hints=_texts(raw.get("hints", {}), "hint"),
-        option_labels={k: _texts(v, "options") for k, v in options.items()},
+        hints=text_map(raw.get("hints", {}), "hint", code=ErrorCode.INVALID_FORM_FIELD),
+        option_labels={
+            k: text_map(v, "options", code=ErrorCode.INVALID_FORM_FIELD) for k, v in options.items()
+        },
     )
 
 

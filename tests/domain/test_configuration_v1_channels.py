@@ -17,7 +17,7 @@ from app.domain.configuration_v1_channels import (
 )
 from app.domain.configuration_values import Secret
 from app.domain.errors import ErrorCode
-from tests.support.configuration import Recorder, entity, parse
+from tests.support.configuration import Recorder, entity, parse, refusals
 from tests.support.configuration_columns import uncovered_columns
 from tests.support.configuration_parts import installation, organisation, plan_opened, stub_format
 
@@ -84,10 +84,6 @@ def stored_sms(**overrides: Any) -> Entity:
 
 def current(**channels: tuple[Entity, ...]) -> Entity:
     return installation(organisation("acme", **channels))
-
-
-def refusals(result: Any) -> list[tuple[str, ErrorCode, str | None]]:
-    return [(r.path, r.code, r.field) for r in result.refusals]
 
 
 def test_a_mail_server_is_created_with_the_defaults_and_the_integrations_permission() -> None:

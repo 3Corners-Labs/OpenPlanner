@@ -33,6 +33,7 @@ from app.domain.configuration_schema import (
 )
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_values import Value
+from app.domain.errors import ErrorCode
 
 ENTRY = Kind(
     "entry",
@@ -260,3 +261,8 @@ def plan_with_values(current: Entity, _may: Any = allow, **values: Value) -> Pla
         context=RuleContext(),
         settings_version=1,
     )
+
+
+def refusals(result: Plan) -> list[tuple[str, ErrorCode, str | None]]:
+    """Return what stops a plan as (path, code, field)."""
+    return [(r.path, r.code, r.field) for r in result.refusals]

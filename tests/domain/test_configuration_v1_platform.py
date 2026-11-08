@@ -26,7 +26,7 @@ from app.domain.configuration_v1_platform import (
 from app.domain.configuration_values import Sealed, Secret, Value
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.settings_registry import BY_KEY, Topic
-from tests.support.configuration import Recorder, allow, entity
+from tests.support.configuration import Recorder, allow, entity, refusals
 from tests.support.configuration_columns import uncovered_columns
 
 DOMAIN = Kind(
@@ -122,10 +122,6 @@ def with_secret(document: Document, collection: str, key: str, value: Value) -> 
     return replace(document, root=replace(document.root, children={"platform": (opened,)}))
 
 
-def codes(result: Plan) -> list[tuple[str, ErrorCode, str | None]]:
-    return [(r.path, r.code, r.field) for r in result.refusals]
-
-
 # --- settings ----------------------------------------------------------------------------
 
 
@@ -160,14 +156,16 @@ def test_a_setting_that_is_the_same_is_no_change_and_null_resets_it() -> None:
 def test_a_key_the_portal_does_not_let_the_superuser_set_is_refused(key: str) -> None:
     result = plan({"platform": {"settings": {key: "x"}}})
 
-    assert codes(result) == [(f"platform.settings[{key}]", ErrorCode.SETTING_NOT_EDITABLE, key)]
+    assert refusals(result) == [(f"platform.settings[{key}]", ErrorCode.SETTING_NOT_EDITABLE, key)]
     assert editable_setting(key) is None
 
 
 def test_a_value_of_the_wrong_type_or_outside_its_bounds_is_refused_by_key() -> None:
     for value in (0, 5000, "10", True, 1.5):
         result = plan({"platform": {"settings": {BATCH: value}}})
-        assert codes(result) == [(f"platform.settings[{BATCH}]", ErrorCode.SETTING_INVALID, BATCH)]
+        assert refusals(result) == [
+            (f"platform.settings[{BATCH}]", ErrorCode.SETTING_INVALID, BATCH)
+        ]
 
 
 def test_production_refuses_the_values_it_never_uses() -> None:
@@ -186,7 +184,7 @@ def test_a_setting_the_environment_locks_cannot_change_but_may_be_restated() -> 
     reset = plan({"platform": {"settings": {BATCH: None}}}, state, usage=usage)
     same = plan({"platform": {"settings": {BATCH: 50}}}, state, usage=usage)
 
-    assert codes(changed) == [(f"platform.settings[{BATCH}]", ErrorCode.SETTING_LOCKED, BATCH)]
+    assert refusals(changed) == [(f"platform.settings[{BATCH}]", ErrorCode.SETTING_LOCKED, BATCH)]
     assert [r.code for r in reset.refusals] == [ErrorCode.SETTING_LOCKED]
     assert same.ok
 
@@ -205,7 +203,7 @@ def test_settings_that_break_a_rule_together_are_refused_when_one_changes() -> N
     fine = plan({"platform": {"settings": {BATCH: 78}}}, state, context=context)
     untouched = plan({"platform": {"api": {"enabled": True}}}, state, context=context)
 
-    assert codes(refused) == [("platform.settings", ErrorCode.SETTING_COMBINATION, "settings")]
+    assert refusals(refused) == [("platform.settings", ErrorCode.SETTING_COMBINATION, "settings")]
     assert fine.ok
     assert untouched.ok
     assert seen[0] == {RATE: "5/hour", BATCH: 77}
@@ -257,7 +255,9 @@ def test_the_login_suffix_may_not_overlap_a_claimed_domain_either_way() -> None:
         state,
     )
 
-    assert codes(overlap) == [(f"platform.settings[{SUFFIX}]", ErrorCode.IDP_DOMAIN_TAKEN, SUFFIX)]
+    assert refusals(overlap) == [
+        (f"platform.settings[{SUFFIX}]", ErrorCode.IDP_DOMAIN_TAKEN, SUFFIX)
+    ]
     assert apart.ok
     assert [r.code for r in claim.refusals] == [ErrorCode.IDP_DOMAIN_TAKEN]
     assert claim_ok.ok
@@ -330,12 +330,12 @@ def test_a_blank_secret_a_foreign_name_and_a_locked_secret_are_refused() -> None
         Secret("   "),
     )
 
-    assert codes(plan({}, document=blank)) == [
+    assert refusals(plan({}, document=blank)) == [
         ("platform.secrets[smtp_password]", ErrorCode.SETTING_INVALID, "smtp_password")
     ]
     assert plan({"platform": {"secrets": {"webex_service_app": sealed}}}).ok
     foreign = plan({"platform": {"secrets": {"session_secret": sealed}}})
-    assert codes(foreign) == [
+    assert refusals(foreign) == [
         ("platform.secrets[session_secret]", ErrorCode.SETTING_NOT_EDITABLE, "session_secret")
     ]
     locked = plan(
@@ -374,7 +374,7 @@ def test_the_api_switch_has_the_api_permission_and_defaults_to_off() -> None:
 
 
 def test_the_platform_itself_cannot_be_deleted() -> None:
-    assert codes(plan({"platform": {"action": "delete"}})) == [
+    assert refusals(plan({"platform": {"action": "delete"}})) == [
         ("platform", ErrorCode.INVALID_CONFIGURATION, None)
     ]
 
@@ -568,7 +568,7 @@ def test_the_template_of_an_existing_role_cannot_change() -> None:
     moved = plan({"platform": {"roles": [{**ROLE_DOC, "template": "org_admin"}]}}, state)
 
     assert same.ok
-    assert codes(moved) == [
+    assert refusals(moved) == [
         ("platform.roles[planners]", ErrorCode.INVALID_CONFIGURATION, "template")
     ]
 
@@ -621,9 +621,9 @@ def test_a_calendar_needs_a_slug_and_a_name_like_an_organisation_does() -> None:
         }
     )
 
-    assert codes(bad_slug)[0][1:] == (ErrorCode.INVALID_CONFIGURATION, "slug")
-    assert codes(bad_name)[0][1] is ErrorCode.INVALID_CONFIGURATION
-    assert codes(bad_day_name)[0][1] is ErrorCode.INVALID_CONFIGURATION
+    assert refusals(bad_slug)[0][1:] == (ErrorCode.INVALID_CONFIGURATION, "slug")
+    assert refusals(bad_name)[0][1] is ErrorCode.INVALID_CONFIGURATION
+    assert refusals(bad_day_name)[0][1] is ErrorCode.INVALID_CONFIGURATION
 
 
 def test_a_calendar_still_named_by_an_organisation_or_group_is_not_deleted() -> None:
@@ -645,7 +645,7 @@ def test_a_calendar_still_named_by_an_organisation_or_group_is_not_deleted() -> 
     )
     unused = plan(delete, current(platform(holiday_calendars=(calendar,))))
 
-    assert codes(refused) == [
+    assert refusals(refused) == [
         ("platform.holiday_calendars[nl]", ErrorCode.HOLIDAY_CALENDAR_IN_USE, None)
     ]
     assert released.ok

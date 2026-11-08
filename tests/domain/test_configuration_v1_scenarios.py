@@ -21,7 +21,7 @@ from app.domain.configuration_v1_scenarios import (
 )
 from app.domain.configuration_values import Binary
 from app.domain.errors import ErrorCode
-from tests.support.configuration import Recorder, entity, parse
+from tests.support.configuration import Recorder, entity, parse, refusals
 from tests.support.configuration_columns import uncovered_columns
 from tests.support.configuration_parts import installation, organisation, plan_opened, stub_format
 
@@ -73,10 +73,6 @@ def group_doc(*scenarios: dict[str, Any]) -> dict[str, Any]:
 def empty() -> Any:
     group = entity("group", ("helpdesk",))
     return installation(organisation("acme", groups=(group,)))
-
-
-def refusals(result: Any) -> list[tuple[str, ErrorCode, str | None]]:
-    return [(r.path, r.code, r.field) for r in result.refusals]
 
 
 def test_an_organisation_scenario_is_created_by_the_closure_screen_of_the_organisation() -> None:

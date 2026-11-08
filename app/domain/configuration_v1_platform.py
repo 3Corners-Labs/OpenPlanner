@@ -20,7 +20,12 @@ from app.domain.configuration_changes import (
     Resolution,
     RuleContext,
 )
-from app.domain.configuration_checks import setting_value
+from app.domain.configuration_checks import (
+    combination_refusal,
+    setting_entry_check,
+    strings_of,
+    text_of,
+)
 from app.domain.configuration_schema import (
     Collection,
     Kind,
@@ -32,6 +37,18 @@ from app.domain.configuration_schema import (
     text,
 )
 from app.domain.configuration_tree import Entity, walk
+from app.domain.configuration_v1_calendars import INTEGRITY as CALENDAR_INTEGRITY
+from app.domain.configuration_v1_names import (
+    API_SETTINGS_KIND,
+    HOLIDAY_CALENDAR_KIND,
+    HOLIDAY_KIND,
+    LOG_DESTINATION_KIND,
+    PLATFORM_KIND,
+    PLATFORM_SECRET_KIND,
+    PLATFORM_SETTING_KIND,
+    PROVIDER_DOMAIN_KIND,
+    ROLE_KIND,
+)
 from app.domain.configuration_values import Json, Secret, Value
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.log_destinations import (
@@ -67,21 +84,9 @@ SECRET_NAMES = frozenset(
 from the registry) and the Webex Service App's tokens."""
 
 
-def _text(values: Mapping[str, Value], name: str) -> str:
-    """Return a text field of ``values``, or the empty text when it is not one."""
-    value = values.get(name)
-    return value if isinstance(value, str) else ""
-
-
 def _flag(values: Mapping[str, Value], name: str) -> bool:
     """Return a boolean field of ``values``; anything but ``true`` is false."""
     return values.get(name) is True
-
-
-def _words(values: Mapping[str, Value], name: str) -> list[str]:
-    """Return a list-of-texts field of ``values``."""
-    value = values.get(name)
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
 
 
 def editable_setting(key: str) -> SettingSpec | None:
@@ -97,22 +102,14 @@ def editable_setting(key: str) -> SettingSpec | None:
     return spec if editable(spec) and key not in TEMPORARY_SETTINGS else None
 
 
-def _check_setting(
-    merged: Mapping[str, Value], current: Mapping[str, Value] | None, context: RuleContext
-) -> Mapping[str, Value]:
-    """Check a platform setting: an editable class C key, a value of its type and bounds."""
-    key = _text(merged, "key")
-    spec = editable_setting(key)
-    if spec is None:
-        raise DomainError(ErrorCode.SETTING_NOT_EDITABLE, key)
-    return {**merged, "value": setting_value(spec, merged["value"], production=context.production)}
+_check_setting = setting_entry_check(editable_setting)
 
 
 def _check_secret(
     merged: Mapping[str, Value], current: Mapping[str, Value] | None, context: RuleContext
 ) -> Mapping[str, Value]:
     """Check a platform secret: a name the portal writes, and a value that is not blank."""
-    name = _text(merged, "name")
+    name = text_of(merged, "name")
     if name not in SECRET_NAMES:
         raise DomainError(ErrorCode.SETTING_NOT_EDITABLE, name)
     value = merged.get("secret")
@@ -138,22 +135,22 @@ def _check_log_destination(
 ) -> Mapping[str, Value]:
     """Check a log destination as the logging screen does, and return it cleaned."""
     try:
-        kind = DestinationKind(_text(merged, "kind"))
+        kind = DestinationKind(text_of(merged, "kind"))
     except ValueError:
         raise DomainError(ErrorCode.LOG_DESTINATION_INVALID, "kind") from None
-    name = _text(merged, "name")
+    name = text_of(merged, "name")
     clean = validate_draft(
         DestinationDraft(
             name=name,
             kind=kind,
-            address=_text(merged, "address"),
-            index=_text(merged, "index_name"),
-            source=_text(merged, "source"),
-            min_level=_text(merged, "min_level"),
-            categories=_categories(_text(merged, "categories")),
+            address=text_of(merged, "address"),
+            index=text_of(merged, "index_name"),
+            source=text_of(merged, "source"),
+            min_level=text_of(merged, "min_level"),
+            categories=_categories(text_of(merged, "categories")),
             include_diagnostic=_flag(merged, "include_diagnostic"),
             include_trace=_flag(merged, "include_trace"),
-            ca_pem=_text(merged, "ca_pem"),
+            ca_pem=text_of(merged, "ca_pem"),
         ),
         production=context.production,
     )
@@ -181,15 +178,15 @@ def _check_role(
     merged: Mapping[str, Value], current: Mapping[str, Value] | None, context: RuleContext
 ) -> Mapping[str, Value]:
     """Check a custom role: the definition's bounds, a fixed template, a free claim value."""
-    claim = _text(merged, "claim_value")
+    claim = text_of(merged, "claim_value")
     if current is not None and current.get("template") != merged.get("template"):
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "template")
     draft = RoleDraft.create(
-        template=_text(merged, "template"),
-        permissions=_words(merged, "permissions"),
+        template=text_of(merged, "template"),
+        permissions=strings_of(merged, "permissions"),
         claim_value=claim,
-        name_nl=_text(merged, "name_nl"),
-        name_en=_text(merged, "name_en"),
+        name_nl=text_of(merged, "name_nl"),
+        name_en=text_of(merged, "name_en"),
     )
     if claim.casefold() in {value.casefold() for value in context.built_in_claim_values}:
         raise DomainError(ErrorCode.CLAIM_VALUE_TAKEN, "claim_value")
@@ -206,7 +203,7 @@ def _check_calendar(
     merged: Mapping[str, Value], current: Mapping[str, Value] | None, context: RuleContext
 ) -> Mapping[str, Value]:
     """Check a holiday calendar: a display name and a slug as organisations have them."""
-    check_name_and_slug(_text(merged, "name"), _text(merged, "slug"))
+    check_name_and_slug(text_of(merged, "name"), text_of(merged, "slug"))
     return merged
 
 
@@ -214,19 +211,19 @@ def _check_holiday(
     merged: Mapping[str, Value], current: Mapping[str, Value] | None, context: RuleContext
 ) -> Mapping[str, Value]:
     """Check a holiday: an ISO date written in full, and a name."""
-    day = _text(merged, "day")
+    day = text_of(merged, "day")
     try:
         valid = date.fromisoformat(day).isoformat() == day
     except ValueError:
         valid = False
     if not valid:
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "day")
-    check_name(_text(merged, "name"))
+    check_name(text_of(merged, "name"))
     return merged
 
 
 PLATFORM_SETTING = Kind(
-    "platform_setting",
+    PLATFORM_SETTING_KIND,
     key=("key",),
     permission=PLATFORM_MANAGE,
     tables=frozenset({"platform_settings"}),
@@ -236,7 +233,7 @@ PLATFORM_SETTING = Kind(
     description="The portal value of one class C setting.",
 )
 PLATFORM_SECRET = Kind(
-    "platform_secret",
+    PLATFORM_SECRET_KIND,
     key=("name",),
     permission=PLATFORM_MANAGE,
     tables=frozenset({"integration_credentials"}),
@@ -249,7 +246,7 @@ PLATFORM_SECRET = Kind(
     description="A sealed platform secret: a class C secret setting or the Webex Service App.",
 )
 API_SETTINGS = Kind(
-    "api_settings",
+    API_SETTINGS_KIND,
     permission=Permission.API_CLIENTS_MANAGE,
     tables=frozenset({"api_settings"}),
     fields=(boolean("enabled", default=False), boolean("docs_public", default=False)),
@@ -257,7 +254,7 @@ API_SETTINGS = Kind(
     description="The superuser's switches for the machine API.",
 )
 LOG_DESTINATION = Kind(
-    "log_destination",
+    LOG_DESTINATION_KIND,
     key=("name",),
     permission=Permission.LOGGING_MANAGE,
     tables=frozenset({"log_destinations"}),
@@ -282,7 +279,7 @@ LOG_DESTINATION = Kind(
     description="A place where copies of the log lines go.",
 )
 ROLE = Kind(
-    "role",
+    ROLE_KIND,
     key=("claim_value",),
     permission=Permission.ROLES_MANAGE,
     tables=frozenset({"roles"}),
@@ -298,7 +295,7 @@ ROLE = Kind(
     description="A custom role: a copy of a built-in template within its bounds.",
 )
 HOLIDAY = Kind(
-    "holiday",
+    HOLIDAY_KIND,
     key=("day",),
     permission=Permission.HOLIDAYS_MANAGE,
     tables=frozenset({"holidays"}),
@@ -307,7 +304,7 @@ HOLIDAY = Kind(
     description="One closed date of a holiday calendar.",
 )
 HOLIDAY_CALENDAR = Kind(
-    "holiday_calendar",
+    HOLIDAY_CALENDAR_KIND,
     key=("slug",),
     permission=Permission.HOLIDAYS_MANAGE,
     tables=frozenset({"holiday_calendars"}),
@@ -320,7 +317,7 @@ HOLIDAY_CALENDAR = Kind(
     description="A reusable set of closed days.",
 )
 PLATFORM = Kind(
-    "platform",
+    PLATFORM_KIND,
     permission=PLATFORM_MANAGE,
     tables=frozenset({"settings_version"}),
     deletable=False,
@@ -346,24 +343,26 @@ def _setting_values(resolution: Resolution) -> dict[str, object]:
     """Return the portal values of the class C settings as the resulting tree holds them."""
     return {
         entity.key[0]: entity.fields["value"]
-        for _, entity in walk(resolution.resulting, "platform_setting")
+        for _, entity in walk(resolution.resulting, PLATFORM_SETTING_KIND)
         if "value" in entity.fields
     }
 
 
 def _locked(resolution: Resolution) -> Iterator[Refusal]:
     """Refuse a change to a setting or secret the environment locks (ADR 0042)."""
-    for change in _touched(resolution, "platform_setting", "platform_secret"):
+    for change in _touched(resolution, PLATFORM_SETTING_KIND, PLATFORM_SECRET_KIND):
         if change.key[0] in resolution.usage.locked_settings:
             yield Refusal(change.path, ErrorCode.SETTING_LOCKED, change.key[0])
 
 
 def _combination(resolution: Resolution) -> Iterator[Refusal]:
     """Refuse settings that break a rule together (ADR 0042), as the portal's change does."""
-    problem = resolution.context.combination_problem
-    changes = _touched(resolution, "platform_setting")
-    if problem is not None and changes and problem(_setting_values(resolution)):
-        yield Refusal("platform.settings", ErrorCode.SETTING_COMBINATION, "settings")
+    if _touched(resolution, PLATFORM_SETTING_KIND):
+        found = combination_refusal(
+            resolution, _setting_values(resolution), "platform.settings", "settings"
+        )
+        if found is not None:
+            yield found
 
 
 def _login_suffix(resolution: Resolution) -> Iterator[Refusal]:
@@ -374,32 +373,19 @@ def _login_suffix(resolution: Resolution) -> Iterator[Refusal]:
     )
     if not isinstance(suffix, str):
         return
-    for change in _touched(resolution, "platform_setting"):
+    for change in _touched(resolution, PLATFORM_SETTING_KIND):
         if change.key == (LOGIN_SUFFIX,) and any(
             overlaps(domain.key[0], suffix) for _, domain in _claims(resolution.resulting)
         ):
             yield Refusal(change.path, ErrorCode.IDP_DOMAIN_TAKEN, LOGIN_SUFFIX)
-    for change in _touched(resolution, "identity_provider_domain"):
+    for change in _touched(resolution, PROVIDER_DOMAIN_KIND):
         if change.action.value == "create" and overlaps(change.key[0], suffix):
             yield Refusal(change.path, ErrorCode.IDP_DOMAIN_TAKEN, "domain")
 
 
 def _claims(root: Entity) -> Iterator[tuple[tuple[str, ...], Entity]]:
     """Yield the claimed login domains of a tree."""
-    return walk(root, "identity_provider_domain")
-
-
-def _calendar_in_use(resolution: Resolution) -> Iterator[Refusal]:
-    """Refuse deleting a holiday calendar an organisation or group still names."""
-    deleted = {c.key[0]: c.path for c in resolution.deletions if c.kind == "holiday_calendar"}
-    if not deleted:
-        return
-    for _, entity in walk(resolution.resulting):
-        if entity.kind not in ("organisation", "group"):
-            continue
-        for slug in _words(entity.fields, "holiday_calendars"):
-            if slug in deleted:
-                yield Refusal(deleted.pop(slug), ErrorCode.HOLIDAY_CALENDAR_IN_USE)
+    return walk(root, PROVIDER_DOMAIN_KIND)
 
 
 def _integrity(resolution: Resolution) -> Iterator[Refusal]:
@@ -407,9 +393,8 @@ def _integrity(resolution: Resolution) -> Iterator[Refusal]:
     yield from _locked(resolution)
     yield from _combination(resolution)
     yield from _login_suffix(resolution)
-    yield from _calendar_in_use(resolution)
 
 
-INTEGRITY: tuple[IntegrityRule, ...] = (_integrity,)
+INTEGRITY: tuple[IntegrityRule, ...] = (_integrity, *CALENDAR_INTEGRITY)
 """The rules across objects of this slice: environment locks, the combination of settings,
-the login suffix against claimed domains, and a calendar still in use."""
+the login suffix against claimed domains, and the calendar rules."""

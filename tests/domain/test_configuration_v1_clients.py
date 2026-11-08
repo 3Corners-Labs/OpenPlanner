@@ -1,6 +1,7 @@
 """The API client in a version-1 configuration document (ADR 0099)."""
 
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -14,10 +15,11 @@ from app.domain.configuration_tree import Entity
 from app.domain.configuration_v1_clients import API_CLIENT, INTEGRITY
 from app.domain.configuration_values import Secret
 from app.domain.errors import DomainError, ErrorCode
-from tests.support.configuration import Recorder, allow, entity, parse, plan
+from tests.support.configuration import Recorder, allow, entity, parse, plan, refusals
 from tests.support.configuration_columns import uncovered_columns
 
 CLIENT_ID = "opc_" + "a" * 20
+NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
 DIGEST = "a" * 64
 GROUP = Kind("group", key=("slug",), anchor=Anchor.GROUP, fields=(text("slug", required=True),))
 ORGANISATION = Kind(
@@ -64,7 +66,7 @@ def opened(data: dict[str, Any], current: Entity, secret: str = DIGEST) -> Plan:
         current,
         usage=Usage(),
         may_change=allow,
-        context=RuleContext(),
+        context=RuleContext(now=NOW),
         settings_version=1,
     )
 
@@ -98,12 +100,8 @@ def client(enabled: bool = False, **over: Any) -> Entity:
 
 def planned(data: dict[str, Any], current: Entity | None = None, **options: Any) -> Plan:
     """Plan ``data`` in the test format."""
+    options.setdefault("context", RuleContext(now=NOW))
     return plan(data, current if current is not None else world(), fmt=FORMAT, **options)
-
-
-def refusals(result: Plan) -> list[tuple[str, ErrorCode, str | None]]:
-    """Return what stops a plan as (path, code, field)."""
-    return [(r.path, r.code, r.field) for r in result.refusals]
 
 
 def test_a_client_is_created_normalised_with_its_secret_hash_and_the_right_permission() -> None:
@@ -269,3 +267,13 @@ def test_every_column_of_the_client_tables_is_covered() -> None:
     assert uncovered_columns([API_CLIENT]) == {}
     assert API_CLIENT.tables == {"api_clients", "api_client_groups"}
     assert API_CLIENT.organisation_field == "organisation"
+
+
+def test_a_secret_cannot_live_longer_than_the_portal_lets_it_and_a_new_one_not_be_over() -> None:
+    far = planned({"api_clients": [sealed(secret_expires_at="2028-01-01T00:00:00+00:00")]})
+    past = planned({"api_clients": [sealed(secret_expires_at="2026-01-01T00:00:00+00:00")]})
+    edge = planned({"api_clients": [sealed(secret_expires_at="2027-11-08T00:00:00+00:00")]})
+
+    assert refusals(far)[0][2] == "secret_expires_at"
+    assert refusals(past)[0][2] == "secret_expires_at"
+    assert not [r for r in refusals(edge) if r[2] == "secret_expires_at"]

@@ -16,11 +16,11 @@ the reminder rules of ``MessagingService``, ``check_form`` for the form rules of
 
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, cast
 
 from app.domain.agenda import agents_for
-from app.domain.agent_term import TERM_KEYS, TERM_PLURAL, TERM_SINGULAR, check_term_pair, clean_term
+from app.domain.agent_term import TERM_KEYS, clean_term
 from app.domain.authorization import Permission
 from app.domain.channel_settings import CONFIGURABLE_CHANNELS
 from app.domain.channels import (
@@ -34,7 +34,15 @@ from app.domain.configuration_changes import (
     Resolution,
     RuleContext,
 )
-from app.domain.configuration_checks import contacts_check
+from app.domain.configuration_checks import (
+    contacts_check,
+    effective_idp_key,
+    int_setting,
+    invalid,
+    strings_of,
+    term_pair_refusals,
+    text_override_check,
+)
 from app.domain.configuration_schema import (
     Anchor,
     Collection,
@@ -49,17 +57,25 @@ from app.domain.configuration_schema import (
     text,
 )
 from app.domain.configuration_tree import Address, Entity, path_of, walk
+from app.domain.configuration_v1_calendars import (
+    CalendarWorld,
+    changes_holidays,
+    parse_days,
+    world_of,
+)
 from app.domain.configuration_v1_group_parts import (
     check_form,
     check_reminders,
     day_of,
-    invalid,
     items_of,
     new_items,
     override_json,
     rule_json,
     schedule_of,
-    strings_of,
+)
+from app.domain.configuration_v1_names import (
+    GROUP_KIND,
+    GROUP_TEXT_KIND,
 )
 from app.domain.configuration_values import Json, Value
 from app.domain.entitlements import is_idp_key
@@ -93,12 +109,10 @@ from app.domain.scheduling import (
     Offer,
     PhoneMode,
     ScheduleOverride,
+    ScheduleRule,
     validate_schedule,
     windows_on,
 )
-
-DEFAULT_MAX_CUSTOM_FIELDS = 5
-"""The number of custom form fields when the settings say nothing (ADR 0055)."""
 
 _DEFAULTS = Group(0, 0, "default", "default", "UTC", 30)
 """A group with every default of the dataclass, the one source of a new group's defaults."""
@@ -299,31 +313,27 @@ def _check_group(
             group.phone_mode,
         ),
     )
-    limit = ctx.settings.get("booking_form_max_custom_fields", DEFAULT_MAX_CUSTOM_FIELDS)
     checked["form_fields"] = cast(
         "list[Json]",
         check_form(
             items_of(view.get("form_fields")),
             items_of(before.get("form_fields")),
-            limit if isinstance(limit, int) else DEFAULT_MAX_CUSTOM_FIELDS,
+            int_setting(ctx, "booking_form_max_custom_fields"),
         ),
     )
     return checked
 
 
-def _check_text(
-    view: Mapping[str, Value], current: Mapping[str, Value] | None, ctx: RuleContext
-) -> Mapping[str, Value]:
-    """Check one text of a group: a known locale, a known block, the portal's own text rules."""
-    if view["locale"] not in ctx.locales:
-        raise invalid("locale")
-    key, body = str(view["key"]), str(view["text"])
-    cleaned = clean_term(key, body) if key in TERM_KEYS else clean_text(key, body)
-    return {**view, "text": cleaned}
+def _clean_group_text(key: str, body: str) -> str:
+    """Clean one text of a group as the portal does: a term word or a message block."""
+    return clean_term(key, body) if key in TERM_KEYS else clean_text(key, body)
+
+
+_check_text = text_override_check(_clean_group_text)
 
 
 GROUP_TEXT = Kind(
-    "group_text",
+    GROUP_TEXT_KIND,
     key=("locale", "key"),
     permission=Permission.TEXTS_MANAGE,
     tables=frozenset({"group_texts"}),
@@ -337,7 +347,7 @@ GROUP_TEXT = Kind(
 )
 
 GROUP = Kind(
-    "group",
+    GROUP_KIND,
     key=("slug",),
     permission=Permission.GROUP_EDIT,
     create_permission=Permission.GROUP_CREATE,
@@ -445,17 +455,6 @@ GROUP = Kind(
 # --- rules across objects -----------------------------------------------------------------
 
 
-def _days(values: Iterable[object]) -> list[date]:
-    """Return the dates among ``values``; what is no date was already refused by the kind."""
-    found: list[date] = []
-    for value in values:
-        try:
-            found.append(date.fromisoformat(str(value)))
-        except ValueError:
-            continue
-    return found
-
-
 def _group_path(address: Address) -> str:
     """Return the path of a group in a document from its address (organisation, slug)."""
     return path_of(path_of("", "organisations", address[:1]), "groups", address[1:])
@@ -463,75 +462,16 @@ def _group_path(address: Address) -> str:
 
 def _groups(root: Entity) -> dict[Address, Entity]:
     """Return every group of a tree by address."""
-    return {address: group for address, group in walk(root, GROUP.name)}
-
-
-def _calendar_days(root: Entity) -> dict[str, set[date]]:
-    """Return the holidays of every calendar of a tree by calendar slug."""
-    days: dict[str, set[date]] = {}
-    for address, calendar in walk(root, "holiday_calendar"):
-        found = days.setdefault(address[0], set())
-        for holiday in calendar.children.get("days", ()):
-            try:
-                found.add(date.fromisoformat(holiday.key[0]))
-            except ValueError:
-                continue
-    return days
-
-
-def _organisation_calendars(root: Entity, slug: str) -> list[str]:
-    """Return the calendar slugs an organisation of a tree has chosen."""
-    for address, organisation in walk(root, "organisation"):
-        if address == (slug,):
-            return [
-                str(x) for x in cast("list[str]", organisation.fields.get("holiday_calendars", []))
-            ]
-    return []
-
-
-def _closed_days(root: Entity, address: Address, group: Entity) -> set[date]:
-    """Return the holidays on which a group is closed: its effective calendars, minus open days."""
-    days = _calendar_days(root)
-    own = group.fields.get("holiday_source") == "own"
-    slugs = (
-        strings_of(group.fields, "holiday_calendars")
-        if own
-        else (_organisation_calendars(root, address[0]))
-    )
-    closed: set[date] = set()
-    for slug in slugs:
-        closed |= days.get(str(slug), set())
-    return closed - set(_days(strings_of(group.fields, "holiday_open_days")))
-
-
-def _agents(
-    root: Entity,
-    address: Address,
-    group: Entity,
-    load_start: datetime,
-    load_end: datetime,
-    ctx: RuleContext,
-) -> int | None:
-    """Return the agents on duty for a whole slot under a tree's schedule, or ``None``."""
-    try:
-        rules, overrides = schedule_of(group.fields)
-        built = _build_group({"slug": address[-1], **group.fields}, ctx)
-    except (DomainError, ValueError, KeyError, TypeError):
-        return None
-    day = load_start.astimezone(built.tz).date()
-    if day in _closed_days(root, address, group) and not any(o.day == day for o in overrides):
-        overrides = [*overrides, ScheduleOverride(day, None)]
-    windows = windows_on(day, rules, overrides)
-    return agents_for(built, load_start, load_end, day, windows)
+    return {address: group for address, group in walk(root, GROUP_KIND)}
 
 
 def _slug_rules(resolution: Resolution) -> Iterator[Refusal]:
     """Slugs are unique across the installation; an idp value is unique within an organisation."""
     groups = _groups(resolution.resulting)
-    touched = {change.address for change in resolution.changes if change.kind == GROUP.name}
+    touched = {change.address for change in resolution.changes if change.kind == GROUP_KIND}
     slugs = Counter(address[-1] for address in groups)
     keys: Counter[tuple[str, str]] = Counter(
-        (address[0], str(group.fields.get("idp_key") or address[-1]))
+        (address[0], effective_idp_key(group.fields, address[-1]))
         for address, group in groups.items()
     )
     for address, group in groups.items():
@@ -539,55 +479,43 @@ def _slug_rules(resolution: Resolution) -> Iterator[Refusal]:
             continue
         if slugs[address[-1]] > 1:
             yield Refusal(_group_path(address), ErrorCode.SLUG_TAKEN, "slug")
-        if keys[(address[0], str(group.fields.get("idp_key") or address[-1]))] > 1:
+        if keys[(address[0], effective_idp_key(group.fields, address[-1]))] > 1:
             yield Refusal(_group_path(address), ErrorCode.IDP_KEY_TAKEN, "idp_key")
 
 
-def _calendar_rules(resolution: Resolution) -> Iterator[Refusal]:
-    """Every holiday calendar a group names exists, and a new open day is a real holiday."""
-    known = _calendar_days(resolution.resulting)
+def _built(fields: Mapping[str, Value], address: Address, ctx: RuleContext) -> Group:
+    """Build the group a tree holds at ``address``; its own refusal when its fields do not."""
+    return _build_group({"slug": address[-1], **fields}, ctx)
+
+
+def _open_day_rules(resolution: Resolution) -> Iterator[Refusal]:
+    """A new open day is a holiday of the calendars the group observes and not in the past."""
     before = _groups(resolution.current)
+    world = world_of(resolution.resulting)
     for address, group in _groups(resolution.resulting).items():
-        path = _group_path(address)
-        named = strings_of(group.fields, "holiday_calendars")
-        if any(slug not in known for slug in named):
-            yield Refusal(path, ErrorCode.HOLIDAY_CALENDAR_NOT_FOUND, "holiday_calendars")
         old = before.get(address)
-        had = set(_days(strings_of(old.fields, "holiday_open_days"))) if old else set()
-        added = [d for d in _days(strings_of(group.fields, "holiday_open_days")) if d not in had]
+        had = set(parse_days(strings_of(old.fields, "holiday_open_days"))) if old else set()
+        added = [
+            d for d in parse_days(strings_of(group.fields, "holiday_open_days")) if d not in had
+        ]
         if not added:
             continue
-        closed = _calendar_days_for(resolution.resulting, address, group)
-        today = _today(group, resolution.context)
-        if any(d not in closed or (today is not None and d < today) for d in added):
+        path = _group_path(address)
+        try:
+            today = _built(group.fields, address, resolution.context).today(resolution.context.now)
+        except DomainError as error:
+            yield Refusal(path, error.code, error.field)
+            continue
+        observed = world.observed(address)
+        if any(d not in observed or d < today for d in added):
             yield Refusal(path, ErrorCode.HOLIDAY_NOT_FOUND, "holiday_open_days")
-
-
-def _calendar_days_for(root: Entity, address: Address, group: Entity) -> set[date]:
-    """Return every holiday date of the calendars a group observes (open days included)."""
-    own = group.fields.get("holiday_source") == "own"
-    slugs = (
-        strings_of(group.fields, "holiday_calendars")
-        if own
-        else (_organisation_calendars(root, address[0]))
-    )
-    days = _calendar_days(root)
-    return {d for slug in slugs for d in days.get(str(slug), set())}
-
-
-def _today(group: Entity, ctx: RuleContext) -> date | None:
-    """Return the group's local today, or ``None`` when its fields cannot build a group."""
-    try:
-        return _build_group({"slug": "x", **group.fields}, ctx).today(ctx.now)
-    except (DomainError, ValueError, KeyError, TypeError):
-        return None
 
 
 def _grid_and_archive_rules(resolution: Resolution) -> Iterator[Refusal]:
     """The time grid freezes while bookings are ahead; archiving and un-archiving follow rules."""
     before = _groups(resolution.current)
     for change in resolution.changes:
-        if change.kind != GROUP.name:
+        if change.kind != GROUP_KIND:
             continue
         old = before.get(change.address)
         busy = change.address in resolution.usage.future_bookings
@@ -615,61 +543,91 @@ def _archived_rules(resolution: Resolution) -> Iterator[Refusal]:
     for change in (*resolution.changes, *resolution.deletions):
         if (change.organisation, change.group) not in archived:
             continue
-        if change.kind == GROUP.name and (
+        if change.kind == GROUP_KIND and (
             change.action is ChangeAction.DELETE or "archived" in change.fields
         ):
             continue
         yield Refusal(change.path, ErrorCode.GROUP_ARCHIVED)
 
 
+def _agents(
+    world: CalendarWorld,
+    address: Address,
+    staffing: tuple[Group, list[ScheduleRule], list[ScheduleOverride]],
+    start: datetime,
+    end: datetime,
+) -> int:
+    """Return the agents on duty for a whole slot under a schedule and the holidays it sees."""
+    group, rules, overrides = staffing
+    day = start.astimezone(group.tz).date()
+    if day in world.closed(address) and not any(o.day == day for o in overrides):
+        overrides = [*overrides, ScheduleOverride(day, None)]
+    return agents_for(group, start, end, day, windows_on(day, rules, overrides))
+
+
+def _staffing(
+    fields: Mapping[str, Value], address: Address, ctx: RuleContext
+) -> tuple[Group, list[ScheduleRule], list[ScheduleOverride]]:
+    """Build a group and read its schedule; a group that cannot be built is a refusal."""
+    rules, overrides = schedule_of(fields)
+    return _built(fields, address, ctx), rules, overrides
+
+
 def _capacity_rules(resolution: Resolution) -> Iterator[Refusal]:
     """A change to the staffing may not create or worsen a shortfall on a slot already booked.
 
     The portal lets a planner lower the staffing and shows the shortfall (ADR 0044); a document
-    changes many groups at once, so it is refused instead (ADR 0099 point 7).
+    changes many groups at once, so it is refused instead (ADR 0099 point 7). A holiday is
+    staffing too: a day closed by a calendar, by the calendars an organisation chose or by a
+    group's holiday fields removes capacity from groups the plan does not otherwise touch, so
+    then every group with booked slots is checked.
     """
-    before = _groups(resolution.current)
-    after = _groups(resolution.resulting)
-    ctx = resolution.context
-    for change in resolution.changes:
-        if change.kind != GROUP.name or not set(change.fields) & set(_SCHEDULE_FIELDS):
+    changed = {
+        c.address
+        for c in resolution.changes
+        if c.kind == GROUP_KIND and set(c.fields) & set(_SCHEDULE_FIELDS)
+    }
+    targets = changed | (
+        set(resolution.usage.slot_loads) if changes_holidays(resolution) else set()
+    )
+    if not any(resolution.usage.slot_loads.get(address) for address in targets):
+        return
+    before, after = _groups(resolution.current), _groups(resolution.resulting)
+    old_world, new_world = world_of(resolution.current), world_of(resolution.resulting)
+    for address in sorted(targets):
+        old, new = before.get(address), after.get(address)
+        loads = resolution.usage.slot_loads.get(address, ())
+        if old is None or new is None or not loads:
             continue
-        old, new = before.get(change.address), after.get(change.address)
-        if old is None or new is None:
+        path = _group_path(address)
+        try:
+            was = _staffing(old.fields, address, resolution.context)
+            now = _staffing(new.fields, address, resolution.context)
+        except DomainError as error:
+            yield Refusal(path, error.code, error.field)
             continue
-        for load in resolution.usage.slot_loads.get(change.address, ()):
-            now = _agents(resolution.resulting, change.address, new, load.start, load.end, ctx)
-            was = _agents(resolution.current, change.address, old, load.start, load.end, ctx)
-            if now is not None and was is not None and now < load.booked and now < was:
-                yield Refusal(
-                    change.path, ErrorCode.CONFIGURATION_CAPACITY_BELOW_BOOKED, "schedule_rules"
-                )
+        for load in loads:
+            after_agents = _agents(new_world, address, now, load.start, load.end)
+            before_agents = _agents(old_world, address, was, load.start, load.end)
+            if after_agents < load.booked and after_agents < before_agents:
+                yield Refusal(path, ErrorCode.CONFIGURATION_CAPACITY_BELOW_BOOKED, "schedule_rules")
                 break
 
 
 def _term_rules(resolution: Resolution) -> Iterator[Refusal]:
     """A group sets both words of the agent term in a locale, or neither."""
     for address, group in _groups(resolution.resulting).items():
-        words: dict[str, dict[str, str | None]] = {}
-        for entry in group.children.get("texts", ()):
-            if entry.key[1] in TERM_KEYS:
-                words.setdefault(entry.key[0], {TERM_SINGULAR: None, TERM_PLURAL: None})[
-                    entry.key[1]
-                ] = str(entry.fields.get("text"))
-        for locale, pair in words.items():
-            try:
-                check_term_pair(pair)
-            except DomainError as error:
-                yield Refusal(
-                    path_of(_group_path(address), "texts", (locale, str(error.field))),
-                    error.code,
-                    error.field,
-                )
+        base = _group_path(address)
+
+        def blame(locale: str, key: str, base: str = base) -> str:
+            return path_of(base, "texts", (locale, key))
+
+        yield from term_pair_refusals(group.children.get("texts", ()), blame)
 
 
 INTEGRITY: tuple[IntegrityRule, ...] = (
     _slug_rules,
-    _calendar_rules,
+    _open_day_rules,
     _grid_and_archive_rules,
     _archived_rules,
     _capacity_rules,
