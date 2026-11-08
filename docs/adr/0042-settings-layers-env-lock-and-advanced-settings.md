@@ -4,7 +4,7 @@ Status: accepted (2026-10-28), requested and accepted by the product owner. Refi
 secrets stay in the environment) and the CLAUDE.md stack rule "Settings: `pydantic-settings`
 from env only". Builds on ADR 0014/0039 (permissions), ADR 0015 (fresh login), ADR 0031
 (audit), ADR 0033 (manual) and ADR 0032 (contact-center connection per organisation). Partly built; see `docs/adr-status.md` for what is built.
-Step 6b-2 is built for the organisation's contact-center connection with ADR 0032 CC-4a (#PRNUM):
+Step 6b-2 is built for the organisation's contact-center connection with ADR 0032 CC-4a (#630):
 the server generates and rotates each organisation's webhook secret.
 Extended by ADR 0049 (`oidc_entitlement_claim`, `OIDC_CLAIM_MODE`) and ADR 0089
 (configuration package). Amended by ADR 0083 (§8: a second identity provider, now per
