@@ -128,6 +128,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_OUT_OF_SCOPE: "admin.form.error.configuration_out_of_scope",
     ErrorCode.SCENARIO_NAME_TAKEN: "admin.form.error.scenario_name_taken",
     ErrorCode.ALERT_TARGET_TAKEN: "admin.form.error.alert_target_taken",
+    ErrorCode.CONFIGURATION_PLAN_STALE: "admin.form.error.configuration_plan_stale",
+    ErrorCode.CONFIGURATION_TOO_MANY_CHANGES: "admin.form.error.configuration_too_many_changes",
     ErrorCode.CONFIGURATION_OBJECT_IN_USE: "admin.form.error.configuration_object_in_use",
     ErrorCode.CONFIGURATION_CAPACITY_BELOW_BOOKED: (
         "admin.form.error.configuration_capacity_below_booked"

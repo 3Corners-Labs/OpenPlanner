@@ -2,13 +2,14 @@
 
 Both the document that states the desired configuration and the snapshot of what the
 installation has now are trees of ``Entity`` objects, so the planner can compare them without
-knowing what either was read from (ADR 0099 point 6). The tree holds no behaviour; reading it
-from JSON is ``configuration_document``, comparing two of them is ``configuration_plan``.
+knowing what either was read from (ADR 0099 point 6). The tree holds no behaviour beyond
+walking it (``walk``, ``map_fields``, ``any_field``, ``drop_fields``); reading it from JSON is
+``configuration_document``, comparing two of them is ``configuration_plan``.
 """
 
 from collections import deque
-from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterator, Mapping
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
 from app.domain.configuration_values import Value
@@ -81,3 +82,36 @@ def walk(root: Entity, kind: str | None = None) -> Iterator[tuple[Address, Entit
                 if kind is None or child.kind == kind:
                     yield here, child
                 pending.append((here, child))
+
+
+type FieldChange = Callable[[str, Address, str, Value], Value]
+"""Turns one field value into another, given the object's kind, its address and the field."""
+
+
+def map_fields(entity: Entity, change: FieldChange, address: Address = ()) -> Entity:
+    """Return ``entity`` with every field value, below it too, passed through ``change``."""
+    fields = {
+        name: change(entity.kind, address, name, value) for name, value in entity.fields.items()
+    }
+    children = {
+        group: tuple(map_fields(child, change, (*address, *child.key)) for child in members)
+        for group, members in entity.children.items()
+    }
+    return replace(entity, fields=fields, children=children)
+
+
+def any_field(entity: Entity, test: Callable[[Value], bool]) -> bool:
+    """Whether any field value of ``entity``, or of an object below it, passes ``test``."""
+    return any(test(value) for value in entity.fields.values()) or any(
+        any_field(child, test) for members in entity.children.values() for child in members
+    )
+
+
+def drop_fields(entity: Entity, test: Callable[[Value], bool]) -> Entity:
+    """Return ``entity`` without the fields whose value passes ``test``, below it too."""
+    fields = {name: value for name, value in entity.fields.items() if not test(value)}
+    children = {
+        group: tuple(drop_fields(child, test) for child in members)
+        for group, members in entity.children.items()
+    }
+    return replace(entity, fields=fields, children=children)

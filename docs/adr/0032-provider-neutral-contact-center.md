@@ -5,7 +5,7 @@ Status: proposed (2026-10-25). Renumbered from 0021 on 2026-10-27: two ADRs were
 unchanged. Extends ADR 0007 and ADR 0018; once accepted, it replaces
 their per-group mapping (ADR 0018 point 1) with the model below. Still proposed (awaiting the
 product owner's acceptance, CC-0); partly built: steps CC-1 and CC-2 (domain, schema, port and
-registry) and CC-3 (webhook route per kind) are merged, see *Build status* and `docs/adr-status.md`.
+registry), CC-3 (webhook route per kind) and CC-5 (docs) are merged, see *Build status* and `docs/adr-status.md`.
 Note (2026-11-01 review): point 8 (first name and host join URL only) contradicts point 5 and
 ADR 0018 §2, whose payload is what is sent (`app/adapters/wxcc.py`: booking reference, first
 name, start label, group name, meeting link, kind). Point 8 amended by ADR 0081 §6. ADR 0043
@@ -85,7 +85,7 @@ port and one adapter per kind.
 | CC-2 | Port and registry: `ContactCenterTask`, `ContactCenterDispatchers` (one dispatcher per kind), `ProviderDescriptor` per adapter with generic validation in the domain; the WxCC adapter maps the neutral task to Create Task v2 unchanged; recorded-payload test on the allow-list of CLAUDE.md (point 8 as amended by ADR 0081 §6) | #616 | merged |
 | CC-3 | Webhooks at `/webhooks/contact-center/{kind}`, verified by the adapter within 300 s; `/webhooks/wxcc` kept as alias. Each adapter defines its `InboundWebhook` (check, parsing, secret), listed in `contact_centers.INBOUND`; a task is looked up with its platform. OpenPlanner still registers the WxCC subscription at `/webhooks/wxcc`; moving the registration comes with the organisation connection (CC-4) | #626 | merged |
 | CC-4 | Admin: one contact-center connection per organisation (`integrations.manage`); group form rendered from the adapter's `ProviderDescriptor` | – | planned |
-| CC-5 | Docs: architecture, dataflow, webhooks, threat model, `scripts/diagrams/content.py` | – | planned |
+| CC-5 | Docs: architecture, dataflow, webhooks, threat model, `scripts/diagrams/content.py`. Describes what CC-1 to CC-3 built (webhooks and threat model largely came with CC-3, #626); the organisation connection of CC-4 updates the same places when it lands | #627 | merged |
 | CC-6 | Second platform adapter (for example Genesys Cloud) | – | planned (needs its own ADR) |
 
 ## Consequences

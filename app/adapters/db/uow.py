@@ -35,6 +35,7 @@ from app.adapters.db.admin_sessions import AdminSessionQueries
 from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.certificate import CertificateQueries
+from app.adapters.db.configuration_document import ConfigurationDocumentQueries
 from app.adapters.db.contact_center_rows import (
     has_task,
     legacy_group_columns,
@@ -95,6 +96,7 @@ from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.public_address import PublicAddressQueries
+from app.adapters.db.record_names import bot_credential_name, channel_secret_name
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
@@ -210,11 +212,6 @@ def _check_name(group_id: int) -> str:
 
 
 HEARTBEAT_NAME = "worker-heartbeat"
-
-
-def bot_credential_name(organisation_id: int | None) -> str:
-    """Return the credential name of a Webex bot token: an organisation's or the platform's."""
-    return f"webex-bot:{organisation_id if organisation_id is not None else 'platform'}"
 
 
 """Integration report name of the worker's heartbeat row (ADR 0068)."""
@@ -485,14 +482,10 @@ def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
     return SmsSettings(**{**values, "provider": SmsProvider(values["provider"])})
 
 
-def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
-    """Return the record name a channel secret is sealed under (associated data, ADR 0008)."""
-    return f"channel:{organisation_id}:{channel.value}"
-
-
 class SqlTransaction(
     AdminSessionQueries,
     AlertTargetQueries,
+    ConfigurationDocumentQueries,
     HealthQueries,
     OverviewLayoutQueries,
     ParticipantLinkQueries,
@@ -1644,7 +1637,7 @@ class SqlTransaction(
             if self._box is None:
                 raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
             row.secret_nonce, row.secret_ciphertext = self._box.seal(
-                _secret_name(organisation_id, config.channel), secret.encode()
+                channel_secret_name(organisation_id, config.channel), secret.encode()
             )
         await self._session.flush()
 
@@ -1671,7 +1664,7 @@ class SqlTransaction(
             return None
         if self._box is None:
             raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
-        name = _secret_name(organisation_id, channel)
+        name = channel_secret_name(organisation_id, channel)
         return self._box.open(name, row.secret_nonce, row.secret_ciphertext).decode()
 
     async def get_group_texts(self, group_id: int) -> dict[tuple[str, str], str]:

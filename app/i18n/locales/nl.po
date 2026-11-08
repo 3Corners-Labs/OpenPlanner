@@ -8821,6 +8821,9 @@ msgstr "Grootste uitgepakte omvang van een geüpload lettertype (bytes)"
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Maximale grootte van een configuratiepakket (MB)"
 
+msgid "settings.field.configuration_apply_max_changes.label"
+msgstr "Maximaal aantal wijzigingen in één configuratiedocument"
+
 msgid "admin.done.package_imported"
 msgstr "Het configuratiepakket is geïmporteerd: {count} organisatie(s). De processen nemen de nieuwe instellingen binnen tien seconden over."
 
@@ -8859,6 +8862,12 @@ msgstr "Het document noemt iets buiten de organisatie waarvoor het geldt."
 
 msgid "admin.form.error.configuration_object_in_use"
 msgstr "Dit object wordt nog gebruikt door afspraken, tijdsloten of een actieve sluiting en kan niet worden verwijderd."
+
+msgid "admin.form.error.configuration_plan_stale"
+msgstr "De configuratie is veranderd sinds het plan is gemaakt, of het plan ontbreekt. Maak het plan opnieuw en controleer het."
+
+msgid "admin.form.error.configuration_too_many_changes"
+msgstr "Dit document wijzigt meer dan het toegestane aantal objecten tegelijk. Splits het document of verhoog de instelling."
 
 msgid "admin.form.error.scenario_name_taken"
 msgstr "Er is al een scenario met deze naam. Kies een andere naam."
