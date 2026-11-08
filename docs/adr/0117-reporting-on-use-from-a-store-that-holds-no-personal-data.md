@@ -1,8 +1,9 @@
 # 0117. Reporting on use, from a store that holds no personal data
 
 Status: accepted (2026-11-06, PR #558), requested by the product owner (open point O16). Partly built:
-steps 1 (the domain), 2 (the store and the booking facts), 4 (rollup, retention, backfill, lag) and 5
-(permission, navigation, query layer, the *Volume* screen) are merged; the rest is planned.
+steps 1 (the domain), 2 (the store and the booking facts), 4 (rollup, retention, backfill, lag), 5
+(permission, navigation, query layer, the *Volume* screen) and 6 (the SVG charts and the *Queue and
+calls*, *Capacity* and *Channels* screens) are merged; the rest is planned.
 Extends
 ADR 0102 (what remains after a purge; step 4 is its first statistics table), ADR 0014
 (authorisation), ADR 0023 (machine API), ADR 0047 (admin structure), ADR 0042 (settings) and
@@ -447,7 +448,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | | planned |
 | 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | #608 | merged |
 | 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | #619 | merged |
-| 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | | planned |
+| 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | PR_NUMBER6 | merged |
 | 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | | planned |
 | 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | | planned |
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | | planned |
@@ -526,6 +527,36 @@ empty** (nothing records them) and U8 and U11 wait for step 3. The settings `rep
 3 to 20) and `reporting_org_min_cell_size` (D, 3, 3 to 50; the larger of the two applies) are added. Not
 done here, with reason: hour cuts and the group-total rule belong to the screens that cut by hour and by
 subject (steps 6 and 7); the *Volume* screen has none.
+
+**Step 6 notes (no change of a decision):** the charts extend the module that already draws the overview
+widgets (`app/web/charts.py`, ADR 0061), so there is one home for chart drawing: the same split of work
+(geometry in Python, markup in a Jinja macro `admin/_report_chart.html`, no framework import), a second
+family `ReportChart` -> `report_geometry` with three kinds: *column* (one series), *stacked* (up to four
+series, the later ones patterned) and *line* (marker shape and dash per series, broken at a hidden
+cell). Every chart is a `<figure>` with a visually hidden `<figcaption>`, an SVG with `<title>` and
+`<desc>`, and a table made from the same model directly after it, in its own labelled scroll region; the
+drawing keeps a minimum width and scrolls inside its frame, so the text stays readable at 320 px; colours
+are the `--adm-*` tokens through `rchart__s1..4` classes, forced colours and print (tables only) have
+rules. **A hidden cell is `None` all the way to the SVG**: a dashed marker of one fixed height with the
+label `< n`, a scale made from the shown values only, so neither a bar nor the axis nor a hover text
+carries it; a sum with a hidden part is hidden whole. **Placement** follows point 11 literally: the
+families are the closed `view` query value (`volume`, `queue`, `capacity`, `channels`) of the existing
+*Usage* sub-tab routes, with a link row on the page and the range kept; no route, tab or permission is
+added, and `reports.view` covers every family. The page widths stay *wide*. Metrics by screen: *Queue
+and calls* Q1 to Q9, U8, U11; *Capacity* C1 to C5; *Channels* M1, M2, T1 (the ADR lists T1 with the
+channels). The report builders are `usage_report_queue`, `usage_report_capacity` and
+`usage_report_channels` next to `usage_report`; the service reads all four families through one `_load`
+(one scope, one threshold), and `UsageScreen[R]` is the one result type. Rules added on top of the cell
+threshold, against rebuilding one booking: a share, mean or utilisation shows only when every figure it
+is made from shows, and a utilisation of 1 to threshold - 1 bookings reads as hidden; the weekday-by-hour
+table (C4) needs a range of 7 days or more and, per group, a total of five times the threshold, and the
+language table (M2) the same group total, with the number of groups left out stated on the page. Not
+shown, with reason: the share of bookings claimed in the own queue (Q7), because no fact records what
+was offered; *Volume* got no chart in this step (its day table keeps its *provisional* marks). The
+families draw nothing but a note while no cell of their metrics exists in the range, so the screens work
+before step 3's facts are written. `seed-closures` also writes example cells for the demo group so the
+end-to-end pages have something to draw. No setting is added: the chart sizes and the group-total factor
+are fixed design values (point 8 states the factor).
 
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:
