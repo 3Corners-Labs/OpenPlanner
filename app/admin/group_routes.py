@@ -41,6 +41,8 @@ import structlog
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.adapters.contact_centers import routing
+from app.adapters.wxcc import BUSINESS_ADDRESS, CHANNEL
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.block_subjects import block_subject_values, read_block_subjects, subject_choices
 from app.admin.check_routes import check_service, check_view
@@ -68,6 +70,7 @@ from app.admin.readiness_view import checklist_view, readiness_service
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
+from app.domain.contact_center import ContactCenterKind, ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.planning import (
     GroupSettings,
@@ -182,6 +185,38 @@ INTEGRATION_LABELS: dict[str, str] = {
     "wxcc_channel": "admin.field.wxcc_channel",
     "wxcc_routing_value": "admin.field.wxcc_routing_value",
 }
+
+ROUTING_ATTRIBUTE_FIELDS: dict[str, str] = {
+    "wxcc_business_address": BUSINESS_ADDRESS,
+    "wxcc_channel": CHANNEL,
+}
+"""The settings form's routing inputs and the WxCC attributes they fill (ADR 0032). The input
+names stay as they were until CC-4 renders the form from the platform's descriptor."""
+ROUTING_VALUE_FIELD = "wxcc_routing_value"
+"""The settings form's input for the routing value."""
+
+
+def _form_routing(form: FormData) -> ContactCenterRouting | None:
+    """Return the routing the settings form describes, or ``None`` when its inputs are empty.
+
+    Raises:
+        DomainError: ``invalid_configuration`` naming the refused ``contact_center.<field>``.
+    """
+    return routing(
+        ContactCenterKind.WEBEX_CC,
+        form.optional_text(ROUTING_VALUE_FIELD),
+        {name: form.optional_text(field) for field, name in ROUTING_ATTRIBUTE_FIELDS.items()},
+    )
+
+
+def _routing_inputs(center: ContactCenterRouting | None) -> dict[str, str | None]:
+    """Return the settings form's routing inputs for the stored routing."""
+    inputs = {
+        field: center.attribute(name) if center else None
+        for field, name in ROUTING_ATTRIBUTE_FIELDS.items()
+    }
+    inputs[ROUTING_VALUE_FIELD] = center.routing_value if center else None
+    return inputs
 
 
 def planning_service(request: Request) -> PlanningService:
@@ -659,12 +694,15 @@ def _settings_fields(
             options=phone_options,
         ),
     ]
+    routing_inputs = _routing_inputs(current.contact_center)
     integrations = [
         text("video_host_email", current.video_host_email, "admin.field.video_host_email_hint"),
-        text("wxcc_business_address", current.wxcc_business_address),
-        text("wxcc_channel", current.wxcc_channel),
+        text("wxcc_business_address", routing_inputs["wxcc_business_address"]),
+        text("wxcc_channel", routing_inputs["wxcc_channel"]),
         text(
-            "wxcc_routing_value", current.wxcc_routing_value, "admin.field.wxcc_routing_value_hint"
+            ROUTING_VALUE_FIELD,
+            routing_inputs[ROUTING_VALUE_FIELD],
+            "admin.field.wxcc_routing_value_hint",
         ),
         Field(
             "trial_call_enabled",
@@ -816,6 +854,10 @@ async def save_settings(
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
     fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
     chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback)
+    try:
+        center = _form_routing(form)
+    except DomainError as error:
+        form.refusal(error)
     if not form.errors and None not in chosen:
         new = GroupSettings(
             name=form.text("name"),
@@ -827,9 +869,7 @@ async def save_settings(
             dispatch_fallback=DispatchFallback(str(fallback)),
             fallback_space_room_id=form.optional_text("fallback_space_room_id"),
             video_host_email=form.optional_text("video_host_email"),
-            wxcc_business_address=form.optional_text("wxcc_business_address"),
-            wxcc_channel=form.optional_text("wxcc_channel"),
-            wxcc_routing_value=form.optional_text("wxcc_routing_value"),
+            contact_center=center,
             direct_call_max_concurrent=cap,
             embedding_enabled=embedding == "yes",
             trial_call_enabled=trial == "yes",

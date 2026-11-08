@@ -354,7 +354,7 @@ def create_app(
                 uow,
                 app.state.integration_service,
                 wired.video,
-                wired.dispatcher,
+                wired.dispatchers,
                 agent_start_label,
                 app.state.fallback_service,
             )

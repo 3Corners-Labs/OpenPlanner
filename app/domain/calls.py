@@ -1,8 +1,9 @@
-"""Calls: what leaves OpenPlanner for video and WxCC, and what comes back (ADR 0017, 0018, 0010).
+"""Calls: what leaves OpenPlanner for video and the contact center, and what comes back.
 
-What leaves OpenPlanner is built here, so the privacy rules live in one place: a meeting
-request carries the group's name and times only; a work item carries the booking reference,
-the first name and the meeting link (CLAUDE.md). Everything the platforms report back becomes
+What leaves OpenPlanner is built here, so the privacy rules live in one place (ADR 0017, 0018,
+0010, 0032): a meeting request carries the group's name and times only; a contact-center task
+carries the booking reference, first name, start label, group name, meeting link, kind and the
+routing variables of ADR 0081 (CLAUDE.md). Everything the platforms report back becomes
 a ``BookingEvent`` and updates one aggregated ``CallStatus`` per booking.
 
     booked ─► meeting_created ─► task_created ─► task_connected ─► host_joined
@@ -21,6 +22,7 @@ from enum import StrEnum
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.domain.booking import Booking
+from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import Group, JoinClient
 
@@ -63,7 +65,7 @@ class EventKind(StrEnum):
     TASK_ENDED = "task_ended"
     TASK_END_REQUESTED = "task_end_requested"
     END_NOT_POSSIBLE = "end_not_possible"
-    """WxCC refused to end the task (detail: the code, e.g. ``rejected_403``)."""
+    """The contact center refused to end the task (detail: the code, e.g. ``rejected_403``)."""
     TASK_MARKED_CANCELLED = "task_marked_cancelled"
     FALLBACK_QUEUED = "fallback_queued"
     """The booking went to the own queue instead of the contact center (ADR 0082 point 11;
@@ -151,7 +153,7 @@ class CallState(StrEnum):
 
 
 class TaskState(StrEnum):
-    """State of the WxCC work item."""
+    """State of the contact-center task."""
 
     NONE = "none"
     QUEUED = "queued"
@@ -159,7 +161,7 @@ class TaskState(StrEnum):
     ENDED = "ended"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    """Marked cancelled by a v2 task message; ended once WxCC reports it (ADR 0021)."""
+    """Marked cancelled by a task message; ended once the platform reports it (ADR 0021)."""
 
 
 @dataclass(frozen=True)
@@ -337,11 +339,19 @@ class MeetingRequest:
 
 
 @dataclass(frozen=True)
-class WorkItem:
-    """What WxCC receives for a booking: reference, first name and meeting link only.
+class ContactCenterTask:
+    """What a contact-center platform receives for a booking (ADR 0032 point 5, ADR 0081 §6).
 
-    ``variables`` are the routing variables of ADR 0081: the mapped codes of the participant's
-    subject and attributes, ``{name: value}``, never a label, a form answer or another field.
+    Only the fields CLAUDE.md allows: booking reference, first name, start label, group name,
+    meeting link and kind, plus the group's routing. The adapter of ``routing.kind`` maps it
+    to its own API.
+
+    Attributes:
+        routing: The group's routing at the platform; complete (every required attribute).
+        routing_value: What the platform's flow routes on (the routing value or the slug).
+        variables: The routing variables of ADR 0081: the mapped codes of the participant's
+            subject and attributes, ``{name: value}``, never a label, a form answer or another
+            field.
     """
 
     reference: str
@@ -350,8 +360,7 @@ class WorkItem:
     group_name: str
     meeting_link: str = field(repr=False)
     kind: str
-    business_address: str
-    channel: str
+    routing: ContactCenterRouting
     routing_value: str
     variables: tuple[tuple[str, str], ...] = ()
 
@@ -373,30 +382,30 @@ def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
     )
 
 
-def work_item(booking: Booking, group: Group, *, start_label: str) -> WorkItem:
-    """Return the work item to dispatch for ``booking``.
+def contact_center_task(booking: Booking, group: Group, *, start_label: str) -> ContactCenterTask:
+    """Return the contact-center task to dispatch for ``booking``.
 
     ``start_label`` is the start time as the agent reads it (formatted at the edge).
 
     Raises:
-        DomainError: ``integration_not_ready`` naming what is missing (``wxcc``,
+        DomainError: ``integration_not_ready`` naming what is missing (``contact_center``,
             ``meeting`` or ``contact``).
     """
-    if group.wxcc_business_address is None or group.wxcc_channel is None:
-        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "wxcc")
+    routing = group.contact_center
+    if routing is None or not routing.complete:
+        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "contact_center")
     if booking.meeting is None or booking.meeting.link is None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "meeting")
     if booking.contact is None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "contact")
-    return WorkItem(
+    return ContactCenterTask(
         reference=booking.reference,
         first_name=booking.contact.first_name,
         start_label=start_label,
         group_name=group.name,
         meeting_link=booking.meeting.link,
         kind=booking.kind.value,
-        business_address=group.wxcc_business_address,
-        channel=group.wxcc_channel,
+        routing=routing,
         routing_value=group.routing_value,
         variables=tuple(sorted(group.routing.variables(booking.routing).items())),
     )

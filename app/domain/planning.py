@@ -21,6 +21,7 @@ from datetime import date, time, timedelta
 from app.domain.admin import AdminService, Authorization, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.availability import SlotTime, slots_on
+from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import effective_schedule
 from app.domain.lookups import group_by_slug
@@ -82,9 +83,7 @@ class GroupSettings:
     dispatch_fallback: DispatchFallback
     fallback_space_room_id: str | None
     video_host_email: str | None
-    wxcc_business_address: str | None
-    wxcc_channel: str | None
-    wxcc_routing_value: str | None
+    contact_center: ContactCenterRouting | None
     not_picked_up_minutes: int
     direct_call_max_concurrent: int | None
     embedding_enabled: bool

@@ -43,9 +43,15 @@ from app.adapters.registrations import Expected, Listing, list_registrations
 from app.adapters.webex_auth import AuthorizedClient, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
 from app.adapters.webhook_selftest import self_test
-from app.adapters.wxcc import PROBE_KIND
+from app.adapters.wxcc import PROBE_KIND, channel_and_address
 from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
-from app.domain.calls import BROWSER_LINK_PARAMS, EventKind, MeetingRequest, WorkItem, join_link
+from app.domain.calls import (
+    BROWSER_LINK_PARAMS,
+    ContactCenterTask,
+    EventKind,
+    MeetingRequest,
+    join_link,
+)
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.domain.ports import (
     Clock,
@@ -272,15 +278,15 @@ class PlatformChecker:
         base = self._config.wxcc_base_url
         if not base:
             return [Finding(CheckArea.WXCC, "wxcc.not_configured", CheckStatus.SKIPPED)]
-        if not group.wxcc_channel or not group.wxcc_business_address:
+        mapping = channel_and_address(group.contact_center)
+        if mapping is None:
             return [Finding(CheckArea.WXCC, "wxcc.no_mapping", CheckStatus.WARN)]
-        routing = GroupRouting(
-            group.slug, group.wxcc_channel, group.wxcc_business_address, group.routing_value
-        )
+        channel, address = mapping
+        routing = GroupRouting(group.slug, channel, address, group.routing_value)
         sharing = sorted(
             p.slug
             for p in [group, *(p for p in peers if p.id != group.id)]
-            if p.wxcc_channel and p.wxcc_business_address == group.wxcc_business_address
+            if (peer := channel_and_address(p.contact_center)) and peer[1] == address
         )
         try:
             token = await self._tokens.access_token()
@@ -312,18 +318,17 @@ class PlatformChecker:
         """
         if self._dispatcher is None or self._probes is None:
             return []
-        if not group.wxcc_channel or not group.wxcc_business_address:  # pragma: no cover
+        if group.contact_center is None or not group.contact_center.complete:  # pragma: no cover
             return []
         now = self._clock.now()
-        item = WorkItem(
+        item = ContactCenterTask(
             reference=f"probe-{uuid.uuid4().hex[:12]}",
             first_name=PROBE_FIRST_NAME,
             start_label=now.astimezone(group.tz).strftime("%Y-%m-%d %H:%M"),
             group_name=group.name,
             meeting_link=link or PROBE_LINK,
             kind=PROBE_KIND,
-            business_address=group.wxcc_business_address,
-            channel=group.wxcc_channel,
+            routing=group.contact_center,
             routing_value=group.routing_value,
         )
         area = CheckArea.WXCC

@@ -11,7 +11,7 @@ import json
 import secrets
 from collections.abc import AsyncIterator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date, datetime
 from typing import Any
 
@@ -35,6 +35,15 @@ from app.adapters.db.admin_sessions import AdminSessionQueries
 from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.certificate import CertificateQueries
+from app.adapters.db.contact_center_rows import (
+    has_task,
+    legacy_group_columns,
+    routing_of,
+    save_routing,
+    task_columns,
+    task_of,
+    without_task,
+)
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, answers_json
@@ -54,6 +63,7 @@ from app.adapters.db.models import (
     ClosureNoticeRow,
     ClosureRow,
     DiagnosticModeRow,
+    GroupContactCenterRow,
     GroupContactsRow,
     GroupHolidayCalendarRow,
     GroupHolidayOpenDayRow,
@@ -149,6 +159,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
+from app.domain.contact_center import ContactCenterKind
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -156,7 +167,14 @@ from app.domain.embedding import AllowedOrigins
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.images import PageImage
-from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
+from app.domain.job_plan import (
+    JobCounts,
+    JobStatus,
+    JobSummary,
+    JobType,
+    PlannedJob,
+    stored_values,
+)
 from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
 from app.domain.privacy import PURGED_FIELDS
@@ -224,8 +242,8 @@ def _organisation(row: OrganisationRow) -> Organisation:
     )
 
 
-def _group(row: GroupRow) -> Group:
-    """Map a group row to the domain."""
+def _group(row: GroupRow, center: GroupContactCenterRow | None) -> Group:
+    """Map a group row and its contact-center routing row to the domain."""
     return Group(
         id=row.id,
         organisation_id=row.organisation_id,
@@ -237,9 +255,7 @@ def _group(row: GroupRow) -> Group:
         horizon_days=row.horizon_days,
         phone_mode=PhoneMode(row.phone_mode),
         video_host_email=row.video_host_email,
-        wxcc_business_address=row.wxcc_business_address,
-        wxcc_channel=row.wxcc_channel,
-        wxcc_routing_value=row.wxcc_routing_value,
+        contact_center=routing_of(row, center),
         not_picked_up_minutes=row.not_picked_up_minutes,
         direct_call_max_concurrent=row.direct_call_max_concurrent,
         dispatch_lead_minutes=row.dispatch_lead_minutes,
@@ -349,9 +365,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "horizon_days": group.horizon_days,
         "phone_mode": group.phone_mode.value,
         "video_host_email": group.video_host_email,
-        "wxcc_business_address": group.wxcc_business_address,
-        "wxcc_channel": group.wxcc_channel,
-        "wxcc_routing_value": group.wxcc_routing_value,
+        **legacy_group_columns(group.contact_center),
         "not_picked_up_minutes": group.not_picked_up_minutes,
         "direct_call_max_concurrent": group.direct_call_max_concurrent,
         "dispatch_lead_minutes": group.dispatch_lead_minutes,
@@ -376,6 +390,7 @@ def _group_columns(group: Group) -> dict[str, Any]:
 
 def _booking(row: BookingRow, slot: SlotRow) -> Booking:
     """Map a booking row and its slot; a purged booking has no contact."""
+    task_id, task_kind = task_of(row)
     contact = (
         Contact(
             first_name=row.first_name,
@@ -408,7 +423,8 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         if row.trial_room_id and row.trial_expires_at
         else None,
         trial_count=row.trial_count,
-        wxcc_task_id=row.wxcc_task_id,
+        contact_center_task_id=task_id,
+        contact_center_kind=task_kind,
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
@@ -540,26 +556,30 @@ class SqlTransaction(
             GroupRow.archived_at.is_not(None) if archived else GroupRow.archived_at.is_(None)
         )
         rows = await self._session.execute(
-            select(GroupRow, OrganisationRow)
+            select(GroupRow, OrganisationRow, GroupContactCenterRow)
             .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
+            .outerjoin(GroupContactCenterRow, GroupContactCenterRow.group_id == GroupRow.id)
             .where(scope_filter(scope, OrganisationRow.slug, GroupRow.slug), archive_filter)
             .order_by(OrganisationRow.name, GroupRow.name)
         )
-        return [GroupSummary(_group(group), org.slug, org.name) for group, org in rows]
+        return [
+            GroupSummary(_group(group, center), org.slug, org.name) for group, org, center in rows
+        ]
 
     async def get_group_summary(self, slug: str) -> GroupSummary | None:
         """Return one group with its organisation, for an authorisation decision."""
         found = (
             await self._session.execute(
-                select(GroupRow, OrganisationRow)
+                select(GroupRow, OrganisationRow, GroupContactCenterRow)
                 .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
+                .outerjoin(GroupContactCenterRow, GroupContactCenterRow.group_id == GroupRow.id)
                 .where(GroupRow.slug == slug)
             )
         ).one_or_none()
         if found is None:
             return None
-        group, organisation = found
-        return GroupSummary(_group(group), organisation.slug, organisation.name)
+        group, organisation, center = found
+        return GroupSummary(_group(group, center), organisation.slug, organisation.name)
 
     async def add_audit_event(self, event: AuditEvent) -> None:
         """Store an audit event."""
@@ -738,12 +758,16 @@ class SqlTransaction(
     async def get_group(self, slug: str) -> Group | None:
         """Return the group with ``slug``."""
         row = await self._session.scalar(select(GroupRow).where(GroupRow.slug == slug))
-        return _group(row) if row else None
+        return await self._mapped_group(row) if row else None
 
     async def get_group_by_id(self, group_id: int) -> Group | None:
         """Return the group with ``group_id``."""
         row = await self._session.get(GroupRow, group_id)
-        return _group(row) if row else None
+        return await self._mapped_group(row) if row else None
+
+    async def _mapped_group(self, row: GroupRow) -> Group:
+        """Map a group row together with its contact-center routing row, if it has one."""
+        return _group(row, await self._session.get(GroupContactCenterRow, row.id))
 
     async def get_schedule(
         self, group_id: int, first_day: date, last_day: date
@@ -1034,7 +1058,7 @@ class SqlTransaction(
             .where(
                 BookingRow.group_id == group_id,
                 BookingRow.status == BookingStatus.CONFIRMED.value,
-                BookingRow.wxcc_task_id.is_(None),
+                without_task(),
                 CallStatusRow.fallback.is_(True),
                 SlotRow.start > after,
             )
@@ -1063,13 +1087,15 @@ class SqlTransaction(
         )
         self._session.add(row)
         await self._session.flush()
-        return _group(row)
+        await save_routing(self._session, row.id, group.contact_center)
+        return replace(_group(row, None), contact_center=group.contact_center)
 
     async def save_group(self, group: Group) -> None:
         """Store the settings of an existing group; slug and organisation never change."""
         await self._session.execute(
             update(GroupRow).where(GroupRow.id == group.id).values(**_group_columns(group))
         )
+        await save_routing(self._session, group.id, group.contact_center)
 
     async def erasable_groups(self, archived_before: datetime) -> list[Group]:
         """Return the archived groups nothing refers to any more (ADR 0084 step 3).
@@ -1097,7 +1123,7 @@ class SqlTransaction(
             )
             .order_by(GroupRow.archived_at, GroupRow.id)
         )
-        return [_group(row) for row in rows]
+        return [await self._mapped_group(row) for row in rows]
 
     async def delete_group(self, group_id: int) -> None:
         """Erase the group's slots and row; the schema's cascades take the rest.
@@ -1359,10 +1385,12 @@ class SqlTransaction(
             .values(trial_room_id=None, trial_join_url=None, trial_expires_at=None)
         )
 
-    async def save_task_id(self, booking_id: int, task_id: str) -> None:
-        """Store the booking's WxCC task id."""
+    async def save_task_id(self, booking_id: int, task_id: str, kind: ContactCenterKind) -> None:
+        """Store the booking's contact-center task id and platform (old column too, ADR 0116)."""
         await self._session.execute(
-            update(BookingRow).where(BookingRow.id == booking_id).values(wxcc_task_id=task_id)
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(**task_columns(task_id, kind))
         )
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
@@ -1395,8 +1423,8 @@ class SqlTransaction(
         )
 
     async def get_booking_by_task(self, task_id: str) -> Booking | None:
-        """Return the booking whose WxCC task has ``task_id``."""
-        return await self._booking_where(BookingRow.wxcc_task_id == task_id)
+        """Return the booking whose contact-center task has ``task_id`` (either column)."""
+        return await self._booking_where(has_task(task_id))
 
     async def _booking_where(self, condition: ColumnElement[bool]) -> Booking | None:
         """Return the one booking matching ``condition``, with its slot."""
@@ -1920,7 +1948,7 @@ class SqlTransaction(
             delete(JobRow).where(
                 JobRow.booking_id == booking_id,
                 JobRow.status == _PENDING,
-                JobRow.type.in_(sorted(t.value for t in types)),
+                JobRow.type.in_(sorted(v for t in types for v in stored_values(t))),
             )
         )
 
@@ -1930,7 +1958,7 @@ class SqlTransaction(
             update(JobRow)
             .where(
                 JobRow.booking_id == booking_id,
-                JobRow.type == job_type.value,
+                JobRow.type.in_(stored_values(job_type)),
                 JobRow.status == _PENDING,
             )
             .values(status=_RUNNING, claimed_at=now, attempts=JobRow.attempts + 1)
@@ -1943,7 +1971,7 @@ class SqlTransaction(
             update(JobRow)
             .where(
                 JobRow.booking_id == booking_id,
-                JobRow.type == job_type.value,
+                JobRow.type.in_(stored_values(job_type)),
                 JobRow.status == _RUNNING,
             )
             .values(status=_DONE if done else _PENDING, last_error=None)

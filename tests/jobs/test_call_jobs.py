@@ -26,12 +26,12 @@ async def test_meeting_then_work_item(setup: Setup) -> None:
     bid = await setup.booking()
 
     await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
-    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])).run_due()
+    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])).run_due()
 
     booking = setup.uow.state.bookings[bid]
     assert booking.meeting is not None
     assert booking.meeting.id == "meeting-1"
-    assert booking.wxcc_task_id == "task-1"
+    assert booking.contact_center_task_id == "task-1"
     assert setup.video.created[0].host_email == "host@example.nl"
     item = setup.dispatcher.items[0]
     assert (item.first_name, item.meeting_link) == ("Ada", "https://site.webex.com/m/1")
@@ -44,7 +44,7 @@ async def test_jobs_are_idempotent(setup: Setup) -> None:
     bid = await setup.booking()
     for _ in range(2):
         await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
-        await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])).run_due()
+        await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])).run_due()
 
     assert len(setup.video.created) == 1
     assert len(setup.dispatcher.items) == 1
@@ -66,7 +66,7 @@ async def test_groups_without_integrations_are_skipped() -> None:
     queue = FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])
 
     await setup.runner(queue).run_due()
-    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])).run_due()
+    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])).run_due()
 
     assert queue.done == [1]
     assert setup.video.created == []
@@ -75,7 +75,7 @@ async def test_groups_without_integrations_are_skipped() -> None:
 
 async def test_dispatch_waits_for_the_meeting(setup: Setup) -> None:
     bid = await setup.booking()
-    queue = FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])
+    queue = FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])
 
     await setup.runner(queue).run_due()
 
@@ -87,7 +87,7 @@ async def test_refusals_fail_at_once_and_show_on_the_timeline(setup: Setup) -> N
     bid = await setup.booking()
     await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
     setup.dispatcher.error = IntegrationError("rejected_400", retryable=False)
-    queue = FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])
+    queue = FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])
 
     await setup.runner(queue).run_due()
 
@@ -152,7 +152,9 @@ async def test_stale_dispatch_does_nothing(setup: Setup) -> None:
     await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
     moved = SLOT_0900 + timedelta(hours=1)
 
-    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK, pinned=moved)])).run_due()
+    await setup.runner(
+        FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK, pinned=moved)])
+    ).run_due()
 
     assert setup.dispatcher.items == []
 
@@ -172,13 +174,13 @@ async def test_only_configured_integrations_are_claimed(setup: Setup) -> None:
     await runner.run_due()
 
     assert JobType.CREATE_VIDEO_ROOM in queue.requested_types
-    assert JobType.DISPATCH_WXCC_TASK not in queue.requested_types
+    assert JobType.DISPATCH_CONTACT_CENTER_TASK not in queue.requested_types
 
 
 async def _dispatched(setup: Setup) -> int:
     bid = await setup.booking()
     await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
-    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])).run_due()
+    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])).run_due()
     return bid
 
 
@@ -254,7 +256,7 @@ async def test_nothing_to_end_without_a_task_or_after_it_ended(setup: Setup) -> 
     end = job(bid, JobType.END_WXCC_TASK, pinned=None)
     await setup.runner(FakeQueue([end])).run_due()  # no task yet
     await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
-    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])).run_due()
+    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])).run_due()
     await setup.integration.record(bid, EventKind.TASK_ENDED)
 
     await setup.runner(FakeQueue([end])).run_due()  # the agent already ended it
@@ -285,10 +287,10 @@ async def test_a_job_with_nothing_to_do_is_skipped_with_its_reason(setup: Setup)
     ("group", "job_type", "reason"),
     [
         ({}, JobType.CREATE_VIDEO_ROOM, "no_video"),
-        ({"video_host_email": "h@example.nl"}, JobType.DISPATCH_WXCC_TASK, "no_dispatch"),
+        ({"video_host_email": "h@example.nl"}, JobType.DISPATCH_CONTACT_CENTER_TASK, "no_dispatch"),
         (
             {**WIRED, "dispatch_kind": DispatchKind.OPENPLANNER_QUEUE},
-            JobType.DISPATCH_WXCC_TASK,
+            JobType.DISPATCH_CONTACT_CENTER_TASK,
             "own_queue",
         ),
     ],

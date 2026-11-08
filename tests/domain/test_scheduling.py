@@ -12,7 +12,7 @@ from app.domain.scheduling import (
     validate_schedule,
     windows_on,
 )
-from tests.support.domain import make_group, window
+from tests.support.domain import make_group, webex_routing, window
 
 MONDAY = date(2026, 1, 5)
 
@@ -47,10 +47,6 @@ def test_group_defaults() -> None:
         ("name", "Team\nBcc: x@example.org"),
         ("video_host_email", "no-at-sign"),
         ("video_host_email", "host@example.nl\nBcc: x@example.org"),
-        ("wxcc_business_address", ""),
-        ("wxcc_business_address", "a" * 256),
-        ("wxcc_channel", "chan\tnel"),
-        ("wxcc_routing_value", "r" * 513),
         ("not_picked_up_minutes", 0),
         ("not_picked_up_minutes", 121),
         ("direct_call_max_concurrent", 0),
@@ -330,16 +326,17 @@ def test_integrations_are_enabled_per_group() -> None:
     plain = make_group()
     wired = make_group(
         video_host_email="host-demo@example.nl",
-        wxcc_business_address="openplanner@example.biz",
-        wxcc_channel="openplanner-video",
+        contact_center=webex_routing("openplanner@example.biz", "openplanner-video"),
     )
 
     assert (plain.video_enabled, plain.dispatch_enabled) == (False, False)
     assert (wired.video_enabled, wired.dispatch_enabled) == (True, True)
     assert plain.routing_value == "aangifte-2026"  # the slug unless set
-    assert make_group(wxcc_routing_value="team-7").routing_value == "team-7"
+    routed = make_group(contact_center=webex_routing(routing_value="team-7"))
+    assert routed.routing_value == "team-7"
     # Dispatch needs both the business address and the channel.
-    assert not make_group(wxcc_business_address="a@example.biz").dispatch_enabled
+    partial = webex_routing("a@example.biz", None)
+    assert not make_group(contact_center=partial).dispatch_enabled
 
 
 def test_a_block_may_have_zero_agents() -> None:

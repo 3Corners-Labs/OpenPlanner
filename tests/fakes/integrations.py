@@ -11,15 +11,16 @@ from app.domain.alert_model import AlertChannelKind, AlertTarget, RenderedAlert
 from app.domain.booking import MeetingRef
 from app.domain.calls import (
     CallState,
+    ContactCenterTask,
     EventKind,
     MeetingRequest,
     MeetingStatus,
     TaskSnapshot,
     TaskState,
-    WorkItem,
 )
 from app.domain.checks import Finding
-from app.domain.ports import IntegrationError, RequestRecord
+from app.domain.contact_center import ContactCenterKind
+from app.domain.ports import ContactCenterDispatcher, IntegrationError, RequestRecord
 from app.domain.scheduling import Group
 
 
@@ -52,9 +53,14 @@ class FakeVideo:
         return self.statuses.get(meeting_id, MeetingStatus(CallState.SCHEDULED))
 
 
+def webex_cc(dispatcher: "FakeDispatcher") -> dict[ContactCenterKind, ContactCenterDispatcher]:
+    """Return ``dispatcher`` as the application's dispatcher of Webex Contact Center."""
+    return {ContactCenterKind.WEBEX_CC: dispatcher}
+
+
 class FakeDispatcher:
     def __init__(self) -> None:
-        self.items: list[WorkItem] = []
+        self.items: list[ContactCenterTask] = []
         self.error: IntegrationError | None = None
         self.ended: list[str] = []
         self.end_error: IntegrationError | None = None
@@ -64,10 +70,10 @@ class FakeDispatcher:
         self.snapshots: dict[str, TaskSnapshot] = {}
         self.read_error: IntegrationError | None = None
 
-    async def create_task(self, item: WorkItem) -> str:
+    async def create_task(self, task: ContactCenterTask) -> str:
         if self.error:
             raise self.error
-        self.items.append(item)
+        self.items.append(task)
         return f"task-{len(self.items)}"
 
     async def end_task(self, task_id: str) -> None:

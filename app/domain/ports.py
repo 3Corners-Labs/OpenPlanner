@@ -2,7 +2,8 @@
 
 Adapters in ``app.adapters`` implement them; tests use the fakes in ``tests/fakes``.
 External systems still to come with their work package: ``VideoProvider`` (WP5, including
-live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007),
+live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007; one per
+``ContactCenterKind``, ADR 0032),
 ``IdentityProvider`` (WP7).
 """
 
@@ -33,11 +34,11 @@ from app.domain.calls import (
     BookingEvent,
     BookingOverview,
     CallStatus,
+    ContactCenterTask,
     EventKind,
     MeetingRequest,
     MeetingStatus,
     TaskSnapshot,
-    WorkItem,
 )
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
@@ -51,6 +52,7 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
+from app.domain.contact_center import ContactCenterKind
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -297,7 +299,7 @@ REASON_LIMIT = 300
 
 
 class IntegrationError(Exception):
-    """A call to Webex or WxCC failed; ``code`` says why, ``retryable`` whether to try again.
+    """A call to a platform failed; ``code`` says why, ``retryable`` whether to try again.
 
     The code is a short machine key (``unauthorized``, ``rate_limited``, ``server_error``,
     ``rejected``); it never contains response bodies, which could hold personal data.
@@ -385,30 +387,34 @@ class IntegrationChecker(Protocol):
 
 
 class ContactCenterDispatcher(Protocol):
-    """Creates and ends work items in Webex Contact Center (ADR 0018, 0021)."""
+    """Creates and ends tasks at one contact-center platform (ADR 0018, 0021, 0032).
 
-    async def create_task(self, item: WorkItem) -> str:
-        """Create the work item and return the task id.
+    The application holds one per ``ContactCenterKind`` (``ContactCenterDispatchers``) and
+    picks it by the group's routing, as it picks a ``MessageSender`` per ``ChannelKind``.
+    """
+
+    async def create_task(self, task: ContactCenterTask) -> str:
+        """Create the task and return its id at the platform.
 
         Raises:
-            IntegrationError: If WxCC refuses or cannot be reached.
+            IntegrationError: If the platform refuses or cannot be reached.
         """
         ...
 
     async def end_task(self, task_id: str) -> None:
-        """End the task (End Task API; needs ``cjp:user``).
+        """End the task.
 
         Raises:
-            IntegrationError: If WxCC refuses (``rejected_403`` without the scope) or cannot be
-                reached.
+            IntegrationError: If the platform refuses (``rejected_403`` without the scope) or
+                cannot be reached.
         """
         ...
 
     async def mark_cancelled(self, task_id: str, reference: str) -> None:
-        """Tell the agent the booking was cancelled (Task Messages API, ``cjp:task_write``).
+        """Tell the agent the booking was cancelled, with the booking reference only.
 
         Raises:
-            IntegrationError: If WxCC refuses or cannot be reached.
+            IntegrationError: If the platform refuses or cannot be reached.
         """
         ...
 
@@ -419,9 +425,13 @@ class ContactCenterDispatcher(Protocol):
         never the task's attributes. A task the platform does not know is ``TaskState.NONE``.
 
         Raises:
-            IntegrationError: If WxCC refuses or cannot be reached.
+            IntegrationError: If the platform refuses or cannot be reached.
         """
         ...
+
+
+ContactCenterDispatchers = Mapping[ContactCenterKind, ContactCenterDispatcher]
+"""The configured dispatcher per platform (ADR 0032 point 5); empty without a contact center."""
 
 
 class ProbeRegistry(Protocol):
@@ -1202,8 +1212,8 @@ class Transaction(Protocol):
         """Forget the trial call's meeting and link; the count stays."""
         ...
 
-    async def save_task_id(self, booking_id: int, task_id: str) -> None:
-        """Store the booking's WxCC task id."""
+    async def save_task_id(self, booking_id: int, task_id: str, kind: ContactCenterKind) -> None:
+        """Store the booking's contact-center task id and the platform that holds it."""
         ...
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
@@ -1215,7 +1225,7 @@ class Transaction(Protocol):
         ...
 
     async def get_booking_by_task(self, task_id: str) -> Booking | None:
-        """Return the booking whose WxCC task has ``task_id``."""
+        """Return the booking whose contact-center task has ``task_id``."""
         ...
 
     async def claim_booking(self, booking_id: int, claim: Claim) -> bool:

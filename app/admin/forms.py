@@ -169,6 +169,11 @@ FIELD_MESSAGES: dict[str, str] = {
     "wxcc_business_address": "admin.form.error.integration_text",
     "wxcc_channel": "admin.form.error.integration_text",
     "wxcc_routing_value": "admin.form.error.integration_text",
+    # ADR 0032: the routing's own refusals, linked to the settings form's inputs (FIELD_TARGET).
+    "contact_center.business_address": "admin.form.error.integration_text",
+    "contact_center.channel": "admin.form.error.integration_text",
+    "contact_center.routing_value": "admin.form.error.integration_text",
+    "contact_center.attributes": "admin.form.error.integration_text",
     "offer": "admin.form.error.choice",
     "embedding_enabled": "admin.form.error.choice",
     "trial_call_enabled": "admin.form.error.choice",
@@ -258,6 +263,10 @@ FIELD_TARGET: dict[str, str] = {
     "window": "closes",
     "schedule_rules": "opens",
     "schedule_overrides": "day",
+    "contact_center.business_address": "wxcc_business_address",
+    "contact_center.channel": "wxcc_channel",
+    "contact_center.routing_value": "wxcc_routing_value",
+    "contact_center.attributes": "wxcc_business_address",
 }
 """Schedule-level refusals are linked to the input the admin most likely needs to change."""
 

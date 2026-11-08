@@ -168,6 +168,7 @@ from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
+from app.adapters.wxcc import business_address, channel_and_address
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.adapters.wxcc_sample_flow import Route, sample_flow
 from app.config import Settings, environment
@@ -417,9 +418,9 @@ async def _wxcc_config_check(
         )
     async with _service_app(settings, transport) as (http, tokens):
         groups = [
-            GroupRouting(g.slug, g.wxcc_channel, g.wxcc_business_address, g.routing_value)
+            GroupRouting(g.slug, *mapping, g.routing_value)
             for g in await _groups(settings)
-            if g.wxcc_channel and g.wxcc_business_address
+            if (mapping := channel_and_address(g.contact_center))
         ]
         if not groups:
             return "No group has a WxCC channel and business address; nothing to check.\n", False
@@ -478,8 +479,10 @@ async def _wxcc_sample_flow(
     group = next((g for g in groups if g.slug == slug), None)
     if group is None:
         return f"no group '{slug}'\n", False
-    if not group.wxcc_channel or not group.wxcc_business_address:
+    mapping = channel_and_address(group.contact_center)
+    if mapping is None:
         return f"group '{slug}' has no WxCC channel and business address\n", False
+    channel, address = mapping
     chosen: dict[str, str] = {}
     for item in queues:
         value, sep, queue = item.partition("=")
@@ -490,13 +493,13 @@ async def _wxcc_sample_flow(
         {
             g.routing_value
             for g in groups
-            if g.wxcc_business_address == group.wxcc_business_address
+            if business_address(g.contact_center) == address
             and g.routing_value != group.routing_value
         }
     )
     routes = [Route(value, chosen.get(value, value)) for value in values]
     fallback = fallback or routes[0].queue
-    ids, found = await _wxcc_names(settings, group.wxcc_channel, transport)
+    ids, found = await _wxcc_names(settings, channel, transport)
     if found is None:
         sys.stderr.write("channel not found in WxCC: link the flow to it in Flow Designer\n")
     flow = sample_flow(f"openplanner_{group.slug}", routes, fallback, ids, found)

@@ -144,6 +144,8 @@ EVENT_LABELS: dict[str, str] = {
     "job.send_change": "audit.job.send_change",
     "job.send_reminder": "audit.job.send_reminder",
     "job.send_cancellation": "audit.job.send_cancellation",
+    "job.dispatch_contact_center_task": "audit.job.dispatch_wxcc_task",
+    # Before ADR 0032 the dispatch job had this name; older events keep it.
     "job.dispatch_wxcc_task": "audit.job.dispatch_wxcc_task",
     "job.end_wxcc_task": "audit.job.end_wxcc_task",
     "job.purge_pii": "audit.job.purge_pii",
@@ -204,6 +206,7 @@ DETAIL_LABELS: dict[str, str] = {
     "configuration.import": "admin.audit.detail.configuration_import",
     # ADR 0068: a meeting or work item job planned again from the booking page.
     "retry.create_video_room": "admin.audit.detail.retry_create_video_room",
+    "retry.dispatch_contact_center_task": "admin.audit.detail.retry_dispatch_wxcc_task",
     "retry.dispatch_wxcc_task": "admin.audit.detail.retry_dispatch_wxcc_task",
     # ADR 0084: the group was archived (action group.delete).
     "archived": "admin.audit.detail.archived",
@@ -230,6 +233,8 @@ DETAIL_LABELS: dict[str, str] = {
     "max_bookings_per_email": "admin.field.max_bookings_per_email",
     "calendar_invite_address": "admin.field.calendar_invite_address",
     "video_host_email": "admin.field.video_host_email",
+    # ADR 0032: the routing is one setting; changes audited before it name the three fields.
+    "contact_center": "admin.field.contact_center",
     "wxcc_business_address": "admin.field.wxcc_business_address",
     "wxcc_channel": "admin.field.wxcc_channel",
     "wxcc_routing_value": "admin.field.wxcc_routing_value",

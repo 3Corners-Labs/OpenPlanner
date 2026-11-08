@@ -16,12 +16,11 @@ from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import AUDITOR, GROUP_ADMIN, OUTSIDER, two_organisations
-from tests.support.domain import NOW, TEST_TOKEN_KEY, book, window
+from tests.support.domain import NOW, TEST_TOKEN_KEY, book, webex_routing, window
 
 WIRED = {
     "video_host_email": "host@example.nl",
-    "wxcc_business_address": "openplanner@example.biz",
-    "wxcc_channel": "openplanner-video",
+    "contact_center": webex_routing("openplanner@example.biz", "openplanner-video"),
 }
 
 
@@ -60,7 +59,7 @@ async def test_a_work_item_is_planned_at_the_dispatch_moment() -> None:
     booking = uow.state.bookings[booking_id]
     uow.state.bookings[booking_id] = replace(booking, meeting=MeetingRef("m", "https://x"))
 
-    await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.DISPATCH_WXCC_TASK)
+    await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.DISPATCH_CONTACT_CENTER_TASK)
 
     [planned] = uow.state.jobs[booking_id]
     assert planned.run_at == booking.start - timedelta(minutes=5)
@@ -100,5 +99,5 @@ async def test_a_purged_booking_is_never_given_a_new_meeting() -> None:
     with pytest.raises(DomainError, match="nothing_to_retry"):
         await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.CREATE_VIDEO_ROOM)
     with pytest.raises(DomainError, match="nothing_to_retry"):
-        await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.DISPATCH_WXCC_TASK)
+        await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.DISPATCH_CONTACT_CENTER_TASK)
     assert uow.state.jobs[booking_id] == []

@@ -133,7 +133,7 @@ def test_the_heartbeat_row_is_written_once_a_minute(ago: timedelta | None, due: 
 
 def test_a_worker_without_the_wxcc_settings_fails_for_a_group_that_dispatches() -> None:
     no_dispatch = WorkerHeartbeat(NOW, "1.0.0", VIDEO)
-    both = WorkerHeartbeat(NOW, "1.0.0", (*VIDEO, JobType.DISPATCH_WXCC_TASK.value))
+    both = WorkerHeartbeat(NOW, "1.0.0", (*VIDEO, JobType.DISPATCH_CONTACT_CENTER_TASK.value))
 
     def codes(heartbeat: WorkerHeartbeat, dispatches: bool) -> list[tuple[str, CheckStatus]]:
         findings = worker_findings(
@@ -151,3 +151,6 @@ def test_a_worker_without_the_wxcc_settings_fails_for_a_group_that_dispatches() 
     assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) in codes(no_dispatch, True)
     assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) not in codes(no_dispatch, False)
     assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) not in codes(both, True)
+    # A worker of the previous minor still reports the job under its old name (ADR 0116).
+    previous = WorkerHeartbeat(NOW, "1.0.0", (*VIDEO, "dispatch_wxcc_task"))
+    assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) not in codes(previous, True)

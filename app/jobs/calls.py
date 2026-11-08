@@ -5,11 +5,11 @@ cancelled), whether it has nothing to do (the result exists, or the group does n
 skipped with a reason, ADR 0068) and logging. Failures are classified by the runner
 (``IntegrationError.retryable``).
 
-    create_video_room  ─► CallService.ensure_meeting
-    dispatch_wxcc_task ─► CallService.ensure_task   (waits for the meeting)
-    delete_video_room  ─► CallService.delete_meeting
-    delete_trial_call  ─► CallService.delete_trial_call   (ADR 0071)
-    end_wxcc_task      ─► CallService.end_task      (cancelled bookings, ADR 0021)
+    create_video_room            ─► CallService.ensure_meeting
+    dispatch_contact_center_task ─► CallService.ensure_task   (waits for the meeting)
+    delete_video_room            ─► CallService.delete_meeting
+    delete_trial_call            ─► CallService.delete_trial_call   (ADR 0071)
+    end_wxcc_task                ─► CallService.end_task      (cancelled bookings, ADR 0021)
 """
 
 import structlog
@@ -36,11 +36,11 @@ NO_VIDEO = "no_video"
 OWN_QUEUE = "own_queue"
 """Skip reason: the group's agents pick bookings up in OpenPlanner (ADR 0043): no work item."""
 NO_DISPATCH = "no_dispatch"
-"""Skip reason: the group has no WxCC channel or business address: no work item."""
+"""Skip reason: the group's contact-center routing is missing or incomplete: no task."""
 
 FAILURE_EVENTS = {
     JobType.CREATE_VIDEO_ROOM: EventKind.MEETING_FAILED,
-    JobType.DISPATCH_WXCC_TASK: EventKind.TASK_FAILED,
+    JobType.DISPATCH_CONTACT_CENTER_TASK: EventKind.TASK_FAILED,
 }
 """Timeline event of a job's final failure; other call jobs record ``integration_error``."""
 
@@ -49,7 +49,7 @@ CALL_JOBS = frozenset(
         JobType.CREATE_VIDEO_ROOM,
         JobType.DELETE_VIDEO_ROOM,
         JobType.DELETE_TRIAL_CALL,
-        JobType.DISPATCH_WXCC_TASK,
+        JobType.DISPATCH_CONTACT_CENTER_TASK,
         JobType.END_WXCC_TASK,
     }
 )
@@ -79,7 +79,7 @@ class CallJobs:
                 JobType.DELETE_TRIAL_CALL,
             }
         if self._calls.dispatch_available:
-            types.add(JobType.DISPATCH_WXCC_TASK)
+            types.add(JobType.DISPATCH_CONTACT_CENTER_TASK)
         if self._calls.end_available:
             types.add(JobType.END_WXCC_TASK)
         return types
@@ -107,7 +107,9 @@ class CallJobs:
         elif is_stale(job.pinned_start, booking):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
-        elif job.type is JobType.DISPATCH_WXCC_TASK and await self._calls.diverts(booking, group):
+        elif job.type is JobType.DISPATCH_CONTACT_CENTER_TASK and await self._calls.diverts(
+            booking, group
+        ):
             # ADR 0082 point 11: the contact center is down; the booking went to the own queue.
             log.info("job.skipped", job_id=job.id, reason=FALLBACK)
             return FALLBACK
@@ -124,7 +126,7 @@ class CallJobs:
         """Put a job's final failure on the booking's timeline, with the provider's reason."""
         kind = FAILURE_EVENTS.get(job.type, EventKind.INTEGRATION_ERROR)
         await self._calls.record_failure(job.booking_id, code, kind, message)
-        if job.type is JobType.DISPATCH_WXCC_TASK:
+        if job.type is JobType.DISPATCH_CONTACT_CENTER_TASK:
             await self._calls.dispatch_failed(job.booking_id)
 
 
@@ -138,7 +140,7 @@ def nothing_to_do(job_type: JobType, booking: Booking, group: Group) -> str | No
         if booking.meeting is not None:
             return ALREADY_DONE
         return None if group.video_enabled else NO_VIDEO
-    if booking.wxcc_task_id:
+    if booking.contact_center_task_id:
         return ALREADY_DONE
     if group.dispatch_enabled:
         return None

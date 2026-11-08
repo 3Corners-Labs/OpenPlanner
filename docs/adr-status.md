@@ -51,7 +51,7 @@ from the rows below.
 | 0029 | Updates from the portal | BUILT | #33, #36; migration 0020; `scripts/updater/` | Quiet-hours scheduling ("not yet" in the ADR) |
 | 0030 | HTTPS via ACME (Caddy) | BUILT | #35; `deploy/proxy/`; reworked by ADR 0064 | – |
 | 0031 | Audit log per level | BUILT | #34; migration 0021 | – |
-| 0032 | Provider-neutral contact center | NOT BUILT | no `ContactCenterKind`, `group_contact_center` or `ContactCenterTask`; `wxcc_*` remain | Everything (CC-0 to CC-6) |
+| 0032 | Provider-neutral contact center | PARTIAL | CC-1 and CC-2 (#PRNUM): `app/domain/contact_center.py` (`ContactCenterKind`, `ContactCenterRouting`, `ProviderDescriptor`), `ContactCenterTask` and `ContactCenterDispatchers` in `app/domain/calls.py` and `ports.py`, `app/adapters/contact_centers.py` (descriptor registry), `wxcc.DESCRIPTOR`, migration 0098 (`group_contact_center`, `bookings.contact_center_task_id`/`contact_center_kind`, job type `dispatch_contact_center_task`; expand step of ADR 0116, old `wxcc_*` columns still written) | CC-0 acceptance by the product owner; CC-3 webhook route per kind; CC-4 organisation connection and descriptor-rendered form; CC-5 docs; CC-6 second platform; contract step: drop `groups.wxcc_*`, `bookings.wxcc_task_id` and the stored value `dispatch_wxcc_task` a minor later |
 | 0033 | Context-sensitive help | PARTIAL | #43; 20 topics nl/en; `(i)` markers on 8 topics | 28 admin routes still in `NOT_YET_DOCUMENTED` |
 | 0034 | Audit events to a log platform | BUILT | #72; `adapters/event_sink.py` | – (the client's security review AU-3 is not code) |
 | 0035 | Embedding | BUILT | #83, #85, #86, #87; migration 0037 | – |

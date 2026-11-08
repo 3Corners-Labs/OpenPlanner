@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.models import JobRow
 from app.adapters.db.uow import locked_session
 from app.domain.channels import ChannelKind
-from app.domain.job_plan import JobType
+from app.domain.job_plan import JobType, stored_values
 
 STALE_CLAIM = timedelta(minutes=10)
 """After this long a running job is considered abandoned by a crashed worker."""
@@ -67,7 +67,7 @@ class SqlJobQueue:
                 await session.scalars(
                     select(JobRow)
                     .where(
-                        JobRow.type.in_([t.value for t in types]),
+                        JobRow.type.in_(sorted(v for t in types for v in stored_values(t))),
                         or_(
                             JobRow.channel.is_(None),
                             JobRow.channel.in_([c.value for c in channels]),

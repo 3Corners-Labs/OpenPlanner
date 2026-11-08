@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import timedelta
 
 from app.domain.booking import Booking, BookingStatus
-from tests.support.domain import ADA_CONTACT, NOW, SLOT_0900, make_group
+from tests.support.domain import ADA_CONTACT, NOW, SLOT_0900, make_group, webex_routing
 
 GROUP = make_group(
     id=1,
@@ -12,8 +12,7 @@ GROUP = make_group(
     slug="demo",
     name="Demo: videogesprek",
     video_host_email="host-demo@example.nl",
-    wxcc_business_address="openplanner@example.biz",
-    wxcc_channel="openplanner-video",
+    contact_center=webex_routing("openplanner@example.biz", "openplanner-video"),
 )
 """Group ``demo`` with a video host and contact-centre routing: everything a call needs."""
 

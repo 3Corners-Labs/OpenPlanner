@@ -6,6 +6,7 @@ from pydantic import SecretStr
 from app.adapters.db.engine import create_engine
 from app.adapters.integrations import build_integrations, webex_fingerprint
 from app.config import Settings
+from app.domain.contact_center import ContactCenterKind
 from tests.fakes.clock import FixedClock
 
 
@@ -16,7 +17,7 @@ async def test_nothing_is_built_without_a_service_app(tmp_path: Path) -> None:
         built = build_integrations(settings, engine, http, FixedClock())
     await engine.dispose()
 
-    assert (built.tokens, built.video, built.dispatcher) == (None, None, None)
+    assert (built.tokens, built.video, built.dispatchers) == (None, None, {})
 
 
 async def test_wxcc_needs_its_api_host(tmp_path: Path) -> None:
@@ -39,8 +40,8 @@ async def test_wxcc_needs_its_api_host(tmp_path: Path) -> None:
     await engine.dispose()
 
     assert video_only.video is not None
-    assert video_only.dispatcher is None
-    assert both.dispatcher is not None
+    assert video_only.dispatchers == {}
+    assert set(both.dispatchers) == {ContactCenterKind.WEBEX_CC}
 
 
 def test_the_webex_fingerprint_changes_with_the_service_app_only() -> None:

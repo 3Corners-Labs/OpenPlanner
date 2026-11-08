@@ -184,7 +184,9 @@ async def test_a_dispatched_booking_is_not_changed(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     booking_id = await _book(bookings)
-    uow.state.bookings[booking_id] = replace(uow.state.bookings[booking_id], wxcc_task_id="t-1")
+    uow.state.bookings[booking_id] = replace(
+        uow.state.bookings[booking_id], contact_center_task_id="t-1"
+    )
 
     with pytest.raises(DomainError, match="planner_too_late"):
         await planner.move(GROUP_ADMIN, "demo", booking_id, SLOT_0930)

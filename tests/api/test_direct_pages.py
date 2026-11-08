@@ -23,8 +23,8 @@ from app.domain.scheduling import DispatchKind, Offer
 from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeDispatcher, FakeVideo
-from tests.support.domain import NOW
+from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
+from tests.support.domain import NOW, webex_routing
 from tests.support.participant import confirm_newest, open_link
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
@@ -47,8 +47,7 @@ async def _configure(database_url: str, **changes: object) -> None:
 
 WIRED = {
     "video_host_email": "host@example.nl",
-    "wxcc_business_address": "openplanner@example.biz",
-    "wxcc_channel": "openplanner-video",
+    "contact_center": webex_routing("openplanner@example.biz", "openplanner-video"),
 }
 
 
@@ -119,7 +118,7 @@ class Site:
 async def site(demo_settings: Settings) -> AsyncIterator[Site]:
     await _configure(demo_settings.database_url, **WIRED)
     clock, video, dispatcher = FixedClock(NOW), FakeVideo(), FakeDispatcher()
-    integrations = Integrations(None, video, dispatcher)
+    integrations = Integrations(None, video, webex_cc(dispatcher))
     async with app_client(demo_settings, clock, integrations) as client:
         yield Site(client, clock, video, dispatcher, demo_settings.database_url)
 
@@ -374,7 +373,7 @@ async def test_leaving_a_waiting_call_ends_the_work_item_and_says_so(site: Site)
     assert response.status_code == 303
     assert response.headers["location"] == f"{wait}?status=left"
     assert JobType.END_WXCC_TASK in await _jobs(site, booking_id)
-    assert JobType.DISPATCH_WXCC_TASK not in await _pending_jobs(site, booking_id)
+    assert JobType.DISPATCH_CONTACT_CENTER_TASK not in await _pending_jobs(site, booking_id)
     assert await _events(site, booking_id) == [
         EventKind.MEETING_CREATED,
         EventKind.TASK_CREATED,
@@ -568,7 +567,7 @@ async def test_leaving_is_rate_limited_like_booking(demo_settings: Settings) -> 
     limited = demo_settings.model_copy(
         update={"rate_limit_enabled": True, "rate_limit_bookings": "2/hour"}
     )
-    integrations = Integrations(None, FakeVideo(), FakeDispatcher())
+    integrations = Integrations(None, FakeVideo(), webex_cc(FakeDispatcher()))
     async with app_client(limited, FixedClock(NOW), integrations) as client:
         statuses = [
             (await client.post("/b/m/guess/wait/leave", headers=SAME_ORIGIN)).status_code

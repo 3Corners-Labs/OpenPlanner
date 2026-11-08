@@ -41,7 +41,7 @@ async def test_prepare_gives_a_booking_stand_in_ids_and_audits_it(uow: InMemoryU
     assert ids.meeting_id == "simulated-meeting-123"
     assert ids.task_id == "simulated-task-123"
     assert booking.meeting == MeetingRef("simulated-meeting-123", SIMULATED_LINK)
-    assert booking.wxcc_task_id == "simulated-task-123"
+    assert booking.contact_center_task_id == "simulated-task-123"
     timeline = [(e.kind, e.detail) for e in uow.state.booking_events[123]]
     assert timeline == [
         (EventKind.MEETING_CREATED, "simulated"),
@@ -55,7 +55,9 @@ async def test_prepare_gives_a_booking_stand_in_ids_and_audits_it(uow: InMemoryU
 
 async def test_real_platform_ids_are_never_overwritten(uow: InMemoryUnitOfWork) -> None:
     real = MeetingRef("real-meeting", "https://site.webex.com/j.php?MTID=m1")
-    uow.state.bookings[123] = replace(make_booking(), meeting=real, wxcc_task_id="real-task")
+    uow.state.bookings[123] = replace(
+        make_booking(), meeting=real, contact_center_task_id="real-task"
+    )
 
     ids = await _service(uow).prepare(ORG_ADMIN, "demo", 123)
 

@@ -11,6 +11,7 @@ from app.adapters.db.models import BookingEventRow, BookingRow
 from app.adapters.db.uow import SqlTransaction, SqlUnitOfWork
 from app.domain.booking import MeetingRef
 from app.domain.calls import BookingEvent, EventKind
+from app.domain.contact_center import ContactCenterKind
 from app.domain.privacy import PURGED_FIELDS
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
@@ -31,7 +32,7 @@ async def _booking_with_everything(engine: AsyncEngine, service: BookingService)
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         await tx.save_meeting(booking_id, MeetingRef("room-1", "https://example.test/join"))
-        await tx.save_task_id(booking_id, "task-1")
+        await tx.save_task_id(booking_id, "task-1", ContactCenterKind.WEBEX_CC)
         await tx.add_booking_event(
             BookingEvent(booking_id, NOW, EventKind.MEETING_FAILED, "rejected_400", "ada@x.test")
         )
@@ -98,4 +99,6 @@ def test_purge_personal_data_names_the_fields_of_privacy_and_no_others() -> None
     """The column names in the update come from ``PURGED_FIELDS``, not from a second list."""
     source = inspect.getsource(SqlTransaction.purge_personal_data)
     assert "PURGED_FIELDS" in source
-    assert not re.search(r"\b(first_name|email|video_room_id|wxcc_task_id)\s*=", source)
+    assert not re.search(
+        r"\b(first_name|email|video_room_id|contact_center_task_id|wxcc_task_id)\s*=", source
+    )

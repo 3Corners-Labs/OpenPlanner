@@ -29,7 +29,7 @@ from app.domain.connection_health import (
 )
 from app.domain.event_context import bind_booking, bind_level, trace_scope
 from app.domain.integration import IntegrationService
-from app.domain.ports import Clock, ContactCenterDispatcher, IntegrationError, UnitOfWork
+from app.domain.ports import Clock, ContactCenterDispatchers, IntegrationError, UnitOfWork
 from app.domain.tunable import value_of
 
 NOTE_EVERY = timedelta(seconds=10)
@@ -108,7 +108,8 @@ class TaskReconciler:
     Args:
         uow: Opens database transactions.
         clock: Current time.
-        dispatcher: Reads a task's state (``read_task``); ``None`` without a contact center.
+        dispatchers: Read a task's state (``read_task``), one per platform; empty without a
+            contact center. A task of a platform without a dispatcher is left as it is.
         integration: Writes a timeline event and the call status (``IntegrationService``).
         after: How long a task may go without a change (``task_reconcile_after_minutes``).
     """
@@ -117,14 +118,14 @@ class TaskReconciler:
         self,
         uow: UnitOfWork,
         clock: Clock,
-        dispatcher: ContactCenterDispatcher | None,
+        dispatchers: ContactCenterDispatchers,
         integration: IntegrationService,
         after: timedelta | Callable[[], timedelta],
     ) -> None:
         """Store the collaborators; nothing has been read yet."""
         self._uow = uow
         self._clock = clock
-        self._dispatcher = dispatcher
+        self._dispatchers = dispatchers
         self._integration = integration
         self._after = after
         self._read_at: dict[int, datetime] = {}
@@ -137,7 +138,7 @@ class TaskReconciler:
         failure with the count; one with an open failure whose run found none gets the success
         that closes the alert.
         """
-        if self._dispatcher is None:
+        if not self._dispatchers:
             return 0
         now = self._clock.now()
         after = value_of(self._after)
@@ -159,13 +160,14 @@ class TaskReconciler:
 
     async def _read(self, task: StaleTask) -> EventKind | None:
         """Return the event that brings the booking to the task's state, if it differs."""
-        if self._dispatcher is None:  # pragma: no cover - run() returns before
+        dispatcher = self._dispatchers.get(task.kind)
+        if dispatcher is None:
             return None
         with trace_scope():
             bind_level(task.organisation, task.group)
             bind_booking(task.booking_id)
             try:
-                snapshot = await self._dispatcher.read_task(task.task_id)
+                snapshot = await dispatcher.read_task(task.task_id)
             except IntegrationError:
                 return None
         if snapshot.state is task.state:

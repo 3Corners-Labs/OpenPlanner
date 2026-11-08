@@ -15,6 +15,7 @@ from typing import Any, Protocol
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.db.contact_center_rows import has_any_task, stored_task_id, stored_task_kind
 from app.adapters.db.models import (
     AuditEventRow,
     BookingRow,
@@ -35,6 +36,7 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
+from app.domain.contact_center import ContactCenterKind
 from app.domain.integration_check import CHECK_EVENT, PROBE_REASON_PREFIX
 from app.domain.request_log import REQUEST_EVENT, counts_as_failure, request_platform
 from app.domain.security_log import TOKEN_REFRESH_FAILED
@@ -189,7 +191,8 @@ class HealthQueries:
         rows = await self._session.execute(
             select(
                 BookingRow.id,
-                BookingRow.wxcc_task_id,
+                stored_task_id(),
+                stored_task_kind(),
                 CallStatusRow.task,
                 OrganisationRow.slug,
                 GroupRow.slug,
@@ -199,7 +202,7 @@ class HealthQueries:
             .join(GroupRow, GroupRow.id == BookingRow.group_id)
             .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
             .where(
-                BookingRow.wxcc_task_id.is_not(None),
+                has_any_task(),
                 SlotRow.start < unchanged_before,
                 CallStatusRow.task.in_([s.value for s in WATCHED_TASKS]),
                 or_(changed.is_(None), changed < unchanged_before),
@@ -208,6 +211,13 @@ class HealthQueries:
             .limit(limit)
         )
         return [
-            StaleTask(booking_id, task_id or "", TaskState(task), organisation, group)
-            for booking_id, task_id, task, organisation, group in rows
+            StaleTask(
+                booking_id,
+                task_id or "",
+                TaskState(task),
+                organisation,
+                group,
+                ContactCenterKind(kind),
+            )
+            for booking_id, task_id, kind, task, organisation, group in rows
         ]

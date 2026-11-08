@@ -11,7 +11,7 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
     lapsed ──► send_unconfirmed_lapsed (now); the purge planned while pending stays
     booked ──► create_video_room (now) ─► send_confirmation | send_change (now)
            ──► send_reminder × rules (start − offset, if still ahead and reachable)
-           ──► dispatch_wxcc_task (start − dispatch lead) ──► purge_pii (end + 24 h)
+           ──► dispatch_contact_center_task (start − dispatch lead) ──► purge_pii (end + 24 h)
     cancelled ──► end_wxcc_task, delete_video_room (now) ─► send_cancellation (now, unless
                   rescheduled) ──► purge_pii (now + 24 h)
     suspended ──► end_wxcc_task (now) ─► send_suspension (now) ──► purge_pii (the earlier of
@@ -22,9 +22,13 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
 Closure notices are not pinned (the booking is no longer confirmed); they only run while the
 booking is still suspended (``is_stale``). Requests to confirm only run while the booking still
 awaits confirmation.
+
+A job type is a persisted name, renamed by expand/contract (ADR 0116): ``LEGACY_JOB_TYPES`` maps
+an old stored value to its member, so ``JobType(old)`` still reads, and ``stored_values`` gives
+every value a query on a type must match until the old value is dropped a minor later.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -35,7 +39,7 @@ from app.domain.confirmation import ConfirmWindow
 
 
 def dispatch_moment(start: datetime, dispatch_lead: timedelta) -> datetime:
-    """Return the moment a booking's WxCC task is dispatched.
+    """Return the moment a booking's contact-center task is dispatched.
 
     From then on an agent may pick up the task and join the meeting. A booking cancelled or
     moved after it gets its task marked cancelled (ADR 0021); the participant's own change lead
@@ -54,7 +58,11 @@ of an alert delivery (ADR 0082 point 9)."""
 
 
 class JobType(StrEnum):
-    """Every kind of background job."""
+    """Every kind of background job.
+
+    A value written before a rename still reads (``LEGACY_JOB_TYPES``); new jobs are written
+    with the member's own value only.
+    """
 
     CREATE_VIDEO_ROOM = "create_video_room"
     DELETE_VIDEO_ROOM = "delete_video_room"
@@ -63,7 +71,8 @@ class JobType(StrEnum):
     SEND_CHANGE = "send_change"
     SEND_REMINDER = "send_reminder"
     SEND_CANCELLATION = "send_cancellation"
-    DISPATCH_WXCC_TASK = "dispatch_wxcc_task"
+    DISPATCH_CONTACT_CENTER_TASK = "dispatch_contact_center_task"
+    """Create the booking's task at its group's contact center (ADR 0032)."""
     END_WXCC_TASK = "end_wxcc_task"
     PURGE_PII = "purge_pii"
     SEND_SUSPENSION = "send_suspension"
@@ -79,6 +88,27 @@ class JobType(StrEnum):
     SEND_UNCONFIRMED_LAPSED = "send_unconfirmed_lapsed"
     SEND_TEAM_INVITE = "send_team_invite"
     SEND_TEAM_CANCEL = "send_team_cancel"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "JobType | None":
+        """Read a stored value of before a rename as its member (``LEGACY_JOB_TYPES``)."""
+        return LEGACY_JOB_TYPES.get(str(value))
+
+
+LEGACY_JOB_TYPES: Mapping[str, JobType] = {
+    "dispatch_wxcc_task": JobType.DISPATCH_CONTACT_CENTER_TASK,
+}
+"""Stored job type values of before a rename, read as their member (ADR 0116 expand/contract).
+
+``dispatch_wxcc_task`` became ``dispatch_contact_center_task`` in ADR 0032 step CC-1: the
+migration renames the stored rows, and a job a web container of the previous minor writes
+during a rolling update still runs. Dropped a minor later (the contract step)."""
+
+
+def stored_values(job_type: JobType) -> tuple[str, ...]:
+    """Return every stored value that means ``job_type``: its own and its legacy values."""
+    legacy = sorted(old for old, member in LEGACY_JOB_TYPES.items() if member is job_type)
+    return (job_type.value, *legacy)
 
 
 TEAM_INVITES = frozenset({JobType.SEND_TEAM_INVITE, JobType.SEND_TEAM_CANCEL})
@@ -139,7 +169,7 @@ class JobCounts:
     overdue: int = 0
 
 
-RETRYABLE_JOBS = frozenset({JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_WXCC_TASK})
+RETRYABLE_JOBS = frozenset({JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_CONTACT_CENTER_TASK})
 """Jobs an admin may plan again from the booking page (ADR 0068): the ones that create
 something at a platform. Messages are not among them: the participant must not be mailed twice."""
 
@@ -190,7 +220,7 @@ def plan_for_booking(
         reminders.append(PlannedJob(JobType.SEND_REMINDER, run_at, start, rule.channel))
     jobs.extend(sorted(reminders, key=lambda job: job.run_at))
     dispatch_at = max(now, dispatch_moment(start, dispatch_lead))
-    jobs.append(PlannedJob(JobType.DISPATCH_WXCC_TASK, dispatch_at, start))
+    jobs.append(PlannedJob(JobType.DISPATCH_CONTACT_CENTER_TASK, dispatch_at, start))
     jobs.append(PlannedJob(JobType.PURGE_PII, end + PURGE_AFTER, None))
     return jobs
 
@@ -249,7 +279,7 @@ def plan_for_direct(*, start: datetime, end: datetime) -> list[PlannedJob]:
     return [
         PlannedJob(JobType.CREATE_VIDEO_ROOM, start, start),
         PlannedJob(JobType.SEND_CONFIRMATION, start, start, ChannelKind.EMAIL),
-        PlannedJob(JobType.DISPATCH_WXCC_TASK, start, start),
+        PlannedJob(JobType.DISPATCH_CONTACT_CENTER_TASK, start, start),
         PlannedJob(JobType.PURGE_PII, end + PURGE_AFTER, None),
     ]
 
@@ -305,7 +335,7 @@ def plan_for_pending(*, now: datetime, window: ConfirmWindow) -> list[PlannedJob
     The request to confirm goes now, the reminders at ``window.reminders``, all by email (the
     point is to verify that address). At ``window.confirm_by`` ``EXPIRE_UNCONFIRMED`` cancels
     a booking that is still pending, and its personal data is purged ``PURGE_AFTER`` later.
-    No meeting, reminder of the appointment or WxCC task yet: confirming replaces all of
+    No meeting, reminder of the appointment or contact-center task yet: confirming replaces all of
     these jobs with ``plan_for_booking``.
     """
     return [
@@ -332,7 +362,7 @@ def plan_for_suspension(
 ) -> list[PlannedJob]:
     """Return the jobs that replace all pending jobs of a booking put on hold (ADR 0024).
 
-    Reminders and the planned WxCC task go, and a work item that already exists is ended;
+    Reminders and the planned contact-center task go, and a work item that already exists is ended;
     the meeting stays, so a reinstated booking keeps its link. An open trial call is deleted
     (ADR 0071): replacing the jobs would otherwise drop its pending clean-up. The purge is at
     ``Closure.purge_at``, which has a moment also while the closure is open-ended (ADR 0102);

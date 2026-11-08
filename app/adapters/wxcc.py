@@ -1,5 +1,9 @@
 """``ContactCenterDispatcher`` on the WxCC Create Task API v2, work items (ADR 0018, 0021).
 
+The adapter of ``ContactCenterKind.WEBEX_CC`` (ADR 0032): ``DESCRIPTOR`` describes the group
+routing WxCC needs (business address and channel, both required, and a routing value of at most
+512 bytes), and ``task_body`` maps the neutral ``ContactCenterTask`` to Create Task v2.
+
 The work item goes to the group's business address and channel; the flow behind the entry
 point chooses the queue from ``flowSettings.openplannerGroup``. The routing variables of
 ADR 0081 (mapped subject and attribute codes) go next to it in ``flowSettings``, where the
@@ -24,10 +28,33 @@ from typing import Any
 from urllib.parse import quote
 
 from app.adapters.webex_auth import AuthorizedClient
-from app.domain.calls import TaskSnapshot, TaskState, WorkItem
+from app.domain.calls import ContactCenterTask, TaskSnapshot, TaskState
+from app.domain.contact_center import (
+    AttributeSpec,
+    ContactCenterKind,
+    ContactCenterRouting,
+    ProviderDescriptor,
+)
 from app.domain.ports import Clock, IntegrationError
 
 ROUTING_KEY = "openplannerGroup"
+
+BUSINESS_ADDRESS = "business_address"
+"""Routing attribute: the business address of the work item asset (ADR 0018)."""
+CHANNEL = "channel"
+"""Routing attribute: the name of the work item channel."""
+
+DESCRIPTOR = ProviderDescriptor(
+    kind=ContactCenterKind.WEBEX_CC,
+    label_key="admin.contact_center.webex_cc",
+    attributes=(
+        AttributeSpec(BUSINESS_ADDRESS, 255, True, "admin.field.wxcc_business_address"),
+        AttributeSpec(CHANNEL, 255, True, "admin.field.wxcc_channel"),
+    ),
+    routing_value_max_length=512,
+)
+"""What a group needs for WxCC (ADR 0032 point 4); the limits are WxCC's (``flowSettings``
+values up to 512 bytes), fixed by the platform and so constants, not settings."""
 
 PROBE_KIND = "probe"
 """``kind`` of the group check's probe work item (ADR 0082 point 2); the flow's Case branch on
@@ -67,13 +94,36 @@ REQUIRED_FIELDS = frozenset({"bookingReference"})
 and ``kind``."""
 
 
-def task_body(item: WorkItem, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
-    """Return the Create Task v2 request for ``item``."""
+def channel_and_address(routing: ContactCenterRouting | None) -> tuple[str, str] | None:
+    """Return the channel and business address of a WxCC routing that has both, else ``None``."""
+    if routing is None or routing.kind is not ContactCenterKind.WEBEX_CC:
+        return None
+    channel, address = routing.attribute(CHANNEL), routing.attribute(BUSINESS_ADDRESS)
+    return (channel, address) if channel and address else None
+
+
+def business_address(routing: ContactCenterRouting | None) -> str | None:
+    """Return the business address of a WxCC routing, if it has one."""
+    if routing is None or routing.kind is not ContactCenterKind.WEBEX_CC:
+        return None
+    return routing.attribute(BUSINESS_ADDRESS)
+
+
+def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
+    """Return the Create Task v2 request for ``item``, a task of a complete WxCC routing.
+
+    Raises:
+        IntegrationError: ``not_ready`` (not retryable) when the routing lacks an attribute.
+    """
+    address = item.routing.attribute(BUSINESS_ADDRESS)
+    channel = item.routing.attribute(CHANNEL)
+    if item.routing.kind is not ContactCenterKind.WEBEX_CC or not address or not channel:
+        raise IntegrationError("not_ready", retryable=False)
     return {
         "origin": {"id": item.reference, "name": item.first_name},
-        "destination": {"id": item.business_address, "type": "businessAddress"},
+        "destination": {"id": address, "type": "businessAddress"},
         "channelType": "workItem",
-        "channel": item.channel,
+        "channel": channel,
         "flowSettings": {**dict(item.variables), ROUTING_KEY: item.routing_value},
         "channelParams": {
             "type": "work-item-form",
@@ -123,10 +173,10 @@ class WxccTasks:
         self._base = base_url.rstrip("/")
         self._clock = clock
 
-    async def create_task(self, item: WorkItem) -> str:
+    async def create_task(self, task: ContactCenterTask) -> str:
         """Create the work item and return its task id."""
         timestamp = int(self._clock.now().timestamp() * 1000)
-        body = task_body(item, str(uuid.uuid4()), timestamp)
+        body = task_body(task, str(uuid.uuid4()), timestamp)
         response = await self._client.request(
             "POST", f"{self._base}/v2/tasks", json=body, ok=(200, 201, 202)
         )

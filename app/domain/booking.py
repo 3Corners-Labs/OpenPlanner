@@ -20,6 +20,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from app.domain.channels import ChannelKind
+from app.domain.contact_center import ContactCenterKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import Answers, normalise_email, normalise_phone
 from app.domain.routing import RoutingChoice
@@ -232,7 +233,10 @@ class Booking:
     meeting: MeetingRef | None = None
     trial: TrialCall | None = None
     trial_count: int = 0
-    wxcc_task_id: str | None = None
+    contact_center_task_id: str | None = None
+    """The task at the contact center (ADR 0032); a provider link, purged with the contact."""
+    contact_center_kind: ContactCenterKind | None = None
+    """The platform that holds ``contact_center_task_id``."""
     kind: BookingKind = BookingKind.SCHEDULED
     closure_id: int | None = None
     change_reason: ChangeReason | None = None
@@ -255,7 +259,7 @@ class Booking:
 
     @property
     def is_active(self) -> bool:
-        """Whether the appointment goes ahead (reminders, meeting, WxCC task)."""
+        """Whether the appointment goes ahead (reminders, meeting, contact-center task)."""
         return self.status is BookingStatus.CONFIRMED
 
     @property

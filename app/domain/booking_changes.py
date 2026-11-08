@@ -54,7 +54,7 @@ def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> 
     if not booking.is_active:
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     lead = max(group.planner_lead, group.dispatch_lead)
-    if booking.wxcc_task_id is not None or now >= booking.start - lead:
+    if booking.contact_center_task_id is not None or now >= booking.start - lead:
         raise DomainError(ErrorCode.PLANNER_TOO_LATE)
 
 

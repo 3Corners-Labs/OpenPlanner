@@ -200,6 +200,8 @@ class GroupRow(Base):
     horizon_days: Mapped[int] = mapped_column(Integer)
     phone_mode: Mapped[str] = mapped_column(String(16))
     video_host_email: Mapped[str | None] = mapped_column(String(254))
+    # Before ADR 0032: the WxCC routing. Still written alongside ``group_contact_center`` and
+    # read when a group has no row there; dropped a minor later (ADR 0116 expand/contract).
     wxcc_business_address: Mapped[str | None] = mapped_column(String(255))
     wxcc_channel: Mapped[str | None] = mapped_column(String(255))
     wxcc_routing_value: Mapped[str | None] = mapped_column(String(512))
@@ -283,6 +285,29 @@ class GroupFormFieldRow(Base):
     __table_args__ = (
         UniqueConstraint("group_id", "key"),
         CheckConstraint("classification IN ('pii', 'not_pii')", name="classification"),
+    )
+
+
+class GroupContactCenterRow(Base):
+    """A group's routing at its contact-center platform (ADR 0032 point 3); no personal data.
+
+    ``attributes`` is a JSON object of strings, validated against the platform's descriptor
+    when it is read (``app.adapters.contact_centers``).
+    """
+
+    __tablename__ = "group_contact_center"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(String(32))
+    routing_value: Mapped[str | None] = mapped_column(String(512))
+    attributes: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+
+    __table_args__ = (
+        CheckConstraint(
+            "json_valid(attributes) AND json_type(attributes) = 'object'", name="attributes"
+        ),
     )
 
 
@@ -513,6 +538,12 @@ class BookingRow(Base):
     guest_join_url: Mapped[str | None] = mapped_column(String(2048))
     host_join_url: Mapped[str | None] = mapped_column(String(2048))
     video_room_id: Mapped[str | None] = mapped_column(String(255))
+    # ADR 0032: the task at the contact center and the platform that holds it; a provider
+    # link, purged with the contact (privacy.DERIVED_FIELDS).
+    contact_center_task_id: Mapped[str | None] = mapped_column(String(255))
+    contact_center_kind: Mapped[str | None] = mapped_column(String(32))
+    # Before ADR 0032; still written for a Webex Contact Center task until dropped a minor
+    # later (ADR 0116), and read for a row that has no ``contact_center_task_id``.
     wxcc_task_id: Mapped[str | None] = mapped_column(String(255))
     # ADR 0071: the trial call on Webex; the link is PII and purged with the contact.
     trial_room_id: Mapped[str | None] = mapped_column(String(255))
@@ -547,6 +578,7 @@ class BookingRow(Base):
         Index("ix_bookings_video_room_id", "video_room_id"),
         Index("ix_bookings_trial_room_id", "trial_room_id"),
         Index("ix_bookings_wxcc_task_id", "wxcc_task_id"),
+        Index("ix_bookings_contact_center_task_id", "contact_center_task_id"),
         CheckConstraint(
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended', "
             "'awaiting_rebook', 'pending_confirmation')",

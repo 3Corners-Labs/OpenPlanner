@@ -21,6 +21,7 @@ from app.domain.scheduling import DispatchFallback, Group
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
+from tests.fakes.integrations import webex_cc
 from tests.fakes.jobs import FakeQueue, job
 from tests.support.admin import GROUP_ADMIN, OUTSIDER
 from tests.support.call_jobs import WIRED, Setup, group_uow
@@ -77,7 +78,7 @@ def redispatched(setup: Setup, booking_id: int) -> list[PlannedJob]:
     return [
         j
         for j in setup.uow.state.jobs.get(booking_id, [])
-        if j.type is JobType.DISPATCH_WXCC_TASK and j.run_at == setup.clock.now()
+        if j.type is JobType.DISPATCH_CONTACT_CENTER_TASK and j.run_at == setup.clock.now()
     ]
 
 
@@ -167,7 +168,7 @@ def runner(setup: Setup, queue: FakeQueue, fallback: FallbackService) -> JobRunn
         None,
         composer,
         video=setup.video,
-        dispatcher=setup.dispatcher,
+        dispatchers=webex_cc(setup.dispatcher),
         integration=setup.integration,
         fallback=fallback,
     )
@@ -178,7 +179,7 @@ async def test_a_dispatch_job_skips_while_the_group_is_in_fallback() -> None:
     fallback = service(setup)
     bid = await setup.booking()
     await fallback.sweep(health(HealthState.DOWN))
-    queue = FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK)])
+    queue = FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])
     await runner(setup, queue, fallback).run_due()
     assert setup.dispatcher.items == []
     assert queue.failed == []
@@ -190,7 +191,7 @@ async def test_a_dispatch_that_fails_for_good_lands_in_the_queue() -> None:
     setup = wired()
     bid = await setup.booking()
     setup.dispatcher.error = IntegrationError("server_error", retryable=True)
-    queue = FakeQueue([job(bid, JobType.DISPATCH_WXCC_TASK, attempts=4)])
+    queue = FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK, attempts=4)])
     setup.uow.state.bookings[bid] = replace(setup.uow.state.bookings[bid], meeting=None)
     from app.domain.booking import MeetingRef
 
@@ -226,7 +227,7 @@ async def test_a_group_not_in_fallback_or_a_dispatched_booking_is_not_diverted()
     assert not await fallback.diverts(booking, group)
     await fallback.sweep(health(HealthState.DOWN))
     group = setup.uow.state.groups[1]
-    assert not await fallback.diverts(replace(booking, wxcc_task_id="t-1"), group)
+    assert not await fallback.diverts(replace(booking, contact_center_task_id="t-1"), group)
 
 
 async def test_a_dispatch_failure_of_a_group_without_the_fallback_stays_out_of_the_queue() -> None:
@@ -245,7 +246,12 @@ async def test_a_direct_call_in_fallback_reaches_the_queue_with_a_line_in_the_sp
     bid = await setup.booking()
     await fallback.sweep(health(HealthState.DOWN))
     calls = CallService(
-        setup.uow, setup.integration, setup.video, setup.dispatcher, agent_start_label, fallback
+        setup.uow,
+        setup.integration,
+        setup.video,
+        webex_cc(setup.dispatcher),
+        agent_start_label,
+        fallback,
     )
     await calls.ensure_task(setup.uow.state.bookings[bid], setup.uow.state.groups[1])
     assert setup.dispatcher.items == []
