@@ -60,16 +60,14 @@ class DeliveryState:
     Attributes:
         token: The streak and level that was last sent (``Alert.token``).
         sent_at: When it was last delivered, ``None`` while it never was.
-        suppressed: Reports of the alert counted since, not sent.
         attempts: Failed tries of the pending delivery.
-        retry_at: When the next try may run, after a failure.
+        retry_at: When the next try may run after a failure (after the last retry: the repeat).
     """
 
     target_id: int
     key: str
     token: str = ""
     sent_at: datetime | None = None
-    suppressed: int = 0
     attempts: int = 0
     retry_at: datetime | None = None
 

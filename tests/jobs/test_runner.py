@@ -12,13 +12,13 @@ from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.event_context import TRACE_ID, current, current_trace_id
-from app.domain.job_plan import JobType
+from app.domain.job_plan import BACKOFF, JobType
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from app.domain.system_log import EventRetention, SystemLog
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
-from app.jobs.runner import BACKOFF, JobRunner
+from app.jobs.runner import JobRunner
 from tests.fakes.clock import FixedClock
 from tests.fakes.jobs import FakeQueue, job
 from tests.fakes.messaging import RecordingSender, RefusingSender

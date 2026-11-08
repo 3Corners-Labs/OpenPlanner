@@ -61,6 +61,7 @@ from app.adapters.db.models import (
     GroupTextRow,
     HolidayCalendarRow,
     HolidayRow,
+    IntegrationCredentialRow,
     IntegrationReportRow,
     JobRow,
     OrganisationContactsRow,
@@ -188,6 +189,13 @@ def _check_name(group_id: int) -> str:
 
 
 HEARTBEAT_NAME = "worker-heartbeat"
+
+
+def bot_credential_name(organisation_id: int | None) -> str:
+    """Return the credential name of a Webex bot token: an organisation's or the platform's."""
+    return f"webex-bot:{organisation_id if organisation_id is not None else 'platform'}"
+
+
 """Integration report name of the worker's heartbeat row (ADR 0068)."""
 
 
@@ -850,7 +858,16 @@ class SqlTransaction(
         return int(count or 0)
 
     async def delete_organisation(self, organisation_id: int) -> None:
-        """Erase the organisation's row; the schema's cascades take the rest."""
+        """Erase the organisation's row; the schema's cascades take the rest.
+
+        The sealed Webex bot token (ADR 0082 point 9) has no foreign key, so it is deleted here
+        in the same transaction: a later organisation with a reused id never inherits it.
+        """
+        await self._session.execute(
+            delete(IntegrationCredentialRow).where(
+                IntegrationCredentialRow.name == bot_credential_name(organisation_id)
+            )
+        )
         await self._session.execute(
             delete(OrganisationRow).where(OrganisationRow.id == organisation_id)
         )

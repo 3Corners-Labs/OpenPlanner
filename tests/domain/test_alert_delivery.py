@@ -10,10 +10,11 @@ from app.domain.alert_delivery import (
     DELIVERY_FAILED,
     MAX_TARGETS,
     RETRY_AFTER,
+    Action,
     AlertNotifier,
     AlertTargetService,
-    after_failure,
-    due,
+    outcome,
+    step,
 )
 from app.domain.alert_model import AlertChannelKind, AlertTarget, DeliveryState, RenderedAlert
 from app.domain.alerts import Alert, AlertLevel
@@ -72,26 +73,28 @@ def test_a_target_needs_a_valid_address_and_level() -> None:
         AlertTarget(None, 1, AlertChannelKind.EMAIL, "ops@voorbeeld.nl", "info")
 
 
-def test_due_sends_a_new_streak_and_repeats_only_after_the_interval() -> None:
+def test_step_sends_a_new_streak_and_repeats_only_after_the_interval() -> None:
     alert = Alert(HEALTH_EVENT, AlertLevel.OUTAGE, "down", "demo", None, "", NOW, NOW)
-    assert due(alert, None, NOW, REPEAT)
+    assert step(alert, None, NOW, REPEAT) is Action.SEND
     sent = DeliveryState(1, alert.key, alert.token, NOW)
-    assert not due(alert, sent, NOW + timedelta(hours=1), REPEAT)
-    assert due(alert, sent, NOW + REPEAT, REPEAT)
-    assert due(alert, DeliveryState(1, alert.key, "other", NOW), NOW, REPEAT)
+    assert step(alert, sent, NOW + timedelta(hours=1), REPEAT) is Action.WAIT
+    assert step(alert, sent, NOW + REPEAT, REPEAT) is Action.SEND
+    assert step(alert, DeliveryState(1, alert.key, "other", NOW), NOW, REPEAT) is Action.SEND
 
 
 def test_a_failure_is_retried_then_waits_for_the_repeat() -> None:
     alert = Alert(HEALTH_EVENT, AlertLevel.OUTAGE, "down", "demo", None, "", NOW, NOW)
     state = DeliveryState(1, alert.key, alert.token)
     for wait in RETRY_AFTER:
-        state = after_failure(state, alert, NOW)
+        state = outcome(state, alert, False, NOW, REPEAT)
         assert state.retry_at == NOW + wait
-        assert not due(alert, state, NOW, REPEAT)
-        assert due(alert, state, NOW + wait, REPEAT)
-    state = after_failure(state, alert, NOW)
-    assert not due(alert, state, NOW + timedelta(hours=1), REPEAT)
-    assert due(alert, state, NOW + REPEAT, REPEAT)
+        assert step(alert, state, NOW, REPEAT) is Action.WAIT
+        assert step(alert, state, NOW + wait, REPEAT) is Action.SEND
+    state = outcome(state, alert, False, NOW, REPEAT)
+    assert step(alert, state, NOW + timedelta(hours=1), REPEAT) is Action.WAIT
+    assert step(alert, state, NOW + REPEAT, REPEAT) is Action.SEND
+    done = outcome(state, alert, True, NOW, REPEAT)
+    assert (done.sent_at, done.attempts, done.retry_at) == (NOW, 0, None)
 
 
 async def test_the_notifier_sends_once_counts_and_repeats(uow: InMemoryUnitOfWork) -> None:
@@ -102,13 +105,16 @@ async def test_the_notifier_sends_once_counts_and_repeats(uow: InMemoryUnitOfWor
     senders, clock = FakeAlertSenders(), FixedClock(NOW)
     notifier = AlertNotifier(uow, clock, senders, compose, REPEAT)
     assert await notifier.run() == 1
-    uow.state.audit.append(down(at=timedelta(minutes=5)))
-    clock.advance(timedelta(minutes=10))
-    assert await notifier.run() == 0
+    for minutes in (5, 6, 7):  # three more reports while the alert lasts
+        uow.state.audit.append(down(at=timedelta(minutes=minutes)))
+    for _ in range(30):  # every minute a run: none sends, none counts on its own
+        clock.advance(timedelta(minutes=1))
+        assert not await notifier.run()
+    assert await notifier.run() is None  # asked again within the minute: no run
     clock.advance(REPEAT)
     assert await notifier.run() == 1
     assert [address for address, _ in senders.sent] == ["ops@voorbeeld.nl"] * 2
-    assert senders.sent[1][1].text.endswith("|demo|1|nl")  # the counted report is named
+    assert senders.sent[1][1].text.endswith("|demo|3|nl")  # the reports, not the runs
 
 
 async def test_the_level_and_the_scope_decide_who_gets_an_alert(uow: InMemoryUnitOfWork) -> None:
@@ -144,17 +150,30 @@ async def test_a_failed_delivery_is_an_event_and_never_an_alert(uow: InMemoryUni
     assert (failed.reason, failed.organisation) == ("unreachable", "demo")
     assert "ops@" not in failed.detail
     senders.error = None
-    assert await notifier.run() == 0  # waits for the retry
-    clock.advance(RETRY_AFTER[0])
-    assert await notifier.run() == 1
+    clock.advance(RETRY_AFTER[0] - timedelta(seconds=1))
+    assert await notifier.run() is None  # within the minute: no run, the retry waits
+    clock.advance(timedelta(seconds=1))
+    assert await notifier.run() == 1  # the first retry, a minute after the failure
+
+
+EMAIL = ("email", "ops@voorbeeld.nl", "warning")
+
+
+def make_service(
+    uow: InMemoryUnitOfWork,
+    senders: FakeAlertSenders | None = None,
+    bots: FakeBotTokens | None = None,
+) -> AlertTargetService:
+    clock = FixedClock(NOW)
+    return AlertTargetService(
+        uow, clock, AdminService(uow, clock), senders or FakeAlertSenders(), compose, bots
+    )
 
 
 async def test_targets_are_managed_audited_and_tested(uow: InMemoryUnitOfWork) -> None:
     senders, bots = FakeAlertSenders(), FakeBotTokens()
-    service = AlertTargetService(
-        uow, FixedClock(NOW), AdminService(uow, FixedClock(NOW)), senders, compose, bots
-    )
-    target_id = await service.add(SUPER, "demo", target())
+    service = make_service(uow, senders, bots)
+    target_id = await service.add(SUPER, "demo", *EMAIL)
     assert [t.id for t in await service.targets(SUPER, "demo")] == [target_id]
     assert await service.send_test(SUPER, "demo", target_id) is None
     assert senders.sent[0][1].subject == "test"
@@ -172,25 +191,21 @@ async def test_targets_are_managed_audited_and_tested(uow: InMemoryUnitOfWork) -
 
 
 async def test_only_who_may_manage_the_scope_changes_its_targets(uow: InMemoryUnitOfWork) -> None:
-    service = AlertTargetService(
-        uow, FixedClock(NOW), AdminService(uow, FixedClock(NOW)), FakeAlertSenders(), compose
-    )
+    service = make_service(uow)
     # integrations.manage is the superuser's alone (ADR 0039), so an organisation admin is
     # refused on both scopes, as is another organisation's admin.
     for principal, organisation in ((OUTSIDER, "demo"), (ORG_ADMIN, "demo"), (ORG_ADMIN, None)):
         with pytest.raises(DomainError) as caught:
-            await service.add(principal, organisation, target())
+            await service.add(principal, organisation, *EMAIL)
         assert caught.value.code is ErrorCode.NOT_PERMITTED
-    await service.add(SUPER, None, target(None))
+    await service.add(SUPER, None, *EMAIL)
     assert await service.has_bot(SUPER, None) is None  # no settings key: no bot can be kept
 
 
 async def test_a_scope_has_at_most_ten_targets(uow: InMemoryUnitOfWork) -> None:
-    service = AlertTargetService(
-        uow, FixedClock(NOW), AdminService(uow, FixedClock(NOW)), FakeAlertSenders(), compose
-    )
+    service = make_service(uow)
     for _ in range(MAX_TARGETS):
-        await service.add(SUPER, "demo", target())
+        await service.add(SUPER, "demo", *EMAIL)
     with pytest.raises(DomainError) as caught:
-        await service.add(SUPER, "demo", target())
+        await service.add(SUPER, "demo", *EMAIL)
     assert caught.value.field == "targets"

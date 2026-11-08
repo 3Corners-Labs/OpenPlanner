@@ -52,6 +52,10 @@ async def test_an_organisations_targets_live_on_its_channels_page(site: Site) ->
     page = (await site.client.get("/admin/organisations/demo/channels")).text
     assert 'action="/admin/organisations/demo/channels/alerts/targets"' in page
     assert "Webex-bot" in page
+    empty = await site.client.post(
+        "/admin/organisations/demo/channels/alerts/bot", data={"token": ""}, headers=SAME_ORIGIN
+    )
+    assert "done=unchanged" in empty.headers["location"]  # an empty field removes nothing
     await site.login_as(ORG_ADMIN)
     refused = await site.client.post(
         "/admin/organisations/demo/channels/alerts/targets",

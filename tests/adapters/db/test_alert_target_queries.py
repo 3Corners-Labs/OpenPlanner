@@ -27,9 +27,34 @@ async def test_targets_and_deliveries_round_trip_and_go_together(engine: AsyncEn
         assert [t.id for t in await tx.list_alert_targets(None)] == [platform]
         assert len(await tx.all_alert_targets()) == 2
         (state,) = await tx.list_alert_deliveries()
-    assert (state.token, state.sent_at, state.suppressed) == ("tok", NOW, 2)
+    assert (state.token, state.sent_at, state.attempts) == ("tok", NOW, 2)
     async with uow.locked() as tx:
         await tx.delete_alert_target(org_target)
     async with uow.read() as tx:
         assert await tx.list_alert_deliveries() == []
         assert [t.id for t in await tx.all_alert_targets()] == [platform]
+
+
+async def test_deleting_an_organisation_deletes_its_bot_token(engine: AsyncEngine) -> None:
+    """A later organisation with a reused id never inherits the bot (ADR 0084 point 4)."""
+    from sqlalchemy import select
+
+    from app.adapters.db.models import IntegrationCredentialRow, OrganisationRow
+    from app.adapters.db.uow import bot_credential_name
+    from app.domain.scheduling import Organisation
+
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        stored = await tx.add_organisation(Organisation(0, "Weg", "weg"))
+    async with uow.locked() as tx:
+        tx._session.add(  # type: ignore[attr-defined]  # noqa: SLF001
+            IntegrationCredentialRow(
+                name=bot_credential_name(stored.id), nonce=b"n", ciphertext=b"c", updated_at=NOW
+            )
+        )
+    async with uow.locked() as tx:
+        await tx.delete_organisation(stored.id)
+    async with uow.read() as tx:
+        session = tx._session  # type: ignore[attr-defined]  # noqa: SLF001
+        assert await session.get(IntegrationCredentialRow, bot_credential_name(stored.id)) is None
+        assert (await session.scalars(select(OrganisationRow.id))).all() == []

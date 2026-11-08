@@ -25,6 +25,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.credentials import CredentialStore
+from app.adapters.db.uow import bot_credential_name
 from app.adapters.integrations import secret_box
 from app.adapters.webex_auth import http_failure
 from app.config import Settings
@@ -55,10 +56,13 @@ class Secrets(Protocol):
         """Store the credential ``name``."""
         ...
 
+    async def delete(self, name: str) -> None:
+        """Remove the credential ``name``."""
+        ...
 
-def bot_name(organisation_id: int | None) -> str:
-    """Return the credential name of the bot token of an organisation, or of the platform."""
-    return f"webex-bot:{organisation_id if organisation_id is not None else 'platform'}"
+
+bot_name = bot_credential_name
+"""The credential name of a bot token (defined with the organisation's delete)."""
 
 
 class BotTokens:
@@ -76,15 +80,18 @@ class BotTokens:
         """Return the bot token of the scope, or ``None`` when none is set."""
         stored = await self._secrets.get(bot_name(organisation_id))
         token = stored.get("token") if stored else None
-        return token if isinstance(token, str) and token else None
+        return token if isinstance(token, str) else None
 
     async def has_token(self, organisation_id: int | None) -> bool:
         """Return whether the scope has a bot token (the portal shows only this)."""
         return await self.token(organisation_id) is not None
 
     async def save(self, organisation_id: int | None, token: str | None, now: datetime) -> None:
-        """Store the scope's bot token; ``None`` removes it."""
-        await self._secrets.put(bot_name(organisation_id), {"token": token or ""}, now)
+        """Store the scope's bot token; ``None`` removes the record."""
+        if token is None:
+            await self._secrets.delete(bot_name(organisation_id))
+        else:
+            await self._secrets.put(bot_name(organisation_id), {"token": token}, now)
 
 
 class EmailAlertSender:

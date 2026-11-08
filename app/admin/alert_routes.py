@@ -22,9 +22,9 @@ from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin
 from app.domain.alert_delivery import AlertTargetService
-from app.domain.alert_model import TARGET_LEVELS, AlertChannelKind, AlertTarget
+from app.domain.alert_model import TARGET_LEVELS, AlertChannelKind
 from app.domain.authorization import Permission, Principal
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import DomainError
 from app.i18n import BoundGettext
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -104,12 +104,14 @@ async def _add(
 ) -> Response:
     """Add a target from the posted form; a refusal returns to the page with a message."""
     form = await read_form(request, locale)
-    kind, level = form.text("kind"), form.text("min_level")
     try:
-        if kind not in {k.value for k in AlertChannelKind}:
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "kind")
-        target = AlertTarget(None, None, AlertChannelKind(kind), form.text("address"), level)
-        await alert_service(request).add(principal, organisation, target)
+        await alert_service(request).add(
+            principal,
+            organisation,
+            form.text("kind"),
+            form.text("address"),
+            form.text("min_level"),
+        )
     except DomainError as error:
         raise_refusal(error)
         return redirect_done(_page(organisation), "alert_refused", anchor="alerts")
@@ -146,7 +148,12 @@ async def _bot(
 ) -> Response:
     """Store or remove the bot token; the token is never shown again."""
     form = await read_form(request, locale)
-    token = None if form.checked("remove") else form.text("token") or None
+    if form.checked("remove"):
+        token = None
+    elif form.text("token"):
+        token = form.text("token")
+    else:  # an empty field changes nothing: removing takes the explicit box
+        return redirect_done(_page(organisation), "unchanged", anchor="alerts")
     try:
         await alert_service(request).set_bot(principal, organisation, token)
     except DomainError as error:

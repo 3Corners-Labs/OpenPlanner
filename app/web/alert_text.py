@@ -7,11 +7,12 @@ portal. Never a name, address, note, join link or token: an alert holds none of 
 """
 
 from collections.abc import Callable
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from app.domain.alert_delivery import TEST_ALERT
 from app.domain.alert_model import AlertTarget, RenderedAlert
-from app.domain.alerts import Alert, AlertLevel
+from app.domain.alerts import QUEUE_WAIT_EVENT, WORKER_ALERT, Alert, AlertLevel
 
 LEVEL_KEYS: dict[AlertLevel, str] = {
     AlertLevel.INFO: "alert.message.level.info",
@@ -23,12 +24,34 @@ LEVEL_KEYS: dict[AlertLevel, str] = {
 Gettext = Callable[..., str]
 
 
-def alert_link(base_url: str, alert: Alert) -> str:
-    """Return where the alert leads in the portal: the overview's alerts, or the log's chain."""
-    base = base_url.rstrip("/")
+STATUS_PATH = "/admin/settings"
+"""Where *System status* lives; the worker alert leads there."""
+
+
+def alert_path(alert: Alert) -> str:
+    """Return where an alert leads in the portal, the same for the banner and a message.
+
+    The worker alert leads to *System status*, a queue wait to the group's queue, an event in a
+    trace to its chain in the log, and any other to the log's system problems (of its group).
+    Whether the reader may open the log is the banner's own check.
+    """
+    if alert.action == WORKER_ALERT:
+        return STATUS_PATH
+    if alert.action == QUEUE_WAIT_EVENT and alert.group:
+        return f"/admin/groups/{alert.group}/queue"
     if alert.trace_id:
-        return f"{base}/admin/audit?trace={alert.trace_id}"
-    return f"{base}/admin/"
+        return f"/admin/audit?trace={alert.trace_id}"
+    narrow = {
+        "source": "system",
+        "problems": "1",
+        **({"group": alert.group} if alert.group else {}),
+    }
+    return f"/admin/audit?{urlencode(narrow)}"
+
+
+def alert_link(base_url: str, alert: Alert) -> str:
+    """Return the full address of ``alert_path`` for a message."""
+    return f"{base_url.rstrip('/')}{alert_path(alert)}"
 
 
 def compose_alert(

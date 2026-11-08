@@ -17,18 +17,29 @@ counts, the version and a link into the portal (ADR 0082 point 10). Never a part
 
 import re
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime, timedelta
+from enum import StrEnum
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.alert_model import (
+    AlertChannelKind,
     AlertTarget,
     DeliveryState,
     RenderedAlert,
 )
-from app.domain.alerts import ALERT_RULES, Alert, AlertLevel, open_alerts
-from app.domain.audit import SYSTEM_ACTOR, AuditEvent, AuditFilter, Outcome, Source
+from app.domain.alerts import (
+    ALERT_RULES,
+    Alert,
+    AlertLevel,
+    condition_events,
+    open_alerts,
+    reports_since,
+)
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.authorization import Permission, Principal, Scope
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.job_plan import BACKOFF
 from app.domain.ports import (
     AlertSenders,
     BotTokenStore,
@@ -49,10 +60,11 @@ MAX_TARGETS = 10
 """Targets per scope at most (ADR 0082 *Settings*); a fixed bound, not a setting."""
 BOT_TOKEN = re.compile(r"^[A-Za-z0-9_.-]{20,400}$")
 """A Webex bot's access token: letters, digits, ``_``, ``.``, ``-``; never logged or shown."""
-RETRY_AFTER = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=15))
-"""Waits before the retries of a failed delivery, as for jobs (ADR 0068)."""
-EVENTS_PER_RULE = 200
-"""Newest events read per condition action, as ``alerts.EVENTS_PER_RULE``."""
+RETRY_AFTER = BACKOFF
+"""Waits before the retries of a failed delivery: the jobs' backoff (ADR 0068); after the last
+retry the delivery waits for the repeat interval."""
+NOTIFY_EVERY = timedelta(minutes=1)
+"""How often the worker delivers due alerts; fixed, the repeat is the setting."""
 
 
 def takes(target: AlertTarget, alert: Alert) -> bool:
@@ -60,37 +72,39 @@ def takes(target: AlertTarget, alert: Alert) -> bool:
     return alert.level.rank >= AlertLevel(target.min_level).rank
 
 
-def due(alert: Alert, state: DeliveryState | None, now: datetime, repeat: timedelta) -> bool:
-    """Return whether ``alert`` must be sent now to the target ``state`` belongs to.
+class Action(StrEnum):
+    """What the notifier does with one alert for one target now."""
 
-    A new streak or a higher level (a new token) is sent at once; the same one again only after
-    ``repeat``. A failed delivery waits for its ``retry_at``; after the last retry it waits for
-    the repeat, counted from the first failure's moment.
+    SEND = "send"
+    WAIT = "wait"
+
+
+def step(alert: Alert, state: DeliveryState | None, now: datetime, repeat: timedelta) -> Action:
+    """Return whether ``alert`` is sent to the target ``state`` belongs to, now (the one rule).
+
+    A new streak or a higher level (a new token) goes out at once. The same one again only
+    after ``repeat`` since it was last sent. A failed delivery waits for its ``retry_at``.
     """
     if state is None:
-        return True
+        return Action.SEND
     if state.retry_at is not None:
-        if state.attempts > len(RETRY_AFTER):
-            return state.sent_at is None or now - state.sent_at >= repeat
-        return now >= state.retry_at
+        return Action.SEND if now >= state.retry_at else Action.WAIT
     if state.token != alert.token:
-        return True
-    return state.sent_at is not None and now - state.sent_at >= repeat
+        return Action.SEND
+    if state.sent_at is not None and now - state.sent_at >= repeat:
+        return Action.SEND
+    return Action.WAIT
 
 
-def after_failure(state: DeliveryState, alert: Alert, now: datetime) -> DeliveryState:
-    """Return the state after a failed try: the next retry, or none left until the repeat."""
+def outcome(
+    state: DeliveryState, alert: Alert, sent: bool, now: datetime, repeat: timedelta
+) -> DeliveryState:
+    """Return the state after a try: sent, the next retry, or (retries used up) the repeat."""
+    if sent:
+        return replace(state, token=alert.token, sent_at=now, attempts=0, retry_at=None)
     attempts = state.attempts + 1
-    wait = RETRY_AFTER[min(attempts, len(RETRY_AFTER)) - 1]
-    return DeliveryState(
-        state.target_id,
-        state.key,
-        state.token,
-        state.sent_at if attempts <= len(RETRY_AFTER) else now,
-        state.suppressed,
-        attempts,
-        now + wait,
-    )
+    wait = RETRY_AFTER[attempts - 1] if attempts <= len(RETRY_AFTER) else repeat
+    return replace(state, token=alert.token, attempts=attempts, retry_at=now + wait)
 
 
 def trial_alert(now: datetime, organisation: str | None) -> Alert:
@@ -99,14 +113,17 @@ def trial_alert(now: datetime, organisation: str | None) -> Alert:
 
 
 class AlertNotifier:
-    """Sends the open alerts to their targets; the worker runs it every minute.
+    """Sends the open alerts to their targets, at most every ``NOTIFY_EVERY``.
+
+    The worker asks it on every loop; it decides itself when a run is due, like the watches.
 
     Args:
         uow: Opens database transactions.
         clock: Current time.
         senders: The sender of a target (``AlertSenders``); ``None`` when it has none.
-        compose: Writes an alert out: ``compose(alert, target, suppressed, locale)``, in the
-            default locale of the target's organisation (Dutch for the platform's).
+        compose: Writes an alert out: ``compose(alert, target, reports, locale)``, in the
+            default locale of the target's organisation (Dutch for the platform's), ``reports``
+            being the condition's reports since the previous message.
         repeat: How long before a lasting alert is sent again (``alert_repeat_hours``).
     """
 
@@ -118,22 +135,27 @@ class AlertNotifier:
         compose: Callable[[Alert, AlertTarget, int, str], RenderedAlert],
         repeat: timedelta | Callable[[], timedelta],
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators; the first run is on the first ask."""
         self._uow = uow
         self._clock = clock
         self._senders = senders
         self._compose = compose
         self._repeat = repeat
+        self._ran_at: datetime | None = None
 
-    async def run(self) -> int:
-        """Deliver what is due; return how many messages went out."""
+    async def run(self) -> int | None:
+        """Deliver what is due when a run is due; return how many went out, ``None`` if not."""
         now = self._clock.now()
+        if self._ran_at is not None and now - self._ran_at < NOTIFY_EVERY:
+            return None
+        self._ran_at = now
         repeat = value_of(self._repeat)
         async with self._uow.read() as tx:
-            alerts = await _open(tx)
+            events = await condition_events(tx, (rule.action for rule in ALERT_RULES))
             targets = await tx.all_alert_targets()
             organisations = {o.id: o for o in await tx.list_organisations(Scope(True))}
             states = {(s.target_id, s.key): s for s in await tx.list_alert_deliveries()}
+        alerts = open_alerts(events)
         sent = 0
         for target in targets:
             owner = organisations.get(target.organisation_id) if target.organisation_id else None
@@ -145,27 +167,12 @@ class AlertNotifier:
                 if alert.organisation != slug or not takes(target, alert):
                     continue
                 state = states.get((_id(target), alert.key))
-                if not due(alert, state, now, repeat):
-                    if state is not None and state.token == alert.token and state.retry_at is None:
-                        await self._count(state)
+                if step(alert, state, now, repeat) is Action.WAIT:
                     continue
-                sent += await self._deliver(target, alert, state, now, locale)
+                since = state.sent_at if state and state.sent_at else alert.since
+                reports = reports_since(events, alert, since) if state and state.sent_at else 0
+                sent += await self._deliver(target, alert, state, now, repeat, locale, reports)
         return sent
-
-    async def _count(self, state: DeliveryState) -> None:
-        """Count a report of an alert that was already sent (dedupe, ADR 0082 point 9)."""
-        async with self._uow.locked() as tx:
-            await tx.save_alert_delivery(
-                DeliveryState(
-                    state.target_id,
-                    state.key,
-                    state.token,
-                    state.sent_at,
-                    state.suppressed + 1,
-                    state.attempts,
-                    state.retry_at,
-                )
-            )
 
     async def _deliver(
         self,
@@ -173,22 +180,18 @@ class AlertNotifier:
         alert: Alert,
         state: DeliveryState | None,
         now: datetime,
+        repeat: timedelta,
         locale: str,
+        reports: int,
     ) -> int:
         """Send ``alert`` to ``target`` and store the outcome; return 1 when it went out."""
-        suppressed = state.suppressed if state is not None else 0
-        message = self._compose(alert, target, suppressed, locale)
-        error = await send(self._senders, target, message)
+        error = await send(self._senders, target, self._compose(alert, target, reports, locale))
         base = state or DeliveryState(_id(target), alert.key, alert.token)
         async with self._uow.locked() as tx:
-            if error is None:
-                await tx.save_alert_delivery(
-                    DeliveryState(_id(target), alert.key, alert.token, now)
-                )
-                return 1
-            await tx.save_alert_delivery(after_failure(base, alert, now))
-            await tx.add_audit_event(_failure(target, alert, error, now))
-        return 0
+            await tx.save_alert_delivery(outcome(base, alert, error is None, now, repeat))
+            if error is not None:
+                await tx.add_audit_event(_failure(target, alert, error, now))
+        return 1 if error is None else 0
 
 
 async def send(senders: AlertSenders, target: AlertTarget, message: RenderedAlert) -> str | None:
@@ -263,12 +266,14 @@ class AlertTargetService:
         if token is not None and not BOT_TOKEN.fullmatch(token):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "bot_token")
         now = self._clock.now()
-        await self._bots.save(organisation_id, token, now)
+        # The audit event first: a token that changed without one is worse than an event of a
+        # change that then failed (and the admin sees the failure).
         async with self._uow.locked() as tx:
             action = "set" if token else "remove"
             await record_change(
                 tx, now, principal, permission, organisation, None, f"alert_bot.{action}"
             )
+        await self._bots.save(organisation_id, token, now)
 
     async def targets(self, principal: Principal, organisation: str | None) -> list[AlertTarget]:
         """Return the targets of the platform (``None``) or of ``organisation``.
@@ -280,21 +285,29 @@ class AlertTargetService:
         async with self._uow.read() as tx:
             return await tx.list_alert_targets(organisation_id)
 
-    async def add(self, principal: Principal, organisation: str | None, target: AlertTarget) -> int:
-        """Store ``target`` for the platform or ``organisation``; at most ``MAX_TARGETS``.
+    async def add(
+        self,
+        principal: Principal,
+        organisation: str | None,
+        kind: str,
+        address: str,
+        min_level: str,
+    ) -> int:
+        """Store a target for the platform or ``organisation``; at most ``MAX_TARGETS``.
 
         Raises:
             DomainError: ``not_permitted``, ``organisation_not_found`` or
-                ``invalid_configuration`` naming ``targets`` (limit reached).
+                ``invalid_configuration`` naming ``kind``, ``address``, ``min_level`` or
+                ``targets`` (limit reached).
         """
         organisation_id, permission = await self._authorize(principal, organisation)
+        if kind not in {k.value for k in AlertChannelKind}:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "kind")
+        target = AlertTarget(None, organisation_id, AlertChannelKind(kind), address, min_level)
         async with self._uow.locked() as tx:
             if len(await tx.list_alert_targets(organisation_id)) >= MAX_TARGETS:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "targets")
-            stored = AlertTarget(
-                None, organisation_id, target.kind, target.address, target.min_level
-            )
-            target_id = await tx.add_alert_target(stored)
+            target_id = await tx.add_alert_target(target)
             await record_change(
                 tx,
                 self._clock.now(),
@@ -384,17 +397,6 @@ class AlertTargetService:
             if target.id == target_id:
                 return target
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "target")
-
-
-async def _open(tx: Transaction) -> list[Alert]:
-    """Return every open alert of every rule, in all scopes (the worker sees everything)."""
-    events: list[AuditEvent] = []
-    for rule in ALERT_RULES:
-        entries = await tx.list_audit_events(
-            Scope(True), EVENTS_PER_RULE, AuditFilter(source=Source.SYSTEM, action=rule.action)
-        )
-        events += [entry.event for entry in entries]
-    return open_alerts(events)
 
 
 def _id(target: AlertTarget) -> int:

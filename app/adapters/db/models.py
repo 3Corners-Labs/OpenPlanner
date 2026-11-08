@@ -1505,6 +1505,5 @@ class AlertDeliveryRow(Base):
     alert_key: Mapped[str] = mapped_column(String(255), primary_key=True)
     token: Mapped[str] = mapped_column(String(32))
     sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
-    suppressed: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     retry_at: Mapped[datetime | None] = mapped_column(UTCDateTime())

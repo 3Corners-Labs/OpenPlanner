@@ -76,7 +76,6 @@ class AlertTargetQueries:
                 row.alert_key,
                 row.token,
                 row.sent_at,
-                row.suppressed,
                 row.attempts,
                 row.retry_at,
             )
@@ -91,7 +90,6 @@ class AlertTargetQueries:
                 alert_key=state.key[:255],
                 token=state.token,
                 sent_at=state.sent_at,
-                suppressed=state.suppressed,
                 attempts=state.attempts,
                 retry_at=state.retry_at,
             )

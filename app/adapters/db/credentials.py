@@ -9,6 +9,7 @@ import json
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
@@ -37,6 +38,13 @@ class CredentialStore:
             return None
         value: dict[str, Any] = json.loads(self._box.open(name, row.nonce, row.ciphertext))
         return value
+
+    async def delete(self, name: str) -> None:
+        """Remove the credential ``name``, if any."""
+        async with locked_session(self._engine) as session:
+            await session.execute(
+                delete(IntegrationCredentialRow).where(IntegrationCredentialRow.name == name)
+            )
 
     async def put(self, name: str, value: dict[str, Any], now: datetime) -> None:
         """Create or replace the credential ``name``."""

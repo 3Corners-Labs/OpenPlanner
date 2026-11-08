@@ -49,6 +49,9 @@ class Secrets:
     async def put(self, name: str, value: dict[str, object], now: object) -> None:
         self.values[name] = value
 
+    async def delete(self, name: str) -> None:
+        self.values.pop(name, None)
+
 
 async def test_email_goes_out_as_plain_text_and_failures_become_integration_errors() -> None:
     mail = Mail()
@@ -123,4 +126,5 @@ async def test_the_sender_follows_the_targets_kind_and_scope() -> None:
         assert secrets.values[bot_name(1)] == {"token": "x" * 30}
         await bots.save(1, None, None)  # type: ignore[arg-type]
         assert not await bots.has_token(1)
+        assert bot_name(1) not in secrets.values  # removed, not an empty token
         assert bot_name(None) == "webex-bot:platform"
