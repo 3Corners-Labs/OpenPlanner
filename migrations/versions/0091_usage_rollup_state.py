@@ -2,8 +2,9 @@
 
 ``usage_rollup_state`` is one row: the id of the last fact the worker rolled into ``usage_hour``,
 when it did, when the backfill of old bookings was completed, and the hour from which live
-facts exist (the backfill never repeats what live code wrote). The rollup advances it in the same transaction as the counts, so a crash
-neither double-counts nor loses a fact. ``usage_backfill`` holds one row per booking already
+facts exist (the backfill never repeats what live code wrote). The rollup advances the
+watermark in the same transaction as the counts, so a crash neither double-counts nor loses
+a fact. ``usage_backfill`` holds one row per booking already
 turned into facts by ``python -m app.cli usage-backfill`` (idempotence); it holds a booking id
 and nothing else, and a booking row goes with its row. Both are expand-only and hold no
 personal data.
