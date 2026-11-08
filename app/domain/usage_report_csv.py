@@ -82,7 +82,8 @@ def _heat(name: str, heat: HeatTable) -> Iterator[Row]:
 def _per_day(name: str, days: tuple[object, ...]) -> Iterator[Row]:
     """Yield one line per figure of each day of a day table (``DayRow``, ``DayPeak``, …)."""
     for day in days:
-        assert is_dataclass(day)  # noqa: S101 - a day table holds dataclasses, nothing else
+        if not is_dataclass(day):
+            raise TypeError(f"day table {name} holds something that is no dataclass")
         values = {f.name: getattr(day, f.name) for f in fields(day)}
         label = values.pop("day").isoformat()
         for column, value in values.items():
@@ -116,7 +117,8 @@ def screen_rows(report: object) -> list[Row]:
         report: A report of one family (``VolumeReport``, ``QueueReport``, ``CapacityReport``
             or ``ChannelsReport``); its small cells are already hidden.
     """
-    assert is_dataclass(report)  # noqa: S101 - reports are frozen dataclasses
+    if not is_dataclass(report):
+        raise TypeError("a report is a dataclass")
     rows: list[Row] = []
     for field in fields(report):
         if field.name in _NOT_TABLES | _PRESENTATION:
