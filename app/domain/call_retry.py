@@ -12,17 +12,15 @@ it counts toward the hourly alert on many changes by one person (``planner_chang
                                               ─► replace pending job ─► audit
 """
 
-from collections.abc import Callable
 from datetime import datetime
 
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, require
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Booking
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import RETRYABLE_JOBS, JobType, PlannedJob
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.scheduling import Group
-from app.domain.tunable import value_of
 
 
 class CallRetryService:
@@ -31,22 +29,14 @@ class CallRetryService:
     Args:
         uow: Opens database transactions.
         clock: Current time.
-        admin: Authorises and audits the retry.
-        alert_per_hour: ``planner_changes_alert_per_hour`` (class C).
+        admin: Authorises and audits the retry, with its hourly alert.
     """
 
-    def __init__(
-        self,
-        uow: UnitOfWork,
-        clock: Clock,
-        admin: AdminService,
-        alert_per_hour: int | Callable[[], int],
-    ) -> None:
+    def __init__(self, uow: UnitOfWork, clock: Clock, admin: AdminService) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
-        self._alert_per_hour = alert_per_hour
 
     async def retry(self, principal: Principal, slug: str, booking_id: int, job: JobType) -> None:
         """Plan ``job`` again for the booking.
@@ -76,7 +66,7 @@ class CallRetryService:
             await tx.add_jobs(
                 booking_id, [PlannedJob(job, _run_at(booking, group, job, now), booking.start)]
             )
-            await record_change(
+            await self._admin.record_change(
                 tx,
                 now,
                 principal,
@@ -85,7 +75,6 @@ class CallRetryService:
                 slug,
                 f"retry.{job.value}",
                 booking_id=booking_id,
-                alert_threshold=value_of(self._alert_per_hour),
             )
 
 

@@ -34,7 +34,8 @@ async def _setup(alert_per_hour: int = 50) -> tuple[InMemoryUnitOfWork, CallRetr
     receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY), slug="demo")
     booking_id = receipt.booking.id or 0
     uow.state.jobs[booking_id] = []  # the first attempts ran and failed
-    service = CallRetryService(uow, clock, AdminService(uow, clock), alert_per_hour)
+    thresholds = {Permission.BOOKINGS_MANAGE: alert_per_hour}
+    service = CallRetryService(uow, clock, AdminService(uow, clock, alert_thresholds=thresholds))
     return uow, service, booking_id
 
 
@@ -49,10 +50,11 @@ async def test_a_failed_meeting_is_planned_again_now_and_audited() -> None:
         PlannedJob(JobType.CREATE_VIDEO_ROOM, NOW, booking.start)
     ]  # a second click replaces the pending job
     event = uow.state.audit[-1]
-    assert (event.action, event.group, event.detail) == (
+    assert (event.action, event.group, event.detail, event.booking_id) == (
         Permission.BOOKINGS_MANAGE.value,
         "demo",
         "retry.create_video_room",
+        booking_id,
     )
 
 

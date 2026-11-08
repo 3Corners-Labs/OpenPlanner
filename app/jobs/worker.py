@@ -206,7 +206,6 @@ async def run_worker(
                 Translator(load_catalogues(), CachedTextOverrides(uow)).gettext,
                 settings.public_base_url,
             ),
-            lambda: live.settings.planner_changes_alert_per_hour,
         )
 
         # ADR 0082 points 6 and 7: reconcile stale tasks, then recompute the health.

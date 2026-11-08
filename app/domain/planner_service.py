@@ -19,15 +19,16 @@ agreed to it (ADR 0022).
 A planner never changes a booking that starts within the group's planner lead, that has been
 dispatched to the contact center, or that is neither confirmed nor awaiting confirmation
 (``booking_changes``). When one
-planner makes more than ``alert_per_hour`` changes in an hour, a system event warns the
-group's admins (abuse case: a compromised planner account). It never blocks.
+planner makes more than ``planner_changes_alert_per_hour`` changes in an hour, a system event
+warns the group's admins (abuse case: a compromised planner account; ``AdminService`` runs it,
+``app.domain.activity_alert``). It never blocks.
 """
 
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from app.domain import booking_changes
-from app.domain.admin import AdminService, Authorization, record_change, require
+from app.domain.admin import AdminService, Authorization, require
 from app.domain.agenda import AgendaSlot, ShortfallAcceptance
 from app.domain.agenda_service import agenda_days
 from app.domain.authorization import Permission, Principal, scope_for
@@ -45,7 +46,7 @@ from app.domain.reschedule_proposal import (
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.slot_close import shortfall_resolved
-from app.domain.tunable import value_for, value_of
+from app.domain.tunable import value_for
 from app.domain.usage import ActorClass
 
 CONFIRMED_BY_STAFF = "booking.confirmed_by_staff"
@@ -58,9 +59,9 @@ class PlannerService:
     Args:
         uow: Opens database transactions.
         clock: Current time.
-        admin: Authorises every operation and audits refusals.
+        admin: Authorises every operation, audits refusals, and records each change with its
+            hourly alert (``planner_changes_alert_per_hour``).
         bookings: Places the moved booking (shared with the participant's reschedule).
-        alert_per_hour: ``planner_changes_alert_per_hour`` (class C).
         rebook_days: ``planner_rebook_days`` (class D): a request lapses this long after the
             booking's start.
         reminder_days: ``planner_rebook_reminder_days`` (class D): the one reminder goes this
@@ -75,7 +76,6 @@ class PlannerService:
         clock: Clock,
         admin: AdminService,
         bookings: BookingService,
-        alert_per_hour: int | Callable[[], int],
         *,
         rebook_days: int | Callable[[int], int] = 14,
         reminder_days: int | Callable[[int], int] = 3,
@@ -86,7 +86,6 @@ class PlannerService:
         self._clock = clock
         self._admin = admin
         self._bookings = bookings
-        self._alert_per_hour = alert_per_hour
         self._rebook_days = rebook_days
         self._reminder_days = reminder_days
         self._proposal_hours = proposal_hours
@@ -408,7 +407,7 @@ class PlannerService:
     ) -> None:
         """Record the change; warn once when the planner passes the hourly threshold."""
         target = authorization.target
-        await record_change(
+        await self._admin.record_change(
             tx,
             self._clock.now(),
             principal,
@@ -417,7 +416,6 @@ class PlannerService:
             target.group,
             detail,
             booking_id=booking_id,
-            alert_threshold=value_of(self._alert_per_hour),
         )
 
 

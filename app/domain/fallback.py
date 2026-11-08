@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterable
 from datetime import datetime
 from typing import Protocol
 
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, require
 from app.domain.alert_delivery import DEFAULT_LOCALE
 from app.domain.alerts import FALLBACK_EVENT
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
@@ -35,7 +35,6 @@ from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.ports import Clock, IntegrationError, UnitOfWork
 from app.domain.scheduling import Group
-from app.domain.tunable import value_of
 
 ON = "on"
 """Reason of the ``dispatch.fallback`` failure."""
@@ -77,8 +76,6 @@ class FallbackService:
         integration: Writes timeline events and the call status.
         poster: Posts to a team space.
         texts: The messages for the space.
-        alert_per_hour: ``planner_changes_alert_per_hour`` (class C): ending a fallback by hand
-            counts toward the hourly alert on many changes by one person.
     """
 
     def __init__(
@@ -89,7 +86,6 @@ class FallbackService:
         integration: IntegrationService,
         poster: SpacePoster,
         texts: FallbackTexts,
-        alert_per_hour: int | Callable[[], int],
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -98,7 +94,6 @@ class FallbackService:
         self._integration = integration
         self._poster = poster
         self._texts = texts
-        self._alert_per_hour = alert_per_hour
 
     async def diverts(self, booking: Booking, group: Group) -> bool:
         """Put a booking due for dispatch in the own queue while its group is in fallback.
@@ -196,7 +191,7 @@ class FallbackService:
             await tx.save_group_fallback(group.id, None)
             await tx.add_audit_event(_event(group, organisation, Outcome.SUCCESS, now))
             if principal is not None:
-                await record_change(
+                await self._admin.record_change(
                     tx,
                     now,
                     principal,
@@ -204,7 +199,6 @@ class FallbackService:
                     organisation,
                     group.slug,
                     "fallback.off",
-                    alert_threshold=value_of(self._alert_per_hour),
                 )
             waiting = [
                 b

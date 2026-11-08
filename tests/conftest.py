@@ -13,7 +13,8 @@ from pydantic import SecretStr
 
 from app.adapters.integrations import Integrations
 from app.config import Settings
-from app.domain.audit import AuditEvent
+from app.domain.activity_alert import ALERTS
+from app.domain.audit import AuditEvent, Outcome
 from app.domain.event_context import set_service
 from app.domain.event_schema import detail_problem
 from app.domain.log_events import lookup
@@ -26,6 +27,18 @@ APP = str(ROOT / "app") + "/"
 READ_BACK = APP + "adapters/db/"
 """Where events are built from stored rows; the action was checked when it was written."""
 
+COUNTED = frozenset(alert.permission.value for alert in ALERTS)
+"""Actions an hourly alert counts (``app.domain.activity_alert``)."""
+
+ALERTED = ("domain/admin.py", "_change_event")
+"""Where a counted success is built: for ``AdminService.record_change``, which runs its alert."""
+
+
+def built_outside_its_alert(event: AuditEvent, where: str, function: str) -> bool:
+    """Whether ``event`` is a success an hourly alert counts, built where its check never runs."""
+    counted = event.outcome is Outcome.SUCCESS and event.action in COUNTED
+    return counted and (where, function) != ALERTED
+
 
 @pytest.fixture(autouse=True, scope="session")
 def _audited_actions_are_registered() -> Iterator[None]:
@@ -35,10 +48,12 @@ def _audited_actions_are_registered() -> Iterator[None]:
     constant, ``job.<type>``), so this watches the events the code in ``app/`` creates instead
     of reading the source; ``tests/test_log_events_scan.py`` covers the log calls. The same
     watch checks that every detail follows the convention the line's ``labels.*`` are read
-    from (ADR 0103 point 6, ``app.domain.event_schema.detail_problem``).
+    from (ADR 0103 point 6, ``app.domain.event_schema.detail_problem``), and that a success an
+    hourly alert counts comes from ``AdminService.record_change`` (ADR 0044).
     """
     seen: dict[str, str] = {}
     malformed: dict[str, str] = {}
+    unchecked: dict[str, str] = {}
     original = AuditEvent.__post_init__
 
     def watched(event: AuditEvent) -> None:
@@ -50,6 +65,8 @@ def _audited_actions_are_registered() -> Iterator[None]:
             problem = detail_problem(event.detail)
             if problem is not None:
                 malformed.setdefault(f"{where} ({event.action})", problem)
+            if built_outside_its_alert(event, where, caller.co_name):
+                unchecked.setdefault(f"{where} ({caller.co_name})", event.action)
 
     AuditEvent.__post_init__ = watched  # type: ignore[method-assign]
     yield
@@ -57,6 +74,7 @@ def _audited_actions_are_registered() -> Iterator[None]:
     unknown = {action: where for action, where in seen.items() if lookup(action) is None}
     assert unknown == {}, "audited actions missing from app/domain/log_events.py"
     assert malformed == {}, "audit details that break the convention of app/domain/event_schema"
+    assert unchecked == {}, "counted successes built outside AdminService.record_change"
 
 
 @pytest.fixture(autouse=True)

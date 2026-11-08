@@ -17,7 +17,7 @@ values that were refused (ADR 0049), and audits what changed in their roles and 
 since the last one (ADR 0046).
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 
@@ -65,6 +65,7 @@ from app.domain.staff import (
     change_events,
 )
 from app.domain.tasks import ActiveJobs
+from app.domain.tunable import value_of
 
 ANONYMOUS = ANONYMOUS_ACTOR
 """Actor recorded for events without a logged-in admin (e.g. a failed login)."""
@@ -105,6 +106,11 @@ class AdminService:
         clock: Current time, for audit events.
         retention_of: The organisation's maximum for bookings on hold, for the retention
             overview (ADR 0102, class D).
+        alert_thresholds: Per permission that an hourly alert counts
+            (``app.domain.activity_alert``), its threshold or the live setting that holds it:
+            ``planner_changes_alert_per_hour`` for ``bookings.manage`` and
+            ``contact_reveals_alert_per_hour`` for ``bookings.view`` (class C). Without one,
+            ``record_change`` refuses that permission.
     """
 
     def __init__(
@@ -112,11 +118,54 @@ class AdminService:
         uow: UnitOfWork,
         clock: Clock,
         retention_of: ClosureRetentionOf = default_closure_retention,
+        alert_thresholds: Mapping[Permission, int | Callable[[], int]] | None = None,
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators.
+
+        Raises:
+            ValueError: If a threshold is given for a permission that no alert counts.
+        """
+        thresholds = dict(alert_thresholds or {})
+        uncounted = sorted(p.value for p in thresholds if alert_for(p) is None)
+        if uncounted:
+            raise ValueError(f"no hourly alert counts {uncounted}")
         self._uow = uow
         self._clock = clock
         self._retention_of = retention_of
+        self._alert_thresholds = thresholds
+
+    async def record_change(
+        self,
+        tx: Transaction,
+        at: datetime,
+        principal: Principal,
+        permission: Permission,
+        organisation: str | None,
+        group: str | None,
+        detail: str = "",
+        *,
+        booking_id: int | None = None,
+    ) -> None:
+        """Record a successful admin action and run the hourly alert that counts it, if any.
+
+        The same event as the module's ``record_change``, in the caller's transaction. For a
+        permission that an alert counts (``app.domain.activity_alert``), the alert is checked
+        right after the event with this service's threshold.
+
+        Raises:
+            ValueError: If an alert counts ``permission`` and this service has no threshold
+                for it.
+        """
+        alert = alert_for(permission)
+        threshold = 0
+        if alert is not None:
+            if permission not in self._alert_thresholds:
+                raise ValueError(f"{alert.action} counts {permission.value}: no threshold given")
+            threshold = value_of(self._alert_thresholds[permission])
+        event = _change_event(at, principal, permission, organisation, group, detail, booking_id)
+        await tx.add_audit_event(event)
+        if alert is not None:
+            await alert.check(tx, event, threshold)
 
     async def authorize(
         self,
@@ -528,23 +577,36 @@ async def record_change(
     detail: str = "",
     *,
     booking_id: int | None = None,
-    alert_threshold: int | None = None,
 ) -> None:
     """Record a successful admin action in the same transaction as the action itself.
 
     Mostly a change; also a request worth accounting for, such as showing a participant's
     contact details (ADR 0044 §2). ``detail`` names what changed or was asked for (field
     names, ``rule.add``-style keys), never values; ``booking_id`` names the booking it is about.
-    A permission that an hourly alert counts (``app.domain.activity_alert``) needs that alert's
-    ``alert_threshold``: the alert is checked right after the event, in this transaction.
+    A permission that an hourly alert counts goes through ``AdminService.record_change``, which
+    runs the alert as well.
 
     Raises:
-        ValueError: If ``permission`` is counted by an alert and no ``alert_threshold`` is given.
+        ValueError: If an hourly alert counts ``permission`` (``app.domain.activity_alert``).
     """
     alert = alert_for(permission)
-    if alert is not None and alert_threshold is None:
-        raise ValueError(f"{permission.value} is counted by {alert.action}: pass its threshold")
-    event = AuditEvent(
+    if alert is not None:
+        raise ValueError(f"{alert.action} counts {permission.value}: use AdminService")
+    event = _change_event(at, principal, permission, organisation, group, detail, booking_id)
+    await tx.add_audit_event(event)
+
+
+def _change_event(
+    at: datetime,
+    principal: Principal,
+    permission: Permission,
+    organisation: str | None,
+    group: str | None,
+    detail: str,
+    booking_id: int | None,
+) -> AuditEvent:
+    """Build the audit event of a successful admin action (field names, never values)."""
+    return AuditEvent(
         at,
         principal.subject,
         permission.value,
@@ -555,6 +617,3 @@ async def record_change(
         detail,
         booking_id=booking_id,
     )
-    await tx.add_audit_event(event)
-    if alert is not None and alert_threshold is not None:
-        await alert.check(tx, event, alert_threshold)

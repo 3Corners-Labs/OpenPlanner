@@ -79,6 +79,7 @@ from app.domain.agenda_service import AgendaService
 from app.domain.alert_delivery import AlertTargetService
 from app.domain.alerts import AlertService
 from app.domain.api_access import ApiAccessService
+from app.domain.authorization import Permission
 from app.domain.branding_service import BrandingService
 from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
@@ -440,8 +441,15 @@ def create_app(
             reach=lambda org: _reach(per_organisation(org)),
         )
         app.state.participant_link_service = ParticipantLinkService(uow, clock)
+        # ADR 0044: the hourly alerts, one threshold per counted permission, for every writer.
         app.state.admin_service = AdminService(
-            uow, clock, app.state.live_settings.closure_retention
+            uow,
+            clock,
+            app.state.live_settings.closure_retention,
+            {
+                Permission.BOOKINGS_MANAGE: lambda: live().planner_changes_alert_per_hour,
+                Permission.BOOKINGS_VIEW: lambda: live().contact_reveals_alert_per_hour,
+            },
         )
         app.state.usage_report_service = UsageReportService(
             uow,
@@ -634,17 +642,10 @@ def create_app(
             lambda: timedelta(seconds=live().meeting_status_refresh_seconds),
             settings.app_version,
         )
-
-        def changes_alert_per_hour() -> int:
-            # ADR 0044: one threshold for every writer of a bookings.manage change.
-            return live().planner_changes_alert_per_hour
-
-        app.state.call_retry_service = CallRetryService(
-            uow, clock, app.state.admin_service, changes_alert_per_hour
-        )
+        app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
         # ADR 0044 §2: the participant's contact details on the booking page, on request.
         app.state.participant_contact_service = ParticipantContactService(
-            uow, clock, app.state.admin_service, lambda: live().contact_reveals_alert_per_hour
+            uow, clock, app.state.admin_service
         )
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
@@ -729,7 +730,6 @@ def create_app(
             app.state.integration_service,
             BotSpacePoster(app.state.bot_tokens, http, live().webex_api_base_url, request_log),
             SpaceTexts(app.state.translator.gettext, settings.public_base_url),
-            changes_alert_per_hour,
         )
         text_overrides.attach(uow)
         app.state.organisation_text_service = OrganisationTextService(
@@ -769,7 +769,6 @@ def create_app(
             clock,
             app.state.admin_service,
             app.state.booking_service,
-            changes_alert_per_hour,
             rebook_days=lambda org: per_organisation(org).planner_rebook_days,
             reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
             proposal_hours=lambda org: _proposal_hours(per_organisation(org)),

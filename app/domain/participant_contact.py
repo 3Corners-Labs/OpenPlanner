@@ -23,14 +23,11 @@ stopped.
     reveal  bookings.view  group level  the contact details of one booking of the group
 """
 
-from collections.abc import Callable
-
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, require
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Contact
 from app.domain.lookups import group_booking
 from app.domain.ports import Clock, UnitOfWork
-from app.domain.tunable import value_of
 
 CONTACT_VIEWED = "booking.contact_viewed"
 """The audit detail of a request for a participant's contact details."""
@@ -42,22 +39,15 @@ class ParticipantContactService:
     Args:
         uow: Opens database transactions.
         clock: Current time, for the audit event.
-        admin: Authorises every request and audits refusals.
-        alert_per_hour: ``contact_reveals_alert_per_hour`` (class C).
+        admin: Authorises every request, audits refusals, and records each request with its
+            hourly alert (``contact_reveals_alert_per_hour``).
     """
 
-    def __init__(
-        self,
-        uow: UnitOfWork,
-        clock: Clock,
-        admin: AdminService,
-        alert_per_hour: int | Callable[[], int],
-    ) -> None:
+    def __init__(self, uow: UnitOfWork, clock: Clock, admin: AdminService) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
-        self._alert_per_hour = alert_per_hour
 
     async def reveal(self, principal: Principal, slug: str, booking_id: int) -> Contact | None:
         """Return the contact details of one booking of the group, and audit the request.
@@ -82,7 +72,7 @@ class ParticipantContactService:
             booking, _ = await group_booking(tx, slug, booking_id)
             if booking.contact is None:
                 return None
-            await record_change(
+            await self._admin.record_change(
                 tx,
                 self._clock.now(),
                 principal,
@@ -91,6 +81,5 @@ class ParticipantContactService:
                 target.group,
                 CONTACT_VIEWED,
                 booking_id=booking_id,
-                alert_threshold=value_of(self._alert_per_hour),
             )
         return booking.contact

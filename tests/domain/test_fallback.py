@@ -9,7 +9,7 @@ from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService
 from app.domain.alerts import FALLBACK_EVENT
 from app.domain.audit import Outcome
-from app.domain.authorization import Scope
+from app.domain.authorization import Permission, Scope
 from app.domain.booking import Booking
 from app.domain.calls import EventKind
 from app.domain.connection_health import HealthEntry, HealthState, Platform
@@ -67,14 +67,14 @@ def wired(**fields: object) -> Setup:
 def service(
     setup: Setup, poster: Poster | None = None, alert_per_hour: int = 50
 ) -> FallbackService:
+    thresholds = {Permission.BOOKINGS_MANAGE: alert_per_hour}
     return FallbackService(
         setup.uow,
         setup.clock,
-        AdminService(setup.uow, setup.clock),
+        AdminService(setup.uow, setup.clock, alert_thresholds=thresholds),
         setup.integration,
         poster or Poster(),
         Texts(),
-        alert_per_hour,
     )
 
 

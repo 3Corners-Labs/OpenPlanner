@@ -7,17 +7,18 @@ hour. The event that takes the count one above the threshold (a class C setting)
 system event, so a burst raises one warning, not one per action. It only warns, never refuses:
 the action goes ahead, because a false alarm must not stop staff from helping a participant.
 
-    record_change(.., permission, .., alert_threshold=n)        (app.domain.admin)
-        ─► event stored ─► alert_for(permission).check(tx, event, n)
+    AdminService.record_change(.., permission, ..)               (app.domain.admin)
+        ─► event stored ─► alert_for(permission).check(tx, event, n = its threshold)
         ─► count(event.actor, permission, success, past hour) == n + 1
         ─► system event <alert>, failure, <reason>, "actor:<subject>,<counted>:<count>"
 
-The rule that keeps this exact: every counted event is written through ``record_change`` with
-its alert's threshold, so the check runs in the same transaction. ``record_change`` refuses a
-counted permission without a threshold, so a new writer fails its first test, and
-``tests/domain/test_activity_alert.py`` refuses a counted event built by hand. A counted event
-written without the check could carry the count past threshold + 1 unseen, and that burst would
-raise nothing. A refused attempt is not a success, so it never counts.
+The rule that keeps this exact: every counted event is written through
+``AdminService.record_change``, which runs the check in the same transaction with the threshold
+the composition root gave the service (``app/main.py``: the class C settings). The module's
+``record_change`` refuses a counted permission, the service refuses one it has no threshold
+for, and ``tests/conftest.py`` fails the test run on a counted success built anywhere else. A
+counted event written without the check could carry the count past threshold + 1 unseen, and
+that burst would raise nothing. A refused attempt is not a success, so it never counts.
 
 The warning carries the actor's subject identifier and a count, never a participant's data. It
 sits at the organisation and group of the event that crossed the threshold, so whoever may read
