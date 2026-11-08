@@ -15,6 +15,7 @@ from app.domain.configuration_changes import (
     RuleContext,
     Usage,
 )
+from app.domain.configuration_tree import walk
 from app.domain.configuration_values import Binary, Secret, Value
 from app.domain.errors import DomainError, ErrorCode
 from tests.support.configuration import (
@@ -772,3 +773,17 @@ def test_the_resolution_holds_the_settings_context_the_rules_need(version: int) 
     )
 
     assert seen[0].context.settings["limit"] == version
+
+
+def test_walking_a_tree_yields_every_object_with_its_address() -> None:
+    tags = (entity("tag", ("a",)),)
+    root = installation(shop("s", box("b", _children={"tags": tags})), shop("t"))
+
+    assert [(address, found.kind) for address, found in walk(root)] == [
+        (("s",), "shop"),
+        (("t",), "shop"),
+        ((), "platform"),
+        (("s", "b"), "box"),
+        (("s", "b", "a"), "tag"),
+    ]
+    assert [address for address, _ in walk(root, "tag")] == [("s", "b", "a")]

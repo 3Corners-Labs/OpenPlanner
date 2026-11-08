@@ -21,7 +21,6 @@ from dataclasses import dataclass
 
 from app.domain.authorization import LEVELS, Level, Permission, Target
 from app.domain.configuration_changes import (
-    Address,
     Change,
     ChangeAction,
     MayChange,
@@ -39,7 +38,7 @@ from app.domain.configuration_schema import (
     Kind,
     Shape,
 )
-from app.domain.configuration_tree import Action, Entity, path_of
+from app.domain.configuration_tree import Action, Address, Entity, path_of
 from app.domain.configuration_values import Value, canonical_json
 from app.domain.errors import DomainError, ErrorCode
 

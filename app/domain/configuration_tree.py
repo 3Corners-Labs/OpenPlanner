@@ -6,11 +6,14 @@ knowing what either was read from (ADR 0099 point 6). The tree holds no behaviou
 from JSON is ``configuration_document``, comparing two of them is ``configuration_plan``.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
 from app.domain.configuration_values import Value
+
+type Address = tuple[str, ...]
+"""An object's natural keys from the top of the tree: ``("acme", "helpdesk")`` for a group."""
 
 
 class Action(StrEnum):
@@ -59,3 +62,21 @@ def path_of(parent: str, collection: str, key: tuple[str, ...]) -> str:
     """Return the path of an object: the parent's, then the collection and the key parts."""
     own = collection + "".join(f"[{part}]" for part in key)
     return f"{parent}.{own}" if parent else own
+
+
+def walk(root: Entity, kind: str | None = None) -> Iterator[tuple[Address, Entity]]:
+    """Yield every object below ``root`` with its address, parents before their children.
+
+    Args:
+        root: The tree to walk (the root itself is not yielded).
+        kind: Only the objects of this kind, when given.
+    """
+    pending: list[tuple[Address, Entity]] = [((), root)]
+    while pending:
+        address, entity = pending.pop(0)
+        for children in entity.children.values():
+            for child in children:
+                here = (*address, *child.key)
+                if kind is None or child.kind == kind:
+                    yield here, child
+                pending.append((here, child))

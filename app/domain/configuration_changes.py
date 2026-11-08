@@ -13,12 +13,9 @@ from datetime import UTC, datetime
 from enum import StrEnum
 
 from app.domain.authorization import Permission, Target
-from app.domain.configuration_tree import Entity
+from app.domain.configuration_tree import Address, Entity
 from app.domain.configuration_values import Value
 from app.domain.errors import ErrorCode
-
-type Address = tuple[str, ...]
-"""An object's natural keys from the top of the tree: ``("acme", "helpdesk")`` for a group."""
 
 
 class ChangeAction(StrEnum):
