@@ -23,7 +23,9 @@ from tests.support.configuration_parts import installation, organisation, plan_o
 
 FMT = stub_format((IDENTITY_PROVIDERS,), (), *INTEGRITY)
 DISCOVERY = "https://idp.acme.nl/.well-known/openid-configuration"
-SECRET = "aHVudGVyMi1zZWNyZXQ="  # base64 text; the test opens it as the plain secret
+SECRET = (
+    "aHVudGVyMi1zZWNyZXQ="  # gitleaks:allow (test value: base64 the test opens as the plain secret)
+)
 
 
 def provider(**overrides: Any) -> dict[str, Any]:

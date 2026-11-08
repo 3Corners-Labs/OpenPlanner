@@ -22,7 +22,9 @@ from tests.support.configuration_columns import uncovered_columns
 from tests.support.configuration_parts import installation, organisation, plan_opened, stub_format
 
 FMT = stub_format((EMAIL_CHANNEL, SMS_CHANNEL), (), *INTEGRITY)
-SECRET = "aHVudGVyMi1zZWNyZXQ="  # base64 text; the test opens it as the plain secret
+SECRET = (
+    "aHVudGVyMi1zZWNyZXQ="  # gitleaks:allow (test value: base64 the test opens as the plain secret)
+)
 EMAIL_PATH = "organisations[acme].email"
 SMS_PATH = "organisations[acme].sms"
 
