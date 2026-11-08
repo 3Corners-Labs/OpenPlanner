@@ -259,7 +259,8 @@ flowchart LR
     smtp[adapters.smtp<br/>SmtpMailSender]
     smsad[adapters.senders · SMS_GATEWAYS<br/>webex_connect → WebexConnectSmsSender]
     videoad[adapters.webex_meetings<br/>WebexMeetings]
-    wxccad[adapters.wxcc<br/>WxccTasks]
+    wxccad[adapters.wxcc<br/>WxccTasks · DESCRIPTOR · WXCC_INBOUND]
+    ccreg[adapters.contact_centers<br/>DESCRIPTORS · INBOUND per kind]
     idpad[adapters.oidc<br/>OidcIdentityProvider]
     releasead[adapters.releases<br/>GitHubReleases]
     logad[adapters.log_senders<br/>Syslog · Splunk · Elastic · Http]
@@ -271,12 +272,25 @@ flowchart LR
     smsad -.implements.-> ports
     videoad -.implements.-> ports
     wxccad -.implements.-> ports
+    ccreg -.lists.-> wxccad
     idpad -.implements.-> ports
     releasead -.implements.-> ports
     logad -.implements.-> ports
     alertad -.implements.-> ports
 
 ```
+
+A contact-center platform is data (ADR 0032): the domain names it as a `ContactCenterKind`, the
+application holds one `ContactCenterDispatcher` per kind (`ContactCenterDispatchers`), and each
+platform's adapter describes its routing attributes (`ProviderDescriptor`) and its inbound
+webhooks (`InboundWebhook`). `adapters.contact_centers` is the one list of both; the webhook route
+`/webhooks/contact-center/{kind}` and the group's routing read from it. Webex Contact Center is
+the only platform today; `/webhooks/wxcc` is its older address. Where a routing or a task is
+stored is decided in one place, `app/adapters/db/contact_center_rows.py`, by the expand step of
+ADR 0116: for WxCC every write fills both the old `groups.wxcc_*` and `bookings.wxcc_task_id`
+columns and the new `group_contact_center` table and `bookings.contact_center_*` columns, and
+every read takes the old columns; the new places are read only for another kind. The next minor
+switches the read order, the one after drops the old columns.
 
 Tests replace every adapter with a fake from `tests/fakes/`. The in-memory unit of work has the
 same commit and rollback behaviour as the SQL one.
@@ -306,6 +320,7 @@ same commit and rollback behaviour as the SQL one.
 | Groups, staffing blocks (add, change, split, remove), staffing exceptions, preview (admin) | `app/domain/planning.py` |
 | Holiday calendars and their resolution per group (ADR 0025) | `app/domain/holidays.py`, `app/domain/holiday_service.py`, `app/admin/holiday_routes.py` |
 | What leaves for Webex/WxCC, timeline, call status, join window | `app/domain/calls.py` |
+| Contact-center platforms as data: kind, neutral routing, provider descriptor, task reference (ADR 0032) | `app/domain/contact_center.py`, `app/adapters/contact_centers.py`, `app/adapters/db/contact_center_rows.py` |
 | Recording platform events, admin timeline and agenda | `app/domain/integration.py` |
 | Creating meetings and work items (worker and direct calls) | `app/domain/call_service.py`, `app/jobs/calls.py` |
 | Cap on open direct calls, place in line, usual wait (ADR 0026) | `app/domain/direct_queue.py` |
@@ -313,7 +328,7 @@ same commit and rollback behaviour as the SQL one.
 | Updates from the admin portal: versions, requests, release check, banner, host updater (ADR 0029); live steps (ADR 0048) | `app/domain/updates.py`, `app/domain/update_service.py`, `app/adapters/releases.py`, `app/adapters/db/updates.py`, `app/adapters/db/backup.py`, `app/admin/update_routes.py`, `app/web/static/update-progress.js`, `app/cli.py`, `scripts/updater/` |
 | Installing and repairing a host: packages, settings files, pinned release, host updater (ADR 0050) | `scripts/install.sh`, `docs/install.md` |
 | Maintenance mode: switch, cache, refusals in `RequirePermission`, disabled buttons, participant and machine-API rules, alert (ADR 0038) | `app/domain/maintenance.py`, `app/domain/maintenance_service.py`, `app/adapters/db/maintenance_state.py`, `app/admin/maintenance_routes.py`, `app/admin/frozen_forms.py`, `app/api/maintenance.py`, `app/cli.py`, `scripts/updater/` |
-| Webex and WxCC adapters, encrypted tokens, webhooks | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py` |
+| Webex and WxCC adapters, encrypted tokens, webhooks (`/webhooks/webex`, `/webhooks/contact-center/{kind}`) | `app/adapters/webex_auth.py`, `webex_meetings.py`, `wxcc.py`, `webhooks.py`, `crypto.py`, `db/credentials.py`, `app/api/webhooks.py` |
 | Operator commands: `register-webhooks`, `wxcc-check` probes, `wxcc-config-check` | `app/cli.py`, `app/adapters/webhook_registration.py`, `app/adapters/diagnostics.py`, `app/adapters/wxcc_config.py` |
 | Operator commands: `webhooks-list`, `webhooks-reset`, `webhooks-health`; stored results | `app/cli.py`, `app/adapters/registrations.py`, `app/adapters/webhook_selftest.py`, `app/adapters/db/reports.py` |
 | Verify button "Koppeling controleren" | `app/domain/checks.py`, `app/domain/integration_check.py`, `app/adapters/group_check.py`, `app/admin/check_routes.py`, `app/web/check_labels.py` |
@@ -372,6 +387,7 @@ erDiagram
     GROUP ||--o{ CLOSURE : "closed in an emergency"
     CLOSURE |o--o{ BOOKING : "put on hold"
     BOOKING |o--o| BOOKING : "rescheduled from"
+    GROUP ||--o| GROUP_CONTACT_CENTER : "routes to a contact center"
 
     ORGANISATION {
         int id
@@ -392,8 +408,16 @@ erDiagram
         bool queue_free_pick_allowed
         int max_bookings_per_email
         string phone_mode
-        string wxcc_queue_id
+        string wxcc_routing_value "WxCC: still the source of truth"
+        string wxcc_business_address "WxCC: still the source of truth"
+        string wxcc_channel "WxCC: still the source of truth"
         string holiday_source "inherit | own"
+    }
+    GROUP_CONTACT_CENTER {
+        int group_id
+        string kind "webex_cc; written alongside, read only for another kind"
+        string routing_value
+        string attributes "JSON, keys from the ProviderDescriptor"
     }
     HOLIDAY_CALENDAR {
         string slug
@@ -443,6 +467,9 @@ erDiagram
         string guest_join_url "PII"
         string host_join_url "PII"
         string trial_join_url "PII"
+        string wxcc_task_id "provider link, purged; WxCC: still the source of truth"
+        string contact_center_task_id "provider link, purged; written alongside"
+        string contact_center_kind
         datetime pii_purged_at
     }
     JOB {
@@ -988,7 +1015,7 @@ repository's `pre-pr-review` skill before the PR (`docs/skills.md`).
 | 0096 | Overview widgets chosen by the admin (accepted, step 1 built) |
 | 0097 | The OIDC issuer is pinned |
 | 0098 | Admin sessions held on the server |
-| 0099 | Configuration as a JSON document with plan and apply (proposed, not built) |
+| 0099 | Configuration as a JSON document with plan and apply (the domain is built; adapter, CLI, portal and API follow) |
 | 0100 | Admin login requires a second factor, shown by the identity provider |
 | 0101 | Sub-tabs on a side-navigation entry; Advanced settings in three |
 | 0102 | Retention: open closures, back-ups, and what remains after a purge |

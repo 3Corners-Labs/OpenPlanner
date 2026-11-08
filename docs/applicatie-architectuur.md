@@ -644,7 +644,7 @@ de invoer voor de DPIA.
 | Widget-API | `/api/v1/widget/{org}/{group}/…` | website van de organisatie | CORS op toegestane origins, dezelfde limieten en honeypot |
 | Machine-API | `/api/agent/v1/…` | contactcenter-bot | uit tenzij ingeschakeld, client credentials, token van tien minuten, `RequireScope`, optionele IP-allowlist |
 | Instantie | `/api/v1/instance` | de worker, een beheerder | publiek, zonder cookie, leeslimiet |
-| Webhooks | `/webhooks/webex`, `/webhooks/wxcc` | Webex, Webex Contact Center | handtekening over de ruwe body, replay-sleutel, tijdvenster van 300 seconden; alleen met een geconfigureerd secret |
+| Webhooks | `/webhooks/webex`, `/webhooks/contact-center/{kind}` (alias `/webhooks/wxcc`) | Webex, Webex Contact Center | handtekening over de ruwe body, replay-sleutel, tijdvenster van 300 seconden; alleen met een geconfigureerd secret |
 | Beheerportaal | `/admin/…` | beheerders | OIDC-login, serversessie, één permissie per route, CSRF |
 | Health | `/healthz`, `/readyz` | orkestratie, monitoring | geen |
 | OpenAPI | `/openapi.json`, `/api/agent/v1/openapi.json` | ontwikkelaars | interactieve documentatie uit; de machine-API alleen zolang de superuser haar publiceert |
@@ -957,7 +957,7 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 | Een berichtkanaal | `ChannelKind` + `MessageSender` | e-mail, sms; WhatsApp als waarde met toestemmingsregel, zonder adapter. Gevraagd: RCS, WhatsApp, Signal en iMessage naar keuze van de deelnemer, elk gevalideerd (O17) | per kanaal ja; de keuze door de deelnemer en de validatie per kanaal raken het domein | ADR 0009, 0056 |
 | Een sms-gateway | `SmsProvider` + `SMS_GATEWAYS` | Webex Connect; gevraagd: gateways via de open standaard SMPP (O18) | ja | ADR 0028 |
 | Een logbestemming | `DestinationKind` + `build_sender` | syslog, Splunk HEC, Elastic, HTTP NDJSON | ja | ADR 0085 |
-| Een contactcenterplatform | `ContactCenterDispatcher` | Webex Contact Center; de poort is neutraal van naam, het contract en de groepsvelden zijn WxCC-vormig; gevraagd: Genesys Engage via GMS nu en Genesys Cloud CX later (O15) | nee: ADR 0032 beschrijft de neutrale vorm (soort per organisatie, routering per groep, descriptor per adapter), niet gebouwd | ADR 0032 |
+| Een contactcenterplatform | `ContactCenterDispatcher` | Webex Contact Center; poort, taak, routering en webhookroute zijn neutraal (`ContactCenterKind`, `ContactCenterTask`, `ProviderDescriptor`, `/webhooks/contact-center/{kind}`); gevraagd: Genesys Engage via GMS nu en Genesys Cloud CX later (O15) | deels: ADR 0032 CC-1 tot en met CC-3 gebouwd; de koppeling per organisatie en het formulier uit de descriptor (CC-4) zijn open | ADR 0032 |
 | Een videoplatform | `VideoProvider` | Webex Meetings | beperkt: poort bestaat, contract volgt Webex; tweede platform vraagt een ADR naar het model van 0032 | ADR 0017 |
 | Een wachtrijgedrag | `DispatchKind` | contactcenter, eigen wachtrij | een derde soort raakt het domein (regels voor zicht en claim) | ADR 0043 |
 | Een identity provider | registratie in het portaal, geen code | elke OIDC-provider met asymmetrische handtekening; keuze op e-maildomein met DNS-bewijs | ja | ADR 0083 |
@@ -999,7 +999,9 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 1. Bouw eerst ADR 0032: `ContactCenterKind` in het domein, één verbinding per organisatie,
    neutrale routering per groep in een eigen tabel, een descriptor per adapter die het
    beheerformulier aanstuurt, `ContactCenterTask` als neutrale taak, webhooks op
-   `/webhooks/contact-center/{kind}`. Eén omkeerbare migratie neemt de WxCC-velden over.
+   `/webhooks/contact-center/{kind}`. Migratie 0098 neemt de WxCC-velden over als
+   uitbreidingsstap (ADR 0116): de oude kolommen blijven geschreven en gelezen tot de volgende
+   minor, de minor daarna verwijdert ze.
 2. Daarna is een platform één adapter plus descriptor, opgenomen fixtures en een eigen ADR voor
    API, authenticatie en webhooks (CC-6 in `docs/backlog-architecture-gaps.md`).
 3. De privacyregel voor uitgaande berichten (alleen referentie, voornaam, startlabel, groepsnaam,
@@ -1233,7 +1235,7 @@ van het besluit nog niet in de code staat; het overzicht zegt welke.
 | Identiteit | 0013 OIDC, 0046 medewerkersdirectory en SCIM, 0049 claim, 0083 provider per organisatie, 0090 meegeleverde provider, 0095 medewerkers in de provider, 0097 issuer, 0098 serversessies, 0100 tweede factor, 0106 standaard meegeleverd | gebouwd; 0046, 0049, 0090, 0095, 0106 deels |
 | Privacy en beveiliging | 0008 secrets, 0023 machine-API, 0053 securityevents, 0091 versleutelde hops, 0092 uploads, 0094 cryptografie-inventaris, 0102 retentie | gebouwd; 0008, 0023, 0091 deels |
 | Logging | 0031 audit per niveau, 0034 events naar logplatform, 0040 schema en opslag, 0085 logbestemmingen, 0103 zelfbeschrijvende regels | gebouwd; 0085, 0103 deels |
-| Levering en beheer | 0006 ondertekening, 0029 updates, 0030 HTTPS, 0048 live voortgang, 0050 installer, 0052 releases, 0059 kandidaten, 0064 HTTPS standaard, 0067 versiebeheer, 0070 certificaatbron, 0079 release als workflow, 0086 publiek adres, 0089 configuratiepakket, 0099 configuratie als JSON, 0108 publieke images, 0112 interne CA, 0114 Kubernetes | gebouwd; 0067, 0079, 0089, 0108, 0112, 0114 deels; 0099 niet gebouwd |
+| Levering en beheer | 0006 ondertekening, 0029 updates, 0030 HTTPS, 0048 live voortgang, 0050 installer, 0052 releases, 0059 kandidaten, 0064 HTTPS standaard, 0067 versiebeheer, 0070 certificaatbron, 0079 release als workflow, 0086 publiek adres, 0089 configuratiepakket, 0099 configuratie als JSON, 0108 publieke images, 0112 interne CA, 0114 Kubernetes | gebouwd; 0067, 0079, 0089, 0108, 0112, 0114 deels; 0099 deels (domein) |
 | Schaal | 0036 schaalgrenzen en naden | niet gebouwd (de triggers zijn beleid) |
 | Website | 0087, 0110, 0111, 0113 | deels |
 | Na 0.4.0 | 0116 één editie, onderhoudslijnen en geteste upgradepaden | aanvaard op 5 november 2026; gebouwd zijn de besluitteksten van stap 1 (#533), stap 2 (een gewijzigde migratie maakt een minorrelease) en het toelatingsbeleid van stap 9; de rest niet |

@@ -664,6 +664,24 @@ class ClosureScenarioRow(Base):
         ForeignKey("closure_images.id", ondelete="SET NULL")
     )
 
+    # ADR 0099 point 2: the name is the natural key within the organisation or the group.
+    __table_args__ = (
+        Index(
+            "uq_closure_scenarios_organisation_name",
+            "organisation_id",
+            "name",
+            unique=True,
+            sqlite_where=text("group_id IS NULL"),
+        ),
+        Index(
+            "uq_closure_scenarios_group_name",
+            "group_id",
+            "name",
+            unique=True,
+            sqlite_where=text("group_id IS NOT NULL"),
+        ),
+    )
+
 
 class ClosureNoticeRow(Base):
     """The notice and optional heading of a closure, in one locale. Written by an admin; no PII."""
@@ -1578,6 +1596,22 @@ class AlertTargetRow(Base):
     __table_args__ = (
         CheckConstraint("kind IN ('email', 'webex_space')", name="kind"),
         CheckConstraint("min_level IN ('warning', 'outage')", name="min_level"),
+        # ADR 0099 point 2: kind and address are the natural key within the owner.
+        Index(
+            "uq_alert_targets_organisation_address",
+            "organisation_id",
+            "kind",
+            "address",
+            unique=True,
+            sqlite_where=text("organisation_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_alert_targets_platform_address",
+            "kind",
+            "address",
+            unique=True,
+            sqlite_where=text("organisation_id IS NULL"),
+        ),
     )
 
 

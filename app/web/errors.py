@@ -120,6 +120,18 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: (
         "admin.form.error.configuration_installation_in_use"
     ),
+    # ADR 0099: the configuration document.
+    ErrorCode.CONFIGURATION_FORMAT_UNSUPPORTED: "admin.form.error.configuration_format_unsupported",
+    ErrorCode.CONFIGURATION_UNKNOWN_FIELD: "admin.form.error.configuration_unknown_field",
+    ErrorCode.CONFIGURATION_OBJECT_EXISTS: "admin.form.error.configuration_object_exists",
+    ErrorCode.CONFIGURATION_OBJECT_MISSING: "admin.form.error.configuration_object_missing",
+    ErrorCode.CONFIGURATION_OUT_OF_SCOPE: "admin.form.error.configuration_out_of_scope",
+    ErrorCode.SCENARIO_NAME_TAKEN: "admin.form.error.scenario_name_taken",
+    ErrorCode.ALERT_TARGET_TAKEN: "admin.form.error.alert_target_taken",
+    ErrorCode.CONFIGURATION_OBJECT_IN_USE: "admin.form.error.configuration_object_in_use",
+    ErrorCode.CONFIGURATION_CAPACITY_BELOW_BOOKED: (
+        "admin.form.error.configuration_capacity_below_booked"
+    ),
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {

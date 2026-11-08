@@ -141,7 +141,8 @@ the code changes, this document changes in the same pull request. `docs/threat-m
 ## Webhook secrets (Webex and WxCC)
 
 - **Purpose.** Authenticate events that Webex and Webex Contact Center send to
-  `/webhooks/webex` and `/webhooks/wxcc` (`app/adapters/webhooks.py`).
+  `/webhooks/webex` and `/webhooks/contact-center/{kind}` with its alias `/webhooks/wxcc`
+  (`app/adapters/webhooks.py`; each platform's check is its adapter's `InboundWebhook`).
 - **Algorithm.** Webex: hex HMAC-SHA1 of the raw body in `X-Spark-Signature`. WxCC: hex HMAC-SHA256
   in `X-WebexCC-Signature`, with a signed timestamp that must lie within 300 s. Comparison is
   constant-time.
