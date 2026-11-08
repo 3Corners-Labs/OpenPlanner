@@ -96,4 +96,6 @@ the organisation, the group, the time and a link into the portal: never particip
 
 **Webex space**: create a bot in the Webex developer portal (only the right
 `spark:messages_write`), add the bot to the space, paste the bot's token under **Webex bot** and
-enter the space's id as the address. The token is stored encrypted and never shown again.
+enter the space's id as the address. The token is stored encrypted and never shown again. Step by
+step, with a group's fallback to its own queue: see
+[Setting up the contact center](contact-center-setup.md), steps 10 and 11.

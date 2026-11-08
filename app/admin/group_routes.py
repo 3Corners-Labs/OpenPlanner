@@ -87,6 +87,7 @@ from app.domain.scheduling import (
     MAX_TRIAL_CALL_MINUTES,
     MAX_TRIAL_CALLS_PER_BOOKING,
     MIN_TRIAL_CALL_MINUTES,
+    DispatchFallback,
     DispatchKind,
     Group,
     GroupSummary,
@@ -595,6 +596,25 @@ def _settings_fields(
             error=form.error_for("dispatch_kind"),
             options=dispatch_options,
         ),
+        # ADR 0082 point 11: the fallback sits next to the dispatch kind it falls back from.
+        Field(
+            "dispatch_fallback",
+            _("admin.field.dispatch_fallback"),
+            "select",
+            value("dispatch_fallback", current.dispatch_fallback.value),
+            hint=_("admin.field.dispatch_fallback_hint"),
+            error=form.error_for("dispatch_fallback"),
+            options=tuple(Option(f.value, _(FALLBACK_LABELS[f])) for f in DispatchFallback),
+        ),
+        Field(
+            "fallback_space_room_id",
+            _("admin.field.fallback_space_room_id"),
+            value=value("fallback_space_room_id", current.fallback_space_room_id),
+            hint=_("admin.field.fallback_space_room_id_hint"),
+            error=form.error_for("fallback_space_room_id"),
+            required=False,
+            attributes={"spellcheck": "false", "autocomplete": "off", "maxlength": "200"},
+        ),
         number("dispatch_lead_minutes", current.dispatch_lead_minutes, {"min": "0", "max": "60"}),
         number(
             "participant_change_lead_minutes",
@@ -794,7 +814,9 @@ async def save_settings(
     trial = form.choice("trial_call_enabled", {"yes", "no"})
     join_client = form.choice("join_client", {client.value for client in JoinClient})
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
-    if not form.errors and None not in (phone, dispatch, embedding, free_pick, trial, join_client):
+    fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
+    chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback)
+    if not form.errors and None not in chosen:
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
@@ -802,6 +824,8 @@ async def save_settings(
             dispatch_kind=DispatchKind(str(dispatch)),
             queue_free_pick_allowed=free_pick == "yes",
             calendar_invite_address=form.optional_text("calendar_invite_address"),
+            dispatch_fallback=DispatchFallback(str(fallback)),
+            fallback_space_room_id=form.optional_text("fallback_space_room_id"),
             video_host_email=form.optional_text("video_host_email"),
             wxcc_business_address=form.optional_text("wxcc_business_address"),
             wxcc_channel=form.optional_text("wxcc_channel"),
@@ -943,6 +967,12 @@ def _capacity_field(
         attributes={"min": "0", "max": "1000", "inputmode": "numeric"},
     )
 
+
+FALLBACK_LABELS: dict[DispatchFallback, str] = {
+    DispatchFallback.NONE: "admin.fallback.none",
+    DispatchFallback.OWN_QUEUE: "admin.fallback.own_queue",
+}
+"""The fallback choices of a contact-center group (ADR 0082 point 11)."""
 
 OFFER_VALUES = frozenset(offer.value for offer in Offer)
 

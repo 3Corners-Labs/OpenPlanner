@@ -27,6 +27,7 @@ from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import (
     RESERVED_SLUGS,
+    DispatchFallback,
     DispatchKind,
     Group,
     JoinClient,
@@ -78,6 +79,8 @@ class GroupSettings:
     queue_free_pick_allowed: bool
     max_bookings_per_email: int
     calendar_invite_address: str | None
+    dispatch_fallback: DispatchFallback
+    fallback_space_room_id: str | None
     video_host_email: str | None
     wxcc_business_address: str | None
     wxcc_channel: str | None

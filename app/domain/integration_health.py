@@ -6,7 +6,7 @@ left stale; ``IntegrationHealthWatch`` runs both every ``task_reconcile_interval
 model and its rules are in ``app.domain.connection_health``.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime, timedelta
 
 from app.domain.alerts import open_conditions
@@ -202,6 +202,7 @@ class IntegrationHealthWatch:
         health: Evaluates the health state.
         clock: Current time.
         interval: How often (``task_reconcile_interval_minutes``).
+        after: Runs with the fresh health, e.g. the fallback sweep (ADR 0082 point 11).
     """
 
     def __init__(
@@ -210,6 +211,7 @@ class IntegrationHealthWatch:
         health: IntegrationHealthService,
         clock: Clock,
         interval: timedelta | Callable[[], timedelta],
+        after: Callable[[tuple[HealthEntry, ...]], Awaitable[object]] | None = None,
     ) -> None:
         """Store the collaborators; the first sweep is on the first run."""
         self._reconciler = reconciler
@@ -217,6 +219,7 @@ class IntegrationHealthWatch:
         self._clock = clock
         self._interval = interval
         self._ran_at: datetime | None = None
+        self._after = after
 
     async def run(self) -> bool:
         """Reconcile and evaluate when due; return whether it ran."""
@@ -225,5 +228,7 @@ class IntegrationHealthWatch:
             return False
         self._ran_at = now
         await self._reconciler.run()
-        await self._health.evaluate()
+        entries = await self._health.evaluate()
+        if self._after is not None:
+            await self._after(entries)
         return True

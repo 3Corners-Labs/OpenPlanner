@@ -53,6 +53,8 @@ EVENT_LABELS: dict[EventKind, str] = {
     EventKind.TASK_END_REQUESTED: "call.event.task_end_requested",
     EventKind.END_NOT_POSSIBLE: "call.event.end_not_possible",
     EventKind.TASK_MARKED_CANCELLED: "call.event.task_marked_cancelled",
+    EventKind.FALLBACK_QUEUED: "call.event.fallback_queued",
+    EventKind.FALLBACK_ENDED: "call.event.fallback_ended",
     EventKind.WAITING_LEFT: "call.event.waiting_left",
     EventKind.MEETING_STARTED: "call.event.meeting_started",
     EventKind.HOST_JOINED: "call.event.host_joined",

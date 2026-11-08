@@ -296,3 +296,26 @@ async def test_claims_made_before_a_token_key_rotation_still_read_as_mine(
     assert [r.mine for r in (await rotated.view(AGENT, "demo")).rows] == [True]
     assert [r.mine for r in (await forgotten.view(AGENT, "demo")).rows] == [False]
     assert uow.state.bookings[booking_id].claim is not None
+
+
+async def test_a_fallback_queue_hands_out_only_the_bookings_that_fell_back(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0082 point 12: a booking still at the contact center is never claimable by id."""
+    from app.domain.scheduling import DispatchFallback
+
+    agent = principal("a-9", "W", frozenset({Role.AGENT}), frozenset(), [("demo", "wxcc")])
+    uow.state.groups[3] = replace(
+        uow.state.groups[3],
+        dispatch_fallback=DispatchFallback.OWN_QUEUE,
+        queue_free_pick_allowed=True,
+    )
+    at_contact_center = await _book(uow, clock, slug="wxcc")
+    fell_back = await _book(uow, clock, SLOT_0930, slug="wxcc")
+    uow.state.call_status[fell_back] = CallStatus(fell_back, fallback=True)
+    clock.advance(SLOT_0900 - clock.now())
+
+    with pytest.raises(DomainError) as excinfo:
+        await queue.claim(agent, "wxcc", at_contact_center)
+    assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
+    assert (await queue.claim(agent, "wxcc", fell_back)).booking_id == fell_back

@@ -10183,3 +10183,57 @@ msgstr "This database is too old for that version: update to the version named i
 
 msgid "settings.field.overview_max_widgets.label"
 msgstr "Most widgets on an own overview"
+
+msgid "admin.field.dispatch_fallback"
+msgstr "Fallback when the contact center fails"
+
+msgid "admin.field.dispatch_fallback_hint"
+msgstr "With own queue: an appointment whose dispatch fails, and while the contact center is down every appointment, goes to OpenPlanner's queue. The team must then know that queue and work it."
+
+msgid "admin.field.fallback_space_room_id"
+msgstr "The team's Webex space (fallback)"
+
+msgid "admin.field.fallback_space_room_id_hint"
+msgstr "Optional. The id of the space where the organisation's bot posts a message during a fallback, and per appointment the start time and first name. Never the link to the call."
+
+msgid "admin.fallback.none"
+msgstr "None"
+
+msgid "admin.fallback.own_queue"
+msgstr "Own queue"
+
+msgid "admin.fallback.banner.title"
+msgstr "Fallback active"
+
+msgid "admin.fallback.banner.text"
+msgstr "The contact center has been down since {time}. This group's appointments now come to this queue."
+
+msgid "admin.fallback.end"
+msgstr "End the fallback"
+
+msgid "admin.fallback.chip"
+msgstr "Fallback"
+
+msgid "admin.done.fallback_ended"
+msgstr "The fallback has ended. Appointments not yet picked up go to the contact center after all."
+
+msgid "admin.alerts.source.fallback"
+msgstr "Fallback to the own queue"
+
+msgid "admin.alerts.text.fallback"
+msgstr "This group falls back to its own queue because the contact center is down. Open the queue to pick up appointments."
+
+msgid "call.event.fallback_queued"
+msgstr "Put in the own queue (fallback)"
+
+msgid "call.event.fallback_ended"
+msgstr "Fallback ended: to the contact center"
+
+msgid "fallback.space.activated"
+msgstr "**{group}** falls back to its own queue: the contact center is down. Pick up appointments in the queue: {link}"
+
+msgid "fallback.space.queued"
+msgstr "{time}: {first_name} is in the queue. {link}"
+
+msgid "admin.form.error.fallback_space_room_id"
+msgstr "Enter the id of a Webex space: letters, digits, - and _, 10 to 200 characters."

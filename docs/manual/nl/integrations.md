@@ -72,7 +72,8 @@ volgt de melding *Meldingen van het contactcenter*: kijk dan bij de registraties
 
 De adressen en de Webex-bot voor meldingen van het hele platform (updates, certificaten, het
 achtergrondproces, verzoeken zonder organisatie). Ze werken zoals bij een organisatie: zie
-[Kanalen](channels.md).
+[Kanalen](channels.md). Het aanmaken van de bot is stap 11 van
+[Contactcenter inrichten](contact-center-setup.md).
 
 ## Webhooks
 

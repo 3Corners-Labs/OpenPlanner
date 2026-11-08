@@ -99,4 +99,5 @@ nooit gegevens van deelnemers.
 **Webex-ruimte**: maak in het Webex-ontwikkelaarsportaal een bot aan (alleen het recht
 `spark:messages_write`), voeg de bot toe aan de ruimte, plak het token van de bot bij
 **Webex-bot** en vul het id van de ruimte in als adres. Het token wordt versleuteld bewaard en
-nooit meer getoond.
+nooit meer getoond. Stap voor stap, met de terugval van een groep naar de eigen wachtrij: zie
+[Contactcenter inrichten](contact-center-setup.md), stap 10 en 11.

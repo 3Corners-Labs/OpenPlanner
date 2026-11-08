@@ -72,7 +72,8 @@ by the alert *Events from the contact center*: then look at the registrations be
 
 The addresses and the Webex bot for alerts of the whole platform (updates, certificates, the
 background process, requests of no organisation). They work as for an organisation: see
-[Channels](channels.md).
+[Channels](channels.md). Creating the bot is step 11 of
+[Setting up the contact center](contact-center-setup.md).
 
 ## Webhooks
 
