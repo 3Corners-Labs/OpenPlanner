@@ -28,6 +28,8 @@ SWEPT = frozenset(
         "GET /groups",
         "GET /groups/{slug}/availability",
         "GET /configuration",
+        "POST /configuration/plan",
+        "POST /configuration/apply",
         "PUT /configuration",
     }
 )
@@ -100,18 +102,20 @@ async def test_the_answers_hold_no_marker_and_only_the_clients_own_groups(
         assert other not in response.text, "the other tenant in an answer"
 
 
-async def test_the_configuration_package_holds_no_booking_no_token_and_no_client_secret(
+async def test_the_configuration_document_holds_no_booking_no_token_and_no_client_secret(
     booked: Agent,
 ) -> None:
     issued = await booked.register(organisation="andere", groups=[OTHER], **TRANSFER)
-    headers = {**await booked.bearer(issued), "x-passphrase": PASSPHRASE}
+    token = await booked.bearer(issued)
 
-    exported = await booked.client.get(f"{BASE}/configuration", headers=headers)
+    for passphrase in (None, PASSPHRASE):
+        headers = {**token, **({"x-passphrase": passphrase} if passphrase else {})}
+        exported = await booked.client.get(f"{BASE}/configuration", headers=headers)
 
-    assert exported.status_code == 200, exported.text
-    package = exported.content
-    assert _markers_in(package.decode("latin-1")) == set(), "personal data in the package"
-    token = headers["authorization"].removeprefix("Bearer ")
-    for secret in (issued.secret, token, PASSPHRASE):
-        assert secret.encode() not in package, "a credential in clear text in the package"
-    assert issued.client.client_id.encode() in package, "the client itself is configuration"
+        assert exported.status_code == 200, exported.text
+        document = exported.content
+        assert _markers_in(document.decode()) == set(), "personal data in the document"
+        bearer = token["authorization"].removeprefix("Bearer ")
+        for secret in (issued.secret, bearer, PASSPHRASE):
+            assert secret.encode() not in document, "a credential in clear text in the document"
+        assert issued.client.client_id.encode() in document, "the client itself is configuration"

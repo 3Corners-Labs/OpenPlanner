@@ -43,6 +43,8 @@ _DOMAIN_STATUS: dict[ErrorCode, int] = {
     ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: 409,
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: 409,
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: 413,
+    # ADR 0099: the configuration document over the API.
+    ErrorCode.CONFIGURATION_PLAN_STALE: 409,
     ErrorCode.INTEGRATION_NOT_READY: 503,
 }
 
