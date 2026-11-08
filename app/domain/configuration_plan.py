@@ -234,6 +234,7 @@ class _Planner:
         create = current is None
         path = wanted.path
         given: dict[str, Value] = {}
+        refused: set[str] = set()
         valid = True
         for name, value in wanted.fields.items():
             spec = kind.field(name)
@@ -242,12 +243,13 @@ class _Planner:
                     value = spec.check(value, self._context)  # noqa: PLW2901 - normalised value
                 except DomainError as error:
                     self._refuse(path, error.code, error.field or name)
+                    refused.add(name)
                     valid = False
                     continue
             given[name] = value
         base: dict[str, Value] = dict(current.fields) if current is not None else {}
         if create:
-            valid = self._defaults(kind, given, base, path) and valid
+            valid = self._defaults(kind, given | dict.fromkeys(refused), base, path) and valid
         merged = {**base, **given}
         if valid and kind.check is not None and (create or _differs(kind, current, given)):
             keys = dict(zip(kind.key, wanted.key, strict=True))

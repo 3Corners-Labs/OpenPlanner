@@ -269,6 +269,7 @@ def _read_map(coll: Collection, raw: Mapping[object, object], parent: str) -> tu
                 raise _invalid(path_of(parent, coll.name, key))
             here = (*key, part)
             where = path_of(parent, coll.name, here)
+            _read_value(kind.field(kind.key[len(key)]), part, where)
             if len(here) < len(kind.key):
                 if not isinstance(value, Mapping):
                     raise _invalid(where)

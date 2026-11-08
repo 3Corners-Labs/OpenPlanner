@@ -171,7 +171,7 @@ def test_a_value_of_the_wrong_type_or_outside_its_bounds_is_refused_by_key() -> 
 
 
 def test_production_refuses_the_values_it_never_uses() -> None:
-    data = {"platform": {"settings": {"update_auto_apply": True}}}
+    data = {"platform": {"settings": {"update_channel": "rc"}}}
 
     assert plan(data).ok
     refused = plan(data, context=RuleContext(production=True))
@@ -601,7 +601,7 @@ def test_a_calendar_and_its_days_are_created_with_the_holiday_permission() -> No
     assert to_json(parse(data))["platform"] == data["platform"]
 
 
-@pytest.mark.parametrize("day", ["2026-2-3", "2026-13-01", "25-12-2026", "kerst", "2026-12-25T00"])
+@pytest.mark.parametrize("day", ["2026-2-3", "2026-13-01", "25-12-2026", "kerst"])
 def test_a_day_must_be_an_iso_date_in_full(day: str) -> None:
     data = {"platform": {"holiday_calendars": [{"slug": "nl", "name": "NL", "days": {day: "X"}}]}}
 
@@ -700,3 +700,14 @@ def test_every_platform_table_is_covered_and_no_column_is_left_over() -> None:
         )
         == {}
     )
+
+
+def test_a_day_longer_than_a_date_is_refused_when_the_document_is_read() -> None:
+    data = {
+        "platform": {
+            "holiday_calendars": [{"slug": "nl", "name": "NL", "days": {"2026-12-25T00": "X"}}]
+        }
+    }
+
+    with pytest.raises(DomainError):
+        parse(data)

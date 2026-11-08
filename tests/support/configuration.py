@@ -39,7 +39,11 @@ ENTRY = Kind(
     key=("locale", "key"),
     permission=Permission.TEXTS_MANAGE,
     tables=frozenset({"entries"}),
-    fields=(text("locale", required=True), text("key", required=True), text("text")),
+    fields=(
+        text("locale", required=True, max_length=8),
+        text("key", required=True),
+        text("text"),
+    ),
 )
 LABEL = Kind(
     "label",

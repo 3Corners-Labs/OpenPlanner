@@ -407,3 +407,10 @@ def test_a_path_names_the_collection_and_the_key_parts() -> None:
     assert path_of("boxes[a]", "texts", ("nl", "k")) == "boxes[a].texts[nl][k]"
     assert path_of("", "platform", ()) == "platform"
     assert path_of("platform", "switch", ()) == "platform.switch"
+
+
+def test_a_key_part_of_a_map_is_checked_against_its_field() -> None:
+    refused(
+        {**base(), "boxes": [{"slug": "a", "texts": {"x" * 9: {"k": "x"}}}]},
+        ErrorCode.INVALID_CONFIGURATION,
+    )

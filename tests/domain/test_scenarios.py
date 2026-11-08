@@ -294,8 +294,8 @@ async def test_a_scenario_name_is_taken_within_its_owner_only(scenarios: Scenari
 
     with pytest.raises(DomainError) as refused:
         await scenarios.save(ORG_ADMIN, ORGANISATION, ScenarioInput(" Storing ", NOTICES))
+    other = await scenarios.save(ORG_ADMIN, GROUP, STRIKE)
     with pytest.raises(DomainError) as renamed:
-        other = await scenarios.save(ORG_ADMIN, GROUP, STRIKE)
         await scenarios.save(ORG_ADMIN, GROUP, ScenarioInput("Storing", NOTICES), other.id)
 
     assert refused.value.code is ErrorCode.SCENARIO_NAME_TAKEN
