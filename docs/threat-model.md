@@ -120,11 +120,13 @@ probes and tests without closing a path. The behaviour is pinned by
 `tests/admin/test_admin_flow.py::test_a_post_without_fetch_metadata_and_without_origin_is_let_through`.
 On the two audited downloads, which are `GET`s, two cases still download. A browser that sends
 no `Sec-Fetch-Site` sends no `Origin` on a navigation either, and `SameSite=Lax` sends the
-cookie on one, so a link on another site still works in such a browser; every browser since
-Chrome 76, Firefox 90 and Safari 16.4 (March 2023) sends `Sec-Fetch-Site`. And a link the admin
-opens from another program, such as a desktop mail or chat client, arrives as `none`, the
-admin's own navigation. Either way the file stays in the admin's own browser and the attacker
-never sees it; what is left is an export line the admin did not mean.
+cookie on one, so a link on another site still works in such a browser. Every browser since
+Chrome 76, Firefox 90 and Safari 16.4 (March 2023) sends `Sec-Fetch-Site`, but only to an
+https address or to localhost: without TLS (the default since ADR 0064) the downloads have no
+cross-site guard. And a navigation the admin starts outside a page arrives as `none`, also when
+it is redirected to the download: an address typed or bookmarked, or a link opened from another
+program such as a desktop mail or chat client. Either way the file stays in the admin's own
+browser and the attacker never sees it; what is left is an export line the admin did not mean.
 Where `SameSite` is not enough because the cookie is not involved, there is nothing to
 forge: the public forms act on a link or on a booking the caller creates, and the bot API
 uses a bearer token that a page cannot attach (no CORS headers).
@@ -137,8 +139,11 @@ carries no cookie.
 
 No `GET` changes a booking, a setting or a right. The routes below do something besides
 returning a page; each is deliberate. An admin `GET` that writes an audit event refuses a
-request another site makes, so a link elsewhere cannot make a signed-in admin's browser write
-an event in their name. The downloads depend on `SameOrigin` (a `403` and a security event).
+request another site makes, so a link elsewhere cannot make a signed-in admin's browser export,
+view or do anything else in their name; a link to a page outside the admin's rights still
+writes a refusal (`denied`) with them as actor, as any request does, which records what the
+browser asked for, not something the admin did. The downloads depend on `SameOrigin` (a `403`
+and a security event).
 The contact details count only from the booking page itself (`from_this_page`), which also
 refuses an address that was typed, bookmarked or shared, because what they show is personal
 data. The one exception is the login callback, which the identity provider sends cross-site by
@@ -156,7 +161,7 @@ needs a test of its own.
 | `GET /admin/preferences` | Stores theme, menu width and alert choices in the caller's own session cookie, then redirects to `next`. | Only own presentation preferences; `next` is checked (see below); a third-party link can at worst change a theme. |
 | `GET /admin/groups/{slug}/bookings/{id}?contact=show` | Shows the participant's contact details and writes the audit event `booking.contact_viewed` (ADR 0044 §2). | Reading, accounted for; only the button on the booking page itself counts (`from_this_page`), so a shared, bookmarked, crafted or prefetched address, or a link to it on another page of the portal, shows and writes nothing. |
 | `GET /admin/updates/progress`, `/…/live` fragments | Poll status. | Read-only. |
-| `GET /admin/audit/export.csv` | Writes the audit event `audit.export` (ADR 0040); a refusal over a limit is audited too. | Reading, accounted for. `SameOrigin`: a request another site makes (`cross-site`, `same-site`) gets a `403` and a `request.rejected` security event, and no file and no export event; the link on the audit page (`same-origin`) and an address typed, bookmarked or opened from another program (`none`, which no page can set) download, as the admin's own navigation (the residue is under *CSRF in three layers*). The file holds no participant data, so unlike the contact details its address may be reused. A login does not replay it: the admin comes back to the audit page (see *Redirects*). |
+| `GET /admin/audit/export.csv` | Writes the audit event `audit.export` (ADR 0040); a refusal over a limit is audited too. | Reading, accounted for. `SameOrigin`: a request another site makes (`cross-site`, `same-site`) gets a `403` and a `request.rejected` security event, and no file and no export event; the link on the audit page (`same-origin`) and an address typed, bookmarked or opened from another program (`none`, which no page can set) download, as the admin's own navigation (the residue is under *CSRF in three layers*). The file holds no participant data, so unlike the contact details its address may be reused. A login does not replay it: the admin comes back to the audit page (see *Redirects*). A refused export sends the admin back to the audit page with the reason (`refused`, a closed list), so no page is ever shown at the export's address, where a reload, a link or a login would run it again. |
 | `GET /admin/idp-mapping/export.txt` | Writes the audit event `idp_mapping.exported` (ADR 0049 point 17). | As the audit export: `SameOrigin`, and the file holds entitlement values, no personal data. |
 | `GET /api/agent/v1/configuration` | Writes an audit event with the detail `configuration.export` and the API client as actor (ADR 0099). | The machine API takes a bearer token in the `Authorization` header, which a browser never adds by itself, so a link on another site carries none (no CORS). |
 

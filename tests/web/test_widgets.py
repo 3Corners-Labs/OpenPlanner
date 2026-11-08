@@ -1,8 +1,6 @@
 """The widget register (ADR 0061 §2): every widget declared once, with a permission and titles."""
 
-from fastapi.routing import APIRoute
-
-from app.admin.authz import RequirePermission, can_function
+from app.admin.authz import can_function
 from app.config import Settings
 from app.domain.authorization import Permission, Principal, Role
 from app.domain.job_plan import JobType
@@ -23,7 +21,7 @@ from app.web.widgets import (
 )
 from tests.admin.conftest import AGENT, AUDITOR, GROUP_ADMIN, SUPER
 from tests.support.principals import principal
-from tests.support.routes import all_routes
+from tests.support.routes import all_routes, requirements
 
 REQUIRED_LOCALES = ("nl", "en")
 
@@ -127,17 +125,6 @@ def test_widget_lookup_and_fragment_path() -> None:
     assert fragment_path(WIDGETS[-1]) == "/admin/overview/w/rights"
 
 
-def _permissions(route: APIRoute) -> list[Permission]:
-    found: list[Permission] = []
-    stack = list(route.dependant.dependencies)
-    while stack:
-        dependency = stack.pop()
-        if isinstance(dependency.call, RequirePermission):
-            found.append(dependency.call.permission)
-        stack.extend(dependency.dependencies)
-    return found
-
-
 def test_every_available_widget_has_a_fragment_route_with_its_own_permission(
     settings: Settings,
 ) -> None:
@@ -149,7 +136,7 @@ def test_every_available_widget_has_a_fragment_route_with_its_own_permission(
             assert path not in routes, f"{w.key} is not available yet and must have no route"
             continue
         assert path in routes, f"{w.key} needs a fragment route"
-        assert _permissions(routes[path]) == [w.permission], w.key
+        assert [r.permission for r in requirements(routes[path])] == [w.permission], w.key
 
 
 def test_visible_widgets_follow_the_matrix() -> None:

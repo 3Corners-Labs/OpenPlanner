@@ -3,6 +3,9 @@
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 
+from app.admin.authz import RequirePermission
+from app.web.route_dependencies import dependency_calls
+
 
 def all_routes(routes: list[object]) -> list[APIRoute]:
     """Flatten an app's routes, including routers mounted with include_router."""
@@ -38,3 +41,8 @@ def scoped_routes(routes: list[APIRoute]) -> dict[str, APIRoute]:
         if parameter_names(route.dependant) & SCOPE_PARAMETERS
         for method in sorted(route.methods)
     }
+
+
+def requirements(route: APIRoute) -> list[RequirePermission]:
+    """Return every ``RequirePermission`` the route declares, through its dependencies."""
+    return [call for call in dependency_calls(route) if isinstance(call, RequirePermission)]

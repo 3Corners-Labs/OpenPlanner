@@ -368,9 +368,24 @@ async def test_an_export_over_the_period_limit_is_refused_on_the_page(traced: Si
         "/admin/audit/export.csv", params={"from": "2024-01-01", "to": "2026-01-01"}
     )
 
-    assert response.status_code == 422
-    assert response.headers["content-type"].startswith("text/html")
-    assert "De export beslaat te veel dagen." in response.text
+    # Back to the page with the same filter, never a page at the export's address, where a
+    # reload, a link or a login would run the export again.
+    assert response.status_code == 303
+    location = response.headers["location"]
+    assert location == "/admin/audit?from=2024-01-01&to=2026-01-01&refused=too_many_days"
+    page = await traced.client.get(location)
+    assert page.status_code == 200
+    assert "De export beslaat te veel dagen." in page.text
+
+
+async def test_an_unknown_refusal_code_shows_nothing_and_is_not_echoed(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    page = await site.client.get("/admin/audit", params={"refused": "zz_marker"})
+
+    assert page.status_code == 200
+    assert "zz_marker" not in page.text
+    assert "De export beslaat te veel" not in page.text
 
 
 async def test_the_superuser_switches_diagnostic_mode_and_the_group_sees_its_debug_lines(
