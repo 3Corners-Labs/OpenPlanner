@@ -52,8 +52,8 @@ The overview (`/admin/`, `dashboard.view`) lists groups as cards. Admins asked f
 | 1 | OV-1, OV-2: widget register, fragment routes, overview without script, role defaults | #141 | merged |
 | 2a | OV-3: the queue, running tasks and system status widgets (alerts wait for OV-6) | #150 | merged |
 | 2b | OV-4: server-rendered SVG charts (bar, line, pie) with text summary and table | #153 | merged |
-| 3 | OV-5: live widgets through `live-region.js` (per fragment, `204` while current), one polite live region, CSP on this page only, "poll flood" abuse case | #449 | in PR |
-| 4 | OV-6, OV-7: alerts, banner, pop-ups, level filter; `QUEUE_WAIT_*` settings | #449 | in PR |
+| 3 | OV-5: live widgets through `live-region.js` (per fragment, `204` while current), one polite live region, CSP on this page only, "poll flood" abuse case | #449 | merged |
+| 4 | OV-6, OV-7: alerts, banner, pop-ups, level filter; `QUEUE_WAIT_*` settings | #449 | merged |
 | 5 | SH-3: organisation › group filter in the top bar (overview; other lists keep their own filters) | #161 | merged |
 
 ## Consequences

@@ -101,4 +101,4 @@ default of `production`.
 | 3 | System status offers the root (`GET /admin/settings/tls/ca.crt`); runbook (install the root, the identity provider behind the proxy); `scripts/check-proxy.sh` pass 3 | #476 | merged |
 | 4 | Installer `--internal-ca` | #476 | merged |
 | 5 | docker01 on https (2026-11-03, by hand with the files the installer writes; runbook) | #476 | live |
-| 6 | `IDP_UPSTREAM` and the realm's mail server written by the installer (with ADR 0106 step 5a) | #483 | in PR |
+| 6 | `IDP_UPSTREAM` and the realm's mail server written by the installer (with ADR 0106 step 5a) | #483 | merged |

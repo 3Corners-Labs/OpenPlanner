@@ -1,7 +1,7 @@
 # 0115. The repository is neutral: no client names and no sector words
 
-Status: accepted (2026-11-04), decided by the product owner. Built: the rule, the guard test and
-the rewritten history; the PR question and the CLAUDE.md rule are in the same change. Amends
+Status: accepted (2026-11-04), decided by the product owner. Partly built: the rule, the guard test and
+the rewritten history (steps 2 and 3, texts on GitHub and the support request, are open); the PR question and the CLAUDE.md rule are in the same change. Amends
 the rule "ADRs are never rewritten" once (point 4); extends ADR 0077 (terminology).
 
 ## Context

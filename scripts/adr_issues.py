@@ -7,8 +7,10 @@ into work that is visible where work is tracked:
 - **Sync** (the default): for every row whose state is ``planned`` or ``follow-up`` an open
   issue exists, titled ``ADR NNNN step S: <What>`` and labelled ``adr:NNNN`` (the label is
   created when missing). A row that moved to ``merged``, ``built`` or ``live`` closes its
-  issue; a row ``in PR #N`` leaves the issue to that pull request (``Closes #N``). Issues
-  without an ``adr:`` label are never touched, and running the sync twice changes nothing.
+  issue; a row ``in PR #N`` leaves the issue to that pull request (``Closes #N``). An open
+  issue whose row no longer exists (the step was split or renamed) is closed (ADR 0119).
+  Issues without an ``adr:`` label are never touched, and running the sync twice changes
+  nothing.
 - **Report** (``--report``): one Markdown report of what no longer agrees: a row of
   ``docs/adr-status.md`` whose category contradicts the ADR's table (BUILT with open rows,
   NOT BUILT with merged rows), rows that say ``in PR #N`` for a pull request that is merged or
@@ -47,14 +49,15 @@ REPORT_TITLE = "ADR drift"
 REPORT_LABEL = "adr:drift"
 """The label of the one report issue, so it is never mistaken for a build step."""
 
-STATES = ("planned", "in PR", "merged", "built", "live", "follow-up")
+STATES = ("planned", "in PR", "merged", "built", "live", "follow-up", "superseded")
 """What a *Build status* row may start its state with (ADR 0059 point 7)."""
 
 OPEN_STATES = frozenset({"planned", "follow-up"})
-DONE_STATES = frozenset({"merged", "built", "live"})
+DONE_STATES = frozenset({"merged", "built", "live", "superseded"})
+"""``superseded``: another ADR builds it; the issue closes like a done row (ADR 0119)."""
 IN_PR = "in PR"
 
-CATEGORIES = ("BUILT", "PARTIAL", "NOT BUILT", "POLICY")
+CATEGORIES = ("BUILT", "PARTIAL", "NOT BUILT", "POLICY", "SUPERSEDED")
 """What a *Built?* cell of ``docs/adr-status.md`` starts with."""
 
 _HEADING = re.compile(r"^# (\d{4})\.\s*(.+?)\s*$", re.M)
@@ -150,7 +153,10 @@ class Action:
 
     def __str__(self) -> str:
         """Say what the action does, for the log and for ``--dry-run``."""
-        assert self.step is not None  # noqa: S101 - every kind carries its row
+        if self.kind == "orphan":
+            assert self.issue is not None  # noqa: S101 - an orphan is an issue without a row
+            return f"close #{self.issue.number}: {self.issue.title} (no such row any more)"
+        assert self.step is not None  # noqa: S101 - every other kind carries its row
         if self.kind == "create":
             return f"create: {self.step.issue_title} (label {self.step.label})"
         assert self.issue is not None  # noqa: S101 - the other kinds act on an issue
@@ -267,6 +273,10 @@ def plan(steps: Iterable[Step], issues: Iterable[Issue]) -> list[Action]:
                 actions.append(Action("retitle", step, issue))
         elif step.status in DONE_STATES and issue is not None and issue.state == "OPEN":
             actions.append(Action("close", step, issue))
+    keys = {step.key for step in steps}
+    for key, issue in sorted(by_key.items()):
+        if key not in keys and issue.state == "OPEN":
+            actions.append(Action("orphan", None, issue))
     return actions
 
 
@@ -275,8 +285,9 @@ def issue_body(step: Step) -> str:
     return (
         f"ADR {step.adr} *{step.title}*, build step {step.step}: {step.what}\n\n"
         f"Source: `docs/adr/{step.file}`, section *Build status*; the row says `{step.status}`.\n\n"
-        "The pull request that builds this step sets the row to `in PR #N` and closes this issue "
-        "with `Closes #N` in its description. `scripts/adr_issues.py` closes it as well once the "
+        "The pull request that builds this step sets the row to `merged` with its own number "
+        "(true once it merges, ADR 0119) and closes this issue with `Closes #N` in its "
+        "description. `scripts/adr_issues.py` closes it as well once the "
         "row says `merged`, `built` or `live`, and reopens it while the row stays open "
         "(ADR 0078 point 6): the table in the ADR is the source of truth, so change the row, not "
         "the issue."
@@ -446,6 +457,15 @@ def sync(gh: GitHub, steps: Sequence[Step], dry_run: bool) -> None:
         return
     for action in actions:
         step, issue = action.step, action.issue
+        if action.kind == "orphan" and issue is not None:
+            say(dry_run, str(action))
+            if not dry_run:
+                gh.close_issue(
+                    issue.number,
+                    "No Build status row has this step any more: it was split or renamed "
+                    "(ADR 0119). The rows that replaced it have their own issues.",
+                )
+            continue
         assert step is not None  # noqa: S101 - plan() fills it
         if action.kind == "create":
             ensure_label(gh, labels, step.label, f"Build steps of ADR {step.adr}", dry_run)

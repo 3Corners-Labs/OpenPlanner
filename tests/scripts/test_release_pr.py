@@ -327,3 +327,27 @@ def test_plan_refuses_a_patch_that_carries_a_migration() -> None:
     with pytest.raises(ValueError, match="carries no migration"):
         plan("v0.4.0", ["fix: a"], "0.4.1", migrations_changed=True)
     assert plan("v0.4.0", ["fix: a"], "0.4.1", migrations_changed=False) == "0.4.1"
+
+
+def test_the_release_pr_lists_the_adrs_this_release_finishes() -> None:
+    """ADR 0119: the product owner reads which decisions became built, and what is still open."""
+    from scripts.release_pr import adr_progress
+
+    before = "\n".join(
+        [
+            "| 0001 | One | BUILT | e | – |",
+            "| 0002 | Two | PARTIAL | e | x |",
+            "| 0003 | Three | NOT BUILT | e | x |",
+        ]
+    )
+    after = before.replace("| 0002 | Two | PARTIAL |", "| 0002 | Two | BUILT |") + (
+        "\n| 0004 | Four | NOT BUILT (policy part) | e | x |"
+    )
+
+    section = adr_progress(before, after, "v0.5.0")
+
+    assert section.startswith("## ADRs\n\nBuilt since v0.5.0 (1):\n\n- ADR 0002 Two\n")
+    assert "Still open (2): 0003, 0004; of these nothing built yet: 0003, 0004." in section
+    body = pr_body("0.6.0", "v0.5.0", ["feat: a"], "po", "2026-11-08", section)
+    assert section in body
+    assert "## ADRs" not in pr_body("0.6.0", "v0.5.0", ["feat: a"], "po", "2026-11-08")

@@ -25,6 +25,7 @@ Nothing here pushes, opens or tags; every subcommand can be run on a laptop as w
 
 import argparse
 import re
+import subprocess  # noqa: S404 - git show with fixed arguments only
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -151,7 +152,56 @@ def release_changelog(text: str, version: str, date: str) -> str:
     return text
 
 
-def pr_body(version: str, previous: str, subjects: Sequence[str], actor: str, date: str) -> str:
+_OVERVIEW_ROW = re.compile(r"^\| (\d{4}) \| (.+?) \| (.+?) \| .+? \| .+? \|$")
+
+
+def _categories(overview: str) -> dict[str, tuple[str, str]]:
+    """Return the title and the *Built?* word per ADR from ``docs/adr-status.md``."""
+    found = {}
+    for line in overview.splitlines():
+        row = _OVERVIEW_ROW.match(line.strip())
+        if row:
+            word = "NOT BUILT" if row.group(3).startswith("NOT BUILT") else row.group(3).split()[0]
+            found[row.group(1)] = (row.group(2), word)
+    return found
+
+
+def adr_progress(before: str, after: str, previous: str) -> str:
+    """Return the release PR's ADR section: what became built, and what is still open (ADR 0119).
+
+    Args:
+        before: ``docs/adr-status.md`` at the last release.
+        after: ``docs/adr-status.md`` now.
+        previous: The last release tag, for the wording.
+
+    Returns:
+        A Markdown section; the product owner reads here which decisions this release finishes.
+    """
+    was, now = _categories(before), _categories(after)
+    done = [
+        f"- ADR {number} {title}"
+        for number, (title, word) in sorted(now.items())
+        if word == "BUILT" and was.get(number, ("", ""))[1] != "BUILT"
+    ]
+    open_ = sorted(n for n, (_, word) in now.items() if word in {"PARTIAL", "NOT BUILT"})
+    unbuilt = sorted(n for n, (_, word) in now.items() if word == "NOT BUILT")
+    return (
+        "## ADRs\n\n"
+        f"Built since {previous} ({len(done)}):\n\n" + ("\n".join(done) or "- (none)") + "\n\n"
+        f"Still open ({len(open_)}): {', '.join(open_) or 'none'}; of these nothing built yet: "
+        f"{', '.join(unbuilt) or 'none'}. Source: `docs/adr-status.md`, tested against every "
+        "ADR's *Build status* table.\n\n"
+    )
+
+
+def pr_body(
+    version: str,
+    previous: str,
+    subjects: Sequence[str],
+    actor: str,
+    date: str,
+    adrs: str = "",
+) -> str:
     """Return the release PR's description: the PR template with every section answered.
 
     Args:
@@ -160,6 +210,7 @@ def pr_body(version: str, previous: str, subjects: Sequence[str], actor: str, da
         subjects: The subjects of the commits since the last release.
         actor: Who dispatched the workflow; the instruction of ADR 0012 and 0052.
         date: The date in the changelog heading.
+        adrs: The ADR section of :func:`adr_progress`; empty leaves it out.
     """
     audit = needs_audit(version)
     listed = "\n".join(f"- {subject}" for subject in subjects) or "- (none)"
@@ -179,8 +230,7 @@ def pr_body(version: str, previous: str, subjects: Sequence[str], actor: str, da
         f"and *Unreleased* in `CHANGELOG.md` is now `## {version} ({date})`. Opened by the "
         "`release` workflow on "
         f"the dispatch of {actor} (ADR 0079); nothing else changes.\n\n"
-        f"Commits since {previous} ({len(subjects)}):\n\n{listed}\n\n"
-        "## Why\n\n"
+        f"Commits since {previous} ({len(subjects)}):\n\n{listed}\n\n" + adrs + "## Why\n\n"
         "A release is a release PR plus a tag on the product owner's instruction (ADR 0052 "
         "point 3). This PR is the first half; the `tag` dispatch of the same workflow sets the "
         "tag on its merge commit, and `main.yml` builds, signs and publishes.\n\n"
@@ -287,6 +337,17 @@ def _plan(args: argparse.Namespace) -> None:
         sys.stdout.write(f"{key}={value}\n")
 
 
+def _at(ref: str, path: Path) -> str:
+    """Return a file's text at a git ref; empty when it did not exist there."""
+    found = subprocess.run(  # noqa: S603 - fixed argument list, no shell
+        ["git", "show", f"{ref}:{path.as_posix()}"],  # noqa: S607 - git from PATH
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return found.stdout if found.returncode == 0 else ""
+
+
 def _prepare(args: argparse.Namespace) -> None:
     version, date = args.version, args.date or _today()
     parse_version(version)
@@ -300,7 +361,13 @@ def _prepare(args: argparse.Namespace) -> None:
     ):
         path = Path(name)
         path.write_text(edit(path.read_text(), version))
-    Path(args.body).write_text(pr_body(version, previous, subjects, args.actor, date))
+    overview = Path("docs/adr-status.md")
+    adrs = (
+        adr_progress(_at(previous, overview), overview.read_text(), previous)
+        if overview.exists()
+        else ""
+    )
+    Path(args.body).write_text(pr_body(version, previous, subjects, args.actor, date, adrs))
     sys.stdout.write(f"prepared v{version} ({date}); body in {args.body}\n")
 
 
