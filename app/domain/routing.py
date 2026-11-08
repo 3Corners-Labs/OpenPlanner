@@ -55,6 +55,16 @@ ATTRIBUTE_VALUES: Mapping[Attribute, tuple[str, ...]] = {
 catalogue; a test keeps it equal to the i18n module's list."""
 
 
+def offers(subjects: Collection[str] | None, code: str | None) -> bool:
+    """Return whether something offering ``subjects`` takes a participant who chose ``code``.
+
+    ``None`` or empty ``subjects`` offer every subject, and no choice (the group asks none)
+    fits everything (ADR 0081 point 4). The one home of the rule for blocks, slots and the
+    agenda.
+    """
+    return not subjects or code is None or code in subjects
+
+
 def _invalid(name: str) -> DomainError:
     """Return the configuration error for ``name``."""
     return DomainError(ErrorCode.INVALID_CONFIGURATION, name)

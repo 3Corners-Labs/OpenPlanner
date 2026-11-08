@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.routing import offers
 from app.domain.scheduling import Group, ScheduleOverride, ScheduleRule, TimeWindow, windows_on
 
 MAX_RANGE_DAYS = 62
@@ -50,7 +51,7 @@ class SlotTime:
 
     def offers_subject(self, code: str | None) -> bool:
         """Return whether a participant who chose ``code`` may book this slot."""
-        return self.subjects is None or code is None or code in self.subjects
+        return offers(self.subjects, code)
 
 
 @dataclass(frozen=True)

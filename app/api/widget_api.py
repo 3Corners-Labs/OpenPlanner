@@ -46,7 +46,7 @@ from starlette.responses import JSONResponse, Response
 from app.api.contact_form import ANSWER_PREFIX, HONEYPOT_FIELD, load_contact_form
 from app.api.labels import slot_label
 from app.api.maintenance import WidgetMaintenance, retry_after
-from app.api.slot_picker import PickerView, parse_filter, picker, slot_value
+from app.api.slot_picker import PickerView, SlotFilter, picker, slot_value, subject_filter
 from app.api.widget_schemas import (
     MAX_BODY_BYTES,
     WidgetAvailability,
@@ -437,7 +437,7 @@ async def availability(
         month=month,
         day=day,
         # Only a code of the group goes into the filter, so the answer never echoes the query.
-        slot_filter=parse_filter([("subject", subject or "")], found.routing),
+        slot_filter=SlotFilter(subject=subject_filter(subject, found.routing)),
     )
     return _availability(view, locale)
 

@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.domain.branding import Branding
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.routing import SUBJECT_CODE, GroupRouting
+from app.domain.routing import SUBJECT_CODE, GroupRouting, offers
 
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _NOT_SLUG = re.compile(r"[^a-z0-9]+")
@@ -466,7 +466,7 @@ class TimeWindow:
         A block without subjects offers all of them, and a booking without a subject (the
         group asks none) fits every block.
         """
-        return not self.subjects or code is None or code in self.subjects
+        return offers(self.subjects, code)
 
     @property
     def staffed(self) -> bool:

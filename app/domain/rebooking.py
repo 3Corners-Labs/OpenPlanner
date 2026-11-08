@@ -140,7 +140,7 @@ def propose(
                     open_slots,
                     reach,
                     now,
-                    booking.routing.subject if booking.routing else None,
+                    booking.subject,
                 )
                 if room[slot.start] > 0
             ),

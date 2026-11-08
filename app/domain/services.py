@@ -94,7 +94,9 @@ class ContactInput:
     """Raw contact fields from the booking form, validated by ``Contact.create``.
 
     ``answers`` maps the keys of the group's custom form fields to the submitted strings
-    (ADR 0055); they are validated by ``validate_answers``.
+    (ADR 0055), validated by ``validate_answers``, and the routing questions keyed
+    ``_subject`` and ``_<attribute>`` (ADR 0081), validated by ``GroupRouting.choose``; a custom
+    field key starts with a letter, so the two never collide.
     """
 
     first_name: str = field(repr=False)
@@ -641,8 +643,7 @@ class BookingService:
             raise DomainError(ErrorCode.OUTSIDE_BOOKING_WINDOW)
         day = start.astimezone(group.tz).date()
         rules, overrides = await effective_schedule(tx, group, day, day)
-        subject = routing.subject if routing else None
-        offered = offered_slot(group, rules, overrides, start, subject)
+        offered = offered_slot(group, rules, overrides, start, routing.subject if routing else None)
         if offered is None:
             raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
         if covering(await tx.get_closures(group.id, now), offered.start) is not None:

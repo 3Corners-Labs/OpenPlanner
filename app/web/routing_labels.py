@@ -35,6 +35,13 @@ def source_label(source: str, gettext: BoundGettext) -> str:
     return gettext(question_key(source))
 
 
+def mapping_source_label(source: str, gettext: BoundGettext) -> str:
+    """Return a mapping source as the admin screen names it: *Subject*, or the question."""
+    if source == SUBJECT_SOURCE:
+        return gettext("admin.routing.source.subject")
+    return source_label(source, gettext)
+
+
 def option_label(
     routing: GroupRouting, source: str, code: str, gettext: BoundGettext, locale: str
 ) -> str:

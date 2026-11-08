@@ -483,8 +483,7 @@ async def _reschedule_response(
     context = _page_context(details, locale, public_ref, None, _clock(request).now())
     context["errors"] = errors or []
     chosen = parse_start(start)
-    routing = details.booking.routing
-    subject = routing.subject if routing else None  # ADR 0081: a move keeps the subject
+    subject = details.booking.subject  # ADR 0081: a move keeps the subject
     slot = await _available(service, group, chosen, subject) if chosen else None
     if chosen is not None and slot is not None and chosen != details.booking.start:
         context["new_start"] = slot_value(chosen)

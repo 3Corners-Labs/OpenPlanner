@@ -78,15 +78,17 @@ the *Data fields* card and not masked in logs."""
 ROUTING_FIELDS: tuple[str, ...] = ("subject_code", "routing_answers")
 """The participant's subject and routing answers (ADR 0081): codes from a closed list, no
 personal data, so not masked and not on the *Data fields* card; ADR 0081 has them purged with
-the booking all the same. Reporting (ADR 0117) keeps its own copy of the subject code."""
+the booking all the same. Reporting by subject (ADR 0117) must copy the code into its fact
+before the purge; it cannot read it from a purged booking."""
 
 PURGED_FIELDS: tuple[str, ...] = (
     *(f.name for f in DATA_FIELDS),
     *DERIVED_FIELDS,
     *ROUTING_FIELDS,
 )
-"""Every column the purge sets to NULL: ``DATA_FIELDS`` and ``DERIVED_FIELDS``. The purge works
-from this list, so there is no second one to drift (ADR 0102 point 13). What the purge does is
+"""Every column the purge sets to NULL: ``DATA_FIELDS``, ``DERIVED_FIELDS`` and
+``ROUTING_FIELDS``. The purge works from this list, so there is no second one to drift (ADR 0102
+point 13). What the purge does is
 *delete fields from the appointment*; it does not make the booking anonymous."""
 
 USAGE_FIELDS: tuple[str, ...] = (

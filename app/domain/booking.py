@@ -244,6 +244,11 @@ class Booking:
     """The subject and attribute codes the participant chose (ADR 0081); not personal data."""
 
     @property
+    def subject(self) -> str | None:
+        """The code of the subject the participant chose (ADR 0081), or ``None``."""
+        return self.routing.subject if self.routing else None
+
+    @property
     def reference(self) -> str:
         """Human-readable booking reference for agents and reports, e.g. ``OP-000123``."""
         return f"OP-{self.id or 0:06d}"

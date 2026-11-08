@@ -25,6 +25,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from app.domain.availability import slots_on, staffed_runs
 from app.domain.closure import Closure, covering
+from app.domain.routing import offers
 from app.domain.scheduling import Group, TimeWindow
 
 
@@ -74,7 +75,7 @@ class AgendaSlot:
 
     def offers_subject(self, code: str | None) -> bool:
         """Return whether a booking with subject ``code`` may move into this slot."""
-        return self.subjects is None or code is None or code in self.subjects
+        return offers(self.subjects, code)
 
     @property
     def shortfall(self) -> int:

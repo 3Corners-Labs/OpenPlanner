@@ -103,6 +103,15 @@ def _hour(value: str, low: int, high: int) -> int | None:
     return int(value) if value.isdigit() and len(value) <= 2 and low <= int(value) <= high else None
 
 
+def subject_filter(code: str | None, routing: GroupRouting | None) -> str | None:
+    """Return ``code`` when it is one of ``routing``'s subjects (ADR 0081), else ``None``.
+
+    Only a code the group wrote reaches the filter, so a page never echoes the query.
+    """
+    found = routing.subject(code) if routing else None
+    return found.code if found else None
+
+
 def parse_filter(
     params: Sequence[tuple[str, str]], routing: GroupRouting | None = None
 ) -> SlotFilter:
@@ -117,8 +126,7 @@ def parse_filter(
     start = _hour(values.get("from", ""), 0, 23)
     end = _hour(values.get("until", ""), 1, 24)
     invalid = start is not None and end is not None and end <= start
-    found = routing.subject(values.get("subject")) if routing else None
-    chosen = found.code if found else None
+    chosen = subject_filter(values.get("subject"), routing)
     return SlotFilter(days, start, None if invalid else end, invalid, chosen)
 
 

@@ -9,8 +9,10 @@ entry that no longer validates is skipped rather than failing the page.
 
 import contextlib
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from typing import Any
+
+import structlog
 
 from app.domain.errors import DomainError
 from app.domain.routing import (
@@ -20,6 +22,8 @@ from app.domain.routing import (
     RoutingChoice,
     Subject,
 )
+
+log = structlog.get_logger()
 
 
 def routing_json(routing: GroupRouting) -> str | None:
@@ -42,7 +46,9 @@ def routing_from_json(raw: str | None) -> GroupRouting:
 
     Read entry by entry: a subject, attribute or mapping that no longer validates (an attribute
     an older release does not know, a rule tightened since) is left out, the rest is kept. The
-    column is written only by ``save_group_routing``, so reading never erases what it skips.
+    column is written only by ``save_group_routing``: a settings save never touches it, but
+    the next change on the routing screen saves the routing without the skipped entries. Every
+    skip is logged (``routing.entry_skipped``, counts only).
     """
     if not raw:
         return GroupRouting()
@@ -52,11 +58,11 @@ def routing_from_json(raw: str | None) -> GroupRouting:
         return GroupRouting()
     if not isinstance(body, dict):
         return GroupRouting()
-    subjects = tuple(_entries(body.get("subjects"), _subject))
-    attributes = tuple(_entries(body.get("attributes"), Attribute))
+    subjects = _entries(body.get("subjects"), _subject, "subjects")
+    attributes = _entries(body.get("attributes"), Attribute, "attributes")
     mapping = body.get("mapping")
-    variables = tuple(
-        _entries(list(mapping.items()) if isinstance(mapping, dict) else [], _variable)
+    variables = _entries(
+        list(mapping.items()) if isinstance(mapping, dict) else [], _variable, "mapping"
     )
     by_code = {s.code: s for s in reversed(subjects)}  # the first of a duplicate code wins
     routing = GroupRouting(
@@ -70,13 +76,18 @@ def routing_from_json(raw: str | None) -> GroupRouting:
     return routing
 
 
-def _entries[T](items: object, read: Callable[[Any], T]) -> Iterator[T]:
-    """Yield ``read(item)`` for every item that reads; a broken item is skipped."""
+def _entries[T](items: object, read: Callable[[Any], T], part: str) -> tuple[T, ...]:
+    """Return ``read(item)`` for every item that reads; broken items are skipped and logged."""
+    found: list[T] = []
+    skipped = 0
     for item in items if isinstance(items, list) else []:
         try:
-            yield read(item)
+            found.append(read(item))
         except (ValueError, KeyError, TypeError, AttributeError, DomainError):
-            continue
+            skipped += 1
+    if skipped:
+        log.warning("routing.entry_skipped", part=part, count=skipped)
+    return tuple(found)
 
 
 def _subject(item: Any) -> Subject:

@@ -40,7 +40,7 @@ from app.domain.routing_service import GroupRoutingView, RoutingService
 from app.i18n import BoundGettext
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
-from app.web.routing_labels import option_label, question_key, source_label, value_key
+from app.web.routing_labels import mapping_source_label, option_label, question_key, value_key
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -147,9 +147,7 @@ def _mappings(
         views.append(
             {
                 "source": source,
-                "label": _("admin.routing.source.subject")
-                if source == SUBJECT_SOURCE
-                else source_label(source, _),
+                "label": mapping_source_label(source, _),
                 "variable": value(f"variable_{source}", variable.name if variable else ""),
                 "error": form.error_for(f"variable_{source}") if mine else None,
                 "codes": [

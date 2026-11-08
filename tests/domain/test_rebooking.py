@@ -220,6 +220,4 @@ def test_a_proposal_offers_only_slots_whose_blocks_offer_the_bookings_subject() 
     assert proposal.new_start == TUE_0900
     # A booking without a subject fits every block.
     assert MON_0930 in _starts(ranked(GROUP, MON_0900, [nearest, later], REACH, NOW))
-    assert MON_0930 not in _starts(
-        ranked(GROUP, MON_0900, [nearest, later], REACH, NOW, "general")
-    )
+    assert MON_0930 not in _starts(ranked(GROUP, MON_0900, [nearest, later], REACH, NOW, "general"))
