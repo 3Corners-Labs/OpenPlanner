@@ -8835,9 +8835,6 @@ msgstr "This package was made with another version of OpenPlanner. Export it aga
 msgid "admin.form.error.configuration_package_too_large"
 msgstr "The package is larger than the largest configuration package allowed."
 
-msgid "admin.form.error.configuration_installation_in_use"
-msgstr "This installation is in use: it has bookings, slots or an active closure. A package can only be imported into a new installation."
-
 msgid "admin.form.error.configuration_format_unsupported"
 msgstr "This configuration document uses a format this version of OpenPlanner does not know."
 

@@ -13,7 +13,6 @@ import pytest
 
 from app.config import Settings
 from app.domain.configuration_document import document_filename
-from app.domain.configuration_package import package_filename
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
 from tests.support.downloads import DOWNLOAD_MODULES
 
@@ -71,15 +70,10 @@ def test_the_document_filename_is_safe_for_the_default_installation() -> None:
     assert SAFE_FILENAME.fullmatch(document_filename("Docker 01/ä", EXPORTED))
 
 
-def test_the_package_filename_is_safe_for_the_default_installation() -> None:
-    assert SAFE_FILENAME.fullmatch(package_filename("", EXPORTED))
-    assert SAFE_FILENAME.fullmatch(package_filename("docker01", EXPORTED))
-
-
 @pytest.mark.parametrize("installation", ["Prod", "test_host", "ACC-1.Nl"])
-def test_the_package_filename_is_safe_for_every_allowed_installation_name(
+def test_the_document_filename_is_safe_for_every_allowed_installation_name(
     installation: str, settings: Settings
 ) -> None:
     allowed = settings.model_copy(update={"installation_name": installation}).installation_name
 
-    assert SAFE_FILENAME.fullmatch(package_filename(allowed, EXPORTED))
+    assert SAFE_FILENAME.fullmatch(document_filename(allowed, EXPORTED))

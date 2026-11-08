@@ -8848,9 +8848,6 @@ msgstr "Dit pakket is gemaakt met een andere versie van OpenPlanner. Exporteer h
 msgid "admin.form.error.configuration_package_too_large"
 msgstr "Het pakket is groter dan de maximale grootte van een configuratiepakket."
 
-msgid "admin.form.error.configuration_installation_in_use"
-msgstr "Deze installatie is in gebruik: er zijn afspraken, tijdsloten of een actieve sluiting. Een pakket kan alleen in een nieuwe installatie worden geïmporteerd."
-
 msgid "admin.form.error.configuration_format_unsupported"
 msgstr "Dit configuratiedocument heeft een formaat dat deze versie van OpenPlanner niet kent."
 

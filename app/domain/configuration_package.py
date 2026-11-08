@@ -20,12 +20,6 @@ FORMAT = 1
 MIN_PASSPHRASE_LENGTH = 16
 """A passphrase protects every secret of the platform: a protection, never a setting."""
 
-MEDIA_TYPE = "application/vnd.sqlite3"
-"""The media type of a package: a SQLite file."""
-
-PACKAGE_FILENAME = "openplanner-configuration-{installation}-{date}.sqlite"
-"""The download name of an exported package, in the portal and over the API."""
-
 
 def filename_slug(installation: str) -> str:
     """Return the installation name as a slug, so a download name passes the filename rule.
@@ -33,13 +27,6 @@ def filename_slug(installation: str) -> str:
     Lower case; every character outside ``[a-z0-9.-]`` becomes ``-``.
     """
     return re.sub(r"[^a-z0-9.-]", "-", (installation or "openplanner").lower())
-
-
-def package_filename(installation: str, exported_at: datetime) -> str:
-    """Return the download name of a package exported on ``exported_at``."""
-    return PACKAGE_FILENAME.format(
-        installation=filename_slug(installation), date=exported_at.strftime("%Y%m%d")
-    )
 
 
 VERSION_TABLE = "alembic_version"
@@ -130,23 +117,11 @@ STATE_TABLES = frozenset(
 """The tables a package empties: bookings and their personal data, the log, staff, and what
 belongs to this host. A test fails when a table of the model is in neither set."""
 
-IN_USE_TABLES = ("bookings", "slots", "closures")
-"""An installation with a row in any of these is in use: an import is refused (point 5)."""
-
-PORTABLE_ENVIRONMENT = (
-    "oidc_discovery_url",
-    "oidc_client_id",
-    "oidc_client_secret",
-    "oidc_scopes",
-)
-"""The class A values that travel with a package (point 4): the login, nothing of the host."""
-
 PERMISSION = Permission.SETTINGS_PLATFORM_MANAGE
-"""Export and import are a change of the platform's configuration (point 6)."""
+"""Reading a package is a change of the platform's configuration (point 6)."""
 
-EXPORT_DETAIL = "configuration.export"
 IMPORT_DETAIL = "configuration.import"
-"""The audit detail of an export and an import; the import adds its counts."""
+"""The audit detail of a package import; it adds its counts."""
 
 COUNTED_TABLES = ("organisations", "groups", "identity_providers", "api_clients")
 """What a summary counts, in this order; the import's audit detail names the same."""

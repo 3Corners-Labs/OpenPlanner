@@ -280,9 +280,6 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",
-    ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: (
-        "admin.form.error.configuration_installation_in_use"
-    ),
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
     ErrorCode.SCENARIO_NAME_TAKEN: "admin.form.error.scenario_name_taken",
     ErrorCode.ALERT_TARGET_TAKEN: "admin.form.error.alert_target_taken",
