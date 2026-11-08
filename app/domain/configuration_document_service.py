@@ -191,7 +191,9 @@ class ConfigurationDocumentService:
         if secrets and (passphrase is None or len(passphrase) < MIN_PASSPHRASE_LENGTH):
             raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")
         async with self._uow.read() as tx:
-            snapshot = await tx.read_configuration(self._clock.now(), self._locked())
+            snapshot = await tx.read_configuration(
+                self._clock.now(), self._locked(), secrets=secrets
+            )
         if secrets and not snapshot.secrets_available:
             raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
         document = Document(
