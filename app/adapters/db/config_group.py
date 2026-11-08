@@ -19,11 +19,14 @@ from typing import cast
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.contact_centers import DESCRIPTORS
 from app.adapters.crypto import SecretBox
 from app.adapters.db.config_common import Writer, find_organisation_id, row_or_refuse
+from app.adapters.db.contact_center_rows import legacy_group_columns, routing_of, save_routing
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.form_fields import FormFieldQueries
 from app.adapters.db.models import (
+    GroupContactCenterRow,
     GroupContactsRow,
     GroupHolidayCalendarRow,
     GroupHolidayOpenDayRow,
@@ -55,12 +58,16 @@ from app.domain.configuration_v1_group_parts import (
 )
 from app.domain.configuration_v1_names import GROUP_KIND, GROUP_TEXT_KIND
 from app.domain.configuration_values import Json, Value
+from app.domain.contact_center_codec import contact_center_from_json, contact_center_to_json
 from app.domain.contacts import block_from_json, block_to_json
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import FieldDefinition, FormDefinition
 from app.domain.routing_codec import routing_from_json as strict_routing
 from app.domain.routing_codec import routing_to_json
 from app.domain.scheduling import Offer, ScheduleOverride, ScheduleRule, TimeWindow
+
+DESCRIPTORS_BY_VALUE = {kind.value: descriptor for kind, descriptor in DESCRIPTORS.items()}
+"""The contact-center platforms a document may name, by the value of their kind."""
 
 COLUMNS = (
     "name",
@@ -70,9 +77,6 @@ COLUMNS = (
     "horizon_days",
     "phone_mode",
     "video_host_email",
-    "wxcc_business_address",
-    "wxcc_channel",
-    "wxcc_routing_value",
     "not_picked_up_minutes",
     "direct_call_max_concurrent",
     "dispatch_lead_minutes",
@@ -203,6 +207,7 @@ async def read_groups(session: AsyncSession) -> dict[str, tuple[Entity, ...]]:
         ).all()
     )
     contacts = {c.group_id: c.body for c in await session.scalars(select(GroupContactsRow))}
+    centers = {c.group_id: c for c in await session.scalars(select(GroupContactCenterRow))}
     texts = _grouped(
         (t.group_id, t)
         for t in await session.scalars(
@@ -226,6 +231,9 @@ async def read_groups(session: AsyncSession) -> dict[str, tuple[Entity, ...]]:
         fields["reminder_rules"] = _list(
             {"channel": r.channel, "minutes_before": r.minutes_before, "enabled": r.enabled}
             for r in reminders.get(row.id, [])
+        )
+        fields["contact_center"] = cast(
+            "Json", contact_center_to_json(routing_of(row, centers.get(row.id)))
         )
         fields["routing"] = cast("Json", routing_to_json(stored_routing(row.routing)))
         block = contacts_block(contacts[row.id]) if row.id in contacts else None
@@ -426,6 +434,8 @@ async def write_group(session: AsyncSession, box: SecretBox | None, change: Chan
         row.idp_key = str(values.get("idp_key") or slug)
     if "archived" in names and values.get("archived") and row.archived_at is None:
         row.archived_at = datetime.now(UTC)
+    if "contact_center" in names:
+        await _write_contact_center(session, row, values.get("contact_center"))
     if "routing" in names:
         routing = values.get("routing")
         row.routing = (
@@ -443,6 +453,15 @@ async def write_group(session: AsyncSession, box: SecretBox | None, change: Chan
     if "contacts" in names:
         await _write_contacts(session, row.id, values.get("contacts"))
     await session.flush()
+
+
+async def _write_contact_center(session: AsyncSession, row: GroupRow, value: object) -> None:
+    """Store a group's contact-center routing as the portal does (ADR 0032, ADR 0116 expand)."""
+    routing = contact_center_from_json(value, DESCRIPTORS_BY_VALUE)
+    for name, column in legacy_group_columns(routing).items():
+        setattr(row, name, column)
+    await session.flush()
+    await save_routing(session, row.id, routing)
 
 
 async def write_group_text(session: AsyncSession, box: SecretBox | None, change: Change) -> None:

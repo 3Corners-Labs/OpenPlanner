@@ -78,6 +78,7 @@ from app.domain.configuration_v1_names import (
     GROUP_TEXT_KIND,
 )
 from app.domain.configuration_values import Json, Value
+from app.domain.contact_center_codec import contact_center_from_json, contact_center_to_json
 from app.domain.entitlements import is_idp_key
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import (
@@ -160,9 +161,6 @@ _SETTINGS: tuple[FieldSpec, ...] = (
     _setting("horizon_days", 1, 366),
     _choice("phone_mode", (mode.value for mode in PhoneMode)),
     text("video_host_email", nullable=True),
-    text("wxcc_business_address", nullable=True, max_length=255),
-    text("wxcc_channel", nullable=True, max_length=255),
-    text("wxcc_routing_value", nullable=True, max_length=512),
     _setting("not_picked_up_minutes", 1, MAX_NOT_PICKED_UP_MINUTES),
     integer("direct_call_max_concurrent", nullable=True, minimum=1, maximum=MAX_DIRECT_CALLS),
     _setting("dispatch_lead_minutes", 0, MAX_DISPATCH_LEAD_MINUTES),
@@ -229,6 +227,7 @@ _REMINDER_ITEMS = (
 _GROUP_TABLES = frozenset(
     {
         "groups",
+        "group_contact_center",
         "group_contacts",
         "group_form_fields",
         "group_holiday_calendars",
@@ -238,6 +237,13 @@ _GROUP_TABLES = frozenset(
         "reminder_rules",
     }
 )
+
+
+def _check_contact_center(value: Value, ctx: RuleContext) -> Value:
+    """Check a group's contact-center routing against the platform's descriptor; normalise it."""
+    return cast(
+        "Json", contact_center_to_json(contact_center_from_json(value, ctx.contact_centers))
+    )
 
 
 def _check_routing(value: Value, ctx: RuleContext) -> Value:
@@ -254,6 +260,9 @@ def _build_group(view: Mapping[str, Value], ctx: RuleContext) -> Group:
     routing = view.get("routing")
     if routing is not None:
         values["routing"] = routing_from_json(routing)
+    values["contact_center"] = contact_center_from_json(
+        view.get("contact_center"), ctx.contact_centers
+    )
     return Group(
         0,
         0,
@@ -430,6 +439,20 @@ GROUP = Kind(
             columns=tuple(
                 f"reminder_rules.{name}" for name in ("channel", "minutes_before", "enabled")
             ),
+        ),
+        json_object(
+            "contact_center",
+            nullable=True,
+            check=_check_contact_center,
+            columns=(
+                "wxcc_business_address",
+                "wxcc_channel",
+                "wxcc_routing_value",
+                "group_contact_center.kind",
+                "group_contact_center.routing_value",
+                "group_contact_center.attributes",
+            ),
+            description="The platform the group dispatches to, its routing value and attributes.",
         ),
         json_object(
             "routing",

@@ -310,6 +310,21 @@
           },
           "description": "The group's own scenarios."
         },
+        "contact_center": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "The platform the group dispatches to, its routing value and attributes."
+        },
         "contacts": {
           "oneOf": [
             {
@@ -769,39 +784,6 @@
           "oneOf": [
             {
               "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "wxcc_business_address": {
-          "oneOf": [
-            {
-              "type": "string",
-              "maxLength": 255
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "wxcc_channel": {
-          "oneOf": [
-            {
-              "type": "string",
-              "maxLength": 255
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "wxcc_routing_value": {
-          "oneOf": [
-            {
-              "type": "string",
-              "maxLength": 512
             },
             {
               "type": "null"
