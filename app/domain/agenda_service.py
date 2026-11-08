@@ -139,8 +139,10 @@ async def agenda_days(
     rules, overrides = await effective_schedule(tx, group, first_day, last_day)
     lower, upper = utc_bounds(group, first_day, last_day)
     holding = await tx.find_agenda_bookings(group.id, lower, upper)
-    booked = Counter(b.start for b in holding)
-    pending = Counter(b.start for b in holding if b.awaits_confirmation)
+    held = Counter(p.start for p in await tx.list_open_proposals(group.id, lower, upper))
+    # ADR 0057 point 7: a held proposal counts like a booking awaiting confirmation.
+    booked = Counter(b.start for b in holding) + held
+    pending = Counter(b.start for b in holding if b.awaits_confirmation) + held
     closures = await tx.get_closures(group.id, now)
     accepted = {a.start: a for a in await tx.get_shortfall_acceptances(group.id, lower, upper)}
     result = []

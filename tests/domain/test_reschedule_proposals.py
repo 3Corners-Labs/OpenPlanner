@@ -311,3 +311,138 @@ async def test_a_booking_that_goes_ahead_gets_no_suggestions(bookings: BookingSe
     _booking_id, token = await _book(bookings)
 
     assert await bookings.suggestions(token) == []
+
+
+# --- the planner's review (step 3) ----------------------------------------------------------
+
+
+def _short(uow: InMemoryUnitOfWork) -> None:
+    """Staff Mondays with one agent, so a slot with two bookings is one short."""
+    from app.domain.scheduling import ScheduleRule
+    from tests.support.domain import window
+
+    for group_id in uow.state.groups:
+        uow.state.rules[group_id] = [ScheduleRule(weekday=0, window=window(capacity=1))]
+
+
+async def test_the_agenda_counts_a_held_proposal_like_a_pending_booking(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    from app.domain.agenda_service import agenda_days
+
+    booking_id, _token = await _book(bookings)
+    await planner.propose(GROUP_ADMIN, "demo", booking_id, NEXT_0900, ChangeReason.STAFFING)
+
+    async with uow.read() as tx:
+        group = uow.state.groups[1]
+        (day,) = await agenda_days(tx, group, NEXT_0900.date(), 1, clock.now())
+    slot = next(s for s in day.slots if s.start == NEXT_0900)
+    assert (slot.booked, slot.pending) == (1, 1)
+
+
+async def test_the_review_proposes_the_last_made_booking_with_the_free_times(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    await _book(bookings)
+    last, _token = await _book(bookings)
+    _short(uow)
+
+    (row,) = await planner.slot_proposals(GROUP_ADMIN, "demo", SLOT_0900)
+
+    assert row.booking.id == last
+    assert row.proposed == NEXT_0900  # same time of day, a week on
+    assert row.options[0] == NEXT_0900
+    assert SLOT_0930 in row.options
+
+
+async def test_sending_the_review_holds_asks_and_audits_each_booking(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    first, _ = await _book(bookings)
+    second, _ = await _book(bookings)
+    from app.domain.scheduling import ScheduleRule
+    from tests.support.domain import window
+
+    uow.state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=0, closes="09:30"))] + [
+        ScheduleRule(weekday=0, window=window(opens="09:30", closes="10:00", capacity=2))
+    ]
+
+    sent = await planner.propose_slot(
+        GROUP_ADMIN, "demo", SLOT_0900, ChangeReason.STAFFING, {first: NEXT_0930, second: None}
+    )
+
+    assert sent == 2
+    assert uow.state.bookings[first].status is BookingStatus.AWAITING_REBOOK
+    assert uow.state.bookings[second].status is BookingStatus.AWAITING_REBOOK
+    async with uow.read() as tx:
+        held = await tx.get_open_proposal(first)
+        assert held is not None
+        assert held.start == NEXT_0930
+        assert await tx.get_open_proposal(second) is None
+    details = [e.detail for e in uow.state.audit if e.detail.startswith("planner.")]
+    assert sorted(details) == [
+        "planner.propose,reason:staffing,bulk",
+        "planner.rebook,reason:staffing,bulk",
+    ]
+
+
+async def test_a_review_of_a_changed_slot_sends_nothing(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    await _book(bookings)
+    last, _ = await _book(bookings)
+    _short(uow)
+    await _book(bookings, NEXT_0900)  # the proposed slot fills up meanwhile
+
+    with pytest.raises(DomainError) as caught:
+        await planner.propose_slot(
+            GROUP_ADMIN, "demo", SLOT_0900, ChangeReason.STAFFING, {last: NEXT_0900}
+        )
+    with pytest.raises(DomainError) as other:
+        await planner.propose_slot(
+            GROUP_ADMIN, "demo", SLOT_0900, ChangeReason.STAFFING, {999: NEXT_0930}
+        )
+
+    assert caught.value.code is ErrorCode.SLOT_CHANGED
+    assert other.value.code is ErrorCode.SLOT_CHANGED
+    assert uow.state.bookings[last].status is BookingStatus.CONFIRMED
+    assert uow.state.proposals == {}
+
+
+async def test_the_planner_withdraws_or_confirms_a_proposal(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    withdrawn, _ = await _book(bookings)
+    confirmed, _ = await _book(bookings)
+    await planner.propose(GROUP_ADMIN, "demo", withdrawn, NEXT_0900, ChangeReason.STAFFING)
+    await planner.propose(GROUP_ADMIN, "demo", confirmed, NEXT_0930, ChangeReason.STAFFING)
+
+    waiting = await planner.waiting(GROUP_ADMIN, "demo")
+    await planner.withdraw(GROUP_ADMIN, "demo", withdrawn)
+    moved = await planner.confirm_proposal(GROUP_ADMIN, "demo", confirmed)
+
+    assert {w.booking.id: w.proposal.start for w in waiting if w.proposal} == {
+        withdrawn: NEXT_0900,
+        confirmed: NEXT_0930,
+    }
+    assert uow.state.bookings[withdrawn].status is BookingStatus.AWAITING_REBOOK
+    async with uow.read() as tx:
+        assert await tx.get_open_proposal(withdrawn) is None
+    assert (moved.start, moved.status) == (NEXT_0930, BookingStatus.CONFIRMED)
+    with pytest.raises(DomainError) as caught:
+        await planner.withdraw(GROUP_ADMIN, "demo", withdrawn)
+    assert caught.value.code is ErrorCode.PROPOSAL_NOT_OPEN
+    details = {e.detail for e in uow.state.audit}
+    assert {"planner.withdraw", "planner.confirm_proposal"} <= details
+
+
+async def test_another_groups_booking_cannot_be_withdrawn_through_this_group(
+    planner: PlannerService, bookings: BookingService
+) -> None:
+    booking_id, _ = await _book(bookings)
+    await planner.propose(GROUP_ADMIN, "demo", booking_id, NEXT_0900, ChangeReason.STAFFING)
+
+    with pytest.raises(DomainError) as caught:
+        await planner.withdraw(GROUP_ADMIN, "demo-twee", booking_id)
+
+    assert caught.value.code in {ErrorCode.BOOKING_NOT_FOUND, ErrorCode.NOT_PERMITTED}

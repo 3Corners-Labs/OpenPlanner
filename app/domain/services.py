@@ -926,14 +926,24 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
-            proposal = await tx.get_open_proposal(_id(booking))
-            now = self._clock.now()
-            if proposal is None or proposal.is_due(now):
-                raise DomainError(ErrorCode.PROPOSAL_NOT_OPEN)
             group = await self._group_by_id(tx, booking.group_id)
-            return await self.relocate(
-                tx, booking, group, proposal.start, actor=ActorClass.PARTICIPANT
-            )
+            return await self.confirm_proposal_in(tx, booking, group, ActorClass.PARTICIPANT)
+
+    async def confirm_proposal_in(
+        self, tx: Transaction, booking: Booking, group: Group, actor: ActorClass
+    ) -> BookingReceipt:
+        """Move ``booking`` into its open proposal inside the caller's locked transaction.
+
+        Shared by the participant's link and the planner confirming on their behalf after a
+        phone call (ADR 0057 point 10); ``actor`` says which, for the usage facts.
+
+        Raises:
+            DomainError: ``proposal_not_open`` or any error of ``relocate``.
+        """
+        proposal = await tx.get_open_proposal(_id(booking))
+        if proposal is None or proposal.is_due(self._clock.now()):
+            raise DomainError(ErrorCode.PROPOSAL_NOT_OPEN)
+        return await self.relocate(tx, booking, group, proposal.start, actor=actor)
 
     async def _booked_jobs(
         self, tx: Transaction, group: Group, booking: Booking, *, sms: bool = False

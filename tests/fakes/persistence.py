@@ -1004,6 +1004,21 @@ class InMemoryTransaction:
         mine = [p for p in self.state.proposals.values() if p.booking_id == booking_id]
         return max((p for p in mine if p.is_open), key=lambda p: p.id or 0, default=None)
 
+    async def list_open_proposals(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[HeldProposal]:
+        return sorted(
+            (
+                p
+                for p in self.state.proposals.values()
+                if p.is_open
+                and lower <= p.start < upper
+                and self.state.bookings[p.booking_id].group_id == group_id
+                and self.state.bookings[p.booking_id].awaits_rebook
+            ),
+            key=lambda p: (p.start, p.id or 0),
+        )
+
     async def save_proposal(self, proposal: HeldProposal) -> None:
         self.state.proposals[proposal.id or 0] = proposal
 

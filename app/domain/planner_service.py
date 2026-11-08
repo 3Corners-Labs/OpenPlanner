@@ -22,10 +22,11 @@ planner makes more than ``alert_per_hour`` changes in an hour, a system event wa
 group's admins (abuse case: a compromised planner account). It never blocks.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from app.domain import booking_changes
+from app.domain import booking_changes, rebooking
 from app.domain.admin import AdminService, Authorization, require
 from app.domain.agenda import AgendaSlot, ShortfallAcceptance
 from app.domain.agenda_service import agenda_days
@@ -36,11 +37,12 @@ from app.domain.booking_changes import ProposalTiming
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.rebooking import last_made
+from app.domain.rebooking import DEFAULT_REACH, Reach, last_made
 from app.domain.reschedule_proposal import (
     DEFAULT_PROPOSAL_HOURS,
     HeldProposal,
     ProposalHours,
+    ProposalOutcome,
 )
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
@@ -59,6 +61,34 @@ CONFIRMED_BY_STAFF = "booking.confirmed_by_staff"
 """The audit detail of a planner confirming for the participant (ADR 0056 point 11)."""
 
 
+MAX_OPTIONS = 12
+"""How many free times a proposal row offers to choose from, best first: a presentation limit
+of the form, not a setting (the reach settings bound the search)."""
+
+
+@dataclass(frozen=True)
+class ProposalRow:
+    """One booking on the review page: the assistant's choice and what may replace it.
+
+    Attributes:
+        booking: The booking that has to move.
+        proposed: The assistant's proposed start, or ``None``: no slot fits, ask to rebook.
+        options: Free starts the planner may choose instead, best first.
+    """
+
+    booking: Booking
+    proposed: datetime | None
+    options: tuple[datetime, ...]
+
+
+@dataclass(frozen=True)
+class Waiting:
+    """A booking awaiting a new time, with its open proposal if it has one (ADR 0057)."""
+
+    booking: Booking
+    proposal: HeldProposal | None
+
+
 class PlannerService:
     """Application service for a planner's changes to existing bookings.
 
@@ -74,6 +104,8 @@ class PlannerService:
             long before the request lapses.
         proposal_hours: ``reschedule_proposal_confirm_hours`` and
             ``reschedule_proposal_reminder_hours`` (class D, ADR 0057).
+        reach: ``reschedule_search_days`` and ``reschedule_time_tolerance_minutes`` (class D,
+            ADR 0057): where the assistant looks for new times.
     """
 
     def __init__(
@@ -87,6 +119,7 @@ class PlannerService:
         rebook_days: int | Callable[[int], int] = 14,
         reminder_days: int | Callable[[int], int] = 3,
         proposal_hours: ProposalHours | Callable[[int], ProposalHours] = DEFAULT_PROPOSAL_HOURS,
+        reach: Reach | Callable[[int], Reach] = DEFAULT_REACH,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -97,6 +130,7 @@ class PlannerService:
         self._rebook_days = rebook_days
         self._reminder_days = reminder_days
         self._proposal_hours = proposal_hours
+        self._reach = reach
 
     def rebook_days(self, organisation_id: int) -> int:
         """Days after the start after which an unanswered request to rebook lapses."""
@@ -242,12 +276,56 @@ class PlannerService:
         async with self._uow.locked() as tx:
             group = await group_by_slug(tx, slug)
             booking = await self._changeable(tx, group, booking_id)
-            proposal = await self._bookings.propose_in(
-                tx, booking, group, start, reason=reason, timing=self._timing(group)
-            )
+            proposal = await self._propose(tx, group, booking, start, reason)
             detail = f"planner.propose,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
         return proposal
+
+    async def _propose(
+        self, tx: Transaction, group: Group, booking: Booking, start: datetime, reason: ChangeReason
+    ) -> HeldProposal:
+        """Hold ``start`` for ``booking`` with this service's periods."""
+        return await self._bookings.propose_in(
+            tx, booking, group, start, reason=reason, timing=self._timing(group)
+        )
+
+    async def _assist(
+        self, tx: Transaction, group: Group, movers: list[Booking]
+    ) -> list[ProposalRow]:
+        """Return the assistant's proposal and the free times for each of ``movers``.
+
+        The agenda is read around the movers' days within the organisation's reach; held
+        proposals count as taken (``agenda_days``), so two proposals never share a last place.
+        """
+        if not movers:
+            return []
+        now = self._clock.now()
+        reach = value_for(self._reach, group.organisation_id)
+        days = [b.start.astimezone(group.tz).date() for b in movers]
+        first = max(group.today(now), min(days) - timedelta(days=reach.search_days))
+        last = max(days) + timedelta(days=reach.search_days)
+        agenda = await agenda_days(tx, group, first, (last - first).days + 1, now)
+        slots = [slot for day in agenda for slot in day.slots]
+        proposals = rebooking.propose(group, movers, slots, reach, now)
+        chosen = {p.booking_id: p.new_start for p in proposals}
+        return [
+            ProposalRow(
+                b,
+                chosen.get(_id_of(b)),
+                tuple(
+                    s.start for s in rebooking.ranked(group, b.start, slots, reach, now, b.subject)
+                )[:MAX_OPTIONS],
+            )
+            for b in movers
+        ]
+
+    async def _own_booking(self, tx: Transaction, slug: str, booking_id: int) -> Booking:
+        """Return the booking ``booking_id`` of the group ``slug``; another group's is unknown."""
+        group = await group_by_slug(tx, slug)
+        booking = await tx.get_booking(booking_id)
+        if booking is None or booking.group_id != group.id:
+            raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+        return booking
 
     def _timing(self, group: Group) -> ProposalTiming:
         """Return the organisation's periods for a proposal."""
@@ -308,17 +386,147 @@ class PlannerService:
                 await tx.record_usage(shortfall_resolved(group, start, after.agents, after.booked))
         return waiting
 
-    async def waiting(self, principal: Principal, slug: str) -> list[Booking]:
-        """Return the group's bookings awaiting a new time from the participant, earliest first.
+    async def waiting(self, principal: Principal, slug: str) -> list[Waiting]:
+        """Return the group's bookings awaiting a new time, earliest first, with any proposal.
+
+        A proposal past its deadline is not shown: it no longer holds its place.
 
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
         await self._authorize(principal, slug)
+        now = self._clock.now()
         async with self._uow.read() as tx:
             group = await group_by_slug(tx, slug)
             scope = scope_for(principal, Permission.BOOKINGS_MANAGE)
-            return await tx.list_suspended_bookings(scope, group.id, BookingStatus.AWAITING_REBOOK)
+            waiting = await tx.list_suspended_bookings(
+                scope, group.id, BookingStatus.AWAITING_REBOOK
+            )
+            result = []
+            for booking in waiting:
+                proposal = await tx.get_open_proposal(booking.id) if booking.id else None
+                open_ = proposal if proposal is not None and not proposal.is_due(now) else None
+                result.append(Waiting(booking, open_))
+        return result
+
+    async def booking_proposal(
+        self, principal: Principal, slug: str, booking_id: int
+    ) -> ProposalRow:
+        """Return the assistant's proposal for one confirmed booking, with the free times.
+
+        For the per-booking action "propose a new time" (ADR 0057 point 1).
+
+        Raises:
+            DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active`` or
+                ``planner_too_late``.
+        """
+        await self._authorize(principal, slug)
+        async with self._uow.read() as tx:
+            group = await group_by_slug(tx, slug)
+            booking = await self._changeable(tx, group, booking_id)
+            if not booking.is_active:
+                raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+            (row,) = await self._assist(tx, group, [booking])
+        return row
+
+    async def slot_proposals(
+        self, principal: Principal, slug: str, start: datetime
+    ) -> list[ProposalRow]:
+        """Return the assistant's proposals for the slot's excess bookings (ADR 0057 point 5).
+
+        The last-made confirmed bookings a planner may still change, as many as the open
+        shortfall; each with the proposed time (or none: ask to rebook) and the free times the
+        planner may choose instead.
+
+        Raises:
+            DomainError: ``not_permitted``, ``group_not_found`` or ``slot_unavailable``.
+        """
+        await self._authorize(principal, slug)
+        async with self._uow.read() as tx:
+            group = await group_by_slug(tx, slug)
+            movers = [b for b in await self._candidates(tx, group, start) if b.is_active]
+            return await self._assist(tx, group, movers)
+
+    async def propose_slot(
+        self,
+        principal: Principal,
+        slug: str,
+        start: datetime,
+        reason: ChangeReason,
+        choices: Mapping[int, datetime | None],
+    ) -> int:
+        """Send the reviewed proposals of a slot in one transaction; return how many went.
+
+        ``choices`` maps each ticked booking to the time the planner kept or chose, or to
+        ``None`` to ask that participant to choose a time themselves (ADR 0044). Every capacity
+        is checked again under the write lock; when a booking is no longer among the slot's
+        excess or a chosen time no longer fits, nothing is sent and ``slot_changed`` asks the
+        planner to review again (ADR 0057 point 5: never sent blind).
+
+        Raises:
+            DomainError: ``not_permitted``, ``group_not_found``, ``slot_unavailable`` or
+                ``slot_changed``.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            movers = {b.id: b for b in await self._candidates(tx, group, start) if b.is_active}
+            if not choices or not set(choices) <= set(movers):
+                raise DomainError(ErrorCode.SLOT_CHANGED)
+            for booking_id, chosen in choices.items():
+                booking = movers[booking_id]
+                if chosen is None:
+                    await self._request(tx, group, booking, reason)
+                    detail = f"planner.rebook,reason:{reason.value},bulk"
+                else:
+                    try:
+                        await self._propose(tx, group, booking, chosen, reason)
+                    except DomainError as error:  # the time no longer fits: review again
+                        raise DomainError(ErrorCode.SLOT_CHANGED) from error
+                    detail = f"planner.propose,reason:{reason.value},bulk"
+                await self._audit(tx, principal, authorization, detail, booking_id)
+            after = await self._slot(tx, group, start)
+            if after is not None and not after.shortfall:  # ADR 0117 metric C5
+                await tx.record_usage(shortfall_resolved(group, start, after.agents, after.booked))
+        return len(choices)
+
+    async def withdraw(self, principal: Principal, slug: str, booking_id: int) -> None:
+        """Take back a booking's open proposal; it keeps awaiting a new time (point 10).
+
+        The held place is free at once; the participant can still choose a time themselves.
+
+        Raises:
+            DomainError: ``not_permitted``, ``booking_not_found`` or ``proposal_not_open``.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            booking = await self._own_booking(tx, slug, booking_id)
+            released = await booking_changes.release_proposal(
+                tx, booking, self._clock.now(), ProposalOutcome.WITHDRAWN
+            )
+            if released is None:
+                raise DomainError(ErrorCode.PROPOSAL_NOT_OPEN)
+            await self._audit(tx, principal, authorization, "planner.withdraw", booking_id)
+
+    async def confirm_proposal(self, principal: Principal, slug: str, booking_id: int) -> Booking:
+        """Take the proposed time on the participant's behalf, after a phone call (point 10).
+
+        The booking moves as when the participant confirms by their link: the change mail
+        with the calendar file goes to them. Audited; the usage fact names the planner.
+
+        Raises:
+            DomainError: ``not_permitted``, ``booking_not_found``, ``proposal_not_open`` or
+                any error of the move.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            booking = await self._own_booking(tx, slug, booking_id)
+            receipt = await self._bookings.confirm_proposal_in(
+                tx, booking, group, ActorClass.PLANNER
+            )
+            await self._audit(tx, principal, authorization, "planner.confirm_proposal", booking_id)
+        return receipt.booking
 
     async def accept(self, principal: Principal, slug: str, start: datetime) -> None:
         """Accept the shortfall of the slot at ``start`` as it is now ("leave as is").
@@ -434,6 +642,13 @@ class PlannerService:
                     Source.SYSTEM,
                 )
             )
+
+
+def _id_of(booking: Booking) -> int:
+    """Return the id of a stored booking; a missing id is a programming error."""
+    if booking.id is None:
+        raise ValueError("booking has not been stored")
+    return booking.id
 
 
 def _ids(bookings: list[Booking]) -> list[int]:

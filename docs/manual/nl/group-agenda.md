@@ -150,6 +150,31 @@ De afspraken die op een nieuwe tijd wachten, staan in de lijst **Wacht op nieuwe
 agenda, met de oorspronkelijke tijd, de reden en de datum waarop de vraag vervalt. Ook daar
 kunt u een afspraak zelf verplaatsen of annuleren.
 
+### Een nieuwe tijd voorstellen
+
+Met **Nieuwe tijd voorstellen** bij een bevestigde afspraak zoekt de assistent een vrije tijd
+voor de deelnemer: eerst hetzelfde tijdstip op een andere dag, dan het kleinste verschil in
+tijdstip, dan de dichtstbijzijnde dag. U kunt die tijd houden of een andere vrije tijd kiezen.
+De oude plek komt meteen vrij; de voorgestelde tijd wordt voor de deelnemer vastgehouden en telt
+in de agenda mee als niet bevestigd. De deelnemer krijgt het voorstel per e-mail (en sms als er
+een telefoonnummer is) en kan de nieuwe tijd bevestigen, zelf een andere tijd kiezen of
+annuleren. Zonder bevestiging verplaatsen we niets: na de termijn komt de vastgehouden tijd vrij
+en kan de deelnemer nog zelf kiezen tot de vraag vervalt.
+
+Bij een tijdslot met een tekort staat ook **Nieuwe tijden voorstellen**. U ziet per afspraak
+(de laatst gemaakte, zoveel als het tekort) de voorgestelde tijd. Per afspraak kunt u een
+andere tijd kiezen, de deelnemer zelf laten kiezen of de afspraak uitvinken. Alles gaat in één
+keer; past een gekozen tijd intussen niet meer, dan verstuurt OpenPlanner niets en toont het de
+lijst opnieuw.
+
+In **Wacht op nieuwe tijd** staat bij een voorstel de voorgestelde tijd en tot wanneer die wordt
+vastgehouden. Na een telefoongesprek kunt u daar **Bevestigen namens deelnemer** kiezen; de
+deelnemer krijgt dan de bevestiging met de nieuwe tijd. Met **Voorstel intrekken** komt de
+vastgehouden tijd vrij en wacht de afspraak verder op een tijd van de deelnemer.
+
+Hoe lang een voorstel wordt vastgehouden, wanneer de herinnering gaat en hoe ver de assistent
+zoekt, stelt de beheerder van de organisatie in bij de instellingen (onderwerp Planner).
+
 ### Tekort accepteren
 
 Helpt er bijvoorbeeld een collega van een ander team, dan kiest u bij het tijdslot **Tekort

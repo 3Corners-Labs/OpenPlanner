@@ -1472,6 +1472,15 @@ class Transaction(Protocol):
         """
         ...
 
+    async def list_open_proposals(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[HeldProposal]:
+        """Return the group's open proposals for a slot with lower <= start < upper (ADR 0057).
+
+        Open as in ``get_open_proposal``; the agenda counts them like pending confirmations.
+        """
+        ...
+
     async def save_proposal(self, proposal: HeldProposal) -> None:
         """Persist a proposal's release (``released_at``, ``outcome``)."""
         ...

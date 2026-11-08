@@ -11273,3 +11273,69 @@ msgstr "Release the proposed time"
 
 msgid "audit.job.send_proposal_released"
 msgstr "Send notice of a released proposal"
+
+msgid "admin.agenda.propose"
+msgstr "Propose a new time"
+
+msgid "admin.agenda.slot_propose"
+msgstr "Propose new times"
+
+msgid "admin.proposal.title"
+msgstr "Propose a new time for {reference}"
+
+msgid "admin.proposal.time"
+msgstr "New time"
+
+msgid "admin.proposal.ask"
+msgstr "No proposal: ask the participant to choose a time"
+
+msgid "admin.proposal.none_found"
+msgstr "The assistant found no free time within its reach. Choose another time or ask the participant to choose."
+
+msgid "admin.proposal.held_lead"
+msgstr "The proposed time is held for the participant until they confirm, choose another time or cancel, or until the deadline passes. Nothing moves without a confirmation."
+
+msgid "admin.proposal.button"
+msgstr "Send the proposal"
+
+msgid "admin.proposal.slot_title"
+msgstr "Propose new times for {when}"
+
+msgid "admin.proposal.slot_lead"
+msgstr "The most recently made appointments in this slot ({count}) no longer fit. Check the proposed time for each, choose another or untick the appointment."
+
+msgid "admin.proposal.include"
+msgstr "Include"
+
+msgid "admin.proposal.slot_button"
+msgstr "Send the proposals"
+
+msgid "admin.proposal.none_chosen"
+msgstr "Tick at least one appointment."
+
+msgid "admin.proposal.column"
+msgstr "Proposed time"
+
+msgid "admin.proposal.held_until"
+msgstr "held until {deadline}"
+
+msgid "admin.proposal.confirm"
+msgstr "Confirm for the participant"
+
+msgid "admin.proposal.withdraw"
+msgstr "Withdraw the proposal"
+
+msgid "admin.done.proposed"
+msgstr "New time proposed. The participant gets the proposal and the old place is free."
+
+msgid "admin.done.proposals_sent"
+msgstr "Sent: {count}. The old places are free; proposed times are held."
+
+msgid "admin.done.proposal_withdrawn"
+msgstr "Proposal withdrawn. The appointment awaits a new time from the participant."
+
+msgid "admin.done.proposal_confirmed_by_staff"
+msgstr "The proposed time is confirmed for the participant. The participant gets an email with the new time."
+
+msgid "admin.done.proposal_gone"
+msgstr "This proposal is no longer open."

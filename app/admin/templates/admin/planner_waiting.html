@@ -17,6 +17,7 @@
         <th scope="col">{{ _("admin.planner.waiting_was") }}</th>
         <th scope="col">{{ _("admin.planner.reason") }}</th>
         <th scope="col">{{ _("admin.planner.waiting_by") }}</th>
+        <th scope="col">{{ _("admin.proposal.column") }}</th>
         <th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th>
       </tr>
     </thead>
@@ -27,7 +28,17 @@
         <td>{{ row.booking.when }}</td>
         <td>{{ row.reason }}</td>
         <td>{{ row.rebook_by }}</td>
+        <td>{% if row.proposed %}{{ row.proposed }}<br><span class="muted">{{ _("admin.proposal.held_until", deadline=row.proposed_until) }}</span>{% else %}–{% endif %}</td>
         <td>
+          {% if row.proposed %}
+          <form method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/proposal/confirm" class="inline-form">
+            <button type="submit" class="button button--quiet button--small">{{ _("admin.proposal.confirm") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></button>
+          </form>
+          <form method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/proposal/withdraw" class="inline-form">
+            <button type="submit" class="button button--quiet button--small">{{ _("admin.proposal.withdraw") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></button>
+          </form>
+          <br>
+          {% endif %}
           <a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/move">{{ _("admin.agenda.move") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></a>
           <br><a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/cancel">{{ _("admin.agenda.cancel") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></a>
         </td>
