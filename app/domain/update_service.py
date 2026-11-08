@@ -28,10 +28,10 @@ from app.domain.update_policy import (
     ANY_TIME,
     SupportLine,
     UpdateWindow,
+    auto_apply_effective,
     claimable,
     line_support,
     on_line,
-    parse_support,
 )
 from app.domain.updates import (
     CHECK_INTERVAL,
@@ -165,8 +165,9 @@ class UpdateService:
         line: ``update_line`` (ADR 0116 point 9): ``X.Y`` offers that minor's patches only;
             empty offers everything on the channel. A value or a callable, as ``channel``.
         window: ``update_window`` in the installation's zone: when the worker requests and
-            the updater claims an automatic update. A value or a callable, as ``channel``;
-            ``auto_apply`` is already the effective value (``auto_apply_effective``).
+            the updater claims an automatic update. A value or a callable, as ``channel``.
+        production: Whether ``ENVIRONMENT=prod``: auto-apply then needs a window
+            (``auto_apply_effective``), and an automatic request is never claimed without one.
     """
 
     def __init__(
@@ -183,6 +184,7 @@ class UpdateService:
         interval: timedelta | Callable[[], timedelta] = CHECK_INTERVAL,
         line: str | Callable[[], str] = "",
         window: UpdateWindow | Callable[[], UpdateWindow] = ANY_TIME,
+        production: bool = False,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -196,6 +198,7 @@ class UpdateService:
         self._interval = interval if callable(interval) else _constant(interval)
         self._line = line if callable(line) else _constant(line)
         self._window = window if callable(window) else _constant(window)
+        self._production = production
 
     @property
     def current(self) -> Version | None:
@@ -235,27 +238,30 @@ class UpdateService:
             if listing is not None:
                 await tx.save_release_listing(listing)
             release = self._available(check, listing or await tx.get_release_listing())
-            automatic = self._auto_apply() and self._window().is_open(now)
+            automatic = self._automatic() and self._window().is_open(now)
             if automatic and release is not None and self._current is not None:
                 if open_request(await tx.get_update_requests()) is None:
                     await self._add(tx, None, UpdateAction.UPDATE, release.version)
         return True
 
-    async def _support(self, known: str | None) -> str | None:
-        """Return the source's ``support.json`` when it parses, else what was known before.
+    async def _support(
+        self, known: tuple[SupportLine, ...] | None
+    ) -> tuple[SupportLine, ...] | None:
+        """Return the source's support lines, or what was known when it has none or fails.
 
-        A missing or malformed index is no failed check: the page keeps the last good one.
+        A missing or unreadable index is no failed check: the page keeps the last good one.
         """
         if self._releases is None:  # pragma: no cover - the caller checked it
             return known
         try:
-            text = await self._releases.support()
-            if text is not None:
-                parse_support(text)
-                return text
-        except (IntegrationError, ValueError):
-            pass
-        return known
+            found = await self._releases.support()
+        except IntegrationError:
+            return known
+        return found if found is not None else known
+
+    def _automatic(self) -> bool:
+        """Whether the worker requests updates itself (``auto_apply_effective``)."""
+        return auto_apply_effective(self._auto_apply(), self._window(), self._production)
 
     def _offered(self, listing: Sequence[ListedRelease]) -> list[ListedRelease]:
         """Return the listed versions offered: newer, on the channel and on the line."""
@@ -276,9 +282,7 @@ class UpdateService:
             return None
         found = available_update(self._current, check, self._channel())
         line = self._line()
-        if found is None or (line and f"{found.version.major}.{found.version.minor}" != line):
-            return None
-        return found
+        return found if found is not None and line in ("", found.version.line) else None
 
     # --- superuser ---------------------------------------------------------------------
 
@@ -352,7 +356,7 @@ class UpdateService:
         return UpdateOverview(
             enabled=self._checking,
             channel=self._channel(),
-            auto_apply=self._auto_apply(),
+            auto_apply=self._automatic(),
             interval=self._interval(),
             current=self._current,
             check=check,
@@ -368,9 +372,7 @@ class UpdateService:
             line=self._line(),
             window=window,
             next_window=window.next_opening(now),
-            support=line_support(
-                parse_support(check.support) if check and check.support else [], self._current
-            ),
+            support=line_support(check.support if check and check.support else (), self._current),
         )
 
     async def history(self, principal: Principal, limit: int = 30) -> list[AuditEntry]:
@@ -524,6 +526,8 @@ class UpdateService:
             )
         )
         versions = f"from:{self._current},to:{target}"
+        if apply_after is not None:
+            versions += f",after:{apply_after:%Y%m%dT%H%MZ}"
         if principal is None:
             event = AuditEvent(
                 now,

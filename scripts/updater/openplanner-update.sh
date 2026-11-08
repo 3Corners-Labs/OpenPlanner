@@ -225,10 +225,12 @@ do_update() { # do_update ID TARGET FROM
   # of it runs yet); the running application says whether this database is new enough.
   stop=$(docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$digest" 2>/dev/null \
     | sed -n 's/^MIN_UPGRADE_FROM=//p')
-  # A stop applies only to a target at or above it, so a running version from before the check
-  # is never asked for a command it does not have.
+  # A stop applies only to a target above it (the stop itself is where older databases go
+  # first), so a running version from before the check is never asked for a command it does
+  # not have on the way to the stop.
   if [[ -n $stop ]] && { ! [[ $stop =~ $STOP_RE ]] \
-    || { [[ $(printf '%s\n%s\n' "$stop" "${target%%-*}" | sort -V | head -n 1) == "$stop" ]] \
+    || { [[ $stop != "${target%%-*}" ]] \
+      && [[ $(printf '%s\n%s\n' "$stop" "${target%%-*}" | sort -V | head -n 1) == "$stop" ]] \
       && ! app upgrade-path-check --image-version "$target" --stop "$stop" >/dev/null; }; }; then
     report "$id" failed upgrade_path_required
     return

@@ -22,11 +22,15 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
-from enum import StrEnum
 from zoneinfo import ZoneInfo
 
 from app.domain.audit import SYSTEM_ACTOR
+
+# LineStatus and SupportLine are defined with the release check that carries them; they are
+# named here too, next to the rules that read them.
+from app.domain.updates import LineStatus as LineStatus
 from app.domain.updates import ListedRelease, UpdateRequest, UpdateStatus, Version
+from app.domain.updates import SupportLine as SupportLine
 
 MAX_RANGES = 7
 """At most this many ranges in ``update_window``."""
@@ -48,7 +52,7 @@ def on_line(listing: Sequence[ListedRelease], line: str) -> list[ListedRelease]:
     """Return the listed releases of line ``X.Y``; all of them when ``line`` is empty."""
     if not line:
         return list(listing)
-    return [item for item in listing if f"{item.version.major}.{item.version.minor}" == line]
+    return [item for item in listing if item.version.line == line]
 
 
 @dataclass(frozen=True)
@@ -157,45 +161,23 @@ def auto_apply_effective(auto_apply: bool, window: UpdateWindow, production: boo
     return auto_apply and (not production or not window.any_time)
 
 
-def claimable(request: UpdateRequest, now: datetime, window: UpdateWindow) -> bool:
+def claimable(
+    request: UpdateRequest, now: datetime, window: UpdateWindow, production: bool = False
+) -> bool:
     """Whether the updater may take ``request`` now.
 
     A request waits until its ``apply_after``; one the worker made itself waits for the
-    window as well. A superuser's request without ``apply_after`` is taken at once.
+    window as well, and in production is never taken without a window (the window was
+    cleared after the worker asked: auto-apply no longer applies there). A superuser's
+    request without ``apply_after`` is taken at once.
     """
     if request.status is not UpdateStatus.REQUESTED:
         return False
     if request.apply_after is not None and now < request.apply_after:
         return False
-    return request.requested_by != SYSTEM_ACTOR or window.is_open(now)
-
-
-class LineStatus(StrEnum):
-    """The status of a minor's line in ``support.json`` (ADR 0116 point 2)."""
-
-    SUPPORTED = "supported"
-    """The newest minor: features and fixes."""
-    SECURITY = "security"
-    """The minor before it (from 1.0.0): security fixes only."""
-    EXTENDED = "extended"
-    """A paid extended line: security fixes until ``until``."""
-    ENDED = "ended"
-    """No more fixes: update to a supported line."""
-
-
-@dataclass(frozen=True)
-class SupportLine:
-    """One line of ``support.json``.
-
-    Attributes:
-        line: ``X.Y``.
-        status: Its support status.
-        until: The last day it receives fixes, when known (ISO date text).
-    """
-
-    line: str
-    status: LineStatus
-    until: str | None = None
+    if request.requested_by != SYSTEM_ACTOR:
+        return True
+    return window.is_open(now) and not (production and window.any_time)
 
 
 def parse_support(text: str) -> list[SupportLine]:
@@ -229,23 +211,26 @@ def line_support(lines: Sequence[SupportLine], version: Version | None) -> Suppo
     """
     if version is None or not lines:
         return None
-    line = f"{version.major}.{version.minor}"
     return next(
-        (entry for entry in lines if entry.line == line), SupportLine(line, LineStatus.ENDED)
+        (entry for entry in lines if entry.line == version.line),
+        SupportLine(version.line, LineStatus.ENDED),
     )
 
 
-def upgrade_stop(image: Version | None, last_run: Version | None, stop: Version | None) -> str:
-    """Return the stop an upgrade must go through first, or ``""`` when it may go ahead.
+def upgrade_stop(
+    image: Version | None, last_run: Version | None, stop: Version | None
+) -> Version | None:
+    """Return the stop an upgrade must go through first, or ``None`` when it may go ahead.
 
     Args:
         image: ``APP_VERSION`` of the image about to migrate.
         last_run: The version that last ran on this database (``running_versions``).
         stop: ``MIN_UPGRADE_FROM`` baked into the image.
 
-    A stop applies only to images at or above it (an image before 1.0.0 knows no stop), and
-    only when the database's version is known; a new database has none.
+    A stop applies only to images above it: the stop itself is where older databases go
+    first (1.0.0 takes every 0.x database). Unknown versions (a new database, a build that is
+    no release) know no stop.
     """
-    if image is None or last_run is None or stop is None or image < stop:
-        return ""
-    return str(stop) if last_run < stop else ""
+    if image is None or last_run is None or stop is None or image <= stop:
+        return None
+    return stop if last_run < stop else None

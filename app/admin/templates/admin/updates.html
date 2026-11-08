@@ -1,5 +1,6 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_icons.html" import icon %}
+{% from "admin/_fields.html" import field with context %}
 {% block title %}{{ _("admin.updates.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -55,41 +56,29 @@
     <h2 id="update-heading">{{ _("admin.updates.update_heading", version=overview.available.version) }}</h2>
     <p class="card__lead">{{ _("admin.updates.update_lead") }} {{ _("admin.updates.choose_lead") }}</p>
   </div>
-  {% if offered %}
-  <ul class="stack" aria-label="{{ _("admin.updates.choose_heading") }}">
-    {% for item in offered %}
-    <li class="stack__item">
-      <form method="post" action="/admin/updates/update">
+  <form method="post" action="/admin/updates/update">
+    {{ field(apply_after) }}
+    {% if offered %}
+    <ul class="stack" aria-label="{{ _("admin.updates.choose_heading") }}">
+      {% for item in offered %}
+      <li class="stack__item">
         <h3><code>{{ item.version }}</code>{% if item.candidate %} <span class="chip">{{ _("admin.updates.candidate") }}</span>{% endif %}{% if item.published %} <span class="hint">{{ _("admin.updates.published", at=item.published) }}</span>{% endif %}</h3>
         {% if item.docs_only %}<div class="alert alert--info"><p>{{ _("admin.updates.docs_only") }}</p></div>{% endif %}
         {% if item.lines %}<ul class="hint">{% for line in item.lines %}<li>{% if line.docs %}<span class="chip chip--wrap">{{ _("admin.updates.note.docs") }}</span> {% endif %}{{ line.text }}</li>{% endfor %}</ul>{% else %}<p class="hint">{{ _("admin.updates.no_notes") }}</p>{% endif %}
         <p><a href="{{ item.url }}">{{ icon("external") }}<span>{{ _("admin.updates.release_notes") }}</span></a></p>
-        <input type="hidden" name="target" value="{{ item.version }}">
-        <div class="field">
-          <label for="apply-after-{{ loop.index }}">{{ _("admin.updates.apply_after.label") }}</label>
-          <p class="hint" id="apply-after-{{ loop.index }}-hint">{{ _("admin.updates.apply_after.hint") }}</p>
-          <input type="datetime-local" id="apply-after-{{ loop.index }}" name="apply_after" aria-describedby="apply-after-{{ loop.index }}-hint">
-        </div>
         <div class="form-actions">
-          <button type="submit" class="button{% if not loop.first %} button--secondary{% endif %}">{% if loop.first %}{{ _("admin.updates.update_now", version=item.version) }}{% else %}{{ _("admin.updates.install_this", version=item.version) }}{% endif %}</button>
+          <button type="submit" name="target" value="{{ item.version }}" class="button{% if not loop.first %} button--secondary{% endif %}">{% if loop.first %}{{ _("admin.updates.update_now", version=item.version) }}{% else %}{{ _("admin.updates.install_this", version=item.version) }}{% endif %}</button>
         </div>
-      </form>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <form method="post" action="/admin/updates/update">
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
     <p><a href="{{ overview.available.url }}">{{ icon("external") }}<span>{{ _("admin.updates.release_notes") }}</span></a></p>
-    <div class="field">
-          <label for="apply-after-0">{{ _("admin.updates.apply_after.label") }}</label>
-          <p class="hint" id="apply-after-0-hint">{{ _("admin.updates.apply_after.hint") }}</p>
-          <input type="datetime-local" id="apply-after-0" name="apply_after" aria-describedby="apply-after-0-hint">
-        </div>
     <div class="form-actions">
       <button type="submit" class="button">{{ _("admin.updates.update_now", version=overview.available.version) }}</button>
     </div>
+    {% endif %}
   </form>
-  {% endif %}
 </section>
 {% endif %}
 {% if overview.restore %}

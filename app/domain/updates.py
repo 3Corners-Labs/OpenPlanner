@@ -121,6 +121,11 @@ class Version:
         return cls(int(major), int(minor), int(patch), int(candidate) if candidate else None)
 
     @property
+    def line(self) -> str:
+        """The minor this version belongs to, ``MAJOR.MINOR`` (ADR 0116: its line)."""
+        return f"{self.major}.{self.minor}"
+
+    @property
     def is_candidate(self) -> bool:
         """Whether this is a release candidate rather than a release."""
         return self.candidate is not None
@@ -297,6 +302,34 @@ def detail_fields(detail: str) -> dict[str, str]:
     return fields
 
 
+class LineStatus(StrEnum):
+    """The status of a minor's line in ``support.json`` (ADR 0116 point 2)."""
+
+    SUPPORTED = "supported"
+    """The newest minor: features and fixes."""
+    SECURITY = "security"
+    """The minor before it (from 1.0.0): security fixes only."""
+    EXTENDED = "extended"
+    """A paid extended line: security fixes until ``until``."""
+    ENDED = "ended"
+    """No more fixes: update to a supported line."""
+
+
+@dataclass(frozen=True)
+class SupportLine:
+    """One line of ``support.json``.
+
+    Attributes:
+        line: ``X.Y``.
+        status: Its support status.
+        until: The last day it receives fixes, when known (ISO date text).
+    """
+
+    line: str
+    status: LineStatus
+    until: str | None = None
+
+
 @dataclass(frozen=True)
 class ReleaseCheck:
     """The outcome of the latest release check.
@@ -307,7 +340,7 @@ class ReleaseCheck:
         error: The failure code of this check (``unauthorized``, ``server_error``, …), if any.
         requested_at: When a superuser asked for a check ahead of the interval ("Check
             now"); the worker's next check clears it.
-        support: The last ``support.json`` read (ADR 0116 point 9), as text; kept from an
+        support: The lines of the last ``support.json`` read (ADR 0116 point 9); kept from an
             earlier check when this one could not read it.
     """
 
@@ -315,7 +348,7 @@ class ReleaseCheck:
     latest: Release | None
     error: str = ""
     requested_at: datetime | None = None
-    support: str | None = None
+    support: tuple[SupportLine, ...] | None = None
 
 
 class UpdateAction(StrEnum):

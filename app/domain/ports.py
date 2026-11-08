@@ -79,7 +79,13 @@ from app.domain.staff import (
 from app.domain.staff_directory import DirectoryUser, NewStaffMember, StaffAction
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
-from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.updates import (
+    ListedRelease,
+    ReleaseCheck,
+    RunningVersion,
+    SupportLine,
+    UpdateRequest,
+)
 from app.domain.usage import StaffFact, UsageFact
 from app.domain.worker_check import WorkerHeartbeat
 
@@ -409,8 +415,10 @@ class ReleaseSource(Protocol):
         """
         ...
 
-    async def support(self) -> str | None:
-        """Return ``support.json`` (ADR 0116 point 9) as text; ``None`` when there is none.
+    async def support(self) -> tuple[SupportLine, ...] | None:
+        """Return the lines of ``support.json`` (ADR 0116 point 9); ``None`` when there is none.
+
+        An index that does not parse counts as none.
 
         Raises:
             IntegrationError: If the source refuses or cannot be reached.

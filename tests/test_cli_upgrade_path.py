@@ -53,6 +53,7 @@ async def test_the_updater_asks_for_the_target_image(settings: Settings) -> None
     assert not ok
     assert "upgrade to 2.0.0 first" in report
     assert (await _upgrade_path_check(settings, "1.9.0", "2.0.0"))[1]  # before the stop
+    assert (await _upgrade_path_check(settings, "2.0.0", "2.0.0"))[1]  # the stop itself
 
 
 def test_the_command_runs_from_the_command_line(

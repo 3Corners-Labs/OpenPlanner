@@ -9949,26 +9949,12 @@ msgstr "Any time (no window set)"
 msgid "admin.updates.window.next"
 msgstr "Next opening: {at}"
 
-msgid "admin.updates.weekday.mon"
-msgstr "Mon"
 
-msgid "admin.updates.weekday.tue"
-msgstr "Tue"
 
-msgid "admin.updates.weekday.wed"
-msgstr "Wed"
 
-msgid "admin.updates.weekday.thu"
-msgstr "Thu"
 
-msgid "admin.updates.weekday.fri"
-msgstr "Fri"
 
-msgid "admin.updates.weekday.sat"
-msgstr "Sat"
 
-msgid "admin.updates.weekday.sun"
-msgstr "Sun"
 
 msgid "admin.updates.support"
 msgstr "Support of this line"
@@ -9997,8 +9983,6 @@ msgstr "Date and time in the portal's time zone. Empty: the updater starts as so
 msgid "admin.updates.waits_until"
 msgstr "The updater starts this request from {at}."
 
-msgid "admin.form.error.update_apply_after_invalid"
-msgstr "Enter the moment as a date and a time, or leave the field empty."
 
 msgid "admin.updates.reason.upgrade_path_required"
 msgstr "This database is too old for that version: update to the version named in the log first."

@@ -9961,26 +9961,12 @@ msgstr "Altijd (geen venster ingesteld)"
 msgid "admin.updates.window.next"
 msgstr "Volgende opening: {at}"
 
-msgid "admin.updates.weekday.mon"
-msgstr "ma"
 
-msgid "admin.updates.weekday.tue"
-msgstr "di"
 
-msgid "admin.updates.weekday.wed"
-msgstr "wo"
 
-msgid "admin.updates.weekday.thu"
-msgstr "do"
 
-msgid "admin.updates.weekday.fri"
-msgstr "vr"
 
-msgid "admin.updates.weekday.sat"
-msgstr "za"
 
-msgid "admin.updates.weekday.sun"
-msgstr "zo"
 
 msgid "admin.updates.support"
 msgstr "Ondersteuning van deze lijn"
@@ -10009,8 +9995,6 @@ msgstr "Datum en tijd in de tijdzone van het portaal. Leeg: de updater begint zo
 msgid "admin.updates.waits_until"
 msgstr "De updater begint vanaf {at} aan dit verzoek."
 
-msgid "admin.form.error.update_apply_after_invalid"
-msgstr "Vul het moment in als datum en tijd, of laat het veld leeg."
 
 msgid "admin.updates.reason.upgrade_path_required"
 msgstr "Deze database is te oud voor die versie: update eerst naar de versie die in het logboek staat."

@@ -9,10 +9,12 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.update_service import UpdateService
 from app.domain.updates import (
+    LineStatus,
     ListedRelease,
     Release,
     ReleaseCheck,
     RunningVersion,
+    SupportLine,
     UpdateStatus,
     UpdateStep,
     Version,
@@ -388,7 +390,7 @@ async def test_a_request_may_wait_until_a_moment_in_the_portals_zone(site: Site)
 
     requested = await site.client.post(
         "/admin/updates/update",
-        data={"apply_after": "2099-01-01T12:00"},
+        data={"apply_after": "01-01-2099", "apply_after_time": "12:00"},
         headers=SAME_ORIGIN,
     )
 
@@ -405,11 +407,13 @@ async def test_a_moment_that_is_no_moment_is_refused_with_its_reason(site: Site)
     await site.login_as(SUPER)
 
     refused = await site.client.post(
-        "/admin/updates/update", data={"apply_after": "tomorrow"}, headers=SAME_ORIGIN
+        "/admin/updates/update",
+        data={"apply_after": "tomorrow", "apply_after_time": "12:00"},
+        headers=SAME_ORIGIN,
     )
 
     assert refused.status_code == 422
-    assert "Vul het moment in als datum en tijd" in refused.text
+    assert 'aria-invalid="true"' in refused.text
     assert (await updates(site).overview(SUPER)).open is None
 
 
@@ -436,7 +440,7 @@ async def test_the_page_shows_the_support_of_the_running_line(site: Site, admin_
     engine = create_engine(admin_db)
     try:
         async with SqlUnitOfWork(engine).locked() as tx:
-            support = '{"lines": [{"line": "1.4", "status": "supported"}]}'
+            support = (SupportLine("1.4", LineStatus.SUPPORTED),)
             await tx.save_release_check(ReleaseCheck(NOW, RELEASE, support=support))
     finally:
         await engine.dispose()

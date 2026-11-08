@@ -11,9 +11,11 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.db.updates import last_running_version
 from app.domain.updates import (
+    LineStatus,
     Release,
     ReleaseCheck,
     RunningVersion,
+    SupportLine,
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
@@ -96,13 +98,14 @@ async def test_apply_after_and_the_support_index_round_trip(uow: SqlUnitOfWork) 
                 apply_after=later,
             )
         )
-        await tx.save_release_check(ReleaseCheck(NOW, None, support='{"lines": []}'))
+        support = (SupportLine("1.2", LineStatus.EXTENDED, "2027-12-31"),)
+        await tx.save_release_check(ReleaseCheck(NOW, None, support=support))
     async with uow.read() as tx:
         (found,) = await tx.get_update_requests()
         check = await tx.get_release_check()
     assert found.apply_after == later == stored.apply_after
     assert check is not None
-    assert check.support == '{"lines": []}'
+    assert check.support == (SupportLine("1.2", LineStatus.EXTENDED, "2027-12-31"),)
 
 
 async def test_the_last_running_version_is_none_for_a_new_database(

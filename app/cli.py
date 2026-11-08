@@ -539,8 +539,8 @@ async def _upgrade_path_check(
         await engine.dispose()
     image = Version.parse(settings.app_version if image_version is None else image_version)
     floor = Version.parse(settings.min_upgrade_from if stop is None else stop)
-    required = upgrade_stop(image, Version.parse(last or ""), floor)
-    if required:
+    required = upgrade_stop(image, Version.parse(last) if last else None, floor)
+    if required is not None:
         return (
             f"upgrade_path_required: upgrade to {required} first (this database ran {last})\n",
             False,

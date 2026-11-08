@@ -729,21 +729,23 @@ def test_a_listed_image_name_is_never_executed(host: Host) -> None:
 
 def test_a_database_older_than_the_stop_is_refused_before_anything_changes(host: Host) -> None:
     host.given("claim", "7 update 1.4.0 1.3.0\n")
-    host.given("min-upgrade-from", "1.4.0\n")
+    host.given("min-upgrade-from", "1.2.0\n")
     host.given("fail", "upgrade-path-check\n")
 
     host.run()
 
     assert host.pinned() == OLD
     assert reports(host)[-1] == cli("update-report", "7", "failed", "upgrade_path_required")
-    assert cli("upgrade-path-check", "--image-version", "1.4.0", "--stop", "1.4.0") in (
+    assert cli("upgrade-path-check", "--image-version", "1.4.0", "--stop", "1.2.0") in (
         host.commands()
     )
     assert cli("backup-db", "request-7") not in host.commands()
 
 
-def test_a_stop_above_the_target_is_never_asked_about(host: Host) -> None:
-    host.given("min-upgrade-from", "2.0.0\n")
+@pytest.mark.parametrize("stop", ["2.0.0", "1.4.0"])
+def test_a_stop_at_or_above_the_target_is_never_asked_about(host: Host, stop: str) -> None:
+    """The stop itself is where older databases go first (1.0.0 takes every 0.x database)."""
+    host.given("min-upgrade-from", f"{stop}\n")
     host.given("fail", "upgrade-path-check\n")  # a running version without the command
 
     updated(host)

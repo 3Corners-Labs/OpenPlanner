@@ -23,7 +23,13 @@ from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.errors import DomainError
 from app.domain.ports import Clock, IntegrationError, UnitOfWork
-from app.domain.update_policy import ANY_TIME, UpdateWindow, auto_apply_effective, parse_window
+from app.domain.update_policy import (
+    ANY_TIME,
+    SupportLine,
+    UpdateWindow,
+    parse_support,
+    parse_window,
+)
 from app.domain.update_service import UpdateService
 from app.domain.updates import NOTES_CHARS, ListedRelease, UpdateChannel, Version
 
@@ -87,12 +93,12 @@ class GitHubReleases:
         # release at all and an installation on the release channel would never see one.
         return [*found, *await self._latest_release()]
 
-    async def support(self) -> str | None:
-        """Return ``support.json`` of the repository's default branch, raw (ADR 0116 point 9).
+    async def support(self) -> tuple[SupportLine, ...] | None:
+        """Return the lines of ``support.json`` on the default branch (ADR 0116 point 9).
 
-        The release PR keeps it current (``scripts/release_pr.py``) and every release carries
-        a signed copy; the API serves the file itself, so no other host is contacted.
-        ``None`` when the repository has none.
+        The release PR keeps it current (``scripts/support_index.py``) and every release
+        carries a signed copy; the API serves the file itself, so no other host is contacted.
+        ``None`` when the repository has none or it does not parse (logged, never fatal).
 
         Raises:
             IntegrationError: as ``listing`` does.
@@ -100,7 +106,11 @@ class GitHubReleases:
         response = await self._get(self._support_url, accept="application/vnd.github.raw+json")
         if response is None:
             return None
-        return response.text[:SUPPORT_CHARS]
+        try:
+            return tuple(parse_support(response.text[:SUPPORT_CHARS]))
+        except ValueError:
+            log.warning("updates.support_ignored", reason="not_a_support_index")
+            return None
 
     async def _latest_release(self) -> list[ListedRelease]:
         """Return GitHub's latest published release (never a pre-release), if there is one."""
@@ -228,12 +238,6 @@ def update_service(
         except (ValueError, ZoneInfoNotFoundError):  # pragma: no cover - the settings check both
             return ANY_TIME
 
-    def auto_apply() -> bool:
-        now = current()
-        return auto_apply_effective(
-            now.update_auto_apply, window(), production=now.environment == "prod"
-        )
-
     releases = (
         GitHubReleases(
             http, settings.update_repository, token.get_secret_value() if token else None
@@ -249,8 +253,9 @@ def update_service(
         releases=releases,
         checking=settings.update_repository is not None,
         channel=channel,
-        auto_apply=auto_apply,
+        auto_apply=lambda: current().update_auto_apply,
         interval=lambda: timedelta(minutes=current().update_check_minutes),
         line=lambda: current().update_line,
         window=window,
+        production=settings.environment == "prod",
     )

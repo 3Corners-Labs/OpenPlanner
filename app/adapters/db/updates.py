@@ -5,6 +5,7 @@ other one. Versions are stored as ``MAJOR.MINOR.PATCH`` text; a stored value tha
 parses (a hand-edited row) makes the release unknown rather than failing the page.
 """
 
+import json
 from collections.abc import Sequence
 
 from sqlalchemy import delete, inspect, select
@@ -17,11 +18,13 @@ from app.adapters.db.models import (
     UpdateRequestRow,
 )
 from app.domain.errors import DomainError
+from app.domain.update_policy import parse_support
 from app.domain.updates import (
     ListedRelease,
     Release,
     ReleaseCheck,
     RunningVersion,
+    SupportLine,
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
@@ -48,6 +51,24 @@ def _release(version: str | None, url: str | None) -> Release | None:
     try:
         return Release(parsed, url)
     except DomainError:
+        return None
+
+
+def _support_text(lines: tuple[SupportLine, ...] | None) -> str | None:
+    """Store support lines as the ``support.json`` shape they came in (ADR 0116)."""
+    if lines is None:
+        return None
+    entries = [{"line": x.line, "status": x.status.value, "until": x.until} for x in lines]
+    return json.dumps({"lines": entries})
+
+
+def _support_lines(text: str | None) -> tuple[SupportLine, ...] | None:
+    """Read stored support lines; a row this module did not write counts as none."""
+    if text is None:
+        return None
+    try:
+        return tuple(parse_support(text))
+    except ValueError:  # pragma: no cover - only a hand-edited row
         return None
 
 
@@ -85,7 +106,7 @@ class UpdateQueries:
             _release(row.latest_version, row.release_url),
             row.error,
             row.requested_at,
-            row.support,
+            _support_lines(row.support),
         )
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
@@ -98,7 +119,7 @@ class UpdateQueries:
                 release_url=check.latest.url if check.latest else None,
                 error=check.error,
                 requested_at=check.requested_at,
-                support=check.support,
+                support=_support_text(check.support),
             )
         )
         await self._session.flush()

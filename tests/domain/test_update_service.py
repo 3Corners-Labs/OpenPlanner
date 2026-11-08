@@ -738,18 +738,51 @@ async def test_the_updater_claims_an_automatic_request_only_in_the_window(
 async def test_the_support_index_is_kept_and_names_the_running_line(
     uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
 ) -> None:
-    releases.support_json = '{"lines": [{"line": "1.4", "status": "supported"}]}'
+    lines = (SupportLine("1.4", LineStatus.SUPPORTED),)
+    releases.support_lines = lines
     updates = policy_service(uow, clock, releases, auto_apply=False)
     await updates.check_if_due()
-    releases.support_json = "not json"
+    releases.support_lines = None  # gone, or no longer parses
     clock.advance(CHECK_INTERVAL)
     await updates.check_if_due()
 
     overview = await updates.overview(DEMO_SUPERUSER)
 
     assert overview.check is not None
-    assert overview.check.support == '{"lines": [{"line": "1.4", "status": "supported"}]}'
+    assert overview.check.support == lines
     assert overview.support == SupportLine("1.3", LineStatus.ENDED)
     # 10:00 local after the second check: the window has just closed, next Thursday 08:00.
     assert overview.next_window == NOW + timedelta(days=7, hours=-1)
     assert overview.window == OPEN_NOW
+
+
+async def test_in_production_auto_apply_needs_a_window(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    updates = UpdateService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=V1,
+        releases=releases,
+        auto_apply=True,
+        window=parse_window("", AMSTERDAM),
+        production=True,
+    )
+
+    await updates.check_if_due()
+
+    overview = await updates.overview(DEMO_SUPERUSER)
+    assert overview.open is None
+    assert not overview.auto_apply
+
+
+async def test_a_scheduled_request_names_its_moment_in_the_audit(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    updates = policy_service(uow, clock, releases, auto_apply=False)
+    await updates.check_if_due()
+
+    await updates.request_update(DEMO_SUPERUSER, V2, NOW + timedelta(hours=3))
+
+    assert uow.state.audit[-1].detail.endswith(",after:20260101T1100Z")

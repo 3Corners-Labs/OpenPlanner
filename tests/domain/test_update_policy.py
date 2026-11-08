@@ -133,6 +133,15 @@ def test_a_request_waits_for_its_apply_after() -> None:
     assert not claimable(request(status=UpdateStatus.RUNNING), MONDAY_0230, window)
 
 
+def test_in_production_an_automatic_request_needs_a_window_to_be_claimed() -> None:
+    """The window was cleared after the worker asked: auto-apply no longer applies there."""
+    no_window = parse_window("", AMSTERDAM)
+
+    assert not claimable(request(requested_by="system"), MONDAY_0230, no_window, production=True)
+    assert claimable(request(requested_by="system"), MONDAY_0230, no_window)
+    assert claimable(request(), MONDAY_0230, no_window, production=True)
+
+
 # Support.
 
 
@@ -173,9 +182,10 @@ def test_the_running_lines_status_and_an_unlisted_line_has_ended() -> None:
 def test_a_database_older_than_the_stop_must_upgrade_through_it_first() -> None:
     stop = Version(1, 0, 0)
 
-    assert upgrade_stop(Version(1, 2, 0), Version(0, 9, 4), stop) == "1.0.0"
-    assert upgrade_stop(Version(1, 2, 0), Version(1, 0, 3), stop) == ""
-    assert upgrade_stop(Version(0, 6, 0), Version(0, 5, 1), stop) == ""  # before the stop
-    assert upgrade_stop(Version(1, 2, 0), None, stop) == ""  # a new database
-    assert upgrade_stop(None, Version(0, 9, 0), stop) == ""  # no release build
-    assert upgrade_stop(Version(1, 2, 0), Version(0, 9, 0), None) == ""
+    assert upgrade_stop(Version(1, 2, 0), Version(0, 9, 4), stop) == stop
+    assert upgrade_stop(Version(1, 2, 0), Version(1, 0, 3), stop) is None
+    assert upgrade_stop(Version(1, 0, 0), Version(0, 5, 1), stop) is None  # the stop itself
+    assert upgrade_stop(Version(0, 6, 0), Version(0, 5, 1), stop) is None  # before the stop
+    assert upgrade_stop(Version(1, 2, 0), None, stop) is None  # a new database
+    assert upgrade_stop(None, Version(0, 9, 0), stop) is None  # no release build
+    assert upgrade_stop(Version(1, 2, 0), Version(0, 9, 0), None) is None

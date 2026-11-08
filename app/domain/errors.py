@@ -59,7 +59,6 @@ class ErrorCode(StrEnum):
     UPDATE_NOT_AVAILABLE = "update_not_available"
     UPDATE_IN_PROGRESS = "update_in_progress"
     UPDATE_REQUEST_NOT_FOUND = "update_request_not_found"
-    UPDATE_APPLY_AFTER_INVALID = "update_apply_after_invalid"
     PLANNER_TOO_LATE = "planner_too_late"
     MOVE_CAUSES_SHORTFALL = "move_causes_shortfall"
     SLOT_CHANGED = "slot_changed"

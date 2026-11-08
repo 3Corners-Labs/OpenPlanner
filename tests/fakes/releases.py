@@ -3,14 +3,14 @@
 from collections.abc import Sequence
 
 from app.domain.ports import IntegrationError
-from app.domain.updates import ListedRelease, Release
+from app.domain.updates import ListedRelease, Release, SupportLine
 
 
 class FakeReleases:
     """``ReleaseSource`` fake: lists ``release`` and ``more``, counts the calls, fails on demand.
 
-    Each listed release carries the notes ``notes of <version>``; ``support_json`` is the
-    ``support.json`` it serves (ADR 0116). While ``error`` is set, every
+    Each listed release carries the notes ``notes of <version>``; ``support_lines`` are the
+    lines of the ``support.json`` it serves (ADR 0116). While ``error`` is set, every
     listing raises it, as a refusing or unreachable GitHub would.
     """
 
@@ -19,7 +19,7 @@ class FakeReleases:
         self.more = list(more)
         self.error: IntegrationError | None = None
         self.calls = 0
-        self.support_json: str | None = None
+        self.support_lines: tuple[SupportLine, ...] | None = None
 
     async def listing(self) -> list[ListedRelease]:
         self.calls += 1
@@ -28,7 +28,7 @@ class FakeReleases:
         found = [r for r in (self.release, *self.more) if r is not None]
         return [ListedRelease(r.version, r.url, None, f"notes of {r.version}") for r in found]
 
-    async def support(self) -> str | None:
+    async def support(self) -> tuple[SupportLine, ...] | None:
         if self.error is not None:
             raise self.error
-        return self.support_json
+        return self.support_lines

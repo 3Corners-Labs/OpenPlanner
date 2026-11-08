@@ -16,7 +16,7 @@ one, which shows the open request's steps itself.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -24,7 +24,15 @@ from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, session_principal
-from app.admin.forms import done_message, raise_refusal, read_form, redirect_done, safe_next
+from app.admin.forms import (
+    Field,
+    FormData,
+    done_message,
+    raise_refusal,
+    read_form,
+    redirect_done,
+    safe_next,
+)
 from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import page as _page
 from app.domain.audit import AuditEntry
@@ -42,6 +50,7 @@ from app.domain.updates import (
     progress,
 )
 from app.i18n import BoundGettext
+from app.i18n.dates import format_time_of_day, weekday_abbreviations
 from app.web.errors import form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.organisation_settings import settings_for
@@ -343,8 +352,9 @@ async def _overview(
     locale: RequestLocale,
     context: AdminContext,
     error: DomainError | None = None,
+    form: FormData | None = None,
 ) -> HTMLResponse:
-    """Render the updates page, with the refusal of a request when there is one."""
+    """Render the updates page, with the refusal of a request or the form's errors."""
     service = update_service(request)
     found = await service.overview(context.principal)
     entries = await service.history(context.principal)
@@ -383,7 +393,9 @@ async def _overview(
                 else None
             ),
             "outside_version": found.outside_change.version if found.outside_change else "",
-            "errors": form_errors(error, locale.gettext) if error else [],
+            "errors": (
+                form_errors(error, locale.gettext) if error else list(form.errors) if form else []
+            ),
             "done": done_message(request, locale.gettext),
             "progress": live,
             "next_window": (
@@ -391,12 +403,21 @@ async def _overview(
             ),
             "window_ranges": [
                 {
-                    "day": WEEKDAY_LABELS[r.weekday],
-                    "start": r.start.strftime("%H:%M"),
-                    "end": r.end.strftime("%H:%M"),
+                    "day": weekday_abbreviations(locale.code)[r.weekday],
+                    "start": format_time_of_day(r.start, locale.code),
+                    "end": format_time_of_day(r.end, locale.code),
                 }
                 for r in found.window.ranges
             ],
+            "apply_after": Field(
+                "apply_after",
+                locale.gettext("admin.updates.apply_after.label"),
+                "datetime",
+                form.moment_value("apply_after") if form else "",
+                hint=locale.gettext("admin.updates.apply_after.hint"),
+                error=form.error_for("apply_after") if form else None,
+                required=False,
+            ),
             "support_label": SUPPORT_LABELS[found.support.status] if found.support else "",
             "waits_until": (
                 admin_moment(request, locale, found.open.apply_after)
@@ -408,19 +429,10 @@ async def _overview(
     )
     if error is not None:
         response.status_code = status_for(error)
+    elif form is not None and form.errors:
+        response.status_code = 422
     return response
 
-
-WEEKDAY_LABELS = (
-    "admin.updates.weekday.mon",
-    "admin.updates.weekday.tue",
-    "admin.updates.weekday.wed",
-    "admin.updates.weekday.thu",
-    "admin.updates.weekday.fri",
-    "admin.updates.weekday.sat",
-    "admin.updates.weekday.sun",
-)
-"""The weekday names of the update window (ADR 0116), ``date.weekday()`` order."""
 
 SUPPORT_LABELS: dict[LineStatus, str] = {
     LineStatus.SUPPORTED: "admin.updates.support.supported",
@@ -429,21 +441,6 @@ SUPPORT_LABELS: dict[LineStatus, str] = {
     LineStatus.ENDED: "admin.updates.support.ended",
 }
 """The running line's status from ``support.json`` (ADR 0116 point 9)."""
-
-
-def _apply_after(raw: str, zone: ZoneInfo) -> datetime | None:
-    """Read the optional "apply after" field (``YYYY-MM-DDTHH:MM`` in the admin zone) as UTC.
-
-    Raises:
-        DomainError: ``update_apply_after_invalid`` for anything else than empty or a moment.
-    """
-    if not raw.strip():
-        return None
-    try:
-        local = datetime.strptime(raw.strip(), "%Y-%m-%dT%H:%M")
-    except ValueError as error:
-        raise DomainError(ErrorCode.UPDATE_APPLY_AFTER_INVALID) from error
-    return local.replace(tzinfo=zone).astimezone(UTC)
 
 
 @router.get("/updates", response_class=HTMLResponse)
@@ -493,9 +490,9 @@ async def request_update(
     try:
         if raw and target is None:
             raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
-        later = _apply_after(
-            form.text("apply_after"), ZoneInfo(settings_for(request).admin_timezone)
-        )
+        later = form.optional_moment("apply_after", ZoneInfo(settings_for(request).admin_timezone))
+        if form.errors:
+            return await _overview(request, locale, context, form=form)
         await update_service(request).request_update(context.principal, target, later)
     except DomainError as error:
         raise_refusal(error)
