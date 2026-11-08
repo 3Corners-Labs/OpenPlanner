@@ -209,10 +209,7 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/tls/check": {
         "/admin/settings/tls/check": statuses(303, 403, 403, 403, 403, 403, 403),
     },
-    # ADR 0089: the configuration package; an empty form is a short passphrase or no file.
-    "POST /admin/settings/package/export": {
-        "/admin/settings/package/export": statuses(422, 403, 403, 403, 403, 403, 403),
-    },
+    # ADR 0089, read for one release (ADR 0099 point 14): an empty form is no file.
     "POST /admin/settings/package/import": {
         "/admin/settings/package/import": statuses(422, 403, 403, 403, 403, 403, 403),
     },
@@ -539,6 +536,22 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     "POST /admin/organisations/{org}/channels/sms": {
         "/admin/organisations/demo/channels/sms": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    # ADR 0032 point 9: the organisation's own contact-center connection (integrations.manage).
+    "POST /admin/organisations/{org}/channels/contact-center": {
+        "/admin/organisations/demo/channels/contact-center": statuses(
+            422, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/channels/contact-center/webhook-secret": {
+        "/admin/organisations/demo/channels/contact-center/webhook-secret": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/channels/contact-center/delete": {
+        "/admin/organisations/demo/channels/contact-center/delete": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
     },
     "POST /admin/organisations/{org}/channels/{channel}/remove": {
         "/admin/organisations/demo/channels/sms/remove": statuses(

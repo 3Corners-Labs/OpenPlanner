@@ -14,16 +14,11 @@ The downloads are discovered from the app (``DOWNLOAD_MODULES`` in ``tests/suppo
 pins the places that set the header), so a new export has to be added to ``EXPORTS`` here.
 """
 
-import sqlite3
-from contextlib import closing
 from datetime import timedelta
-from pathlib import Path
 
 import pytest
 
-from app.adapters.db.configuration_package import inspect_package
 from app.domain.audit import AuditEvent, Outcome
-from app.domain.configuration_package import CONFIGURATION_TABLES, STATE_TABLES
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.support.admin_site import site_uow
 from tests.support.configuration_package import PACKAGE_PASSPHRASE
@@ -36,14 +31,14 @@ OTHER_MARKER = "wpb2andere"
 STAFF_NAME = "Gina"
 """A staff member of ``demo`` (``GROUP_ADMIN``): state, not configuration."""
 CLEAR_SECRETS = (LOG_DESTINATION["secret"],)
-"""Secrets the sweep stored through the portal; none may be readable in a package."""
+"""Secrets the sweep stored through the portal; none may be readable in a document."""
 
 EXPORTS = {
     "admin/audit_routes.py": "the audit export, per role below",
     "admin/branding_routes.py": "theme.css: colours of the organisation, swept as a page",
     "admin/configuration_routes.py": "the configuration document, below",
     "admin/idp_mapping_routes.py": "the claim mapping text, swept as a page",
-    "admin/settings_routes.py": "the configuration package, below",
+    "admin/settings_routes.py": "the CSR and the internal CA certificate (public), swept as pages",
     "api/agent/routes.py": "the machine API, tests/api/test_privacy_sweep_api.py",
 }
 
@@ -120,55 +115,6 @@ async def test_a_query_cannot_make_the_staff_list_show_another_organisation(
 
     assert STAFF_NAME not in page, "a staff member of the other organisation"
     assert not marker_leaks(page, set())
-
-
-async def _package(site: Site) -> bytes:
-    await site.login_as(SUPER)
-    response = await site.client.post(
-        "/admin/settings/package/export",
-        data={"passphrase": PACKAGE_PASSPHRASE, "passphrase_repeat": PACKAGE_PASSPHRASE},
-        headers=SAME_ORIGIN,
-    )
-    assert response.status_code == 200, response.text
-    return response.content
-
-
-async def test_the_configuration_package_holds_no_personal_data_no_state_and_no_clear_secret(
-    audited: Site, tmp_path: Path
-) -> None:
-    package = await _package(audited)
-
-    # ADR 0089 points 2 and 3: the PII fields are on bookings, a state table, which is emptied
-    # and vacuumed; staff and the audit log are state too; secrets are sealed.
-    assert not marker_leaks(package.decode("latin-1"), set()), "personal data in the package"
-    for secret in CLEAR_SECRETS:
-        assert secret.encode() not in package, "a secret in clear text in the package"
-    for name in (STAFF_NAME, DEMO_MARKER, OTHER_MARKER):
-        assert name.encode() not in package, f"state in the package: {name}"
-    # Not vacuous: the package opens with the passphrase, and the sealed secret is in it.
-    summary = inspect_package(package, PACKAGE_PASSPHRASE, tmp_path)
-    assert summary.secrets >= 1
-    assert summary.counts["organisations"] == 2, "an installation export holds every organisation"
-
-
-async def test_every_state_table_of_the_package_is_empty_and_every_other_table_is_configuration(
-    audited: Site, tmp_path: Path
-) -> None:
-    package = await _package(audited)
-    path = tmp_path / "exported.sqlite"
-    path.write_bytes(package)
-
-    with closing(sqlite3.connect(path)) as db:
-        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        counts = {
-            table: db.execute(f"SELECT count(*) FROM {table}").fetchone()[0]  # noqa: S608  # nosec B608 - names from sqlite_master
-            for table in tables
-        }
-
-    state = {table: n for table, n in counts.items() if table in STATE_TABLES and n}
-    assert state == {}, "a state table with rows in the package"
-    assert counts["organisations"] == 2
-    assert CONFIGURATION_TABLES <= tables
 
 
 async def test_the_configuration_document_holds_no_personal_data_no_state_and_no_clear_secret(

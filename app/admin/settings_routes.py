@@ -46,12 +46,13 @@ through a response. Without the bundled proxy the block says the source does not
     POST /admin/settings/tls/certificate          settings.platform.manage (recent login): upload
     POST /admin/settings/tls/certificate/remove   settings.platform.manage (recent login)
     POST /admin/settings/tls/check                settings.platform.manage (recent login)
-    POST /admin/settings/package/export           settings.platform.manage (recent login): a file
     POST /admin/settings/package/import           settings.platform.manage (recent login): upload
 
-The block *Configuration package* (ADR 0089) exports every configuration table with the
-secrets sealed under a passphrase, and imports such a package into an installation that is
-not in use. The passphrase is read from the form and never echoed, logged or stored.
+The block *Configuration package* carries the JSON document (ADR 0099, see
+``configuration_routes``) and, for one release, the import of the old SQLite package
+(ADR 0089), which is converted to a replacing document and applied with the admin's rights per
+change. The SQLite package is no longer exported. The passphrase is read from the form and
+never echoed, logged or stored.
 """
 
 from dataclasses import dataclass
@@ -79,11 +80,7 @@ from app.admin.usage_view import usage_view
 from app.config import Settings
 from app.domain.authorization import Permission
 from app.domain.configuration_document import Scope
-from app.domain.configuration_package import (
-    MEDIA_TYPE,
-    MIN_PASSPHRASE_LENGTH,
-    package_filename,
-)
+from app.domain.configuration_document_service import Actor
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.identity_provider_service import IdentityProviderService
@@ -544,34 +541,16 @@ async def adopt_setting(
     return redirect_done(_home(key), "adopted", anchor=_anchor(key))
 
 
-@router.post("/settings/package/export")
-async def export_package(
-    request: Request, locale: Locale, _: SameOrigin, context: Change
-) -> Response:
-    """Return a configuration package sealed under the submitted passphrase (ADR 0089)."""
-    form = await read_form(request, locale)
-    passphrase = form.text("passphrase")
-    try:
-        if passphrase != form.text("passphrase_repeat"):
-            raise DomainError(ErrorCode.CONFIRMATION_MISMATCH, PACKAGE_KEY)
-        package = await _packages(request).export(context.principal.subject, passphrase)
-    except DomainError as error:
-        raise_refusal(error)
-        return await render_tab(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
-    current: Settings = request.app.state.settings
-    name = package_filename(current.installation_name, request.app.state.clock.now())
-    return Response(
-        package,
-        media_type=MEDIA_TYPE,
-        headers={"content-disposition": f'attachment; filename="{name}"'},
-    )
-
-
 @router.post("/settings/package/import", response_class=HTMLResponse)
 async def import_package(
     request: Request, locale: Locale, _: SameOrigin, context: Change
 ) -> Response:
-    """Replace the configuration with an uploaded package (ADR 0089 point 5)."""
+    """Apply an uploaded SQLite package as a replacing document (ADR 0099 point 14).
+
+    The package format is read for one release and no longer written. The package is
+    converted to a ``replace`` document of the platform and planned and applied with the
+    admin's rights per change; a refusal of the plan is the page's error.
+    """
     current: Settings = request.app.state.settings
     uploads = await read_uploads(
         request, (PACKAGE_KEY,), current.configuration_package_max_mb * 1024 * 1024, PACKAGE_FIELDS
@@ -580,7 +559,7 @@ async def import_package(
         if uploads.values.get("confirm") != "yes":
             raise DomainError(ErrorCode.CONFIRMATION_MISMATCH, PACKAGE_KEY)
         summary = await _packages(request).import_(
-            context.principal.subject,
+            Actor(context.principal.subject, context.principal),
             uploads.files[PACKAGE_KEY],
             uploads.values.get("passphrase", "").strip(),
         )
@@ -714,7 +693,6 @@ async def render_tab(
         )
         values["package"] = {
             "error": errors.get(PACKAGE_KEY),
-            "min_length": MIN_PASSPHRASE_LENGTH,
             "max_mb": current.configuration_package_max_mb,
         }
     response = _page(request, locale, tab.value, context.principal, values)

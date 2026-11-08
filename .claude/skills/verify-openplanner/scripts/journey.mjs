@@ -9,10 +9,12 @@
  *   booking      book on /g/demo, get the email, confirm by its link       (participant-booking.md)
  *   agenda       the group admin finds that booking in the agenda; an
  *                admin of another organisation is refused                  (admin-agenda.md)
+ *   contact      the booking page shows the contact details on request
+ *                only, and the audit log records it                        (booking-contact.md)
  *   manage       open the emailed link, move the appointment, cancel it    (manage-booking.md)
  *   admin-login  log in and out through Keycloak; a user without a role
  *                is refused                                                (admin-login.md)
- *   all          booking, agenda, manage, agenda, admin-login
+ *   all          booking, agenda, contact, manage, agenda, admin-login
  *
  * Journeys run in the order given, each in a fresh browser context; the first failure stops the
  * run, because later journeys build on earlier ones. Evidence goes to the run folder that
@@ -261,8 +263,11 @@ async function manage({ page, rec, run }) {
   saveState(run, { booking: { reference, day, start, time: label, status: 'cancelled' } });
 }
 
-/** admin-agenda.md: the group admin finds this run's booking; another organisation's admin is refused. */
-async function agenda({ page, rec, run, browser }) {
+/**
+ * Sign in as the group admin on the agenda day of this run's booking and return its one row.
+ * Throws without a booking of this run (the booking journey makes it).
+ */
+async function bookingRow(page, run) {
   const { booking: current } = loadState(run);
   if (!current) throw new Error('precondition: a booking of this run (run the booking journey first)');
   const path = `/admin/groups/${DEMO_GROUP}/agenda?day=${current.day}`;
@@ -275,6 +280,12 @@ async function agenda({ page, rec, run, browser }) {
   // at the new start.
   const row = await agendaRow(page, run.participant.first, current.time);
   await until(`one agenda row at ${current.time} for this run's participant`, async () => (await row.count()) === 1);
+  return { current, path, row };
+}
+
+/** admin-agenda.md: the group admin finds this run's booking; another organisation's admin is refused. */
+async function agenda({ page, rec, run, browser }) {
+  const { current, path, row } = await bookingRow(page, run);
   const cancelled = (await row.getByText(NL.agendaCancelled, { exact: true }).count()) > 0;
   if (cancelled !== (current.status === 'cancelled')) {
     throw new Error(`the row is ${cancelled ? '' : 'not '}marked "${NL.agendaCancelled}", but the booking is ${current.status}`);
@@ -293,6 +304,47 @@ async function agenda({ page, rec, run, browser }) {
   } finally {
     await other.close();
   }
+}
+
+/**
+ * booking-contact.md: the booking page shows the participant's contact details only on request,
+ * hides them again, and the audit log records the request without them.
+ */
+async function contact({ page, rec, run }) {
+  const { first, last, email } = run.participant;
+  const { current, row } = await bookingRow(page, run);
+  await row.getByRole('link', { name: new RegExp(`^${NL.details}\\b`) }).click();
+  const card = page.getByRole('region', { name: NL.contact });
+  await until(`the card "${NL.contact}" on the booking page`, () => card.isVisible());
+  if ((await page.getByText(email).count()) || (await page.getByText(last).count())) {
+    throw new Error('the booking page shows the contact details before anyone asked for them');
+  }
+  const show = card.getByRole('button', { name: NL.contactShow });
+  if (!(await show.isVisible())) throw new Error(`no button "${NL.contactShow}"`);
+  await rec.step(page, 'booking-page', `the booking page of ${current.time} shows "${NL.contactShow}" and no contact details`);
+
+  await show.click();
+  const mail = card.getByRole('link', { name: email, exact: true });
+  await until('the contact details after the request', async () =>
+    new URL(page.url()).searchParams.get('contact') === 'show' && (await mail.count()) === 1);
+  if ((await mail.getAttribute('href')) !== `mailto:${email}`) throw new Error('the address is not a mailto link');
+  if (!(await card.getByText(`${first} ${last}`, { exact: true }).count())) throw new Error('the full name is not shown');
+  // The booking journey gives no phone number, so the card says so instead of a tel: link.
+  if (!(await card.getByText(NL.contactNoPhone, { exact: true }).count())) throw new Error(`no "${NL.contactNoPhone}" for the phone`);
+  await rec.step(page, 'contact-shown',
+    `"${NL.contactShow}" shows the full name, a mailto link and "${NL.contactNoPhone}" for the phone`);
+
+  await card.getByRole('link', { name: NL.contactHide }).click();
+  await until('the contact details hidden again', async () =>
+    !new URL(page.url()).searchParams.has('contact') && (await page.getByText(email).count()) === 0);
+  await rec.step(page, 'contact-hidden', `"${NL.contactHide}" opens the page without them`);
+
+  await page.goto('/admin/audit');
+  const event = page.getByRole('row').filter({ hasText: NL.auditContactViewed });
+  await until(`the audit event "${NL.auditContactViewed}"`, async () => (await event.count()) === 1);
+  const text = await page.locator('main').innerText();
+  if ([first, last, email].some((value) => text.includes(value))) throw new Error('the audit log holds a participant value');
+  await rec.step(page, 'audit-event', `the audit log lists "${NL.auditContactViewed}" once, without the participant's values`);
 }
 
 /** admin-login.md: sign in and out through Keycloak; a user without a role is refused. */
@@ -330,13 +382,13 @@ async function adminLogin({ page, rec, run }) {
   rec.expectConsole('sign-in-again', /status of 403/, 'the portal answers 403 to a user without a role');
 }
 
-const JOURNEYS = { booking, agenda, manage, 'admin-login': adminLogin };
-const ALL = ['booking', 'agenda', 'manage', 'agenda', 'admin-login'];
+const JOURNEYS = { booking, agenda, contact, manage, 'admin-login': adminLogin };
+const ALL = ['booking', 'agenda', 'contact', 'manage', 'agenda', 'admin-login'];
 
 async function main() {
   const asked = process.argv.slice(2);
   if (!asked.length || asked.some((a) => a.startsWith('-'))) {
-    console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(2, 15).join('\n').replace(/^ \* ?/gm, ''));
+    console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(2, 17).join('\n').replace(/^ \* ?/gm, ''));
     process.exit(asked.length ? 0 : 2);
   }
   const names = asked.flatMap((name) => (name === 'all' ? ALL : [name]));

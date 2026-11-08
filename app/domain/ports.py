@@ -46,6 +46,7 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.configuration_changes import Change, ConfigurationSnapshot
+from app.domain.configuration_document import Document
 from app.domain.configuration_package import PackageSummary
 from app.domain.connection_health import (
     HealthEntry,
@@ -54,7 +55,12 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
-from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.contact_center import (
+    ConnectionChange,
+    ContactCenterKind,
+    ContactCenterTaskRef,
+    OrganisationConnection,
+)
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -71,6 +77,7 @@ from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.participant_links import LinkSession
 from app.domain.public_address import AddressCheck, AddressKind, InstanceReply
+from app.domain.reschedule_proposal import HeldProposal
 from app.domain.retention import DueBooking, RetentionFacts
 from app.domain.routing import GroupRouting
 from app.domain.scenarios import ClosureScenario
@@ -440,6 +447,30 @@ ContactCenterDispatchers = Mapping[ContactCenterKind, ContactCenterDispatcher]
 """The configured dispatcher per platform (ADR 0032 point 5); empty without a contact center."""
 
 
+class ContactCenterConnections(Protocol):
+    """The organisations' contact-center connections, sealed and write-only (ADR 0032 point 9).
+
+    The domain sees only ``OrganisationConnection``: never a secret. The webhook secret is
+    generated inside the adapter and read only by the webhook route and the dispatcher.
+    """
+
+    async def get(self, organisation_id: int) -> OrganisationConnection | None:
+        """Return the organisation's connection without its secrets, or ``None``."""
+        ...
+
+    async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
+        """Store the connection; a ``None`` secret keeps the stored one."""
+        ...
+
+    async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
+        """Generate a new webhook secret for an existing connection, replacing the old one."""
+        ...
+
+    async def delete(self, organisation_id: int) -> None:
+        """Remove the organisation's connection and its secrets."""
+        ...
+
+
 class ProbeRegistry(Protocol):
     """Remembers the probe work item of a group check and the events it got (ADR 0082).
 
@@ -581,20 +612,12 @@ class CertificateVolume(Protocol):
 
 
 class ConfigurationTransfer(Protocol):
-    """Reads and writes configuration packages (ADR 0089): SQLite files, secrets re-sealed.
+    """Reads configuration packages (ADR 0089), SQLite files, for one release (ADR 0099).
 
-    The adapter opens the installation's sealed values with its own key and seals them under
-    the package's passphrase on export, and the other way round on import. It never logs or
-    returns a passphrase or an opened value.
+    The adapter opens a package with its passphrase, seals its secrets under the
+    installation's key and returns it as a document. It never logs or returns a passphrase or
+    an opened value outside the document's secrets.
     """
-
-    async def export(self, passphrase: str) -> bytes:
-        """Return a package of this installation sealed under ``passphrase``.
-
-        Raises:
-            DomainError: ``integration_not_ready`` without a settings key.
-        """
-        ...
 
     async def inspect(self, package: bytes, passphrase: str) -> PackageSummary:
         """Return what ``package`` holds, once ``passphrase`` opens it.
@@ -605,17 +628,13 @@ class ConfigurationTransfer(Protocol):
         """
         ...
 
-    async def import_(self, package: bytes, passphrase: str) -> PackageSummary:
-        """Replace every configuration table with the package's; return its summary.
+    async def to_document(self, package: bytes, passphrase: str) -> tuple[Document, PackageSummary]:
+        """Return the package as a ``replace`` document of the platform, and its summary.
 
         Raises:
             DomainError: The codes of ``inspect``; ``configuration_package_version`` when the
                 schema revisions differ; ``integration_not_ready`` without a settings key.
         """
-        ...
-
-    async def in_use(self) -> bool:
-        """Return whether the installation has bookings, slots or an active closure."""
         ...
 
 
@@ -1349,7 +1368,11 @@ class Transaction(Protocol):
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[SlotUsage]:
-        """Return capacity and active bookings of existing slots with lower <= start < upper."""
+        """Return capacity and places taken of existing slots with lower <= start < upper.
+
+        A place is taken by a booking that holds one (``HOLDS_PLACE``) and by an open proposal
+        of a new time (ADR 0057 point 7).
+        """
         ...
 
     async def get_slot(self, group_id: int, start: datetime) -> Slot | None:
@@ -1361,7 +1384,7 @@ class Transaction(Protocol):
         ...
 
     async def count_active_bookings(self, slot_id: int) -> int:
-        """Return the number of confirmed bookings in the slot."""
+        """Return the places taken in the slot: bookings that hold one and open proposals."""
         ...
 
     async def upcoming_starts_for_email(
@@ -1464,6 +1487,22 @@ class Transaction(Protocol):
 
     async def save_contact(self, booking_id: int, contact: Contact) -> None:
         """Replace the participant's details on a booking (ADR 0056 point 10)."""
+        ...
+
+    async def add_proposal(self, proposal: HeldProposal) -> HeldProposal:
+        """Store a held proposal of a new time; it counts in its slot at once (ADR 0057)."""
+        ...
+
+    async def get_open_proposal(self, booking_id: int) -> HeldProposal | None:
+        """Return the booking's open proposal, if any (ADR 0057).
+
+        Open: not released, and the booking still awaits a new time; the same rule that makes a
+        proposal take a place in ``get_slot_usage`` and ``count_active_bookings``.
+        """
+        ...
+
+    async def save_proposal(self, proposal: HeldProposal) -> None:
+        """Persist a proposal's release (``released_at``, ``outcome``)."""
         ...
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
@@ -1980,9 +2019,13 @@ class Transaction(Protocol):
         ...
 
     async def read_configuration(
-        self, now: datetime, locked_settings: frozenset[str]
+        self, now: datetime, locked_settings: frozenset[str], *, secrets: bool = True
     ) -> ConfigurationSnapshot:
-        """Return the configuration as a tree of the document's shape, with its usage facts."""
+        """Return the configuration as a tree of the document's shape, with its usage facts.
+
+        With ``secrets`` false no sealed value is opened, so an export without secrets cannot
+        fail on a value that cannot be opened here (a rotated key, a damaged row).
+        """
         ...
 
     async def apply_configuration(self, changes: Sequence[Change]) -> int:

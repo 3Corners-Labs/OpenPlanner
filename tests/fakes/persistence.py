@@ -70,6 +70,7 @@ from app.domain.own_certificate import OwnCertificate
 from app.domain.participant_links import new_public_ref
 from app.domain.public_address import AddressCheck, AddressKind
 from app.domain.request_log import REQUEST_EVENT, counts_as_failure, request_platform
+from app.domain.reschedule_proposal import HeldProposal
 from app.domain.retention import (
     DueBooking,
     GroupRetentionCounts,
@@ -112,6 +113,7 @@ class State:
     reminder_rules: dict[int, list[ReminderRule]] = field(default_factory=dict)
     slots: dict[int, Slot] = field(default_factory=dict)
     bookings: dict[int, Booking] = field(default_factory=dict)
+    proposals: dict[int, HeldProposal] = field(default_factory=dict)
     usage_facts: list[UsageFact | StaffFact] = field(default_factory=list)
     slots_closed_until: datetime | None = None
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
@@ -979,9 +981,31 @@ class InMemoryTransaction:
         return stored
 
     async def count_active_bookings(self, slot_id: int) -> int:
-        return sum(
+        booked = sum(
             1 for b in self.state.bookings.values() if b.slot_id == slot_id and b.holds_place
         )
+        held = sum(
+            1
+            for p in self.state.proposals.values()
+            if p.slot_id == slot_id
+            and p.is_open
+            and self.state.bookings[p.booking_id].awaits_rebook
+        )
+        return booked + held
+
+    async def add_proposal(self, proposal: HeldProposal) -> HeldProposal:
+        stored = replace(proposal, id=len(self.state.proposals) + 1)
+        self.state.proposals[stored.id or 0] = stored
+        return stored
+
+    async def get_open_proposal(self, booking_id: int) -> HeldProposal | None:
+        if not self.state.bookings[booking_id].awaits_rebook:
+            return None
+        mine = [p for p in self.state.proposals.values() if p.booking_id == booking_id]
+        return max((p for p in mine if p.is_open), key=lambda p: p.id or 0, default=None)
+
+    async def save_proposal(self, proposal: HeldProposal) -> None:
+        self.state.proposals[proposal.id or 0] = proposal
 
     async def upcoming_starts_for_email(
         self, group_id: int, email: str, after: datetime
@@ -1724,7 +1748,7 @@ class InMemoryTransaction:
         return self.state.settings_version
 
     async def read_configuration(
-        self, now: datetime, locked_settings: frozenset[str]
+        self, now: datetime, locked_settings: frozenset[str], *, secrets: bool = True
     ) -> ConfigurationSnapshot:
         snapshot = self.state.configuration or ConfigurationSnapshot(
             Entity("installation", children={"platform": (Entity("platform"),)}), Usage(), 0

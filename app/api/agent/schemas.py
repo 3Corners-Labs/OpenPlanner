@@ -82,3 +82,39 @@ class ConfigurationSummary(BaseModel):
         "`api_clients`."
     )
     secrets: int = Field(description="How many sealed values the package carried.")
+
+
+class PlanChange(BaseModel):
+    """One object a configuration document would create, change or delete: no value."""
+
+    action: str = Field(description="`create`, `update` or `delete`.")
+    kind: str = Field(description="The kind of object, as the document names it.")
+    path: str = Field(description="Where the object is in the document.")
+    fields: list[str] = Field(description="The names of the fields written; none for a delete.")
+
+
+class PlanRefusal(BaseModel):
+    """One thing that stops a plan: where, why and which field, never a value."""
+
+    path: str = Field(description="Where in the document the offending object is.")
+    code: str = Field(description="The refusal code, for example `configuration_object_in_use`.")
+    field: str | None = Field(description="The offending field, when the refusal is about one.")
+
+
+class ConfigurationPlan(BaseModel):
+    """What applying a configuration document would do (ADR 0099): names, never values."""
+
+    ok: bool = Field(description="Whether the plan can be applied: nothing refuses it.")
+    plan_hash: str = Field(description="Send it as `X-Plan-Hash` to apply exactly this plan.")
+    changes: list[PlanChange]
+    refusals: list[PlanRefusal]
+
+
+class ConfigurationApplied(BaseModel):
+    """What applying a configuration document did (ADR 0099)."""
+
+    applied: bool = Field(description="Whether the plan was written; false when it was refused.")
+    settings_version: int | None = Field(
+        description="The new settings version, or null when nothing was written."
+    )
+    plan: ConfigurationPlan

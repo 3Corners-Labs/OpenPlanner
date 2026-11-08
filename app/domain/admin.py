@@ -188,6 +188,20 @@ class AdminService:
         role = granting_role(principal, permission)
         return Authorization(Decision(True, Reason.ROLE, role), Target.everything())
 
+    async def authorize_organisation(
+        self, principal: Principal, permission: Permission, slug: str
+    ) -> int:
+        """Authorise ``permission`` on the organisation ``slug`` and return its id.
+
+        Raises:
+            DomainError: ``not_permitted`` (audited) or ``organisation_not_found``.
+        """
+        require(await self.authorize(principal, permission, organisation_slug=slug))
+        organisation_id = await self.organisation_id(slug)
+        if organisation_id is None:
+            raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+        return organisation_id
+
     async def organisation_id(self, slug: str) -> int | None:
         """Return the id of the organisation ``slug``, or ``None`` when there is none.
 
@@ -511,12 +525,24 @@ async def record_change(
     organisation: str | None,
     group: str | None,
     detail: str = "",
+    *,
+    booking_id: int | None = None,
 ) -> None:
-    """Record a successful change in the same transaction as the change itself.
+    """Record a successful admin action in the same transaction as the action itself.
 
-    ``detail`` names what changed (field names, ``rule.add``-style keys), never values.
+    Mostly a change; also a request worth accounting for, such as showing a participant's
+    contact details (ADR 0044 §2). ``detail`` names what changed or was asked for (field
+    names, ``rule.add``-style keys), never values; ``booking_id`` names the booking it is about.
     """
     event = AuditEvent(
-        at, principal.subject, permission.value, Outcome.SUCCESS, "", organisation, group, detail
+        at,
+        principal.subject,
+        permission.value,
+        Outcome.SUCCESS,
+        "",
+        organisation,
+        group,
+        detail,
+        booking_id=booking_id,
     )
     await tx.add_audit_event(event)

@@ -11,6 +11,7 @@ get a bound of their own, one bucket per address whatever the path (``count_unkn
 """
 
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 import structlog
 from fastapi import Request
@@ -37,6 +38,32 @@ class RejectedRequest(Exception):  # noqa: N818 - reads as an outcome, like HTTP
         super().__init__(status)
         self.status = status
         self.reason = reason
+
+
+def from_this_page(request: Request) -> bool:
+    """Return whether ``request`` comes from the very page it asks for, by the person's action.
+
+    For a ``GET`` that shows personal data and is audited (the participant's contact details,
+    ADR 0044 §2): only the button on that page may make it. The browser must not mark the
+    request as coming from elsewhere (``Sec-Fetch-Site`` other than ``same-origin``: typed,
+    bookmarked, shared in a mail or chat, another site), it must not be a prefetch or
+    prerender (``Sec-Purpose``, ``Purpose``), and its ``Referer`` must be this page's own
+    path, which the portal's ``same-origin`` referrer policy sends. So a shared address, or a
+    link to it planted on any other page of the portal, neither shows the data nor writes a
+    request in someone else's name. The browser vouches for the origin with ``Sec-Fetch-Site``,
+    so behind a proxy only the path is compared; an older browser without it must send this
+    site's own origin in the ``Referer`` as well. Without a ``Referer`` (stripped by a proxy or
+    an extension) nothing is shown: it fails closed.
+    """
+    if request.headers.get("sec-purpose") or request.headers.get("purpose"):
+        return False
+    referer = urlsplit(request.headers.get("referer", ""))
+    if referer.path != request.url.path:
+        return False
+    site = request.headers.get("sec-fetch-site")
+    if site is not None:
+        return site == "same-origin"
+    return (referer.scheme, referer.netloc) == (request.url.scheme, request.url.netloc)
 
 
 def require_same_origin(request: Request) -> None:

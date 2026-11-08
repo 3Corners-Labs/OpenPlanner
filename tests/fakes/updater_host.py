@@ -27,8 +27,12 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``installed``: Debian packages ``dpkg -s`` finds; ``upgradable``: ``apt list --upgradable``.
 - ``docker-key``: the fingerprint of Docker's release key (default the real one).
 - ``config-env``: what ``app.cli config env --out -`` prints (default: a login of four
-  variables); ``fail`` may list ``config-env`` (a wrong passphrase) and ``config-import`` (an
-  installation in use), which exit 2 with the CLI's ``Refused (...)`` line (ADR 0089).
+  variables); ``fail`` may list ``config-env`` (a wrong passphrase), ``config-import`` (an
+  object in use), ``config-plan`` (a refusal in the plan, ADR 0099) and ``config-apply`` (a
+  stale plan), ``config-passphrase`` (a wrong passphrase for a document); they exit 2 with the
+  CLI's ``Refused (...)`` or ``REFUSED ...`` lines.
+  ``config plan`` prints one change and the plan hash ``PLAN_HASH``; ``config apply`` refuses
+  any other ``--plan-hash`` with ``configuration_plan_stale``.
 
 ``apt-get``, ``usermod`` and ``systemctl`` only record their call; ``curl -o`` writes a small
 stand-in for the downloaded file, with a matching checksum unless ``fail`` lists ``checksum``.
@@ -51,6 +55,7 @@ CONFIG_ENV = (
     "OIDC_SCOPES=openid profile email\n"
 )
 CONFIG_SUMMARY = "configuration imported\norganisations       2\ngroups              3\n"
+PLAN_HASH = "ab" * 32
 PROXY = "proxy-container-id"
 COSIGN = "3.1.4"
 # The releases the fake registry knows, so an image's digest can be mapped back to the version
@@ -117,9 +122,32 @@ def _config(args: list[str]) -> int:
         sys.stdout.write(path.read_text() if path.exists() else CONFIG_ENV)
     elif args[0] == "import":
         if _failing("config-import"):
-            print("Refused (configuration_installation_in_use).")
+            print("Refused (configuration_object_in_use).")
             return 2
         sys.stdout.write(CONFIG_SUMMARY)
+    elif args[0] in ("plan", "apply"):
+        return _document(args)
+    return 0
+
+
+def _document(args: list[str]) -> int:
+    """Handle ``app.cli config plan|apply FILE`` of ADR 0099 the way the CLI reports them."""
+    if _failing("config-passphrase"):
+        print("Refused (configuration_passphrase_wrong).")
+        return 2
+    if args[0] == "plan":
+        if _failing("config-plan"):
+            print("REFUSED organisations[acme].groups[team] not_permitted name")
+            print(f"0 change(s), 1 refusal(s)\nplan hash {PLAN_HASH}")
+            return 2
+        print(f"create group acme/team: name\n1 change(s), 0 refusal(s)\nplan hash {PLAN_HASH}")
+        return 0
+    given = args[args.index("--plan-hash") + 1] if "--plan-hash" in args else ""
+    if _failing("config-apply") or given != PLAN_HASH:
+        print("Refused (configuration_plan_stale).")
+        return 2
+    print(f"create group acme/team: name\n1 change(s), 0 refusal(s)\nplan hash {PLAN_HASH}")
+    print("applied; settings version 4")
     return 0
 
 

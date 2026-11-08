@@ -27,7 +27,13 @@
     "loggedOut": { "key": "admin.logged_out.title", "text": "U bent uitgelogd" },
     "forbidden": { "key": "admin.forbidden.title", "text": "Geen toegang" },
     "noRole": { "key": "admin.no_role.text", "text": "U heeft geen rol in het beheerportaal", "match": "prefix" },
-    "agendaCancelled": { "key": "admin.agenda.cancelled", "text": "Geannuleerd" }
+    "agendaCancelled": { "key": "admin.agenda.cancelled", "text": "Geannuleerd" },
+    "details": { "key": "admin.agenda.details", "text": "Details" },
+    "contact": { "key": "admin.booking.contact", "text": "Contactgegevens" },
+    "contactShow": { "key": "admin.booking.contact_show", "text": "Contactgegevens tonen" },
+    "contactHide": { "key": "admin.booking.contact_hide", "text": "Contactgegevens verbergen" },
+    "contactNoPhone": { "key": "admin.booking.contact_no_phone", "text": "Niet opgegeven" },
+    "auditContactViewed": { "key": "admin.audit.detail.booking_contact_viewed", "text": "Contactgegevens van de deelnemer getoond" }
   },
   "subject": {
     "confirmRequest": { "key": "message.confirm_request.subject", "pattern": "^Bevestig uw afspraak met " },

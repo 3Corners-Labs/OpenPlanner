@@ -10,7 +10,7 @@
   <h3 id="document-export-heading">{{ _("admin.configuration.export.title") }}</h3>
   <form method="post" action="{{ document.prefix }}/export" novalidate aria-labelledby="document-export-heading">
     {% if document.can_seal %}
-    <div class="field field--checkbox">
+    <div class="choice__option">
       <input id="document-secrets" name="secrets" type="checkbox" value="yes" aria-describedby="document-secrets-hint">
       <label for="document-secrets">{{ _("admin.configuration.export.secrets") }}</label>
     </div>

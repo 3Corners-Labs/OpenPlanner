@@ -6,10 +6,10 @@ machine API, and a test checks that every public route is either closed or expli
 no route can forget it.
 
     closed    /g/{slug} (and /book, /direct), /b/{token}/cancel, /b/{token}/details,
-              /b/{token}/reschedule,
+              /b/{token}/proposal, /b/{token}/reschedule,
               /b/{token}/test, /b/{token}/wait/leave, and under the reference of ADR 0093
-              /b/m/{ref}/cancel, /b/m/{ref}/details, /b/m/{ref}/reschedule, /b/m/{ref}/test
-              (and /test/go), /b/m/{ref}/wait/leave
+              /b/m/{ref}/cancel, /b/m/{ref}/details, /b/m/{ref}/proposal, /b/m/{ref}/reschedule,
+              /b/m/{ref}/test (and /test/go), /b/m/{ref}/wait/leave
               ─► 503 + Retry-After: the maintenance page instead of the form or the write
     open      the booking page /b/{token} and /b/m/{ref}, the closure page /g/{slug}/closure
               (ADR 0037), waiting and join pages, health, brand assets, webhooks (they record what
@@ -52,12 +52,14 @@ BOOKING_ROUTES = frozenset(
     {
         "/b/{token}/cancel",
         "/b/{token}/details",
+        "/b/{token}/proposal",
         "/b/{token}/reschedule",
         "/b/{token}/test",
         "/b/{token}/test/go",
         "/b/{token}/wait/leave",
         "/b/m/{public_ref}/cancel",
         "/b/m/{public_ref}/details",
+        "/b/m/{public_ref}/proposal",
         "/b/m/{public_ref}/reschedule",
         "/b/m/{public_ref}/test",
         "/b/m/{public_ref}/test/go",
@@ -105,6 +107,7 @@ OPEN_ROUTES = frozenset(
         "/o/{slug}/logo",
         "/o/{slug}/font/{role}",
         "/webhooks/contact-center/{kind}",
+        "/webhooks/contact-center/{kind}/{org}",
         "/webhooks/webex",
         "/webhooks/wxcc",
     }
