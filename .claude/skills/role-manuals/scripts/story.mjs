@@ -362,14 +362,14 @@ export async function openPlannerForm(run, booking, link, heading) {
 }
 
 /**
- * Choose the option of the list labelled `label` whose text matches `match` (the first, or the
- * first that `prefer` also matches); return its text. Throws when none does, so a renamed option
- * fails the step by name instead of leaving the form as it was.
+ * Choose the option of the list labelled `label` whose text is `match` (a text) or matches it (a
+ * pattern), the first or the first that also holds `prefer`; return its text. Throws when none
+ * does, so a renamed option fails the step by name instead of leaving the form as it was.
  */
 export async function pick(page, label, match, prefer = null) {
   const select = page.getByLabel(label);
   const options = (await select.evaluate((s) => [...s.options].map((o) => ({ value: o.value, text: o.text.trim() }))))
-    .filter((o) => o.value && (typeof match === 'string' ? o.text.includes(match) : match.test(o.text)));
+    .filter((o) => o.value && (typeof match === 'string' ? o.text === match : match.test(o.text)));
   const chosen = options.find((o) => prefer && o.text.includes(prefer)) ?? options[0];
   if (!chosen) throw new Error(`no option matching ${match} in the list "${label}"`);
   await select.selectOption(chosen.value);
