@@ -1173,6 +1173,28 @@ vacuumed away.
 | Elevation / information disclosure (ADR 0089 point 7) | A machine client reads every secret of the platform or replaces its configuration without the right, or the passphrase ends up in a URL, a log or an error | One `RequireScope(configuration:transfer)` on both routes, a global scope the superuser grants on purpose; the passphrase is a header, never a query parameter; a missing header is `invalid_request` without input, a short or wrong one is reported by code; every API response is `no-store`; the audit actor is the client id, the detail the same codes and counts as the portal's | `tests/api/test_agent_api.py::test_the_configuration_routes_need_the_transfer_scope`, `test_the_configuration_package_round_trips_over_the_api`, `test_an_export_without_a_usable_passphrase_is_refused_by_code` |
 | Tampering / denial of service (ADR 0089 point 7) | A pipeline imports a package into a running installation, a package of another revision, rubbish, or a body that fills memory | The service's rules are the portal's: `409 configuration_installation_in_use`, `409 configuration_package_version`, `422 configuration_package_invalid`; the body is refused with `413` from the declared length, or as soon as the read passes `CONFIGURATION_PACKAGE_MAX_MB`, before all of it is held; `PUT` is a write and is refused during maintenance (ADR 0038); after an import every access token is gone (tokens are state), so a client must authenticate again | `tests/api/test_agent_api.py::test_an_import_into_an_installation_in_use_is_a_conflict`, `test_an_import_is_refused_by_code_never_echoing_the_file`, `test_the_configuration_package_round_trips_over_the_api` |
 
+## Flow: configuration document, plan and apply (ADR 0099)
+
+Host: `python -m app.cli config export --format json|plan|apply` (actor `system:cli`, which the
+matrix does not bind; the passphrase from a file). The portal and the machine API follow in
+steps 3 and 4 under the same `ConfigurationDocumentService`. A document is JSON that states the
+desired configuration by natural keys; a plan reads it and the installation's configuration and
+returns the changes and the refusals without writing; an apply plans again inside the write
+lock and writes all or nothing. Input from outside: the document (bytes up to
+`CONFIGURATION_PACKAGE_MAX_MB`) and the passphrase. Rights come from the matrix per change.
+No participant data: a document holds configuration only, and business addresses as keys.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering | A crafted document (a repeated key, NaN, deep nesting, a typo that silently does nothing) is read differently from what its author saw | Duplicate keys, NaN, infinity and nesting above 32 are refused at decode; an unknown field is refused with its JSON path; a secret must be `{"sealed": ...}`, a file must match its SHA-256 | `tests/domain/test_configuration_document.py`, `tests/adapters/test_configuration_json.py` |
+| Elevation | An organisation's document reaches the platform or another organisation (names it, moves a client in, deletes below the top level) | `scope` is checked for every top-level object and `replace` deletes only inside the scope; every change asks the permission of the screen that edits it, on the right target | `tests/domain/test_configuration_plan.py::test_an_organisation_document_cannot_name_anything_outside_its_organisation`, `test_each_change_is_checked_against_the_permission_of_its_own_screen` |
+| Information disclosure | The plan tells an actor who may not manage a secret whether a guess is right | Naming a secret needs the permission of its screen whether or not it changes | `tests/domain/test_configuration_plan.py::test_naming_an_unchanged_secret_still_needs_its_permission` |
+| Information disclosure | A secret reaches a log, a plan line, an error or an audit event | `Secret`, `Sealed` and `Binary` keep their content out of `repr`; a plan lists field names; refusals carry a path and a code; the audit detail names an alert target by a digest | `tests/domain/test_configuration_values.py`, `tests/domain/test_configuration_plan.py::test_a_secret_that_is_the_same_is_no_change_and_one_that_differs_never_shows` |
+| Tampering | A sealed value is moved to another object or field, or the header asks for a cheaper key derivation | Kind, natural key and field are the associated data of each sealed value; the scrypt parameters are checked against fixed ones, never taken from the header | `tests/adapters/test_configuration_seal.py` |
+| Tampering | A document that was reviewed deletes or changes something else when it is applied | The apply plans again inside the write lock; the plan hash covers the document, the settings version and the list of changes; a plan with deletions needs the hash | `tests/adapters/db/test_configuration_document.py::test_a_document_with_deletions_needs_the_hash_of_the_reviewed_plan` |
+| Denial of service | A mistaken `replace` document deletes or rewrites too much | Objects that bookings, closures or API grants refer to are never deleted; a plan above `CONFIGURATION_APPLY_MAX_CHANGES` is refused | `tests/adapters/db/test_configuration_document.py::test_a_plan_with_more_changes_than_the_limit_is_refused` |
+| Repudiation | Who applied which change is lost | Every applied change is an audit event under the permission that allowed it, with the plan hash prefix, action, kind and natural key | `tests/domain/test_configuration_document_service.py` |
+
 ## Flow: personal data in the admin portal (ADR 0063)
 
 Admin, every role: overview and list pages, the audit log and its export, search and filter
