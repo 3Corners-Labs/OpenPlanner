@@ -13,17 +13,17 @@ from app.domain.integration import IntegrationService
 from app.domain.scheduling import Group
 from app.domain.simulation import SIMULATED_LINK, SimulationService
 from app.domain.trial_call import TrialState, trial_state
-from tests.domain.test_integration import _booking
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, two_organisations
 from tests.support.domain import NOW
+from tests.support.integration import make_booking
 
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = two_organisations()
-    state.bookings[123] = _booking()  # group 1 = demo
+    state.bookings[123] = make_booking()  # group 1 = demo
     return InMemoryUnitOfWork(state)
 
 
@@ -55,7 +55,7 @@ async def test_prepare_gives_a_booking_stand_in_ids_and_audits_it(uow: InMemoryU
 
 async def test_real_platform_ids_are_never_overwritten(uow: InMemoryUnitOfWork) -> None:
     real = MeetingRef("real-meeting", "https://site.webex.com/j.php?MTID=m1")
-    uow.state.bookings[123] = replace(_booking(), meeting=real, wxcc_task_id="real-task")
+    uow.state.bookings[123] = replace(make_booking(), meeting=real, wxcc_task_id="real-task")
 
     ids = await _service(uow).prepare(ORG_ADMIN, "demo", 123)
 
@@ -145,7 +145,7 @@ async def test_an_open_trial_call_is_never_replaced(uow: InMemoryUnitOfWork) -> 
         MeetingRef("real-trial", "https://site.webex.com/j.php?MTID=t1"),
         NOW + timedelta(minutes=20),
     )
-    uow.state.bookings[123] = replace(_booking(), trial=real, trial_count=1)
+    uow.state.bookings[123] = replace(make_booking(), trial=real, trial_count=1)
 
     ids = await _service(uow).prepare(ORG_ADMIN, "demo", 123)
 

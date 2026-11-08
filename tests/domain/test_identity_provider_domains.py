@@ -18,19 +18,12 @@ from app.domain.identity_provider_service import (
     IdentityProviderService,
 )
 from app.domain.login_domains import DomainState
-from tests.domain.test_identity_provider_service import (
-    AUDITOR,
-    ORG_ADMIN,
-    PLATFORM_DISCOVERY,
-    SUPER,
-    draft,
-)
 from tests.fakes.clock import FixedClock
 from tests.fakes.dns import FakeTxtResolver
 from tests.fakes.identity_providers import FakeDiscoveryFetcher, FakeSigningKeys
 from tests.fakes.persistence import InMemoryUnitOfWork
-
-pytest_plugins = ["tests.domain.test_identity_provider_service"]
+from tests.support.admin import AUDITOR, ORG_ADMIN, SUPER
+from tests.support.organisation_providers import OTHER_DISCOVERY, PLATFORM_DISCOVERY, draft
 
 
 @pytest.fixture
@@ -99,7 +92,7 @@ async def test_the_platform_suffix_and_garbage_are_refused(
 
 
 async def test_a_domain_belongs_to_one_provider(domains: IdentityProviderService) -> None:
-    await domains.create(SUPER, "demo", draft(key="org-b", discovery_url=OTHER), None)
+    await domains.create(SUPER, "demo", draft(key="org-b", discovery_url=OTHER_DISCOVERY), None)
     await domains.claim_domain(SUPER, "demo", "org-a", "acme-a.nl")
 
     with pytest.raises(DomainError) as refused:
@@ -172,6 +165,3 @@ async def test_deleting_the_provider_releases_its_domains(
     await domains.delete(SUPER, "demo", "org-a")
 
     assert not await domains.suffix_conflicts("acme-a.nl")
-
-
-OTHER = "https://login.org-b.example/.well-known/openid-configuration"

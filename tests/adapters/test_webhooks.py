@@ -1,34 +1,9 @@
-import hashlib
-import hmac
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from app.adapters.webhooks import parse_webex, parse_wxcc, verify_webex, verify_wxcc
 from app.domain.calls import EventKind
-
-SECRET = "webhook-secret"
-NOW = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)
-
-
-def wxcc_body(event_type: str = "task:connected", at: datetime = NOW, **data: object) -> bytes:
-    ms = int(at.timestamp() * 1000)
-    return json.dumps(
-        {
-            "id": "4c2c4890",
-            "specversion": "1.0",
-            "type": event_type,
-            "comciscotimestamp": ms,
-            "data": {"taskId": "task-1", **data},
-        }
-    ).encode()
-
-
-def sign(body: bytes, algorithm: str = "sha256") -> str:
-    return hmac.new(SECRET.encode(), body, getattr(hashlib, algorithm)).hexdigest()
-
-
-def timestamp(body: bytes) -> str:
-    return str(json.loads(body)["comciscotimestamp"])
+from tests.support.webhooks import NOW, SECRET, sign, timestamp, wxcc_body
 
 
 def test_wxcc_signature_timestamp_and_window() -> None:

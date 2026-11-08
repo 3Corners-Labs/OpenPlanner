@@ -14,17 +14,11 @@ import pytest
 from app.config import Settings
 from app.domain.configuration_package import package_filename
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
-from tests.admin.test_settings_routes import PACKAGE_PASSPHRASE
+from tests.support.configuration_package import PACKAGE_PASSPHRASE
+from tests.support.downloads import DOWNLOAD_MODULES
 
 SAFE_FILENAME = re.compile(r"^[a-z0-9.-]+$")
 APP = Path(__file__).resolve().parents[2] / "app"
-DOWNLOAD_MODULES = {
-    "admin/audit_routes.py",
-    "admin/branding_routes.py",
-    "admin/idp_mapping_routes.py",
-    "admin/settings_routes.py",
-    "api/agent/routes.py",
-}
 EXPORTED = datetime(2026, 1, 1, tzinfo=UTC)
 
 

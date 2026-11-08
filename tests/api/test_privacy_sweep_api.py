@@ -14,19 +14,12 @@ import pytest
 from fastapi.routing import APIRoute
 
 from app.domain.services import BookingService, ContactInput
-from tests.admin.test_privacy_sweep import MARKERS
-from tests.api import test_agent_api
-from tests.api.test_agent_api import (
-    BASE,
-    OPEN_ROUTES,
-    PASSPHRASE,
-    TRANSFER,
-    Agent,
-)
+from tests.support.agent_api import BASE, OPEN_ROUTES, TRANSFER, Agent
+from tests.support.configuration_package import PASSPHRASE
 from tests.support.domain import SLOT_0900, book_confirmed
+from tests.support.privacy_sweep import MARKERS
 from tests.support.routes import all_routes, scoped_routes
 
-agent = test_agent_api.agent  # the fixture of the API tests, collected here by name
 OTHER = "andere-team"
 WINDOW = {"from": "2026-01-05", "to": "2026-01-06"}
 SWEPT = frozenset(

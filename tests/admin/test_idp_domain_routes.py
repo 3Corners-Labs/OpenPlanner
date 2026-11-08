@@ -7,7 +7,7 @@ reserved suffix of the bundled provider is refused at the field.
 import pytest
 
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.admin.test_idp_routes import register
+from tests.support.organisation_login import register
 
 
 @pytest.fixture

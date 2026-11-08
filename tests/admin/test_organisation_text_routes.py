@@ -11,7 +11,7 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
-from tests.admin.test_admin_flow import audit_events
+from tests.support.admin_site import audit_events
 
 TEXTS = "/admin/organisations/demo/texts"
 INTRO = "Kies een moment; een gesprek duurt {minutes} minuten."

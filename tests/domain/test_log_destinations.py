@@ -9,7 +9,6 @@ from app.domain.log_destinations import (
     DEFAULT_CATEGORIES,
     DestinationDraft,
     DestinationKind,
-    LogDestination,
     accepts,
     categories_text,
     parse_address,
@@ -18,29 +17,7 @@ from app.domain.log_destinations import (
     validate_secret,
 )
 from app.domain.log_events import LogCategory
-from tests.support.domain import NOW
-
-
-def destination(**changes: object) -> LogDestination:
-    values: dict[str, object] = {
-        "id": 1,
-        "name": "Splunk",
-        "kind": DestinationKind.SPLUNK_HEC,
-        "address": "https://splunk.example.org:8088/services/collector/event",
-        "index": "openplanner",
-        "source": "",
-        "min_level": "warning",
-        "categories": frozenset({LogCategory.AUDIT, LogCategory.SECURITY}),
-        "include_diagnostic": False,
-        "include_trace": False,
-        "enabled": True,
-        "secret_set": True,
-        "ca_pem": "",
-        "created_at": NOW,
-        "updated_at": NOW,
-    }
-    values.update(changes)
-    return LogDestination(**values)  # type: ignore[arg-type]
+from tests.support.log_destinations import destination
 
 
 def draft(**changes: object) -> DestinationDraft:

@@ -16,15 +16,14 @@ from app.adapters.db.models import BookingRow, GroupRow, ScheduleRuleRow
 from app.adapters.db.routing_json import routing_json
 from app.config import Settings
 from app.domain.routing import Attribute, GroupRouting, Subject
-from tests.api.test_widget_api import _embed
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
+from tests.support.widget import SITE, embed
 
 FRIDAY_0900 = "2026-01-02T08:00:00Z"
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
-SITE = "https://www.acme.example"
 WIDGET = "/api/v1/widget/demo/demo"
 ROUTING = GroupRouting(
     (
@@ -63,7 +62,7 @@ async def _stored(settings: Settings) -> list[tuple[str | None, str | None]]:
 @pytest.fixture
 async def site(demo_settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
     await _with_routing(demo_settings)
-    await _embed(demo_settings)
+    await embed(demo_settings)
     async with app_client(demo_settings, FixedClock(NOW)) as client:
         yield client
 
@@ -71,7 +70,7 @@ async def site(demo_settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
 @pytest.fixture
 async def bound(demo_settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
     await _with_routing(demo_settings, bind=True)
-    await _embed(demo_settings)
+    await embed(demo_settings)
     async with app_client(demo_settings, FixedClock(NOW)) as client:
         yield client
 
