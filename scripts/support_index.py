@@ -22,8 +22,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from scripts.release_plan import git
-from scripts.release_pr import parse_version
+from scripts.release_plan import git, parse_version
 
 SUPPORT_FILE = Path("support.json")
 POLICY = "N-1 from 1.0.0, latest only before (SECURITY.md, ADR 0116 point 2)"

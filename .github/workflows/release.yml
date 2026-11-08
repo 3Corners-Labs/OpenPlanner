@@ -118,6 +118,12 @@ jobs:
           VERSION: ${{ steps.plan.outputs.version }}
           BASE: ${{ github.ref_name }}
         run: python3 -m scripts.release_pr prepare --version "$VERSION" --base "$BASE" --body "$RUNNER_TEMP/body.md" --actor "$GITHUB_ACTOR"
+      # ADR 0116 point 9: the support index on main follows every release; on a line the line's
+      # copy is refreshed and the next release on main supersedes it.
+      - name: support.json
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: python3 -m scripts.support_index --add "$VERSION"
       - name: what would change (step summary)
         env:
           TITLE: ${{ steps.plan.outputs.title }}
