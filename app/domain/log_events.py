@@ -289,6 +289,25 @@ _OPERATIONS = (
         "Housekeeping removed back-ups older than the retention.",
     ),
     _e(
+        "usage.rollup_failed",
+        _OPS,
+        "error",
+        "error",
+        "The usage facts could not be rolled up: {error}.",
+        "The rollup of ADR 0117 failed this round; the facts wait and are tried again at the "
+        "next interval. System status shows how far behind it is.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "usage.rolled_up",
+        _OPS,
+        "info",
+        "facts cells unreadable events_pruned hours_pruned",
+        "{facts} usage facts rolled up into {cells} hourly cells.",
+        "The worker added usage facts to the hourly table and removed what retention allows "
+        "(ADR 0117).",
+    ),
+    _e(
         "usage.fact_dropped",
         _OPS,
         "warning",

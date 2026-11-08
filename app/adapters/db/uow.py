@@ -99,6 +99,7 @@ from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
 from app.adapters.db.usage import UsageQueries
+from app.adapters.db.usage_rollup import UsageRollupQueries
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.audit import (
@@ -471,6 +472,7 @@ class SqlTransaction(
     RetentionQueries,
     RollupQueries,
     UsageQueries,
+    UsageRollupQueries,
     StaffQueries,
     MaintenanceQueries,
     RoleQueries,

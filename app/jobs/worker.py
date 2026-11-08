@@ -72,6 +72,7 @@ from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.system_log import SystemLog
 from app.domain.tls_check import TlsWatch
 from app.domain.update_service import UpdateService
+from app.domain.usage_rollup_service import UsageRollup
 from app.domain.worker_check import WorkerHeartbeat, heartbeat_due
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
@@ -266,6 +267,14 @@ async def run_worker(
             uow, clock, lambda: timedelta(days=live.settings.booking_row_retention_days)
         ).run,
     )
+    # ADR 0117: usage facts into the hourly table, and the retention of both.
+    usage = UsageRollup(
+        uow,
+        clock,
+        lambda: timedelta(minutes=live.settings.reporting_rollup_interval_minutes),
+        lambda: live.settings.reporting_event_retention_days,
+        lambda: live.settings.reporting_retention_months,
+    )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
         uow,
@@ -345,6 +354,7 @@ async def run_worker(
                     # Before the group check, which reads it (ADR 0068).
                     heartbeat_at = await _heartbeat(uow, clock, runner, version, heartbeat_at)
                     await housekeeping.run()
+                    await usage.run_if_due()  # ADR 0117; never raises
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)
                     await _watch_certificate(tls)

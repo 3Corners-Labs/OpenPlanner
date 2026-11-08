@@ -93,7 +93,8 @@ from app.domain.updates import (
     SupportLine,
     UpdateRequest,
 )
-from app.domain.usage import StaffFact, UsageFact
+from app.domain.usage import StaffFact, UsageCell, UsageFact
+from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -1933,6 +1934,46 @@ class Transaction(Protocol):
 
     async def list_log_destination_status(self, scope: Scope) -> list[DestinationStatus]:
         """Return the status every process reported, for a scope that matches everything."""
+        ...
+
+
+class UsageStore(Protocol):
+    """The rollup's reads and writes within one transaction (ADR 0117 point 4).
+
+    Kept apart from ``Transaction``, which only gained ``record_usage``: the web path writes
+    facts, and only the worker's rollup, retention and the System status card use these.
+    """
+
+    async def read_usage_events(self, after_id: int, limit: int) -> UsageBatch:
+        """Return up to ``limit`` facts after ``after_id``, oldest first."""
+        ...
+
+    async def usage_state(self) -> UsageState:
+        """Return the watermark, the time of the last run and how many facts wait."""
+        ...
+
+    async def add_usage_cells(self, cells: Sequence[UsageCell]) -> None:
+        """Add ``cells`` to the hourly table: a cell of an existing hour and cut adds to its row."""
+        ...
+
+    async def advance_usage_watermark(self, last_event_id: int, at: datetime) -> None:
+        """Move the watermark and the time of the last run, in the same transaction as the cells."""
+        ...
+
+    async def prune_usage(self, events_before: datetime, hours_before: datetime) -> UsagePruned:
+        """Delete rolled-up facts before ``events_before`` and old hourly rows."""
+        ...
+
+
+class UsageUnitOfWork(Protocol):
+    """Opens transactions that carry the rollup's ``UsageStore``."""
+
+    def locked(self) -> AbstractAsyncContextManager[UsageStore]:
+        """Open a write transaction."""
+        ...
+
+    def read(self) -> AbstractAsyncContextManager[UsageStore]:
+        """Open a read transaction."""
         ...
 
 
