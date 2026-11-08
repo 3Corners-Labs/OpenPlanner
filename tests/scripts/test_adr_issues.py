@@ -136,6 +136,17 @@ def test_a_finished_row_closes_its_open_issue() -> None:
     assert [(a.kind, a.issue) for a in actions] == [("close", open_issue)]
 
 
+def test_an_open_issue_whose_row_was_split_is_closed_as_an_orphan() -> None:
+    """ADR 0119: a row split into 4a and 4b leaves the issue of row 4 behind; it is closed."""
+    stale = issue(5, "ADR 0099 step 4: x")
+    closed = issue(6, "ADR 0099 step 3: x", state="CLOSED")
+
+    actions = plan([step("4a", "merged"), step("4b", "merged")], [stale, closed])
+
+    assert [(a.kind, a.issue) for a in actions] == [("orphan", stale)]
+    assert str(actions[0]) == "close #5: ADR 0099 step 4: x (no such row any more)"
+
+
 def test_running_twice_changes_nothing() -> None:
     steps = [step("2", "planned"), step("3", "merged")]
     issues = [issue(5, "ADR 0099 step 2: x"), issue(6, "ADR 0099 step 3: x", state="CLOSED")]
@@ -455,5 +466,6 @@ def test_counts_prints_the_adrs_per_category_and_calls_no_one(
         "PARTIAL: 1",
         "NOT BUILT: 1",
         "POLICY: 0",
+        "SUPERSEDED: 0",
     ]
     assert fake.calls == []

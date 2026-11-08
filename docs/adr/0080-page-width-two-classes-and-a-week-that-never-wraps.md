@@ -1,6 +1,6 @@
 # 0080. Page width: two classes, declared in the register, and a week that never wraps
 
-Status: accepted (2026-10-31), requested by the product owner ("leg vast en bouw", after a screenshot of the group overview in which the weekly schedule wrapped into six days and one). Builds on ADR 0047 (the navigation register decides where a screen lives; it now also decides how wide it is). Built; see *Build status*.
+Status: accepted (2026-10-31), requested by the product owner ("leg vast en bouw", after a screenshot of the group overview in which the weekly schedule wrapped into six days and one). Builds on ADR 0047 (the navigation register decides where a screen lives; it now also decides how wide it is). Partly built: step 1; step 2 (further list screens wide) follows when a table on the test host needs the room; see *Build status*.
 
 ## Context
 

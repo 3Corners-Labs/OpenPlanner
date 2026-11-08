@@ -1,7 +1,7 @@
 # 0108. Public images for minor and major releases only
 
-Status: accepted (2026-11-02), requested by the product owner. Partly built: steps 1 and 3 in
-this build; step 2 is an administrator's act at the first release. Extends ADR 0006 (image
+Status: accepted (2026-11-02), requested by the product owner. Built: steps 1 and 3 in
+#494; step 2, the administrator's act, is done (anonymous pull of 0.4.0 and 0.5.0 checked on 2026-11-08). Extends ADR 0006 (image
 publishing and signing), ADR 0052 (releases), ADR 0059 (release candidates) and ADR 0078
 (release audit).
 Note (2026-11-05): ADR 0116 point 10 amends point 1: every `vX.Y.Z` release goes to the public
@@ -67,9 +67,9 @@ widening it publishes images irreversibly and is a decision (a PR touching `.git
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #428 | merged |
-| 1 | `public-image` input on `publish-image`; `main.yml` sets it for `vX.Y.0`; anonymous pull check; verify commands in the release notes | #494 | in PR |
-| 2 | Organisation administrator sets both public packages to Public (person) | | planned |
-| 3 | `SECURITY.md` and `docs/runbook.md`: how an outsider verifies a release | #494 | in PR |
+| 1 | `public-image` input on `publish-image`; `main.yml` sets it for `vX.Y.0`; anonymous pull check; verify commands in the release notes | #494 | merged |
+| 2 | Organisation administrator sets both public packages to Public (person) |  | built (2026-11-08: `openplanner-public` 0.4.0 and 0.5.0 pull without a login) |
+| 3 | `SECURITY.md` and `docs/runbook.md`: how an outsider verifies a release | #494 | merged |
 
 ## Consequences
 

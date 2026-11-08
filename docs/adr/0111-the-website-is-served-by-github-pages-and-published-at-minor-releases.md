@@ -50,10 +50,10 @@ None in the application. The deployment needs no setting: the domain lives in
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #475 | in PR |
-| 1 | Job `pages`, the `vX.Y.0` rule, `upload-pages-artifact` in `site`, `CNAME`; TransIP script, test, AutoGit file and `.htaccess` removed | #475 | in PR |
-| 2 | Runbook, threat model, data flow, footer text, guardrail baseline | #475 | in PR |
-| 3 | Pages source *GitHub Actions* and the custom domain, environment `github-pages` limited to tags, environment `website` deleted, DNS of openplanner.nl to GitHub Pages, domain verified for the organisation (an administrator) | | planned |
+| 0 | ADR | #475 | merged |
+| 1 | Job `pages`, the `vX.Y.0` rule, `upload-pages-artifact` in `site`, `CNAME`; TransIP script, test, AutoGit file and `.htaccess` removed | #475 | merged |
+| 2 | Runbook, threat model, data flow, footer text, guardrail baseline | #475 | merged |
+| 3 | Pages source *GitHub Actions* and the custom domain, environment `github-pages` limited to tags, environment `website` deleted, DNS of openplanner.nl to GitHub Pages, domain verified for the organisation (an administrator) |  | superseded (ADR 0113) |
 
 ## Consequences
 
