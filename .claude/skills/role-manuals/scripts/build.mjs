@@ -16,6 +16,7 @@
  * docx and marked come from ../package.json (npm ci there); the PDF is printed by the Chrome that
  * the verification stack's client starts (Playwright from e2e/).
  */
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -87,7 +88,9 @@ function substitute(text, file) {
  */
 function safeHref(href, file) {
   const clean = String(href).replace(/[\u0000-\u0020\u007f]/g, '');
-  if (/^(https:|mailto:|#)/i.test(clean) || !/^[a-z][a-z0-9+.-]*:/i.test(clean)) return clean;
+  const scheme = /^[a-z][a-z0-9+.-]*:/i.test(clean);
+  const network = /^[\\/]{2}/.test(clean); // //host or \\host: another machine, not a relative link
+  if (/^(https:|mailto:|#)/i.test(clean) || (!scheme && !network)) return clean;
   console.warn(`${file}: link ${href} dropped (only https, mailto, anchors and relative links)`);
   return null;
 }
@@ -96,32 +99,44 @@ function safeHref(href, file) {
 const FIGURE = /^img\/[a-z0-9][a-z0-9-]*\.png$/;
 const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-/** The 1-based line of every match of `pattern` in `text`, in order. */
-const linesOf = (text, pattern) => [...text.matchAll(pattern)].map((m) => text.slice(0, m.index).split('\n').length);
+
 
 const ENTITIES = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
 const unescape = (s) => String(s ?? '').replace(/&(amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e]);
 
-/** Flatten inline tokens into runs: {text, bold, italic, code, href}. */
-function inline(tokens, file, fmt = {}) {
+/**
+ * Flatten inline tokens into runs: {text, bold, italic, code, href}. `ctx` carries the line of
+ * the first token, collects every bold span with its line (`ctx.bold`) and every error.
+ */
+function inline(tokens, file, ctx, fmt = {}) {
   const out = [];
+  let line = ctx.line;
   for (const t of tokens || []) {
+    const here = { ...ctx, line };
     switch (t.type) {
-      case 'strong': out.push(...inline(t.tokens, file, { ...fmt, bold: true })); break;
-      case 'em': out.push(...inline(t.tokens, file, { ...fmt, italic: true })); break;
+      case 'strong': {
+        const runs = inline(t.tokens, file, { ...here, bold: null }, { ...fmt, bold: true });
+        ctx.bold?.push({ text: runs.map((r) => r.text).join(''), line });
+        out.push(...runs);
+        break;
+      }
+      case 'em': out.push(...inline(t.tokens, file, here, { ...fmt, italic: true })); break;
       case 'codespan': out.push({ ...fmt, text: unescape(t.text), code: true }); break;
-      case 'link': out.push(...inline(t.tokens, file, { ...fmt, href: safeHref(t.href, file) })); break;
+      case 'link': out.push(...inline(t.tokens, file, here, { ...fmt, href: safeHref(t.href, file) })); break;
       case 'br': out.push({ ...fmt, text: '\n' }); break;
-      case 'del': out.push(...inline(t.tokens, file, fmt)); break;
+      case 'del': out.push(...inline(t.tokens, file, here, fmt)); break;
       case 'image': out.push({ ...fmt, text: unescape(t.text) }); break;
-      case 'html': break;
+      case 'html':
+        if (/<!--\s*task:/.test(t.raw)) ctx.errors.push(`${file}:${line}: taakkoppeling midden in een alinea; zet haar op een eigen regel boven de kop`);
+        break;
       case 'escape': out.push({ ...fmt, text: unescape(t.text) }); break;
       case 'text':
-        if (t.tokens && t.tokens.length) out.push(...inline(t.tokens, file, fmt));
+        if (t.tokens && t.tokens.length) out.push(...inline(t.tokens, file, here, fmt));
         else out.push({ ...fmt, text: unescape(t.text) });
         break;
       default: out.push({ ...fmt, text: unescape(t.text ?? t.raw ?? '') });
     }
+    line += (String(t.raw ?? '').match(/\n/g) ?? []).length;
   }
   return out;
 }
@@ -139,68 +154,83 @@ function parseTask(text) {
   return attrs;
 }
 
+const newlines = (raw) => (String(raw ?? '').match(/\n/g) ?? []).length;
+
 /**
- * Build the block model of one source: the blocks, its figures in reading order, and its tasks.
- * A task marker belongs to the heading right after it; that heading keeps the task and gets its
- * anchor here, once. Whatever breaks a rule is returned in `errors` with its line.
+ * Build the block model of one source: the blocks, its figures in reading order, its tasks and
+ * its bold spans, each with the line it starts on (counted from the tokens themselves). A task
+ * marker belongs to the heading right after it; that heading keeps the task and gets its anchor
+ * here, once. Whatever breaks a rule is returned in `errors` with its line.
  */
-function parseDocument(text, body, file) {
+function parseDocument(body, firstLine, file) {
   const errors = [];
-  const markerLines = linesOf(text, /<!--\s*task:/g);
+  const bold = [];
   let figureNo = 0;
-  const figure = (tok) => {
+  const figure = (tok, line) => {
     figureNo += 1;
     const id = path.basename(tok.href, '.png');
-    if (!FIGURE.test(tok.href)) errors.push(`${file}: afbeelding ${tok.href} is geen img/<id>.png`);
+    if (!FIGURE.test(tok.href)) errors.push(`${file}:${line}: afbeelding ${tok.href} is geen img/<id>.png`);
     const note = (VARS.without_webex || {})[id];
     const source = FIGURE.test(tok.href) ? path.join(ws.dir, tok.href) : null;
     return {
-      type: 'figure', id, src: tok.href, file: source, exists: Boolean(source && fs.existsSync(source)),
+      type: 'figure', id, src: tok.href, file: source, exists: Boolean(source && fs.existsSync(source)), line,
       alt: unescape(tok.text), caption: unescape(tok.title || '') + (note ? ` (testopname zonder Webex Meetings: ${note})` : ''),
-      num: figureNo, line: linesOf(text, new RegExp(`\\(${tok.href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'))[0] ?? 0,
+      num: figureNo,
     };
   };
-  const blocks = (tokens) => {
+  const runs = (tokens, line) => inline(tokens, file, { line, bold, errors });
+  const blocks = (tokens, first) => {
     const out = [];
+    let line = first;
     for (const t of tokens) {
       switch (t.type) {
         case 'space': case 'hr': break;
-        case 'heading': out.push({ type: 'heading', level: t.depth, inline: inline(t.tokens, file) }); break;
+        case 'heading': out.push({ type: 'heading', level: t.depth, inline: runs(t.tokens, line), line }); break;
         case 'paragraph':
         case 'text': {
           const toks = (t.tokens || [{ type: 'text', text: t.text }]).filter((x) => !(x.type === 'text' && !String(x.text).trim()));
-          if (toks.length === 1 && toks[0].type === 'image') out.push(figure(toks[0]));
-          else out.push({ type: 'para', inline: inline(t.tokens || [{ type: 'text', text: t.text }], file) });
+          if (toks.length === 1 && toks[0].type === 'image') out.push(figure(toks[0], line));
+          else out.push({ type: 'para', inline: runs(t.tokens || [{ type: 'text', text: t.text, raw: t.raw }], line), line });
           break;
         }
-        case 'list':
-          out.push({ type: 'list', ordered: t.ordered, start: Number(t.start) || 1, items: t.items.map((it) => ({ blocks: blocks(it.tokens) })) });
+        case 'list': {
+          let itemLine = line;
+          const items = t.items.map((it) => {
+            const item = { blocks: blocks(it.tokens, itemLine) };
+            itemLine += newlines(it.raw);
+            return item;
+          });
+          out.push({ type: 'list', ordered: t.ordered, start: Number(t.start) || 1, items, line });
           break;
-        case 'table':
-          out.push({ type: 'table', header: t.header.map((c) => inline(c.tokens, file)), rows: t.rows.map((r) => r.map((c) => inline(c.tokens, file))) });
+        }
+        case 'table': {
+          // A table's rows each sit on a line of their own, after the header and the rule.
+          const rows = t.rows.map((r, i) => r.map((c) => runs(c.tokens, line + 2 + i)));
+          out.push({ type: 'table', header: t.header.map((c) => runs(c.tokens, line)), rows, line });
           break;
+        }
         case 'blockquote': {
-          const inner = blocks(t.tokens);
-          const first = inner[0]?.type === 'para' ? inner[0].inline[0] : null;
-          out.push({ type: 'callout', label: first && first.bold ? first.text.replace(/:\s*$/, '') : '', blocks: inner });
+          const inner = blocks(t.tokens, line);
+          const first0 = inner[0]?.type === 'para' ? inner[0].inline[0] : null;
+          out.push({ type: 'callout', label: first0 && first0.bold ? first0.text.replace(/:\s*$/, '') : '', blocks: inner, line });
           break;
         }
         case 'html': {
-          if (/<!--\s*pagebreak\s*-->/.test(t.raw)) out.push({ type: 'pagebreak' });
-          for (const task of t.raw.matchAll(/<!--\s*task:\s*([\s\S]*?)-->/g)) out.push({ type: 'task', attrs: parseTask(task[1]) });
+          if (/<!--\s*pagebreak\s*-->/.test(t.raw)) out.push({ type: 'pagebreak', line });
+          for (const task of t.raw.matchAll(/<!--\s*task:\s*([\s\S]*?)-->/g)) out.push({ type: 'task', attrs: parseTask(task[1]), line });
           break;
         }
-        case 'code': out.push({ type: 'code', text: t.text }); break;
-        default: console.warn(`${file}: unsupported block ${t.type}`);
+        case 'code': out.push({ type: 'code', text: t.text, line }); break;
+        default: console.warn(`${file}:${line}: unsupported block ${t.type}`);
       }
+      line += newlines(t.raw);
     }
     return out;
   };
-  const model = blocks(marked.lexer(body));
+  const model = blocks(marked.lexer(body), firstLine);
   const figures = [];
   const tasks = [];
   const used = new Set();
-  let markerNo = 0;
   const resolve = (list) => list.forEach((b, i) => {
     if (b.type === 'heading' && b.level > 1) {
       let id = slug(plain(b.inline)) || 'kop';
@@ -210,28 +240,37 @@ function parseDocument(text, body, file) {
       if (b.task) tasks.push({ ...b.task, title: plain(b.inline), anchor: id });
     }
     if (b.type === 'task') {
-      const line = markerLines[markerNo++] ?? 0;
       const next = list[i + 1];
-      if (next?.type === 'heading' && next.level > 1) next.task = { line, ...b.attrs };
-      else errors.push(`${file}:${line}: taakkoppeling zonder kop (niveau 2 of dieper) direct eronder`);
+      if (next?.type === 'heading' && next.level > 1) next.task = { line: b.line, ...b.attrs };
+      else errors.push(`${file}:${b.line}: taakkoppeling zonder kop (niveau 2 of dieper) direct eronder`);
     }
     if (b.type === 'figure') figures.push(b);
     if (b.type === 'list') b.items.forEach((it) => resolve(it.blocks));
     if (b.type === 'callout') resolve(b.blocks);
   });
   resolve(model);
-  return { model, figures, tasks, errors };
+  return { model, figures, tasks, bold, errors };
 }
 
-/** The lines of `text` that name a term this organisation does not show, or the hidden product name. */
-function namedTerms(text, file) {
+/** The terms this organisation does not show (and the hidden product name) that `text` names. */
+function hiddenIn(text) {
   const { product, terms } = hiddenTerms(VARS);
-  const hidden = [...(product ? [product] : []), ...terms];
+  const shown = String(text).toLowerCase();
+  return [...(product ? [product] : []), ...terms].filter((term) => shown.includes(term.toLowerCase()));
+}
+
+/**
+ * Every line of the filled-in source that names a hidden term, outside HTML comments, and every
+ * figure caption that does (a caption also carries its note from `without_webex`).
+ */
+function namedTerms(text, figures, file) {
   const errors = [];
   text.split('\n').forEach((line, n) => {
-    const shown = line.replace(/<!--[\s\S]*?-->/g, '').toLowerCase();
-    for (const term of hidden) if (shown.includes(term.toLowerCase())) errors.push(`${file}:${n + 1}: noemt "${term}"`);
+    for (const term of hiddenIn(line.replace(/<!--[\s\S]*?-->/g, ''))) errors.push(`${file}:${n + 1}: noemt "${term}"`);
   });
+  for (const figure of figures) {
+    for (const term of hiddenIn(figure.caption)) errors.push(`${file}:${figure.line}: het bijschrift noemt "${term}"`);
+  }
   return errors;
 }
 
@@ -599,11 +638,14 @@ const FOOTER = (title) => '<div style="font-family:Arial,sans-serif;font-size:8p
 /** Read and parse one source with the workspace's variables filled in. */
 function parse(file) {
   const name = path.basename(file, '.md');
-  const text = substitute(fs.readFileSync(file, 'utf8'), name);
+  const raw = fs.readFileSync(file, 'utf8');
+  const text = substitute(raw, name);
   const [meta, body] = splitFrontMatter(text);
   meta.title ||= (body.match(/^#\s+(.+)$/m) || [])[1] || name;
-  const doc = parseDocument(text, body, `${name}.md`);
-  return { name, meta, ...doc, errors: [...doc.errors, ...namedTerms(text, `${name}.md`)] };
+  const firstLine = newlines(text.slice(0, text.length - body.length)) + 1;
+  const doc = parseDocument(body, firstLine, `${name}.md`);
+  doc.sha256 = createHash('sha256').update(raw).digest('hex');
+  return { name, meta, ...doc, errors: [...doc.errors, ...namedTerms(text, doc.figures, `${name}.md`)] };
 }
 
 /** Write one manual as Word and HTML; return its HTML file. */
@@ -652,7 +694,8 @@ for (const doc of docs) built.push(await render(doc));
 if (!named.length) {
   // What check.py checks against the matrix, the help topics and the shot list, from this one parse.
   const manuals = docs.map((d) => ({
-    file: d.name, role: d.meta.role ?? '', tasks: d.tasks, figures: d.figures.map((f) => ({ id: f.id, line: f.line })),
+    file: d.name, sha256: d.sha256, role: d.meta.role ?? '', tasks: d.tasks,
+    figures: d.figures.map((f) => ({ id: f.id, line: f.line })), bold: d.bold,
   }));
   fs.writeFileSync(path.join(ws.build, 'manuals.json'), `${JSON.stringify(manuals, null, 2)}\n`);
   // The contract for help in context: per task its screen, permission, shots, manual and anchor.

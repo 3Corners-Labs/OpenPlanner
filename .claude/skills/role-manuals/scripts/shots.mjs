@@ -19,7 +19,7 @@ export const GREY = 'rgb(208, 208, 208)';
 export const PAD = 2;
 /** Version fields whose whole value is covered, and texts that say there is no version (rule 3 of redact.js). */
 const VERSION_FIELDS = [LABEL.admin.commit, LABEL.admin.latest];
-const VERSION_TEXTS = [textOf('admin', 'noReleaseBuild'), textOf('admin', 'versionUnknown')];
+const VERSION_TEXTS = [textOf('admin', 'noReleaseBuild'), textOf('admin', 'noRelease'), textOf('admin', 'versionUnknown')];
 
 /** Texts that show because the installation has no Webex Meetings (logged per capture). */
 export const NO_VIDEO_PHRASES = textsOf('noVideo');
@@ -92,6 +92,7 @@ export class Region {
     const crops = [];
     const area = { ...found };
     const end = this.bottom ? await box(this.bottom) : null;
+    if (this.bottom && !end) throw new Error(`the end of the cut, ${await describeTarget(this.bottom)}, is not on the page`);
     if (end) {
       area.height = end.y + end.height - area.y;
       crops.push(`afgesneden onder ${await describeTarget(this.bottom)}`);

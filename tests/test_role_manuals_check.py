@@ -4,8 +4,13 @@ The script runs on an organisation's workspace, outside CI; these tests keep its
 labels, its rename and its matrix mapping honest.
 """
 
+import argparse
 import importlib.util
+import json
+import sys
 from pathlib import Path
+
+import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / ".claude/skills/role-manuals/scripts/check.py"
 _spec = importlib.util.spec_from_file_location("role_manuals_check", SCRIPT)
@@ -15,13 +20,19 @@ check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check)
 
 
-def test_labels_are_read_per_paragraph_and_path_parts_split() -> None:
-    """A bold span that wraps is one label; a path gives its parts; structure words are not."""
-    text = "Kies **Om nieuwe\ntijd vragen**.\n\n**Tip:** ga naar **Planning → Bezetting**.\n"
-    found = [
-        label for _, paragraph in check.paragraphs(text) for label in check.labels_in(paragraph)
-    ]
-    assert found == ["Om nieuwe tijd vragen", "Planning", "Bezetting"]
+def test_a_bold_span_gives_its_labels_and_a_path_its_parts() -> None:
+    """A path gives its parts; structure words, numbers and a lead-in with a colon are no label."""
+    assert check.labels_of("Planning → Bezetting.") == ["Planning", "Bezetting"]
+    assert check.labels_of("Om nieuwe   tijd vragen") == ["Om nieuwe tijd vragen"]
+    assert check.labels_of("Tip:") == []
+    assert check.labels_of("Stap 2") == []
+    assert check.labels_of("15 minuten") == []
+
+
+def test_labels_carry_the_line_the_build_found() -> None:
+    """The labels of a manual come from the bold spans of build/manuals.json, with their lines."""
+    manual = {"bold": [{"text": "Groepen → demo", "line": 12}, {"text": "Opslaan", "line": 30}]}
+    assert check.labels(manual) == [(12, "Groepen"), (12, "demo"), (30, "Opslaan")]
 
 
 def test_a_renamed_label_is_replaced_only_as_a_whole_part() -> None:
@@ -63,8 +74,36 @@ def test_a_manual_maps_to_its_roles_by_a_word_of_its_role() -> None:
     assert check.manual_roles("Deelnemers", roles) is None
 
 
-def test_only_a_commit_hash_is_passed_to_git() -> None:
-    """A value that could be read as an option never reaches git."""
-    assert check.COMMIT.fullmatch("d36485a6ee78")
-    assert not check.COMMIT.fullmatch("--output=/tmp/x")
-    assert not check.COMMIT.fullmatch("HEAD~1")
+def test_only_a_commit_hash_is_passed_to_git(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--since and the stored commit are refused unless they are a hash; git is never run."""
+    assert check.commit_hash("d36485a6ee78") == "d36485a6ee78"
+    with pytest.raises(argparse.ArgumentTypeError):
+        check.commit_hash("--output=/tmp/x")
+    (tmp_path / "sources").mkdir()
+    (tmp_path / "evidence").mkdir()
+    (tmp_path / "build").mkdir()
+    (tmp_path / "variables.json").write_text(json.dumps({"commit": "HEAD~1"}))
+    (tmp_path / "evidence" / "shots.json").write_text("[]")
+    (tmp_path / "build" / "manuals.json").write_text("[]")
+
+    def no_git(*args: str) -> str:
+        raise AssertionError(f"git was called with {args}")
+
+    monkeypatch.setattr(check, "git", no_git)
+    monkeypatch.setattr(sys, "argv", ["check.py", str(tmp_path)])
+    with pytest.raises(SystemExit, match="no commit hash"):
+        check.main()
+    monkeypatch.setattr(sys, "argv", ["check.py", str(tmp_path), "--since", "--output=/tmp/x"])
+    with pytest.raises(SystemExit):
+        check.main()
+
+
+def test_a_workspace_inside_a_checkout_is_refused_also_through_a_link(tmp_path: Path) -> None:
+    """The guard follows a symbolic link before it looks for a checkout above the folder."""
+    check.guard_outside_checkout(tmp_path)
+    link = tmp_path / "manuals"
+    link.symlink_to(check.REPO / "docs")
+    with pytest.raises(SystemExit, match="inside the checkout"):
+        check.guard_outside_checkout(link.resolve())

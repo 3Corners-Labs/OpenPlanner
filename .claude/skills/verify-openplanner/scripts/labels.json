@@ -44,6 +44,7 @@
     "off": { "key": "admin.settings.value.off", "text": "Uit" },
     "subjectQuestion": { "source": "seed", "text": "Waar gaat uw vraag over?" },
     "retireField": { "key": "admin.form_fields.retire_label", "template": "{label} uitzetten" },
+    "retiredFields": { "key": "admin.form_fields.retired", "template": "Uitgezet (alleen nog bij eerdere afspraken): {names}" },
     "exceptionForm": { "key": "admin.exceptions.add", "text": "Afwijkende bezetting toevoegen" },
     "exceptionButton": { "key": "admin.exceptions.add_button", "text": "Afwijkende bezetting toevoegen" },
     "upcomingExceptions": { "key": "admin.exceptions.upcoming", "text": "Komende afwijkende bezetting" },
@@ -100,6 +101,7 @@
     "channel": { "key": "admin.updates.channel", "text": "Kanaal" },
     "latest": { "key": "admin.updates.latest", "text": "Nieuwste versie" },
     "noReleaseBuild": { "key": "admin.updates.no_release_build", "text": "Geen releaseversie (ontwikkelversie)", "match": "prefix" },
+    "noRelease": { "key": "admin.overview.widget.status.version.none", "text": "Geen release" },
     "versionUnknown": { "key": "admin.booking.version_unknown", "text": "versie onbekend" }
   },
   "noVideo": {

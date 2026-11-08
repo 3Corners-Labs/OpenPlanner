@@ -8,15 +8,16 @@ Usage, from the checkout (the app's own modules and babel come from its environm
 Writes ``evidence/check.md`` in the workspace and exits with 1 when a blocking finding is left.
 It checks what needs the software's own Python; the sources are parsed once, by ``build.mjs``,
 which also refuses a manual that names a term the organisation does not show. Run that first:
-it writes ``build/manuals.json``, the tasks and figures this check reads.
+it writes ``build/manuals.json`` (per manual its tasks, figures and bold spans, with the hash of
+its source), which this check reads and refuses when a source changed since.
 
 1. Tasks: the screen of each task is a help topic of the portal or a participant page, the
    permission exists, and a role of the manual holds it in the authorisation matrix
    (``app.domain.authorization.MATRIX``).
 2. Screenshots: every figure and shot of a task is in the shot list (``evidence/shots.json``,
    written by ``capture.mjs``); which files still have to follow.
-3. Labels: every bold label of the sources is a text of the software (the ``nl`` catalogue, read
-   as the app reads it).
+3. Labels: every bold span the build found is a text of the software (the ``nl`` catalogue, read
+   as the app reads it); a path (A → B) is checked part by part.
 4. Since a commit: labels the software renamed or removed and where the manuals use them (a
    removed one blocks), help topics and templates that changed. ``--fix`` writes a renamed label
    into the sources, inside bold labels only.
@@ -26,6 +27,7 @@ it writes ``build/manuals.json``, the tasks and figures this check reads.
 """
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -69,7 +71,6 @@ STRUCTURAL = re.compile(
 )
 """Bold words that structure the text and are no label of the software."""
 
-BOLD = re.compile(r"\*\*(.+?)\*\*")
 BOLD_SPAN = re.compile(r"\*\*((?:(?!\n\s*\n).)+?)\*\*", re.DOTALL)
 COMMIT = re.compile(r"[0-9a-f]{7,40}")
 """A commit as ``--since`` takes it: an abbreviated or full hash, never an option."""
@@ -143,35 +144,23 @@ def normalise(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().rstrip(".!?:").strip()
 
 
-def paragraphs(text: str) -> list[tuple[int, str]]:
-    """Return (first line number, text on one line) per paragraph and table row."""
-    out: list[tuple[int, str]] = []
-    start, lines = 0, []
-    for number, line in enumerate([*text.splitlines(), ""], 1):
-        if line.strip() and not line.lstrip().startswith(("|", "<!--")):
-            if not lines:
-                start = number
-            lines.append(line.strip())
-            continue
-        if lines:
-            out.append((start, " ".join(lines)))
-            lines = []
-        if line.lstrip().startswith("|"):
-            out.append((number, line))
-    return out
-
-
-def labels_in(line: str) -> list[str]:
-    """Return the bold labels of one paragraph; a path (A → B → C) gives its parts."""
+def labels_of(bold: str) -> list[str]:
+    """Return the labels of one bold span; a path (A → B → C) gives its parts."""
     found = []
-    for bold in BOLD.findall(line):
-        for part in re.split(r"\s*→\s*", bold):
-            part = part.strip().rstrip(".")
-            if not part or part[0] in "[0123456789" or "{{" in part or part.endswith(":"):
-                continue
-            if not STRUCTURAL.match(part):
-                found.append(part)
+    for part in re.split(r"\s*→\s*", bold):
+        part = normalise(part)
+        if not part or part[0] in "[0123456789" or "{{" in part or bold.strip().endswith(":"):
+            continue
+        if not STRUCTURAL.match(part):
+            found.append(part)
     return found
+
+
+def commit_hash(value: str) -> str:
+    """Return ``value`` when it is a commit hash; anything else (an option, a ref) is refused."""
+    if not COMMIT.fullmatch(value):
+        raise argparse.ArgumentTypeError(f"{value!r} is no commit hash")
+    return value
 
 
 def rename_labels(text: str, renamed: dict[str, str]) -> str:
@@ -275,19 +264,21 @@ def check_tasks(manual: dict, ctx: dict, report: Report) -> None:
         )
 
 
-def check_labels(
-    path: Path, text: str, catalogue: Catalogue, verdicts: dict, report: Report
-) -> None:
+def labels(manual: dict) -> list[tuple[int, str]]:
+    """Return (line, label) for every label in the bold spans of one manual."""
+    return [(span["line"], label) for span in manual["bold"] for label in labels_of(span["text"])]
+
+
+def check_labels(manual: dict, catalogue: Catalogue, verdicts: dict, report: Report) -> None:
     """Check that every bold label of a manual is a text of the software."""
-    for number, paragraph in paragraphs(text):
-        for label in labels_in(paragraph):
-            verdict = catalogue.match(label)
-            verdicts[verdict] = verdicts.get(verdict, 0) + 1
-            where = f"{path.name}:{number}"
-            if verdict == "onbekend":
-                report.add("Schermteksten", f"{where}: **{label}** komt niet voor in de software.")
-            elif verdict == "in tekst":
-                report.add("Schermteksten (deel van een langere tekst)", f"{where}: **{label}**")
+    for number, label in labels(manual):
+        verdict = catalogue.match(label)
+        verdicts[verdict] = verdicts.get(verdict, 0) + 1
+        where = f"{manual['file']}.md:{number}"
+        if verdict == "onbekend":
+            report.add("Schermteksten", f"{where}: **{label}** komt niet voor in de software.")
+        elif verdict == "in tekst":
+            report.add("Schermteksten (deel van een langere tekst)", f"{where}: **{label}**")
 
 
 def since(
@@ -307,23 +298,20 @@ def since(
         normalise(old[k]) for k in old if k not in new and normalise(old[k]) not in new_values
     }
     section = f"Gewijzigd in de software sinds {commit[:9]}"
+    for manual in manuals:
+        for number, label in labels(manual):
+            core = normalise(label)
+            where = f"{manual['file']}.md:{number}"
+            if core in renamed:
+                action = "vervangen" if fix else "gebruik --fix om te vervangen"
+                report.add(section, f"{where}: **{label}** heet nu **{renamed[core]}** ({action}).")
+            if core in removed:
+                report.add(
+                    section,
+                    f"{where}: **{label}** bestaat niet meer in de software.",
+                    blocking=True,
+                )
     for path, text in sources.items():
-        for number, paragraph in paragraphs(text):
-            for label in labels_in(paragraph):
-                core = normalise(label)
-                if core in renamed:
-                    action = "vervangen" if fix else "gebruik --fix om te vervangen"
-                    report.add(
-                        section,
-                        f"{path.name}:{number}: **{label}** heet nu **{renamed[core]}** "
-                        f"({action}).",
-                    )
-                if core in removed:
-                    report.add(
-                        section,
-                        f"{path.name}:{number}: **{label}** bestaat niet meer in de software.",
-                        blocking=True,
-                    )
         if fix and renamed:
             changed = rename_labels(text, renamed)
             if changed != text:
@@ -380,7 +368,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("workspace", type=Path, help="the folder of the organisation's manuals")
     parser.add_argument(
-        "--since", help="commit of the previous check (default: commit in variables.json)"
+        "--since",
+        type=commit_hash,
+        help="commit of the previous check (default: commit in variables.json)",
     )
     parser.add_argument("--fix", action="store_true", help="write renamed labels into the sources")
     args = parser.parse_args()
@@ -396,6 +386,11 @@ def main() -> int:
     if not manuals_file.exists():
         sys.exit(f"check.py: {manuals_file} is missing; run build.mjs {ws.root} first")
     manuals = json.loads(manuals_file.read_text())
+    for manual in manuals:
+        source = ws.sources / f"{manual['file']}.md"
+        digest = hashlib.sha256(source.read_bytes()).hexdigest() if source.exists() else None
+        if digest != manual.get("sha256"):
+            sys.exit(f"check.py: {source.name} changed after the last build; run build.mjs again")
     ctx: dict = {
         "shots": {s["id"] for s in json.loads(shots_file.read_text())},
         "topics": {p.stem for p in (REPO / "docs" / "manual" / "nl").glob("*.md")},
@@ -413,9 +408,8 @@ def main() -> int:
     verdicts: dict[str, int] = {}
     for manual in manuals:
         check_tasks(manual, ctx, report)
-    for path, text in sources.items():
-        if not path.name.startswith("00-"):
-            check_labels(path, text, catalogue, verdicts, report)
+        if not manual["file"].startswith("00-"):
+            check_labels(manual, catalogue, verdicts, report)
     missing = sorted(
         s for s in ctx["used"] if s in ctx["shots"] and not (ws.img / f"{s}.png").exists()
     )
@@ -431,9 +425,12 @@ def main() -> int:
         "Schermteksten",
         "Gecontroleerd: " + ", ".join(f"{n} {v}" for v, n in sorted(verdicts.items())) + ".",
     )
-    commit = args.since or config.get("commit")
-    if commit and not COMMIT.fullmatch(commit):
-        sys.exit(f"check.py: {commit!r} is no commit hash")
+    commit = args.since
+    if not commit and config.get("commit"):
+        try:
+            commit = commit_hash(config["commit"])
+        except argparse.ArgumentTypeError as error:
+            sys.exit(f"check.py: commit in variables.json: {error}")
     if commit:
         since(commit, sources, manuals, args.fix, report)
     visual_changes(ws, report)

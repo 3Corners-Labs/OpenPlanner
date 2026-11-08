@@ -61,11 +61,19 @@ async function footerOff(run) {
     + 'HTML-deel van de e-mails ook niet (zelfde instelling).');
 }
 
+/** Whether the booking form's page lists `question` among its retired questions. */
+async function retired(page, question) {
+  const lead = A.retiredFields({ names: '' }).trim();
+  const hints = await page.locator('.hint').allInnerTexts();
+  return hints.some((hint) => hint.trim().startsWith(lead) && hint.includes(question));
+}
+
 /**
  * The demo seed asks "Waar gaat uw vraag over?", a choice the manuals do not describe; like the
  * footer, a real setting takes it away (the button "… uitzetten" on the booking form's
  * questions, which posts at once), so the form in the screenshots holds the interpreter question
- * only and no booking of the story needs an answer to it.
+ * only and no booking of the story needs an answer to it. "Already off" must show as such on the
+ * page; a button that is missing for any other reason fails the step.
  */
 async function subjectQuestionOff(run) {
   const page = await run.staff('orgadmin');
@@ -73,13 +81,16 @@ async function subjectQuestionOff(run) {
   await page.goto(`/admin/groups/${GROUP}/settings/form`);
   const button = page.getByRole('button', { name: off });
   if (!(await button.count())) {
+    if (!(await retired(page, A.subjectQuestion))) throw new Error(`no button "${off}" and the question is not listed as retired`);
     run.notePrep('2b', `De vraag "${A.subjectQuestion}" stond al uit; niets gewijzigd.`);
     return;
   }
   await button.click();
   await page.waitForLoadState('load');
   await page.goto(`/admin/groups/${GROUP}/settings/form`);
-  if (await page.getByRole('button', { name: off }).count()) throw new Error('the question is still on');
+  if ((await page.getByRole('button', { name: off }).count()) || !(await retired(page, A.subjectQuestion))) {
+    throw new Error('the question is not retired after "Uitzetten"');
+  }
   run.notePrep('2b', 'Als `orgadmin`, **Groepen → demo → Instellingen → Boekingsformulier**, bij de eigen vraag '
     + `"${A.subjectQuestion}" (keuzelijst uit de demovulling) op **Uitzetten** gedrukt: de handleidingen beschrijven `
     + 'die demovraag niet; net als bij de voettekst haalt een echte instelling haar weg in plaats van een balk. '

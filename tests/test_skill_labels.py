@@ -14,7 +14,9 @@ from pathlib import Path
 import pytest
 from babel.dates import get_day_names
 
+from app.i18n.formatting import format_message
 from app.i18n.po import load_catalogues
+from app.i18n.terms import AgentTermPlaceholders
 
 ROOT = Path(__file__).resolve().parents[1]
 LABELS = json.loads(
@@ -35,18 +37,20 @@ def _entries() -> Iterator[tuple[str, dict[str, str]]]:
                 yield f"{group}.{name}", entry
 
 
+class _Keep(dict[str, str]):
+    """Placeholder values that leave every other ``{name}`` as it is, for templates and patterns."""
+
+    def __missing__(self, key: str) -> str:
+        return "{" + key + "}"
+
+
+AGENT_TERMS = _Keep(AgentTermPlaceholders().values(NL.__getitem__))
+"""The default agent term as the app fills it in (ADR 0077)."""
+
+
 def _shown(key: str) -> str:
-    """Return the catalogue text of ``key`` with the default agent term filled in (ADR 0077)."""
-    agent, agents = NL["term.agent"], NL["term.agents"]
-    text = re.sub(r"\s+", " ", NL[key]).strip()
-    for placeholder, value in {
-        "{agent}": agent,
-        "{agents}": agents,
-        "{Agent}": agent[:1].upper() + agent[1:],
-        "{Agents}": agents[:1].upper() + agents[1:],
-    }.items():
-        text = text.replace(placeholder, value)
-    return text
+    """Return the catalogue text of ``key`` as the app shows it with the default agent term."""
+    return re.sub(r"\s+", " ", format_message(NL[key], AGENT_TERMS)).strip()
 
 
 ENTRIES = list(_entries())

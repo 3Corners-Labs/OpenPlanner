@@ -116,24 +116,26 @@ The scripts are in `scripts/` and run from the root of the checkout; `<ws>` is t
    its caption.
 5. **Build.** `node .../build.mjs <ws>` is the one parse of the sources. It writes
    `build/<name>.docx`, `.html` and a tagged `.pdf` with bookmarks (`--no-pdf` skips the PDF),
-   `build/manuals.json` (per manual its role, tasks and figures) and `build/help-index.json`. It
-   builds nothing when a source breaks a rule: a task marker without its heading, a figure that is
-   no `img/<id>.png`, or, after the variables are filled in, a term of `do_not_name` or the
-   hidden product name.
-6. **Check.** `uv run python .../check.py <ws>` reads `build/manuals.json` and writes
-   `evidence/check.md`; it exits with 1 on a blocking finding: a task whose screen, permission or
-   shot does not exist, or whose role lacks the permission in `MATRIX`. It also lists bold labels
-   of the sources that are no text of the software. Look at rendered pages
+   `build/manuals.json` (per manual its role, tasks, figures and bold spans, each with its line,
+   and the hash of its source) and `build/help-index.json`. It builds nothing when a source breaks
+   a rule: a task marker without its heading or inside a paragraph, a figure that is no
+   `img/<id>.png`, or, after the variables are filled in, a term of `do_not_name` or the hidden
+   product name in the text or a caption.
+6. **Check.** `uv run python .../check.py <ws>` reads `build/manuals.json` (and refuses it when a
+   source changed since) and writes `evidence/check.md`; it exits with 1 on a blocking finding: a
+   task whose screen, permission or shot does not exist, or whose role lacks the permission in
+   `MATRIX`. It also lists the bold labels the build found that are no text of the software. Look at rendered pages
    (the Read tool shows PDF pages). Run a reader test with `anthropic-skills:doc-coauthoring`
    (its reader-testing stage) before people test.
 7. **Maintain by machine.** On every release run `.claude/skills/role-manuals/scripts/update.sh
-   <ws>` from the checkout. It first refuses a workspace inside a checkout. It starts a fresh
+   <ws>` from the checkout. It first builds without PDF, which refuses a workspace inside a
+   checkout and a source that breaks a rule in seconds, before any stack runs. It starts a fresh
    stack under a compose project of its own (`openplanner-manuals-<checksum of the checkout>`,
    ports 8020, 8100 and 8045; `VERIFY_PROJECT` and `VERIFY_*_PORT` override them), so it never
    meets or removes the stack of another session, and refuses while a stack of this checkout is
    up. It keeps the previous screenshots in `img/previous/`, loads the sample data, captures
-   every id again, builds once without PDF, and runs `check.py --since <commit of the last passing
-   run> --fix`: a label the catalogue only renamed is written into the sources, inside bold
+   every id again and runs `check.py --since <commit of the last passing run> --fix`: a label the
+   catalogue only renamed is written into the sources, inside bold
    labels only; a removed label, a changed help topic or a changed template is reported with the
    sections that use it. It records the new version for the title pages, moves the baseline commit
    only when the check passed, builds everything and stops the stack. A person reads

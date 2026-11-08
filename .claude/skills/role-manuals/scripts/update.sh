@@ -3,11 +3,12 @@
 #
 # Usage, from the checkout: .claude/skills/role-manuals/scripts/update.sh <workspace>
 #
-# 0. refuses a workspace inside a checkout before it touches anything (capture.mjs --list);
+# 0. builds the manuals without PDF: the one parse of the sources, which refuses a workspace
+#    inside a checkout and a source that breaks a rule before anything else runs, and writes the
+#    build/manuals.json that check.py reads;
 # 1. starts a fresh verification stack from the checkout (verify-openplanner);
 # 2. keeps the current screenshots in img/previous/, loads sample data and captures every id;
-# 3. builds the manuals once without PDF (the one parse of the sources, which check.py reads),
-#    checks them against the software since the commit of the last passing run and writes
+# 3. checks the manuals against the software since the commit of the last passing run and writes
 #    labels the software only renamed into the sources (check.py --fix);
 # 4. records this run's version for the title pages, and moves the baseline commit forward only
 #    when the check passed, so a blocking finding is reported again on the next run;
@@ -19,7 +20,7 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../../.." && pwd)"
 workspace="$(cd "${1:?usage: update.sh <workspace>}" && pwd -P)"
-node "$here/capture.mjs" "$workspace" --list >/dev/null
+node "$here/build.mjs" "$workspace" --no-pdf
 stack="$repo/.claude/skills/verify-openplanner/scripts/stack.sh"
 vars="$workspace/variables.json"
 previous="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("commit", ""))' "$vars")"
@@ -32,8 +33,12 @@ VERIFY_KC_PORT="${VERIFY_KC_PORT:-8100}"
 VERIFY_MAIL_PORT="${VERIFY_MAIL_PORT:-8045}"
 export VERIFY_PROJECT VERIFY_WEB_PORT VERIFY_KC_PORT VERIFY_MAIL_PORT
 
-# A stack this script did not start is never stopped by it: stack.sh up refuses while one is up.
-if [ -e "${VERIFY_EVIDENCE_ROOT:-$repo/.verify-openplanner}/current" ]; then
+# A stack this script did not start is never stopped by it: it refuses while this checkout has a
+# run, and the trap stops a stack only once this script's stack.sh up has recorded its run. So
+# an up that refuses (another session's stack under an inherited VERIFY_PROJECT, say) is never
+# followed by a down that would remove that stack.
+current="${VERIFY_EVIDENCE_ROOT:-$repo/.verify-openplanner}/current"
+if [ -e "$current" ]; then
   echo "update.sh: a verification stack is already up; stop it first ($stack down)" >&2
   exit 2
 fi
@@ -41,6 +46,7 @@ fi
 # Called by the EXIT trap below, which shellcheck does not follow.
 # shellcheck disable=SC2329
 stop_stack() {
+  [ -e "$current" ] || return 0
   (cd "$repo" && "$stack" down) >/dev/null 2>&1 || true
 }
 trap stop_stack EXIT
@@ -59,7 +65,6 @@ node "$here/sample-data.mjs" "$workspace"
 node "$here/capture.mjs" "$workspace"
 
 echo "== 3/5 controleren en herstellen"
-node "$here/build.mjs" "$workspace" --no-pdf
 rc=0
 if [ -n "$previous" ]; then
   (cd "$repo" && uv run python "$here/check.py" "$workspace" --since "$previous" --fix) || rc=$?
