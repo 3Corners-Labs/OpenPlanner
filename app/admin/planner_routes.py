@@ -112,15 +112,6 @@ def _booking_view(booking: Booking, group: Group, code: str) -> BookingView:
     )
 
 
-def _shown_day(request: Request, raw: str, group: Group) -> date:
-    """Return the agenda day a form came from (``day``), else the group's today."""
-    try:
-        return date.fromisoformat(raw)
-    except ValueError:
-        clock: Clock = request.app.state.clock
-        return group.today(clock.now())
-
-
 def _agenda(slug: str, day: date) -> str:
     """Return the agenda URL of ``day``."""
     return f"/admin/groups/{slug}/agenda?day={day.isoformat()}"
@@ -341,16 +332,17 @@ async def confirm(
     context: ManageBookings,
 ) -> Response:
     """Confirm a booking awaiting confirmation for the participant, for example on the phone."""
-    form = await read_form(request, locale)
-    day = _shown_day(request, form.text("day"), context.group.group)
+    group = context.group.group
     try:
-        await _planner(request).confirm(context.principal, slug, booking_id)
+        booking = await _planner(request).confirm(context.principal, slug, booking_id)
     except DomainError as error:
         raise_refusal(error)
         if error.code is ErrorCode.BOOKING_NOT_FOUND:
             raise
-        return redirect_done(_agenda(slug, day), "not_pending")
-    return redirect_done(_agenda(slug, day), "confirmed_by_staff")
+        clock: Clock = request.app.state.clock
+        return redirect_done(_agenda(slug, group.today(clock.now())), "not_pending")
+    done = "confirm_lapsed" if booking.lapsed_unconfirmed else "confirmed_by_staff"
+    return redirect_done(_agenda(slug, local_day(booking.start, group.tz)), done)
 
 
 # --- ask to rebook ------------------------------------------------------------------------

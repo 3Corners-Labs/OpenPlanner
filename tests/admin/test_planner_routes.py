@@ -18,6 +18,7 @@ from tests.support.domain import (
     FRIDAY_0900,
     TEST_TOKEN_KEY,
     book_confirmed,
+    book_pending,
     participant,
 )
 
@@ -293,11 +294,9 @@ async def test_malformed_bulk_ids_are_rejected(site: Site) -> None:
 
 
 async def _book_pending(site: Site) -> int:
-    receipt = await BookingService(_uow(site), site.clock, TEST_TOKEN_KEY).book(
-        group_slug="demo",
-        start=FRIDAY_0900,
-        contact=participant(next(_PARTICIPANTS)),
-        locale="nl",
+    bookings = BookingService(_uow(site), site.clock, TEST_TOKEN_KEY)
+    receipt = await book_pending(
+        bookings, FRIDAY_0900, "demo", contact=participant(next(_PARTICIPANTS))
     )
     return receipt.booking.id or 0
 
@@ -326,3 +325,17 @@ async def test_a_pending_booking_shows_as_not_confirmed_and_can_be_confirmed(sit
     assert "done=confirmed_by_staff" in response.headers["location"]
     assert "done=not_pending" in again.headers["location"]
     assert (await _status(site, pending))[0] is BookingStatus.CONFIRMED
+
+
+async def test_confirming_after_the_deadline_says_it_lapsed(site: Site) -> None:
+    pending = await _book_pending(site)
+    async with _uow(site).read() as tx:
+        booking = await tx.get_booking(pending)
+    assert booking is not None
+    assert booking.confirm_by is not None
+    site.clock.advance(booking.confirm_by - site.clock.now() + timedelta(minutes=1))
+    await site.login_as(GROUP_ADMIN)
+
+    response = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {})
+
+    assert "done=confirm_lapsed" in response.headers["location"]

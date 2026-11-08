@@ -404,7 +404,12 @@ class BookingService:
             return await self.confirm_in(tx, booking, group, self._clock.now())
 
     async def confirm_in(
-        self, tx: Transaction, booking: Booking, group: Group, now: datetime
+        self,
+        tx: Transaction,
+        booking: Booking,
+        group: Group,
+        now: datetime,
+        actor: ActorClass = ActorClass.PARTICIPANT,
     ) -> Booking:
         """Confirm a pending booking inside ``tx``: by its email link, or by a planner (ADR 0056).
 
@@ -421,7 +426,7 @@ class BookingService:
             # it on hold at once, as it would have been had it been confirmed before.
             held = confirmed.suspend(_id(closure))
             await tx.save_booking(held)
-            await record_confirmed(tx, booking, group, now)
+            await record_confirmed(tx, booking, group, now, actor)
             await record_closure_change(tx, FactKind.BOOKING_SUSPENDED, held, group, now)
             purge_at = closure.purge_at(booking.end, self._closure_retention(group.organisation_id))
             jobs = plan_for_suspension(
@@ -430,7 +435,7 @@ class BookingService:
             await tx.replace_jobs(_id(booking), jobs)
             return held
         await tx.save_booking(confirmed)
-        await record_confirmed(tx, booking, group, now)
+        await record_confirmed(tx, booking, group, now, actor)
         await tx.replace_jobs(_id(booking), await self._booked_jobs(tx, group, confirmed))
         return confirmed
 

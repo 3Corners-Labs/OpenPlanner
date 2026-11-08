@@ -96,8 +96,14 @@ def _slot_view(
     return SlotView(
         anchor=_anchor(slot.start),
         time=f"{format_clock(slot.start, tz, code)}–{format_clock(slot.end, tz, code)}",
-        staffing=_("admin.agenda.slot_staffing", agents=slot.agents, booked=slot.booked)
-        + (f" {_('admin.agenda.slot_pending', count=slot.pending)}" if slot.pending else ""),
+        staffing=_(
+            "admin.agenda.slot_staffing_pending",
+            agents=slot.agents,
+            booked=slot.booked,
+            pending=slot.pending,
+        )
+        if slot.pending
+        else _("admin.agenda.slot_staffing", agents=slot.agents, booked=slot.booked),
         shortfall=_("admin.agenda.shortfall", count=slot.shortfall) if slot.shortfall else "",
         closed=slot.closed,
         start=slot.start.isoformat(),

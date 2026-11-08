@@ -391,3 +391,8 @@ HOLDS_PLACE = frozenset(
     {BookingStatus.CONFIRMED, BookingStatus.SUSPENDED, BookingStatus.PENDING_CONFIRMATION}
 )
 """Statuses that take a place in their slot (counted against its capacity)."""
+
+IN_AGENDA = frozenset({BookingStatus.CONFIRMED, BookingStatus.PENDING_CONFIRMATION})
+"""Statuses the planner's agenda counts in a slot: confirmed, and those awaiting the
+participant's confirmation, marked as such (ADR 0056 point 11). A booking on hold (ADR 0024)
+waits for a new time and is not in the agenda's slot."""

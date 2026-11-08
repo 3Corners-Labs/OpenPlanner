@@ -156,8 +156,9 @@ class PlannerService:
                 raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
             if not booking.awaits_confirmation:
                 raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
-            result = await self._bookings.confirm_in(tx, booking, group, self._clock.now())
-            if result.awaits_confirmation or result.lapsed_unconfirmed:
+            now = self._clock.now()
+            result = await self._bookings.confirm_in(tx, booking, group, now, ActorClass.PLANNER)
+            if result.lapsed_unconfirmed:  # past confirm_by: lapsed, the caller says so
                 return result
             await self._audit(tx, principal, authorization, CONFIRMED_BY_STAFF, booking_id)
         return result
@@ -302,16 +303,19 @@ class PlannerService:
         )
 
     async def _candidates(self, tx: Transaction, group: Group, start: datetime) -> list[Booking]:
-        """Return the last-made changeable bookings of the slot, as many as its shortfall."""
+        """Return the changeable ones of the slot's last-made bookings (up to its shortfall)."""
         slot = await self._slot(tx, group, start)
         now = self._clock.now()
         if slot is None or not slot.open_shortfall or slot.start < now:
             raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
-        confirmed = await tx.find_confirmed_bookings(
+        # The last-made places are chosen among every booking in the slot, pending ones too
+        # (ADR 0044 §5, ADR 0056 point 11); of those, the ones a planner may change are asked.
+        # A pending booking among them is left to its own confirmation or lapse.
+        holding = await tx.find_agenda_bookings(
             group.id, slot.start, slot.start + timedelta(seconds=1)
         )
-        changeable = [b for b in confirmed if booking_changes.planner_may_change(b, group, now)]
-        return last_made(changeable, slot.open_shortfall)
+        last = last_made(holding, slot.open_shortfall)
+        return [b for b in last if booking_changes.planner_may_change(b, group, now)]
 
     async def _changeable(self, tx: Transaction, group: Group, booking_id: int) -> Booking:
         """Return the group's booking ``booking_id`` if a planner may change it now."""

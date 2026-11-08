@@ -15,7 +15,7 @@ meeting or work item job again.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -28,6 +28,7 @@ from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.simulator_routes import simulator_view
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Permission
+from app.domain.booking import Booking
 from app.domain.call_retry import CallRetryService
 from app.domain.calls import BookingOverview, CallStatus, EventKind, not_picked_up
 from app.domain.errors import DomainError, ErrorCode
@@ -97,6 +98,13 @@ class AgendaRow:
     empty otherwise."""
 
 
+def pending_until(booking: Booking, tz: tzinfo, code: str) -> str:
+    """Return until when a booking awaits confirmation (ADR 0056 point 11); else ``""``."""
+    if not booking.awaits_confirmation or booking.confirm_by is None:
+        return ""
+    return moment_label(booking.confirm_by, tz, code)
+
+
 def integration_service(request: Request) -> IntegrationService:
     """Return the integration service."""
     service: IntegrationService = request.app.state.integration_service
@@ -140,9 +148,7 @@ def agenda_row(
         meeting_id=booking.meeting.id if booking.meeting else "",
         routing=routing_summary(group.routing, booking.routing, _, code),
         fallback=status.fallback,
-        pending_until=moment_label(booking.confirm_by, tz, code)
-        if booking.awaits_confirmation and booking.confirm_by is not None
-        else "",
+        pending_until=pending_until(booking, tz, code),
     )
 
 
@@ -301,9 +307,7 @@ async def booking_detail(
             f"{format_clock(booking.start, tz, code)}–{format_clock(booking.end, tz, code)}",
             "kind": _(KIND_LABELS[booking.kind]),
             "routing": routing_summary(group.routing, booking.routing, _, code),
-            "pending_until": moment_label(booking.confirm_by, tz, code)
-            if booking.awaits_confirmation and booking.confirm_by is not None
-            else "",
+            "pending_until": pending_until(booking, tz, code),
             "call": call,
             "task": task,
             "status": status,

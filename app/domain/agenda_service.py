@@ -138,7 +138,7 @@ async def agenda_days(
     last_day = first_day + timedelta(days=days - 1)
     rules, overrides = await effective_schedule(tx, group, first_day, last_day)
     lower, upper = utc_bounds(group, first_day, last_day)
-    holding = await tx.find_confirmed_bookings(group.id, lower, upper, pending=True)
+    holding = await tx.find_agenda_bookings(group.id, lower, upper)
     booked = Counter(b.start for b in holding)
     pending = Counter(b.start for b in holding if b.awaits_confirmation)
     closures = await tx.get_closures(group.id, now)

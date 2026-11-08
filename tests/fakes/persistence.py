@@ -17,6 +17,7 @@ from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category, Outcome
 from app.domain.authorization import CustomRole, RoleCatalogue, Scope
 from app.domain.booking import (
+    IN_AGENDA,
     Booking,
     BookingKind,
     BookingStatus,
@@ -1331,16 +1332,28 @@ class InMemoryTransaction:
         self.state.closures[closure_id] = replace(closure, image=None)
 
     async def find_confirmed_bookings(
-        self, group_id: int, lower: datetime, upper: datetime | None, *, pending: bool = False
+        self, group_id: int, lower: datetime, upper: datetime | None
     ) -> list[Booking]:
-        statuses = {BookingStatus.CONFIRMED}
-        if pending:
-            statuses.add(BookingStatus.PENDING_CONFIRMATION)
+        return self._scheduled(group_id, lower, upper, {BookingStatus.CONFIRMED})
+
+    async def find_agenda_bookings(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[Booking]:
+        return self._scheduled(group_id, lower, upper, IN_AGENDA)
+
+    def _scheduled(
+        self,
+        group_id: int,
+        lower: datetime,
+        upper: datetime | None,
+        statuses: Collection[BookingStatus],
+    ) -> list[Booking]:
+        wanted = set(statuses)
         found = [
             b
             for b in self.state.bookings.values()
             if b.group_id == group_id
-            and b.status in statuses
+            and b.status in wanted
             and b.kind == "scheduled"
             and lower <= b.start
             and (upper is None or b.start < upper)

@@ -55,9 +55,15 @@ async def record_placed(
     await tx.record_usage(booking_facts.slotted(b))
 
 
-async def record_confirmed(tx: Transaction, booking: Booking, group: Group, now: datetime) -> None:
-    """Record a confirmation by the participant, with the seconds from creation (metric U9)."""
-    await tx.record_usage(booking_facts.confirmed(facts_of_booking(booking, group), now))
+async def record_confirmed(
+    tx: Transaction,
+    booking: Booking,
+    group: Group,
+    now: datetime,
+    actor: ActorClass = ActorClass.PARTICIPANT,
+) -> None:
+    """Record a confirmation, with the seconds from creation (metric U9), and who confirmed."""
+    await tx.record_usage(booking_facts.confirmed(facts_of_booking(booking, group), now, actor))
 
 
 async def record_cancelled(

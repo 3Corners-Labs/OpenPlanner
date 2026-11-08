@@ -75,6 +75,7 @@ DONE_MESSAGES: dict[str, str] = {
     "idp_key_rotated": "admin.done.idp_key_rotated",
     "confirmed_by_staff": "admin.done.confirmed_by_staff",
     "not_pending": "admin.done.not_pending",
+    "confirm_lapsed": "admin.done.confirm_lapsed",
     "idp_domain_claimed": "admin.done.idp_domain_claimed",
     "idp_domain_verified": "admin.done.idp_domain_verified",
     "idp_domain_not_found_yet": "admin.done.idp_domain_not_found_yet",

@@ -10,7 +10,6 @@
     <a href="/admin/groups/{{ summary.group.slug }}/bookings/{{ row.id }}">{{ _("admin.agenda.details") }}<span class="visually-hidden"> {{ row.time }}, {{ row.first_name }}</span></a>
     {% if row.pending_until and manage %}
     <form method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.id }}/confirm" class="inline-form">
-      <input type="hidden" name="day" value="{{ this_day }}">
       <button type="submit" class="button button--quiet button--small">{{ _("admin.agenda.confirm") }}<span class="visually-hidden"> {{ row.time }}, {{ row.first_name }}</span></button>
     </form>
     {% endif %}

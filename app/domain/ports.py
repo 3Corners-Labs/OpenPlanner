@@ -1653,13 +1653,20 @@ class Transaction(Protocol):
         ...
 
     async def find_confirmed_bookings(
-        self, group_id: int, lower: datetime, upper: datetime | None, *, pending: bool = False
+        self, group_id: int, lower: datetime, upper: datetime | None
     ) -> list[Booking]:
         """Return the group's confirmed scheduled bookings with lower <= start < upper.
 
-        ``upper=None`` means no upper bound. ``pending`` adds the bookings awaiting the
-        participant's confirmation, which hold their place too (ADR 0056 point 11). For the
-        domain's own use, not for listings.
+        ``upper=None`` means no upper bound. For the domain's own use, not for listings.
+        """
+        ...
+
+    async def find_agenda_bookings(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[Booking]:
+        """Return the group's scheduled bookings in the agenda (``IN_AGENDA``) in [lower, upper).
+
+        Confirmed ones and those awaiting the participant's confirmation (ADR 0056 point 11).
         """
         ...
 

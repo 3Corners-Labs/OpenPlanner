@@ -82,8 +82,12 @@ class AgendaSlot:
 
     @property
     def shortfall(self) -> int:
-        """Return how many bookings have no agent; 0 when the slot is staffed well enough."""
-        return max(0, self.booked - self.agents)
+        """Return how many bookings have no agent; 0 when staffed well enough or closed.
+
+        A closed slot's bookings are on hold or still awaiting confirmation (ADR 0024, ADR 0056
+        point 2): nobody is short of an agent there.
+        """
+        return 0 if self.closed else max(0, self.booked - self.agents)
 
     @property
     def open_shortfall(self) -> int:

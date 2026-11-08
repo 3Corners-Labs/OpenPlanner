@@ -10581,9 +10581,6 @@ msgstr "Deze afspraak wacht niet (meer) op bevestiging."
 msgid "admin.agenda.pending"
 msgstr "Niet bevestigd, uiterlijk {until}"
 
-msgid "admin.agenda.slot_pending"
-msgstr "(waarvan {count} niet bevestigd)"
-
 msgid "admin.agenda.confirm"
 msgstr "Bevestigen namens deelnemer"
 
@@ -10592,3 +10589,12 @@ msgstr "Alleen niet bevestigd"
 
 msgid "admin.agenda.filter_all"
 msgstr "Alle afspraken"
+
+msgid "admin.done.confirm_lapsed"
+msgstr "Deze afspraak was al vervallen: niemand bevestigde haar op tijd. De deelnemer krijgt daarover bericht."
+
+msgid "admin.agenda.slot_staffing_pending"
+msgstr "{Agents}: {agents}, afspraken: {booked} (waarvan {pending} niet bevestigd)"
+
+msgid "admin.audit.detail.booking_confirmed_by_staff"
+msgstr "Afspraak bevestigd namens de deelnemer"

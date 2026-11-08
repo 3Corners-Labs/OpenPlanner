@@ -88,14 +88,19 @@ def slotted(b: BookingFacts) -> UsageFact:
     return _fact(FactKind.BOOKING_SLOTTED, b, b.start)
 
 
-def confirmed(b: BookingFacts, at: datetime) -> UsageFact:
-    """A confirmation by the participant, with the time it took (metric U9)."""
+def confirmed(
+    b: BookingFacts, at: datetime, actor: ActorClass = ActorClass.PARTICIPANT
+) -> UsageFact:
+    """A confirmation, with the time it took (metric U9).
+
+    By the participant, or by a planner for them (ADR 0056 point 11), told apart by ``actor``.
+    """
     held = max(int((at - b.created_at).total_seconds()), 0)
     return _fact(
         FactKind.BOOKING_CONFIRMED,
         b,
         at,
-        actor_class=ActorClass.PARTICIPANT,
+        actor_class=actor,
         value_seconds=coarse(held),
     )
 
