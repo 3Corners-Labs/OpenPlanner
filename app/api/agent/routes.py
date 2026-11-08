@@ -3,12 +3,15 @@
     GET /api/agent/v1/me                            any valid token
     GET /api/agent/v1/groups                        availability:read
     GET /api/agent/v1/groups/{slug}/availability    availability:read on that group
-    GET /api/agent/v1/configuration                 configuration:transfer (ADR 0089 point 7)
+    GET /api/agent/v1/configuration                 configuration:transfer (ADR 0099)
+    POST /api/agent/v1/configuration/plan           configuration:transfer
+    POST /api/agent/v1/configuration/apply          configuration:transfer
     PUT /api/agent/v1/configuration                 configuration:transfer
 
 Every route depends on exactly one ``RequireScope`` and is rate-limited per client. The
-configuration routes hand the package to ``ConfigurationPackageService`` as the portal does;
-the rules (passphrase, size, installation in use, revision, audit) live there, not here.
+configuration routes hand the document to ``ConfigurationDocumentService`` as the portal does
+(a SQLite package of ADR 0089 goes through ``ConfigurationPackageService``, converted to a
+document); the rules (passphrase, size, rights, in-use, plan hash, audit) live there.
 Change requests (reschedule, cancel, confirmed by the participant) follow in a later step.
 """
 
@@ -16,21 +19,33 @@ from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, Query, Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
+from app.adapters.configuration_json import MEDIA_TYPE
 from app.api.agent.auth import AgentContext, RequireScope, api_access, client_key
 from app.api.agent.errors import ApiProblem
 from app.api.agent.schemas import (
     AvailabilityResponse,
     ClientInfo,
+    ConfigurationApplied,
+    ConfigurationPlan,
     ConfigurationSummary,
     ErrorResponse,
     GroupInfo,
+    PlanChange,
+    PlanRefusal,
     SlotInfo,
 )
 from app.config import Settings
 from app.domain.authorization import ApiScope
-from app.domain.configuration_package import MEDIA_TYPE, package_filename
+from app.domain.configuration_changes import ChangeAction
+from app.domain.configuration_document import Scope, document_filename
+from app.domain.configuration_document_service import (
+    Actor,
+    ApplyResult,
+    ConfigurationDocumentService,
+)
+from app.domain.configuration_plan import Plan
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.services import BookingService
@@ -52,18 +67,37 @@ ReadGroup = Annotated[
 ]
 Transfer = Annotated[AgentContext, Depends(RequireScope(ApiScope.CONFIGURATION_TRANSFER))]
 Passphrase = Annotated[
-    str,
+    str | None,
     Header(
         alias="X-Passphrase",
-        description="The passphrase the package's secrets are sealed under (16 characters or "
-        "more); never stored or logged.",
+        description="The passphrase the document's secrets are sealed under (16 characters or "
+        "more): on an export it seals them (without it the document holds none), on a plan or "
+        "an apply it opens them. Never stored or logged.",
+    ),
+]
+PlanHash = Annotated[
+    str | None,
+    Header(
+        alias="X-Plan-Hash",
+        description="The `plan_hash` of the plan you reviewed; an apply that deletes needs it, "
+        "and any apply is refused when the plan is no longer that one.",
     ),
 ]
 
 _PACKAGE_BODY: dict[str, Any] = {
     "requestBody": {
         "required": True,
-        "content": {MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}},
+        "content": {"application/vnd.sqlite3": {"schema": {"type": "string", "format": "binary"}}},
+    }
+}
+
+_DOCUMENT_BODY: dict[str, Any] = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}},
+            "application/json": {"schema": {"type": "object"}},
+        },
     }
 }
 
@@ -161,71 +195,205 @@ async def availability(
         **_REFUSALS,
         200: {
             "content": {MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}},
-            "description": "The configuration package, a SQLite file (ADR 0089).",
+            "description": "The configuration document of the platform (ADR 0099).",
         },
         422: {
             "model": ErrorResponse,
-            "description": "`invalid_request` (no `X-Passphrase`), "
-            "`configuration_passphrase_short`.",
+            "description": "`configuration_passphrase_short`: the passphrase is under 16 "
+            "characters.",
         },
     },
-    summary="Export the configuration package",
+    summary="Export the configuration as a document",
     tags=["configuration"],
 )
 @limiter.limit(agent_call_limit, key_func=client_key)
 async def export_configuration(
-    request: Request, context: Transfer, passphrase: Passphrase
+    request: Request, context: Transfer, passphrase: Passphrase = None
 ) -> Response:
-    """Return every configuration table of this installation, secrets sealed under the passphrase.
+    """Return the configuration of the whole installation as a JSON document.
 
     Scope `configuration:transfer`, on the whole installation whatever organisation registered
-    the client. The same package the superuser exports on *Advanced settings*; audited as that
-    export is, with the client id as actor. No participant data: every state table is empty.
+    the client. With `X-Passphrase` the secrets are in the document, sealed under it; without,
+    the document holds none. Audited with the client id as actor. No participant data.
     """
-    package = await _packages(request).export(context.caller.client.client_id, passphrase)
+    actor = Actor.api_client(context.caller.client.client_id)
+    document = await _documents(request).export(
+        actor, Scope(), passphrase, secrets=passphrase is not None
+    )
     current: Settings = request.app.state.settings
-    name = package_filename(current.installation_name, request.app.state.clock.now())
+    name = document_filename(current.installation_name, request.app.state.clock.now())
     return Response(
-        package,
+        document,
         media_type=MEDIA_TYPE,
         headers={"content-disposition": f'attachment; filename="{name}"'},
     )
 
 
+@router.post(
+    "/configuration/plan",
+    response_model=ConfigurationPlan,
+    responses={
+        **_REFUSALS,
+        413: {"model": ErrorResponse, "description": "`configuration_package_too_large`."},
+        422: {
+            "model": ErrorResponse,
+            "description": "`invalid_configuration` (the document is not valid), "
+            "`configuration_passphrase_short`, `configuration_passphrase_wrong`, "
+            "`configuration_package_invalid`, `configuration_out_of_scope`.",
+        },
+    },
+    openapi_extra=_DOCUMENT_BODY,
+    summary="Plan a configuration document",
+    tags=["configuration"],
+)
+@limiter.limit(agent_call_limit, key_func=client_key)
+async def plan_configuration(
+    request: Request, context: Transfer, passphrase: Passphrase = None
+) -> ConfigurationPlan:
+    """Say what the document in the body would change, without writing anything.
+
+    Scope `configuration:transfer`. The answer lists every change by action, kind, path and
+    field names, and every refusal; a plan with a refusal has `ok` false. Never a value.
+    """
+    current: Settings = request.app.state.settings
+    body = await _body(request, current.configuration_package_max_mb * 1024 * 1024)
+    plan = await _documents(request).plan(
+        Actor.api_client(context.caller.client.client_id), body, passphrase, scope=Scope()
+    )
+    return _plan_model(plan)
+
+
+@router.post(
+    "/configuration/apply",
+    response_model=ConfigurationApplied,
+    responses={
+        **_REFUSALS,
+        409: {
+            "model": ErrorResponse,
+            "description": "`configuration_plan_stale`: the plan changed since `X-Plan-Hash`, or "
+            "a plan that deletes came without it.",
+        },
+        413: {"model": ErrorResponse, "description": "`configuration_package_too_large`."},
+        422: {
+            "model": ConfigurationApplied,
+            "description": "The plan holds a refusal and nothing was written; or one of "
+            "`invalid_configuration`, `configuration_passphrase_*`, "
+            "`configuration_too_many_changes`, `configuration_out_of_scope`.",
+        },
+    },
+    openapi_extra=_DOCUMENT_BODY,
+    summary="Apply a configuration document",
+    tags=["configuration"],
+)
+@limiter.limit(agent_call_limit, key_func=client_key)
+async def apply_configuration(
+    request: Request,
+    context: Transfer,
+    passphrase: Passphrase = None,
+    plan_hash: PlanHash = None,
+) -> Response:
+    """Write the document in the body: all of it, or nothing.
+
+    Scope `configuration:transfer`. Plans again inside the write lock; a plan that deletes
+    needs the `X-Plan-Hash` of the plan you reviewed. Audited per change with the client id.
+    """
+    return await _apply(request, context, passphrase, plan_hash)
+
+
+async def _apply(
+    request: Request, context: AgentContext, passphrase: str | None, plan_hash: str | None
+) -> Response:
+    """Apply the document in the body; the answer of `POST …/apply` and of `PUT`."""
+    current: Settings = request.app.state.settings
+    body = await _body(request, current.configuration_package_max_mb * 1024 * 1024)
+    return _applied(
+        await _documents(request).apply(
+            Actor.api_client(context.caller.client.client_id),
+            body,
+            passphrase,
+            plan_hash,
+            scope=Scope(),
+        )
+    )
+
+
 @router.put(
     "/configuration",
+    response_model=ConfigurationApplied,
+    responses={
+        **_REFUSALS,
+        409: {
+            "model": ErrorResponse,
+            "description": "`configuration_plan_stale`: the plan changed since `X-Plan-Hash`, or "
+            "a plan that deletes came without it.",
+        },
+        413: {"model": ErrorResponse, "description": "`configuration_package_too_large`."},
+        422: {
+            "model": ConfigurationApplied,
+            "description": "The plan holds a refusal and nothing was written; or one of "
+            "`invalid_configuration`, `configuration_passphrase_*`, "
+            "`configuration_too_many_changes`, `configuration_out_of_scope`.",
+        },
+    },
+    openapi_extra=_DOCUMENT_BODY,
+    summary="Apply a configuration document",
+    tags=["configuration"],
+)
+@limiter.limit(agent_call_limit, key_func=client_key)
+async def put_configuration(
+    request: Request,
+    context: Transfer,
+    passphrase: Passphrase = None,
+    plan_hash: PlanHash = None,
+) -> Response:
+    """Apply the body as the platform's configuration: the same as `POST /configuration/apply`.
+
+    Scope `configuration:transfer`. Kept for the pipelines of ADR 0089 step 3, which `PUT` the
+    configuration; the document's own `mode` says whether what it does not name is deleted
+    (`replace`), and a plan that deletes needs the `X-Plan-Hash` of the plan you reviewed.
+    """
+    return await _apply(request, context, passphrase, plan_hash)
+
+
+@router.put(
+    "/configuration/package",
     response_model=ConfigurationSummary,
     responses={
         **_REFUSALS,
         409: {
             "model": ErrorResponse,
-            "description": "`configuration_installation_in_use` (bookings, slots or an active "
-            "closure exist), `configuration_package_version` (another schema revision).",
+            "description": "`configuration_package_version` (another schema revision).",
         },
         413: {"model": ErrorResponse, "description": "`configuration_package_too_large`."},
         422: {
             "model": ErrorResponse,
-            "description": "`invalid_request` (no `X-Passphrase`), "
-            "`configuration_package_invalid`, `configuration_passphrase_wrong`.",
+            "description": "`configuration_package_invalid`, `configuration_passphrase_wrong`, "
+            "`configuration_passphrase_short` (no `X-Passphrase`), and the refusal that stopped "
+            "the plan.",
         },
     },
     openapi_extra=_PACKAGE_BODY,
-    summary="Import a configuration package",
+    summary="Replace the configuration with an old SQLite package",
     tags=["configuration"],
 )
 @limiter.limit(agent_call_limit, key_func=client_key)
-async def import_configuration(
-    request: Request, context: Transfer, passphrase: Passphrase
+async def import_package(
+    request: Request, context: Transfer, passphrase: Passphrase = None
 ) -> ConfigurationSummary:
-    """Replace every configuration table of this installation with the package in the body.
+    """Apply an ADR 0089 SQLite package as a replacing document of the platform.
 
-    Scope `configuration:transfer`. Only into an installation that is not in use (no booking,
-    slot or active closure); the package must carry the running schema revision; the body is
-    refused above `CONFIGURATION_PACKAGE_MAX_MB`. Audited with the counts, never a value.
+    Scope `configuration:transfer`. Only for one release after the JSON document replaced the
+    package (ADR 0099 point 14); the passphrase is required; the package must carry the running
+    schema revision. The call is the confirmation: what the converted document deletes is
+    deleted unless something refers to it. Audited with the counts, never a value.
     """
+    if passphrase is None:
+        raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")
     current: Settings = request.app.state.settings
-    package = await _body(request, current.configuration_package_max_mb * 1024 * 1024)
-    summary = await _packages(request).import_(context.caller.client.client_id, package, passphrase)
+    body = await _body(request, current.configuration_package_max_mb * 1024 * 1024)
+    summary = await _packages(request).import_(
+        Actor.api_client(context.caller.client.client_id), body, passphrase
+    )
     return ConfigurationSummary(
         installation=summary.installation,
         app_version=summary.app_version,
@@ -234,6 +402,34 @@ async def import_configuration(
         counts=summary.counts,
         secrets=summary.secrets,
     )
+
+
+def _plan_model(plan: Plan) -> ConfigurationPlan:
+    """Describe a plan for the API: names and codes, never a value."""
+    return ConfigurationPlan(
+        ok=plan.ok,
+        plan_hash=plan.digest,
+        changes=[
+            PlanChange(
+                action=c.action.value,
+                kind=c.kind,
+                path=c.path,
+                fields=[] if c.action is ChangeAction.DELETE else list(c.fields),
+            )
+            for c in plan.changes
+        ],
+        refusals=[
+            PlanRefusal(path=r.path, code=r.code.value, field=r.field) for r in plan.refusals
+        ],
+    )
+
+
+def _applied(result: ApplyResult) -> JSONResponse:
+    """Answer an apply: 200 when it was written, 422 with the refusing plan when not."""
+    body = ConfigurationApplied(
+        applied=result.applied, settings_version=result.version, plan=_plan_model(result.plan)
+    )
+    return JSONResponse(body.model_dump(mode="json"), status_code=200 if result.applied else 422)
 
 
 async def _body(request: Request, limit: int) -> bytes:
@@ -252,6 +448,12 @@ async def _body(request: Request, limit: int) -> bytes:
         if len(body) > limit:
             raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE, "package")
     return bytes(body)
+
+
+def _documents(request: Request) -> ConfigurationDocumentService:
+    """Return the application's configuration document service (shared with the portal)."""
+    service: ConfigurationDocumentService = request.app.state.configuration_documents
+    return service
 
 
 def _packages(request: Request) -> ConfigurationPackageService:

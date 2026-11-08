@@ -10,19 +10,6 @@
   <p>{{ _("admin.settings.package.intro") }}</p>
   <p class="hint">{{ _("admin.settings.package.warning") }}</p>
   {{ error_message(package.error, "error-package") }}
-  <h3 id="package-export-heading">{{ _("admin.settings.package.export.title") }}</h3>
-  <form method="post" action="/admin/settings/package/export" novalidate aria-labelledby="package-export-heading">
-    <p class="hint" id="package-passphrase-hint">{{ _("admin.settings.package.passphrase_hint", length=package.min_length) }}</p>
-    <div class="field">
-      <label for="package-passphrase">{{ _("admin.settings.package.passphrase") }}</label>
-      <input id="package-passphrase" name="passphrase" type="password" autocomplete="new-password" aria-describedby="package-passphrase-hint{% if package.error %} error-package{% endif %}"{% if package.error %} aria-invalid="true"{% endif %}>
-    </div>
-    <div class="field">
-      <label for="package-passphrase-repeat">{{ _("admin.settings.package.passphrase_repeat") }}</label>
-      <input id="package-passphrase-repeat" name="passphrase_repeat" type="password" autocomplete="new-password">
-    </div>
-    <button type="submit" class="button">{{ _("admin.settings.package.export.button") }}</button>
-  </form>
   <h3 id="package-import-heading">{{ _("admin.settings.package.import.title") }}</h3>
   <p>{{ _("admin.settings.package.import.intro", max_mb=package.max_mb) }}</p>
   <form method="post" action="/admin/settings/package/import" enctype="multipart/form-data" novalidate aria-labelledby="package-import-heading">

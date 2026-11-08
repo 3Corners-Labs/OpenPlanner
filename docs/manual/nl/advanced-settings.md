@@ -226,30 +226,22 @@ document met verzegelde geheimen vraagt opnieuw om zijn wachtwoord. Een document
 organisatie staat onder **Overzicht → Configuratie** van die organisatie. Elke toegepaste
 wijziging staat in het auditlog, zonder waarden, en u moet recent hebben ingelogd.
 
-**Als SQLite-pakket (tot het wordt uitgefaseerd).** Een configuratiepakket bevat alle instellingen van deze installatie: organisaties, teams,
-openingstijden en uitzonderingen, herinneringen, teksten, formuliervelden, contactopties,
-feestdagkalenders, scenario's voor sluiting, huisstijl, mail- en sms-kanalen, identity
-providers, API-clients, rollen en de platforminstellingen, met hun geheimen. Afspraken,
-tijdsloten, het auditlog en medewerkers gaan niet mee. Zo zet u een nieuwe installatie (test
-of productie) in één keer op, zonder elk wachtwoord en elke sleutel opnieuw in te voeren.
+**Als oud SQLite-pakket (nog één release gelezen).** Eerdere versies exporteerden de hele
+configuratie als SQLite-bestand. Die export is vervallen: gebruik hierboven **Document
+exporteren**. Een bestaand pakket kunt u nog één keer toepassen: kies het bestand in het
+SQLite-blok, vul de wachtwoordzin in en vink aan dat de configuratie van het platform wordt
+vervangen. Het pakket wordt omgezet in een document dat de configuratie van het platform
+vervangt, en dat document wordt net als elk ander gepland en toegepast, met uw rechten per
+wijziging. Wat in gebruik is, wordt nooit verwijderd: een team met afspraken, een actieve
+sluiting, een geaccepteerd tekort of API-toegang laat de hele import weigeren, met de reden op
+het scherm, en er wordt niets geschreven. Het pakket moet van dezelfde versie van OpenPlanner
+zijn. Medewerkers en het auditlog blijven. Na de import gelden de instellingen binnen tien
+seconden. De bootstrap-sleutels van de server (`SETTINGS_ENCRYPTION_KEY` en de andere twee)
+gaan nooit mee: elke installatie houdt haar eigen sleutels.
 
-**Exporteren.** Kies een wachtwoordzin van minstens 16 tekens en herhaal die. U krijgt een
-bestand `openplanner-configuratie-….sqlite`. De geheimen in het bestand zijn versleuteld met
-de wachtwoordzin; die wordt nergens bewaard. Zonder de wachtwoordzin is het pakket waardeloos,
-met de wachtwoordzin bevat het elk geheim van het platform. Bewaar bestand en wachtwoordzin
-dus gescheiden, en niet langer dan nodig.
-
-**Importeren.** Kies het bestand, vul de wachtwoordzin in en vink aan dat alle configuratie
-van deze installatie wordt vervangen. Dat kan alleen in een installatie zonder afspraken,
-tijdsloten of actieve sluiting: een nieuwe installatie dus. Medewerkers en het auditlog
-blijven. Het pakket moet van dezelfde versie van OpenPlanner zijn; is dat niet zo, exporteer
-dan opnieuw vanaf een installatie met deze versie. Na de import gelden de instellingen binnen
-tien seconden. De bootstrap-sleutels van de server (`SETTINGS_ENCRYPTION_KEY` en de andere
-twee) gaan nooit mee: elke installatie houdt haar eigen sleutels.
-
-Elke export en import staat in het auditlog, zonder wachtwoordzin en zonder waarden. U moet
-kort geleden zijn ingelogd. De grootste toegestane pakketgrootte is de platforminstelling
-*Maximale grootte van een configuratiepakket*.
+Elke toegepaste wijziging en elke import staat in het auditlog, zonder wachtwoordzin en zonder
+waarden. U moet kort geleden zijn ingelogd. Het grootste toegestane bestand is de
+platforminstelling *Maximale grootte van een configuratiepakket*.
 
 **Via de API.** Een pipeline kan hetzelfde doen zonder de portal: een API-client met het
 recht *Configuratiepakket exporteren en importeren* (`configuration:transfer`, te geven op

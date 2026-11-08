@@ -887,8 +887,8 @@ def test_a_refused_import_stops_the_installation_with_a_clear_error(host: Host) 
     result = _with_package(host, "--mode", "production", **HOST_SETTINGS)
 
     assert result.returncode == 1
-    assert "configuration_installation_in_use" in result.stderr
-    assert "in use" in result.stderr
+    assert "configuration_object_in_use" in result.stderr
+    assert "converts to" in result.stderr
     assert host.ran("exec -T web rm -f /srv/data/configuration-package.sqlite")
     assert not host.ran("openplanner-updater.timer")
 
@@ -1083,3 +1083,133 @@ def test_an_unknown_provider_choice_is_refused(host: Host) -> None:
 
     assert result.returncode == 1
     assert "--idp must be bundled or own" in result.stderr
+
+
+# A configuration document (ADR 0099): planned, then applied with the hash of that plan.
+
+DOCUMENT_IN_WEB = "/srv/data/configuration-document.json"
+SEALED = '{"format": "openplanner.config/v1", "x": {"sealed": "abc"}}'
+
+
+def _document(host: Host, text: str = '{"format": "openplanner.config/v1"}') -> Path:
+    document = host.root / "configuration.json"
+    document.write_text(text)
+    document.chmod(0o600)
+    return document
+
+
+def _passphrase_file(host: Host) -> Path:
+    passphrase = host.root / "passphrase"
+    passphrase.write_text("a passphrase of sixteen chars\n")
+    passphrase.chmod(0o600)
+    return passphrase
+
+
+def _install_document(host: Host, text: str, *extra: str) -> subprocess.CompletedProcess[str]:
+    return host.run(
+        "--mode",
+        "production",
+        "--configuration",
+        str(_document(host, text)),
+        *extra,
+        "--non-interactive",
+        **PRODUCTION,
+    )
+
+
+def test_a_document_is_planned_and_applied_with_the_hash_of_its_plan(host: Host) -> None:
+    result = _install_document(host, '{"format": "openplanner.config/v1"}')
+
+    assert result.returncode == 0, result.stderr
+    commands = host.commands()
+    started = commands.index(next(c for c in commands if c.endswith(" up -d")))
+    planned = commands.index(next(c for c in commands if "app.cli config plan" in c))
+    applied = commands.index(next(c for c in commands if "app.cli config apply" in c))
+    assert started < planned < applied
+    assert any(c.endswith(f"web:{DOCUMENT_IN_WEB}") for c in commands)
+    assert host.ran(f"config apply {DOCUMENT_IN_WEB} --plan-hash {'ab' * 32}")
+    assert host.ran(f"exec -T web rm -f {DOCUMENT_IN_WEB}")
+    # No passphrase was given or needed; no login file is written, the login is asked as usual.
+    assert not host.ran("--passphrase-file")
+    assert not host.ran("app.cli config env")
+    assert not host.file(CONFIG_ENV).exists()
+    assert host.settings(".env")["OIDC_CLIENT_SECRET"] == "client-secret-from-the-idp"
+    assert "create group acme/team: name" in result.stdout
+    assert "applied; settings version" in result.stdout
+
+
+def test_a_document_with_sealed_secrets_takes_its_passphrase_on_standard_input(
+    host: Host,
+) -> None:
+    passphrase = _passphrase_file(host)
+
+    result = _install_document(host, SEALED, "--passphrase-file", str(passphrase))
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("config plan")
+    apply = next(c for c in host.commands() if "app.cli config apply" in c)
+    assert "--passphrase-file /dev/stdin" in apply
+    assert "a passphrase of sixteen chars" not in " ".join(host.commands())
+
+
+def test_a_document_with_sealed_secrets_needs_a_passphrase_file(host: Host) -> None:
+    result = _install_document(host, SEALED)
+
+    assert result.returncode == 1
+    assert "sealed secrets: give --passphrase-file" in result.stderr
+    assert not host.file(".env").exists()
+
+
+def test_a_plan_with_a_refusal_applies_nothing_and_shows_the_report(host: Host) -> None:
+    host.given("fail", "config-plan\n")
+
+    result = _install_document(host, '{"format": "openplanner.config/v1"}')
+
+    assert result.returncode == 1
+    assert "REFUSED organisations[acme].groups[team] not_permitted name" in result.stderr
+    assert "nothing was applied" in result.stderr
+    assert not host.ran("app.cli config apply")
+    assert host.ran(f"exec -T web rm -f {DOCUMENT_IN_WEB}")
+    assert not host.ran("openplanner-updater.timer")
+
+
+def test_a_plan_that_moved_on_is_refused_and_the_copy_removed(host: Host) -> None:
+    host.given("fail", "config-apply\n")
+
+    result = _install_document(host, '{"format": "openplanner.config/v1"}')
+
+    assert result.returncode == 1
+    assert "configuration_plan_stale" in result.stderr
+    assert host.ran(f"exec -T web rm -f {DOCUMENT_IN_WEB}")
+
+
+def test_a_wrong_passphrase_for_a_document_is_named(host: Host) -> None:
+    host.given("fail", "config-passphrase\n")
+
+    result = _install_document(host, SEALED, "--passphrase-file", str(_passphrase_file(host)))
+
+    assert result.returncode == 1
+    assert "wrong passphrase" in result.stderr
+    assert not host.ran("app.cli config apply")
+
+
+def test_a_file_that_is_neither_a_document_nor_a_package_is_refused_early(host: Host) -> None:
+    result = _install_document(host, "not a configuration\n")
+
+    assert result.returncode == 1
+    assert "neither a configuration document" in result.stderr
+    assert not host.file(".env").exists()
+
+
+def test_a_passphrase_file_alone_is_refused(host: Host) -> None:
+    alone = host.run(
+        "--mode",
+        "production",
+        "--passphrase-file",
+        str(_passphrase_file(host)),
+        "--non-interactive",
+        **PRODUCTION,
+    )
+
+    assert alone.returncode == 1
+    assert "--configuration and --passphrase-file go together" in alone.stderr

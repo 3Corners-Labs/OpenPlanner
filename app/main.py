@@ -22,7 +22,6 @@ from app.adapters.configuration_context import document_service
 from app.adapters.db.backup import database_path
 from app.adapters.db.configuration_package import (
     SqliteConfigurationTransfer,
-    portable_environment,
 )
 from app.adapters.db.engine import create_engine, set_slow_query_ms
 from app.adapters.db.identity_providers import ProviderCredentialStore
@@ -538,20 +537,6 @@ def create_app(
             environment_value=app.state.live_settings.environment_value,
             production=settings.environment == "prod",
         )
-        # ADR 0089: configuration packages, exported and imported on Advanced settings.
-        app.state.configuration_packages = ConfigurationPackageService(
-            SqliteConfigurationTransfer(
-                database_path(settings.database_url),
-                secret_box(settings),
-                installation=settings.installation_name or "",
-                app_version=settings.app_version or "",
-                environment=lambda: portable_environment(settings),
-                now=clock.now,
-            ),
-            clock,
-            app.state.admin_service,
-            max_bytes=lambda: live().configuration_package_max_mb * 1024 * 1024,
-        )
         # ADR 0099: the configuration as a JSON document, planned and applied in the portal;
         # the discovery document of a new or moved identity provider is fetched through the guard.
         app.state.configuration_documents = document_service(
@@ -561,6 +546,17 @@ def create_app(
             settings=live,
             discovery=discovery_fetcher or GuardedDiscoveryFetcher(http, allow_private=lab),
             locked=app.state.live_settings.locked,
+        )
+        # ADR 0099 point 14: a SQLite package (ADR 0089) is still read for one release,
+        # converted to a document and applied by the service above.
+        app.state.configuration_packages = ConfigurationPackageService(
+            SqliteConfigurationTransfer(
+                database_path(settings.database_url), secret_box(settings), now=clock.now
+            ),
+            app.state.configuration_documents,
+            clock,
+            app.state.admin_service,
+            max_bytes=lambda: live().configuration_package_max_mb * 1024 * 1024,
         )
         app.state.reviewed_documents = ReviewedDocuments()
         app.state.certificate_status = CertificateStatus(uow)
@@ -791,6 +787,7 @@ def create_app(
                 "security_log",
                 "client_pseudonyms",
                 "configuration_packages",  # ADR 0089 point 7: the same service as the portal
+                "configuration_documents",  # ADR 0099: the document service, same as the portal
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
             agent_api.state.settings = app.state.settings

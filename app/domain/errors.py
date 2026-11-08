@@ -126,7 +126,6 @@ class ErrorCode(StrEnum):
     CONFIGURATION_PACKAGE_INVALID = "configuration_package_invalid"
     CONFIGURATION_PACKAGE_VERSION = "configuration_package_version"
     CONFIGURATION_PACKAGE_TOO_LARGE = "configuration_package_too_large"
-    CONFIGURATION_INSTALLATION_IN_USE = "configuration_installation_in_use"
     CONFIGURATION_FORMAT_UNSUPPORTED = "configuration_format_unsupported"
     """ADR 0099: the document's ``format`` is not a version this release reads."""
     CONFIGURATION_UNKNOWN_FIELD = "configuration_unknown_field"
