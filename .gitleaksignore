@@ -6,3 +6,6 @@
 # (commit d4df732c); marked `gitleaks:allow` on later commits.
 d4df732c4d2049194f57cc3899f279ec39b78e42:tests/domain/test_configuration_v1_channels.py:generic-api-key:25
 d4df732c4d2049194f57cc3899f279ec39b78e42:tests/domain/test_configuration_v1_login.py:generic-api-key:26
+# A fake referer token in the re-login test of the sign-in query fix (PR #637), reachable in
+# history (commit d431514d); the value is a plain word on later commits.
+d431514d569531900815a84ba87e759c6d3edad6:tests/admin/test_group_routes.py:generic-api-key:562

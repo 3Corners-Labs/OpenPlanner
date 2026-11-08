@@ -559,7 +559,7 @@ async def test_a_recent_login_comes_back_with_the_view_query_only(site: Site) ->
         data={},
         headers={
             **SAME_ORIGIN,
-            "referer": f"http://testserver{GROUP}/staffing?day=2026-11-10&token=0123456789abcdef",
+            "referer": f"http://testserver{GROUP}/staffing?day=2026-11-10&token=fake",
         },
     )
 
