@@ -488,7 +488,7 @@ Call durations (step 3) are not in the booking row and stay exact for the mean. 
 closure and cancel commands write facts whatever `reporting_enabled` says (it reads the portal value
 only in the web and the worker process).
 
-**Step 4 notes (no change of a decision):** migration 0092 adds `usage_rollup_state` (the watermark, the
+**Step 4 notes (no change of a decision):** migration 0093 adds `usage_rollup_state` (the watermark, the
 time of the last run, the backfill's completion and cutoff) and `usage_backfill` (one booking id per
 booking already done), and rebuilds `usage_events` with `AUTOINCREMENT`: without it SQLite reuses the
 largest ids after retention deleted them, and a new fact below the watermark would never be rolled up (the
