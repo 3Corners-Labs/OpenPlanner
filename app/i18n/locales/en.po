@@ -9668,3 +9668,87 @@ msgstr "Continue to the login service"
 
 msgid "admin.alerts.text.check"
 msgstr "The check of this group's integration found a problem ({code}). Open the group and choose Check integration for the explanation."
+
+msgid "settings.field.task_reconcile_interval_minutes.label"
+msgstr "Reconcile task states every (minutes)"
+
+msgid "settings.field.task_reconcile_after_minutes.label"
+msgstr "Reconcile a task after silence of (minutes)"
+
+msgid "settings.field.integration_health_window_minutes.label"
+msgstr "Window for connection health (minutes)"
+
+msgid "settings.field.integration_degraded_failure_percent.label"
+msgstr "Degraded above this share of failed requests (%)"
+
+msgid "settings.field.integration_down_failure_percent.label"
+msgstr "Down above this share of failed requests (%)"
+
+msgid "settings.field.integration_recovery_minutes.label"
+msgstr "Recovered after this many minutes without failures"
+
+msgid "admin.alerts.source.connection"
+msgstr "Connection with Webex or the contact center"
+
+msgid "admin.alerts.source.webhooks_missing"
+msgstr "Events from the contact center"
+
+msgid "admin.alerts.text.connection"
+msgstr "A connection of this organisation is degraded or down ({code}). Open Integrations for the state per platform."
+
+msgid "admin.alerts.text.webhooks_missing"
+msgstr "The contact center did not report tasks back; OpenPlanner checked them itself. Check the webhook registration on Integrations."
+
+msgid "admin.integrations.health.ok"
+msgstr "OK"
+
+msgid "admin.integrations.health.unknown"
+msgstr "Unknown (too few requests)"
+
+msgid "admin.integrations.health.degraded"
+msgstr "Degraded"
+
+msgid "admin.integrations.health.down"
+msgstr "Down"
+
+msgid "admin.integrations.health.platform_wide"
+msgstr "Whole platform"
+
+msgid "admin.integrations.platform.webex"
+msgstr "Webex"
+
+msgid "admin.integrations.platform.wxcc"
+msgstr "Contact center (WxCC)"
+
+msgid "admin.integrations.health"
+msgstr "Health and last events"
+
+msgid "admin.integrations.health_lead"
+msgstr "How the connections are doing, computed from the requests of the last quarter of an hour, and when each platform last reported something."
+
+msgid "admin.integrations.inbound"
+msgstr "Last event per platform"
+
+msgid "admin.integrations.inbound_at"
+msgstr "last event {time}"
+
+msgid "admin.integrations.inbound_none"
+msgstr "No event has come in yet."
+
+msgid "admin.integrations.health_states"
+msgstr "Health per organisation"
+
+msgid "admin.integrations.health_none"
+msgstr "Not computed yet; the worker does this every few minutes."
+
+msgid "admin.integrations.col.organisation"
+msgstr "Organisation"
+
+msgid "admin.integrations.col.since"
+msgstr "Since"
+
+msgid "admin.integrations.col.failures"
+msgstr "Failed"
+
+msgid "admin.integrations.failures_of"
+msgstr "{failures} of {requests}"

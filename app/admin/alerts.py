@@ -42,6 +42,8 @@ from app.domain.alerts import (
     banner_alerts,
 )
 from app.domain.authorization import Permission, Principal, scope_for
+from app.domain.connection_health import HEALTH_EVENT as CONNECTION_HEALTH
+from app.domain.connection_health import WEBHOOKS_MISSING
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.log_destinations import HEALTH_EVENT
 from app.domain.public_address import EVENT as ADDRESS_EVENT
@@ -74,6 +76,8 @@ SOURCE_LABELS: dict[str, str] = {
     CHECK_EVENT: "admin.alerts.source.integration",
     QUEUE_WAIT_EVENT: "admin.alerts.source.queue_wait",
     WORKER_ALERT: "admin.alerts.source.worker",
+    CONNECTION_HEALTH: "admin.alerts.source.connection",
+    WEBHOOKS_MISSING: "admin.alerts.source.webhooks_missing",
 }
 """What an alert is about, per action; the group-level ones name the group."""
 
@@ -90,6 +94,8 @@ OWN_TEXTS: dict[str, str] = {
     HEALTH_EVENT: "admin.alerts.text.log_destination",
     SWEPT: "admin.alerts.text.retention",
     CHECK_EVENT: "admin.alerts.text.check",
+    CONNECTION_HEALTH: "admin.alerts.text.connection",
+    WEBHOOKS_MISSING: "admin.alerts.text.webhooks_missing",
 }
 """Actions whose sentence is the alert's own rather than the reason's label."""
 

@@ -2,8 +2,8 @@
 
 Webhook handlers call ``record_meeting_event`` and ``record_task_event``; jobs call
 ``record``. Each call writes the event and the updated ``CallStatus`` in one transaction.
-Webex events carry an ``event_key``: it is remembered for ``WEBHOOK_MEMORY`` in the same
-transaction, so a replayed or redelivered event changes nothing the second time.
+Webex and WxCC events carry an ``event_key``: it is remembered for ``WEBHOOK_MEMORY`` in the
+same transaction, so a replayed or redelivered event changes nothing the second time.
 Admins see a booking's timeline only with ``bookings.view`` on its group (ADR 0014).
 """
 
@@ -34,6 +34,7 @@ WEBHOOK_MEMORY = timedelta(days=30)
 """How long a Webex event key is remembered; older keys are forgotten on the next event."""
 
 WEBEX_SOURCE = "webex"
+WXCC_SOURCE = "wxcc"
 
 REQUEST_LIMIT = 100
 """How many of a booking's request events its page lists (the newest; ADR 0068)."""
@@ -152,19 +153,30 @@ class IntegrationService:
         return EventOutcome.RECORDED
 
     async def record_task_event(
-        self, task_id: str, kind: EventKind, at: datetime, detail: str = ""
+        self,
+        task_id: str,
+        kind: EventKind,
+        at: datetime,
+        detail: str = "",
+        *,
+        event_key: str = "",
     ) -> EventOutcome:
-        """Record a work item event; ``UNKNOWN`` for tasks OpenPlanner does not know.
+        """Record a work item event once per ``event_key``; ``UNKNOWN`` for foreign tasks.
 
         A ``task:new`` of a booking's task is ``IGNORED``: the dispatch job recorded the
         creation when it got the id. An unknown task may be the group check's probe (ADR
-        0082): its event is noted for the check and the outcome is ``PROBE``.
+        0082): its event is noted for the check and the outcome is ``PROBE``. Like a Webex
+        event, a replayed or redelivered WxCC event is ``DUPLICATE`` (ADR 0082 point 5).
         """
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_task(task_id)
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED
+                if event_key:
+                    await tx.forget_webhook_events(at - WEBHOOK_MEMORY)
+                    if not await tx.claim_webhook_event(WXCC_SOURCE, event_key, at):
+                        return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
                 return EventOutcome.RECORDED
         # Outside the write lock: the registry writes in a transaction of its own.

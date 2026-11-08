@@ -28,17 +28,21 @@ TRACKING_LIMIT = 48
 
 
 def request_detail(record: RequestRecord, version: str) -> str:
-    """Return the event's ``detail``: machine keys and values, within the column's size."""
-    return ",".join(
-        (
-            f"method:{record.method}",
-            f"path:{record.path[:PATH_LIMIT]}",
-            f"status:{record.status}",
-            f"ms:{record.duration_ms}",
-            f"tracking:{record.tracking_id[:TRACKING_LIMIT]}",
-            f"version:{version}",
-        )
-    )
+    """Return the event's ``detail``: machine keys and values, within the column's size.
+
+    ``platform`` (ADR 0082 point 7) is there only for a request that counts for a connection.
+    """
+    parts = [
+        f"method:{record.method}",
+        f"path:{record.path[:PATH_LIMIT]}",
+        f"status:{record.status}",
+        f"ms:{record.duration_ms}",
+        f"tracking:{record.tracking_id[:TRACKING_LIMIT]}",
+        f"version:{version}",
+    ]
+    if record.platform:
+        parts.append(f"platform:{record.platform}")
+    return ",".join(parts)
 
 
 def request_fields(detail: str) -> dict[str, str]:

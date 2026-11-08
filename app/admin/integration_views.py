@@ -3,7 +3,8 @@
 ``webhooks-list``, ``webhooks-reset`` and ``webhooks-health`` store their results
 (``ReportStore``); this module turns them into rows with translated labels. The catalogue keys
 are written out literally so the catalogue test can check them. Cleaning up stays on the
-command line (runbook, section 6): the page offers no destructive action.
+command line (runbook, section 6): the page offers no destructive action. The health card
+shows the connection health and each platform's last verified webhook (ADR 0082).
 """
 
 from collections.abc import Callable
@@ -14,6 +15,7 @@ from app.adapters.db.reports import StoredReport
 from app.adapters.registrations import Reason, State, listing_from_report
 from app.adapters.service_app_check import results_from_report
 from app.adapters.webhook_selftest import Outcome, deliveries_from_report
+from app.domain.connection_health import HealthEntry, HealthState, InboundEvent, Platform
 
 STATE_LABELS: dict[State, tuple[str, str]] = {
     State.CURRENT: ("admin.integrations.state.current", "success"),
@@ -173,3 +175,85 @@ def check_view(
         service_app_passed=bool(service_app and service_app.body.get("passed")),
         probes=_probe_rows(service_app, _),
     )
+
+
+HEALTH_LABELS: dict[HealthState, tuple[str, str]] = {
+    HealthState.OK: ("admin.integrations.health.ok", "success"),
+    HealthState.UNKNOWN: ("admin.integrations.health.unknown", ""),
+    HealthState.DEGRADED: ("admin.integrations.health.degraded", "warning"),
+    HealthState.DOWN: ("admin.integrations.health.down", "danger"),
+}
+"""Label key and chip tone per health state (ADR 0082 point 7); the label is always shown."""
+
+PLATFORM_LABELS: dict[Platform, str] = {
+    Platform.WEBEX: "admin.integrations.platform.webex",
+    Platform.WXCC: "admin.integrations.platform.wxcc",
+}
+
+
+@dataclass(frozen=True)
+class HealthRow:
+    """One connection's health on *Koppelingen*: who, which platform, state, since, counts."""
+
+    organisation: str
+    platform: str
+    state: str
+    tone: str
+    since: str
+    requests: int
+    failures: int
+
+
+@dataclass(frozen=True)
+class InboundRow:
+    """One platform's last verified webhook: when, which event, what came of it."""
+
+    platform: str
+    at: str
+    kind: str
+    outcome: str
+
+
+@dataclass(frozen=True)
+class HealthView:
+    """The health card of *Koppelingen* (ADR 0082 points 5 and 7)."""
+
+    rows: list[HealthRow]
+    inbound: list[InboundRow]
+
+
+def health_view(
+    entries: tuple[HealthEntry, ...],
+    inbound: tuple[InboundEvent, ...],
+    gettext: Callable[..., str],
+    moment: Callable[[datetime], str],
+    organisations: Callable[[str | None], bool],
+) -> HealthView:
+    """Return the health rows the reader may see (``organisations``) and the last webhooks."""
+    rows = [
+        HealthRow(
+            entry.organisation or gettext("admin.integrations.health.platform_wide"),
+            gettext(PLATFORM_LABELS[entry.platform]),
+            gettext(HEALTH_LABELS[entry.state][0]),
+            HEALTH_LABELS[entry.state][1],
+            moment(entry.since),
+            entry.requests,
+            entry.failures,
+        )
+        for entry in entries
+        if organisations(entry.organisation)
+    ]
+    return HealthView(
+        rows,
+        [
+            InboundRow(gettext(PLATFORM_LABELS[e.platform]), moment(e.at), e.kind, e.outcome)
+            for e in inbound
+        ],
+    )
+
+
+def worst_health(entries: tuple[HealthEntry, ...], platform: Platform) -> HealthState | None:
+    """Return the worst state of ``platform`` over every organisation, ``None`` without any."""
+    order = (HealthState.OK, HealthState.UNKNOWN, HealthState.DEGRADED, HealthState.DOWN)
+    states = [e.state for e in entries if e.platform is platform]
+    return max(states, key=order.index) if states else None

@@ -273,7 +273,8 @@ web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex
 | First name | `bookings.first_name` | booking form | as the contact | to WxCC (`firstName`, `origin.name`) |
 | Meeting and task ids, timeline, call status | `bookings.video_room_id`, `wxcc_task_id`, `booking_events`, `call_status` | Webex, WxCC | kept for statistics (no personal data) | no |
 | Participant names/emails in webhook payloads | processed in memory only; webhooks filtered on the groups' host accounts, so other meetings of the organisation are not delivered | Webex | not stored, not logged | no |
-| Webex event keys (SHA-256 of resource, event, event id, join/leave time) | `webhook_events` | OpenPlanner | 30 days, removed on a later event | no |
+| Webex event keys (SHA-256 of resource, event, event id, join/leave time) and WxCC event keys (SHA-256 of type, task id and CloudEvent id, ADR 0082) | `webhook_events` | OpenPlanner | 30 days, removed on a later event | no |
+| Last inbound event per platform and connection health (ADR 0082): time, event type, outcome code; per organisation and platform the state, since when and the request counts | `integration_reports` (`inbound-webex`, `inbound-wxcc`, `integration-health`) | the webhooks; the worker from the `integration.request` events | replaced by the next event or evaluation | no; shown on **Koppelingen** and *System status* |
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
 | Last webhook listing and delivery test (registration ids, events, host account filters, target URLs without query, statuses, outcome codes) | `integration_reports` | Webex, WxCC, the self-test | replaced by the next check | no; shown read-only on **Koppelingen** |
 

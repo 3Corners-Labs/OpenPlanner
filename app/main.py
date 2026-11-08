@@ -94,6 +94,7 @@ from app.domain.identity_provider_service import IdentityProviderService
 from app.domain.idp_mapping import IdpMappingService, MappingSettings
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
+from app.domain.integration_health import IntegrationHealthService
 from app.domain.log_destination_service import LogDestinationService
 from app.domain.login_service import ClaimSettings, LoginService
 from app.domain.maintenance_service import MaintenanceService
@@ -569,6 +570,10 @@ def create_app(
             app.state.admin_service,
             settings.app_version,
             probes=ProbeReports(ReportStore(app.state.engine)),
+        )
+        # ADR 0082 points 5 and 7: the last inbound webhooks and the health of the connections.
+        app.state.health_service = IntegrationHealthService(
+            uow, clock, lambda: live().health_policy()
         )
         app.state.meeting_status_service = MeetingStatusService(
             uow,

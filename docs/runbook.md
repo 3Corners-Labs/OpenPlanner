@@ -2684,4 +2684,11 @@ Bookings keep working: they are stored first, and meetings and work items are jo
   webhooks as below, or clear the cap in the group's settings meanwhile.
 - **Webhooks missing** (status not updating while calls happen): check **Koppelingen**, the
   secrets, and re-run `register-webhooks`; WxCC sets a subscription to `inactive` after
-  repeated delivery errors.
+  repeated delivery errors. Since ADR 0082 step 2 the worker reconciles such tasks itself every
+  `task_reconcile_interval_minutes` (timeline detail `reconciled`) and raises the alert
+  `integration.webhooks_missing`; *Koppelingen* shows each platform's last inbound event.
+- **Health** (ADR 0082 step 2): *Koppelingen* and *System status* show per organisation and
+  platform `ok`, `degraded`, `down` or `unknown`, from the request events of the last
+  `integration_health_window_minutes`; a transition is the system event `integration.health`
+  and an alert (`down` an outage). `down` with `why:token_refresh` in the event's detail: the
+  Service App must be authorised again.

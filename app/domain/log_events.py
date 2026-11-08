@@ -856,6 +856,15 @@ _OPERATIONS = (
         "The proxy falls back to its default certificate.",
     ),
     _e(
+        "integration.health_watch_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The reconcile and health sweep did not run: {error}.",
+        "The worker could not reconcile stale tasks or recompute the connection health (ADR 0082).",
+        _CHECK_HOST,
+    ),
+    _e(
         "idp.domain_watch_failed",
         _OPS,
         "warning",
@@ -941,6 +950,16 @@ _OPERATIONS = (
         "kind meeting_id outcome",
         "Webex reported {kind} for meeting {meeting_id}: {outcome}.",
         "A verified webhook of Webex Meetings was processed.",
+    ),
+    _e(
+        "webhook.note_failed",
+        _OPS,
+        "warning",
+        "source error",
+        "The last {source} webhook could not be noted: {error}.",
+        "A verified webhook was processed, but storing it as the platform's latest inbound "
+        "event failed (ADR 0082 point 5); the event itself is recorded.",
+        _CHECK_HOST,
     ),
     _e(
         "webhook.wxcc",
@@ -1460,10 +1479,36 @@ _AUDIT = (
         "On failure: open the group's *Integrations*; it names the provider's reason.",
     ),
     _e(
+        "integration.health",
+        _SYS,
+        "outcome",
+        "platform from to requests failures why",
+        "The {platform} connection went from {from} to {to}: {failures} of {requests} requests "
+        "failed ({why}).",
+        "The health of a connection changed (ADR 0082 point 7), computed from the request events "
+        "of the last `integration_health_window_minutes`; `down` is an outage, `degraded` a "
+        "warning, and the return to `ok` after `integration_recovery_minutes` closes the alert.",
+        "`down` with `token_refresh`: authorise the Service App again on *Koppelingen*. With "
+        "`failures`: the booking timelines name the provider's reasons. With `probe`: run the "
+        "group check.",
+    ),
+    _e(
+        "integration.webhooks_missing",
+        _SYS,
+        "outcome",
+        "count",
+        "The reconcile found {count} task states the webhooks did not bring.",
+        "The worker asked the contact center about tasks that stayed queued or connected (ADR "
+        "0082 point 6) and found a different state: the webhook subscription may be `inactive` "
+        "or the webhook address unreachable. A run that finds none closes the alert.",
+        "On *Koppelingen*, check the webhook subscription and *Last events*; re-register the "
+        "webhook (runbook, section 6).",
+    ),
+    _e(
         "integration.request",
         _SYS,
         "outcome",
-        "method path status ms tracking version",
+        "method path status ms tracking version platform",
         "{method} {path} for booking {booking_id} answered {status} in {ms} ms: {outcome}.",
         "One request in a booking's chain to Webex or Contact Center (ADR 0065).",
         "On failure: the booking's timeline shows the provider's reason.",

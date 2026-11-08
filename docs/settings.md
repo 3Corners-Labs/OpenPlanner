@@ -100,6 +100,12 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `TLS_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | A lasting certificate finding is reported again at this interval (ADR 0064). |
 | `TLS_CERTIFICATE_SOURCE` | enum | `acme` | acme, own | `settings.platform.manage` | Where the bundled proxy's certificate comes from: Let's Encrypt (acme) or the pair uploaded in the portal (own); 'own' needs an upload (ADR 0072). |
 | `INTEGRATION_CHECK_INTERVAL_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The worker checks every group with a Webex host or a contact-center mapping this often and reports a broken chain as a system event (ADR 0065, 0082). |
+| `TASK_RECONCILE_INTERVAL_MINUTES` | int | `5` | 1–60 | `settings.platform.manage` | How often the worker reads the state of tasks the webhooks left queued or connected, and recomputes the health of the connections (ADR 0082). |
+| `TASK_RECONCILE_AFTER_MINUTES` | int | `10` | 1–120 | `settings.platform.manage` | A task still queued or connected this long after its start and its last change is read at the contact center (ADR 0082). |
+| `INTEGRATION_HEALTH_WINDOW_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | The window of request events the health of a connection is computed over (ADR 0082). |
+| `INTEGRATION_DEGRADED_FAILURE_PERCENT` | int | `25` | 1–100 | `settings.platform.manage` | Share of failed requests above which a connection is degraded, a warning (ADR 0082). |
+| `INTEGRATION_DOWN_FAILURE_PERCENT` | int | `75` | 1–100 | `settings.platform.manage` | Share of failed requests above which a connection is down, an outage; at least the degraded share (ADR 0082). |
+| `INTEGRATION_RECOVERY_MINUTES` | int | `10` | 1–120 | `settings.platform.manage` | A failing connection is healthy this long, without a failed request, before it counts as ok again (ADR 0082). |
 | `INTEGRATION_PROBE_TIMEOUT_SECONDS` | int | `60` | 10–300 | `settings.platform.manage` | How long a group check waits for the task:new and task:ended events of its probe work item before it reports the webhook path broken (ADR 0082). |
 | `JOB_OVERDUE_MINUTES` | int | `10` | 1–1440 | `settings.platform.manage` | A pending job this many minutes past its planned time counts as overdue in a group's integration check (ADR 0068). |
 | `STAFF_INVITE_EXPIRY_DAYS` | int | `7` | 1–30 | `settings.platform.manage` | Days an invitation or password reset link of a staff member stays valid (ADR 0095). |

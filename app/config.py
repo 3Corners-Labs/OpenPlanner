@@ -26,6 +26,7 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
+from app.domain.connection_health import HealthPolicy
 from app.domain.event_schema import Envelope
 from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
@@ -512,6 +513,15 @@ class Settings(BaseSettings):
     # Class C: how long the group check waits for the webhook events of its probe work item
     # (ADR 0082 point 2).
     integration_probe_timeout_seconds: int = Field(default=60, ge=10, le=300)
+    # Class C (ADR 0082 points 6 and 7): how often the worker reconciles stale tasks and
+    # recomputes the health of the connections, how long a task may go without a change, and
+    # the health thresholds.
+    task_reconcile_interval_minutes: int = Field(default=5, ge=1, le=60)
+    task_reconcile_after_minutes: int = Field(default=10, ge=1, le=120)
+    integration_health_window_minutes: int = Field(default=15, ge=5, le=120)
+    integration_degraded_failure_percent: int = Field(default=25, ge=1, le=100)
+    integration_down_failure_percent: int = Field(default=75, ge=1, le=100)
+    integration_recovery_minutes: int = Field(default=10, ge=1, le=120)
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":
@@ -520,6 +530,15 @@ class Settings(BaseSettings):
         if problem:
             raise ValueError(problem)
         return self
+
+    def health_policy(self) -> HealthPolicy:
+        """Return the thresholds of the connection health (ADR 0082 point 7)."""
+        return HealthPolicy(
+            timedelta(minutes=self.integration_health_window_minutes),
+            self.integration_degraded_failure_percent,
+            self.integration_down_failure_percent,
+            timedelta(minutes=self.integration_recovery_minutes),
+        )
 
     def cross_field_problem(self) -> str | None:
         """Return the first rule that combined values break, or ``None``.
@@ -530,6 +549,11 @@ class Settings(BaseSettings):
             return "STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT"
         if self.planner_rebook_reminder_days >= self.planner_rebook_days:
             return "PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS"
+        if self.integration_down_failure_percent < self.integration_degraded_failure_percent:
+            return (
+                "INTEGRATION_DOWN_FAILURE_PERCENT must not be below "
+                "INTEGRATION_DEGRADED_FAILURE_PERCENT"
+            )
         if self.queue_wait_target_minutes > self.queue_wait_warning_minutes:
             return "QUEUE_WAIT_TARGET_MINUTES must not be above QUEUE_WAIT_WARNING_MINUTES"
         if (self.web_tls_cert_file is None) != (self.web_tls_key_file is None):
