@@ -132,7 +132,8 @@
       "locales": [
         "nl",
         "en"
-      ]
+      ],
+      "island": true
     },
     {
       "name": "add widget",
