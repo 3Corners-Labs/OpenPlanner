@@ -76,8 +76,8 @@ the gate and the test, and changing them is a decision (ADR 0078).
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR accepted | #NNN | merged |
-| 1 | Gate blocks (points 1 and 2), tests on the overview and rows (points 3 to 5), `scripts/adr_tables.py` (point 6), orphan sync (point 7), release PR list (point 8), reconciliation (point 9), template and CLAUDE.md | #NNN | merged |
+| 0 | ADR accepted | #595 | merged |
+| 1 | Gate blocks (points 1 and 2), tests on the overview and rows (points 3 to 5), `scripts/adr_tables.py` (point 6), orphan sync (point 7), release PR list (point 8), reconciliation (point 9), template and CLAUDE.md | #595 | merged |
 | 2 | Version picker marks a design-only candidate (point 8) | | planned |
 
 ## Consequences
