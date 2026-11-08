@@ -1,13 +1,15 @@
-"""Creating a booking's meeting and work item, used by the worker and by direct calls.
+"""Creating a booking's meeting and contact-center task, used by the worker and by direct calls.
 
 Every step is idempotent: a booking that already has its meeting or task is left alone, and
-a group without the integration is skipped. Each success is recorded on the booking's
+a group without the integration is skipped. The task goes to the dispatcher of the group's
+platform (``ContactCenterKind``, ADR 0032); it is ended by the dispatcher of the platform that
+holds it. Each success is recorded on the booking's
 timeline. How the start time reads for agents is decided at the edge (``start_label``).
 
-Ending a cancelled booking's work item (ADR 0021), v2 first:
+Ending a cancelled booking's task (ADR 0021), the cancellation message first:
 
-    end_task ─► Task Messages v2 ─► task_marked_cancelled   (refused: integration_error)
-             ─► End Task v1     ─► task_end_requested      (refused: end_not_possible, code)
+    end_task ─► mark_cancelled ─► task_marked_cancelled   (refused: integration_error)
+             ─► end_task       ─► task_end_requested      (refused: end_not_possible, code)
 """
 
 from collections.abc import Awaitable, Callable
@@ -15,24 +17,30 @@ from dataclasses import replace
 from datetime import datetime
 
 from app.domain.booking import Booking
-from app.domain.calls import EventKind, TaskState, meeting_request, work_item
+from app.domain.calls import EventKind, TaskState, contact_center_task, meeting_request
+from app.domain.contact_center import ContactCenterTaskRef
 from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
-from app.domain.ports import ContactCenterDispatcher, IntegrationError, UnitOfWork, VideoProvider
+from app.domain.ports import (
+    ContactCenterDispatchers,
+    IntegrationError,
+    UnitOfWork,
+    VideoProvider,
+)
 from app.domain.scheduling import Group
 
 StartLabel = Callable[[Booking, Group], str]
 
 
 class CallService:
-    """Creates and removes meetings and work items for bookings.
+    """Creates and removes meetings and contact-center tasks for bookings.
 
     Args:
         uow: Stores meeting and task ids.
         integration: Records events on the booking's timeline.
         video: Video provider, or ``None`` when Webex is not configured.
-        dispatcher: WxCC dispatcher, or ``None`` when WxCC is not configured.
+        dispatchers: The dispatcher per contact-center platform; empty when none is configured.
         start_label: Formats the start time for agents.
     """
 
@@ -41,7 +49,7 @@ class CallService:
         uow: UnitOfWork,
         integration: IntegrationService,
         video: VideoProvider | None,
-        dispatcher: ContactCenterDispatcher | None,
+        dispatchers: ContactCenterDispatchers,
         start_label: StartLabel,
         fallback: FallbackService | None = None,
     ) -> None:
@@ -49,7 +57,7 @@ class CallService:
         self._uow = uow
         self._integration = integration
         self._video = video
-        self._dispatcher = dispatcher
+        self._dispatchers = dispatchers
         self._start_label = start_label
         self._fallback = fallback
 
@@ -60,8 +68,8 @@ class CallService:
 
     @property
     def dispatch_available(self) -> bool:
-        """Whether work items can be created (needs video for the meeting link)."""
-        return self._video is not None and self._dispatcher is not None
+        """Whether tasks can be created (needs video for the meeting link)."""
+        return self._video is not None and bool(self._dispatchers)
 
     async def ensure_meeting(self, booking: Booking, group: Group) -> Booking:
         """Create the booking's meeting if the group has video and it has none yet."""
@@ -75,25 +83,32 @@ class CallService:
         return _with(booking, meeting=meeting)
 
     async def ensure_task(self, booking: Booking, group: Group) -> Booking:
-        """Create the booking's work item if WxCC is on for the group and it has none yet.
+        """Create the booking's task if the group dispatches and the booking has none yet.
+
+        The task goes to the dispatcher of the group's platform; a group whose platform has
+        no dispatcher configured is skipped like a group without a contact center.
 
         Raises:
             IntegrationError: ``meeting_missing`` (retryable) while the meeting is not there.
         """
-        if self._dispatcher is None or not group.dispatch_enabled or booking.wxcc_task_id:
+        routing = group.contact_center
+        if routing is None or not group.dispatch_enabled or booking.contact_center_task:
+            return booking
+        dispatcher = self._dispatchers.get(routing.kind)
+        if dispatcher is None:
             return booking
         if await self.diverts(booking, group):
             return booking
         if booking.meeting is None:
             raise IntegrationError("meeting_missing", retryable=True)
-        task_id = await self._dispatcher.create_task(
-            work_item(booking, group, start_label=self._start_label(booking, group))
+        task_id = await dispatcher.create_task(
+            contact_center_task(booking, group, start_label=self._start_label(booking, group))
         )
-        booking_id = _id(booking)
+        booking_id, task = _id(booking), ContactCenterTaskRef(task_id, routing.kind)
         async with self._uow.locked() as tx:
-            await tx.save_task_id(booking_id, task_id)
+            await tx.save_task(booking_id, task)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
-        return _with(booking, wxcc_task_id=task_id)
+        return _with(booking, contact_center_task=task)
 
     async def diverts(self, booking: Booking, group: Group) -> bool:
         """Put a booking due for dispatch in the own queue while its group is in fallback."""
@@ -105,7 +120,7 @@ class CallService:
             await self._fallback.dispatch_failed(booking_id)
 
     async def create_now(self, booking: Booking, group: Group, now: datetime) -> None:
-        """Create the meeting and work item of a direct call in the request, not the worker.
+        """Create the meeting and task of a direct call in the request, not the worker.
 
         Each step first takes the booking's pending job the way the worker claims it, so the
         worker leaves it alone and only one side makes the external resource. A step the
@@ -119,7 +134,10 @@ class CallService:
             booking_id, JobType.CREATE_VIDEO_ROOM, now, lambda: self.ensure_meeting(booking, group)
         )
         await self._claimed(
-            booking_id, JobType.DISPATCH_WXCC_TASK, now, lambda: self.ensure_task(booking, group)
+            booking_id,
+            JobType.DISPATCH_CONTACT_CENTER_TASK,
+            now,
+            lambda: self.ensure_task(booking, group),
         )
 
     async def _claimed(
@@ -152,27 +170,30 @@ class CallService:
 
     @property
     def end_available(self) -> bool:
-        """Whether work items can be ended (needs only WxCC)."""
-        return self._dispatcher is not None
+        """Whether tasks can be ended (needs only a contact center)."""
+        return bool(self._dispatchers)
 
     async def end_task(self, booking: Booking) -> None:
-        """Mark a cancelled booking's work item cancelled (v2), then try to end it (v1).
+        """Mark a cancelled booking's task cancelled, then try to end it.
 
-        Nothing happens without a task, or once WxCC reported it ended or failed. A retry
-        after a successful mark does not mark again.
+        Nothing happens without a task, without a dispatcher for the platform that holds it, or
+        once the platform reported it ended or failed. A retry after a successful mark does not
+        mark again.
 
         Raises:
             IntegrationError: Retryable failures, so the job tries again.
         """
-        if self._dispatcher is None or not booking.wxcc_task_id:
+        task = booking.contact_center_task
+        dispatcher = self._dispatchers.get(task.kind) if task else None
+        if task is None or dispatcher is None:
             return
-        task_id, booking_id = booking.wxcc_task_id, _id(booking)
+        task_id, booking_id = task.id, _id(booking)
         status = await self._integration.status(booking_id)
         if status.task in (TaskState.ENDED, TaskState.FAILED):
             return
         if status.task is not TaskState.CANCELLED:
             try:
-                await self._dispatcher.mark_cancelled(task_id, booking.reference)
+                await dispatcher.mark_cancelled(task_id, booking.reference)
             except IntegrationError as error:
                 if error.retryable:
                     raise
@@ -182,7 +203,7 @@ class CallService:
             else:
                 await self._integration.record(booking_id, EventKind.TASK_MARKED_CANCELLED)
         try:
-            await self._dispatcher.end_task(task_id)
+            await dispatcher.end_task(task_id)
         except IntegrationError as error:
             if error.retryable:
                 raise

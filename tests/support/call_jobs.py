@@ -9,15 +9,14 @@ from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeDispatcher, FakeVideo
+from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
 from tests.fakes.jobs import FakeQueue
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.domain import NOW, TEST_TOKEN_KEY, book, make_group, window
+from tests.support.domain import NOW, TEST_TOKEN_KEY, book, make_group, webex_routing, window
 
 WIRED = {
     "video_host_email": "host@example.nl",
-    "wxcc_business_address": "openplanner@example.biz",
-    "wxcc_channel": "openplanner-video",
+    "contact_center": webex_routing("openplanner@example.biz", "openplanner-video"),
 }
 """The group fields that connect a group to the video provider and the contact centre."""
 
@@ -50,7 +49,7 @@ class Setup:
             None,
             composer,
             video=self.video,
-            dispatcher=self.dispatcher,
+            dispatchers=webex_cc(self.dispatcher),
             integration=self.integration,
         )
 

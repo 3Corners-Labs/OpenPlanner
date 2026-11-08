@@ -11,14 +11,13 @@ from app.domain.ports import IntegrationError, MeetingRequest
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeDispatcher, FakeVideo
+from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.domain import NOW, TEST_TOKEN_KEY, book, make_group, window
+from tests.support.domain import NOW, TEST_TOKEN_KEY, book, make_group, webex_routing, window
 
 WIRED = {
     "video_host_email": "host@example.nl",
-    "wxcc_business_address": "openplanner@example.biz",
-    "wxcc_channel": "openplanner-video",
+    "contact_center": webex_routing("openplanner@example.biz", "openplanner-video"),
 }
 
 
@@ -48,12 +47,12 @@ async def _setup(video_factory=FakeVideo):  # type: ignore[no-untyped-def]
     booking_id = receipt.booking.id or 0
     state.jobs[booking_id] = [
         PlannedJob(JobType.CREATE_VIDEO_ROOM, NOW, None),
-        PlannedJob(JobType.DISPATCH_WXCC_TASK, NOW, None),
+        PlannedJob(JobType.DISPATCH_CONTACT_CENTER_TASK, NOW, None),
     ]
     video = video_factory(uow, booking_id) if video_factory is not FakeVideo else FakeVideo()
     dispatcher = FakeDispatcher()
     integration = IntegrationService(uow, clock, AdminService(uow, clock))
-    calls = CallService(uow, integration, video, dispatcher, lambda b, g: "label")
+    calls = CallService(uow, integration, video, webex_cc(dispatcher), lambda b, g: "label")
     return uow, calls, video, dispatcher, receipt.booking, booking_id
 
 
@@ -64,7 +63,7 @@ async def test_the_request_takes_both_jobs_and_makes_one_meeting_and_one_task() 
 
     assert (len(video.created), len(dispatcher.items)) == (1, 1)
     left = {j.type for j in uow.state.jobs[booking_id]}
-    assert not left & {JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_WXCC_TASK}
+    assert not left & {JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_CONTACT_CENTER_TASK}
 
 
 async def test_the_worker_cannot_claim_the_meeting_job_while_the_request_makes_it() -> None:

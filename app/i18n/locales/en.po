@@ -1504,6 +1504,12 @@ msgstr "Webex host (email address)"
 msgid "admin.field.video_host_email_hint"
 msgstr "Licensed account the meetings are scheduled on. {Agents} with an organisation account become cohost."
 
+msgid "admin.field.contact_center"
+msgstr "Contact center routing"
+
+msgid "admin.contact_center.webex_cc"
+msgstr "Webex Contact Center"
+
 msgid "admin.field.wxcc_business_address"
 msgstr "WxCC business address"
 

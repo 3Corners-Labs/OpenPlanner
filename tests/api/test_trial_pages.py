@@ -15,7 +15,7 @@ from app.domain.ports import IntegrationError
 from app.domain.scheduling import JoinClient
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeDispatcher, FakeVideo
+from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
 from tests.support.domain import NOW
 from tests.support.participant import confirm_newest, emailed_token, open_link
 
@@ -57,7 +57,9 @@ class Site:
 async def site(demo_settings: Settings) -> AsyncIterator[Site]:
     await _configure(demo_settings.database_url, video_host_email=HOST)
     clock, video = FixedClock(NOW), FakeVideo()
-    async with app_client(demo_settings, clock, Integrations(None, video, FakeDispatcher())) as c:
+    async with app_client(
+        demo_settings, clock, Integrations(None, video, webex_cc(FakeDispatcher()))
+    ) as c:
         yield await Site(c, clock, video).booked()
 
 
@@ -154,7 +156,7 @@ async def test_a_group_without_the_switch_offers_no_trial_call(
     await _configure(demo_settings.database_url, video_host_email=HOST, trial_call_enabled=False)
     video = FakeVideo()
     async with app_client(
-        demo_settings, FixedClock(NOW), Integrations(None, video, FakeDispatcher())
+        demo_settings, FixedClock(NOW), Integrations(None, video, webex_cc(FakeDispatcher()))
     ) as client:
         site = await Site(client, FixedClock(NOW), video).booked()
         page = await client.get(f"{site.base}/test")
@@ -235,7 +237,7 @@ async def test_without_webex_a_new_trial_call_cannot_open_but_an_open_one_keeps_
 ) -> None:
     await site.open()  # opened while Webex was there
     async with app_client(
-        demo_settings, FixedClock(NOW), Integrations(None, None, FakeDispatcher())
+        demo_settings, FixedClock(NOW), Integrations(None, None, webex_cc(FakeDispatcher()))
     ) as client:
         base = await open_link(client, site.token)
         page = await client.get(f"{base}/test")
@@ -249,7 +251,7 @@ async def test_without_webex_a_new_trial_call_cannot_open_but_an_open_one_keeps_
     async with app_client(
         demo_settings,
         FixedClock(NOW + timedelta(hours=1)),
-        Integrations(None, None, FakeDispatcher()),
+        Integrations(None, None, webex_cc(FakeDispatcher())),
     ) as client:
         later = await client.get(f"{await open_link(client, site.token)}/test")
 

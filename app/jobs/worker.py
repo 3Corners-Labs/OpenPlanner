@@ -212,7 +212,7 @@ async def run_worker(
             TaskReconciler(
                 uow,
                 clock,
-                wired.dispatcher,
+                wired.dispatchers,
                 integration,
                 lambda: timedelta(minutes=live.settings.task_reconcile_after_minutes),
             ),
@@ -235,7 +235,7 @@ async def run_worker(
                     management_token_key_previous(settings),
                 ),
                 video=wired.video,
-                dispatcher=wired.dispatcher,
+                dispatchers=wired.dispatchers,
                 integration=integration,
                 fallback=fallback,
                 retention=lambda: live.settings.event_retention,
@@ -376,7 +376,7 @@ async def run_worker(
         poll_seconds=settings.worker_poll_seconds,
         fallback_mail=fallback_mail(settings) is not None,
         video_enabled=wired.video is not None,
-        dispatch_enabled=wired.dispatcher is not None,
+        dispatch_enabled=bool(wired.dispatchers),
         release_check=settings.update_repository is not None,
     )
     try:

@@ -68,11 +68,19 @@ ALIASES: frozenset[str] = frozenset({"name", "answers", "note"})
 ADR 0102 point 13, kept so a log line that still uses the word is masked). The log mask covers
 these too."""
 
-DERIVED_FIELDS: tuple[str, ...] = ("video_room_id", "trial_room_id", "wxcc_task_id", "claimed_by")
+DERIVED_FIELDS: tuple[str, ...] = (
+    "video_room_id",
+    "trial_room_id",
+    "contact_center_task_id",
+    "wxcc_task_id",
+    "claimed_by",
+)
 """Columns of ``Booking`` that are no personal data on their own but find it again: the
-ids of the meeting, the trial meeting and the work item (the key to a record at Cisco that
-holds the participant's name and email address) and the agent who claimed the booking
-(ADR 0102 point 11). The purge empties them with the personal fields; they are not shown on
+ids of the meeting, the trial meeting and the contact-center task (the key to a record at the
+platform that holds the participant's name and email address) and the agent who claimed the
+booking (ADR 0102 point 11). ``wxcc_task_id`` is the task id's column of before ADR 0032; it is
+still written alongside ``contact_center_task_id`` until it is dropped a minor later (ADR 0116),
+so the purge empties both. The purge empties them with the personal fields; they are not shown on
 the *Data fields* card and not masked in logs."""
 
 ROUTING_FIELDS: tuple[str, ...] = ("subject_code", "routing_answers")

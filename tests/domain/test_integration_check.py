@@ -25,7 +25,7 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeChecker
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, two_organisations
-from tests.support.domain import NOW, make_group
+from tests.support.domain import NOW, make_group, webex_routing
 
 OK = Finding(CheckArea.WEBEX, "webex.host_ok", CheckStatus.OK, (("host", "h@example.nl"),))
 WARN = Finding(CheckArea.WXCC, "wxcc.screenpop.missing", CheckStatus.WARN)
@@ -290,8 +290,7 @@ def _with_mapping(uow: InMemoryUnitOfWork, *ids: int) -> None:
     for group_id in ids:
         uow.state.groups[group_id] = replace(
             uow.state.groups[group_id],
-            wxcc_channel="openplanner-video",
-            wxcc_business_address="openplanner@example.biz",
+            contact_center=webex_routing("openplanner@example.biz", "openplanner-video"),
         )
 
 

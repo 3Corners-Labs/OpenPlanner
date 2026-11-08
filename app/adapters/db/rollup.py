@@ -14,6 +14,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.db.contact_center_rows import purge_columns
 from app.adapters.db.models import (
     BookingDayCountRow,
     BookingEventRow,
@@ -24,7 +25,6 @@ from app.adapters.db.models import (
 )
 from app.domain.booking import BookingStatus
 from app.domain.booking_rollup import DayCount, RollableBooking
-from app.domain.privacy import PURGED_FIELDS
 
 _OPEN_JOBS = ("pending", "running")
 
@@ -46,9 +46,7 @@ class RollupQueries:
         Each row says whether a column of ``privacy.PURGED_FIELDS`` is still filled and how many
         pending or running jobs it has, so the domain can refuse it.
         """
-        filled = or_(
-            *(getattr(BookingRow, name).is_not(None) for name in PURGED_FIELDS),
-        )
+        filled = or_(*(column.is_not(None) for column in purge_columns()))
         open_jobs = (
             select(func.count(JobRow.id))
             .where(JobRow.booking_id == BookingRow.id, JobRow.status.in_(_OPEN_JOBS))

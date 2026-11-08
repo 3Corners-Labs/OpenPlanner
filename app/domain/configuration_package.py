@@ -49,6 +49,7 @@ CONFIGURATION_TABLES = frozenset(
         "channel_settings",
         "closure_images",
         "closure_scenarios",
+        "group_contact_center",
         "group_contacts",
         "group_form_fields",
         "group_holiday_calendars",

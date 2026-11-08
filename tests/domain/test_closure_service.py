@@ -148,7 +148,7 @@ async def test_confirming_inside_a_closure_puts_the_booking_on_hold(
     planned = _jobs(uow, booking_id)
     assert JobType.SEND_SUSPENSION in planned
     assert JobType.CREATE_VIDEO_ROOM not in planned
-    assert JobType.DISPATCH_WXCC_TASK not in planned
+    assert JobType.DISPATCH_CONTACT_CENTER_TASK not in planned
     assert JobType.SEND_CONFIRMATION not in planned
 
 

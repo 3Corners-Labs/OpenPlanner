@@ -1,9 +1,9 @@
 """Simulated platform events for trying OpenPlanner without Webex agents (never in production).
 
-The simulator on an admin booking page plays the events Webex and WxCC would send: an agent
-accepts the work item, host and participant join, the meeting ends. The admin portal signs them
-and posts them to OpenPlanner's own webhook endpoints, so they take the real path. This
-service holds the rules around it:
+The simulator on an admin booking page plays the events Webex and the contact center would
+send: an agent accepts the work item, host and participant join, the meeting ends. The admin
+portal signs them and posts them to OpenPlanner's own webhook endpoints, so they take the real
+path. This service holds the rules around it:
 
     prepare(principal, slug, id)        stand-in meeting and task ids for a booking without
                                         them, and an open stand-in trial call (ADR 0071) where
@@ -23,6 +23,7 @@ from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Booking, MeetingRef, TrialCall
 from app.domain.calls import EventKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, Transaction, UnitOfWork
@@ -34,6 +35,17 @@ SIMULATED_LINK = "https://simulated-meeting.invalid/join"
 
 SIMULATED_DETAIL = "simulated"
 """Timeline detail of the stand-in meeting and task, so nobody mistakes them for real ones."""
+
+SIMULATED_PLATFORM = ContactCenterKind.WEBEX_CC
+"""The platform whose task events the simulator plays: it signs and posts WxCC's events to
+``/webhooks/wxcc`` (``app.adapters.simulated_events``), so a group without a contact center gets
+a WxCC stand-in task. Not a legacy default: it is what the simulator imitates."""
+
+
+def simulated_platform(group: Group) -> ContactCenterKind:
+    """Return the platform of a stand-in task: the group's, else the one the simulator plays."""
+    return group.contact_center.kind if group.contact_center else SIMULATED_PLATFORM
+
 
 PREPARE_EVENT = "simulator.prepare"
 PLAY_EVENT = "simulator.event"
@@ -100,10 +112,11 @@ class SimulationService:
                 meeting_id = f"simulated-meeting-{booking_id}"
                 await tx.save_meeting(booking_id, MeetingRef(meeting_id, SIMULATED_LINK))
                 created.append(EventKind.MEETING_CREATED)
-            task_id = booking.wxcc_task_id
+            task_id = booking.contact_center_task.id if booking.contact_center_task else None
             if task_id is None:
                 task_id = f"simulated-task-{booking_id}"
-                await tx.save_task_id(booking_id, task_id)
+                task = ContactCenterTaskRef(task_id, simulated_platform(group))
+                await tx.save_task(booking_id, task)
                 created.append(EventKind.TASK_CREATED)
             trial_id = booking.trial.meeting.id if booking.trial else None
             if trial_state(booking, group, now) is TrialState.AVAILABLE:
@@ -130,7 +143,7 @@ class SimulationService:
             booking, _ = await _booking(tx, slug, booking_id)
         return SimulationIds(
             booking.meeting.id if booking.meeting else None,
-            booking.wxcc_task_id,
+            booking.contact_center_task.id if booking.contact_center_task else None,
             booking.trial.meeting.id if booking.trial else None,
         )
 

@@ -131,6 +131,7 @@ from app.domain.authorization import (
     role_keys,
     scope_for,
 )
+from app.domain.contact_center import ContactCenterKind
 from app.domain.entitlements import ClaimMode, LoginClaims, resolve
 from app.domain.errors import DomainError
 from app.domain.identity import PLATFORM
@@ -771,7 +772,7 @@ async def integrations(
         access_expires=moment(health.access_expires_at) if health else None,
         refresh_expires=moment(health.refresh_expires_at) if health else None,
         refresh_expiring_soon=bool(health and health.refresh_expiring_soon),
-        wxcc=wired.dispatcher is not None,
+        wxcc=ContactCenterKind.WEBEX_CC in wired.dispatchers,
         webex_webhook=f"{base}/webhooks/webex",
         webex_secret=settings.webex_webhook_secret is not None,
         wxcc_webhook=f"{base}/webhooks/wxcc",

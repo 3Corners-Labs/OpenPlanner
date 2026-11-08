@@ -44,7 +44,7 @@ def test_base_plan() -> None:
     assert plan() == [
         PlannedJob(JobType.CREATE_VIDEO_ROOM, NOW, START),
         PlannedJob(JobType.SEND_CONFIRMATION, NOW, START, ChannelKind.EMAIL),
-        PlannedJob(JobType.DISPATCH_WXCC_TASK, START - timedelta(minutes=5), START),
+        PlannedJob(JobType.DISPATCH_CONTACT_CENTER_TASK, START - timedelta(minutes=5), START),
         PlannedJob(JobType.PURGE_PII, END + timedelta(hours=24), None),
     ]
 
@@ -97,20 +97,22 @@ def test_reminder_exactly_at_now_is_skipped() -> None:
 
 def test_dispatch_follows_the_groups_lead() -> None:
     dispatch = [
-        j for j in plan(dispatch_lead=timedelta(minutes=15)) if j.type is JobType.DISPATCH_WXCC_TASK
+        j
+        for j in plan(dispatch_lead=timedelta(minutes=15))
+        if j.type is JobType.DISPATCH_CONTACT_CENTER_TASK
     ]
 
     assert dispatch == [
-        PlannedJob(JobType.DISPATCH_WXCC_TASK, START - timedelta(minutes=15), START)
+        PlannedJob(JobType.DISPATCH_CONTACT_CENTER_TASK, START - timedelta(minutes=15), START)
     ]
 
 
 def test_dispatch_is_not_planned_in_the_past() -> None:
     late_now = START - timedelta(minutes=2)
 
-    dispatch = [j for j in plan(now=late_now) if j.type is JobType.DISPATCH_WXCC_TASK]
+    dispatch = [j for j in plan(now=late_now) if j.type is JobType.DISPATCH_CONTACT_CENTER_TASK]
 
-    assert dispatch == [PlannedJob(JobType.DISPATCH_WXCC_TASK, late_now, START)]
+    assert dispatch == [PlannedJob(JobType.DISPATCH_CONTACT_CENTER_TASK, late_now, START)]
 
 
 def test_cancellation_plan() -> None:
@@ -206,7 +208,7 @@ def test_pending_booking_plan_has_no_meeting_task_or_reminder() -> None:
     }
 
     assert types.isdisjoint(
-        {JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_WXCC_TASK, JobType.SEND_REMINDER}
+        {JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_CONTACT_CENTER_TASK, JobType.SEND_REMINDER}
     )
 
 

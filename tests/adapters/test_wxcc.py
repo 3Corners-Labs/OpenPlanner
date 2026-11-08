@@ -2,33 +2,37 @@
 
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import httpx
 import pytest
 
 from app.adapters.wxcc import (
+    BUSINESS_ADDRESS,
+    CHANNEL,
+    DESCRIPTOR,
     WORK_ITEM_FIELDS,
     WxccTasks,
     cancellation_body,
     task_body,
     task_snapshot,
 )
-from app.domain.calls import TaskSnapshot, TaskState, WorkItem
+from app.domain.calls import ContactCenterTask, TaskSnapshot, TaskState
+from app.domain.contact_center import ContactCenterKind
 from app.domain.ports import IntegrationError
 from tests.fakes.clock import FixedClock
 from tests.fakes.tokens import authorized_client
-from tests.support.domain import NOW
+from tests.support.domain import NOW, webex_routing
 
-ITEM = WorkItem(
+ITEM = ContactCenterTask(
     reference="OP-000123",
     first_name="Ada",
     start_label="5 jan 2026, 09:00",
     group_name="Demo: videogesprek",
     meeting_link="https://site.webex.com/m/1",
     kind="scheduled",
-    business_address="openplanner@example.biz",
-    channel="openplanner-video",
+    routing=webex_routing("openplanner@example.biz", "openplanner-video"),
     routing_value="demo",
 )
 
@@ -63,6 +67,22 @@ def test_task_body_matches_the_create_task_v2_contract() -> None:
     assert tuple(data) == WORK_ITEM_FIELDS  # the schema check in wxcc-config-check uses these
     assert len(data) <= 50
     assert all(len(str(v).encode()) <= 1024 for v in data.values())
+
+
+def test_the_descriptor_states_what_wxcc_needs_per_group() -> None:
+    assert DESCRIPTOR.kind is ContactCenterKind.WEBEX_CC
+    assert DESCRIPTOR.required == {BUSINESS_ADDRESS, CHANNEL}
+    assert DESCRIPTOR.routing_value_max_length == 512  # flowSettings values up to 512 bytes
+    assert {s.name: s.max_length for s in DESCRIPTOR.attributes} == {
+        BUSINESS_ADDRESS: 255,
+        CHANNEL: 255,
+    }
+
+
+def test_a_task_without_a_complete_routing_is_refused_before_it_is_sent() -> None:
+    incomplete = replace(ITEM, routing=webex_routing(channel=None))
+    with pytest.raises(IntegrationError, match="not_ready"):
+        task_body(incomplete, "alias-1", 1)
 
 
 def _tasks(handler: Callable[[httpx.Request], httpx.Response]) -> WxccTasks:
