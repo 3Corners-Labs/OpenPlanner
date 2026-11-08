@@ -56,7 +56,9 @@ class HelpTopic:
 TOPICS = (
     HelpTopic("overview", ("/admin/",), Permission.DASHBOARD_VIEW),
     # ADR 0047 steps 3 and 5: the groups list and the organisation's own page.
-    HelpTopic("groups", ("/admin/groups",), Permission.GROUP_VIEW),
+    HelpTopic("groups", ("/admin/groups", "/admin/groups/new"), Permission.GROUP_VIEW),
+    # ADR 0047 step 4: the group's first tab, with the readiness checklist.
+    HelpTopic("group-overview", ("/admin/groups/{slug}",), Permission.GROUP_VIEW),
     HelpTopic(
         "organisation",
         (
@@ -115,7 +117,19 @@ TOPICS = (
         Permission.IDENTITY_PROVIDERS_VIEW,
     ),
     HelpTopic("group-contacts", ("/admin/groups/{slug}/contact",), Permission.CLOSURE_MANAGE),
-    HelpTopic("group-closure", ("/admin/groups/{slug}/closure",), Permission.CLOSURE_MANAGE),
+    HelpTopic(
+        "group-closure",
+        (
+            "/admin/groups/{slug}/closure",
+            "/admin/groups/{slug}/closure/bookings/{booking_id}/move",
+        ),
+        Permission.CLOSURE_MANAGE,
+    ),
+    HelpTopic(
+        "organisation-closure",
+        ("/admin/organisations/{org}/closure",),
+        Permission.ORGANISATION_CLOSURE,
+    ),
     HelpTopic(
         "group-booking-form",
         ("/admin/groups/{slug}/settings/form", "/admin/groups/{slug}/settings/form/{key}"),
@@ -143,6 +157,7 @@ TOPICS = (
         "group-agenda",
         (
             "/admin/groups/{slug}/agenda",
+            "/admin/groups/{slug}/bookings/{booking_id}",
             "/admin/groups/{slug}/agenda/week",
             "/admin/groups/{slug}/agenda/bookings/{booking_id}/move",
             "/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel",

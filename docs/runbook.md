@@ -86,18 +86,19 @@ images (`OPENPLANNER_IMAGE` and `OPENPLANNER_PROXY_IMAGE` in `.env.update`).
 
 ### As an outsider (public images, ADR 0108)
 
-A minor or major release (`vX.Y.0`, from 0.4.0) is also pushed, with the same digest and the
-same signature, to two public packages: `ghcr.io/<owner>/<repo>-public` and
+Every release (`vX.Y.Z`; minor and major releases from 0.4.0, patches from the first release
+after ADR 0116 step 6, also patches from a maintenance line) is also pushed, with the same digest
+and the same signature, to two public packages: `ghcr.io/<owner>/<repo>-public` and
 `ghcr.io/<owner>/<repo>-proxy-public`. No account or login is needed to pull or verify them.
-Release candidates and patch releases are never public. The release notes of the release list
+Release candidates are never public. The release notes of the release list
 both references with their digests and the exact commands; they come down to:
 
 ```sh
 cosign verify ghcr.io/<owner>/<repo>-public@sha256:<digest> \
-  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.Z \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 cosign verify-attestation ghcr.io/<owner>/<repo>-public@sha256:<digest> --type cyclonedx \
-  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.Z \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 

@@ -12,10 +12,10 @@ from app.adapters.webex_meetings import WebexMeetings
 from app.domain.audit import AuditEvent, Category, Outcome
 from app.domain.booking import BookingStatus
 from app.domain.calls import CallState, EventKind
-from app.domain.job_plan import JobType
+from app.domain.job_plan import BACKOFF, JobType
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
-from app.jobs.runner import BACKOFF, JobRunner
+from app.jobs.runner import JobRunner
 from tests.fakes.jobs import FakeQueue, job
 from tests.fakes.messaging import RefusingSender
 from tests.fakes.tokens import authorized_client

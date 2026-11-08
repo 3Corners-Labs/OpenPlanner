@@ -22,6 +22,7 @@ import httpx
 import structlog
 
 from app.adapters import internal_ca
+from app.adapters.alert_senders import ConfiguredAlertSenders, alert_bots
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable, set_slow_query_ms
 from app.adapters.db.jobs import SqlJobQueue
@@ -42,11 +43,12 @@ from app.adapters.log_senders import build_sender
 from app.adapters.log_shipping import LogShipper, ship_settings
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.releases import update_service
-from app.adapters.senders import ConfiguredSenders, fallback_mail
+from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
 from app.config import Settings, environment, loose_secret_files
 from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
+from app.domain.alert_delivery import AlertNotifier
 from app.domain.alerts import QUEUE_WAIT_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
 from app.domain.diagnostics import DiagnosticsService
@@ -83,6 +85,7 @@ from app.jobs.runner import JobRunner
 from app.jobs.usage import backfill_usage, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
+from app.web.alert_text import alert_composer
 
 log = structlog.get_logger()
 
@@ -320,6 +323,26 @@ async def run_worker(
         ),
         reported=partial(_open_waits, uow),
     )
+    # ADR 0082 point 9: the open alerts to their email addresses and Webex spaces.
+    notifier = AlertNotifier(
+        uow,
+        clock,
+        ConfiguredAlertSenders(
+            ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
+            lambda: fallback_sender(live.settings),
+            alert_bots(engine, settings),
+            http,
+            settings.webex_api_base_url,
+            request_log,
+        ),
+        alert_composer(
+            Translator(load_catalogues(), CachedTextOverrides(uow)).gettext,
+            settings.public_base_url,
+            version,
+            settings.admin_timezone,
+        ),
+        lambda: timedelta(hours=live.settings.alert_repeat_hours),
+    )
     # ADR 0083 point 12: the TXT records of the routing login domains.
     domains = DomainWatch(
         uow,
@@ -366,6 +389,7 @@ async def run_worker(
                     await _watch_domains(domains)
                     await _check_integrations(watch)
                     await _watch_health(health_watch)
+                    await _notify(notifier)
                     await _watch_waits(waits)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
@@ -433,6 +457,17 @@ async def _watch_certificate(watch: TlsWatch) -> None:
         return
     if check is not None and not check.ok:
         log.warning("tls.certificate", finding=check.finding.value, host=check.host)
+
+
+async def _notify(notifier: AlertNotifier) -> None:
+    """Deliver the due alerts when a run is due (ADR 0082 point 9); never stops the loop.
+
+    Each failed delivery is a system event (``alert.delivery_failed``) of the notifier itself.
+    """
+    try:
+        await notifier.run()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("alert.notify_failed", error=type(exc).__name__)
 
 
 async def _watch_health(watch: IntegrationHealthWatch) -> None:

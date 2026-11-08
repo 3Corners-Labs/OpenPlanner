@@ -433,6 +433,7 @@ LAYERS = (
                 "UsageStore · UsageUnitOfWork",
                 "ConfigurationTransfer",
                 "MessageSender · SenderDirectory",
+                "AlertSender · AlertSenders · BotTokenStore",
                 "MailDomainResolver",
                 "VideoProvider",
                 "ContactCenterDispatcher",

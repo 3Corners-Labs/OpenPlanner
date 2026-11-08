@@ -42,7 +42,7 @@ from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import bind_booking, current, trace_scope
 from app.domain.integration import IntegrationService
-from app.domain.job_plan import TEAM_INVITES, JobType, is_stale
+from app.domain.job_plan import BACKOFF, TEAM_INVITES, JobType, is_stale
 from app.domain.ports import (
     Clock,
     ContactCenterDispatcher,
@@ -62,9 +62,6 @@ from app.logging import tracer
 from app.web.call_labels import agent_start_label
 
 log = structlog.get_logger()
-
-BACKOFF = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=15))
-"""Delay before attempt 2, 3 and 4; after that the job fails."""
 
 
 PRUNE_EVERY = timedelta(hours=1)

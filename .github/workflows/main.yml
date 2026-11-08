@@ -200,14 +200,16 @@ jobs:
           echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
           echo "proxy=${PROXY_IMAGE,,}" >> "$GITHUB_OUTPUT"
           echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-      # ADR 0108: only a minor or major release (vX.Y.0) also goes to the public packages. The
-      # rule is here, not in a setting: widening it publishes images irreversibly.
+      # ADR 0108, amended by ADR 0116 point 10: every release vX.Y.Z (patches included, from
+      # main or a line) also goes to the public packages, so a security fix needs no pull secret
+      # while the release it fixes does not; candidates never reach this job. The rule is here,
+      # not in a setting: widening it publishes images irreversibly.
       - id: public
         run: |
-          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.0$ ]]; then
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "app=${IMAGE,,}-public" >> "$GITHUB_OUTPUT"
             echo "proxy=${PROXY_IMAGE,,}-public" >> "$GITHUB_OUTPUT"
-            echo "::notice::$GITHUB_REF_NAME is a minor or major release: also pushed to the public packages"
+            echo "::notice::$GITHUB_REF_NAME is a release: also pushed to the public packages"
           fi
       - id: publish
         uses: ./.github/actions/publish-image
@@ -353,7 +355,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" site-*.tar.gz --clobber
       # ADR 0113: only a minor or major release goes live (v0.4.0, v1.0.0; not v0.4.1 or a
-      # candidate), as ADR 0108 does for the public images.
+      # candidate).
       - name: is this a minor or major release
         id: minor
         run: |

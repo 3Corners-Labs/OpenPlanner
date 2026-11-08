@@ -111,3 +111,12 @@ def sms_config(settings: SmsSettings, api_key: str) -> SmsGatewayConfig:
         sender_id=settings.sender_id,
         country_code=settings.country_code,
     )
+
+
+def fallback_sender(settings: Settings) -> MessageSender | None:
+    """Return the platform's fallback mail sender, or ``None`` without ``SMTP_HOST``.
+
+    The platform's alert targets send through it (ADR 0082 point 9).
+    """
+    config = fallback_mail(settings)
+    return SmtpMailSender(config) if config is not None else None
