@@ -155,6 +155,7 @@ function parseTask(text) {
 }
 
 const newlines = (raw) => (String(raw ?? '').match(/\n/g) ?? []).length;
+const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 /**
  * Build the block model of one source: the blocks, its figures in reading order, its tasks and
@@ -638,13 +639,13 @@ const FOOTER = (title) => '<div style="font-family:Arial,sans-serif;font-size:8p
 /** Read and parse one source with the workspace's variables filled in. */
 function parse(file) {
   const name = path.basename(file, '.md');
-  const raw = fs.readFileSync(file, 'utf8');
-  const text = substitute(raw, name);
+  const bytes = fs.readFileSync(file);
+  const text = substitute(bytes.toString('utf8'), name);
   const [meta, body] = splitFrontMatter(text);
   meta.title ||= (body.match(/^#\s+(.+)$/m) || [])[1] || name;
   const firstLine = newlines(text.slice(0, text.length - body.length)) + 1;
   const doc = parseDocument(body, firstLine, `${name}.md`);
-  doc.sha256 = createHash('sha256').update(raw).digest('hex');
+  doc.sha256 = sha256(bytes);
   return { name, meta, ...doc, errors: [...doc.errors, ...namedTerms(text, doc.figures, `${name}.md`)] };
 }
 
@@ -693,10 +694,14 @@ const built = [];
 for (const doc of docs) built.push(await render(doc));
 if (!named.length) {
   // What check.py checks against the matrix, the help topics and the shot list, from this one parse.
-  const manuals = docs.map((d) => ({
-    file: d.name, sha256: d.sha256, role: d.meta.role ?? '', tasks: d.tasks,
-    figures: d.figures.map((f) => ({ id: f.id, line: f.line })), bold: d.bold,
-  }));
+  // The build's own inputs, so check.py can refuse this file once a source or a variable changed.
+  const manuals = {
+    variables_sha256: sha256(fs.readFileSync(path.join(ws.dir, 'variables.json'))),
+    manuals: docs.map((d) => ({
+      file: d.name, sha256: d.sha256, role: d.meta.role ?? '', tasks: d.tasks,
+      figures: d.figures.map((f) => ({ id: f.id, line: f.line })), bold: d.bold,
+    })),
+  };
   fs.writeFileSync(path.join(ws.build, 'manuals.json'), `${JSON.stringify(manuals, null, 2)}\n`);
   // The contract for help in context: per task its screen, permission, shots, manual and anchor.
   const index = docs.flatMap((d) => d.tasks.map(({ line, ...task }) => ({ file: d.name, role: d.meta.role, html: `${d.name}.html#${task.anchor}`, ...task })));

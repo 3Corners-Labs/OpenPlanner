@@ -39,6 +39,13 @@ async function box(locator) {
   return (await locator.count()) ? locator.first().boundingBox() : null;
 }
 
+/** The box of an anchor a cut is built on; a missing anchor fails the step and names itself. */
+async function need(locator) {
+  const found = await box(locator);
+  if (!found) throw new Error(`the anchor of the cut, ${locator}, is not on the page`);
+  return found;
+}
+
 /** The window as it is. */
 export class Viewport {
   stretch = false;
@@ -67,9 +74,8 @@ export class Top {
   }
 
   async clip(page, size) {
-    const end = this.until ? await box(this.until) : null;
-    if (this.until && !end) throw new Error(`the end of the cut, ${this.until}, is not on the page`);
-    if (end) {
+    if (this.until) {
+      const end = await need(this.until);
       return [{ x: 0, y: 0, width: size.width, height: Math.min(size.height, end.y + end.height + this.margin) },
         [`van boven tot onder ${await describeTarget(this.until)} (+${this.margin} px)`]];
     }
@@ -87,13 +93,10 @@ export class Region {
   }
 
   async clip(page, size) {
-    const found = await box(this.target);
-    if (!found) throw new Error(`the region ${await describeTarget(this.target)} is not on the page`);
     const crops = [];
-    const area = { ...found };
-    const end = this.bottom ? await box(this.bottom) : null;
-    if (this.bottom && !end) throw new Error(`the end of the cut, ${await describeTarget(this.bottom)}, is not on the page`);
-    if (end) {
+    const area = { ...(await need(this.target)) };
+    if (this.bottom) {
+      const end = await need(this.bottom);
       area.height = end.y + end.height - area.y;
       crops.push(`afgesneden onder ${await describeTarget(this.bottom)}`);
     }

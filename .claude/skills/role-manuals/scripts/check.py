@@ -112,7 +112,11 @@ class Workspace:
 
 
 def guard_outside_checkout(path: Path) -> None:
-    """Stop when ``path`` lies inside a checkout of the software (same rule as workspace.mjs)."""
+    """Stop when ``path`` lies inside a checkout of the software (same rule as workspace.mjs).
+
+    Symbolic links are followed first, so a link into a checkout is refused as well.
+    """
+    path = path.resolve()
     for folder in (path, *path.parents):
         if (folder / "app" / "i18n" / "locales" / "nl.po").exists() or (
             folder / ".claude" / "skills" / "role-manuals"
@@ -144,12 +148,16 @@ def normalise(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().rstrip(".!?:").strip()
 
 
-def labels_of(bold: str) -> list[str]:
-    """Return the labels of one bold span; a path (A → B → C) gives its parts."""
+def labels_of(bold: str, variables: frozenset[str] = frozenset()) -> list[str]:
+    """Return the labels of one bold span; a path (A → B → C) gives its parts.
+
+    The spans are the filled-in text, so a part that is a value of ``variables.json`` (the name
+    of the service, say) is the organisation's word, not a text of the software.
+    """
     found = []
     for part in re.split(r"\s*→\s*", bold):
         part = normalise(part)
-        if not part or part[0] in "[0123456789" or "{{" in part or bold.strip().endswith(":"):
+        if not part or part[0] in "[0123456789" or part in variables or bold.strip().endswith(":"):
             continue
         if not STRUCTURAL.match(part):
             found.append(part)
@@ -264,14 +272,42 @@ def check_tasks(manual: dict, ctx: dict, report: Report) -> None:
         )
 
 
-def labels(manual: dict) -> list[tuple[int, str]]:
+def labels(manual: dict, variables: frozenset[str] = frozenset()) -> list[tuple[int, str]]:
     """Return (line, label) for every label in the bold spans of one manual."""
-    return [(span["line"], label) for span in manual["bold"] for label in labels_of(span["text"])]
+    return [
+        (span["line"], label)
+        for span in manual["bold"]
+        for label in labels_of(span["text"], variables)
+    ]
 
 
-def check_labels(manual: dict, catalogue: Catalogue, verdicts: dict, report: Report) -> None:
+def load_manuals(ws: Workspace, variables: Path) -> list[dict]:
+    """Return the manuals of build/manuals.json, or stop when the build is not of these inputs.
+
+    The build is current when it covers exactly the sources there are, every source's bytes hash
+    as they did, and so do the bytes of ``variables.json``, which filled in the spans.
+    """
+    found = ws.root / "build" / "manuals.json"
+    if not found.exists():
+        sys.exit(f"check.py: {found} is missing; run build.mjs {ws.root} first")
+    data = json.loads(found.read_text())
+    manuals = data.get("manuals", []) if isinstance(data, dict) else []
+    stale = {p.stem for p in ws.sources.glob("*.md")} != {m["file"] for m in manuals} or any(
+        hashlib.sha256((ws.sources / f"{m['file']}.md").read_bytes()).hexdigest() != m["sha256"]
+        for m in manuals
+    )
+    if stale or hashlib.sha256(variables.read_bytes()).hexdigest() != data.get("variables_sha256"):
+        sys.exit(
+            "check.py: the sources or variables.json changed after the last build; build again"
+        )
+    return manuals
+
+
+def check_labels(
+    manual: dict, catalogue: Catalogue, verdicts: dict, report: Report, variables: frozenset[str]
+) -> None:
     """Check that every bold label of a manual is a text of the software."""
-    for number, label in labels(manual):
+    for number, label in labels(manual, variables):
         verdict = catalogue.match(label)
         verdicts[verdict] = verdicts.get(verdict, 0) + 1
         where = f"{manual['file']}.md:{number}"
@@ -282,7 +318,12 @@ def check_labels(manual: dict, catalogue: Catalogue, verdicts: dict, report: Rep
 
 
 def since(
-    commit: str, sources: dict[Path, str], manuals: list[dict], fix: bool, report: Report
+    commit: str,
+    sources: dict[Path, str],
+    manuals: list[dict],
+    fix: bool,
+    report: Report,
+    variables: frozenset[str],
 ) -> None:
     """Report what the software changed since ``commit`` and where the manuals use it."""
     old, new = catalogue_at(commit), catalogue_at(None)
@@ -299,7 +340,7 @@ def since(
     }
     section = f"Gewijzigd in de software sinds {commit[:9]}"
     for manual in manuals:
-        for number, label in labels(manual):
+        for number, label in labels(manual, variables):
             core = normalise(label)
             where = f"{manual['file']}.md:{number}"
             if core in renamed:
@@ -382,15 +423,8 @@ def main() -> int:
     shots_file = ws.evidence / "shots.json"
     if not shots_file.exists():
         sys.exit(f"check.py: {shots_file} is missing; run capture.mjs {ws.root} --list first")
-    manuals_file = ws.root / "build" / "manuals.json"
-    if not manuals_file.exists():
-        sys.exit(f"check.py: {manuals_file} is missing; run build.mjs {ws.root} first")
-    manuals = json.loads(manuals_file.read_text())
-    for manual in manuals:
-        source = ws.sources / f"{manual['file']}.md"
-        digest = hashlib.sha256(source.read_bytes()).hexdigest() if source.exists() else None
-        if digest != manual.get("sha256"):
-            sys.exit(f"check.py: {source.name} changed after the last build; run build.mjs again")
+    manuals = load_manuals(ws, ws.root / "variables.json")
+    variables = frozenset(v.strip() for v in config.values() if isinstance(v, str) and v.strip())
     ctx: dict = {
         "shots": {s["id"] for s in json.loads(shots_file.read_text())},
         "topics": {p.stem for p in (REPO / "docs" / "manual" / "nl").glob("*.md")},
@@ -409,7 +443,7 @@ def main() -> int:
     for manual in manuals:
         check_tasks(manual, ctx, report)
         if not manual["file"].startswith("00-"):
-            check_labels(manual, catalogue, verdicts, report)
+            check_labels(manual, catalogue, verdicts, report, variables)
     missing = sorted(
         s for s in ctx["used"] if s in ctx["shots"] and not (ws.img / f"{s}.png").exists()
     )
@@ -432,7 +466,7 @@ def main() -> int:
         except argparse.ArgumentTypeError as error:
             sys.exit(f"check.py: commit in variables.json: {error}")
     if commit:
-        since(commit, sources, manuals, args.fix, report)
+        since(commit, sources, manuals, args.fix, report, variables)
     visual_changes(ws, report)
     out = ws.evidence / "check.md"
     out.parent.mkdir(parents=True, exist_ok=True)

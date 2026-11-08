@@ -5,6 +5,7 @@ labels, its rename and its matrix mapping honest.
 """
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import sys
@@ -27,6 +28,9 @@ def test_a_bold_span_gives_its_labels_and_a_path_its_parts() -> None:
     assert check.labels_of("Tip:") == []
     assert check.labels_of("Stap 2") == []
     assert check.labels_of("15 minuten") == []
+    assert check.labels_of("de afsprakenplanner → Agenda", frozenset({"de afsprakenplanner"})) == [
+        "Agenda"
+    ]
 
 
 def test_labels_carry_the_line_the_build_found() -> None:
@@ -75,7 +79,7 @@ def test_a_manual_maps_to_its_roles_by_a_word_of_its_role() -> None:
 
 
 def test_only_a_commit_hash_is_passed_to_git(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """--since and the stored commit are refused unless they are a hash; git is never run."""
     assert check.commit_hash("d36485a6ee78") == "d36485a6ee78"
@@ -86,7 +90,16 @@ def test_only_a_commit_hash_is_passed_to_git(
     (tmp_path / "build").mkdir()
     (tmp_path / "variables.json").write_text(json.dumps({"commit": "HEAD~1"}))
     (tmp_path / "evidence" / "shots.json").write_text("[]")
-    (tmp_path / "build" / "manuals.json").write_text("[]")
+    (tmp_path / "build" / "manuals.json").write_text(
+        json.dumps(
+            {
+                "variables_sha256": hashlib.sha256(
+                    (tmp_path / "variables.json").read_bytes()
+                ).hexdigest(),
+                "manuals": [],
+            }
+        )
+    )
 
     def no_git(*args: str) -> str:
         raise AssertionError(f"git was called with {args}")
@@ -95,9 +108,11 @@ def test_only_a_commit_hash_is_passed_to_git(
     monkeypatch.setattr(sys, "argv", ["check.py", str(tmp_path)])
     with pytest.raises(SystemExit, match="no commit hash"):
         check.main()
-    monkeypatch.setattr(sys, "argv", ["check.py", str(tmp_path), "--since", "--output=/tmp/x"])
-    with pytest.raises(SystemExit):
-        check.main()
+    for since in ("--since=--output=/tmp/x", "--since=HEAD~1"):
+        monkeypatch.setattr(sys, "argv", ["check.py", str(tmp_path), since])
+        with pytest.raises(SystemExit):
+            check.main()
+        assert "is no commit hash" in capsys.readouterr().err
 
 
 def test_a_workspace_inside_a_checkout_is_refused_also_through_a_link(tmp_path: Path) -> None:
@@ -106,4 +121,4 @@ def test_a_workspace_inside_a_checkout_is_refused_also_through_a_link(tmp_path: 
     link = tmp_path / "manuals"
     link.symlink_to(check.REPO / "docs")
     with pytest.raises(SystemExit, match="inside the checkout"):
-        check.guard_outside_checkout(link.resolve())
+        check.guard_outside_checkout(link)
