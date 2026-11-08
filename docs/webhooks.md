@@ -47,7 +47,8 @@ account). Cancelling deletes the meeting: `DELETE /v1/meetings/{id}?hostEmail=â€
 ## Outbound: WxCC work item
 
 `POST https://api.wxcc-<region>.cisco.com/v2/tasks` (beta). Response `201` with `data.id` (the
-task id, stored as `wxcc_task_id`).
+task id, stored as `wxcc_task_id` and, since ADR 0032, also as `contact_center_task_id` with
+kind `webex_cc`; the old column stays the one read for WxCC until the next minor).
 
 ```json
 {
@@ -131,7 +132,13 @@ not yet claimed get a fresh dispatch job and the usual request above.
 
 ## Webhook addresses
 
-Both platforms call `<WEBHOOK_BASE_URL>/webhooks/webex` and `<WEBHOOK_BASE_URL>/webhooks/wxcc`.
+Webex calls `<WEBHOOK_BASE_URL>/webhooks/webex`. A contact-center platform calls
+`<WEBHOOK_BASE_URL>/webhooks/contact-center/{kind}` (ADR 0032), for Webex Contact Center
+`/webhooks/contact-center/webex_cc`; a kind without an adapter answers `404`. The old address
+`/webhooks/wxcc` is an alias of it and stays until the WxCC subscriptions are registered at the
+new one; OpenPlanner still registers at `/webhooks/wxcc` and recognises a subscription at either
+address as its own. Both addresses share the event keys, so an event delivered to both is
+recorded once.
 `WEBHOOK_BASE_URL` is optional and defaults to `PUBLIC_BASE_URL`; it exists so that an https
 tunnel or staging host can receive webhooks while the admin login (OIDC redirect) and the
 links in messages stay on `PUBLIC_BASE_URL`. It must be https in production, and
@@ -159,6 +166,7 @@ POST /webhooks/webex   X-Spark-Signature: <hex HMAC-SHA1>
 {"resource":"meetings","event":"ended","data":{"id":"openplanner-selftest-<16 hex>"}}
 
 POST /webhooks/wxcc    X-WebexCC-Signature: <hex HMAC-SHA256>   X-WebexCC-Timestamp: <ms>
+                       (the registered address: alias of /webhooks/contact-center/webex_cc)
 {"type":"task:ended","comciscotimestamp":<ms>,"data":{"taskId":"openplanner-selftest-<16 hex>"}}
 ```
 
@@ -202,7 +210,7 @@ confirmed booking with a meeting between 15 minutes before its start and 30 minu
 end. The poll sets absolute values and adds timeline events only for transitions, marked
 `polled`; it needs the same participant scope as the webhooks.
 
-## Inbound: WxCC subscription (`POST /webhooks/wxcc`)
+## Inbound: WxCC subscription (`POST /webhooks/contact-center/webex_cc`, alias `/webhooks/wxcc`)
 
 Registered with `POST /v2/subscriptions` (`name`, `eventTypes`, `resourceVersion: task:1.0.0` (required in v2; current versions in `GET /v2/event-types`), `destinationUrl`, `secret` of 32 to 256 characters).
 `destinationUrl` must be HTTPS on port 443 with a public domain: local development needs a

@@ -6,17 +6,13 @@ same way. Reading validates every option again and leaves out what another versi
 
 import json
 
-from app.domain.contacts import ContactBlock, ContactKind, ContactOption
+from app.domain.contacts import ContactBlock, ContactKind, ContactOption, block_to_json
 from app.domain.errors import DomainError
 
 
 def contacts_json(block: ContactBlock) -> str:
     """Return a contact block as the JSON stored for organisations, groups, closures, scenarios."""
-    options = [
-        {"kind": o.kind.value, "value": o.value, "labels": dict(o.labels), "hours": dict(o.hours)}
-        for o in block.options
-    ]
-    return json.dumps({"headings": dict(block.headings), "options": options})
+    return json.dumps(block_to_json(block))
 
 
 def contacts_block(body: str) -> ContactBlock:

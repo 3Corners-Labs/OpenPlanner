@@ -44,6 +44,7 @@ from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
+from app.domain.configuration_changes import Change, ConfigurationSnapshot
 from app.domain.configuration_package import PackageSummary
 from app.domain.connection_health import (
     HealthEntry,
@@ -79,6 +80,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
+from app.domain.slot_close import EndedSlots
 from app.domain.staff import (
     GrantHolders,
     RefusedEntitlement,
@@ -1227,8 +1229,8 @@ class Transaction(Protocol):
         """Return the booking whose open trial call (ADR 0071) is the meeting ``meeting_id``."""
         ...
 
-    async def get_booking_by_task(self, task_id: str) -> Booking | None:
-        """Return the booking whose contact-center task has ``task_id``."""
+    async def get_booking_by_task(self, task_id: str, kind: ContactCenterKind) -> Booking | None:
+        """Return the booking whose contact-center task is ``task_id`` at platform ``kind``."""
         ...
 
     async def claim_booking(self, booking_id: int, claim: Claim) -> bool:
@@ -1386,6 +1388,23 @@ class Transaction(Protocol):
         insert failed: then the failure is logged without content and the transaction goes on, so
         reporting never fails a participant's action.
         """
+        ...
+
+    async def ended_slots(self, after: datetime, until: datetime, limit: int) -> EndedSlots:
+        """Return the slots that ended in (``after``, ``until``], with their bookings (ADR 0117).
+
+        At most about ``limit`` slots, oldest end first, and never half of the slots that end
+        at the same moment: ``covered_until`` is ``until`` when everything fitted, otherwise
+        the end of the last slot returned. No personal-data column is read.
+        """
+        ...
+
+    async def slots_closed_until(self) -> datetime | None:
+        """Return the end of the last slot whose closing facts were written, if any."""
+        ...
+
+    async def set_slots_closed_until(self, until: datetime) -> None:
+        """Move the end of the last closed slot forwards, in the caller's transaction."""
         ...
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
@@ -1944,6 +1963,16 @@ class Transaction(Protocol):
 
     async def bump_settings_version(self) -> int:
         """Raise ``settings_version`` by one and return the new value (ADR 0042 §6)."""
+        ...
+
+    async def read_configuration(
+        self, now: datetime, locked_settings: frozenset[str]
+    ) -> ConfigurationSnapshot:
+        """Return the configuration as a tree of the document's shape, with its usage facts."""
+        ...
+
+    async def apply_configuration(self, changes: Sequence[Change]) -> int:
+        """Write the changes of a plan in order and return the new settings version (ADR 0099)."""
         ...
 
     async def platform_secrets(self) -> dict[str, str]:

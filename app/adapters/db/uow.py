@@ -34,7 +34,9 @@ from app.adapters.crypto import SecretBox
 from app.adapters.db.admin_sessions import AdminSessionQueries
 from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
+from app.adapters.db.call_status_rows import call_status_of
 from app.adapters.db.certificate import CertificateQueries
+from app.adapters.db.configuration_document import ConfigurationDocumentQueries
 from app.adapters.db.contact_center_rows import (
     has_task,
     legacy_group_columns,
@@ -95,6 +97,7 @@ from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.public_address import PublicAddressQueries
+from app.adapters.db.record_names import bot_credential_name, channel_secret_name
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
@@ -113,6 +116,7 @@ from app.adapters.db.updates import UpdateQueries
 from app.adapters.db.usage import UsageQueries
 from app.adapters.db.usage_reports import UsageReportQueries
 from app.adapters.db.usage_rollup import UsageRollupQueries
+from app.adapters.db.usage_slots import UsageSlotQueries
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.audit import (
@@ -144,10 +148,8 @@ from app.domain.branding import Branding, FontFile, FontRef, FontRole, HeaderSty
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
-    CallState,
     CallStatus,
     EventKind,
-    TaskState,
     new_status,
 )
 from app.domain.channel_settings import (
@@ -161,7 +163,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
-from app.domain.contact_center import ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -210,11 +212,6 @@ def _check_name(group_id: int) -> str:
 
 
 HEARTBEAT_NAME = "worker-heartbeat"
-
-
-def bot_credential_name(organisation_id: int | None) -> str:
-    """Return the credential name of a Webex bot token: an organisation's or the platform's."""
-    return f"webex-bot:{organisation_id if organisation_id is not None else 'platform'}"
 
 
 """Integration report name of the worker's heartbeat row (ADR 0068)."""
@@ -428,6 +425,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
         rebook_by=row.rebook_by,
+        rebook_requested_at=row.rebook_requested_at,
         confirm_by=row.confirm_by,
         confirmed_at=row.confirmed_at,
         claim=Claim(row.claimed_at, row.claimed_by)
@@ -459,26 +457,6 @@ def _contacts_column(block: ContactBlock | None) -> str | None:
     return contacts_json(block) if block else None
 
 
-def _call_status(row: CallStatusRow) -> CallStatus:
-    """Map a call status row."""
-    return CallStatus(
-        booking_id=row.booking_id,
-        call=CallState(row.call),
-        task=TaskState(row.task),
-        participants=row.participants,
-        host_joined=row.host_joined,
-        host_joined_at=row.host_joined_at,
-        started_at=row.started_at,
-        ended_at=row.ended_at,
-        task_created_at=row.task_created_at,
-        connected_at=row.connected_at,
-        updated_at=row.updated_at,
-        fallback=row.fallback,
-        lobby_since=row.lobby_since,
-        not_picked_up_at=row.not_picked_up_at,
-    )
-
-
 def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
     """Map the JSON of a channel settings row back to the domain (validating it again)."""
     values = json.loads(settings)
@@ -487,14 +465,10 @@ def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
     return SmsSettings(**{**values, "provider": SmsProvider(values["provider"])})
 
 
-def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
-    """Return the record name a channel secret is sealed under (associated data, ADR 0008)."""
-    return f"channel:{organisation_id}:{channel.value}"
-
-
 class SqlTransaction(
     AdminSessionQueries,
     AlertTargetQueries,
+    ConfigurationDocumentQueries,
     HealthQueries,
     OverviewLayoutQueries,
     ParticipantLinkQueries,
@@ -506,6 +480,7 @@ class SqlTransaction(
     RollupQueries,
     UsageQueries,
     UsageRollupQueries,
+    UsageSlotQueries,
     UsageReportQueries,
     StaffQueries,
     MaintenanceQueries,
@@ -1423,9 +1398,9 @@ class SqlTransaction(
             .values(claimed_at=None, claimed_by=None)
         )
 
-    async def get_booking_by_task(self, task_id: str) -> Booking | None:
-        """Return the booking whose contact-center task has ``task_id`` (either column)."""
-        return await self._booking_where(has_task(task_id))
+    async def get_booking_by_task(self, task_id: str, kind: ContactCenterKind) -> Booking | None:
+        """Return the booking whose task is ``task_id`` at platform ``kind`` (either column)."""
+        return await self._booking_where(has_task(task_id, kind))
 
     async def _booking_where(self, condition: ColumnElement[bool]) -> Booking | None:
         """Return the one booking matching ``condition``, with its slot."""
@@ -1502,7 +1477,7 @@ class SqlTransaction(
         return [
             BookingOverview(
                 _booking(booking, slot),
-                _call_status(status) if status else new_status(booking.id),
+                call_status_of(status) if status else new_status(booking.id),
             )
             for booking, slot, status in rows
         ]
@@ -1533,7 +1508,7 @@ class SqlTransaction(
                 start,
                 end,
                 status == BookingStatus.CONFIRMED.value,
-                _call_status(call) if call else new_status(booking_id),
+                call_status_of(call) if call else new_status(booking_id),
                 claimed=claimed_at is not None,
             )
             for booking_id, status, start, end, call, claimed_at in rows
@@ -1542,7 +1517,7 @@ class SqlTransaction(
     async def get_call_status(self, booking_id: int) -> CallStatus | None:
         """Return the booking's aggregated call status."""
         row = await self._session.get(CallStatusRow, booking_id)
-        return _call_status(row) if row else None
+        return call_status_of(row) if row else None
 
     async def save_call_status(self, status: CallStatus) -> None:
         """Create or replace the booking's aggregated call status."""
@@ -1562,6 +1537,8 @@ class SqlTransaction(
                 fallback=status.fallback,
                 lobby_since=status.lobby_since,
                 not_picked_up_at=status.not_picked_up_at,
+                peak_participants=status.peak_participants,
+                guest_joined_at=status.guest_joined_at,
             )
         )
         await self._session.flush()
@@ -1648,7 +1625,7 @@ class SqlTransaction(
             if self._box is None:
                 raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
             row.secret_nonce, row.secret_ciphertext = self._box.seal(
-                _secret_name(organisation_id, config.channel), secret.encode()
+                channel_secret_name(organisation_id, config.channel), secret.encode()
             )
         await self._session.flush()
 
@@ -1675,7 +1652,7 @@ class SqlTransaction(
             return None
         if self._box is None:
             raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
-        name = _secret_name(organisation_id, channel)
+        name = channel_secret_name(organisation_id, channel)
         return self._box.open(name, row.secret_nonce, row.secret_ciphertext).decode()
 
     async def get_group_texts(self, group_id: int) -> dict[tuple[str, str], str]:
@@ -1917,6 +1894,7 @@ class SqlTransaction(
                 closure_id=booking.closure_id,
                 change_reason=booking.change_reason.value if booking.change_reason else None,
                 rebook_by=booking.rebook_by,
+                rebook_requested_at=booking.rebook_requested_at,
                 confirmed_at=booking.confirmed_at,
             )
         )

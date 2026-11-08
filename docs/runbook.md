@@ -1331,7 +1331,7 @@ is current and nothing is missing.
 | State | Meaning | Reasons |
 |---|---|---|
 | `CURRENT` | OpenPlanner's, on `WEBHOOK_BASE_URL`, for a host account a group uses | – |
-| `STALE` | OpenPlanner's (path `/webhooks/webex` or `/webhooks/wxcc`, or named "OpenPlanner …") but no longer right | other address (old tunnel or base URL), no `hostEmail` filter, host account no group uses, event not used, inactive, duplicate |
+| `STALE` | OpenPlanner's (path `/webhooks/webex`, `/webhooks/wxcc` or `/webhooks/contact-center/webex_cc`, or named "OpenPlanner …") but no longer right | other address (old tunnel or base URL), no `hostEmail` filter, host account no group uses, event not used, inactive, duplicate |
 | `FOREIGN` | another application's | never touched |
 
 **`webhooks-reset`** deletes the `STALE` registrations. Without `--yes` it only prints
@@ -2164,6 +2164,24 @@ until then the proxy serves Let's Encrypt. The same holds for `proxy-data` (the 
 account): keep it with the host, or let Caddy obtain a certificate again.
 
 
+## Configuration document (ADR 0099)
+
+The readable successor of the package below: a JSON file (`docs/configuration-document.md`) that
+works across versions and on an installation in use. On the host:
+
+```bash
+python -m app.cli config export --format json --passphrase-file pass.txt config.json
+python -m app.cli config plan config.json --passphrase-file pass.txt
+python -m app.cli config apply config.json --passphrase-file pass.txt --plan-hash HASH
+```
+
+Read the plan first: it lists every change by action, kind and natural key, and every refusal.
+A refusal (`configuration_object_in_use`, `configuration_capacity_below_booked`,
+`configuration_out_of_scope`, `not_permitted`) means nothing is applied. After an apply the web
+and worker processes reload the settings within ten seconds. The audit log holds one event per
+changed object (`configuration.apply`, with the plan hash prefix). A passphrase file is read
+from disk, never from the command line.
+
 ## Configuration package (ADR 0089)
 
 A package is every setting of an installation (organisations, groups, texts, channels, identity
@@ -2507,7 +2525,10 @@ worker.
 
 ## Usage reporting: the rollup and the backfill (ADR 0117)
 
-Every booking change writes a small fact without personal data; the worker adds the facts to the
+Every booking change, call event, queue claim, message and rebooking request writes a small fact
+without personal data, and the worker closes each slot two hours after it ended (its capacity, its
+shortfall and how its bookings ended; a no-show is a participant who was never seen in the
+meeting, so it needs the platform's webhooks or the agenda open); the worker adds the facts to the
 hourly figures the reports read, every `reporting_rollup_interval_minutes` (class C, default 15).
 *System status* shows **Usage reporting**: the facts waiting and when the worker last finished. A
 warning there means facts have waited four intervals: the worker is behind or not running, and the
@@ -2519,6 +2540,9 @@ reports show older figures.
 | log `usage.fact_dropped` (warning, `kind` only) | a booking change committed but its fact could not be written | one is harmless; many point at the database |
 | log `usage.backfill_failed` | the first-start backfill of old bookings did not run | restart the worker, or run the command below |
 | log `usage.rolled_up` | facts rolled up, facts and hourly rows pruned | none |
+| log `usage.slots_failed` (error) | the closing of ended slots (capacity, shortfall, outcomes) failed; the next interval tries again | read the log around it; repeated failures point at the database |
+| log `usage.slots_closed` | slots that ended two hours ago were closed for the reports | none |
+| log `usage.message_failed` (warning) | a message went out but its fact was not written | one is harmless; many point at the database |
 
 The worker makes facts of the bookings that existed before reporting once, at its first start after
 the upgrade. To see it done, or to run it again, inside the `web` container:

@@ -34,8 +34,8 @@ async def test_meeting_and_task_are_stored_and_found(engine: AsyncEngine) -> Non
         await tx.save_task(booking_id, ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC))
     async with uow.read() as tx:
         by_meeting = await tx.get_booking_by_meeting("meeting-1")
-        by_task = await tx.get_booking_by_task("task-1")
-        missing = await tx.get_booking_by_task("nope")
+        by_task = await tx.get_booking_by_task("task-1", ContactCenterKind.WEBEX_CC)
+        missing = await tx.get_booking_by_task("nope", ContactCenterKind.WEBEX_CC)
 
     assert by_meeting is not None
     assert by_meeting.meeting == MeetingRef("meeting-1", "https://site.webex.com/m/1")

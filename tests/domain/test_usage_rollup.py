@@ -17,7 +17,7 @@ from app.domain.usage import (
     UsageOutcome,
     duration_bucket,
 )
-from app.domain.usage_rollup import UNMAPPED, cells_of, merge, roll
+from app.domain.usage_rollup import cells_of, merge, roll
 
 HOUR = datetime(2026, 11, 9, 10, tzinfo=UTC)
 NEXT_HOUR = datetime(2026, 11, 9, 11, tzinfo=UTC)
@@ -145,25 +145,6 @@ def test_every_cell_names_a_metric_that_lists_its_fact() -> None:
     for fact in samples:
         for cell in cells_of(fact):
             assert fact.kind in METRIC_FACTS[cell.metric], (fact.kind, cell.metric)
-
-
-def test_a_fact_kind_is_mapped_or_listed_as_waiting_for_its_step() -> None:
-    mapped = {
-        FactKind.BOOKING_CREATED,
-        FactKind.BOOKING_SLOTTED,
-        FactKind.BOOKING_CONFIRMED,
-        FactKind.BOOKING_CONFIRM_EXPIRED,
-        FactKind.BOOKING_CANCELLED,
-        FactKind.BOOKING_MOVED,
-        FactKind.BOOKING_SUSPENDED,
-        FactKind.BOOKING_RESUMED,
-    }
-
-    assert UNMAPPED == set(FactKind) - mapped
-
-
-def test_a_fact_kind_that_waits_for_its_step_makes_no_cells() -> None:
-    assert cells_of(_fact(FactKind.CALL_ENDED, value_seconds=60)) == []
 
 
 def test_cells_of_the_same_hour_and_cut_are_added_up() -> None:

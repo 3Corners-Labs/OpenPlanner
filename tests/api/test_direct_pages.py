@@ -26,6 +26,7 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
 from tests.support.domain import NOW, webex_routing
 from tests.support.participant import confirm_newest, open_link
+from tests.support.webhooks import WXCC
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
@@ -70,7 +71,7 @@ class Site:
         engine = create_engine(self.database_url)
         uow = SqlUnitOfWork(engine)
         service = IntegrationService(uow, self.clock, AdminService(uow, self.clock))
-        await service.record_task_event(task_id, kind, self.clock.now())
+        await service.record_task_event(task_id, kind, self.clock.now(), **WXCC)
         await engine.dispose()
 
     async def latest_booking_id(self) -> int:

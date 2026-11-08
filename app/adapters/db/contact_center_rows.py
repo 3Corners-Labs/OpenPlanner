@@ -125,11 +125,18 @@ def without_task() -> ColumnElement[bool]:
     return stored_task_id().is_(None)
 
 
-def has_task(task_id: str) -> ColumnElement[bool]:
-    """Return the condition for the booking whose task is ``task_id`` (each branch indexed)."""
-    return or_(
-        and_(BookingRow.wxcc_task_id == task_id, _legacy_kind()),
-        and_(BookingRow.contact_center_task_id == task_id, ~_legacy_kind()),
+def has_task(task_id: str, kind: ContactCenterKind) -> ColumnElement[bool]:
+    """Return the condition for the booking whose task is ``task_id`` at ``kind``.
+
+    Each branch is indexed: Webex Contact Center reads the old column (``task_of``), another
+    platform the new column together with its kind, so one platform's id never finds a
+    booking whose task is at another (ADR 0032 point 6).
+    """
+    if kind is LEGACY_KIND:
+        return and_(BookingRow.wxcc_task_id == task_id, _legacy_kind())
+    return and_(
+        BookingRow.contact_center_task_id == task_id,
+        BookingRow.contact_center_kind == kind.value,
     )
 
 
