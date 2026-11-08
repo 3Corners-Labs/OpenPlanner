@@ -143,7 +143,7 @@ by POST only (point 8).
 | 1 | Domain: confirmation policy, `pending_confirmation`, job plan, settings | #115 | merged |
 | 2 | Persistence, jobs, mails, confirm page and POST; bookings start `pending_confirmation` (migration 0058) | #134 | merged |
 | 3 | Planner: status filter, confirm on behalf of the participant |  | planned |
-| 4 | The participant corrects details | #PRNUM | merged |
+| 4 | The participant corrects details | #641 | merged |
 
 (State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
 
