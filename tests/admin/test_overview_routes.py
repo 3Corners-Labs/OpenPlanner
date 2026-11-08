@@ -52,9 +52,10 @@ async def test_the_overview_works_without_script(site: Site) -> None:
     response = await site.client.get("/admin/")
 
     assert response.headers["content-security-policy"] == SCRIPT_CSP
-    assert re.findall(r"<script[^>]*>", response.text) == [
-        f'<script src="{src}" defer>' for src in re.findall(r'<script src="([^"]+)"', response.text)
-    ]  # only the page's own files, nothing inline
+    tags = re.findall(r"<script[^>]*>", response.text)
+    own = r'<script (type="module" )?src="/static/[^"]+"( defer)?>'
+    assert tags
+    assert all(re.fullmatch(own, tag) for tag in tags), tags  # own files only, nothing inline
     assert 'class="widget-grid"' in response.text
     assert 'href="/admin/"' in response.text  # the Refresh link
     assert "Vernieuwen" in response.text

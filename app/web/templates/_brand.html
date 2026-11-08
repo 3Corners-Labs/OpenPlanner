@@ -1,0 +1,9 @@
+{#- The product mark of ADR 0060, inline so its open tile can move (§7, build step 2). Decorative
+    next to the product name, so it is hidden from assistive technology. ``motion`` is
+    ``"loading"`` (the open tile loops, CSS only), ``"settle"`` (it crosses the grid once and
+    settles, CSS only) or empty (static). The animation never plays under
+    ``prefers-reduced-motion: reduce``, never flashes (WCAG 2.3.1), and the static mark is what
+    every browser without CSS animation shows. -#}
+{% macro brand_mark(class_, size, motion="") -%}
+<svg class="brand-mark {{ class_ }}{% if motion %} brand-mark--{{ motion }}{% endif %}" viewBox="0 0 24 24" width="{{ size }}" height="{{ size }}" aria-hidden="true" focusable="false"><g class="brand-mark__tiles"><rect x="2" y="2" width="5.5" height="5.5" rx="1.4"/><rect x="9.25" y="2" width="5.5" height="5.5" rx="1.4"/><rect x="16.5" y="2" width="5.5" height="5.5" rx="1.4"/><rect x="2" y="9.25" width="5.5" height="5.5" rx="1.4"/><rect x="9.25" y="9.25" width="5.5" height="5.5" rx="1.4"/><rect x="2" y="16.5" width="5.5" height="5.5" rx="1.4"/><rect x="9.25" y="16.5" width="5.5" height="5.5" rx="1.4"/><rect x="16.5" y="16.5" width="5.5" height="5.5" rx="1.4"/></g><path class="brand-mark__slot" d="M22.45 11.68V10.4A1.6 1.6 0 0 0 20.85 8.8H17.65A1.6 1.6 0 0 0 16.05 10.4V13.6A1.6 1.6 0 0 0 17.65 15.2H18.93L20.23 13.9H17.35V10.1H21.15V12.98Z"/></svg>
+{%- endmacro %}
