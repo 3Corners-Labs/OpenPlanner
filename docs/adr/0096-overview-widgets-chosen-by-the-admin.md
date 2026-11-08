@@ -1,10 +1,11 @@
 # 0096. Overview widgets chosen by the admin
 
-Status: accepted (2026-11-01, `po:approved` on #310), requested by the product owner. Extends
+Status: accepted (2026-11-01, `po:approved` on #310), built (2026-11-08), requested by the product owner. Extends
 ADR 0047 (admin structure) and the overview of ADR 0061 ("ADR 0044" in the first version was
-a slip). Partly built: step 1 merged in #310; step 2 (layout storage: table
+a slip). Built in three steps: step 1 merged in #310; step 2 (layout storage: table
 `overview_layouts`, migration 0092, `app/domain/overview_layout.py`, setting
-`overview_max_widgets`) merged in #604; the screens of step 3 are not built yet. Amended on 2026-11-01 (re-evaluation): this ADR is
+`overview_max_widgets`) merged in #604; step 3 (*Add widget* and *Edit overview*, manual topic,
+e2e) merged in #PRNUM. Built. Amended on 2026-11-01 (re-evaluation): this ADR is
 the single home for the per-admin overview layout and supersedes ADR 0062, which decided the
 same. §5: the widgets are declared in `app/web/widgets.py` (ADR 0061 §2), not in
 `overview_routes.py`. §2: ADR 0016 as amended (own small scripts, never HTMX) applies.
@@ -51,7 +52,7 @@ permission.
 | 0 | ADR proposed | #310 | merged |
 | 1 | Remove *New group* from the overview | #310 | merged |
 | 2 | Layout storage (migration, reversible), service in `app/domain/`, tests | #604 | merged |
-| 3 | *Add widget* / *Edit overview* screens, manual topic nl/en, e2e | | planned |
+| 3 | *Add widget* / *Edit overview* screens, manual topic nl/en, e2e | #PRNUM | merged |
 
 ## Consequences
 

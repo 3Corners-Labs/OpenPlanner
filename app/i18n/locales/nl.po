@@ -9941,3 +9941,96 @@ msgid "admin.list.search_active"
 msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
 msgid "settings.field.overview_max_widgets.label"
 msgstr "Meeste widgets op een eigen overzicht"
+
+msgid "admin.layout.add.title"
+msgstr "Widget toevoegen"
+
+msgid "admin.layout.add.lead"
+msgstr "Kies wat u op uw overzicht wilt zien. U ziet alleen widgets die uw rechten toestaan en die er nog niet op staan."
+
+msgid "admin.layout.add.available"
+msgstr "Beschikbare widgets"
+
+msgid "admin.layout.add.button"
+msgstr "Toevoegen"
+
+msgid "admin.layout.add.button_for"
+msgstr "{title} toevoegen"
+
+msgid "admin.layout.add.none"
+msgstr "Alle widgets die u mag zien, staan al op uw overzicht."
+
+msgid "admin.layout.add.full"
+msgstr "Uw overzicht heeft het maximum van {maximum} widgets. Haal er eerst een weg."
+
+msgid "admin.layout.count"
+msgstr "Op uw overzicht: {count} van maximaal {maximum}."
+
+msgid "admin.layout.edit.title"
+msgstr "Overzicht aanpassen"
+
+msgid "admin.layout.edit.lead"
+msgstr "Zet de widgets in de volgorde die bij uw werk past, of haal er een weg. Alleen u ziet deze indeling."
+
+msgid "admin.layout.edit.order"
+msgstr "Volgorde"
+
+msgid "admin.layout.edit.own"
+msgstr "Dit is uw eigen indeling."
+
+msgid "admin.layout.edit.default"
+msgstr "Dit is de standaardindeling van uw rol."
+
+msgid "admin.layout.edit.up"
+msgstr "Omhoog"
+
+msgid "admin.layout.edit.up_for"
+msgstr "{title} omhoog"
+
+msgid "admin.layout.edit.down"
+msgstr "Omlaag"
+
+msgid "admin.layout.edit.down_for"
+msgstr "{title} omlaag"
+
+msgid "admin.layout.edit.remove"
+msgstr "Weghalen"
+
+msgid "admin.layout.edit.remove_for"
+msgstr "{title} weghalen"
+
+msgid "admin.layout.edit.empty"
+msgstr "Uw overzicht heeft geen widgets."
+
+msgid "admin.layout.reset.title"
+msgstr "Standaardindeling herstellen"
+
+msgid "admin.layout.reset.lead"
+msgstr "Haalt uw eigen indeling weg; daarna ziet u weer de standaardindeling van uw rol."
+
+msgid "admin.layout.reset.button"
+msgstr "Standaardindeling herstellen"
+
+msgid "admin.layout.back"
+msgstr "Terug naar het overzicht"
+
+msgid "admin.layout.error.widget"
+msgstr "Deze widget kan hier niet worden gekozen. Laad de pagina opnieuw en probeer het nog eens."
+
+msgid "admin.layout.error.full"
+msgstr "Uw overzicht heeft al het maximum aantal widgets. Haal er eerst een weg."
+
+msgid "admin.layout.error.staff"
+msgstr "Uw indeling kon niet worden bewaard. Log opnieuw in en probeer het nog eens."
+
+msgid "admin.done.widget_added"
+msgstr "De widget staat op uw overzicht."
+
+msgid "admin.done.widget_moved"
+msgstr "De volgorde is aangepast."
+
+msgid "admin.done.widget_removed"
+msgstr "De widget is weggehaald."
+
+msgid "admin.done.layout_reset"
+msgstr "U ziet weer de standaardindeling van uw rol."

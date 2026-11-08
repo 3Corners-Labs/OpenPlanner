@@ -12,7 +12,7 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
-| Overview | `/admin/` | `dashboard.view` | wide | – |
+| Overview | `/admin/` | `dashboard.view` | wide | `/admin/overview/add`, `/admin/overview/edit` |
 | Audit log | `/admin/audit` | `audit.view` | wide | – |
 | Retention | `/admin/retention` | `retention.view` | standard | – |
 

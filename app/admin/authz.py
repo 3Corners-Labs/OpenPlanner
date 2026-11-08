@@ -46,6 +46,7 @@ from app.domain.authorization import (
 from app.domain.event_context import bind_actor_role, bind_level
 from app.domain.login_service import LoginService
 from app.domain.maintenance_service import MaintenanceService
+from app.domain.overview_layout import OverviewLayoutService
 from app.domain.ports import Clock
 from app.domain.roles import RoleService
 from app.domain.scheduling import GroupSummary
@@ -202,6 +203,18 @@ async def _note_activity(request: Request, principal: Principal) -> None:
         await admin_service(request).record_seen(principal)
 
 
+def overview_layout_service(request: Request) -> OverviewLayoutService:
+    """Return the application's service for the admins' own overview layouts (ADR 0096)."""
+    service: OverviewLayoutService = request.app.state.overview_layout_service
+    return service
+
+
+def overview_layout(request: Request) -> tuple[str, ...] | None:
+    """Return the signed-in admin's own layout as read for this request, or ``None``."""
+    stored: tuple[str, ...] | None = getattr(request.state, "overview_layout", None)
+    return stored
+
+
 def can_function(principal: Principal) -> Callable[..., bool]:
     """Return ``can(permission, group=None, organisation=None)`` for templates (same matrix).
 
@@ -326,6 +339,10 @@ class RequirePermission:
             )
         if not authorization.decision.allowed:
             raise AccessDenied
+        # ADR 0096: the page shell shows top-bar shortcuts only for widgets on the overview.
+        request.state.overview_layout = await overview_layout_service(request).stored(
+            principal.subject
+        )
         if authorization.group is None:
             await _scope_to_organisation(service, principal, authorization, locale)
         if request.method not in READ_METHODS:

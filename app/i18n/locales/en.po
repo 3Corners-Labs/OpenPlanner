@@ -9929,3 +9929,96 @@ msgid "admin.list.search_active"
 msgstr "A search is active. Clear the filters to see everything again."
 msgid "settings.field.overview_max_widgets.label"
 msgstr "Most widgets on an own overview"
+
+msgid "admin.layout.add.title"
+msgstr "Add widget"
+
+msgid "admin.layout.add.lead"
+msgstr "Choose what you want to see on your overview. You only see widgets your rights allow and that are not on it yet."
+
+msgid "admin.layout.add.available"
+msgstr "Available widgets"
+
+msgid "admin.layout.add.button"
+msgstr "Add"
+
+msgid "admin.layout.add.button_for"
+msgstr "Add {title}"
+
+msgid "admin.layout.add.none"
+msgstr "Every widget you may see is already on your overview."
+
+msgid "admin.layout.add.full"
+msgstr "Your overview has the maximum of {maximum} widgets. Remove one first."
+
+msgid "admin.layout.count"
+msgstr "On your overview: {count} of at most {maximum}."
+
+msgid "admin.layout.edit.title"
+msgstr "Edit overview"
+
+msgid "admin.layout.edit.lead"
+msgstr "Put the widgets in the order that fits your work, or remove one. Only you see this layout."
+
+msgid "admin.layout.edit.order"
+msgstr "Order"
+
+msgid "admin.layout.edit.own"
+msgstr "This is your own layout."
+
+msgid "admin.layout.edit.default"
+msgstr "This is the default layout of your role."
+
+msgid "admin.layout.edit.up"
+msgstr "Up"
+
+msgid "admin.layout.edit.up_for"
+msgstr "Move {title} up"
+
+msgid "admin.layout.edit.down"
+msgstr "Down"
+
+msgid "admin.layout.edit.down_for"
+msgstr "Move {title} down"
+
+msgid "admin.layout.edit.remove"
+msgstr "Remove"
+
+msgid "admin.layout.edit.remove_for"
+msgstr "Remove {title}"
+
+msgid "admin.layout.edit.empty"
+msgstr "Your overview has no widgets."
+
+msgid "admin.layout.reset.title"
+msgstr "Restore default layout"
+
+msgid "admin.layout.reset.lead"
+msgstr "Removes your own layout; you then see the default layout of your role again."
+
+msgid "admin.layout.reset.button"
+msgstr "Restore default layout"
+
+msgid "admin.layout.back"
+msgstr "Back to the overview"
+
+msgid "admin.layout.error.widget"
+msgstr "This widget cannot be chosen here. Reload the page and try again."
+
+msgid "admin.layout.error.full"
+msgstr "Your overview already has the maximum number of widgets. Remove one first."
+
+msgid "admin.layout.error.staff"
+msgstr "Your layout could not be saved. Log in again and try once more."
+
+msgid "admin.done.widget_added"
+msgstr "The widget is on your overview."
+
+msgid "admin.done.widget_moved"
+msgstr "The order has been changed."
+
+msgid "admin.done.widget_removed"
+msgstr "The widget has been removed."
+
+msgid "admin.done.layout_reset"
+msgstr "You see the default layout of your role again."

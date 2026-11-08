@@ -1,0 +1,32 @@
+{#- *Add widget* (ADR 0096 §2): the widgets the admin's rights allow and that the overview does not show yet, each with its own button; no script, keyboard only. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
+{% block title %}{{ _("admin.layout.add.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% set heading = _("admin.layout.add.title") %}{% set lead = _("admin.layout.add.lead") %}
+{% include "admin/_layout_header.html" %}
+<section class="card" aria-labelledby="offer-heading">
+  <div class="card__header">
+    <h2 id="offer-heading">{{ _("admin.layout.add.available") }}</h2>
+    <p class="card__lead">{{ _("admin.layout.count", count=rows | length, maximum=maximum) }}</p>
+  </div>
+  {% if full %}
+  <p class="empty-state">{{ _("admin.layout.add.full", maximum=maximum) }}</p>
+  {% elif offer %}
+  <ul class="layout-list">
+    {% for item in offer %}
+    <li class="layout-list__item">
+      <span class="layout-list__title">{{ item.title }}</span>
+      <form method="post" action="/admin/overview/add">
+        <input type="hidden" name="widget" value="{{ item.key }}">
+        <button type="submit" class="button button--secondary button--small" aria-label="{{ _("admin.layout.add.button_for", title=item.title) }}">{{ icon("plus") }}<span>{{ _("admin.layout.add.button") }}</span></button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty-state">{{ _("admin.layout.add.none") }}</p>
+  {% endif %}
+</section>
+<p><a href="/admin/overview/edit">{{ _("admin.layout.edit.title") }}</a> · <a href="/admin/">{{ _("admin.layout.back") }}</a></p>
+{% endblock %}

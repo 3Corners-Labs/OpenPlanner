@@ -1,0 +1,15 @@
+{#- Header of the two layout pages of the overview (ADR 0096): breadcrumbs back to the overview, the title, a confirmation or a refusal. Expects ``heading`` and ``lead``. -#}
+<nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
+  <ol>
+    <li><a href="/admin/">{{ _("admin.dashboard.title") }}</a></li>
+    <li><span aria-current="page">{{ heading }}</span></li>
+  </ol>
+</nav>
+<div class="page-header">
+  <div>
+    <h1>{{ heading }}</h1>
+    <p class="page-header__lead">{{ lead }}</p>
+  </div>
+</div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if error %}<div class="alert alert--error" role="alert" id="layout-error"><p>{{ error }}</p></div>{% endif %}

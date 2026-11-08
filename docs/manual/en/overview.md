@@ -86,8 +86,24 @@ upright. The line for the queue connects the groups, so it is not a development 
 ## Default layout per role
 
 Each role starts with its own order: an agent sees the queue first, the Compliance and privacy
-role the changes and the system status. A personal layout comes later (ADR 0062). On a tablet
-at most two widgets sit side by side, on a phone one.
+role the changes and the system status. You can make your own layout of it (see below). On a
+tablet at most two widgets sit side by side, on a phone one.
+
+## Your own layout
+
+At the top of the overview, next to **Refresh**, are two buttons:
+
+- **Add widget** shows the widgets your rights allow that are not on your overview yet. **Add**
+  puts one at the bottom. A widget you may not see is never offered.
+- **Edit overview** shows your widgets in their order. **Up** and **Down** move a widget one
+  place, **Remove** takes it off. Everything works with the keyboard; there is nothing to drag.
+
+As soon as you change something it is your own layout; only you see it, and it stays when you
+log in again. **Restore default layout** removes your own layout, so you see your role's default
+again. If you lose the right to a widget, it disappears from your overview by itself. The number
+of widgets has a maximum the superuser sets (*Most widgets on an own overview*, 12 by default). A
+layout is a personal preference: it does not go into the audit log, and it holds no personal
+data.
 
 ## Your profile menu
 

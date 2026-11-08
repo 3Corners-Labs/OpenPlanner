@@ -41,6 +41,18 @@ def statuses(*codes: int) -> dict[str, int]:
 #   reads overview, rights, matrix, manual and group page, and works the own queue of its groups.
 EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 200, 403)},
+    # ADR 0096: every admin who opens the overview arranges their own; an empty form is refused.
+    "GET /admin/overview/add": {"/admin/overview/add": statuses(200, 200, 200, 200, 200, 200, 403)},
+    "POST /admin/overview/add": {"/admin/overview/add": statuses(422, 422, 422, 422, 422, 422, 403)},
+    "GET /admin/overview/edit": {
+        "/admin/overview/edit": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "POST /admin/overview/edit": {
+        "/admin/overview/edit": statuses(422, 422, 422, 422, 422, 422, 403)
+    },
+    "POST /admin/overview/reset": {
+        "/admin/overview/reset": statuses(303, 303, 303, 303, 303, 303, 403)
+    },
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 200, 403)},
     # ADR 0061: overview widgets, each with the permission of the widget register. The
     # auditor and the agent hold no bookings.view; the agent holds no audit.view.
