@@ -150,8 +150,10 @@ class EnvironmentNotice:
 ENVIRONMENT_LABELS = {
     "dev": "admin.environment.dev",
     "test": "admin.environment.test",
+    "prod": "admin.environment.prod",
 }
-"""Bar label per non-production ``ENVIRONMENT``; production shows no bar."""
+"""The name of each ``ENVIRONMENT`` in the portal: the bar outside production, System status
+and the overview's status widget. Production shows no bar."""
 
 
 def product_footer_of(request: Request) -> bool:
@@ -169,10 +171,18 @@ def product_footer_of(request: Request) -> bool:
 def environment_of(request: Request) -> EnvironmentNotice | None:
     """Return the environment bar for this installation, or ``None`` in production."""
     settings = getattr(request.app.state, "settings", None)
-    key = ENVIRONMENT_LABELS.get(getattr(settings, "environment", "prod"))
-    if key is None:
+    environment = getattr(settings, "environment", "prod")
+    if environment == "prod" or environment not in ENVIRONMENT_LABELS:
         return None
-    return EnvironmentNotice(key, bool(getattr(settings, "simulator_enabled", False)))
+    return EnvironmentNotice(
+        ENVIRONMENT_LABELS[environment], bool(getattr(settings, "simulator_enabled", False))
+    )
+
+
+RENDER_CONTEXT = frozenset({"_", "locale", "languages", "environment", "product_footer"})
+"""The names ``render`` gives every template itself. A page's own context never uses one: it
+would be overwritten without a word (System status once showed the bar's ``EnvironmentNotice``
+where it meant the environment's name)."""
 
 
 def render(
@@ -189,7 +199,15 @@ def render(
     The template receives ``_`` (bound gettext), ``locale``, ``languages``, ``environment``
     and ``product_footer`` in addition to ``context``. ``scripts=True`` allows the page's own
     scripts (``SCRIPT_CSP``).
+
+    Raises:
+        ValueError: ``context`` names one of ``RENDER_CONTEXT`` (a programming error).
     """
+    clash = RENDER_CONTEXT.intersection(context or {})
+    if clash:
+        raise ValueError(
+            f"render() sets {sorted(clash)} itself; give the page's value another name"
+        )
     started = perf_counter()
     response = templates.TemplateResponse(
         request,

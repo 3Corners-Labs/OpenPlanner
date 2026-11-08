@@ -1196,8 +1196,10 @@ fieldset.card {
   color: var(--adm-warning);
 }
 
-/* A chip with a label of several words: it wraps on a narrow screen instead of overflowing. */
+/* A chip with a label of several words: it wraps on a narrow screen instead of overflowing.
+   1em is a pill on one line and a rounded corner on more. */
 .chip--wrap {
+  border-radius: 1em;
   white-space: normal;
 }
 
@@ -1445,6 +1447,15 @@ fieldset.card {
 .widget-list__state {
   grid-column: 2;
   grid-row: 1 / span 2;
+}
+
+/* System status (ADR 0061): a state that does not fit beside its label takes the line under
+   it and wraps there, instead of squeezing the label or running off the card. */
+.widget-list--status .widget-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
 }
 
 .widget-table {
@@ -1865,10 +1876,13 @@ fieldset.card {
   font-weight: 600;
 }
 
+/* A value without spaces (an address, an issuer, a code) wraps inside its box instead of
+   running over the next one. */
 .facts dd {
   margin: 0.15rem 0 0;
   font-size: 1.05rem;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 /* --- Tables -------------------------------------------------------------------------------- */
@@ -1889,6 +1903,29 @@ fieldset.card {
   border-bottom: 1px solid var(--adm-border);
 }
 
+/* A grid of many narrow columns (the agenda's day and week, the rights matrix): half the room
+   between its columns, so it fits beside the full menu at 1280 px (ADR 0080). */
+.admin .data-table--grid th,
+.admin .data-table--grid td {
+  padding-inline: 0.5rem;
+}
+
+.admin .data-table--grid :is(th, td):first-child {
+  padding-left: 1rem;
+}
+
+.admin .data-table--grid :is(th, td):last-child {
+  padding-right: 1rem;
+}
+
+/* An identifier in a cell (a code, an address, a list of role values) wraps instead of widening
+   its table past the page. */
+.admin .data-table code {
+  overflow-wrap: anywhere;
+}
+
+/* A long compound in a heading (CONTACTCENTERTAAK) breaks at a syllable where the browser
+   knows the page's language. */
 .admin .data-table thead th {
   border-bottom: 1px solid var(--adm-border);
   background: var(--adm-surface-muted);
@@ -1897,6 +1934,7 @@ fieldset.card {
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  hyphens: auto;
 }
 
 .admin .data-table tbody tr:last-child > * {

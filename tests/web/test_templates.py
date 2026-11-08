@@ -1,9 +1,12 @@
-"""The language switcher's links: kept parameters only, and only values shaped like dates."""
+"""Page rendering: the language switcher's links, and the context ``render`` reserves for itself."""
+
+import re
 
 import pytest
 from starlette.requests import Request
 
-from app.web.templates import switch_href
+from app.web.templates import RENDER_CONTEXT, switch_href
+from tests.web.conftest import RenderSource
 
 
 def _request(query: str) -> Request:
@@ -33,3 +36,12 @@ def test_the_switcher_keeps_known_parameters_with_date_shaped_values(query: str,
 def test_a_kept_parameter_with_text_in_it_is_dropped_not_echoed(value: str) -> None:
     """ADR 0063 §3: a personal-data value typed into a list URL never comes back in a link."""
     assert switch_href(_request(f"day={value}&days={value}"), "lang", "nl") == "?lang=nl"
+
+
+@pytest.mark.parametrize("name", sorted(RENDER_CONTEXT))
+def test_a_page_value_with_a_name_render_sets_itself_is_refused(
+    name: str, render_source: RenderSource
+) -> None:
+    """System status passed ``environment`` and showed the bar's ``EnvironmentNotice`` instead."""
+    with pytest.raises(ValueError, match=re.escape(str([name]))):
+        render_source("<p>{{ environment }}</p>", {name: "dev"})

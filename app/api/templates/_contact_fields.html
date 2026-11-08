@@ -15,7 +15,7 @@
       {{ error_message(field.error, field.name ~ "-error") }}
       {% for value, label in field.options %}
       {%- set input_id = field.name if loop.first else field.name ~ "-" ~ loop.index %}
-      <div class="choice">
+      <div class="choices__option">
         <input id="{{ input_id }}" name="{{ field.name }}" type="radio" value="{{ value }}"{% if field.value == value %} checked{% endif %}{% if field.required %} required{% endif %}{% if field.error %} aria-invalid="true"{% endif %}>
         <label for="{{ input_id }}">{{ label }}</label>
       </div>

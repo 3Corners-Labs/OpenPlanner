@@ -710,13 +710,13 @@ msgid "admin.group.settings"
 msgstr "Instellingen"
 
 msgid "admin.group.slot_minutes"
-msgstr "Duur van een afspraak"
+msgstr "Duur van een gesprek"
 
 msgid "admin.group.minutes"
 msgstr "{minutes} minuten"
 
 msgid "admin.group.notice"
-msgstr "Minimale aanmeldtijd"
+msgstr "Minimale aanlooptijd"
 
 msgid "admin.group.horizon"
 msgstr "Vooruit boeken"
@@ -4916,7 +4916,8 @@ msgstr "Er is geen webhookgeheim ingesteld (WEBEX_WEBHOOK_SECRET of WXCC_WEBHOOK
 msgid "admin.done.simulator_refused"
 msgstr "Het webhook-endpoint weigerde het event. Kijk in het log van de web-container."
 
-#. Environment bar in the admin portal (dev/test only).
+#. Environment names in the admin portal: the bar (dev/test only), System status and the
+#. overview's status widget.
 
 msgid "admin.environment.label"
 msgstr "Omgeving"
@@ -4926,6 +4927,9 @@ msgstr "Ontwikkelomgeving"
 
 msgid "admin.environment.test"
 msgstr "Testomgeving"
+
+msgid "admin.environment.prod"
+msgstr "Productieomgeving"
 
 msgid "admin.environment.text"
 msgstr "Niet voor echte afspraken van deelnemers."
@@ -7934,7 +7938,7 @@ msgid "admin.rights.refused_intro"
 msgstr "Deze waarden stuurde de identiteitsprovider bij uw laatste login mee, maar deze installatie herkent ze niet. Geef ze door aan het IdP-team."
 
 msgid "admin.roles.entitlement_notice"
-msgstr "Werkt de installatie met een rechtenclaim (ADR 0049), dan stuurt de identiteitsprovider per organisatie of groep één waarde met de sleutel van deze rol, bijvoorbeeld openplanner:custom.3:org-a. De sleutel en de exacte waarden staan op de pagina Koppeling identiteitsprovider."
+msgstr "Werkt de installatie met een rechtenclaim, dan stuurt de identiteitsprovider per organisatie of groep één waarde met de sleutel van deze rol, bijvoorbeeld openplanner:custom.3:org-a. De sleutel en de exacte waarden staan op de pagina Koppeling identiteitsprovider."
 
 msgid "admin.form.error.idp_key"
 msgstr "Gebruik alleen kleine letters, cijfers en koppeltekens (hoogstens 63 tekens), beginnend met een letter of cijfer."
