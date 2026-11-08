@@ -332,7 +332,7 @@ jobs:
           fetch-depth: 0   # the tag, main's commits since it, and the existing lines
           token: ${{ steps.app.outputs.token || github.token }}
       - id: line
-        name: the tag exists, the line does not, main holds a feat since the tag
+        name: a release of X.Y exists, the line does not, main holds a feat since it
         env:
           LINE: ${{ inputs.version }}
         run: python3 -m scripts.release_line cut --line "$LINE" | tee -a "$GITHUB_OUTPUT"
