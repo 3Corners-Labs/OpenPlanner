@@ -145,4 +145,21 @@ def parse_wxcc(payload: dict[str, Any]) -> ParsedEvent | None:
     reason = data.get("reason") if kind is EventKind.TASK_FAILED else ""
     if not isinstance(task_id, str):
         return None
-    return ParsedEvent(task_id, kind, str(reason or "")[:128])
+    key = _wxcc_key(payload, task_id)
+    return ParsedEvent(task_id, kind, str(reason or "")[:128], event_key=key)
+
+
+def _wxcc_key(payload: dict[str, Any], task_id: str) -> str:
+    """Return a digest identifying one WxCC event (ADR 0082 point 5), or ``""``.
+
+    A WxCC event is a CloudEvent with an ``id`` of its own; a redelivery or replay of the same
+    signed body carries the same id. The type and task go in too, so an id reused across event
+    types never hides one. Without an id there is no key: a time field could be the task's own
+    and would hide a real second event (a second ``task:connected`` after a transfer). Only
+    ids and types go in, and the digest is all that is stored.
+    """
+    event_id = payload.get("id")
+    if not isinstance(event_id, str) or not event_id:
+        return ""
+    parts = ("wxcc", str(payload.get("type")), task_id, event_id)
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()

@@ -49,6 +49,7 @@ from app.admin.authz import (
     maintenance_service,
 )
 from app.admin.closure_routes import closure_service
+from app.admin.integration_views import HEALTH_LABELS, PLATFORM_LABELS, worst_health
 from app.admin.live import key
 from app.admin.overview_charts import (
     ChartView,
@@ -72,7 +73,9 @@ from app.domain.authorization import (
     Principal,
     permissions_for,
 )
+from app.domain.connection_health import HealthState, Platform
 from app.domain.diagnostics import DiagnosticsService
+from app.domain.integration_health import IntegrationHealthService
 from app.domain.ports import Clock
 from app.domain.queue_service import QueueService
 from app.domain.staff import CREATED_EVENT
@@ -479,6 +482,32 @@ async def _plaintext_mail(
     return count
 
 
+async def _connection_rows(
+    request: Request, locale: RequestLocale, href: str | None
+) -> list[StatusRow]:
+    """One row per platform: its worst health and when its last webhook came in (ADR 0082).
+
+    ``href`` leads to *Koppelingen* for a reader who may open it.
+    """
+    _ = locale.gettext
+    health: IntegrationHealthService = request.app.state.health_service
+    entries, inbound = await health.overview()
+    last = {event.platform: event for event in inbound}
+    rows: list[StatusRow] = []
+    for platform in Platform:
+        state = worst_health(entries, platform)
+        event = last.get(platform)
+        if state is None and event is None:
+            continue
+        label, tone = HEALTH_LABELS[state or HealthState.UNKNOWN]
+        value = _(label)
+        if event is not None:
+            when = admin_moment(request, locale, event.at)
+            value = f"{value} · {_('admin.integrations.inbound_at', time=when)}"
+        rows.append(StatusRow(_(PLATFORM_LABELS[platform]), value, tone, href))
+    return rows
+
+
 async def _status(request: Request, locale: RequestLocale, principal: Principal) -> WidgetView:
     """System status: what the updates page, maintenance mode and the health checks know."""
     _ = locale.gettext
@@ -549,11 +578,17 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
             ),
             "danger",
         )
+    connections = await _connection_rows(
+        request,
+        locale,
+        "/admin/integrations" if can(Permission.INTEGRATIONS_MANAGE) else None,
+    )
     rows = [
         StatusRow(_("admin.overview.widget.status.version"), version, "", updates_href),
         StatusRow(_("admin.overview.widget.status.update"), update_text, update_tone, updates_href),
         maintenance_row,
         worker,
+        *connections,
         StatusRow(
             _("admin.overview.widget.status.diagnostics"),
             _("admin.overview.widget.status.diagnostics.on", count=modes)

@@ -43,6 +43,31 @@ the audit log as passed or failed. While maintenance mode is on you can still us
 a repaired integration. Without a check yet the screen shows the command line alternative
 (`python -m app.cli wxcc-check`).
 
+## Health and last events
+
+How the connections are doing. **Last event per platform** says when Webex and the contact
+center last reported something, which kind of event and what OpenPlanner did with it
+(`recorded`, `duplicate` already received, `unknown` not OpenPlanner's, `ignored` not
+needed). When nothing comes in for a long time while calls take place, the webhook is
+probably switched off.
+
+**Health per organisation** is computed every few minutes by the background process from the
+requests OpenPlanner itself made in the last quarter of an hour:
+
+- **OK**: few or no failed requests.
+- **Degraded**: more than a quarter failed (setting *Degraded above this share*).
+- **Down**: more than three quarters failed, refreshing the Service App's token failed, or the
+  probe work item of the group check did not complete.
+- **Unknown**: fewer than three requests; too few to tell.
+
+A degraded or down connection is an alert on the overview and in the banner. It returns to
+*OK* only after ten minutes without failures (setting *Recovered after*).
+
+OpenPlanner checks tasks the contact center did not report back itself: a task that stays
+*queued* or *connected* too long after its start is looked up at the contact center by the
+background process. A difference goes on the appointment's timeline as `reconciled`, followed
+by the alert *Events from the contact center*: then look at the registrations below.
+
 ## Webhooks
 
 The two addresses that receive the events of Webex and WxCC, each with whether a secret is
