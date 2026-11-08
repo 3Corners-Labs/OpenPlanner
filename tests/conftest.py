@@ -8,6 +8,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from alembic.config import Config
 from pydantic import SecretStr
 
 from app.adapters.integrations import Integrations
@@ -20,7 +21,8 @@ from app.domain.ports import Clock
 from app.main import create_app
 from tests.fakes.smtp import FakeSmtpServer
 
-APP = str(Path(__file__).resolve().parents[1] / "app") + "/"
+ROOT = Path(__file__).resolve().parents[1]
+APP = str(ROOT / "app") + "/"
 READ_BACK = APP + "adapters/db/"
 """Where events are built from stored rows; the action was checked when it was written."""
 
@@ -116,3 +118,13 @@ def smtp_server(monkeypatch: pytest.MonkeyPatch) -> FakeSmtpServer:
     monkeypatch.setattr(smtplib, "SMTP", server.connect)
     monkeypatch.setattr(smtplib, "SMTP_SSL", server.connect_tls)
     return server
+
+
+@pytest.fixture
+def alembic_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Config:
+    """Return the Alembic configuration for a fresh SQLite file in ``tmp_path`` (migrate.db)."""
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'migrate.db'}")
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    config = Config(str(ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(ROOT / "migrations"))
+    return config
