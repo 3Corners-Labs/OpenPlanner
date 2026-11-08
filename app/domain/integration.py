@@ -162,12 +162,15 @@ class IntegrationService:
         event_key: str = "",
         provider: ContactCenterKind,
         source: str,
+        organisation_id: int | None = None,
     ) -> EventOutcome:
         """Record a work item event once per ``event_key``; ``UNKNOWN`` for foreign tasks.
 
         The task is looked up at ``provider`` only (ADR 0032 point 6): a task id of one
         platform never finds a booking whose task is at another. ``source`` is the platform's
-        code from its adapter, under which its event keys are remembered.
+        code from its adapter, under which its event keys are remembered. With
+        ``organisation_id`` (an organisation's own webhook address, ADR 0032 point 10) a task of
+        another organisation's booking is unknown here.
 
         A ``task:new`` of a booking's task is ``IGNORED``: the dispatch job recorded the
         creation when it got the id. An unknown task may be the group check's probe (ADR
@@ -176,6 +179,10 @@ class IntegrationService:
         """
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_task(task_id, provider)
+            if booking is not None and organisation_id is not None:
+                group = await tx.get_group_by_id(booking.group_id)
+                if group is None or group.organisation_id != organisation_id:
+                    booking = None
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED

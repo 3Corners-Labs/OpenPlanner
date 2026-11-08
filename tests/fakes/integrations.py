@@ -5,6 +5,7 @@ adapters report every call to (ADR 0068).
 """
 
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime
 
 from app.domain.alert_model import AlertChannelKind, AlertTarget, RenderedAlert
@@ -19,7 +20,7 @@ from app.domain.calls import (
     TaskState,
 )
 from app.domain.checks import Finding
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
 from app.domain.ports import ContactCenterDispatcher, IntegrationError, RequestRecord
 from app.domain.scheduling import Group
 
@@ -210,3 +211,34 @@ class FakeSecrets:
 
     async def delete(self, name: str) -> None:
         self.values.pop(name, None)
+
+
+class FakeContactCenterConnections:
+    """``ContactCenterConnections`` in memory: the views and a counter of rotations."""
+
+    def __init__(self) -> None:
+        self.connections: dict[int, OrganisationConnection] = {}
+        self.rotations = 0
+
+    async def get(self, organisation_id: int) -> OrganisationConnection | None:
+        return self.connections.get(organisation_id)
+
+    async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
+        old = self.connections.get(organisation_id)
+        self.connections[organisation_id] = OrganisationConnection(
+            change.kind,
+            change.api_base_url,
+            change.client_id,
+            has_client_secret=bool(change.client_secret) or bool(old and old.has_client_secret),
+            has_refresh_token=bool(change.refresh_token) or bool(old and old.has_refresh_token),
+            webhook_secret_at=old.webhook_secret_at if old else now,
+        )
+
+    async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
+        old = self.connections.get(organisation_id)
+        if old is not None:
+            self.connections[organisation_id] = replace(old, webhook_secret_at=now)
+            self.rotations += 1
+
+    async def delete(self, organisation_id: int) -> None:
+        self.connections.pop(organisation_id, None)

@@ -1,0 +1,30 @@
+{#- The organisation's own contact-center connection (ADR 0032 point 9): the API host, the OAuth client and its write-only secrets; the webhook address with its server-made secret. Without a connection the organisation uses the installation's. -#}
+{% set cc = contact_center %}
+<section class="card" id="contact-center" aria-labelledby="contact-center-heading">
+  <div class="card__header">
+    <h2 id="contact-center-heading">{{ _("admin.channels.cc_title") }} {% if cc.stored %}<span class="chip chip--success">{{ _("admin.channels.cc_connected") }}</span>{% else %}<span class="chip">{{ _("admin.channels.cc_not_connected") }}</span>{% endif %}</h2>
+    <p class="card__lead">{{ _("admin.channels.cc_lead") }}</p>
+    {% if not cc.stored %}<p class="hint">{{ _("admin.channels.cc_fallback") }}</p>{% endif %}
+  </div>
+  {% if not cc.available %}
+  <p>{{ _("admin.channels.cc_no_key") }}</p>
+  {% else %}
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center" novalidate>
+    {{ form_body(cc.fields, _("admin.save")) }}
+  </form>
+  {% if cc.stored %}
+  <h3>{{ _("admin.channels.cc_webhook") }}</h3>
+  <p>{{ _("admin.channels.cc_webhook_lead") }}</p>
+  <p><code>{{ cc.webhook }}</code></p>
+  <p class="hint">{{ _("admin.channels.cc_secret_made", at=cc.secret_made) }}</p>
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/webhook-secret">
+    <p>{{ _("admin.channels.cc_rotate_lead") }}</p>
+    <button type="submit" class="button button--secondary">{{ _("admin.channels.cc_rotate") }}</button>
+  </form>
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/delete">
+    <p>{{ _("admin.channels.cc_remove_lead") }}</p>
+    <button type="submit" class="button button--secondary">{{ _("admin.channels.cc_remove") }}</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</section>

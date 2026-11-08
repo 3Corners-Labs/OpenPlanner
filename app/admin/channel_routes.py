@@ -23,19 +23,19 @@ shown. It is rate-limited like the test email, since it makes the server send DN
 """
 
 from datetime import datetime
-from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from starlette.responses import HTMLResponse, Response
 
 from app.admin import forms
 from app.admin.alert_routes import alert_view
-from app.admin.authz import AdminContext, RequirePermission
+from app.admin.authz import AdminContext
+from app.admin.channel_fields import Manage, channels_url, secret_field, value_of
+from app.admin.contact_center_routes import CONNECTION_ANCHOR, connection_service, connection_view
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import Locale, SameOrigin, organisation_header
 from app.admin.pages import page as _page
-from app.domain.authorization import Permission
 from app.domain.channel_service import ChannelOverview, ChannelSettingsService
 from app.domain.channel_settings import (
     ChannelConfig,
@@ -46,6 +46,7 @@ from app.domain.channel_settings import (
     SmtpSettings,
 )
 from app.domain.channels import ChannelKind
+from app.domain.contact_center import ConnectionChange, ContactCenterKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.mail_domain import DomainReport, Record, Verdict
 from app.i18n import BoundGettext
@@ -125,45 +126,11 @@ REASON_LABELS: dict[str, str] = {
 CHANNEL_PATHS = {"email": ChannelKind.EMAIL, "sms": ChannelKind.SMS}
 """The channels in URLs; anything else is a 404."""
 
-Manage = Annotated[
-    AdminContext,
-    Depends(
-        RequirePermission(Permission.INTEGRATIONS_MANAGE, organisation_param="org", fresh=True)
-    ),
-]
-"""The permission of every channel page of one organisation."""
-
 
 def channel_service(request: Request) -> ChannelSettingsService:
     """Return the application's channel settings service."""
     service: ChannelSettingsService = request.app.state.channel_service
     return service
-
-
-def _url(org: str) -> str:
-    """Return the channels page of organisation ``org``."""
-    return f"/admin/organisations/{org}/channels"
-
-
-def _value(form: FormData, name: str, stored: object) -> str:
-    """Return the submitted value of ``name``, else the stored one ('' for none)."""
-    if name in form.values:
-        return form.values[name]
-    return "" if stored is None else str(stored)
-
-
-def _secret_field(name: str, label: str, hint: str, form: FormData, required: bool) -> Field:
-    """Return a write-only secret input: always empty, never echoed back."""
-    return Field(
-        name,
-        label,
-        "password",
-        "",
-        hint=hint,
-        error=form.error_for(name),
-        required=required,
-        attributes={"autocomplete": "new-password", "spellcheck": "false"},
-    )
 
 
 def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext) -> list[Field]:
@@ -174,7 +141,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
         Field(
             "smtp_host",
             _("admin.channels.smtp_host"),
-            value=_value(form, "smtp_host", config.host if config else None),
+            value=value_of(form, "smtp_host", config.host if config else None),
             hint=_("admin.channels.smtp_host_hint"),
             error=form.error_for("smtp_host"),
             attributes={"autocapitalize": "none", "spellcheck": "false"},
@@ -183,7 +150,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
             "smtp_port",
             _("admin.channels.smtp_port"),
             "number",
-            _value(form, "smtp_port", config.port if config else 587),
+            value_of(form, "smtp_port", config.port if config else 587),
             hint=_("admin.channels.smtp_port_hint"),
             error=form.error_for("smtp_port"),
             attributes={"min": "1", "max": "65535", "inputmode": "numeric"},
@@ -199,13 +166,13 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
         Field(
             "smtp_username",
             _("admin.channels.smtp_username"),
-            value=_value(form, "smtp_username", config.username if config else None),
+            value=value_of(form, "smtp_username", config.username if config else None),
             hint=_("admin.channels.smtp_username_hint"),
             error=form.error_for("smtp_username"),
             required=False,
             attributes={"autocomplete": "off", "autocapitalize": "none", "spellcheck": "false"},
         ),
-        _secret_field(
+        secret_field(
             "smtp_credential",
             _("admin.channels.smtp_password"),
             _("admin.channels.secret_hint_set")
@@ -218,7 +185,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
             "sender_address",
             _("admin.channels.sender_address"),
             "email",
-            _value(form, "sender_address", config.sender_address if config else None),
+            value_of(form, "sender_address", config.sender_address if config else None),
             hint=_("admin.channels.sender_address_hint"),
             error=form.error_for("sender_address"),
             attributes={"autocomplete": "off", "spellcheck": "false"},
@@ -226,7 +193,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
         Field(
             "sender_name",
             _("admin.channels.sender_name"),
-            value=_value(form, "sender_name", config.sender_name if config else None),
+            value=value_of(form, "sender_name", config.sender_name if config else None),
             hint=_("admin.channels.sender_name_hint"),
             error=form.error_for("sender_name"),
             required=False,
@@ -235,7 +202,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
             "reply_to_address",
             _("admin.channels.reply_to_address"),
             "email",
-            _value(form, "reply_to_address", config.reply_to_address if config else None),
+            value_of(form, "reply_to_address", config.reply_to_address if config else None),
             hint=_("admin.channels.reply_to_address_hint"),
             error=form.error_for("reply_to_address"),
             required=False,
@@ -244,7 +211,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
         Field(
             "dkim_selector",
             _("admin.channels.dkim_selector"),
-            value=_value(form, "dkim_selector", config.dkim_selector if config else None),
+            value=value_of(form, "dkim_selector", config.dkim_selector if config else None),
             hint=_("admin.channels.dkim_selector_hint"),
             error=form.error_for("dkim_selector"),
             required=False,
@@ -273,12 +240,12 @@ def _sms_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext)
             "sms_api_base_url",
             _("admin.channels.sms_api_base_url"),
             "url",
-            _value(form, "sms_api_base_url", config.api_base_url if config else None),
+            value_of(form, "sms_api_base_url", config.api_base_url if config else None),
             hint=_("admin.channels.sms_api_base_url_hint"),
             error=form.error_for("sms_api_base_url"),
             attributes={"autocapitalize": "none", "spellcheck": "false"},
         ),
-        _secret_field(
+        secret_field(
             "sms_api_key",
             _("admin.channels.sms_api_key"),
             _("admin.channels.secret_hint_set")
@@ -290,7 +257,7 @@ def _sms_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext)
         Field(
             "sms_sender_id",
             _("admin.channels.sms_sender_id"),
-            value=_value(form, "sms_sender_id", config.sender_id if config else None),
+            value=value_of(form, "sms_sender_id", config.sender_id if config else None),
             hint=_("admin.channels.sms_sender_id_hint"),
             error=form.error_for("sms_sender_id"),
             attributes={"spellcheck": "false"},
@@ -298,7 +265,7 @@ def _sms_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext)
         Field(
             "sms_country_code",
             _("admin.channels.sms_country_code"),
-            value=_value(form, "sms_country_code", config.country_code if config else "31"),
+            value=value_of(form, "sms_country_code", config.country_code if config else "31"),
             hint=_("admin.channels.sms_country_code_hint"),
             error=form.error_for("sms_country_code"),
             attributes={"inputmode": "numeric", "maxlength": "3"},
@@ -353,6 +320,7 @@ async def _form_page(
     test: FormData | None = None,
     domain: FormData | None = None,
     report: DomainReport | None = None,
+    connection: FormData | None = None,
 ) -> HTMLResponse:
     """Render both channel forms, the test email form and the domain check (with its report)."""
     overview: ChannelOverview = await channel_service(request).overview(context.principal, org)
@@ -362,6 +330,7 @@ async def _form_page(
     sms = submitted.get(ChannelKind.SMS) or FormData({}, _)
     test = test or FormData({}, _)
     domain = domain or FormData({}, _)
+    connection = connection or FormData({}, _)
     stored_email = overview.channels[ChannelKind.EMAIL]
     stored_sms = overview.channels[ChannelKind.SMS]
     response = _page(
@@ -388,9 +357,10 @@ async def _form_page(
             "test_fields": _test_fields(test, _),
             "domain_error": domain.error_for(DOMAIN_FIELD),
             "domain_report": _domain_view(report, _) if report else None,
-            "errors": email.errors + sms.errors + test.errors + domain.errors,
+            "errors": email.errors + sms.errors + test.errors + domain.errors + connection.errors,
             "done": forms.done_message(request, _),
             "alerts": await alert_view(request, _, context.principal, org),
+            "contact_center": await connection_view(request, locale, context, org, connection, tz),
         },
     )
     response.status_code = status
@@ -440,7 +410,7 @@ async def _save(
             forms.raise_refusal(error)
             form.refusal(error)
         else:
-            return forms.redirect_done(_url(org), "saved" if changed else "unchanged")
+            return forms.redirect_done(channels_url(org), "saved" if changed else "unchanged")
     return await _form_page(request, locale, context, org, {channel: form}, 422)
 
 
@@ -519,7 +489,7 @@ async def send_test_email(
             form.refusal(error)
     else:
         if failure is None:
-            return forms.redirect_done(_url(org), "test_sent")
+            return forms.redirect_done(channels_url(org), "test_sent")
         form.errors.append(FormError(TEST_FIELD, _test_failure(failure, gettext)))
     return await _form_page(request, locale, context, org, {}, 422, form)
 
@@ -546,6 +516,31 @@ async def save_sms(
     return await _save(request, locale, context, org, ChannelKind.SMS, form, config, secret)
 
 
+@router.post("/organisations/{org}/channels/contact-center", response_class=HTMLResponse)
+async def save_contact_center(
+    request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Save the organisation's own contact-center connection; blank secrets keep the stored ones."""
+    form = await forms.read_form(request, locale)
+    kind = form.choice("cc_kind", {k.value for k in ContactCenterKind})
+    if kind is not None:
+        try:
+            change = ConnectionChange(
+                ContactCenterKind(kind),
+                form.text("cc_api_base_url"),
+                form.text("cc_client_id"),
+                client_secret=form.values.get("cc_client_secret") or None,
+                refresh_token=form.values.get("cc_refresh_token") or None,
+            )
+            await connection_service(request).save(context.principal, org, change)
+        except DomainError as error:
+            forms.raise_refusal(error)
+            form.refusal(error)
+        else:
+            return forms.redirect_done(channels_url(org), "saved", anchor=CONNECTION_ANCHOR)
+    return await _form_page(request, locale, context, org, {}, 422, connection=form)
+
+
 @router.post("/organisations/{org}/channels/{channel}/remove", response_class=HTMLResponse)
 async def remove_channel(
     request: Request, org: str, channel: str, _: SameOrigin, context: Manage
@@ -559,4 +554,4 @@ async def remove_channel(
     except DomainError as error:
         forms.raise_refusal(error)
         raise
-    return forms.redirect_done(_url(org), "removed")
+    return forms.redirect_done(channels_url(org), "removed")
