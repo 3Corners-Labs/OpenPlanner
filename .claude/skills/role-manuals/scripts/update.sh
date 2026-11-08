@@ -73,8 +73,9 @@ else
 fi
 
 echo "== 4/5 versie vastleggen"
-commit="$(git -C "$repo" rev-parse --short=12 HEAD)"
-version="$(sed -n 's/^version = "\(.*\)"/\1/p' "$repo/pyproject.toml" | head -n 1)"
+# The commit and version the screenshots come from: the build of this run, not the HEAD of now.
+commit="$(sed -n 's/^BUILT_FROM_COMMIT=//p' "${current%/current}/$(cat "$current")/stack.env" | cut -c1-12)"
+version="$(git -C "$repo" show "$commit:pyproject.toml" | sed -n 's/^version = "\(.*\)"/\1/p' | head -n 1)"
 python3 - "$vars" "$commit" "$version" "$rc" <<'PY'
 import json
 import sys
