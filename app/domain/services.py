@@ -48,6 +48,7 @@ from app.domain.booking import (
     Slot,
 )
 from app.domain.booking_changes import lapse_unconfirmed
+from app.domain.call_usage import record_call_event
 from app.domain.calls import apply_event, new_status
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure, covering
@@ -95,6 +96,7 @@ from app.domain.usage_recording import (
     record_confirmed,
     record_moved,
     record_placed,
+    record_rebook_accepted,
 )
 
 
@@ -477,8 +479,12 @@ class BookingService:
                 ActorClass.PARTICIPANT,
             )
             await tx.replace_jobs(booking.id, plan.jobs)
+            after = apply_event(status, plan.event.kind, now)
+            await record_call_event(
+                tx, booking.id, plan.event.kind, status, after, now, plan.event.detail
+            )
             await tx.add_booking_event(plan.event)
-            await tx.save_call_status(apply_event(status, plan.event.kind, now))
+            await tx.save_call_status(after)
             return DirectLeft(plan.booking, changed=True, agent_present=plan.agent_present)
 
     async def reschedule(
@@ -530,6 +536,8 @@ class BookingService:
         now = self._clock.now()
         await tx.save_booking(old.cancel(now))
         await record_moved(tx, old, group, now, actor)
+        if old.awaits_rebook and actor is ActorClass.PARTICIPANT:
+            await record_rebook_accepted(tx, old, group, now)
         jobs = plan_for_cancellation(
             cancelled_at=now, notify=False, team_invite=group.sends_team_invite
         )

@@ -239,6 +239,8 @@ class Booking:
     closure_id: int | None = None
     change_reason: ChangeReason | None = None
     rebook_by: datetime | None = None
+    rebook_requested_at: datetime | None = None
+    """When a planner asked for a new time (ADR 0044); the time to accept of metric U8."""
     claim: Claim | None = None
     confirm_by: datetime | None = None
     confirmed_at: datetime | None = None
@@ -351,7 +353,9 @@ class Booking:
             raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
         return replace(self, status=BookingStatus.CANCELLED, cancelled_at=self.confirm_by or now)
 
-    def request_rebook(self, reason: ChangeReason, by: datetime) -> "Booking":
+    def request_rebook(
+        self, reason: ChangeReason, by: datetime, requested_at: datetime | None = None
+    ) -> "Booking":
         """Return the booking awaiting a new time from the participant until ``by`` (ADR 0044).
 
         Its place in the slot is freed at once; the booking keeps its contact details, so the
@@ -363,7 +367,11 @@ class Booking:
         if not self.is_active:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
         return replace(
-            self, status=BookingStatus.AWAITING_REBOOK, change_reason=reason, rebook_by=by
+            self,
+            status=BookingStatus.AWAITING_REBOOK,
+            change_reason=reason,
+            rebook_by=by,
+            rebook_requested_at=requested_at,
         )
 
     def suspend(self, closure_id: int) -> "Booking":

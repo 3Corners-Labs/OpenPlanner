@@ -563,6 +563,7 @@ class BookingRow(Base):
     change_reason: Mapped[str | None] = mapped_column(String(16))
     # ADR 0044: when an unanswered request to choose a new time lapses.
     rebook_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    rebook_requested_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_by: Mapped[str | None] = mapped_column(String(64))
     # ADR 0056: the deadline to confirm by email link, and when the participant did.
@@ -1007,6 +1008,7 @@ class UsageRollupStateRow(Base):
     rolled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     backfilled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     backfill_cutoff: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    slots_closed_until: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class UsageBackfillRow(Base):
@@ -1039,6 +1041,9 @@ class CallStatusRow(Base):
     updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     # ADR 0082 point 11: the booking is in the own queue as a fallback.
     fallback: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    # ADR 0117 step 3: the most people seen in the meeting, and when the first guest was seen.
+    peak_participants: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    guest_joined_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class IntegrationCredentialRow(Base):

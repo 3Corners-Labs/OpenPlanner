@@ -51,6 +51,7 @@ from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, GroupSummary
 from app.domain.staff import StaffFilter, StaffMember
 from app.domain.tokens import agent_pseudonym, agent_pseudonyms
+from app.domain.usage_recording import record_queue_claimed, record_queue_released
 
 CLAIMED = "queue.claimed"
 RELEASED = "queue.released"
@@ -288,6 +289,7 @@ class QueueService:
                 raise DomainError(ErrorCode.NOT_CLAIMED)
             await tx.release_claim(booking_id)
             await self._audit(tx, principal, summary, booking_id, RELEASED)
+            await record_queue_released(tx, booking, summary.group, self._clock.now())
 
     async def _group(self, principal: Principal, slug: str) -> GroupSummary:
         """Authorise ``queue.work`` on the group and return it if it has an own queue."""
@@ -320,6 +322,7 @@ class QueueService:
         if not await tx.claim_booking(booking_id, claim):
             raise DomainError(ErrorCode.ALREADY_CLAIMED)
         await self._audit(tx, principal, summary, booking_id, CLAIMED)
+        await record_queue_claimed(tx, booking, summary.group, now)
         return _claimed(booking)
 
     def _holds(self, principal: Principal, booking: Booking) -> bool:

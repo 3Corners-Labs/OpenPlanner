@@ -216,6 +216,10 @@ class CallStatus:
     updated_at: datetime | None = None
     fallback: bool = False
     """The booking is in the own queue as a fallback (ADR 0082 point 11)."""
+    peak_participants: int = 0
+    """The most people seen in the meeting at once; kept when the meeting ends (metric U11)."""
+    guest_joined_at: datetime | None = None
+    """When the first guest (not the host) was seen in the meeting (metric Q4)."""
 
 
 def new_status(booking_id: int) -> CallStatus:
@@ -234,8 +238,12 @@ def apply_event(status: CallStatus, kind: EventKind, at: datetime) -> CallStatus
         changes |= {"call": CallState.IN_PROGRESS, "started_at": status.started_at or at}
     elif kind in (EventKind.HOST_JOINED, EventKind.GUEST_JOINED):
         changes["participants"] = status.participants + 1
+        if not (kind is EventKind.HOST_JOINED and status.host_joined):  # a repeat is no new person
+            changes["peak_participants"] = max(status.peak_participants, status.participants + 1)
         if kind is EventKind.HOST_JOINED:
             changes |= {"host_joined": True, "host_joined_at": status.host_joined_at or at}
+        else:
+            changes["guest_joined_at"] = status.guest_joined_at or at
     elif kind is EventKind.PARTICIPANT_LEFT:
         changes["participants"] = max(0, status.participants - 1)
     elif kind is EventKind.MEETING_ENDED:
@@ -280,12 +288,15 @@ def apply_polled(status: CallStatus, polled: MeetingStatus, at: datetime) -> Cal
     is lost. A meeting that has ended stays ended, and a host who joined once stays joined.
     """
     ended = polled.state is CallState.ENDED
+    guests = polled.participants - (1 if polled.host_joined else 0)
     return replace(
         status,
         call=CallState.ENDED if status.call is CallState.ENDED else polled.state,
         participants=0 if ended else polled.participants,
         host_joined=status.host_joined or polled.host_joined,
         host_joined_at=status.host_joined_at or (at if polled.host_joined else None),
+        peak_participants=max(status.peak_participants, polled.participants),
+        guest_joined_at=status.guest_joined_at or (at if guests > 0 else None),
         started_at=status.started_at or polled.started_at,
         ended_at=status.ended_at or polled.ended_at or (at if ended else None),
         updated_at=at,
