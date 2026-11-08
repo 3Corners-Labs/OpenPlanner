@@ -69,4 +69,4 @@ help has to be on the page itself, never a link to GitHub.
 |---|---|---|---|
 | 1 | Manual module, help pages, (i) disclosures, the topic test with `NOT_YET_DOCUMENTED`; group settings documented | #43 | merged |
 | 2 | Topics screen by screen as screens were built | many | merged |
-| 3 | The last five routes: *Overview of a group* (new), *Emergency closure of an organisation* (new), new group under *Groups*, the booking detail under *Agenda*, moving a booking on hold under *Emergency closure of a team*; `NOT_YET_DOCUMENTED` empty | #PRNUM | merged |
+| 3 | The last five routes: *Overview of a group* (new), *Emergency closure of an organisation* (new), new group under *Groups*, the booking detail under *Agenda*, moving a booking on hold under *Emergency closure of a team*; `NOT_YET_DOCUMENTED` empty | #613 | merged |
