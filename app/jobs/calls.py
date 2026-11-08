@@ -18,7 +18,7 @@ from app.adapters.db.jobs import ClaimedJob
 from app.domain.booking import Booking
 from app.domain.call_service import CallService
 from app.domain.calls import EventKind
-from app.domain.fallback import CONTACT_CENTER_DOWN, DISPATCH_FAILED, FALLBACK, FallbackService
+from app.domain.fallback import FALLBACK
 from app.domain.job_plan import JobType, is_stale
 from app.domain.ports import UnitOfWork
 from app.domain.scheduling import Group
@@ -63,13 +63,10 @@ class CallJobs:
         calls: Creates and removes meetings and work items.
     """
 
-    def __init__(
-        self, uow: UnitOfWork, calls: CallService, fallback: FallbackService | None = None
-    ) -> None:
-        """Store the collaborators; ``fallback`` puts bookings in the own queue (ADR 0082)."""
+    def __init__(self, uow: UnitOfWork, calls: CallService) -> None:
+        """Store the collaborators."""
         self._uow = uow
         self._calls = calls
-        self._fallback = fallback
 
     @property
     def types(self) -> set[JobType]:
@@ -110,14 +107,8 @@ class CallJobs:
         elif is_stale(job.pinned_start, booking):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
-        elif (
-            job.type is JobType.DISPATCH_WXCC_TASK
-            and group.fallback_active
-            and not booking.wxcc_task_id
-            and self._fallback is not None
-        ):
-            # ADR 0082 point 11: the contact center is down; the booking goes to the own queue.
-            await self._fallback.queue_booking(booking, group, CONTACT_CENTER_DOWN)
+        elif job.type is JobType.DISPATCH_WXCC_TASK and await self._calls.diverts(booking, group):
+            # ADR 0082 point 11: the contact center is down; the booking went to the own queue.
             log.info("job.skipped", job_id=job.id, reason=FALLBACK)
             return FALLBACK
         elif (reason := nothing_to_do(job.type, booking, group)) is not None:
@@ -133,14 +124,8 @@ class CallJobs:
         """Put a job's final failure on the booking's timeline, with the provider's reason."""
         kind = FAILURE_EVENTS.get(job.type, EventKind.INTEGRATION_ERROR)
         await self._calls.record_failure(job.booking_id, code, kind, message)
-        if job.type is not JobType.DISPATCH_WXCC_TASK or self._fallback is None:
-            return
-        async with self._uow.read() as tx:
-            booking = await tx.get_booking(job.booking_id)
-            group = await tx.get_group_by_id(booking.group_id) if booking else None
-        if booking is not None and group is not None and group.falls_back:
-            # ADR 0082 point 11: a dispatch that failed for good lands in the own queue.
-            await self._fallback.queue_booking(booking, group, DISPATCH_FAILED)
+        if job.type is JobType.DISPATCH_WXCC_TASK:
+            await self._calls.dispatch_failed(job.booking_id)
 
 
 def nothing_to_do(job_type: JobType, booking: Booking, group: Group) -> str | None:

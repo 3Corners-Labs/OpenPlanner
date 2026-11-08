@@ -356,6 +356,7 @@ def create_app(
                 wired.video,
                 wired.dispatcher,
                 agent_start_label,
+                app.state.fallback_service,
             )
             app.state.trial_call_service = TrialCallService(
                 uow, wired.video, app.state.integration_service, clock
@@ -675,7 +676,6 @@ def create_app(
             clock,
             app.state.admin_service,
             app.state.integration_service,
-            lambda booking, group: app.state.call_service.ensure_task(booking, group),
             BotSpacePoster(app.state.bot_tokens, http, live().webex_api_base_url, request_log),
             SpaceTexts(app.state.translator.gettext, settings.public_base_url),
         )

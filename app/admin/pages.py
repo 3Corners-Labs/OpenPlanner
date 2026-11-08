@@ -169,7 +169,8 @@ def entry_subtabs(
 
 
 OWN_QUEUE_TABS = frozenset({"group.queue"})
-"""Screens shown only on a group that dispatches to OpenPlanner's own queue (ADR 0043)."""
+"""Screens shown only on a group with an own queue: it dispatches there (ADR 0043) or falls back
+to it (ADR 0082 point 11)."""
 
 
 def group_shows(principal: Principal, summary: GroupSummary) -> Callable[[Screen], bool]:
@@ -177,13 +178,13 @@ def group_shows(principal: Principal, summary: GroupSummary) -> Callable[[Screen
 
     The one predicate for the group's tabs and the links of its readiness checklist: the
     matrix grants the screen's permission on this group (or its organisation), and the own
-    queue shows only on a group that dispatches to it (ADR 0043).
+    queue shows only on a group that dispatches or falls back to it (ADR 0043, ADR 0082).
     """
     can = can_function(principal)
 
     def shows(screen: Screen) -> bool:
         return bool(can(screen.permission, summary)) and (
-            summary.group.has_own_queue or screen.key not in OWN_QUEUE_TABS
+            summary.group.queue_open or screen.key not in OWN_QUEUE_TABS
         )
 
     return shows

@@ -814,12 +814,7 @@ async def save_settings(
     trial = form.choice("trial_call_enabled", {"yes", "no"})
     join_client = form.choice("join_client", {client.value for client in JoinClient})
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
-    # A form without the field (an older page, a script) keeps the group's current fallback.
-    fallback = (
-        form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
-        if form.text("dispatch_fallback")
-        else context.group.group.dispatch_fallback.value
-    )
+    fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
     chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback)
     if not form.errors and None not in chosen:
         new = GroupSettings(
@@ -830,9 +825,7 @@ async def save_settings(
             queue_free_pick_allowed=free_pick == "yes",
             calendar_invite_address=form.optional_text("calendar_invite_address"),
             dispatch_fallback=DispatchFallback(str(fallback)),
-            fallback_space_room_id=form.optional_text("fallback_space_room_id")
-            if "fallback_space_room_id" in form.values
-            else context.group.group.fallback_space_room_id,
+            fallback_space_room_id=form.optional_text("fallback_space_room_id"),
             video_host_email=form.optional_text("video_host_email"),
             wxcc_business_address=form.optional_text("wxcc_business_address"),
             wxcc_channel=form.optional_text("wxcc_channel"),

@@ -6,11 +6,24 @@ name and the same link. Never the host join link: claiming in the queue gives th
 point 6), so the space keeps no link that outlives the booking.
 """
 
+import re
 from collections.abc import Callable
 
 from app.domain.booking import Booking
 from app.domain.scheduling import Group
 from app.i18n.dates import format_clock, format_day
+
+MARKDOWN_SPECIAL = re.compile(r"([\\`*_{}\[\]()<>#+\-.!|~@:])")
+"""Characters with a meaning in Webex markdown (links, mentions, emphasis, headings)."""
+
+
+def escape_markdown(text: str) -> str:
+    """Return ``text`` with every markdown character escaped, so it shows as typed.
+
+    A participant's first name or an admin's group name must never become a link, a mention
+    or formatting in a message the organisation's bot posts.
+    """
+    return MARKDOWN_SPECIAL.sub(r"\\\1", text)
 
 
 class SpaceTexts:
@@ -33,7 +46,10 @@ class SpaceTexts:
     def activated(self, group: Group, locale: str) -> str:
         """Return the activation message, with a link to the queue."""
         return self._gettext(
-            locale, "fallback.space.activated", group=group.name, link=self._link(group)
+            locale,
+            "fallback.space.activated",
+            group=escape_markdown(group.name),
+            link=self._link(group),
         )
 
     def queued(self, group: Group, booking: Booking, locale: str) -> str:
@@ -47,6 +63,6 @@ class SpaceTexts:
             locale,
             "fallback.space.queued",
             time=when,
-            first_name=first_name,
+            first_name=escape_markdown(first_name),
             link=self._link(group),
         )

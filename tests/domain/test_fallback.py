@@ -14,7 +14,7 @@ from app.domain.calls import EventKind
 from app.domain.connection_health import HealthEntry, HealthState, Platform
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import CONTACT_CENTER_DOWN, DISPATCH_FAILED, FallbackService
-from app.domain.job_plan import JobType
+from app.domain.job_plan import JobType, PlannedJob
 from app.domain.ports import IntegrationError
 from app.domain.queue_service import load_entries
 from app.domain.scheduling import DispatchFallback, Group
@@ -61,22 +61,24 @@ def wired(**fields: object) -> Setup:
     return setup
 
 
-def service(
-    setup: Setup, poster: Poster | None = None, dispatched: list[int] | None = None
-) -> FallbackService:
-    async def dispatch(booking: Booking, group: Group) -> None:
-        if dispatched is not None:
-            dispatched.append(booking.id or 0)
-
+def service(setup: Setup, poster: Poster | None = None) -> FallbackService:
     return FallbackService(
         setup.uow,
         setup.clock,
         AdminService(setup.uow, setup.clock),
         setup.integration,
-        dispatch,
-        poster,
+        poster or Poster(),
         Texts(),
     )
+
+
+def redispatched(setup: Setup, booking_id: int) -> list[PlannedJob]:
+    """The dispatch jobs planned now for the booking (the fallback's end plans them)."""
+    return [
+        j
+        for j in setup.uow.state.jobs.get(booking_id, [])
+        if j.type is JobType.DISPATCH_WXCC_TASK and j.run_at == setup.clock.now()
+    ]
 
 
 def health(state: HealthState, org: str = "demo") -> list[HealthEntry]:
@@ -84,8 +86,8 @@ def health(state: HealthState, org: str = "demo") -> list[HealthEntry]:
 
 
 async def test_the_group_falls_back_while_the_contact_center_is_down_and_returns() -> None:
-    setup, poster, dispatched = wired(), Poster(), []
-    fallback = service(setup, poster, dispatched)
+    setup, poster = wired(), Poster()
+    fallback = service(setup, poster)
     bid = await setup.booking()
     assert await fallback.sweep(health(HealthState.DEGRADED)) == []
     assert await fallback.sweep(health(HealthState.DOWN)) == ["aangifte"]
@@ -94,13 +96,14 @@ async def test_the_group_falls_back_while_the_contact_center_is_down_and_returns
     assert poster.posts == [(1, ROOM, "on:aangifte:nl")]
     group = setup.uow.state.groups[1]
     booking = setup.uow.state.bookings[bid]
-    await fallback.queue_booking(booking, group, CONTACT_CENTER_DOWN)
+    assert await fallback.diverts(booking, group)
     assert setup.uow.state.call_status[bid].fallback
     assert poster.posts[-1][2] == "queued:Ada"
     assert await fallback.sweep(health(HealthState.OK)) == ["aangifte"]
     assert not setup.uow.state.groups[1].fallback_active
     assert not setup.uow.state.call_status[bid].fallback  # back to the contact center
-    assert dispatched == [bid]
+    # A fresh dispatch job: its retries and a final failure (back to the queue) still apply.
+    assert [(j.run_at, j.pinned_start) for j in redispatched(setup, bid)] == [(NOW, booking.start)]
     events = [e for e in setup.uow.state.audit if e.action == FALLBACK_EVENT]
     assert [(e.outcome, e.reason, e.group) for e in events] == [
         (Outcome.FAILURE, "on", "aangifte"),
@@ -116,18 +119,16 @@ async def test_a_group_without_the_fallback_or_on_its_own_queue_never_switches()
 async def test_a_claimed_booking_stays_in_the_queue_when_the_fallback_ends() -> None:
     from app.domain.booking import Claim
 
-    setup, dispatched = wired(), []
-    fallback = service(setup, None, dispatched)
+    setup = wired()
+    fallback = service(setup)
     bid = await setup.booking()
     await fallback.sweep(health(HealthState.DOWN))
-    await fallback.queue_booking(
-        setup.uow.state.bookings[bid], setup.uow.state.groups[1], CONTACT_CENTER_DOWN
-    )
+    assert await fallback.diverts(setup.uow.state.bookings[bid], setup.uow.state.groups[1])
     setup.uow.state.bookings[bid] = replace(
         setup.uow.state.bookings[bid], claim=Claim(NOW, "agent")
     )
     await fallback.sweep(health(HealthState.OK))
-    assert dispatched == []
+    assert redispatched(setup, bid) == []
     assert setup.uow.state.call_status[bid].fallback
 
 
@@ -211,7 +212,42 @@ async def test_a_fallback_queue_shows_only_the_bookings_that_fell_back() -> None
     async with setup.uow.read() as tx:
         before = await load_entries(tx, Scope(everything=True), group, near)
     assert before == []
-    await service(setup).queue_booking(setup.uow.state.bookings[first], group, DISPATCH_FAILED)
+    await service(setup).dispatch_failed(first)
     async with setup.uow.read() as tx:
         after = await load_entries(tx, Scope(everything=True), group, near)
     assert [e.booking.id for e in after] == [first]
+
+
+async def test_a_group_not_in_fallback_or_a_dispatched_booking_is_not_diverted() -> None:
+    setup = wired()
+    fallback = service(setup)
+    bid = await setup.booking()
+    booking, group = setup.uow.state.bookings[bid], setup.uow.state.groups[1]
+    assert not await fallback.diverts(booking, group)
+    await fallback.sweep(health(HealthState.DOWN))
+    group = setup.uow.state.groups[1]
+    assert not await fallback.diverts(replace(booking, wxcc_task_id="t-1"), group)
+
+
+async def test_a_dispatch_failure_of_a_group_without_the_fallback_stays_out_of_the_queue() -> None:
+    setup = wired(dispatch_fallback=DispatchFallback.NONE)
+    bid = await setup.booking()
+    await service(setup).dispatch_failed(bid)
+    assert bid not in setup.uow.state.call_status or not setup.uow.state.call_status[bid].fallback
+
+
+async def test_a_direct_call_in_fallback_reaches_the_queue_with_a_line_in_the_space() -> None:
+    from app.domain.call_service import CallService
+    from app.web.call_labels import agent_start_label
+
+    setup, poster = wired(), Poster()
+    fallback = service(setup, poster)
+    bid = await setup.booking()
+    await fallback.sweep(health(HealthState.DOWN))
+    calls = CallService(
+        setup.uow, setup.integration, setup.video, setup.dispatcher, agent_start_label, fallback
+    )
+    await calls.ensure_task(setup.uow.state.bookings[bid], setup.uow.state.groups[1])
+    assert setup.dispatcher.items == []
+    assert setup.uow.state.call_status[bid].fallback
+    assert poster.posts[-1][2] == "queued:Ada"

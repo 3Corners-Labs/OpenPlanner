@@ -22,3 +22,17 @@ def test_a_line_holds_time_first_name_and_the_queue_never_the_join_link() -> Non
         assert "webex.com" not in line
         assert "Lovelace" not in line
         assert "Team" in texts.activated(group, locale)
+
+
+def test_a_first_name_never_becomes_a_link_or_a_mention_in_the_space() -> None:
+    texts = SpaceTexts(Translator(load_catalogues()).gettext, "https://plan.voorbeeld.nl")
+    group = make_group(slug="team", name="Team *one*")
+    booking = confirmed_booking()
+    assert booking.contact is not None
+    booking = replace(
+        booking, contact=replace(booking.contact, first_name="[Open](https://evil.example) <@x>")
+    )
+    line = texts.queued(group, booking, "nl")
+    assert "[Open](" not in line
+    assert r"\[Open\]\(https\://evil\.example\) \<\@x\>" in line
+    assert r"Team \*one\*" in texts.activated(group, "nl")

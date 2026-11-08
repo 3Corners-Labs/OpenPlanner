@@ -24,5 +24,7 @@ SETTINGS_FORM = {
     "wxcc_routing_value": "team-42",
     "not_picked_up_minutes": "10",
     "embedding_enabled": "yes",
+    "dispatch_fallback": "none",
+    "fallback_space_room_id": "",
 }
 """A complete, valid settings form for the demo group."""

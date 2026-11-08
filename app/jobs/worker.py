@@ -51,7 +51,6 @@ from app.domain.admin_session_service import AdminSessionService
 from app.domain.alert_delivery import AlertNotifier
 from app.domain.alerts import QUEUE_WAIT_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
-from app.domain.call_service import CallService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.fallback import FallbackService
@@ -85,7 +84,6 @@ from app.jobs.runner import JobRunner
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.web.alert_text import alert_composer
-from app.web.call_labels import agent_start_label
 from app.web.fallback_text import SpaceTexts
 
 log = structlog.get_logger()
@@ -192,14 +190,14 @@ async def run_worker(
         )
         integration = IntegrationService(uow, clock, AdminService(uow, clock), version)
         # ADR 0082 point 11: bookings to the own queue when the contact center fails.
-        calls = CallService(uow, integration, wired.video, wired.dispatcher, agent_start_label)
         fallback = FallbackService(
             uow,
             clock,
             AdminService(uow, clock),
             integration,
-            calls.ensure_task,
-            BotSpacePoster(alert_bots(engine, settings), http, settings.webex_api_base_url),
+            BotSpacePoster(
+                alert_bots(engine, settings), http, settings.webex_api_base_url, request_log
+            ),
             SpaceTexts(
                 Translator(load_catalogues(), CachedTextOverrides(uow)).gettext,
                 settings.public_base_url,

@@ -17,12 +17,12 @@ activation and one line per booking: start time, first name and a link to the qu
 the host join link (claiming gives that, ADR 0043 point 6). The participant notices nothing.
 """
 
-from collections.abc import Awaitable, Callable, Iterable
-from dataclasses import replace
+from collections.abc import Callable, Iterable
 from datetime import datetime
 from typing import Protocol
 
 from app.domain.admin import AdminService, record_change, require
+from app.domain.alert_delivery import DEFAULT_LOCALE
 from app.domain.alerts import FALLBACK_EVENT
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.authorization import Permission, Principal, Scope
@@ -31,6 +31,7 @@ from app.domain.calls import EventKind
 from app.domain.connection_health import HealthEntry, HealthState, Platform
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
+from app.domain.job_plan import JobType, PlannedJob
 from app.domain.ports import Clock, IntegrationError, UnitOfWork
 from app.domain.scheduling import Group
 
@@ -72,8 +73,7 @@ class FallbackService:
         clock: Current time.
         admin: Authorises ending a fallback by hand.
         integration: Writes timeline events and the call status.
-        dispatch: Dispatches a booking to the contact center after all (``CallService``).
-        poster: Posts to a team space; ``None`` posts nothing.
+        poster: Posts to a team space.
         texts: The messages for the space.
     """
 
@@ -83,27 +83,44 @@ class FallbackService:
         clock: Clock,
         admin: AdminService,
         integration: IntegrationService,
-        dispatch: Callable[[Booking, Group], Awaitable[object]] | None = None,
-        poster: SpacePoster | None = None,
-        texts: FallbackTexts | None = None,
+        poster: SpacePoster,
+        texts: FallbackTexts,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._integration = integration
-        self._dispatch = dispatch
         self._poster = poster
         self._texts = texts
 
-    async def queue_booking(self, booking: Booking, group: Group, detail: str) -> None:
-        """Put ``booking`` in the group's own queue, flagged as fallback, and tell the team."""
+    async def diverts(self, booking: Booking, group: Group) -> bool:
+        """Put a booking due for dispatch in the own queue while its group is in fallback.
+
+        The one place that decides it, for the dispatch job and for a direct call alike.
+
+        Returns:
+            Whether the booking went to the queue instead of the contact center.
+        """
+        if not group.fallback_active or booking.wxcc_task_id:
+            return False
+        await self._queue(booking, group, CONTACT_CENTER_DOWN)
+        return True
+
+    async def dispatch_failed(self, booking_id: int) -> None:
+        """Queue a booking whose dispatch failed for good, when its group falls back."""
+        async with self._uow.read() as tx:
+            booking = await tx.get_booking(booking_id)
+            group = await tx.get_group_by_id(booking.group_id) if booking else None
+        if booking is not None and group is not None and group.falls_back:
+            await self._queue(booking, group, DISPATCH_FAILED)
+
+    async def _queue(self, booking: Booking, group: Group, detail: str) -> None:
+        """Flag ``booking`` as fallback in the group's own queue and tell the team."""
         if booking.id is None:  # pragma: no cover - bookings are stored
             return
         await self._integration.record(booking.id, EventKind.FALLBACK_QUEUED, detail=detail)
-        texts = self._texts
-        if texts is not None:
-            await self._post(group, lambda locale: texts.queued(group, booking, locale))
+        await self._post(group, lambda locale: self._texts.queued(group, booking, locale))
 
     async def sweep(self, health: Iterable[HealthEntry]) -> list[str]:
         """Switch fallbacks on and off by the organisations' contact-center health.
@@ -157,14 +174,17 @@ class FallbackService:
         async with self._uow.locked() as tx:
             await tx.save_group_fallback(group.id, now)
             await tx.add_audit_event(_event(group, organisation, Outcome.FAILURE, now))
-        texts = self._texts
-        if texts is not None:
-            await self._post(group, lambda locale: texts.activated(group, locale))
+        await self._post(group, lambda locale: self._texts.activated(group, locale))
 
     async def _switch_off(
         self, group: Group, organisation: str, principal: Principal | None
     ) -> None:
-        """End the fallback; bookings not yet claimed go to the contact center after all."""
+        """End the fallback; bookings not yet claimed go to the contact center after all.
+
+        Each gets a fresh dispatch job in the same locked transaction (its earlier one skipped
+        with reason ``fallback``), so the job path dispatches it with its retries and a final
+        failure puts it back in the queue: no booking is left between the two.
+        """
         now = self._clock.now()
         async with self._uow.locked() as tx:
             await tx.save_group_fallback(group.id, None)
@@ -179,34 +199,42 @@ class FallbackService:
                     group.slug,
                     "fallback.off",
                 )
-            waiting = await tx.fallback_bookings(group.id, now)
-        restored = replace(group, fallback_active_since=None)
+            waiting = [
+                b
+                for b in await tx.fallback_bookings(group.id, now)
+                if b.id is not None and b.claim is None
+            ]
+            for booking in waiting:
+                await tx.add_jobs(
+                    _stored(booking),
+                    [PlannedJob(JobType.DISPATCH_WXCC_TASK, now, booking.start)],
+                )
         for booking in waiting:
-            if booking.id is None or booking.claim is not None:
-                continue
-            await self._integration.record(booking.id, EventKind.FALLBACK_ENDED)
-            if self._dispatch is not None:
-                try:
-                    await self._dispatch(booking, restored)
-                except IntegrationError:
-                    continue  # its dispatch job retries; the booking left the queue already
+            await self._integration.record(_stored(booking), EventKind.FALLBACK_ENDED)
 
     async def _post(self, group: Group, write: Callable[[str], str]) -> None:
         """Post to the group's own space in its organisation's locale, when it has a space.
 
         A failure never stops the fallback: the queue shows the booking all the same.
         """
-        if self._poster is None or group.fallback_space_room_id is None:
+        if group.fallback_space_room_id is None:
             return
         async with self._uow.read() as tx:
             organisation = await tx.get_organisation_by_id(group.organisation_id)
-        locale = organisation.default_locale if organisation else "nl"
+        locale = organisation.default_locale if organisation else DEFAULT_LOCALE
         try:
             await self._poster.post(
                 group.organisation_id, group.fallback_space_room_id, write(locale)
             )
         except IntegrationError:
             return
+
+
+def _stored(booking: Booking) -> int:
+    """Return the ID of a stored booking; a missing ID is a programming error."""
+    if booking.id is None:  # pragma: no cover - filtered by the caller
+        raise ValueError("booking without id")
+    return booking.id
 
 
 def _event(group: Group, organisation: str, outcome: Outcome, now: datetime) -> AuditEvent:

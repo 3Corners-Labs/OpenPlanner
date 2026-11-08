@@ -16,6 +16,7 @@ from datetime import datetime
 
 from app.domain.booking import Booking
 from app.domain.calls import EventKind, TaskState, meeting_request, work_item
+from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.ports import ContactCenterDispatcher, IntegrationError, UnitOfWork, VideoProvider
@@ -42,13 +43,15 @@ class CallService:
         video: VideoProvider | None,
         dispatcher: ContactCenterDispatcher | None,
         start_label: StartLabel,
+        fallback: FallbackService | None = None,
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators; ``fallback`` diverts dispatches to the own queue (ADR 0082)."""
         self._uow = uow
         self._integration = integration
         self._video = video
         self._dispatcher = dispatcher
         self._start_label = start_label
+        self._fallback = fallback
 
     @property
     def video_available(self) -> bool:
@@ -79,10 +82,7 @@ class CallService:
         """
         if self._dispatcher is None or not group.dispatch_enabled or booking.wxcc_task_id:
             return booking
-        if group.fallback_active:  # ADR 0082 point 11: a direct call takes the own-queue path
-            await self._integration.record(
-                _id(booking), EventKind.FALLBACK_QUEUED, detail="contact_center_down"
-            )
+        if await self.diverts(booking, group):
             return booking
         if booking.meeting is None:
             raise IntegrationError("meeting_missing", retryable=True)
@@ -94,6 +94,15 @@ class CallService:
             await tx.save_task_id(booking_id, task_id)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
         return _with(booking, wxcc_task_id=task_id)
+
+    async def diverts(self, booking: Booking, group: Group) -> bool:
+        """Put a booking due for dispatch in the own queue while its group is in fallback."""
+        return self._fallback is not None and await self._fallback.diverts(booking, group)
+
+    async def dispatch_failed(self, booking_id: int) -> None:
+        """Hand a dispatch that failed for good to the fallback (ADR 0082 point 11)."""
+        if self._fallback is not None:
+            await self._fallback.dispatch_failed(booking_id)
 
     async def create_now(self, booking: Booking, group: Group, now: datetime) -> None:
         """Create the meeting and work item of a direct call in the request, not the worker.

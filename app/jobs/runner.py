@@ -169,8 +169,7 @@ class JobRunner:
         self._calls = (
             CallJobs(
                 uow,
-                CallService(uow, integration, video, dispatcher, agent_start_label),
-                fallback,
+                CallService(uow, integration, video, dispatcher, agent_start_label, fallback),
             )
             if integration is not None
             else None

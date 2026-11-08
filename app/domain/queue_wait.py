@@ -64,7 +64,7 @@ class QueueWaitWatch:
         now = self._clock.now()
         everything = Scope(everything=True)
         async with self._uow.read() as tx:
-            groups = [g for g in await tx.list_groups(everything) if g.group.has_own_queue]
+            groups = [g for g in await tx.list_groups(everything) if g.group.queue_open]
             waits = [
                 (g, summarise(await load_entries(tx, everything, g.group, now), now).longest_wait)
                 for g in groups

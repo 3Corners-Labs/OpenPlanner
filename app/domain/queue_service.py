@@ -242,6 +242,11 @@ class QueueService:
             raise DomainError(ErrorCode.FREE_PICK_NOT_ALLOWED)
         async with self._uow.locked() as tx:
             booking = await _booking_of(tx, summary.group, booking_id)
+            status = await tx.get_call_status(booking_id)
+            if not summary.group.has_own_queue and not (status is not None and status.fallback):
+                # A fallback queue (ADR 0082) holds only the bookings that fell back; any other
+                # booking of the group is at the contact center and not ours to hand out.
+                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
             if booking.claim is not None:
                 raise DomainError(ErrorCode.ALREADY_CLAIMED)
             return await self._claim(tx, principal, summary, booking, self._clock.now())
