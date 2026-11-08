@@ -40,6 +40,7 @@ from app.domain.own_queue import (
     VideoState,
     next_up,
     not_claimed_in_time,
+    not_picked_up,
     participant_state,
     summarise,
     video_state,
@@ -110,12 +111,15 @@ class GroupQueueSummary:
             request.
         longest_wait: How long the first of them has waited.
         staff_available: Staff who may work this queue and are signed in now.
+        not_picked_up: Bookings nobody claimed ``not_picked_up_minutes`` after their start
+            (ADR 0043 point 8).
     """
 
     summary: GroupSummary
     waiting: int
     longest_wait: timedelta
     staff_available: int
+    not_picked_up: int = 0
 
 
 @dataclass(frozen=True)
@@ -207,12 +211,20 @@ class QueueService:
             }
             rows = []
             for summary in groups:
-                queue = summarise(await self._entries(tx, principal, summary.group, now), now)
+                entries = await self._entries(tx, principal, summary.group, now)
+                queue = summarise(entries, now)
+                limit = timedelta(minutes=summary.group.not_picked_up_minutes)
                 available = _signed_in_for(
                     staff[summary.organisation_slug], summary, now, session_lifetime
                 )
                 rows.append(
-                    GroupQueueSummary(summary, queue.waiting, queue.longest_wait, available)
+                    GroupQueueSummary(
+                        summary,
+                        queue.waiting,
+                        queue.longest_wait,
+                        available,
+                        not_picked_up(entries, now, limit),
+                    )
                 )
         return sorted(rows, key=lambda r: (-r.waiting, -r.longest_wait, r.summary.group.name))
 

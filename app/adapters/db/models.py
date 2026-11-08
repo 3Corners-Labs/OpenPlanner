@@ -1021,6 +1021,10 @@ class CallStatusRow(Base):
     updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     # ADR 0082 point 11: the booking is in the own queue as a fallback.
     fallback: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    # ADR 0043: when the participant started waiting in the lobby, and when the worker
+    # reported the booking as not picked up.
+    lobby_since: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    not_picked_up_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class IntegrationCredentialRow(Base):

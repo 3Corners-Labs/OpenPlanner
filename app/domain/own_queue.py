@@ -6,13 +6,14 @@ participant always gets the first free agent: "pick up next" takes the participa
 lobby first, then the earliest start.
 
     visible ─ confirmed, start ≤ now + queue_visible_from_minutes, end > now
-    next_up ─ unclaimed; in the lobby first, then by start, then by booking id
+    next_up ─ unclaimed; in the lobby first (longest waiting first), then by start, then by id
 
 "In the lobby" means the participant joined the meeting (Webex webhook, ADR 0010) and no host
-has. The lobby wait itself is not stored, so among waiting participants the earliest start goes
-first, which is nearly always the one waiting longest. A direct call (ADR 0019) is the request
-to talk now, so its participant waits from its start, whether or not they opened the link yet;
-a scheduled appointment's participant waits from the lobby join.
+has. ``CallStatus.lobby_since`` records when, so among waiting participants the one who joined
+first goes first; a status from before that field falls back to its last change, then the
+start. A direct call (ADR 0019) is the request to talk now, so its participant waits from its
+start, whether or not they opened the link yet; a scheduled appointment's participant waits from
+the lobby join.
 
 Every row also says whether the video link is ready, still being prepared or failed, and the
 claimed booking where the participant is (ADR 0072): an agent never waits for a link that will
@@ -44,6 +45,7 @@ __all__ = [
     "participant_state",
     "next_up",
     "not_claimed_in_time",
+    "not_picked_up",
     "summarise",
     "video_state",
     "visible",
@@ -135,13 +137,13 @@ class QueueEntry:
     def waiting_since(self) -> datetime:
         """When the participant started waiting.
 
-        A direct call waits from its start, which is the request (ADR 0019). For a scheduled
-        appointment the lobby join itself is not stored (module docstring); the status's last
-        change is the join for a participant alone in the lobby. Without one, the booking's start.
+        A direct call waits from its start, which is the request (ADR 0019). A scheduled
+        appointment waits from the lobby join (``CallStatus.lobby_since``); a status recorded
+        before that field existed falls back to its last change, then to the booking's start.
         """
         if self.is_direct:
             return self.booking.start
-        return self.status.updated_at or self.booking.start
+        return self.status.lobby_since or self.status.updated_at or self.booking.start
 
 
 @dataclass(frozen=True)
@@ -195,9 +197,20 @@ def next_up(entries: Iterable[QueueEntry]) -> QueueEntry | None:
     open_entries = [e for e in entries if not e.claimed and e.booking.is_active]
     if not open_entries:
         return None
-    return min(open_entries, key=lambda e: (not e.in_lobby, e.booking.start, e.booking.id or 0))
+    return min(open_entries, key=_pick_order)
+
+
+def _pick_order(entry: QueueEntry) -> tuple[bool, datetime, datetime, int]:
+    """Order for "pick up next": in the lobby first, the longest waiting first, then by start."""
+    since = entry.waiting_since if entry.in_lobby else entry.booking.start
+    return (not entry.in_lobby, since, entry.booking.start, entry.booking.id or 0)
 
 
 def not_claimed_in_time(entry: QueueEntry, now: datetime, limit: timedelta) -> bool:
     """Return whether nobody claimed ``entry`` within ``limit`` after its start."""
     return not entry.claimed and now - entry.booking.start > limit
+
+
+def not_picked_up(entries: Iterable[QueueEntry], now: datetime, limit: timedelta) -> int:
+    """Return how many entries nobody claimed within ``limit`` after their start (ADR 0043 §8)."""
+    return sum(1 for e in entries if not_claimed_in_time(e, now, limit))

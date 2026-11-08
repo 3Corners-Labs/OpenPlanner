@@ -216,6 +216,11 @@ class CallStatus:
     updated_at: datetime | None = None
     fallback: bool = False
     """The booking is in the own queue as a fallback (ADR 0082 point 11)."""
+    lobby_since: datetime | None = None
+    """When the participant joined and started waiting for an agent (ADR 0043 point 6); cleared
+    when everyone left or the meeting ended, so a rejoin waits from the rejoin."""
+    not_picked_up_at: datetime | None = None
+    """When the worker reported the booking as not picked up (ADR 0043 point 8); once only."""
 
 
 def new_status(booking_id: int) -> CallStatus:
@@ -236,10 +241,15 @@ def apply_event(status: CallStatus, kind: EventKind, at: datetime) -> CallStatus
         changes["participants"] = status.participants + 1
         if kind is EventKind.HOST_JOINED:
             changes |= {"host_joined": True, "host_joined_at": status.host_joined_at or at}
+        elif not status.host_joined:
+            changes["lobby_since"] = status.lobby_since or at
     elif kind is EventKind.PARTICIPANT_LEFT:
         changes["participants"] = max(0, status.participants - 1)
+        if changes["participants"] == 0:
+            changes["lobby_since"] = None
     elif kind is EventKind.MEETING_ENDED:
         changes |= {"call": CallState.ENDED, "ended_at": at, "participants": 0}
+        changes["lobby_since"] = None
     elif kind is EventKind.TASK_CREATED:
         changes |= {"task": TaskState.QUEUED, "task_created_at": at}
     elif kind is EventKind.TASK_CONNECTED:

@@ -474,6 +474,8 @@ def _call_status(row: CallStatusRow) -> CallStatus:
         connected_at=row.connected_at,
         updated_at=row.updated_at,
         fallback=row.fallback,
+        lobby_since=row.lobby_since,
+        not_picked_up_at=row.not_picked_up_at,
     )
 
 
@@ -1558,6 +1560,8 @@ class SqlTransaction(
                 connected_at=status.connected_at,
                 updated_at=status.updated_at,
                 fallback=status.fallback,
+                lobby_since=status.lobby_since,
+                not_picked_up_at=status.not_picked_up_at,
             )
         )
         await self._session.flush()

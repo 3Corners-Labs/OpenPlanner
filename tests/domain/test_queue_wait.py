@@ -1,13 +1,15 @@
 """The wait watch (ADR 0061 OV-7): one warning alert per crossing of the wait threshold."""
 
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 
 from app.domain.alerts import QUEUE_WAIT_EVENT, QUEUE_WAIT_OVER
 from app.domain.audit import Outcome, Source
+from app.domain.booking import Claim
 from app.domain.calls import CallStatus
-from app.domain.queue_wait import QueueWaitWatch
+from app.domain.queue_wait import NOT_PICKED_UP_EVENT, NotPickedUpWatch, QueueWaitWatch
 from app.domain.scheduling import DispatchKind, Organisation, ScheduleRule
 from app.domain.services import BookingService
 from app.domain.system_log import SystemLog
@@ -131,3 +133,47 @@ async def test_a_queue_switched_off_is_forgotten_without_an_event(
     await watch.check()
 
     assert _waits(uow) == []
+
+
+def _unpicked(uow: InMemoryUnitOfWork) -> list[tuple[Outcome, int | None, str, str]]:
+    return [
+        (e.outcome, e.booking_id, e.reason, e.detail)
+        for e in uow.state.audit
+        if e.action == NOT_PICKED_UP_EVENT
+    ]
+
+
+async def test_a_booking_nobody_claimed_in_time_is_reported_once(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0043 point 8: one system event per booking, also when the watch runs again."""
+    state = uow
+    booking_id = await _waiting(state, clock)
+    watch = NotPickedUpWatch(state, clock, SystemLog(state, clock))
+
+    clock.advance(timedelta(minutes=10))
+    assert await watch.check() == 0  # exactly the limit is still in time
+    clock.advance(timedelta(minutes=1))
+    assert await watch.check() == 1
+    clock.advance(timedelta(minutes=1))
+    assert await watch.check() == 0
+
+    assert _unpicked(state) == [(Outcome.FAILURE, booking_id, "not_picked_up", "minutes:10")]
+    assert state.state.call_status[booking_id].not_picked_up_at == SLOT_0900 + timedelta(minutes=11)
+
+
+async def test_a_claimed_booking_or_a_contact_center_group_is_never_reported(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    state = uow
+    bookings = BookingService(state, clock, TEST_TOKEN_KEY)
+    await book_confirmed(bookings, group_slug="wxcc", start=SLOT_0900, contact=ADA, locale="nl")
+    booking_id = await _waiting(state, clock)
+    booking = state.state.bookings[booking_id]
+    state.state.bookings[booking_id] = replace(booking, claim=Claim(clock.now(), "agent-pseudonym"))
+    watch = NotPickedUpWatch(state, clock, SystemLog(state, clock))
+
+    clock.advance(timedelta(minutes=30))
+
+    assert await watch.check() == 0
+    assert _unpicked(state) == []

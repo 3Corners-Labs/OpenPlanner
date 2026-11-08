@@ -37,8 +37,9 @@ tijden.
   **Alles bekijken** opent het auditlog zelf.
 
 - **Wachtrij in mijn groepen**: per groep met een eigen wachtrij in uw bereik hoeveel deelnemers
-  er wachten, hoe lang de langste wacht al duurt en hoeveel medewerkers die de wachtrij mogen
-  bedienen nu zijn aangemeld. Een deelnemer met een afspraak telt mee zodra die in de lobby
+  er wachten, hoe lang de langste wacht al duurt, hoeveel afspraken niemand op tijd heeft
+  opgepakt (**Niet opgepakt**, de tijd die bij de groep is ingesteld) en hoeveel medewerkers die
+  de wachtrij mogen bedienen nu zijn aangemeld. Een deelnemer met een afspraak telt mee zodra die in de lobby
   staat; een directe oproep telt vanaf de aanvraag, ook als de link nog niet is geopend. De groepsnaam opent de wachtrij. Alleen aantallen en minuten,
   nooit namen. Onder de langste wachttijd staat of die binnen het doel blijft, erboven zit, of boven
 de grens waarop een melding komt (*Doel voor de wachttijd* en *Melding bij wachttijd boven*,

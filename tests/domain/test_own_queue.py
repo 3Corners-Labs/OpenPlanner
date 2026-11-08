@@ -14,6 +14,7 @@ from app.domain.own_queue import (
     VideoState,
     next_up,
     not_claimed_in_time,
+    not_picked_up,
     participant_state,
     summarise,
     video_state,
@@ -78,6 +79,24 @@ def test_next_is_the_participant_in_the_lobby_before_the_earliest_start() -> Non
     assert nxt is not None
     assert nxt.booking.id == 2
     assert nxt.in_lobby
+
+
+def test_next_in_the_lobby_is_the_one_who_joined_first_not_the_earliest_start() -> None:
+    """ADR 0043 point 6: "pick up next" takes who waited longest in the lobby."""
+    early = entry(1, -10, lobby=True)
+    late = entry(2, -5, lobby=True)
+    early = replace(early, status=replace(early.status, lobby_since=NOW - timedelta(minutes=1)))
+    late = replace(late, status=replace(late.status, lobby_since=NOW - timedelta(minutes=6)))
+
+    assert (nxt := next_up([early, late])) is not None
+    assert nxt.booking.id == 2
+    assert nxt.waiting_since == NOW - timedelta(minutes=6)
+
+
+def test_a_booking_counts_as_not_picked_up_after_its_limit() -> None:
+    entries = [entry(1, -11), entry(2, -10), entry(3, -30, claimed=True)]
+
+    assert not_picked_up(entries, NOW, timedelta(minutes=10)) == 1
 
 
 def test_next_is_the_earliest_start_when_nobody_waits() -> None:

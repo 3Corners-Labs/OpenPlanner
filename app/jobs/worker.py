@@ -67,7 +67,7 @@ from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
-from app.domain.queue_wait import QueueWaitWatch
+from app.domain.queue_wait import NotPickedUpWatch, QueueWaitWatch
 from app.domain.request_log import RequestEvents
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
@@ -341,6 +341,8 @@ async def run_worker(
         ),
         reported=partial(_open_waits, uow),
     )
+    # ADR 0043 point 8: one system event per own-queue booking nobody claimed in time.
+    unpicked = NotPickedUpWatch(uow, clock, system_log)
     # ADR 0082 point 9: the open alerts to their email addresses and Webex spaces.
     notifier = AlertNotifier(
         uow,
@@ -409,6 +411,7 @@ async def run_worker(
                     await _watch_health(health_watch)
                     await _notify(notifier)
                     await _watch_waits(waits)
+                    await _watch_unpicked(unpicked)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=live.settings.worker_poll_seconds)
@@ -548,6 +551,17 @@ async def _watch_waits(watch: QueueWaitWatch) -> None:
         return
     if crossed:
         log.info("queue.wait_crossed", groups=len(crossed))
+
+
+async def _watch_unpicked(watch: NotPickedUpWatch) -> None:
+    """Record the own-queue bookings nobody claimed in time; a failure never stops the loop."""
+    try:
+        found = await watch.check()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("queue.unpicked_watch_failed", error=type(exc).__name__)
+        return
+    if found:
+        log.info("queue.unpicked_found", bookings=found)
 
 
 async def _main() -> None:
