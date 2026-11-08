@@ -2574,7 +2574,10 @@ fieldset.card {
   gap: 0.25rem 1rem;
 }
 
-.day-nav a {
+/* A link on a line of its own (the day navigation, an agenda row's actions) is a 24 px target
+   (WCAG 2.5.8), also right above the row's confirm button. */
+.day-nav a,
+.agenda-actions a {
   display: inline-block;
   min-height: 24px;
   padding: 0.25rem 0;
