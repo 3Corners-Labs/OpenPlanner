@@ -26,6 +26,7 @@ from tests.support.domain import (
     SLOT_0900,
     SLOT_0930,
     book_confirmed,
+    book_pending,
     participant,
     window,
     with_team_invite,
@@ -365,3 +366,70 @@ async def test_only_who_may_manage_asks_to_rebook(
         await planner.slot_candidates(AUDITOR, "demo", SLOT_0900)
     with pytest.raises(DomainError, match="not_permitted"):
         await planner.waiting(AUDITOR, "demo")
+
+
+# --- confirm on the participant's behalf (ADR 0056 point 11) --------------------------------
+
+
+async def test_a_planner_confirms_for_the_participant_who_gets_the_full_confirmation(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    booking_id = receipt.booking.id or 0
+
+    confirmed = await planner.confirm(GROUP_ADMIN, "demo", booking_id)
+
+    assert confirmed.status is BookingStatus.CONFIRMED
+    assert (JobType.SEND_CONFIRMATION, ChannelKind.EMAIL) in _messages(uow, booking_id)
+    [event] = [e for e in uow.state.audit if e.detail == "booking.confirmed_by_staff"]
+    assert (event.actor, event.outcome, event.booking_id) == (
+        GROUP_ADMIN.subject,
+        Outcome.SUCCESS,
+        booking_id,
+    )
+
+
+async def test_only_a_pending_booking_of_the_own_group_can_be_confirmed(
+    planner: PlannerService, bookings: BookingService
+) -> None:
+    confirmed = await _book(bookings)
+    other = await _book(bookings, slug="andere-team")
+    with pytest.raises(DomainError) as not_pending:
+        await planner.confirm(GROUP_ADMIN, "demo", confirmed)
+    with pytest.raises(DomainError) as elsewhere:
+        await planner.confirm(GROUP_ADMIN, "demo", other)
+    with pytest.raises(DomainError) as refused:
+        await planner.confirm(AUDITOR, "demo", confirmed)
+
+    assert not_pending.value.code.value == "booking_not_pending"
+    assert elsewhere.value.code.value == "booking_not_found"
+    assert refused.value.code.value == "not_permitted"
+
+
+async def test_after_its_deadline_a_pending_booking_lapses_instead(
+    planner: PlannerService, bookings: BookingService, clock: FixedClock, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    booking_id = receipt.booking.id or 0
+    confirm_by = receipt.booking.confirm_by
+    assert confirm_by is not None
+    clock.advance(confirm_by - clock.now() + timedelta(minutes=1))
+
+    result = await planner.confirm(GROUP_ADMIN, "demo", booking_id)
+
+    assert result.status is not BookingStatus.CONFIRMED
+    assert not [e for e in uow.state.audit if e.detail == "booking.confirmed_by_staff"]
+
+
+async def test_a_pending_booking_holds_its_place_in_the_agenda(
+    bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0056 point 11: counted towards occupancy and shortfall, and marked as pending."""
+    await _book(bookings)
+    await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+
+    agenda = AgendaService(uow, clock, AdminService(uow, clock), horizon_days=14)
+    days = await agenda.days(GROUP_ADMIN, "demo", SLOT_0900.date(), 1)
+
+    [slot] = [s for s in days[0].slots if s.start == SLOT_0900]
+    assert (slot.booked, slot.pending) == (2, 1)

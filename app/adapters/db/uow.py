@@ -2120,15 +2120,18 @@ class SqlTransaction(
             await self._save_notices(closure.id, closure)
 
     async def find_confirmed_bookings(
-        self, group_id: int, lower: datetime, upper: datetime | None
+        self, group_id: int, lower: datetime, upper: datetime | None, *, pending: bool = False
     ) -> list[Booking]:
-        """Return the group's confirmed scheduled bookings with lower <= start < upper."""
+        """Return the group's confirmed (and, with ``pending``, unconfirmed) scheduled bookings."""
+        statuses = [BookingStatus.CONFIRMED.value]
+        if pending:
+            statuses.append(BookingStatus.PENDING_CONFIRMATION.value)
         query = (
             select(BookingRow, SlotRow)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
             .where(
                 BookingRow.group_id == group_id,
-                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.status.in_(statuses),
                 SlotRow.kind == BookingKind.SCHEDULED.value,
                 SlotRow.start >= lower,
             )

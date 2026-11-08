@@ -1331,13 +1331,16 @@ class InMemoryTransaction:
         self.state.closures[closure_id] = replace(closure, image=None)
 
     async def find_confirmed_bookings(
-        self, group_id: int, lower: datetime, upper: datetime | None
+        self, group_id: int, lower: datetime, upper: datetime | None, *, pending: bool = False
     ) -> list[Booking]:
+        statuses = {BookingStatus.CONFIRMED}
+        if pending:
+            statuses.add(BookingStatus.PENDING_CONFIRMATION)
         found = [
             b
             for b in self.state.bookings.values()
             if b.group_id == group_id
-            and b.status is BookingStatus.CONFIRMED
+            and b.status in statuses
             and b.kind == "scheduled"
             and lower <= b.start
             and (upper is None or b.start < upper)

@@ -94,6 +94,19 @@ geeft.
 
 Een tekort lost u op door de bezetting weer te verhogen, of door afspraken te wijzigen (hieronder).
 
+## Niet bevestigde afspraken
+
+Een nieuwe afspraak wacht tot de deelnemer haar bevestigt met de link in de e-mail. In het
+dagoverzicht en bij de afspraak zelf staat dan **Niet bevestigd, uiterlijk** met het moment
+waarop de afspraak vervalt als niemand bevestigt. Zo'n afspraak houdt haar plek vast: bij het
+tijdslot staat hoeveel van de afspraken nog niet bevestigd zijn, en ze tellen mee voor tekorten.
+Met **Alleen niet bevestigd** ziet u alleen deze afspraken; **Alle afspraken** toont weer alles.
+
+Belt de deelnemer, dan kunt u met het recht **Boekingen wijzigen** kiezen voor **Bevestigen
+namens deelnemer**. De deelnemer krijgt dan dezelfde bevestiging met alle gegevens als na het
+eigen bevestigen, en het auditlog legt vast wie bevestigde. Na het moment van vervallen kan dat
+niet meer.
+
 ## Afspraken wijzigen
 
 Met het recht **Boekingen wijzigen** (groepsbeheerders, organisatiebeheerders en een eigen

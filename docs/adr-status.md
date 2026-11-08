@@ -75,7 +75,7 @@ from the rows below.
 | 0053 | Security events, public entry points | BUILT | #97; `web/security_events.py` | – |
 | 0054 | EUPL-1.2 and CLA | BUILT (code side) | #102, #104; `reuse lint`; `publiccode.yml`, validated in CI, version and date set by the release PR | Not code: the lawyer's review of the CLA, making the repository public, listing on developer.overheid.nl |
 | 0055 | Booking form fields | BUILT | #114; migration 0053 | – |
-| 0056 | Participant confirms by email | PARTIAL | step 1 #115, step 2 #134 (migration 0058) | Step 3 (planner confirms on behalf), step 4 (participant corrects details) |
+| 0056 | Participant confirms by email | PARTIAL | step 1 #115, step 2 #134 (migration 0058), step 3 #PRNUM (agenda status, filter, confirm on behalf) | Step 4 (participant corrects details) |
 | 0057 | Rebooking assistant | PARTIAL | step 1 #129 (`domain/rebooking.py`) | Steps 2–4: held proposal, message, confirm and expiry, review page, automatic mode, `reschedule_*` settings |
 | 0058 | Fast PR lane, full queue lane | PARTIAL | #122, #124 | Decision 6 (cheaper matrix sweep); unsure: GitHub required check and the `ci:full` label |
 | 0059 | Release candidates, update channels | BUILT | #131, #132, #140 | Points 4 and 6 amended by ADR 0067 |

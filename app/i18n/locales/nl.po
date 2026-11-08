@@ -10571,3 +10571,24 @@ msgstr "Wacht op een nieuwe tijd"
 
 msgid "reports.status.pending_confirmation"
 msgstr "Wacht op bevestiging"
+
+msgid "admin.done.confirmed_by_staff"
+msgstr "De afspraak is bevestigd namens de deelnemer. De deelnemer krijgt de bevestiging met alle gegevens."
+
+msgid "admin.done.not_pending"
+msgstr "Deze afspraak wacht niet (meer) op bevestiging."
+
+msgid "admin.agenda.pending"
+msgstr "Niet bevestigd, uiterlijk {until}"
+
+msgid "admin.agenda.slot_pending"
+msgstr "(waarvan {count} niet bevestigd)"
+
+msgid "admin.agenda.confirm"
+msgstr "Bevestigen namens deelnemer"
+
+msgid "admin.agenda.filter_pending"
+msgstr "Alleen niet bevestigd"
+
+msgid "admin.agenda.filter_all"
+msgstr "Alle afspraken"

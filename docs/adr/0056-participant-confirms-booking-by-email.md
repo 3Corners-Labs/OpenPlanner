@@ -142,7 +142,7 @@ by POST only (point 8).
 |---|---|---|---|
 | 1 | Domain: confirmation policy, `pending_confirmation`, job plan, settings | #115 | merged |
 | 2 | Persistence, jobs, mails, confirm page and POST; bookings start `pending_confirmation` (migration 0058) | #134 | merged |
-| 3 | Planner: status filter, confirm on behalf of the participant |  | planned |
+| 3 | Planner: status *Not confirmed* with its deadline in agenda and booking detail (no longer shown as cancelled), counted in a slot's occupancy and shortfall and marked, the filter *Not confirmed only*, and confirming on behalf of the participant (`bookings.manage`, audited `booking.confirmed_by_staff`, the full confirmation mail) | #PRNUM | merged |
 | 4 | The participant corrects details |  | planned |
 
 (State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)

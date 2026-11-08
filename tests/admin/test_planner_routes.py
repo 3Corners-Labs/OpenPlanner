@@ -290,3 +290,39 @@ async def test_malformed_bulk_ids_are_rejected(site: Site) -> None:
     )
 
     assert response.status_code == 400
+
+
+async def _book_pending(site: Site) -> int:
+    receipt = await BookingService(_uow(site), site.clock, TEST_TOKEN_KEY).book(
+        group_slug="demo",
+        start=FRIDAY_0900,
+        contact=participant(next(_PARTICIPANTS)),
+        locale="nl",
+    )
+    return receipt.booking.id or 0
+
+
+async def test_a_pending_booking_shows_as_not_confirmed_and_can_be_confirmed(site: Site) -> None:
+    """ADR 0056 point 11: text and icon, a filter, and confirming for the participant."""
+    pending = await _book_pending(site)
+    confirmed = await _book(site)
+    await site.login_as(GROUP_ADMIN)
+
+    day = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+    only = (await site.client.get(f"{AGENDA}?day=2026-01-02&status=pending")).text
+
+    assert "Niet bevestigd, uiterlijk" in day
+    assert "Geannuleerd" not in day  # a pending booking is not a cancelled one
+    assert "(waarvan 1 niet bevestigd)" in day
+    assert f'action="{AGENDA}/bookings/{pending}/confirm"' in day
+    assert f'action="{AGENDA}/bookings/{confirmed}/confirm"' not in day
+    assert f"/bookings/{pending}" in only
+    assert f"/bookings/{confirmed}" not in only
+
+    response = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {"day": "2026-01-02"})
+    again = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {"day": "2026-01-02"})
+
+    assert response.status_code == 303
+    assert "done=confirmed_by_staff" in response.headers["location"]
+    assert "done=not_pending" in again.headers["location"]
+    assert (await _status(site, pending))[0] is BookingStatus.CONFIRMED

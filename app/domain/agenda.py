@@ -58,7 +58,8 @@ class AgendaSlot:
         start: Start (UTC).
         end: End (UTC).
         agents: Agents on duty for the whole slot under the current staffing.
-        booked: Confirmed scheduled bookings in the slot.
+        booked: Scheduled bookings holding a place in the slot: confirmed, and those awaiting
+            the participant's confirmation (ADR 0056 point 11).
         closed: Whether an emergency closure covers the slot (ADR 0024).
         accepted: Whether a planner accepted the shortfall at exactly these counts.
         subjects: The subject codes all blocks of the slot offer (ADR 0081 point 4); ``None``
@@ -72,6 +73,8 @@ class AgendaSlot:
     closed: bool = False
     accepted: bool = False
     subjects: frozenset[str] | None = None
+    pending: int = 0
+    """Of ``booked``, how many await the participant's confirmation (shown as such)."""
 
     def offers_subject(self, code: str | None) -> bool:
         """Return whether a booking with subject ``code`` may move into this slot."""
@@ -127,6 +130,7 @@ def agenda_day(
     booked: Mapping[datetime, int],
     closures: Iterable[Closure],
     acceptances: Mapping[datetime, ShortfallAcceptance] | None = None,
+    pending: Mapping[datetime, int] | None = None,
 ) -> list[AgendaSlot]:
     """Return the slots of ``day`` (group time): those the staffing offers and those booked.
 
@@ -134,10 +138,11 @@ def agenda_day(
         group: The group, for time zone and slot length.
         day: Local date.
         windows: The effective staffing of ``day``.
-        booked: Confirmed scheduled bookings per slot start (UTC); starts on other days are
-            ignored.
+        booked: Scheduled bookings holding a place per slot start (UTC), confirmed or awaiting
+            confirmation; starts on other days are ignored.
         closures: The group's closures that have not ended.
         acceptances: Accepted shortfalls per slot start; only a matching one counts.
+        pending: Of ``booked``, those awaiting confirmation per slot start.
     """
     length = timedelta(minutes=group.slot_minutes)
     known = list(closures)
@@ -149,7 +154,13 @@ def agenda_day(
         closed = covering(known, start) is not None
         agents = 0 if closed else agents_for(group, start, start + length, day, windows)
         slot = AgendaSlot(
-            start, start + length, agents, booked.get(start, 0), closed, subjects=offered.get(start)
+            start,
+            start + length,
+            agents,
+            booked.get(start, 0),
+            closed,
+            subjects=offered.get(start),
+            pending=(pending or {}).get(start, 0),
         )
         acceptance = (acceptances or {}).get(start)
         if slot.shortfall and acceptance is not None and slot.matches(acceptance):

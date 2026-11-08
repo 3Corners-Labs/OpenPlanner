@@ -10558,3 +10558,24 @@ msgstr "Waiting for a new time"
 
 msgid "reports.status.pending_confirmation"
 msgstr "Waiting for confirmation"
+
+msgid "admin.done.confirmed_by_staff"
+msgstr "The appointment was confirmed for the participant. The participant gets the confirmation with all details."
+
+msgid "admin.done.not_pending"
+msgstr "This appointment is not (or no longer) awaiting confirmation."
+
+msgid "admin.agenda.pending"
+msgstr "Not confirmed, at the latest {until}"
+
+msgid "admin.agenda.slot_pending"
+msgstr "(of which {count} not confirmed)"
+
+msgid "admin.agenda.confirm"
+msgstr "Confirm for participant"
+
+msgid "admin.agenda.filter_pending"
+msgstr "Not confirmed only"
+
+msgid "admin.agenda.filter_all"
+msgstr "All appointments"

@@ -70,6 +70,10 @@ class SlotView:
     can_accept: bool = False
 
 
+PENDING_FILTER = "pending"
+"""``?status=`` of the day view that shows only bookings awaiting confirmation (ADR 0056)."""
+
+
 def _anchor(start: datetime) -> str:
     """Return the HTML id of the slot starting at ``start`` (UTC, so unique across DST)."""
     return f"slot-{start:%Y%m%dT%H%M}"
@@ -92,7 +96,8 @@ def _slot_view(
     return SlotView(
         anchor=_anchor(slot.start),
         time=f"{format_clock(slot.start, tz, code)}–{format_clock(slot.end, tz, code)}",
-        staffing=_("admin.agenda.slot_staffing", agents=slot.agents, booked=slot.booked),
+        staffing=_("admin.agenda.slot_staffing", agents=slot.agents, booked=slot.booked)
+        + (f" {_('admin.agenda.slot_pending', count=slot.pending)}" if slot.pending else ""),
         shortfall=_("admin.agenda.shortfall", count=slot.shortfall) if slot.shortfall else "",
         closed=slot.closed,
         start=slot.start.isoformat(),
@@ -125,13 +130,20 @@ def _meeting_status(request: Request) -> MeetingStatusService:
 
 
 async def _day(
-    request: Request, locale: RequestLocale, context: AdminContext, slug: str, day: str | None
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    slug: str,
+    day: str | None,
+    status: str | None = None,
 ) -> tuple[dict[str, object], str]:
     """Load one day of the agenda; return what its table renders and the key of that table.
 
     The key changes whenever a slot or row would look different, so the poller is only sent
     a new table when something changed. Past days do not poll: nothing on them changes.
+    ``status=pending`` shows only the bookings awaiting confirmation (ADR 0056 point 11).
     """
+    only_pending = status == PENDING_FILTER
     _, code = locale.gettext, locale.code
     group = context.group.group
     clock: Clock = request.app.state.clock
@@ -148,8 +160,10 @@ async def _day(
     changeable: set[int] = set()
     running = 0
     for item in overview:
-        row = agenda_row(item, group, now, _, code)
         booking = item.booking
+        if only_pending and not booking.awaits_confirmation:
+            continue
+        row = agenda_row(item, group, now, _, code)
         running += booking.is_active and item.status.call is CallState.IN_PROGRESS
         if manage and planner_may_change(booking, group, now):
             changeable.add(row.id)
@@ -167,7 +181,7 @@ async def _day(
             )
         slots[booking.start].rows.append(row)
     ordered = [slots[start] for start in sorted(slots)]
-    shown = key(ordered, direct, sorted(changeable))
+    shown = key(ordered, direct, sorted(changeable), only_pending)
     unpicked = sum(r.not_picked_up for s in ordered for r in s.rows) + sum(
         r.not_picked_up for r in direct
     )
@@ -184,9 +198,13 @@ async def _day(
             "changeable": changeable,
             "manage": manage,
             "announcement": _("admin.agenda.live_status", running=running, unpicked=unpicked),
-            "poll": f"/admin/groups/{slug}/agenda/live?day={chosen.isoformat()}&seen={shown}"
+            "poll": f"/admin/groups/{slug}/agenda/live?day={chosen.isoformat()}"
+            + (f"&status={PENDING_FILTER}" if only_pending else "")
+            + f"&seen={shown}"
             if chosen >= today
             else None,
+            "only_pending": only_pending,
+            "pending_filter": PENDING_FILTER,
             "poll_seconds": settings_for(request).meeting_status_refresh_seconds,
         },
         shown,
@@ -195,10 +213,15 @@ async def _day(
 
 @router.get("/groups/{slug}/agenda", response_class=HTMLResponse)
 async def agenda(
-    request: Request, locale: Locale, slug: str, context: ViewBookings, day: str | None = None
+    request: Request,
+    locale: Locale,
+    slug: str,
+    context: ViewBookings,
+    day: str | None = None,
+    status: str | None = None,
 ) -> HTMLResponse:
     """Show the group's slots of one day with agents, bookings and their call status."""
-    page, _shown = await _day(request, locale, context, slug, day)
+    page, _shown = await _day(request, locale, context, slug, day, status)
     return group_page(request, locale, context, "admin/group_agenda.html", page, scripts=True)
 
 
@@ -210,9 +233,10 @@ async def agenda_live(
     context: ViewBookings,
     day: str | None = None,
     seen: Seen = "",
+    status: str | None = None,
 ) -> Response:
     """Return the day's table for the page's poller; 204 while ``seen`` is current."""
-    page, shown = await _day(request, locale, context, slug, day)
+    page, shown = await _day(request, locale, context, slug, day, status)
     return fragment(request, locale, context, "admin/_agenda_table.html", seen, shown, page)
 
 
