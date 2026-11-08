@@ -4119,7 +4119,7 @@ msgid "admin.updates.note.docs"
 msgstr "ontwerp of documentatie, niets gebouwd"
 
 msgid "admin.updates.docs_only"
-msgstr "Geen verandering in hoe OpenPlanner werkt: ten opzichte van de versie ervoor verandert deze versie alleen documentatie of ontwerp (zoals een ADR); er is niets gebouwd."
+msgstr "Geen verandering in hoe OpenPlanner werkt, volgens de titels van de wijzigingen: ten opzichte van de versie ervoor verandert alleen documentatie of ontwerp (zoals een ADR); er is niets gebouwd."
 
 msgid "admin.updates.install_this"
 msgstr "Deze versie installeren ({version})"

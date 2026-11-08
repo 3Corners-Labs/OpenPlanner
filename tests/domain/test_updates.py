@@ -167,6 +167,12 @@ def test_notes_cut_at_the_limit_never_count_as_docs_only() -> None:
     assert not cut.docs_only  # the lines that were cut off may change behaviour
 
 
+def test_notes_that_reach_the_limit_exactly_are_taken_as_cut() -> None:
+    line = "docs(adr): " + "x" * (NOTES_CHARS - len("docs(adr): ") - 1)
+    assert listed(line).docs_only  # one character short of the limit: nothing was cut
+    assert not listed(line + "x").docs_only  # at the limit: cut or not cannot be told
+
+
 def test_check_is_due_first_time_and_after_an_hour() -> None:
     last = ReleaseCheck(NOW, RELEASE)
     assert check_due(None, NOW)

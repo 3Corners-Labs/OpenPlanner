@@ -63,7 +63,9 @@ documentatie, niets gebouwd*: hij beschrijft een besluit, een ontwerp of een han
 geen scherm of functie die al werkt. Bestaat een versie alleen uit zulke regels, dan staat
 boven de toelichting dat er niets verandert in hoe OpenPlanner werkt. Zo'n versie bijwerken kan,
 maar levert geen nieuwe functie op. Het scherm zegt dit nooit van een versie zonder toelichting
-of met een ingekorte toelichting.
+of met een ingekorte toelichting. Het gaat af op de titels van de wijzigingen en vergelijkt met
+de versie ervoor: slaat u bij het bijwerken versies over, lees dan ook de toelichting van de
+versies ertussen.
 
 ## Het lopende verzoek
 

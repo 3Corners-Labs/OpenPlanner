@@ -60,7 +60,10 @@ async def listed(admin_db: str) -> None:
             await tx.save_release_listing(
                 [
                     ListedRelease(
-                        RELEASE.version, RELEASE.url, NOW, f"feat(x): y (#9)\n{DOCS_LINE}"
+                        RELEASE.version,
+                        RELEASE.url,
+                        NOW,
+                        f"feat(x): y (#9)\n{DOCS_LINE}\ndocs(x): <b>bold</b> (#10)",
                     ),
                     ListedRelease(patch.version, patch.url, NOW, DOCS_LINE),
                 ]
@@ -81,10 +84,13 @@ async def test_picker_marks_docs_lines_and_a_version_that_changes_no_behaviour(
 ) -> None:
     await site.login_as(SUPER)
     page = (await site.client.get("/admin/updates")).text
-    _, newest, docs_only = page.split('class="stack__item"')
+    first, second = page.index("<code>1.4.0</code>"), page.index("<code>1.3.1</code>")
+    newest, docs_only = page[first:second], page[second:]
     assert "feat(x): y (#9)" in newest
     assert DOCS_LINE in newest
-    assert newest.count(DOCS_CHIP) == 1  # the docs line only, not the feature
+    assert "docs(x): &lt;b&gt;bold&lt;/b&gt; (#10)" in newest  # markup in a note is escaped
+    assert "<b>bold</b>" not in newest
+    assert newest.count(DOCS_CHIP) == 2  # the two docs lines, not the feature
     assert NO_BEHAVIOUR not in newest  # a feature is built in 1.4.0
     assert docs_only.count(DOCS_CHIP) == 1
     assert NO_BEHAVIOUR in docs_only

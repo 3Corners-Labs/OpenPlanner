@@ -58,7 +58,9 @@ such as `docs(adr): ...`, carries the label *design or documentation, nothing bu
 describes a decision, a design or a manual, not a screen or feature that already works. When a
 version consists of such lines only, a notice above the notes says that nothing changes in how
 OpenPlanner works. Updating to such a version is possible but brings no new feature. The screen
-never says this of a version without notes or with shortened notes.
+never says this of a version without notes or with shortened notes. It goes by the titles of the
+changes and compares with the version before it: when an update skips versions, also read the
+notes of the versions in between.
 
 ## The open request
 
