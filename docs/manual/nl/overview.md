@@ -153,3 +153,11 @@ sessie: u ziet haar terug als u later naar het overzicht gaat, en na opnieuw inl
 filter weer op alles. Is een keuze actief, dan heeft de knop een gekleurde achtergrond, ook als er
 op een kleiner scherm alleen het pictogram past. Op dit moment werkt het filter op het overzicht;
 de andere lijsten hebben hun eigen filters.
+
+## Groepen met een noodsluiting
+
+Onder de widgets staan de groepen binnen uw bereik. **Alleen groepen met een actieve
+noodsluiting** beperkt die lijst tot groepen die nu gesloten zijn, met het aantal ervan. Een
+gesloten groep heeft het label **Noodsluiting actief**; wie de sluiting mag beheren, komt via dat
+label direct op het tabblad **Noodsluiting** van de groep. Een sluiting die later begint, telt
+nog niet mee. Het oude adres van de lijst met sluitingen leidt naar dit filter.

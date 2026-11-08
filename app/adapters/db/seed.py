@@ -198,7 +198,7 @@ async def _seed_form(engine: AsyncEngine) -> None:
     """Give the new demo group its example form fields."""
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
-        group = await _group(tx, DEMO_SLUG)
+        group = await seeded_group(tx, DEMO_SLUG)
         await tx.save_form(group.id, FormDefinition(2, DEMO_FORM_FIELDS))
 
 
@@ -241,21 +241,21 @@ async def seed_closure_examples(
     )
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
-        closed_group = await _group(tx, CLOSED_GROUP_SLUG)
+        closed_group = await seeded_group(tx, CLOSED_GROUP_SLUG)
         if created:
-            start = _local(closed_group, now, -1, time(8))
+            start = local_time(closed_group, now, -1, time(8))
             stored = await tx.add_closure(_example_closure(closed_group, start, None, now))
             image = ImageFile.from_upload(_example_png())
             await tx.save_closure_image(stored.id or 0, EXAMPLE_IMAGE_TEXT, image)
         if planned:
-            group = await _group(tx, PLANNED_GROUP_SLUG)
-            start = _local(group, now, 14, time(8))
+            group = await seeded_group(tx, PLANNED_GROUP_SLUG)
+            start = local_time(group, now, 14, time(8))
             await tx.add_closure(_example_closure(group, start, start + timedelta(days=2), now))
         (closure,) = await tx.get_closures(closed_group.id, now)
         token = await _suspended_booking(tx, closed_group, closure, now, token_key)
-        demo = await _group(tx, DEMO_SLUG)
+        demo = await seeded_group(tx, DEMO_SLUG)
         pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
-        journey_group = await _group(tx, JOURNEY_GROUP_SLUG)
+        journey_group = await seeded_group(tx, JOURNEY_GROUP_SLUG)
         journeys = {
             browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
         }
@@ -289,7 +289,7 @@ def _example_png(size: int = 96) -> bytes:
     )
 
 
-def _local(group: Group, now: datetime, days: int, at: time) -> datetime:
+def local_time(group: Group, now: datetime, days: int, at: time) -> datetime:
     """Return ``at`` on the day ``days`` after today in the group's time zone, in UTC."""
     day = (now.astimezone(group.tz) + timedelta(days=days)).date()
     return datetime.combine(day, at, tzinfo=group.tz).astimezone(UTC)
@@ -300,7 +300,7 @@ def _next_weekday(group: Group, now: datetime, at: time) -> datetime:
     days = 1
     while (now + timedelta(days=days)).astimezone(group.tz).weekday() >= FIRST_WEEKEND_DAY:
         days += 1
-    return _local(group, now, days, at)
+    return local_time(group, now, days, at)
 
 
 async def _slot(tx: Transaction, group: Group, start: datetime, end: datetime) -> int:
@@ -313,7 +313,7 @@ async def _slot(tx: Transaction, group: Group, start: datetime, end: datetime) -
     return slot.id
 
 
-async def _store_booking(
+async def store_example_booking(
     tx: Transaction,
     group: Group,
     start: datetime,
@@ -355,10 +355,10 @@ async def _journey(
 ) -> JourneyExample:
     """Store the journey's two confirmed bookings and return their pages."""
     confirmed = BookingStatus.CONFIRMED
-    trial_token, trial = await _store_booking(
+    trial_token, trial = await store_example_booking(
         tx, group, _next_weekday(group, now, time(15)), now, token_key, status=confirmed
     )
-    call_token, call = await _store_booking(
+    call_token, call = await store_example_booking(
         tx, group, now + JOURNEY_CALL_IN, now, token_key, status=confirmed
     )
     admin = f"/admin/groups/{group.slug}/bookings"
@@ -373,7 +373,7 @@ async def _journey(
     )
 
 
-async def _group(tx: Transaction, slug: str) -> Group:
+async def seeded_group(tx: Transaction, slug: str) -> Group:
     """Return the seeded group ``slug``."""
     group = await tx.get_group(slug)
     if group is None:
@@ -396,8 +396,8 @@ async def _suspended_booking(
     """Store a booking on hold by ``closure`` next week and return its management token."""
     if closure.id is None:
         raise ValueError("the closure must be stored")
-    start = _local(group, now, 7, time(10))
-    token, booking = await _store_booking(
+    start = local_time(group, now, 7, time(10))
+    token, booking = await store_example_booking(
         tx, group, start, now, token_key, status=BookingStatus.CONFIRMED
     )
     await tx.save_booking(booking.suspend(closure.id))
@@ -411,7 +411,7 @@ async def _pending_booking(
 
     It lies on the next weekday at ``at`` and has a day to be confirmed.
     """
-    token, _ = await _store_booking(
+    token, _ = await store_example_booking(
         tx,
         group,
         _next_weekday(group, now, at),

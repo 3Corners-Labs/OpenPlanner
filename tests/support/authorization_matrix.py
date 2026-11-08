@@ -808,7 +808,8 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # Emergency closure of a whole organisation: organisation admins and the superuser.
     # ADR 0047 §4: the old closures list redirects permanently to the organisation's tab.
-    "GET /admin/closures": {"/admin/closures": statuses(308, 308, 403, 308, 403, 403, 403)},
+    # ADR 0047 §4, step 5: the old closures list is the overview's filter *active closures*.
+    "GET /admin/closures": {"/admin/closures": statuses(308, 308, 308, 308, 308, 308, 403)},
     "GET /admin/organisations/{org}/closure": {
         "/admin/organisations/demo/closure": statuses(200, 200, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/closure": statuses(200, 403, 403, 200, 403, 403, 403),

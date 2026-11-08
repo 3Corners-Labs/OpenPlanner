@@ -2,8 +2,7 @@
 
 from types import SimpleNamespace
 
-from app.admin.group_routes import OWN_QUEUE_TABS
-from app.admin.pages import object_tabs
+from app.admin.pages import OWN_QUEUE_TABS, object_tabs
 from app.domain.authorization import Permission
 from app.web.navigation import Home, home_of, object_page
 

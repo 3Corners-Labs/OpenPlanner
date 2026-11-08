@@ -33,7 +33,8 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
-from app.admin.pages import Locale, SameOrigin, organisation_header, page
+from app.admin.pages import Locale, SameOrigin, organisation_header, organisation_shows, page
+from app.admin.readiness_view import checklist_view, readiness_service
 from app.domain.authorization import Permission, scope_for
 from app.domain.entitlements import IDP_KEY_PATTERN
 from app.domain.errors import DomainError
@@ -244,6 +245,12 @@ async def organisation(request: Request, locale: Locale, org: str, context: Read
             "organisation": current,
             "org_header": organisation_header(request, locale, principal, current.name, org),
             "groups": groups,
+            "readiness": checklist_view(
+                await readiness_service(request).organisation(principal, org),
+                locale,
+                organisation_shows(principal, org),
+                {"org": org},
+            ),
             "language_name": names.get(current.default_locale, current.default_locale),
             "done": done_message(request, locale.gettext),
         },

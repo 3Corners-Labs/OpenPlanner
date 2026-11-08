@@ -30,7 +30,9 @@ Het log bevat nooit gegevens van deelnemers: geen namen, e-mailadressen of telef
   bij een regel.
 - **Groep**, **Afspraaknummer** en **Alleen problemen** werken zoals u verwacht.
 
-Een onbekende of onjuiste waarde wordt genegeerd.
+Een onbekende of onjuiste waarde wordt genegeerd. Boven de tabel staat hoeveel regels u ziet. De
+pagina toont de nieuwste 100; zijn dat er zoveel, dan zegt de telling dat. Verfijn dan het filter
+of exporteer.
 
 ## Exporteren
 

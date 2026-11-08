@@ -5,7 +5,7 @@ Changes are POST forms with the Fetch Metadata check. A new or rotated secret is
 in the response to the POST itself (never in a URL, never cached); afterwards only its expiry
 is visible. ``ApiAccessService`` authorises again, validates and audits.
 
-    GET  /admin/api                            switches and clients
+    GET  /admin/api                            switches and clients (search ``q``, ``org``)
     POST /admin/api/settings                   API on/off, documentation on/off
     GET  /admin/api/clients/new                form for a new client
     POST /admin/api/clients                    register → secret page
@@ -31,6 +31,7 @@ from app.admin.forms import (
     read_form,
     redirect_done,
 )
+from app.admin.list_search import ORGANISATION_PARAM, QUERY_PARAM, ListFilter, narrow
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.config import AGENT_API_PREFIX as PREFIX
@@ -223,11 +224,30 @@ def _url(client_id: str | None = None) -> str:
     return f"/admin/api/clients/{client_id}" if client_id else "/admin/api"
 
 
+def narrow_clients(
+    clients: list[ApiClient], names: dict[str, str], query: str, organisation: str
+) -> tuple[list[ApiClient], ListFilter]:
+    """Return the clients matching ``query`` (name or client id) and ``organisation``."""
+    return narrow(
+        sorted(clients, key=lambda c: (c.organisation, c.name)),
+        query,
+        organisation,
+        organisation_of=lambda c: (c.organisation, names.get(c.organisation, c.organisation)),
+        fields=lambda c: (c.name, c.client_id),
+    )
+
+
 @router.get("/api", response_class=HTMLResponse)
 async def overview(request: Request, locale: Locale, context: Manage) -> HTMLResponse:
-    """Show the switches and every registered client."""
+    """Show the switches and the registered clients, in the list pattern (ADR 0047 step 5)."""
     found = await api_access(request).overview(context.principal)
     names = {o.slug: o.name for o in found.organisations}
+    rows, filters = narrow_clients(
+        list(found.clients),
+        names,
+        request.query_params.get(QUERY_PARAM, ""),
+        request.query_params.get(ORGANISATION_PARAM, ""),
+    )
     base = request.app.state.settings.public_base_url.rstrip("/")
     return _page(
         request,
@@ -236,7 +256,9 @@ async def overview(request: Request, locale: Locale, context: Manage) -> HTMLRes
         context.principal,
         {
             "overview": found,
-            "clients": [_view(request, locale, c, names) for c in found.clients],
+            "clients": [_view(request, locale, c, names) for c in rows],
+            "total": len(found.clients),
+            "filters": filters,
             "docs_url": f"{base}{PREFIX}/docs",
             "token_minutes": int(ACCESS_TOKEN_LIFETIME.total_seconds() // 60),
             "done": done_message(request, locale.gettext),

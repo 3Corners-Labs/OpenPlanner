@@ -1,11 +1,13 @@
 """The superuser's API pages (ADR 0023): switches, register, show the secret once, manage."""
 
 import re
+from datetime import UTC, datetime
 
 import pytest
 
+from app.admin.api_routes import narrow_clients
 from app.domain.api_access import ApiAccessService
-from app.domain.api_clients import credential_hash
+from app.domain.api_clients import ApiClient, credential_hash
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 
 NEW_CLIENT = {
@@ -172,3 +174,45 @@ async def test_a_client_is_deleted_only_when_it_is_switched_off(superuser: Site)
     assert deleted.headers["location"] == "/admin/api?done=client_deleted"
     assert (await superuser.client.get(url)).status_code == 404
     assert client_id not in (await superuser.client.get("/admin/api")).text
+
+
+def test_the_client_list_narrows_by_search_and_organisation() -> None:
+    def client(client_id: str, name: str, organisation: str) -> ApiClient:
+        return ApiClient(
+            id=None,
+            client_id=client_id,
+            name=name,
+            organisation=organisation,
+            groups=frozenset(),
+            scopes=frozenset(),
+            networks=(),
+            enabled=True,
+            secret_hash="0" * 64,
+            secret_expires_at=datetime(2027, 1, 1, tzinfo=UTC),
+            created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+
+    clients = [client("op_a", "Bot Noord", "demo"), client("op_b", "Bot Zuid", "andere")]
+    names = {"demo": "Demo-acme", "andere": "Andere acme"}
+
+    rows, filters = narrow_clients(clients, names, "  NOORD ", "")
+    assert [c.client_id for c in rows] == ["op_a"]
+    assert filters.active
+    rows, filters = narrow_clients(clients, names, "", "andere")
+    assert [c.client_id for c in rows] == ["op_b"]
+    rows, filters = narrow_clients(clients, names, "", "elders")  # unknown: dropped
+    assert len(rows) == 2
+    assert not filters.active
+    assert [o.value for o in filters.organisations] == ["andere", "demo"]
+
+
+async def test_the_client_list_counts_and_never_shows_the_search_again(site: Site) -> None:
+    await site.login_as(SUPER)
+    await register(site)
+
+    found = (await site.client.get("/admin/api?q=wxcc&lang=en")).text
+    missed = (await site.client.get("/admin/api?q=geheim-zoekwoord&lang=en")).text
+
+    assert "Clients that match: 1 of 1" in found
+    assert "No client matches this filter." in missed
+    assert "geheim-zoekwoord" not in missed

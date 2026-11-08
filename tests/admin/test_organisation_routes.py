@@ -103,7 +103,6 @@ async def test_the_old_lists_redirect_permanently_into_the_organisation(site: Si
     own = {
         "/admin/organisation-settings": f"{LIST}/demo/settings",
         "/admin/embedding": f"{LIST}/demo/embedding",
-        "/admin/closures": f"{LIST}/demo/closure",
     }
     for old, new in own.items():
         response = await site.client.get(old)

@@ -58,10 +58,12 @@ from app.admin.pages import (
     Locale,
     SameOrigin,
     current_home,
+    group_shows,
     object_tabs,
     page,
     with_manual,
 )
+from app.admin.readiness_view import checklist_view, readiness_service
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
@@ -179,10 +181,6 @@ INTEGRATION_LABELS: dict[str, str] = {
 }
 
 
-OWN_QUEUE_TABS = frozenset({"group.queue"})
-"""Tabs shown only on a group that dispatches to OpenPlanner's own queue (ADR 0043)."""
-
-
 def planning_service(request: Request) -> PlanningService:
     """Return the application's planning service."""
     service: PlanningService = request.app.state.planning_service
@@ -204,15 +202,11 @@ def group_page(
     ``scripts=True`` allows the page's own script (the queue's live region, ADR 0072).
     """
     summary = context.group
-    can = can_function(context.principal)
     tabs, subtabs = object_tabs(
         locale,
         object_page("group"),
         summary.group.slug,
-        lambda screen: (
-            can(screen.permission, summary)
-            and (summary.group.has_own_queue or screen.key not in OWN_QUEUE_TABS)
-        ),
+        group_shows(context.principal, summary),
         current_home(request),
     )
     response = page(
@@ -515,6 +509,12 @@ async def group(
         context,
         "admin/group.html",
         {
+            "readiness": checklist_view(
+                await readiness_service(request).group(context.principal, slug),
+                locale,
+                group_shows(context.principal, summary),
+                {"slug": summary.group.slug, "org": summary.organisation_slug},
+            ),
             "phone_label": _(PHONE_LABELS[summary.group.phone_mode]),
             "group_rights": group_rights,
             "week": _week(schedule, locale),
