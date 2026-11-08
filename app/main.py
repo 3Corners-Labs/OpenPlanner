@@ -18,7 +18,6 @@ from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, a
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
-from app.adapters.contact_center_connections import sealed_connections
 from app.adapters.db.backup import database_path
 from app.adapters.db.configuration_package import (
     SqliteConfigurationTransfer,
@@ -39,6 +38,7 @@ from app.adapters.idp_registry import OrganisationProviders
 from app.adapters.integrations import (
     Integrations,
     build_integrations,
+    sealed_connections,
     secret_box,
     webex_fingerprint,
 )
@@ -360,6 +360,7 @@ def create_app(
                 wired.dispatchers,
                 agent_start_label,
                 app.state.fallback_service,
+                wired.organisations,
             )
             app.state.trial_call_service = TrialCallService(
                 uow, wired.video, app.state.integration_service, clock

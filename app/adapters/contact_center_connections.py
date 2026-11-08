@@ -9,14 +9,11 @@ the webhook route only, outside the domain.
 """
 
 import secrets as random
+from dataclasses import dataclass, field
 from datetime import datetime
-
-from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.credentials import Secrets
 from app.adapters.db.uow import contact_center_credential_name
-from app.adapters.integrations import sealed_store
-from app.config import Settings
 from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
 
 WEBHOOK_SECRET_BYTES = 32
@@ -26,6 +23,30 @@ WEBHOOK_SECRET_BYTES = 32
 def new_webhook_secret() -> str:
     """Return a fresh webhook secret (URL-safe, never typed or shown)."""
     return random.token_urlsafe(WEBHOOK_SECRET_BYTES)
+
+
+@dataclass(frozen=True)
+class ConnectionCredentials:
+    """An organisation's connection with its OAuth secrets, for its dispatcher only.
+
+    Attributes:
+        kind: The platform.
+        api_base_url: The platform's API host.
+        client_id: The OAuth client id.
+        client_secret: The client secret; ``""`` when none is stored.
+        refresh_token: The refresh token; ``""`` when none is stored.
+    """
+
+    kind: ContactCenterKind
+    api_base_url: str
+    client_id: str
+    client_secret: str = field(repr=False)
+    refresh_token: str = field(repr=False)
+
+    @property
+    def complete(self) -> bool:
+        """Whether tokens can be had: both OAuth secrets are stored."""
+        return bool(self.client_secret and self.refresh_token)
 
 
 class SealedConnections:
@@ -89,6 +110,19 @@ class SealedConnections:
         """Remove the organisation's connection and its secrets."""
         await self._store.delete(contact_center_credential_name(organisation_id))
 
+    async def credentials(self, organisation_id: int) -> ConnectionCredentials | None:
+        """Return what the dispatcher needs to act for the organisation; for the adapter only."""
+        record = await self._record(organisation_id)
+        if record is None:
+            return None
+        return ConnectionCredentials(
+            ContactCenterKind(str(record["kind"])),
+            str(record["api_base_url"]),
+            str(record["client_id"]),
+            str(record.get("client_secret") or ""),
+            str(record.get("refresh_token") or ""),
+        )
+
     async def webhook_secret(self, organisation_id: int, kind: ContactCenterKind) -> str | None:
         """Return the webhook secret when the organisation is connected to ``kind``; else ``None``.
 
@@ -99,9 +133,3 @@ class SealedConnections:
             return None
         secret = record.get("webhook_secret")
         return secret if isinstance(secret, str) and secret else None
-
-
-def sealed_connections(engine: AsyncEngine, settings: Settings) -> SealedConnections | None:
-    """Return the connections, or ``None`` without a settings key (nothing can be sealed)."""
-    store = sealed_store(engine, settings)
-    return SealedConnections(store) if store is not None else None

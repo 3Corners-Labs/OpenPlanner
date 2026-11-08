@@ -17,6 +17,7 @@ A routing may be incomplete (an admin filled in one attribute of two): it is sto
 and the group does not dispatch until it is complete, as before ADR 0032.
 """
 
+import ipaddress
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -248,7 +249,7 @@ class ConnectionChange:
 
     def __post_init__(self) -> None:
         """Validate every field and drop a trailing slash; secrets are checked for shape only."""
-        if not API_HOST.fullmatch(self.api_base_url):
+        if not API_HOST.fullmatch(self.api_base_url) or not _public_host(self.api_base_url):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}api_base_url")
         object.__setattr__(self, "api_base_url", self.api_base_url.rstrip("/"))
         if not CLIENT_ID.fullmatch(self.client_id):
@@ -263,6 +264,23 @@ class ConnectionChange:
         """Return the names of the secrets this change replaces (for the audit, never values)."""
         sent = (("client_secret", self.client_secret), ("refresh_token", self.refresh_token))
         return tuple(name for name, value in sent if value)
+
+
+def _public_host(url: str) -> bool:
+    """Whether the API host is not this machine or an internal network (ADR 0032 point 12).
+
+    Refused: ``localhost`` and names under it, and IP literals that are loopback, private,
+    link-local, reserved or unspecified. A host name that resolves to such an address is not
+    caught here; the platforms' hosts are public names.
+    """
+    host = url.removeprefix("https://").split("/", 1)[0].rsplit(":", 1)[0].lower()
+    if host == "localhost" or host.endswith(".localhost"):
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return True
+    return address.is_global
 
 
 def _secret_shape(value: str) -> bool:

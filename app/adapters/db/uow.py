@@ -217,6 +217,11 @@ def contact_center_credential_name(organisation_id: int) -> str:
     return f"contact-center:{organisation_id}"
 
 
+def organisation_tokens_name(organisation_id: int) -> str:
+    """Return the credential name of the access tokens of an organisation's own connection."""
+    return f"contact-center-tokens:{organisation_id}"
+
+
 def bot_credential_name(organisation_id: int | None) -> str:
     """Return the credential name of a Webex bot token: an organisation's or the platform's."""
     return f"webex-bot:{organisation_id if organisation_id is not None else 'platform'}"
@@ -911,6 +916,7 @@ class SqlTransaction(
                     (
                         bot_credential_name(organisation_id),
                         contact_center_credential_name(organisation_id),
+                        organisation_tokens_name(organisation_id),
                     )
                 )
             )
