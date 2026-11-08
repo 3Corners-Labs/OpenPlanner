@@ -90,6 +90,8 @@ class AgendaRow:
     """The Webex meeting's id, for support requests; not personal data (the join link is)."""
     routing: str = ""
     """The participant's subject and attributes in words (ADR 0081); not personal data."""
+    fallback: bool = False
+    """The booking is in the own queue as a fallback (ADR 0082 point 11)."""
 
 
 def integration_service(request: Request) -> IntegrationService:
@@ -132,6 +134,7 @@ def agenda_row(
         waiting=booking.awaits_rebook,
         meeting_id=booking.meeting.id if booking.meeting else "",
         routing=routing_summary(group.routing, booking.routing, _, code),
+        fallback=status.fallback,
     )
 
 

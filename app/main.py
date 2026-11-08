@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.adapters import internal_ca
-from app.adapters.alert_senders import ConfiguredAlertSenders, alert_bots
+from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, alert_bots
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
@@ -90,6 +90,7 @@ from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
 from app.domain.entitlements import ClaimMode
 from app.domain.event_context import set_service
+from app.domain.fallback import FallbackService
 from app.domain.form_service import FormService
 from app.domain.holiday_service import HolidayService
 from app.domain.identity_provider_service import IdentityProviderService
@@ -152,6 +153,7 @@ from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
+from app.web.fallback_text import SpaceTexts
 from app.web.organisation_settings import ClockScopeMiddleware
 from app.web.protection import configure_rate_limits, limiter, set_rate_limits
 from app.web.proxy_headers import ProxyHeaderMiddleware
@@ -666,6 +668,16 @@ def create_app(
                 settings.admin_timezone,
             ),
             app.state.bot_tokens,
+        )
+        # ADR 0082 point 11: a group admin ends a fallback by hand; the worker switches it.
+        app.state.fallback_service = FallbackService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.integration_service,
+            lambda booking, group: app.state.call_service.ensure_task(booking, group),
+            BotSpacePoster(app.state.bot_tokens, http, live().webex_api_base_url, request_log),
+            SpaceTexts(app.state.translator.gettext, settings.public_base_url),
         )
         text_overrides.attach(uow)
         app.state.organisation_text_service = OrganisationTextService(

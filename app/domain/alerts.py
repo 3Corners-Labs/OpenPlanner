@@ -47,6 +47,10 @@ from app.domain.storage import FREE_SPACE_CRITICAL, STORAGE_EVENT
 from app.domain.tls import EVENT as CERTIFICATE_EVENT
 from app.domain.tls import Finding
 
+FALLBACK_EVENT = "dispatch.fallback"
+"""System event of a group's fallback to the own queue (ADR 0082 point 11); written by
+``app.domain.fallback``, which imports it from here."""
+
 QUEUE_WAIT_EVENT = "queue.wait"
 """System event of a group's longest wait crossing ``queue_wait_warning_minutes`` (OV-7)."""
 
@@ -163,6 +167,8 @@ ALERT_RULES: tuple[AlertRule, ...] = (
     ),
     # ADR 0082 point 6: the reconcile found states the webhooks did not bring.
     AlertRule(WEBHOOKS_MISSING, Permission.AUDIT_VIEW),
+    # ADR 0082 point 11: a group falls back to its own queue; its team must work it.
+    AlertRule(FALLBACK_EVENT, Permission.QUEUE_WORK),
 )
 """Every condition event that raises an alert; a test checks that each watch writes one."""
 

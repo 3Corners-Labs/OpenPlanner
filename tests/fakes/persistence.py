@@ -990,6 +990,26 @@ class InMemoryTransaction:
     async def get_booking(self, booking_id: int) -> Booking | None:
         return self.state.bookings.get(booking_id)
 
+    async def fallback_bookings(self, group_id: int, after: datetime) -> list[Booking]:
+        return sorted(
+            (
+                b
+                for b in self.state.bookings.values()
+                if b.group_id == group_id
+                and b.status is BookingStatus.CONFIRMED
+                and b.wxcc_task_id is None
+                and b.start > after
+                and (status := self.state.call_status.get(b.id or 0)) is not None
+                and status.fallback
+            ),
+            key=lambda b: b.start,
+        )
+
+    async def save_group_fallback(self, group_id: int, since: datetime | None) -> None:
+        self.state.groups[group_id] = replace(
+            self.state.groups[group_id], fallback_active_since=since
+        )
+
     async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
         self.state.groups[group_id] = replace(self.state.groups[group_id], routing=routing)
 

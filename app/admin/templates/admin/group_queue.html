@@ -2,6 +2,17 @@
 {% block title %}{{ _("admin.tab.queue") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
+{% if fallback_since %}
+<section class="alert alert--warning" aria-labelledby="fallback-heading">
+  <h2 id="fallback-heading">{{ _("admin.fallback.banner.title") }}</h2>
+  <p>{{ _("admin.fallback.banner.text", time=fallback_since) }}</p>
+  {% if can_end_fallback %}
+  <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/fallback/end">
+    <button type="submit" class="button button--secondary">{{ _("admin.fallback.end") }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
 {% if refusal %}
 <div class="alert alert--error" role="alert"><p>{{ refusal }}</p></div>
 {% endif %}

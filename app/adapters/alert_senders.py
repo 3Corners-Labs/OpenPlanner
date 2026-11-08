@@ -222,3 +222,39 @@ def alert_bots(engine: AsyncEngine, settings: Settings) -> BotTokens | None:
     """Return the bot tokens, or ``None`` without a settings key (nothing can be sealed)."""
     box = secret_box(settings)
     return BotTokens(CredentialStore(engine, box)) if box is not None else None
+
+
+class BotSpacePoster:
+    """``SpacePoster`` for a group's team space: the organisation's bot (ADR 0082 point 12).
+
+    Args:
+        bots: The bot tokens; ``None`` without a settings key.
+        http: Shared HTTP client.
+        base_url: Webex API host.
+        request_log: Where Webex requests are reported.
+    """
+
+    def __init__(
+        self,
+        bots: BotTokens | None,
+        http: httpx.AsyncClient,
+        base_url: str,
+        request_log: RequestLog | None = None,
+    ) -> None:
+        """Store the collaborators."""
+        self._bots = bots
+        self._http = http
+        self._base_url = base_url
+        self._request_log = request_log
+
+    async def post(self, organisation_id: int, room_id: str, markdown: str) -> None:
+        """Post ``markdown`` to the room with the organisation's bot.
+
+        Raises:
+            IntegrationError: ``no_sender`` without a bot token, or the refusal's code.
+        """
+        token = await self._bots.token(organisation_id) if self._bots else None
+        if token is None:
+            raise IntegrationError("no_sender", retryable=False)
+        sender = WebexSpaceSender(self._http, token, self._base_url, self._request_log)
+        await sender.send(room_id, RenderedAlert("", markdown, markdown))

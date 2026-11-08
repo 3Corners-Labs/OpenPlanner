@@ -10161,3 +10161,57 @@ msgstr "Melding opnieuw sturen na (uren)"
 
 msgid "settings.field.overview_max_widgets.label"
 msgstr "Meeste widgets op een eigen overzicht"
+
+msgid "admin.field.dispatch_fallback"
+msgstr "Terugval als het contactcenter uitvalt"
+
+msgid "admin.field.dispatch_fallback_hint"
+msgstr "Met eigen wachtrij: een afspraak waarvan het doorzetten mislukt, en zolang het contactcenter onbereikbaar is elke afspraak, komt in de wachtrij van OpenPlanner. Het team moet die wachtrij dan kennen en werken."
+
+msgid "admin.field.fallback_space_room_id"
+msgstr "Webex-ruimte van het team (terugval)"
+
+msgid "admin.field.fallback_space_room_id_hint"
+msgstr "Optioneel. Het id van de ruimte waar de bot van de organisatie bij terugval een bericht plaatst, en per afspraak de begintijd en voornaam. Nooit de link naar het gesprek."
+
+msgid "admin.fallback.none"
+msgstr "Geen"
+
+msgid "admin.fallback.own_queue"
+msgstr "Eigen wachtrij"
+
+msgid "admin.fallback.banner.title"
+msgstr "Terugval actief"
+
+msgid "admin.fallback.banner.text"
+msgstr "Het contactcenter is onbereikbaar sinds {time}. De afspraken van deze groep komen nu in deze wachtrij."
+
+msgid "admin.fallback.end"
+msgstr "Terugval beëindigen"
+
+msgid "admin.fallback.chip"
+msgstr "Terugval"
+
+msgid "admin.done.fallback_ended"
+msgstr "De terugval is beëindigd. Afspraken die nog niet zijn opgepakt, gaan alsnog naar het contactcenter."
+
+msgid "admin.alerts.source.fallback"
+msgstr "Terugval naar de eigen wachtrij"
+
+msgid "admin.alerts.text.fallback"
+msgstr "Deze groep valt terug op haar eigen wachtrij, omdat het contactcenter onbereikbaar is. Open de wachtrij om afspraken op te pakken."
+
+msgid "call.event.fallback_queued"
+msgstr "In de eigen wachtrij gezet (terugval)"
+
+msgid "call.event.fallback_ended"
+msgstr "Terugval beëindigd: naar het contactcenter"
+
+msgid "fallback.space.activated"
+msgstr "**{group}** valt terug op de eigen wachtrij: het contactcenter is onbereikbaar. Pak afspraken op in de wachtrij: {link}"
+
+msgid "fallback.space.queued"
+msgstr "{time}: {first_name} staat in de wachtrij. {link}"
+
+msgid "admin.form.error.fallback_space_room_id"
+msgstr "Vul het id van een Webex-ruimte in: letters, cijfers, - en _, 10 tot 200 tekens."

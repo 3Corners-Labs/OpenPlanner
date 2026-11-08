@@ -1522,6 +1522,18 @@ _AUDIT = (
         "On failure: open the group's *Integrations*; it names the provider's reason.",
     ),
     _e(
+        "dispatch.fallback",
+        _SYS,
+        "outcome",
+        "",
+        "The group's fallback to the own queue is {outcome} ({reason}).",
+        "ADR 0082 point 11: a contact-center group with `dispatch_fallback = own_queue` falls "
+        "back while its organisation's contact center is `down` (failure `on`), and returns "
+        "when it is `ok` again or a group admin ends it (success).",
+        "While it is on: the team works the group's queue (*Wachtrij*). After it: bookings not "
+        "yet claimed go to the contact center.",
+    ),
+    _e(
         "integration.health",
         _SYS,
         "outcome",

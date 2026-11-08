@@ -79,6 +79,11 @@ class CallService:
         """
         if self._dispatcher is None or not group.dispatch_enabled or booking.wxcc_task_id:
             return booking
+        if group.fallback_active:  # ADR 0082 point 11: a direct call takes the own-queue path
+            await self._integration.record(
+                _id(booking), EventKind.FALLBACK_QUEUED, detail="contact_center_down"
+            )
+            return booking
         if booking.meeting is None:
             raise IntegrationError("meeting_missing", retryable=True)
         task_id = await self._dispatcher.create_task(
