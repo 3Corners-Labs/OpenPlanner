@@ -106,6 +106,7 @@ class State:
     audit: list[AuditEvent] = field(default_factory=list)
     diagnostic_modes: list[DiagnosticMode] = field(default_factory=list)
     staff: dict[str, StaffMember] = field(default_factory=dict)
+    overview_layouts: dict[str, tuple[str, ...]] = field(default_factory=dict)
     admin_sessions: list[AdminSession] = field(default_factory=list)
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
@@ -282,6 +283,20 @@ class InMemoryTransaction:
             self.state.staff[subject] = replace(
                 self.state.staff[subject], status=status, status_at=at
             )
+
+    async def get_overview_layout(self, subject: str) -> tuple[str, ...] | None:
+        return self.state.overview_layouts.get(subject)
+
+    async def save_overview_layout(
+        self, subject: str, keys: tuple[str, ...] | None, at: datetime
+    ) -> bool:
+        if subject not in self.state.staff:
+            return False
+        if keys is None:
+            self.state.overview_layouts.pop(subject, None)
+        else:
+            self.state.overview_layouts[subject] = keys
+        return True
 
     async def erase_staff(self, subject: str, at: datetime) -> None:
         member = self.state.staff.get(subject)

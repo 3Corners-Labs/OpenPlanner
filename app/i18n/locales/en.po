@@ -9921,3 +9921,5 @@ msgstr "Default texts"
 
 msgid "admin.list.search_active"
 msgstr "A search is active. Clear the filters to see everything again."
+msgid "settings.field.overview_max_widgets.label"
+msgstr "Most widgets on an own overview"

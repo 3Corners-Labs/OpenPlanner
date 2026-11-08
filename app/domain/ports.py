@@ -754,6 +754,19 @@ class Transaction(Protocol):
         """Set the status of ``subject`` (suspended or active again); unknown ones are ignored."""
         ...
 
+    async def get_overview_layout(self, subject: str) -> tuple[str, ...] | None:
+        """Return the own overview layout of ``subject`` (ADR 0096), or ``None`` without one."""
+        ...
+
+    async def save_overview_layout(
+        self, subject: str, keys: tuple[str, ...] | None, at: datetime
+    ) -> bool:
+        """Store ``keys`` as ``subject``'s overview layout; ``None`` deletes it.
+
+        Returns ``False`` when ``subject`` has no staff record (nothing is stored then).
+        """
+        ...
+
     async def erase_staff(self, subject: str, at: datetime) -> None:
         """Erase the record of ``subject`` (ADR 0046 point 9); the subject and times stay.
 
