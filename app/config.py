@@ -265,6 +265,8 @@ class Settings(BaseSettings):
     # Class C platform.
     overview_live_enabled: bool = True
     overview_poll_seconds: int = Field(default=10, ge=5, le=60)
+    # ADR 0096: the most widgets a personal overview layout may hold. Class C platform.
+    overview_max_widgets: int = Field(default=12, ge=4, le=24)
     # ADR 0061 OV-7: the longest wait in an own queue above which a warning alert is raised,
     # and the target the queue widget compares against. Class D organisation.
     queue_wait_warning_minutes: int = Field(default=8, ge=1, le=120)

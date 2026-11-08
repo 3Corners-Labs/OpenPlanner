@@ -10158,3 +10158,6 @@ msgstr "Dat kon niet: controleer het adres, het token, of het maximum van tien a
 
 msgid "settings.field.alert_repeat_hours.label"
 msgstr "Melding opnieuw sturen na (uren)"
+
+msgid "settings.field.overview_max_widgets.label"
+msgstr "Meeste widgets op een eigen overzicht"

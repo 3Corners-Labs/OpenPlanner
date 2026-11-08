@@ -755,6 +755,21 @@ class StaffRow(Base):
     status_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
+class OverviewLayoutRow(Base):
+    """An admin's own overview layout (ADR 0096): widget keys in order, comma-separated.
+
+    Keys only, never personal data; erasing the staff record (ADR 0046) deletes it.
+    """
+
+    __tablename__ = "overview_layouts"
+
+    staff_id: Mapped[int] = mapped_column(
+        ForeignKey("staff.id", ondelete="CASCADE"), primary_key=True
+    )
+    widget_keys: Mapped[str] = mapped_column(String(500))
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
 class StaffMembershipRow(Base):
     """One grant of an admin as last seen: a role on an organisation or a group (ADR 0049)."""
 

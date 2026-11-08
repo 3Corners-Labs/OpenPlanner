@@ -105,6 +105,7 @@ from app.domain.messaging_service import MessagingService
 from app.domain.mfa import MfaPolicy
 from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
+from app.domain.overview_layout import OverviewLayoutService
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
@@ -156,6 +157,7 @@ from app.web.protection import configure_rate_limits, limiter, set_rate_limits
 from app.web.proxy_headers import ProxyHeaderMiddleware
 from app.web.public_links import PublicRedirectMiddleware
 from app.web.static_assets import ASSETS, VersionedStaticFiles
+from app.web.widgets import WIDGETS
 
 
 def _public_host(public_base_url: str) -> str | None:
@@ -598,6 +600,9 @@ def create_app(
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
         app.state.readiness_service = ReadinessService(uow, clock, app.state.admin_service)
+        app.state.overview_layout_service = OverviewLayoutService(
+            uow, clock, [w.key for w in WIDGETS], lambda: live().overview_max_widgets
+        )
         app.state.scenario_service = ScenarioService(uow, clock, app.state.admin_service)
         app.state.embedding_service = EmbeddingService(
             uow,

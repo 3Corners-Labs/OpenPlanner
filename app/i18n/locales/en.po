@@ -10146,3 +10146,6 @@ msgstr "That did not work: check the address, the token, or the maximum of ten a
 
 msgid "settings.field.alert_repeat_hours.label"
 msgstr "Send an alert again after (hours)"
+
+msgid "settings.field.overview_max_widgets.label"
+msgstr "Most widgets on an own overview"

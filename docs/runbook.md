@@ -1802,15 +1802,21 @@ migration, point 4).
 | Step | How | What runs |
 |---|---|---|
 | Cut the line (once per minor, only when needed) | *Run workflow* on `main`, `step = cut-line`, `version = X.Y` (tick `dry_run` first) | `scripts/release_line.py cut` checks that a release of X.Y exists, the line does not, and `main` holds a `feat` since its newest release; the release app pushes `release/X.Y` and the label `backport:X.Y` is created |
-| Fix | the usual PR to `main`, merged through the queue; add the label `backport:X.Y` (before or after the merge) | `backport.yml` cherry-picks the merge commit onto `backport/X.Y/pr-N` and opens the PR against `release/X.Y` with auto-merge, so the line's merge queue runs the full lane; when the cherry-pick does not apply it comments on the PR, and a Claude Code session makes the backport by hand (`git cherry-pick -x`) |
+| Fix | the usual PR to `main`, merged through the queue; add the label `backport:X.Y` (before or after the merge) | `backport.yml` cherry-picks the merge commit onto `backport/X.Y/pr-N` and opens the PR against `release/X.Y` with auto-merge; a pull request into a line runs the full lane itself (a line has no merge queue) and must be up to date with the line; when the cherry-pick does not apply it comments on the PR, and a Claude Code session makes the backport by hand (`git cherry-pick -x`) |
 | Candidate | the merge on the line | `main.yml` tags `vX.Y.Z-rc.N` from `scripts/release_plan.py --candidate --branch release/X.Y` and publishes it as on `main` (no mutation run: the fix ran it on `main`) |
 | Release | *Run workflow* on `release/X.Y`, `step = release-pr`, then `step = tag` on `release/X.Y` | the release PR goes to the line (a patch, no audit); the tag sits on the line's merge commit; `main.yml` accepts a tag on `main` or a patch tag on its own line (`scripts/release_line.py tag-allowed`); a line's release is never GitHub's *Latest* release and never moves `:latest` |
 | Changelog | the next release PR on `main` | `release_pr.py prepare` takes over the released sections of every `origin/release/X.Y` that `main` lacks, in version order |
 
 Two rulesets cover `release/[0-9]*`, both in `.github/guardrails.json`, which the hourly
 guardrail audit compares with GitHub. `release lines` has the rules of `main` (pull request,
-merge queue, the same required checks, no force push, no deletion) and, like `main`, no
-bypass; a test fails when its rules drift from `main`'s. `release line creation` only
+the same required checks, no force push, no deletion) and, like `main`, no bypass. Only the
+merge queue is missing: GitHub refuses one on a wildcard ref, so a line's pull request must be
+up to date with the line (`strict`) and runs the full CI lane on the pull request (`ci.yml`). A
+test fails when its rules drift from `main`'s otherwise. A pull request runs the `ci.yml` of its own merge
+commit, so a line cut from a release before #605 (0.5.x and earlier) skips the full lane until
+#605 itself is the line's first backport; cut such a line, then backport #605 first. With
+`strict` and auto-merge, a second backport waits until someone updates its branch (an
+administrator, so a decision PR keeps `po:approved`). `release line creation` only
 restricts creating a line, and its bypass lets the release app (and administrators) do that.
 The environment `release` allows `main` and `release/[0-9]*`, so a line's candidate, release
 and tag jobs get the app's token. A release PR's branch `release/vX.Y.Z` matches neither. To

@@ -179,6 +179,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the participant's waiting page (ADR 0072). |
 | `OVERVIEW_LIVE_ENABLED` | bool | `true` | — | `settings.platform.manage` | Lets the overview's widgets refresh themselves and pop up new alerts; off, the page shows what it loaded with and a Refresh link (ADR 0061 §3, §4). |
 | `OVERVIEW_POLL_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of a live widget on the overview (ADR 0061 §4). |
+| `OVERVIEW_MAX_WIDGETS` | int | `12` | 4–24 | `settings.platform.manage` | Most widgets an admin's own overview layout may hold; adding beyond it is refused (ADR 0096). |
 | `MEETING_STATUS_REFRESH_SECONDS` | int | `30` | 10–300 | `settings.platform.manage` | Seconds a meeting status on the agenda may be old before the video provider is asked (webhooks come first), and between two refreshes of the agenda's status columns (ADR 0010). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `MAX_SUBJECTS_PER_GROUP` | int | `20` | 1–100 | `settings.platform.manage` | Subjects a group may give participants to choose from at most (ADR 0081). |

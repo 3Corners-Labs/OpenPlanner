@@ -4,7 +4,7 @@ Each widget of the overview page is a server-rendered fragment with its own rout
 ``/admin/overview/w/{key}`` and its own permission from the matrix (ADR 0014). This module
 declares them: key, i18n title, permission, scope, the views it supports, its default number
 of rows, whether it refreshes itself (ADR 0061 §4) and its manual topic. It also
-holds the default layout per role, which ADR 0062 reads as the starting point of a personal
+holds the default layout per role, which ADR 0096 reads as the starting point of a personal
 layout.
 
 Like the navigation register (ADR 0047), the register decides *what* exists and *where* it
@@ -67,7 +67,7 @@ class Widget:
         permission: The permission its route needs; the matrix decides whether it shows.
         scope: The level it aggregates at.
         views: The views it supports; the first is its default.
-        default_rows: How many rows it shows unless a layout (ADR 0062) says otherwise.
+        default_rows: How many rows it shows unless a layout (ADR 0096) says otherwise.
         live: Whether the live script (ADR 0061 §4) may refresh it.
         topic: The manual topic that explains it.
         available: Whether this step renders it; without it there is no route (OV-3).
@@ -171,7 +171,7 @@ DEFAULT_LAYOUTS: dict[Role, tuple[str, ...]] = {
     Role.AUDITOR: ("changes", "status", "alerts", "rights"),
     Role.AGENT: ("queue", "bookings-today", "alerts", "rights"),
 }
-"""The default layout per built-in role: widget keys in order (ADR 0062 §2 starts from it)."""
+"""The default layout per built-in role: widget keys in order (ADR 0096 §1 starts from it)."""
 
 _BY_KEY = {w.key: w for w in WIDGETS}
 
@@ -192,7 +192,7 @@ def resolve_view(item: Widget, requested: str | None) -> View:
     """Return the view ``item`` draws: ``requested`` when it supports it, else its first.
 
     The first view in the register is the widget's default (ADR 0061 §2). ``requested`` comes
-    from outside (a query parameter, later a personal layout, ADR 0062), so anything that is
+    from outside (a query parameter, later a personal layout, ADR 0096), so anything that is
     not exactly the name of a supported view, including garbage, is the default.
     """
     try:
