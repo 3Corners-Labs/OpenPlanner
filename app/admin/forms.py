@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, tzinfo
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlencode
 
 from fastapi import Request
 from starlette.responses import RedirectResponse
@@ -582,21 +582,60 @@ def done_message(request: Request, _: BoundGettext) -> str | None:
     return _(DONE_MESSAGES[key], count=count) if key in DONE_MESSAGES else None
 
 
+_RETURN_KEY = re.compile(r"[a-z][a-z0-9_]{0,31}")
+_RETURN_VALUE = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
+_RETURN_SECRETS = ("token", "code", "state", "nonce", "secret", "key", "password")
+RETURN_QUERY_MAX_PARAMS = 8
+"""Fixed rule, no setting: a "return to" query with more parameters is dropped whole."""
+
+
+def _kept_return_query(query: str) -> str:
+    """Return the part of ``query`` a "return to" target may carry, or ``""``.
+
+    Only parameters that select a view (a short name with a value of letters, digits and
+    ``_.:-``: a tab, a date, a page number) are kept. A secret (``token``, ``code``, ``state``
+    and the like) never goes into a login URL or the session, and free text (a search, an
+    address) is dropped, so no personal data travels in a URL.
+    """
+    pairs = parse_qsl(query, keep_blank_values=True)
+    if len(pairs) > RETURN_QUERY_MAX_PARAMS:
+        return ""
+    kept = [
+        (key, value)
+        for key, value in pairs
+        if _RETURN_KEY.fullmatch(key)
+        and not any(secret in key for secret in _RETURN_SECRETS)
+        and _RETURN_VALUE.fullmatch(value)
+    ]
+    return urlencode(kept)
+
+
 def safe_next(value: str | None) -> str:
     """Return ``value`` if it is an admin path on this site; otherwise the dashboard.
 
     For every "return to" target that arrives with a request (login, re-login, the update
-    banner's snooze), so none can send the admin off the portal.
+    banner's snooze), so none can send the admin off the portal. The path must start with
+    ``/admin`` and contain no ``//`` at the start, no backslash and no ``://`` anywhere; its
+    query keeps only the view parameters of ``_kept_return_query``.
     """
-    if (
+    if not (
         value
         and value.startswith("/admin")
         and not value.startswith("//")
         and "\\" not in value
         and "://" not in value
     ):
-        return value
-    return "/admin/"
+        return "/admin/"
+    path, _, query = value.partition("?")
+    path = path.split("#", 1)[0]
+    kept = _kept_return_query(query.split("#", 1)[0])
+    return f"{path}?{kept}" if kept else path
+
+
+def return_target(request: Request) -> str:
+    """Return where to come back to after a login: this page's path and its view query."""
+    kept = _kept_return_query(request.url.query)
+    return safe_next(f"{request.url.path}?{kept}" if kept else request.url.path)
 
 
 def redirect_done(

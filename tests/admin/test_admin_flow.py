@@ -330,3 +330,81 @@ async def test_admin_login_disabled_without_identity_provider(settings) -> None:
 
     assert response.status_code == 503
     assert "Beheer niet beschikbaar" in response.text
+
+
+async def _login_through(site: Site, page: str) -> tuple[str, str]:
+    """Open ``page`` without a session, sign in, and return (login location, final location)."""
+    sent = await site.client.get(page)
+    assert sent.status_code == 303
+    login = sent.headers["location"]
+    await site.client.get(login)
+    site.idp.next_principal = SUPER
+    back = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+    return login, back.headers["location"]
+
+
+async def test_the_query_of_the_page_survives_the_login(site: Site) -> None:
+    _, landed = await _login_through(site, "/admin/groups/demo/usage?view=queue&from=2026-11-01")
+
+    assert landed == "/admin/groups/demo/usage?view=queue&from=2026-11-01"
+
+
+async def test_a_next_with_a_query_survives_the_login(site: Site) -> None:
+    await site.client.get("/admin/login", params={"next": "/admin/groups/demo/usage?view=queue"})
+    site.idp.next_principal = GROUP_ADMIN
+
+    response = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+
+    assert response.headers["location"] == "/admin/groups/demo/usage?view=queue"
+
+
+@pytest.mark.parametrize(
+    ("page", "kept"),
+    [
+        # A token, code or state never goes into the login URL or the session (ADR 0011).
+        ("/admin/alerts/close?token=0123456789abcdef&next=/admin/", "/admin/alerts/close"),
+        ("/admin/groups/demo/usage?view=queue&code=abc", "/admin/groups/demo/usage?view=queue"),
+        # Free text (a search, an address) is not carried: no personal data into a URL.
+        ("/admin/staff?q=jan%40voorbeeld.nl&view=all", "/admin/staff?view=all"),
+        ("/admin/staff?q=Jan+Jansen", "/admin/staff"),
+        # A value that names another site stays a query value under /admin, never a target.
+        ("/admin/groups/demo?next=https://evil.example/", "/admin/groups/demo"),
+    ],
+)
+async def test_the_kept_query_holds_no_token_and_no_free_text(
+    site: Site, page: str, kept: str
+) -> None:
+    login, landed = await _login_through(site, page)
+
+    assert landed == kept
+    for secret in ("0123456789abcdef", "abc", "voorbeeld", "Jansen", "evil"):
+        if secret not in kept:
+            assert secret not in login
+            assert secret not in landed
+
+
+async def test_a_long_query_is_dropped_whole(site: Site) -> None:
+    query = "&".join(f"p{i}=v" for i in range(20))
+
+    _, landed = await _login_through(site, f"/admin/groups/demo/usage?{query}")
+
+    assert landed == "/admin/groups/demo/usage"
+
+
+@pytest.mark.parametrize(
+    "next_url",
+    [
+        "/admin/x?y=https://evil.example/",
+        "/admin?//evil.example",
+        "/admin/x?y=\\evil",
+        "//evil.example/admin?view=queue",
+    ],
+)
+async def test_a_query_does_not_loosen_the_redirect_guard(site: Site, next_url: str) -> None:
+    await site.client.get("/admin/login", params={"next": next_url})
+    site.idp.next_principal = GROUP_ADMIN
+
+    response = await site.client.get("/admin/callback", params={"code": "c", "state": "state-1"})
+
+    assert response.headers["location"] in ("/admin/", next_url.split("?")[0])
+    assert "evil" not in response.headers["location"]

@@ -91,7 +91,7 @@ from app.admin.authz import (
     session_principal,
     session_service,
 )
-from app.admin.forms import Field, read_form, safe_next
+from app.admin.forms import Field, read_form, return_target, safe_next
 from app.admin.idp_mapping_routes import reason_label
 from app.admin.idp_routes import JWKS_PATH
 from app.admin.integration_views import check_view, health_view
@@ -824,7 +824,7 @@ def register_admin(app: FastAPI) -> None:
     """Install the admin routes and turn ``LoginRequired``/``AccessDenied`` into responses."""
 
     async def login_required(request: Request, exc: Exception) -> Response:
-        target = quote(request.url.path, safe="/")
+        target = quote(return_target(request), safe="/")
         return RedirectResponse(f"/admin/login?next={target}", status_code=303)
 
     async def access_denied(request: Request, exc: Exception) -> Response:
