@@ -7,7 +7,7 @@ from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.webhooks import sign_wxcc
 from app.domain.contact_center import ContactCenterKind, Registration
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.fakes.integrations import FakeRegistrar
+from tests.fakes.integrations import FakeOrganisationDispatchers
 from tests.support.admin_site import site_app
 
 PAGE = "/admin/organisations/demo/channels"
@@ -25,9 +25,11 @@ def _connections(site: Site) -> SealedConnections:
     return connections
 
 
-def _registrar(site: Site, outcome: Registration = Registration.REGISTERED) -> FakeRegistrar:
+def _registrar(
+    site: Site, outcome: Registration = Registration.REGISTERED
+) -> FakeOrganisationDispatchers:
     """Put a fake in place of the platform: no test talks to a real contact center."""
-    registrar = FakeRegistrar(outcome)
+    registrar = FakeOrganisationDispatchers(outcome=outcome)
     state = site_app(site).state
     state.integrations = replace(state.integrations, organisations=registrar)
     return registrar

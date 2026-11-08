@@ -474,6 +474,22 @@ class ConnectionRegistrar(Protocol):
         ...
 
 
+class OrganisationConnections(Protocol):
+    """Dispatch and registration through each organisation's own connection (ADR 0032).
+
+    One adapter does both (``OrganisationWxcc``); ``DispatcherChoice`` sees it as
+    ``OrganisationDispatchers`` and the connection service as ``ConnectionRegistrar``.
+    """
+
+    async def own(self, organisation_id: int, kind: ContactCenterKind) -> OwnConnection | None:
+        """Return the organisation's own connection for ``kind`` (``OrganisationDispatchers``)."""
+        ...
+
+    async def register(self, organisation_id: int, organisation: str) -> Registration:
+        """Register the organisation's webhook address at its platform (``ConnectionRegistrar``)."""
+        ...
+
+
 class ContactCenterConnections(Protocol):
     """The organisations' contact-center connections, sealed and write-only (ADR 0032 point 9).
 

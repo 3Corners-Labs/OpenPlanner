@@ -92,49 +92,74 @@ async def test_without_a_complete_connection_there_is_no_dispatcher() -> None:
     assert seen == []
 
 
-def _platform(seen: list[httpx.Request], listed: list[dict[str, str]]) -> httpx.MockTransport:
+ADDRESS = "https://openplanner.example/webhooks/contact-center/webex_cc/demo"
+
+
+def _platform(seen: list[httpx.Request], listed: object, create: int = 200) -> httpx.MockTransport:
+    """A WxCC whose subscription listing is ``listed`` and whose create answers ``create``."""
+
     def answer(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         if str(request.url) == OAUTH:
             return httpx.Response(200, json={"access_token": "own-access", "expires_in": 3600})
-        if request.method == "GET" and request.url.path == "/v2/subscriptions":
-            return httpx.Response(200, json={"data": listed})
+        if request.method == "GET":
+            return httpx.Response(200, json=listed)
         if request.method == "DELETE":
             return httpx.Response(204)
-        if request.method == "POST" and request.url.path == "/v2/subscriptions":
-            return httpx.Response(200, json={"id": "new"})
-        return httpx.Response(404)
+        return httpx.Response(create, json={"id": "new"})
 
     return httpx.MockTransport(answer)
 
 
-async def test_registering_replaces_the_subscription_at_the_organisations_address() -> None:
-    """ADR 0032 CC-4d: a new secret takes effect; another address is never touched."""
-    address = "https://openplanner.example/webhooks/contact-center/webex_cc/demo"
-    listed = [
-        {"id": "old-1", "destinationUrl": address},
-        {"id": "theirs", "destinationUrl": "https://elsewhere.example/hook"},
-    ]
-    secrets, seen = FakeSecrets(), []  # type: list[httpx.Request]
-    connections = SealedConnections(secrets)
-    http = httpx.AsyncClient(transport=_platform(seen, listed))
+async def _registering(
+    listed: object, create: int = 200
+) -> tuple[OrganisationWxcc, SealedConnections, list[httpx.Request]]:
+    seen: list[httpx.Request] = []
+    connections = SealedConnections(FakeSecrets())
+    http = httpx.AsyncClient(transport=_platform(seen, listed, create))
     organisations = OrganisationWxcc(
         connections,
-        secrets,
+        FakeSecrets(),
         http,
         FixedClock(NOW),
         OAUTH,
-        webhook_base="https://openplanner.example/",
+        webhook_base="https://openplanner.example",
     )
+    return organisations, connections, seen
+
+
+async def test_registering_replaces_the_subscription_at_the_organisations_address() -> None:
+    """ADR 0032 CC-4d: a new secret takes effect; another address is never touched."""
+    listed = {
+        "data": [
+            {"id": "old-1", "destinationUrl": ADDRESS},
+            {"id": "theirs", "destinationUrl": "https://elsewhere.example/hook"},
+            {"id": "../v2/x", "destinationUrl": ADDRESS},
+        ]
+    }
+    organisations, connections, seen = await _registering(listed)
     assert await organisations.register(1, "demo") is Registration.NOT_READY
     await connections.save(1, OWN, NOW)
 
-    outcome = await organisations.register(1, "demo")
+    assert await organisations.register(1, "demo") is Registration.REGISTERED
 
-    assert outcome is Registration.REGISTERED
-    deleted = [r.url.path for r in seen if r.method == "DELETE"]
-    assert deleted == ["/v2/subscriptions/old-1"]
+    assert [r.url.path for r in seen if r.method == "DELETE"] == ["/v2/subscriptions/old-1"]
     [created] = [r for r in seen if r.method == "POST" and r.url.path == "/v2/subscriptions"]
     body = json.loads(created.content)
-    assert body["destinationUrl"] == address
-    assert body["secret"] == secrets.values["contact-center:1"]["webhook_secret"]
+    assert body["destinationUrl"] == ADDRESS
+    assert body["secret"] == await connections.webhook_secret(1, WXCC)
+
+
+async def test_a_refused_create_or_an_odd_listing_is_refused_and_an_outage_failed() -> None:
+    for listed, create, expected in (
+        ({"data": []}, 403, Registration.REFUSED),
+        (["not", "an", "object"], 200, Registration.REFUSED),
+        ({"data": []}, 503, Registration.FAILED),
+    ):
+        organisations, connections, seen = await _registering(listed, create)
+        await connections.save(1, OWN, NOW)
+
+        assert await organisations.register(1, "demo") is expected, (listed, create)
+        if expected is Registration.REFUSED and create == 200:
+            changes = [r for r in seen if r.method == "DELETE" or r.url.path == "/v2/subscriptions"]
+            assert [r.method for r in changes] == ["GET"]  # nothing deleted, nothing created

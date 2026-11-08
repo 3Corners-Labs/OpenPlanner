@@ -30,6 +30,7 @@ from app.domain.ports import (
     Clock,
     ContactCenterDispatchers,
     IntegrationChecker,
+    OrganisationConnections,
     RequestLog,
     VideoProvider,
 )
@@ -52,7 +53,7 @@ class Integrations:
     video: VideoProvider | None = None
     dispatchers: ContactCenterDispatchers = field(default_factory=dict)
     checker: IntegrationChecker | None = None
-    organisations: OrganisationWxcc | None = None
+    organisations: OrganisationConnections | None = None
 
     @property
     def dispatch_configured(self) -> bool:

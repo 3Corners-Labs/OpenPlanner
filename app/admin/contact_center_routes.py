@@ -128,7 +128,7 @@ async def connection_view(
         "available": service.available,
         "stored": stored is not None,
         "fields": _connection_fields(form, stored, _),
-        "webhook": f"{base}{INBOUND[stored.kind].organisation_path(org)}" if stored else "",
+        "webhook": INBOUND[stored.kind].organisation_url(base, org) if stored else "",
         "secret_made": moment_label(made, tz, locale.code) if made else "",
     }
 

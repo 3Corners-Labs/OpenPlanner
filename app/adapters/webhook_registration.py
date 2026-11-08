@@ -14,6 +14,7 @@ import re
 from collections.abc import Iterable
 
 from app.adapters.webex_auth import AuthorizedClient
+from app.domain.contact_center import Registration
 from app.domain.ports import IntegrationError
 
 WEBEX_EVENTS = (
@@ -133,11 +134,18 @@ async def register_wxcc(
     listed = (await client.request("GET", f"{base}/v2/subscriptions")).json()
     if any(item.get("destinationUrl") == target_url for item in listed.get("data", [])):
         return "wxcc subscription: exists"
-    return await _create_wxcc(client, base, target_url, secret)
+    refusal = await _create_wxcc(client, base, target_url, secret)
+    return "wxcc subscription: created" if refusal is None else f"wxcc subscription: {refusal}"
 
 
-async def _create_wxcc(client: AuthorizedClient, base: str, target_url: str, secret: str) -> str:
-    """Create the WxCC subscription at ``target_url``; return ``created`` or ``refused (...)``."""
+async def _create_wxcc(
+    client: AuthorizedClient, base: str, target_url: str, secret: str
+) -> str | None:
+    """Create the WxCC subscription at ``target_url``; ``None``, or why WxCC refused it.
+
+    Raises:
+        IntegrationError: Retryable failures.
+    """
     try:
         await client.request(
             "POST",
@@ -160,8 +168,8 @@ async def _create_wxcc(client: AuthorizedClient, base: str, target_url: str, sec
             else "WxCC refused the request (destination must be https on port 443 with a public "
             "domain; secret 32+ characters)"
         )
-        return f"wxcc subscription: refused ({error.code}): {reason}"
-    return "wxcc subscription: created"
+        return f"refused ({error.code}): {reason}"
+    return None
 
 
 SUBSCRIPTION_ID = re.compile(r"[A-Za-z0-9_=-]{1,256}")
@@ -170,16 +178,28 @@ SUBSCRIPTION_ID = re.compile(r"[A-Za-z0-9_=-]{1,256}")
 
 async def replace_wxcc(
     client: AuthorizedClient, base_url: str, target_url: str, secret: str
-) -> str:
+) -> Registration:
     """Make the one WxCC subscription at ``target_url`` carry ``secret`` (ADR 0032 CC-4d).
 
-    WxCC keeps a subscription's secret, so a rotated secret needs a new subscription: the
-    subscriptions at ``target_url`` are deleted, then one is created; ``created`` or ``refused``.
+    WxCC keeps a subscription's secret, so a new secret needs a new subscription: those at
+    ``target_url`` (and only those, ids checked) are deleted, then one is created. A listing
+    that is not the expected object counts as refused; nothing is deleted then.
+
+    Raises:
+        IntegrationError: Retryable failures (``FAILED`` for the caller).
     """
     base = base_url.rstrip("/")
-    listed = (await client.request("GET", f"{base}/v2/subscriptions")).json()
-    for item in listed.get("data", []):
-        item_id = str(item.get("id") or "")
-        if item.get("destinationUrl") == target_url and SUBSCRIPTION_ID.fullmatch(item_id):
-            await client.request("DELETE", f"{base}/v2/subscriptions/{item_id}")
-    return await _create_wxcc(client, base, target_url, secret)
+    try:
+        items = (await client.request("GET", f"{base}/v2/subscriptions")).json()["data"]
+        ours = [
+            str(item["id"])
+            for item in items
+            if item.get("destinationUrl") == target_url
+            and SUBSCRIPTION_ID.fullmatch(str(item.get("id") or ""))
+        ]
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return Registration.REFUSED
+    for item_id in ours:
+        await client.request("DELETE", f"{base}/v2/subscriptions/{item_id}")
+    refusal = await _create_wxcc(client, base, target_url, secret)
+    return Registration.REGISTERED if refusal is None else Registration.REFUSED

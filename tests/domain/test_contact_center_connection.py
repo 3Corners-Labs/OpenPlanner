@@ -9,7 +9,7 @@ from app.domain.contact_center import ConnectionChange, ContactCenterKind, Regis
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeContactCenterConnections, FakeRegistrar
+from tests.fakes.integrations import FakeContactCenterConnections, FakeOrganisationDispatchers
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, two_organisations
 from tests.support.domain import NOW
@@ -49,7 +49,9 @@ def clock() -> FixedClock:
 def service(
     uow: InMemoryUnitOfWork, clock: FixedClock, connections: FakeContactCenterConnections
 ) -> ContactCenterConnectionService:
-    return ContactCenterConnectionService(uow, clock, AdminService(uow, clock), connections)
+    return ContactCenterConnectionService(
+        uow, clock, AdminService(uow, clock), connections, lambda: None
+    )
 
 
 async def test_a_connection_is_kept_and_its_audit_names_fields_not_values(
@@ -137,7 +139,9 @@ async def test_only_the_superuser_may_touch_it(
 async def test_without_a_settings_key_nothing_can_be_kept(
     uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    service = ContactCenterConnectionService(uow, clock, AdminService(uow, clock), None)
+    service = ContactCenterConnectionService(
+        uow, clock, AdminService(uow, clock), None, lambda: None
+    )
 
     assert not service.available
     assert await service.view(SUPER, "demo") is None
@@ -179,7 +183,7 @@ async def test_saving_and_rotating_register_the_address_and_audit_the_outcome(
     uow: InMemoryUnitOfWork, clock: FixedClock, connections: FakeContactCenterConnections
 ) -> None:
     """ADR 0032 CC-4d: the platform is told at once; its answer is audited, never undone."""
-    registrar = FakeRegistrar(Registration.REFUSED)
+    registrar = FakeOrganisationDispatchers(outcome=Registration.REFUSED)
     service = ContactCenterConnectionService(
         uow, clock, AdminService(uow, clock), connections, lambda: registrar
     )

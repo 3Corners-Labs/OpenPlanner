@@ -44,7 +44,7 @@ class ContactCenterConnectionService:
         connections: The sealed connections; ``None`` without a settings key, when nothing can
             be sealed.
         registrar: Returns what registers the address at the platform (the integrations are
-            rebuilt when the settings change); ``None`` or returning ``None``: not registered.
+            rebuilt when the settings change); returning ``None``: not registered.
     """
 
     def __init__(
@@ -53,7 +53,7 @@ class ContactCenterConnectionService:
         clock: Clock,
         admin: AdminService,
         connections: ContactCenterConnections | None,
-        registrar: Callable[[], ConnectionRegistrar | None] | None = None,
+        registrar: Callable[[], ConnectionRegistrar | None],
     ) -> None:
         """Store the collaborators."""
         self._registrar = registrar
@@ -127,7 +127,7 @@ class ContactCenterConnectionService:
         self, principal: Principal, organisation_id: int, organisation: str
     ) -> Registration:
         """Register the organisation's address at its platform and audit the outcome."""
-        registrar = self._registrar() if self._registrar is not None else None
+        registrar = self._registrar()
         if registrar is None:
             return Registration.NOT_READY
         outcome = await registrar.register(organisation_id, organisation)

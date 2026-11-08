@@ -11,6 +11,7 @@ organisation's tasks then wait for it and never go to the installation's tenant
 """
 
 import hashlib
+from dataclasses import dataclass
 
 import httpx
 
@@ -24,7 +25,6 @@ from app.adapters.wxcc import WxccTasks, wxcc_tasks
 from app.domain.contact_center import ContactCenterKind, Registration
 from app.domain.ports import (
     Clock,
-    ContactCenterDispatcher,
     IntegrationError,
     OwnConnection,
     RequestLog,
@@ -41,6 +41,15 @@ def _digest(credentials: ConnectionCredentials) -> str:
         credentials.refresh_token,
     )
     return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class _Built:
+    """An organisation's signed-in tokens and dispatcher, and the digest they were built from."""
+
+    digest: str
+    tokens: WebexTokens
+    dispatcher: WxccTasks
 
 
 class OrganisationWxcc:
@@ -70,7 +79,7 @@ class OrganisationWxcc:
         webhook_base: str = "",
     ) -> None:
         """Store the collaborators; no dispatcher is built yet."""
-        self._webhook_base = webhook_base.rstrip("/")
+        self._webhook_base = webhook_base
         self._connections = connections
         self._tokens = tokens
         self._http = http
@@ -78,7 +87,7 @@ class OrganisationWxcc:
         self._oauth_url = oauth_url
         self._security = security
         self._request_log = request_log
-        self._built: dict[int, tuple[str, WebexTokens, WxccTasks]] = {}
+        self._built: dict[int, _Built] = {}
 
     async def own(self, organisation_id: int, kind: ContactCenterKind) -> OwnConnection | None:
         """Return the organisation's own connection, its WxCC dispatcher built or reused.
@@ -89,7 +98,8 @@ class OrganisationWxcc:
         if credentials is None:
             self._built.pop(organisation_id, None)
             return None
-        return OwnConnection(self._dispatcher(organisation_id, credentials, kind))
+        built = self._build(organisation_id, credentials, kind)
+        return OwnConnection(built.dispatcher if built is not None else None)
 
     async def register(self, organisation_id: int, organisation: str) -> Registration:
         """Make WxCC send the organisation's events to its own address, with its secret (CC-4d).
@@ -103,25 +113,16 @@ class OrganisationWxcc:
         built = self._build(organisation_id, credentials, ContactCenterKind.WEBEX_CC)
         if built is None:
             return Registration.NOT_READY
-        tokens, _ = built
-        client = AuthorizedClient(self._http, tokens, self._request_log)
-        target = f"{self._webhook_base}{WXCC_INBOUND.organisation_path(organisation)}"
+        client = AuthorizedClient(self._http, built.tokens, self._request_log)
+        target = WXCC_INBOUND.organisation_url(self._webhook_base, organisation)
         try:
-            line = await replace_wxcc(client, credentials.api_base_url, target, secret)
+            return await replace_wxcc(client, credentials.api_base_url, target, secret)
         except IntegrationError as error:
             return Registration.FAILED if error.retryable else Registration.REFUSED
-        return Registration.REGISTERED if line.endswith("created") else Registration.REFUSED
-
-    def _dispatcher(
-        self, organisation_id: int, credentials: ConnectionCredentials, kind: ContactCenterKind
-    ) -> ContactCenterDispatcher | None:
-        """Return the organisation's WxCC dispatcher, or ``None`` when it cannot dispatch."""
-        built = self._build(organisation_id, credentials, kind)
-        return built[1] if built is not None else None
 
     def _build(
         self, organisation_id: int, credentials: ConnectionCredentials, kind: ContactCenterKind
-    ) -> tuple[WebexTokens, WxccTasks] | None:
+    ) -> _Built | None:
         """Return the organisation's tokens and dispatcher, built or reused; ``None`` if none."""
         if (
             credentials.kind is not ContactCenterKind.WEBEX_CC
@@ -132,8 +133,8 @@ class OrganisationWxcc:
             return None
         digest = _digest(credentials)
         built = self._built.get(organisation_id)
-        if built is not None and built[0] == digest:
-            return built[1], built[2]
+        if built is not None and built.digest == digest:
+            return built
         config = ServiceAppConfig(
             client_id=credentials.client_id,
             client_secret=credentials.client_secret,
@@ -150,5 +151,5 @@ class OrganisationWxcc:
             request_log=self._request_log,
             name=organisation_tokens_name(organisation_id),
         )
-        self._built[organisation_id] = (digest, tokens, dispatcher)
-        return tokens, dispatcher
+        self._built[organisation_id] = _Built(digest, tokens, dispatcher)
+        return self._built[organisation_id]
