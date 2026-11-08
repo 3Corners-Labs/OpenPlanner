@@ -963,7 +963,7 @@ repository's `pre-pr-review` skill before the PR (`docs/skills.md`).
 | 0105 | A Participants tab on the organisation |
 | 0106 | The bundled identity provider by default, user names under a platform suffix |
 | 0107 | Release tags come only from the release app |
-| 0108 | Public images for minor and major releases only (proposed, not built) |
+| 0108 | Public images for minor and major releases (built; every release since ADR 0116 step 6) |
 | 0109 | The guardrails are watched against a baseline |
 | 0110 | The website reads its releases live and lists no ADRs |
 | 0111 | The website is served by GitHub Pages and published at minor releases |

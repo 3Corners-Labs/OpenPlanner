@@ -6,6 +6,7 @@ import stat
 import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 REPO = Path(__file__).parents[2]
@@ -56,6 +57,46 @@ def test_the_notes_carry_the_references_and_the_identity_of_the_tag() -> None:
     assert "https://github.com/o/r/.github/workflows/main.yml@refs/tags/v0.4.0" in notes
     assert "cosign verify-attestation" in notes
     assert "token.actions.githubusercontent.com" in notes
+    assert "Release audit" in notes  # a minor release carries the audit of ADR 0078
+
+
+def test_the_notes_of_a_patch_claim_no_audit() -> None:
+    notes = subprocess.run(  # noqa: S603
+        [BASH, str(REPO / "scripts/public-release-notes.sh"), "o/r", "v0.4.1", APP, PROXY],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "refs/tags/v0.4.1" in notes
+    assert "Release audit" not in notes
+
+
+def _bash_major() -> int:
+    """The major version of ``BASH``; the workflow runs on the runner's bash 5."""
+    found = subprocess.run(  # noqa: S603 - fixed argv, no shell
+        [BASH, "-c", "echo ${BASH_VERSINFO[0]}"], capture_output=True, text=True, check=True
+    )
+    return int(found.stdout.strip() or 0)
+
+
+@pytest.mark.skipif(_bash_major() < 4, reason="the rule uses ${VAR,,} (bash 4+), as on the runner")
+@pytest.mark.parametrize(
+    ("tag", "public"),
+    [("v0.5.0", True), ("v0.5.1", True), ("v1.12.3", True), ("v0.5.1-rc.3", False)],
+)
+def test_the_public_rule_selects_every_release_and_no_candidate(
+    tag: str, public: bool, tmp_path: Path
+) -> None:
+    workflow = yaml.safe_load((REPO / ".github/workflows/main.yml").read_text())
+    rule = next(s for s in workflow["jobs"]["publish"]["steps"] if s.get("id") == "public")["run"]
+    output = tmp_path / "output"
+    output.touch()
+    env = {"GITHUB_REF_NAME": tag, "GITHUB_OUTPUT": str(output), "IMAGE": "ghcr.io/O/R"}
+    env |= {"PROXY_IMAGE": "ghcr.io/O/R-proxy", "PATH": "/usr/bin:/bin"}
+    subprocess.run([BASH, "-c", rule], env=env, check=True, capture_output=True)  # noqa: S603
+    lines = output.read_text().splitlines()
+    expected = ["app=ghcr.io/o/r-public", "proxy=ghcr.io/o/r-proxy-public"] if public else []
+    assert lines == expected
 
 
 def test_every_release_tag_and_no_candidate_selects_the_public_packages() -> None:

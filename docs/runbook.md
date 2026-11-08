@@ -95,10 +95,10 @@ both references with their digests and the exact commands; they come down to:
 
 ```sh
 cosign verify ghcr.io/<owner>/<repo>-public@sha256:<digest> \
-  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.Z \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 cosign verify-attestation ghcr.io/<owner>/<repo>-public@sha256:<digest> --type cyclonedx \
-  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.Z \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 

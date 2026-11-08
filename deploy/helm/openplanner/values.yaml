@@ -3,8 +3,8 @@
 # not repeated.
 
 image:
-  # The public package of a minor or major release (ADR 0108); a private package needs
-  # imagePullSecrets.
+  # The public package holds every release (ADR 0108, ADR 0116 point 10); a release
+  # candidate is only in the private package, which needs imagePullSecrets.
   repository: ghcr.io/3corners-labs/openplanner-public
   # Required: the release, for example 0.4.0. A digest is better (image.digest overrides the tag).
   tag: ""
