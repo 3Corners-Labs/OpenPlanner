@@ -3,7 +3,7 @@
 Status: accepted (2026-10-29) by the product owner, with the choices recorded under *Choices
 made on acceptance*. Requested by the product owner. Builds on ADR 0011 (management tokens),
 ADR 0022 (channels and consent), ADR 0042 (settings classes), ADR 0044 (planner, lapse of an
-unanswered request) and ADR 0055 (booking form fields). Partly built; see `docs/adr-status.md` for what is built.
+unanswered request) and ADR 0055 (booking form fields). Built (steps 1–4 and 3b); see `docs/adr-status.md`.
 Note (2026-11-01 review): in §4, "the change deadline" means start − dispatch lead
 (`app/domain/confirmation.py`), not `Group.change_deadline` as ADR 0069 redefined it.
 
@@ -142,8 +142,9 @@ by POST only (point 8).
 |---|---|---|---|
 | 1 | Domain: confirmation policy, `pending_confirmation`, job plan, settings | #115 | merged |
 | 2 | Persistence, jobs, mails, confirm page and POST; bookings start `pending_confirmation` (migration 0058) | #134 | merged |
-| 3 | Planner: status filter, confirm on behalf of the participant |  | planned |
-| 4 | The participant corrects details |  | planned |
+| 3 | Planner: status *Not confirmed* with its deadline in agenda and booking detail (no longer shown as cancelled), counted in a slot's occupancy and shortfall (not in a closed slot) and marked, the filter *Not confirmed only*, and confirming on behalf of the participant (`bookings.manage`, audited `booking.confirmed_by_staff`, the full confirmation mail; after `confirm_by` it lapses and the planner is told so) | #638 | merged |
+| 3b | Moving and cancelling a pending booking as a confirmed one; a moved pending booking stays pending with its own `confirm_by` (point 11, last sentence). Asking it to choose a new time stays for confirmed bookings: a pending one is moved, cancelled or left to lapse | #639 | merged |
+| 4 | The participant corrects details | #641 | merged |
 
 (State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
 

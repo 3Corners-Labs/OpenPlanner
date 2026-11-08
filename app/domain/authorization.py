@@ -552,7 +552,8 @@ class ApiScope(StrEnum):
     """OAuth scopes of the machine API (ADR 0023), granted per API client by the superuser."""
 
     AVAILABILITY_READ = "availability:read"
-    # ADR 0089 point 7: export and import the configuration package of the whole installation.
+    # ADR 0089 point 7, ADR 0099 step 4: export, plan and apply the configuration of the whole
+    # installation. The client is not bound by the matrix, which makes the scope a superuser's.
     CONFIGURATION_TRANSFER = "configuration:transfer"
 
 

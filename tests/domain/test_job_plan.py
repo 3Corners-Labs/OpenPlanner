@@ -289,3 +289,52 @@ def test_every_plan_that_replaces_all_jobs_cleans_up_an_open_trial_call() -> Non
 
     for name, plan in plans.items():
         assert JobType.DELETE_TRIAL_CALL in [job.type for job in plan], name
+
+
+def test_a_proposal_replaces_the_request_and_adds_reminder_and_expiry() -> None:
+    from app.domain.job_plan import plan_for_proposal
+
+    proposed = NOW + timedelta(days=7)
+    confirm_by = NOW + timedelta(hours=48)
+    jobs = plan_for_proposal(
+        now=NOW,
+        rebook_by=NOW + timedelta(days=14),
+        rebook_reminder_at=NOW + timedelta(days=11),
+        proposed_start=proposed,
+        confirm_by=confirm_by,
+        proposal_reminder_at=confirm_by - timedelta(hours=12),
+        sms=True,
+    )
+    quiet = plan_for_proposal(
+        now=NOW,
+        rebook_by=NOW + timedelta(days=14),
+        rebook_reminder_at=None,
+        proposed_start=proposed,
+        confirm_by=confirm_by,
+        proposal_reminder_at=None,
+        sms=False,
+    )
+
+    pinned = {(j.type, j.channel) for j in jobs if j.pinned_start == proposed}
+    assert pinned == {
+        (JobType.SEND_RESCHEDULE_PROPOSAL, ChannelKind.EMAIL),
+        (JobType.SEND_RESCHEDULE_PROPOSAL, ChannelKind.SMS),
+        (JobType.SEND_PROPOSAL_REMINDER, ChannelKind.EMAIL),
+        (JobType.SEND_PROPOSAL_REMINDER, ChannelKind.SMS),
+        (JobType.EXPIRE_PROPOSAL, None),
+    }
+    assert JobType.SEND_REBOOK_REQUEST not in {j.type for j in jobs}
+    assert {JobType.LAPSE_REBOOK, JobType.PURGE_PII, JobType.END_WXCC_TASK} <= {
+        j.type for j in jobs
+    }
+    assert JobType.SEND_PROPOSAL_REMINDER not in {j.type for j in quiet}
+    assert {j.channel for j in quiet if j.channel} == {ChannelKind.EMAIL}
+
+
+def test_a_released_proposal_sends_its_notice_now() -> None:
+    from app.domain.job_plan import plan_for_released_proposal
+
+    assert [(j.type, j.channel) for j in plan_for_released_proposal(now=NOW, sms=True)] == [
+        (JobType.SEND_PROPOSAL_RELEASED, ChannelKind.EMAIL),
+        (JobType.SEND_PROPOSAL_RELEASED, ChannelKind.SMS),
+    ]

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ _("proposal.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1>{{ _("proposal.title") }}</h1>
+<dl class="details">
+  <dt>{{ _("proposal.new") }}</dt><dd>{{ proposal_label }}</dd>
+  <dt>{{ _("proposal.old") }}</dt><dd>{{ slot_label }}</dd>
+  <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
+</dl>
+<p>{{ _("proposal.text", deadline=proposal_by) }}</p>
+<form method="post" action="/b/m/{{ ref }}/proposal">
+  <button type="submit" class="button button--large">{{ _("proposal.submit") }}</button>
+</form>
+<ul class="actions">
+  <li><a href="/b/m/{{ ref }}/reschedule">{{ _("manage.proposal.other") }}</a></li>
+  <li><a href="/b/m/{{ ref }}">{{ _("cancel.back") }}</a></li>
+</ul>
+{% endblock %}

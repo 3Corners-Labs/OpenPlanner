@@ -66,10 +66,18 @@ class ConfigurationDocumentQueries:
     """Reads the configuration into a tree and applies the changes of a plan."""
 
     async def read_configuration(
-        self: _Transaction, now: datetime, locked_settings: frozenset[str]
+        self: _Transaction,
+        now: datetime,
+        locked_settings: frozenset[str],
+        *,
+        secrets: bool = True,
     ) -> ConfigurationSnapshot:
-        """Return the configuration tree, the usage facts and the settings version."""
-        session, box = self._session, self._box
+        """Return the configuration tree, the usage facts and the settings version.
+
+        Without ``secrets`` the readers get no settings key, so no sealed value is opened.
+        """
+        session = self._session
+        box = self._box if secrets else None
         platform = await config_platform.read_platform(session, box)
         alerts = await config_alerts.read_alert_targets(session)
         organisations = await config_organisation.read_organisations(session, box)

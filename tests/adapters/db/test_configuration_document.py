@@ -19,6 +19,7 @@ from app.adapters.db.config_clients import read_api_clients
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
+from app.domain.authorization import Role
 from app.domain.configuration_changes import RuleContext
 from app.domain.configuration_document import Scope
 from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
@@ -26,6 +27,7 @@ from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
 from tests.support.config_seed import seed
 from tests.support.database import migrated_database
+from tests.support.principals import principal
 
 NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
 PASSPHRASE = "a long enough passphrase"
@@ -183,3 +185,51 @@ async def test_an_organisation_export_holds_only_that_organisation(source: Async
     assert data["scope"] == {"organisation": "acme"}
     assert "platform" not in data
     assert [o["slug"] for o in data["organisations"]] == ["acme"]
+
+
+async def test_an_organisation_admin_exports_what_they_may_change_and_no_integration_secrets(
+    source: AsyncEngine,
+) -> None:
+    box = SecretBox(b"a" * 32)
+    superuser = Actor("root", principal("root", "Root", [Role.SUPERUSER]))
+    admin = Actor("org", principal("org", "Org", [Role.ORG_ADMIN], ["acme"]))
+    svc = service(source, box)
+
+    everything = json.loads(await svc.export(superuser, Scope("acme"), None, secrets=False))
+    own = json.loads(await svc.export(admin, Scope("acme"), None, secrets=False))
+
+    assert [o["slug"] for o in own["organisations"]] == ["acme"]
+    assert [g["slug"] for g in own["organisations"][0]["groups"]] == [
+        g["slug"] for g in everything["organisations"][0]["groups"]
+    ]
+    mine, all_of_it = own["organisations"][0], everything["organisations"][0]
+    assert set(mine) < set(all_of_it)
+    assert {"groups", "holiday_calendars", "origins"} <= set(mine)
+    # Branding is held back from the organisation admin (ADR 0039), so a document of theirs
+    # cannot carry it: applying it elsewhere would be refused for the same reason.
+    assert not {"theme_tokens", "accent_color", "display_name"} & set(mine)
+
+
+async def test_a_plan_says_whether_the_document_held_sealed_secrets(
+    source: AsyncEngine, target: AsyncEngine
+) -> None:
+    box = SecretBox(b"a" * 32)
+    with_secrets = await service(source, box).export(HOST, Scope(), PASSPHRASE, secrets=True)
+    without = await service(source, box).export(HOST, Scope(), None, secrets=False)
+
+    sealed = await service(target, SecretBox(b"b" * 32)).plan(HOST, with_secrets, PASSPHRASE)
+    plain = await service(target, SecretBox(b"b" * 32)).plan(HOST, without, None)
+
+    assert sealed.sealed
+    assert not plain.sealed
+
+
+async def test_an_export_without_secrets_survives_a_secret_that_cannot_be_opened(
+    source: AsyncEngine,
+) -> None:
+    wrong_key = SecretBox(b"z" * 32)  # the rows were sealed under another key (a rotation)
+
+    exported = await service(source, wrong_key).export(HOST, Scope(), None, secrets=False)
+
+    assert json.loads(exported)["format"] == "openplanner.config/v1"
+    assert b"sealed" not in exported

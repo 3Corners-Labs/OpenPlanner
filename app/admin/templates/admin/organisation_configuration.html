@@ -1,0 +1,7 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.tab.configuration") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "admin/_configuration_document.html" %}
+{% endblock %}

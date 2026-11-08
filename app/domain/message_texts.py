@@ -31,6 +31,9 @@ SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "manag
 CANCELLATION_SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "reason"})
 REBOOK_EMAIL_PLACEHOLDERS = EMAIL_PLACEHOLDERS | {"deadline"}
 REBOOK_SMS_PLACEHOLDERS = SMS_PLACEHOLDERS | {"deadline", "reason"}
+PROPOSAL_EMAIL_PLACEHOLDERS = REBOOK_EMAIL_PLACEHOLDERS | {"new_date", "new_time"}
+PROPOSAL_SMS_PLACEHOLDERS = REBOOK_SMS_PLACEHOLDERS | {"new_date", "new_time"}
+"""ADR 0057: a proposed new time names the old and the proposed moment and its deadline."""
 LAPSED_SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name"})
 """ADR 0044: a request to rebook names when it lapses; a lapsed one has no link left."""
 """A cancelled booking has nothing left to manage; a planner's reason may be added (ADR 0044)."""
@@ -49,7 +52,8 @@ class TextBlock:
         key: Catalogue key of the default text, e.g. ``message.reminder.intro``.
         purpose: ``confirmation``, ``change``, ``reminder``, ``cancellation``, the planner's
             ``rebook_request``, ``rebook_reminder``, ``rebook_lapsed`` and ``reason``
-            (ADR 0044), or ``all``.
+            (ADR 0044), the assistant's ``reschedule_proposal``, ``proposal_reminder`` and
+            ``proposal_released`` (ADR 0057), or ``all``.
         channel: The channel the block is sent on.
         part: ``subject``, ``intro``, ``signoff``, ``body`` (SMS) or ``reason_<code>``.
         placeholders: The ``{name}``s the text may use.
@@ -115,6 +119,10 @@ MESSAGE_BLOCKS: tuple[TextBlock, ...] = (
             ("rebook_request", REBOOK_EMAIL_PLACEHOLDERS, REBOOK_SMS_PLACEHOLDERS),
             ("rebook_reminder", REBOOK_EMAIL_PLACEHOLDERS, REBOOK_SMS_PLACEHOLDERS),
             ("rebook_lapsed", EMAIL_PLACEHOLDERS, LAPSED_SMS_PLACEHOLDERS),
+            # ADR 0057: a proposed new time, its reminder, and its release after the deadline.
+            ("reschedule_proposal", PROPOSAL_EMAIL_PLACEHOLDERS, PROPOSAL_SMS_PLACEHOLDERS),
+            ("proposal_reminder", PROPOSAL_EMAIL_PLACEHOLDERS, PROPOSAL_SMS_PLACEHOLDERS),
+            ("proposal_released", REBOOK_EMAIL_PLACEHOLDERS, REBOOK_SMS_PLACEHOLDERS),
         )
         for block in (
             TextBlock(

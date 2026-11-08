@@ -43,7 +43,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import bind_booking, current, trace_scope
 from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
-from app.domain.job_plan import BACKOFF, TEAM_INVITES, JobType, is_stale
+from app.domain.job_plan import BACKOFF, PROPOSAL_NOTICES, TEAM_INVITES, JobType, is_stale
 from app.domain.message_usage import record_message
 from app.domain.ports import (
     Clock,
@@ -106,9 +106,11 @@ NO_TEAM_INVITE = "no_team_invite"
 LAPSES: dict[JobType, Callable[[Transaction, Booking, datetime], Awaitable[bool]]] = {
     JobType.LAPSE_REBOOK: booking_changes.lapse,
     JobType.EXPIRE_UNCONFIRMED: booking_changes.lapse_unconfirmed,
+    JobType.EXPIRE_PROPOSAL: booking_changes.expire_proposal,
 }
-"""Jobs that cancel a booking left unanswered: a request to rebook (ADR 0044) or to confirm
-(ADR 0056). Each re-reads the booking and does nothing when it was answered in time."""
+"""Jobs that end what was left unanswered: a request to rebook (ADR 0044) or to confirm (ADR
+0056) cancels the booking; a proposed new time (ADR 0057) releases its held place. Each re-reads
+the booking and does nothing when it was answered in time."""
 
 MESSAGE_CHANNELS = frozenset({ChannelKind.EMAIL, ChannelKind.SMS})
 """Channels whose message jobs are claimed when a sender directory is available."""
@@ -296,6 +298,11 @@ class JobRunner:
                 else None
             )
             texts = await tx.get_group_texts(group.id) if group else {}
+            proposal = (
+                await tx.get_open_proposal(booking.id)
+                if booking and booking.id is not None and job.type in PROPOSAL_NOTICES
+                else None
+            )
             organisation = (
                 await tx.get_organisation_by_id(group.organisation_id)
                 if group and job.type in TEAM_INVITES
@@ -311,7 +318,7 @@ class JobRunner:
         ):
             log.info("job.skipped", job_id=job.id, reason=NO_RECIPIENT)
             return NO_RECIPIENT
-        if is_stale(job.pinned_start, booking, job.type):
+        if is_stale(job.pinned_start, booking, job.type, proposal=proposal, now=now):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
         if job.type in TEAM_INVITES and not group.sends_team_invite:
@@ -340,6 +347,7 @@ class JobRunner:
                     closure=closure,
                     product_footer=self._product_footer is None
                     or self._product_footer(group.organisation_id),
+                    proposal=proposal,
                 )
         step = self._step(job, "compose", step)
         await sender.send(message)

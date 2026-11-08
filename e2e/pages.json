@@ -74,6 +74,22 @@
       ]
     },
     {
+      "name": "correct your details",
+      "path": "{correct_details}",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "confirm a proposed new time",
+      "path": "{proposal_page}",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "trial call (not available)",
       "path": "{trial_page}",
       "locales": [
@@ -110,6 +126,24 @@
     {
       "name": "overview",
       "path": "/admin/",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "add widget",
+      "path": "/admin/overview/add",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "edit overview",
+      "path": "/admin/overview/edit",
       "user": "super",
       "locales": [
         "nl",
@@ -242,6 +276,14 @@
     {
       "name": "advanced settings: settings",
       "path": "/admin/settings/values",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "organisation: configuration document",
+      "path": "/admin/organisations/demo/configuration",
       "user": "super",
       "locales": [
         "nl"

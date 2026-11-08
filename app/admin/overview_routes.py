@@ -47,8 +47,10 @@ from app.admin.authz import (
     admin_service,
     can_function,
     maintenance_service,
+    overview_layout,
 )
 from app.admin.closure_routes import closure_service
+from app.admin.forms import done_message
 from app.admin.integration_views import HEALTH_LABELS, PLATFORM_LABELS, worst_health
 from app.admin.live import key
 from app.admin.overview_charts import (
@@ -90,7 +92,7 @@ from app.web.job_labels import JOB_TYPE_LABELS
 from app.web.locale import RequestLocale
 from app.web.templates import FragmentResponse, render
 from app.web.update_labels import STATUS_LABELS
-from app.web.widgets import OVERVIEW_PATH, View, Widget, resolve_view, visible, widget
+from app.web.widgets import OVERVIEW_PATH, View, Widget, on_overview, resolve_view, widget
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -748,13 +750,13 @@ def _shaped(
 
 
 async def _views(request: Request, locale: RequestLocale, principal: Principal) -> list[WidgetView]:
-    """Render every visible widget of the admin's default layout, in the views asked for.
+    """Render the widgets of the admin's overview (own layout or default), in the views asked for.
 
     The address names a view per widget (``/admin/?bookings-today=bar``); what it asks that a
     widget does not support is ignored (``resolve_view``).
     """
     allowed = can_function(principal)
-    items = visible(principal, allowed)
+    items = on_overview(principal, allowed, overview_layout(request))
     on_page = {w.key: w for w in items}
     selected = explicit_views(on_page, request.query_params)
     return [
@@ -827,6 +829,7 @@ async def overview(
         principal,
         {
             "live": live,
+            "done": done_message(request, locale.gettext),
             # The least urgent level that pops up for this admin; ``None``: no pop-ups (§7).
             "popup_level": floor.value if floor else None,
             "views": views,

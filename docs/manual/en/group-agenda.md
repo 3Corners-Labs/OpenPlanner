@@ -12,8 +12,9 @@ holidays and an emergency closure. When you change the staffing, the agenda show
 
 Every slot of the day has its own block, with its time, the number of agents and the number of
 confirmed bookings. Below it are the bookings with the participant's first name and the state
-of the video meeting (with the Webex meeting ID under it) and the contact center task. The email address and phone number are only
-on a booking's detail page (**Details**).
+of the video meeting (with the Webex meeting ID under it) and the contact center task. The full
+name, email address and phone number are only on a booking's detail page (**Details**), and
+there too only when you ask for them (see *Reaching the participant*).
 
 - **Closed**: an emergency closure covers this slot.
 - **Outside the staffing**: only a cancelled or past booking is here; the staffing has no slot
@@ -70,6 +71,32 @@ center task goes wrong:
   Cisco support when Webex has to look into the error. It holds no personal data. These
   requests are kept for 30 days by default.
 
+## Reaching the participant
+
+The detail page does not simply show the participant's contact details: you see them only after
+you choose **Show contact details**. It then shows the first and last name, the email address
+and the phone number, if the participant gave one (otherwise it says *Not given*). Clicking the
+number or the address calls or mails from your own program.
+
+- Show them only when you need to reach the participant, for example when a booking can no
+  longer be changed (see *Changing bookings*). Whoever opens the page to look into a failure
+  does not see them.
+- Each time you show them, the audit log records who did, for which group and which booking
+  (*Participant's contact details shown*). The details themselves are not in it.
+- **Hide contact details** takes them off the screen again, for example before you take a
+  screenshot for Webex support.
+- Only the button on the page itself shows them. When you open the page through a shared link
+  (in a mail or chat), a bookmark or a link on another website or page, they are not shown and
+  nothing goes into the audit log; choose **Show contact details** yourself. If the button
+  does not show them either, your browser or the network does not pass on which page you came
+  from (the *referrer*); ask your administrator to allow it for the portal.
+- When the booking's personal data have been deleted (see
+  [Data fields and personal data](data-fields.md)), the page says so and there is nothing left
+  to show.
+
+Everyone who may view the group's bookings can show them. The Compliance and privacy role never
+can, and agents in the queue see the first name only.
+
 ## Week view
 
 A table with the times in the rows and the days from Monday to Sunday in the columns. Each cell
@@ -88,6 +115,23 @@ a staffing change you see whether it causes a shortfall.
 
 Solve a shortfall by raising the staffing again, or by changing bookings (below).
 
+## Unconfirmed appointments
+
+A new appointment waits until the participant confirms it with the link in the email. The day
+view and the appointment itself then show **Not confirmed, at the latest** with the moment the
+appointment lapses if nobody confirms. Such an appointment holds its place: the slot says how many
+of its appointments are not confirmed yet, and they count towards shortfalls. **Not confirmed
+only** shows just these appointments; **All appointments** shows everything again.
+
+When the participant calls, someone with the right **Change bookings** can choose **Confirm for
+participant**. The participant then gets the same confirmation with all details as after
+confirming themselves, and the audit log records who confirmed. After the lapse moment that is no
+longer possible.
+
+An unconfirmed appointment can also be **Moved** or **Cancelled** like a confirmed one. A moved
+appointment stays unconfirmed and gets a new lapse moment. Asking for a new time is not offered:
+such an appointment lapses on its own when nobody confirms.
+
 ## Changing bookings
 
 With the right **Change bookings** (group admins, organisation admins and a custom Planner
@@ -97,7 +141,8 @@ gave a phone number. You may be asked to log in again first.
 
 A booking can no longer be changed when it starts within the group's **Changes by a planner**
 time (60 minutes by default), when it has already gone to the contact center, or when it is
-cancelled. Call the participant instead.
+cancelled. Contact the participant yourself instead: choose **Details** at the booking, then
+**Show contact details** (see *Reaching the participant*).
 
 ### Move
 

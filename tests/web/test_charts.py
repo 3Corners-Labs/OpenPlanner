@@ -30,7 +30,7 @@ from app.web.charts import (
     shorten,
 )
 
-THREE = [Datum("Aangifte", 4), Datum("Bezwaar", 2), Datum("Toeslagen", 0)]
+THREE = [Datum("Aangifte", 4), Datum("Balie", 2), Datum("Helpdesk", 0)]
 SIX = [Datum(f"Groep {n}", n) for n in range(1, 7)]
 PATH_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 
@@ -53,7 +53,7 @@ def test_the_summary_names_the_title_and_every_value() -> None:
 
     summary = describe("Afspraken vandaag", THREE, sentence, "; ")
 
-    assert summary == "Afspraken vandaag: Aangifte: 4; Bezwaar: 2; Toeslagen: 0"
+    assert summary == "Afspraken vandaag: Aangifte: 4; Balie: 2; Helpdesk: 0"
     assert describe("Leeg", [], sentence, "; ") == "Leeg: "
 
 
@@ -72,7 +72,7 @@ def test_vertical_bars_are_proportional_and_carry_their_value_as_text() -> None:
     assert half.height == pytest.approx(tall.height / 2, abs=0.1)
     assert none.height == 0
     assert [m.value_text for m in chart.marks] == ["4", "2", "0"]  # a zero bar still says so
-    assert [m.full_label for m in chart.marks] == ["Aangifte", "Bezwaar", "Toeslagen"]
+    assert [m.full_label for m in chart.marks] == ["Aangifte", "Balie", "Helpdesk"]
     assert tall.y + tall.height == pytest.approx(chart.axis[1])  # bars stand on the axis
     assert tall.value_y < tall.y  # the value sits above its bar
     assert tall.x < half.x < none.x
@@ -150,7 +150,7 @@ def test_a_pie_draws_a_slice_only_for_values_above_zero_but_lists_every_item() -
     assert chart.kind is ChartKind.PIE
     assert (chart.width, chart.height) == (PIE_SIZE, PIE_SIZE)
     assert [bool(m.path) for m in chart.marks] == [True, True, False]
-    assert [m.full_label for m in chart.marks] == ["Aangifte", "Bezwaar", "Toeslagen"]
+    assert [m.full_label for m in chart.marks] == ["Aangifte", "Balie", "Helpdesk"]
     assert [m.value_text for m in chart.marks] == ["4", "2", "0"]
 
 

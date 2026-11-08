@@ -38,10 +38,12 @@ SECTOR = re.compile(
             _w("minis", "terie"),
             _w(r"\bg", r"ov\b"),
             _w(r"g", "ov-booking"),
-            _w("belasting", "dienst"),
+            _w("belas", "ting"),
             _w("fin", "[-_ ]?bld"),
             _w("rij", "ks"),
-            _w("inkomsten", "belasting"),
+            _w("toe", "slag"),
+            _w("inwo", "ner"),
+            _w("vergun", "ning"),
         ]
     ),
     re.IGNORECASE,
@@ -156,8 +158,13 @@ def test_no_client_and_no_sector_words_in_the_repository() -> None:
 def test_the_guard_sees_the_words() -> None:
     assert sector_words_in("a " + _w("citi", "zen") + " books")
     assert sector_words_in("een " + _w("bur", "ger") + " boekt")
-    assert sector_words_in(_w("Belasting", "dienst"))
+    assert sector_words_in(_w("Belas", "tingdienst"))
     assert sector_words_in("<" + _w("g", "ov-booking") + ">")
+    # Slipped through in the demo seed's subjects and in examples (2026-11-08).
+    assert sector_words_in(_w("Huur", "toe", "slag"))
+    assert sector_words_in(_w("Belas", "tingen"))
+    assert sector_words_in("vragen die " + _w("inwo", "ners") + " beantwoorden")
+    assert sector_words_in(_w("Vergun", "ningen") + " Loket")
 
 
 def test_the_guard_reads_the_text_of_an_office_file(tmp_path: Path) -> None:

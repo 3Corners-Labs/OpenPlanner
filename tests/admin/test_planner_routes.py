@@ -18,6 +18,7 @@ from tests.support.domain import (
     FRIDAY_0900,
     TEST_TOKEN_KEY,
     book_confirmed,
+    book_pending,
     participant,
 )
 
@@ -138,7 +139,9 @@ async def test_a_planner_cancels_with_a_fixed_reason(site: Site) -> None:
     assert await _status(site, booking_id) == (BookingStatus.CANCELLED, ChangeReason.TECHNICAL)
 
 
-async def test_a_booking_that_starts_soon_needs_a_phone_call(site: Site) -> None:
+async def test_a_booking_that_starts_soon_needs_a_call_with_the_details_on_request(
+    site: Site,
+) -> None:
     booking_id = await _book(site)
     site.clock.advance(FRIDAY_0900 - timedelta(minutes=30) - site.clock.now())
     await site.login_as(GROUP_ADMIN)
@@ -147,7 +150,8 @@ async def test_a_booking_that_starts_soon_needs_a_phone_call(site: Site) -> None
     agenda = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
 
     assert response.status_code == 409
-    assert "Bel de deelnemer" in response.text
+    assert "Neem zelf contact op met de deelnemer" in response.text
+    assert "Details en dan Contactgegevens tonen" in response.text  # where the number is
     assert f"/bookings/{booking_id}/move" not in agenda
 
 
@@ -290,3 +294,72 @@ async def test_malformed_bulk_ids_are_rejected(site: Site) -> None:
     )
 
     assert response.status_code == 400
+
+
+async def _book_pending(site: Site) -> int:
+    bookings = BookingService(_uow(site), site.clock, TEST_TOKEN_KEY)
+    receipt = await book_pending(
+        bookings, FRIDAY_0900, "demo", contact=participant(next(_PARTICIPANTS))
+    )
+    return receipt.booking.id or 0
+
+
+async def test_a_pending_booking_shows_as_not_confirmed_and_can_be_confirmed(site: Site) -> None:
+    """ADR 0056 point 11: text and icon, a filter, and confirming for the participant."""
+    pending = await _book_pending(site)
+    confirmed = await _book(site)
+    await site.login_as(GROUP_ADMIN)
+
+    day = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+    only = (await site.client.get(f"{AGENDA}?day=2026-01-02&status=pending")).text
+
+    assert "Niet bevestigd, uiterlijk" in day
+    assert "Geannuleerd" not in day  # a pending booking is not a cancelled one
+    assert "(waarvan 1 niet bevestigd)" in day
+    assert f'action="{AGENDA}/bookings/{pending}/confirm"' in day
+    assert f'action="{AGENDA}/bookings/{confirmed}/confirm"' not in day
+    assert f"/bookings/{pending}" in only
+    assert f"/bookings/{confirmed}" not in only
+
+    response = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {"day": "2026-01-02"})
+    again = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {"day": "2026-01-02"})
+
+    assert response.status_code == 303
+    assert "done=confirmed_by_staff" in response.headers["location"]
+    assert "done=not_pending" in again.headers["location"]
+    assert (await _status(site, pending))[0] is BookingStatus.CONFIRMED
+
+
+async def test_confirming_after_the_deadline_says_it_lapsed(site: Site) -> None:
+    pending = await _book_pending(site)
+    async with _uow(site).read() as tx:
+        booking = await tx.get_booking(pending)
+    assert booking is not None
+    assert booking.confirm_by is not None
+    site.clock.advance(booking.confirm_by - site.clock.now() + timedelta(minutes=1))
+    await site.login_as(GROUP_ADMIN)
+
+    response = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {})
+
+    assert "done=confirm_lapsed" in response.headers["location"]
+
+
+async def test_a_pending_booking_offers_move_and_cancel_but_not_rebook(site: Site) -> None:
+    """ADR 0056 point 11: moved or cancelled like a confirmed one; it lapses on its own."""
+    pending = await _book_pending(site)
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+
+    assert f'href="{AGENDA}/bookings/{pending}/move"' in text
+    assert f'href="{AGENDA}/bookings/{pending}/cancel"' in text
+    assert f'href="{AGENDA}/bookings/{pending}/rebook"' not in text
+
+
+async def test_the_rebook_form_is_refused_for_a_pending_booking(site: Site) -> None:
+    pending = await _book_pending(site)
+    await site.login_as(GROUP_ADMIN)
+
+    response = await site.client.get(f"{AGENDA}/bookings/{pending}/rebook")
+
+    assert response.status_code == 409

@@ -13,6 +13,7 @@ from app.domain.closure import Closure
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.event_context import TRACE_ID, current, current_trace_id
 from app.domain.job_plan import BACKOFF, JobType
+from app.domain.reschedule_proposal import HeldProposal, ProposalOutcome
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from app.domain.system_log import EventRetention, SystemLog
@@ -81,6 +82,7 @@ async def test_without_sender_only_purges_and_lapses_are_claimed(
         JobType.PURGE_PII,
         JobType.LAPSE_REBOOK,
         JobType.EXPIRE_UNCONFIRMED,
+        JobType.EXPIRE_PROPOSAL,
     }
 
 
@@ -428,6 +430,59 @@ async def test_the_request_to_rebook_goes_only_while_it_is_open(
 
     assert len(sender.sent) == 1
     assert sender.sent[0].subject == "Kies een nieuwe tijd voor uw videogesprek"
+
+
+NEXT_0900 = SLOT_0900 + timedelta(days=7)
+
+
+async def _add_proposal(uow: InMemoryUnitOfWork, bid: int) -> HeldProposal:
+    async with uow.locked() as tx:
+        return await tx.add_proposal(
+            HeldProposal(
+                None,
+                bid,
+                9,
+                NEXT_0900,
+                NEXT_0900 + timedelta(minutes=30),
+                NOW + timedelta(hours=48),
+                NOW,
+            )
+        )
+
+
+async def test_a_proposal_goes_only_while_it_is_open_at_the_time_it_was_planned_for(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    await _awaiting(uow, bid)
+    proposal = await _add_proposal(uow, bid)
+    sender = RecordingSender()
+    current = job(bid, JobType.SEND_RESCHEDULE_PROPOSAL, pinned=NEXT_0900)
+    replaced = job(bid, JobType.SEND_RESCHEDULE_PROPOSAL, pinned=SLOT_0900)
+
+    await JobRunner(FakeQueue([current]), uow, FixedClock(NOW), sender, composer).run_due()
+    await JobRunner(FakeQueue([replaced]), uow, FixedClock(NOW), sender, composer).run_due()
+    late = FixedClock(NOW + timedelta(hours=48))
+    await JobRunner(FakeQueue([current]), uow, late, sender, composer).run_due()
+    uow.state.proposals[proposal.id or 0] = proposal.released(NOW, ProposalOutcome.WITHDRAWN)
+    await JobRunner(FakeQueue([current]), uow, FixedClock(NOW), sender, composer).run_due()
+
+    assert [m.subject for m in sender.sent] == ["Nieuwe tijd voorgesteld voor uw videogesprek"]
+
+
+async def test_the_expiry_releases_the_hold_and_plans_the_notice(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    await _awaiting(uow, bid)
+    proposal = await _add_proposal(uow, bid)
+    queue = FakeQueue([job(bid, JobType.EXPIRE_PROPOSAL, pinned=NEXT_0900)])
+
+    await JobRunner(queue, uow, FixedClock(NOW + timedelta(hours=48)), None, composer).run_due()
+
+    assert uow.state.proposals[proposal.id or 0].outcome is ProposalOutcome.EXPIRED
+    assert any(j.type is JobType.SEND_PROPOSAL_RELEASED for j in uow.state.jobs[bid])
+    assert queue.done == [1]
 
 
 async def test_team_invite_goes_to_the_teams_address_only_while_the_group_sends_one(

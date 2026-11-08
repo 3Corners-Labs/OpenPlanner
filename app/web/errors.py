@@ -15,6 +15,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.SLOT_UNAVAILABLE: "error.slot_unavailable",
     ErrorCode.OUTSIDE_BOOKING_WINDOW: "error.outside_booking_window",
     ErrorCode.BOOKING_LOCKED: "error.booking_locked",
+    ErrorCode.PROPOSAL_NOT_OPEN: "error.proposal_not_open",
     ErrorCode.BOOKING_NOT_ACTIVE: "error.booking_not_active",
     ErrorCode.BOOKING_NOT_PENDING: "error.booking_not_pending",
     ErrorCode.SAME_SLOT: "error.same_slot",
@@ -117,9 +118,6 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",
-    ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: (
-        "admin.form.error.configuration_installation_in_use"
-    ),
     # ADR 0099: the configuration document.
     ErrorCode.CONFIGURATION_FORMAT_UNSUPPORTED: "admin.form.error.configuration_format_unsupported",
     ErrorCode.CONFIGURATION_UNKNOWN_FIELD: "admin.form.error.configuration_unknown_field",

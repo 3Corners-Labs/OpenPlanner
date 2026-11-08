@@ -57,13 +57,13 @@ async def test_the_groups_are_read_in_the_form_a_document_carries(seeded: AsyncE
     assert helpdesk["holiday_calendars"] == ["nl"]
     assert helpdesk["holiday_open_days"] == [CHRISTMAS.isoformat()]
     assert helpdesk["contacts"] == CONTACTS
-    assert helpdesk["routing"]["subjects"][0]["code"] == "tax"  # type: ignore[index]
+    assert helpdesk["routing"]["subjects"][0]["code"] == "billing"  # type: ignore[index]
     assert helpdesk["reminder_rules"] == [
         {"channel": "email", "minutes_before": 1440, "enabled": True}
     ]
     rules = helpdesk["schedule_rules"]
     assert [r["weekday"] for r in rules] == [0, 1]  # type: ignore[index]
-    assert rules[1]["subjects"] == ["tax"]  # type: ignore[index]
+    assert rules[1]["subjects"] == ["billing"]  # type: ignore[index]
     assert rules[1]["valid_from"] == "2026-01-01"  # type: ignore[index]
     overrides = helpdesk["schedule_overrides"]
     assert overrides[0]["opens"] is None  # type: ignore[index]  # a closed day

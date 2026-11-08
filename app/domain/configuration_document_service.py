@@ -26,11 +26,13 @@ from app.domain.configuration_changes import (
     RuleContext,
 )
 from app.domain.configuration_document import Document, Mode, Scope, parse_document, to_json
+from app.domain.configuration_package import MIN_PASSPHRASE_LENGTH
 from app.domain.configuration_plan import Plan, plan_document
 from app.domain.configuration_schema import Format
-from app.domain.configuration_tree import Entity
+from app.domain.configuration_tree import Entity, any_field
 from app.domain.configuration_v1 import FORMATS, V1
-from app.domain.configuration_values import Json
+from app.domain.configuration_values import Json, Sealed
+from app.domain.configuration_visibility import visible_to
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, UnitOfWork
 
@@ -89,6 +91,15 @@ class Actor:
     def host(cls) -> "Actor":
         """Return the host (the CLI), which the matrix does not bind: an explicit choice."""
         return cls("system:cli", None)
+
+    @classmethod
+    def api_client(cls, client_id: str) -> "Actor":
+        """Return an API client holding the scope ``configuration:transfer`` (ADR 0089 point 7).
+
+        The scope covers the whole installation, so the matrix does not bind the client
+        either: an explicit choice, like the host's, made by whoever granted the scope.
+        """
+        return cls(client_id, None)
 
     def may_change(self, permission: Permission, target: Target) -> bool:
         """Whether the actor holds ``permission`` on ``target``."""
@@ -169,7 +180,7 @@ class ConfigurationDocumentService:
     ) -> bytes:
         """Write the configuration of ``scope`` as a document; audited.
 
-        With ``secrets`` the passphrase seals them (at least 16 characters); without, every
+        With ``secrets`` the passphrase seals them (see ``MIN_PASSPHRASE_LENGTH``); without, every
         secret is left out and no passphrase is needed.
 
         Raises:
@@ -177,17 +188,19 @@ class ConfigurationDocumentService:
                 secrets are wanted and the installation has no settings key.
         """
         self._may_export(actor, scope, secrets=secrets)
-        if secrets and (passphrase is None or len(passphrase) < 16):
+        if secrets and (passphrase is None or len(passphrase) < MIN_PASSPHRASE_LENGTH):
             raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")
         async with self._uow.read() as tx:
-            snapshot = await tx.read_configuration(self._clock.now(), self._locked())
+            snapshot = await tx.read_configuration(
+                self._clock.now(), self._locked(), secrets=secrets
+            )
         if secrets and not snapshot.secrets_available:
             raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
         document = Document(
             format=V1.name,
             mode=Mode.MERGE,
             scope=scope,
-            root=_confined(snapshot.root, scope),
+            root=visible_to(_confined(snapshot.root, scope), V1, actor.may_change),
             digest="",
             schema=V1,
             meta={
@@ -228,7 +241,17 @@ class ConfigurationDocumentService:
                 ``configuration_package_*`` and ``configuration_passphrase_*``,
                 ``configuration_out_of_scope``.
         """
-        document = self._read(data, passphrase, scope)
+        document = self._read(data, scope)
+        sealed = any_field(document.root, lambda value: isinstance(value, Sealed))
+        plan = await self.plan_document(actor, self._sealing.open(document, passphrase))
+        return replace(plan, sealed=sealed)
+
+    async def plan_document(self, actor: Actor, document: Document) -> Plan:
+        """Plan a document that is already read and whose secrets are opened.
+
+        For callers that build a document themselves (a SQLite package converted on read,
+        ADR 0099 point 14); ``plan`` is this after decoding and opening.
+        """
         async with self._uow.read() as tx:
             snapshot = await tx.read_configuration(self._clock.now(), self._locked())
         return self._plan(actor, document, snapshot)
@@ -252,7 +275,28 @@ class ConfigurationDocumentService:
                 for a plan with deletions or no longer the plan's;
                 ``configuration_too_many_changes``.
         """
-        document = self._read(data, passphrase, scope)
+        document = self._sealing.open(self._read(data, scope), passphrase)
+        return await self.apply_document(actor, document, plan_hash)
+
+    async def apply_document(
+        self,
+        actor: Actor,
+        document: Document,
+        plan_hash: str | None,
+        *,
+        confirmed: bool = False,
+    ) -> ApplyResult:
+        """Apply a document that is already read and whose secrets are opened.
+
+        Plans again inside the write lock and writes all or nothing, as ``apply`` does after
+        decoding and opening it. ``confirmed`` stands for a review the caller has no step for: a
+        SQLite package import (ADR 0099 point 14), which is a deliberate replace and was never
+        reviewed; a plan that deletes then needs no reviewed hash. A hash that is given is
+        still checked.
+
+        Raises:
+            DomainError: ``configuration_plan_stale``, ``configuration_too_many_changes``.
+        """
         async with self._uow.read() as tx:
             first = self._plan(
                 actor, document, await tx.read_configuration(self._clock.now(), self._locked())
@@ -269,7 +313,7 @@ class ConfigurationDocumentService:
             async with self._uow.locked() as tx:
                 snapshot = await tx.read_configuration(self._clock.now(), self._locked())
                 plan = self._plan(actor, document, snapshot)
-                problem = self._problem(plan, first, plan_hash)
+                problem = self._problem(plan, first, plan_hash, confirmed=confirmed)
                 if plan.refusals or problem is not None:
                     result = ApplyResult(plan, None)
                 elif not plan.changes:
@@ -296,8 +340,8 @@ class ConfigurationDocumentService:
         """Refuse an export the actor may not make (ADR 0099 point 11).
 
         A document of the platform, or any with secrets, needs the platform's manage
-        permission; one of an organisation, that organisation's. The view of single kinds
-        by narrower roles comes with the portal (step 3).
+        permission; one of an organisation, that organisation's. What the actor may not manage
+        is left out of the document (``visible_to``).
         """
         if scope.is_platform or secrets:
             allowed = actor.may_change(Permission.SETTINGS_PLATFORM_MANAGE, Target.everything())
@@ -309,12 +353,12 @@ class ConfigurationDocumentService:
         if not allowed:
             raise DomainError(ErrorCode.NOT_PERMITTED)
 
-    def _read(self, data: bytes, passphrase: str | None, scope: Scope | None) -> Document:
-        """Decode, parse, confine and open a document."""
+    def _read(self, data: bytes, scope: Scope | None) -> Document:
+        """Decode, parse and confine a document; its sealed secrets are still sealed."""
         document = parse_document(self._codec.decode(data, self._max_bytes()), self._formats)
         if scope is not None and document.scope != scope:
             raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "scope")
-        return self._sealing.open(document, passphrase)
+        return document
 
     def _plan(self, actor: Actor, document: Document, snapshot: ConfigurationSnapshot) -> Plan:
         """Plan ``document`` against a snapshot of the configuration."""
@@ -335,7 +379,9 @@ class ConfigurationDocumentService:
             settings_version=snapshot.version,
         )
 
-    def _problem(self, plan: Plan, first: Plan, plan_hash: str | None) -> ErrorCode | None:
+    def _problem(
+        self, plan: Plan, first: Plan, plan_hash: str | None, *, confirmed: bool = False
+    ) -> ErrorCode | None:
         """Return why an otherwise valid plan may not be written, or ``None``."""
         if plan.refusals:
             return None
@@ -344,7 +390,7 @@ class ConfigurationDocumentService:
         deletes = any(c.action is ChangeAction.DELETE for c in plan.changes)
         if plan.digest != first.digest:
             return ErrorCode.CONFIGURATION_PLAN_STALE
-        if plan_hash is None and deletes:
+        if plan_hash is None and deletes and not confirmed:
             return ErrorCode.CONFIGURATION_PLAN_STALE
         if plan_hash is not None and plan_hash != plan.digest:
             return ErrorCode.CONFIGURATION_PLAN_STALE

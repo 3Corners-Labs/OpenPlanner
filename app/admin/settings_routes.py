@@ -46,12 +46,13 @@ through a response. Without the bundled proxy the block says the source does not
     POST /admin/settings/tls/certificate          settings.platform.manage (recent login): upload
     POST /admin/settings/tls/certificate/remove   settings.platform.manage (recent login)
     POST /admin/settings/tls/check                settings.platform.manage (recent login)
-    POST /admin/settings/package/export           settings.platform.manage (recent login): a file
     POST /admin/settings/package/import           settings.platform.manage (recent login): upload
 
-The block *Configuration package* (ADR 0089) exports every configuration table with the
-secrets sealed under a passphrase, and imports such a package into an installation that is
-not in use. The passphrase is read from the form and never echoed, logged or stored.
+The block *Configuration package* carries the JSON document (ADR 0099, see
+``configuration_routes``) and, for one release, the import of the old SQLite package
+(ADR 0089), which is converted to a replacing document and applied with the admin's rights per
+change. The SQLite package is no longer exported. The passphrase is read from the form and
+never echoed, logged or stored.
 """
 
 from dataclasses import dataclass
@@ -68,6 +69,7 @@ from app.adapters.settings_report import SettingState
 from app.admin.address_view import address_view
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.backup_view import backup_view
+from app.admin.configuration_view import DOCUMENT_KEY, document_block
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
@@ -77,11 +79,8 @@ from app.admin.uploads import read_uploads
 from app.admin.usage_view import usage_view
 from app.config import Settings
 from app.domain.authorization import Permission
-from app.domain.configuration_package import (
-    MEDIA_TYPE,
-    MIN_PASSPHRASE_LENGTH,
-    package_filename,
-)
+from app.domain.configuration_document import Scope
+from app.domain.configuration_document_service import Actor
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.identity_provider_service import IdentityProviderService
@@ -340,19 +339,19 @@ def data_field_rows(locale: RequestLocale) -> list[DataFieldRow]:
 @router.get("/settings", response_class=HTMLResponse)
 async def advanced_settings(request: Request, locale: Locale, context: View) -> HTMLResponse:
     """Show System status: the environment, the certificate and the data fields."""
-    return await _overview(request, locale, context, Tab.STATUS)
+    return await render_tab(request, locale, context, Tab.STATUS)
 
 
 @router.get("/settings/values", response_class=HTMLResponse)
 async def setting_values(request: Request, locale: Locale, context: View) -> HTMLResponse:
     """Show every portal setting by topic with its value and source."""
-    return await _overview(request, locale, context, Tab.VALUES)
+    return await render_tab(request, locale, context, Tab.VALUES)
 
 
 @router.get("/settings/package", response_class=HTMLResponse)
 async def configuration_package(request: Request, locale: Locale, context: Manage) -> HTMLResponse:
     """Show the export and import of the configuration package (ADR 0089)."""
-    return await _overview(request, locale, context, Tab.PACKAGE)
+    return await render_tab(request, locale, context, Tab.PACKAGE)
 
 
 LoginChange = Annotated[
@@ -373,7 +372,7 @@ async def try_login_mapping(
     try:
         values = validate_mapping({key: form.text(key) for key in LOGIN_KEYS})
     except DomainError as error:
-        return await _overview(
+        return await render_tab(
             request, locale, context, Tab.VALUES, (error.field or "", error), 422
         )
     save_login_trial(request, context.principal.subject, values, request.app.state.clock.now())
@@ -401,7 +400,7 @@ async def change_topic(
             await _service(request).change(context.principal, spec.key, raw, hours=hours)
         except DomainError as error:
             raise_refusal(error)
-            return await _overview(request, locale, context, Tab.VALUES, (spec.key, error), 422)
+            return await render_tab(request, locale, context, Tab.VALUES, (spec.key, error), 422)
         changed += 1
     anchor = topic_anchor(Topic(topic))[1:] if topic in {t.value for t in Topic} else ""
     return redirect_done(VALUES_URL, "saved" if changed else "unchanged", anchor=anchor)
@@ -424,7 +423,7 @@ async def change_setting(
             await _service(request).change(context.principal, key, form.text("value"), hours=hours)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, _tab(key), (key, error), 422)
+        return await render_tab(request, locale, context, _tab(key), (key, error), 422)
     return redirect_done(_home(key), "saved", anchor=_anchor(key))
 
 
@@ -437,7 +436,7 @@ async def reset_setting(
         await _service(request).reset(context.principal, key)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, _tab(key), (key, error), 409)
+        return await render_tab(request, locale, context, _tab(key), (key, error), 409)
     if key == SOURCE_KEY:
         await (await _source(request)).sync(SOURCES[0])  # back to the default: ACME
     return redirect_done(_home(key), "saved", anchor=_anchor(key))
@@ -452,7 +451,7 @@ async def request_certificate(
         await (await _source(request)).generate_csr(context.principal)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, Tab.STATUS, (CSR_KEY, error), 422)
+        return await render_tab(request, locale, context, Tab.STATUS, (CSR_KEY, error), 422)
     return redirect_done(URL, "csr_generated", anchor="tls-heading")
 
 
@@ -499,7 +498,7 @@ async def upload_certificate(
     except DomainError as error:
         raise_refusal(error)
         refusal = (error.field or "chain", error)
-        return await _overview(request, locale, context, Tab.STATUS, refusal, 422)
+        return await render_tab(request, locale, context, Tab.STATUS, refusal, 422)
     return redirect_done(URL, "certificate_uploaded", anchor="tls-heading")
 
 
@@ -512,7 +511,7 @@ async def remove_certificate(
         removed = await (await _source(request)).remove(context.principal)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, Tab.STATUS, (REMOVE_KEY, error), 409)
+        return await render_tab(request, locale, context, Tab.STATUS, (REMOVE_KEY, error), 409)
     return redirect_done(
         URL, "certificate_removed" if removed else "unchanged", anchor="tls-heading"
     )
@@ -538,38 +537,20 @@ async def adopt_setting(
         await _service(request).adopt(context.principal, key)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, _tab(key), (key, error), 409)
+        return await render_tab(request, locale, context, _tab(key), (key, error), 409)
     return redirect_done(_home(key), "adopted", anchor=_anchor(key))
-
-
-@router.post("/settings/package/export")
-async def export_package(
-    request: Request, locale: Locale, _: SameOrigin, context: Change
-) -> Response:
-    """Return a configuration package sealed under the submitted passphrase (ADR 0089)."""
-    form = await read_form(request, locale)
-    passphrase = form.text("passphrase")
-    try:
-        if passphrase != form.text("passphrase_repeat"):
-            raise DomainError(ErrorCode.CONFIRMATION_MISMATCH, PACKAGE_KEY)
-        package = await _packages(request).export(context.principal.subject, passphrase)
-    except DomainError as error:
-        raise_refusal(error)
-        return await _overview(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
-    current: Settings = request.app.state.settings
-    name = package_filename(current.installation_name, request.app.state.clock.now())
-    return Response(
-        package,
-        media_type=MEDIA_TYPE,
-        headers={"content-disposition": f'attachment; filename="{name}"'},
-    )
 
 
 @router.post("/settings/package/import", response_class=HTMLResponse)
 async def import_package(
     request: Request, locale: Locale, _: SameOrigin, context: Change
 ) -> Response:
-    """Replace the configuration with an uploaded package (ADR 0089 point 5)."""
+    """Apply an uploaded SQLite package as a replacing document (ADR 0099 point 14).
+
+    The package format is read for one release and no longer written. The package is
+    converted to a ``replace`` document of the platform and planned and applied with the
+    admin's rights per change; a refusal of the plan is the page's error.
+    """
     current: Settings = request.app.state.settings
     uploads = await read_uploads(
         request, (PACKAGE_KEY,), current.configuration_package_max_mb * 1024 * 1024, PACKAGE_FIELDS
@@ -578,13 +559,13 @@ async def import_package(
         if uploads.values.get("confirm") != "yes":
             raise DomainError(ErrorCode.CONFIRMATION_MISMATCH, PACKAGE_KEY)
         summary = await _packages(request).import_(
-            context.principal.subject,
+            Actor(context.principal.subject, context.principal),
             uploads.files[PACKAGE_KEY],
             uploads.values.get("passphrase", "").strip(),
         )
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
+        return await render_tab(request, locale, context, Tab.PACKAGE, (PACKAGE_KEY, error), 422)
     return redirect_done(
         PACKAGE_URL,
         "package_imported",
@@ -637,7 +618,7 @@ def _anchor(key: str) -> str:
     return f"setting-{key}" if key in BY_KEY else ""
 
 
-async def _overview(
+async def render_tab(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
@@ -661,7 +642,12 @@ async def _overview(
         "done": done_message(request, locale.gettext),
         "manage": manage,
         "unknown_error": next(
-            (m for k, m in errors.items() if k not in BY_KEY and k != PACKAGE_KEY), None
+            (
+                m
+                for k, m in errors.items()
+                if k not in BY_KEY and k not in (PACKAGE_KEY, DOCUMENT_KEY)
+            ),
+            None,
         ),
     }
     if tab is Tab.STATUS:
@@ -702,9 +688,11 @@ async def _overview(
             "login_form": _login_form(context, current, live, errors, locale),
         }
     else:
+        values["document"] = document_block(
+            current, Scope(), can_seal=True, error=errors.get(DOCUMENT_KEY)
+        )
         values["package"] = {
             "error": errors.get(PACKAGE_KEY),
-            "min_length": MIN_PASSPHRASE_LENGTH,
             "max_mb": current.configuration_package_max_mb,
         }
     response = _page(request, locale, tab.value, context.principal, values)

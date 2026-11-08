@@ -17,7 +17,8 @@ agreed to it (ADR 0022).
     waiting the group's bookings awaiting a new time, for the agenda's list
 
 A planner never changes a booking that starts within the group's planner lead, that has been
-dispatched to the contact center, or that is not confirmed (``booking_changes``). When one
+dispatched to the contact center, or that is neither confirmed nor awaiting confirmation
+(``booking_changes``). When one
 planner makes more than ``alert_per_hour`` changes in an hour, a system event warns the
 group's admins (abuse case: a compromised planner account). It never blocks.
 """
@@ -32,10 +33,16 @@ from app.domain.agenda_service import agenda_days
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.booking import Booking, BookingStatus, ChangeReason
+from app.domain.booking_changes import ProposalTiming
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.rebooking import last_made
+from app.domain.reschedule_proposal import (
+    DEFAULT_PROPOSAL_HOURS,
+    HeldProposal,
+    ProposalHours,
+)
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.slot_close import shortfall_resolved
@@ -47,6 +54,10 @@ ALERT_ACTION = "planner.changes_alert"
 
 ALERT_WINDOW = timedelta(hours=1)
 """The period ``planner_changes_alert_per_hour`` counts over (fixed: it is per hour)."""
+
+
+CONFIRMED_BY_STAFF = "booking.confirmed_by_staff"
+"""The audit detail of a planner confirming for the participant (ADR 0056 point 11)."""
 
 
 class PlannerService:
@@ -62,6 +73,8 @@ class PlannerService:
             booking's start.
         reminder_days: ``planner_rebook_reminder_days`` (class D): the one reminder goes this
             long before the request lapses.
+        proposal_hours: ``reschedule_proposal_confirm_hours`` and
+            ``reschedule_proposal_reminder_hours`` (class D, ADR 0057).
     """
 
     def __init__(
@@ -74,6 +87,7 @@ class PlannerService:
         *,
         rebook_days: int | Callable[[int], int] = 14,
         reminder_days: int | Callable[[int], int] = 3,
+        proposal_hours: ProposalHours | Callable[[int], ProposalHours] = DEFAULT_PROPOSAL_HOURS,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -83,6 +97,7 @@ class PlannerService:
         self._alert_per_hour = alert_per_hour
         self._rebook_days = rebook_days
         self._reminder_days = reminder_days
+        self._proposal_hours = proposal_hours
 
     def rebook_days(self, organisation_id: int) -> int:
         """Days after the start after which an unanswered request to rebook lapses."""
@@ -92,8 +107,12 @@ class PlannerService:
         """Days before the lapse at which the one reminder goes."""
         return value_for(self._reminder_days, organisation_id)
 
-    async def booking(self, principal: Principal, slug: str, booking_id: int) -> Booking:
+    async def booking(
+        self, principal: Principal, slug: str, booking_id: int, *, rebook: bool = False
+    ) -> Booking:
         """Return one booking of the group that the planner may still change (for a form).
+
+        With ``rebook``, only one whose participant may be asked to choose a new time.
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found``, ``booking_not_found``,
@@ -102,7 +121,7 @@ class PlannerService:
         await self._authorize(principal, slug)
         async with self._uow.read() as tx:
             group = await group_by_slug(tx, slug)
-            return await self._changeable(tx, group, booking_id)
+            return await self._changeable(tx, group, booking_id, rebook=rebook)
 
     async def move(
         self,
@@ -134,6 +153,31 @@ class PlannerService:
             )
             await self._audit(tx, principal, authorization, "planner.move", booking_id)
         return receipt.booking
+
+    async def confirm(self, principal: Principal, slug: str, booking_id: int) -> Booking:
+        """Confirm a pending booking on the participant's behalf (ADR 0056 point 11).
+
+        For example when the participant phones. The participant gets the same full
+        confirmation as by their own link; the confirmation is audited as
+        ``booking.confirmed_by_staff``. After ``confirm_by`` the booking lapses instead.
+
+        Raises:
+            DomainError: ``not_permitted``, ``booking_not_found`` or ``booking_not_pending``.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            booking = await tx.get_booking(booking_id)
+            if booking is None or booking.group_id != group.id:  # never another group's booking
+                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+            if not booking.awaits_confirmation:
+                raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
+            now = self._clock.now()
+            result = await self._bookings.confirm_in(tx, booking, group, now, ActorClass.PLANNER)
+            if result.lapsed_unconfirmed:  # past confirm_by: lapsed, the caller says so
+                return result
+            await self._audit(tx, principal, authorization, CONFIRMED_BY_STAFF, booking_id)
+        return result
 
     async def cancel(
         self, principal: Principal, slug: str, booking_id: int, reason: ChangeReason
@@ -167,6 +211,9 @@ class PlannerService:
     ) -> Booking:
         """Ask the participant to choose a new time; the booking frees its place at once.
 
+        Only for a confirmed booking: one awaiting confirmation is moved or cancelled instead,
+        or left to lapse (ADR 0056 point 11).
+
         Raises:
             DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active`` or
                 ``planner_too_late``.
@@ -174,11 +221,50 @@ class PlannerService:
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
             group = await group_by_slug(tx, slug)
-            booking = await self._changeable(tx, group, booking_id)
+            booking = await self._changeable(tx, group, booking_id, rebook=True)
             waiting = await self._request(tx, group, booking, reason)
             detail = f"planner.rebook,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
         return waiting
+
+    async def propose(
+        self,
+        principal: Principal,
+        slug: str,
+        booking_id: int,
+        start: datetime,
+        reason: ChangeReason,
+    ) -> HeldProposal:
+        """Propose a new time for a confirmed booking and hold it there (ADR 0057 point 1).
+
+        The fifth action next to move, ask to rebook, cancel and leave as is, under the same
+        right and limits; the booking awaits a new time at once, and the participant confirms,
+        chooses another time or cancels.
+
+        Raises:
+            DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active``,
+                ``planner_too_late``, ``same_slot``, ``booking_locked`` (the proposed slot is
+                too close) or any error of a booking for the proposed slot.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            booking = await self._changeable(tx, group, booking_id)
+            proposal = await self._bookings.propose_in(
+                tx, booking, group, start, reason=reason, timing=self._timing(group)
+            )
+            detail = f"planner.propose,reason:{reason.value}"
+            await self._audit(tx, principal, authorization, detail, booking_id)
+        return proposal
+
+    def _timing(self, group: Group) -> ProposalTiming:
+        """Return the organisation's periods for a proposal."""
+        organisation_id = group.organisation_id
+        return ProposalTiming(
+            rebook_days=self.rebook_days(organisation_id),
+            rebook_reminder_days=self.reminder_days(organisation_id),
+            hours=value_for(self._proposal_hours, organisation_id),
+        )
 
     async def slot_candidates(
         self, principal: Principal, slug: str, start: datetime
@@ -279,23 +365,33 @@ class PlannerService:
         )
 
     async def _candidates(self, tx: Transaction, group: Group, start: datetime) -> list[Booking]:
-        """Return the last-made changeable bookings of the slot, as many as its shortfall."""
+        """Return the changeable ones of the slot's last-made bookings (up to its shortfall)."""
         slot = await self._slot(tx, group, start)
         now = self._clock.now()
         if slot is None or not slot.open_shortfall or slot.start < now:
             raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
-        confirmed = await tx.find_confirmed_bookings(
+        # The last-made places are chosen among every booking in the slot, pending ones too
+        # (ADR 0044 §5, ADR 0056 point 11); of those, the ones a planner may change are asked.
+        # A pending booking among them is left to its own confirmation or lapse.
+        holding = await tx.find_agenda_bookings(
             group.id, slot.start, slot.start + timedelta(seconds=1)
         )
-        changeable = [b for b in confirmed if booking_changes.planner_may_change(b, group, now)]
-        return last_made(changeable, slot.open_shortfall)
+        last = last_made(holding, slot.open_shortfall)
+        return [b for b in last if booking_changes.planner_may_request_rebook(b, group, now)]
 
-    async def _changeable(self, tx: Transaction, group: Group, booking_id: int) -> Booking:
-        """Return the group's booking ``booking_id`` if a planner may change it now."""
+    async def _changeable(
+        self, tx: Transaction, group: Group, booking_id: int, *, rebook: bool = False
+    ) -> Booking:
+        """Return the group's booking ``booking_id`` if a planner may change it now.
+
+        With ``rebook``, only if its participant may also be asked to choose a new time.
+        """
         booking = await tx.get_booking(booking_id)
         if booking is None or booking.group_id != group.id:  # never another group's booking
             raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
         booking_changes.ensure_planner_may_change(booking, group, self._clock.now())
+        if rebook and not booking.is_active:
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
         return booking
 
     async def _slot(self, tx: Transaction, group: Group, start: datetime) -> AgendaSlot | None:

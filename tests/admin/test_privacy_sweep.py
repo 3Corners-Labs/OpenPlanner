@@ -2,9 +2,11 @@
 
 Bookings whose personal-data fields hold unique marker values are stored in the demo group,
 and every admin GET route is fetched as the superuser, who sees everything. A marker in a
-response is a leak, unless ADR 0063 §4 allows it there: the booking detail page may show all
-of it, the queue item the first name and the join link, and the group's own agenda, queue
-and planner pages the first name only (``FIRST_NAME_PAGES``).
+response is a leak, unless ADR 0063 §4 allows it there: the booking detail page shows the
+answers, and the participant's name, address and number only after *Show contact details*
+(ADR 0044 §2, the product owner's choice of 2026-11-08), the queue item the first name and the
+join link, and the group's own agenda, queue and planner pages the first name only
+(``FIRST_NAME_PAGES``).
 
 The templates are discovered from the file system: every admin template must have been
 rendered during the sweep, so a template added later is covered without editing this test.
@@ -14,6 +16,7 @@ bookings are the fixture ``marked`` (``tests/admin/conftest.py``), stored by
 ``tests/support/privacy_sweep.py``.
 """
 
+import json
 from dataclasses import fields
 from pathlib import Path
 
@@ -27,7 +30,7 @@ from app.domain.privacy import ALIASES, PII_FIELDS
 from app.domain.staff import StaffFilter
 from app.domain.storage import FREE_SPACE_CRITICAL, STORAGE_EVENT
 from app.web.widgets import OVERVIEW_PATH, WIDGETS
-from tests.admin.conftest import Site
+from tests.admin.conftest import SAME_ORIGIN, Site
 from tests.support.admin_site import post_form, site_app, site_uow
 from tests.support.privacy_sweep import MARKERS, QUEUE_ITEM, Fixture, marker_leaks
 from tests.support.routes import all_routes
@@ -39,6 +42,12 @@ TEMPLATE_NAMES = frozenset(
 """Every admin template, found on disk; each must be rendered by the sweep."""
 
 DETAIL = "/admin/groups/demo/bookings/{id}"
+DETAIL_CONTACT = DETAIL + "?contact=show"
+"""The booking page after *Show contact details*: the one page with the name, address and number."""
+CONTACT_MARKERS = frozenset(
+    MARKERS[f] for f in ("first_name", "last_name", "email", "phone", "form_answers")
+)
+"""What the booking page shows on request; without the request, the answers only."""
 QUEUE_ITEM_LIVE = QUEUE_ITEM + "/live"
 """The claimed booking's status fragment (ADR 0072): the join link travels with it."""
 FIRST_NAME_PAGES = frozenset(
@@ -122,6 +131,7 @@ PATHS: dict[str, str] = {
     "/admin/organisations/{org}/edit": "/admin/organisations/demo/edit",
     "/admin/organisations/{org}/delete": "/admin/organisations/demo/delete",
     "/admin/organisations/{org}/settings": "/admin/organisations/demo/settings",
+    "/admin/organisations/{org}/configuration": "/admin/organisations/demo/configuration",
     "/admin/organisations/{org}/texts/{text_locale}": "/admin/organisations/demo/texts/nl",
     "/admin/organisations/{org}/texts": "/admin/organisations/demo/texts",
     "/admin/organisations/{org}/branding": "/admin/organisations/demo/branding",
@@ -180,8 +190,10 @@ def _concrete(route: APIRoute, found: Fixture) -> str:
 
 def _allowed(path: str, found: Fixture) -> set[str]:
     """The markers ADR 0063 §4 allows on ``path``."""
+    if path == found.fill(DETAIL_CONTACT):
+        return set(CONTACT_MARKERS)
     if path == found.fill(DETAIL):
-        return set(MARKERS.values())
+        return {MARKERS["form_answers"]}
     if path in {found.fill(QUEUE_ITEM), found.fill(QUEUE_ITEM_LIVE)}:
         return {MARKERS["first_name"], MARKERS["guest_join_url"]}
     if path in {found.fill(p) for p in FIRST_NAME_PAGES}:
@@ -198,6 +210,11 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
     # audit log then holds a view of the marker booking before the log and its export are swept.
     detail = (await site.client.get(found.fill(DETAIL))).text
     assert MARKERS["form_answers"] in detail, "the detail page does not show the answer"
+    page = found.fill(DETAIL)
+    button = {**SAME_ORIGIN, "referer": f"http://testserver{page}"}  # the page's own button
+    shown = await site.client.get(found.fill(DETAIL_CONTACT), headers=button)
+    assert MARKERS["phone"] in shown.text, "the detail page does not show the contact on request"
+    assert not marker_leaks(shown.text, _allowed(found.fill(DETAIL_CONTACT), found))
     queue_item = (await site.client.get(found.fill(QUEUE_ITEM))).text
     assert MARKERS["first_name"] in queue_item
     assert MARKERS["guest_join_url"] in queue_item
@@ -249,6 +266,20 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
             response = await site.client.get(f"{scope}?view={view}")
             assert response.status_code == 200, (scope, view)
             assert not marker_leaks(response.text, set()), (scope, view)
+
+    # ADR 0099: the plan of a configuration document, with a change in it, shows keys and field
+    # names of the document and never a marker.
+    exported = await post_form(site, "/admin/settings/configuration/export")
+    changed = json.loads(exported.content)
+    changed["organisations"][0]["name"] = "Renamed"
+    planned = await site.client.post(
+        "/admin/settings/configuration/plan",
+        files={"document": ("config.json", json.dumps(changed).encode(), "application/json")},
+        headers=SAME_ORIGIN,
+    )
+    assert planned.status_code == 200, planned.text
+    assert "Renamed" not in planned.text, "a plan shows field names, never values"
+    assert not marker_leaks(planned.text, set()), "configuration plan"
 
     # ADR 0095: the invitation form, and the page of a refused action on a person.
     for path, response in (

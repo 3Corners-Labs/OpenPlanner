@@ -128,11 +128,12 @@ node .claude/skills/verify-openplanner/scripts/journey.mjs booking agenda
 |---|---|---|
 | `booking` | `features/participant-booking.md` | a stack that is up |
 | `agenda` | `features/admin-agenda.md` | a booking of this run |
+| `contact` | `features/booking-contact.md` | a booking of this run, no earlier request for it in the audit log |
 | `manage` | `features/manage-booking.md` | a confirmed booking of this run |
 | `admin-login` | `features/admin-login.md` | a stack that is up |
 
-`all` runs `booking agenda manage agenda admin-login`: the second agenda sees the moved booking
-cancelled. Journeys run in the order given, each in a fresh browser context, and the first
+`all` runs `booking agenda contact manage agenda admin-login`: the second agenda sees the moved
+booking cancelled. Journeys run in the order given, each in a fresh browser context, and the first
 failure stops the run. It prints one `PASS` or `FAIL` line per step and a summary table. Exit
 code 0: every journey passed; 1: a journey failed; 2: nothing could run (no stack, not this
 run's stack, Playwright missing).

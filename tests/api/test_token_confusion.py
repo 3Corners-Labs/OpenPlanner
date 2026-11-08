@@ -122,7 +122,7 @@ async def test_machine_api_query_of_the_wrong_type_is_a_422_without_the_input(
     assert CANARY not in response.text
 
 
-async def test_a_machine_api_passphrase_that_is_too_short_or_missing_is_a_422_without_it(
+async def test_a_machine_api_passphrase_that_is_too_short_is_a_422_without_it(
     agent: Agent,
 ) -> None:
     issued = await agent.register(scopes=["configuration:transfer"])
@@ -131,7 +131,6 @@ async def test_a_machine_api_passphrase_that_is_too_short_or_missing_is_a_422_wi
     short = await agent.client.get(
         f"{AGENT_BASE}/configuration", headers={**headers, "x-passphrase": CANARY}
     )
-    missing = await agent.client.get(f"{AGENT_BASE}/configuration", headers=headers)
 
-    assert short.status_code == missing.status_code == 422
-    assert CANARY not in short.text + missing.text
+    assert short.status_code == 422
+    assert CANARY not in short.text
