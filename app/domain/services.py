@@ -194,6 +194,7 @@ class BookingService:
             raise ValueError(f"the token key must be at least {MIN_KEY_BYTES} bytes")
         self._uow = uow
         self._clock = clock
+        self._events = SystemLog(uow, clock)
         self._token_key = token_key
         self._token_keys = (token_key, *([previous_token_key] if previous_token_key else []))
         self._confirm_policy = confirm_policy
@@ -391,11 +392,7 @@ class BookingService:
             if closure is not None
             else None
         )
-        correctable = (
-            booking.contact is not None
-            and (booking.is_active or booking.awaits_confirmation)
-            and now < deadline
-        )
+        correctable = _correctable(booking, group, now)
         return BookingDetails(
             booking,
             group,
@@ -524,19 +521,19 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
-            if booking.contact is None or not (booking.is_active or booking.awaits_confirmation):
-                raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
             group = await self._group_by_id(tx, booking.group_id)
-            now = self._clock.now()
-            if now >= group.change_deadline(booking.start):
-                raise DomainError(ErrorCode.BOOKING_LOCKED)
+            if booking.contact is None or not _correctable(booking, group, self._clock.now()):
+                holds_place = booking.is_active or booking.awaits_confirmation
+                raise DomainError(
+                    ErrorCode.BOOKING_LOCKED if holds_place else ErrorCode.BOOKING_NOT_ACTIVE
+                )
             email = booking.contact.email
             corrected = await self._contact(tx, group, replace(contact, email=email))
             changed = _changed_fields(booking.contact, corrected)
             if not changed:
                 return booking
             await tx.save_contact(_id(booking), corrected)
-            await SystemLog(self._uow, self._clock).record_in(
+            await self._events.record_in(
                 tx,
                 DETAILS_CORRECTED,
                 Outcome.SUCCESS,
@@ -837,8 +834,26 @@ async def _check_address_limit(
 
 def _changed_fields(before: Contact, after: Contact) -> list[str]:
     """Return the names of the contact fields that differ (for the event; never values)."""
-    names = ("first_name", "last_name", "phone", "answers")
-    return [name for name in names if getattr(before, name) != getattr(after, name)]
+    pairs = (
+        ("first_name", before.first_name != after.first_name),
+        ("last_name", before.last_name != after.last_name),
+        ("phone", before.phone != after.phone),
+        ("answers", before.answers != after.answers),
+    )
+    return [name for name, changed in pairs if changed]
+
+
+def _correctable(booking: Booking, group: Group, now: datetime) -> bool:
+    """Return whether the participant may still correct their details (ADR 0056 point 10).
+
+    While the booking holds its place (confirmed or awaiting confirmation), still has the
+    participant's details, and until the change deadline, like moving (ADR 0069).
+    """
+    return (
+        booking.contact is not None
+        and (booking.is_active or booking.awaits_confirmation)
+        and now < group.change_deadline(booking.start)
+    )
 
 
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:

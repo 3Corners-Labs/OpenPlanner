@@ -51,7 +51,7 @@ from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import DomainError
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService
@@ -559,9 +559,7 @@ async def correct_details(
     values = read_contact(await request.form())
     try:
         await _service(request).correct_details(ref, contact_input(values))
-    except DomainError as error:
-        if error.code is ErrorCode.BOOKING_LOCKED:
-            return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
+    except DomainError as error:  # one no longer correctable goes back to the booking page
         return await _details_response(request, public_ref, locale, values, error)
     return RedirectResponse(_manage_url(public_ref, "details"), status_code=303)
 
