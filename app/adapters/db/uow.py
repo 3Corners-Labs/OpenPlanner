@@ -98,7 +98,10 @@ from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
 from app.adapters.db.proposals import ProposalQueries, places_taken
 from app.adapters.db.public_address import PublicAddressQueries
-from app.adapters.db.record_names import bot_credential_name, channel_secret_name
+from app.adapters.db.record_names import (
+    channel_secret_name,
+    organisation_records,
+)
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
@@ -874,12 +877,13 @@ class SqlTransaction(
     async def delete_organisation(self, organisation_id: int) -> None:
         """Erase the organisation's row; the schema's cascades take the rest.
 
-        The sealed Webex bot token (ADR 0082 point 9) has no foreign key, so it is deleted here
-        in the same transaction: a later organisation with a reused id never inherits it.
+        The sealed Webex bot token (ADR 0082 point 9) and contact-center connection (ADR 0032
+        point 9) have no foreign key, so they are deleted here in the same transaction: a later
+        organisation with a reused id never inherits them.
         """
         await self._session.execute(
             delete(IntegrationCredentialRow).where(
-                IntegrationCredentialRow.name == bot_credential_name(organisation_id)
+                IntegrationCredentialRow.name.in_(organisation_records(organisation_id))
             )
         )
         await self._session.execute(

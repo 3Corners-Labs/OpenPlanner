@@ -1292,7 +1292,7 @@ msgid "admin.form.error.planner_change_min_lead_minutes"
 msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."
 
 msgid "admin.form.error.planner_too_late"
-msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Bel de deelnemer."
+msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Neem zelf contact op met de deelnemer: kies bij de afspraak Details en dan Contactgegevens tonen."
 
 msgid "admin.form.error.booking_limit_reached"
 msgstr "Dit e-mailadres heeft al een afspraak in dat tijdslot, of al het maximum aantal afspraken bij dit team (zie Afspraken per e-mailadres in de instellingen). Kies een ander tijdslot."
@@ -6698,6 +6698,36 @@ msgstr "Antwoorden op het formulier"
 msgid "admin.booking.answers_lead"
 msgstr "Persoonsgegevens; ze worden gewist met de rest van de afspraak."
 
+msgid "admin.booking.contact"
+msgstr "Contactgegevens"
+
+msgid "admin.booking.contact_lead"
+msgstr "Toon ze alleen als u de deelnemer moet bereiken. Het auditlog legt elke keer vast wie ze bekeek."
+
+msgid "admin.booking.contact_shown"
+msgstr "Het auditlog heeft vastgelegd dat u ze bekeek. Verberg ze voordat u een schermafdruk maakt."
+
+msgid "admin.booking.contact_show"
+msgstr "Contactgegevens tonen"
+
+msgid "admin.booking.contact_hide"
+msgstr "Contactgegevens verbergen"
+
+msgid "admin.booking.contact_name"
+msgstr "Naam"
+
+msgid "admin.booking.contact_email"
+msgstr "E-mailadres"
+
+msgid "admin.booking.contact_phone"
+msgstr "Telefoonnummer"
+
+msgid "admin.booking.contact_no_phone"
+msgstr "Niet opgegeven"
+
+msgid "admin.booking.contact_deleted"
+msgstr "De persoonsgegevens van deze afspraak zijn verwijderd."
+
 msgid "admin.settings.secret_hint"
 msgstr "Leeg laten houdt de huidige waarde; die wordt nooit getoond."
 
@@ -10658,6 +10688,87 @@ msgstr "Wacht op een nieuwe tijd"
 msgid "reports.status.pending_confirmation"
 msgstr "Wacht op bevestiging"
 
+msgid "admin.channels.cc_title"
+msgstr "Contactcenter"
+
+msgid "admin.channels.cc_connected"
+msgstr "Eigen koppeling"
+
+msgid "admin.channels.cc_not_connected"
+msgstr "Koppeling van de installatie"
+
+msgid "admin.channels.cc_lead"
+msgstr "De koppeling van deze organisatie met haar eigen contactcenter: het platform, het API-adres en de OAuth-client. Taken van de groepen van deze organisatie gaan via deze koppeling."
+
+msgid "admin.channels.cc_fallback"
+msgstr "Zolang hier niets is ingesteld, gebruikt deze organisatie de koppeling die voor de hele installatie is ingesteld."
+
+msgid "admin.channels.cc_no_key"
+msgstr "Er is geen sleutel voor instellingen geconfigureerd, dus een eigen koppeling kan niet versleuteld worden bewaard. Vraag de beheerder van de server om SETTINGS_ENCRYPTION_KEY."
+
+msgid "admin.channels.cc_kind"
+msgstr "Platform"
+
+
+msgid "admin.channels.cc_api_base_url"
+msgstr "API-adres"
+
+msgid "admin.channels.cc_api_base_url_hint"
+msgstr "Het API-adres van uw regio, bijvoorbeeld https://api.wxcc-eu1.cisco.com. Alleen https."
+
+msgid "admin.channels.cc_client_id"
+msgstr "Client-ID"
+
+msgid "admin.channels.cc_client_id_hint"
+msgstr "De client-ID van de Service App in de tenant van deze organisatie."
+
+msgid "admin.channels.cc_client_secret"
+msgstr "Clientgeheim"
+
+msgid "admin.channels.cc_client_secret_hint"
+msgstr "Het clientgeheim van de Service App. Wordt versleuteld bewaard en nooit meer getoond."
+
+msgid "admin.channels.cc_refresh_token"
+msgstr "Refresh-token"
+
+msgid "admin.channels.cc_refresh_token_hint"
+msgstr "Het refresh-token dat de Service App kreeg toen de beheerder van uw tenant haar toestemming gaf. Wordt versleuteld bewaard en nooit meer getoond."
+
+msgid "admin.channels.cc_webhook"
+msgstr "Webhookadres"
+
+msgid "admin.channels.cc_webhook_lead"
+msgstr "Het contactcenter meldt de status van taken op dit adres. OpenPlanner controleert elke melding met een geheim dat de server zelf maakt; niemand typt of ziet het."
+
+msgid "admin.channels.cc_secret_made"
+msgstr "Geheim gemaakt op {at}."
+
+msgid "admin.channels.cc_rotate_lead"
+msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt. Het oude geheim werkt daarna niet meer."
+
+msgid "admin.channels.cc_rotate"
+msgstr "Nieuw webhookgeheim maken"
+
+msgid "admin.channels.cc_remove_lead"
+msgstr "Verwijdert de eigen koppeling en haar geheimen. Deze organisatie gebruikt daarna weer de koppeling van de installatie."
+
+msgid "admin.channels.cc_remove"
+msgstr "Eigen koppeling verwijderen"
+
+msgid "admin.done.webhook_secret_rotated"
+msgstr "Er is een nieuw webhookgeheim gemaakt."
+
+msgid "admin.done.contact_center_refused"
+msgstr "Dat kon niet: deze organisatie heeft nog geen eigen koppeling, of er is geen sleutel voor instellingen geconfigureerd."
+
+msgid "admin.form.error.cc_api_base_url"
+msgstr "Vul een https-adres in met alleen een hostnaam en eventueel een poort."
+
+msgid "admin.form.error.cc_client_id"
+msgstr "Een client-ID bestaat uit letters, cijfers en . _ : - zonder spaties."
+
+msgid "admin.form.error.cc_secret"
+msgstr "Vul het geheim in als één regel zonder spaties."
 msgid "admin.done.confirmed_by_staff"
 msgstr "De afspraak is bevestigd namens de deelnemer. De deelnemer krijgt de bevestiging met alle gegevens."
 
@@ -10684,6 +10795,9 @@ msgstr "{Agents}: {agents}, afspraken: {booked} (waarvan {pending} niet bevestig
 
 msgid "admin.audit.detail.booking_confirmed_by_staff"
 msgstr "Afspraak bevestigd namens de deelnemer"
+
+msgid "admin.audit.detail.booking_contact_viewed"
+msgstr "Contactgegevens van de deelnemer getoond"
 
 msgid "reports.view.volume"
 msgstr "Volume"

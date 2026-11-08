@@ -75,3 +75,5 @@ The map names user paths, handles, state and proof; how the code does it belongs
   out at the identity provider, a user without a role.
 - [Group agenda](./admin-agenda.md): the participant's booking as group staff see it, its
   cancelled state, and the refusal of an admin of another organisation.
+- [Contact details on the booking page](./booking-contact.md): the details only on request,
+  hiding them again, and the request in the audit log without them.

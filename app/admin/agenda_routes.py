@@ -35,7 +35,7 @@ from app.admin.shortfalls import agenda_service
 from app.domain.agenda import AgendaSlot
 from app.domain.authorization import Permission
 from app.domain.booking import BookingKind
-from app.domain.booking_changes import planner_may_change
+from app.domain.booking_changes import planner_may_change, planner_may_request_rebook
 from app.domain.calls import CallState
 from app.domain.meeting_status_service import MeetingStatusService
 from app.domain.ports import Clock
@@ -164,6 +164,7 @@ async def _day(
     }
     direct: list[AgendaRow] = []
     changeable: set[int] = set()
+    rebookable: set[int] = set()
     running = 0
     for item in overview:
         booking = item.booking
@@ -173,6 +174,8 @@ async def _day(
         running += booking.is_active and item.status.call is CallState.IN_PROGRESS
         if manage and planner_may_change(booking, group, now):
             changeable.add(row.id)
+        if manage and planner_may_request_rebook(booking, group, now):
+            rebookable.add(row.id)
         if booking.kind is BookingKind.DIRECT:
             direct.append(row)
             continue
@@ -187,7 +190,7 @@ async def _day(
             )
         slots[booking.start].rows.append(row)
     ordered = [slots[start] for start in sorted(slots)]
-    shown = key(ordered, direct, sorted(changeable), only_pending)
+    shown = key(ordered, direct, sorted(changeable), sorted(rebookable), only_pending)
     unpicked = sum(r.not_picked_up for s in ordered for r in s.rows) + sum(
         r.not_picked_up for r in direct
     )
@@ -202,6 +205,7 @@ async def _day(
             "slots": ordered,
             "direct": direct,
             "changeable": changeable,
+            "rebookable": rebookable,
             "manage": manage,
             # ADR 0057 point 5: review every short slot of the day at once.
             "day_review": f"/admin/groups/{slug}/agenda/slot-propose?day={chosen.isoformat()}"

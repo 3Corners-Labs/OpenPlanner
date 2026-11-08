@@ -537,6 +537,22 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/organisations/{org}/channels/sms": {
         "/admin/organisations/demo/channels/sms": statuses(422, 403, 403, 403, 403, 403, 403),
     },
+    # ADR 0032 point 9: the organisation's own contact-center connection (integrations.manage).
+    "POST /admin/organisations/{org}/channels/contact-center": {
+        "/admin/organisations/demo/channels/contact-center": statuses(
+            422, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/channels/contact-center/webhook-secret": {
+        "/admin/organisations/demo/channels/contact-center/webhook-secret": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/channels/contact-center/delete": {
+        "/admin/organisations/demo/channels/contact-center/delete": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
+    },
     "POST /admin/organisations/{org}/channels/{channel}/remove": {
         "/admin/organisations/demo/channels/sms/remove": statuses(
             409, 403, 403, 403, 403, 403, 403

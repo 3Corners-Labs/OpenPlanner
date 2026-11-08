@@ -132,7 +132,10 @@ not yet claimed get a fresh dispatch job and the usual request above.
 
 ## Webhook addresses
 
-Webex calls `<WEBHOOK_BASE_URL>/webhooks/webex`. A contact-center platform calls
+Webex calls `<WEBHOOK_BASE_URL>/webhooks/webex`. An organisation with its own contact-center
+connection (ADR 0032 point 10) is called at `<WEBHOOK_BASE_URL>/webhooks/contact-center/{kind}/{org}`,
+verified with that organisation's generated secret; the task is looked up among its bookings only,
+and an organisation without that connection answers `404`. Otherwise a contact-center platform calls
 `<WEBHOOK_BASE_URL>/webhooks/contact-center/{kind}` (ADR 0032), for Webex Contact Center
 `/webhooks/contact-center/webex_cc`; a kind without an adapter answers `404`. The old address
 `/webhooks/wxcc` is an alias of it and stays until the WxCC subscriptions are registered at the

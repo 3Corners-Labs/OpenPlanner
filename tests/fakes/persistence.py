@@ -1763,7 +1763,7 @@ class InMemoryTransaction:
         return self.state.settings_version
 
     async def read_configuration(
-        self, now: datetime, locked_settings: frozenset[str]
+        self, now: datetime, locked_settings: frozenset[str], *, secrets: bool = True
     ) -> ConfigurationSnapshot:
         snapshot = self.state.configuration or ConfigurationSnapshot(
             Entity("installation", children={"platform": (Entity("platform"),)}), Usage(), 0

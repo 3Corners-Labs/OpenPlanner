@@ -79,6 +79,16 @@ def secret_box(settings: Settings) -> SecretBox | None:
         return None
 
 
+def sealed_store(engine: AsyncEngine, settings: Settings) -> CredentialStore | None:
+    """Return the encrypted credential store, or ``None`` without a settings key.
+
+    The one home of "sealed per-organisation records need a key": the alert bot tokens and the
+    contact-center connections both start from it.
+    """
+    box = secret_box(settings)
+    return CredentialStore(engine, box) if box is not None else None
+
+
 def installation_box(settings: Settings) -> SecretBox:
     """Return the box under the current ``SETTINGS_ENCRYPTION_KEY``, reading the previous one too.
 

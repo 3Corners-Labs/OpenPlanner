@@ -107,6 +107,7 @@ OPEN_ROUTES = frozenset(
         "/o/{slug}/logo",
         "/o/{slug}/font/{role}",
         "/webhooks/contact-center/{kind}",
+        "/webhooks/contact-center/{kind}/{org}",
         "/webhooks/webex",
         "/webhooks/wxcc",
     }

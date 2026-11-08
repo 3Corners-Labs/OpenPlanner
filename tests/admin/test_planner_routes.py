@@ -140,7 +140,9 @@ async def test_a_planner_cancels_with_a_fixed_reason(site: Site) -> None:
     assert await _status(site, booking_id) == (BookingStatus.CANCELLED, ChangeReason.TECHNICAL)
 
 
-async def test_a_booking_that_starts_soon_needs_a_phone_call(site: Site) -> None:
+async def test_a_booking_that_starts_soon_needs_a_call_with_the_details_on_request(
+    site: Site,
+) -> None:
     booking_id = await _book(site)
     site.clock.advance(FRIDAY_0900 - timedelta(minutes=30) - site.clock.now())
     await site.login_as(GROUP_ADMIN)
@@ -149,7 +151,8 @@ async def test_a_booking_that_starts_soon_needs_a_phone_call(site: Site) -> None
     agenda = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
 
     assert response.status_code == 409
-    assert "Bel de deelnemer" in response.text
+    assert "Neem zelf contact op met de deelnemer" in response.text
+    assert "Details en dan Contactgegevens tonen" in response.text  # where the number is
     assert f"/bookings/{booking_id}/move" not in agenda
 
 
@@ -340,6 +343,27 @@ async def test_confirming_after_the_deadline_says_it_lapsed(site: Site) -> None:
     response = await _post(site, f"{AGENDA}/bookings/{pending}/confirm", {})
 
     assert "done=confirm_lapsed" in response.headers["location"]
+
+
+async def test_a_pending_booking_offers_move_and_cancel_but_not_rebook(site: Site) -> None:
+    """ADR 0056 point 11: moved or cancelled like a confirmed one; it lapses on its own."""
+    pending = await _book_pending(site)
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+
+    assert f'href="{AGENDA}/bookings/{pending}/move"' in text
+    assert f'href="{AGENDA}/bookings/{pending}/cancel"' in text
+    assert f'href="{AGENDA}/bookings/{pending}/rebook"' not in text
+
+
+async def test_the_rebook_form_is_refused_for_a_pending_booking(site: Site) -> None:
+    pending = await _book_pending(site)
+    await site.login_as(GROUP_ADMIN)
+
+    response = await site.client.get(f"{AGENDA}/bookings/{pending}/rebook")
+
+    assert response.status_code == 409
 
 
 # --- the rebooking assistant (ADR 0057 step 3) -------------------------------------------

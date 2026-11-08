@@ -68,6 +68,10 @@ WRITABLE_IN_MAINTENANCE = frozenset(
         "POST /admin/organisations/{org}/channels/alerts/targets/{target_id}/remove",
         "POST /admin/organisations/{org}/channels/alerts/targets/{target_id}/test",
         "POST /admin/organisations/{org}/channels/alerts/bot",
+        # ADR 0032 point 9: the organisation's contact-center connection, integrations.manage.
+        "POST /admin/organisations/{org}/channels/contact-center",
+        "POST /admin/organisations/{org}/channels/contact-center/webhook-secret",
+        "POST /admin/organisations/{org}/channels/contact-center/delete",
     }
 )
 
@@ -200,6 +204,8 @@ PUBLIC_SCOPED = frozenset(
         "GET /api/v1/widget/{org}/{group}/availability",
         "OPTIONS /api/v1/widget/{org}/{group}/bookings",
         "POST /api/v1/widget/{org}/{group}/bookings",
+        # ADR 0032 point 10: the platform calls it, verified by the organisation's own secret.
+        "POST /webhooks/contact-center/{kind}/{org}",
         "GET /g/{slug}",
         "GET /g/{slug}/book",
         "GET /g/{slug}/booked",
