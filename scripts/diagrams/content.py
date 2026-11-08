@@ -438,6 +438,7 @@ LAYERS = (
                 "VideoProvider",
                 "ContactCenterDispatcher",
                 "ContactCenterConnections · OrganisationDispatchers",
+                "ConnectionRegistrar",
                 "IntegrationChecker · ProbeRegistry",
                 "RequestLog",
                 "IdentityProvider · StaffDirectory",

@@ -1,11 +1,13 @@
 """The organisation's own contact-center connection on its *Kanalen* page (ADR 0032 points 9–10)."""
 
 import json
+from dataclasses import replace
 
 from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.webhooks import sign_wxcc
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, Registration
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.fakes.integrations import FakeRegistrar
 from tests.support.admin_site import site_app
 
 PAGE = "/admin/organisations/demo/channels"
@@ -23,11 +25,20 @@ def _connections(site: Site) -> SealedConnections:
     return connections
 
 
+def _registrar(site: Site, outcome: Registration = Registration.REGISTERED) -> FakeRegistrar:
+    """Put a fake in place of the platform: no test talks to a real contact center."""
+    registrar = FakeRegistrar(outcome)
+    state = site_app(site).state
+    state.integrations = replace(state.integrations, organisations=registrar)
+    return registrar
+
+
 async def _connect(site: Site) -> None:
+    _registrar(site)
     await site.login_as(SUPER)
     saved = await site.client.post(f"{PAGE}/contact-center", data=FORM, headers=SAME_ORIGIN)
     assert saved.status_code == 303
-    assert "done=saved" in saved.headers["location"]
+    assert "done=contact_center_registered" in saved.headers["location"]
 
 
 async def test_the_superuser_connects_an_organisation_and_never_sees_the_secrets(
@@ -48,6 +59,7 @@ async def test_the_superuser_connects_an_organisation_and_never_sees_the_secrets
 
 
 async def test_a_refused_field_is_shown_on_the_form(site: Site) -> None:
+    _registrar(site)
     await site.login_as(SUPER)
     refused = await site.client.post(
         f"{PAGE}/contact-center",
@@ -72,6 +84,18 @@ async def test_rotating_and_removing_the_connection(site: Site) -> None:
     assert "done=removed" in removed.headers["location"]
     assert before is not None
     assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) is None
+
+
+async def test_a_refused_registration_says_so_and_keeps_the_new_secret(site: Site) -> None:
+    """ADR 0032 CC-4d: the platform's refusal is shown; the change itself stays."""
+    await _connect(site)
+    before = await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC)
+    _registrar(site, Registration.REFUSED)
+
+    refused = await site.client.post(f"{PAGE}/contact-center/webhook-secret", headers=SAME_ORIGIN)
+
+    assert "done=contact_center_not_registered" in refused.headers["location"]
+    assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) != before
 
 
 async def test_an_organisation_admin_may_not_set_the_connection(site: Site) -> None:

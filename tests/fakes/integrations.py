@@ -20,7 +20,12 @@ from app.domain.calls import (
     TaskState,
 )
 from app.domain.checks import Finding
-from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
+from app.domain.contact_center import (
+    ConnectionChange,
+    ContactCenterKind,
+    OrganisationConnection,
+    Registration,
+)
 from app.domain.ports import (
     ContactCenterDispatcher,
     IntegrationError,
@@ -259,3 +264,15 @@ class FakeOrganisationDispatchers:
         if organisation_id not in self.connections:
             return None
         return OwnConnection(self.connections[organisation_id])
+
+
+class FakeRegistrar:
+    """``ConnectionRegistrar`` that answers ``outcome`` and remembers whom it registered."""
+
+    def __init__(self, outcome: Registration = Registration.REGISTERED) -> None:
+        self.outcome = outcome
+        self.registered: list[tuple[int, str]] = []
+
+    async def register(self, organisation_id: int, organisation: str) -> Registration:
+        self.registered.append((organisation_id, organisation))
+        return self.outcome

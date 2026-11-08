@@ -30,7 +30,6 @@ from app.domain.ports import (
     Clock,
     ContactCenterDispatchers,
     IntegrationChecker,
-    OrganisationDispatchers,
     RequestLog,
     VideoProvider,
 )
@@ -53,7 +52,7 @@ class Integrations:
     video: VideoProvider | None = None
     dispatchers: ContactCenterDispatchers = field(default_factory=dict)
     checker: IntegrationChecker | None = None
-    organisations: OrganisationDispatchers | None = None
+    organisations: OrganisationWxcc | None = None
 
     @property
     def dispatch_configured(self) -> bool:
@@ -194,7 +193,7 @@ def _organisation_dispatchers(
     clock: Clock,
     security: SecurityLog | None,
     request_log: RequestLog | None,
-) -> OrganisationDispatchers | None:
+) -> OrganisationWxcc | None:
     """Return the organisations' own dispatchers, or ``None`` without a settings key."""
     store = sealed_store(engine, settings)
     if store is None:
@@ -207,4 +206,5 @@ def _organisation_dispatchers(
         webex_oauth_url(settings),
         security,
         request_log,
+        settings.webhook_base,
     )

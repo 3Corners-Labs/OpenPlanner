@@ -5,11 +5,11 @@ from datetime import timedelta
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.contact_center import ConnectionChange, ContactCenterKind
+from app.domain.contact_center import ConnectionChange, ContactCenterKind, Registration
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeContactCenterConnections
+from tests.fakes.integrations import FakeContactCenterConnections, FakeRegistrar
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, two_organisations
 from tests.support.domain import NOW
@@ -173,3 +173,28 @@ def test_the_fields_are_checked_and_the_refusal_names_only_the_field(
         change(**{field: value})
 
     assert refused.value.field == f"contact_center_connection.{field}"
+
+
+async def test_saving_and_rotating_register_the_address_and_audit_the_outcome(
+    uow: InMemoryUnitOfWork, clock: FixedClock, connections: FakeContactCenterConnections
+) -> None:
+    """ADR 0032 CC-4d: the platform is told at once; its answer is audited, never undone."""
+    registrar = FakeRegistrar(Registration.REFUSED)
+    service = ContactCenterConnectionService(
+        uow, clock, AdminService(uow, clock), connections, lambda: registrar
+    )
+
+    saved = await service.save(SUPER, "demo", change())
+    rotated = await service.rotate_webhook_secret(SUPER, "demo")
+
+    assert (saved, rotated) == (Registration.REFUSED, Registration.REFUSED)
+    assert registrar.registered == [(1, "demo"), (1, "demo")]
+    details = [e.detail for e in uow.state.audit if e.detail.endswith("outcome:refused")]
+    assert details == ["contact_center_connection.register,outcome:refused"] * 2
+    assert await service.view(SUPER, "demo") is not None  # the change itself stays
+
+
+async def test_without_a_registrar_nothing_is_registered(
+    service: ContactCenterConnectionService,
+) -> None:
+    assert await service.save(SUPER, "demo", change()) is Registration.NOT_READY

@@ -664,7 +664,11 @@ def create_app(
         # ADR 0032 point 9: each organisation's own contact-center connection, sealed.
         app.state.contact_center_connections = sealed_connections(app.state.engine, settings)
         app.state.contact_center_connection_service = ContactCenterConnectionService(
-            uow, clock, app.state.admin_service, app.state.contact_center_connections
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.contact_center_connections,
+            lambda: app.state.integrations.organisations,
         )
         app.state.alert_target_service = AlertTargetService(
             uow,

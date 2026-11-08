@@ -10,6 +10,7 @@ A refused registration is reported with the scope it most likely needs and the o
 still tried; the report never contains the secret.
 """
 
+import re
 from collections.abc import Iterable
 
 from app.adapters.webex_auth import AuthorizedClient
@@ -132,6 +133,11 @@ async def register_wxcc(
     listed = (await client.request("GET", f"{base}/v2/subscriptions")).json()
     if any(item.get("destinationUrl") == target_url for item in listed.get("data", [])):
         return "wxcc subscription: exists"
+    return await _create_wxcc(client, base, target_url, secret)
+
+
+async def _create_wxcc(client: AuthorizedClient, base: str, target_url: str, secret: str) -> str:
+    """Create the WxCC subscription at ``target_url``; return ``created`` or ``refused (...)``."""
     try:
         await client.request(
             "POST",
@@ -156,3 +162,24 @@ async def register_wxcc(
         )
         return f"wxcc subscription: refused ({error.code}): {reason}"
     return "wxcc subscription: created"
+
+
+SUBSCRIPTION_ID = re.compile(r"[A-Za-z0-9_=-]{1,256}")
+"""An id from the subscription listing, checked before it goes into a DELETE path."""
+
+
+async def replace_wxcc(
+    client: AuthorizedClient, base_url: str, target_url: str, secret: str
+) -> str:
+    """Make the one WxCC subscription at ``target_url`` carry ``secret`` (ADR 0032 CC-4d).
+
+    WxCC keeps a subscription's secret, so a rotated secret needs a new subscription: the
+    subscriptions at ``target_url`` are deleted, then one is created; ``created`` or ``refused``.
+    """
+    base = base_url.rstrip("/")
+    listed = (await client.request("GET", f"{base}/v2/subscriptions")).json()
+    for item in listed.get("data", []):
+        item_id = str(item.get("id") or "")
+        if item.get("destinationUrl") == target_url and SUBSCRIPTION_ID.fullmatch(item_id):
+            await client.request("DELETE", f"{base}/v2/subscriptions/{item_id}")
+    return await _create_wxcc(client, base, target_url, secret)

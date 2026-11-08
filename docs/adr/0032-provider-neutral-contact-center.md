@@ -7,7 +7,7 @@ proposed (2026-10-25) for the rest until CC-0 names the next platform. Renumbere
 cancelled booking". Extends ADR 0007 and ADR 0018; it replaces their per-group mapping (ADR
 0018 point 1) with the model below. Partly built: steps CC-1 and CC-2 (domain, schema, port and
 registry), CC-3 (webhook route per kind), CC-4a (the organisation's connection), CC-4b
-(dispatch through it) and CC-5 (docs)
+(dispatch through it), CC-4d (registering its webhook address) and CC-5 (docs)
 are merged, see *Build status* and `docs/adr-status.md`.
 Note (2026-11-01 review): point 8 (first name and host join URL only) contradicts point 5 and
 ADR 0018 §2, whose payload is what is sent (`app/adapters/wxcc.py`: booking reference, first
@@ -143,7 +143,7 @@ parameter) and the field shapes (an https host with at most a port; client id
 | CC-3 | Webhooks at `/webhooks/contact-center/{kind}`, verified by the adapter within 300 s; `/webhooks/wxcc` kept as alias. Each adapter defines its `InboundWebhook` (check, parsing, secret), listed in `contact_centers.INBOUND`; a task is looked up with its platform. OpenPlanner still registers the WxCC subscription at `/webhooks/wxcc`; moving the registration comes with the organisation connection (CC-4) | #626 | merged |
 | CC-4a | The organisation's connection (points 9–11): one sealed record under `contact-center:{id}` (no migration), the card on organisation → *Kanalen* (`integrations.manage`, audited, write-only), the generated and rotatable webhook secret (ADR 0042 step 6b-2 for the organisation), and `/webhooks/contact-center/{kind}/{organisation}` verified with it | #630 | merged |
 | CC-4b | Dispatch, end and reconcile with the organisation's own credentials and API host, the installation's as fallback (points 12–13): `DispatcherChoice`, `OrganisationWxcc`, tokens under `contact-center-tokens:{id}`, internal hosts refused | #631 | merged |
-| CC-4d | Register the organisation's WxCC subscription at its own address with its own credentials on save, and again on rotating the secret | – | planned |
+| CC-4d | Register the organisation's WxCC subscription at its own address with its own credentials on save, and again on rotating the secret: `ConnectionRegistrar`, `replace_wxcc` (the subscriptions at that address are replaced, so a new secret takes effect); the outcome is audited and shown | #PRNUM | merged |
 | CC-4c | The group form rendered from the adapter's `ProviderDescriptor` | – | planned |
 | CC-5 | Docs: architecture, dataflow, webhooks, threat model, `scripts/diagrams/content.py`. Describes what CC-1 to CC-3 built (webhooks and threat model largely came with CC-3, #626); the organisation connection of CC-4 updates the same places when it lands | #627 | merged |
 | CC-6 | Second platform adapter (for example Genesys Cloud) | – | planned (needs its own ADR) |

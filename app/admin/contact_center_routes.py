@@ -18,7 +18,7 @@ from app.admin.authz import AdminContext
 from app.admin.channel_fields import Manage, channels_url, secret_field, value_of
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import SameOrigin
-from app.domain.contact_center import ContactCenterKind, OrganisationConnection
+from app.domain.contact_center import ContactCenterKind, OrganisationConnection, Registration
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError
 from app.i18n import BoundGettext
@@ -28,6 +28,21 @@ router = APIRouter(prefix="/admin", include_in_schema=False)
 
 CONNECTION_ANCHOR = "contact-center"
 """The id of the contact-center card, so a confirmation scrolls to it."""
+
+SAVED_DONE = {
+    Registration.REGISTERED: "contact_center_registered",
+    Registration.NOT_READY: "contact_center_saved_not_ready",
+    Registration.REFUSED: "contact_center_not_registered",
+    Registration.FAILED: "contact_center_not_registered",
+}
+"""The confirmation after saving, by what registering the address came to (CC-4d)."""
+ROTATED_DONE = {
+    Registration.REGISTERED: "webhook_secret_rotated",
+    Registration.NOT_READY: "webhook_secret_rotated",
+    Registration.REFUSED: "contact_center_not_registered",
+    Registration.FAILED: "contact_center_not_registered",
+}
+"""The confirmation after a new secret, by what registering it came to."""
 
 
 def _back(org: str, done: str) -> Response:
@@ -124,15 +139,11 @@ async def rotate_contact_center_secret(
 ) -> Response:
     """Generate a new webhook secret for the organisation's connection."""
     try:
-        await connection_service(request).rotate_webhook_secret(context.principal, org)
+        outcome = await connection_service(request).rotate_webhook_secret(context.principal, org)
     except DomainError as error:
         forms.raise_refusal(error)
-        return forms.redirect_done(
-            channels_url(org), "contact_center_refused", anchor=CONNECTION_ANCHOR
-        )
-    return forms.redirect_done(
-        channels_url(org), "webhook_secret_rotated", anchor=CONNECTION_ANCHOR
-    )
+        return _back(org, "contact_center_refused")
+    return _back(org, ROTATED_DONE[outcome])
 
 
 @router.post("/organisations/{org}/channels/contact-center/delete")
@@ -144,7 +155,5 @@ async def remove_contact_center(
         await connection_service(request).remove(context.principal, org)
     except DomainError as error:
         forms.raise_refusal(error)
-        return forms.redirect_done(
-            channels_url(org), "contact_center_refused", anchor=CONNECTION_ANCHOR
-        )
+        return _back(org, "contact_center_refused")
     return _back(org, "removed")
