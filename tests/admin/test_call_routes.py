@@ -28,6 +28,7 @@ from app.domain.job_plan import JobType
 from app.domain.participant_contact import CONTACT_VIEWED
 from app.domain.ports import RequestRecord
 from app.domain.request_log import RequestEvents
+from app.domain.scheduling import DispatchFallback, DispatchKind
 from app.domain.services import BookingService, ContactInput
 from tests.admin.conftest import (
     AUDITOR,
@@ -335,6 +336,37 @@ async def test_a_retry_counts_toward_the_planners_alert_with_its_platform_settin
     assert [(e.group, e.detail) for e in alerts] == [
         ("demo", f"actor:{GROUP_ADMIN.subject},changes:6")
     ]
+
+
+async def _in_fallback(site: Site, slug: str) -> None:
+    """Put the group in fallback to its own queue, as the worker does when the center is down."""
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        group = await tx.get_group(slug)
+        assert group is not None
+        fallback = DispatchFallback.OWN_QUEUE
+        kind = DispatchKind.CONTACT_CENTER
+        await tx.save_group(replace(group, dispatch_kind=kind, dispatch_fallback=fallback))
+        await tx.save_group_fallback(group.id, site.clock.now())
+
+
+async def test_ending_a_fallback_by_hand_counts_toward_the_planners_alert(
+    settings: Settings, admin_db: str
+) -> None:
+    """ADR 0044: ending a fallback by hand is a change, counted with the retries before it."""
+    limited = settings.model_copy(update={"planner_changes_alert_per_hour": 5})
+    async with _running_site(limited, admin_db) as site:
+        booking_id = await _failed_meeting(site)
+        await site.login_as(GROUP_ADMIN)
+        retry = f"/admin/groups/demo/bookings/{booking_id}/retry"
+        for _ in range(5):
+            await site.client.post(retry, data={"job": "create_video_room"}, headers=SAME_ORIGIN)
+        await _in_fallback(site, "demo")
+        ended = await site.client.post("/admin/groups/demo/queue/fallback/end", headers=SAME_ORIGIN)
+        alerts = [e for e in await audit_log(site) if e.action == CHANGES_ALERT.action]
+
+    assert "done=fallback_ended" in ended.headers["location"]
+    assert [e.detail for e in alerts] == [f"actor:{GROUP_ADMIN.subject},changes:6"]
 
 
 async def _with_meeting(site: Site, booking_id: int, meeting_id: str) -> None:

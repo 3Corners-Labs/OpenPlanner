@@ -21,7 +21,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 
-from app.domain.activity_alert import alert_for
+from app.domain.activity_alert import COUNTED_ACTIONS, alert_for
 from app.domain.audit import ANONYMOUS_ACTOR, AuditEntry, AuditEvent, AuditFilter, Outcome
 from app.domain.audit_export import (
     EXPORT_EVENT,
@@ -282,7 +282,14 @@ class AdminService:
         group: str | None = None,
         detail: str = "",
     ) -> None:
-        """Write an audit event (logins, denials, changes)."""
+        """Write an audit event (logins, denials, changes).
+
+        Raises:
+            ValueError: For a success that an hourly alert counts: ``record_change`` writes
+                those, with their alert (``app.domain.activity_alert``).
+        """
+        if outcome is Outcome.SUCCESS and action in COUNTED_ACTIONS:
+            raise ValueError(f"a success of {action} is counted: use record_change")
         event = AuditEvent(
             self._clock.now(), actor, action, outcome, reason, organisation, group, detail
         )

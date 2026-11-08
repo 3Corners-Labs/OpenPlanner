@@ -2,9 +2,11 @@
 
 ``app.domain.activity_alert`` stays exact only when each successful event it counts is followed
 by the alert's check. ``AdminService.record_change`` runs it with the threshold the composition
-root gave the service; the module's ``record_change`` refuses a counted permission, and
-``tests/conftest.py`` fails the run on a counted success built anywhere else.
+root gave the service. The module's ``record_change`` and ``AdminService.record`` refuse a
+counted success, and ``tests/conftest.py`` fails the run on one built anywhere else.
 """
+
+import sys
 
 import pytest
 
@@ -12,9 +14,10 @@ from app.domain.activity_alert import ALERTS, CHANGES_ALERT, REVEALS_ALERT, aler
 from app.domain.admin import AdminService, record_change
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Permission
-from tests.conftest import built_outside_its_alert
+from tests.conftest import checked_by_its_alert
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support import recorders
 from tests.support.admin import GROUP_ADMIN
 from tests.support.domain import NOW
 
@@ -84,12 +87,25 @@ def test_each_permission_has_at_most_one_alert() -> None:
     assert alert_for(Permission.GROUP_EDIT) is None
 
 
-def test_the_watch_finds_a_counted_success_built_outside_its_alert() -> None:
+def test_the_watch_accepts_a_counted_success_only_under_admin_service_record_change() -> None:
     change = AuditEvent(NOW, "g-1", CHANGES_ALERT.permission.value, Outcome.SUCCESS)
     refusal = AuditEvent(NOW, "g-1", CHANGES_ALERT.permission.value, Outcome.DENIED)
     other = AuditEvent(NOW, "g-1", Permission.GROUP_EDIT.value, Outcome.SUCCESS)
+    here = sys._getframe()
 
-    assert built_outside_its_alert(change, "domain/fallback.py", "_switch_off")
-    assert not built_outside_its_alert(change, "domain/admin.py", "_change_event")
-    assert not built_outside_its_alert(refusal, "domain/admin.py", "record")
-    assert not built_outside_its_alert(other, "domain/fallback.py", "_switch_off")
+    assert checked_by_its_alert(change, recorders.AdminService().record_change())
+    assert not checked_by_its_alert(change, here)
+    assert checked_by_its_alert(refusal, here)
+    assert checked_by_its_alert(other, here)
+
+
+async def test_the_service_refuses_to_record_a_counted_success_by_hand(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    admin = AdminService(uow, clock, alert_thresholds={Permission.BOOKINGS_VIEW: 20})
+
+    with pytest.raises(ValueError, match=r"bookings\.view"):
+        await admin.record("g-1", Permission.BOOKINGS_VIEW.value, Outcome.SUCCESS)
+    await admin.record("g-1", Permission.BOOKINGS_VIEW.value, Outcome.DENIED, "no_role")
+
+    assert [(e.action, e.outcome) for e in uow.state.audit] == [("bookings.view", Outcome.DENIED)]

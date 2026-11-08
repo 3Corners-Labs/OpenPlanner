@@ -5,6 +5,7 @@ import sys
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from types import FrameType
 
 import httpx
 import pytest
@@ -13,7 +14,7 @@ from pydantic import SecretStr
 
 from app.adapters.integrations import Integrations
 from app.config import Settings
-from app.domain.activity_alert import ALERTS
+from app.domain.activity_alert import COUNTED_ACTIONS
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.event_context import set_service
 from app.domain.event_schema import detail_problem
@@ -27,17 +28,24 @@ APP = str(ROOT / "app") + "/"
 READ_BACK = APP + "adapters/db/"
 """Where events are built from stored rows; the action was checked when it was written."""
 
-COUNTED = frozenset(alert.permission.value for alert in ALERTS)
-"""Actions an hourly alert counts (``app.domain.activity_alert``)."""
-
-ALERTED = ("domain/admin.py", "_change_event")
-"""Where a counted success is built: for ``AdminService.record_change``, which runs its alert."""
+RECORDER = "AdminService.record_change"
+"""The one method that may write a success an hourly alert counts: it runs the alert."""
 
 
-def built_outside_its_alert(event: AuditEvent, where: str, function: str) -> bool:
-    """Whether ``event`` is a success an hourly alert counts, built where its check never runs."""
-    counted = event.outcome is Outcome.SUCCESS and event.action in COUNTED
-    return counted and (where, function) != ALERTED
+def checked_by_its_alert(event: AuditEvent, frame: FrameType | None) -> bool:
+    """Whether ``event`` is no counted success, or is built under ``AdminService.record_change``.
+
+    That method runs the hourly alert right after the event (``app.domain.activity_alert``); a
+    counted success built anywhere else would let a burst pass its threshold unseen. ``frame``
+    is the frame that built the event; the walk goes up the stack from there.
+    """
+    if event.outcome is not Outcome.SUCCESS or event.action not in COUNTED_ACTIONS:
+        return True
+    while frame is not None:
+        if frame.f_code.co_qualname == RECORDER:
+            return True
+        frame = frame.f_back
+    return False
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -65,8 +73,8 @@ def _audited_actions_are_registered() -> Iterator[None]:
             problem = detail_problem(event.detail)
             if problem is not None:
                 malformed.setdefault(f"{where} ({event.action})", problem)
-            if built_outside_its_alert(event, where, caller.co_name):
-                unchecked.setdefault(f"{where} ({caller.co_name})", event.action)
+            if not checked_by_its_alert(event, sys._getframe(2)):
+                unchecked.setdefault(f"{where} ({caller.co_qualname})", event.action)
 
     AuditEvent.__post_init__ = watched  # type: ignore[method-assign]
     yield
