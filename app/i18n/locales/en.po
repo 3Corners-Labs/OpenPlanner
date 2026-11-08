@@ -10654,6 +10654,33 @@ msgstr "Waiting for a new time"
 msgid "reports.status.pending_confirmation"
 msgstr "Waiting for confirmation"
 
+msgid "admin.done.confirmed_by_staff"
+msgstr "The appointment was confirmed for the participant. The participant gets the confirmation with all details."
+
+msgid "admin.done.not_pending"
+msgstr "This appointment is not (or no longer) awaiting confirmation."
+
+msgid "admin.agenda.pending"
+msgstr "Not confirmed, at the latest {until}"
+
+msgid "admin.agenda.confirm"
+msgstr "Confirm for participant"
+
+msgid "admin.agenda.filter_pending"
+msgstr "Not confirmed only"
+
+msgid "admin.agenda.filter_all"
+msgstr "All appointments"
+
+msgid "admin.done.confirm_lapsed"
+msgstr "This appointment had already lapsed: nobody confirmed it in time. The participant is told so."
+
+msgid "admin.agenda.slot_staffing_pending"
+msgstr "{Agents}: {agents}, bookings: {booked} (of which {pending} not confirmed)"
+
+msgid "admin.audit.detail.booking_confirmed_by_staff"
+msgstr "Appointment confirmed for the participant"
+
 msgid "reports.view.volume"
 msgstr "Volume"
 

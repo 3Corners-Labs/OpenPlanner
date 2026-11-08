@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "admin/_icons.html" import icon %}
 {% block title %}{{ reference }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
@@ -8,6 +9,7 @@
     <h2 id="booking-heading">{{ reference }}</h2>
     <p class="card__lead">{{ when }} · {{ kind }}{% if routing %} · {{ routing }}{% endif %}</p>
   </div>
+  {% if pending_until %}<p><span class="chip chip--warning">{{ icon("clock") }}{{ _("admin.agenda.pending", until=pending_until) }}</span></p>{% endif %}
   <dl class="facts">
     <div><dt>{{ _("admin.agenda.meeting") }}</dt><dd><span class="chip{% if call.tone %} chip--{{ call.tone }}{% endif %}">{{ call.label }}</span></dd></div>
     {% if meeting_id %}<div><dt>{{ _("admin.agenda.meeting_id") }}</dt><dd><code>{{ meeting_id }}</code></dd></div>{% endif %}

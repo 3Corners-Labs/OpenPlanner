@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import RedirectResponse
 
 from app.admin.authz import AdminContext, RequirePermission
-from app.admin.forms import safe_next
+from app.admin.return_to import safe_next
 from app.admin.session import choose_alert_prefs, choose_nav, choose_theme
 from app.domain.authorization import Permission
 

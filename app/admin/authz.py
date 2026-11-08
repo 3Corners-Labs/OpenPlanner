@@ -28,6 +28,7 @@ from typing import Annotated
 import structlog
 from fastapi import Depends, Request
 
+from app.admin.return_to import return_path
 from app.admin.session import current_login, load_login, login_age, reject_session
 from app.domain.admin import AdminService, Authorization
 from app.domain.admin_session_service import AdminSessionService
@@ -240,20 +241,6 @@ def can_function(principal: Principal) -> Callable[..., bool]:
         return not scope_for(principal, permission).is_empty
 
     return can
-
-
-def return_path(request: Request) -> str:
-    """Return the page to come back to after a fresh login or a profile-menu choice.
-
-    A GET returns to itself. A POST returns to the page that sent the form (the referer
-    path); every receiver passes it through ``safe_next``, so a forged referer cannot leave
-    the portal.
-    """
-    if request.method == "GET":
-        return request.url.path
-    referer = request.headers.get("referer", "")
-    path = referer.split("://", 1)[-1].partition("/")[2]
-    return f"/{path.split('?', 1)[0]}" if path else "/admin/"
 
 
 class RequirePermission:

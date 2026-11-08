@@ -1684,6 +1684,15 @@ class Transaction(Protocol):
         """
         ...
 
+    async def find_agenda_bookings(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[Booking]:
+        """Return the group's scheduled bookings in the agenda (``IN_AGENDA``) in [lower, upper).
+
+        Confirmed ones and those awaiting the participant's confirmation (ADR 0056 point 11).
+        """
+        ...
+
     async def list_suspended_bookings(
         self, scope: Scope, group_id: int, status: BookingStatus = BookingStatus.SUSPENDED
     ) -> list[Booking]:
