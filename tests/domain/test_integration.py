@@ -472,3 +472,17 @@ async def test_a_bookings_task_new_is_ignored_and_a_probes_events_are_noted(
     )
     assert uow.state.booking_events.get(123, []) == []  # nothing on the booking's timeline
     assert await probes.events("probe-task") == (EventKind.TASK_CREATED, EventKind.TASK_ENDED)
+
+
+def test_the_lobby_wait_starts_at_the_first_join_and_ends_when_everyone_left() -> None:
+    """ADR 0043 point 6: ``lobby_since`` is the join, kept on a second guest, cleared on leave."""
+    later = NOW + timedelta(minutes=2)
+    status = apply_event(new_status(1), EventKind.GUEST_JOINED, NOW)
+    status = apply_event(status, EventKind.GUEST_JOINED, later)
+    assert status.lobby_since == NOW
+    status = apply_event(status, EventKind.PARTICIPANT_LEFT, later)
+    assert status.lobby_since == NOW
+    status = apply_event(status, EventKind.PARTICIPANT_LEFT, later)
+    assert status.lobby_since is None
+    status = apply_event(status, EventKind.HOST_JOINED, later)
+    assert apply_event(status, EventKind.GUEST_JOINED, later).lobby_since is None

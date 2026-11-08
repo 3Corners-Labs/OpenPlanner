@@ -39,7 +39,6 @@ from app.domain.own_queue import (
     QueueEntry,
     VideoState,
     next_up,
-    not_claimed_in_time,
     participant_state,
     summarise,
     video_state,
@@ -51,6 +50,7 @@ from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, GroupSummary
 from app.domain.staff import StaffFilter, StaffMember
 from app.domain.tokens import agent_pseudonym, agent_pseudonyms
+from app.domain.usage_recording import record_queue_claimed, record_queue_released
 
 CLAIMED = "queue.claimed"
 RELEASED = "queue.released"
@@ -110,12 +110,15 @@ class GroupQueueSummary:
             request.
         longest_wait: How long the first of them has waited.
         staff_available: Staff who may work this queue and are signed in now.
+        not_picked_up: Bookings nobody claimed ``not_picked_up_minutes`` after their start
+            (ADR 0043 point 8).
     """
 
     summary: GroupSummary
     waiting: int
     longest_wait: timedelta
     staff_available: int
+    not_picked_up: int = 0
 
 
 @dataclass(frozen=True)
@@ -178,7 +181,7 @@ class QueueService:
         nxt = next_up(entries)
         return QueueView(
             group,
-            [_row(e, me, not_claimed_in_time(e, now, limit)) for e in entries],
+            [_row(e, me, e.not_picked_up(now, limit)) for e in entries],
             nxt.booking.id if nxt else None,
             group.queue_free_pick_allowed,
             _supervises(principal, summary),
@@ -207,12 +210,20 @@ class QueueService:
             }
             rows = []
             for summary in groups:
-                queue = summarise(await self._entries(tx, principal, summary.group, now), now)
+                entries = await self._entries(tx, principal, summary.group, now)
+                queue = summarise(entries, now)
+                limit = timedelta(minutes=summary.group.not_picked_up_minutes)
                 available = _signed_in_for(
                     staff[summary.organisation_slug], summary, now, session_lifetime
                 )
                 rows.append(
-                    GroupQueueSummary(summary, queue.waiting, queue.longest_wait, available)
+                    GroupQueueSummary(
+                        summary,
+                        queue.waiting,
+                        queue.longest_wait,
+                        available,
+                        sum(1 for e in entries if e.not_picked_up(now, limit)),
+                    )
                 )
         return sorted(rows, key=lambda r: (-r.waiting, -r.longest_wait, r.summary.group.name))
 
@@ -288,6 +299,7 @@ class QueueService:
                 raise DomainError(ErrorCode.NOT_CLAIMED)
             await tx.release_claim(booking_id)
             await self._audit(tx, principal, summary, booking_id, RELEASED)
+            await record_queue_released(tx, booking, summary.group, self._clock.now())
 
     async def _group(self, principal: Principal, slug: str) -> GroupSummary:
         """Authorise ``queue.work`` on the group and return it if it has an own queue."""
@@ -320,6 +332,7 @@ class QueueService:
         if not await tx.claim_booking(booking_id, claim):
             raise DomainError(ErrorCode.ALREADY_CLAIMED)
         await self._audit(tx, principal, summary, booking_id, CLAIMED)
+        await record_queue_claimed(tx, booking, summary.group, now)
         return _claimed(booking)
 
     def _holds(self, principal: Principal, booking: Booking) -> bool:

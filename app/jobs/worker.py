@@ -67,10 +67,11 @@ from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
-from app.domain.queue_wait import QueueWaitWatch
+from app.domain.queue_wait import NotPickedUpWatch, QueueWaitWatch
 from app.domain.request_log import RequestEvents
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
+from app.domain.slot_close_service import SlotCloser
 from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.system_log import SystemLog
 from app.domain.tls_check import TlsWatch
@@ -83,7 +84,7 @@ from app.i18n.dates import configure_clock
 from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
-from app.jobs.usage import backfill_usage, roll_up_usage
+from app.jobs.usage import backfill_usage, close_slots, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.web.alert_text import alert_composer
@@ -299,6 +300,9 @@ async def run_worker(
         lambda: live.settings.reporting_retention_months,
     )
     backfill = UsageBackfill(uow, clock, lambda: live.settings.reporting_enabled)
+    slot_closer = SlotCloser(
+        uow, clock, lambda: timedelta(minutes=live.settings.reporting_rollup_interval_minutes)
+    )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
         uow,
@@ -341,6 +345,8 @@ async def run_worker(
         ),
         reported=partial(_open_waits, uow),
     )
+    # ADR 0043 point 8: one system event per own-queue booking nobody claimed in time.
+    unpicked = NotPickedUpWatch(uow, clock, system_log)
     # ADR 0082 point 9: the open alerts to their email addresses and Webex spaces.
     notifier = AlertNotifier(
         uow,
@@ -399,6 +405,7 @@ async def run_worker(
                     heartbeat_at = await _heartbeat(uow, clock, runner, version, heartbeat_at)
                     await housekeeping.run()
                     await backfill_usage(backfill)  # ADR 0117: bounded, until complete
+                    await close_slots(slot_closer)  # ADR 0117 step 3; logs, never raises
                     await roll_up_usage(usage)  # ADR 0117; logs a failure, never raises
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)
@@ -409,6 +416,7 @@ async def run_worker(
                     await _watch_health(health_watch)
                     await _notify(notifier)
                     await _watch_waits(waits)
+                    await _watch_unpicked(unpicked)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=live.settings.worker_poll_seconds)
@@ -548,6 +556,17 @@ async def _watch_waits(watch: QueueWaitWatch) -> None:
         return
     if crossed:
         log.info("queue.wait_crossed", groups=len(crossed))
+
+
+async def _watch_unpicked(watch: NotPickedUpWatch) -> None:
+    """Record the own-queue bookings nobody claimed in time; a failure never stops the loop."""
+    try:
+        found = await watch.check()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("queue.unpicked_watch_failed", error=type(exc).__name__)
+        return
+    if found:
+        log.info("queue.unpicked_found", bookings=found)
 
 
 async def _main() -> None:

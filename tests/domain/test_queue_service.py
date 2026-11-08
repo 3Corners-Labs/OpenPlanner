@@ -266,6 +266,19 @@ async def test_the_summaries_cover_the_own_queues_in_reach_with_waiting_and_staf
     assert summaries[0].staff_available == 1
 
 
+async def test_the_summaries_count_the_bookings_not_picked_up_in_time(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0043 point 8: the overview shows how many nobody claimed in time."""
+    await _book(uow, clock)
+    await _book(uow, clock, SLOT_0930)
+    clock.advance(SLOT_0900 + timedelta(minutes=11) - clock.now())
+
+    [summary] = await queue.summaries(GROUP_ADMIN, timedelta(hours=8))
+
+    assert summary.not_picked_up == 1
+
+
 async def test_the_summaries_leave_out_contact_center_groups_and_groups_outside_reach(
     queue: QueueService, uow: InMemoryUnitOfWork
 ) -> None:
