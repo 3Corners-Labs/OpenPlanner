@@ -504,6 +504,8 @@ with data held elsewhere. The row itself is deleted `booking_row_retention_days`
 | `bookings` | `first_name`, `last_name`, `email`, `phone`, `form_answers`, `guest_join_url`, `host_join_url`, `trial_join_url`; provider links `video_room_id`, `trial_room_id`, `wxcc_task_id`; `claimed_by` (the list `privacy.PURGED_FIELDS`) | slot end + 24 h, cancellation + 24 h; a suspended booking at most until the earlier of closure end + 30 days and `closure_max_retention_days` after the slot end | the `purge_pii` job, else the daily retention sweep, else `python -m app.cli purge-overdue`; `management_token_hash` is replaced by a random value, `booking_events.message` emptied | `purge-overdue` runs before the system is back |
 | `bookings` (what stays after the purge) | `management_token_salt`, `public_ref` (random, names no one), `locale`, `consents`, times, `closure_id`, `change_reason`, status | until `booking_row_retention_days` (class C, default 730 days, 365 to 3650) after `pii_purged_at` | the worker's daily housekeeping (`booking_rows.rollup`): merges the row into a count per group, day and status, then deletes it with its events, call status and finished jobs; never a row that still holds personal data or has an open job | `purge-overdue` first; rows already merged stay merged |
 | `booking_day_counts` | none: group, UTC day of the slot, final status, a count and the latest `pii_purged_at` among them | for good: statistics without a person or an identifier | deleted with the group (cascade) | as the live system |
+| `usage_events` | none: fact kind, the UTC hour (never an exact time), organisation, group and the codes and numbers of `privacy.USAGE_FIELDS`; no booking id, reference or free text, so a row cannot be joined back to an appointment | the outbox of the rollup (ADR 0117, built from step 2): until the worker rolls it up and deletes it after `reporting_event_retention_days` (step 4; until then rows stay) | the worker's rollup (step 4); no cascade, statistics outlive the group | as the live system |
+| `usage_hour`, `usage_staff_hour` | none: counts and sums per hour, group, metric and cut; `usage_staff_hour` holds a team member's row id (`staff_id`) and exists for the team view, which is off by default (ADR 0117 point 9) | `reporting_retention_months` (step 4) | the worker's housekeeping (step 4); a removed team member's rows fold into one *former team members* row | as the live system |
 | `booking_events` | `message` (provider reason, up to 300 characters, masked); kind, time and reason code carry no personal data | `message`: as the booking's purge; the rest with the booking row | the purge empties `message`; the row goes with the booking (cascade) | as `bookings` |
 | `call_status` | none: states and times of the meeting and the work item, by booking id | with the booking row | cascade with the booking | as `bookings` |
 | `jobs` | none: booking id, type, run time, status, last error as a reason code (no payload with personal data) | pending jobs until they run; the row with the booking | the purge job is the last job of every plan; cascade with the booking | restored jobs find their booking purged or stale and end silently |
@@ -558,6 +560,21 @@ flowchart LR
 
 The reasoning and the criteria for an installation of its own are in `docs/threat-model.md`,
 section *Shared trust boundaries*.
+
+## Usage facts (ADR 0117, step 2)
+
+Every state change of a booking writes one small fact in the transaction that makes the change
+(`app/domain/usage_recording.py` builds it, `Transaction.record_usage` stores it in a savepoint):
+
+    booking placed / confirmed / cancelled / moved / lapsed / suspended / resumed
+       ─► UsageFact (hour, organisation, group, kind, codes) ─► usage_events    (this step)
+       ─► worker rollup ─► usage_hour ─► reports                                 (steps 4 and 5)
+
+A fact holds the hour and the allow-listed codes and numbers only (`privacy.USAGE_FIELDS`): no
+name, address, phone number, join link, booking id, reference, token or free text. A failing
+insert is rolled back to its savepoint and dropped with a log line that names the kind and no
+value, so reporting never fails a participant's action; `reporting_enabled` (class C) off writes
+nothing. Nothing in this path reads a purged column.
 
 ## Planned flows
 
