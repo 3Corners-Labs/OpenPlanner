@@ -15,8 +15,8 @@ the reminder rules of ``MessagingService``, ``check_form`` for the form rules of
 """
 
 from collections import Counter
-from collections.abc import Iterable, Iterator, Mapping, Sequence
-from datetime import date, datetime, time
+from collections.abc import Iterable, Iterator, Mapping
+from datetime import date, datetime
 from typing import Any, cast
 
 from app.domain.agenda import agents_for
@@ -26,8 +26,6 @@ from app.domain.channel_settings import CONFIGURABLE_CHANNELS
 from app.domain.channels import (
     MAX_REMINDER_MINUTES,
     MIN_REMINDER_MINUTES,
-    ChannelKind,
-    ReminderRule,
 )
 from app.domain.configuration_changes import (
     ChangeAction,
@@ -51,17 +49,27 @@ from app.domain.configuration_schema import (
     text,
 )
 from app.domain.configuration_tree import Address, Entity, path_of, walk
-from app.domain.configuration_values import Json, Value, canonical_json
+from app.domain.configuration_v1_group_parts import (
+    check_form,
+    check_reminders,
+    day_of,
+    invalid,
+    items_of,
+    new_items,
+    override_json,
+    rule_json,
+    schedule_of,
+    strings_of,
+)
+from app.domain.configuration_values import Json, Value
 from app.domain.entitlements import is_idp_key
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import (
     Classification,
-    FieldDefinition,
-    FormDefinition,
 )
 from app.domain.form_fields import FieldType as FormFieldType
 from app.domain.message_texts import clean_text
-from app.domain.messaging_service import MAX_REMINDER_RULES
+from app.domain.routing_codec import routing_from_json, routing_to_json
 from app.domain.scheduling import (
     MAX_BOOKINGS_PER_EMAIL,
     MAX_CAPACITY,
@@ -78,14 +86,13 @@ from app.domain.scheduling import (
     MAX_TRIAL_CALLS_PER_BOOKING,
     MIN_TRIAL_CALL_MINUTES,
     RESERVED_SLUGS,
+    DispatchFallback,
     DispatchKind,
     Group,
     JoinClient,
     Offer,
     PhoneMode,
     ScheduleOverride,
-    ScheduleRule,
-    TimeWindow,
     validate_schedule,
     windows_on,
 )
@@ -96,9 +103,12 @@ DEFAULT_MAX_CUSTOM_FIELDS = 5
 _DEFAULTS = Group(0, 0, "default", "default", "UTC", 30)
 """A group with every default of the dataclass, the one source of a new group's defaults."""
 
-_ENUMS: dict[str, type[PhoneMode] | type[DispatchKind] | type[JoinClient]] = {
+_ENUMS: dict[
+    str, type[PhoneMode] | type[DispatchKind] | type[DispatchFallback] | type[JoinClient]
+] = {
     "phone_mode": PhoneMode,
     "dispatch_kind": DispatchKind,
+    "dispatch_fallback": DispatchFallback,
     "join_client": JoinClient,
 }
 _SCHEDULE_FIELDS = (
@@ -143,6 +153,8 @@ _SETTINGS: tuple[FieldSpec, ...] = (
     integer("direct_call_max_concurrent", nullable=True, minimum=1, maximum=MAX_DIRECT_CALLS),
     _setting("dispatch_lead_minutes", 0, MAX_DISPATCH_LEAD_MINUTES),
     _choice("dispatch_kind", (kind.value for kind in DispatchKind)),
+    _choice("dispatch_fallback", (kind.value for kind in DispatchFallback)),
+    text("fallback_space_room_id", nullable=True, max_length=200),
     _setting("participant_change_lead_minutes", 0, MAX_PARTICIPANT_CHANGE_LEAD_MINUTES),
     _setting("planner_change_min_lead_minutes", 0, MAX_PLANNER_LEAD_MINUTES),
     boolean("trial_call_enabled", default=_default("trial_call_enabled")),
@@ -179,6 +191,7 @@ _RULE_ITEMS = (
     integer("capacity", required=True, minimum=0, maximum=MAX_CAPACITY),
     text("label", nullable=True, max_length=MAX_LABEL_LENGTH),
     text("offer", default=Offer.SCHEDULED.value, choices=_OFFERS),
+    strings("subjects"),
     text("valid_from", nullable=True),
     text("valid_to", nullable=True),
 )
@@ -189,6 +202,7 @@ _OVERRIDE_ITEMS = (
     integer("capacity", nullable=True, minimum=0, maximum=MAX_CAPACITY),
     text("label", nullable=True, max_length=MAX_LABEL_LENGTH),
     text("offer", default=Offer.SCHEDULED.value, choices=_OFFERS),
+    strings("subjects"),
 )
 _REMINDER_ITEMS = (
     text("channel", required=True, choices=tuple(c.value for c in CONFIGURABLE_CHANNELS)),
@@ -212,58 +226,9 @@ _GROUP_TABLES = frozenset(
 )
 
 
-def _invalid(field: str, code: ErrorCode = ErrorCode.INVALID_CONFIGURATION) -> DomainError:
-    """Return the refusal that names ``field``."""
-    return DomainError(code, field)
-
-
-def _items(value: Value | None) -> list[dict[str, Json]]:
-    """Return the objects of a list field (empty when it is absent)."""
-    return cast("list[dict[str, Json]]", value if isinstance(value, list) else [])
-
-
-def _strings(fields: Mapping[str, Value], name: str) -> list[str]:
-    """Return the texts of a list field (empty when it is absent)."""
-    found = fields.get(name)
-    return [str(x) for x in found] if isinstance(found, list) else []
-
-
-def _same_item(item: Mapping[str, Json], others: Iterable[Mapping[str, Json]]) -> bool:
-    """Whether an item equals one of ``others`` (compared as canonical JSON)."""
-    text_ = canonical_json(dict(item))
-    return any(canonical_json(dict(other)) == text_ for other in others)
-
-
-def _new_items(
-    items: Sequence[dict[str, Json]], before: Sequence[dict[str, Json]]
-) -> list[dict[str, Json]]:
-    """Return the items a document adds: those the current object does not already hold.
-
-    The portal checks an entry when it is added, not again when it is left alone, so an
-    exception for a day that has passed or a reminder that no longer fits stays valid.
-    """
-    return [item for item in items if not _same_item(item, before)]
-
-
-def _clock(value: Json, field: str) -> time:
-    """Read a local time (``09:00``); anything else is refused naming ``field``."""
-    try:
-        return time.fromisoformat(str(value))
-    except ValueError:
-        raise _invalid(field) from None
-
-
-def _day(value: Json, field: str) -> date:
-    """Read a date (``2026-12-25``); anything else is refused naming ``field``."""
-    try:
-        return date.fromisoformat(str(value))
-    except ValueError:
-        raise _invalid(field) from None
-
-
-def _clock_text(value: time) -> str:
-    """Write a local time as ``HH:MM``, with seconds only when there are some."""
-    return value.isoformat(timespec="minutes" if value.second == 0 else "seconds")
+def _check_routing(value: Value, ctx: RuleContext) -> Value:
+    """Check a group's routing as the routing screens do; return it as it is stored."""
+    return cast("Json", routing_to_json(routing_from_json(value)))
 
 
 def _build_group(view: Mapping[str, Value], ctx: RuleContext) -> Group:
@@ -272,6 +237,9 @@ def _build_group(view: Mapping[str, Value], ctx: RuleContext) -> Group:
     for name, enum in _ENUMS.items():
         if name in values:
             values[name] = enum(values[name])
+    routing = view.get("routing")
+    if routing is not None:
+        values["routing"] = routing_from_json(routing)
     return Group(
         0,
         0,
@@ -280,80 +248,6 @@ def _build_group(view: Mapping[str, Value], ctx: RuleContext) -> Group:
         archived_at=ctx.now if view.get("archived") else None,
         **values,
     )
-
-
-def _window(item: Mapping[str, Json]) -> TimeWindow:
-    """Build the staffing block of a rule or an exception item."""
-    return TimeWindow(
-        _clock(item["opens"], "opens"),
-        _clock(item["closes"], "closes"),
-        int(cast("int", item["capacity"])),
-        cast("str | None", item.get("label")),
-        Offer(str(item.get("offer", Offer.SCHEDULED.value))),
-    )
-
-
-def _rule(item: Mapping[str, Json]) -> ScheduleRule:
-    """Build a weekly staffing rule from its item."""
-    start, end = item.get("valid_from"), item.get("valid_to")
-    return ScheduleRule(
-        int(cast("int", item["weekday"])),
-        _window(item),
-        None if start is None else _day(start, "valid_from"),
-        None if end is None else _day(end, "valid_to"),
-    )
-
-
-def _override(item: Mapping[str, Json]) -> ScheduleOverride:
-    """Build an exception from its item: all three of opens, closes and capacity, or none."""
-    day = _day(item["day"], "day")
-    parts = (item.get("opens"), item.get("closes"), item.get("capacity"))
-    if all(part is None for part in parts):
-        return ScheduleOverride(day, None)
-    if any(part is None for part in parts):
-        raise _invalid("window")
-    return ScheduleOverride(day, _window(item))
-
-
-def _rule_json(rule: ScheduleRule) -> dict[str, Json]:
-    """Write a rule as the item the document and the export hold."""
-    window = rule.window
-    return {
-        "weekday": rule.weekday,
-        "opens": _clock_text(window.opens),
-        "closes": _clock_text(window.closes),
-        "capacity": window.capacity,
-        "label": window.label,
-        "offer": window.offer.value,
-        "valid_from": rule.valid_from.isoformat() if rule.valid_from else None,
-        "valid_to": rule.valid_to.isoformat() if rule.valid_to else None,
-    }
-
-
-def _override_json(override: ScheduleOverride) -> dict[str, Json]:
-    """Write an exception as the item the document and the export hold."""
-    window = override.window
-    return {
-        "day": override.day.isoformat(),
-        "opens": None if window is None else _clock_text(window.opens),
-        "closes": None if window is None else _clock_text(window.closes),
-        "capacity": None if window is None else window.capacity,
-        "label": None if window is None else window.label,
-        "offer": Offer.SCHEDULED.value if window is None else window.offer.value,
-    }
-
-
-def schedule_of(
-    fields: Mapping[str, Value],
-) -> tuple[list[ScheduleRule], list[ScheduleOverride]]:
-    """Return the rules and exceptions a group's fields hold.
-
-    Raises:
-        DomainError: ``invalid_configuration`` naming the offending part of an item.
-    """
-    rules = [_rule(item) for item in _items(fields.get("schedule_rules"))]
-    overrides = [_override(item) for item in _items(fields.get("schedule_overrides"))]
-    return rules, overrides
 
 
 def _check_schedule(
@@ -368,148 +262,16 @@ def _check_schedule(
     """
     rules, overrides = schedule_of(view)
     validate_schedule(rules, overrides)
-    items = [_override_json(o) for o in overrides]
-    had = _items(before.get("schedule_overrides")) if before else []
+    items = [override_json(o) for o in overrides]
+    had = items_of(before.get("schedule_overrides")) if before else []
     today = group.today(ctx.now)
-    for new in _new_items(items, had):
-        if _day(new["day"], "day") < today:
-            raise _invalid("day")
+    for new in new_items(items, had):
+        if day_of(new["day"], "day") < today:
+            raise invalid("day")
     return {
-        "schedule_rules": [_rule_json(rule) for rule in rules],
+        "schedule_rules": [rule_json(rule) for rule in rules],
         "schedule_overrides": items,
     }
-
-
-def check_reminders(
-    items: Sequence[dict[str, Json]], before: Sequence[dict[str, Json]], phone_mode: PhoneMode
-) -> list[dict[str, Json]]:
-    """Check a group's reminder rules as ``MessagingService`` does; return them normalised.
-
-    The offset, the number of rules and the pair of channel and offset are checked for all of
-    them; the channel (email or SMS, and SMS only where the form asks for a phone number) only
-    for a rule that is new, as the portal never removes an SMS rule when the phone field goes.
-
-    Raises:
-        DomainError: ``invalid_configuration`` naming ``minutes_before``, ``channel`` or
-            ``reminders``; ``reminder_exists`` for the same channel and offset twice.
-    """
-    if len(items) > MAX_REMINDER_RULES:
-        raise _invalid("reminders")
-    seen: set[tuple[str, int]] = set()
-    rules: list[dict[str, Json]] = []
-    for item in items:
-        rule = ReminderRule(
-            ChannelKind(str(item["channel"])),
-            int(cast("int", item["minutes_before"])),
-            bool(item["enabled"]),
-        )
-        pair = (rule.channel.value, rule.minutes_before)
-        if pair in seen:
-            raise _invalid("minutes_before", ErrorCode.REMINDER_EXISTS)
-        seen.add(pair)
-        rules.append(
-            {
-                "channel": rule.channel.value,
-                "minutes_before": rule.minutes_before,
-                "enabled": rule.enabled,
-            }
-        )
-    for new in _new_items(rules, before):
-        if new["channel"] == ChannelKind.SMS.value and phone_mode is PhoneMode.HIDDEN:
-            raise _invalid("channel")
-    return rules
-
-
-def _texts(value: Json, field: str) -> dict[str, str]:
-    """Return a JSON object of texts, or refuse naming ``field``."""
-    if not isinstance(value, dict) or not all(
-        isinstance(k, str) and isinstance(v, str) for k, v in value.items()
-    ):
-        raise _invalid(field, ErrorCode.INVALID_FORM_FIELD)
-    return dict(cast("dict[str, str]", value))
-
-
-def _definition(raw: Mapping[str, Json]) -> FieldDefinition:
-    """Build a form field from its item, which runs every check of the form screen."""
-    options = raw.get("option_labels", {})
-    if not isinstance(options, dict):
-        raise _invalid("options", ErrorCode.INVALID_FORM_FIELD)
-    return FieldDefinition.create(
-        key=str(raw["key"]),
-        type=FormFieldType(str(raw["type"])),
-        labels=_texts(raw["labels"], "label"),
-        required=bool(raw.get("required", False)),
-        classification=Classification(str(raw.get("classification", "pii"))),
-        options=cast("list[str]", raw.get("options", [])),
-        minimum=cast("int | None", raw.get("minimum")),
-        maximum=cast("int | None", raw.get("maximum")),
-        hints=_texts(raw.get("hints", {}), "hint"),
-        option_labels={k: _texts(v, "options") for k, v in options.items()},
-    )
-
-
-def _form_json(definition: FieldDefinition) -> dict[str, Json]:
-    """Write a form field as the item the document and the export hold."""
-    return {
-        "key": definition.key,
-        "type": definition.type.value,
-        "required": definition.required,
-        "classification": definition.classification.value,
-        "options": list(definition.options),
-        "minimum": definition.minimum,
-        "maximum": definition.maximum,
-        "labels": dict(definition.labels),
-        "hints": dict(definition.hints),
-        "option_labels": {k: dict(v) for k, v in definition.option_labels.items()},
-        "retired": definition.retired,
-    }
-
-
-def check_form(
-    items: Sequence[dict[str, Json]], before: Sequence[dict[str, Json]], limit: int
-) -> list[dict[str, Json]]:
-    """Check a group's custom form fields as ``FormService`` does; return them normalised.
-
-    The listed fields are the form: the active ones in form order, the retired ones after. A
-    field that exists now and is not listed is retired by the adapter, never deleted, so its
-    key stays reserved. The type of an active field cannot change and a retired field cannot
-    come back. A retired field left as it is is not checked again. The limit counts active
-    fields and is lifted to what the form holds when the document adds none.
-
-    Raises:
-        DomainError: ``invalid_form_field`` naming the attribute, ``form_field_forbidden`` for a
-            label that asks for forbidden data.
-    """
-    existing = {str(item["key"]): item for item in before}
-    keys = [str(item["key"]) for item in items]
-    if len(set(keys)) != len(keys):
-        raise _invalid("key", ErrorCode.INVALID_FORM_FIELD)
-    active: list[FieldDefinition] = []
-    retired: list[FieldDefinition] = []
-    kept: list[dict[str, Json]] = []
-    for item in items:
-        old = existing.get(str(item["key"]))
-        if item.get("retired") and old is not None and old.get("retired") and item == old:
-            kept.append(item)
-            continue
-        if old is not None and not old.get("retired") and old["type"] != item["type"]:
-            raise _invalid("type", ErrorCode.INVALID_FORM_FIELD)
-        if old is not None and old.get("retired") and not item.get("retired"):
-            raise _invalid("key", ErrorCode.INVALID_FORM_FIELD)
-        (retired if item.get("retired") else active).append(_definition(item))
-    was_active = {key for key, old in existing.items() if not old.get("retired")}
-    added = [d for d in active if d.key not in was_active]
-    form = FormDefinition.create(
-        version=1,
-        fields=active,
-        max_custom_fields=limit if added else max(limit, len(active)),
-        retired=retired,
-    )
-    return [
-        *(_form_json(d) for d in form.fields),
-        *(_form_json(d) for d in form.retired),
-        *kept,
-    ]
 
 
 def _check_group(
@@ -517,13 +279,14 @@ def _check_group(
 ) -> Mapping[str, Value]:
     """Check a whole group as the settings, staffing, reminder and form screens do."""
     if current is None and str(view["slug"]) in RESERVED_SLUGS:
-        raise _invalid("slug", ErrorCode.SLUG_TAKEN)
+        raise invalid("slug", ErrorCode.SLUG_TAKEN)
     group = _build_group(view, ctx)
     idp_key = view.get("idp_key")
     if idp_key is not None and not is_idp_key(str(idp_key)):
-        raise _invalid("idp_key")
+        raise invalid("idp_key")
     days = [
-        _day(day, "holiday_open_days").isoformat() for day in _strings(view, "holiday_open_days")
+        day_of(day, "holiday_open_days").isoformat()
+        for day in strings_of(view, "holiday_open_days")
     ]
     before = current or {}
     checked: dict[str, Value] = {**view, "holiday_open_days": cast("list[Json]", days)}
@@ -531,8 +294,8 @@ def _check_group(
     checked["reminder_rules"] = cast(
         "list[Json]",
         check_reminders(
-            _items(view.get("reminder_rules")),
-            _items(before.get("reminder_rules")),
+            items_of(view.get("reminder_rules")),
+            items_of(before.get("reminder_rules")),
             group.phone_mode,
         ),
     )
@@ -540,8 +303,8 @@ def _check_group(
     checked["form_fields"] = cast(
         "list[Json]",
         check_form(
-            _items(view.get("form_fields")),
-            _items(before.get("form_fields")),
+            items_of(view.get("form_fields")),
+            items_of(before.get("form_fields")),
             limit if isinstance(limit, int) else DEFAULT_MAX_CUSTOM_FIELDS,
         ),
     )
@@ -553,7 +316,7 @@ def _check_text(
 ) -> Mapping[str, Value]:
     """Check one text of a group: a known locale, a known block, the portal's own text rules."""
     if view["locale"] not in ctx.locales:
-        raise _invalid("locale")
+        raise invalid("locale")
     key, body = str(view["key"]), str(view["text"])
     cleaned = clean_term(key, body) if key in TERM_KEYS else clean_text(key, body)
     return {**view, "text": cleaned}
@@ -635,6 +398,7 @@ GROUP = Kind(
                     "capacity",
                     "label",
                     "offer",
+                    "subjects",
                     "valid_from",
                     "valid_to",
                 )
@@ -646,7 +410,7 @@ GROUP = Kind(
             permission=Permission.SCHEDULE_MANAGE,
             columns=tuple(
                 f"schedule_overrides.{name}"
-                for name in ("day", "opens", "closes", "capacity", "label", "offer")
+                for name in ("day", "opens", "closes", "capacity", "label", "offer", "subjects")
             ),
         ),
         objects(
@@ -658,6 +422,12 @@ GROUP = Kind(
             ),
         ),
         json_object(
+            "routing",
+            nullable=True,
+            check=_check_routing,
+            description="Subjects, switched-on routing attributes and their mapping.",
+        ),
+        json_object(
             "contacts",
             nullable=True,
             permission=Permission.CLOSURE_MANAGE,
@@ -667,7 +437,7 @@ GROUP = Kind(
     ),
     collections=(Collection("texts", GROUP_TEXT, Shape.MAP),),
     check=_check_group,
-    derived=frozenset({"groups.form_version"}),
+    derived=frozenset({"groups.form_version", "groups.fallback_active_since"}),
     description="A bookable team: its settings, form, staffing, reminders, texts and contacts.",
 )
 
@@ -724,14 +494,14 @@ def _closed_days(root: Entity, address: Address, group: Entity) -> set[date]:
     days = _calendar_days(root)
     own = group.fields.get("holiday_source") == "own"
     slugs = (
-        _strings(group.fields, "holiday_calendars")
+        strings_of(group.fields, "holiday_calendars")
         if own
         else (_organisation_calendars(root, address[0]))
     )
     closed: set[date] = set()
     for slug in slugs:
         closed |= days.get(str(slug), set())
-    return closed - set(_days(_strings(group.fields, "holiday_open_days")))
+    return closed - set(_days(strings_of(group.fields, "holiday_open_days")))
 
 
 def _agents(
@@ -779,12 +549,12 @@ def _calendar_rules(resolution: Resolution) -> Iterator[Refusal]:
     before = _groups(resolution.current)
     for address, group in _groups(resolution.resulting).items():
         path = _group_path(address)
-        named = _strings(group.fields, "holiday_calendars")
+        named = strings_of(group.fields, "holiday_calendars")
         if any(slug not in known for slug in named):
             yield Refusal(path, ErrorCode.HOLIDAY_CALENDAR_NOT_FOUND, "holiday_calendars")
         old = before.get(address)
-        had = set(_days(_strings(old.fields, "holiday_open_days"))) if old else set()
-        added = [d for d in _days(_strings(group.fields, "holiday_open_days")) if d not in had]
+        had = set(_days(strings_of(old.fields, "holiday_open_days"))) if old else set()
+        added = [d for d in _days(strings_of(group.fields, "holiday_open_days")) if d not in had]
         if not added:
             continue
         closed = _calendar_days_for(resolution.resulting, address, group)
@@ -797,7 +567,7 @@ def _calendar_days_for(root: Entity, address: Address, group: Entity) -> set[dat
     """Return every holiday date of the calendars a group observes (open days included)."""
     own = group.fields.get("holiday_source") == "own"
     slugs = (
-        _strings(group.fields, "holiday_calendars")
+        strings_of(group.fields, "holiday_calendars")
         if own
         else (_organisation_calendars(root, address[0]))
     )

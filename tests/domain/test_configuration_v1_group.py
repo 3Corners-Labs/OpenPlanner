@@ -27,6 +27,7 @@ from app.domain.configuration_v1_group import (
     check_reminders,
 )
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.routing_codec import routing_from_json, routing_to_json
 from app.domain.scheduling import PhoneMode
 from tests.support.configuration import Recorder, entity, parse, plan
 from tests.support.configuration_columns import uncovered_columns
@@ -82,6 +83,7 @@ RULE = {
     "capacity": 3,
     "label": None,
     "offer": "scheduled",
+    "subjects": [],
     "valid_from": None,
     "valid_to": None,
 }
@@ -341,7 +343,10 @@ def test_rules_and_exceptions_the_portal_refuses_are_refused() -> None:
 def test_an_exception_for_a_day_that_has_passed_is_refused_only_when_it_is_new() -> None:
     old = {"day": "2026-11-01", "opens": None, "closes": None, "capacity": None}
     current = world(
-        org("acme", team(schedule_overrides=[{**old, "label": None, "offer": "scheduled"}]))
+        org(
+            "acme",
+            team(schedule_overrides=[{**old, "label": None, "offer": "scheduled", "subjects": []}]),
+        )
     )
 
     kept = planned(doc({"slug": "team", "schedule_overrides": [old], "name": "Helpdesk"}), current)
@@ -850,3 +855,82 @@ def test_the_kinds_name_the_tables_the_assembler_expects() -> None:
         "schedule_overrides",
         "reminder_rules",
     }
+
+
+# --- fallback, routing and subjects (ADR 0081, ADR 0082) ------------------------------------
+
+ROUTING = {
+    "subjects": [
+        {"code": "billing", "labels": {"nl": "Factuur", "en": "Invoice"}},
+        {"code": "other", "labels": {"nl": "Anders", "en": "Other"}},
+    ],
+    "attributes": ["preferred_language"],
+    "mapping": {"subject": {"name": "topic", "values": {"billing": "B"}}},
+}
+
+
+def test_a_new_group_has_no_fallback_and_no_routing() -> None:
+    values = group_change(planned(doc(NEW_TEAM))).values
+
+    assert values["dispatch_fallback"] == "none"
+    assert values["fallback_space_room_id"] is None
+    assert values["routing"] is None
+
+
+def test_the_fallback_is_checked_like_the_portal_checks_it() -> None:
+    own = {
+        **NEW_TEAM,
+        "dispatch_fallback": "own_queue",
+        "fallback_space_room_id": "Y2lzY29zcGFyazo",
+    }
+    bad_room = {**NEW_TEAM, "fallback_space_room_id": "no good"}
+
+    ok = planned(doc(own))
+    refused = planned(doc(bad_room))
+
+    assert group_change(ok).values["dispatch_fallback"] == "own_queue"
+    assert refusals(refused) == [
+        (
+            "organisations[acme].groups[team]",
+            ErrorCode.INVALID_CONFIGURATION,
+            "fallback_space_room_id",
+        )
+    ]
+    with pytest.raises(DomainError):
+        parse(doc({**NEW_TEAM, "dispatch_fallback": "elsewhere"}), FORMAT)
+
+
+def test_routing_is_normalised_through_the_codec_and_an_empty_one_is_none() -> None:
+    created = group_change(planned(doc({**NEW_TEAM, "routing": ROUTING}))).values["routing"]
+    emptied = planned(
+        doc({"slug": "team", "routing": {}}), world(org("acme", team(routing=ROUTING)))
+    )
+
+    assert created == routing_to_json(routing_from_json(ROUTING))
+    assert group_change(emptied).values["routing"] is None
+
+
+def test_routing_the_portal_would_refuse_is_refused() -> None:
+    bad = {"subjects": [{"code": "Bad Code", "labels": {"nl": "A", "en": "A"}}]}
+
+    result = planned(doc({**NEW_TEAM, "routing": bad}))
+
+    assert refusals(result) == [
+        ("organisations[acme].groups[team]", ErrorCode.INVALID_CONFIGURATION, "subject_code")
+    ]
+
+
+def test_a_block_offers_the_subjects_it_names_sorted_and_without_repeats() -> None:
+    rule = {**RULE, "subjects": ["other", "billing", "other"]}
+
+    result = planned(doc({**NEW_TEAM, "schedule_rules": [rule]}))
+
+    assert group_change(result).values["schedule_rules"][0]["subjects"] == ["billing", "other"]
+
+
+def test_a_subject_code_that_is_no_code_is_refused() -> None:
+    result = planned(doc({**NEW_TEAM, "schedule_rules": [{**RULE, "subjects": ["Bad Code"]}]}))
+
+    assert refusals(result) == [
+        ("organisations[acme].groups[team]", ErrorCode.INVALID_CONFIGURATION, "subjects")
+    ]
