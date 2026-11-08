@@ -117,6 +117,7 @@ SETTING_LABELS: dict[str, str] = {
     "closure_max_retention_days": "settings.field.closure_max_retention_days.label",
     "closure_max_notice_days": "settings.field.closure_max_notice_days.label",
     "booking_form_max_custom_fields": "settings.field.booking_form_max_custom_fields.label",
+    "max_subjects_per_group": "settings.field.max_subjects_per_group.label",
     "phone_default_region": "settings.field.phone_default_region.label",
     "booking_confirm_window_hours": "settings.field.booking_confirm_window_hours.label",
     "booking_confirm_cutoff_hours": "settings.field.booking_confirm_cutoff_hours.label",

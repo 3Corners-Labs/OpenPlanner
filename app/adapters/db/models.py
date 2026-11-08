@@ -229,6 +229,8 @@ class GroupRow(Base):
     idp_key: Mapped[str] = mapped_column(String(64), default=_slug_as_idp_key)
     # ADR 0084: set when the group is archived; NULL while it is in use.
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # ADR 0081: subjects, switched-on routing attributes and their mapping, as JSON; no PII.
+    routing: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         UniqueConstraint("organisation_id", "idp_key", name="uq_groups_organisation_idp_key"),
@@ -311,6 +313,8 @@ class ScheduleRuleRow(Base):
     capacity: Mapped[int] = mapped_column(Integer)
     label: Mapped[str | None] = mapped_column(String(50))
     offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
+    # ADR 0081 point 4: the subject codes the block offers, comma-separated; NULL offers all.
+    subjects: Mapped[str | None] = mapped_column(String(1000))
     valid_from: Mapped[date | None] = mapped_column(Date)
     valid_to: Mapped[date | None] = mapped_column(Date)
 
@@ -335,6 +339,8 @@ class ScheduleOverrideRow(Base):
     capacity: Mapped[int | None] = mapped_column(Integer)
     label: Mapped[str | None] = mapped_column(String(50))
     offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
+    # ADR 0081 point 4: the subject codes the block offers, comma-separated; NULL offers all.
+    subjects: Mapped[str | None] = mapped_column(String(1000))
 
     __table_args__ = (
         Index("ix_schedule_overrides_group_day", "group_id", "day"),
@@ -527,6 +533,10 @@ class BookingRow(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     # ADR 0055: answers to the group's custom fields as JSON; PII, purged as a whole.
     form_answers: Mapped[str | None] = mapped_column(Text)
+    # ADR 0081: the chosen subject's code and the attribute codes (JSON); no PII, purged with
+    # the booking all the same (privacy.ROUTING_FIELDS).
+    subject_code: Mapped[str | None] = mapped_column(String(40))
+    routing_answers: Mapped[str | None] = mapped_column(String(500))
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),

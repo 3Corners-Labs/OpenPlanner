@@ -6,7 +6,7 @@
 <section class="card" aria-labelledby="booking-heading">
   <div class="card__header">
     <h2 id="booking-heading">{{ reference }}</h2>
-    <p class="card__lead">{{ when }} · {{ kind }}</p>
+    <p class="card__lead">{{ when }} · {{ kind }}{% if routing %} · {{ routing }}{% endif %}</p>
   </div>
   <dl class="facts">
     <div><dt>{{ _("admin.agenda.meeting") }}</dt><dd><span class="chip{% if call.tone %} chip--{{ call.tone }}{% endif %}">{{ call.label }}</span></dd></div>

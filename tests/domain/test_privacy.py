@@ -11,6 +11,7 @@ from app.domain.privacy import (
     ENTITY,
     PII_FIELDS,
     PURGED_FIELDS,
+    ROUTING_FIELDS,
     Classification,
     DataField,
     classification,
@@ -83,5 +84,5 @@ def test_note_is_no_personal_data_field_but_stays_masked_in_logs() -> None:
 def test_the_purge_clears_the_personal_fields_and_the_provider_links() -> None:
     """ADR 0102 point 11: the one list the purge works from."""
     assert DERIVED_FIELDS == ("video_room_id", "trial_room_id", "wxcc_task_id", "claimed_by")
-    assert set(PURGED_FIELDS) == PII_FIELDS | set(DERIVED_FIELDS)
+    assert set(PURGED_FIELDS) == PII_FIELDS | set(DERIVED_FIELDS) | set(ROUTING_FIELDS)
     assert len(PURGED_FIELDS) == len(set(PURGED_FIELDS))

@@ -540,7 +540,7 @@ async def _move_response(
     booking = await closure_service(request).booking(context.principal, group.slug, booking_id)
     today = local_day(_clock(request).now(), group.tz)
     free = await _booking_service(request).availability(
-        group.slug, today, today + timedelta(days=MOVE_DAYS)
+        group.slug, today, today + timedelta(days=MOVE_DAYS), booking.subject
     )
     _ = locale.gettext
     options = slot_options([slot.start for slot in free], group.tz, locale.code)

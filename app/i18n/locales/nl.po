@@ -9685,6 +9685,174 @@ msgstr "Doorgaan naar de inlogdienst"
 msgid "admin.alerts.text.check"
 msgstr "De controle van de koppeling van deze groep vond een probleem ({code}). Open de groep en kies Koppeling controleren voor de uitleg."
 
+msgid "booking.routing.subject.label"
+msgstr "Waarover gaat uw afspraak?"
+
+msgid "booking.routing.subject.choose_hint"
+msgstr "Kies eerst een onderwerp. U ziet dan alleen de tijden waarop er iemand voor dit onderwerp is."
+
+msgid "booking.routing.subject.show_times"
+msgstr "Toon tijden"
+
+msgid "booking.routing.preferred_language.label"
+msgstr "In welke taal wilt u het gesprek voeren?"
+
+msgid "booking.routing.preferred_language.value.nl"
+msgstr "Nederlands"
+
+msgid "booking.routing.preferred_language.value.en"
+msgstr "Engels"
+
+msgid "booking.routing.channel_preference.label"
+msgstr "Hoe wilt u het gesprek voeren?"
+
+msgid "booking.routing.channel_preference.value.video"
+msgstr "Met beeld (video)"
+
+msgid "booking.routing.channel_preference.value.phone"
+msgstr "Telefonisch"
+
+msgid "admin.routing.title"
+msgstr "Onderwerpen en routing"
+
+msgid "admin.routing.settings_lead"
+msgstr "Laat deelnemers een onderwerp kiezen, vraag een voorkeurstaal of manier van contact, en geef die keuzes als codes door aan het contactcenter."
+
+msgid "admin.routing.summary"
+msgstr "{subjects} onderwerpen, {attributes} routingvragen, {mapped} doorgegeven aan het contactcenter."
+
+msgid "admin.routing.summary_none"
+msgstr "Deze groep vraagt geen onderwerp en geen routingvragen."
+
+msgid "admin.routing.open"
+msgstr "Onderwerpen en routing openen"
+
+msgid "admin.routing.back"
+msgstr "Terug naar de instellingen"
+
+msgid "admin.routing.subjects.title"
+msgstr "Onderwerpen"
+
+msgid "admin.routing.subjects.lead"
+msgstr "Met één of meer onderwerpen vraagt het formulier de deelnemer als eerste waarover de afspraak gaat. De code blijft vast: boekingen en rapportages bewaren hem."
+
+msgid "admin.routing.subjects.none"
+msgstr "Nog geen onderwerpen. Het formulier vraagt er dan geen."
+
+msgid "admin.routing.subject.label"
+msgstr "Onderwerp"
+
+msgid "admin.routing.subject.code"
+msgstr "Code"
+
+msgid "admin.routing.subject.code_hint"
+msgstr "Kleine letters, cijfers en streepjes, hoogstens 40 tekens, bijvoorbeeld vraag-algemeen. Kan later niet meer veranderen."
+
+msgid "admin.routing.subject.label_nl"
+msgstr "Naam (Nederlands)"
+
+msgid "admin.routing.subject.label_en"
+msgstr "Naam (Engels)"
+
+msgid "admin.routing.subject.bound"
+msgstr "aan een blok gekoppeld"
+
+msgid "admin.routing.subject.remove"
+msgstr "Verwijderen"
+
+msgid "admin.routing.subject.remove_label"
+msgstr "Onderwerp {label} verwijderen"
+
+msgid "admin.routing.subject.add"
+msgstr "Onderwerp toevoegen"
+
+msgid "admin.routing.subject.add_lead"
+msgstr "Een groep heeft hoogstens {count} onderwerpen."
+
+msgid "admin.routing.subject.add_button"
+msgstr "Onderwerp toevoegen"
+
+msgid "admin.routing.subject.limit_reached"
+msgstr "Deze groep heeft het maximum van {count} onderwerpen."
+
+msgid "admin.routing.subject.edit_lead"
+msgstr "Code {code}; die blijft vast."
+
+msgid "admin.routing.attributes.title"
+msgstr "Routingvragen"
+
+msgid "admin.routing.attributes.lead"
+msgstr "Vragen uit een vaste lijst van OpenPlanner. Het antwoord is een code, nooit vrije tekst, en geen persoonsgegeven."
+
+msgid "admin.routing.attributes.values"
+msgstr "Keuzes: {values}."
+
+msgid "admin.routing.attribute.preferred_language.help"
+msgstr "Vraagt de taal van het gesprek."
+
+msgid "admin.routing.attribute.channel_preference.help"
+msgstr "Vraagt of de deelnemer met beeld of telefonisch wil praten."
+
+msgid "admin.routing.mapping.title"
+msgstr "Doorgeven aan het contactcenter"
+
+msgid "admin.routing.mapping.lead"
+msgstr "Per onderwerp en routingvraag: de naam van de variabele die de flow van het contactcenter leest, en de waarde per keuze. Wat hier leeg blijft, wordt niet verstuurd."
+
+msgid "admin.routing.mapping.none"
+msgstr "Voeg eerst een onderwerp of routingvraag toe."
+
+msgid "admin.routing.mapping.variable"
+msgstr "Naam van de variabele"
+
+msgid "admin.routing.mapping.variable_hint"
+msgstr "Letters, cijfers en liggende streepjes, beginnend met een letter, bijvoorbeeld onderwerp. Leeg: niets versturen."
+
+msgid "admin.routing.mapping.values"
+msgstr "Waarden voor {source}"
+
+msgid "admin.routing.mapping.code"
+msgstr "Keuze"
+
+msgid "admin.routing.mapping.value"
+msgstr "Verstuurde waarde"
+
+msgid "admin.routing.mapping.save"
+msgstr "{source} opslaan"
+
+msgid "admin.routing.source.subject"
+msgstr "Onderwerp"
+
+msgid "admin.routing.error.subject_code"
+msgstr "Kies een code van kleine letters, cijfers en streepjes die deze groep nog niet heeft."
+
+msgid "admin.routing.error.subject_label"
+msgstr "Vul de naam in, hoogstens 80 tekens."
+
+msgid "admin.routing.error.subjects"
+msgstr "Deze groep heeft al het maximum aantal onderwerpen."
+
+msgid "admin.routing.error.subject_in_use"
+msgstr "Een blok biedt dit onderwerp nog aan. Haal het eerst bij dat blok weg."
+
+msgid "admin.routing.error.variable_name"
+msgstr "Gebruik letters, cijfers en liggende streepjes, beginnend met een letter, en geen naam die al gebruikt wordt."
+
+msgid "admin.routing.error.variable_value"
+msgstr "Een waarde is een code: letters, cijfers, punt, dubbele punt, streepje of liggend streepje, hoogstens 64 tekens."
+
+msgid "admin.routing.error.mapping"
+msgstr "Dit onderwerp of deze vraag bestaat niet meer."
+
+msgid "admin.field.block_subjects"
+msgstr "Onderwerpen in dit blok"
+
+msgid "admin.field.block_subjects_hint"
+msgstr "Niets aangevinkt: het blok biedt alle onderwerpen. Een deelnemer die een onderwerp kiest, ziet alleen de tijden van blokken die het aanbieden."
+
+msgid "settings.field.max_subjects_per_group.label"
+msgstr "Onderwerpen per groep (maximaal)"
+
 msgid "admin.tab.planning"
 msgstr "Planning"
 

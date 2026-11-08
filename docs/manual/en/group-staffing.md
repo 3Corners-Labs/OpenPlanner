@@ -131,3 +131,10 @@ Choose and press **Save**. When a date has an own exception, that goes first, th
 a calendar that applies and was not kept open (closed), then the weekly blocks. An
 [emergency closure](group-closure.md) is applied on top of all this. A holiday never lifts a
 closure.
+
+## Subjects per block
+
+When the team has [subjects](group-routing.md), you choose on a block and on an exception which
+subjects it offers. Nothing ticked: the block offers all of them. A participant who first chooses a
+subject on the team's page sees only the times of blocks that offer it. The block's capacity counts
+for all subjects together.

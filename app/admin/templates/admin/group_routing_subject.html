@@ -1,0 +1,20 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ subject_label }} · {{ _("admin.routing.title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/settings/routing/subjects/{{ subject_code }}" novalidate aria-labelledby="edit-subject-heading">
+  <div class="card__header">
+    <h2 id="edit-subject-heading">{{ subject_label }}</h2>
+    <p class="card__lead">{{ _("admin.routing.subject.edit_lead", code=subject_code) }}</p>
+  </div>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+    <a href="/admin/groups/{{ summary.group.slug }}/settings/routing">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

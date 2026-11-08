@@ -60,6 +60,7 @@ Regels:
 - Wijzigen = nieuwe boeking in nieuw slot + oude op `cancelled`, in één transactie; videoroom en jobs worden opnieuw gemaakt.
 - Elke tijdgebonden job pint `slot.start`; bij uitvoeren controleert hij of de boeking nog `confirmed` is en of de starttijd onveranderd is, anders stopt hij stil. (Patroon van Tymeslot reminder-jobs.) Bij annuleren/wijzigen worden openstaande jobs van de boeking verwijderd.
 - `management_token` wordt één keer getoond in de mail-URL en alleen gehasht opgeslagen.
+- Groep, onderwerp, skill, wachtrij (ADR 0081): een `Group` is tegelijk de agenda waarin een deelnemer boekt, het team dat het gesprek voert en de standaardwachtrij. Wat de deelnemer kiest is een **onderwerp** (een vaste lijst per groep met een vaste code, `groups.routing`); wat een medewerker heeft is een **skill** (blijft in het contactcenter); waar het werk heen gaat is een **wachtrij**. Een groep kan ook routingvragen uit een vaste catalogus aanzetten (`preferred_language`, `channel_preference`). Onderwerp en antwoorden staan als codes op de boeking (`subject_code`, `routing_answers`), zijn geen persoonsgegevens, en gaan alleen als gekoppelde routingvariabelen mee in de taak naar het contactcenter. Een blok kan aangeven welke onderwerpen het aanbiedt (`ScheduleRule.subjects`).
 
 ## 4. Externe koppelingen
 

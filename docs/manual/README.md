@@ -27,6 +27,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Embedding on websites / insluiten op websites | [Insluiten op websites](nl/embedding.md) | [Embedding on websites](en/embedding.md) |
 | A team's contact options / contactalternatieven van een team | [Contactalternatieven van een team](nl/group-contacts.md) | [A team's contact options](en/group-contacts.md) |
 | A team's booking form / boekingsformulier van een team | [Boekingsformulier van een team](nl/group-booking-form.md) | [A team's booking form](en/group-booking-form.md) |
+| A team's subjects and routing / onderwerpen en routing van een team | [Onderwerpen en routing van een team](nl/group-routing.md) | [A team's subjects and routing](en/group-routing.md) |
 | Emergency closure of a team / noodsluiting van een team | [Noodsluiting van een team](nl/group-closure.md) | [Emergency closure of a team](en/group-closure.md) |
 | Closure scenarios / scenario's voor een noodsluiting | [Scenario's voor een noodsluiting](nl/closure-scenarios.md) | [Scenarios for an emergency closure](en/closure-scenarios.md) |
 | Group agenda / agenda van de groep | [Agenda van de groep](nl/group-agenda.md) | [Group agenda](en/group-agenda.md) |
