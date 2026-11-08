@@ -28,6 +28,7 @@ from app.domain.closure import Closure
 from app.domain.job_plan import JobType
 from app.domain.message_texts import GroupTexts
 from app.domain.ports import Attachment, OutboundMessage
+from app.domain.reschedule_proposal import HeldProposal
 from app.domain.scheduling import Group, JoinClient
 from app.domain.tokens import token_for_booking
 from app.i18n import BoundGettext, Translator
@@ -58,6 +59,9 @@ class MessageKind:
         confirm: A request to confirm a new booking (ADR 0056): no name, link to the confirm
             page, and the deadline in the texts is ``Booking.confirm_by``.
         book_again: Whether the message links to the group page to make a new appointment.
+        proposal: A proposed new time (ADR 0057): no join link, the texts name the proposed
+            moment (``new_date``, ``new_time``), the link goes to the page that confirms it on
+            its POST, and the deadline is the proposal's ``confirm_by``.
     """
 
     subject_key: str
@@ -71,6 +75,7 @@ class MessageKind:
     calendar: bool = True
     confirm: bool = False
     book_again: bool = False
+    proposal: bool = False
 
 
 MESSAGE_KINDS: dict[JobType, MessageKind] = {
@@ -158,6 +163,37 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         calendar=False,
         confirm=True,
     ),
+    # ADR 0057: a proposed new time, held until its deadline; the old time leaves the calendar.
+    JobType.SEND_RESCHEDULE_PROPOSAL: MessageKind(
+        "message.reschedule_proposal.subject",
+        "message.reschedule_proposal.intro",
+        True,
+        True,
+        "message.reschedule_proposal.sms",
+        manage_key="message.manage_proposal",
+        proposal=True,
+    ),
+    JobType.SEND_PROPOSAL_REMINDER: MessageKind(
+        "message.proposal_reminder.subject",
+        "message.proposal_reminder.intro",
+        True,
+        True,
+        "message.proposal_reminder.sms",
+        manage_key="message.manage_proposal",
+        calendar=False,
+        proposal=True,
+    ),
+    # ADR 0057 point 9: the proposed time was released; choosing stays possible until the lapse.
+    JobType.SEND_PROPOSAL_RELEASED: MessageKind(
+        "message.proposal_released.subject",
+        "message.proposal_released.intro",
+        True,
+        True,
+        "message.proposal_released.sms",
+        manage_key="message.manage_rebook",
+        rebook=True,
+        calendar=False,
+    ),
     JobType.SEND_UNCONFIRMED_LAPSED: MessageKind(
         "message.unconfirmed_lapsed.subject",
         "message.unconfirmed_lapsed.intro",
@@ -199,8 +235,12 @@ REASON_KEYS: dict[ChangeReason, str] = {
 """The text block of each planner's reason (ADR 0044), written out for the catalogue test."""
 
 
-def _deadline(kind: MessageKind, booking: Booking, group: Group) -> datetime:
+def _deadline(
+    kind: MessageKind, booking: Booking, group: Group, proposal: HeldProposal | None = None
+) -> datetime:
     """Return the deadline the message names: a lapse of a request, else the change one."""
+    if kind.proposal and proposal is not None:
+        return proposal.confirm_by
     if kind.rebook and booking.rebook_by is not None:
         return booking.rebook_by
     if kind.confirm and booking.confirm_by is not None:
@@ -257,6 +297,7 @@ class MessageComposer:
         texts: GroupTexts | None = None,
         closure: Closure | None = None,
         product_footer: bool = True,
+        proposal: HeldProposal | None = None,
     ) -> OutboundMessage:
         """Return the message for ``job_type`` on ``channel``.
 
@@ -271,36 +312,47 @@ class MessageComposer:
             product_footer: Whether the HTML part ends with "Appointments via OpenPlanner" and
                 the product mark (ADR 0060 §6, the organisation's class D setting). The
                 plain-text part never carries it.
+            proposal: For a proposed new time: the proposal it is about (ADR 0057).
 
         Raises:
             KeyError: If ``job_type`` is not a message job.
             ValueError: If the booking's personal data has been purged, it has no phone
-                number for an SMS, the message has no SMS form, or a closure message has no
-                closure.
+                number for an SMS, the message has no SMS form, a closure message has no
+                closure, or a proposal message has no proposal.
         """
         kind = MESSAGE_KINDS[job_type]
         if booking.contact is None:
             raise ValueError("booking has no contact details")
         if kind.closure_notice and closure is None:
             raise ValueError("closure message without a closure")
+        if kind.proposal and proposal is None:
+            raise ValueError("proposal message without a proposal")
         gettext = self._translator.bind(booking.locale, group.organisation_id, group.id)
         _ = _Texts(gettext, texts or {})
         if channel is ChannelKind.SMS:
-            return self._sms(kind, booking, group, _)
+            return self._sms(kind, booking, group, _, proposal)
         tz, locale = group.tz, booking.locale
         date = format_day(local_day(booking.start, tz), locale)
         start_time = format_clock(booking.start, tz, locale)
         end_time = format_clock(booking.end, tz, locale)
-        deadline = _deadline(kind, booking, group)
+        deadline = _deadline(kind, booking, group, proposal)
         deadline_text = (
             f"{format_day(local_day(deadline, tz), locale)}, {format_clock(deadline, tz, locale)}"
         )
         params = {"date": date, "time": start_time, "group_name": group.name}
-        if kind.rebook:
+        if kind.rebook or kind.proposal:
             params["deadline"] = deadline_text
+        when = f"{date}, {start_time}–{end_time}"
+        if kind.proposal and proposal is not None:
+            params["new_date"] = format_day(local_day(proposal.start, tz), locale)
+            params["new_time"] = format_clock(proposal.start, tz, locale)
+            new_end = format_clock(proposal.end, tz, locale)
+            when = f"{params['new_date']}, {params['new_time']}–{new_end}"
         manage_url = self.manage_url(booking) if kind.includes_manage_link else None
         if manage_url and kind.confirm:  # ADR 0056 §8: the page confirms only on its POST
             manage_url = f"{manage_url}/confirm"
+        if manage_url and kind.proposal:  # ADR 0057 §8: the same, for the proposed time
+            manage_url = f"{manage_url}/proposal"
         on_hold = kind.closure_notice
         join_url = (
             f"{manage_url}/join"
@@ -309,6 +361,7 @@ class MessageComposer:
             and not on_hold
             and not kind.rebook
             and not kind.confirm
+            and not kind.proposal
             else None
         )
         greeting = (
@@ -321,8 +374,8 @@ class MessageComposer:
             "subject": _(kind.subject_key, **params),
             "greeting": greeting,
             "intro": _(kind.intro_key, **params),
-            "when_label": _("message.when"),
-            "when": f"{date}, {start_time}–{end_time}",
+            "when_label": _("message.proposed_when" if kind.proposal else "message.when"),
+            "when": when,
             "team_label": _("message.team"),
             "group_name": group.name,
             "manage_url": manage_url,
@@ -338,7 +391,13 @@ class MessageComposer:
             "reason_label": _("message.reason"),
             "reason": _reason(booking, _),
             "manage_text": _(kind.manage_key, deadline=deadline_text),
-            "manage_link": _("message.confirm_link" if kind.confirm else "message.manage_link"),
+            "manage_link": _(
+                "message.confirm_link"
+                if kind.confirm
+                else "message.proposal_link"
+                if kind.proposal
+                else "message.manage_link"
+            ),
             "book_url": f"{self._base_url}/g/{group.slug}" if kind.book_again else None,
             "book_text": _("message.book_again"),
             "book_link": _("message.book_again_link"),
@@ -467,21 +526,35 @@ class MessageComposer:
         )
         return Attachment("afspraak.ics", "text/calendar", calendar)
 
-    def _sms(self, kind: MessageKind, booking: Booking, group: Group, _: _Texts) -> OutboundMessage:
-        """Return the SMS: one text block with first name, moment, team and the manage link."""
+    def _sms(
+        self,
+        kind: MessageKind,
+        booking: Booking,
+        group: Group,
+        _: _Texts,
+        proposal: HeldProposal | None = None,
+    ) -> OutboundMessage:
+        """Return the SMS: one text block with first name, moment, team and the manage link.
+
+        A proposal's SMS also names the proposed moment and links to the page that confirms it.
+        """
         contact = booking.contact
         if kind.sms_key is None or contact is None or contact.phone is None:
             raise ValueError("message has no SMS form or the booking no phone number")
+        manage_url = self.manage_url(booking)
+        moment = proposal.start if proposal is not None else booking.start
         text = _(
             kind.sms_key,
             first_name=contact.first_name,
             date=format_day(local_day(booking.start, group.tz), booking.locale),
             time=format_clock(booking.start, group.tz, booking.locale),
             group_name=group.name,
-            manage_url=self.manage_url(booking),
+            manage_url=f"{manage_url}/proposal" if kind.proposal else manage_url,
             reason=_reason(booking, _) or "",
             deadline=format_day(
-                local_day(_deadline(kind, booking, group), group.tz), booking.locale
+                local_day(_deadline(kind, booking, group, proposal), group.tz), booking.locale
             ),
+            new_date=format_day(local_day(moment, group.tz), booking.locale),
+            new_time=format_clock(moment, group.tz, booking.locale),
         )
         return OutboundMessage(ChannelKind.SMS, contact.phone, "", text)

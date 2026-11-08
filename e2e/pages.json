@@ -74,6 +74,14 @@
       ]
     },
     {
+      "name": "confirm a proposed new time",
+      "path": "{proposal_page}",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "trial call (not available)",
       "path": "{trial_page}",
       "locales": [

@@ -151,5 +151,16 @@ async def test_the_management_page_of_a_booking_on_hold_names_the_day_its_detail
     assert "Your details are deleted by Wednesday, April 8, 2026 at the latest." in english
 
 
+async def test_the_seeded_proposal_page_opens_through_the_link(
+    site: httpx.AsyncClient, examples: ClosureExamples
+) -> None:
+    target = (await site.get(examples.proposal_page)).headers["location"]  # the exchange
+    page = await site.get(target)
+
+    assert target.endswith("/proposal")
+    assert page.status_code == 200
+    assert "<h1>Nieuwe tijd bevestigen</h1>" in page.text
+
+
 async def test_a_closure_without_bookings_on_hold_promises_nothing(site: httpx.AsyncClient) -> None:
     assert "closure-delete-by" not in (await site.get(PLANNED + "/closure")).text

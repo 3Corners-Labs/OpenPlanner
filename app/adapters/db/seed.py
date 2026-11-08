@@ -39,12 +39,13 @@ from app.adapters.db.models import (
 )
 from app.adapters.db.seed_usage import usage_example_cells
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.booking import Booking, BookingStatus, Contact, Slot
+from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact, Slot
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.form_fields import Classification, FieldDefinition, FieldType, FormDefinition
 from app.domain.images import ImageFile, ImageText
 from app.domain.ports import Transaction
+from app.domain.reschedule_proposal import HeldProposal
 from app.domain.scheduling import Group, PhoneMode
 from app.domain.tokens import derive_token, hash_token, new_token_salt
 
@@ -141,6 +142,8 @@ class ClosureExamples:
             Chromium; the flow runs in each browser, and each confirms its own booking.
         pending_flow_firefox: The same for Firefox.
         pending_flow_webkit: The same for WebKit.
+        proposal_page: The page where a participant takes a proposed new time (ADR 0057), of
+            a booking awaiting a new time with an open proposal; never confirmed by the checks.
         trial_page: The trial call page of that booking. It shows the page's "not available
             for this appointment" state; its other states are covered by the API tests.
         journeys: The participant's journey per e2e browser (``BROWSERS``), new each run.
@@ -153,6 +156,7 @@ class ClosureExamples:
     pending_flow_chromium: str
     pending_flow_firefox: str
     pending_flow_webkit: str
+    proposal_page: str
     trial_page: str
     journeys: dict[str, JourneyExample]
 
@@ -258,6 +262,7 @@ async def seed_closure_examples(
         if created:
             await tx.add_usage_cells(usage_example_cells(demo.organisation_id, demo.id, now))
         pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
+        proposed = await _proposed_booking(tx, demo, now, token_key)
         journey_group = await seeded_group(tx, JOURNEY_GROUP_SLUG)
         journeys = {
             browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
@@ -270,6 +275,7 @@ async def seed_closure_examples(
         pending_flow_chromium=f"/b/{pending[1]}/confirm",
         pending_flow_firefox=f"/b/{pending[2]}/confirm",
         pending_flow_webkit=f"/b/{pending[3]}/confirm",
+        proposal_page=f"/b/{proposed}/proposal",
         trial_page=f"/b/{token}/test",
         journeys=journeys,
     )
@@ -422,6 +428,35 @@ async def _pending_booking(
         token_key,
         status=BookingStatus.PENDING_CONFIRMATION,
         confirm_by=now + timedelta(days=1),
+    )
+    return token
+
+
+async def _proposed_booking(tx: Transaction, group: Group, now: datetime, token_key: bytes) -> str:
+    """Store a demo booking awaiting a new time with a proposal held for it (ADR 0057).
+
+    It was on the next weekday at 14:00; 14:30 that day is proposed and held for two days.
+    Return its token.
+    """
+    start = _next_weekday(group, now, time(14))
+    token, booking = await store_example_booking(
+        tx, group, start, now, token_key, status=BookingStatus.CONFIRMED
+    )
+    await tx.save_booking(
+        booking.request_rebook(ChangeReason.STAFFING, start + timedelta(days=14), now)
+    )
+    new_start = start + timedelta(minutes=group.slot_minutes)
+    new_end = new_start + timedelta(minutes=group.slot_minutes)
+    await tx.add_proposal(
+        HeldProposal(
+            None,
+            booking.id or 0,
+            await _slot(tx, group, new_start, new_end),
+            new_start,
+            new_end,
+            now + timedelta(days=2),
+            now,
+        )
     )
     return token
 

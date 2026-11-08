@@ -123,7 +123,9 @@ from app.domain.ports import (
 from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
 from app.domain.readiness import ReadinessService
+from app.domain.rebooking import Reach
 from app.domain.request_log import RequestEvents
+from app.domain.reschedule_proposal import ProposalHours
 from app.domain.roles import RoleService
 from app.domain.routing_service import RoutingService
 from app.domain.scenario_service import ScenarioService
@@ -207,6 +209,18 @@ def _confirm_policy(settings: Settings) -> ConfirmPolicy:
         cutoff_hours=settings.booking_confirm_cutoff_hours,
         reminders=settings.booking_confirm_reminders,
         min_minutes=settings.booking_confirm_min_minutes,
+    )
+
+
+def _reach(settings: Settings) -> Reach:
+    """Return how far proposed and suggested times may lie, from one organisation's settings."""
+    return Reach(settings.reschedule_search_days, settings.reschedule_time_tolerance_minutes)
+
+
+def _proposal_hours(settings: Settings) -> ProposalHours:
+    """Return how long a proposal is held and when it is recalled (ADR 0057)."""
+    return ProposalHours(
+        settings.reschedule_proposal_confirm_hours, settings.reschedule_proposal_reminder_hours
     )
 
 
@@ -419,6 +433,7 @@ def create_app(
             confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
             previous_token_key=management_token_key_previous(settings),
             closure_retention=app.state.live_settings.closure_retention,
+            reach=lambda org: _reach(per_organisation(org)),
         )
         app.state.participant_link_service = ParticipantLinkService(uow, clock)
         app.state.admin_service = AdminService(
@@ -728,6 +743,7 @@ def create_app(
             lambda: live().planner_changes_alert_per_hour,
             rebook_days=lambda org: per_organisation(org).planner_rebook_days,
             reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
+            proposal_hours=lambda org: _proposal_hours(per_organisation(org)),
         )
         app.state.role_service = RoleService(
             uow,

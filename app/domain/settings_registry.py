@@ -1822,6 +1822,50 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=29,
     ),
     S(
+        "reschedule_proposal_confirm_hours",
+        K.INT,
+        48,
+        _D,
+        T.PLANNER,
+        "Hours a proposed new time is held for the participant to confirm; never beyond the "
+        "proposed slot's change deadline (ADR 0057).",
+        minimum=4,
+        maximum=168,
+    ),
+    S(
+        "reschedule_proposal_reminder_hours",
+        K.INT,
+        12,
+        _D,
+        T.PLANNER,
+        "Hours before a proposal's deadline at which its one reminder goes; 0 sends none "
+        "(below the confirm hours, ADR 0057).",
+        minimum=0,
+        maximum=72,
+    ),
+    S(
+        "reschedule_search_days",
+        K.INT,
+        14,
+        _D,
+        T.PLANNER,
+        "Days before or after the original day within which the assistant proposes and suggests "
+        "a new time (ADR 0057).",
+        minimum=1,
+        maximum=60,
+    ),
+    S(
+        "reschedule_time_tolerance_minutes",
+        K.INT,
+        60,
+        _D,
+        T.PLANNER,
+        "Largest difference in time of day between the original and a proposed or suggested "
+        "time; 0 allows only the same time (ADR 0057).",
+        minimum=0,
+        maximum=240,
+    ),
+    S(
         "closure_max_retention_days",
         K.INT,
         90,

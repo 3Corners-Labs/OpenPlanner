@@ -90,6 +90,10 @@ class JobType(StrEnum):
     SEND_UNCONFIRMED_LAPSED = "send_unconfirmed_lapsed"
     SEND_TEAM_INVITE = "send_team_invite"
     SEND_TEAM_CANCEL = "send_team_cancel"
+    SEND_RESCHEDULE_PROPOSAL = "send_reschedule_proposal"
+    SEND_PROPOSAL_REMINDER = "send_proposal_reminder"
+    EXPIRE_PROPOSAL = "expire_proposal"
+    SEND_PROPOSAL_RELEASED = "send_proposal_released"
 
     @classmethod
     def _missing_(cls, value: object) -> "JobType | None":
@@ -114,8 +118,16 @@ TEAM_INVITES = frozenset({JobType.SEND_TEAM_INVITE, JobType.SEND_TEAM_CANCEL})
 CLOSURE_NOTICES = frozenset({JobType.SEND_SUSPENSION, JobType.SEND_CLOSURE_UPDATE})
 """Messages about an emergency closure; sent only while the booking is suspended."""
 
-REBOOK_NOTICES = frozenset({JobType.SEND_REBOOK_REQUEST, JobType.SEND_REBOOK_REMINDER})
-"""A planner's request to choose a new time (ADR 0044); sent only while it is unanswered."""
+REBOOK_NOTICES = frozenset(
+    {JobType.SEND_REBOOK_REQUEST, JobType.SEND_REBOOK_REMINDER, JobType.SEND_PROPOSAL_RELEASED}
+)
+"""A planner's request to choose a new time (ADR 0044), and the notice that a proposed time was
+released while the participant can still choose (ADR 0057 point 9); sent only while unanswered."""
+
+PROPOSAL_NOTICES = frozenset({JobType.SEND_RESCHEDULE_PROPOSAL, JobType.SEND_PROPOSAL_REMINDER})
+"""A proposed new time and its reminder (ADR 0057 point 8), pinned to the proposed start: sent
+only while the booking awaits a new time and that proposal still holds its place (the runner
+checks the proposal)."""
 
 CONFIRM_NOTICES = frozenset({JobType.SEND_CONFIRM_REQUEST, JobType.SEND_CONFIRM_REMINDER})
 """Requests to confirm a booking by email link (ADR 0056); sent only while it is pending."""
@@ -234,7 +246,7 @@ def is_stale(
     """
     if job_type in CLOSURE_NOTICES:
         return not booking.is_suspended or booking.contact is None
-    if job_type in REBOOK_NOTICES:
+    if job_type in REBOOK_NOTICES or job_type in PROPOSAL_NOTICES:
         return not booking.awaits_rebook or booking.contact is None
     if job_type in CONFIRM_NOTICES:
         return not booking.awaits_confirmation or booking.contact is None
@@ -314,6 +326,55 @@ def plan_for_rebook(
     jobs.append(PlannedJob(JobType.LAPSE_REBOOK, rebook_by, None))
     jobs.append(PlannedJob(JobType.PURGE_PII, rebook_by + PURGE_AFTER, None))
     return jobs
+
+
+def plan_for_proposal(
+    *,
+    now: datetime,
+    rebook_by: datetime,
+    rebook_reminder_at: datetime | None,
+    proposed_start: datetime,
+    confirm_by: datetime,
+    proposal_reminder_at: datetime | None,
+    sms: bool,
+    team_invite: bool = False,
+) -> list[PlannedJob]:
+    """Return the jobs that replace all pending jobs of a booking with a held proposal (ADR 0057).
+
+    The booking awaits a new time as after ``plan_for_rebook`` (meeting, task and reminders go;
+    its reminder and lapse at ``rebook_by`` stay, point 9), but instead of the plain request the
+    participant gets the proposal now, one reminder at ``proposal_reminder_at`` and, at
+    ``confirm_by``, ``EXPIRE_PROPOSAL`` releases the held place if nobody answered. The proposal
+    jobs are pinned to ``proposed_start``; they carry no personal data and no proposal id.
+    """
+    channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
+    rebook = plan_for_rebook(
+        now=now,
+        rebook_by=rebook_by,
+        reminder_at=rebook_reminder_at,
+        sms=sms,
+        team_invite=team_invite,
+    )
+    jobs = [job for job in rebook if job.type is not JobType.SEND_REBOOK_REQUEST]
+    jobs.extend(
+        PlannedJob(JobType.SEND_RESCHEDULE_PROPOSAL, now, proposed_start, c) for c in channels
+    )
+    if proposal_reminder_at is not None and proposal_reminder_at > now:
+        jobs.extend(
+            PlannedJob(JobType.SEND_PROPOSAL_REMINDER, proposal_reminder_at, proposed_start, c)
+            for c in channels
+        )
+    jobs.append(PlannedJob(JobType.EXPIRE_PROPOSAL, confirm_by, proposed_start))
+    return jobs
+
+
+def plan_for_released_proposal(*, now: datetime, sms: bool) -> list[PlannedJob]:
+    """Return the message jobs when a held proposal expires unanswered (ADR 0057 point 9).
+
+    The booking still awaits a new time; its reminder, lapse and purge stay planned.
+    """
+    channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
+    return [PlannedJob(JobType.SEND_PROPOSAL_RELEASED, now, None, c) for c in channels]
 
 
 def plan_for_lapse(*, now: datetime, sms: bool) -> list[PlannedJob]:

@@ -70,6 +70,7 @@ from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.participant_links import LinkSession
 from app.domain.public_address import AddressCheck, AddressKind, InstanceReply
+from app.domain.reschedule_proposal import HeldProposal
 from app.domain.retention import DueBooking, RetentionFacts
 from app.domain.routing import GroupRouting
 from app.domain.scenarios import ClosureScenario
@@ -1348,7 +1349,11 @@ class Transaction(Protocol):
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[SlotUsage]:
-        """Return capacity and active bookings of existing slots with lower <= start < upper."""
+        """Return capacity and places taken of existing slots with lower <= start < upper.
+
+        A place is taken by a booking that holds one (``HOLDS_PLACE``) and by an open proposal
+        of a new time (ADR 0057 point 7).
+        """
         ...
 
     async def get_slot(self, group_id: int, start: datetime) -> Slot | None:
@@ -1360,7 +1365,7 @@ class Transaction(Protocol):
         ...
 
     async def count_active_bookings(self, slot_id: int) -> int:
-        """Return the number of confirmed bookings in the slot."""
+        """Return the places taken in the slot: bookings that hold one and open proposals."""
         ...
 
     async def upcoming_starts_for_email(
@@ -1459,6 +1464,18 @@ class Transaction(Protocol):
 
     async def save_booking(self, booking: Booking) -> None:
         """Persist changes to an existing booking (status, cancelled_at)."""
+        ...
+
+    async def add_proposal(self, proposal: HeldProposal) -> HeldProposal:
+        """Store a held proposal of a new time; it counts in its slot at once (ADR 0057)."""
+        ...
+
+    async def get_open_proposal(self, booking_id: int) -> HeldProposal | None:
+        """Return the booking's proposal that still holds its place, if any (ADR 0057)."""
+        ...
+
+    async def save_proposal(self, proposal: HeldProposal) -> None:
+        """Persist a proposal's release (``released_at``, ``outcome``)."""
         ...
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:

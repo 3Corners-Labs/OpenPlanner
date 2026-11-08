@@ -22,6 +22,9 @@ Server-rendered and usable without JavaScript. Every response goes through
     GET  /b/m/{ref}/cancel         confirm ─► POST ─► 303 /b/m/{ref}?status=cancelled
     GET  /b/m/{ref}/reschedule     slot picker ─► ?start= confirm ─► POST
                                    ─► 303 /b/m/{new ref}?status=rescheduled
+                                   (awaiting a new time: up to three suggested times, ADR 0057)
+    GET  /b/m/{ref}/proposal       the proposed new time, one button ─► POST
+                                   ─► 303 /b/m/{new ref}?status=rescheduled (ADR 0057 point 8)
 The cookie rule is in ``app.api.link_session``; the join, trial and waiting pages are in
 ``join_pages``, ``trial_pages`` and ``direct_pages``.
 """
@@ -48,7 +51,7 @@ from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService
@@ -77,6 +80,7 @@ STATUS_NOTICES: dict[str, str] = {
     "cancelled": "manage.notice.cancelled",
     "confirmed": "manage.notice.confirmed",
     "lapsed": "manage.notice.lapsed",
+    "proposal_gone": "manage.notice.proposal_gone",
 }
 
 STATUS_LABELS: dict[BookingStatus, str] = {
@@ -338,6 +342,13 @@ def _manage_context(
         # ADR 0044: a planner asked for a new time; the request lapses at ``rebook_by``.
         "awaiting_rebook": booking.awaits_rebook,
         "rebook_by": _moment(booking.rebook_by, group, locale),
+        # ADR 0057: a proposed new time held for the participant until ``confirm_by``.
+        "proposal_label": slot_label(details.proposal.start, details.proposal.end, group, locale)
+        if details.proposal
+        else None,
+        "proposal_by": _moment(details.proposal.confirm_by, group, locale)
+        if details.proposal
+        else None,
         "closure": closure_view(closure, group, locale, now) if closure else None,
         "delete_by": delete_by_label(details.delete_by, group, locale),
         "group": group,
@@ -358,6 +369,7 @@ LEGACY_SUBPATHS = (
     "/confirm",
     "/cancel",
     "/reschedule",
+    "/proposal",
     "/wait",
     "/wait/status",
     "/wait/leave",
@@ -453,6 +465,38 @@ async def confirm(request: Request, public_ref: str, locale: Locale, _: SameOrig
     return RedirectResponse(_manage_url(public_ref, status), status_code=303)
 
 
+@router.get("/b/m/{public_ref}/proposal", response_class=HTMLResponse)
+@limiter.limit(read_limit)
+async def proposal_page(request: Request, public_ref: str, locale: Locale) -> Response:
+    """Show the proposed new time with one button to take it; a GET never moves (ADR 0057)."""
+    details = await _details(request, public_ref)
+    if details.proposal is None:
+        return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
+    context = _page_context(details, locale, public_ref, None, _clock(request).now())
+    return await participant_page(request, locale, "proposal.html", details.group, context)
+
+
+@router.post("/b/m/{public_ref}/proposal", response_class=HTMLResponse)
+@limiter.limit(booking_limit)
+async def confirm_proposal(
+    request: Request, public_ref: str, locale: Locale, _: SameOrigin
+) -> Response:
+    """Take the proposed time: the booking moves there with a new reference, as a reschedule.
+
+    A proposal answered, withdrawn or past its deadline sends the browser back to the booking
+    page, which says so and still offers to choose a time.
+    """
+    ref = await authorise(request, public_ref)
+    try:
+        receipt = await _service(request).confirm_proposal(ref)
+    except DomainError as error:
+        if error.code is not ErrorCode.PROPOSAL_NOT_OPEN:
+            raise
+        return RedirectResponse(_manage_url(public_ref, "proposal_gone"), status_code=303)
+    new = receipt.booking
+    return await start(request, new.id or 0, _manage_url(new.public_ref, "rescheduled"))
+
+
 @router.post("/b/m/{public_ref}/cancel", response_class=HTMLResponse)
 @limiter.limit(booking_limit)
 async def cancel(request: Request, public_ref: str, locale: Locale, _: SameOrigin) -> Response:
@@ -486,6 +530,13 @@ async def _reschedule_response(
     context["errors"] = errors or []
     chosen = parse_start(start)
     subject = details.booking.subject  # ADR 0081: a move keeps the subject
+    context["suggestions"] = []
+    if details.booking.awaits_rebook:  # ADR 0057 point 8: the next best times, not held
+        suggestions = await service.suggestions(await authorise(request, public_ref))
+        length = details.booking.end - details.booking.start
+        context["suggestions"] = [
+            (slot_value(at), slot_label(at, at + length, group, locale)) for at in suggestions
+        ]
     slot = await _available(service, group, chosen, subject) if chosen else None
     if chosen is not None and slot is not None and chosen != details.booking.start:
         context["new_start"] = slot_value(chosen)
