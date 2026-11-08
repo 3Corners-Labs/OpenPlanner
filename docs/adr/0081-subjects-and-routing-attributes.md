@@ -91,10 +91,10 @@ a privacy rule, not a preference.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR, privacy rule in `CLAUDE.md` and `docs/dataflow.md` | #179 | merged |
-| 1 | Subjects per group: domain, migration, form question, agenda and queue display | #PRNUM | merged |
-| 2 | Attribute catalogue (`preferred_language`, `channel_preference`), form questions | #PRNUM | merged |
-| 3 | Routing mapping per group and the dispatcher payload, with the payload test of point 6 | #PRNUM | merged |
-| 4 | Subject bound to a staffing block (ADR 0072 offer) | #PRNUM | merged |
+| 1 | Subjects per group: domain, migration, form question, agenda and queue display | #598 | merged |
+| 2 | Attribute catalogue (`preferred_language`, `channel_preference`), form questions | #598 | merged |
+| 3 | Routing mapping per group and the dispatcher payload, with the payload test of point 6 | #598 | merged |
+| 4 | Subject bound to a staffing block (ADR 0072 offer) | #598 | merged |
 
 ## Consequences
 
