@@ -8,10 +8,10 @@ duplicate alert target is deleted, as it only repeated the address), then create
 indexes: partial ones, because a NULL owner does not make a key unique in SQLite. The
 downgrade drops the indexes; the names stay as they were made.
 
-Revises 0096. Open PRs also claim numbers, so recheck the head before merging.
+Revises 0098. Open PRs also claim numbers, so recheck the head before merging.
 
 Revision ID: 0099
-Revises: 0096
+Revises: 0098
 Create Date: 2026-11-08 18:00:00.000000
 """
 
@@ -21,7 +21,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0099"
-down_revision: str | None = "0096"
+down_revision: str | None = "0098"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

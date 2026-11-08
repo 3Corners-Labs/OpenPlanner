@@ -101,7 +101,7 @@ def worker_findings(
             )
         if has_host and JobType.CREATE_VIDEO_ROOM.value not in heartbeat.job_types:
             findings.append(Finding(area, "worker.no_video_jobs", CheckStatus.FAIL))
-        if dispatches and JobType.DISPATCH_WXCC_TASK.value not in heartbeat.job_types:
+        if dispatches and JobType.DISPATCH_CONTACT_CENTER_TASK.value not in heartbeat.job_types:
             findings.append(Finding(area, "worker.no_dispatch_jobs", CheckStatus.FAIL))
     if counts.failed:
         findings.append(

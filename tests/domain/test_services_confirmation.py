@@ -113,7 +113,7 @@ async def test_confirming_plans_the_appointment(
     types = _types(uow, confirmed.id)
     assert types[:2] == [JobType.CREATE_VIDEO_ROOM, JobType.SEND_CONFIRMATION]
     assert JobType.EXPIRE_UNCONFIRMED not in types
-    assert JobType.DISPATCH_WXCC_TASK in types
+    assert JobType.DISPATCH_CONTACT_CENTER_TASK in types
 
 
 async def test_a_second_click_changes_nothing(

@@ -85,7 +85,7 @@ async def test_book_creates_slot_booking_and_jobs(
         JobType.CREATE_VIDEO_ROOM,
         JobType.SEND_CONFIRMATION,
         JobType.SEND_REMINDER,
-        JobType.DISPATCH_WXCC_TASK,
+        JobType.DISPATCH_CONTACT_CENTER_TASK,
         JobType.PURGE_PII,
     ]
 
@@ -401,7 +401,7 @@ async def test_booking_cannot_be_moved_from_the_change_lead(
     assert details.booking.status is BookingStatus.CONFIRMED
     assert details.changeable is False
     jobs = uow.state.jobs[receipt.booking.id or 0]
-    assert JobType.DISPATCH_WXCC_TASK in [j.type for j in jobs]
+    assert JobType.DISPATCH_CONTACT_CENTER_TASK in [j.type for j in jobs]
 
 
 @pytest.mark.parametrize(
@@ -442,7 +442,7 @@ async def test_booking_can_be_cancelled_after_the_change_lead_and_dispatch(
     assert cancelled.status is BookingStatus.CANCELLED
     jobs = [j.type for j in uow.state.jobs[receipt.booking.id or 0]]
     assert JobType.END_WXCC_TASK in jobs
-    assert JobType.DISPATCH_WXCC_TASK not in jobs
+    assert JobType.DISPATCH_CONTACT_CENTER_TASK not in jobs
 
 
 async def test_booking_can_be_moved_until_just_before_the_change_lead(
@@ -493,7 +493,9 @@ async def test_dispatch_job_follows_the_groups_dispatch_lead(uow: InMemoryUnitOf
     with pytest.raises(DomainError, match="booking_locked"):
         await at_lead.reschedule(receipt.management_token, SLOT_0930)
     dispatch = [
-        j for j in uow.state.jobs[receipt.booking.id or 0] if j.type is JobType.DISPATCH_WXCC_TASK
+        j
+        for j in uow.state.jobs[receipt.booking.id or 0]
+        if j.type is JobType.DISPATCH_CONTACT_CENTER_TASK
     ]
     assert dispatch[0].run_at == SLOT_0900 - timedelta(minutes=15)
 

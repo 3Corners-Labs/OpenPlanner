@@ -11,11 +11,12 @@ from app.domain.calls import (
     EventKind,
     TaskState,
     apply_event,
+    contact_center_task,
     meeting_request,
     new_status,
     not_picked_up,
-    work_item,
 )
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
 from app.domain.integration import WEBHOOK_MEMORY, EventOutcome, IntegrationService
 from app.domain.job_plan import JobStatus, JobType, PlannedJob
@@ -24,7 +25,7 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeProbes
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.admin import GROUP_ADMIN, OUTSIDER
-from tests.support.domain import NOW, SLOT_0900
+from tests.support.domain import NOW, SLOT_0900, webex_routing
 from tests.support.integration import GROUP, make_booking
 
 # --- what leaves OpenPlanner -------------------------------------------------------------
@@ -43,26 +44,33 @@ def test_meeting_request_carries_no_personal_data() -> None:
 def test_work_item_carries_only_first_name_and_meeting_link() -> None:
     booking = make_booking(meeting=MeetingRef("m-1", "https://site.webex.com/meet/abc"))
 
-    item = work_item(booking, GROUP, start_label="5 jan 2026, 09:00")
+    item = contact_center_task(booking, GROUP, start_label="5 jan 2026, 09:00")
 
     assert item.reference == "OP-000123"
     assert item.first_name == "Ada"
     assert item.meeting_link == "https://site.webex.com/meet/abc"
-    assert (item.business_address, item.channel, item.routing_value) == (
-        "openplanner@example.biz",
-        "openplanner-video",
-        "demo",
-    )
+    assert item.routing == GROUP.contact_center
+    assert item.routing_value == "demo"
     assert item.kind == "scheduled"
     assert "Lovelace" not in repr(item)
     assert "ada@example.org" not in repr(item)
 
 
+def test_task_needs_a_complete_routing() -> None:
+    booking = make_booking(meeting=MeetingRef("m-1", "https://site.webex.com/meet/abc"))
+    for group in (
+        replace(GROUP, contact_center=None),
+        replace(GROUP, contact_center=webex_routing(channel=None)),
+    ):
+        with pytest.raises(DomainError, match="integration_not_ready: contact_center"):
+            contact_center_task(booking, group, start_label="x")
+
+
 def test_work_item_needs_a_meeting_and_contact_data() -> None:
     with pytest.raises(DomainError, match="integration_not_ready: meeting"):
-        work_item(make_booking(), GROUP, start_label="x")
+        contact_center_task(make_booking(), GROUP, start_label="x")
     with pytest.raises(DomainError, match="integration_not_ready: contact"):
-        work_item(
+        contact_center_task(
             make_booking(meeting=MeetingRef("m", "https://x.webex.com/m"), contact=None),
             GROUP,
             start_label="x",
@@ -131,7 +139,8 @@ def uow() -> InMemoryUnitOfWork:
     state.organisation_slugs = {1: "demo", 2: "andere"}
     state.groups[1] = GROUP
     state.bookings[123] = make_booking(
-        meeting=MeetingRef("meeting-1", "https://site.webex.com/m"), wxcc_task_id="task-1"
+        meeting=MeetingRef("meeting-1", "https://site.webex.com/m"),
+        contact_center_task=ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC),
     )
     return InMemoryUnitOfWork(state)
 

@@ -6,9 +6,9 @@ import pytest
 
 from app.domain.errors import DomainError
 from app.domain.scheduling import DispatchKind
-from tests.support.domain import make_group
+from tests.support.domain import make_group, webex_routing
 
-WXCC = {"wxcc_business_address": "aangifte@example.org", "wxcc_channel": "video"}
+WXCC = {"contact_center": webex_routing("aangifte@example.org", "video")}
 QUEUE = DispatchKind.OPENPLANNER_QUEUE
 
 

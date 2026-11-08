@@ -261,6 +261,21 @@ def hour_of(moment: datetime) -> datetime:
     return moment.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
 
 
+MOVE_REASON = "move"
+"""The ``reason_code`` of a ``booking.created`` fact that replaces a moved booking."""
+
+LEAD_GRAIN_SECONDS = 900
+"""Lead and hold times are kept to the quarter hour. The booking row keeps its exact creation and
+start times for ``booking_row_retention_days``, so an exact lead time would let a fact be matched
+to one booking by its group, hour and locale (abuse case R3). A fixed rule, not a setting."""
+
+
+def coarse(seconds: int) -> int:
+    """Return ``seconds`` rounded towards zero to a multiple of ``LEAD_GRAIN_SECONDS``."""
+    grain = abs(seconds) // LEAD_GRAIN_SECONDS * LEAD_GRAIN_SECONDS
+    return grain if seconds >= 0 else -grain
+
+
 def usable_locale(text: str | None) -> str | None:
     """Return ``text`` when it is a short language tag a fact accepts, else ``None``.
 

@@ -31,3 +31,8 @@ class UTCDateTime(TypeDecorator[datetime]):
         if value is None:
             return None
         return value.replace(tzinfo=UTC) if isinstance(value, datetime) else value
+
+
+def plain(value: object) -> object:
+    """Return an enum member as its value, anything else as it is (for typed cut columns)."""
+    return getattr(value, "value", value)

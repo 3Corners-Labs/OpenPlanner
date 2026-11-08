@@ -163,6 +163,7 @@ def test_the_organisation_is_an_object_page_with_five_tabs() -> None:
         "organisation.settings",
         "organisation.embedding",
         "organisation.login",
+        "organisation.usage",
     ]
     # ADR 0105: what participants see and receive, in one tab; the branding page is its own.
     participants = organisation.tabs[1]

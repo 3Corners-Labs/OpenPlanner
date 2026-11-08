@@ -34,7 +34,7 @@ def test_duplicates_are_made_distinct_and_the_names_are_then_unique(
     alembic_config: Config,
     tmp_path: Path,
 ) -> None:
-    command.upgrade(alembic_config, "0096")
+    command.upgrade(alembic_config, "0098")
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         database.executescript(BEFORE)
 
@@ -69,7 +69,7 @@ def test_a_long_name_keeps_its_suffix_within_the_column(
     tmp_path: Path,
 ) -> None:
     long = "x" * 80
-    command.upgrade(alembic_config, "0096")
+    command.upgrade(alembic_config, "0098")
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         database.execute("INSERT INTO organisations (id, name, slug) VALUES (1, 'Acme', 'acme')")
         for _ in range(2):
@@ -94,7 +94,7 @@ def test_the_downgrade_drops_the_indexes(
     tmp_path: Path,
 ) -> None:
     command.upgrade(alembic_config, "head")
-    command.downgrade(alembic_config, "0096")
+    command.downgrade(alembic_config, "0098")
 
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
         database.execute("INSERT INTO organisations (id, name, slug) VALUES (1, 'Acme', 'acme')")

@@ -49,6 +49,7 @@ CONFIGURATION_TABLES = frozenset(
         "channel_settings",
         "closure_images",
         "closure_scenarios",
+        "group_contact_center",
         "group_contacts",
         "group_form_fields",
         "group_holiday_calendars",
@@ -113,8 +114,10 @@ STATE_TABLES = frozenset(
         "staff_memberships",
         "staff_refused_entitlements",
         "update_requests",
+        "usage_backfill",
         "usage_events",
         "usage_hour",
+        "usage_rollup_state",
         "usage_staff_hour",
         "webhook_events",
     }

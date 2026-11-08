@@ -165,7 +165,7 @@ async def run_service_app_check(request: Request, _: SameOrigin, context: Manage
     settings = request.app.state.settings
     wired: Integrations = request.app.state.integrations
     clock: Clock = request.app.state.clock
-    wxcc = settings.wxcc_api_base_url if wired.dispatcher is not None else None
+    wxcc = settings.wxcc_api_base_url if wired.dispatchers else None
     results = await service_app_check(
         request.app.state.http, wired.tokens, settings.webex_api_base_url, wxcc, clock
     )
