@@ -216,6 +216,7 @@ FLOWS: dict[str, Flow] = {
     ),
     PLATFORM_SETTINGS: Flow(ADMIN),
     "## Flow: configuration package (ADR 0089)": Flow(ADMIN),
+    "## Flow: configuration document, plan and apply (ADR 0099)": Flow(ADMIN),
     "## Flow: personal data in the admin portal (ADR 0063)": Flow(ADMIN),
     "## Flow: organisation settings (ADR 0042 step 5)": Flow(ADMIN),
     "## Flow: organisation texts (ADR 0074)": Flow(ADMIN),

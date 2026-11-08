@@ -575,7 +575,7 @@ flowchart LR
 The reasoning and the criteria for an installation of its own are in `docs/threat-model.md`,
 section *Shared trust boundaries*.
 
-## Usage facts (ADR 0117, step 2)
+## Usage facts (ADR 0117, steps 2 and 3)
 
 Every state change of a booking writes one small fact in the transaction that makes the change
 (`app/domain/usage_recording.py` builds it, `Transaction.record_usage` stores it in a savepoint):
@@ -588,6 +588,20 @@ From step 4 the worker adds the facts to `usage_hour` (cells per hour, group, me
 watermark moved in the same transaction), deletes facts past their term and hourly rows past theirs, and
 makes facts of the booking rows that existed before reporting (`usage-backfill`, from the columns the
 purge leaves, never a purged one). *System status* shows the facts waiting and the time of the last run.
+
+From step 3 the same holds for the call and what surrounds it, each fact written in the transaction of
+the change it describes:
+
+    call event (webhook, job, poll, a participant leaving a direct call)  ─► call.* / trial.*  (status change only)
+    claim / release in the own queue                                      ─► queue.*
+    message job sent / given up                                           ─► message.sent / message.failed (channel, purpose)
+    planner asks / participant chooses / request lapses                   ─► rebook.*
+    worker, two hours after a slot ended                                  ─► slot.closed, slot.shortfall, booking.outcome, call.not_picked_up
+
+A failure reaches a fact as a code of a closed list, never as the provider's text; a participant, an agent
+and a recipient are never in a fact. `completed` and `no_show` are derived from the call (`docs/reporting.md`).
+The new columns hold no personal data: `call_status.peak_participants` and `guest_joined_at`,
+`bookings.rebook_requested_at`, `usage_rollup_state.slots_closed_until`.
 
 A fact holds the hour and the allow-listed codes and numbers only (`privacy.USAGE_FIELDS`): no
 name, address, phone number, join link, booking id, reference, token or free text. A failing

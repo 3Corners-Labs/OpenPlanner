@@ -79,7 +79,6 @@ import argparse
 import asyncio
 import dataclasses
 import json
-import os
 import ssl
 import sys
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
@@ -173,6 +172,11 @@ from app.adapters.webhooks import WXCC_INBOUND
 from app.adapters.wxcc import channel_and_address, wxcc_mapping
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.adapters.wxcc_sample_flow import Route, sample_flow
+from app.cli_config import add_arguments as add_document_arguments
+from app.cli_config import passphrase_from as _passphrase
+from app.cli_config import render_schema as render_config_schema
+from app.cli_config import run as run_document
+from app.cli_config import write_private as _write_private
 from app.config import Settings, environment
 from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
@@ -1331,6 +1335,9 @@ def _config_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser
         "import", help="replace this installation's configuration (not in use only)"
     )
     import_cmd.add_argument("path", type=Path, help="the package file")
+    plan_cmd = actions.add_parser("plan", help="what a configuration document would change")
+    apply_cmd = actions.add_parser("apply", help="apply a configuration document (ADR 0099)")
+    add_document_arguments(export_cmd, plan_cmd, apply_cmd)
     env_cmd = actions.add_parser("env", help="write the package's login variables as an env file")
     env_cmd.add_argument("path", type=Path, help="the package file")
     env_cmd.add_argument(
@@ -1340,7 +1347,13 @@ def _config_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser
         help="the env file to write (600), or - for standard output (the installer's one-off "
         "container, whose filesystem is read-only; ADR 0089 point 8)",
     )
-    for sub in (export_cmd, show_cmd, import_cmd, env_cmd):
+    export_cmd.add_argument(
+        "--passphrase-file",
+        type=Path,
+        metavar="PATH",
+        help="a file whose first line is the passphrase (never on the command line)",
+    )
+    for sub in (show_cmd, import_cmd, env_cmd):
         sub.add_argument(
             "--passphrase-file",
             type=Path,
@@ -1348,20 +1361,6 @@ def _config_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser
             metavar="PATH",
             help="a file whose first line is the passphrase (never on the command line)",
         )
-
-
-def _passphrase(path: Path) -> str:
-    """Return the first line of ``path`` without its line ending."""
-    with path.open(encoding="utf-8") as handle:
-        return handle.readline().rstrip("\r\n")
-
-
-def _write_private(path: Path, data: bytes) -> None:
-    """Write ``data`` to ``path`` with mode 600, replacing an existing file."""
-    path.unlink(missing_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "wb") as handle:
-        handle.write(data)
 
 
 def _summary_lines(summary: PackageSummary) -> str:
@@ -1380,7 +1379,15 @@ def _summary_lines(summary: PackageSummary) -> str:
 
 async def _config(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
     """Run a ``config`` command; return the report and exit code. Never prints a secret."""
-    passphrase = _passphrase(args.passphrase_file)
+    if args.action in ("plan", "apply") or (
+        args.action == "export" and getattr(args, "format", "sqlite") == "json"
+    ):
+        return await run_document(settings, args)
+    if getattr(args, "organisation", None):
+        return "Refused (invalid_configuration): --organisation needs --format json.\n", 2
+    if args.passphrase_file is None:
+        return "Refused (configuration_passphrase_short).\n", 2
+    passphrase = _passphrase(args.passphrase_file) or ""
     engine = create_engine(settings.database_url)
     clock = SystemClock()
     transfer = SqliteConfigurationTransfer(
@@ -1788,6 +1795,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     target.add_argument("key", nargs="?", help="variable name")
     target.add_argument("--all-class-c", action="store_true", help="every changeable value")
     commands.add_parser("settings-doc", help="print the settings reference as Markdown")
+    commands.add_parser(
+        "config-schema", help="print the JSON Schema of the configuration document (ADR 0099)"
+    )
     commands.add_parser("logging-doc", help="print the logging reference as Markdown")
     commands.add_parser("reporting-doc", help="print the reporting metric catalogue as Markdown")
     commands.add_parser("usage-backfill", help="turn existing bookings into usage facts (ADR 0117)")
@@ -1843,6 +1853,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return code
     if args.command == "settings-doc":
         sys.stdout.write(render_settings_doc())
+        return 0
+    if args.command == "config-schema":
+        sys.stdout.write(render_config_schema())
         return 0
     if args.command == "logging-doc":
         sys.stdout.write(render_logging_doc())

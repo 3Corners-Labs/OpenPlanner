@@ -563,6 +563,7 @@ class BookingRow(Base):
     change_reason: Mapped[str | None] = mapped_column(String(16))
     # ADR 0044: when an unanswered request to choose a new time lapses.
     rebook_by: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    rebook_requested_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     claimed_by: Mapped[str | None] = mapped_column(String(64))
     # ADR 0056: the deadline to confirm by email link, and when the participant did.
@@ -661,6 +662,24 @@ class ClosureScenarioRow(Base):
     contacts: Mapped[str | None] = mapped_column(Text)
     image_id: Mapped[int | None] = mapped_column(
         ForeignKey("closure_images.id", ondelete="SET NULL")
+    )
+
+    # ADR 0099 point 2: the name is the natural key within the organisation or the group.
+    __table_args__ = (
+        Index(
+            "uq_closure_scenarios_organisation_name",
+            "organisation_id",
+            "name",
+            unique=True,
+            sqlite_where=text("group_id IS NULL"),
+        ),
+        Index(
+            "uq_closure_scenarios_group_name",
+            "group_id",
+            "name",
+            unique=True,
+            sqlite_where=text("group_id IS NOT NULL"),
+        ),
     )
 
 
@@ -989,6 +1008,7 @@ class UsageRollupStateRow(Base):
     rolled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     backfilled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     backfill_cutoff: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    slots_closed_until: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class UsageBackfillRow(Base):
@@ -1025,6 +1045,9 @@ class CallStatusRow(Base):
     # reported the booking as not picked up.
     lobby_since: Mapped[datetime | None] = mapped_column(UTCDateTime())
     not_picked_up_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0117 step 3: the most people seen in the meeting, and when the first guest was seen.
+    peak_participants: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    guest_joined_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class IntegrationCredentialRow(Base):
@@ -1577,6 +1600,22 @@ class AlertTargetRow(Base):
     __table_args__ = (
         CheckConstraint("kind IN ('email', 'webex_space')", name="kind"),
         CheckConstraint("min_level IN ('warning', 'outage')", name="min_level"),
+        # ADR 0099 point 2: kind and address are the natural key within the owner.
+        Index(
+            "uq_alert_targets_organisation_address",
+            "organisation_id",
+            "kind",
+            "address",
+            unique=True,
+            sqlite_where=text("organisation_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_alert_targets_platform_address",
+            "kind",
+            "address",
+            unique=True,
+            sqlite_where=text("organisation_id IS NULL"),
+        ),
     )
 
 

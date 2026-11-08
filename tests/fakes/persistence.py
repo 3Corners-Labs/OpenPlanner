@@ -33,6 +33,8 @@ from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import GroupCheck
 from app.domain.closure import Closure
+from app.domain.configuration_changes import Change, ConfigurationSnapshot, Usage
+from app.domain.configuration_tree import Entity
 from app.domain.connection_health import (
     WATCHED_TASKS,
     HealthEntry,
@@ -82,6 +84,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.security_log import TOKEN_REFRESH_FAILED
+from app.domain.slot_close import ClosedBooking, EndedSlot, EndedSlots
 from app.domain.staff import (
     GrantHolders,
     Membership,
@@ -108,6 +111,7 @@ class State:
     slots: dict[int, Slot] = field(default_factory=dict)
     bookings: dict[int, Booking] = field(default_factory=dict)
     usage_facts: list[UsageFact | StaffFact] = field(default_factory=list)
+    slots_closed_until: datetime | None = None
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
     claimed_jobs: dict[tuple[int, JobType], PlannedJob] = field(default_factory=dict)
     active_jobs: list[ActiveJob] = field(default_factory=list)
@@ -163,6 +167,8 @@ class State:
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     custom_roles: dict[int, CustomRole] = field(default_factory=dict)
     settings_version: int = 0
+    configuration: ConfigurationSnapshot | None = None
+    applied_configuration: list[list[Change]] = field(default_factory=list)
     platform_settings: dict[str, object] = field(default_factory=dict)
     platform_expiries: dict[str, datetime] = field(default_factory=dict)
     organisation_settings: dict[int, dict[str, object]] = field(default_factory=dict)
@@ -1029,6 +1035,47 @@ class InMemoryTransaction:
         self.state.usage_facts.append(fact)
         return True
 
+    async def ended_slots(self, after: datetime, until: datetime, limit: int) -> EndedSlots:
+        found = sorted(
+            (s for s in self.state.slots.values() if after < s.end <= until),
+            key=lambda s: (s.end, s.id or 0),
+        )
+        covered = until
+        if len(found) >= limit:
+            covered = found[limit - 1].end
+            found = [s for s in found if s.end <= covered]
+        slots = tuple(
+            EndedSlot(
+                s.id or 0,
+                s.group_id,
+                s.kind,
+                s.start,
+                s.end,
+                s.capacity_snapshot,
+                tuple(
+                    ClosedBooking(
+                        b.status,
+                        b.locale,
+                        b.created_at,
+                        b.start,
+                        b.claim is not None,
+                        self.state.call_status.get(b.id or 0) or new_status(b.id or 0),
+                    )
+                    for b in sorted(self.state.bookings.values(), key=lambda b: b.id or 0)
+                    if b.slot_id == s.id
+                ),
+            )
+            for s in found
+        )
+        return EndedSlots(slots, covered)
+
+    async def slots_closed_until(self) -> datetime | None:
+        return self.state.slots_closed_until
+
+    async def set_slots_closed_until(self, until: datetime) -> None:
+        current = self.state.slots_closed_until
+        self.state.slots_closed_until = until if current is None else max(current, until)
+
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(
             self.state.bookings[booking_id],
@@ -1654,6 +1701,23 @@ class InMemoryTransaction:
         self.state.custom_roles.pop(role_id, None)
 
     async def settings_version(self) -> int:
+        return self.state.settings_version
+
+    async def read_configuration(
+        self, now: datetime, locked_settings: frozenset[str]
+    ) -> ConfigurationSnapshot:
+        snapshot = self.state.configuration or ConfigurationSnapshot(
+            Entity("installation", children={"platform": (Entity("platform"),)}), Usage(), 0
+        )
+        return replace(
+            snapshot,
+            version=self.state.settings_version,
+            usage=replace(snapshot.usage, locked_settings=locked_settings),
+        )
+
+    async def apply_configuration(self, changes: Sequence[Change]) -> int:
+        self.state.applied_configuration.append(list(changes))
+        self.state.settings_version += 1
         return self.state.settings_version
 
     async def platform_settings(self) -> dict[str, object]:

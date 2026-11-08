@@ -204,8 +204,22 @@ async def test_only_who_may_manage_the_scope_changes_its_targets(uow: InMemoryUn
 
 async def test_a_scope_has_at_most_ten_targets(uow: InMemoryUnitOfWork) -> None:
     service = make_service(uow)
-    for _ in range(MAX_TARGETS):
-        await service.add(SUPER, "demo", *EMAIL)
+    for number in range(MAX_TARGETS):
+        await service.add(SUPER, "demo", "email", f"ops{number}@acme.example", "warning")
     with pytest.raises(DomainError) as caught:
         await service.add(SUPER, "demo", *EMAIL)
     assert caught.value.field == "targets"
+
+
+async def test_a_target_is_known_by_its_kind_and_address_within_its_scope(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    service = make_service(uow)
+    await service.add(SUPER, "demo", *EMAIL)
+
+    with pytest.raises(DomainError) as caught:
+        await service.add(SUPER, "demo", EMAIL[0], EMAIL[1], "outage")
+
+    assert caught.value.code is ErrorCode.ALERT_TARGET_TAKEN
+    assert caught.value.field == "address"
+    await service.add(SUPER, None, *EMAIL)  # the platform's list is another scope

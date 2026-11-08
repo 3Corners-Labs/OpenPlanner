@@ -14,7 +14,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.credentials import Secrets
-from app.adapters.db.uow import contact_center_credential_name
+from app.adapters.db.record_names import contact_center_credential_name
 from app.adapters.integrations import sealed_store
 from app.config import Settings
 from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
