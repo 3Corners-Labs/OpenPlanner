@@ -7,6 +7,7 @@ error type only and goes on with the next interval (ADR 0117 point 4). Only coun
 
 import structlog
 
+from app.domain.slot_close_service import SlotCloser
 from app.domain.usage_backfill_service import UsageBackfill
 from app.domain.usage_rollup_service import RollupRun, UsageRollup
 
@@ -41,3 +42,14 @@ async def backfill_usage(backfill: UsageBackfill) -> None:
         return
     if run.bookings:
         log.info("usage.backfilled", bookings=run.bookings, facts=run.facts, complete=run.complete)
+
+
+async def close_slots(closer: SlotCloser) -> None:
+    """Close the slots that ended if it is due; a failure is logged, never fatal (ADR 0117)."""
+    try:
+        run = await closer.run_if_due()
+    except Exception as exc:  # never stop the worker loop over reporting
+        log.error("usage.slots_failed", error=type(exc).__name__)
+        return
+    if run is not None and run.slots:
+        log.info("usage.slots_closed", slots=run.slots, facts=run.facts)

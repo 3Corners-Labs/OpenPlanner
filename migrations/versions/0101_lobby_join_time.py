@@ -9,8 +9,8 @@ Two nullable columns on ``call_status``, nothing to backfill (expand only, ADR 0
 
 The previous image does not read either column.
 
-Revision ID: 0100
-Revises: 0098
+Revision ID: 0101
+Revises: 0100
 """
 
 from collections.abc import Sequence
@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0100"
-down_revision: str | None = "0098"
+revision: str = "0101"
+down_revision: str | None = "0100"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

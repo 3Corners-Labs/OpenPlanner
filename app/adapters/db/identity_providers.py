@@ -36,12 +36,12 @@ from app.domain.login_domains import DomainClaim, DomainState
 from app.domain.mfa import MfaPolicy
 
 
-def _secret_name(key: str) -> str:
+def secret_name(key: str) -> str:
     """Return the record name a client secret is sealed under (associated data)."""
     return f"idp:{key}:secret"
 
 
-def _key_name(key: str, kid: str) -> str:
+def key_name(key: str, kid: str) -> str:
     """Return the record name a private key is sealed under (associated data)."""
     return f"idp:{key}:key:{kid}"
 
@@ -254,7 +254,7 @@ class IdentityProviderQueries:
             DomainError: ``integration_not_ready`` without a box.
         """
         row = await self._provider_row(provider_key)
-        nonce, ciphertext = self._seal(_key_name(provider_key, key.kid), key.private_pem)
+        nonce, ciphertext = self._seal(key_name(provider_key, key.kid), key.private_pem)
         self._session.add(
             IdentityProviderKeyRow(
                 kid=key.kid,
@@ -328,7 +328,7 @@ class IdentityProviderQueries:
         """Seal ``secret`` onto the row, or clear it when ``None`` on a new row."""
         if secret is None:
             return
-        row.secret_nonce, row.secret_ciphertext = self._seal(_secret_name(key), secret)
+        row.secret_nonce, row.secret_ciphertext = self._seal(secret_name(key), secret)
 
     def _seal(self, name: str, plaintext: str) -> tuple[bytes, bytes]:
         """Seal ``plaintext`` under ``name``.
@@ -401,11 +401,11 @@ class ProviderCredentialStore:
         if self._box is not None:
             if row.secret_nonce is not None and row.secret_ciphertext is not None:
                 secret = self._box.open(
-                    _secret_name(key), row.secret_nonce, row.secret_ciphertext
+                    secret_name(key), row.secret_nonce, row.secret_ciphertext
                 ).decode()
             if current is not None:
                 kid = current.kid
                 pem = self._box.open(
-                    _key_name(key, current.kid), current.key_nonce, current.key_ciphertext
+                    key_name(key, current.kid), current.key_nonce, current.key_ciphertext
                 ).decode()
         return ProviderCredentials(provider, secret, kid, pem)

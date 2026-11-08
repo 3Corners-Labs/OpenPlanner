@@ -20,8 +20,10 @@ async def _request(uow: InMemoryUnitOfWork, booking_id: int) -> None:
     async with uow.locked() as tx:
         booking = await tx.get_booking(booking_id)
         assert booking is not None
+        group = await tx.get_group_by_id(booking.group_id)
+        assert group is not None
         await booking_changes.request_rebook(
-            tx, booking, NOW, reason=REASON, rebook_days=14, reminder_days=3
+            tx, booking, group, NOW, reason=REASON, rebook_days=14, reminder_days=3
         )
 
 

@@ -8824,6 +8824,9 @@ msgstr "Grootste uitgepakte omvang van een geüpload lettertype (bytes)"
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Maximale grootte van een configuratiepakket (MB)"
 
+msgid "settings.field.configuration_apply_max_changes.label"
+msgstr "Maximaal aantal wijzigingen in één configuratiedocument"
+
 msgid "admin.done.package_imported"
 msgstr "Het configuratiepakket is geïmporteerd: {count} organisatie(s). De processen nemen de nieuwe instellingen binnen tien seconden over."
 
@@ -8844,6 +8847,39 @@ msgstr "Het pakket is groter dan de maximale grootte van een configuratiepakket.
 
 msgid "admin.form.error.configuration_installation_in_use"
 msgstr "Deze installatie is in gebruik: er zijn afspraken, tijdsloten of een actieve sluiting. Een pakket kan alleen in een nieuwe installatie worden geïmporteerd."
+
+msgid "admin.form.error.configuration_format_unsupported"
+msgstr "Dit configuratiedocument heeft een formaat dat deze versie van OpenPlanner niet kent."
+
+msgid "admin.form.error.configuration_unknown_field"
+msgstr "Het document bevat een veld dat niet bestaat. Controleer de naam op het genoemde pad."
+
+msgid "admin.form.error.configuration_object_exists"
+msgstr "Dit object bestaat al, terwijl het document het wil aanmaken."
+
+msgid "admin.form.error.configuration_object_missing"
+msgstr "Dit object bestaat niet, terwijl het document het wil wijzigen."
+
+msgid "admin.form.error.configuration_out_of_scope"
+msgstr "Het document noemt iets buiten de organisatie waarvoor het geldt."
+
+msgid "admin.form.error.configuration_object_in_use"
+msgstr "Dit object wordt nog gebruikt door afspraken, tijdsloten of een actieve sluiting en kan niet worden verwijderd."
+
+msgid "admin.form.error.configuration_plan_stale"
+msgstr "De configuratie is veranderd sinds het plan is gemaakt, of het plan ontbreekt. Maak het plan opnieuw en controleer het."
+
+msgid "admin.form.error.configuration_too_many_changes"
+msgstr "Dit document wijzigt meer dan het toegestane aantal objecten tegelijk. Splits het document of verhoog de instelling."
+
+msgid "admin.form.error.scenario_name_taken"
+msgstr "Er is al een scenario met deze naam. Kies een andere naam."
+
+msgid "admin.form.error.alert_target_taken"
+msgstr "Dit alarmdoel bestaat al."
+
+msgid "admin.form.error.configuration_capacity_below_booked"
+msgstr "De capaciteit is lager dan het aantal plaatsen dat al is geboekt."
 
 msgid "admin.settings.package.title"
 msgstr "Configuratiepakket"
