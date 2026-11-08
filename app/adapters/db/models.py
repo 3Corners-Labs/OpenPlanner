@@ -1232,6 +1232,8 @@ class ReleaseCheckRow(Base):
     release_url: Mapped[str | None] = mapped_column(String(300))
     error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
     requested_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    # ADR 0116 point 9: the last support.json read, as text; the updates page parses it.
+    support: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 
@@ -1253,6 +1255,8 @@ class UpdateRequestRow(Base):
     reason: Mapped[str] = mapped_column(String(40), server_default=text("''"))
     step: Mapped[str | None] = mapped_column(String(16))
     step_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0116 point 9: the updater does not take the request before this moment.
+    apply_after: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         Index("ix_update_requests_status", "status"),

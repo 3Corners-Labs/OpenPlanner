@@ -43,6 +43,9 @@ spec:
             - sh
             - -c
             - |-
+              # ADR 0116 point 6: refuse a database older than the image's stop (exit 1); an
+              # image from before the check has no such command (exit 2) and goes ahead.
+              python -m app.cli upgrade-path-check || [ $? -eq 2 ] || exit 1
               alembic upgrade head || exit 1
               set -- --no-access-log --proxy-headers --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
               if [ -n "${WEB_TLS_CERT_FILE:-}" ]; then

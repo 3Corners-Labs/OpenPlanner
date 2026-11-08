@@ -951,6 +951,15 @@ _OPERATIONS = (
         "The release feed held an entry that is not a version or points elsewhere.",
     ),
     _e(
+        "updates.support_ignored",
+        _OPS,
+        "warning",
+        "reason",
+        "The support index was ignored: {reason}.",
+        "support.json on the repository's default branch does not parse (ADR 0116 point 9); "
+        "the updates page keeps the last good one.",
+    ),
+    _e(
         "updates.version_note_failed",
         _OPS,
         "warning",

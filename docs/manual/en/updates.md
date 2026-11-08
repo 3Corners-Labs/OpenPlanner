@@ -21,10 +21,23 @@ The first card shows:
 - **Latest version**: the newest version found, with a link to its notes.
 - **Last checked**: when the server last looked for a new version. When that failed, a chip
   gives the code.
+- **Line**: the minor version this installation follows, such as `1.4`: it is then only offered
+  the fixes of that version, not the next minor. *Every version on the channel* when no line is
+  set.
+- **Update window**: when the installation may update itself, for example *Sun 03:00–05:00*,
+  with the next opening; *Any time* when no window is set.
+- **Support of this line**: whether the running version still receives fixes: *Supported* (the
+  newest minor), *Security fixes only* (from 1.0.0 the minor before it), *Extended line* (with
+  its end date) or *No longer supported*: update to a supported line then.
 
-The channel, automatic updating and the interval between two checks are not set here but by
-the superuser in **Advanced settings**, topic Updates (`UPDATE_CHANNEL`, `UPDATE_AUTO_APPLY`,
-`UPDATE_CHECK_MINUTES`; see [Advanced settings](advanced-settings.md)).
+The channel, automatic updating, the interval between two checks, the line and the window are
+not set here but by the superuser in **Advanced settings**, topic Updates (`UPDATE_CHANNEL`,
+`UPDATE_AUTO_APPLY`, `UPDATE_CHECK_MINUTES`, `UPDATE_LINE`, `UPDATE_WINDOW`; see
+[Advanced settings](advanced-settings.md)). The window is up to seven ranges such as
+`mon 02:00-04:00, sat 01:00-05:00` in the portal's time zone, each at least 30 minutes. Inside
+a range the server files an automatic update itself and the updater carries it out; outside, it
+waits for the next range. A request you file yourself is never held up by the window. In a
+production installation automatic updating only works with a window set.
 
 <!-- field: check_now -->
 ### Check now
@@ -42,6 +55,14 @@ When a newer version is available, a card says so with its release notes. Two th
 - An update or restore switches maintenance mode on before the backup is made and off again
   when it has succeeded or has been rolled back. When it fails completely, maintenance mode
   stays on (see [Maintenance mode](maintenance.md)).
+
+<!-- field: apply_after -->
+### Apply after
+
+Under each version, **Apply after** takes a date and time (in the portal's time zone) from
+which the updater carries the request out, for example tonight at 23:00. Leave it empty to
+start as soon as the updater sees the request (within a minute). The open request then says from
+when the updater starts it; until then you can withdraw it.
 
 <!-- field: target -->
 ### Choosing a version

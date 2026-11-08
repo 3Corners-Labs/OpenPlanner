@@ -27,6 +27,9 @@ FROM python:3.12-slim-bookworm AS runtime
 ARG APP_VERSION=""
 # The git commit of the build (ADR 0052), set by main.yml on every image; empty locally.
 ARG APP_COMMIT=""
+# ADR 0116 point 6: a database last run by an older version upgrades through this release
+# first; the release PR raises it. Images before it know no stop.
+ARG MIN_UPGRADE_FROM="1.0.0"
 # CVE-2026-84782 (OpenSSL, HIGH): the base tag still ships libssl3 3.0.22-1~deb12u1.
 # Remove this layer once the python:3.12-slim-bookworm image carries deb12u2 or later.
 RUN apt-get update \
@@ -49,6 +52,7 @@ RUN mkdir /srv/data /srv/portal-certs && chown app:app /srv/data /srv/portal-cer
 # whatever the base image happens to ship: an empty PYTHONTZPATH makes zoneinfo use only it.
 ENV APP_VERSION=${APP_VERSION} \
     APP_COMMIT=${APP_COMMIT} \
+    MIN_UPGRADE_FROM=${MIN_UPGRADE_FROM} \
     PATH=/srv/.venv/bin:$PATH \
     PYTHONPATH=/srv \
     PYTHONTZPATH="" \

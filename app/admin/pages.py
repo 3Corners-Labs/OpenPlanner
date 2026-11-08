@@ -20,7 +20,13 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from app.admin.authz import can_function, return_path, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
-from app.admin.session import THEMES, session_alert_prefs, session_nav, session_theme
+from app.admin.session import (
+    THEMES,
+    current_session,
+    session_alert_prefs,
+    session_nav,
+    session_theme,
+)
 from app.admin.top_bar import top_links
 from app.domain.authorization import Permission, Principal, Role, Scope, scope_for
 from app.domain.scheduling import GroupSummary
@@ -372,6 +378,16 @@ def role_labels(
     return built_in + custom
 
 
+def _signed_in_key(request: Request) -> str:
+    """Return the moment of this session's sign-in as epoch seconds, or empty without one.
+
+    It names the sign-in for ``brand-motion.js`` only (play once per sign-in); a time, no
+    secret and no personal data.
+    """
+    found = current_session(request)
+    return str(int(found.login_at.timestamp())) if found is not None else ""
+
+
 def page(
     request: Request,
     locale: RequestLocale,
@@ -433,6 +449,8 @@ def page(
             ],
             # A message page (refusal, not found) keeps ``help_topic`` None: no help link.
             "help_topic": help_topic,
+            # ADR 0060 §7: which sign-in the top-bar mark settles for once (brand-motion.js).
+            "brand_signed_in": _signed_in_key(request),
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
             "update_banner": getattr(request.state, "update_notice", None),
             # Set by ``maintenance_routes.load_maintenance_notice`` (ADR 0038).

@@ -39,10 +39,8 @@ FAVICON_LINKS = (
     f'<link rel="icon" href="{ASSETS.url("brand/favicon-32.png")}" type="image/png" sizes="32x32">',
     f'<link rel="apple-touch-icon" href="{ASSETS.url("brand/apple-touch-icon.png")}">',
 )
-MARK = (
-    f'<img class="product-footer__mark" src="{ASSETS.url("brand/mark.svg")}" alt="" '
-    'width="20" height="20">'
-)
+MARK = '<svg class="brand-mark product-footer__mark" viewBox="0 0 24 24" width="20" height="20"'
+"""The footer mark, inline so it can move (ADR 0060 §7); decorative, so hidden."""
 
 
 def test_the_brand_files_of_the_adr_ship() -> None:
@@ -113,7 +111,7 @@ async def test_the_footer_follows_the_organisations_setting(site: Site) -> None:
     page = (await site.client.get("/g/demo")).text
 
     assert '<footer class="site-footer">' not in page
-    assert ASSETS.url("brand/mark.svg") not in page
+    assert "product-footer__mark" not in page
     for link in FAVICON_LINKS:  # the favicon is product identity, never a setting
         assert link in page
 
@@ -149,10 +147,8 @@ async def test_the_admin_top_bar_shows_the_mark_for_every_role(site: Site, role:
     for link in FAVICON_LINKS:
         assert link in page
     top_bar = page.split('<header class="admin-topbar">', 1)[1].split("</header>", 1)[0]
-    assert (
-        f'<img class="admin-brand__mark" src="{ASSETS.url("brand/mark.svg")}" alt="" '
-        'width="26" height="26">' in top_bar
-    )
+    assert '<svg class="brand-mark admin-brand__mark" viewBox="0 0 24 24" width="26"' in top_bar
+    assert 'aria-hidden="true"' in top_bar.split("admin-brand__mark", 1)[1].split(">", 1)[0]
     assert "<span>Administration</span>" in top_bar  # the product name stays text
     assert ">OP<" not in top_bar
     assert '<footer class="site-footer">' not in page  # the participant footer is not the portal's
@@ -165,4 +161,4 @@ async def test_the_portal_has_no_participant_footer_in_any_theme(site: Site) -> 
         page = (await site.client.get("/admin/")).text
         assert f'data-theme="{theme}"' in page
         assert '<footer class="site-footer">' not in page
-        assert ASSETS.url("brand/mark.svg") in page
+        assert "brand-mark admin-brand__mark" in page

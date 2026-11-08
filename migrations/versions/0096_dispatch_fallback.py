@@ -6,8 +6,8 @@ center is down), and to ``call_status`` the flag ``fallback`` of a booking in th
 fallback. Defaulted and nullable columns only (an expand step, ADR 0116); the downgrade drops
 them.
 
-Revision ID: 0094
-Revises: 0093
+Revision ID: 0096
+Revises: 0095
 Create Date: 2026-11-08 18:00:00.000000
 """
 
@@ -16,8 +16,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0094"
-down_revision: str | None = "0093"
+revision: str = "0096"
+down_revision: str | None = "0095"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -65,6 +65,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `APP_VERSION` | string | `""` | Baked into release images (ADR 0029). |
 | `APP_COMMIT` | string | `""` | Git commit baked into every image (ADR 0052). |
 | `APP_IMAGE_DIGEST` | string | `""` | Registry digest the host pinned this image at, for the evidence report (WP-C2). |
+| `MIN_UPGRADE_FROM` | string | `1.0.0` | Baked into the image (ADR 0116 point 6): a database last run by an older version upgrades through this release first (`upgrade_path_required`); images before it know no stop. |
 | `INSTALLATION_NAME` | string | `""` | Name of this installation in every log line and event record (ADR 0040/0034). |
 | `WEBEX_API_BASE_URL` | url | `https://webexapis.com/v1` | Webex API endpoint; changed only for test doubles. |
 | `SIMULATOR_ENABLED` | bool | `false` | Platform-event simulator on admin booking pages; refused in production. |
@@ -173,7 +174,9 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_REPOSITORY` | string | — | — | `settings.platform.manage` | owner/name of the release repository (ADR 0029). |
 | `UPDATE_CHECK_TOKEN` | secret | — | — | `settings.platform.manage` | Read token for a private repository; write-only. |
 | `UPDATE_CHANNEL` | enum | `release` | release, rc | `settings.platform.manage` | What the installation follows (ADR 0059, 0065): releases only, or release candidates (`rc`) too; `rc` is not usable in production. |
-| `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); not usable in production. |
+| `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); in production only with `update_window` set (ADR 0116). |
+| `UPDATE_LINE` | string | `""` | — | `settings.platform.manage` | Follow the patches of one minor `X.Y` only (ADR 0116 point 9); empty follows everything the channel offers. |
+| `UPDATE_WINDOW` | string | `""` | — | `settings.platform.manage` | When automatic updates happen, in `admin_timezone`: up to 7 ranges such as `mon 02:00-04:00, sat 01:00-05:00`, each at least 30 minutes (ADR 0116 point 9); empty is any time. A superuser's click is immediate. |
 | `UPDATE_CHECK_MINUTES` | int | `60` | 5–1440 | `settings.platform.manage` | Minutes between two release checks by the worker (ADR 0067); "Check now" on the updates page asks for one ahead of time. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the participant's waiting page (ADR 0072). |

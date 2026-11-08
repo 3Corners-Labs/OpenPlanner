@@ -487,7 +487,11 @@ class FormData:
         if day is None or clock is None:
             self._fail(name, "admin.form.error.moment")
             return None
-        return datetime.combine(day, clock, tz).astimezone(UTC)
+        try:
+            return datetime.combine(day, clock, tz).astimezone(UTC)
+        except OverflowError:  # year 1 or 9999 beyond UTC: no moment this service can hold
+            self._fail(name, "admin.form.error.moment")
+            return None
 
     def moment_value(self, name: str, default: str = "") -> str:
         """Return a submitted ``datetime`` field as ``dayTtime`` to re-render, or ``default``."""

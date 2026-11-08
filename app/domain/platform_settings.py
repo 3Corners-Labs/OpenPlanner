@@ -13,7 +13,7 @@ became stricter) is ignored rather than applied, and reported as such.
 process refreshes every ``RELOAD_SECONDS``, the worker once per loop.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -23,6 +23,7 @@ from zoneinfo import available_timezones
 from app.domain.authorization import Scope
 from app.domain.ports import UnitOfWork
 from app.domain.settings_registry import Kind, SettingSpec, within_bounds
+from app.domain.update_policy import valid_line, valid_window
 from app.domain.user_names import valid_suffix
 
 RELOAD_SECONDS = 10
@@ -110,20 +111,30 @@ _TYPES: dict[Kind, tuple[type, ...]] = {
 }
 
 
-TIMEZONE_KEYS = frozenset({"admin_timezone"})
-"""String settings whose value must be an IANA time zone known to this installation."""
+def _known_zone(value: str) -> bool:
+    """Whether ``value`` is an IANA time zone this installation knows."""
+    return value in _zones()
 
-DOMAIN_KEYS = frozenset({"bundled_idp_login_suffix"})
-"""String settings whose value must be a lower-case domain name (ADR 0106 point 5)."""
+
+CHECKED_KEYS: Mapping[str, Callable[[str], bool]] = {
+    "admin_timezone": _known_zone,
+    "bundled_idp_login_suffix": valid_suffix,
+    "update_line": valid_line,
+    "update_window": valid_window,
+}
+"""String settings with a format of their own, and the check of it: an IANA time zone this
+installation knows, a lower-case domain name (ADR 0106 point 5), a line ``X.Y`` and an update
+window (ADR 0116 point 9)."""
 
 PRODUCTION_REFUSED: Mapping[str, frozenset[object]] = {
     "update_channel": frozenset({"rc"}),
-    "update_auto_apply": frozenset({True}),
 }
 """Portal values that are never usable with ``ENVIRONMENT=prod`` (ADR 0067 point 1).
 
-Production follows releases on a superuser's click. A stored value in this table is ignored
-and flagged, like any value outside the bounds; the environment may still lock the setting.
+Production follows releases. A stored value in this table is ignored and flagged, like any
+value outside the bounds; the environment may still lock the setting. Auto-apply is usable
+in production since ADR 0116, but only takes effect with ``update_window`` set
+(``update_policy.auto_apply_effective``).
 """
 
 
@@ -143,9 +154,7 @@ def usable(spec: SettingSpec, value: object, *, production: bool = False) -> boo
     types = _TYPES.get(spec.kind, ())
     if isinstance(value, bool) and spec.kind is not Kind.BOOL:
         return False
-    if spec.key in TIMEZONE_KEYS and not (isinstance(value, str) and value in _zones()):
-        return False
-    if spec.key in DOMAIN_KEYS and not (isinstance(value, str) and valid_suffix(value)):
+    if spec.key in CHECKED_KEYS and not (isinstance(value, str) and CHECKED_KEYS[spec.key](value)):
         return False
     return isinstance(value, types) and within_bounds(spec, value)
 
