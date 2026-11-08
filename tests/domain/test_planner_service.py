@@ -455,7 +455,7 @@ async def test_a_confirmation_by_a_planner_is_counted_as_the_planners(
 async def test_a_moved_pending_booking_stays_pending_with_its_own_deadline(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
-    receipt = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    receipt = await book_pending(bookings, slug="demo", contact=another_participant())
 
     moved = await planner.move(GROUP_ADMIN, "demo", receipt.booking.id or 0, SLOT_0930)
 
@@ -469,8 +469,8 @@ async def test_a_moved_pending_booking_stays_pending_with_its_own_deadline(
 async def test_a_pending_booking_can_be_cancelled_but_not_asked_to_rebook(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
-    first = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
-    second = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    first = await book_pending(bookings, slug="demo", contact=another_participant())
+    second = await book_pending(bookings, slug="demo", contact=another_participant())
 
     await planner.cancel(GROUP_ADMIN, "demo", first.booking.id or 0, ChangeReason.STAFFING)
     with pytest.raises(DomainError, match="booking_not_active"):
@@ -487,8 +487,8 @@ async def test_a_pending_booking_is_told_by_email_only_and_the_team_gets_no_with
 ) -> None:
     """ADR 0056: never sent to the team nor by SMS, so nothing of either on a change."""
     uow.state.groups[1] = with_team_invite(uow.state.groups[1])
-    contact = replace(participant(next(_PARTICIPANTS)), phone="+31612345678")
-    moving = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    contact = replace(another_participant(), phone="+31612345678")
+    moving = await book_pending(bookings, slug="demo", contact=another_participant())
     cancelling = await book_pending(bookings, slug="demo", contact=contact)
 
     moved = await planner.move(GROUP_ADMIN, "demo", moving.booking.id or 0, SLOT_0930)
