@@ -107,9 +107,13 @@ roles and live regions, the browser features used, what happens without the scri
   the open tile crosses the grid once and settles in its place.
 - **Keyboard:** none; the mark is decorative (`aria-hidden`) and never takes focus.
 - **Live regions:** none; nothing is announced.
-- **Browser features:** custom elements, `matchMedia`, `sessionStorage`, CSS animation of
-  `transform`; `forced-colors` gets system colours and no change of meaning.
+- **Browser features:** custom elements, ES modules, `matchMedia`, `sessionStorage`, CSS animation
+  of `transform` on SVG (all Baseline widely available); `forced-colors` gets system colours and no
+  change of meaning. The shared rules are in `brand-mark.css`.
 - **Without the script:** the static mark, exactly as before.
 - **Used by:** the overview (loaded with the page's other scripts when the overview refreshes
   itself).
+- **Size:** under 1 KB gzipped.
+- **Open:** the island checks of ADR 0118 point 10 run once that ADR's step 2 adds the `island`
+  flag to `e2e/pages.json`; the overview is listed there already for axe and keyboard runs.
 

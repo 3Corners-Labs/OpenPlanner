@@ -8,17 +8,28 @@ from tests.admin.conftest import SUPER, Site
 STATIC = Path(__file__).resolve().parents[2] / "app" / "web" / "static"
 
 
-def test_the_motion_never_plays_under_reduced_motion_and_never_flashes() -> None:
-    """Every animation rule sits inside ``prefers-reduced-motion: no-preference``."""
-    for name in ("admin.css", "site.css"):
-        css = (STATIC / name).read_text(encoding="utf-8")
-        block = css.split("@media (prefers-reduced-motion: no-preference) {\n  .brand-mark--", 1)
-        assert len(block) == 2, name
-        outside = css.replace(block[1].split("\n}\n", 1)[0], "")
-        assert "brand-mark-cross 2.4s" not in outside, name
-        assert "brand-mark-cross 1.2s" not in outside, name
-        # five positions in 2.4 s: at most about two steps per second, far from a flash (2.3.1)
-        assert "steps(1, end)" in css, name
+def test_the_motion_never_plays_under_reduced_motion_and_stops_on_its_own() -> None:
+    """Every animation sits inside ``no-preference``; the loop stops after two rounds."""
+    css = (STATIC / "brand-mark.css").read_text(encoding="utf-8")
+    guarded = re.search(
+        r"@media \(prefers-reduced-motion: no-preference\) \{(.*?)\n\}", css, re.DOTALL
+    )
+
+    assert guarded is not None
+    outside = css.replace(guarded.group(0), "")
+    assert "animation:" not in outside
+    assert "brand-mark-cross 2.4s steps(1, end) 2;" in guarded.group(1)  # 4.8 s (WCAG 2.2.2)
+    assert "infinite" not in css
+    assert "forced-colors: active" in css
+
+
+def test_both_surfaces_link_the_one_brand_sheet() -> None:
+    root = STATIC.parents[1]
+    shell = (root / "admin" / "templates" / "admin" / "_shell.html").read_text(encoding="utf-8")
+    base = (root / "web" / "templates" / "base.html").read_text(encoding="utf-8")
+
+    assert "static_url('brand-mark.css')" in shell
+    assert "static_url('brand-mark.css')" in base
 
 
 def test_the_island_only_adds_the_settle_class_once_per_sign_in() -> None:
