@@ -90,29 +90,30 @@ Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 
 ## Settings topics
 
-Every class C and D setting (ADR 0042) is shown under its topic on the settings screen
-of its scope (ADR 0047 §5). A test fails when a setting has no home here.
+A settings screen declares the ADR 0042 topics it shows, as sections in this order
+(ADR 0047 §5). A class C setting's topic is declared on a platform screen, a class D
+setting's on an organisation screen; a test fails otherwise.
 
-| Topic | Class | Shown at |
+| Topic | Screen | Section |
 |---|---|---|
-| `operations` | C | Settings: `/admin/settings/values#topic-operations` |
-| `retention` | C | Settings: `/admin/settings/values#topic-retention` |
-| `retention` | D | Settings: `/admin/organisations/{org}/settings#topic-retention` |
-| `storage` | C | Settings: `/admin/settings/values#topic-storage` |
-| `rate_limits` | C | Settings: `/admin/settings/values#topic-rate_limits` |
-| `admin_session` | C | Settings: `/admin/settings/values#topic-admin_session` |
-| `login_mapping` | C | Settings: `/admin/settings/values#topic-login_mapping` |
-| `mail` | C | Settings: `/admin/settings/values#topic-mail` |
-| `webex` | C | Settings: `/admin/settings/values#topic-webex` |
-| `updates` | C | Settings: `/admin/settings/values#topic-updates` |
-| `display` | C | Settings: `/admin/settings/values#topic-display` |
-| `display` | D | Settings: `/admin/organisations/{org}/settings#topic-display` |
-| `staff` | C | Settings: `/admin/settings/values#topic-staff` |
-| `staff` | D | Settings: `/admin/organisations/{org}/settings#topic-staff` |
-| `planner` | C | Settings: `/admin/settings/values#topic-planner` |
-| `planner` | D | Settings: `/admin/organisations/{org}/settings#topic-planner` |
-| `booking_form` | C | Settings: `/admin/settings/values#topic-booking_form` |
-| `booking_form` | D | Settings: `/admin/organisations/{org}/settings#topic-booking_form` |
-| `confirmation` | C | Settings: `/admin/settings/values#topic-confirmation` |
-| `confirmation` | D | Settings: `/admin/organisations/{org}/settings#topic-confirmation` |
-| `participant_link` | C | Settings: `/admin/settings/values#topic-participant_link` |
+| `operations` | Settings | `/admin/settings/values#topic-operations` |
+| `retention` | Settings | `/admin/settings/values#topic-retention` |
+| `storage` | Settings | `/admin/settings/values#topic-storage` |
+| `rate_limits` | Settings | `/admin/settings/values#topic-rate_limits` |
+| `admin_session` | Settings | `/admin/settings/values#topic-admin_session` |
+| `login_mapping` | Settings | `/admin/settings/values#topic-login_mapping` |
+| `mail` | Settings | `/admin/settings/values#topic-mail` |
+| `webex` | Settings | `/admin/settings/values#topic-webex` |
+| `updates` | Settings | `/admin/settings/values#topic-updates` |
+| `display` | Settings | `/admin/settings/values#topic-display` |
+| `staff` | Settings | `/admin/settings/values#topic-staff` |
+| `planner` | Settings | `/admin/settings/values#topic-planner` |
+| `booking_form` | Settings | `/admin/settings/values#topic-booking_form` |
+| `confirmation` | Settings | `/admin/settings/values#topic-confirmation` |
+| `participant_link` | Settings | `/admin/settings/values#topic-participant_link` |
+| `retention` | Settings | `/admin/organisations/{org}/settings#topic-retention` |
+| `display` | Settings | `/admin/organisations/{org}/settings#topic-display` |
+| `staff` | Settings | `/admin/organisations/{org}/settings#topic-staff` |
+| `planner` | Settings | `/admin/organisations/{org}/settings#topic-planner` |
+| `booking_form` | Settings | `/admin/organisations/{org}/settings#topic-booking_form` |
+| `confirmation` | Settings | `/admin/organisations/{org}/settings#topic-confirmation` |

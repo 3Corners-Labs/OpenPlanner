@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.authorization import Permission
-from app.domain.settings_registry import REGISTRY, SettingClass, SettingSpec, Topic
+from app.domain.settings_registry import SettingClass, SettingSpec, Topic
 from app.i18n import Translator
 
 MAX_SECTIONS = 3
@@ -71,6 +71,9 @@ class Screen:
             that row.
         own_label_key: For a screen with sub-tabs: the label of its own page in that row,
             when it differs from the screen's label (an entry's name is not its first part).
+        topics: For a settings screen: the ADR 0042 topics it shows, as sections in this
+            order (ADR 0047 §5, step 6). A topic that exists on two scopes is declared on the
+            screen of each, under the same name.
     """
 
     key: str
@@ -85,6 +88,7 @@ class Screen:
     wide_subpages: tuple[str, ...] = ()
     subtabs: tuple["Screen", ...] = ()
     own_label_key: str = ""
+    topics: tuple[Topic, ...] = ()
 
     @property
     def routes(self) -> tuple[str, ...]:
@@ -136,6 +140,35 @@ class Home:
     subtab: str | None = None
     width: Width = Width.STANDARD
 
+
+PLATFORM_TOPICS = (
+    Topic.OPERATIONS,
+    Topic.RETENTION,
+    Topic.STORAGE,
+    Topic.RATE_LIMITS,
+    Topic.ADMIN_SESSION,
+    Topic.LOGIN_MAPPING,
+    Topic.MAIL,
+    Topic.WEBEX,
+    Topic.UPDATES,
+    Topic.DISPLAY,
+    Topic.STAFF,
+    Topic.PLANNER,
+    Topic.BOOKING_FORM,
+    Topic.CONFIRMATION,
+    Topic.PARTICIPANT_LINK,
+)
+"""The topics of *Platform › Advanced settings › Settings*, in the order of its sections."""
+
+ORGANISATION_TOPICS = (
+    Topic.RETENTION,
+    Topic.DISPLAY,
+    Topic.STAFF,
+    Topic.PLANNER,
+    Topic.BOOKING_FORM,
+    Topic.CONFIRMATION,
+)
+"""The topics of an organisation's *Overview › Settings*, in the order of its sections."""
 
 SECTIONS = (
     Section(
@@ -306,6 +339,8 @@ SECTIONS = (
                         "/admin/settings/values",
                         Permission.SETTINGS_PLATFORM_VIEW,
                         "sliders",
+                        # Class C, and the platform defaults of class D (ADR 0042 §1).
+                        topics=PLATFORM_TOPICS,
                     ),
                     Screen(
                         "platform.package",
@@ -390,6 +425,7 @@ OBJECTS = (
                         f"{_ORGANISATION}/settings",
                         Permission.SETTINGS_ORGANISATION_MANAGE,
                         "sliders",
+                        topics=ORGANISATION_TOPICS,
                     ),
                     Screen(
                         "organisation.embedding",
@@ -607,23 +643,27 @@ OBJECTS = (
 """Object pages with tabs and sub-tabs."""
 
 
-SETTINGS_SCREENS: dict[SettingClass, str] = {
-    SettingClass.PLATFORM: "platform.settings.values",
-    SettingClass.ORGANISATION: "organisation.settings",
-}
-"""The screen that shows the portal settings of each class (ADR 0047 §5, step 6).
+def _scope_screens(class_: SettingClass) -> Iterator[Screen]:
+    """Yield the screens of the scope where a setting of ``class_`` is changed."""
+    for entry, item in screens():
+        organisation = entry == object_page("organisation").entry and item.key.startswith(
+            "organisation."
+        )
+        if (class_ is SettingClass.ORGANISATION and organisation) or (
+            class_ is SettingClass.PLATFORM and item.key.startswith("platform.")
+        ):
+            yield item
 
-A setting's ``topic`` (ADR 0042 registry) is a section of that screen, rendered in the
-registry's topic order, so settings of the same kind sit together on every scope. A topic that
-exists on two scopes (a platform default and an organisation's own value) carries the same name
-on both. Class A and B live in the environment and have no screen.
-"""
 
+def topic_home(spec: SettingSpec) -> Screen | None:
+    """Return the screen of ``spec``'s scope that declares its topic (ADR 0047 §5).
 
-def settings_home(spec: SettingSpec) -> Screen | None:
-    """Return the register screen that shows ``spec``, or ``None`` outside the portal."""
-    key = SETTINGS_SCREENS.get(spec.class_)
-    return screen(key) if key else None
+    Class C lives on a platform screen, class D on an organisation screen; ``None`` for a
+    setting outside the portal (class A and B) or a topic no screen of its scope declares.
+    """
+    if not spec.in_portal:
+        return None
+    return next((s for s in _scope_screens(spec.class_) if spec.topic in s.topics), None)
 
 
 def topic_anchor(topic: Topic) -> str:
@@ -770,19 +810,15 @@ def _topic_rows(translator: Translator, locale: str) -> list[str]:
     rows = [
         "## Settings topics",
         "",
-        "Every class C and D setting (ADR 0042) is shown under its topic on the settings screen",
-        "of its scope (ADR 0047 §5). A test fails when a setting has no home here.",
+        "A settings screen declares the ADR 0042 topics it shows, as sections in this order",
+        "(ADR 0047 §5). A class C setting's topic is declared on a platform screen, a class D",
+        "setting's on an organisation screen; a test fails otherwise.",
         "",
-        "| Topic | Class | Shown at |",
+        "| Topic | Screen | Section |",
         "|---|---|---|",
     ]
-    used = {(spec.topic, spec.class_) for spec in REGISTRY if spec.in_portal}
-    for topic in Topic:
-        for class_, key in SETTINGS_SCREENS.items():
-            if (topic, class_) not in used:
-                continue
-            home = screen(key)
-            name = translator.gettext(locale, home.label_key)
-            anchor = f"{home.path}{topic_anchor(topic)}"
-            rows.append(f"| `{topic.value}` | {class_.value} | {name}: `{anchor}` |")
+    for _, item in screens():
+        name = translator.gettext(locale, item.label_key)
+        for topic in item.topics:
+            rows.append(f"| `{topic.value}` | {name} | `{item.path}{topic_anchor(topic)}` |")
     return rows
