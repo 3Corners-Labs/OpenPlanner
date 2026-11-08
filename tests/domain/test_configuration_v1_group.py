@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from app.adapters.wxcc import DESCRIPTOR as WEBEX_CC
 from app.domain.authorization import Permission, Target
 from app.domain.configuration_changes import Change, ChangeAction, RuleContext, SlotLoad, Usage
 from app.domain.configuration_document import to_json
@@ -34,7 +35,11 @@ from tests.support.configuration import Recorder, entity, parse, plan, refusals
 from tests.support.configuration_columns import uncovered_columns
 
 NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
-CONTEXT = RuleContext(now=NOW, settings={"booking_form_max_custom_fields": 2})
+CONTEXT = RuleContext(
+    now=NOW,
+    settings={"booking_form_max_custom_fields": 2},
+    contact_centers={WEBEX_CC.kind.value: WEBEX_CC},
+)
 ADDRESS = ("acme", "team")
 
 HOLIDAY = Kind(
@@ -192,8 +197,6 @@ def test_a_new_group_must_state_its_name_timezone_and_slot_length(missing: str) 
         ("planner_change_min_lead_minutes", 2),
         ("video_host_email", "no-address"),
         ("calendar_invite_address", "no-address"),
-        ("wxcc_channel", ""),
-        ("wxcc_routing_value", "bad\x07value"),
         ("name", "x" * 5 + "\x07"),
     ],
 )
@@ -205,6 +208,39 @@ def test_a_setting_the_portal_would_refuse_is_refused_with_its_field(
     assert refusals(result) == [
         ("organisations[acme].groups[team]", ErrorCode.INVALID_CONFIGURATION, field)
     ]
+
+
+@pytest.mark.parametrize(
+    ("value", "field"),
+    [
+        ({"kind": "webex_cc", "attributes": {"channel": ""}}, "contact_center.channel"),
+        ({"kind": "webex_cc", "routing_value": "bad\x07value"}, "contact_center.routing_value"),
+        ({"kind": "unknown_platform"}, "contact_center.kind"),
+        ({"kind": "webex_cc", "attributes": {"nonsense": "x"}}, "contact_center.attributes"),
+        ({"kind": "webex_cc", "extra": 1}, "contact_center"),
+    ],
+)
+def test_a_contact_center_routing_the_platform_refuses_is_refused_with_the_part_that_is_wrong(
+    value: object, field: str
+) -> None:
+    result = planned(doc({**NEW_TEAM, "dispatch_lead_minutes": 5, "contact_center": value}))
+
+    assert refusals(result) == [
+        ("organisations[acme].groups[team]", ErrorCode.INVALID_CONFIGURATION, field)
+    ]
+
+
+def test_a_contact_center_routing_is_stored_as_written_and_an_empty_one_is_no_routing() -> None:
+    routing = {"kind": "webex_cc", "routing_value": "team-42", "attributes": {"channel": "video"}}
+
+    kept = planned(doc({**NEW_TEAM, "dispatch_lead_minutes": 5, "contact_center": routing}))
+    empty = planned(
+        doc({**NEW_TEAM, "dispatch_lead_minutes": 5, "contact_center": {"kind": "webex_cc"}})
+    )
+
+    assert refusals(kept) == []
+    assert kept.changes[0].values["contact_center"] == routing
+    assert empty.changes[0].values["contact_center"] is None
 
 
 def test_a_value_outside_its_bounds_is_refused_when_the_document_is_read() -> None:
@@ -895,6 +931,7 @@ def test_the_kinds_name_the_tables_the_assembler_expects() -> None:
     assert GROUP.tables | GROUP_TEXT.tables == {
         "groups",
         "group_texts",
+        "group_contact_center",
         "group_form_fields",
         "group_contacts",
         "group_holiday_calendars",

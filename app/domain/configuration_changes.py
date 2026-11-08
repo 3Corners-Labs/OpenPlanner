@@ -15,6 +15,7 @@ from enum import StrEnum
 from app.domain.authorization import Permission, Target
 from app.domain.configuration_tree import Address, Entity
 from app.domain.configuration_values import Value
+from app.domain.contact_center import ProviderDescriptor
 from app.domain.errors import ErrorCode
 
 
@@ -92,6 +93,8 @@ class RuleContext:
         smtp_plaintext_relay_allowed: Whether the host allows an unencrypted mail relay.
         combination_problem: Names the rule that a set of settings values breaks together
             (ADR 0042), or ``None``; supplied by the layer that can read the environment.
+        contact_centers: The descriptor of every contact-center platform the installation has
+            an adapter for, by the value of its kind (ADR 0032).
     """
 
     locales: frozenset[str] = frozenset({"nl", "en"})
@@ -101,6 +104,7 @@ class RuleContext:
     built_in_claim_values: frozenset[str] = frozenset()
     smtp_plaintext_relay_allowed: bool = False
     combination_problem: Callable[[Mapping[str, object]], str | None] | None = None
+    contact_centers: Mapping[str, ProviderDescriptor] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
