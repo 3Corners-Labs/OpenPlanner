@@ -15,7 +15,7 @@ from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import AUDITOR, GROUP_ADMIN, OUTSIDER, two_organisations
+from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM, OUTSIDER, two_organisations
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book, webex_routing, window
 
 WIRED = {
@@ -72,6 +72,18 @@ async def test_only_who_manages_the_groups_bookings_may_retry(principal: object)
 
     with pytest.raises(DomainError, match="not_permitted"):
         await service.retry(principal, "demo", booking_id, JobType.CREATE_VIDEO_ROOM)  # type: ignore[arg-type]
+
+
+async def test_another_groups_booking_is_not_found_through_this_groups_address() -> None:
+    """Threat model: an id tried through another group's address plans and audits nothing."""
+    uow, service, booking_id = await _setup()
+    before = len(uow.state.audit)
+
+    with pytest.raises(DomainError, match="booking_not_found"):
+        await service.retry(OTHER_TEAM, "andere-team", booking_id, JobType.CREATE_VIDEO_ROOM)
+
+    assert uow.state.jobs[booking_id] == []
+    assert not [e for e in uow.state.audit[before:] if e.detail.startswith("retry.")]
 
 
 async def test_nothing_is_retried_that_exists_is_not_retryable_or_is_cancelled() -> None:

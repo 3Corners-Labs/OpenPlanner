@@ -1006,13 +1006,13 @@ writes a heartbeat row that the group check reads.
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
-| Elevation of privilege | An auditor, agent or another organisation's admin plans jobs | `bookings.manage` on the route (fresh login) and again in the domain; the booking must belong to the group | `tests/admin/test_authorization_matrix.py`, `tests/domain/test_call_retry.py::test_only_who_manages_the_groups_bookings_may_retry` |
+| Elevation of privilege | An auditor, agent or another organisation's admin plans jobs | `bookings.manage` on the route (fresh login) and again in the domain; the booking must belong to the group | `tests/admin/test_authorization_matrix.py`, `tests/domain/test_call_retry.py::test_only_who_manages_the_groups_bookings_may_retry`, `test_another_groups_booking_is_not_found_through_this_groups_address` |
 | Denial of service | Repeated clicks flood Webex or WxCC | One pending job per type: a click replaces it; only for an active booking that still lacks the meeting or task; messages cannot be retried | `tests/domain/test_call_retry.py::test_a_failed_meeting_is_planned_again_now_and_audited`, `test_nothing_is_retried_that_exists_is_not_retryable_or_is_cancelled` |
 | Information disclosure | A request event leaks personal data or a token | Only method, path (no query), status, duration, tracking id, version; never body, query or header | `tests/adapters/test_webex_auth.py::test_every_request_is_reported_without_query_or_body` |
 | Information disclosure | Request events show a booking to the wrong admins | Written at the booking's organisation and group from the trace; read through `list_audit_events` with the `bookings.view` scope | `tests/domain/test_request_log.py::test_a_request_is_a_system_event_at_the_bookings_level_in_its_trace` |
 | Denial of service | Request events fill the disk | Own retention `INTEGRATION_REQUEST_RETENTION_DAYS` (1–365, default 30) before the other system events | `tests/domain/test_request_log.py::test_request_events_are_pruned_on_their_own_retention` |
 | Tampering (CSRF) | A third-party site triggers a retry | Fetch Metadata check on the POST | `tests/admin/test_authorization_matrix.py` (same-origin header required) |
-| Repudiation | Nobody knows who retried | Audited as `bookings.manage` with detail `retry.<job type>` | `tests/domain/test_call_retry.py::test_a_failed_meeting_is_planned_again_now_and_audited` |
+| Repudiation | Nobody knows who retried | Audited as `bookings.manage` with detail `retry.<job type>` and the booking id, so the audit log lists it under the booking | `tests/domain/test_call_retry.py::test_a_failed_meeting_is_planned_again_now_and_audited`, `tests/admin/test_call_routes.py::test_retry_plans_the_meeting_again_and_says_so` |
 
 ## Flow: machine API for contact-center bots (ADR 0023)
 

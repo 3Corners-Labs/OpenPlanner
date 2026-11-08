@@ -52,7 +52,7 @@ from app.domain.job_plan import (
     plan_for_suspension,
     plan_purge,
 )
-from app.domain.lookups import group_booking
+from app.domain.lookups import group_booking, group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scenario_service import usable_scenario
 from app.domain.scheduling import Group, GroupSummary, Organisation
@@ -176,7 +176,7 @@ class ClosureService:
         await self._authorize(principal, slug)
         now = self._clock.now()
         async with self._uow.read() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             closures = await tx.get_closures(group.id, now)
             suspended = await tx.list_suspended_bookings(self._scope(principal), group.id)
             ahead = await tx.find_confirmed_bookings(group.id, now, None)
@@ -209,7 +209,7 @@ class ClosureService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             stored, count = await self._close(tx, group, closure)
             detail = _start_detail(stored, count, closure.scenario_id)
             await self._audit(tx, principal, authorization, slug, detail)
@@ -240,7 +240,7 @@ class ClosureService:
         authorization = await self._authorize(principal, slug)
         now = self._clock.now()
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             current = await _visible(tx, group, now)
             if ends_at is not None and ends_at <= max(now, current.starts_at):
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "ends_at")
@@ -274,7 +274,7 @@ class ClosureService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             outcome = await self._lift(tx, principal, group, reinstate=reinstate)
             await self._audit(
                 tx, principal, authorization, slug, f"closure.lift,bookings:{outcome.done}"
@@ -295,7 +295,7 @@ class ClosureService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             current = await _visible(tx, group, self._clock.now())
             if image is None and current.image is None:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "image")
@@ -311,7 +311,7 @@ class ClosureService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             current = await _visible(tx, group, self._clock.now())
             await tx.remove_closure_image(_id(current))
             await self._audit(tx, principal, authorization, slug, "closure.image.remove")
@@ -338,7 +338,7 @@ class ClosureService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             outcome = await self._reinstate_all(tx, principal, group)
             await self._audit(
                 tx, principal, authorization, slug, f"booking.reinstate_all,bookings:{outcome.done}"
@@ -365,7 +365,7 @@ class ClosureService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             bookings = await tx.list_suspended_bookings(self._scope(principal), group.id)
             for booking in bookings:
                 await self._cancel(tx, group, booking)
@@ -701,14 +701,6 @@ def _notices(raw: Mapping[str, str]) -> dict[str, str]:
         DomainError: ``invalid_configuration`` with ``notice_<locale>``.
     """
     return {loc: clean_notice(raw.get(loc, ""), notice_field(loc)) for loc in NOTICE_LOCALES}
-
-
-async def _group(tx: Transaction, slug: str) -> Group:
-    """Return the group with ``slug`` or raise ``group_not_found``."""
-    group = await tx.get_group(slug)
-    if group is None:
-        raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-    return group
 
 
 async def _visible(tx: Transaction, group: Group, now: datetime) -> Closure:
