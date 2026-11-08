@@ -168,7 +168,7 @@ from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
-from app.adapters.wxcc import business_address, channel_and_address
+from app.adapters.wxcc import channel_and_address, wxcc_mapping
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.adapters.wxcc_sample_flow import Route, sample_flow
 from app.config import Settings, environment
@@ -493,7 +493,8 @@ async def _wxcc_sample_flow(
         {
             g.routing_value
             for g in groups
-            if business_address(g.contact_center) == address
+            if (peer := wxcc_mapping(g.contact_center))
+            and peer.business_address == address
             and g.routing_value != group.routing_value
         }
     )

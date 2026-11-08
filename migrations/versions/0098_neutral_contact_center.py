@@ -6,13 +6,13 @@ The expand step of ADR 0116, not the single renaming migration ADR 0032 sketched
   and copies every group's ``wxcc_*`` routing into it with kind ``webex_cc``;
 - adds the nullable ``bookings.contact_center_task_id`` and ``bookings.contact_center_kind``
   and copies ``wxcc_task_id`` into them;
-- renames the stored job type ``dispatch_wxcc_task`` to ``dispatch_contact_center_task``
-  (a value update; the worker still reads the old value a web container of the previous minor
-  may write during a rolling update).
 
-The old columns stay and the application keeps writing them, so the downgrade drops the new
-table and columns without losing anything and only renames the job type back. Dropping the old
-columns is the contract step, a minor later.
+The stored job type ``dispatch_wxcc_task`` is not touched: the previous minor's image must keep
+reading it (ADR 0116 §5); the next minor switches the value, the one after drops the old one.
+
+The old columns stay and stay the source of truth for a Webex Contact Center routing or task,
+so the previous image keeps working and the downgrade drops the new table and columns without
+losing anything. Dropping the old columns is the contract step, a minor later.
 
 Revision ID: 0098
 Revises: 0096
@@ -31,8 +31,6 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 WEBEX_CC = "webex_cc"
-OLD_JOB = "dispatch_wxcc_task"
-NEW_JOB = "dispatch_contact_center_task"
 
 
 def upgrade() -> None:
@@ -91,16 +89,10 @@ def upgrade() -> None:
         ),
         {"kind": WEBEX_CC},
     )
-    connection.execute(
-        sa.text("UPDATE jobs SET type = :new WHERE type = :old"), {"new": NEW_JOB, "old": OLD_JOB}
-    )
 
 
 def downgrade() -> None:
-    """Rename the job type back and drop the new table and columns (the old ones hold it all)."""
-    op.get_bind().execute(
-        sa.text("UPDATE jobs SET type = :old WHERE type = :new"), {"new": NEW_JOB, "old": OLD_JOB}
-    )
+    """Drop the new table and columns (the old ones hold it all)."""
     with op.batch_alter_table("bookings") as batch:
         batch.drop_index("ix_bookings_contact_center_task_id")
         batch.drop_column("contact_center_kind")

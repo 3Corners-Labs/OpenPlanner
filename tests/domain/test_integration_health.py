@@ -16,6 +16,7 @@ from app.domain.connection_health import (
     InboundEvent,
     Platform,
 )
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.integration_health import (
     IntegrationHealthService,
@@ -144,7 +145,8 @@ async def test_the_last_inbound_event_is_kept_per_platform(uow: InMemoryUnitOfWo
 
 def with_task(uow: InMemoryUnitOfWork, task: TaskState, booking_id: int = 10) -> None:
     uow.state.bookings[booking_id] = confirmed_booking(
-        id=booking_id, contact_center_task_id=f"t-{booking_id}"
+        id=booking_id,
+        contact_center_task=ContactCenterTaskRef(f"t-{booking_id}", ContactCenterKind.WEBEX_CC),
     )
     uow.state.call_status[booking_id] = CallStatus(
         booking_id, task=task, task_created_at=SLOT_0900 - timedelta(minutes=5)

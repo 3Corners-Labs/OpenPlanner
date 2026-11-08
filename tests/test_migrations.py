@@ -579,7 +579,7 @@ def test_existing_destinations_keep_the_decisions_and_events_get_an_empty_role(
 def test_the_wxcc_routing_task_and_job_get_neutral_places_and_survive_a_downgrade(
     alembic_config: Config, tmp_path: Path
 ) -> None:
-    """ADR 0032 CC-1 as an ADR 0116 expand step: copied forward, old columns kept, job renamed."""
+    """ADR 0032 CC-1 as an ADR 0116 expand step: copied forward, old values untouched."""
     import json
     import sqlite3
     from contextlib import closing
@@ -629,7 +629,7 @@ def test_the_wxcc_routing_task_and_job_get_neutral_places_and_survive_a_downgrad
         (2, "webex_cc", None, {"business_address": "half@example.biz"}),
     ]
     assert tasks == [("task-1", "webex_cc", "task-1"), (None, None, None)]
-    assert jobs == [("dispatch_contact_center_task",), ("purge_pii",)]
+    assert jobs == [("dispatch_wxcc_task",), ("purge_pii",)]  # the previous image reads it
 
     command.downgrade(alembic_config, "0096")
     with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:

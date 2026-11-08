@@ -42,7 +42,6 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.contact_centers import routing
-from app.adapters.wxcc import BUSINESS_ADDRESS, CHANNEL
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.block_subjects import block_subject_values, read_block_subjects, subject_choices
 from app.admin.check_routes import check_service, check_view
@@ -67,10 +66,16 @@ from app.admin.pages import (
     with_manual,
 )
 from app.admin.readiness_view import checklist_view, readiness_service
+from app.admin.routing_inputs import (
+    FORM_KIND,
+    ROUTING_ATTRIBUTE_FIELDS,
+    ROUTING_LABELS,
+    ROUTING_VALUE_FIELD,
+)
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
-from app.domain.contact_center import ContactCenterKind, ContactCenterRouting
+from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.planning import (
     GroupSettings,
@@ -181,19 +186,8 @@ OPTIONAL_NUMBERS = frozenset({"direct_call_max_concurrent"})
 
 INTEGRATION_LABELS: dict[str, str] = {
     "video_host_email": "admin.field.video_host_email",
-    "wxcc_business_address": "admin.field.wxcc_business_address",
-    "wxcc_channel": "admin.field.wxcc_channel",
-    "wxcc_routing_value": "admin.field.wxcc_routing_value",
+    **ROUTING_LABELS,
 }
-
-ROUTING_ATTRIBUTE_FIELDS: dict[str, str] = {
-    "wxcc_business_address": BUSINESS_ADDRESS,
-    "wxcc_channel": CHANNEL,
-}
-"""The settings form's routing inputs and the WxCC attributes they fill (ADR 0032). The input
-names stay as they were until CC-4 renders the form from the platform's descriptor."""
-ROUTING_VALUE_FIELD = "wxcc_routing_value"
-"""The settings form's input for the routing value."""
 
 
 def _form_routing(form: FormData) -> ContactCenterRouting | None:
@@ -203,7 +197,7 @@ def _form_routing(form: FormData) -> ContactCenterRouting | None:
         DomainError: ``invalid_configuration`` naming the refused ``contact_center.<field>``.
     """
     return routing(
-        ContactCenterKind.WEBEX_CC,
+        FORM_KIND,
         form.optional_text(ROUTING_VALUE_FIELD),
         {name: form.optional_text(field) for field, name in ROUTING_ATTRIBUTE_FIELDS.items()},
     )

@@ -11,7 +11,7 @@ from app.adapters.db.models import BookingEventRow, BookingRow
 from app.adapters.db.uow import SqlTransaction, SqlUnitOfWork
 from app.domain.booking import MeetingRef
 from app.domain.calls import BookingEvent, EventKind
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.privacy import PURGED_FIELDS
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
@@ -32,7 +32,7 @@ async def _booking_with_everything(engine: AsyncEngine, service: BookingService)
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         await tx.save_meeting(booking_id, MeetingRef("room-1", "https://example.test/join"))
-        await tx.save_task_id(booking_id, "task-1", ContactCenterKind.WEBEX_CC)
+        await tx.save_task(booking_id, ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC))
         await tx.add_booking_event(
             BookingEvent(booking_id, NOW, EventKind.MEETING_FAILED, "rejected_400", "ada@x.test")
         )

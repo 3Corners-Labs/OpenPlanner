@@ -144,8 +144,6 @@ EVENT_LABELS: dict[str, str] = {
     "job.send_change": "audit.job.send_change",
     "job.send_reminder": "audit.job.send_reminder",
     "job.send_cancellation": "audit.job.send_cancellation",
-    "job.dispatch_contact_center_task": "audit.job.dispatch_wxcc_task",
-    # Before ADR 0032 the dispatch job had this name; older events keep it.
     "job.dispatch_wxcc_task": "audit.job.dispatch_wxcc_task",
     "job.end_wxcc_task": "audit.job.end_wxcc_task",
     "job.purge_pii": "audit.job.purge_pii",
@@ -206,7 +204,6 @@ DETAIL_LABELS: dict[str, str] = {
     "configuration.import": "admin.audit.detail.configuration_import",
     # ADR 0068: a meeting or work item job planned again from the booking page.
     "retry.create_video_room": "admin.audit.detail.retry_create_video_room",
-    "retry.dispatch_contact_center_task": "admin.audit.detail.retry_dispatch_wxcc_task",
     "retry.dispatch_wxcc_task": "admin.audit.detail.retry_dispatch_wxcc_task",
     # ADR 0084: the group was archived (action group.delete).
     "archived": "admin.audit.detail.archived",

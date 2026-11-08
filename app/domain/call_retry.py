@@ -1,8 +1,8 @@
 """Planning a booking's meeting or work item job again from the booking page (ADR 0068).
 
 Whoever holds ``bookings.manage`` on the group may plan ``create_video_room`` or
-``dispatch_contact_center_task`` again for an active booking that still lacks the result. The
-pending job of that type, if any, is replaced, so a click never doubles a job; the new job runs
+``dispatch_wxcc_task`` again for an active booking that still lacks the result. The pending
+job of that type, if any, is replaced, so a click never doubles a job; the new job runs
 now (the meeting) or at the dispatch moment (the work item), pinned to the booking's start as
 every call job is. The retry is audited as a ``bookings.manage`` change with the job type;
 the job's own outcome lands on the timeline when the worker runs it.
@@ -86,7 +86,7 @@ def _missing(booking: Booking, group: Group, job: JobType) -> bool:
         return False
     if job is JobType.CREATE_VIDEO_ROOM:
         return group.video_enabled and booking.meeting is None
-    return group.dispatch_enabled and not booking.contact_center_task_id
+    return group.dispatch_enabled and not booking.contact_center_task
 
 
 def _run_at(booking: Booking, group: Group, job: JobType, now: datetime) -> datetime:

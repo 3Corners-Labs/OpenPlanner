@@ -5,11 +5,12 @@ cancelled), whether it has nothing to do (the result exists, or the group does n
 skipped with a reason, ADR 0068) and logging. Failures are classified by the runner
 (``IntegrationError.retryable``).
 
-    create_video_room            ─► CallService.ensure_meeting
-    dispatch_contact_center_task ─► CallService.ensure_task   (waits for the meeting)
-    delete_video_room            ─► CallService.delete_meeting
-    delete_trial_call            ─► CallService.delete_trial_call   (ADR 0071)
-    end_wxcc_task                ─► CallService.end_task      (cancelled bookings, ADR 0021)
+    create_video_room  ─► CallService.ensure_meeting
+    dispatch_wxcc_task ─► CallService.ensure_task   (waits for the meeting; member
+                          DISPATCH_CONTACT_CENTER_TASK, ADR 0032)
+    delete_video_room  ─► CallService.delete_meeting
+    delete_trial_call  ─► CallService.delete_trial_call   (ADR 0071)
+    end_wxcc_task      ─► CallService.end_task      (cancelled bookings, ADR 0021)
 """
 
 import structlog
@@ -140,7 +141,7 @@ def nothing_to_do(job_type: JobType, booking: Booking, group: Group) -> str | No
         if booking.meeting is not None:
             return ALREADY_DONE
         return None if group.video_enabled else NO_VIDEO
-    if booking.contact_center_task_id:
+    if booking.contact_center_task:
         return ALREADY_DONE
     if group.dispatch_enabled:
         return None

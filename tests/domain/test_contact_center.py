@@ -13,7 +13,7 @@ from app.domain.contact_center import (
     routing_field,
 )
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.job_plan import LEGACY_JOB_TYPES, JobType, stored_values
+from app.domain.job_plan import NEXT_JOB_TYPES, JobType
 from tests.support.domain import make_group
 
 DESCRIPTOR = ProviderDescriptor(
@@ -118,18 +118,17 @@ def test_a_group_dispatches_only_with_a_complete_routing() -> None:
 # --- the job type renamed by expand/contract (ADR 0116) -----------------------------------
 
 
-def test_the_old_dispatch_job_value_still_reads_as_the_new_type() -> None:
+def test_the_renamed_dispatch_job_keeps_its_stored_value_this_minor() -> None:
+    # ADR 0116 §5: the previous image must read every job this image writes.
+    assert JobType.DISPATCH_CONTACT_CENTER_TASK.value == "dispatch_wxcc_task"
     assert JobType("dispatch_wxcc_task") is JobType.DISPATCH_CONTACT_CENTER_TASK
+    # The value the next minor writes already reads, for a rollback.
     assert JobType("dispatch_contact_center_task") is JobType.DISPATCH_CONTACT_CENTER_TASK
-    assert "dispatch_wxcc_task" not in {t.value for t in JobType}  # never written again
+    assert "dispatch_contact_center_task" not in {t.value for t in JobType}
     with pytest.raises(ValueError, match="no_such_job"):
         JobType("no_such_job")
 
 
-def test_queries_on_a_renamed_type_match_both_stored_values() -> None:
-    assert stored_values(JobType.DISPATCH_CONTACT_CENTER_TASK) == (
-        "dispatch_contact_center_task",
-        "dispatch_wxcc_task",
-    )
-    assert stored_values(JobType.PURGE_PII) == ("purge_pii",)
-    assert set(LEGACY_JOB_TYPES.values()) <= set(JobType)
+def test_every_next_value_reads_as_an_existing_member() -> None:
+    assert set(NEXT_JOB_TYPES.values()) <= set(JobType)
+    assert not set(NEXT_JOB_TYPES) & {t.value for t in JobType}

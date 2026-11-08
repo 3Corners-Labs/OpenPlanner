@@ -160,14 +160,14 @@ class TaskReconciler:
 
     async def _read(self, task: StaleTask) -> EventKind | None:
         """Return the event that brings the booking to the task's state, if it differs."""
-        dispatcher = self._dispatchers.get(task.kind)
+        dispatcher = self._dispatchers.get(task.task.kind)
         if dispatcher is None:
             return None
         with trace_scope():
             bind_level(task.organisation, task.group)
             bind_booking(task.booking_id)
             try:
-                snapshot = await dispatcher.read_task(task.task_id)
+                snapshot = await dispatcher.read_task(task.task.id)
             except IntegrationError:
                 return None
         if snapshot.state is task.state:

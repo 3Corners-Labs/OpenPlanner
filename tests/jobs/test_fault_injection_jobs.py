@@ -97,7 +97,7 @@ async def test_a_work_item_is_not_dispatched_for_a_meeting_that_was_never_made(
     await setup.runner(task).run_due()
 
     assert setup.dispatcher.items == []
-    assert setup.uow.state.bookings[bid].contact_center_task_id is None
+    assert setup.uow.state.bookings[bid].contact_center_task is None
 
 
 async def test_a_mail_provider_that_times_out_is_retried_with_a_code(setup: Setup) -> None:

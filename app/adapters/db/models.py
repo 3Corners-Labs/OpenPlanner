@@ -200,8 +200,8 @@ class GroupRow(Base):
     horizon_days: Mapped[int] = mapped_column(Integer)
     phone_mode: Mapped[str] = mapped_column(String(16))
     video_host_email: Mapped[str | None] = mapped_column(String(254))
-    # Before ADR 0032: the WxCC routing. Still written alongside ``group_contact_center`` and
-    # read when a group has no row there; dropped a minor later (ADR 0116 expand/contract).
+    # Before ADR 0032: the WxCC routing. Written alongside ``group_contact_center`` and, for
+    # WxCC, the source of truth on read this minor (ADR 0116 §5, contact_center_rows.py).
     wxcc_business_address: Mapped[str | None] = mapped_column(String(255))
     wxcc_channel: Mapped[str | None] = mapped_column(String(255))
     wxcc_routing_value: Mapped[str | None] = mapped_column(String(512))
@@ -542,8 +542,8 @@ class BookingRow(Base):
     # link, purged with the contact (privacy.DERIVED_FIELDS).
     contact_center_task_id: Mapped[str | None] = mapped_column(String(255))
     contact_center_kind: Mapped[str | None] = mapped_column(String(32))
-    # Before ADR 0032; still written for a Webex Contact Center task until dropped a minor
-    # later (ADR 0116), and read for a row that has no ``contact_center_task_id``.
+    # Before ADR 0032; written for a Webex Contact Center task and, for that platform, the
+    # source of truth on read this minor (ADR 0116 §5, contact_center_rows.py).
     wxcc_task_id: Mapped[str | None] = mapped_column(String(255))
     # ADR 0071: the trial call on Webex; the link is PII and purged with the contact.
     trial_room_id: Mapped[str | None] = mapped_column(String(255))

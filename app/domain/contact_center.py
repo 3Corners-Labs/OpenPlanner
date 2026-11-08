@@ -43,6 +43,19 @@ class ContactCenterKind(StrEnum):
     """Webex Contact Center, through its Tasks API (ADR 0018)."""
 
 
+@dataclass(frozen=True)
+class ContactCenterTaskRef:
+    """A booking's task at a contact-center platform (ADR 0032 point 6).
+
+    Attributes:
+        id: The platform's task id; a provider link, purged with the contact.
+        kind: The platform that holds the task, and so the dispatcher that ends it.
+    """
+
+    id: str
+    kind: ContactCenterKind
+
+
 def routing_field(name: str) -> str:
     """Return the field a refusal of routing attribute (or routing value) ``name`` names."""
     return f"{FIELD_PREFIX}{name}"

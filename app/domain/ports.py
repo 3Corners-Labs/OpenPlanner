@@ -52,7 +52,7 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -1212,8 +1212,8 @@ class Transaction(Protocol):
         """Forget the trial call's meeting and link; the count stays."""
         ...
 
-    async def save_task_id(self, booking_id: int, task_id: str, kind: ContactCenterKind) -> None:
-        """Store the booking's contact-center task id and the platform that holds it."""
+    async def save_task(self, booking_id: int, task: ContactCenterTaskRef) -> None:
+        """Store the booking's contact-center task: its id and the platform that holds it."""
         ...
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.domain.checks import CheckArea, CheckStatus, Finding
-from app.domain.job_plan import JobCounts, JobType, stored_values
+from app.domain.job_plan import JobCounts, JobType
 
 HEARTBEAT_EVERY = timedelta(minutes=1)
 """How often the worker writes its heartbeat row: a constant of the loop (ADR 0068)."""
@@ -101,8 +101,7 @@ def worker_findings(
             )
         if has_host and JobType.CREATE_VIDEO_ROOM.value not in heartbeat.job_types:
             findings.append(Finding(area, "worker.no_video_jobs", CheckStatus.FAIL))
-        dispatch_values = stored_values(JobType.DISPATCH_CONTACT_CENTER_TASK)
-        if dispatches and not set(dispatch_values) & set(heartbeat.job_types):
+        if dispatches and JobType.DISPATCH_CONTACT_CENTER_TASK.value not in heartbeat.job_types:
             findings.append(Finding(area, "worker.no_dispatch_jobs", CheckStatus.FAIL))
     if counts.failed:
         findings.append(

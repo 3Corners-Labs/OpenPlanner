@@ -323,7 +323,7 @@ Three kinds of action are generated, not listed:
 - **a machine API scope** (`availability:read`, `configuration:transfer`): a client of the machine API used, or was denied, that
   scope (ADR 0023).
 - **a worker job**, `job.<type>`: the outcome of one job, shown on the booking's timeline;
-  the types are `create_video_room`, `delete_video_room`, `delete_trial_call`, `send_confirmation`, `send_change`, `send_reminder`, `send_cancellation`, `dispatch_contact_center_task`, `end_wxcc_task`, `purge_pii`, `send_suspension`, `send_closure_update`, `send_reinstatement`, `send_rebook_request`, `send_rebook_reminder`, `send_rebook_lapsed`, `lapse_rebook`, `send_confirm_request`, `send_confirm_reminder`, `expire_unconfirmed`, `send_unconfirmed_lapsed`, `send_team_invite`, `send_team_cancel`.
+  the types are `create_video_room`, `delete_video_room`, `delete_trial_call`, `send_confirmation`, `send_change`, `send_reminder`, `send_cancellation`, `dispatch_wxcc_task`, `end_wxcc_task`, `purge_pii`, `send_suspension`, `send_closure_update`, `send_reinstatement`, `send_rebook_request`, `send_rebook_reminder`, `send_rebook_lapsed`, `lapse_rebook`, `send_confirm_request`, `send_confirm_reminder`, `expire_unconfirmed`, `send_unconfirmed_lapsed`, `send_team_invite`, `send_team_cancel`.
 
 ## Where the lines go
 

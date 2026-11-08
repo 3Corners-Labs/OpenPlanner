@@ -18,12 +18,11 @@ from datetime import datetime
 
 from app.domain.booking import Booking
 from app.domain.calls import EventKind, TaskState, contact_center_task, meeting_request
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterTaskRef
 from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.ports import (
-    ContactCenterDispatcher,
     ContactCenterDispatchers,
     IntegrationError,
     UnitOfWork,
@@ -93,7 +92,7 @@ class CallService:
             IntegrationError: ``meeting_missing`` (retryable) while the meeting is not there.
         """
         routing = group.contact_center
-        if routing is None or not group.dispatch_enabled or booking.contact_center_task_id:
+        if routing is None or not group.dispatch_enabled or booking.contact_center_task:
             return booking
         dispatcher = self._dispatchers.get(routing.kind)
         if dispatcher is None:
@@ -105,11 +104,11 @@ class CallService:
         task_id = await dispatcher.create_task(
             contact_center_task(booking, group, start_label=self._start_label(booking, group))
         )
-        booking_id = _id(booking)
+        booking_id, task = _id(booking), ContactCenterTaskRef(task_id, routing.kind)
         async with self._uow.locked() as tx:
-            await tx.save_task_id(booking_id, task_id, routing.kind)
+            await tx.save_task(booking_id, task)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
-        return _with(booking, contact_center_task_id=task_id, contact_center_kind=routing.kind)
+        return _with(booking, contact_center_task=task)
 
     async def diverts(self, booking: Booking, group: Group) -> bool:
         """Put a booking due for dispatch in the own queue while its group is in fallback."""
@@ -184,10 +183,11 @@ class CallService:
         Raises:
             IntegrationError: Retryable failures, so the job tries again.
         """
-        dispatcher = self._holder(booking)
-        if dispatcher is None or not booking.contact_center_task_id:
+        task = booking.contact_center_task
+        dispatcher = self._dispatchers.get(task.kind) if task else None
+        if task is None or dispatcher is None:
             return
-        task_id, booking_id = booking.contact_center_task_id, _id(booking)
+        task_id, booking_id = task.id, _id(booking)
         status = await self._integration.status(booking_id)
         if status.task in (TaskState.ENDED, TaskState.FAILED):
             return
@@ -212,14 +212,6 @@ class CallService:
             )
             return
         await self._integration.record(booking_id, EventKind.TASK_END_REQUESTED)
-
-    def _holder(self, booking: Booking) -> ContactCenterDispatcher | None:
-        """Return the dispatcher of the platform that holds the booking's task, if configured.
-
-        A task stored before ADR 0032 has no kind; it is a Webex Contact Center task.
-        """
-        kind = booking.contact_center_kind or ContactCenterKind.WEBEX_CC
-        return self._dispatchers.get(kind)
 
     async def delete_meeting(self, booking: Booking, group: Group) -> None:
         """Delete the booking's meeting, if it has one."""

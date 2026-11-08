@@ -6,6 +6,7 @@ import pytest
 
 from app.domain.audit import Outcome
 from app.domain.calls import CallState, EventKind, TaskState
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import DispatchKind
@@ -31,7 +32,7 @@ async def test_meeting_then_work_item(setup: Setup) -> None:
     booking = setup.uow.state.bookings[bid]
     assert booking.meeting is not None
     assert booking.meeting.id == "meeting-1"
-    assert booking.contact_center_task_id == "task-1"
+    assert booking.contact_center_task == ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC)
     assert setup.video.created[0].host_email == "host@example.nl"
     item = setup.dispatcher.items[0]
     assert (item.first_name, item.meeting_link) == ("Ada", "https://site.webex.com/m/1")

@@ -5,7 +5,7 @@ from dataclasses import replace
 from app.domain.admin import AdminService
 from app.domain.booking import MeetingRef
 from app.domain.call_service import CallService
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.integration import IntegrationService
 from app.domain.ports import ContactCenterDispatchers
 from app.domain.scheduling import ScheduleRule
@@ -22,6 +22,9 @@ GROUP = make_group(
     video_host_email="host@example.nl",
     contact_center=webex_routing("openplanner@example.biz", "openplanner-video", "team-1"),
 )
+
+WEBEX_CC = ContactCenterKind.WEBEX_CC
+TASK_1 = ContactCenterTaskRef("task-1", WEBEX_CC)
 
 
 async def _service(dispatchers: ContactCenterDispatchers):  # type: ignore[no-untyped-def]
@@ -46,12 +49,8 @@ async def test_the_task_goes_to_the_dispatcher_of_the_groups_platform() -> None:
     [task] = dispatcher.items
     assert task.routing == GROUP.contact_center
     assert task.routing_value == "team-1"
-    assert (done.contact_center_task_id, done.contact_center_kind) == (
-        "task-1",
-        ContactCenterKind.WEBEX_CC,
-    )
-    stored = uow.state.bookings[booking.id or 0]
-    assert stored.contact_center_kind is ContactCenterKind.WEBEX_CC
+    assert done.contact_center_task == TASK_1
+    assert uow.state.bookings[booking.id or 0].contact_center_task == TASK_1
 
 
 async def test_a_platform_without_a_dispatcher_is_skipped_like_no_contact_center() -> None:
@@ -65,9 +64,7 @@ async def test_a_platform_without_a_dispatcher_is_skipped_like_no_contact_center
 async def test_the_task_is_ended_by_the_dispatcher_of_the_platform_that_holds_it() -> None:
     dispatcher = FakeDispatcher()
     _, calls, booking = await _service(webex_cc(dispatcher))
-    held = replace(
-        booking, contact_center_task_id="t-9", contact_center_kind=ContactCenterKind.WEBEX_CC
-    )
+    held = replace(booking, contact_center_task=ContactCenterTaskRef("t-9", WEBEX_CC))
 
     await calls.end_task(held)
 
@@ -76,7 +73,13 @@ async def test_the_task_is_ended_by_the_dispatcher_of_the_platform_that_holds_it
 
 
 async def test_a_task_without_a_dispatcher_for_its_platform_is_left_alone() -> None:
-    _, calls, booking = await _service({})
-    held = replace(booking, contact_center_task_id="t-9")
+    uow, calls, booking = await _service({})
+    held = replace(booking, contact_center_task=ContactCenterTaskRef("t-9", WEBEX_CC))
+    booking_id = booking.id or 0
+    status_before = uow.state.call_status.get(booking_id)
+    events_before = list(uow.state.booking_events.get(booking_id, []))
 
     await calls.end_task(held)  # nothing to call, nothing raised
+
+    assert uow.state.booking_events.get(booking_id, []) == events_before  # no timeline event
+    assert uow.state.call_status.get(booking_id) == status_before  # status unchanged

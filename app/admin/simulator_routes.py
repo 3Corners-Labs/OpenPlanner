@@ -91,7 +91,7 @@ def simulator_view(
         return None
     return SimulatorView(
         action=f"/admin/groups/{slug}/bookings/{booking.id}/simulate",
-        prepared=booking.meeting is not None and booking.contact_center_task_id is not None,
+        prepared=booking.meeting is not None and booking.contact_center_task is not None,
         buttons=[EventButton(event.value, _(key)) for event, key in EVENT_LABELS.items()],
     )
 

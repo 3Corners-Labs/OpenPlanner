@@ -43,14 +43,14 @@ from app.adapters.registrations import Expected, Listing, list_registrations
 from app.adapters.webex_auth import AuthorizedClient, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
 from app.adapters.webhook_selftest import self_test
-from app.adapters.wxcc import PROBE_KIND, channel_and_address
+from app.adapters.wxcc import channel_and_address
 from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
 from app.domain.calls import (
     BROWSER_LINK_PARAMS,
-    ContactCenterTask,
     EventKind,
     MeetingRequest,
     join_link,
+    probe_task,
 )
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.domain.ports import (
@@ -318,18 +318,13 @@ class PlatformChecker:
         """
         if self._dispatcher is None or self._probes is None:
             return []
-        if group.contact_center is None or not group.contact_center.complete:  # pragma: no cover
-            return []
         now = self._clock.now()
-        item = ContactCenterTask(
+        item = probe_task(
+            group,
             reference=f"probe-{uuid.uuid4().hex[:12]}",
             first_name=PROBE_FIRST_NAME,
             start_label=now.astimezone(group.tz).strftime("%Y-%m-%d %H:%M"),
-            group_name=group.name,
             meeting_link=link or PROBE_LINK,
-            kind=PROBE_KIND,
-            routing=group.contact_center,
-            routing_value=group.routing_value,
         )
         area = CheckArea.WXCC
         try:

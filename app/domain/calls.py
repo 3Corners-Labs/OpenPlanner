@@ -338,6 +338,11 @@ class MeetingRequest:
     """A trial call (ADR 0071): the participant can enter alone, without the lobby."""
 
 
+PROBE_KIND = "probe"
+"""``kind`` of a group check's probe task (ADR 0082 point 2); the flow's Case branch on it ends
+the probe before an agent sees it. Fixed on purpose: the flow and OpenPlanner agree."""
+
+
 @dataclass(frozen=True)
 class ContactCenterTask:
     """What a contact-center platform receives for a booking (ADR 0032 point 5, ADR 0081 §6).
@@ -391,9 +396,7 @@ def contact_center_task(booking: Booking, group: Group, *, start_label: str) -> 
         DomainError: ``integration_not_ready`` naming what is missing (``contact_center``,
             ``meeting`` or ``contact``).
     """
-    routing = group.contact_center
-    if routing is None or not routing.complete:
-        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "contact_center")
+    routing = _complete_routing(group)
     if booking.meeting is None or booking.meeting.link is None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "meeting")
     if booking.contact is None:
@@ -409,3 +412,39 @@ def contact_center_task(booking: Booking, group: Group, *, start_label: str) -> 
         routing_value=group.routing_value,
         variables=tuple(sorted(group.routing.variables(booking.routing).items())),
     )
+
+
+def probe_task(
+    group: Group, *, reference: str, first_name: str, start_label: str, meeting_link: str
+) -> ContactCenterTask:
+    """Return the probe task of a group check (ADR 0082 point 2): no participant data at all.
+
+    ``reference`` is no booking's, ``first_name`` a fixed stand-in and ``meeting_link`` the
+    probe meeting's (already deleted) or a placeholder; the kind is ``probe``, which the flow
+    ends before an agent sees it.
+
+    Raises:
+        DomainError: ``integration_not_ready`` (``contact_center``) without a complete routing.
+    """
+    return ContactCenterTask(
+        reference=reference,
+        first_name=first_name,
+        start_label=start_label,
+        group_name=group.name,
+        meeting_link=meeting_link,
+        kind=PROBE_KIND,
+        routing=_complete_routing(group),
+        routing_value=group.routing_value,
+    )
+
+
+def _complete_routing(group: Group) -> ContactCenterRouting:
+    """Return the group's routing if it is complete.
+
+    Raises:
+        DomainError: ``integration_not_ready`` (``contact_center``) otherwise.
+    """
+    routing = group.contact_center
+    if routing is None or not routing.complete:
+        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "contact_center")
+    return routing

@@ -16,6 +16,7 @@ from app.domain.calls import (
     new_status,
     not_picked_up,
 )
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
 from app.domain.integration import WEBHOOK_MEMORY, EventOutcome, IntegrationService
 from app.domain.job_plan import JobStatus, JobType, PlannedJob
@@ -138,7 +139,8 @@ def uow() -> InMemoryUnitOfWork:
     state.organisation_slugs = {1: "demo", 2: "andere"}
     state.groups[1] = GROUP
     state.bookings[123] = make_booking(
-        meeting=MeetingRef("meeting-1", "https://site.webex.com/m"), contact_center_task_id="task-1"
+        meeting=MeetingRef("meeting-1", "https://site.webex.com/m"),
+        contact_center_task=ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC),
     )
     return InMemoryUnitOfWork(state)
 

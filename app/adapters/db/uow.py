@@ -159,7 +159,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterTaskRef
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -173,7 +173,6 @@ from app.domain.job_plan import (
     JobSummary,
     JobType,
     PlannedJob,
-    stored_values,
 )
 from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
@@ -390,7 +389,6 @@ def _group_columns(group: Group) -> dict[str, Any]:
 
 def _booking(row: BookingRow, slot: SlotRow) -> Booking:
     """Map a booking row and its slot; a purged booking has no contact."""
-    task_id, task_kind = task_of(row)
     contact = (
         Contact(
             first_name=row.first_name,
@@ -423,8 +421,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         if row.trial_room_id and row.trial_expires_at
         else None,
         trial_count=row.trial_count,
-        contact_center_task_id=task_id,
-        contact_center_kind=task_kind,
+        contact_center_task=task_of(row),
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
@@ -1385,12 +1382,10 @@ class SqlTransaction(
             .values(trial_room_id=None, trial_join_url=None, trial_expires_at=None)
         )
 
-    async def save_task_id(self, booking_id: int, task_id: str, kind: ContactCenterKind) -> None:
-        """Store the booking's contact-center task id and platform (old column too, ADR 0116)."""
+    async def save_task(self, booking_id: int, task: ContactCenterTaskRef) -> None:
+        """Store the booking's contact-center task (the old column too, ADR 0116)."""
         await self._session.execute(
-            update(BookingRow)
-            .where(BookingRow.id == booking_id)
-            .values(**task_columns(task_id, kind))
+            update(BookingRow).where(BookingRow.id == booking_id).values(**task_columns(task))
         )
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
@@ -1948,7 +1943,7 @@ class SqlTransaction(
             delete(JobRow).where(
                 JobRow.booking_id == booking_id,
                 JobRow.status == _PENDING,
-                JobRow.type.in_(sorted(v for t in types for v in stored_values(t))),
+                JobRow.type.in_(sorted(t.value for t in types)),
             )
         )
 
@@ -1958,7 +1953,7 @@ class SqlTransaction(
             update(JobRow)
             .where(
                 JobRow.booking_id == booking_id,
-                JobRow.type.in_(stored_values(job_type)),
+                JobRow.type == job_type.value,
                 JobRow.status == _PENDING,
             )
             .values(status=_RUNNING, claimed_at=now, attempts=JobRow.attempts + 1)
@@ -1971,7 +1966,7 @@ class SqlTransaction(
             update(JobRow)
             .where(
                 JobRow.booking_id == booking_id,
-                JobRow.type.in_(stored_values(job_type)),
+                JobRow.type == job_type.value,
                 JobRow.status == _RUNNING,
             )
             .values(status=_DONE if done else _PENDING, last_error=None)

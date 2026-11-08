@@ -13,7 +13,7 @@ from app.domain.connection_health import (
     InboundEvent,
     Platform,
 )
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.security_log import TOKEN_REFRESH_FAILED
@@ -84,7 +84,7 @@ async def test_stale_tasks_carry_their_organisation_and_group(engine: AsyncEngin
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     booking_id = receipt.booking.id or 0
     async with uow.locked() as tx:
-        await tx.save_task_id(booking_id, "task-1", ContactCenterKind.WEBEX_CC)
+        await tx.save_task(booking_id, ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC))
         await tx.save_call_status(
             CallStatus(
                 booking_id, task=TaskState.QUEUED, task_created_at=SLOT_0900 - timedelta(minutes=5)
@@ -93,7 +93,7 @@ async def test_stale_tasks_carry_their_organisation_and_group(engine: AsyncEngin
     async with uow.read() as tx:
         stale = await tx.stale_tasks(SLOT_0900 + timedelta(minutes=10), 50)
         early = await tx.stale_tasks(SLOT_0900 - timedelta(minutes=10), 50)
-    assert [(t.booking_id, t.task_id, t.state) for t in stale] == [
+    assert [(t.booking_id, t.task.id, t.state) for t in stale] == [
         (booking_id, "task-1", TaskState.QUEUED)
     ]
     assert stale[0].organisation

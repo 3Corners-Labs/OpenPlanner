@@ -49,11 +49,13 @@ def attributes_json(attributes: Mapping[str, str]) -> str:
 
 
 def attributes_from_json(text: str) -> dict[str, str]:
-    """Return the stored attributes; anything but an object of strings reads as empty."""
-    try:
-        value = json.loads(text)
-    except ValueError:
-        return {}
-    if not isinstance(value, dict):
-        return {}
-    return {str(k): v for k, v in value.items() if isinstance(v, str)}
+    """Return the stored attributes, an object of strings.
+
+    Raises:
+        ValueError: For text that is not JSON or not an object of strings (a broken row is
+            reported, not read as a group without routing).
+    """
+    value = json.loads(text)
+    if not isinstance(value, dict) or not all(isinstance(v, str) for v in value.values()):
+        raise ValueError("contact-center attributes must be an object of strings")
+    return dict(value)

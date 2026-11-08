@@ -36,7 +36,7 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.integration_check import CHECK_EVENT, PROBE_REASON_PREFIX
 from app.domain.request_log import REQUEST_EVENT, counts_as_failure, request_platform
 from app.domain.security_log import TOKEN_REFRESH_FAILED
@@ -213,11 +213,10 @@ class HealthQueries:
         return [
             StaleTask(
                 booking_id,
-                task_id or "",
+                ContactCenterTaskRef(task_id or "", ContactCenterKind(kind)),
                 TaskState(task),
                 organisation,
                 group,
-                ContactCenterKind(kind),
             )
             for booking_id, task_id, kind, task, organisation, group in rows
         ]

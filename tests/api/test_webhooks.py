@@ -17,7 +17,7 @@ from app.domain.audit import Category
 from app.domain.authorization import Scope
 from app.domain.booking import MeetingRef
 from app.domain.calls import CallState, TaskState
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
 from tests.conftest import app_client
@@ -41,7 +41,7 @@ async def booking_id(database_url: str) -> int:
     booking_id = receipt.booking.id or 0
     async with uow.locked() as tx:
         await tx.save_meeting(booking_id, MeetingRef("meeting-1", "https://site.webex.com/m/1"))
-        await tx.save_task_id(booking_id, "task-1", ContactCenterKind.WEBEX_CC)
+        await tx.save_task(booking_id, ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC))
     await engine.dispose()
     return booking_id
 

@@ -1,20 +1,21 @@
 """Routing and task ids in their new places, old columns kept in step (ADR 0032, ADR 0116)."""
 
 from dataclasses import replace
+from datetime import timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.models import BookingRow, GroupContactCenterRow, GroupRow, JobRow
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.contact_center import ContactCenterKind
-from app.domain.job_plan import JobType
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.job_plan import JobType, PlannedJob
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book, webex_routing
 
+WEBEX_CC = ContactCenterKind.WEBEX_CC
 ROUTING = webex_routing("openplanner@example.biz", "openplanner-video", "team-1")
 
 
@@ -106,15 +107,42 @@ async def test_a_group_written_by_the_previous_minor_reads_from_the_old_columns(
     assert group.dispatch_enabled
 
 
+async def test_an_edit_by_the_previous_image_to_the_old_columns_wins_over_the_copy(
+    engine: AsyncEngine,
+) -> None:
+    """ADR 0116 §5: for WxCC the old columns are the source of truth in this minor."""
+    await seed_group(engine, slug="aangifte")
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        group = await tx.get_group("aangifte")
+        assert group is not None
+        await tx.save_group(replace(group, contact_center=ROUTING))
+    # The previous image edits the group: it only knows the old columns.
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(GroupRow).values(wxcc_channel="other-channel", wxcc_routing_value=None)
+        )
+
+    async with uow.read() as tx:
+        stored = await tx.get_group("aangifte")
+    assert stored is not None
+    assert stored.contact_center == webex_routing("openplanner@example.biz", "other-channel")
+
+
+async def _booking_with_task(engine: AsyncEngine) -> tuple[SqlUnitOfWork, int]:
+    await seed_group(engine, slug="aangifte")
+    uow = SqlUnitOfWork(engine)
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    booking_id = receipt.booking.id or 0
+    async with uow.locked() as tx:
+        await tx.save_task(booking_id, ContactCenterTaskRef("task-new", WEBEX_CC))
+    return uow, booking_id
+
+
 async def test_a_task_is_stored_in_both_columns_and_an_old_one_still_found(
     engine: AsyncEngine,
 ) -> None:
-    await seed_group(engine, slug="aangifte")
-    uow = SqlUnitOfWork(engine)
-    first = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
-    booking_id = first.booking.id or 0
-    async with uow.locked() as tx:
-        await tx.save_task_id(booking_id, "task-new", ContactCenterKind.WEBEX_CC)
+    uow, booking_id = await _booking_with_task(engine)
     async with engine.connect() as connection:
         row = (
             await connection.execute(
@@ -137,28 +165,79 @@ async def test_a_task_is_stored_in_both_columns_and_an_old_one_still_found(
     async with uow.read() as tx:
         found = await tx.get_booking_by_task("t-old")
     assert found is not None
-    assert (found.contact_center_task_id, found.contact_center_kind) == (
-        "t-old",
-        ContactCenterKind.WEBEX_CC,
-    )
+    assert found.contact_center_task == ContactCenterTaskRef("t-old", WEBEX_CC)
 
 
-async def test_a_dispatch_job_of_the_previous_minor_is_claimed_as_the_new_type(
+async def test_a_purge_by_the_previous_image_leaves_no_task_behind(engine: AsyncEngine) -> None:
+    """The old image empties ``wxcc_task_id`` only; the WxCC copy must not bring the task back."""
+    uow, booking_id = await _booking_with_task(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(
+                wxcc_task_id=None,
+                first_name=None,
+                last_name=None,
+                email=None,
+                phone=None,
+                guest_join_url=None,
+                host_join_url=None,
+                pii_purged_at=NOW,
+            )
+        )
+
+    async with uow.read() as tx:
+        booking = await tx.get_booking(booking_id)
+        found = await tx.get_booking_by_task("task-new")
+        rollable = await tx.find_rollable(NOW + timedelta(days=1), 0, 10)
+    assert booking is not None
+    assert booking.contact_center_task is None
+    assert found is None
+    [row] = rollable
+    assert not row.holds_data  # the stale copy does not keep the row from its rollup
+
+
+async def test_for_a_wxcc_task_the_new_column_never_wins_over_the_old_one(
     engine: AsyncEngine,
 ) -> None:
-    await seed_group(engine, slug="aangifte")
-    uow = SqlUnitOfWork(engine)
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
-    booking_id = receipt.booking.id or 0
+    """Old column NULL or different, new column filled, kind ``webex_cc``: the old one counts."""
+    uow, booking_id = await _booking_with_task(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(contact_center_task_id="t-other", wxcc_task_id="t-wxcc")
+        )
+    async with uow.read() as tx:
+        assert await tx.get_booking_by_task("t-other") is None  # webex_cc: the old column wins
+        found = await tx.get_booking_by_task("t-wxcc")
+    assert found is not None
+    assert found.contact_center_task == ContactCenterTaskRef("t-wxcc", WEBEX_CC)
+
+
+async def test_a_dispatch_job_keeps_the_value_the_previous_image_reads(
+    engine: AsyncEngine,
+) -> None:
+    uow, booking_id = await _booking_with_task(engine)
     async with engine.begin() as connection:
         await connection.execute(
             JobRow.__table__.insert().values(
-                booking_id=booking_id, type="dispatch_wxcc_task", run_at=NOW, status="pending"
+                booking_id=booking_id,
+                type="dispatch_contact_center_task",  # what the next minor writes
+                run_at=NOW,
+                status="pending",
             )
         )
+    async with uow.read() as tx:
+        jobs = await tx.get_booking_jobs(booking_id)
+    assert JobType.DISPATCH_CONTACT_CENTER_TASK in {j.type for j in jobs}  # still reads
     async with uow.locked() as tx:
-        assert await tx.claim_booking_job(booking_id, JobType.DISPATCH_CONTACT_CENTER_TASK, NOW)
-        await tx.finish_booking_job(booking_id, JobType.DISPATCH_CONTACT_CENTER_TASK, done=False)
-
-    [job] = await SqlJobQueue(engine).claim_due(NOW, {JobType.DISPATCH_CONTACT_CENTER_TASK}, set())
-    assert job.type is JobType.DISPATCH_CONTACT_CENTER_TASK
+        await tx.add_jobs(booking_id, [PlannedJob(JobType.DISPATCH_CONTACT_CENTER_TASK, NOW, None)])
+    async with engine.connect() as connection:
+        types = set(
+            (await connection.execute(select(JobRow.type).where(JobRow.booking_id == booking_id)))
+            .scalars()
+            .all()
+        )
+    assert "dispatch_wxcc_task" in types  # this image writes the old value (ADR 0116 §5)

@@ -151,6 +151,6 @@ def test_a_worker_without_the_wxcc_settings_fails_for_a_group_that_dispatches() 
     assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) in codes(no_dispatch, True)
     assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) not in codes(no_dispatch, False)
     assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) not in codes(both, True)
-    # A worker of the previous minor still reports the job under its old name (ADR 0116).
+    # A worker of the previous minor reports the same stored value (ADR 0116 §5).
     previous = WorkerHeartbeat(NOW, "1.0.0", (*VIDEO, "dispatch_wxcc_task"))
     assert ("worker.no_dispatch_jobs", CheckStatus.FAIL) not in codes(previous, True)

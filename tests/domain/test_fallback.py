@@ -12,6 +12,7 @@ from app.domain.authorization import Scope
 from app.domain.booking import Booking
 from app.domain.calls import EventKind
 from app.domain.connection_health import HealthEntry, HealthState, Platform
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import CONTACT_CENTER_DOWN, DISPATCH_FAILED, FallbackService
 from app.domain.job_plan import JobType, PlannedJob
@@ -227,7 +228,12 @@ async def test_a_group_not_in_fallback_or_a_dispatched_booking_is_not_diverted()
     assert not await fallback.diverts(booking, group)
     await fallback.sweep(health(HealthState.DOWN))
     group = setup.uow.state.groups[1]
-    assert not await fallback.diverts(replace(booking, contact_center_task_id="t-1"), group)
+    assert not await fallback.diverts(
+        replace(
+            booking, contact_center_task=ContactCenterTaskRef("t-1", ContactCenterKind.WEBEX_CC)
+        ),
+        group,
+    )
 
 
 async def test_a_dispatch_failure_of_a_group_without_the_fallback_stays_out_of_the_queue() -> None:

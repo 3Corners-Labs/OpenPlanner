@@ -812,6 +812,29 @@ async def test_trial_call_fields_are_checked(site: Site, field: str, value: str)
     assert f'<a href="#{field}">' in response.text
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("wxcc_routing_value", "r" * 513),
+        ("wxcc_channel", "chan\tnel"),
+        ("wxcc_business_address", "a" * 256),
+    ],
+)
+async def test_a_refused_routing_value_is_linked_to_its_input_and_nothing_is_saved(
+    site: Site, field: str, value: str
+) -> None:
+    """ADR 0032: the routing's refusal (``contact_center.<attribute>``) points at the input."""
+    await site.login_as(SUPER)
+    await _post(site, f"{GROUP}/settings", dict(SETTINGS_FORM))
+    before = (await site.client.get(f"{GROUP}/settings")).text
+
+    response = await _post(site, f"{GROUP}/settings", {**SETTINGS_FORM, "name": "X", field: value})
+
+    assert response.status_code == 422
+    assert f'<a href="#{field}">' in response.text
+    assert (await site.client.get(f"{GROUP}/settings")).text == before  # nothing saved
+
+
 async def test_the_trial_call_switch_and_limits_are_saved(site: Site) -> None:
     await site.login_as(SUPER)
     form = {

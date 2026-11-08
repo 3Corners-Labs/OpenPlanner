@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import MeetingRef
 from app.domain.calls import BookingEvent, CallState, EventKind, TaskState, apply_event, new_status
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.job_plan import JobType
 from app.domain.scheduling import Offer
 from app.domain.services import BookingService
@@ -31,7 +31,7 @@ async def test_meeting_and_task_are_stored_and_found(engine: AsyncEngine) -> Non
 
     async with uow.locked() as tx:
         await tx.save_meeting(booking_id, MeetingRef("meeting-1", "https://site.webex.com/m/1"))
-        await tx.save_task_id(booking_id, "task-1", ContactCenterKind.WEBEX_CC)
+        await tx.save_task(booking_id, ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC))
     async with uow.read() as tx:
         by_meeting = await tx.get_booking_by_meeting("meeting-1")
         by_task = await tx.get_booking_by_task("task-1")
@@ -42,7 +42,7 @@ async def test_meeting_and_task_are_stored_and_found(engine: AsyncEngine) -> Non
     assert by_meeting.meeting.link == "https://site.webex.com/m/1"
     assert by_task is not None
     assert by_task.id == booking_id
-    assert by_task.contact_center_task_id == "task-1"
+    assert by_task.contact_center_task == ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC)
     assert missing is None
 
 

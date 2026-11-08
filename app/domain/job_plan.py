@@ -11,7 +11,7 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
     lapsed ──► send_unconfirmed_lapsed (now); the purge planned while pending stays
     booked ──► create_video_room (now) ─► send_confirmation | send_change (now)
            ──► send_reminder × rules (start − offset, if still ahead and reachable)
-           ──► dispatch_contact_center_task (start − dispatch lead) ──► purge_pii (end + 24 h)
+           ──► dispatch_wxcc_task (start − dispatch lead) ──► purge_pii (end + 24 h)
     cancelled ──► end_wxcc_task, delete_video_room (now) ─► send_cancellation (now, unless
                   rescheduled) ──► purge_pii (now + 24 h)
     suspended ──► end_wxcc_task (now) ─► send_suspension (now) ──► purge_pii (the earlier of
@@ -23,9 +23,9 @@ Closure notices are not pinned (the booking is no longer confirmed); they only r
 booking is still suspended (``is_stale``). Requests to confirm only run while the booking still
 awaits confirmation.
 
-A job type is a persisted name, renamed by expand/contract (ADR 0116): ``LEGACY_JOB_TYPES`` maps
-an old stored value to its member, so ``JobType(old)`` still reads, and ``stored_values`` gives
-every value a query on a type must match until the old value is dropped a minor later.
+A job type is a persisted name, renamed by expand/contract (ADR 0116 §5): the previous minor's
+image must keep reading every stored value, so a renamed member keeps its old value in this
+minor, and ``NEXT_JOB_TYPES`` reads the new value the next minor will write.
 """
 
 from collections.abc import Iterable, Mapping
@@ -60,8 +60,8 @@ of an alert delivery (ADR 0082 point 9)."""
 class JobType(StrEnum):
     """Every kind of background job.
 
-    A value written before a rename still reads (``LEGACY_JOB_TYPES``); new jobs are written
-    with the member's own value only.
+    A renamed member keeps its stored value until the next minor (ADR 0116 §5); the value that
+    minor writes already reads as the member (``NEXT_JOB_TYPES``).
     """
 
     CREATE_VIDEO_ROOM = "create_video_room"
@@ -71,8 +71,10 @@ class JobType(StrEnum):
     SEND_CHANGE = "send_change"
     SEND_REMINDER = "send_reminder"
     SEND_CANCELLATION = "send_cancellation"
-    DISPATCH_CONTACT_CENTER_TASK = "dispatch_contact_center_task"
-    """Create the booking's task at its group's contact center (ADR 0032)."""
+    DISPATCH_CONTACT_CENTER_TASK = "dispatch_wxcc_task"
+    """Create the booking's task at its group's contact center (ADR 0032). The stored value stays
+    ``dispatch_wxcc_task`` in this minor, so the previous minor's image still reads its jobs; the
+    next minor writes ``dispatch_contact_center_task`` and the one after drops the old value."""
     END_WXCC_TASK = "end_wxcc_task"
     PURGE_PII = "purge_pii"
     SEND_SUSPENSION = "send_suspension"
@@ -91,24 +93,18 @@ class JobType(StrEnum):
 
     @classmethod
     def _missing_(cls, value: object) -> "JobType | None":
-        """Read a stored value of before a rename as its member (``LEGACY_JOB_TYPES``)."""
-        return LEGACY_JOB_TYPES.get(str(value))
+        """Read the value the next minor writes for a renamed member (``NEXT_JOB_TYPES``)."""
+        return NEXT_JOB_TYPES.get(str(value))
 
 
-LEGACY_JOB_TYPES: Mapping[str, JobType] = {
-    "dispatch_wxcc_task": JobType.DISPATCH_CONTACT_CENTER_TASK,
+NEXT_JOB_TYPES: Mapping[str, JobType] = {
+    "dispatch_contact_center_task": JobType.DISPATCH_CONTACT_CENTER_TASK,
 }
-"""Stored job type values of before a rename, read as their member (ADR 0116 expand/contract).
+"""Stored values a later minor writes for a renamed member, read as that member (ADR 0116).
 
-``dispatch_wxcc_task`` became ``dispatch_contact_center_task`` in ADR 0032 step CC-1: the
-migration renames the stored rows, and a job a web container of the previous minor writes
-during a rolling update still runs. Dropped a minor later (the contract step)."""
-
-
-def stored_values(job_type: JobType) -> tuple[str, ...]:
-    """Return every stored value that means ``job_type``: its own and its legacy values."""
-    legacy = sorted(old for old, member in LEGACY_JOB_TYPES.items() if member is job_type)
-    return (job_type.value, *legacy)
+This minor still writes the old value, so the previous image keeps working on the new schema;
+the next minor switches to the new value, and this mapping lets this image read those jobs after
+a rollback."""
 
 
 TEAM_INVITES = frozenset({JobType.SEND_TEAM_INVITE, JobType.SEND_TEAM_CANCEL})

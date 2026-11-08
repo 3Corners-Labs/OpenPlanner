@@ -24,10 +24,11 @@ and ``workItemData`` are never read. A 404 is a task WxCC does not know (``TaskS
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import quote
 
 from app.adapters.webex_auth import AuthorizedClient
+from app.domain import calls
 from app.domain.calls import ContactCenterTask, TaskSnapshot, TaskState
 from app.domain.contact_center import (
     AttributeSpec,
@@ -56,9 +57,8 @@ DESCRIPTOR = ProviderDescriptor(
 """What a group needs for WxCC (ADR 0032 point 4); the limits are WxCC's (``flowSettings``
 values up to 512 bytes), fixed by the platform and so constants, not settings."""
 
-PROBE_KIND = "probe"
-"""``kind`` of the group check's probe work item (ADR 0082 point 2); the flow's Case branch on
-it ends the probe before an agent sees it. Fixed on purpose: the flow and OpenPlanner agree."""
+PROBE_KIND = calls.PROBE_KIND
+"""``kind`` of the group check's probe work item (ADR 0082 point 2), defined in the domain."""
 
 TASK_STATES: dict[str, TaskState] = {
     "new": TaskState.QUEUED,
@@ -94,19 +94,34 @@ REQUIRED_FIELDS = frozenset({"bookingReference"})
 and ``kind``."""
 
 
+class WxccMapping(NamedTuple):
+    """A group's WxCC attributes; either may be missing while the routing is incomplete."""
+
+    channel: str | None
+    business_address: str | None
+
+    @property
+    def complete(self) -> tuple[str, str] | None:
+        """The channel and business address when both are set, else ``None``."""
+        if self.channel and self.business_address:
+            return self.channel, self.business_address
+        return None
+
+
+def wxcc_mapping(routing: ContactCenterRouting | None) -> WxccMapping | None:
+    """Return the WxCC attributes of ``routing``; ``None`` without one or for another platform.
+
+    The one place that checks the kind and reads the WxCC attributes of a routing.
+    """
+    if routing is None or routing.kind is not ContactCenterKind.WEBEX_CC:
+        return None
+    return WxccMapping(routing.attribute(CHANNEL), routing.attribute(BUSINESS_ADDRESS))
+
+
 def channel_and_address(routing: ContactCenterRouting | None) -> tuple[str, str] | None:
     """Return the channel and business address of a WxCC routing that has both, else ``None``."""
-    if routing is None or routing.kind is not ContactCenterKind.WEBEX_CC:
-        return None
-    channel, address = routing.attribute(CHANNEL), routing.attribute(BUSINESS_ADDRESS)
-    return (channel, address) if channel and address else None
-
-
-def business_address(routing: ContactCenterRouting | None) -> str | None:
-    """Return the business address of a WxCC routing, if it has one."""
-    if routing is None or routing.kind is not ContactCenterKind.WEBEX_CC:
-        return None
-    return routing.attribute(BUSINESS_ADDRESS)
+    mapping = wxcc_mapping(routing)
+    return mapping.complete if mapping else None
 
 
 def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
@@ -115,10 +130,10 @@ def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict
     Raises:
         IntegrationError: ``not_ready`` (not retryable) when the routing lacks an attribute.
     """
-    address = item.routing.attribute(BUSINESS_ADDRESS)
-    channel = item.routing.attribute(CHANNEL)
-    if item.routing.kind is not ContactCenterKind.WEBEX_CC or not address or not channel:
+    pair = channel_and_address(item.routing)
+    if pair is None:
         raise IntegrationError("not_ready", retryable=False)
+    channel, address = pair
     return {
         "origin": {"id": item.reference, "name": item.first_name},
         "destination": {"id": address, "type": "businessAddress"},
