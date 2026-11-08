@@ -26,6 +26,7 @@ The cookie rule is in ``app.api.link_session``; the join, trial and waiting page
 ``join_pages``, ``trial_pages`` and ``direct_pages``.
 """
 
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Annotated
 
@@ -34,6 +35,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.api.contact_form import (
     HONEYPOT_FIELD,
+    SUBJECT_INPUT,
     ContactForm,
     contact_input,
     load_contact_form,
@@ -109,11 +111,11 @@ def _manage_url(public_ref: str, status: str) -> str:
 
 
 async def _available(
-    service: BookingService, group: Group, start: datetime
+    service: BookingService, group: Group, start: datetime, subject: str | None = None
 ) -> AvailableSlot | None:
-    """Return the slot at ``start`` if it can still be booked."""
+    """Return the slot at ``start`` if it can still be booked (for ``subject``, ADR 0081)."""
     day = local_day(start, group.tz)
-    for slot in await service.availability(group.slug, day, day):
+    for slot in await service.availability(group.slug, day, day, subject):
         if slot.start == start:
             return slot
     return None
@@ -142,6 +144,9 @@ async def group_page(
         deleted_by = await service.closure_delete_by(group, closure)
         banner = closure_view(closure, group, locale, now, deleted_by)
         return await participant_page(request, locale, "closure.html", group, {"closure": banner})
+    slot_filter = parse_filter(request.query_params.multi_items())
+    if group.routing.subject(slot_filter.subject) is None:
+        slot_filter = replace(slot_filter, subject=None)
     view = await picker(
         service,
         group,
@@ -150,7 +155,7 @@ async def group_page(
         f"/g/{group.slug}",
         month=month,
         day=day,
-        slot_filter=parse_filter(request.query_params.multi_items()),
+        slot_filter=slot_filter,
     )
     errors = (
         [FormError(None, locale.gettext("error.slot_unavailable"))]
@@ -163,6 +168,16 @@ async def group_page(
         "direct_call": await service.direct_call_availability(slug),
         "closure": banner,
         "closure_page": f"/g/{group.slug}/closure",
+        # ADR 0081 point 4: the subject first, so the calendar shows only the blocks that
+        # offer it; the booking form asks it again, pre-selected.
+        "subjects": [
+            {
+                "value": s.code,
+                "label": s.label(locale.code),
+                "selected": s.code == slot_filter.subject,
+            }
+            for s in group.routing.subjects
+        ],
     }
     return await participant_page(request, locale, "group.html", group, context)
 
@@ -225,9 +240,16 @@ def _book_context(
 @router.get("/g/{slug}/book", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def booking_form(
-    request: Request, slug: str, locale: Locale, start: str | None = None
+    request: Request,
+    slug: str,
+    locale: Locale,
+    start: str | None = None,
+    subject: str | None = None,
 ) -> Response:
-    """Show the contact form for one slot, or send the visitor back to choose one."""
+    """Show the contact form for one slot, or send the visitor back to choose one.
+
+    A ``subject`` chosen before the calendar (ADR 0081) pre-selects the form's first question.
+    """
     service = _service(request)
     group = await service.get_group(slug)
     parsed = parse_start(start)
@@ -235,7 +257,9 @@ async def booking_form(
     if parsed is None or slot is None:
         return RedirectResponse(f"/g/{group.slug}?status=unavailable", status_code=303)
     contact = await load_contact_form(service, group, _clock(request).now())
-    context = _book_context(contact, parsed, slot, locale, [], {})
+    chosen = group.routing.subject(subject)
+    values = {SUBJECT_INPUT: chosen.code} if chosen else {}
+    context = _book_context(contact, parsed, slot, locale, [], values)
     return await participant_page(request, locale, "book.html", group, context)
 
 
@@ -460,7 +484,9 @@ async def _reschedule_response(
     context = _page_context(details, locale, public_ref, None, _clock(request).now())
     context["errors"] = errors or []
     chosen = parse_start(start)
-    slot = await _available(service, group, chosen) if chosen else None
+    routing = details.booking.routing
+    subject = routing.subject if routing else None  # ADR 0081: a move keeps the subject
+    slot = await _available(service, group, chosen, subject) if chosen else None
     if chosen is not None and slot is not None and chosen != details.booking.start:
         context["new_start"] = slot_value(chosen)
         context["new_label"] = slot_label(chosen, slot.end, group, locale)
@@ -475,7 +501,7 @@ async def _reschedule_response(
             month=month,
             day=day,
             exclude=details.booking.start,
-            slot_filter=parse_filter(request.query_params.multi_items()),
+            slot_filter=replace(parse_filter(request.query_params.multi_items()), subject=subject),
         )
         name = "reschedule.html"
     return await participant_page(request, locale, name, group, context, status_code)

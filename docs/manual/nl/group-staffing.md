@@ -140,3 +140,10 @@ Kies en druk op **Opslaan**. Heeft een datum een eigen afwijking, dan gaat die v
 een feestdag uit een kalender die geldt en niet openbleef (gesloten), en dan de tijdblokken van
 de week. Een [noodsluiting](group-closure.md) komt daar bovenop. Een feestdag heft een sluiting
 nooit op.
+
+## Onderwerpen per blok
+
+Heeft het team [onderwerpen](group-routing.md), dan kiest u bij een blok en bij een uitzondering
+welke onderwerpen het aanbiedt. Niets aangevinkt: het blok biedt ze allemaal. Een deelnemer die op
+de pagina van het team eerst een onderwerp kiest, ziet alleen de tijden van blokken die het
+aanbieden. De capaciteit van het blok geldt voor alle onderwerpen samen.

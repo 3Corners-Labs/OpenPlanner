@@ -858,11 +858,6 @@
         "text": "The connection to the contact center is checked all the time; administrators get an alert by email or in a Webex space, and a team can fall back to OpenPlanner's own queue when the contact center is down."
       },
       {
-        "adr": "0081",
-        "title": "Subjects and routing",
-        "text": "A subject and routing attributes per team from a fixed list, so the contact center sends the call to the right skill."
-      },
-      {
         "adr": "0057",
         "title": "Rebooking assistant",
         "text": "When a team falls short, the participant is offered a new time and keeps the place until they answer."

@@ -493,6 +493,9 @@ OBJECTS = (
                 (
                     f"{_GROUP}/settings/form",
                     f"{_GROUP}/settings/form/{{key}}",
+                    # ADR 0081 point 7: subjects and routing, next to the booking form.
+                    f"{_GROUP}/settings/routing",
+                    f"{_GROUP}/settings/routing/subjects/{{code}}",
                     f"{_GROUP}/settings/archive",
                 ),
             ),

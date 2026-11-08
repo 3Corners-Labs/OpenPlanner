@@ -1,0 +1,13 @@
+{#- The subjects a staffing block offers (ADR 0081 point 4); only for a group with subjects. -#}
+{% if subject_choices %}
+<fieldset class="form-section" aria-describedby="block-subjects-hint">
+  <legend>{{ _("admin.field.block_subjects") }}</legend>
+  <p id="block-subjects-hint" class="hint">{{ _("admin.field.block_subjects_hint") }}</p>
+  {% for choice in subject_choices %}
+  <div class="choice__option">
+    <input type="checkbox" id="{{ choice.name }}" name="{{ choice.name }}" value="yes"{% if choice.checked %} checked{% endif %}>
+    <label for="{{ choice.name }}">{{ choice.label }}</label>
+  </div>
+  {% endfor %}
+</fieldset>
+{% endif %}

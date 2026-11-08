@@ -76,6 +76,8 @@ from app.domain.job_plan import (
 )
 from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
+from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, open_for_direct
 from app.domain.tokens import (
     MIN_KEY_BYTES,
@@ -220,9 +222,12 @@ class BookingService:
             return await tx.get_closure_image(closures[0].id)
 
     async def availability(
-        self, group_slug: str, first_day: date, last_day: date
+        self, group_slug: str, first_day: date, last_day: date, subject: str | None = None
     ) -> list[AvailableSlot]:
         """Return the bookable slots of a group between two local dates (inclusive).
+
+        With ``subject`` only the slots whose blocks offer it (ADR 0081 point 4); a code the
+        group does not have is ignored, so a crafted query shows the plain agenda.
 
         Raises:
             DomainError: ``group_not_found`` or ``invalid_range``.
@@ -245,6 +250,7 @@ class BookingService:
             now=self._clock.now(),
             booked={u.start: u.active for u in usage},
             snapshots={u.start: u.capacity_snapshot for u in usage},
+            subject=subject if group.routing.subject(subject) else None,
         )
         return [slot for slot in slots if covering(closures, slot.start) is None]
 
@@ -267,8 +273,9 @@ class BookingService:
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
             details = await self._contact(tx, group, contact)
+            routing = _routing(group, contact)
             return await self._place(
-                tx, group, start, details, locale, consents, None, pending=True
+                tx, group, start, details, locale, consents, None, pending=True, routing=routing
             )
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
@@ -311,6 +318,7 @@ class BookingService:
             if not await self._direct_room(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_FULL)
             details = await self._contact(tx, group, contact)
+            routing = _routing(group, contact)
             end = now + timedelta(minutes=group.slot_minutes)
             slot = await tx.add_slot(Slot(None, group.id, now, end, 1, BookingKind.DIRECT))
             salt = new_token_salt()
@@ -329,6 +337,7 @@ class BookingService:
                     created_at=now,
                     token_salt=salt,
                     kind=BookingKind.DIRECT,
+                    routing=routing,
                 )
             )
             await tx.replace_jobs(_id(booking), plan_for_direct(start=now, end=end))
@@ -507,6 +516,7 @@ class BookingService:
             sms=sms,
             pending=old.awaits_confirmation,
             confirmed_at=old.confirmed_at,
+            routing=old.routing,
         )
 
     async def _direct_open(self, tx: Transaction, group: Group, now: datetime) -> bool:
@@ -541,7 +551,7 @@ class BookingService:
         region = self._phone_region(group.organisation_id)
         answers = validate_answers(
             await tx.get_form(group.id),
-            contact.answers,
+            {k: v for k, v in contact.answers.items() if not k.startswith(ROUTING_PREFIX)},
             today=self._clock.now().astimezone(group.tz).date(),
             region=region,
         )
@@ -602,8 +612,12 @@ class BookingService:
         sms: bool = False,
         pending: bool = False,
         confirmed_at: datetime | None = None,
+        routing: RoutingChoice | None = None,
     ) -> BookingReceipt:
         """Reserve a place at ``start`` and store the booking with its jobs.
+
+        ``routing`` is the participant's subject and attribute codes (ADR 0081); a slot whose
+        blocks do not offer the subject is unavailable for it (point 4).
 
         ``pending`` places it awaiting confirmation with its own ``confirm_by`` (a participant's
         new booking, or a moved one that was still pending, ADR 0056); otherwise it is placed
@@ -623,7 +637,8 @@ class BookingService:
             raise DomainError(ErrorCode.OUTSIDE_BOOKING_WINDOW)
         day = start.astimezone(group.tz).date()
         rules, overrides = await effective_schedule(tx, group, day, day)
-        offered = offered_slot(group, rules, overrides, start)
+        subject = routing.subject if routing else None
+        offered = offered_slot(group, rules, overrides, start, subject)
         if offered is None:
             raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
         if covering(await tx.get_closures(group.id, now), offered.start) is not None:
@@ -668,6 +683,7 @@ class BookingService:
                 rescheduled_from_id=rescheduled_from,
                 confirm_by=window.confirm_by if window else None,
                 confirmed_at=confirmed_at,
+                routing=routing,
             )
         )
         jobs = (
@@ -746,3 +762,13 @@ def _id(entity: Booking | Slot | Closure) -> int:
     if entity.id is None:
         raise ValueError("entity has not been stored")
     return entity.id
+
+
+def _routing(group: Group, contact: ContactInput) -> RoutingChoice | None:
+    """Return the participant's subject and attribute codes, or ``None`` when none are asked.
+
+    Raises:
+        DomainError: ``invalid_answer`` naming the routing question (ADR 0081).
+    """
+    choice = group.routing.choose(contact.answers)
+    return None if choice.empty else choice

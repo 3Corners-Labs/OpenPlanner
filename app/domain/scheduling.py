@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.domain.branding import Branding
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.routing import SUBJECT_CODE, GroupRouting
 
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _NOT_SLUG = re.compile(r"[^a-z0-9]+")
@@ -252,6 +253,8 @@ class Group:
         archived_at: When the group was archived (ADR 0084 point 3), or ``None`` while it is
             in use. An archived group takes no bookings, answers 404 on its public page, is
             read-only in the portal and keeps its slug until the nightly sweep erases it.
+        routing: Subjects, switched-on routing attributes and their mapping to the contact
+            center (ADR 0081); empty by default, and then the form is as before.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -287,6 +290,7 @@ class Group:
     calendar_invite_address: str | None = None
     idp_key: str = ""
     archived_at: datetime | None = None
+    routing: GroupRouting = field(default_factory=GroupRouting)
 
     @property
     def is_archived(self) -> bool:
@@ -427,6 +431,8 @@ class TimeWindow:
         label: Optional admin note such as "Lunch"; admin content only, never shown to
             participants or logged, and no part of equality or ordering.
         offer: Slots, direct calls or both (ADR 0072); ``scheduled`` by default.
+        subjects: The codes of the group's subjects this block offers (ADR 0081 point 4),
+            sorted; empty offers every subject. A code the group no longer has offers nothing.
     """
 
     opens: time
@@ -434,6 +440,7 @@ class TimeWindow:
     capacity: int
     label: str | None = field(default=None, compare=False)
     offer: Offer = Offer.SCHEDULED
+    subjects: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Require ``opens < closes``, ``0 <= capacity <= MAX_CAPACITY`` and a valid label."""
@@ -448,6 +455,18 @@ class TimeWindow:
             or _LINE_BREAKS.search(self.label)
         ):
             raise _invalid("label")
+        if tuple(sorted(set(self.subjects))) != self.subjects or any(
+            not SUBJECT_CODE.fullmatch(code) for code in self.subjects
+        ):
+            raise _invalid("subjects")
+
+    def offers_subject(self, code: str | None) -> bool:
+        """Return whether a participant who chose ``code`` may book in this block.
+
+        A block without subjects offers all of them, and a booking without a subject (the
+        group asks none) fits every block.
+        """
+        return not self.subjects or code is None or code in self.subjects
 
     @property
     def staffed(self) -> bool:

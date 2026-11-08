@@ -748,6 +748,24 @@ answers (anyone).
 | Tampering | A stored answer changes meaning because its question changed | Key and type are fixed after saving; a retired key is never used again; answers keep the form version | `tests/domain/test_form_service.py::test_update_keeps_key_and_type_and_reports_a_change`, `test_retiring_keeps_the_label_blocks_the_key_and_makes_answers_pii` |
 | Elevation of privilege | A group admin or another organisation's admin changes a form | `group.edit` on the route and again in `FormService`; denials audited | `tests/admin/test_authorization_matrix.py` (rows `/settings/form`), `tests/domain/test_form_service.py::test_only_who_edits_the_group_may_change_its_form` |
 
+## Flow: subjects and routing attributes (ADR 0081)
+
+Admin: `GET/POST /admin/groups/{slug}/settings/routing[/subjects[/{code}[/move|/remove]]|
+/attributes|/mapping/{source}]` behind `group.edit`. Public: the subject and attribute answers
+(`q__subject`, `q__<attribute>`) on `POST /g/{slug}/book`, `POST /g/{slug}/direct` and the
+widget's `POST …/bookings`; `?subject=` on `GET /g/{slug}`, `GET /g/{slug}/book` and the widget's
+availability. Outbound: the routing variables in the WxCC task's `flowSettings`. Inputs from
+outside: subjects, attribute switches and the mapping (an administrator), the answers and the
+query parameter (anyone).
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | Something a participant typed reaches the contact center through a routing variable | An answer is accepted only when it is one of the group's subject codes or the catalogue's codes; the dispatcher receives only the mapped `{name: value}` pairs, values from the mapping the administrator wrote (code grammar, no spaces or markup); free-text and ADR 0055 fields never route | `tests/domain/test_routing.py::test_a_crafted_answer_is_refused_by_its_key_only`, `test_a_value_is_a_code_never_free_text`, `tests/adapters/test_wxcc_routing_payload.py::test_no_other_booking_field_or_label_reaches_the_payload`, `test_every_routing_value_is_a_mapped_code_of_the_group_or_the_catalogue` |
+| Tampering | A mapping overwrites `openplannerGroup` and sends the work item to another group's queue | The name is reserved in the mapping, and the task body writes the group's routing value last | `tests/domain/test_routing.py::test_a_variable_name_follows_the_grammar`, `tests/adapters/test_wxcc_routing_payload.py::test_the_routing_key_of_openplanner_cannot_be_overwritten` |
+| Tampering | A crafted `?subject=` or answer books a slot of a block that does not offer the subject | The booking service checks the chosen subject against the slot's blocks under the write lock; an unknown code in the query is ignored (the plain agenda) | `tests/domain/test_subject_blocks.py::test_a_slot_whose_block_does_not_offer_the_subject_is_unavailable`, `test_an_unknown_subject_in_the_query_shows_the_plain_agenda` |
+| Information disclosure | A subject label or answer turns out to be personal data | Subjects and attributes are short choices from a list the organisation or OpenPlanner wrote; new attributes need an ADR; the code is stored, never a label | `tests/domain/test_routing.py::test_the_catalogue_offers_the_locales_with_a_catalogue` |
+| Elevation of privilege | A group admin or another organisation's admin changes the routing | `group.edit` on the route and again in `RoutingService`; denials audited, changes audited by code or source, never a label or value | `tests/admin/test_authorization_matrix.py` (rows `/settings/routing`), `tests/domain/test_routing_service.py::test_only_who_edits_the_group_may_change_its_routing` |
+
 ## Flow: embedded booking (ADR 0035, EM-2)
 
 Public, unauthenticated, called by `<openplanner-booking>` on a host website:

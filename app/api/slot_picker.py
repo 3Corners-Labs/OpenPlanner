@@ -20,6 +20,7 @@ from datetime import UTC, date, datetime, timedelta, tzinfo
 from urllib.parse import urlencode
 
 from app.domain.availability import MAX_RANGE_DAYS, AvailableSlot
+from app.domain.routing import SUBJECT_CODE
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.i18n.dates import (
@@ -55,12 +56,16 @@ class SlotFilter:
         end_hour: A slot fits if it ends by this full hour (local time).
         invalid_range: The participant chose an end at or before the start; ``end_hour`` is
             then dropped and the form explains why.
+        subject: The subject the participant chose before the calendar (ADR 0081 point 4);
+            only slots whose staffing blocks offer it are shown. Not a time condition, so it
+            leaves ``active`` alone and survives clearing the filter.
     """
 
     days: frozenset[int] = frozenset()
     start_hour: int | None = None
     end_hour: int | None = None
     invalid_range: bool = False
+    subject: str | None = None
 
     @property
     def active(self) -> bool:
@@ -86,7 +91,11 @@ class SlotFilter:
             params.append(("from", str(self.start_hour)))
         if self.end_hour is not None:
             params.append(("until", str(self.end_hour)))
-        return params
+        return params + self.subject_query()
+
+    def subject_query(self) -> list[tuple[str, str]]:
+        """Return the chosen subject as a query parameter, or nothing."""
+        return [("subject", self.subject)] if self.subject else []
 
 
 def _hour(value: str, low: int, high: int) -> int | None:
@@ -103,7 +112,9 @@ def parse_filter(params: Sequence[tuple[str, str]]) -> SlotFilter:
     start = _hour(values.get("from", ""), 0, 23)
     end = _hour(values.get("until", ""), 1, 24)
     invalid = start is not None and end is not None and end <= start
-    return SlotFilter(days, start, None if invalid else end, invalid)
+    subject = values.get("subject", "")
+    chosen = subject if SUBJECT_CODE.fullmatch(subject) else None
+    return SlotFilter(days, start, None if invalid else end, invalid, chosen)
 
 
 @dataclass(frozen=True)
@@ -126,6 +137,7 @@ class FilterView:
     invalid_range: bool
     clear_href: str
     action: str
+    subject: str | None = None
 
 
 @dataclass(frozen=True)
@@ -280,12 +292,17 @@ def _times(group: Group, day: date, slots: list[AvailableSlot], locale: RequestL
 
 
 async def _free(
-    service: BookingService, group: Group, first: date, last: date, exclude: datetime | None
+    service: BookingService,
+    group: Group,
+    first: date,
+    last: date,
+    exclude: datetime | None,
+    subject: str | None = None,
 ) -> list[AvailableSlot]:
-    """Return the free slots between two local dates, without ``exclude``."""
+    """Return the free slots between two local dates for ``subject``, without ``exclude``."""
     if last < first:
         return []
-    slots = await service.availability(group.slug, first, last)
+    slots = await service.availability(group.slug, first, last, subject)
     return [slot for slot in slots if slot.start != exclude]
 
 
@@ -316,7 +333,9 @@ async def _first_free(
         start = _window_end(start, last) + timedelta(days=1)
         if start > last:
             return None
-        window = await _free(service, group, start, _window_end(start, last), exclude)
+        window = await _free(
+            service, group, start, _window_end(start, last), exclude, slot_filter.subject
+        )
 
 
 def _end_hour(slot: AvailableSlot, tz: tzinfo) -> int:
@@ -348,8 +367,11 @@ def _filter_view(
         starts=[Option(str(h), f"{h:02d}:00", h == slot_filter.start_hour) for h in starts],
         ends=[Option(str(h), f"{h:02d}:00", h == slot_filter.end_hour) for h in ends],
         invalid_range=slot_filter.invalid_range,
-        clear_href=base,
+        clear_href=f"{base}?{urlencode(slot_filter.subject_query())}"
+        if slot_filter.subject
+        else base,
         action=base,
+        subject=slot_filter.subject,
     )
 
 
@@ -386,7 +408,8 @@ async def picker(
     def href(*params: tuple[str, str]) -> str:
         return f"{base}?{urlencode([*slot_filter.query(), *params])}"
 
-    window = await _free(service, group, today, _window_end(today, last), exclude)
+    subject = slot_filter.subject
+    window = await _free(service, group, today, _window_end(today, last), exclude, subject)
     first_slot = await _first_free(service, group, window, today, last, exclude, slot_filter)
     requested_day = _parse_day(day)
     requested_month = _parse_month(month)
@@ -399,7 +422,9 @@ async def picker(
     else:
         shown = first_month
     month_end = _add_months(shown, 1) - timedelta(days=1)
-    month_slots = await _free(service, group, max(shown, today), min(month_end, last), exclude)
+    month_slots = await _free(
+        service, group, max(shown, today), min(month_end, last), exclude, subject
+    )
     by_day = _by_day(group, [s for s in month_slots if slot_filter.matches(s, group.tz)])
     selected = requested_day if requested_day in by_day else next(iter(by_day), None)
 

@@ -71,6 +71,7 @@
 <div class="form-grid">
   {% for f in fields %}{{ field(f) }}{% endfor %}
 </div>
+{% if subject_choices is defined %}{% include "admin/_block_subjects.html" %}{% endif %}
 <div class="form-actions">
   <button type="submit" class="button">{{ button_label }}</button>
   {%- if cancel_url %}

@@ -10,6 +10,7 @@
   ("#integrations", _("admin.settings.integrations")),
   ("#idp-key", _("admin.group.idp_key.title")),
   ("#booking-form", _("admin.form_fields.title")),
+  ("#routing", _("admin.routing.title")),
   ("#check", _("admin.check.title")),
 ] %}
 {% if can("group.delete", summary) %}{% set topics = topics + [("#archive", _("admin.group.archive.title"))] %}{% endif %}
@@ -73,6 +74,19 @@
   <p>{{ _("admin.form_fields.summary_none", limit=form_summary.limit) }}</p>
   {% endif %}
   <p><a class="button button--secondary" href="/admin/groups/{{ summary.group.slug }}/settings/form">{{ _("admin.form_fields.open") }}</a></p>
+</section>
+{% set routing = summary.group.routing %}
+<section class="card" id="routing" aria-labelledby="routing-heading">
+  <div class="card__header">
+    <h2 id="routing-heading">{{ _("admin.routing.title") }}</h2>
+    <p class="card__lead">{{ _("admin.routing.settings_lead") }}</p>
+  </div>
+  {% if routing.subjects or routing.attributes %}
+  <p>{{ _("admin.routing.summary", subjects=routing.subjects | length, attributes=routing.attributes | length, mapped=routing.mapping | length) }}</p>
+  {% else %}
+  <p>{{ _("admin.routing.summary_none") }}</p>
+  {% endif %}
+  <p><a class="button button--secondary" href="/admin/groups/{{ summary.group.slug }}/settings/routing">{{ _("admin.routing.open") }}</a></p>
 </section>
 <section class="card" id="check" aria-labelledby="check-heading">
   <div class="card__header">

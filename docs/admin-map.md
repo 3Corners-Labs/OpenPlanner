@@ -77,7 +77,7 @@ Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
 | Overview | `/admin/groups/{slug}` | `group.view` | wide | – |
-| Settings | `/admin/groups/{slug}/settings` | `group.edit` | standard | `/admin/groups/{slug}/settings/form`, `/admin/groups/{slug}/settings/form/{key}`, `/admin/groups/{slug}/settings/archive` |
+| Settings | `/admin/groups/{slug}/settings` | `group.edit` | standard | `/admin/groups/{slug}/settings/form`, `/admin/groups/{slug}/settings/form/{key}`, `/admin/groups/{slug}/settings/routing`, `/admin/groups/{slug}/settings/routing/subjects/{code}`, `/admin/groups/{slug}/settings/archive` |
 | Staffing | `/admin/groups/{slug}/staffing` | `schedule.manage` | wide | `/admin/groups/{slug}/staffing/{rule_id}`, `/admin/groups/{slug}/staffing/{rule_id}/split` |
 | Staffing exceptions | `/admin/groups/{slug}/exceptions` | `schedule.manage` | standard | `/admin/groups/{slug}/exceptions/{override_id}` |
 | Holidays | `/admin/groups/{slug}/holidays` | `schedule.manage` | standard | – |

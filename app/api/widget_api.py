@@ -35,7 +35,7 @@ from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
@@ -46,7 +46,7 @@ from starlette.responses import JSONResponse, Response
 from app.api.contact_form import ANSWER_PREFIX, HONEYPOT_FIELD, load_contact_form
 from app.api.labels import slot_label
 from app.api.maintenance import WidgetMaintenance, retry_after
-from app.api.slot_picker import PickerView, picker, slot_value
+from app.api.slot_picker import PickerView, SlotFilter, picker, slot_value
 from app.api.widget_schemas import (
     MAX_BODY_BYTES,
     WidgetAvailability,
@@ -418,13 +418,17 @@ async def availability(
     locale: Locale,
     month: str | None = None,
     day: str | None = None,
+    subject: Annotated[str | None, Query(max_length=40)] = None,
 ) -> WidgetAvailability:
     """Return a month (``YYYY-MM``) and the free times of a day (``YYYY-MM-DD``).
 
     Without parameters: the month of the first free day, and that day. A day outside today …
-    the booking horizon, or a malformed value, is ignored as on the standalone page.
+    the booking horizon, or a malformed value, is ignored as on the standalone page. With
+    ``subject`` (the host page's ``subject`` attribute, ADR 0081) only the times of staffing
+    blocks that offer it; a code the group does not have is ignored.
     """
     found = _group(request)
+    chosen = found.routing.subject(subject)
     view = await picker(
         _booking_service(request),
         found,
@@ -433,6 +437,7 @@ async def availability(
         f"/g/{found.slug}",
         month=month,
         day=day,
+        slot_filter=SlotFilter(subject=chosen.code if chosen else None),
     )
     return _availability(view, locale)
 

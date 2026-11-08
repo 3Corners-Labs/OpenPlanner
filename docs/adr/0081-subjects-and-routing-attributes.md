@@ -1,6 +1,6 @@
 # 0081. Subjects and routing attributes next to the group
 
-Status: accepted (2026-10-31), requested by the product owner; not built. Extends ADR 0032
+Status: accepted (2026-10-31), requested by the product owner; built (steps 1–4, 2026-11-08). Extends ADR 0032
 (provider-neutral contact center) and ADR 0043 (own queue); amends the privacy rule on outbound
 payloads in `CLAUDE.md` and ADR 0032. Relates to ADR 0055 (custom form fields) and open point
 O4 (agents in more than one group).
@@ -91,10 +91,10 @@ a privacy rule, not a preference.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR, privacy rule in `CLAUDE.md` and `docs/dataflow.md` | #179 | merged |
-| 1 | Subjects per group: domain, migration, form question, agenda and queue display | | planned |
-| 2 | Attribute catalogue (`preferred_language`, `channel_preference`), form questions | | planned |
-| 3 | Routing mapping per group and the dispatcher payload, with the payload test of point 6 | | planned |
-| 4 | Subject bound to a staffing block (ADR 0072 offer) | | planned |
+| 1 | Subjects per group: domain, migration, form question, agenda and queue display | #PRNUM | merged |
+| 2 | Attribute catalogue (`preferred_language`, `channel_preference`), form questions | #PRNUM | merged |
+| 3 | Routing mapping per group and the dispatcher payload, with the payload test of point 6 | #PRNUM | merged |
+| 4 | Subject bound to a staffing block (ADR 0072 offer) | #PRNUM | merged |
 
 ## Consequences
 

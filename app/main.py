@@ -119,6 +119,7 @@ from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
 from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
+from app.domain.routing_service import RoutingService
 from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
@@ -485,6 +486,9 @@ def create_app(
         )
         app.state.form_service = FormService(
             uow, clock, app.state.admin_service, lambda: live().booking_form_max_custom_fields
+        )
+        app.state.routing_service = RoutingService(
+            uow, clock, app.state.admin_service, lambda: live().max_subjects_per_group
         )
         # ADR 0042 step 4: class C settings changed in the portal, checked against the lock.
         app.state.settings_service = SettingsService(

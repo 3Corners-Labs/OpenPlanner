@@ -117,6 +117,7 @@ Load the script once per page; place one element per group where its calendar be
 | `organisation` | yes | Your organisation's slug, as shown in the code on the Insluiten page |
 | `group` | yes | The group's slug (the last part of `/g/{slug}`) |
 | `lang` | no | `nl` or `en`. Without it: the nearest `lang` attribute of an ancestor, then `<html lang>`, then `nl` |
+| `subject` | no | A subject code of the group (ADR 0081). The calendar then shows only the times of staffing blocks that offer it, and the form has the subject chosen. A code the group does not have is ignored |
 | `heading-level` | no | Level of the widget's headings, 2–6 (default 2), so they fit your page outline; sub-headings are one level lower |
 
 Changing `organisation`, `group` or `lang` later restarts the widget.

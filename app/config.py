@@ -281,6 +281,8 @@ class Settings(BaseSettings):
     # ADR 0055: custom fields per group's booking form at most (class C platform), and the
     # country of phone numbers typed without a country code (class D organisation).
     booking_form_max_custom_fields: int = Field(default=5, ge=0, le=15)
+    # ADR 0081: subjects a group may give participants to choose from (class C platform).
+    max_subjects_per_group: int = Field(default=20, ge=1, le=100)
     phone_default_region: str = Field(default="NL", pattern=r"^[A-Z]{2}$")
     # ADR 0056: a participant confirms a booking by email link within the earlier of this many
     # hours after booking and this many hours before the start, with this many reminders.
