@@ -52,7 +52,12 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
-from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.contact_center import (
+    ConnectionChange,
+    ContactCenterKind,
+    ContactCenterTaskRef,
+    OrganisationConnection,
+)
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -434,6 +439,30 @@ class ContactCenterDispatcher(Protocol):
 
 
 ContactCenterDispatchers = Mapping[ContactCenterKind, ContactCenterDispatcher]
+
+
+class ContactCenterConnections(Protocol):
+    """The organisations' contact-center connections, sealed and write-only (ADR 0032 point 9).
+
+    The domain sees only ``OrganisationConnection``: never a secret. The webhook secret is
+    generated inside the adapter and read only by the webhook route and the dispatcher.
+    """
+
+    async def get(self, organisation_id: int) -> OrganisationConnection | None:
+        """Return the organisation's connection without its secrets, or ``None``."""
+        ...
+
+    async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
+        """Store the connection; a ``None`` secret keeps the stored one."""
+        ...
+
+    async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
+        """Generate a new webhook secret for an existing connection, replacing the old one."""
+        ...
+
+    async def delete(self, organisation_id: int) -> None:
+        """Remove the organisation's connection and its secrets."""
+        ...
 """The configured dispatcher per platform (ADR 0032 point 5); empty without a contact center."""
 
 
