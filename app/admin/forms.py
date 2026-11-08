@@ -281,6 +281,8 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
         "admin.form.error.configuration_installation_in_use"
     ),
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
+    ErrorCode.SCENARIO_NAME_TAKEN: "admin.form.error.scenario_name_taken",
+    ErrorCode.ALERT_TARGET_TAKEN: "admin.form.error.alert_target_taken",
     ErrorCode.GROUP_ARCHIVED: "admin.form.error.group_archived",
     ErrorCode.CONFIRMATION_MISMATCH: "admin.form.error.confirmation_mismatch",
     ErrorCode.API_CLIENT_ENABLED: "admin.form.error.api_client_enabled",

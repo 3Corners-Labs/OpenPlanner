@@ -16,6 +16,7 @@ from app.domain.audit import AuditEvent, AuditFilter
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.availability import utc_bounds
 from app.domain.booking import Booking
+from app.domain.call_usage import record_call_event
 from app.domain.calls import (
     TRIAL_MEETING_EVENTS,
     BookingEvent,
@@ -255,11 +256,13 @@ class IntegrationService:
         message: str = "",
     ) -> None:
         """Write the event and the updated status in the caller's transaction."""
+        status = await tx.get_call_status(booking_id) or new_status(booking_id)
+        after = apply_event(status, kind, at)
+        await record_call_event(tx, booking_id, kind, status, after, at, detail)
         await tx.add_booking_event(
             BookingEvent(booking_id, at, kind, detail[:128], message[:REASON_LIMIT], self._version)
         )
-        status = await tx.get_call_status(booking_id) or new_status(booking_id)
-        await tx.save_call_status(apply_event(status, kind, at))
+        await tx.save_call_status(after)
 
 
 async def _claim(tx: Transaction, source: str, event_key: str, at: datetime) -> bool:

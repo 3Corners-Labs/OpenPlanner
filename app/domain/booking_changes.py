@@ -33,6 +33,8 @@ from app.domain.usage import ActorClass
 from app.domain.usage_recording import (
     record_cancelled,
     record_confirm_expired,
+    record_rebook_expired,
+    record_rebook_proposed,
 )
 
 
@@ -113,6 +115,7 @@ async def cancel(
 async def request_rebook(
     tx: Transaction,
     booking: Booking,
+    group: Group,
     now: datetime,
     *,
     reason: ChangeReason,
@@ -125,6 +128,7 @@ async def request_rebook(
     Args:
         tx: The caller's locked transaction.
         booking: A confirmed booking.
+        group: Its group, for the usage fact.
         now: Current time.
         reason: The planner's fixed reason, shown in the messages.
         rebook_days: ``planner_rebook_days``: the request lapses this long after the start.
@@ -136,8 +140,9 @@ async def request_rebook(
         DomainError: ``booking_not_active`` if it is not confirmed.
     """
     rebook_by = booking.start + timedelta(days=rebook_days)
-    waiting = booking.request_rebook(reason, rebook_by)
+    waiting = booking.request_rebook(reason, rebook_by, now)
     await tx.save_booking(waiting)
+    await record_rebook_proposed(tx, waiting, group, now, ActorClass.PLANNER)
     jobs = plan_for_rebook(
         now=now,
         rebook_by=rebook_by,
@@ -157,7 +162,9 @@ async def lapse(tx: Transaction, booking: Booking, now: datetime) -> bool:
     if not booking.awaits_rebook:
         return False
     await tx.save_booking(booking.cancel(now))
-    await record_cancelled(tx, booking, await _group(tx, booking), now, ActorClass.SYSTEM)
+    group = await _group(tx, booking)
+    await record_cancelled(tx, booking, group, now, ActorClass.SYSTEM)
+    await record_rebook_expired(tx, booking, group, now)
     await tx.add_jobs(_id(booking), plan_for_lapse(now=now, sms=sms_reachable(booking)))
     return True
 

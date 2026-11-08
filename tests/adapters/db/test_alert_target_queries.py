@@ -41,7 +41,7 @@ async def test_deleting_an_organisation_deletes_its_sealed_records(engine: Async
     from sqlalchemy import select
 
     from app.adapters.db.models import IntegrationCredentialRow, OrganisationRow
-    from app.adapters.db.uow import (
+    from app.adapters.db.record_names import (
         bot_credential_name,
         contact_center_credential_name,
         organisation_tokens_name,

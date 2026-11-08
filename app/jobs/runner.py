@@ -44,6 +44,7 @@ from app.domain.event_context import bind_booking, current, trace_scope
 from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import BACKOFF, TEAM_INVITES, JobType, is_stale
+from app.domain.message_usage import record_message
 from app.domain.ports import (
     Clock,
     ContactCenterDispatchers,
@@ -344,6 +345,7 @@ class JobRunner:
         await sender.send(message)
         self._step(job, "send", step)
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
+        await self._usage(job, now, sent=True)
         return None
 
     @staticmethod
@@ -374,8 +376,18 @@ class JobRunner:
         await self._queue.fail(job.id, error)
         log.error("job.failed", job_id=job.id, type=job.type.value, error=error)
         await self._record(job, Outcome.FAILURE, error, message)
+        await self._usage(job, now, sent=False)
         if job.type in CALL_JOBS and self._calls is not None:
             await self._calls.record_failure(job, error, message)
+
+    async def _usage(self, job: ClaimedJob, at: datetime, *, sent: bool) -> None:
+        """Write the usage fact of a message job; a failure here is only logged (ADR 0117)."""
+        try:
+            await record_message(
+                self._uow, job.type, job.channel or ChannelKind.EMAIL, job.booking_id, at, sent=sent
+            )
+        except Exception as exc:  # the message is sent (or given up on); reporting never changes it
+            log.warning("usage.message_failed", job_id=job.id, error=type(exc).__name__)
 
     async def _record(
         self, job: ClaimedJob, outcome: Outcome, reason: str, message: str = ""

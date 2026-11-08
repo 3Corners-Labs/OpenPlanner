@@ -327,6 +327,35 @@ _OPERATIONS = (
         "(ADR 0117).",
     ),
     _e(
+        "usage.slots_failed",
+        _OPS,
+        "error",
+        "error",
+        "Closing the slots that ended failed: {error}.",
+        "The worker could not write the capacity and outcome facts of ended slots (ADR 0117 "
+        "step 3); the next interval tries again.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "usage.slots_closed",
+        _OPS,
+        "info",
+        "slots facts",
+        "{slots} ended slots closed for the reports, {facts} usage facts written.",
+        "The worker wrote the capacity, shortfall and outcome facts of slots that ended "
+        "(ADR 0117 step 3).",
+    ),
+    _e(
+        "usage.message_failed",
+        _OPS,
+        "warning",
+        "job_id error",
+        "The usage fact of message job {job_id} could not be written: {error}.",
+        "A message was sent (or given up on) but its fact for the reports was not written "
+        "(ADR 0117); the message and its job are not affected.",
+        _CHECK_HOST,
+    ),
+    _e(
         "usage.fact_dropped",
         _OPS,
         "warning",
