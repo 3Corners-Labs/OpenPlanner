@@ -29,7 +29,8 @@ The log never contains participants' data: no names, email addresses or phone nu
   there too.
 - **Group**, **Appointment number** and **Problems only** work as you would expect.
 
-An unknown or malformed value is ignored.
+An unknown or malformed value is ignored. Above the table the page says how many rows you see.
+It lists the newest 100; when it reaches that, the count says so. Narrow the filter or export.
 
 ## Exporting
 

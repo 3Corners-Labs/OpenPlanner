@@ -117,6 +117,7 @@ from app.domain.ports import (
 )
 from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
+from app.domain.readiness import ReadinessService
 from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
 from app.domain.scenario_service import ScenarioService
@@ -584,6 +585,7 @@ def create_app(
         app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
+        app.state.readiness_service = ReadinessService(uow, clock, app.state.admin_service)
         app.state.scenario_service = ScenarioService(uow, clock, app.state.admin_service)
         app.state.embedding_service = EmbeddingService(
             uow,

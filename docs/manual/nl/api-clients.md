@@ -22,6 +22,10 @@ of hij aan staat, tot wanneer zijn secret geldig is en wanneer hij voor het laat
 vroeg. **Verloopt binnenkort** verschijnt als het secret binnen 30 dagen afloopt. Een naam
 leidt naar de pagina van de client.
 
+Boven de tabel zoekt u op naam of client-ID en, bij clients van meer organisaties, kiest u een
+organisatie. Het aantal zegt hoeveel clients er passen en hoeveel er in totaal zijn. De
+zoektekst komt niet terug op het scherm; de pagina meldt alleen dat er gezocht wordt.
+
 ## Een nieuwe client
 
 Kies **Nieuwe API-client**.

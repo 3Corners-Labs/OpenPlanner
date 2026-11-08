@@ -658,6 +658,18 @@ def home_of(route_path: str) -> Home | None:
     return _HOMES.get(route_path)
 
 
+def screen(key: str) -> Screen:
+    """Return the screen of the register called ``key`` (an entry, tab or sub-tab).
+
+    Raises:
+        KeyError: When no screen has that key; a caller names keys of the register only.
+    """
+    found = next((s for _, s in screens() if s.key == key), None)
+    if found is None:
+        raise KeyError(key)
+    return found
+
+
 def entry(key: str) -> Screen | None:
     """Return the side-navigation entry called ``key``, if any."""
     return next((e for section in SECTIONS for e in section.entries if e.key == key), None)

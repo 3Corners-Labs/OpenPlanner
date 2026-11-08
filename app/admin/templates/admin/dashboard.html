@@ -26,6 +26,19 @@
 <p class="empty-state">{{ _("admin.overview.no_widgets") }}</p>
 {% endif %}
 <h2 id="groups-heading" class="section-title">{{ _("admin.dashboard.groups") }}</h2>
+{#- ADR 0047 §4: active closures are a filter of this list, never a page of their own; each closed group links to its Closure tab. -#}
+<form class="card" method="get" action="/admin/" aria-labelledby="closures-filter-heading">
+  <h3 id="closures-filter-heading" class="visually-hidden">{{ _("admin.dashboard.filter") }}</h3>
+  <div class="inline-forms">
+    <div class="choice__option">
+      <input type="checkbox" id="filter-closures" name="closures" value="1"{% if only_closed %} checked{% endif %}>
+      <label for="filter-closures">{{ _("admin.dashboard.only_closed") }}</label>
+    </div>
+    <button type="submit" class="button button--secondary">{{ icon("filter") }}<span>{{ _("admin.groups.apply") }}</span></button>
+    {% if only_closed %}<a href="/admin/">{{ _("admin.groups.clear") }}</a>{% endif %}
+  </div>
+  <p class="card__lead">{% if only_closed %}{{ _("admin.dashboard.closed_count", count=groups | length, total=total_groups) }}{% else %}{{ _("admin.groups.count", count=groups | length) }}{% endif %}</p>
+</form>
 {% if groups %}
 <ul class="card-grid" aria-labelledby="groups-heading">
   {% for summary in groups %}
@@ -36,6 +49,7 @@
       <span class="chip chip--accent">{{ icon("clock") }}{{ _("admin.group.minutes", minutes=summary.group.slot_minutes) }}</span>
       {% set short = shortfalls.get(summary.group.slug) %}
       {% if short %}<a class="chip chip--danger" href="{{ short.first_href }}">{{ icon("alert") }}{{ _("admin.shortfall.chip", count=short.count) }}</a>{% endif %}
+      {% if summary.group.slug in closed %}{% if can("closure.manage", summary) %}<a class="chip chip--warning" href="/admin/groups/{{ summary.group.slug }}/closure">{{ icon("alert") }}{{ _("admin.dashboard.closed") }}</a>{% else %}<span class="chip chip--warning">{{ icon("alert") }}{{ _("admin.dashboard.closed") }}</span>{% endif %}{% endif %}
     </div>
     <div class="group-card__footer">
       <a class="link-with-icon" href="/g/{{ summary.group.slug }}">{{ icon("external") }}<span>/g/{{ summary.group.slug }}</span></a>
@@ -44,6 +58,8 @@
   </li>
   {% endfor %}
 </ul>
+{% elif only_closed %}
+<p class="empty-state">{{ _("admin.dashboard.no_closed") }}</p>
 {% else %}
 <p class="empty-state">{{ _("admin.dashboard.no_groups") }}</p>
 {% endif %}

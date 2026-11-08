@@ -152,7 +152,7 @@ from a request without a check.
 | `GET /b/m/{ref}/join/go`, `/test/go` | The join link of the Webex meeting, kept on the booking | `join_link` refuses anything but `https` and applies the group's client setting (ADR 0075); the value is written by the Webex adapter, never by a request |
 | After a form post (`/g/{slug}/book`, `/b/m/{ref}/…`, direct call) | The application: path built from the slug or the reference of the booking the cookie holds | Relative paths only; references and slugs come from the database |
 | After an admin form post | The application: the route's own URL plus `?done=`, optionally an anchor | Relative; `done` values come from a closed list |
-| Moved screens (`/admin/groups/{slug}/hours`, old organisation paths) | The application | Fixed relative `301`/`308` |
+| Moved screens (`/admin/groups/{slug}/hours`, `/admin/groups/{slug}/closure/contacts`, `/admin/closures`, old organisation paths) | The application | Fixed relative `301`/`308`, built from the authorised object's slug or a constant (`/admin/?closures=1`); same permission as the target. `test_the_old_contact_path_redirects_to_messages_contact`, `test_active_closures_are_a_filter_of_the_overview` |
 | `GET /b/{token}…` (any old link): the exchange | The application: `/b/m/{ref}` plus the same page, and a well-formed `?lang=` | Relative; the reference comes from the database after the token was checked |
 | `GET /b/m/{ref}/wait/status` without the cookie | None: the refusal page, no redirect | The 403 page; a poll (`redirect: manual`) just stops |
 

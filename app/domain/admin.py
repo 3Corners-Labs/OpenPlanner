@@ -92,6 +92,10 @@ class Authorization:
     group: GroupSummary | None = None
 
 
+AUDIT_LOG_LIMIT = 100
+"""How many of the newest events the audit page lists; the export reads more (ADR 0040)."""
+
+
 class AdminService:
     """Application service for the admin portal.
 
@@ -361,7 +365,7 @@ class AdminService:
             return await tx.active_jobs(limit)
 
     async def audit_log(
-        self, principal: Principal, narrow: AuditFilter | None = None, limit: int = 100
+        self, principal: Principal, narrow: AuditFilter | None = None, limit: int = AUDIT_LOG_LIMIT
     ) -> list[AuditEntry]:
         """Return the newest audit events ``principal`` may see, with the actors' names.
 
