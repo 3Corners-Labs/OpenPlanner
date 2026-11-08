@@ -28,9 +28,6 @@ def test_a_bold_span_gives_its_labels_and_a_path_its_parts() -> None:
     assert check.labels_of("Tip:") == []
     assert check.labels_of("Stap 2") == []
     assert check.labels_of("15 minuten") == []
-    assert check.labels_of("de afsprakenplanner → Agenda", frozenset({"de afsprakenplanner"})) == [
-        "Agenda"
-    ]
 
 
 def test_labels_carry_the_line_the_build_found() -> None:
@@ -78,6 +75,60 @@ def test_a_manual_maps_to_its_roles_by_a_word_of_its_role() -> None:
     assert check.manual_roles("Deelnemers", roles) is None
 
 
+def _built_workspace(root: Path, variables: dict, sources: dict[str, str] | None = None) -> Path:
+    """Write a workspace and a build/manuals.json current for it, as build.mjs writes one."""
+    for folder in ("sources", "evidence", "build"):
+        (root / folder).mkdir(exist_ok=True)
+    (root / "variables.json").write_text(json.dumps(variables))
+    (root / "evidence" / "shots.json").write_text("[]")
+    for stem, text in (sources or {}).items():
+        (root / "sources" / f"{stem}.md").write_text(text)
+    manuals = [
+        {
+            "file": path.stem,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "role": "",
+            "tasks": [],
+            "figures": [],
+            "bold": [],
+        }
+        for path in sorted((root / "sources").glob("*.md"))
+    ]
+    digest = hashlib.sha256((root / "variables.json").read_bytes()).hexdigest()
+    (root / "build" / "manuals.json").write_text(
+        json.dumps({"variables_sha256": digest, "manuals": manuals})
+    )
+    return root
+
+
+def test_a_current_build_is_read_with_its_inputs(tmp_path: Path) -> None:
+    """The variables, the sources and the manuals come back from one read of each."""
+    root = _built_workspace(tmp_path, {"product": "de dienst"}, {"10-planner": "# Planner\n"})
+    inputs = check.load_inputs(check.Workspace(root))
+    assert inputs.config == {"product": "de dienst"}
+    assert [m["file"] for m in inputs.manuals] == ["10-planner"]
+    assert list(inputs.sources.values()) == ["# Planner\n"]
+
+
+@pytest.mark.parametrize("change", ["added", "removed", "edited", "variables", "old format"])
+def test_a_build_of_other_inputs_is_refused(tmp_path: Path, change: str) -> None:
+    """A source added, removed or edited, edited variables or an older build file is refused."""
+    root = _built_workspace(tmp_path, {"product": "de dienst"}, {"10-planner": "# Planner\n"})
+    sources = root / "sources"
+    if change == "added":
+        (sources / "20-medewerker.md").write_text("# Medewerker\n")
+    elif change == "removed":
+        (sources / "10-planner.md").unlink()
+    elif change == "edited":
+        (sources / "10-planner.md").write_text("# Planner, bijgewerkt\n")
+    elif change == "variables":
+        (root / "variables.json").write_text(json.dumps({"product": "iets anders"}))
+    else:
+        (root / "build" / "manuals.json").write_text("[]")
+    with pytest.raises(SystemExit, match="build again"):
+        check.load_inputs(check.Workspace(root))
+
+
 def test_only_a_commit_hash_is_passed_to_git(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -85,21 +136,7 @@ def test_only_a_commit_hash_is_passed_to_git(
     assert check.commit_hash("d36485a6ee78") == "d36485a6ee78"
     with pytest.raises(argparse.ArgumentTypeError):
         check.commit_hash("--output=/tmp/x")
-    (tmp_path / "sources").mkdir()
-    (tmp_path / "evidence").mkdir()
-    (tmp_path / "build").mkdir()
-    (tmp_path / "variables.json").write_text(json.dumps({"commit": "HEAD~1"}))
-    (tmp_path / "evidence" / "shots.json").write_text("[]")
-    (tmp_path / "build" / "manuals.json").write_text(
-        json.dumps(
-            {
-                "variables_sha256": hashlib.sha256(
-                    (tmp_path / "variables.json").read_bytes()
-                ).hexdigest(),
-                "manuals": [],
-            }
-        )
-    )
+    _built_workspace(tmp_path, {"commit": "HEAD~1"})
 
     def no_git(*args: str) -> str:
         raise AssertionError(f"git was called with {args}")

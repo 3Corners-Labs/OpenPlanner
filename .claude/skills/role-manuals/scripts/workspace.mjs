@@ -7,6 +7,7 @@
  * book, what it does not want named) live only there, in variables.json and sources/.
  * check.py applies the same guard in Python.
  */
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
@@ -35,9 +36,12 @@ export function openWorkspace(arg) {
   const file = join(dir, 'variables.json');
   if (!existsSync(file)) throw new Error(`${file} is missing; set the workspace up first (role-manuals SKILL.md)`);
   const evidence = join(dir, 'evidence');
+  const bytes = readFileSync(file);
   return {
     dir,
-    vars: JSON.parse(readFileSync(file, 'utf8')),
+    vars: JSON.parse(bytes.toString('utf8')),
+    /** The hash of the variables.json bytes these `vars` come from (build/manuals.json keeps it). */
+    varsSha256: createHash('sha256').update(bytes).digest('hex'),
     sources: join(dir, 'sources'),
     img: join(dir, 'img'),
     build: join(dir, 'build'),

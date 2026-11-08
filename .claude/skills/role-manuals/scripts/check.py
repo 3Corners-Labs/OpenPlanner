@@ -8,8 +8,8 @@ Usage, from the checkout (the app's own modules and babel come from its environm
 Writes ``evidence/check.md`` in the workspace and exits with 1 when a blocking finding is left.
 It checks what needs the software's own Python; the sources are parsed once, by ``build.mjs``,
 which also refuses a manual that names a term the organisation does not show. Run that first:
-it writes ``build/manuals.json`` (per manual its tasks, figures and bold spans, with the hash of
-its source), which this check reads and refuses when a source changed since.
+it writes ``build/manuals.json``, which ``load_inputs`` reads (and refuses when an input of that
+build changed since).
 
 1. Tasks: the screen of each task is a help topic of the portal or a participant page, the
    permission exists, and a role of the manual holds it in the authorisation matrix
@@ -148,16 +148,12 @@ def normalise(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().rstrip(".!?:").strip()
 
 
-def labels_of(bold: str, variables: frozenset[str] = frozenset()) -> list[str]:
-    """Return the labels of one bold span; a path (A → B → C) gives its parts.
-
-    The spans are the filled-in text, so a part that is a value of ``variables.json`` (the name
-    of the service, say) is the organisation's word, not a text of the software.
-    """
+def labels_of(bold: str) -> list[str]:
+    """Return the labels of one bold span; a path (A → B → C) gives its parts."""
     found = []
     for part in re.split(r"\s*→\s*", bold):
         part = normalise(part)
-        if not part or part[0] in "[0123456789" or part in variables or bold.strip().endswith(":"):
+        if not part or part[0] in "[0123456789" or bold.strip().endswith(":"):
             continue
         if not STRUCTURAL.match(part):
             found.append(part)
@@ -193,8 +189,8 @@ class Catalogue:
     """The texts of the software, for exact and placeholder matches."""
 
     def __init__(self, entries: dict[str, str], extra: list[str]) -> None:
-        """Index the texts without their closing punctuation."""
-        self.values = {normalise(v) for v in entries.values() if v} | set(extra)
+        """Index the texts and the ``extra`` ones accepted beside them, without end punctuation."""
+        self.values = {normalise(v) for v in [*entries.values(), *extra] if v and normalise(v)}
         self.patterns = [
             re.compile("^" + re.sub(r"\\\{\w+\\\}", ".+?", re.escape(v)) + "$")
             for v in self.values
@@ -272,42 +268,58 @@ def check_tasks(manual: dict, ctx: dict, report: Report) -> None:
         )
 
 
-def labels(manual: dict, variables: frozenset[str] = frozenset()) -> list[tuple[int, str]]:
+def labels(manual: dict) -> list[tuple[int, str]]:
     """Return (line, label) for every label in the bold spans of one manual."""
-    return [
-        (span["line"], label)
-        for span in manual["bold"]
-        for label in labels_of(span["text"], variables)
-    ]
+    return [(span["line"], label) for span in manual["bold"] for label in labels_of(span["text"])]
 
 
-def load_manuals(ws: Workspace, variables: Path) -> list[dict]:
-    """Return the manuals of build/manuals.json, or stop when the build is not of these inputs.
+@dataclass
+class Inputs:
+    """What one check works on: the variables, the sources as text, and the build's manuals."""
 
-    The build is current when it covers exactly the sources there are, every source's bytes hash
-    as they did, and so do the bytes of ``variables.json``, which filled in the spans.
+    config: dict
+    sources: dict[Path, str]
+    manuals: list[dict]
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def load_inputs(ws: Workspace) -> Inputs:
+    """Read variables.json, the sources and build/manuals.json once, and refuse a stale build.
+
+    ``build/manuals.json`` (written by build.mjs) holds ``variables_sha256``, the hash of the
+    variables.json bytes it was built with, and ``manuals``: per source its ``file`` (the stem),
+    ``sha256`` (of its bytes), ``role``, ``tasks`` and ``figures`` (each with its ``line``) and
+    ``bold`` (each span's ``text`` and ``line``). The build is refused when a source was added,
+    removed or edited, or variables.json was edited, since; the message names which.
     """
     found = ws.root / "build" / "manuals.json"
     if not found.exists():
         sys.exit(f"check.py: {found} is missing; run build.mjs {ws.root} first")
-    data = json.loads(found.read_text())
-    manuals = data.get("manuals", []) if isinstance(data, dict) else []
-    stale = {p.stem for p in ws.sources.glob("*.md")} != {m["file"] for m in manuals} or any(
-        hashlib.sha256((ws.sources / f"{m['file']}.md").read_bytes()).hexdigest() != m["sha256"]
-        for m in manuals
+    variables = (ws.root / "variables.json").read_bytes()
+    raw = {p: p.read_bytes() for p in sorted(ws.sources.glob("*.md"))}
+    try:
+        data = json.loads(found.read_text())
+        built = {m["file"]: m["sha256"] for m in data["manuals"]}
+        built_variables = data["variables_sha256"]
+    except (TypeError, KeyError, json.JSONDecodeError):
+        sys.exit(f"check.py: {found} was made by another build.mjs; build again")
+    now = {p.stem: _sha256(b) for p, b in raw.items()}
+    changed = sorted(
+        (set(now) ^ set(built)) | {n for n in now.keys() & built.keys() if now[n] != built[n]}
     )
-    if stale or hashlib.sha256(variables.read_bytes()).hexdigest() != data.get("variables_sha256"):
-        sys.exit(
-            "check.py: the sources or variables.json changed after the last build; build again"
-        )
-    return manuals
+    if _sha256(variables) != built_variables:
+        changed.append("variables.json")
+    if changed:
+        sys.exit(f"check.py: changed after the last build: {', '.join(changed)}; build again")
+    return Inputs(json.loads(variables), {p: b.decode() for p, b in raw.items()}, data["manuals"])
 
 
-def check_labels(
-    manual: dict, catalogue: Catalogue, verdicts: dict, report: Report, variables: frozenset[str]
-) -> None:
+def check_labels(manual: dict, catalogue: Catalogue, verdicts: dict, report: Report) -> None:
     """Check that every bold label of a manual is a text of the software."""
-    for number, label in labels(manual, variables):
+    for number, label in labels(manual):
         verdict = catalogue.match(label)
         verdicts[verdict] = verdicts.get(verdict, 0) + 1
         where = f"{manual['file']}.md:{number}"
@@ -318,12 +330,7 @@ def check_labels(
 
 
 def since(
-    commit: str,
-    sources: dict[Path, str],
-    manuals: list[dict],
-    fix: bool,
-    report: Report,
-    variables: frozenset[str],
+    commit: str, sources: dict[Path, str], manuals: list[dict], fix: bool, report: Report
 ) -> None:
     """Report what the software changed since ``commit`` and where the manuals use it."""
     old, new = catalogue_at(commit), catalogue_at(None)
@@ -340,7 +347,7 @@ def since(
     }
     section = f"Gewijzigd in de software sinds {commit[:9]}"
     for manual in manuals:
-        for number, label in labels(manual, variables):
+        for number, label in labels(manual):
             core = normalise(label)
             where = f"{manual['file']}.md:{number}"
             if core in renamed:
@@ -417,14 +424,12 @@ def main() -> int:
     args = parser.parse_args()
     ws = Workspace(args.workspace.resolve())
     guard_outside_checkout(ws.root)
-    config = json.loads((ws.root / "variables.json").read_text())
-    report = Report()
-    sources = {p: p.read_text() for p in sorted(ws.sources.glob("*.md"))}
     shots_file = ws.evidence / "shots.json"
     if not shots_file.exists():
         sys.exit(f"check.py: {shots_file} is missing; run capture.mjs {ws.root} --list first")
-    manuals = load_manuals(ws, ws.root / "variables.json")
-    variables = frozenset(v.strip() for v in config.values() if isinstance(v, str) and v.strip())
+    inputs = load_inputs(ws)
+    config, sources, manuals = inputs.config, inputs.sources, inputs.manuals
+    report = Report()
     ctx: dict = {
         "shots": {s["id"] for s in json.loads(shots_file.read_text())},
         "topics": {p.stem for p in (REPO / "docs" / "manual" / "nl").glob("*.md")},
@@ -438,12 +443,14 @@ def main() -> int:
         "used": set(),
         "tasks": 0,
     }
-    catalogue = Catalogue(catalogue_at(None), config.get("extra_screen_texts", []))
+    # The organisation's own words (its variables) are known texts beside the catalogue.
+    words = [v for v in config.values() if isinstance(v, str)]
+    catalogue = Catalogue(catalogue_at(None), [*config.get("extra_screen_texts", []), *words])
     verdicts: dict[str, int] = {}
     for manual in manuals:
         check_tasks(manual, ctx, report)
         if not manual["file"].startswith("00-"):
-            check_labels(manual, catalogue, verdicts, report, variables)
+            check_labels(manual, catalogue, verdicts, report)
     missing = sorted(
         s for s in ctx["used"] if s in ctx["shots"] and not (ws.img / f"{s}.png").exists()
     )
@@ -466,7 +473,7 @@ def main() -> int:
         except argparse.ArgumentTypeError as error:
             sys.exit(f"check.py: commit in variables.json: {error}")
     if commit:
-        since(commit, sources, manuals, args.fix, report, variables)
+        since(commit, sources, manuals, args.fix, report)
     visual_changes(ws, report)
     out = ws.evidence / "check.md"
     out.parent.mkdir(parents=True, exist_ok=True)

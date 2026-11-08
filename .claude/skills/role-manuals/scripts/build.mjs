@@ -8,8 +8,8 @@
  *
  * Input:  sources/*.md (front matter + the Markdown subset of the style guide), img/*.png,
  *         variables.json (product name, help desk, software version, accent colour, font).
- * Output: build/<name>.docx, build/<name>.html, build/<name>.pdf; build/manuals.json (per manual its
- *         role, tasks and figures, which check.py checks) and build/help-index.json, the contract for
+ * Output: build/<name>.docx, build/<name>.html, build/<name>.pdf; build/manuals.json (what check.py
+ *         checks; its load_inputs describes it) and build/help-index.json, the contract for
  *         help in context (per task: screen, permission, shots, title, anchor). Nothing is built when
  *         a source breaks a rule: a task marker without its heading, a figure that is no
  *         img/<id>.png, or a term this organisation does not show (after its variables are filled in).
@@ -696,7 +696,7 @@ if (!named.length) {
   // What check.py checks against the matrix, the help topics and the shot list, from this one parse.
   // The build's own inputs, so check.py can refuse this file once a source or a variable changed.
   const manuals = {
-    variables_sha256: sha256(fs.readFileSync(path.join(ws.dir, 'variables.json'))),
+    variables_sha256: ws.varsSha256,
     manuals: docs.map((d) => ({
       file: d.name, sha256: d.sha256, role: d.meta.role ?? '', tasks: d.tasks,
       figures: d.figures.map((f) => ({ id: f.id, line: f.line })), bold: d.bold,

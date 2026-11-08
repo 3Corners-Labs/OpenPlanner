@@ -122,7 +122,8 @@ The scripts are in `scripts/` and run from the root of the checkout; `<ws>` is t
    `img/<id>.png`, or, after the variables are filled in, a term of `do_not_name` or the hidden
    product name in the text or a caption.
 6. **Check.** `uv run python .../check.py <ws>` reads `build/manuals.json` (and refuses it when a
-   source changed since) and writes `evidence/check.md`; it exits with 1 on a blocking finding: a
+   source was added, removed or edited, or `variables.json` changed, since that build) and writes
+   `evidence/check.md`; it exits with 1 on a blocking finding: a
    task whose screen, permission or shot does not exist, or whose role lacks the permission in
    `MATRIX`. It also lists the bold labels the build found that are no text of the software. Look at rendered pages
    (the Read tool shows PDF pages). Run a reader test with `anthropic-skills:doc-coauthoring`
@@ -156,7 +157,7 @@ The scripts are in `scripts/` and run from the root of the checkout; `<ws>` is t
 | `accent_colour`, `font` | branding: six hex digits without `#`, a font family name |
 | `hide_product_name` | `true` covers the product name and its mark in screenshots and blocks it in the text |
 | `do_not_name` | terms that appear neither in the text nor in a screenshot (also inside compounds; a row, column or field whose label holds one is covered whole) |
-| `extra_screen_texts` | bold texts the check accepts that are no catalogue text (language names, provider names) |
+| `extra_screen_texts` | bold texts the check accepts that are no catalogue text (language names, provider names); the text values of `variables.json` count as such too |
 | `without_webex` | per shot id, the note its caption gets while it was taken without Webex Meetings |
 | `roles` | optional: per word of a manual's `role`, the role keys it covers |
 
