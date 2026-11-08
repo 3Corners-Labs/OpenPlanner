@@ -172,8 +172,8 @@ def test_a_gap_names_the_decision_that_allows_it() -> None:
 
     assert all(gap.decision.startswith("ADR ") for gap in gaps)
     # What is left is the decision's own: a holiday date is its identity, the Dutch holidays
-    # are dates, each removed alone.
-    assert len(gaps) == 3
+    # are dates, each removed alone; an alert target (two homes) is removed and added again.
+    assert len(gaps) == 5
 
 
 def test_the_heuristic_finds_the_known_creators() -> None:
