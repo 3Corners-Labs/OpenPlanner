@@ -32,7 +32,7 @@ from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
 from app.domain.staff_directory import ADMIN_URL_PATTERN
 from app.domain.system_log import EventRetention
 from app.domain.update_policy import valid_line, valid_window
-from app.domain.updates import Version
+from app.domain.updates import valid_release
 from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
 from app.i18n.dates import ClockStyle
 
@@ -581,8 +581,7 @@ class Settings(BaseSettings):
     @classmethod
     def _valid_stop(cls, value: str) -> str:
         """Refuse a ``MIN_UPGRADE_FROM`` that is neither empty nor a release ``X.Y.Z``."""
-        found = Version.parse(value) if value else None
-        if value and (found is None or found.is_candidate or value.startswith("v")):
+        if value and not valid_release(value):
             raise ValueError("MIN_UPGRADE_FROM must be empty or a release such as 1.0.0")
         return value
 

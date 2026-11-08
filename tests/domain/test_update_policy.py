@@ -6,8 +6,6 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.domain.update_policy import (
-    LineStatus,
-    SupportLine,
     auto_apply_effective,
     claimable,
     line_support,
@@ -19,7 +17,9 @@ from app.domain.update_policy import (
     valid_window,
 )
 from app.domain.updates import (
+    LineStatus,
     ListedRelease,
+    SupportLine,
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
@@ -119,18 +119,20 @@ def test_a_click_is_claimed_at_once_and_an_automatic_request_in_the_window() -> 
     window = parse_window("mon 02:00-04:00", AMSTERDAM)
     later = MONDAY_0230 + timedelta(hours=3)
 
-    assert claimable(request(), later, window)
-    assert claimable(request(requested_by="system"), MONDAY_0230, window)
-    assert not claimable(request(requested_by="system"), later, window)
+    assert claimable(request(), later, window, production=False)
+    assert claimable(request(requested_by="system"), MONDAY_0230, window, production=False)
+    assert not claimable(request(requested_by="system"), later, window, production=False)
 
 
 def test_a_request_waits_for_its_apply_after() -> None:
     window = parse_window("", AMSTERDAM)
     waiting = request(apply_after=MONDAY_0230 + timedelta(hours=1))
 
-    assert not claimable(waiting, MONDAY_0230, window)
-    assert claimable(waiting, MONDAY_0230 + timedelta(hours=1), window)
-    assert not claimable(request(status=UpdateStatus.RUNNING), MONDAY_0230, window)
+    assert not claimable(waiting, MONDAY_0230, window, production=False)
+    assert claimable(waiting, MONDAY_0230 + timedelta(hours=1), window, production=False)
+    assert not claimable(
+        request(status=UpdateStatus.RUNNING), MONDAY_0230, window, production=False
+    )
 
 
 def test_in_production_an_automatic_request_needs_a_window_to_be_claimed() -> None:
@@ -138,7 +140,7 @@ def test_in_production_an_automatic_request_needs_a_window_to_be_claimed() -> No
     no_window = parse_window("", AMSTERDAM)
 
     assert not claimable(request(requested_by="system"), MONDAY_0230, no_window, production=True)
-    assert claimable(request(requested_by="system"), MONDAY_0230, no_window)
+    assert claimable(request(requested_by="system"), MONDAY_0230, no_window, production=False)
     assert claimable(request(), MONDAY_0230, no_window, production=True)
 
 

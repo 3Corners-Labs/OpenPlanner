@@ -17,7 +17,7 @@ happened. The host updater does the work and checks the image signature.
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Outcome, Source
@@ -26,7 +26,6 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, IntegrationError, ReleaseSource, Transaction, UnitOfWork
 from app.domain.update_policy import (
     ANY_TIME,
-    SupportLine,
     UpdateWindow,
     auto_apply_effective,
     claimable,
@@ -43,6 +42,7 @@ from app.domain.updates import (
     Release,
     ReleaseCheck,
     RunningVersion,
+    SupportLine,
     UpdateAction,
     UpdateChannel,
     UpdateRequest,
@@ -462,7 +462,11 @@ class UpdateService:
                 if target not in {item.version for item in choices}:
                     raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
                 chosen = target
-            later = apply_after if apply_after and apply_after > self._clock.now() else None
+            later = (
+                apply_after.astimezone(UTC)
+                if apply_after and apply_after > self._clock.now()
+                else None
+            )
             return await self._add(tx, principal, UpdateAction.UPDATE, chosen, later)
 
     async def request_restore(self, principal: Principal) -> UpdateRequest:
@@ -556,7 +560,11 @@ class UpdateService:
         now = self._clock.now()
         window = self._window()
         async with self._uow.locked() as tx:
-            waiting = [r for r in await tx.get_update_requests() if claimable(r, now, window)]
+            waiting = [
+                r
+                for r in await tx.get_update_requests()
+                if claimable(r, now, window, production=self._production)
+            ]
             if not waiting:
                 return None
             started = claimed(waiting[-1], now)

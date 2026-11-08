@@ -38,10 +38,10 @@ from app.admin.pages import page as _page
 from app.domain.audit import AuditEntry
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.update_policy import LineStatus
 from app.domain.update_service import UpdateNotice, UpdateOverview, UpdateService
 from app.domain.updates import (
     SNOOZE,
+    LineStatus,
     UpdateRequest,
     UpdateStatus,
     Version,

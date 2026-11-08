@@ -14,7 +14,7 @@ from app.domain.admin import AdminService
 from app.domain.audit import Outcome, Source
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import IntegrationError
-from app.domain.update_policy import LineStatus, SupportLine, UpdateWindow, parse_window
+from app.domain.update_policy import UpdateWindow, parse_window
 from app.domain.update_service import SYSTEM_ACTOR, UPDATER_ACTOR, UpdateService
 from app.domain.updates import (
     CHECK_INTERVAL,
@@ -22,8 +22,10 @@ from app.domain.updates import (
     HOST_ACTOR,
     RESTORE_WINDOW,
     VERSION_ACTION,
+    LineStatus,
     Release,
     ReleaseCheck,
+    SupportLine,
     UpdateAction,
     UpdateChannel,
     UpdateRequest,
@@ -786,3 +788,21 @@ async def test_a_scheduled_request_names_its_moment_in_the_audit(
     await updates.request_update(DEMO_SUPERUSER, V2, NOW + timedelta(hours=3))
 
     assert uow.state.audit[-1].detail.endswith(",after:20260101T1100Z")
+
+
+async def test_in_production_a_waiting_automatic_request_needs_its_window_to_be_claimed(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await policy_service(uow, clock, releases).check_if_due()  # the worker asked in a window
+    cleared = UpdateService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=V1,
+        releases=releases,
+        auto_apply=True,
+        window=parse_window("", AMSTERDAM),  # the superuser cleared the window since
+        production=True,
+    )
+
+    assert await cleared.claim() is None

@@ -148,6 +148,12 @@ class Version:
         return release if self.candidate is None else f"{release}-rc.{self.candidate}"
 
 
+def valid_release(value: str) -> bool:
+    """Whether ``value`` is a release ``X.Y.Z``: no ``v`` prefix, no candidate (ADR 0116)."""
+    found = Version.parse(value)
+    return found is not None and not found.is_candidate and not value.startswith("v")
+
+
 @dataclass(frozen=True)
 class Release:
     """A published release: its version and its release page (the notes).

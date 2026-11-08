@@ -25,12 +25,14 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from app.domain.audit import SYSTEM_ACTOR
-
-# LineStatus and SupportLine are defined with the release check that carries them; they are
-# named here too, next to the rules that read them.
-from app.domain.updates import LineStatus as LineStatus
-from app.domain.updates import ListedRelease, UpdateRequest, UpdateStatus, Version
-from app.domain.updates import SupportLine as SupportLine
+from app.domain.updates import (
+    LineStatus,
+    ListedRelease,
+    SupportLine,
+    UpdateRequest,
+    UpdateStatus,
+    Version,
+)
 
 MAX_RANGES = 7
 """At most this many ranges in ``update_window``."""
@@ -162,7 +164,7 @@ def auto_apply_effective(auto_apply: bool, window: UpdateWindow, production: boo
 
 
 def claimable(
-    request: UpdateRequest, now: datetime, window: UpdateWindow, production: bool = False
+    request: UpdateRequest, now: datetime, window: UpdateWindow, *, production: bool
 ) -> bool:
     """Whether the updater may take ``request`` now.
 
@@ -202,6 +204,12 @@ def parse_support(text: str) -> list[SupportLine]:
             SupportLine(line, LineStatus(status), until if isinstance(until, str) else None)
         )
     return found
+
+
+def support_text(lines: Sequence[SupportLine]) -> str:
+    """Return support lines as ``support.json`` text, the shape ``parse_support`` reads."""
+    entries = [{"line": x.line, "status": x.status.value, "until": x.until} for x in lines]
+    return json.dumps({"lines": entries})
 
 
 def line_support(lines: Sequence[SupportLine], version: Version | None) -> SupportLine | None:

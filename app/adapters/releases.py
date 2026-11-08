@@ -25,13 +25,12 @@ from app.domain.errors import DomainError
 from app.domain.ports import Clock, IntegrationError, UnitOfWork
 from app.domain.update_policy import (
     ANY_TIME,
-    SupportLine,
     UpdateWindow,
     parse_support,
     parse_window,
 )
 from app.domain.update_service import UpdateService
-from app.domain.updates import NOTES_CHARS, ListedRelease, UpdateChannel, Version
+from app.domain.updates import NOTES_CHARS, ListedRelease, SupportLine, UpdateChannel, Version
 
 log = structlog.get_logger()
 

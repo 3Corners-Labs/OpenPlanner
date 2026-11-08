@@ -450,3 +450,16 @@ async def test_the_page_shows_the_support_of_the_running_line(site: Site, admin_
 
     assert "Ondersteuning van deze lijn" in page
     assert "Niet meer ondersteund" in page  # 1.3 is not listed: it has ended
+
+
+@pytest.mark.usefixtures("released")
+async def test_a_moment_no_clock_can_hold_is_refused_not_a_server_error(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    refused = await site.client.post(
+        "/admin/updates/update",
+        data={"apply_after": "01-01-0001", "apply_after_time": "00:00"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert refused.status_code == 422

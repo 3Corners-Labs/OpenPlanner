@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from app.domain.update_policy import LineStatus, parse_support
+from app.domain.update_policy import parse_support
+from app.domain.updates import LineStatus
 from scripts import support_index
 from scripts.support_index import index, write
 from tests.scripts.conftest import Git, commit_all

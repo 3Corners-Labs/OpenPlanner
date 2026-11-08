@@ -5,7 +5,6 @@ other one. Versions are stored as ``MAJOR.MINOR.PATCH`` text; a stored value tha
 parses (a hand-edited row) makes the release unknown rather than failing the page.
 """
 
-import json
 from collections.abc import Sequence
 
 from sqlalchemy import delete, inspect, select
@@ -18,7 +17,7 @@ from app.adapters.db.models import (
     UpdateRequestRow,
 )
 from app.domain.errors import DomainError
-from app.domain.update_policy import parse_support
+from app.domain.update_policy import parse_support, support_text
 from app.domain.updates import (
     ListedRelease,
     Release,
@@ -56,10 +55,7 @@ def _release(version: str | None, url: str | None) -> Release | None:
 
 def _support_text(lines: tuple[SupportLine, ...] | None) -> str | None:
     """Store support lines as the ``support.json`` shape they came in (ADR 0116)."""
-    if lines is None:
-        return None
-    entries = [{"line": x.line, "status": x.status.value, "until": x.until} for x in lines]
-    return json.dumps({"lines": entries})
+    return None if lines is None else support_text(lines)
 
 
 def _support_lines(text: str | None) -> tuple[SupportLine, ...] | None:
