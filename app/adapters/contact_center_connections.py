@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.adapters.db.credentials import Secrets
-from app.adapters.db.uow import contact_center_credential_name, organisation_tokens_name
+from app.adapters.db.record_names import contact_center_credential_name, organisation_tokens_name
 from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
 
 WEBHOOK_SECRET_BYTES = 32

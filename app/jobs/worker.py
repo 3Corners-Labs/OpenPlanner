@@ -71,6 +71,7 @@ from app.domain.queue_wait import NotPickedUpWatch, QueueWaitWatch
 from app.domain.request_log import RequestEvents
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
+from app.domain.slot_close_service import SlotCloser
 from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.system_log import SystemLog
 from app.domain.tls_check import TlsWatch
@@ -83,7 +84,7 @@ from app.i18n.dates import configure_clock
 from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
-from app.jobs.usage import backfill_usage, roll_up_usage
+from app.jobs.usage import backfill_usage, close_slots, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.web.alert_text import alert_composer
@@ -301,6 +302,9 @@ async def run_worker(
         lambda: live.settings.reporting_retention_months,
     )
     backfill = UsageBackfill(uow, clock, lambda: live.settings.reporting_enabled)
+    slot_closer = SlotCloser(
+        uow, clock, lambda: timedelta(minutes=live.settings.reporting_rollup_interval_minutes)
+    )
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
         uow,
@@ -403,6 +407,7 @@ async def run_worker(
                     heartbeat_at = await _heartbeat(uow, clock, runner, version, heartbeat_at)
                     await housekeeping.run()
                     await backfill_usage(backfill)  # ADR 0117: bounded, until complete
+                    await close_slots(slot_closer)  # ADR 0117 step 3; logs, never raises
                     await roll_up_usage(usage)  # ADR 0117; logs a failure, never raises
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)

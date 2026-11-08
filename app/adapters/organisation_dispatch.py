@@ -16,7 +16,7 @@ import httpx
 
 from app.adapters.contact_center_connections import ConnectionCredentials, SealedConnections
 from app.adapters.db.credentials import Secrets
-from app.adapters.db.uow import organisation_tokens_name
+from app.adapters.db.record_names import organisation_tokens_name
 from app.adapters.webex_auth import ServiceAppConfig
 from app.adapters.wxcc import WxccTasks, wxcc_tasks
 from app.domain.contact_center import ContactCenterKind
