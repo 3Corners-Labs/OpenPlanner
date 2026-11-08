@@ -83,7 +83,12 @@ class Actor:
     """
 
     subject: str
-    principal: Principal | None = None
+    principal: Principal | None
+
+    @classmethod
+    def host(cls) -> "Actor":
+        """Return the host (the CLI), which the matrix does not bind: an explicit choice."""
+        return cls("system:cli", None)
 
     def may_change(self, permission: Permission, target: Target) -> bool:
         """Whether the actor holds ``permission`` on ``target``."""
@@ -171,6 +176,7 @@ class ConfigurationDocumentService:
             DomainError: ``configuration_passphrase_short``; ``integration_not_ready`` when
                 secrets are wanted and the installation has no settings key.
         """
+        self._may_export(actor, scope, secrets=secrets)
         if secrets and (passphrase is None or len(passphrase) < 16):
             raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")
         async with self._uow.read() as tx:
@@ -253,22 +259,29 @@ class ConfigurationDocumentService:
             )
         if not first.ok:
             return await self._refused(actor, document, first)
+        if plan_hash is not None and plan_hash != first.digest:
+            await self._record_refusal(actor, document, ErrorCode.CONFIGURATION_PLAN_STALE)
+            raise DomainError(ErrorCode.CONFIGURATION_PLAN_STALE)
         issuers, refusals = await self._issuers(first)
         if refusals:
             return await self._refused(actor, document, replace(first, refusals=refusals))
-        async with self._uow.locked() as tx:
-            snapshot = await tx.read_configuration(self._clock.now(), self._locked())
-            plan = self._plan(actor, document, snapshot)
-            problem = self._problem(plan, first, plan_hash)
-            if plan.refusals or problem is not None:
-                result = ApplyResult(plan, None)
-            elif not plan.changes:
-                result = ApplyResult(plan, snapshot.version)
-            else:
-                version = await tx.apply_configuration(_enriched(plan.changes, issuers))
-                for change in plan.changes:
-                    await tx.add_audit_event(self._event(actor, plan, change))
-                result = ApplyResult(plan, version)
+        try:
+            async with self._uow.locked() as tx:
+                snapshot = await tx.read_configuration(self._clock.now(), self._locked())
+                plan = self._plan(actor, document, snapshot)
+                problem = self._problem(plan, first, plan_hash)
+                if plan.refusals or problem is not None:
+                    result = ApplyResult(plan, None)
+                elif not plan.changes:
+                    result = ApplyResult(plan, snapshot.version)
+                else:
+                    version = await tx.apply_configuration(_enriched(plan.changes, issuers))
+                    for change in plan.changes:
+                        await tx.add_audit_event(self._event(actor, plan, change))
+                    result = ApplyResult(plan, version)
+        except DomainError as error:
+            await self._record_refusal(actor, document, error.code)
+            raise
         if problem is not None:
             await self._record_refusal(actor, document, problem)
             raise DomainError(problem)
@@ -277,6 +290,24 @@ class ConfigurationDocumentService:
         return result
 
     # --- internals -----------------------------------------------------------------------
+
+    @staticmethod
+    def _may_export(actor: Actor, scope: Scope, *, secrets: bool) -> None:
+        """Refuse an export the actor may not make (ADR 0099 point 11).
+
+        A document of the platform, or any with secrets, needs the platform's manage
+        permission; one of an organisation, that organisation's. The view of single kinds
+        by narrower roles comes with the portal (step 3).
+        """
+        if scope.is_platform or secrets:
+            allowed = actor.may_change(Permission.SETTINGS_PLATFORM_MANAGE, Target.everything())
+        else:
+            allowed = actor.may_change(
+                Permission.SETTINGS_ORGANISATION_MANAGE,
+                Target.for_organisation(str(scope.organisation)),
+            )
+        if not allowed:
+            raise DomainError(ErrorCode.NOT_PERMITTED)
 
     def _read(self, data: bytes, passphrase: str | None, scope: Scope | None) -> Document:
         """Decode, parse, confine and open a document."""

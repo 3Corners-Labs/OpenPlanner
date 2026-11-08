@@ -34,6 +34,14 @@ def _refuse_constant(name: str) -> Any:
     raise ValueError(name)
 
 
+def _finite(text: str) -> float:
+    """Read a number with a fraction or exponent, refusing what overflows to infinity."""
+    value = float(text)
+    if value in (float("inf"), float("-inf")):
+        raise ValueError(text)
+    return value
+
+
 def _depth(value: Any, level: int = 0) -> int:
     """Return how deeply ``value`` nests, stopping once it is deeper than allowed."""
     if level > MAX_DEPTH:
@@ -59,6 +67,7 @@ def decode(data: bytes, max_bytes: int) -> object:
             data.decode("utf-8"),
             object_pairs_hook=_no_duplicates,
             parse_constant=_refuse_constant,
+            parse_float=_finite,
         )
     except (UnicodeDecodeError, ValueError, RecursionError):
         raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "document") from None

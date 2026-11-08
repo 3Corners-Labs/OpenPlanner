@@ -30,9 +30,9 @@ from app.domain.configuration_document_service import (
 from app.domain.configuration_json_schema import json_schema
 from app.domain.configuration_plan import Plan
 from app.domain.configuration_v1 import V1
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 
-ACTOR = Actor("system:cli")
+ACTOR = Actor.host()
 
 
 def add_arguments(
@@ -57,7 +57,7 @@ def add_arguments(
     apply_cmd.add_argument("--plan-hash", metavar="HASH", help="the hash `plan` printed")
 
 
-def _passphrase(path: Path | None) -> str | None:
+def passphrase_from(path: Path | None) -> str | None:
     """Return the first line of ``path``, or ``None`` when no file is given."""
     if path is None:
         return None
@@ -102,12 +102,12 @@ async def run(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
     scope = Scope(args.organisation) if args.organisation else Scope()
     service, engine = _service(settings)
     try:
-        passphrase = _passphrase(args.passphrase_file)
+        passphrase = passphrase_from(args.passphrase_file)
         if args.action == "export":
             data = await service.export(ACTOR, scope, passphrase, secrets=not args.no_secrets)
-            _write_private(args.path, data)
+            write_private(args.path, data)
             return f"document written: {args.path}\n", 0
-        document = await asyncio.to_thread(Path(args.path).read_bytes)
+        document = await asyncio.to_thread(_read_limited, Path(args.path), settings)
         if args.action == "plan":
             plan = await service.plan(ACTOR, document, passphrase, scope=_pinned(args))
             return _report(plan), 0 if plan.ok else 2
@@ -124,17 +124,34 @@ async def run(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
         await engine.dispose()  # type: ignore[attr-defined]
 
 
+def _read_limited(path: Path, settings: Settings) -> bytes:
+    """Read a document, refusing a file above the size limit before reading it."""
+    limit = settings.configuration_package_max_mb * 1024 * 1024
+    if path.stat().st_size > limit:
+        raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE, "document")
+    return path.read_bytes()
+
+
 def _pinned(args: argparse.Namespace) -> Scope | None:
     """Return the scope the command pins the document to, if it names an organisation."""
     return Scope(args.organisation) if args.organisation else None
 
 
-def _write_private(path: Path, data: bytes) -> None:
-    """Write ``data`` to ``path`` with mode 600, replacing an existing file."""
-    path.unlink(missing_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "wb") as handle:
-        handle.write(data)
+def write_private(path: Path, data: bytes) -> None:
+    """Write ``data`` to ``path`` with mode 600, replacing an existing file atomically.
+
+    The data goes to a new file next to the target and is renamed over it, so a failed write
+    never loses the old file or leaves half a document under the target's name.
+    """
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.part")
+    temporary.unlink(missing_ok=True)
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def render_schema() -> str:

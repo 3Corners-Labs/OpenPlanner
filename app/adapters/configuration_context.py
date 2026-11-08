@@ -9,7 +9,7 @@ permissive.
 
 import os
 
-from app.adapters.settings_report import locked_keys
+from app.adapters.settings_report import combination_problem, locked_keys
 from app.config import Settings
 from app.domain.configuration_changes import RuleContext
 
@@ -40,6 +40,7 @@ def rule_context(settings: Settings) -> RuleContext:
             )
         ),
         smtp_plaintext_relay_allowed=settings.smtp_plaintext_relay_allowed,
+        combination_problem=lambda proposed: combination_problem(settings, os.environ, proposed),
     )
 
 

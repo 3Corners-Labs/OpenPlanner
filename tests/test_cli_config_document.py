@@ -102,3 +102,35 @@ def test_the_sqlite_export_still_needs_a_passphrase(
 ) -> None:
     assert main(["config", "export", str(tmp_path / "x.sqlite")]) == 2
     assert "configuration_passphrase_short" in capsys.readouterr().out
+
+
+def test_a_failed_export_keeps_the_old_file_and_the_file_is_private(
+    seeded: str, tmp_path: Path
+) -> None:
+    document = tmp_path / "config.json"
+    document.write_text("old")
+
+    assert main(["config", "export", str(document), "--format", "json", "--no-secrets"]) == 0
+    assert document.read_text() != "old"
+    assert stat.S_IMODE(document.stat().st_mode) == 0o600
+    assert not list(tmp_path.glob(".config.json.*"))
+
+
+def test_a_document_above_the_size_limit_is_refused_before_it_is_read(
+    seeded: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CONFIGURATION_PACKAGE_MAX_MB", "1")
+    document = tmp_path / "big.json"
+    document.write_bytes(b" " * (1024 * 1024 + 1))
+
+    assert main(["config", "plan", str(document)]) == 2
+    assert "configuration_package_too_large" in capsys.readouterr().out
+
+
+def test_an_organisation_needs_the_json_format(
+    seeded: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["config", "export", str(tmp_path / "x"), "--organisation", "demo"])
+
+    assert code == 2
+    assert "--format json" in capsys.readouterr().out

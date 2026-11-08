@@ -29,7 +29,7 @@ from tests.support.database import migrated_database
 
 NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
 PASSPHRASE = "a long enough passphrase"
-HOST = Actor("system:cli")
+HOST = Actor.host()
 
 
 def service(

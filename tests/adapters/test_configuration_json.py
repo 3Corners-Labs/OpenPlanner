@@ -35,6 +35,8 @@ def test_more_bytes_than_the_limit_are_refused_before_they_are_read() -> None:
         b'{"a": NaN}',
         b'{"a": Infinity}',
         b'{"a": -Infinity}',
+        b'{"a": 1e999}',
+        b"[-1e999]",
         b"\xff\xfe",
     ],
 )

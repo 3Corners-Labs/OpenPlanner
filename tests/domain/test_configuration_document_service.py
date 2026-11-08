@@ -10,6 +10,7 @@ from app.adapters.configuration_json import JsonCodec
 from app.adapters.configuration_seal import PassphraseSealing
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
+from app.domain.authorization import Permission, Role, Target
 from app.domain.configuration_changes import ConfigurationSnapshot, RuleContext, Usage
 from app.domain.configuration_document import Scope
 from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
@@ -20,7 +21,7 @@ from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import SUPER, principal
 
 NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
-HOST = Actor("system:cli")
+HOST = Actor.host()
 PASSPHRASE = "a long enough passphrase"  # noqa: S105 - a test passphrase
 DOCUMENT = {
     "format": "openplanner.config/v1",
@@ -354,3 +355,92 @@ async def test_a_limit_the_portal_changed_beats_the_process_default() -> None:
     plan = await build(unit, settings={"embedding_max_origins": 20}).plan(HOST, encoded(data), None)
 
     assert not plan.ok
+
+
+async def test_an_export_needs_the_manage_permission_of_its_scope_and_secrets_the_platform_s() -> (
+    None
+):
+    nobody = Actor("sub-nobody", principal("sub-nobody", "Nobody"))
+    org_admin = Actor("s-org", principal("s-org", "Org", [Role.ORG_ADMIN], ["acme"]))
+    superuser = Actor(SUPER.subject, SUPER)
+    unit = uow(organisation())
+
+    for actor, scope, secrets in (
+        (nobody, Scope("acme"), False),
+        (nobody, Scope(), False),
+        (org_admin, Scope(), False),
+        (org_admin, Scope("acme"), True),
+    ):
+        with pytest.raises(DomainError) as refused:
+            await build(unit).export(actor, scope, PASSPHRASE if secrets else None, secrets=secrets)
+        assert refused.value.code is ErrorCode.NOT_PERMITTED
+    assert await build(unit).export(org_admin, Scope("acme"), None, secrets=False)
+    assert await build(unit).export(superuser, Scope(), PASSPHRASE, secrets=True)
+
+
+async def test_a_wrong_hash_is_refused_before_any_discovery_is_fetched() -> None:
+    unit = uow(organisation())
+    fetched: list[str] = []
+
+    async def issuer_of(url: str, auth: str) -> str:
+        fetched.append(url)
+        return "https://idp.voorbeeld.nl"
+
+    data = {
+        "format": "openplanner.config/v1",
+        "organisations": [
+            {
+                "slug": "acme",
+                "identity_providers": [
+                    {
+                        "key": "acme-idp",
+                        "name": "Acme",
+                        "discovery_url": "https://idp.voorbeeld.nl/.well-known/openid-configuration",
+                        "client_id": "openplanner",
+                        "client_auth": "private_key_jwt",
+                        "entitlement_claim": "groups",
+                        "entitlement_prefix": "op",
+                    }
+                ],
+            }
+        ],
+    }
+
+    with pytest.raises(DomainError) as error:
+        await build(unit, issuer_of=issuer_of).apply(HOST, encoded(data), None, "0" * 64)
+
+    assert error.value.code is ErrorCode.CONFIGURATION_PLAN_STALE
+    assert fetched == []
+
+
+async def test_a_writer_failing_inside_the_lock_is_audited_with_its_code() -> None:
+    unit = uow()
+
+    async def broken(changes: object) -> int:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "kind")
+
+    original = type(unit).locked
+
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def locked(self: InMemoryUnitOfWork):  # type: ignore[no-untyped-def]
+        async with original(self) as tx:
+            tx.apply_configuration = broken  # type: ignore[method-assign,assignment]
+            yield tx
+
+    unit.locked = locked.__get__(unit)  # type: ignore[method-assign]
+
+    with pytest.raises(DomainError):
+        await build(unit).apply(HOST, encoded(DOCUMENT), None, None)
+
+    (event,) = unit.state.audit
+    assert event.outcome is Outcome.DENIED
+    assert event.reason == ErrorCode.INVALID_CONFIGURATION.value
+
+
+def test_an_actor_without_a_principal_is_the_host_and_only_by_asking() -> None:
+    assert Actor.host().principal is None
+    assert Actor.host().may_change(Permission.ROLES_MANAGE, Target.everything())
+    with pytest.raises(TypeError):
+        Actor("sub-x")  # type: ignore[call-arg]
