@@ -436,7 +436,7 @@ LAYERS = (
                 "AlertSender · AlertSenders · BotTokenStore",
                 "MailDomainResolver",
                 "VideoProvider",
-                "ContactCenterDispatcher · ContactCenterConnections",
+                "ContactCenterDispatcher · ContactCenterConnections · OrganisationDispatchers",
                 "IntegrationChecker · ProbeRegistry",
                 "RequestLog",
                 "IdentityProvider · StaffDirectory",
