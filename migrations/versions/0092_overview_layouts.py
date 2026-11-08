@@ -4,11 +4,11 @@
 keys in order (comma-separated) and when they last changed. Keys only, no personal data;
 erasing the staff member deletes it. Without a row the role's default layout applies.
 
-Revises 0090 (usage reporting, ADR 0117). Number 0091 is claimed by #598 (ADR 0081); whichever
-merges second rebases its ``down_revision`` onto the other, so recheck the head before merging.
+Revises 0091 (subjects and routing, ADR 0081). Open PRs also claim numbers, so recheck the
+head before merging.
 
 Revision ID: 0092
-Revises: 0090
+Revises: 0091
 Create Date: 2026-11-08 03:00:00.000000
 """
 
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0092"
-down_revision: str | None = "0090"
+down_revision: str | None = "0091"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
