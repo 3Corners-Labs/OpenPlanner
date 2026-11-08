@@ -48,6 +48,10 @@ ALERT_WINDOW = timedelta(hours=1)
 """The period ``planner_changes_alert_per_hour`` counts over (fixed: it is per hour)."""
 
 
+CONFIRMED_BY_STAFF = "booking.confirmed_by_staff"
+"""The audit detail of a planner confirming for the participant (ADR 0056 point 11)."""
+
+
 class PlannerService:
     """Application service for a planner's changes to existing bookings.
 
@@ -133,6 +137,30 @@ class PlannerService:
             )
             await self._audit(tx, principal, authorization, "planner.move", booking_id)
         return receipt.booking
+
+    async def confirm(self, principal: Principal, slug: str, booking_id: int) -> Booking:
+        """Confirm a pending booking on the participant's behalf (ADR 0056 point 11).
+
+        For example when the participant phones. The participant gets the same full
+        confirmation as by their own link; the confirmation is audited as
+        ``booking.confirmed_by_staff``. After ``confirm_by`` the booking lapses instead.
+
+        Raises:
+            DomainError: ``not_permitted``, ``booking_not_found`` or ``booking_not_pending``.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            booking = await tx.get_booking(booking_id)
+            if booking is None or booking.group_id != group.id:  # never another group's booking
+                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+            if not booking.awaits_confirmation:
+                raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
+            result = await self._bookings.confirm_in(tx, booking, group, self._clock.now())
+            if result.awaits_confirmation or result.lapsed_unconfirmed:
+                return result
+            await self._audit(tx, principal, authorization, CONFIRMED_BY_STAFF, booking_id)
+        return result
 
     async def cancel(
         self, principal: Principal, slug: str, booking_id: int, reason: ChangeReason
