@@ -42,11 +42,6 @@ from tests.support.organisation_providers import (
 
 
 @pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = State()
     state.organisations = {o.id: o for o in ORGANISATIONS}
