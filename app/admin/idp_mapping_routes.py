@@ -2,12 +2,13 @@
 
 Read-only: the exact entitlement value per role per organisation and group within the
 viewer's scope, who last held each one, and the values refused in the window. The download
-is the same list as a text file for the IdP team, audited. Editing a group's IdP value is a
-form on the group's settings page (``group_routes``), built here (``group_idp_view``) so the
-page and the form share one translation of the data.
+is the same list as a text file for the IdP team, audited, and only the portal itself may ask
+for it (``SameOrigin``). Editing a group's IdP value is a form on the group's settings page
+(``group_routes``), built here (``group_idp_view``) so the page and the form share one
+translation of the data.
 
     GET /admin/idp-mapping             idp_mapping.view
-    GET /admin/idp-mapping/export.txt  idp_mapping.view, audited idp_mapping.exported
+    GET /admin/idp-mapping/export.txt  idp_mapping.view, audited idp_mapping.exported, same origin
 """
 
 from collections.abc import Sequence
@@ -20,7 +21,7 @@ from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import Field, FormData
-from app.admin.pages import Locale, admin_moment, page
+from app.admin.pages import Locale, SameOrigin, admin_moment, page
 from app.domain.authorization import Permission, Role, Target, decide
 from app.domain.entitlements import IDP_KEY_PATTERN, ClaimMode, RefusalReason
 from app.domain.idp_mapping import EntitlementLine, IdpMappingService, MappingOverview
@@ -237,8 +238,14 @@ async def idp_mapping(request: Request, locale: Locale, context: View) -> HTMLRe
 
 
 @router.get("/idp-mapping/export.txt", response_model=None)
-async def export_idp_mapping(request: Request, locale: Locale, context: View) -> Response:
-    """Download the values as a text file, one per line; the download is audited."""
+async def export_idp_mapping(
+    request: Request, locale: Locale, _: SameOrigin, context: View
+) -> Response:
+    """Download the values as a text file, one per line; the download is audited.
+
+    Because opening it writes an audit event, a request another site makes is refused
+    (``SameOrigin``, ASVS V3.5.3): a link elsewhere cannot export in an admin's name.
+    """
     document = await idp_mapping_service(request).export(context.principal)
     clock: Clock = request.app.state.clock
     name = f"openplanner-entitlements-{clock.now():%Y%m%d}.txt"

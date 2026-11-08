@@ -45,6 +45,9 @@ groepsbeheerders niet.
 - Zonder periode krijgt u de laatste 366 dagen. Een langere periode of meer dan 100.000
   regels wordt geweigerd: maak het filter dan nauwer.
 - Elke export komt zelf in het auditlog, met het aantal regels.
+- De download start alleen vanuit het portaal zelf: met de knop, of met een adres dat u intypt
+  of als bladwijzer bewaart. Een link ernaar op een andere website (ook mail of chat in de
+  browser) geeft een foutmelding, zodat niemand een export op uw naam in het log kan zetten.
 
 Een export bevat de identificatie (subject) van beheerders. Bewaar het bestand volgens het
 beleid van uw organisatie.

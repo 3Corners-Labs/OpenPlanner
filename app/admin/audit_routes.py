@@ -17,7 +17,8 @@ the admin may view it.
 ADR 0040, part 3: filters for minimum level, category, period (days in ``ADMIN_TIMEZONE``) and
 trace id; a trace id shows the whole chain of one request or job. The export writes exactly
 the current filter inside the admin's scope as CSV (``app.domain.audit_export``) and is itself
-an audit event; an export over a limit is refused on the page, never cut short.
+an audit event, so only the portal itself may ask for it (``SameOrigin``); an export over a
+limit is refused on the page, never cut short.
 
 ADR 0040, part 4: the superuser switches diagnostic mode on for one group or organisation
 (``app.domain.diagnostics``); the page lists the modes that are on, each with when it ends.
@@ -778,10 +779,15 @@ async def audit(
 async def export(
     request: Request,
     locale: Locale,
+    _: SameOrigin,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_EXPORT))],
     query: Annotated[AuditQuery, Depends()],
 ) -> Response:
-    """Download exactly the current filter as CSV (ADR 0040, part 3); the export is audited."""
+    """Download exactly the current filter as CSV (ADR 0040, part 3); the export is audited.
+
+    Because opening it writes an audit event, a request another site makes is refused
+    (``SameOrigin``, ASVS V3.5.3): a link elsewhere cannot export in an admin's name.
+    """
     service = admin_service(request)
     settings = settings_for(request)
     zone = ZoneInfo(settings.admin_timezone)
