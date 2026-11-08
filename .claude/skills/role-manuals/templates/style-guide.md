@@ -1,7 +1,7 @@
 # Redactiestatuut rolhandleidingen
 
-> **Eerst invullen per organisatie:** het woord voor wie boekt (`{{eindgebruikers}}` in
-> `variabelen.json`), de aanspreekvorm per rol, wat niet genoemd wordt (§2.3), of de productnaam
+> **Eerst invullen per organisatie:** het woord voor wie boekt (`{{participants}}` in
+> `variables.json`), de aanspreekvorm per rol, wat niet genoemd wordt (§2.3), of de productnaam
 > in beeld mag, en de echte datum en versie in de front matter.
 
 Dit statuut legt vast hoe de vier rolhandleidingen worden geschreven, opgebouwd en gecontroleerd.
@@ -13,10 +13,10 @@ Vier handleidingen, elk voor één rol, in het Nederlands:
 
 | Bestand | Rol | Lezer | Vorm | Omvang (A4, met afbeeldingen) | Taal | Aanspreekvorm |
 |---|---|---|---|---|---|---|
-| `bron/10-beheerder.md` | Beheerder | organisatiebeheerder (functioneel beheer) en applicatiebeheerder (technisch-functioneel beheer) | naslag, inrichtingschecklist, beheerkalender, walkthroughs | 20–30 | B2 | je |
-| `bron/20-planner.md` | Planner | wie de bezetting en de afspraken van een groep regelt | werkinstructies, weekritme, walkthroughs | 12–20 | B2 | je |
-| `bron/30-medewerker.md` | Medewerker | wie de videogesprekken voert | werkkaart (1 A4), walkthrough, "wat als" | 6–10 | B1 | je |
-| `bron/40-deelnemers.md` | {{Eindgebruikers}} | wie een videoafspraak maakt | "zo werkt het", walkthrough, vragen en antwoorden | 4–6 | B1 | u |
+| `sources/10-beheerder.md` | Beheerder | organisatiebeheerder (functioneel beheer) en applicatiebeheerder (technisch-functioneel beheer) | naslag, inrichtingschecklist, beheerkalender, walkthroughs | 20–30 | B2 | je |
+| `sources/20-planner.md` | Planner | wie de bezetting en de afspraken van een groep regelt | werkinstructies, weekritme, walkthroughs | 12–20 | B2 | je |
+| `sources/30-medewerker.md` | Medewerker | wie de videogesprekken voert | werkkaart (1 A4), walkthrough, "wat als" | 6–10 | B1 | je |
+| `sources/40-deelnemers.md` | {{Participants}} | wie een videoafspraak maakt | "zo werkt het", walkthrough, vragen en antwoorden | 4–6 | B1 | u |
 
 De handleidingen zijn ook bewijs dat de software bestaat en werkt. Daarom komt elke
 schermafdruk uit de echte, draaiende software (zie §6) en staat er niets in wat niet gebouwd is.
@@ -37,10 +37,10 @@ schermafdruk uit de echte, draaiende software (zie §6) en staat er niets in wat
    diagnosemodus]. Kies ook hoe een groep afspraken doorzet: met de **eigen wachtrij** (in het
    scherm: "Eigen wachtrij van …") of met een contactcenter, en schrijf alleen over die keuze.
 4. **Wel noemen:** Webex Meetings, voor het videogesprek.
-5. **Eindgebruikers** heten "{{eindgebruikers}}". In de schermen heten zij **deelnemer**.
+5. **Eindgebruikers** heten "{{participants}}". In de schermen heten zij **deelnemer**.
    Leg dat verband één keer uit in elke handleiding voor medewerkers, planners en beheerders,
    en gebruik daarna het schermwoord "deelnemer" waar je een scherm beschrijft.
-6. **Geen klantnaam, geen sectorwoorden** buiten "{{eindgebruikers}}". Voorbeelden gebruiken
+6. **Geen klantnaam, geen sectorwoorden** buiten "{{participants}}". Voorbeelden gebruiken
    `voorbeeld.nl` en verzonnen namen (Sanne Jansen, Ahmed el Amrani, Bakkerij De Korenaar).
 7. **Tijdloos.** Geen datums, jaartallen of "binnenkort" in de lopende tekst. Versie en datum
    staan alleen in de kop van het bestand (front matter) en zijn de echte. Nooit een eerdere
@@ -62,7 +62,7 @@ schermafdruk uit de echte, draaiende software (zie §6) en staat er niets in wat
 - **Waarom bij elke taak.** Eén zin: wanneer en waarom doe je dit.
 - **Geen marketing.** Geen "eenvoudig", "snel", "gebruiksvriendelijk". Laat de stappen dat tonen.
 - **Woorden van het scherm.** Gebruik "groep" (zoals het menu **Groepen**); leg één keer uit dat een
-  groep een team is met een eigen agenda en een eigen pagina voor {{eindgebruikers}}.
+  groep een team is met een eigen agenda en een eigen pagina voor {{participants}}.
 
 ## 4. Vaste opbouw
 
@@ -71,12 +71,12 @@ voor de rol niet bestaat.
 
 ```markdown
 ---
-titel: Handleiding voor de planner
-ondertitel: Bezetting en afspraken van een groep regelen in {{product}}
-rol: Planner
-versie: "0.1 (concept)"
-datum: 8 november 2026
-softwareversie: "{{softwareversie}}"
+title: Handleiding voor de planner
+subtitle: Bezetting en afspraken van een groep regelen in {{product}}
+role: Planner
+version: "0.1 (concept)"
+date: [echte datum]
+software_version: "{{software_version}}"
 ---
 
 # Handleiding voor de planner
@@ -112,12 +112,13 @@ softwareversie: "{{softwareversie}}"
 - Tabellen met een kopregel; geen uitlijning (`|:---|`).
 - **Afbeelding:** op een eigen regel, `![alt-tekst](img/<id>.png "Bijschrift")`. De alt-tekst
   zegt wat je ziet en waarom het ertoe doet (voor wie het beeld niet ziet). Het bijschrift wordt
-  "Afbeelding n. …". Gebruik alleen id's uit `opnamelijst.md`.
+  "Afbeelding n. …". Gebruik alleen id's uit `shot-list.md`.
 - **Kaders:** een citaatblok dat begint met een vet label: `> **Tip:** …`, `> **Let op:** …`,
   `> **Belangrijk:** …`.
-- **Nieuwe pagina:** een regel `<!-- pagina -->`.
+- **Nieuwe pagina:** een regel `<!-- pagebreak -->`.
 - **Werkkaart** (alleen medewerker): kop `## Werkkaart`, direct na de titel, past op één A4.
-- Variabelen: `{{product}}`, `{{Product}}`, `{{helpdesk}}`, `{{softwareversie}}`.
+- Variabelen: `{{product}}`, `{{Product}}`, `{{help_desk}}`, `{{software_version}}`,
+  `{{participants}}`, `{{Participants}}` (uit `variables.json`).
 - **Taakkoppeling:** op de regel direct vóór de kop van elke walkthrough en elke taak:
   `<!-- task: screen=<scherm>; permission=<recht>; shots=<id>,<id> -->`. `screen` is het
   hulponderwerp van het scherm (bestandsnaam in `docs/manual/nl/` zonder `.md`) of een
@@ -127,23 +128,25 @@ softwareversie: "{{softwareversie}}"
   `docs/authorization.md`; `shots` zijn id's uit de opnamelijst. Hiermee controleert en
   bijwerkt de bouwstraat de handleiding automatisch, en later toont de software de taak op het
   juiste scherm.
-- Geen HTML behalve `<!-- pagina -->` en de taakkoppelingen.
+- Geen HTML behalve `<!-- pagebreak -->` en de taakkoppelingen.
 
 ## 6. Schermafdrukken en walkthroughs (bewijs)
 
 - Alleen schermafdrukken van de echte software: een lokale installatie gebouwd uit de broncode,
   gevuld met verzonnen gegevens. Nooit een mock-up of een bewerkte schermafdruk.
-- Toegestaan: bijsnijden en het zichtbaar afdekken van de productnaam (grijze balk). Elke
-  afdekking staat in `bewijs/bewijslog.md`.
+- Toegestaan: bijsnijden en het zichtbaar afdekken (grijze balk) van de productnaam als die
+  verborgen blijft, van de termen die niet genoemd worden (§2.3) en van versienummers. Elke
+  afdekking staat in `evidence/log.md`.
 - Wat zonder Webex Meetings niet te tonen is (deelnemen aan het gesprek, proefgesprek), wordt
   opgenomen in een testomgeving met Webex Meetings. Tot dan staat er een kader
   "Schermafdruk volgt", nooit een nagemaakt beeld.
-- `bewijs/bewijslog.md` noemt per opname: de commit van de software, het tijdstip, de rol waarmee
+- `evidence/log.md` noemt per opname: de commit van de software, het tijdstip, de rol waarmee
   is ingelogd en het adres.
 - **Voorbeeldgegevens.** Agenda's, wachtrij, rapporten en auditlog worden gevuld met verzonnen
-  personen, via dezelfde echte gebruikerspaden (`scripts/voorbeeldgegevens.py`). Hun datums liggen
-  rond de opnamedatum: de weken ervoor en erna. Nooit een datum van vóór de eerste versie van de
-  software, en nooit een verzette klok: wat in beeld staat, gebeurde echt op die dag.
+  personen, via dezelfde echte gebruikerspaden (`sample-data.mjs`). Hun afspraken liggen op de
+  werkdagen na de opnamedatum; het boeken, bevestigen, verplaatsen en annuleren gebeurde op de
+  opnamedag zelf. Nooit een eerdere datum en nooit een verzette klok: wat in beeld staat,
+  gebeurde echt op die dag.
 - **Versienummers en commit-id's** worden in beeld afgedekt, zodat schermafdrukken niet verouderen.
   De echte softwareversie en de echte datum staan op de titelpagina en in het bewijslog.
 
@@ -152,5 +155,6 @@ softwareversie: "{{softwareversie}}"
 1. Feitencheck: elke schermtekst staat in `nl.po`, elke regel in de bronnen van §2.
 2. Lezerstest: een lezer zonder voorkennis voert met alleen de handleiding drie taken uit.
 3. Alle afbeeldingen hebben een alt-tekst; geen kleur als enige signaal.
-4. Niets uit de lijst "Niet noemen" (§2.3) en geen productnaam in tekst of beeld.
-5. `scripts/check.py` meldt 0 blokkerende bevindingen.
+4. Niets uit de lijst "Niet noemen" (§2.3, `do_not_name`) in tekst of beeld, en geen productnaam
+   als die verborgen blijft (`hide_product_name`).
+5. `check.py` meldt 0 blokkerende bevindingen.

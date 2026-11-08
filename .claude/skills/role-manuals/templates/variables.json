@@ -1,22 +1,23 @@
 {
   "product": "de afsprakenplanner",
   "Product": "De afsprakenplanner",
-  "helpdesk": "[contactgegevens servicedesk invullen]",
-  "softwareversie": "[versie en commit van de schermafdrukken]",
+  "help_desk": "[contactgegevens servicedesk invullen]",
+  "software_version": "[versie en commit van de schermafdrukken]",
   "commit": "",
-  "accentkleur": "1F4E79",
-  "lettertype": "Arial",
-  "eindgebruikers": "deelnemers",
-  "Eindgebruikers": "Deelnemers",
-  "niet_noemen": [],
-  "schermteksten_extra": [
+  "accent_colour": "1F4E79",
+  "font": "Arial",
+  "participants": "deelnemers",
+  "Participants": "Deelnemers",
+  "hide_product_name": true,
+  "do_not_name": [],
+  "extra_screen_texts": [
     "English",
     "Nederlands",
     "Webex Meetings",
     "polled",
     "< 5"
   ],
-  "opnames_zonder_webex": {
+  "without_webex": {
     "bb-09-mail-bevestiging": "de links naar het gesprek en het proefgesprek ontbreken",
     "bb-10-uw-afspraak": "de links naar het gesprek en het proefgesprek ontbreken",
     "mw-02-wachtrij": "bij de afspraak staat Videolink wordt klaargezet",

@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Bring an organisation's role manuals up to date with this checkout, in one run.
+#
+# Usage, from the checkout: .claude/skills/role-manuals/scripts/update.sh <workspace>
+#
+# 1. starts a fresh verification stack from the checkout (verify-openplanner);
+# 2. keeps the current screenshots in img/previous/, loads sample data and captures every id;
+# 3. checks the manuals against the software since the commit of the last passing run and writes
+#    labels the software only renamed into the sources (check.py --fix);
+# 4. records this run's version for the title pages, and moves the baseline commit forward only
+#    when the check passed, so a blocking finding is reported again on the next run;
+# 5. builds Word, HTML and PDF; the stack is stopped when the script ends.
+# Docker and Chrome do not run inside an agent's macOS sandbox: run this in a normal terminal.
+# Exit code: that of check.py (1 when a blocking finding is left), else that of the failing step.
+set -euo pipefail
+
+here="$(cd "$(dirname "$0")" && pwd)"
+repo="$(cd "$here/../../../.." && pwd)"
+workspace="$(cd "${1:?usage: update.sh <workspace>}" && pwd)"
+stack="$repo/.claude/skills/verify-openplanner/scripts/stack.sh"
+vars="$workspace/variables.json"
+previous="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("commit", ""))' "$vars")"
+
+# A stack this script did not start is never stopped by it: stack.sh up refuses while one is up.
+if [ -e "${VERIFY_EVIDENCE_ROOT:-$repo/.verify-openplanner}/current" ]; then
+  echo "update.sh: a verification stack is already up; stop it first ($stack down)" >&2
+  exit 2
+fi
+
+# Called by the EXIT trap below, which shellcheck does not follow.
+# shellcheck disable=SC2329
+stop_stack() {
+  (cd "$repo" && "$stack" down) >/dev/null 2>&1 || true
+}
+trap stop_stack EXIT
+
+echo "== 1/5 stack starten"
+(cd "$repo" && "$stack" up)
+
+echo "== 2/5 voorbeeldgegevens laden en opnemen"
+mkdir -p "$workspace/img/previous" "$workspace/evidence/previous"
+find "$workspace/img" -maxdepth 1 -name '*.png' -exec cp -p {} "$workspace/img/previous/" \;
+if [ -f "$workspace/evidence/state.json" ]; then
+  mv "$workspace/evidence/state.json" "$workspace/evidence/previous/state-$(date +%Y%m%d-%H%M%S).json"
+fi
+node "$here/sample-data.mjs" "$workspace"
+node "$here/capture.mjs" "$workspace"
+
+echo "== 3/5 controleren en herstellen"
+rc=0
+if [ -n "$previous" ]; then
+  (cd "$repo" && uv run python "$here/check.py" "$workspace" --since "$previous" --fix) || rc=$?
+else
+  (cd "$repo" && uv run python "$here/check.py" "$workspace") || rc=$?
+fi
+
+echo "== 4/5 versie vastleggen"
+commit="$(git -C "$repo" rev-parse --short=12 HEAD)"
+version="$(sed -n 's/^version = "\(.*\)"/\1/p' "$repo/pyproject.toml" | head -n 1)"
+python3 - "$vars" "$commit" "$version" "$rc" <<'PY'
+import json
+import sys
+
+path, commit, version, rc = sys.argv[1:5]
+with open(path) as handle:
+    data = json.load(handle)
+data["software_version"] = f"{version}, gebouwd uit commit {commit[:7]}"
+if rc == "0":
+    data["commit"] = commit
+with open(path, "w") as handle:
+    json.dump(data, handle, ensure_ascii=False, indent=2)
+    handle.write("\n")
+PY
+
+echo "== 5/5 bouwen"
+node "$here/build.mjs" "$workspace"
+
+echo "Klaar. Lees evidence/check.md en bekijk de verschilbeelden in evidence/diff/."
+exit "$rc"

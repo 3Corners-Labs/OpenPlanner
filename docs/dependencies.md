@@ -52,9 +52,15 @@ alternative in common use.
 | Package | Purpose | License | Maintenance | Note |
 |---|---|---|---|---|
 | python-docx | Word version of the architecture plates (`make diagrams`, `scripts/diagrams/`) | MIT | active (1.2.0, 2025) | De facto library for .docx. Added per run with `uv run --with`; not in `uv.lock`, never in CI or the image |
+| docx (npm) | Word version of the role manuals (`.claude/skills/role-manuals/scripts/build.mjs`) | MIT | active (9.15.3) | De facto library for writing .docx from JavaScript. Pinned in `.claude/skills/role-manuals/package.json` with its lockfile, installed with `npm ci --ignore-scripts`, tracked by Renovate; never in CI or the image |
+| marked (npm) | Markdown parser of the role manuals' build (`build.mjs`) | MIT | active (15.0.12) | The most used Markdown parser for JavaScript. Pinned and installed like docx |
 
 `make diagrams` also calls the draw.io desktop app (Apache-2.0) and Chrome on the developer's
 machine; neither is a dependency of the project.
+
+The `role-manuals` skill captures, compares and prints to PDF with the Playwright of `e2e/` and
+an installed Google Chrome, and runs its check in the project's own environment (`uv run`); it
+adds no Python package.
 
 ## CI tooling
 

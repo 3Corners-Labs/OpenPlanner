@@ -1,19 +1,19 @@
 # Opbouw per rolhandleiding
 
-Kopieer per rol het blok naar `bron/<nn>-<rol>.md` en vul het in volgens het redactiestatuut. Wat
+Kopieer per rol het blok naar `sources/<nn>-<rol>.md` en vul het in volgens het redactiestatuut. Wat
 tussen haken staat, is een schrijfopdracht en verdwijnt. Een onderdeel dat voor de rol niet
 bestaat, laat je weg.
 
-## 10 Beheerder (`bron/10-beheerder.md`)
+## 10 Beheerder (`sources/10-beheerder.md`)
 
 ```markdown
 ---
-titel: Handleiding voor de beheerder
-ondertitel: De organisatie en haar groepen inrichten en beheren in {{product}}
-rol: Beheerder
-versie: "0.1 (concept)"
-datum: [echte datum]
-softwareversie: "{{softwareversie}}"
+title: Handleiding voor de beheerder
+subtitle: De organisatie en haar groepen inrichten en beheren in {{product}}
+role: Beheerder
+version: "0.1 (concept)"
+date: [echte datum]
+software_version: "{{software_version}}"
 ---
 
 # Handleiding voor de beheerder
@@ -33,7 +33,7 @@ softwareversie: "{{softwareversie}}"
 ## Hulp en contact
 ```
 
-## 20 Planner (`bron/20-planner.md`)
+## 20 Planner (`sources/20-planner.md`)
 
 ```markdown
 # Handleiding voor de planner
@@ -51,12 +51,12 @@ softwareversie: "{{softwareversie}}"
 ## Hulp en contact
 ```
 
-## 30 Medewerker (`bron/30-medewerker.md`)
+## 30 Medewerker (`sources/30-medewerker.md`)
 
 ```markdown
 # Handleiding voor de medewerker
 ## Werkkaart              [één A4: dagroutine in stappen, de statussen en wat je doet, drie keer "wat als"]
-<!-- pagina -->
+<!-- pagebreak -->
 ## In het kort
 ## Jouw rol               [wie er boekt en hoe ze op het scherm heten; wat je van hen ziet]
 ## Voordat je begint      [inloggen, overzicht, profielmenu, sessies, rechten]
@@ -68,12 +68,12 @@ softwareversie: "{{softwareversie}}"
 ## Hulp en contact
 ```
 
-## 40 Wie boekt (`bron/40-deelnemers.md`)
+## 40 Wie boekt (`sources/40-deelnemers.md`)
 
 ```markdown
 ---
-titel: Een videoafspraak maken
-rol: {{Eindgebruikers}}
+title: Een videoafspraak maken
+role: {{Participants}}
 ---
 # Een videoafspraak maken
 ## In het kort            [u-vorm, B1]

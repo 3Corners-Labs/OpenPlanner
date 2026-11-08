@@ -1,10 +1,10 @@
 ---
-titel: Aanpak adoptie, communicatie en training
-ondertitel: Zo voeren we {{product}} in bij beheerders, planners, medewerkers en {{eindgebruikers}}
-rol: Projectleiding, adoptie en communicatie
-versie: "0.1 (concept)"
-datum: 8 november 2026
-softwareversie: "{{softwareversie}}"
+title: Aanpak adoptie, communicatie en training
+subtitle: Zo voeren we {{product}} in bij beheerders, planners, medewerkers en {{participants}}
+role: Projectleiding, adoptie en communicatie
+version: "0.1 (concept)"
+date: [echte datum]
+software_version: "{{software_version}}"
 ---
 
 # Aanpak adoptie, communicatie en training
@@ -12,7 +12,7 @@ softwareversie: "{{softwareversie}}"
 ## In het kort
 
 Software is pas ingevoerd als mensen er anders door werken. Deze aanpak beschrijft hoe we dat
-bereiken voor vier groepen: beheerders, planners, medewerkers, en de {{eindgebruikers}} die een
+bereiken voor vier groepen: beheerders, planners, medewerkers, en de {{participants}} die een
 videoafspraak maken. De aanpak heeft vijf stappen: **verkennen, ontwerpen, maken en toetsen,
 uitrollen** en **borgen**.
 
@@ -21,7 +21,7 @@ De kern in zes zinnen:
 - Elke rol krijgt eigen materiaal, opgebouwd rond **taken**, niet rond schermen.
 - Elke rol krijgt de **vorm** die past bij hoe die rol werkt: een werkkaart voor de medewerker,
   werkinstructies voor de planner, naslag en checklists voor de beheerder, een korte uitleg voor
-  {{eindgebruikers}}.
+  {{participants}}.
 - We schrijven alles vanuit de **werkende software**, met echte schermafdrukken. Zo is de
   handleiding ook het bewijs dat het product bestaat en doet wat we zeggen.
 - Er is **één bron** voor al het materiaal. Daaruit maken we nu Word en PDF, en later HTML,
@@ -31,7 +31,7 @@ De kern in zes zinnen:
   bij elke versie automatisch opnemen, controleren en bijwerken, en later de hulp in de software
   zelf tonen, op het juiste scherm en voor de juiste rol.
 
-<!-- pagina -->
+<!-- pagebreak -->
 
 ## 1. Uitgangspunten
 
@@ -44,7 +44,7 @@ De kern in zes zinnen:
 | Eén bron, meer vormen | Markdown als bron; Word en PDF nu, HTML later | Bijwerken op één plek; geen tegenstrijdige versies |
 | White-label | De productnaam is één variabele; branding volgt later | De organisatie kiest haar eigen naam voor de dienst |
 | Tijdloos | Geen datums in de lopende tekst; de versie hoort bij de softwareversie | Materiaal veroudert niet ongemerkt |
-| Toegankelijk | B1 voor {{eindgebruikers}} en medewerkers; alt-tekst bij elke afbeelding; koppen in volgorde | Iedereen moet het materiaal kunnen gebruiken, ook met een schermlezer |
+| Toegankelijk | B1 voor {{participants}} en medewerkers; alt-tekst bij elke afbeelding; koppen in volgorde | Iedereen moet het materiaal kunnen gebruiken, ook met een schermlezer |
 
 ## 2. Het verandermodel: ADKAR per rol
 
@@ -57,11 +57,11 @@ een stap overslaat, krijgt weerstand of terugval.
 | Rol | Bewustzijn | Bereidheid | Kennis | Kunnen | Borgen |
 |---|---|---|---|---|---|
 | Beheerder | Startbijeenkomst met het project: wat verandert er in inrichting en rechten | Zelf inrichten en zien wie wat mag, in één rechtenmatrix | Beheerdershandleiding, inrichtingschecklist, ingebouwde hulp | Inrichten in de testomgeving; één proefafspraak van boeken tot gesprek | Beheerkalender; controle van de handleiding bij elke update |
-| Planner | Informatiesessie: bezetting is een aantal medewerkers, geen rooster met namen | Tekorten direct zien en zelf oplossen; {{eindgebruikers}} kiezen zelf een nieuwe tijd | Plannershandleiding, kernbegrippen, weekritme | Praktijktraining met drie oefeningen in de testomgeving | Weekritme als checklist; overleg met de sleutelgebruiker |
+| Planner | Informatiesessie: bezetting is een aantal medewerkers, geen rooster met namen | Tekorten direct zien en zelf oplossen; {{participants}} kiezen zelf een nieuwe tijd | Plannershandleiding, kernbegrippen, weekritme | Praktijktraining met drie oefeningen in de testomgeving | Weekritme als checklist; overleg met de sleutelgebruiker |
 | Medewerker | Korte demonstratie in het teamoverleg | De eerste vrije medewerker krijgt het gesprek; nooit twee collega's tegelijk in één gesprek | Werkkaart en korte handleiding | Oefengesprek met een collega als deelnemer | Ondersteuning op de werkvloer in de eerste weken; vragenlog |
-| {{Eindgebruikers}} | Tekst op de website op de plek waar zij hun vraag stellen | Niet reizen, zelf een tijd kiezen, zelf verplaatsen of annuleren | De pagina's leggen zichzelf uit; korte uitleg "Een videoafspraak maken" | Het proefgesprek, als de organisatie het aanbiedt; andere contactmogelijkheden als het niet lukt | Vragen en antwoorden bijwerken met echte vragen |
+| {{Participants}} | Tekst op de website op de plek waar zij hun vraag stellen | Niet reizen, zelf een tijd kiezen, zelf verplaatsen of annuleren | De pagina's leggen zichzelf uit; korte uitleg "Een videoafspraak maken" | Het proefgesprek, als de organisatie het aanbiedt; andere contactmogelijkheden als het niet lukt | Vragen en antwoorden bijwerken met echte vragen |
 
-<!-- pagina -->
+<!-- pagebreak -->
 
 ## 3. Vorm per rol
 
@@ -75,7 +75,7 @@ begrippen en samenhang). Per rol leggen we het accent anders.
 | Beheerder | Alles kunnen inrichten en controleren; weten wie wat mag | Opzoeken en doen: naslag, inrichtingschecklist, beheerkalender, twee walkthroughs | 20–30 blz. | B2, je-vorm | Word en PDF | HTML op het intranet, naast de ingebouwde hulp |
 | Planner | Elke week de bezetting goed zetten en afwijkingen oplossen | Doen en begrijpen: werkinstructies, kernbegrippen, weekritme, drie walkthroughs | 12–20 blz. | B2, je-vorm | Word en PDF | HTML op het intranet |
 | Medewerker | Snel en zeker een gesprek oppakken en voeren | Doen: werkkaart van één A4, één walkthrough, "wat als" | 6–10 blz. | B1, je-vorm | Werkkaart geprint naast het scherm, PDF | HTML en de ingebouwde hulp |
-| {{Eindgebruikers}} | Een afspraak maken, wijzigen en het gesprek in komen | Leren en doen in één: walkthrough, vragen en antwoorden | 4–6 blz. | B1, u-vorm | PDF als download | HTML op de website, bij de link naar de afsprakenpagina |
+| {{Participants}} | Een afspraak maken, wijzigen en het gesprek in komen | Leren en doen in één: walkthrough, vragen en antwoorden | 4–6 blz. | B1, u-vorm | PDF als download | HTML op de website, bij de link naar de afsprakenpagina |
 
 Elke handleiding heeft dezelfde vaste opbouw. Wie er één kent, vindt zijn weg in alle vier:
 
@@ -175,19 +175,19 @@ antwoorden, teksten voor de website.
 | Langste wachttijd in de wachtrij, tegen het doel | Widget **Wachtrij in mijn groepen** op het overzicht (actueel, geen historie) | Planner, medewerker |
 | Tekorten in de komende 14 dagen | Overzicht van de groep en de planningspagina's | Planner |
 | Vragen per honderd afspraken | Vragenlog van de servicedesk | Adoptieregisseur |
-| Tevredenheid van {{eindgebruikers}} | Korte vraag na het gesprek, buiten de software | Adoptieregisseur |
+| Tevredenheid van {{participants}} | Korte vraag na het gesprek, buiten de software | Adoptieregisseur |
 | Tijd tot een nieuwe medewerker zelfstandig werkt | Sleutelgebruiker | Teamleider |
 
 > **Let op:** De software telt nog niet of een gesprek is afgerond of dat iemand niet verscheen, en
 > houdt geen historie van wachttijden bij. Die cijfers komen voorlopig uit het vragenlog en uit
 > waarnemingen in de eerste weken.
 
-<!-- pagina -->
+<!-- pagebreak -->
 
 ## 5. Communicatieplan
 
 Eerst het waarom, dan het wat, dan het hoe. Het waarom komt van de leidinggevende; het hoe van het
-project en de sleutelgebruikers. Voor {{eindgebruikers}} zijn de website en de berichten die de
+project en de sleutelgebruikers. Voor {{participants}} zijn de website en de berichten die de
 software zelf stuurt de belangrijke kanalen; de beheerder past die berichten aan in het
 beheerportaal.
 
@@ -197,7 +197,7 @@ beheerportaal.
 | L – 5 weken | Medewerkers | Wat er voor jou verandert en wanneer; wie je sleutelgebruiker is | Teamoverleg, korte demonstratie | Teamleider en sleutelgebruiker |
 | L – 4 weken | Beheerders | Inrichtingschecklist, toegang tot de testomgeving | E-mail en werksessie | Project |
 | L – 3 weken | Planners en medewerkers | Uitnodiging voor de training, met de handleiding vooraf | Agenda-uitnodiging | Project |
-| L – 2 weken | {{Eindgebruikers}} | Nieuwe manier om een videoafspraak te maken; tekst bij de link | Website | Communicatieafdeling |
+| L – 2 weken | {{Participants}} | Nieuwe manier om een videoafspraak te maken; tekst bij de link | Website | Communicatieafdeling |
 | L – 1 week | Iedereen intern | Laatste praktische informatie: wanneer, waar hulp, wie de sleutelgebruiker is | Intranet, teamoverleg | Project |
 | L | Iedereen intern | We zijn live; zo meld je een vraag of probleem | Intranet, werkvloer | Sponsor en project |
 | L + 1 week | Iedereen intern | Wat we horen en wat we al hebben aangepast | Intranet, teamoverleg | Project |
@@ -208,7 +208,7 @@ beheerportaal.
 - **Beheerder:** je richt de organisatie en de groepen zelf in, en ziet op één plek wie wat mag.
 - **Planner:** je zet de bezetting per week; tekorten zie je direct en los je zelf op.
 - **Medewerker:** je pakt het volgende gesprek op uit de wachtrij en voert het in Webex Meetings.
-- **{{Eindgebruikers}}:** u kiest zelf een moment voor een videogesprek, en verplaatst of
+- **{{Participants}}:** u kiest zelf een moment voor een videogesprek, en verplaatst of
   annuleert het zelf.
 
 ## 6. Trainingsplan
@@ -222,7 +222,7 @@ de deelnemer zelfstandig uitvoert; die oefening toetst de leerdoelen.
 | Planner | Praktijktraining | 1 dagdeel | 4–8 | De week inplannen; een afwijkende dag; een tekort oplossen |
 | Medewerker | Korte training en oefengesprek | 1 uur | 6–12 | Een gesprek oppakken, voeren en vrijgeven; wat als de deelnemer niet komt |
 | Sleutelgebruiker | Train de trainer | 1 dagdeel extra | 2–6 | Een training geven aan een collega; een vraag in het vragenlog verwerken |
-| {{Eindgebruikers}} | Geen training | – | – | De pagina's leggen zichzelf uit; het proefgesprek helpt bij camera en microfoon |
+| {{Participants}} | Geen training | – | – | De pagina's leggen zichzelf uit; het proefgesprek helpt bij camera en microfoon |
 
 Volgens het 70-20-10-principe leren mensen het meeste in het werk zelf (70), van collega's (20)
 en het minste in een training (10). Daarom zijn de werkkaart, de sleutelgebruiker en de
@@ -277,15 +277,16 @@ wat een nieuwe versie raakt. Eén opdracht doet het hele rondje:
 | Schermafdrukken | opnames die meer dan 0,2 % van het beeld verschillen, met een verschilbeeld | de tekst bij die stap nalezen |
 | Niet noemen | woorden die de organisatie (nog) niet wil noemen, en de productnaam | blokkeert |
 
-> **Tip:** De opdracht is `scripts/bijwerken.sh <map met de software>`. Het rapport staat daarna in
-> `bewijs/controle.md`, de verschilbeelden in `bewijs/verschil/`.
+> **Tip:** De opdracht is `.claude/skills/role-manuals/scripts/update.sh <werkmap>`, vanuit de
+> map met de software. Het rapport staat daarna in `evidence/check.md`, de verschilbeelden in
+> `evidence/diff/`.
 
 ## 9. Risico's en maatregelen
 
 | Risico | Maatregel |
 |---|---|
 | Medewerkers zien het als extra werk | Sleutelgebruikers uit het eigen team; laat zien wat het oplevert; oefengesprek vóór de eerste dag |
-| Een deel van de {{eindgebruikers}} is minder digitaal vaardig | Pagina's en uitleg op B1; het proefgesprek; andere contactmogelijkheden op de pagina |
+| Een deel van de {{participants}} is minder digitaal vaardig | Pagina's en uitleg op B1; het proefgesprek; andere contactmogelijkheden op de pagina |
 | De handleiding veroudert | Eén bron, controle bij elke softwareversie, tijdloze tekst |
 | Te veel tegelijk | Groep voor groep live; lessen van de vorige groep in de volgende training |
 | Het videogesprek lukt niet | Proefgesprek vooraf; "wat als" in elke handleiding; de medewerker geeft de afspraak vrij en de deelnemer maakt een nieuwe |
@@ -311,16 +312,16 @@ Hoe het eruitziet:
   taken van dat scherm voor jouw rol.
 - **Walkthroughs** lopen over schermen heen. Op elk scherm staat dan "Stap 2 van 5" met vorige en
   volgende, zonder pop-up en ook zonder JavaScript.
-- **Op de pagina's voor {{eindgebruikers}}** staat per stap een uitklapblok **Hulp bij deze stap**,
+- **Op de pagina's voor {{participants}}** staat per stap een uitklapblok **Hulp bij deze stap**,
   en per groep een kort blok met vragen en antwoorden. Nooit een link naar buiten: de hulp staat op
   de pagina zelf.
 - **Schermafdrukken** maakt de software bij elke nieuwe versie zelf, met verzonnen gegevens. Ze
   gaan mee met de versie, net als de handleidingen als PDF.
 
-De bouwstraat maakt nu al de koppeling die dat mogelijk maakt: `build/hulpindex.json` noemt per
+De bouwstraat maakt nu al de koppeling die dat mogelijk maakt: `build/help-index.json` noemt per
 scherm de taken per rol, met het recht en de plek in de handleiding. Het voorstel voor de software
-ligt klaar als besluitvoorstel (ADR). Het gaat de software in samen met de eerste bouwstap: **Hoe
-doe ik …** op twee schermen (bezetting en wachtrij), met tests die de koppelingen bewaken.
+wordt een besluit (ADR) samen met de eerste bouwstap: **Hoe doe ik …** op twee schermen
+(bezetting en wachtrij), met tests die de koppelingen bewaken.
 
 ## 11. Volgende stappen
 
@@ -328,6 +329,6 @@ doe ik …** op twee schermen (bezetting en wachtrij), met tests die de koppelin
 2. De schermafdrukken die Webex Meetings nodig hebben opnemen in de testomgeving.
 3. Lezerstest per rol plannen en uitvoeren.
 4. Kiezen hoe de dienst heet en hoe hij eruitziet; daarna de branding in de bouwstraat zetten.
-5. Bij elke nieuwe softwareversie `bijwerken.sh` draaien en het controlerapport afhandelen.
+5. Bij elke nieuwe softwareversie `update.sh` draaien en het controlerapport afhandelen.
 6. Het besluitvoorstel voor hulp in de software bespreken; bij akkoord de eerste bouwstap plannen.
 7. De HTML-versie publiceren op het intranet en bij de link op de website.

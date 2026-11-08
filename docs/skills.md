@@ -33,8 +33,8 @@ kind of work outside the code.
 
 | Step | Skill | Why |
 |---|---|---|
-| Method, writing, build | `role-manuals` (repo) | The five steps, the form per role, the redactiestatuut and the build to Word, PDF and HTML |
-| Screenshots and walkthroughs | `verify-openplanner` (repo) | Real user paths on a stack built from the checkout, with fictional data and an evidence log |
+| Method, writing, build | `role-manuals` (repo) | The five steps, the form per role, the style guide, the capture story and the build to Word, PDF and HTML; run from the checkout on a workspace outside it |
+| Screenshots and walkthroughs | `verify-openplanner` (repo) | The stack built from the checkout and its client (`scripts/stack-client.mjs`), shared with `role-manuals`: real user paths, fictional data, an evidence log |
 | Word output | `anthropic-skills:docx` | docx-js conventions and output checks |
 | Reader test | `anthropic-skills:doc-coauthoring` | Its reader-testing stage: a reader without context tries the role's tasks with the manual |
 | Process pictures | `diagram` | A role's flow as Mermaid, SVG and PNG |

@@ -1,16 +1,27 @@
-// Builds the role manuals from one Markdown source into Word (.docx) and HTML; pdf.py prints the
-// HTML to PDF. One parse feeds both renderers, so Word, HTML and PDF always carry the same text.
-//
-// Usage: node scripts/build.mjs [bron/<file>.md ...]   (default: every file in bron/)
-// Input:  bron/*.md (front matter + the Markdown subset of the redactiestatuut), img/*.png,
-//         variabelen.json (product name, help desk, software version, accent colour, font).
-// Output: build/<name>.docx and build/<name>.html.
-
+#!/usr/bin/env node
+/**
+ * Build the role manuals of a workspace from one Markdown source into Word (.docx), HTML and
+ * tagged PDF. One parse feeds every renderer, so Word, HTML and PDF carry the same text. Part of
+ * the role-manuals skill (../SKILL.md).
+ *
+ *   node .claude/skills/role-manuals/scripts/build.mjs <workspace> [sources/<file>.md ...] [--no-pdf]
+ *
+ * Input:  sources/*.md (front matter + the Markdown subset of the style guide), img/*.png,
+ *         variables.json (product name, help desk, software version, accent colour, font).
+ * Output: build/<name>.docx, build/<name>.html, build/<name>.pdf, and build/help-index.json,
+ *         the contract for help in context (per task: screen, permission, shots, title, anchor).
+ * docx and marked come from ../package.json (npm ci there); the PDF is printed by the Chrome that
+ * the verification stack's client starts (Playwright from e2e/).
+ */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { marked } from 'marked';
+import { pathToFileURL } from 'node:url';
+
 import * as docx from 'docx';
+import { marked } from 'marked';
+
+import { launchBrowser } from '../../verify-openplanner/scripts/stack-client.mjs';
+import { fail, openWorkspace } from './workspace.mjs';
 
 const {
   AlignmentType, BorderStyle, Document, ExternalHyperlink, Footer, HeadingLevel, ImageRun,
@@ -18,23 +29,30 @@ const {
   TableOfContents, TableRow, TabStopType, TextRun, WidthType,
 } = docx;
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-if (ROOT.split(path.sep).join('/').includes('.claude/skills')) {
-  console.error('build.mjs: copy the scripts to a workspace outside the repository first (role-manuals SKILL.md).');
-  process.exit(2);
+const argv = process.argv.slice(2);
+let ws;
+try {
+  ws = openWorkspace(argv[0]);
+} catch (error) {
+  fail('build.mjs', error.message);
 }
-const SRC = path.join(ROOT, 'bron');
-const OUT = path.join(ROOT, 'build');
-const VARS = JSON.parse(fs.readFileSync(path.join(ROOT, 'variabelen.json'), 'utf8'));
+const VARS = ws.vars;
 
-const FONT = VARS.lettertype || 'Arial';
-const ACCENT = VARS.accentkleur || '1F4E79';
+/** A branding value from variables.json, refused unless it matches `pattern`. */
+function branding(key, fallback, pattern) {
+  const value = VARS[key] ?? fallback;
+  if (!pattern.test(value)) fail('build.mjs', `${key} in variables.json must match ${pattern}`);
+  return value;
+}
+const FONT = branding('font', 'Arial', /^[\p{L}\p{N} .'-]{1,60}$/u); // one family name
+const ACCENT = branding('accent_colour', '1F4E79', /^[0-9A-Fa-f]{6}$/);
 const PAGE_W = 11906; // A4 in DXA
 const PAGE_H = 16838;
 const MARGIN = 1134; // 2 cm
 const CONTENT_W = PAGE_W - 2 * MARGIN;
 const MAX_IMG_W = 600; // px at 96 dpi, about 15.9 cm
 const MAX_IMG_H = 720;
+const MAX_LIST_LEVEL = 2; // the numbering configs define levels 0 to 2
 
 // ---------------------------------------------------------------------------------------------
 // Source: front matter, variables, Markdown tokens to a small block model.
@@ -51,34 +69,41 @@ function splitFrontMatter(text) {
   return [meta, text.slice(match[0].length)];
 }
 
-/** Replace `{{name}}` by its value from variabelen.json; warn on unknown names. */
+/** Replace `{{name}}` by its text value from variables.json; warn on unknown names. */
 function substitute(text, file) {
   return text.replace(/\{\{(\w+)\}\}/g, (all, key) => {
-    if (key in VARS) return VARS[key];
+    if (typeof VARS[key] === 'string') return VARS[key];
     console.warn(`${file}: unknown variable ${all}`);
     return all;
   });
+}
+
+/** A link target the manuals may carry: https, mailto, an anchor or a relative path. */
+function safeHref(href, file) {
+  if (/^(https:|mailto:|#)/i.test(href) || !/^[a-z][a-z0-9+.-]*:/i.test(href)) return href;
+  console.warn(`${file}: link ${href} dropped (only https, mailto, anchors and relative links)`);
+  return null;
 }
 
 const ENTITIES = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
 const unescape = (s) => String(s ?? '').replace(/&(amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e]);
 
 /** Flatten inline tokens into runs: {text, bold, italic, code, href}. */
-function inline(tokens, fmt = {}) {
+function inline(tokens, file, fmt = {}) {
   const out = [];
   for (const t of tokens || []) {
     switch (t.type) {
-      case 'strong': out.push(...inline(t.tokens, { ...fmt, bold: true })); break;
-      case 'em': out.push(...inline(t.tokens, { ...fmt, italic: true })); break;
+      case 'strong': out.push(...inline(t.tokens, file, { ...fmt, bold: true })); break;
+      case 'em': out.push(...inline(t.tokens, file, { ...fmt, italic: true })); break;
       case 'codespan': out.push({ ...fmt, text: unescape(t.text), code: true }); break;
-      case 'link': out.push(...inline(t.tokens, { ...fmt, href: t.href })); break;
+      case 'link': out.push(...inline(t.tokens, file, { ...fmt, href: safeHref(t.href, file) })); break;
       case 'br': out.push({ ...fmt, text: '\n' }); break;
-      case 'del': out.push(...inline(t.tokens, fmt)); break;
+      case 'del': out.push(...inline(t.tokens, file, fmt)); break;
       case 'image': out.push({ ...fmt, text: unescape(t.text) }); break;
       case 'html': break;
       case 'escape': out.push({ ...fmt, text: unescape(t.text) }); break;
       case 'text':
-        if (t.tokens && t.tokens.length) out.push(...inline(t.tokens, fmt));
+        if (t.tokens && t.tokens.length) out.push(...inline(t.tokens, file, fmt));
         else out.push({ ...fmt, text: unescape(t.text) });
         break;
       default: out.push({ ...fmt, text: unescape(t.text ?? t.raw ?? '') });
@@ -89,62 +114,63 @@ function inline(tokens, fmt = {}) {
 
 const plain = (runs) => runs.map((r) => r.text).join('');
 
+/** Read the attributes of a `<!-- task: screen=...; permission=...; shots=a,b -->` marker. */
+function parseTask(text) {
+  const attrs = {};
+  for (const part of text.split(';')) {
+    const [key, ...rest] = part.split('=');
+    if (key.trim()) attrs[key.trim()] = rest.join('=').trim();
+  }
+  attrs.shots = (attrs.shots || '').split(',').map((x) => x.trim()).filter(Boolean);
+  return attrs;
+}
+
 /** Build the block model of one document; figures are numbered in reading order. */
-function parseDocument(body) {
+function parseDocument(body, file) {
   let figureNo = 0;
   const figure = (tok) => {
     figureNo += 1;
-    const file = path.join(ROOT, tok.href);
     const id = path.basename(tok.href, '.png');
-    const note = (VARS.opnames_zonder_webex || {})[id];
-    const caption = unescape(tok.title || '') + (note ? ` (testopname zonder Webex Meetings: ${note})` : '');
+    const note = (VARS.without_webex || {})[id];
     return {
-      type: 'figure', src: tok.href, file, exists: fs.existsSync(file),
-      alt: unescape(tok.text), caption, num: figureNo,
+      type: 'figure', src: tok.href, file: path.join(ws.dir, tok.href), exists: fs.existsSync(path.join(ws.dir, tok.href)),
+      alt: unescape(tok.text), caption: unescape(tok.title || '') + (note ? ` (testopname zonder Webex Meetings: ${note})` : ''),
+      num: figureNo,
     };
   };
   const blocks = (tokens) => {
     const out = [];
     for (const t of tokens) {
       switch (t.type) {
-        case 'space': break;
-        case 'heading': out.push({ type: 'heading', level: t.depth, inline: inline(t.tokens) }); break;
+        case 'space': case 'hr': break;
+        case 'heading': out.push({ type: 'heading', level: t.depth, inline: inline(t.tokens, file) }); break;
         case 'paragraph':
         case 'text': {
-          const toks = (t.tokens || [{ type: 'text', text: t.text }])
-            .filter((x) => !(x.type === 'text' && !String(x.text).trim()));
+          const toks = (t.tokens || [{ type: 'text', text: t.text }]).filter((x) => !(x.type === 'text' && !String(x.text).trim()));
           if (toks.length === 1 && toks[0].type === 'image') out.push(figure(toks[0]));
-          else out.push({ type: 'para', inline: inline(t.tokens || [{ type: 'text', text: t.text }]) });
+          else out.push({ type: 'para', inline: inline(t.tokens || [{ type: 'text', text: t.text }], file) });
           break;
         }
         case 'list':
-          out.push({
-            type: 'list', ordered: t.ordered, start: Number(t.start) || 1,
-            items: t.items.map((it) => ({ blocks: blocks(it.tokens) })),
-          });
+          out.push({ type: 'list', ordered: t.ordered, start: Number(t.start) || 1, items: t.items.map((it) => ({ blocks: blocks(it.tokens) })) });
           break;
         case 'table':
-          out.push({
-            type: 'table', header: t.header.map((c) => inline(c.tokens)),
-            rows: t.rows.map((r) => r.map((c) => inline(c.tokens))),
-          });
+          out.push({ type: 'table', header: t.header.map((c) => inline(c.tokens, file)), rows: t.rows.map((r) => r.map((c) => inline(c.tokens, file))) });
           break;
         case 'blockquote': {
           const inner = blocks(t.tokens);
           const first = inner[0]?.type === 'para' ? inner[0].inline[0] : null;
-          const label = first && first.bold ? first.text.replace(/:\s*$/, '') : '';
-          out.push({ type: 'callout', label, blocks: inner });
+          out.push({ type: 'callout', label: first && first.bold ? first.text.replace(/:\s*$/, '') : '', blocks: inner });
           break;
         }
         case 'html': {
-          if (/<!--\s*pagina\s*-->/.test(t.raw)) out.push({ type: 'pagebreak' });
+          if (/<!--\s*pagebreak\s*-->/.test(t.raw)) out.push({ type: 'pagebreak' });
           const task = t.raw.match(/<!--\s*task:\s*([\s\S]*?)-->/);
           if (task) out.push({ type: 'task', attrs: parseTask(task[1]) });
           break;
         }
         case 'code': out.push({ type: 'code', text: t.text }); break;
-        case 'hr': break;
-        default: console.warn(`unsupported block ${t.type}`);
+        default: console.warn(`${file}: unsupported block ${t.type}`);
       }
     }
     return out;
@@ -160,20 +186,9 @@ function parseDocument(body) {
   return { model, figures };
 }
 
-/** Read the attributes of a `<!-- task: screen=...; permission=...; shots=a,b -->` marker. */
-function parseTask(text) {
-  const attrs = {};
-  for (const part of text.split(';')) {
-    const [key, ...rest] = part.split('=');
-    if (key.trim()) attrs[key.trim()] = rest.join('=').trim();
-  }
-  attrs.shots = (attrs.shots || '').split(',').map((x) => x.trim()).filter(Boolean);
-  return attrs;
-}
-
 const isWarning = (label) => /let op|belangrijk|waarschuwing/i.test(label || '');
 
-/** Read width and height from a PNG header. */
+/** Width and height from a PNG header. */
 function pngSize(file) {
   const data = fs.readFileSync(file);
   return { width: data.readUInt32BE(16), height: data.readUInt32BE(20), data };
@@ -182,9 +197,17 @@ function pngSize(file) {
 function fitImage(width, height, maxW) {
   let w = maxW;
   let h = Math.round((height * maxW) / width);
-  if (h > MAX_IMG_H) { h = MAX_IMG_H; w = Math.round((width * MAX_IMG_H) / height); }
+  if (h > MAX_IMG_H) {
+    h = MAX_IMG_H;
+    w = Math.round((width * MAX_IMG_H) / height);
+  }
   return { w, h };
 }
+
+const screenshotsLine = (figures) => {
+  const missing = figures.filter((f) => !f.exists).length;
+  return `${figures.length - missing} uit de werkende software, op een testinstallatie met verzonnen gegevens${missing ? `; ${missing} volgen` : ''}`;
+};
 
 // ---------------------------------------------------------------------------------------------
 // Word renderer (docx-js).
@@ -201,16 +224,13 @@ function wordDocument(meta, model, figures) {
   const orderedRef = (start) => {
     olCount += 1;
     const reference = `ol-${olCount}`;
+    const level = (n, format, text, first) => ({
+      level: n, format, text, start: first, alignment: AlignmentType.LEFT,
+      style: { paragraph: { indent: { left: 567 * (n + 1), hanging: 397 } } },
+    });
     numbering.push({
       reference,
-      levels: [
-        { level: 0, format: LevelFormat.DECIMAL, text: '%1.', start, alignment: AlignmentType.LEFT,
-          style: { paragraph: { indent: { left: 567, hanging: 397 } } } },
-        { level: 1, format: LevelFormat.LOWER_LETTER, text: '%2.', start: 1, alignment: AlignmentType.LEFT,
-          style: { paragraph: { indent: { left: 1134, hanging: 397 } } } },
-        { level: 2, format: LevelFormat.LOWER_ROMAN, text: '%3.', start: 1, alignment: AlignmentType.LEFT,
-          style: { paragraph: { indent: { left: 1701, hanging: 397 } } } },
-      ],
+      levels: [level(0, LevelFormat.DECIMAL, '%1.', start), level(1, LevelFormat.LOWER_LETTER, '%2.', 1), level(2, LevelFormat.LOWER_ROMAN, '%3.', 1)],
     });
     return reference;
   };
@@ -218,8 +238,7 @@ function wordDocument(meta, model, figures) {
   const runs = (inl, base = {}) => inl.flatMap((r) => r.text.split('\n').map((part, i) => {
     const opts = {
       text: part, bold: r.bold || base.bold, italics: r.italic || base.italic,
-      font: r.code ? 'Consolas' : FONT, size: base.size, color: base.color,
-      break: i > 0 ? 1 : undefined,
+      font: r.code ? 'Consolas' : FONT, size: base.size, color: base.color, break: i > 0 ? 1 : undefined,
     };
     return r.href
       ? new ExternalHyperlink({ link: r.href, children: [new TextRun({ ...opts, style: 'Hyperlink' })] })
@@ -289,22 +308,19 @@ function wordDocument(meta, model, figures) {
       switch (b.type) {
         case 'heading':
           if (b.level === 1) break; // the title is on the title page
-          out.push(new Paragraph({
-            heading: b.level === 2 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2,
-            children: runs(b.inline),
-          }));
+          out.push(new Paragraph({ heading: b.level === 2 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2, children: runs(b.inline) }));
           break;
         case 'para':
           out.push(new Paragraph({ indent: ctx.indent ? { left: ctx.indent } : undefined, children: runs(b.inline) }));
           break;
         case 'list': {
           const ref = b.ordered ? orderedRef(b.start) : 'bullets';
+          const level = Math.min(ctx.level, MAX_LIST_LEVEL);
           for (const item of b.items) {
             const [first, ...rest] = item.blocks;
             const lead = first?.type === 'para' ? first.inline : [];
-            out.push(new Paragraph({ numbering: { reference: ref, level: ctx.level }, spacing: { after: 80 }, children: runs(lead) }));
-            out.push(...render(first?.type === 'para' ? rest : item.blocks,
-              { indent: 567 * (ctx.level + 1), level: ctx.level + 1 }));
+            out.push(new Paragraph({ numbering: { reference: ref, level }, spacing: { after: 80 }, children: runs(lead) }));
+            out.push(...render(first?.type === 'para' ? rest : item.blocks, { indent: 567 * (level + 1), level: ctx.level + 1 }));
           }
           break;
         }
@@ -314,7 +330,10 @@ function wordDocument(meta, model, figures) {
           const color = warn ? 'B7791F' : ACCENT;
           const fill = warn ? 'FFF6E5' : 'EEF4FA';
           for (const inner of b.blocks) {
-            if (inner.type !== 'para') { out.push(...render([inner], ctx)); continue; }
+            if (inner.type !== 'para') {
+              out.push(...render([inner], ctx));
+              continue;
+            }
             out.push(new Paragraph({
               shading: { type: ShadingType.CLEAR, fill, color: 'auto' },
               border: { left: { style: BorderStyle.SINGLE, size: 24, color, space: 8 } },
@@ -347,15 +366,14 @@ function wordDocument(meta, model, figures) {
       new TextRun({ text: value, font: FONT, size: 21, color: '444444' }),
     ],
   });
-  const missing = figures.filter((f) => !f.exists).length;
   const title = [
-    new Paragraph({ spacing: { before: 2600, after: 120 }, children: [new TextRun({ text: meta.rol || '', bold: true, size: 24, color: ACCENT, font: FONT })] }),
-    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: meta.titel })] }),
-    new Paragraph({ spacing: { after: 1400 }, children: [new TextRun({ text: meta.ondertitel || '', size: 28, color: '444444', font: FONT })] }),
-    metaLine('Versie', meta.versie || ''),
-    metaLine('Datum', meta.datum || ''),
-    metaLine('Softwareversie', meta.softwareversie || ''),
-    ...(figures.length ? [metaLine('Schermafdrukken', `${figures.length - missing} uit de werkende software, op een testinstallatie met verzonnen gegevens${missing ? `; ${missing} volgen` : ''}`)] : []),
+    new Paragraph({ spacing: { before: 2600, after: 120 }, children: [new TextRun({ text: meta.role || '', bold: true, size: 24, color: ACCENT, font: FONT })] }),
+    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: meta.title })] }),
+    new Paragraph({ spacing: { after: 1400 }, children: [new TextRun({ text: meta.subtitle || '', size: 28, color: '444444', font: FONT })] }),
+    metaLine('Versie', meta.version || ''),
+    metaLine('Datum', meta.date || ''),
+    metaLine('Softwareversie', meta.software_version || ''),
+    ...(figures.length ? [metaLine('Schermafdrukken', screenshotsLine(figures))] : []),
     new Paragraph({ children: [new PageBreak()] }),
     new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: 'Inhoud' })] }),
     new TableOfContents('Inhoud', { hyperlink: true, headingStyleRange: '1-2' }),
@@ -365,16 +383,15 @@ function wordDocument(meta, model, figures) {
     children: [new Paragraph({
       tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_W }],
       children: [
-        new TextRun({ text: `${meta.titel} · versie ${meta.versie}`, size: 16, color: '666666', font: FONT }),
+        new TextRun({ text: meta.version ? `${meta.title} · versie ${meta.version}` : meta.title, size: 16, color: '666666', font: FONT }),
         new TextRun({ children: ['\tPagina ', PageNumber.CURRENT, ' van ', PageNumber.TOTAL_PAGES], size: 16, color: '666666', font: FONT }),
       ],
     })],
   });
-  const body = render(model);
   return new Document({
     creator: 'Bouwstraat rolhandleidingen',
-    title: meta.titel,
-    description: meta.ondertitel,
+    title: meta.title,
+    description: meta.subtitle,
     features: { updateFields: true },
     styles: {
       default: {
@@ -392,13 +409,13 @@ function wordDocument(meta, model, figures) {
         page: { size: { width: PAGE_W, height: PAGE_H }, margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN, footer: 567 } },
       },
       footers: { default: footer, first: new Footer({ children: [new Paragraph({ children: [] })] }) },
-      children: [...title, ...body],
+      children: [...title, ...render(model)],
     }],
   });
 }
 
 // ---------------------------------------------------------------------------------------------
-// HTML renderer (screen and print; pdf.py prints it).
+// HTML renderer (screen and print; the PDF is printed from it).
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -414,7 +431,8 @@ function htmlInline(inl) {
   }).join('');
 }
 
-function htmlDocument(meta, model, figures, index = []) {
+/** The HTML page of one manual; every task marker is filed in `index` under its next heading. */
+function htmlDocument(meta, model, figures, index) {
   const toc = [];
   let pendingTask = null;
   const used = new Set();
@@ -432,7 +450,7 @@ function htmlDocument(meta, model, figures, index = []) {
         const id = anchor(text);
         toc.push({ level: b.level, text, id });
         if (pendingTask) {
-          index.push({ ...pendingTask, titel: text, anker: id });
+          index.push({ ...pendingTask, title: text, anchor: id });
           pendingTask = null;
         }
         return `<h${b.level} id="${id}">${htmlInline(b.inline)}</h${b.level}>`;
@@ -446,18 +464,16 @@ function htmlDocument(meta, model, figures, index = []) {
       case 'table':
         return `<table${b.header.length >= 5 ? ' class="breed"' : ''}><thead><tr>${b.header.map((c) => `<th scope="col">${htmlInline(c)}</th>`).join('')}</tr></thead>`
           + `<tbody>${b.rows.map((r) => `<tr>${b.header.map((_, i) => `<td>${htmlInline(r[i] || [])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-      case 'callout': {
-        const kind = isWarning(b.label) ? 'callout callout--let-op' : 'callout';
-        return `<aside class="${kind}" aria-label="${esc(b.label || 'Opmerking')}">${render(b.blocks)}</aside>`;
-      }
+      case 'callout':
+        return `<aside class="${isWarning(b.label) ? 'callout callout--let-op' : 'callout'}" aria-label="${esc(b.label || 'Opmerking')}">${render(b.blocks)}</aside>`;
       case 'figure': {
         const caption = `<figcaption><span class="fignum">Afbeelding ${b.num}.</span> ${esc(b.caption)}</figcaption>`;
         if (!b.exists) {
           return `<figure class="figure figure--volgt"><div class="placeholder"><strong>Schermafdruk volgt</strong> <span>(${esc(path.basename(b.src, '.png'))})</span><br>${esc(b.alt)}</div>${caption}</figure>`;
         }
         const { width, height } = pngSize(b.file);
-        const mobile = width / height < 0.8 ? ' figure--smal' : '';
-        return `<figure class="figure${mobile}"><img src="../${esc(b.src)}" alt="${esc(b.alt)}" width="${Math.round(width / 2)}" height="${Math.round(height / 2)}">${caption}</figure>`;
+        const narrow = width / height < 0.8 ? ' figure--smal' : '';
+        return `<figure class="figure${narrow}"><img src="../${esc(b.src)}" alt="${esc(b.alt)}" width="${Math.round(width / 2)}" height="${Math.round(height / 2)}">${caption}</figure>`;
       }
       case 'pagebreak': return '<div class="pagina" aria-hidden="true"></div>';
       case 'task': pendingTask = b.attrs; return '';
@@ -466,27 +482,25 @@ function htmlDocument(meta, model, figures, index = []) {
     }
   }).join('\n');
   const content = render(model);
-  const missing = figures.filter((f) => !f.exists).length;
-  const tocHtml = toc.filter((t) => t.level === 2)
-    .map((t) => `<li><a href="#${t.id}">${esc(t.text)}</a></li>`).join('');
+  const tocHtml = toc.filter((t) => t.level === 2).map((t) => `<li><a href="#${t.id}">${esc(t.text)}</a></li>`).join('');
   return `<!doctype html>
 <html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(meta.titel)}</title>
+<title>${esc(meta.title)}</title>
 <style>${CSS}</style>
 </head>
 <body>
 <header class="titelpagina">
-  <p class="rol">${esc(meta.rol || '')}</p>
-  <h1>${esc(meta.titel)}</h1>
-  <p class="ondertitel">${esc(meta.ondertitel || '')}</p>
+  <p class="rol">${esc(meta.role || '')}</p>
+  <h1>${esc(meta.title)}</h1>
+  <p class="ondertitel">${esc(meta.subtitle || '')}</p>
   <dl class="meta">
-    <div><dt>Versie</dt><dd>${esc(meta.versie || '')}</dd></div>
-    <div><dt>Datum</dt><dd>${esc(meta.datum || '')}</dd></div>
-    <div><dt>Softwareversie</dt><dd>${esc(meta.softwareversie || '')}</dd></div>
-    ${figures.length ? `<div><dt>Schermafdrukken</dt><dd>${figures.length - missing} uit de werkende software, op een testinstallatie met verzonnen gegevens${missing ? `; ${missing} volgen` : ''}</dd></div>` : ''}
+    <div><dt>Versie</dt><dd>${esc(meta.version || '')}</dd></div>
+    <div><dt>Datum</dt><dd>${esc(meta.date || '')}</dd></div>
+    <div><dt>Softwareversie</dt><dd>${esc(meta.software_version || '')}</dd></div>
+    ${figures.length ? `<div><dt>Schermafdrukken</dt><dd>${esc(screenshotsLine(figures))}</dd></div>` : ''}
   </dl>
 </header>
 <nav class="inhoud" aria-labelledby="inhoud-kop"><h2 id="inhoud-kop">Inhoud</h2><ol>${tocHtml}</ol></nav>
@@ -501,7 +515,7 @@ ${content}
 const CSS = `
 :root { --accent: #${ACCENT}; --tekst: #1a1a1a; --gedempt: #555; --lijn: #c9d1db; --tip: #eef4fa; --letop: #fff6e5; --letop-lijn: #b7791f; }
 @page { size: A4; }
-html { font-family: ${FONT}, Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.45; color: var(--tekst); background: #fff; }
+html { font-family: "${FONT}", Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.45; color: var(--tekst); background: #fff; }
 body { margin: 0 auto; max-width: 174mm; }
 h1 { font-size: 26pt; line-height: 1.15; color: var(--accent); margin: 0 0 0.3em; }
 h2 { font-size: 16pt; color: var(--accent); margin: 1.6em 0 0.5em; break-after: avoid; }
@@ -543,32 +557,59 @@ pre { background: #f3f4f6; padding: 0.6em; overflow-x: auto; }
 @media screen { body { padding: 2em 16px; } .titelpagina { min-height: auto; padding: 3em 0; } }
 `;
 
+const FOOTER = (title) => '<div style="font-family:Arial,sans-serif;font-size:8px;color:#666;width:100%;padding:0 18mm;'
+  + `display:flex;justify-content:space-between"><span>${esc(title)}</span><span>Pagina <span class="pageNumber"></span> `
+  + 'van <span class="totalPages"></span></span></div>';
+
 // ---------------------------------------------------------------------------------------------
 
+/** Build one source into Word and HTML; return its HTML file and its entries for the help index. */
 async function build(file) {
   const name = path.basename(file, '.md');
   const [rawMeta, rawBody] = splitFrontMatter(fs.readFileSync(file, 'utf8'));
   const meta = Object.fromEntries(Object.entries(rawMeta).map(([k, v]) => [k, substitute(v, name)]));
   const body = substitute(rawBody, name);
-  if (!meta.titel) meta.titel = (body.match(/^#\s+(.+)$/m) || [])[1] || name;
-  const { model, figures } = parseDocument(body);
-  fs.mkdirSync(OUT, { recursive: true });
-  const buffer = await Packer.toBuffer(wordDocument(meta, model, figures));
-  fs.writeFileSync(path.join(OUT, `${name}.docx`), buffer);
+  meta.title ||= (body.match(/^#\s+(.+)$/m) || [])[1] || name;
+  const { model, figures } = parseDocument(body, name);
+  fs.mkdirSync(ws.build, { recursive: true });
+  fs.writeFileSync(path.join(ws.build, `${name}.docx`), await Packer.toBuffer(wordDocument(meta, model, figures)));
   const index = [];
-  fs.writeFileSync(path.join(OUT, `${name}.html`), htmlDocument(meta, model, figures, index));
-  HULPINDEX.push(...index.map((e) => ({ bestand: name, rol: meta.rol, html: `${name}.html#${e.anker}`, ...e })));
+  const html = path.join(ws.build, `${name}.html`);
+  fs.writeFileSync(html, htmlDocument(meta, model, figures, index));
   const missing = figures.filter((f) => !f.exists).map((f) => path.basename(f.src, '.png'));
   console.log(`${name}: ${figures.length} afbeeldingen, ${missing.length} volgen${missing.length ? ` (${missing.join(', ')})` : ''}`);
+  return { html, title: meta.title, entries: index.map((e) => ({ file: name, role: meta.role, html: `${name}.html#${e.anchor}`, ...e })) };
 }
 
-const HULPINDEX = [];
-const args = process.argv.slice(2);
-const files = args.length ? args.map((a) => path.resolve(a))
-  : fs.readdirSync(SRC).filter((f) => f.endsWith('.md')).sort().map((f) => path.join(SRC, f));
-for (const f of files) await build(f);
-if (!args.length) {
-  // The contract for context-driven help: per screen, the tasks per role with their permission.
-  fs.writeFileSync(path.join(OUT, 'hulpindex.json'), `${JSON.stringify(HULPINDEX, null, 2)}\n`);
-  console.log(`hulpindex: ${HULPINDEX.length} taken op ${new Set(HULPINDEX.map((e) => e.screen)).size} schermen`);
+/** Print each HTML manual to a tagged PDF with bookmarks, A4, a footer with title and page. */
+async function printPdfs(built) {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    for (const { html, title } of built) {
+      await page.goto(pathToFileURL(html).href, { waitUntil: 'load' });
+      await page.evaluate(() => document.fonts.ready.then(() => true));
+      const target = html.replace(/\.html$/, '.pdf');
+      await page.pdf({
+        path: target, format: 'A4', printBackground: true, displayHeaderFooter: true,
+        headerTemplate: '<span></span>', footerTemplate: FOOTER(title),
+        margin: { top: '18mm', bottom: '20mm', left: '18mm', right: '18mm' }, tagged: true, outline: true,
+      });
+      console.log(`pdf: ${path.basename(target)}`);
+    }
+  } finally {
+    await browser.close();
+  }
 }
+
+const named = argv.slice(1).filter((a) => !a.startsWith('--'));
+const files = named.length ? named.map((a) => path.resolve(a))
+  : fs.readdirSync(ws.sources).filter((f) => f.endsWith('.md')).sort().map((f) => path.join(ws.sources, f));
+const built = [];
+for (const f of files) built.push(await build(f));
+if (!named.length) {
+  const index = built.flatMap((b) => b.entries);
+  fs.writeFileSync(path.join(ws.build, 'help-index.json'), `${JSON.stringify(index, null, 2)}\n`);
+  console.log(`help-index: ${index.length} taken op ${new Set(index.map((e) => e.screen)).size} schermen`);
+}
+if (!argv.includes('--no-pdf')) await printPdfs(built);
