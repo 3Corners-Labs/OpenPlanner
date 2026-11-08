@@ -10,8 +10,9 @@ address and phone number only on request: *Show contact details* opens the page 
 product owner's choice of 2026-11-08). Only the button on the page itself counts
 (``from_own_page``): the same address shared in a mail or chat, bookmarked, typed, followed
 from another site or prefetched shows the page without them and writes nothing, so it never
-puts a request in someone else's name. The ``mailto:`` link percent-encodes the address, so
-characters a participant may type before the ``@`` cannot fill other fields of the draft.
+puts a request in someone else's name. The ``mailto:`` link percent-encodes the address
+(``Contact.mailto``), so what a participant may type before the ``@`` cannot fill other fields
+of the draft.
 
     GET  /admin/groups/{slug}/bookings/{booking_id}         bookings.view
     GET  /admin/groups/{slug}/bookings/{booking_id}?contact=show   bookings.view, audited
@@ -26,7 +27,6 @@ meeting or work item job again.
 from dataclasses import dataclass
 from datetime import datetime, timedelta, tzinfo
 from typing import Annotated
-from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
@@ -346,7 +346,6 @@ async def booking_detail(
             "requests": _request_views(request, locale, timeline.requests),
             "retry_action": f"/admin/groups/{slug}/bookings/{booking_id}/retry",
             "contact": shown,
-            "contact_mailto": f"mailto:{quote(shown.email, safe='@')}" if shown else "",
             "contact_deleted": deleted,
             "contact_hide": f"/admin/groups/{slug}/bookings/{booking_id}#contact",
             "answers": labelled_answers(

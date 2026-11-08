@@ -27,7 +27,7 @@
   {% if contact %}
   <dl class="facts">
     <div><dt>{{ _("admin.booking.contact_name") }}</dt><dd>{{ contact.name }}</dd></div>
-    <div><dt>{{ _("admin.booking.contact_email") }}</dt><dd><a href="{{ contact_mailto }}">{{ contact.email }}</a></dd></div>
+    <div><dt>{{ _("admin.booking.contact_email") }}</dt><dd><a href="{{ contact.mailto }}">{{ contact.email }}</a></dd></div>
     <div><dt>{{ _("admin.booking.contact_phone") }}</dt><dd>{% if contact.phone %}<a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>{% else %}{{ _("admin.booking.contact_no_phone") }}{% endif %}</dd></div>
   </dl>
   <p><a href="{{ contact_hide }}">{{ _("admin.booking.contact_hide") }}</a></p>

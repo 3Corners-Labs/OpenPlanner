@@ -16,6 +16,7 @@ from app.domain.form_fields import (
     derive_key,
     format_options,
     labelled_answers,
+    mailto_href,
     normalise_email,
     normalise_phone,
     parse_options,
@@ -387,6 +388,13 @@ def test_normalisers_name_the_field_they_were_given() -> None:
     assert str(caught.value) == "invalid_contact: email"
     with pytest.raises(DomainError):
         normalise_phone("123", "NL", "phone")
+
+
+def test_a_mailto_link_encodes_what_would_start_its_own_fields() -> None:
+    address = normalise_email("ada?cc=x&body=y#z%@example.org", "email")  # legal before the @
+
+    assert mailto_href(address) == "mailto:ada%3Fcc%3Dx%26body%3Dy%23z%25@example.org"
+    assert mailto_href("ada@example.org") == "mailto:ada@example.org"
 
 
 def test_options_are_parsed_from_lines_and_formatted_back() -> None:
