@@ -5,6 +5,7 @@ open on Monday 5 January 09:00-10:00 Amsterdam time (08:00-09:00 UTC) in 30-minu
 The demo group that the HTTP tests seed is open on weekdays (``FRIDAY``, ``FRIDAY_0900``).
 """
 
+import itertools
 from dataclasses import replace
 from datetime import UTC, date, datetime, time
 from typing import Any
@@ -13,6 +14,7 @@ from app.adapters.contact_centers import routing
 from app.adapters.wxcc import BUSINESS_ADDRESS, CHANNEL
 from app.domain.authorization import Role
 from app.domain.booking import Contact
+from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterRouting
 from app.domain.scheduling import DispatchKind, Group, Offer, PhoneMode, TimeWindow
 from app.domain.services import BookingReceipt, BookingService, ContactInput
@@ -122,3 +124,28 @@ async def book(
 ) -> BookingReceipt:
     """Book ``start`` for ``contact`` (Ada) in ``slug`` and confirm it, as by email link."""
     return await book_confirmed(service, group_slug=slug, start=start, contact=contact, locale="nl")
+
+
+_OTHERS = itertools.count(1)
+
+
+def another_participant() -> ContactInput:
+    """Return Ada's details under an address no earlier call returned (ADR 0066 stays out)."""
+    return participant(next(_OTHERS))
+
+
+async def book_another(
+    service: BookingService,
+    start: datetime = SLOT_0900,
+    slug: str = "demo",
+    consents: frozenset[ChannelKind] = frozenset(),
+) -> BookingReceipt:
+    """Book and confirm ``start`` in ``slug`` for ``another_participant``."""
+    return await book_confirmed(
+        service,
+        group_slug=slug,
+        start=start,
+        contact=another_participant(),
+        locale="nl",
+        consents=consents,
+    )

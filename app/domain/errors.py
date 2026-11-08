@@ -25,6 +25,7 @@ class ErrorCode(StrEnum):
     BOOKING_NOT_ACTIVE = "booking_not_active"
     BOOKING_NOT_PENDING = "booking_not_pending"
     BOOKING_LOCKED = "booking_locked"
+    PROPOSAL_NOT_OPEN = "proposal_not_open"
     SAME_SLOT = "same_slot"
     DATABASE_BUSY = "database_busy"
     NOT_PERMITTED = "not_permitted"

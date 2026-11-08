@@ -1632,3 +1632,32 @@ class AlertDeliveryRow(Base):
     sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     retry_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+
+class RescheduleProposalRow(Base):
+    """A proposed new time holding one place in its slot until answered (ADR 0057 point 7).
+
+    No personal data: the booking holds it. The place counts while ``released_at`` is empty and
+    the booking still awaits a new time (``uow.get_slot_usage``, ``count_active_bookings``).
+    """
+
+    __tablename__ = "reschedule_proposals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
+    slot_id: Mapped[int] = mapped_column(ForeignKey("slots.id", ondelete="CASCADE"))
+    start: Mapped[datetime] = mapped_column(UTCDateTime())
+    end: Mapped[datetime] = mapped_column(UTCDateTime())
+    confirm_by: Mapped[datetime] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    released_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    outcome: Mapped[str | None] = mapped_column(String(16))
+
+    __table_args__ = (
+        CheckConstraint(
+            "outcome IN ('confirmed', 'chosen', 'cancelled', 'expired', 'withdrawn')",
+            name="outcome",
+        ),
+        Index("ix_reschedule_proposals_booking_id", "booking_id"),
+        Index("ix_reschedule_proposals_slot_id", "slot_id"),
+    )

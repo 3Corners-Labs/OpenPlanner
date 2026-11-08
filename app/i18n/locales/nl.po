@@ -11191,3 +11191,110 @@ msgstr "Gegevens aanpassen"
 
 msgid "manage.notice.details"
 msgstr "Uw gegevens zijn aangepast."
+msgid "error.proposal_not_open"
+msgstr "Deze voorgestelde tijd is niet meer beschikbaar. U kunt nog wel zelf een nieuwe tijd kiezen."
+
+msgid "settings.field.reschedule_proposal_confirm_hours.label"
+msgstr "Voorgestelde tijd vastgehouden (uren)"
+
+msgid "settings.field.reschedule_proposal_reminder_hours.label"
+msgstr "Herinnering aan voorstel voor de termijn (uren, 0 = geen)"
+
+msgid "settings.field.reschedule_search_days.label"
+msgstr "Zoeken naar een nieuwe tijd binnen (dagen)"
+
+msgid "settings.field.reschedule_time_tolerance_minutes.label"
+msgstr "Verschil in tijdstip ten hoogste (minuten)"
+
+msgid "message.reschedule_proposal.subject"
+msgstr "Nieuwe tijd voorgesteld voor uw videogesprek"
+
+msgid "message.reschedule_proposal.intro"
+msgstr "Uw videogesprek met {group_name} op {date} om {time} kan niet doorgaan. Wij stellen een nieuwe tijd voor: {new_date} om {new_time}. Wij houden die tijd voor u vast tot {deadline}. Bevestig de nieuwe tijd, kies zelf een andere tijd of annuleer de afspraak. Zonder uw bevestiging verplaatsen wij niets."
+
+msgid "message.reschedule_proposal.sms"
+msgstr "Beste {first_name}, uw videogesprek met {group_name} op {date} om {time} kan niet doorgaan. {reason} Voorstel: {new_date} om {new_time}. Bevestig voor {deadline} of kies een andere tijd: {manage_url}"
+
+msgid "message.proposal_reminder.subject"
+msgstr "Herinnering: bevestig de voorgestelde tijd"
+
+msgid "message.proposal_reminder.intro"
+msgstr "U hebt de voorgestelde nieuwe tijd voor uw videogesprek met {group_name}, {new_date} om {new_time}, nog niet bevestigd. Wij houden die tijd voor u vast tot {deadline}."
+
+msgid "message.proposal_reminder.sms"
+msgstr "Beste {first_name}, bevestig voor {deadline} de voorgestelde tijd {new_date} om {new_time} bij {group_name}, of kies een andere: {manage_url}"
+
+msgid "message.proposal_released.subject"
+msgstr "De voorgestelde tijd is vrijgegeven"
+
+msgid "message.proposal_released.intro"
+msgstr "U hebt de voorgestelde nieuwe tijd voor uw videogesprek met {group_name} niet op tijd bevestigd. Wij houden die tijd niet langer voor u vast. U kunt nog tot {deadline} zelf een nieuwe tijd kiezen; daarna vervalt de afspraak."
+
+msgid "message.proposal_released.sms"
+msgstr "Beste {first_name}, de voorgestelde tijd bij {group_name} is vrijgegeven. Kies voor {deadline} zelf een nieuwe tijd: {manage_url}"
+
+msgid "message.manage_proposal"
+msgstr "Bevestig de nieuwe tijd, kies een andere tijd of annuleer, uiterlijk {deadline}:"
+
+msgid "message.proposal_link"
+msgstr "Nieuwe tijd bekijken"
+
+msgid "message.proposed_when"
+msgstr "Voorgestelde tijd"
+
+msgid "manage.proposal.title"
+msgstr "Er is een nieuwe tijd voor u voorgesteld"
+
+msgid "manage.proposal.text"
+msgstr "Voorgestelde tijd: {slot}. Wij houden die tijd voor u vast tot {deadline}. Zonder uw bevestiging verplaatsen wij niets."
+
+msgid "manage.proposal.confirm"
+msgstr "Nieuwe tijd bevestigen"
+
+msgid "manage.proposal.other"
+msgstr "Een andere tijd kiezen"
+
+msgid "manage.notice.proposal_gone"
+msgstr "De voorgestelde tijd is niet meer beschikbaar. U kunt nog wel zelf een nieuwe tijd kiezen."
+
+msgid "proposal.title"
+msgstr "Nieuwe tijd bevestigen"
+
+msgid "proposal.new"
+msgstr "Nieuwe tijd"
+
+msgid "proposal.old"
+msgstr "Oorspronkelijke tijd"
+
+msgid "proposal.text"
+msgstr "Bevestigt u de nieuwe tijd, dan verplaatsen wij uw afspraak en krijgt u een bevestiging met een agenda-uitnodiging. Wij houden de tijd vast tot {deadline}."
+
+msgid "proposal.submit"
+msgstr "Ja, deze tijd past mij"
+
+msgid "reschedule.suggested.title"
+msgstr "Voorgestelde tijden"
+
+msgid "reschedule.suggested.hint"
+msgstr "Deze tijden liggen het dichtst bij uw oorspronkelijke afspraak. Ze worden niet voor u vastgehouden."
+
+msgid "admin.messages.purpose_reschedule_proposal"
+msgstr "Nieuwe tijd voorgesteld"
+
+msgid "admin.messages.purpose_proposal_reminder"
+msgstr "Herinnering aan voorgestelde tijd"
+
+msgid "admin.messages.purpose_proposal_released"
+msgstr "Voorgestelde tijd vrijgegeven"
+
+msgid "audit.job.send_reschedule_proposal"
+msgstr "Voorstel nieuwe tijd sturen"
+
+msgid "audit.job.send_proposal_reminder"
+msgstr "Herinnering aan voorstel sturen"
+
+msgid "audit.job.expire_proposal"
+msgstr "Voorgestelde tijd vrijgeven"
+
+msgid "audit.job.send_proposal_released"
+msgstr "Melding vrijgegeven voorstel sturen"

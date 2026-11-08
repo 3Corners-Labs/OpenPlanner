@@ -41,7 +41,7 @@ worker ──HTTPS──> SMS API of the organisation's provider ──> mobile 
 
 | Data item | Destination | When | Legal basis owner | Retention at the processor |
 |---|---|---|---|---|
-| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, and on a planner's move, cancellation or request to rebook (ADR 0044), only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
+| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, and on a planner's move, cancellation, request to rebook (ADR 0044) or proposed new time (ADR 0057), only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
 | First name, date, time, team, management link | as above (message text) | as above | as above | as above |
 
 A planner's move, cancellation or request to choose a new time, its one reminder and its lapse (ADR 0044) are sent by SMS as well, to bookings with a phone
@@ -116,7 +116,8 @@ filter matches on it. The list and the rule are constants, not settings.
 | Provider links | `bookings.video_room_id`, `trial_room_id`, `contact_center_task_id` (and the older `wxcc_task_id`, written alongside until it is dropped, ADR 0032/0116) | video provider, WxCC | as above (deleted by the purge, ADR 0102 point 11) | no. Each is the key to a meeting or work item at Cisco that holds the participant's name and email address |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | replaced by a random value by the purge, so the link stops working; the salt stays and identifies nothing without the token | token itself only in the confirmation mail |
 
-Jobs, slots, schedules and audit events carry no personal data of participants. A failed meeting
+Jobs, slots, schedules, held proposals of a new time (`reschedule_proposals`: booking, slot,
+times, deadline and outcome, ADR 0057) and audit events carry no personal data of participants. A failed meeting
 job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
 the group name and the host's address (masked), never a participant's data; the system event of the
 automatic group check (ADR 0065 step 2) carries the same masked reason of the probe meeting,

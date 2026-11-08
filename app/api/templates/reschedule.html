@@ -5,6 +5,17 @@
 <p class="eyebrow">{{ group.name }}</p>
 <h1>{{ _("reschedule.title") }}</h1>
 <p class="lead">{{ _("reschedule.current", slot=slot_label) }} {{ _("reschedule.intro") }}</p>
+{% if suggestions %}
+<section class="card" aria-labelledby="suggested-heading">
+  <h2 id="suggested-heading">{{ _("reschedule.suggested.title") }}</h2>
+  <p class="hint">{{ _("reschedule.suggested.hint") }}</p>
+  <ul class="actions">
+    {% for value, label in suggestions %}
+    <li><a href="/b/m/{{ ref }}/reschedule?start={{ value | urlencode }}">{{ label }}</a></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 {% set action = "/b/m/" ~ ref ~ "/reschedule" %}
 {% set method = "get" %}
 {% include "_slot_picker.html" %}

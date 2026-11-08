@@ -103,6 +103,7 @@ STATE_TABLES = frozenset(
         "integration_reports",
         "alert_deliveries",
         "jobs",
+        "reschedule_proposals",
         "log_destination_status",
         "maintenance_state",
         "overview_layouts",

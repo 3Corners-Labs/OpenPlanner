@@ -32,10 +32,16 @@ from app.domain.agenda_service import agenda_days
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.booking import Booking, BookingStatus, ChangeReason
+from app.domain.booking_changes import ProposalTiming
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.rebooking import last_made
+from app.domain.reschedule_proposal import (
+    DEFAULT_PROPOSAL_HOURS,
+    HeldProposal,
+    ProposalHours,
+)
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.slot_close import shortfall_resolved
@@ -66,6 +72,8 @@ class PlannerService:
             booking's start.
         reminder_days: ``planner_rebook_reminder_days`` (class D): the one reminder goes this
             long before the request lapses.
+        proposal_hours: ``reschedule_proposal_confirm_hours`` and
+            ``reschedule_proposal_reminder_hours`` (class D, ADR 0057).
     """
 
     def __init__(
@@ -78,6 +86,7 @@ class PlannerService:
         *,
         rebook_days: int | Callable[[int], int] = 14,
         reminder_days: int | Callable[[int], int] = 3,
+        proposal_hours: ProposalHours | Callable[[int], ProposalHours] = DEFAULT_PROPOSAL_HOURS,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -87,6 +96,7 @@ class PlannerService:
         self._alert_per_hour = alert_per_hour
         self._rebook_days = rebook_days
         self._reminder_days = reminder_days
+        self._proposal_hours = proposal_hours
 
     def rebook_days(self, organisation_id: int) -> int:
         """Days after the start after which an unanswered request to rebook lapses."""
@@ -208,6 +218,45 @@ class PlannerService:
             detail = f"planner.rebook,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
         return waiting
+
+    async def propose(
+        self,
+        principal: Principal,
+        slug: str,
+        booking_id: int,
+        start: datetime,
+        reason: ChangeReason,
+    ) -> HeldProposal:
+        """Propose a new time for a confirmed booking and hold it there (ADR 0057 point 1).
+
+        The fifth action next to move, ask to rebook, cancel and leave as is, under the same
+        right and limits; the booking awaits a new time at once, and the participant confirms,
+        chooses another time or cancels.
+
+        Raises:
+            DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active``,
+                ``planner_too_late``, ``same_slot``, ``booking_locked`` (the proposed slot is
+                too close) or any error of a booking for the proposed slot.
+        """
+        authorization = await self._authorize(principal, slug)
+        async with self._uow.locked() as tx:
+            group = await group_by_slug(tx, slug)
+            booking = await self._changeable(tx, group, booking_id)
+            proposal = await self._bookings.propose_in(
+                tx, booking, group, start, reason=reason, timing=self._timing(group)
+            )
+            detail = f"planner.propose,reason:{reason.value}"
+            await self._audit(tx, principal, authorization, detail, booking_id)
+        return proposal
+
+    def _timing(self, group: Group) -> ProposalTiming:
+        """Return the organisation's periods for a proposal."""
+        organisation_id = group.organisation_id
+        return ProposalTiming(
+            rebook_days=self.rebook_days(organisation_id),
+            rebook_reminder_days=self.reminder_days(organisation_id),
+            hours=value_for(self._proposal_hours, organisation_id),
+        )
 
     async def slot_candidates(
         self, principal: Principal, slug: str, start: datetime
