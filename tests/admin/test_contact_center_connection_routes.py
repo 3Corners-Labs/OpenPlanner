@@ -57,6 +57,8 @@ async def test_a_refused_field_is_shown_on_the_form(site: Site) -> None:
 
     assert refused.status_code == 422
     assert "client-secret-value" not in refused.text
+    assert 'aria-describedby="cc_api_base_url' in refused.text
+    assert "Vul een https-adres in met alleen een hostnaam" in refused.text
 
 
 async def test_rotating_and_removing_the_connection(site: Site) -> None:

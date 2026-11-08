@@ -13,10 +13,9 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.alert_senders import Secrets
-from app.adapters.db.credentials import CredentialStore
+from app.adapters.db.credentials import Secrets
 from app.adapters.db.uow import contact_center_credential_name
-from app.adapters.integrations import secret_box
+from app.adapters.integrations import sealed_store
 from app.config import Settings
 from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
 
@@ -67,7 +66,7 @@ class SealedConnections:
         record = dict(await self._record(organisation_id) or {})
         record |= {
             "kind": change.kind.value,
-            "api_base_url": change.api_base_url.rstrip("/"),
+            "api_base_url": change.api_base_url,
             "client_id": change.client_id,
         }
         if change.client_secret is not None:
@@ -104,5 +103,5 @@ class SealedConnections:
 
 def sealed_connections(engine: AsyncEngine, settings: Settings) -> SealedConnections | None:
     """Return the connections, or ``None`` without a settings key (nothing can be sealed)."""
-    box = secret_box(settings)
-    return SealedConnections(CredentialStore(engine, box)) if box is not None else None
+    store = sealed_store(engine, settings)
+    return SealedConnections(store) if store is not None else None

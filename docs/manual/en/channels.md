@@ -91,7 +91,8 @@ and its secrets.
 
 As long as an organisation has no connection of its own, it uses the installation's. That
 fallback goes away in a later version. Sending tasks through the own connection comes in the next
-step; until then this card records the connection and the webhook address.
+step; until then this card records the connection and the webhook address. The webhook address
+only works once OpenPlanner registers it with the contact center in that step.
 
 ## What is recorded
 

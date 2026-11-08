@@ -10611,3 +10611,12 @@ msgstr "Er is een nieuw webhookgeheim gemaakt."
 
 msgid "admin.done.contact_center_refused"
 msgstr "Dat kon niet: deze organisatie heeft nog geen eigen koppeling, of er is geen sleutel voor instellingen geconfigureerd."
+
+msgid "admin.form.error.cc_api_base_url"
+msgstr "Vul een https-adres in met alleen een hostnaam en eventueel een poort."
+
+msgid "admin.form.error.cc_client_id"
+msgstr "Een client-ID bestaat uit letters, cijfers en . _ : - zonder spaties."
+
+msgid "admin.form.error.cc_secret"
+msgstr "Vul het geheim in als één regel zonder spaties."

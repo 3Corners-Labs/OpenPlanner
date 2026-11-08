@@ -439,6 +439,7 @@ class ContactCenterDispatcher(Protocol):
 
 
 ContactCenterDispatchers = Mapping[ContactCenterKind, ContactCenterDispatcher]
+"""The configured dispatcher per platform (ADR 0032 point 5); empty without a contact center."""
 
 
 class ContactCenterConnections(Protocol):
@@ -463,9 +464,6 @@ class ContactCenterConnections(Protocol):
     async def delete(self, organisation_id: int) -> None:
         """Remove the organisation's connection and its secrets."""
         ...
-
-
-"""The configured dispatcher per platform (ADR 0032 point 5); empty without a contact center."""
 
 
 class ProbeRegistry(Protocol):

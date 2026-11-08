@@ -109,6 +109,16 @@ organisatie is inderdaad wat moet kunnen".
     (`WEBEX_CLIENT_*`, `WXCC_API_BASE_URL`, `WXCC_WEBHOOK_SECRET`) and its events keep arriving
     at `/webhooks/contact-center/{kind}` and `/webhooks/wxcc`. The minor after that drops the
     fallback, the installation-wide WxCC settings and the address without an organisation.
+12. **Open for CC-4b.** Before the dispatcher sends an organisation's client secret and refresh
+    token to its API host, CC-4b decides whether hosts on loopback, private or link-local
+    addresses are refused (credential redirection). Only the superuser can set the host, so
+    CC-4a accepts any https host name.
+
+**Settings.** The amendment adds no setting. The connection is integration data, sealed per
+organisation (ADR 0008), not a class D setting: its secrets are write-only and the webhook
+secret is generated. Fixed on purpose: the webhook secret's 32 random bytes (a crypto
+parameter) and the field shapes (an https host with at most a port; client id
+`[A-Za-z0-9_.:-]{1,200}`; secrets up to 4,096 printable characters without spaces).
 
 ## Build status
 

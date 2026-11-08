@@ -19,15 +19,14 @@ platform, so a bot that is set up wrong never turns the Service App's Webex heal
 import time
 from collections.abc import Callable
 from datetime import datetime
-from typing import Protocol
 
 import httpx
 import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.credentials import CredentialStore
+from app.adapters.db.credentials import Secrets
 from app.adapters.db.uow import bot_credential_name
-from app.adapters.integrations import secret_box
+from app.adapters.integrations import sealed_store
 from app.adapters.webex_auth import http_failure
 from app.config import Settings
 from app.domain.alert_model import AlertChannelKind, AlertTarget, RenderedAlert
@@ -45,22 +44,6 @@ from app.domain.ports import (
 log = structlog.get_logger()
 MESSAGES_PATH = "/v1/messages"
 TIMEOUT_SECONDS = 15.0
-
-
-class Secrets(Protocol):
-    """The encrypted credential store (``CredentialStore``): read and write by name."""
-
-    async def get(self, name: str) -> dict[str, object] | None:
-        """Return the credential ``name``, or ``None``."""
-        ...
-
-    async def put(self, name: str, value: dict[str, object], now: datetime) -> None:
-        """Store the credential ``name``."""
-        ...
-
-    async def delete(self, name: str) -> None:
-        """Remove the credential ``name``."""
-        ...
 
 
 bot_name = bot_credential_name
@@ -220,8 +203,8 @@ class ConfiguredAlertSenders:
 
 def alert_bots(engine: AsyncEngine, settings: Settings) -> BotTokens | None:
     """Return the bot tokens, or ``None`` without a settings key (nothing can be sealed)."""
-    box = secret_box(settings)
-    return BotTokens(CredentialStore(engine, box)) if box is not None else None
+    store = sealed_store(engine, settings)
+    return BotTokens(store) if store is not None else None
 
 
 class BotSpacePoster:

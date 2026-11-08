@@ -378,16 +378,10 @@ class AlertTargetService:
         if organisation is None:
             require(await self._admin.authorize(principal, Permission.SETTINGS_PLATFORM_MANAGE))
             return None, Permission.SETTINGS_PLATFORM_MANAGE
-        require(
-            await self._admin.authorize(
-                principal, Permission.INTEGRATIONS_MANAGE, organisation_slug=organisation
-            )
+        permission = Permission.INTEGRATIONS_MANAGE
+        return await self._admin.authorize_organisation(principal, permission, organisation), (
+            permission
         )
-        async with self._uow.read() as tx:
-            found = await tx.get_organisation(organisation)
-        if found is None:
-            raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
-        return found.id, Permission.INTEGRATIONS_MANAGE
 
     async def _target(
         self, tx: Transaction, organisation_id: int | None, target_id: int

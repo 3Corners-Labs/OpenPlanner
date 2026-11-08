@@ -13,7 +13,7 @@ one minor (point 11, ADR 0116).
     remove(org) ─► audit ─► record deleted
 """
 
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, record_change
 from app.domain.authorization import Permission, Principal
 from app.domain.contact_center import CONNECTION_FIELD, ConnectionChange, OrganisationConnection
 from app.domain.errors import DomainError, ErrorCode
@@ -75,8 +75,7 @@ class ContactCenterConnectionService:
         connections = self._ready()
         if change.client_secret is None and await connections.get(organisation_id) is None:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_secret")
-        sent = [name for name in ("client_secret", "refresh_token") if getattr(change, name)]
-        detail = ",".join([f"{AUDIT_KEY}.save", f"kind:{change.kind.value}", *sent])
+        detail = ",".join([f"{AUDIT_KEY}.save", f"kind:{change.kind.value}", *change.secrets_sent])
         await self._audit(principal, organisation, detail)
         await connections.save(organisation_id, change, self._clock.now())
 
@@ -105,16 +104,6 @@ class ContactCenterConnectionService:
         await self._audit(principal, organisation, f"{AUDIT_KEY}.remove")
         await connections.delete(organisation_id)
 
-    async def organisation_of(self, slug: str) -> int | None:
-        """Return the id of the organisation ``slug`` for its webhook address (no principal).
-
-        The webhook route verifies the event with that organisation's own secret afterwards;
-        nothing about the organisation is answered here.
-        """
-        async with self._uow.read() as tx:
-            found = await tx.get_organisation(slug)
-        return found.id if found is not None else None
-
     def _ready(self) -> ContactCenterConnections:
         """Return the sealed connections, or refuse when no settings key is configured."""
         if self._connections is None:
@@ -130,9 +119,4 @@ class ContactCenterConnectionService:
 
     async def _authorize(self, principal: Principal, organisation: str) -> int:
         """Authorise ``integrations.manage`` on the organisation; return its id."""
-        require(await self._admin.authorize(principal, PERMISSION, organisation_slug=organisation))
-        async with self._uow.read() as tx:
-            found = await tx.get_organisation(organisation)
-        if found is None or found.id is None:
-            raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
-        return found.id
+        return await self._admin.authorize_organisation(principal, PERMISSION, organisation)

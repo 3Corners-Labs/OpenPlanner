@@ -247,15 +247,22 @@ class ConnectionChange:
     refresh_token: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate every field; secrets are checked for shape only, never echoed."""
+        """Validate every field and drop a trailing slash; secrets are checked for shape only."""
         if not API_HOST.fullmatch(self.api_base_url):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}api_base_url")
+        object.__setattr__(self, "api_base_url", self.api_base_url.rstrip("/"))
         if not CLIENT_ID.fullmatch(self.client_id):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_id")
-        for name in ("client_secret", "refresh_token"):
-            value = getattr(self, name)
-            if value is not None and not _secret_shape(value):
-                raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}{name}")
+        if self.client_secret is not None and not _secret_shape(self.client_secret):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_secret")
+        if self.refresh_token is not None and not _secret_shape(self.refresh_token):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}refresh_token")
+
+    @property
+    def secrets_sent(self) -> tuple[str, ...]:
+        """Return the names of the secrets this change replaces (for the audit, never values)."""
+        sent = (("client_secret", self.client_secret), ("refresh_token", self.refresh_token))
+        return tuple(name for name, value in sent if value)
 
 
 def _secret_shape(value: str) -> bool:

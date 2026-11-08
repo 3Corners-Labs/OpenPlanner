@@ -25,9 +25,9 @@ from starlette.responses import Response
 from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.contact_centers import INBOUND, inbound
 from app.adapters.webhooks import InboundWebhook, parse_webex, verify_webex
+from app.domain.admin import AdminService
 from app.domain.connection_health import InboundEvent, Platform
 from app.domain.contact_center import ContactCenterKind
-from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.integration import EventOutcome, IntegrationService
 from app.domain.integration_health import IntegrationHealthService
 from app.domain.ports import Clock
@@ -144,8 +144,8 @@ async def organisation_contact_center(request: Request, kind: str, org: str) -> 
     connections: SealedConnections | None = request.app.state.contact_center_connections
     if handling is None or connections is None or not is_slug(org):
         return Response(status_code=404)
-    service: ContactCenterConnectionService = request.app.state.contact_center_connection_service
-    organisation_id = await service.organisation_of(org)
+    admin: AdminService = request.app.state.admin_service
+    organisation_id = await admin.organisation_id(org)
     if organisation_id is None:
         return Response(status_code=404)
     secret = await connections.webhook_secret(organisation_id, handling.kind)

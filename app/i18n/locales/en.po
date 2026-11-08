@@ -10598,3 +10598,12 @@ msgstr "A new webhook secret was made."
 
 msgid "admin.done.contact_center_refused"
 msgstr "That was not possible: this organisation has no own connection yet, or no settings key is configured."
+
+msgid "admin.form.error.cc_api_base_url"
+msgstr "Enter an https address with only a host name and optionally a port."
+
+msgid "admin.form.error.cc_client_id"
+msgstr "A client ID consists of letters, digits and . _ : - without spaces."
+
+msgid "admin.form.error.cc_secret"
+msgstr "Enter the secret as one line without spaces."

@@ -92,7 +92,8 @@ wist de koppeling en haar geheimen.
 
 Zolang een organisatie geen eigen koppeling heeft, gebruikt zij de koppeling van de installatie.
 Die terugval verdwijnt in een volgende versie. Het versturen van taken via de eigen koppeling
-komt in de volgende stap; tot dan legt deze kaart de koppeling en het webhookadres vast.
+komt in de volgende stap; tot dan legt deze kaart de koppeling en het webhookadres vast. Het
+webhookadres werkt pas als OpenPlanner in die stap de melding bij het contactcenter aanmeldt.
 
 ## Wat wordt vastgelegd
 

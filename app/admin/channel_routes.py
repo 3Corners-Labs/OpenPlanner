@@ -23,21 +23,19 @@ shown. It is rate-limited like the test email, since it makes the server send DN
 """
 
 from datetime import datetime
-from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from starlette.responses import HTMLResponse, Response
 
-from app.adapters.contact_centers import DESCRIPTORS
-from app.adapters.webhooks import CONTACT_CENTER_PATH
 from app.admin import forms
 from app.admin.alert_routes import alert_view
-from app.admin.authz import AdminContext, RequirePermission
+from app.admin.authz import AdminContext
+from app.admin.channel_fields import Manage, channels_url, secret_field, value_of
+from app.admin.contact_center_routes import CONNECTION_ANCHOR, connection_service, connection_view
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import Locale, SameOrigin, organisation_header
 from app.admin.pages import page as _page
-from app.domain.authorization import Permission
 from app.domain.channel_service import ChannelOverview, ChannelSettingsService
 from app.domain.channel_settings import (
     ChannelConfig,
@@ -48,8 +46,7 @@ from app.domain.channel_settings import (
     SmtpSettings,
 )
 from app.domain.channels import ChannelKind
-from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
-from app.domain.contact_center_connection import ContactCenterConnectionService
+from app.domain.contact_center import ConnectionChange, ContactCenterKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.mail_domain import DomainReport, Record, Verdict
 from app.i18n import BoundGettext
@@ -126,50 +123,14 @@ REASON_LABELS: dict[str, str] = {
 }
 """Explanation per reason code of ``app.domain.mail_domain``; a test checks every reason."""
 
-CONNECTION_ANCHOR = "contact-center"
-"""The id of the contact-center card, so a confirmation scrolls to it."""
 CHANNEL_PATHS = {"email": ChannelKind.EMAIL, "sms": ChannelKind.SMS}
 """The channels in URLs; anything else is a 404."""
-
-Manage = Annotated[
-    AdminContext,
-    Depends(
-        RequirePermission(Permission.INTEGRATIONS_MANAGE, organisation_param="org", fresh=True)
-    ),
-]
-"""The permission of every channel page of one organisation."""
 
 
 def channel_service(request: Request) -> ChannelSettingsService:
     """Return the application's channel settings service."""
     service: ChannelSettingsService = request.app.state.channel_service
     return service
-
-
-def _url(org: str) -> str:
-    """Return the channels page of organisation ``org``."""
-    return f"/admin/organisations/{org}/channels"
-
-
-def _value(form: FormData, name: str, stored: object) -> str:
-    """Return the submitted value of ``name``, else the stored one ('' for none)."""
-    if name in form.values:
-        return form.values[name]
-    return "" if stored is None else str(stored)
-
-
-def _secret_field(name: str, label: str, hint: str, form: FormData, required: bool) -> Field:
-    """Return a write-only secret input: always empty, never echoed back."""
-    return Field(
-        name,
-        label,
-        "password",
-        "",
-        hint=hint,
-        error=form.error_for(name),
-        required=required,
-        attributes={"autocomplete": "new-password", "spellcheck": "false"},
-    )
 
 
 def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext) -> list[Field]:
@@ -180,7 +141,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
         Field(
             "smtp_host",
             _("admin.channels.smtp_host"),
-            value=_value(form, "smtp_host", config.host if config else None),
+            value=value_of(form, "smtp_host", config.host if config else None),
             hint=_("admin.channels.smtp_host_hint"),
             error=form.error_for("smtp_host"),
             attributes={"autocapitalize": "none", "spellcheck": "false"},
@@ -189,7 +150,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
             "smtp_port",
             _("admin.channels.smtp_port"),
             "number",
-            _value(form, "smtp_port", config.port if config else 587),
+            value_of(form, "smtp_port", config.port if config else 587),
             hint=_("admin.channels.smtp_port_hint"),
             error=form.error_for("smtp_port"),
             attributes={"min": "1", "max": "65535", "inputmode": "numeric"},
@@ -205,13 +166,13 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
         Field(
             "smtp_username",
             _("admin.channels.smtp_username"),
-            value=_value(form, "smtp_username", config.username if config else None),
+            value=value_of(form, "smtp_username", config.username if config else None),
             hint=_("admin.channels.smtp_username_hint"),
             error=form.error_for("smtp_username"),
             required=False,
             attributes={"autocomplete": "off", "autocapitalize": "none", "spellcheck": "false"},
         ),
-        _secret_field(
+        secret_field(
             "smtp_credential",
             _("admin.channels.smtp_password"),
             _("admin.channels.secret_hint_set")
@@ -224,7 +185,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
             "sender_address",
             _("admin.channels.sender_address"),
             "email",
-            _value(form, "sender_address", config.sender_address if config else None),
+            value_of(form, "sender_address", config.sender_address if config else None),
             hint=_("admin.channels.sender_address_hint"),
             error=form.error_for("sender_address"),
             attributes={"autocomplete": "off", "spellcheck": "false"},
@@ -232,7 +193,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
         Field(
             "sender_name",
             _("admin.channels.sender_name"),
-            value=_value(form, "sender_name", config.sender_name if config else None),
+            value=value_of(form, "sender_name", config.sender_name if config else None),
             hint=_("admin.channels.sender_name_hint"),
             error=form.error_for("sender_name"),
             required=False,
@@ -241,7 +202,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
             "reply_to_address",
             _("admin.channels.reply_to_address"),
             "email",
-            _value(form, "reply_to_address", config.reply_to_address if config else None),
+            value_of(form, "reply_to_address", config.reply_to_address if config else None),
             hint=_("admin.channels.reply_to_address_hint"),
             error=form.error_for("reply_to_address"),
             required=False,
@@ -250,7 +211,7 @@ def _smtp_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext
         Field(
             "dkim_selector",
             _("admin.channels.dkim_selector"),
-            value=_value(form, "dkim_selector", config.dkim_selector if config else None),
+            value=value_of(form, "dkim_selector", config.dkim_selector if config else None),
             hint=_("admin.channels.dkim_selector_hint"),
             error=form.error_for("dkim_selector"),
             required=False,
@@ -279,12 +240,12 @@ def _sms_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext)
             "sms_api_base_url",
             _("admin.channels.sms_api_base_url"),
             "url",
-            _value(form, "sms_api_base_url", config.api_base_url if config else None),
+            value_of(form, "sms_api_base_url", config.api_base_url if config else None),
             hint=_("admin.channels.sms_api_base_url_hint"),
             error=form.error_for("sms_api_base_url"),
             attributes={"autocapitalize": "none", "spellcheck": "false"},
         ),
-        _secret_field(
+        secret_field(
             "sms_api_key",
             _("admin.channels.sms_api_key"),
             _("admin.channels.secret_hint_set")
@@ -296,7 +257,7 @@ def _sms_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext)
         Field(
             "sms_sender_id",
             _("admin.channels.sms_sender_id"),
-            value=_value(form, "sms_sender_id", config.sender_id if config else None),
+            value=value_of(form, "sms_sender_id", config.sender_id if config else None),
             hint=_("admin.channels.sms_sender_id_hint"),
             error=form.error_for("sms_sender_id"),
             attributes={"spellcheck": "false"},
@@ -304,7 +265,7 @@ def _sms_fields(form: FormData, stored: ChannelSettings | None, _: BoundGettext)
         Field(
             "sms_country_code",
             _("admin.channels.sms_country_code"),
-            value=_value(form, "sms_country_code", config.country_code if config else "31"),
+            value=value_of(form, "sms_country_code", config.country_code if config else "31"),
             hint=_("admin.channels.sms_country_code_hint"),
             error=form.error_for("sms_country_code"),
             attributes={"inputmode": "numeric", "maxlength": "3"},
@@ -347,89 +308,6 @@ def _status(stored: ChannelSettings | None, locale: RequestLocale, tz: ZoneInfo)
     if not stored.ready:
         return {"label": _("admin.channels.secret_missing"), "tone": "warning", "changed": changed}
     return {"label": _("admin.channels.ready"), "tone": "success", "changed": changed}
-
-
-def connection_service(request: Request) -> ContactCenterConnectionService:
-    """Return the application's contact-center connection service (ADR 0032 point 9)."""
-    service: ContactCenterConnectionService = request.app.state.contact_center_connection_service
-    return service
-
-
-def _connection_fields(
-    form: FormData, stored: OrganisationConnection | None, _: BoundGettext
-) -> list[Field]:
-    """Return the contact-center connection inputs; the secrets are write-only."""
-    secret_hint = _("admin.channels.secret_hint_set")
-    return [
-        Field(
-            "cc_kind",
-            _("admin.channels.cc_kind"),
-            "select",
-            form.values.get("cc_kind", stored.kind.value if stored else ContactCenterKind.WEBEX_CC),
-            error=form.error_for("cc_kind"),
-            options=tuple(
-                forms.Option(kind.value, _(d.label_key)) for kind, d in DESCRIPTORS.items()
-            ),
-        ),
-        Field(
-            "cc_api_base_url",
-            _("admin.channels.cc_api_base_url"),
-            "url",
-            _value(form, "cc_api_base_url", stored.api_base_url if stored else None),
-            hint=_("admin.channels.cc_api_base_url_hint"),
-            error=form.error_for("cc_api_base_url"),
-            attributes={"autocapitalize": "none", "spellcheck": "false"},
-        ),
-        Field(
-            "cc_client_id",
-            _("admin.channels.cc_client_id"),
-            value=_value(form, "cc_client_id", stored.client_id if stored else None),
-            hint=_("admin.channels.cc_client_id_hint"),
-            error=form.error_for("cc_client_id"),
-            attributes={"autocapitalize": "none", "spellcheck": "false"},
-        ),
-        _secret_field(
-            "cc_client_secret",
-            _("admin.channels.cc_client_secret"),
-            secret_hint
-            if stored and stored.has_client_secret
-            else _("admin.channels.cc_client_secret_hint"),
-            form,
-            required=not (stored and stored.has_client_secret),
-        ),
-        _secret_field(
-            "cc_refresh_token",
-            _("admin.channels.cc_refresh_token"),
-            secret_hint
-            if stored and stored.has_refresh_token
-            else _("admin.channels.cc_refresh_token_hint"),
-            form,
-            required=False,
-        ),
-    ]
-
-
-async def _connection_view(
-    request: Request,
-    locale: RequestLocale,
-    context: AdminContext,
-    org: str,
-    form: FormData,
-    tz: ZoneInfo,
-) -> dict[str, object]:
-    """Return the contact-center card: its form, webhook address and when its secret was made."""
-    service = connection_service(request)
-    _ = locale.gettext
-    stored = await service.view(context.principal, org)
-    base = request.app.state.settings.webhook_base
-    made = stored.webhook_secret_at if stored else None
-    return {
-        "available": service.available,
-        "stored": stored is not None,
-        "fields": _connection_fields(form, stored, _),
-        "webhook": f"{base}{CONTACT_CENTER_PATH}/{stored.kind.value}/{org}" if stored else "",
-        "secret_made": moment_label(made, tz, locale.code) if made else "",
-    }
 
 
 async def _form_page(
@@ -482,7 +360,7 @@ async def _form_page(
             "errors": email.errors + sms.errors + test.errors + domain.errors + connection.errors,
             "done": forms.done_message(request, _),
             "alerts": await alert_view(request, _, context.principal, org),
-            "contact_center": await _connection_view(request, locale, context, org, connection, tz),
+            "contact_center": await connection_view(request, locale, context, org, connection, tz),
         },
     )
     response.status_code = status
@@ -532,7 +410,7 @@ async def _save(
             forms.raise_refusal(error)
             form.refusal(error)
         else:
-            return forms.redirect_done(_url(org), "saved" if changed else "unchanged")
+            return forms.redirect_done(channels_url(org), "saved" if changed else "unchanged")
     return await _form_page(request, locale, context, org, {channel: form}, 422)
 
 
@@ -611,7 +489,7 @@ async def send_test_email(
             form.refusal(error)
     else:
         if failure is None:
-            return forms.redirect_done(_url(org), "test_sent")
+            return forms.redirect_done(channels_url(org), "test_sent")
         form.errors.append(FormError(TEST_FIELD, _test_failure(failure, gettext)))
     return await _form_page(request, locale, context, org, {}, 422, form)
 
@@ -659,34 +537,8 @@ async def save_contact_center(
             forms.raise_refusal(error)
             form.refusal(error)
         else:
-            return forms.redirect_done(_url(org), "saved", anchor=CONNECTION_ANCHOR)
+            return forms.redirect_done(channels_url(org), "saved", anchor=CONNECTION_ANCHOR)
     return await _form_page(request, locale, context, org, {}, 422, connection=form)
-
-
-@router.post("/organisations/{org}/channels/contact-center/webhook-secret")
-async def rotate_contact_center_secret(
-    request: Request, org: str, _: SameOrigin, context: Manage
-) -> Response:
-    """Generate a new webhook secret for the organisation's connection."""
-    try:
-        await connection_service(request).rotate_webhook_secret(context.principal, org)
-    except DomainError as error:
-        forms.raise_refusal(error)
-        return forms.redirect_done(_url(org), "contact_center_refused", anchor=CONNECTION_ANCHOR)
-    return forms.redirect_done(_url(org), "webhook_secret_rotated", anchor=CONNECTION_ANCHOR)
-
-
-@router.post("/organisations/{org}/channels/contact-center/delete")
-async def remove_contact_center(
-    request: Request, org: str, _: SameOrigin, context: Manage
-) -> Response:
-    """Remove the organisation's connection; it falls back to the installation's."""
-    try:
-        await connection_service(request).remove(context.principal, org)
-    except DomainError as error:
-        forms.raise_refusal(error)
-        return forms.redirect_done(_url(org), "contact_center_refused", anchor=CONNECTION_ANCHOR)
-    return forms.redirect_done(_url(org), "removed", anchor=CONNECTION_ANCHOR)
 
 
 @router.post("/organisations/{org}/channels/{channel}/remove", response_class=HTMLResponse)
@@ -702,4 +554,4 @@ async def remove_channel(
     except DomainError as error:
         forms.raise_refusal(error)
         raise
-    return forms.redirect_done(_url(org), "removed")
+    return forms.redirect_done(channels_url(org), "removed")

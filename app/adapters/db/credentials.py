@@ -7,7 +7,7 @@ lock (``BEGIN IMMEDIATE``) like every other writer.
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -15,6 +15,22 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.crypto import SecretBox
 from app.adapters.db.models import IntegrationCredentialRow
 from app.adapters.db.uow import locked_session
+
+
+class Secrets(Protocol):
+    """The encrypted credential store, read and written by name (``CredentialStore``, a fake)."""
+
+    async def get(self, name: str) -> dict[str, object] | None:
+        """Return the credential ``name``, or ``None``."""
+        ...
+
+    async def put(self, name: str, value: dict[str, object], now: datetime) -> None:
+        """Store the credential ``name``."""
+        ...
+
+    async def delete(self, name: str) -> None:
+        """Remove the credential ``name``."""
+        ...
 
 
 class CredentialStore:

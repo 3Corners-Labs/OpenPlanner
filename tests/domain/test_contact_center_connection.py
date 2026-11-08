@@ -4,13 +4,12 @@ from datetime import timedelta
 
 import pytest
 
-from app.adapters.contact_center_connections import SealedConnections
 from app.domain.admin import AdminService
 from app.domain.contact_center import ConnectionChange, ContactCenterKind
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeSecrets
+from tests.fakes.integrations import FakeContactCenterConnections
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, two_organisations
 from tests.support.domain import NOW
@@ -32,8 +31,8 @@ def change(**overrides: object) -> ConnectionChange:
 
 
 @pytest.fixture
-def secrets() -> FakeSecrets:
-    return FakeSecrets()
+def connections() -> FakeContactCenterConnections:
+    return FakeContactCenterConnections()
 
 
 @pytest.fixture
@@ -48,17 +47,15 @@ def clock() -> FixedClock:
 
 @pytest.fixture
 def service(
-    uow: InMemoryUnitOfWork, clock: FixedClock, secrets: FakeSecrets
+    uow: InMemoryUnitOfWork, clock: FixedClock, connections: FakeContactCenterConnections
 ) -> ContactCenterConnectionService:
-    return ContactCenterConnectionService(
-        uow, clock, AdminService(uow, clock), SealedConnections(secrets)
-    )
+    return ContactCenterConnectionService(uow, clock, AdminService(uow, clock), connections)
 
 
-async def test_a_connection_is_kept_sealed_and_shown_without_its_secrets(
-    service: ContactCenterConnectionService, uow: InMemoryUnitOfWork, secrets: FakeSecrets
+async def test_a_connection_is_kept_and_its_audit_names_fields_not_values(
+    service: ContactCenterConnectionService, uow: InMemoryUnitOfWork
 ) -> None:
-    await service.save(SUPER, "demo", change())
+    await service.save(SUPER, "demo", change(api_base_url=f"{HOST}/"))
 
     shown = await service.view(SUPER, "demo")
 
@@ -66,10 +63,6 @@ async def test_a_connection_is_kept_sealed_and_shown_without_its_secrets(
     assert (shown.kind, shown.api_base_url, shown.client_id) == (WXCC, HOST, "C0ffee-client")
     assert shown.has_client_secret
     assert shown.has_refresh_token
-    assert shown.webhook_secret_at == NOW
-    assert "client-secret-value" not in repr(shown)
-    stored = secrets.values["contact-center:1"]
-    assert len(str(stored["webhook_secret"])) >= 32  # WxCC wants 32–256 characters
     [event] = [e for e in uow.state.audit if "contact_center_connection" in e.detail]
     assert event.detail == (
         "contact_center_connection.save,kind:webex_cc,client_secret,refresh_token"
@@ -77,33 +70,30 @@ async def test_a_connection_is_kept_sealed_and_shown_without_its_secrets(
     assert "client-secret-value" not in event.detail
 
 
-async def test_a_blank_secret_keeps_the_stored_one_but_a_new_connection_needs_one(
-    service: ContactCenterConnectionService, secrets: FakeSecrets
+async def test_a_new_connection_needs_a_client_secret(
+    service: ContactCenterConnectionService, uow: InMemoryUnitOfWork
 ) -> None:
     with pytest.raises(DomainError) as refused:
         await service.save(SUPER, "demo", change(client_secret=None))
     assert refused.value.field == "contact_center_connection.client_secret"
 
     await service.save(SUPER, "demo", change())
-    await service.save(
-        SUPER, "demo", change(client_secret=None, refresh_token=None, client_id="other")
-    )
+    await service.save(SUPER, "demo", change(client_secret=None, refresh_token=None))
 
-    stored = secrets.values["contact-center:1"]
-    assert stored["client_secret"] == "client-secret-value"
-    assert stored["client_id"] == "other"
+    assert uow.state.audit[-1].detail == "contact_center_connection.save,kind:webex_cc"
 
 
-async def test_rotating_replaces_the_webhook_secret(
-    service: ContactCenterConnectionService, secrets: FakeSecrets, clock: FixedClock
+async def test_rotating_makes_a_new_webhook_secret(
+    service: ContactCenterConnectionService,
+    connections: FakeContactCenterConnections,
+    clock: FixedClock,
 ) -> None:
     await service.save(SUPER, "demo", change())
-    before = secrets.values["contact-center:1"]["webhook_secret"]
     clock.advance(timedelta(days=1))
 
     await service.rotate_webhook_secret(SUPER, "demo")
 
-    assert secrets.values["contact-center:1"]["webhook_secret"] != before
+    assert connections.rotations == 1
     shown = await service.view(SUPER, "demo")
     assert shown is not None
     assert shown.webhook_secret_at == NOW + timedelta(days=1)
@@ -119,14 +109,14 @@ async def test_rotating_without_a_connection_is_refused(
 
 
 async def test_removing_falls_back_to_the_installation(
-    service: ContactCenterConnectionService, secrets: FakeSecrets
+    service: ContactCenterConnectionService, connections: FakeContactCenterConnections
 ) -> None:
     await service.save(SUPER, "demo", change())
 
     await service.remove(SUPER, "demo")
 
     assert await service.view(SUPER, "demo") is None
-    assert secrets.values == {}
+    assert connections.connections == {}
 
 
 @pytest.mark.parametrize("who", [ORG_ADMIN, OUTSIDER, GROUP_ADMIN])
@@ -161,6 +151,7 @@ async def test_without_a_settings_key_nothing_can_be_kept(
     [
         ("api_base_url", "http://api.example.com"),
         ("api_base_url", "https://api.example.com/path?x=1"),
+        ("api_base_url", "https://user@api.example.com"),
         ("client_id", "has space"),
         ("client_secret", "two words"),
         ("refresh_token", "x" * 4097),
@@ -173,19 +164,3 @@ def test_the_fields_are_checked_and_the_refusal_names_only_the_field(
         change(**{field: value})
 
     assert refused.value.field == f"contact_center_connection.{field}"
-
-
-async def test_the_webhook_secret_is_only_for_the_connected_kind(
-    service: ContactCenterConnectionService, secrets: FakeSecrets
-) -> None:
-    connections = SealedConnections(secrets)
-    assert await connections.webhook_secret(1, WXCC) is None
-    await service.save(SUPER, "demo", change())
-
-    assert (
-        await connections.webhook_secret(1, WXCC)
-        == secrets.values["contact-center:1"]["webhook_secret"]
-    )
-    assert await connections.webhook_secret(2, WXCC) is None
-    assert await service.organisation_of("demo") == 1
-    assert await service.organisation_of("unknown") is None
