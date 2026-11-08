@@ -11170,3 +11170,24 @@ msgstr "Let op: dit plan wijzigt een claimwaarde (de sleutel van een organisatie
 
 msgid "admin.configuration.warning.webex"
 msgstr "Let op: dit plan vervangt de tokens van de Webex Service App. De installatie waar het document vandaan komt, kan daardoor geen verbinding meer maken."
+
+msgid "details.title"
+msgstr "Gegevens aanpassen"
+
+msgid "details.email"
+msgstr "E-mailadres"
+
+msgid "details.email_hint"
+msgstr "Het e-mailadres kunt u hier niet wijzigen. Wilt u een ander adres gebruiken, annuleer dan deze afspraak en maak een nieuwe."
+
+msgid "details.save"
+msgstr "Wijzigingen opslaan"
+
+msgid "details.back"
+msgstr "Terug naar uw afspraak"
+
+msgid "manage.details"
+msgstr "Gegevens aanpassen"
+
+msgid "manage.notice.details"
+msgstr "Uw gegevens zijn aangepast."
