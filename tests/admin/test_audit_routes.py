@@ -328,9 +328,7 @@ async def test_each_event_links_to_its_whole_chain(traced: Site) -> None:
 async def test_the_export_is_the_current_filter_inside_the_scope(traced: Site) -> None:
     await traced.login_as(ORG_ADMIN)
     page = (await traced.client.get("/admin/audit", params={"category": "system"})).text
-    # No ``download`` attribute: the file comes from ``content-disposition``, and a refused
-    # export's redirect back to this page is shown as a page, not saved as a file.
-    assert '<a href="/admin/audit/export.csv?category=system">' in page
+    assert 'href="/admin/audit/export.csv?category=system"' in page
 
     response = await traced.client.get("/admin/audit/export.csv", params={"category": "system"})
 

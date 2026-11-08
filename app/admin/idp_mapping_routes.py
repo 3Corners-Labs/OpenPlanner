@@ -238,9 +238,7 @@ async def idp_mapping(request: Request, locale: Locale, context: View) -> HTMLRe
 
 
 @router.get("/idp-mapping/export.txt", response_model=None)
-async def export_idp_mapping(
-    request: Request, locale: Locale, _: SameOrigin, context: View
-) -> Response:
+async def export_idp_mapping(request: Request, _: SameOrigin, context: View) -> Response:
     """Download the values as a text file, one per line; the download is audited.
 
     So, like the audit log export, it refuses a request another site makes (``SameOrigin``).

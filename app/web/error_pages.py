@@ -50,15 +50,26 @@ _NOT_FOUND = {
 }
 
 
-def _page(request: Request, status: int, title_key: str, message_key: str) -> Response:
-    """Render the generic error page."""
+def _page(
+    request: Request,
+    status: int,
+    title_key: str,
+    message_key: str,
+    *,
+    language_switcher: bool = True,
+) -> Response:
+    """Render the generic error page; ``language_switcher=False`` leaves its links out."""
     locale = resolve_locale(request)
     response = render(
         templates,
         request,
         "error.html",
         locale,
-        {"title": locale.gettext(title_key), "message": locale.gettext(message_key)},
+        {
+            "title": locale.gettext(title_key),
+            "message": locale.gettext(message_key),
+            "hide_language_switcher": not language_switcher,
+        },
     )
     response.status_code = status
     return response
@@ -98,7 +109,12 @@ async def rejected_request_page(request: Request, exc: Exception) -> Response:
     status = exc.status if isinstance(exc, RejectedRequest) else 400
     if isinstance(exc, RejectedRequest) and exc.reason:
         await report(request, REQUEST_REJECTED, exc.reason)
-    return _page(request, status, "error.title", "error.invalid_request")
+    # A refused GET is an action refused at its own address (an audited download): the
+    # language links are query-only, so one of them would ask for the action again.
+    switcher = request.method != "GET"
+    return _page(
+        request, status, "error.title", "error.invalid_request", language_switcher=switcher
+    )
 
 
 async def validation_error_page(request: Request, exc: Exception) -> Response:

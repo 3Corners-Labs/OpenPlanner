@@ -31,6 +31,7 @@ async def test_a_download_another_site_asks_for_is_refused_and_not_audited(
 
     assert response.status_code == 403
     assert "content-disposition" not in response.headers
+    assert "hreflang" not in response.text  # its language links would ask for the download
     events = [(action, outcome, reason) for _, action, outcome, reason in await audit_events(site)]
     assert (REQUEST_REJECTED, Outcome.DENIED, CROSS_SITE) in events
     assert AUDITED_DOWNLOADS[path] not in {action for action, _, _ in events}
@@ -82,3 +83,13 @@ async def test_a_typed_download_without_a_session_returns_to_the_overview_after_
 
     assert response.status_code == 303
     assert response.headers["location"] == "/admin/login?next=/admin/"
+
+
+async def test_a_refused_form_post_keeps_its_language_links(site: Site) -> None:
+    # Only a refused GET, an action at its own address, leaves them out.
+    await site.login_as(SUPER)
+
+    response = await site.client.post("/admin/logout", headers={"sec-fetch-site": "cross-site"})
+
+    assert response.status_code == 403
+    assert "hreflang" in response.text

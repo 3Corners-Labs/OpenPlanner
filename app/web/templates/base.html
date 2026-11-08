@@ -26,7 +26,7 @@
       {{ _("site.name") }}
       {%- endif -%}
     {% endblock %}</p>
-    {% include "_language_switcher.html" %}
+    {% if not (hide_language_switcher | default(false)) %}{% include "_language_switcher.html" %}{% endif %}
     {% block header_extra %}{% endblock %}
   </header>
   <main id="content" tabindex="-1">
