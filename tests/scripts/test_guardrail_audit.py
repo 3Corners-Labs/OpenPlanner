@@ -289,6 +289,10 @@ def test_a_line_has_mains_rules_without_a_bypass_and_only_creation_is_bypassed()
     )
     expected = json.loads(json.dumps(main["rules"]))
     expected["required_status_checks"]["do_not_enforce_on_create"] = True
+    # GitHub refuses a merge queue on a wildcard ref: a line's pull request must be up to date
+    # with the line instead, and runs the full lane on the pull request (ci.yml).
+    del expected["merge_queue"]
+    expected["required_status_checks"]["strict_required_status_checks_policy"] = True
 
     assert line["rules"] == expected
     assert line["bypass_actors"] == main["bypass_actors"] == []

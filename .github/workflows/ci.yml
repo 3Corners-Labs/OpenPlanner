@@ -1,7 +1,8 @@
 name: ci
 
 # ADR 0058: two lanes. The fast lane runs everywhere; the full lane (`matrix`, `container`,
-# `e2e`) runs in the merge queue, on `main`, and on a pull request labelled `ci:full`. On any
+# `e2e`) runs in the merge queue, on `main`, on a pull request labelled `ci:full`, and on every
+# pull request into a maintenance line release/X.Y (ADR 0116), which has no merge queue. On any
 # other pull request those jobs end as skipped, which a required check accepts, and the queue
 # runs them before anything reaches `main`.
 on:
@@ -73,6 +74,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
+      || github.base_ref != github.event.repository.default_branch
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
@@ -208,6 +210,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
+      || github.base_ref != github.event.repository.default_branch
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
@@ -287,6 +290,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
+      || github.base_ref != github.event.repository.default_branch
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     env:

@@ -2,7 +2,7 @@ name: backport
 
 # ADR 0116 point 3: a fix merges to main first; the label `backport:X.Y` on its pull request
 # opens the cherry-pick pull request onto the maintenance line release/X.Y, which then runs the
-# full lane in the merge queue under the line's ruleset (and the decision gate, as on main).
+# full lane on the pull request under the line's ruleset (and the decision gate, as on main).
 # The label may be set before or after the merge. A cherry-pick that does not apply cleanly
 # opens nothing: the job comments on the pull request, and a Claude Code session (or a person)
 # makes the backport by hand with `git cherry-pick -x`.
@@ -85,7 +85,7 @@ jobs:
             git push --force origin "$branch"
             url="$(gh pr create --base "release/$line" --head "$branch" \
               --title "$TITLE (backport to $line)" \
-              --body "Cherry-pick of #$NUMBER ($COMMIT) onto \`release/$line\` (ADR 0116 point 3), opened by the backport workflow for the label \`backport:$line\`. The review questions and the security review are those of #$NUMBER; the line's merge queue runs the full lane.")"
+              --body "Cherry-pick of #$NUMBER ($COMMIT) onto \`release/$line\` (ADR 0116 point 3), opened by the backport workflow for the label \`backport:$line\`. The review questions and the security review are those of #$NUMBER; the pull request runs the full lane and must be up to date with the line.")"
             gh pr merge --auto --squash "$url"
             echo "::notice::opened $url"
           done
