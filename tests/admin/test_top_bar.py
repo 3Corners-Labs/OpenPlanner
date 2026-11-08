@@ -6,7 +6,6 @@ source shows none.
 """
 
 import re
-from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy import update
@@ -24,41 +23,7 @@ from tests.admin.conftest import (
 )
 from tests.support.admin_site import site_uow
 from tests.support.queue import own_queue
-
-LINK = re.compile(r'<a class="admin-topbar__link[^"]*" href="([^"]+)"([^>]*)>(.*?)</a>', re.DOTALL)
-
-
-@dataclass(frozen=True)
-class TopLink:
-    """One link of the top bar as the page renders it."""
-
-    href: str
-    label: str
-    count: str | None
-    aria_label: str | None
-    name: str
-
-
-def _top_bar(page: str) -> list[TopLink]:
-    """Return the links of the top bar's end, in order, before the profile menu."""
-    end = page.split('<div class="admin-topbar__end">', 1)[1].split(
-        '<details class="admin-profile">'
-    )[0]
-    links = []
-    for href, attrs, inner in LINK.findall(end):
-        label = re.search(r'admin-topbar__label">([^<]+)<', inner)
-        count = re.search(r'<span class="chip chip--accent">([^<]+)</span>', inner)
-        aria = re.search(r'aria-label="([^"]+)"', attrs)
-        links.append(
-            TopLink(
-                href,
-                label.group(1) if label else "",
-                count.group(1) if count else None,
-                aria.group(1) if aria else None,
-                " ".join(re.sub(r"<[^>]+>", " ", inner).split()),
-            )
-        )
-    return links
+from tests.support.top_bar import top_bar_links
 
 
 async def _seed_jobs(site: Site) -> int:
@@ -81,7 +46,7 @@ async def _seed_jobs(site: Site) -> int:
 async def test_the_links_come_before_help_in_a_fixed_order(site: Site) -> None:
     await site.login_as(SUPER)
 
-    links = _top_bar((await site.client.get("/admin/?lang=en")).text)
+    links = top_bar_links((await site.client.get("/admin/?lang=en")).text)
 
     assert [(link.href, link.label) for link in links] == [
         ("/admin/settings", "Status"),
@@ -105,7 +70,7 @@ async def test_each_link_shows_only_to_who_may_open_what_it_leads_to(site: Site)
     for who, (principal, labels) in expected.items():
         await site.login_as(principal)
 
-        links = _top_bar((await site.client.get("/admin/?lang=en")).text)
+        links = top_bar_links((await site.client.get("/admin/?lang=en")).text)
 
         assert [link.label for link in links] == labels, who
 
@@ -126,7 +91,7 @@ async def test_the_tasks_link_counts_running_and_failed_jobs_for_the_screen_read
 
     tasks = next(
         link
-        for link in _top_bar((await site.client.get("/admin/?lang=en")).text)
+        for link in top_bar_links((await site.client.get("/admin/?lang=en")).text)
         if link.label == "Tasks"
     )
 
@@ -142,7 +107,7 @@ async def test_the_count_speaks_dutch_too(site: Site) -> None:
 
     tasks = next(
         link
-        for link in _top_bar((await site.client.get("/admin/?lang=nl")).text)
+        for link in top_bar_links((await site.client.get("/admin/?lang=nl")).text)
         if link.label == "Taken"
     )
 
@@ -154,7 +119,7 @@ async def test_a_link_without_a_count_has_no_count_and_no_aria_label(site: Site)
     await _seed_jobs(site)
     await site.login_as(SUPER)
 
-    links = _top_bar((await site.client.get("/admin/?lang=en")).text)
+    links = top_bar_links((await site.client.get("/admin/?lang=en")).text)
 
     for link in links:
         if link.label != "Tasks":
@@ -167,7 +132,7 @@ async def test_no_active_jobs_means_no_count(site: Site) -> None:
 
     tasks = next(
         link
-        for link in _top_bar((await site.client.get("/admin/?lang=en")).text)
+        for link in top_bar_links((await site.client.get("/admin/?lang=en")).text)
         if link.label == "Tasks"
     )
 
@@ -181,7 +146,7 @@ async def test_the_links_are_on_every_admin_page_and_the_count_is_a_number_only(
 
     for path in ("/admin/", "/admin/audit", "/admin/rights", "/admin/settings"):
         page = (await site.client.get(path)).text
-        links = _top_bar(page)
+        links = top_bar_links(page)
 
         assert links[0].label == "Status", path
         counts = [link.count for link in links if link.count is not None]

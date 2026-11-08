@@ -22,10 +22,10 @@ from app.web.templates import HTML_CSP, SCRIPT_CSP
 from tests.admin.conftest import AGENT, AUDITOR, ORG_ADMIN, OUTSIDER, SUPER, Site, _running_site
 from tests.support.admin_site import site_uow
 from tests.support.queue import own_queue
+from tests.support.top_bar import top_bar_links
 
 BANNER = 'class="alert alert-banner"'
 POLL = re.compile(r'data-poll="([^"]+)"')
-ALERTS_LINK = r'<a class="admin-topbar__link" href="/admin/#widget-alerts"([^>]*)>(.*?)</a>'
 
 
 async def _condition(
@@ -278,10 +278,9 @@ async def test_the_alerts_link_counts_the_open_alerts_for_the_screen_reader_too(
     await site.login_as(SUPER)
     text = (await site.client.get(f"/admin/audit?lang={lang}")).text
 
-    link = re.search(ALERTS_LINK, text, re.DOTALL)
-    assert link is not None
-    assert "aria-label" not in link.group(1)
-    assert " ".join(re.sub(r"<[^>]+>", " ", link.group(2)).split()) == name
+    link = next(link for link in top_bar_links(text) if link.href == "/admin/#widget-alerts")
+    assert link.aria_label is None
+    assert link.name == name
 
 
 def test_every_alert_text_names_only_placeholders_the_page_provides() -> None:

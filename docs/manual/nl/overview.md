@@ -133,8 +133,8 @@ alleen wat uw rol mag openen:
 - **Handleiding** opent het onderwerp van de pagina waar u op staat.
 
 Op een telefoon blijven de pictogrammen, het getal en uw initialen staan; de woorden staan
-voor schermlezers in de balk. Het getal staat ook in de naam van de snelkoppeling, bijvoorbeeld
-*Taken, 2 lopend of mislukt*. Een snelkoppeling zonder bron voor een getal toont er geen.
+voor schermlezers in de balk. Een schermlezer leest de snelkoppeling met het getal en wat het
+betekent, bijvoorbeeld *Taken 2 lopend of mislukt*. Een snelkoppeling zonder bron voor een getal toont er geen.
 
 ## Werkgebied kiezen
 

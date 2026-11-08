@@ -24,7 +24,7 @@ COUNTS_ATTRIBUTE = "top_counts"
 HELP_KEY = "top.help"
 """The register key of the manual link, which opens the page's own topic when it has one."""
 
-COUNT_LABELS = {
+COUNT_WORDS = {
     "top.tasks": "admin.topbar.tasks.count_words",
     "top.alerts": "admin.topbar.alerts.count_words",
 }
@@ -103,6 +103,6 @@ def top_links(
             continue
         label = translate(link.label_key)
         count = counts.get(link.key, 0)
-        words = translate(COUNT_LABELS[link.key]) if count else ""
+        words = translate(COUNT_WORDS[link.key]) if count else ""
         links.append(TopLink(label, link.path, current, link.icon, count, words))
     return links
