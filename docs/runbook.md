@@ -1812,7 +1812,11 @@ guardrail audit compares with GitHub. `release lines` has the rules of `main` (p
 the same required checks, no force push, no deletion) and, like `main`, no bypass. Only the
 merge queue is missing: GitHub refuses one on a wildcard ref, so a line's pull request must be
 up to date with the line (`strict`) and runs the full CI lane on the pull request (`ci.yml`). A
-test fails when its rules drift from `main`'s otherwise. `release line creation` only
+test fails when its rules drift from `main`'s otherwise. A pull request runs the `ci.yml` of its own merge
+commit, so a line cut from a release before #605 (0.5.x and earlier) skips the full lane until
+#605 itself is the line's first backport; cut such a line, then backport #605 first. With
+`strict` and auto-merge, a second backport waits until someone updates its branch (an
+administrator, so a decision PR keeps `po:approved`). `release line creation` only
 restricts creating a line, and its bypass lets the release app (and administrators) do that.
 The environment `release` allows `main` and `release/[0-9]*`, so a line's candidate, release
 and tag jobs get the app's token. A release PR's branch `release/vX.Y.Z` matches neither. To

@@ -74,7 +74,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
-      || github.base_ref != github.event.repository.default_branch
+      || startsWith(github.base_ref, 'release/')
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
@@ -210,7 +210,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
-      || github.base_ref != github.event.repository.default_branch
+      || startsWith(github.base_ref, 'release/')
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
@@ -290,7 +290,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
-      || github.base_ref != github.event.repository.default_branch
+      || startsWith(github.base_ref, 'release/')
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     env:
