@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.admin_sessions import AdminSessionQueries
+from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
@@ -460,6 +461,7 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 
 class SqlTransaction(
     AdminSessionQueries,
+    AlertTargetQueries,
     HealthQueries,
     ParticipantLinkQueries,
     ApiClientQueries,

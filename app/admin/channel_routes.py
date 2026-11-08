@@ -30,6 +30,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
 from app.admin import forms
+from app.admin.alert_routes import alert_view
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import Locale, SameOrigin, organisation_header
@@ -389,6 +390,7 @@ async def _form_page(
             "domain_report": _domain_view(report, _) if report else None,
             "errors": email.errors + sms.errors + test.errors + domain.errors,
             "done": forms.done_message(request, _),
+            "alerts": await alert_view(request, _, context.principal, org),
         },
     )
     response.status_code = status

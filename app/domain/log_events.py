@@ -879,6 +879,26 @@ _OPERATIONS = (
         "The proxy falls back to its default certificate.",
     ),
     _e(
+        "alert.notify_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The delivery of alerts did not run: {error}.",
+        "The worker could not read the open alerts or the alert targets (ADR 0082 point 9).",
+        _CHECK_HOST,
+    ),
+    _e(
+        "alert.delivery_failed",
+        _SYS,
+        "outcome",
+        "target kind alert",
+        "An alert ({alert}) could not be delivered to target {target} ({kind}): {reason}.",
+        "Sending an alert to an email address or a Webex space failed (ADR 0082 point 9); it is "
+        "retried after 1, 5 and 15 minutes and then at the repeat interval. Never an alert itself.",
+        "`no_sender`: set up the mail channel or the bot token. `unauthorized`: paste a new bot "
+        "token. `rejected_404`: the bot is not in the space, or the room id is wrong.",
+    ),
+    _e(
         "integration.health_watch_failed",
         _OPS,
         "warning",

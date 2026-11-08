@@ -32,6 +32,7 @@ from app.adapters.integrations import Integrations
 from app.adapters.service_app_check import SERVICE_APP_REPORT
 from app.admin import (
     agenda_routes,
+    alert_routes,
     alerts,
     api_routes,
     audit_routes,
@@ -72,6 +73,7 @@ from app.admin import (
     staff_status_routes,
     update_routes,
 )
+from app.admin.alert_routes import alert_view
 from app.admin.authz import (
     AccessDenied,
     AdminContext,
@@ -810,6 +812,7 @@ async def integrations(
             "channels": channels,
             "checks": checks,
             "health": connections,
+            "alerts": await alert_view(request, locale.gettext, context.principal, None),
         },
     )
 
@@ -894,6 +897,7 @@ def register_admin(app: FastAPI) -> None:
         contact_routes.router,
         embedding_routes.router,
         form_routes.router,
+        alert_routes.router,
         routing_routes.router,
         api_routes.router,
         simulator_routes.router,

@@ -15,6 +15,7 @@ What goes out holds codes only: level, source action, reason, organisation and g
 counts, the version and a link into the portal (ADR 0082 point 10). Never a participant's data.
 """
 
+import re
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
@@ -28,15 +29,26 @@ from app.domain.alerts import ALERT_RULES, Alert, AlertLevel, open_alerts
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, AuditFilter, Outcome, Source
 from app.domain.authorization import Permission, Principal, Scope
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.ports import AlertSenders, Clock, IntegrationError, Transaction, UnitOfWork
+from app.domain.ports import (
+    AlertSenders,
+    BotTokenStore,
+    Clock,
+    IntegrationError,
+    Transaction,
+    UnitOfWork,
+)
 from app.domain.tunable import value_of
 
 DELIVERY_FAILED = "alert.delivery_failed"
 """System event of a failed delivery; deliberately not an alert rule (no loop)."""
+DEFAULT_LOCALE = "nl"
+"""The locale of the platform's alerts (CLAUDE.md: Dutch by default)."""
 TEST_ALERT = "test"
 """``Alert.action`` of a test alert sent from the portal."""
 MAX_TARGETS = 10
 """Targets per scope at most (ADR 0082 *Settings*); a fixed bound, not a setting."""
+BOT_TOKEN = re.compile(r"^[A-Za-z0-9_.-]{20,400}$")
+"""A Webex bot's access token: letters, digits, ``_``, ``.``, ``-``; never logged or shown."""
 RETRY_AFTER = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=15))
 """Waits before the retries of a failed delivery, as for jobs (ADR 0068)."""
 EVENTS_PER_RULE = 200
@@ -81,7 +93,7 @@ def after_failure(state: DeliveryState, alert: Alert, now: datetime) -> Delivery
     )
 
 
-def test_alert(now: datetime, organisation: str | None) -> Alert:
+def trial_alert(now: datetime, organisation: str | None) -> Alert:
     """Return the alert a *Send a test alert* button sends: a warning with no condition."""
     return Alert(TEST_ALERT, AlertLevel.WARNING, TEST_ALERT, organisation, None, "", now, now)
 
@@ -93,7 +105,8 @@ class AlertNotifier:
         uow: Opens database transactions.
         clock: Current time.
         senders: The sender of a target (``AlertSenders``); ``None`` when it has none.
-        compose: Writes an alert out for a target, in the target's organisation's locale.
+        compose: Writes an alert out: ``compose(alert, target, suppressed, locale)``, in the
+            default locale of the target's organisation (Dutch for the platform's).
         repeat: How long before a lasting alert is sent again (``alert_repeat_hours``).
     """
 
@@ -102,7 +115,7 @@ class AlertNotifier:
         uow: UnitOfWork,
         clock: Clock,
         senders: AlertSenders,
-        compose: Callable[[Alert, AlertTarget, int], RenderedAlert],
+        compose: Callable[[Alert, AlertTarget, int, str], RenderedAlert],
         repeat: timedelta | Callable[[], timedelta],
     ) -> None:
         """Store the collaborators."""
@@ -119,11 +132,15 @@ class AlertNotifier:
         async with self._uow.read() as tx:
             alerts = await _open(tx)
             targets = await tx.all_alert_targets()
-            organisations = {o.id: o.slug for o in await tx.list_organisations(Scope(True))}
+            organisations = {o.id: o for o in await tx.list_organisations(Scope(True))}
             states = {(s.target_id, s.key): s for s in await tx.list_alert_deliveries()}
         sent = 0
         for target in targets:
-            slug = organisations.get(target.organisation_id) if target.organisation_id else None
+            owner = organisations.get(target.organisation_id) if target.organisation_id else None
+            if target.organisation_id is not None and owner is None:
+                continue
+            slug = owner.slug if owner else None
+            locale = owner.default_locale if owner else DEFAULT_LOCALE
             for alert in alerts:
                 if alert.organisation != slug or not takes(target, alert):
                     continue
@@ -132,7 +149,7 @@ class AlertNotifier:
                     if state is not None and state.token == alert.token and state.retry_at is None:
                         await self._count(state)
                     continue
-                sent += await self._deliver(target, alert, state, now)
+                sent += await self._deliver(target, alert, state, now, locale)
         return sent
 
     async def _count(self, state: DeliveryState) -> None:
@@ -151,11 +168,17 @@ class AlertNotifier:
             )
 
     async def _deliver(
-        self, target: AlertTarget, alert: Alert, state: DeliveryState | None, now: datetime
+        self,
+        target: AlertTarget,
+        alert: Alert,
+        state: DeliveryState | None,
+        now: datetime,
+        locale: str,
     ) -> int:
         """Send ``alert`` to ``target`` and store the outcome; return 1 when it went out."""
         suppressed = state.suppressed if state is not None else 0
-        error = await send(self._senders, target, self._compose(alert, target, suppressed))
+        message = self._compose(alert, target, suppressed, locale)
+        error = await send(self._senders, target, message)
         base = state or DeliveryState(_id(target), alert.key, alert.token)
         async with self._uow.locked() as tx:
             if error is None:
@@ -196,6 +219,7 @@ class AlertTargetService:
         admin: Authorises and audits refusals.
         senders: The sender of a target, for the test alert.
         compose: Writes the test alert out.
+        bots: The sealed bot tokens; ``None`` without a settings key (no secrets kept).
     """
 
     def __init__(
@@ -204,7 +228,8 @@ class AlertTargetService:
         clock: Clock,
         admin: AdminService,
         senders: AlertSenders,
-        compose: Callable[[Alert, AlertTarget, int], RenderedAlert],
+        compose: Callable[[Alert, AlertTarget, int, str], RenderedAlert],
+        bots: BotTokenStore | None = None,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -212,6 +237,38 @@ class AlertTargetService:
         self._admin = admin
         self._senders = senders
         self._compose = compose
+        self._bots = bots
+
+    async def has_bot(self, principal: Principal, organisation: str | None) -> bool | None:
+        """Return whether the scope has a bot token; ``None`` when none can be kept.
+
+        Raises:
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
+        """
+        organisation_id, _ = await self._authorize(principal, organisation)
+        return await self._bots.has_token(organisation_id) if self._bots else None
+
+    async def set_bot(
+        self, principal: Principal, organisation: str | None, token: str | None
+    ) -> None:
+        """Store or, with ``None``, remove the scope's bot token; audited without the token.
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``, ``integration_not_ready``
+                (no settings key) or ``invalid_configuration`` naming ``bot_token``.
+        """
+        organisation_id, permission = await self._authorize(principal, organisation)
+        if self._bots is None:
+            raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
+        if token is not None and not BOT_TOKEN.fullmatch(token):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "bot_token")
+        now = self._clock.now()
+        await self._bots.save(organisation_id, token, now)
+        async with self._uow.locked() as tx:
+            action = "set" if token else "remove"
+            await record_change(
+                tx, now, principal, permission, organisation, None, f"alert_bot.{action}"
+            )
 
     async def targets(self, principal: Principal, organisation: str | None) -> list[AlertTarget]:
         """Return the targets of the platform (``None``) or of ``organisation``.
@@ -284,10 +341,11 @@ class AlertTargetService:
         organisation_id, permission = await self._authorize(principal, organisation)
         async with self._uow.read() as tx:
             target = await self._target(tx, organisation_id, target_id)
+            owner = await tx.get_organisation(organisation) if organisation else None
         now = self._clock.now()
-        error = await send(
-            self._senders, target, self._compose(test_alert(now, organisation), target, 0)
-        )
+        locale = owner.default_locale if owner else DEFAULT_LOCALE
+        message = self._compose(trial_alert(now, organisation), target, 0, locale)
+        error = await send(self._senders, target, message)
         async with self._uow.locked() as tx:
             await record_change(
                 tx,

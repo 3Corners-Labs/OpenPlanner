@@ -106,6 +106,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `INTEGRATION_DEGRADED_FAILURE_PERCENT` | int | `25` | 1–100 | `settings.platform.manage` | Share of failed requests above which a connection is degraded, a warning (ADR 0082). |
 | `INTEGRATION_DOWN_FAILURE_PERCENT` | int | `75` | 1–100 | `settings.platform.manage` | Share of failed requests above which a connection is down, an outage; at least the degraded share (ADR 0082). |
 | `INTEGRATION_RECOVERY_MINUTES` | int | `10` | 1–120 | `settings.platform.manage` | A failing connection is healthy this long, without a failed request, before it counts as ok again (ADR 0082). |
+| `ALERT_REPEAT_HOURS` | int | `4` | 1–168 | `settings.platform.manage` | A lasting alert is sent to its email addresses and Webex spaces again after this many hours; reports in between are counted, not sent (ADR 0082). |
 | `INTEGRATION_PROBE_TIMEOUT_SECONDS` | int | `60` | 10–300 | `settings.platform.manage` | How long a group check waits for the task:new and task:ended events of its probe work item before it reports the webhook path broken (ADR 0082). |
 | `JOB_OVERDUE_MINUTES` | int | `10` | 1–1440 | `settings.platform.manage` | A pending job this many minutes past its planned time counts as overdue in a group's integration check (ADR 0068). |
 | `STAFF_INVITE_EXPIRY_DAYS` | int | `7` | 1–30 | `settings.platform.manage` | Days an invitation or password reset link of a staff member stays valid (ADR 0095). |

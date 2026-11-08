@@ -10011,3 +10011,138 @@ msgstr "Default texts"
 
 msgid "admin.list.search_active"
 msgstr "A search is active. Clear the filters to see everything again."
+
+msgid "alert.message.level.info"
+msgstr "Information"
+
+msgid "alert.message.level.warning"
+msgstr "Warning"
+
+msgid "alert.message.level.outage"
+msgstr "Outage"
+
+msgid "alert.message.subject"
+msgstr "OpenPlanner: {level} ({action})"
+
+msgid "alert.message.what"
+msgstr "Alert {action}, reason {reason}."
+
+msgid "alert.message.since"
+msgstr "Since {time}."
+
+msgid "alert.message.organisation"
+msgstr "Organisation: {organisation}."
+
+msgid "alert.message.group"
+msgstr "Group: {group}."
+
+msgid "alert.message.repeated"
+msgstr "Reported {count} more times since the previous message."
+
+msgid "alert.message.link"
+msgstr "View in the portal: {link}"
+
+msgid "alert.message.version"
+msgstr "OpenPlanner {version}"
+
+msgid "alert.message.test.subject"
+msgstr "OpenPlanner: test alert"
+
+msgid "alert.message.test.text"
+msgstr "This is a test alert. If it arrives, this address receives OpenPlanner's alerts."
+
+msgid "admin.alerts.targets.title"
+msgstr "Alerts to administrators"
+
+msgid "admin.alerts.targets.lead"
+msgstr "Where OpenPlanner sends alerts when something goes wrong: an email address or a Webex space. A lasting alert comes again after the repeat interval; in between it is only counted."
+
+msgid "admin.alerts.targets.none"
+msgstr "No alert addresses yet."
+
+msgid "admin.alerts.target.kind"
+msgstr "Kind"
+
+msgid "admin.alerts.target.kind.email"
+msgstr "Email"
+
+msgid "admin.alerts.target.kind.webex_space"
+msgstr "Webex space"
+
+msgid "admin.alerts.target.address"
+msgstr "Address or room id"
+
+msgid "admin.alerts.target.address_hint"
+msgstr "An administrators' email address, or the id of the Webex space the bot is in."
+
+msgid "admin.alerts.target.level"
+msgstr "From"
+
+msgid "admin.alerts.target.level.warning"
+msgstr "Warnings and outages"
+
+msgid "admin.alerts.target.level.outage"
+msgstr "Outages only"
+
+msgid "admin.alerts.target.test"
+msgstr "Send a test alert"
+
+msgid "admin.alerts.target.remove"
+msgstr "Remove"
+
+msgid "admin.alerts.target.add"
+msgstr "Add an address"
+
+msgid "admin.alerts.target.add_button"
+msgstr "Add"
+
+msgid "admin.alerts.bot.title"
+msgstr "Webex bot"
+
+msgid "admin.alerts.bot.lead"
+msgstr "Alerts to a Webex space go through a bot of your own that may only send messages."
+
+msgid "admin.alerts.bot.set"
+msgstr "Token set"
+
+msgid "admin.alerts.bot.not_set"
+msgstr "No token"
+
+msgid "admin.alerts.bot.token"
+msgstr "Bot token"
+
+msgid "admin.alerts.bot.token_hint"
+msgstr "Paste the token from the Webex developer portal. It is stored encrypted and never shown again."
+
+msgid "admin.alerts.bot.remove"
+msgstr "Remove the token"
+
+msgid "admin.alerts.bot.save"
+msgstr "Save"
+
+msgid "admin.alerts.bot.no_key"
+msgstr "A bot token can only be stored once the installation has a key for secrets (SETTINGS_ENCRYPTION_KEY)."
+
+msgid "admin.done.alert_target_added"
+msgstr "The alert address was added."
+
+msgid "admin.done.alert_target_removed"
+msgstr "The alert address was removed."
+
+msgid "admin.done.alert_test_sent"
+msgstr "The test alert was sent."
+
+msgid "admin.done.alert_test_failed"
+msgstr "The test alert could not be sent. Check the mail channel, or the bot token and the room id."
+
+msgid "admin.done.alert_bot_saved"
+msgstr "The bot token was saved."
+
+msgid "admin.done.alert_bot_removed"
+msgstr "The bot token was removed."
+
+msgid "admin.done.alert_refused"
+msgstr "That did not work: check the address, the token, or the maximum of ten addresses."
+
+msgid "settings.field.alert_repeat_hours.label"
+msgstr "Send an alert again after (hours)"

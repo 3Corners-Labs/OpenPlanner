@@ -38,6 +38,7 @@ class Creatable:
 
 
 PERMANENT_HOLIDAY_DATE = Gap("ADR 0084 context: a holiday date is its identity, remove and add")
+ALERT_TARGET_REPLACED = Gap("ADR 0082 point 9: an alert target is removed and added again")
 PERMANENT_HOLIDAY_RANGE = Gap("ADR 0084 context: the Dutch holidays are dates, each removed alone")
 
 CREATABLES: dict[str, Creatable] = {
@@ -68,6 +69,15 @@ CREATABLES: dict[str, Creatable] = {
     "/admin/groups/{slug}/settings/routing/subjects": Creatable(
         change="/admin/groups/{slug}/settings/routing/subjects/{code}",
         delete="/admin/groups/{slug}/settings/routing/subjects/{code}/remove",
+    ),
+    # ADR 0082 point 9: a target is an address and a level; it is removed and added again.
+    "/admin/integrations/alerts/targets": Creatable(
+        change=ALERT_TARGET_REPLACED,
+        delete="/admin/integrations/alerts/targets/{target_id}/remove",
+    ),
+    "/admin/organisations/{org}/channels/alerts/targets": Creatable(
+        change=ALERT_TARGET_REPLACED,
+        delete="/admin/organisations/{org}/channels/alerts/targets/{target_id}/remove",
     ),
     "/admin/groups/{slug}/reminders": Creatable(
         change="/admin/groups/{slug}/reminders/{channel}/{minutes}",

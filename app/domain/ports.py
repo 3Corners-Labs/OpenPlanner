@@ -179,6 +179,18 @@ class AlertSenders(Protocol):
         ...
 
 
+class BotTokenStore(Protocol):
+    """The Webex bot tokens of the platform and the organisations, sealed (ADR 0082 point 9)."""
+
+    async def has_token(self, organisation_id: int | None) -> bool:
+        """Return whether the scope (``None``: the platform) has a bot token."""
+        ...
+
+    async def save(self, organisation_id: int | None, token: str | None, now: datetime) -> None:
+        """Store the scope's bot token; ``None`` removes it."""
+        ...
+
+
 class SenderDirectory(Protocol):
     """Finds the sender of an organisation's channel (ADR 0022).
 

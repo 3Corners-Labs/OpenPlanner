@@ -7,6 +7,7 @@ adapters report every call to (ADR 0068).
 from collections.abc import Sequence
 from datetime import datetime
 
+from app.domain.alert_model import AlertChannelKind, AlertTarget, RenderedAlert
 from app.domain.booking import MeetingRef
 from app.domain.calls import (
     CallState,
@@ -142,3 +143,48 @@ class FakeRequestLog:
         if self.error is not None:
             raise self.error
         self.records.append(record)
+
+
+class FakeAlertSender:
+    """``AlertSender`` that keeps what it was asked to send, or fails with ``error``."""
+
+    def __init__(
+        self, sent: list[tuple[str, RenderedAlert]], error: IntegrationError | None
+    ) -> None:
+        self.sent = sent
+        self.error = error
+
+    async def send(self, address: str, alert: RenderedAlert) -> None:
+        if self.error:
+            raise self.error
+        self.sent.append((address, alert))
+
+
+class FakeAlertSenders:
+    """``AlertSenders`` in memory: every target has a sender unless its kind is switched off."""
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, RenderedAlert]] = []
+        self.error: IntegrationError | None = None
+        self.missing: set[AlertChannelKind] = set()
+
+    async def sender(self, target: AlertTarget) -> FakeAlertSender | None:
+        if target.kind in self.missing:
+            return None
+        return FakeAlertSender(self.sent, self.error)
+
+
+class FakeBotTokens:
+    """``BotTokenStore`` in memory."""
+
+    def __init__(self) -> None:
+        self.tokens: dict[int | None, str] = {}
+
+    async def has_token(self, organisation_id: int | None) -> bool:
+        return organisation_id in self.tokens
+
+    async def save(self, organisation_id: int | None, token: str | None, now: datetime) -> None:
+        if token:
+            self.tokens[organisation_id] = token
+        else:
+            self.tokens.pop(organisation_id, None)
