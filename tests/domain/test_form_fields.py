@@ -333,6 +333,12 @@ def test_other_purposes_see_only_non_pii(purpose: Purpose) -> None:
     assert _mixed_answers().visible(purpose) == {"topic": "rent"}
 
 
+def test_the_participant_sees_all_their_own_answers() -> None:
+    # ADR 0056 point 10: a PII-tagged answer must prefill, or saving would drop or refuse it.
+    everything = {"customer_no": "A-1", "topic": "rent"}
+    assert _mixed_answers().visible(Purpose.PARTICIPANT_SELF) == everything
+
+
 def test_dispatch_sees_nothing() -> None:
     assert _mixed_answers().visible(Purpose.DISPATCH) == {}
 

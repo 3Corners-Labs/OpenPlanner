@@ -11064,3 +11064,24 @@ msgstr "Followed the link, of those made"
 
 msgid "reports.channels.trial.entered_share"
 msgstr "Entered the meeting, of those who followed the link"
+
+msgid "details.title"
+msgstr "Change your details"
+
+msgid "details.email"
+msgstr "Email address"
+
+msgid "details.email_hint"
+msgstr "You cannot change the email address here. To use another address, cancel this appointment and make a new one."
+
+msgid "details.save"
+msgstr "Save changes"
+
+msgid "details.back"
+msgstr "Back to your appointment"
+
+msgid "manage.details"
+msgstr "Change your details"
+
+msgid "manage.notice.details"
+msgstr "Your details have been changed."
