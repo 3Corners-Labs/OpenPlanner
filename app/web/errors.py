@@ -60,6 +60,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.REMINDER_NOT_FOUND: "error.not_found.text",
     ErrorCode.UPDATE_NOT_AVAILABLE: "admin.form.error.update_not_available",
     ErrorCode.UPDATE_IN_PROGRESS: "admin.form.error.update_in_progress",
+    ErrorCode.UPDATE_APPLY_AFTER_INVALID: "admin.form.error.update_apply_after_invalid",
     ErrorCode.UPDATE_REQUEST_NOT_FOUND: "error.not_found.text",
     ErrorCode.PLANNER_TOO_LATE: "admin.form.error.planner_too_late",
     ErrorCode.MOVE_CAUSES_SHORTFALL: "admin.form.error.move_causes_shortfall",

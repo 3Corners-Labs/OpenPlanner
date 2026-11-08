@@ -263,12 +263,15 @@ class ReleaseCheck:
         error: The failure code of this check (``unauthorized``, ``server_error``, …), if any.
         requested_at: When a superuser asked for a check ahead of the interval ("Check
             now"); the worker's next check clears it.
+        support: The last ``support.json`` read (ADR 0116 point 9), as text; kept from an
+            earlier check when this one could not read it.
     """
 
     checked_at: datetime
     latest: Release | None
     error: str = ""
     requested_at: datetime | None = None
+    support: str | None = None
 
 
 class UpdateAction(StrEnum):
@@ -342,6 +345,8 @@ class UpdateRequest:
         reason: The updater's code for a rollback or failure (``health_check_failed``, …).
         step: The step the updater reported last; ``None`` before its first report.
         step_at: When it reported that step.
+        apply_after: The updater does not take it before this moment (ADR 0116 point 9);
+            ``None``: at once (a superuser's click) or in the next window (the worker's own).
     """
 
     id: int | None
@@ -356,6 +361,7 @@ class UpdateRequest:
     reason: str = ""
     step: UpdateStep | None = None
     step_at: datetime | None = None
+    apply_after: datetime | None = None
 
     @property
     def is_open(self) -> bool:

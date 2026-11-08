@@ -17,13 +17,22 @@ happened. The host updater does the work and checks the image signature.
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Outcome, Source
 from app.domain.authorization import Permission, Principal, Scope, Target, decide
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, IntegrationError, ReleaseSource, Transaction, UnitOfWork
+from app.domain.update_policy import (
+    ANY_TIME,
+    SupportLine,
+    UpdateWindow,
+    claimable,
+    line_support,
+    on_line,
+    parse_support,
+)
 from app.domain.updates import (
     CHECK_INTERVAL,
     HISTORY_ACTIONS,
@@ -107,6 +116,10 @@ class UpdateOverview:
             first, with their notes (ADR 0067 point 3); empty while a request is open.
         outside_change: The running version when it came from outside the portal (installer,
             by hand) and is the latest change (ADR 0067 point 6); else ``None``.
+        line: The minor followed (``update_line``, ADR 0116); empty for everything.
+        window: When automatic updates happen (``update_window``).
+        next_window: When the window opens next (now when it is open); ``None`` without one.
+        support: The running line's entry of ``support.json``; ``None`` when unknown.
     """
 
     enabled: bool
@@ -124,6 +137,10 @@ class UpdateOverview:
     offered: list[ListedRelease] = field(default_factory=list)
     interval: timedelta = CHECK_INTERVAL
     check_requested: bool = False
+    line: str = ""
+    window: UpdateWindow = ANY_TIME
+    next_window: datetime | None = None
+    support: SupportLine | None = None
 
 
 class UpdateService:
@@ -145,6 +162,11 @@ class UpdateService:
             a value or a callable, as ``channel``.
         interval: How often the worker checks for releases (``update_check_minutes``); a
             value or a callable, as ``channel``.
+        line: ``update_line`` (ADR 0116 point 9): ``X.Y`` offers that minor's patches only;
+            empty offers everything on the channel. A value or a callable, as ``channel``.
+        window: ``update_window`` in the installation's zone: when the worker requests and
+            the updater claims an automatic update. A value or a callable, as ``channel``;
+            ``auto_apply`` is already the effective value (``auto_apply_effective``).
     """
 
     def __init__(
@@ -159,6 +181,8 @@ class UpdateService:
         channel: UpdateChannel | Callable[[], UpdateChannel] = UpdateChannel.RELEASE,
         auto_apply: bool | Callable[[], bool] = False,
         interval: timedelta | Callable[[], timedelta] = CHECK_INTERVAL,
+        line: str | Callable[[], str] = "",
+        window: UpdateWindow | Callable[[], UpdateWindow] = ANY_TIME,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -170,6 +194,8 @@ class UpdateService:
         self._channel = channel if callable(channel) else _constant(channel)
         self._auto_apply = auto_apply if callable(auto_apply) else _constant(auto_apply)
         self._interval = interval if callable(interval) else _constant(interval)
+        self._line = line if callable(line) else _constant(line)
+        self._window = window if callable(window) else _constant(window)
 
     @property
     def current(self) -> Version | None:
@@ -194,22 +220,46 @@ class UpdateService:
         if not check_due(last, now, self._interval()):
             return False
         listing: list[ListedRelease] | None
+        known = last.support if last else None
         try:
             listing = await self._releases.listing()
             ranked = sorted(listing, key=lambda item: item.version, reverse=True)
-            check = ReleaseCheck(now, ranked[0].release if ranked else None)
+            check = ReleaseCheck(
+                now, ranked[0].release if ranked else None, support=await self._support(known)
+            )
         except IntegrationError as error:
             listing = None
-            check = ReleaseCheck(now, last.latest if last else None, error.code)
+            check = ReleaseCheck(now, last.latest if last else None, error.code, support=known)
         async with self._uow.locked() as tx:
             await tx.save_release_check(check)
             if listing is not None:
                 await tx.save_release_listing(listing)
             release = self._available(check, listing or await tx.get_release_listing())
-            if self._auto_apply() and release is not None and self._current is not None:
+            automatic = self._auto_apply() and self._window().is_open(now)
+            if automatic and release is not None and self._current is not None:
                 if open_request(await tx.get_update_requests()) is None:
                     await self._add(tx, None, UpdateAction.UPDATE, release.version)
         return True
+
+    async def _support(self, known: str | None) -> str | None:
+        """Return the source's ``support.json`` when it parses, else what was known before.
+
+        A missing or malformed index is no failed check: the page keeps the last good one.
+        """
+        if self._releases is None:  # pragma: no cover - the caller checked it
+            return known
+        try:
+            text = await self._releases.support()
+            if text is not None:
+                parse_support(text)
+                return text
+        except (IntegrationError, ValueError):
+            pass
+        return known
+
+    def _offered(self, listing: Sequence[ListedRelease]) -> list[ListedRelease]:
+        """Return the listed versions offered: newer, on the channel and on the line."""
+        return on_line(offered(self._current, listing, self._channel()), self._line())
 
     def _available(
         self, check: ReleaseCheck | None, listing: Sequence[ListedRelease]
@@ -219,12 +269,16 @@ class UpdateService:
         From the stored listing (ADR 0067); without one (an installation that never listed),
         from the check's latest as before.
         """
-        choices = offered(self._current, listing, self._channel())
+        choices = self._offered(listing)
         if choices:
             return choices[0].release
         if listing:
             return None
-        return available_update(self._current, check, self._channel())
+        found = available_update(self._current, check, self._channel())
+        line = self._line()
+        if found is None or (line and f"{found.version.major}.{found.version.minor}" != line):
+            return None
+        return found
 
     # --- superuser ---------------------------------------------------------------------
 
@@ -293,7 +347,8 @@ class UpdateService:
             listing = await tx.get_release_listing()
         current = open_request(history)
         outside = versions[0] if len(versions) > 1 and versions[0].request_id is None else None
-        on_this_channel = on_channel(listing, self._channel())
+        on_this_channel = on_line(on_channel(listing, self._channel()), self._line())
+        window = self._window()
         return UpdateOverview(
             enabled=self._checking,
             channel=self._channel(),
@@ -309,7 +364,13 @@ class UpdateService:
             restore=None if current else restore_candidate(history, self._current, now),
             history=history,
             outside_change=outside,
-            offered=[] if current else offered(self._current, listing, self._channel()),
+            offered=[] if current else self._offered(listing),
+            line=self._line(),
+            window=window,
+            next_window=window.next_opening(now),
+            support=line_support(
+                parse_support(check.support) if check and check.support else [], self._current
+            ),
         )
 
     async def history(self, principal: Principal, limit: int = 30) -> list[AuditEntry]:
@@ -367,12 +428,16 @@ class UpdateService:
         return stored
 
     async def request_update(
-        self, principal: Principal, target: Version | None = None
+        self,
+        principal: Principal,
+        target: Version | None = None,
+        apply_after: datetime | None = None,
     ) -> UpdateRequest:
         """Ask the host updater to move to ``target``, or to the newest version offered.
 
         ``target`` must be in the listing and newer than the running version (ADR 0067
-        point 3: forward only; going back is ``request_restore``).
+        point 3: forward only; going back is ``request_restore``). With ``apply_after`` the
+        updater takes it from that moment on (ADR 0116 point 9); a moment in the past is now.
 
         Raises:
             DomainError: ``not_permitted``; ``update_in_progress`` while a request is open;
@@ -385,7 +450,7 @@ class UpdateService:
             if self._current is None:
                 raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
             listing = await tx.get_release_listing()
-            choices = offered(self._current, listing, self._channel())
+            choices = self._offered(listing)
             if target is None:
                 release = self._available(await tx.get_release_check(), listing)
                 if release is None:
@@ -395,7 +460,8 @@ class UpdateService:
                 if target not in {item.version for item in choices}:
                     raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
                 chosen = target
-            return await self._add(tx, principal, UpdateAction.UPDATE, chosen)
+            later = apply_after if apply_after and apply_after > self._clock.now() else None
+            return await self._add(tx, principal, UpdateAction.UPDATE, chosen, later)
 
     async def request_restore(self, principal: Principal) -> UpdateRequest:
         """Ask the host updater to go back to the version the latest update replaced.
@@ -430,7 +496,12 @@ class UpdateService:
         return ended
 
     async def _add(
-        self, tx: Transaction, principal: Principal | None, action: UpdateAction, target: Version
+        self,
+        tx: Transaction,
+        principal: Principal | None,
+        action: UpdateAction,
+        target: Version,
+        apply_after: datetime | None = None,
     ) -> UpdateRequest:
         """Store a new request from the running version to ``target`` and audit it.
 
@@ -449,6 +520,7 @@ class UpdateService:
                 requested_by=principal.subject if principal else SYSTEM_ACTOR,
                 requested_at=now,
                 status=UpdateStatus.REQUESTED,
+                apply_after=apply_after,
             )
         )
         versions = f"from:{self._current},to:{target}"
@@ -472,12 +544,15 @@ class UpdateService:
     # --- host updater ------------------------------------------------------------------
 
     async def claim(self) -> UpdateRequest | None:
-        """Mark the oldest waiting request as running and return it; ``None`` if none waits."""
+        """Mark the oldest claimable request as running and return it; ``None`` if none is.
+
+        A request waits for its ``apply_after``, and one the worker made itself for the
+        window (ADR 0116 point 9, ``update_policy.claimable``).
+        """
         now = self._clock.now()
+        window = self._window()
         async with self._uow.locked() as tx:
-            waiting = [
-                r for r in await tx.get_update_requests() if r.status is UpdateStatus.REQUESTED
-            ]
+            waiting = [r for r in await tx.get_update_requests() if claimable(r, now, window)]
             if not waiting:
                 return None
             started = claimed(waiting[-1], now)

@@ -103,6 +103,8 @@ SETTING_LABELS: dict[str, str] = {
     "update_channel": "settings.field.update_channel.label",
     "update_auto_apply": "settings.field.update_auto_apply.label",
     "update_check_minutes": "settings.field.update_check_minutes.label",
+    "update_line": "settings.field.update_line.label",
+    "update_window": "settings.field.update_window.label",
     "update_check_token": "settings.field.update_check_token.label",  # nosec B105 - an i18n key
     "time_format": "settings.field.time_format.label",
     "admin_timezone": "settings.field.admin_timezone.label",

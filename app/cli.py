@@ -26,6 +26,10 @@ Usage:
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
     ``python -m app.cli update-claim``  claim the waiting request: ``id action target from``
+    ``python -m app.cli upgrade-path-check [--image-version V] [--stop V]``  refuse to migrate a
+        database last run by a version older than the image's ``MIN_UPGRADE_FROM`` (ADR 0116
+        point 6): ``upgrade_path_required``, naming the stop; the web start-up and the updater
+        run it before ``alembic upgrade``
     ``python -m app.cli update-progress ID STEP``  record the step it starts (ADR 0048)
     ``python -m app.cli update-report ID STATUS [REASON]``  record the outcome
     ``python -m app.cli backup-db [NAME] [--prune]``  back up the database, delete old backups
@@ -111,6 +115,7 @@ from app.adapters.db.rotation import rotation_status
 from app.adapters.db.sealed import rekey_database
 from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.db.updates import last_running_version
 from app.adapters.db.upgrade_fixture import (
     FixtureState,
     compare_states,
@@ -207,8 +212,9 @@ from app.domain.settings_service import SettingsService
 from app.domain.system_log import SystemLog
 from app.domain.tls import Address, CertificateCheck
 from app.domain.tls_check import TlsWatch
+from app.domain.update_policy import upgrade_stop
 from app.domain.update_service import UpdateService
-from app.domain.updates import OUTCOMES, REPORTED_STEPS
+from app.domain.updates import OUTCOMES, REPORTED_STEPS, Version
 from app.i18n import Translator, load_catalogues
 from app.keys import client_pseudonym_key, management_token_key
 from app.web import navigation
@@ -516,6 +522,30 @@ def _version(settings: Settings) -> str:
     """Return the release and commit this image was built from (ADR 0052)."""
     release = settings.app_version or "none (no release)"
     return f"version {release}\ncommit {settings.app_commit or 'unknown'}\n"
+
+
+async def _upgrade_path_check(
+    settings: Settings, image_version: str | None, stop: str | None
+) -> tuple[str, bool]:
+    """Say whether this database may migrate to the image (ADR 0116 point 6).
+
+    Defaults are this image's ``APP_VERSION`` and ``MIN_UPGRADE_FROM``; the host updater
+    passes the target image's instead, before it switches.
+    """
+    engine = create_engine(settings.database_url)
+    try:
+        last = await last_running_version(engine)
+    finally:
+        await engine.dispose()
+    image = Version.parse(settings.app_version if image_version is None else image_version)
+    floor = Version.parse(settings.min_upgrade_from if stop is None else stop)
+    required = upgrade_stop(image, Version.parse(last or ""), floor)
+    if required:
+        return (
+            f"upgrade_path_required: upgrade to {required} first (this database ran {last})\n",
+            False,
+        )
+    return "upgrade path ok\n", True
 
 
 async def _update_claim(settings: Settings) -> str:
@@ -1604,6 +1634,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("seed-demo", help="create the demo organisations and groups")
     commands.add_parser("seed-closures", help="add the closure examples (not in production)")
+    path_cmd = commands.add_parser(
+        "upgrade-path-check", help="refuse a database older than MIN_UPGRADE_FROM (ADR 0116)"
+    )
+    path_cmd.add_argument("--image-version", help="the image to migrate to (default: this one)")
+    path_cmd.add_argument("--stop", help="its MIN_UPGRADE_FROM (default: this image's)")
     seed_cmd = commands.add_parser("seed", help="generated data sets (not in production)")
     seed_cmd.add_argument(
         "--upgrade-fixture", action="store_true", required=True, help="the upgrade fixture"
@@ -1821,6 +1856,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _write(asyncio.run(_webhooks_health(Settings())))
     if args.command == "seed-closures":
         return _write(asyncio.run(_seed_closures(Settings())))
+    if args.command == "upgrade-path-check":
+        return _write(asyncio.run(_upgrade_path_check(Settings(), args.image_version, args.stop)))
     if args.command == "seed":
         return _write(asyncio.run(_seed_upgrade_fixture(Settings(), args.bookings)))
     if args.command == "upgrade-check":

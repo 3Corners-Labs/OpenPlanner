@@ -16,8 +16,9 @@ one, which shows the open request's steps itself.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
@@ -29,6 +30,7 @@ from app.admin.pages import page as _page
 from app.domain.audit import AuditEntry
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.update_policy import LineStatus
 from app.domain.update_service import UpdateNotice, UpdateOverview, UpdateService
 from app.domain.updates import (
     SNOOZE,
@@ -42,6 +44,7 @@ from app.domain.updates import (
 from app.i18n import BoundGettext
 from app.web.errors import form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
+from app.web.organisation_settings import settings_for
 from app.web.templates import render
 from app.web.update_labels import (
     ACTION_LABELS,
@@ -382,12 +385,64 @@ async def _overview(
             "errors": form_errors(error, locale.gettext) if error else [],
             "done": done_message(request, locale.gettext),
             "progress": live,
+            "next_window": (
+                admin_moment(request, locale, found.next_window) if found.next_window else None
+            ),
+            "window_ranges": [
+                {
+                    "day": WEEKDAY_LABELS[r.weekday],
+                    "start": r.start.strftime("%H:%M"),
+                    "end": r.end.strftime("%H:%M"),
+                }
+                for r in found.window.ranges
+            ],
+            "support_label": SUPPORT_LABELS[found.support.status] if found.support else "",
+            "waits_until": (
+                admin_moment(request, locale, found.open.apply_after)
+                if found.open and found.open.apply_after
+                else None
+            ),
         },
         scripts=live is not None,
     )
     if error is not None:
         response.status_code = status_for(error)
     return response
+
+
+WEEKDAY_LABELS = (
+    "admin.updates.weekday.mon",
+    "admin.updates.weekday.tue",
+    "admin.updates.weekday.wed",
+    "admin.updates.weekday.thu",
+    "admin.updates.weekday.fri",
+    "admin.updates.weekday.sat",
+    "admin.updates.weekday.sun",
+)
+"""The weekday names of the update window (ADR 0116), ``date.weekday()`` order."""
+
+SUPPORT_LABELS: dict[LineStatus, str] = {
+    LineStatus.SUPPORTED: "admin.updates.support.supported",
+    LineStatus.SECURITY: "admin.updates.support.security",
+    LineStatus.EXTENDED: "admin.updates.support.extended",
+    LineStatus.ENDED: "admin.updates.support.ended",
+}
+"""The running line's status from ``support.json`` (ADR 0116 point 9)."""
+
+
+def _apply_after(raw: str, zone: ZoneInfo) -> datetime | None:
+    """Read the optional "apply after" field (``YYYY-MM-DDTHH:MM`` in the admin zone) as UTC.
+
+    Raises:
+        DomainError: ``update_apply_after_invalid`` for anything else than empty or a moment.
+    """
+    if not raw.strip():
+        return None
+    try:
+        local = datetime.strptime(raw.strip(), "%Y-%m-%dT%H:%M")
+    except ValueError as error:
+        raise DomainError(ErrorCode.UPDATE_APPLY_AFTER_INVALID) from error
+    return local.replace(tzinfo=zone).astimezone(UTC)
 
 
 @router.get("/updates", response_class=HTMLResponse)
@@ -437,7 +492,10 @@ async def request_update(
     try:
         if raw and target is None:
             raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
-        await update_service(request).request_update(context.principal, target)
+        later = _apply_after(
+            form.text("apply_after"), ZoneInfo(settings_for(request).admin_timezone)
+        )
+        await update_service(request).request_update(context.principal, target, later)
     except DomainError as error:
         raise_refusal(error)
         return await _overview(request, locale, context, error)

@@ -31,6 +31,7 @@ from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
 from app.domain.staff_directory import ADMIN_URL_PATTERN
 from app.domain.system_log import EventRetention
+from app.domain.update_policy import valid_window
 from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
 from app.i18n.dates import ClockStyle
 
@@ -465,6 +466,18 @@ class Settings(BaseSettings):
     # Neither is allowed in production, from the environment or from the portal.
     update_channel: Literal["release", "rc"] = "release"
     update_auto_apply: bool = False
+    # ADR 0116 point 9 (class C): UPDATE_LINE ``X.Y`` follows the patches of one minor only;
+    # UPDATE_WINDOW (``mon 02:00-04:00, sat 01:00-05:00`` in ``admin_timezone``) bounds when
+    # the worker requests and the updater claims an automatic update. Auto-apply works in
+    # production only with a window set.
+    update_line: str = Field(default="", pattern=r"^((0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5}))?$")
+    update_window: str = ""
+    # ADR 0116 point 6 (class B, build: baked into the image next to APP_VERSION): a database
+    # last run by an older version must upgrade through this stop first. It applies only to
+    # images at or above it, so images before 1.0.0 know no stop.
+    min_upgrade_from: str = Field(
+        default="1.0.0", pattern=r"^((0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5}))?$"
+    )
     # Class C: minutes between two release checks by the worker; "Check now" on the updates
     # page asks for one ahead of time. GitHub allows 60 anonymous calls per hour per address,
     # so the portal floor is 5 minutes.
@@ -545,6 +558,14 @@ class Settings(BaseSettings):
             return "SMTP_USERNAME needs SMTP_STARTTLS or SMTP_TLS"
         return None
 
+    @field_validator("update_window")
+    @classmethod
+    def _valid_window(cls, value: str) -> str:
+        """Refuse an ``UPDATE_WINDOW`` that is no list of weekly ranges (ADR 0116)."""
+        if not valid_window(value):
+            raise ValueError("UPDATE_WINDOW needs ranges like 'mon 02:00-04:00, sat 01:00-05:00'")
+        return value
+
     @model_validator(mode="after")
     def _production_requirements(self) -> "Settings":
         """In production, refuse to start with development defaults."""
@@ -578,10 +599,10 @@ class Settings(BaseSettings):
             "UPDATE_CHANNEL must be release in production (ADR 0059)",
         )
         check(
-            self.update_auto_apply,
+            self.update_auto_apply and not self.update_window.strip(),
             "update_auto_apply",
             "UPDATE_AUTO_APPLY",
-            "UPDATE_AUTO_APPLY is not allowed in production (ADR 0059)",
+            "UPDATE_AUTO_APPLY needs UPDATE_WINDOW in production (ADR 0116)",
         )
         check(
             self.management_token_key is None,

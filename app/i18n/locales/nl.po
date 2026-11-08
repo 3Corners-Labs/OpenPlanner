@@ -6065,7 +6065,7 @@ msgid "admin.settings.problem.update_channel"
 msgstr "het updatekanaal rc mag in productie niet gekozen zijn: productie volgt releases."
 
 msgid "admin.settings.problem.update_auto_apply"
-msgstr "automatisch bijwerken mag in productie niet aan staan: een superuser start de update."
+msgstr "automatische updates hebben in productie een updatevenster nodig: zonder venster start een superuser elke update."
 
 msgid "authz.permission.settings_platform_view"
 msgstr "Systeemstatus en geavanceerde instellingen bekijken"
@@ -6324,6 +6324,12 @@ msgstr "Automatisch bijwerken"
 
 msgid "settings.field.update_check_minutes.label"
 msgstr "Minuten tussen twee versiecontroles"
+
+msgid "settings.field.update_line.label"
+msgstr "Alleen één minorversie volgen (X.Y)"
+
+msgid "settings.field.update_window.label"
+msgstr "Venster voor automatische updates"
 
 msgid "settings.field.time_format.label"
 msgstr "Tijdnotatie"
@@ -9765,3 +9771,72 @@ msgstr "Standaardteksten"
 
 msgid "admin.list.search_active"
 msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
+
+msgid "admin.updates.line"
+msgstr "Lijn"
+
+msgid "admin.updates.line.all"
+msgstr "Elke versie van het kanaal"
+
+msgid "admin.updates.window"
+msgstr "Updatevenster"
+
+msgid "admin.updates.window.any_time"
+msgstr "Altijd (geen venster ingesteld)"
+
+msgid "admin.updates.window.next"
+msgstr "Volgende opening: {at}"
+
+msgid "admin.updates.weekday.mon"
+msgstr "ma"
+
+msgid "admin.updates.weekday.tue"
+msgstr "di"
+
+msgid "admin.updates.weekday.wed"
+msgstr "wo"
+
+msgid "admin.updates.weekday.thu"
+msgstr "do"
+
+msgid "admin.updates.weekday.fri"
+msgstr "vr"
+
+msgid "admin.updates.weekday.sat"
+msgstr "za"
+
+msgid "admin.updates.weekday.sun"
+msgstr "zo"
+
+msgid "admin.updates.support"
+msgstr "Ondersteuning van deze lijn"
+
+msgid "admin.updates.support.supported"
+msgstr "Ondersteund"
+
+msgid "admin.updates.support.security"
+msgstr "Alleen beveiligingsupdates"
+
+msgid "admin.updates.support.extended"
+msgstr "Verlengde lijn"
+
+msgid "admin.updates.support.ended"
+msgstr "Niet meer ondersteund: update naar een ondersteunde lijn"
+
+msgid "admin.updates.support.until"
+msgstr "tot {until}"
+
+msgid "admin.updates.apply_after.label"
+msgstr "Uitvoeren na (optioneel)"
+
+msgid "admin.updates.apply_after.hint"
+msgstr "Datum en tijd in de tijdzone van het portaal. Leeg: de updater begint zodra hij het verzoek ziet."
+
+msgid "admin.updates.waits_until"
+msgstr "De updater begint vanaf {at} aan dit verzoek."
+
+msgid "admin.form.error.update_apply_after_invalid"
+msgstr "Vul het moment in als datum en tijd, of laat het veld leeg."
+
+msgid "admin.updates.reason.upgrade_path_required"
+msgstr "Deze database is te oud voor die versie: update eerst naar de versie die in het logboek staat."

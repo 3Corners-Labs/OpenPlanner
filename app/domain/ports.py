@@ -408,6 +408,14 @@ class ReleaseSource(Protocol):
         """
         ...
 
+    async def support(self) -> str | None:
+        """Return ``support.json`` (ADR 0116 point 9) as text; ``None`` when there is none.
+
+        Raises:
+            IntegrationError: If the source refuses or cannot be reached.
+        """
+        ...
+
 
 class CertificateProbe(Protocol):
     """Performs a TLS handshake with a server and reads the certificate it presents (ADR 0064)."""
