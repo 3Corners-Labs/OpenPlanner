@@ -326,11 +326,55 @@ jobs:
           name: playwright-traces
           path: e2e/test-results/
 
+  # ADR 0116 point 7: databases that released versions wrote (the fixture attached to every
+  # release) go through this checkout's migrations, back to their revision, through the
+  # released image and up again; the schema step on 100,000 bookings stays under its budget.
+  # Runs in the merge queue, and on a pull request that touches the schema or its adapter.
+  upgrade-matrix:
+    name: upgrade matrix (released fixtures)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read   # pull the released images (patch images are private, ADR 0108)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: scope
+        name: does this change touch the schema
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] \
+            || git diff --name-only "$BASE" HEAD -- migrations app/adapters/db scripts/upgrade-matrix.sh scripts/upgrade_window.py | grep -q .; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::no change to migrations/ or app/adapters/db/; the merge queue runs the matrix"
+          fi
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        if: steps.scope.outputs.run == 'true'
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - if: steps.scope.outputs.run == 'true'
+        run: uv sync --locked
+      - name: log in to the image registry
+        if: steps.scope.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: fixtures of the support window, then the duration budget
+        if: steps.scope.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/upgrade-matrix.sh window "ghcr.io/${GITHUB_REPOSITORY,,}"
+
   # ADR 0051: a deprecated runtime, action or input fails the build instead of leaving a warning
   # annotation that nobody reads. Runs after every other job, also when one of them failed.
   deprecations:
     name: no deprecation warnings
-    needs: [python, matrix, duplication, dependencies, semgrep, gitleaks, container, e2e]
+    needs: [python, matrix, duplication, dependencies, semgrep, gitleaks, container, e2e, upgrade-matrix]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
