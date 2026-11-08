@@ -97,8 +97,8 @@ EXAMPLE_CONTACTS = ContactBlock(
 # A made-up participant: the booking on hold exists only in development and test databases.
 EXAMPLE_PARTICIPANT = Contact.create(
     first_name="Voorbeeld",
-    last_name="Inwoner",
-    email="inwoner@example.org",
+    last_name="Deelnemer",
+    email="deelnemer@example.org",
     phone=None,
     phone_mode=PhoneMode.OPTIONAL,
 )
@@ -180,10 +180,10 @@ DEMO_FORM_FIELDS = (
         type=FieldType.CHOICE,
         labels={"nl": "Waar gaat uw vraag over?", "en": "What is your question about?"},
         hints={"nl": "Dan bereidt de medewerker zich voor.", "en": "So the agent can prepare."},
-        options=("toeslagen", "belastingen", "anders"),
+        options=("algemeen", "aanvraag", "anders"),
         option_labels={
-            "toeslagen": {"nl": "Toeslagen", "en": "Benefits"},
-            "belastingen": {"nl": "Belastingen", "en": "Taxes"},
+            "algemeen": {"nl": "Algemene vraag", "en": "General question"},
+            "aanvraag": {"nl": "Aanvraag", "en": "Request"},
             "anders": {"nl": "Iets anders", "en": "Something else"},
         },
         classification=Classification.NOT_PII,
@@ -332,12 +332,13 @@ async def store_example_booking(
 ) -> tuple[str, Booking]:
     """Store an example booking of the made-up participant at ``start``; return its token and it.
 
-    Each booking gets its own address, so repeated seeds stay under the address limit
-    (ADR 0066) when an e2e flow moves or rebooks one.
+    Each booking gets its own address, the made-up participant's with part of the salt, so
+    repeated seeds stay under the address limit (ADR 0066) when an e2e flow moves or rebooks one.
     """
     end = start + timedelta(minutes=group.slot_minutes)
     salt = new_token_salt()
     token = derive_token(token_key, salt)
+    local, _, domain = EXAMPLE_PARTICIPANT.email.partition("@")
     booking = await tx.add_booking(
         Booking(
             id=None,
@@ -346,7 +347,7 @@ async def store_example_booking(
             start=start,
             end=end,
             status=status,
-            contact=replace(EXAMPLE_PARTICIPANT, email=f"voorbeeld-{salt[:8].lower()}@example.org"),
+            contact=replace(EXAMPLE_PARTICIPANT, email=f"{local}-{salt[:8].lower()}@{domain}"),
             locale="nl",
             token_hash=hash_token(token),
             created_at=now,

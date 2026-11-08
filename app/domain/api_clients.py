@@ -170,7 +170,7 @@ class ApiClient:
     Attributes:
         id: Database id; ``None`` before it is stored.
         client_id: Public identifier, also the actor in audit events.
-        name: Label for the superuser, e.g. "WxCC AI Agent Belastingen".
+        name: Label for the superuser, e.g. "WxCC AI Agent Klantenservice".
         organisation: Slug of the organisation it belongs to.
         groups: Group slugs it is narrowed to; empty means every group of the organisation.
         scopes: OAuth scopes it holds.

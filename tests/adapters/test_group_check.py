@@ -343,9 +343,9 @@ async def test_groups_sharing_an_asset_are_named_only_from_the_peers_given() -> 
     twin = replace(
         GROUP,
         id=2,
-        slug="vergunning",
+        slug="helpdesk",
         contact_center=webex_routing(
-            "videoafspraak@example.video", "videoafspraak-prototype", "vergunning"
+            "videoafspraak@example.video", "videoafspraak-prototype", "helpdesk"
         ),
     )
 
@@ -353,7 +353,7 @@ async def test_groups_sharing_an_asset_are_named_only_from_the_peers_given() -> 
     shared = [f for f in findings if f.code == "wxcc.routing.shared"]
 
     assert shared
-    assert shared[0].params == (("groups", "aangifte, vergunning"),)
+    assert shared[0].params == (("groups", "aangifte, helpdesk"),)
     assert json.dumps([f.params for f in findings])  # params are plain strings
 
 
