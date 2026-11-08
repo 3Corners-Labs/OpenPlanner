@@ -14,7 +14,7 @@ permissions:
 
 env:
   # renovate: datasource=github-releases depName=astral-sh/uv
-  UV_VERSION: "0.13.6"
+  UV_VERSION: "0.13.7"
   # renovate: datasource=python-version depName=python
   PYTHON_VERSION: "3.12"
   IMAGE: ghcr.io/${{ github.repository }}
