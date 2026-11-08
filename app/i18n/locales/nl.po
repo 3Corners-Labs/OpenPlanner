@@ -8831,7 +8831,7 @@ msgid "settings.field.configuration_review_minutes.label"
 msgstr "Minuten dat een geüpload configuratiedocument bewaard blijft na het plan"
 
 msgid "admin.done.package_imported"
-msgstr "Het configuratiepakket is geïmporteerd: {count} organisatie(s). De processen nemen de nieuwe instellingen binnen tien seconden over."
+msgstr "Het configuratiepakket is als document toegepast: {count} organisatie(s). De processen nemen de nieuwe instellingen binnen tien seconden over."
 
 msgid "admin.form.error.configuration_passphrase_short"
 msgstr "De wachtwoordzin is te kort, of de herhaling verschilt. Gebruik minstens 16 tekens."
@@ -8885,19 +8885,13 @@ msgid "admin.form.error.configuration_capacity_below_booked"
 msgstr "De capaciteit is lager dan het aantal plaatsen dat al is geboekt."
 
 msgid "admin.settings.package.title"
-msgstr "Configuratiepakket"
+msgstr "SQLite-pakket (oud formaat)"
 
 msgid "admin.settings.package.intro"
-msgstr "Een configuratiepakket bevat alle instellingen van deze installatie: organisaties, teams, openingstijden, teksten, kanalen, identity providers, API-clients en platforminstellingen, met hun geheimen. Afspraken, het auditlog en medewerkers gaan niet mee. Zo zet u een nieuwe installatie (test of productie) in één keer op."
+msgstr "Een SQLite-pakket uit een eerdere versie wordt nog één release gelezen. Het wordt omgezet in een document dat de configuratie van het platform vervangt en dan net als elk document gepland en toegepast, met uw rechten per wijziging; wat in gebruik is (afspraken, tijdsloten, API-toegang) wordt nooit verwijderd. Nieuwe pakketten worden niet meer gemaakt: exporteer hierboven een document."
 
 msgid "admin.settings.package.warning"
-msgstr "Met de wachtwoordzin bevat het pakket elk geheim van het platform. Bewaar het bestand en de wachtwoordzin gescheiden en alleen zolang u ze nodig heeft. Elke export en import staat in het auditlog."
-
-msgid "admin.settings.package.export.title"
-msgstr "Exporteren"
-
-msgid "admin.settings.package.passphrase_hint"
-msgstr "Kies een wachtwoordzin van minstens {length} tekens. Die wordt nergens bewaard: zonder de wachtwoordzin is het pakket niet te importeren."
+msgstr "Het pakket wordt niet eerst als plan getoond: de wijzigingen volgen uit het plan dat nu wordt berekend. Elke wijziging en elke import staat in het auditlog."
 
 msgid "admin.settings.package.passphrase"
 msgstr "Wachtwoordzin"
@@ -8905,23 +8899,20 @@ msgstr "Wachtwoordzin"
 msgid "admin.settings.package.passphrase_repeat"
 msgstr "Wachtwoordzin (herhaling)"
 
-msgid "admin.settings.package.export.button"
-msgstr "Pakket downloaden"
-
 msgid "admin.settings.package.import.title"
 msgstr "Importeren"
 
 msgid "admin.settings.package.import.intro"
-msgstr "Alleen in een installatie zonder afspraken, tijdsloten of actieve sluiting. Alle huidige configuratie wordt vervangen door die uit het pakket; medewerkers en het auditlog blijven. Maximaal {max_mb} MB; het pakket moet van deze versie van OpenPlanner zijn."
+msgstr "Maximaal {max_mb} MB; het pakket moet van deze versie van OpenPlanner zijn. Medewerkers en het auditlog blijven."
 
 msgid "admin.settings.package.import.file"
 msgstr "Pakketbestand (.sqlite)"
 
 msgid "admin.settings.package.import.confirm"
-msgstr "Ik begrijp dat alle configuratie van deze installatie wordt vervangen."
+msgstr "Ik begrijp dat de configuratie van het platform wordt vervangen door die uit het pakket."
 
 msgid "admin.settings.package.import.button"
-msgstr "Pakket importeren"
+msgstr "Pakket toepassen"
 
 msgid "admin.audit.detail.configuration_export"
 msgstr "Configuratiepakket geëxporteerd"
