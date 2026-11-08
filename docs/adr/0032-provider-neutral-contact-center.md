@@ -85,7 +85,7 @@ port and one adapter per kind.
 | CC-2 | Port and registry: `ContactCenterTask`, `ContactCenterDispatchers` (one dispatcher per kind), `ProviderDescriptor` per adapter with generic validation in the domain; the WxCC adapter maps the neutral task to Create Task v2 unchanged; recorded-payload test on the allow-list of CLAUDE.md (point 8 as amended by ADR 0081 §6) | #616 | merged |
 | CC-3 | Webhooks at `/webhooks/contact-center/{kind}`, verified by the adapter within 300 s; `/webhooks/wxcc` kept as alias. Each adapter defines its `InboundWebhook` (check, parsing, secret), listed in `contact_centers.INBOUND`; a task is looked up with its platform. OpenPlanner still registers the WxCC subscription at `/webhooks/wxcc`; moving the registration comes with the organisation connection (CC-4) | #626 | merged |
 | CC-4 | Admin: one contact-center connection per organisation (`integrations.manage`); group form rendered from the adapter's `ProviderDescriptor` | – | planned |
-| CC-5 | Docs: architecture, dataflow, webhooks, threat model, `scripts/diagrams/content.py`. Describes what CC-1 to CC-3 built (webhooks and threat model largely came with CC-3, #626); the organisation connection of CC-4 updates the same places when it lands | #PRNUM | merged |
+| CC-5 | Docs: architecture, dataflow, webhooks, threat model, `scripts/diagrams/content.py`. Describes what CC-1 to CC-3 built (webhooks and threat model largely came with CC-3, #626); the organisation connection of CC-4 updates the same places when it lands | #627 | merged |
 | CC-6 | Second platform adapter (for example Genesys Cloud) | – | planned (needs its own ADR) |
 
 ## Consequences
