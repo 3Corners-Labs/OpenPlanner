@@ -54,8 +54,12 @@ class BookingFacts:
     change_reason: str | None = None
 
 
-def _fact(kind: FactKind, b: BookingFacts, at: datetime, **extra: object) -> UsageFact:
-    """Return a fact of ``kind`` keyed on ``at``, with the booking's group, kind and locale."""
+def keyed(kind: FactKind, b: BookingFacts, at: datetime, **extra: object) -> UsageFact:
+    """Return a fact of ``kind`` keyed on ``at``, with the booking's group, kind and locale.
+
+    Public for the other fact builders (``call_facts``, ``queue_facts``), so the group, the kind
+    and the locale of every fact come from one place.
+    """
     return UsageFact(
         kind,
         hour_of(at),
@@ -74,7 +78,7 @@ def created(b: BookingFacts, *, moved: bool = False) -> UsageFact:
     The lead time is the seconds from creation to the slot start (metric U6).
     """
     lead = max(int((b.start - b.created_at).total_seconds()), 0)
-    return _fact(
+    return keyed(
         FactKind.BOOKING_CREATED,
         b,
         b.created_at,
@@ -85,13 +89,13 @@ def created(b: BookingFacts, *, moved: bool = False) -> UsageFact:
 
 def slotted(b: BookingFacts) -> UsageFact:
     """A booking in a slot, keyed on the slot start (the busiest hours, metric C4)."""
-    return _fact(FactKind.BOOKING_SLOTTED, b, b.start)
+    return keyed(FactKind.BOOKING_SLOTTED, b, b.start)
 
 
 def confirmed(b: BookingFacts, at: datetime) -> UsageFact:
     """A confirmation by the participant, with the time it took (metric U9)."""
     held = max(int((at - b.created_at).total_seconds()), 0)
-    return _fact(
+    return keyed(
         FactKind.BOOKING_CONFIRMED,
         b,
         at,
@@ -105,7 +109,7 @@ def cancelled(b: BookingFacts, at: datetime, actor: ActorClass, reason: str | No
 
     The lead time is signed: a booking cancelled after its start has a negative one.
     """
-    return _fact(
+    return keyed(
         FactKind.BOOKING_CANCELLED,
         b,
         b.start,
@@ -118,7 +122,7 @@ def cancelled(b: BookingFacts, at: datetime, actor: ActorClass, reason: str | No
 
 def confirm_expired(b: BookingFacts, at: datetime) -> UsageFact:
     """A booking never confirmed in time (metrics U2 and U9), with how long it was held."""
-    return _fact(
+    return keyed(
         FactKind.BOOKING_CONFIRM_EXPIRED,
         b,
         b.start,
@@ -130,9 +134,57 @@ def confirm_expired(b: BookingFacts, at: datetime) -> UsageFact:
 
 def moved(b: BookingFacts, at: datetime, actor: ActorClass | None) -> UsageFact:
     """A booking moved to another slot (metric U7); the actor is ``None`` when it is not known."""
-    return _fact(FactKind.BOOKING_MOVED, b, at, actor_class=actor, reason_code=b.change_reason)
+    return keyed(FactKind.BOOKING_MOVED, b, at, actor_class=actor, reason_code=b.change_reason)
 
 
 def closure_change(kind: FactKind, b: BookingFacts, at: datetime) -> UsageFact:
     """A booking suspended or resumed by an emergency closure (metric U10)."""
-    return _fact(kind, b, at, actor_class=ActorClass.CLOSURE)
+    return keyed(kind, b, at, actor_class=ActorClass.CLOSURE)
+
+
+def rebook_proposed(b: BookingFacts, at: datetime, actor: ActorClass) -> UsageFact:
+    """A new time was asked of the participant (metric U8): by a planner, or by the assistant.
+
+    The reason is the planner's fixed reason (``ChangeReason``), a closed list.
+    """
+    return keyed(FactKind.REBOOK_PROPOSED, b, at, actor_class=actor, reason_code=b.change_reason)
+
+
+def rebook_accepted(b: BookingFacts, at: datetime, requested_at: datetime | None) -> UsageFact:
+    """The participant chose a new time (metric U8), with the quarter hours it took.
+
+    ``requested_at`` is unknown for a request made before it was recorded: no time then.
+    """
+    took = (
+        None if requested_at is None else coarse(max(int((at - requested_at).total_seconds()), 0))
+    )
+    return keyed(
+        FactKind.REBOOK_ACCEPTED,
+        b,
+        at,
+        actor_class=ActorClass.PARTICIPANT,
+        reason_code=b.change_reason,
+        value_seconds=took,
+    )
+
+
+def rebook_expired(b: BookingFacts, at: datetime) -> UsageFact:
+    """The request lapsed without a new time (metric U8)."""
+    return keyed(
+        FactKind.REBOOK_EXPIRED, b, at, actor_class=ActorClass.SYSTEM, reason_code=b.change_reason
+    )
+
+
+def queue_claimed(b: BookingFacts, at: datetime, visible_from: datetime) -> UsageFact:
+    """An agent of the own queue claimed a booking, with the seconds since it became visible.
+
+    No agent, not even a pseudonym, is in the fact: a team member's own figures are a
+    ``StaffFact`` that step 7 writes while an organisation has switched the team view on.
+    """
+    waited = max(int((at - visible_from).total_seconds()), 0)
+    return keyed(FactKind.QUEUE_CLAIMED, b, at, value_seconds=waited)
+
+
+def queue_released(b: BookingFacts, at: datetime) -> UsageFact:
+    """A claimed booking was put back in the queue (metric Q7)."""
+    return keyed(FactKind.QUEUE_RELEASED, b, at)

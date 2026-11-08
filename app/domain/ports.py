@@ -80,6 +80,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
+from app.domain.slot_close import EndedSlots
 from app.domain.staff import (
     GrantHolders,
     RefusedEntitlement,
@@ -1387,6 +1388,23 @@ class Transaction(Protocol):
         insert failed: then the failure is logged without content and the transaction goes on, so
         reporting never fails a participant's action.
         """
+        ...
+
+    async def ended_slots(self, after: datetime, until: datetime, limit: int) -> EndedSlots:
+        """Return the slots that ended in (``after``, ``until``], with their bookings (ADR 0117).
+
+        At most about ``limit`` slots, oldest end first, and never half of the slots that end
+        at the same moment: ``covered_until`` is ``until`` when everything fitted, otherwise
+        the end of the last slot returned. No personal-data column is read.
+        """
+        ...
+
+    async def slots_closed_until(self) -> datetime | None:
+        """Return the end of the last slot whose closing facts were written, if any."""
+        ...
+
+    async def set_slots_closed_until(self, until: datetime) -> None:
+        """Move the end of the last closed slot forwards, in the caller's transaction."""
         ...
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
