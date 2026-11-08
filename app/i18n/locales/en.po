@@ -9299,6 +9299,9 @@ msgstr "Warning"
 msgid "admin.settings.usage.behind"
 msgstr "The usage facts have waited longer than {minutes} minutes: the worker is behind or not running, and the reports show older figures."
 
+msgid "admin.settings.usage.unreadable"
+msgstr "The usage figures could not be read from the database."
+
 msgid "admin.settings.usage.off"
 msgstr "Usage reporting is switched off: no facts are written."
 

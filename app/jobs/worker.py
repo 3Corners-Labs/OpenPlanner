@@ -338,7 +338,6 @@ async def run_worker(
         dispatch_enabled=wired.dispatcher is not None,
         release_check=settings.update_repository is not None,
     )
-    await backfill_usage(backfill)
     try:
         while not stop.is_set():
             if await is_reachable(engine):
@@ -358,6 +357,7 @@ async def run_worker(
                     # Before the group check, which reads it (ADR 0068).
                     heartbeat_at = await _heartbeat(uow, clock, runner, version, heartbeat_at)
                     await housekeeping.run()
+                    await backfill_usage(backfill)  # ADR 0117: bounded, until complete
                     await roll_up_usage(usage)  # ADR 0117; logs a failure, never raises
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)

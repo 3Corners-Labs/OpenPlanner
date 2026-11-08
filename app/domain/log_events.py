@@ -312,7 +312,7 @@ _OPERATIONS = (
         "usage.backfilled",
         _OPS,
         "info",
-        "bookings facts",
+        "bookings facts complete",
         "{bookings} old bookings turned into {facts} usage facts.",
         "The worker's first start after the upgrade made facts of the existing bookings "
         "(ADR 0117 point 5).",

@@ -72,3 +72,15 @@ async def test_the_english_page_uses_english_words(site: Site) -> None:
 
     assert "Facts waiting" in part
     assert "behind or not running" in part
+
+
+async def test_an_unreadable_database_is_a_warning_not_a_healthy_card(site: Site) -> None:
+    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with app.state.engine.begin() as connection:
+        await connection.exec_driver_sql("DROP TABLE usage_events")
+    await site.login_as(SUPER)
+
+    part = await _part(site)
+
+    assert 'role="alert"' in part
+    assert "konden niet" in part

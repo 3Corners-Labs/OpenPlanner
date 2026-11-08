@@ -46,7 +46,7 @@ async def usage_view(request: Request, locale: RequestLocale, settings: Settings
         async with SqlUnitOfWork(request.app.state.engine).read() as tx:
             state = await tx.usage_state()
     except SQLAlchemyError:
-        return UsageView(settings.reporting_enabled, 0, "", "")
+        return UsageView(settings.reporting_enabled, 0, "", _("admin.settings.usage.unreadable"))
     interval = timedelta(minutes=settings.reporting_rollup_interval_minutes)
     last = admin_moment(request, locale, state.rolled_at) if state.rolled_at else ""
     warning = ""

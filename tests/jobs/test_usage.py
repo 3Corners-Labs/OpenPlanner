@@ -69,7 +69,15 @@ async def test_the_backfill_logs_what_it_made() -> None:
     with capture_logs() as logs:
         await backfill_usage(_Backfill(BackfillRun(4, 11)))
 
-    assert logs == [{"event": "usage.backfilled", "log_level": "info", "bookings": 4, "facts": 11}]
+    assert logs == [
+        {
+            "event": "usage.backfilled",
+            "log_level": "info",
+            "bookings": 4,
+            "facts": 11,
+            "complete": False,
+        }
+    ]
 
 
 async def test_a_failing_backfill_never_stops_the_start() -> None:

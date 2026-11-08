@@ -1969,16 +1969,22 @@ class UsageStore(Protocol):
         """Return up to ``limit`` booking rows after ``after_id`` not yet turned into facts."""
         ...
 
-    async def mark_backfilled(self, booking_ids: Sequence[int], at: datetime | None) -> None:
-        """Record bookings as done; with ``at`` also record the backfill as completed then."""
+    async def mark_backfilled(self, booking_ids: Sequence[int]) -> None:
+        """Record bookings as turned into facts."""
+        ...
+
+    async def complete_backfill(self, at: datetime) -> None:
+        """Record that every booking has been looked at."""
         ...
 
     async def usage_cutoff(self, now: datetime) -> datetime:
         """Return the hour live facts start from, or the hour of ``now`` when there are none."""
         ...
 
-    async def prune_usage(self, events_before: datetime, hours_before: datetime) -> UsagePruned:
-        """Delete rolled-up facts before ``events_before`` and old hourly rows."""
+    async def prune_usage(
+        self, events_before: datetime, hours_before: datetime, limit: int
+    ) -> UsagePruned:
+        """Delete at most ``limit`` rolled-up facts before ``events_before`` and old hourly rows."""
         ...
 
 

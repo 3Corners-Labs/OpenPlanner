@@ -40,4 +40,4 @@ async def backfill_usage(backfill: UsageBackfill) -> None:
         log.warning("usage.backfill_failed", error=type(exc).__name__)
         return
     if run.bookings:
-        log.info("usage.backfilled", bookings=run.bookings, facts=run.facts)
+        log.info("usage.backfilled", bookings=run.bookings, facts=run.facts, complete=run.complete)

@@ -430,6 +430,7 @@ LAYERS = (
             C(None, "", name)
             for name in (
                 "Transaction · UnitOfWork",
+                "UsageStore · UsageUnitOfWork",
                 "ConfigurationTransfer",
                 "MessageSender · SenderDirectory",
                 "MailDomainResolver",
@@ -632,7 +633,7 @@ LANES = (
         "versies met releasenotes; pull + cosign-controle door de host-updater",
     ),
     Lane(
-        ("Transaction", "UnitOfWork", "ConfigurationTransfer"),
+        ("Transaction", "UnitOfWork", "UsageStore", "UsageUnitOfWork", "ConfigurationTransfer"),
         Family.PLATFORM,
         "B13 B12",
         "Database",

@@ -24,12 +24,15 @@ from app.adapters.db.models import (
     UsageHourRow,
     UsageRollupStateRow,
 )
+from app.adapters.db.types import plain
 from app.domain.booking import BookingKind, BookingStatus
 from app.domain.channels import ChannelKind
 from app.domain.scheduling import DispatchKind
 from app.domain.usage import (
+    FACT_HOUR,
     ActorClass,
     FactKind,
+    HourSource,
     StaffFact,
     UsageCell,
     UsageFact,
@@ -41,6 +44,11 @@ from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 log = structlog.get_logger()
 
 _STATE_ID = 1
+
+WRITE_KEYED = tuple(
+    kind for kind, source in FACT_HOUR.items() if source is not HourSource.SLOT_START
+)
+"""The fact kinds whose hour is the hour they were written in (not a slot's start)."""
 
 BACKFILL_COLUMNS = (
     "id",
@@ -110,15 +118,18 @@ def _fact_of(row: UsageEventRow) -> UsageFact | StaffFact:
     )
 
 
-def _plain(value: object) -> object:
-    """Return an enum member as its value, anything else as it is."""
-    return getattr(value, "value", value)
-
-
 class UsageRollupQueries:
     """The rollup's part of ``SqlTransaction``; needs ``self._session``."""
 
     _session: AsyncSession
+
+    async def _state(self) -> UsageRollupStateRow:
+        """Return the one state row, creating it empty the first time."""
+        state = await self._session.get(UsageRollupStateRow, _STATE_ID)
+        if state is None:
+            state = UsageRollupStateRow(id=_STATE_ID, last_event_id=0)
+            self._session.add(state)
+        return state
 
     async def read_usage_events(self, after_id: int, limit: int) -> UsageBatch:
         """Return up to ``limit`` facts after ``after_id``; a row of a newer version is skipped."""
@@ -169,7 +180,7 @@ class UsageRollupQueries:
                 *(
                     getattr(UsageHourRow, name).is_(None)
                     if getattr(cell, name) is None
-                    else getattr(UsageHourRow, name) == _plain(getattr(cell, name))
+                    else getattr(UsageHourRow, name) == plain(getattr(cell, name))
                     for name in _CUTS
                 ),
             )
@@ -184,7 +195,7 @@ class UsageRollupQueries:
                         count=cell.count,
                         sum_value=cell.sum_value,
                         max_value=cell.max_value,
-                        **{name: _plain(getattr(cell, name)) for name in _CUTS},
+                        **{name: plain(getattr(cell, name)) for name in _CUTS},
                     )
                 )
             else:
@@ -195,30 +206,35 @@ class UsageRollupQueries:
 
     async def advance_usage_watermark(self, last_event_id: int, at: datetime) -> None:
         """Move the watermark and the time of the last run, forwards only."""
-        state = await self._session.get(UsageRollupStateRow, _STATE_ID)
-        if state is None:
-            self._session.add(
-                UsageRollupStateRow(id=_STATE_ID, last_event_id=last_event_id, rolled_at=at)
-            )
-        else:
-            state.last_event_id = max(state.last_event_id, last_event_id)
-            state.rolled_at = at
+        state = await self._state()
+        state.last_event_id = max(state.last_event_id, last_event_id)
+        state.rolled_at = at
         await self._session.flush()
 
-    async def prune_usage(self, events_before: datetime, hours_before: datetime) -> UsagePruned:
-        """Delete facts already rolled up and older than ``events_before``, and old hourly rows.
+    async def prune_usage(
+        self, events_before: datetime, hours_before: datetime, limit: int
+    ) -> UsagePruned:
+        """Delete at most ``limit`` rolled-up facts and ``limit`` hourly rows past their term.
 
-        A fact the rollup has not read is never deleted, however old.
+        A fact the rollup has not read is never deleted, however old. The caller repeats until
+        a call deletes less than ``limit``, so one transaction never holds the write lock for a
+        large delete.
         """
         state = await self._session.get(UsageRollupStateRow, _STATE_ID)
         last = state.last_event_id if state is not None else 0
+        old_events = (
+            select(UsageEventRow.id)
+            .where(UsageEventRow.id <= last, UsageEventRow.bucket_hour < events_before)
+            .limit(limit)
+        )
+        old_hours = (
+            select(UsageHourRow.id).where(UsageHourRow.bucket_hour < hours_before).limit(limit)
+        )
         events = await self._session.execute(
-            delete(UsageEventRow).where(
-                UsageEventRow.id <= last, UsageEventRow.bucket_hour < events_before
-            )
+            delete(UsageEventRow).where(UsageEventRow.id.in_(old_events))
         )
         hours = await self._session.execute(
-            delete(UsageHourRow).where(UsageHourRow.bucket_hour < hours_before)
+            delete(UsageHourRow).where(UsageHourRow.id.in_(old_hours))
         )
         return UsagePruned(events.rowcount or 0, hours.rowcount or 0)  # type: ignore[attr-defined]
 
@@ -268,43 +284,36 @@ class UsageRollupQueries:
             for r in rows
         ]
 
-    async def mark_backfilled(self, booking_ids: Sequence[int], at: datetime | None) -> None:
-        """Record bookings as done; with ``at`` also record the backfill as complete."""
+    async def mark_backfilled(self, booking_ids: Sequence[int]) -> None:
+        """Record bookings as turned into facts."""
         if booking_ids:
             await self._session.execute(
                 insert(UsageBackfillRow), [{"booking_id": i} for i in booking_ids]
             )
-        if at is not None:
-            state = await self._session.get(UsageRollupStateRow, _STATE_ID)
-            if state is None:
-                self._session.add(
-                    UsageRollupStateRow(id=_STATE_ID, last_event_id=0, backfilled_at=at)
-                )
-            else:
-                state.backfilled_at = at
+
+    async def complete_backfill(self, at: datetime) -> None:
+        """Record that every booking has been looked at."""
+        (await self._state()).backfilled_at = at
         await self._session.flush()
 
     async def usage_cutoff(self, now: datetime) -> datetime:
         """Return the hour live facts start from, decided once and kept.
 
-        The hour of the first ``booking.created`` fact, or the hour of ``now`` when there is
-        none yet. It is stored with the first backfill, so a later run uses the same hour
-        although the backfill has by then written facts of older hours.
+        The hour of the first fact keyed on the moment it was written (a booking created,
+        confirmed, moved, suspended or resumed), or the hour of ``now`` when there is none yet;
+        a fact keyed on a slot start says nothing about when it was written. It is stored with
+        the first backfill, so a later run uses the same hour although the backfill has by then
+        written facts of older hours.
         """
-        state = await self._session.get(UsageRollupStateRow, _STATE_ID)
-        if state is not None and state.backfill_cutoff is not None:
-            return state.backfill_cutoff
-        first = await self._session.scalar(
-            select(func.min(UsageEventRow.bucket_hour)).where(
-                UsageEventRow.kind == FactKind.BOOKING_CREATED.value
+        state = await self._state()
+        if state.backfill_cutoff is None:
+            first = await self._session.scalar(
+                select(func.min(UsageEventRow.bucket_hour)).where(
+                    UsageEventRow.kind.in_([k.value for k in WRITE_KEYED])
+                )
             )
-        )
-        cutoff = first if first is not None else now.replace(minute=0, second=0, microsecond=0)
-        if state is None:
-            self._session.add(
-                UsageRollupStateRow(id=_STATE_ID, last_event_id=0, backfill_cutoff=cutoff)
+            state.backfill_cutoff = (
+                first if first is not None else now.replace(minute=0, second=0, microsecond=0)
             )
-        else:
-            state.backfill_cutoff = cutoff
-        await self._session.flush()
-        return cutoff
+            await self._session.flush()
+        return state.backfill_cutoff

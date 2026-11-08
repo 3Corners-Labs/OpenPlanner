@@ -184,7 +184,7 @@ async def test_old_rolled_up_facts_and_old_hours_are_pruned(engine: AsyncEngine)
 async def test_a_fact_the_rollup_has_not_read_is_never_pruned(engine: AsyncEngine) -> None:
     await _write(engine, _created(at=hour_of(NOW - timedelta(days=60))))
     async with SqlUnitOfWork(engine).locked() as tx:
-        pruned = await tx.prune_usage(NOW, NOW - timedelta(days=900))
+        pruned = await tx.prune_usage(NOW, NOW - timedelta(days=900), 100)
 
     assert pruned.events == 0
     async with AsyncSession(engine) as session:
@@ -217,3 +217,90 @@ async def test_the_state_row_is_one_row(engine: AsyncEngine) -> None:
 
     async with AsyncSession(engine) as session:
         assert await session.scalar(select(func.count()).select_from(UsageRollupStateRow)) == 1
+
+
+async def test_an_id_is_never_given_out_twice(engine: AsyncEngine) -> None:
+    """Pruned facts must not free their ids: a new fact below the watermark would be lost."""
+    old = hour_of(NOW - timedelta(days=60))
+    await _write(engine, _created(at=old), _created(at=old))
+    await _rollup(engine, FixedClock(NOW)).run_if_due()
+    async with AsyncSession(engine) as session:
+        assert await session.scalar(select(func.count()).select_from(UsageEventRow)) == 0
+
+    await _write(engine, _created())
+
+    async with AsyncSession(engine) as session:
+        assert await session.scalar(select(func.min(UsageEventRow.id))) == 3
+    assert (await _state(engine)).pending == 1
+
+
+async def test_retention_deletes_in_bounded_batches(engine: AsyncEngine) -> None:
+    old = hour_of(NOW - timedelta(days=60))
+    await _write(engine, *(_created(at=old) for _ in range(5)))
+    async with SqlUnitOfWork(engine).locked() as tx:
+        batch = await tx.read_usage_events(0, 100)
+        await tx.advance_usage_watermark(batch.last_id, NOW)
+
+    counts = []
+    for _ in range(3):
+        async with SqlUnitOfWork(engine).locked() as tx:
+            counts.append((await tx.prune_usage(NOW, NOW - timedelta(days=900), 2)).events)
+
+    assert counts == [2, 2, 1]
+
+
+async def test_a_run_stops_after_its_batches_and_the_next_pass_goes_on(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.domain import usage_rollup_service
+
+    monkeypatch.setattr(usage_rollup_service, "BATCH_SIZE", 2)
+    monkeypatch.setattr(usage_rollup_service, "MAX_BATCHES", 1)
+    await _write(engine, *(_created() for _ in range(5)))
+    rollup = _rollup(engine, FixedClock(NOW))
+
+    first = await rollup.run_if_due()
+    second = await rollup.run_if_due()  # not due by the clock, but work was left
+    third = await rollup.run_if_due()
+
+    assert first is not None
+    assert second is not None
+    assert third is not None
+    assert (first.facts, first.more) == (2, True)
+    assert (second.facts, second.more) == (2, True)
+    assert (third.facts, third.more) == (1, False)
+    assert (await _state(engine)).pending == 0
+    assert await rollup.run_if_due() is None
+
+
+async def test_a_slot_keyed_fact_says_nothing_about_when_it_was_written(
+    engine: AsyncEngine,
+) -> None:
+    future = hour_of(NOW + timedelta(days=30))
+    await _write(
+        engine,
+        UsageFact(
+            FactKind.BOOKING_CANCELLED, future, 1, 2, outcome=UsageOutcome.CANCELLED_BY_PLANNER
+        ),
+    )
+
+    async with SqlUnitOfWork(engine).locked() as tx:
+        cutoff = await tx.usage_cutoff(NOW)
+
+    assert cutoff == hour_of(NOW)
+
+
+async def test_the_cutoff_is_the_first_fact_written_when_there_is_one(
+    engine: AsyncEngine,
+) -> None:
+    early = hour_of(NOW - timedelta(days=3))
+    await _write(engine, _created(at=early), _created())
+
+    async with SqlUnitOfWork(engine).locked() as tx:
+        first = await tx.usage_cutoff(NOW)
+    await _write(engine, _created(at=hour_of(NOW - timedelta(days=9))))
+    async with SqlUnitOfWork(engine).locked() as tx:
+        again = await tx.usage_cutoff(NOW)
+
+    assert first == early
+    assert again == early

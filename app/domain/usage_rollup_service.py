@@ -18,6 +18,8 @@ from datetime import datetime, timedelta
 from app.domain.ports import Clock, UsageUnitOfWork
 from app.domain.usage_rollup import (
     BATCH_SIZE,
+    MAX_BATCHES,
+    PRUNE_BATCH,
     UsagePruned,
     events_cutoff,
     hours_cutoff,
@@ -34,12 +36,14 @@ class RollupRun:
         cells: Distinct hourly cells they were added to.
         unreadable: Rows of a newer version that were passed over.
         pruned: What retention removed.
+        more: Whether facts or rows past their term are left for the next pass.
     """
 
     facts: int = 0
     cells: int = 0
     unreadable: int = 0
     pruned: UsagePruned = UsagePruned()
+    more: bool = False
 
 
 class UsageRollup:
@@ -77,18 +81,26 @@ class UsageRollup:
         """Run when due and return what it did; ``None`` when not due.
 
         The interval counts from the attempt, so a failing run is not retried before the next
-        interval. Any failure propagates to the caller.
+        interval; a run that left work (``more``) is due again at the next pass. Any failure
+        propagates to the caller.
         """
         now = self._clock.now()
         if not self.due(now):
             return None
         self._ran_at = now
-        return await self.run(now)
+        result = await self.run(now)
+        if result.more:
+            self._ran_at = None
+        return result
 
     async def run(self, now: datetime) -> RollupRun:
-        """Roll up every fact after the watermark, one batch per transaction, then prune."""
+        """Roll up facts after the watermark, a bounded number of batches, then prune a batch.
+
+        Each batch is one transaction. Whatever a run leaves (``more``) the next pass takes up.
+        """
         facts = cells = unreadable = 0
-        while True:
+        drained = False
+        for _ in range(MAX_BATCHES):
             async with self._uow.locked() as tx:
                 state = await tx.usage_state()
                 batch = await tx.read_usage_events(state.last_event_id, BATCH_SIZE)
@@ -98,10 +110,14 @@ class UsageRollup:
             facts += len(batch.facts)
             cells += len(merged)
             unreadable += batch.unreadable
-            if batch.last_id == state.last_event_id:
+            if len(batch.facts) + batch.unreadable < BATCH_SIZE:  # a short batch is the last
+                drained = True
                 break
         async with self._uow.locked() as tx:
             pruned = await tx.prune_usage(
-                events_cutoff(now, self._event_days()), hours_cutoff(now, self._months())
+                events_cutoff(now, self._event_days()),
+                hours_cutoff(now, self._months()),
+                PRUNE_BATCH,
             )
-        return RollupRun(facts, cells, unreadable, pruned)
+        more = not drained or pruned.events >= PRUNE_BATCH or pruned.hours >= PRUNE_BATCH
+        return RollupRun(facts, cells, unreadable, pruned, more)

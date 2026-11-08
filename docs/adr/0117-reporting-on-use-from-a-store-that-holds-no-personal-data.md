@@ -490,14 +490,27 @@ only in the web and the worker process).
 
 **Step 4 notes (no change of a decision):** migration 0091 adds `usage_rollup_state` (the watermark, the
 time of the last run, the backfill's completion and cutoff) and `usage_backfill` (one booking id per
-booking already done). The cells and the watermark are stored in one transaction. `usage_hour` has no
+booking already done), and rebuilds `usage_events` with `AUTOINCREMENT`: without it SQLite reuses the
+largest ids after retention deleted them, and a new fact below the watermark would never be rolled up (the
+review of step 4 found it). The cells and the watermark are stored in one transaction. `usage_hour` has no
 unique index over its cut columns (a NULL is never equal to a NULL in one): the rollup is the only writer,
-under the write lock. The rollup maps the booking facts only; the kinds no step writes yet are listed in
-`usage_rollup.UNMAPPED`. The backfill makes facts from the columns the purge leaves: it never invents what
-the row cannot say (call durations, suspension times), derives who cancelled (documented), and stops at the
-cutoff, the hour live facts start from, so nothing is made twice. Settings added: `reporting_event_retention_days`
-(C, 35, 7 to 90), `reporting_retention_months` (C, 25, 13 to 60), `reporting_rollup_interval_minutes`
-(C, 15, 5 to 240). The rollup lag is on *System status*; the dropped-fact count stays a log line.
+under the write lock. A run rolls up at most `MAX_BATCHES` batches of `BATCH_SIZE` facts, retention deletes
+at most `PRUNE_BATCH` rows per transaction, and the backfill does a bounded pass per worker loop until it is
+complete, so none of them holds the write lock or the worker loop for long; what is left follows on the next
+pass. The rollup maps the booking facts only (a declarative table checked against the catalogue at import);
+the kinds no step writes yet, and a team member's fact, are passed over by the watermark and count from the
+release that maps them. The fact rules (which hour, how a lead time is rounded, what a move carries) are in
+`booking_facts`, shared by live recording and the backfill. The backfill makes facts from the columns the
+purge leaves: it never invents what the row cannot say (call durations, suspension times), derives who
+cancelled (a planner's reason, a closure, else the participant: a cancellation by a team member without a
+reason counts as the participant's in U4 and U5 for backfilled hours), and stops at the cutoff, the hour of
+the first fact written at that moment (a fact keyed on a slot start says nothing about when it was written;
+a cancellation of an old booking between the upgrade and that first fact can still be counted twice, which
+the runbook names). Settings added: `reporting_event_retention_days` (C, 35, 7 to 90),
+`reporting_retention_months` (C, 25, 13 to 60), `reporting_rollup_interval_minutes` (C, 15, 5 to 240). The
+rollup lag is on *System status*; the dropped-fact count stays a log line. Not done, with reason: an
+`INSERT ... ON CONFLICT` upsert needs a unique index over expressions, which the model/migration drift test
+cannot hold; the read-then-write per cell inside a bounded batch is correct and bounded.
 
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:

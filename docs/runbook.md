@@ -2487,7 +2487,10 @@ docker compose exec web python -m app.cli usage-backfill
 ```
 
 It prints how many bookings it looked at and how many facts it wrote, and is safe to run again: a
-booking already done is not done twice, and nothing a live fact already covers is repeated. It reads
+booking already done is not done twice. The worker also does it by itself, a bounded pass per loop
+until it is complete. What a live fact already covers is not repeated, with one window: a
+cancellation of an old booking between the upgrade and the first new booking, confirmation or move
+can be counted twice or not at all (the backfill stops at the hour of the first such fact). It reads
 only columns the purge leaves. `REPORTING_ENABLED` off makes it do nothing. Who cancelled, in an old
 booking, is derived (a planner's reason means the planner, a closure the closure, else the
 participant); call durations, the queue method and suspensions have no time on the row and start on

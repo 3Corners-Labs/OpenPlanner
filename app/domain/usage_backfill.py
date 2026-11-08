@@ -20,22 +20,18 @@ facts, so a transition after it is never made twice. Rows already done are recor
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.domain import booking_facts
 from app.domain.booking import BookingKind, BookingStatus
+from app.domain.booking_facts import BookingFacts
 from app.domain.scheduling import DispatchKind
-from app.domain.usage import (
-    MOVE_REASON,
-    ActorClass,
-    FactKind,
-    UsageFact,
-    UsageOutcome,
-    cancelled_outcome,
-    coarse,
-    hour_of,
-    usable_locale,
-)
+from app.domain.usage import ActorClass, UsageFact
 
 BATCH_SIZE = 200
 """Bookings backfilled per transaction: a fixed bound on the write lock, not a policy."""
+
+MAX_BATCHES = 25
+"""Batches the worker backfills per pass before it goes on with its jobs; the rest follows on the
+next pass, until the backfill is complete. The CLI does not stop at it."""
 
 
 @dataclass(frozen=True)
@@ -79,20 +75,6 @@ class BackfillBooking:
     was_moved: bool = False
 
 
-def _fact(kind: FactKind, b: BackfillBooking, at: datetime, **extra: object) -> UsageFact:
-    """Return a fact of ``kind`` keyed on ``at`` with the booking's group and locale."""
-    return UsageFact(
-        kind,
-        hour_of(at),
-        b.organisation_id,
-        b.group_id,
-        booking_kind=b.kind,
-        dispatch_kind=b.dispatch_kind,
-        locale=usable_locale(b.locale),
-        **extra,  # type: ignore[arg-type]
-    )
-
-
 def _cancelled_by(b: BackfillBooking) -> ActorClass:
     """Return who cancelled, as far as the row says (derived, see the module docstring)."""
     if b.change_reason is not None:
@@ -102,62 +84,44 @@ def _cancelled_by(b: BackfillBooking) -> ActorClass:
     return ActorClass.PARTICIPANT
 
 
+def _describe(b: BackfillBooking) -> BookingFacts:
+    """Describe the row for the shared fact builders."""
+    return BookingFacts(
+        organisation_id=b.organisation_id,
+        group_id=b.group_id,
+        booking_kind=b.kind,
+        dispatch_kind=b.dispatch_kind,
+        locale=b.locale,
+        created_at=b.created_at,
+        start=b.start,
+        change_reason=b.change_reason,
+    )
+
+
 def facts_of(b: BackfillBooking, cutoff: datetime) -> list[UsageFact]:
     """Return the facts for what happened to ``b`` before ``cutoff``; none for a later booking."""
     if b.created_at >= cutoff:
         return []
-    lead = coarse(max(int((b.start - b.created_at).total_seconds()), 0))
+    d = _describe(b)
     facts = [
-        _fact(
-            FactKind.BOOKING_CREATED,
-            b,
-            b.created_at,
-            reason_code=MOVE_REASON if b.rescheduled_from_id is not None else None,
-            value_seconds=lead,
-        ),
-        _fact(FactKind.BOOKING_SLOTTED, b, b.start),
+        booking_facts.created(d, moved=b.rescheduled_from_id is not None),
+        booking_facts.slotted(d),
     ]
     if b.confirmed_at is not None and b.confirmed_at < cutoff:
-        held = coarse(int((b.confirmed_at - b.created_at).total_seconds()))
-        facts.append(
-            _fact(
-                FactKind.BOOKING_CONFIRMED,
-                b,
-                b.confirmed_at,
-                actor_class=ActorClass.PARTICIPANT,
-                value_seconds=held,
-            )
-        )
+        facts.append(booking_facts.confirmed(d, b.confirmed_at))
     if (
         b.status is BookingStatus.CANCELLED
         and b.cancelled_at is not None
         and b.cancelled_at < cutoff
     ):
-        facts.append(_ending(b, b.cancelled_at))
+        facts.append(_ending(b, d, b.cancelled_at))
     return facts
 
 
-def _ending(b: BackfillBooking, cancelled_at: datetime) -> UsageFact:
+def _ending(b: BackfillBooking, d: BookingFacts, cancelled_at: datetime) -> UsageFact:
     """Return how a cancelled booking ended: moved, lapsed unconfirmed, or cancelled."""
     if b.was_moved:
-        return _fact(FactKind.BOOKING_MOVED, b, cancelled_at)
+        return booking_facts.moved(d, cancelled_at, None)
     if b.confirmed_at is None and b.confirm_by is not None and cancelled_at >= b.confirm_by:
-        held = coarse(int((cancelled_at - b.created_at).total_seconds()))
-        return _fact(
-            FactKind.BOOKING_CONFIRM_EXPIRED,
-            b,
-            b.start,
-            actor_class=ActorClass.SYSTEM,
-            outcome=UsageOutcome.EXPIRED_UNCONFIRMED,
-            value_seconds=held,
-        )
-    actor = _cancelled_by(b)
-    return _fact(
-        FactKind.BOOKING_CANCELLED,
-        b,
-        b.start,
-        actor_class=actor,
-        outcome=cancelled_outcome(actor),
-        reason_code=b.change_reason,
-        value_seconds=coarse(int((b.start - cancelled_at).total_seconds())),
-    )
+        return booking_facts.confirm_expired(d, cancelled_at)
+    return booking_facts.cancelled(d, cancelled_at, _cancelled_by(b), b.change_reason)

@@ -9,17 +9,20 @@ give the same cells, in any order, so a rebuild from the outbox gives the table 
               ─► ``UsageCell`` rows for ``usage_hour``
 
 A fact never feeds a metric whose catalogue entry does not name its kind (a test checks that).
-The kinds that have no producer yet are in ``UNMAPPED``: they make no cell until the step that
-writes them maps them, so this module and the catalogue stay in step.
+The kinds that have no producer yet are in ``UNMAPPED``. They make no cell, and the watermark
+passes them: a kind starts to count from the release that maps it, and a rebuild from the outbox
+covers only what was mapped when it ran. A team member's fact is passed over the same way until
+step 7 maps it.
 """
 
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
+from typing import Any
 
 from app.domain.usage import (
+    METRICS,
     MOVE_REASON,
-    ActorClass,
     FactKind,
     StaffFact,
     UsageCell,
@@ -28,102 +31,110 @@ from app.domain.usage import (
     duration_bucket,
 )
 
-_Rule = Callable[[UsageFact], list[UsageCell]]
 
+@dataclass(frozen=True)
+class _Feed:
+    """One metric a fact kind feeds, and what its cell reads of the fact.
 
-def _cell(
-    fact: UsageFact,
-    metric: str,
-    *,
-    duration: bool = False,
-    signed: bool = False,
-    **cuts: object,
-) -> UsageCell:
-    """Return the cell of one fact for ``metric``: a count of one and its figure.
-
-    With ``duration`` the fact's seconds are the figure and fall in their bucket; ``signed``
-    uses the mirrored buckets. Anything in ``cuts`` is the cut the metric reads.
+    Attributes:
+        metric: The metric id of ``usage.METRICS``.
+        duration: Whether the fact's seconds are the figure and fall in a bucket.
+        signed: Whether that duration uses the mirrored buckets (it may be negative).
+        cuts: The fact fields the cell keeps as its cut columns.
+        fixed: Cut columns the metric sets to a fixed word (which way a closure change went).
+        only: A condition on the fact; the cell is made only when it holds.
     """
-    seconds = fact.value_seconds if duration else None
+
+    metric: str
+    duration: bool = False
+    signed: bool = False
+    cuts: tuple[str, ...] = ()
+    fixed: tuple[tuple[str, str], ...] = ()
+    only: Callable[[UsageFact], bool] | None = None
+
+
+def _no_move(fact: UsageFact) -> bool:
+    """A booking made by a move is no new booking: it feeds no volume metric."""
+    return fact.reason_code != MOVE_REASON
+
+
+def _by_participant(fact: UsageFact) -> bool:
+    """Only a participant's cancellation feeds the rate and the lateness."""
+    return fact.outcome is UsageOutcome.CANCELLED_BY_PARTICIPANT
+
+
+_FEEDS: dict[FactKind, tuple[_Feed, ...]] = {
+    FactKind.BOOKING_CREATED: (
+        _Feed("U1", only=_no_move),
+        _Feed("U6", duration=True, only=_no_move),
+        _Feed("Q1", cuts=("booking_kind", "dispatch_kind"), only=_no_move),
+        _Feed("M2", cuts=("locale",), only=_no_move),
+    ),
+    FactKind.BOOKING_SLOTTED: (_Feed("C4"),),
+    FactKind.BOOKING_CONFIRMED: (_Feed("U9", duration=True),),
+    FactKind.BOOKING_CONFIRM_EXPIRED: (
+        _Feed("U2", cuts=("outcome",)),
+        _Feed("U9", cuts=("outcome",)),
+    ),
+    FactKind.BOOKING_CANCELLED: (
+        _Feed("U2", cuts=("outcome",)),
+        _Feed("U4", cuts=("actor_class",), only=_by_participant),
+        _Feed("U5", duration=True, signed=True, only=_by_participant),
+    ),
+    FactKind.BOOKING_MOVED: (_Feed("U7", cuts=("actor_class", "reason_code")),),
+    FactKind.BOOKING_SUSPENDED: (
+        _Feed("U10", cuts=("actor_class",), fixed=(("reason_code", "suspended"),)),
+    ),
+    FactKind.BOOKING_RESUMED: (
+        _Feed("U10", cuts=("actor_class",), fixed=(("reason_code", "resumed"),)),
+    ),
+}
+"""The metrics each fact kind feeds. A kind that is not here has no producer yet."""
+
+
+def _check_against_the_catalogue() -> None:
+    """Refuse, at import, a feed that names a metric which does not list its fact kind."""
+    facts_of_metric = {m.id: set(m.facts) for m in METRICS}
+    for kind, feeds in _FEEDS.items():
+        for feed in feeds:
+            if kind not in facts_of_metric.get(feed.metric, set()):
+                raise ValueError(f"{feed.metric} does not list {kind.value} in the catalogue")
+
+
+_check_against_the_catalogue()
+
+
+def _cell(fact: UsageFact, feed: _Feed) -> UsageCell:
+    """Return the cell of one fact for one metric: a count of one and its figure."""
+    seconds = fact.value_seconds if feed.duration else None
     value = seconds or 0
-    return UsageCell(
+    base = UsageCell(
         fact.bucket_hour,
         fact.organisation_id,
         fact.group_id,
-        metric,
+        feed.metric,
         1,
         value,
         value,
-        bucket=duration_bucket(seconds, signed=signed) if seconds is not None else None,
-        **cuts,  # type: ignore[arg-type]
+        bucket=duration_bucket(seconds, signed=feed.signed) if seconds is not None else None,
     )
+    cuts: dict[str, Any] = {name: getattr(fact, name) for name in feed.cuts}
+    cuts.update(feed.fixed)
+    return replace(base, **cuts)
 
 
-def _created(fact: UsageFact) -> list[UsageCell]:
-    """Volume, lead time, queue method and locale; a booking made by a move is none of them."""
-    if fact.reason_code == MOVE_REASON:
-        return []
-    return [
-        _cell(fact, "U1"),
-        _cell(fact, "U6", duration=True),
-        _cell(fact, "Q1", booking_kind=fact.booking_kind, dispatch_kind=fact.dispatch_kind),
-        _cell(fact, "M2", locale=fact.locale),
-    ]
-
-
-def _confirmed(fact: UsageFact) -> list[UsageCell]:
-    """The conversion of unconfirmed bookings, with the time it took."""
-    return [_cell(fact, "U9", duration=True)]
-
-
-def _confirm_expired(fact: UsageFact) -> list[UsageCell]:
-    """An outcome, and the other half of the conversion."""
-    return [_cell(fact, "U2", outcome=fact.outcome), _cell(fact, "U9", outcome=fact.outcome)]
-
-
-def _cancelled(fact: UsageFact) -> list[UsageCell]:
-    """An outcome; a participant's cancellation also feeds the rate and the lateness."""
-    cells = [_cell(fact, "U2", outcome=fact.outcome)]
-    if fact.outcome is UsageOutcome.CANCELLED_BY_PARTICIPANT:
-        cells.append(_cell(fact, "U4", actor_class=fact.actor_class))
-        cells.append(_cell(fact, "U5", duration=True, signed=True))
-    return cells
-
-
-def _moved(fact: UsageFact) -> list[UsageCell]:
-    """A reschedule, by who and for which reason."""
-    return [_cell(fact, "U7", actor_class=fact.actor_class, reason_code=fact.reason_code)]
-
-
-def _closure(word: str) -> _Rule:
-    """Return the rule of a closure change: the reason cut says which way it went."""
-
-    def rule(fact: UsageFact) -> list[UsageCell]:
-        return [_cell(fact, "U10", actor_class=ActorClass.CLOSURE, reason_code=word)]
-
-    return rule
-
-
-_RULES: dict[FactKind, _Rule] = {
-    FactKind.BOOKING_CREATED: _created,
-    FactKind.BOOKING_SLOTTED: lambda fact: [_cell(fact, "C4")],
-    FactKind.BOOKING_CONFIRMED: _confirmed,
-    FactKind.BOOKING_CONFIRM_EXPIRED: _confirm_expired,
-    FactKind.BOOKING_CANCELLED: _cancelled,
-    FactKind.BOOKING_MOVED: _moved,
-    FactKind.BOOKING_SUSPENDED: _closure("suspended"),
-    FactKind.BOOKING_RESUMED: _closure("resumed"),
-}
-
-UNMAPPED: frozenset[FactKind] = frozenset(set(FactKind) - set(_RULES))
+UNMAPPED: frozenset[FactKind] = frozenset(set(FactKind) - set(_FEEDS))
 """The kinds no step writes yet (calls, queue, rebooking, slots, messages, trial calls): they
 make no cell until the step that writes them adds their rule."""
 
 
 def cells_of(fact: UsageFact) -> list[UsageCell]:
     """Return the cells ``fact`` feeds, one per metric; none for a kind that is not mapped."""
-    rule = _RULES.get(fact.kind)
-    return rule(fact) if rule is not None else []
+    return [
+        _cell(fact, feed)
+        for feed in _FEEDS.get(fact.kind, ())
+        if feed.only is None or feed.only(fact)
+    ]
 
 
 def _key(cell: UsageCell) -> UsageCell:
@@ -154,13 +165,20 @@ def merge(cells: Iterable[UsageCell]) -> list[UsageCell]:
 
 
 def roll(facts: Sequence[UsageFact | StaffFact]) -> list[UsageCell]:
-    """Return the merged cells of ``facts``; a team member's fact waits for step 7."""
+    """Return the merged cells of ``facts``; a team member's fact makes none until step 7."""
     return merge(c for f in facts if isinstance(f, UsageFact) for c in cells_of(f))
 
 
 BATCH_SIZE = 500
 """Facts rolled up per transaction: a fixed bound on the write lock, like
 ``booking_rollup.BATCH_SIZE``, not a policy."""
+
+MAX_BATCHES = 20
+"""Batches one run rolls up before it yields to the rest of the worker loop; what is left is
+picked up by the next pass, and System status shows the facts still waiting."""
+
+PRUNE_BATCH = 1000
+"""Rows one transaction deletes when retention prunes: a fixed bound on the write lock."""
 
 LAG_FACTOR = 4
 """System status warns when the rollup is this many intervals behind (ADR 0117 point 4)."""

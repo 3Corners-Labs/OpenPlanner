@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+import pytest
 from sqlalchemy import event, func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -174,3 +175,26 @@ async def test_the_backfill_never_selects_a_purged_column(engine: AsyncEngine) -
         select_list = statement.split(" FROM ")[0]
         for name in PURGED_FIELDS:
             assert f"bookings.{name}" not in select_list, name
+
+
+async def test_the_worker_backfills_in_bounded_passes_until_complete(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.domain import usage_backfill_service
+
+    await _old_bookings(engine)
+    monkeypatch.setattr(usage_backfill_service, "BATCH_SIZE", 1)
+    monkeypatch.setattr(usage_backfill_service, "MAX_BATCHES", 1)
+    backfill = _backfill(engine)
+
+    first = await backfill.run_once()
+    second = await backfill.run_once()
+    third = await backfill.run_once()
+    fourth = await backfill.run_once()
+
+    assert [r.complete for r in (first, second, third, fourth)] == [False, False, True, True]
+    assert (first.bookings, second.bookings) == (1, 1)
+    async with SqlUnitOfWork(engine).read() as tx:
+        assert (await tx.usage_state()).backfilled_at is not None
+    async with AsyncSession(engine) as session:
+        assert await session.scalar(select(func.count()).select_from(UsageBackfillRow)) == 2

@@ -9312,6 +9312,9 @@ msgstr "Let op"
 msgid "admin.settings.usage.behind"
 msgstr "De gebruiksfeiten wachten al langer dan {minutes} minuten: de worker loopt achter of draait niet, en de rapporten tonen oudere cijfers."
 
+msgid "admin.settings.usage.unreadable"
+msgstr "De gebruiksgegevens konden niet uit de database worden gelezen."
+
 msgid "admin.settings.usage.off"
 msgstr "Gebruiksrapportage staat uit: er worden geen feiten vastgelegd."
 

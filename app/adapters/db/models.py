@@ -879,6 +879,7 @@ class UsageEventRow(Base):
     __table_args__ = (
         Index("ix_usage_events_scope_hour", "organisation_id", "group_id", "bucket_hour"),
         Index("ix_usage_events_bucket_hour", "bucket_hour"),
+        {"sqlite_autoincrement": True},  # an id below the watermark must never come back
     )
 
 
