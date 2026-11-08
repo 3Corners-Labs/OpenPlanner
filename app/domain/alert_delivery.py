@@ -305,7 +305,10 @@ class AlertTargetService:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "kind")
         target = AlertTarget(None, organisation_id, AlertChannelKind(kind), address, min_level)
         async with self._uow.locked() as tx:
-            if len(await tx.alert_targets_of(organisation_id)) >= MAX_TARGETS:
+            existing = await tx.alert_targets_of(organisation_id)
+            if any(t.kind is target.kind and t.address == target.address for t in existing):
+                raise DomainError(ErrorCode.ALERT_TARGET_TAKEN, "address")
+            if len(existing) >= MAX_TARGETS:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "targets")
             target_id = await tx.add_alert_target(target)
             await record_change(
