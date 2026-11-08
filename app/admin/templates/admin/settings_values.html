@@ -7,7 +7,7 @@
 {% include "admin/_settings_header.html" %}
 {% set topics = [] %}
 {% if login_form %}{% set added = topics.append(("#login-heading", _("admin.settings.login.title"))) %}{% endif %}
-{% for section in sections %}{% set added = topics.append(("#topic-" ~ section.key, section.heading)) %}{% endfor %}
+{% for section in sections %}{% set added = topics.append(("#" ~ section.anchor, section.heading)) %}{% endfor %}
 {{ page_toc(topics) }}
 {% if login_form %}
 <form class="card" method="post" action="/admin/settings/login/test" novalidate aria-labelledby="login-heading">
@@ -27,11 +27,11 @@
 {#- With the manage permission each topic is one form with one Save; Reset and Take over post
     through formaction. Without it the topic is a read-only section. -#}
 {% if manage %}
-<form method="post" action="/admin/settings/topic/{{ section.key }}" novalidate class="card settings-group" aria-labelledby="topic-{{ section.key }}">
+<form method="post" action="/admin/settings/topic/{{ section.key }}" novalidate class="card settings-group" aria-labelledby="{{ section.anchor }}">
 {% else %}
-<section class="card settings-group" aria-labelledby="topic-{{ section.key }}">
+<section class="card settings-group" aria-labelledby="{{ section.anchor }}">
 {% endif %}
-  <h2 id="topic-{{ section.key }}">{{ section.heading }}</h2>
+  <h2 id="{{ section.anchor }}">{{ section.heading }}</h2>
   <div class="settings-list">
     {{ setting_head() }}
     {% for row in section.rows %}
