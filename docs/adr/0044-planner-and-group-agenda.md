@@ -7,7 +7,11 @@ roles) and ADR 0043 (dispatch kinds, own queue).
 §2 "no JavaScript" amended by ADR 0010 and 0072: the day view refreshes itself through
 `live-region.js`. Note (2026-11-01 review): §4 (and ADR 0057) send SMS "when the participant consented";
 there is no SMS consent: SMS goes when a phone number is known (ADR 0009,
-`app/domain/channels.py`).
+`app/domain/channels.py`). Note (2026-11-08): §2 said email and phone show on the booking's
+detail page "as today", but that page never showed them. The product owner chose on 2026-11-08
+that it shows the participant's name, email address and phone number on request (*Show contact
+details*), never by default, each request an audit event `booking.contact_viewed`
+(`app/domain/participant_contact.py`).
 
 ## Context
 

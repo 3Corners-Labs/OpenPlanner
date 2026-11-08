@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 
+import pytest
+
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.db.uow import SqlUnitOfWork
@@ -15,15 +17,18 @@ from app.adapters.registrations import (
 )
 from app.adapters.webhook_selftest import Delivery, Outcome, deliveries_to_report
 from app.domain.admin import AdminService
+from app.domain.authorization import Principal, Scope
 from app.domain.booking import MeetingRef
 from app.domain.calls import EventKind
 from app.domain.event_context import bind_booking, bind_level, trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
+from app.domain.participant_contact import CONTACT_VIEWED
 from app.domain.ports import RequestRecord
 from app.domain.request_log import RequestEvents
 from app.domain.services import BookingService
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 
 
@@ -331,3 +336,89 @@ async def test_a_booking_without_a_meeting_shows_no_meeting_id(site: Site) -> No
     detail = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
 
     assert "Meeting-ID" not in detail
+
+
+async def _contact_views(site: Site) -> list[tuple[str, int | None]]:
+    """Return actor and booking of every *contact details shown* audit event, oldest first."""
+    async with site_uow(site).read() as tx:
+        events = await tx.list_audit_events(Scope(everything=True), limit=50)
+    return [
+        (e.event.actor, e.event.booking_id)
+        for e in reversed(events)
+        if e.event.detail == CONTACT_VIEWED
+    ]
+
+
+async def test_the_contact_details_show_only_on_request_and_each_request_is_audited(
+    site: Site,
+) -> None:
+    """ADR 0044 §2: name, address and number on Details, never by default (PO, 2026-11-08)."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+    page = f"/admin/groups/demo/bookings/{booking_id}"
+
+    plain = (await site.client.get(page)).text
+    shown = (await site.client.get(f"{page}?contact=show", headers=SAME_ORIGIN)).text
+    english = (await site.client.get(f"{page}?lang=en")).text
+
+    assert '<form method="get" action="#contact">' in plain
+    assert '<input type="hidden" name="contact" value="show">' in plain
+    assert ">Contactgegevens tonen</button>" in plain
+    assert [v for v in ("Lovelace", "ada@example.org", "+31612345678") if v in plain] == []
+    assert "<dt>Naam</dt><dd>Ada Lovelace</dd>" in shown
+    assert '<a href="mailto:ada@example.org">ada@example.org</a>' in shown
+    assert '<a href="tel:+31612345678">+31612345678</a>' in shown
+    assert f'<a href="{page}#contact">Contactgegevens verbergen</a>' in shown
+    assert ">Show contact details</button>" in english
+    assert await _contact_views(site) == [(GROUP_ADMIN.subject, booking_id)]
+
+
+async def test_a_link_from_another_site_shows_no_contact_details_and_audits_nothing(
+    site: Site,
+) -> None:
+    """A crafted link cannot write a view in a planner's name into the audit log."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+
+    response = await site.client.get(
+        f"/admin/groups/demo/bookings/{booking_id}?contact=show",
+        headers={"sec-fetch-site": "cross-site"},
+    )
+
+    assert response.status_code == 200
+    assert "ada@example.org" not in response.text
+    assert ">Contactgegevens tonen</button>" in response.text
+    assert await _contact_views(site) == []
+
+
+async def test_after_the_purge_the_page_says_the_contact_details_are_deleted(site: Site) -> None:
+    booking_id = await _book(site, "demo")
+    async with site_uow(site).locked() as tx:
+        await tx.purge_personal_data(booking_id, site.clock.now())
+    await site.login_as(GROUP_ADMIN)
+
+    text = (
+        await site.client.get(
+            f"/admin/groups/demo/bookings/{booking_id}?contact=show", headers=SAME_ORIGIN
+        )
+    ).text
+
+    assert "De persoonsgegevens van deze afspraak zijn verwijderd." in text
+    assert "Contactgegevens tonen" not in text
+    assert await _contact_views(site) == []
+
+
+@pytest.mark.parametrize("principal", [AUDITOR, OUTSIDER], ids=["auditor", "outsider"])
+async def test_without_bookings_view_the_contact_details_are_refused(
+    site: Site, principal: Principal
+) -> None:
+    booking_id = await _book(site, "demo")
+    await site.login_as(principal)
+
+    response = await site.client.get(
+        f"/admin/groups/demo/bookings/{booking_id}?contact=show", headers=SAME_ORIGIN
+    )
+
+    assert response.status_code == 403
+    assert "ada@example.org" not in response.text
+    assert await _contact_views(site) == []

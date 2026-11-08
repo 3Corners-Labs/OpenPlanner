@@ -13,8 +13,9 @@ meteen in de agenda.
 
 Elk tijdslot van de dag staat in een eigen blok, met de tijd, het aantal medewerkers en het
 aantal bevestigde afspraken. Daaronder staan de afspraken met de voornaam van de deelnemer,
-de stand van de videomeeting (met daaronder het Webex-meeting-ID) en de contactcentertaak. Het e-mailadres en het telefoonnummer
-ziet u alleen op de detailpagina van een afspraak (**Details**).
+de stand van de videomeeting (met daaronder het Webex-meeting-ID) en de contactcentertaak. De
+volledige naam, het e-mailadres en het telefoonnummer staan alleen op de detailpagina van een
+afspraak (**Details**), en ook daar pas als u erom vraagt (zie *De deelnemer bereiken*).
 
 - **Gesloten**: een noodsluiting valt over dit tijdslot.
 - **Buiten de bezetting**: er staat hier alleen een geannuleerde of afgelopen afspraak; de
@@ -73,6 +74,29 @@ videogesprek of contactcentertaak niet goed gaat:
   geeft u door aan Cisco-support als Webex de fout moet uitzoeken. Er staan geen
   persoonsgegevens in. Deze verzoeken worden standaard 30 dagen bewaard.
 
+## De deelnemer bereiken
+
+Op de detailpagina staan de contactgegevens van de deelnemer niet zomaar: u ziet ze pas als u
+**Contactgegevens tonen** kiest. Dan staan er de voor- en achternaam, het e-mailadres en het
+telefoonnummer, als de deelnemer dat opgaf (anders staat er *Niet opgegeven*). Met een klik op
+het nummer of het adres belt of mailt u vanuit uw eigen programma.
+
+- Toon ze alleen als u de deelnemer moet bereiken, bijvoorbeeld als een afspraak niet meer kan
+  worden gewijzigd (zie *Afspraken wijzigen*). Wie de pagina opent om een storing uit te
+  zoeken, ziet ze niet.
+- Elke keer dat u ze toont, legt het auditlog vast wie dat deed, bij welk team en bij welke
+  afspraak (*Contactgegevens van de deelnemer getoond*). De gegevens zelf staan er niet in.
+- Met **Contactgegevens verbergen** haalt u ze weer van het scherm, bijvoorbeeld voordat u een
+  schermafdruk maakt voor Webex-support.
+- Komt u via een link op een andere website op de pagina, dan staan ze er niet; kies dan zelf
+  **Contactgegevens tonen**.
+- Zijn de persoonsgegevens van de afspraak verwijderd (zie
+  [Gegevensvelden en persoonsgegevens](data-fields.md)), dan staat dat er en is er niets meer
+  te tonen.
+
+Iedereen die de afspraken van de groep mag zien, kan ze tonen. De rol Compliance en privacy kan
+dat nooit, en medewerkers in de wachtrij zien alleen de voornaam.
+
 ## Weekoverzicht
 
 Een tabel met de tijden in de rijen en de dagen van maandag tot en met zondag in de kolommen.
@@ -116,7 +140,9 @@ e-mail, en per sms als de deelnemer een telefoonnummer opgaf. U logt daarvoor so
 
 Een afspraak kan niet meer worden gewijzigd als die binnen de tijd van **Wijzigen door een
 planner** begint (instelling van de groep, standaard 60 minuten), als die al naar het
-contactcenter is gegaan, of als die al is geannuleerd. Bel de deelnemer dan.
+contactcenter is gegaan, of als die al is geannuleerd. Neem dan zelf contact op met de
+deelnemer: kies bij de afspraak **Details** en dan **Contactgegevens tonen** (zie *De deelnemer
+bereiken*).
 
 ### Verplaatsen
 

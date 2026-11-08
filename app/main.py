@@ -107,6 +107,7 @@ from app.domain.mfa import MfaPolicy
 from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
 from app.domain.overview_layout import OverviewLayoutService
+from app.domain.participant_contact import ParticipantContactService
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
@@ -608,6 +609,10 @@ def create_app(
             settings.app_version,
         )
         app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
+        # ADR 0044 §2: the participant's contact details on the booking page, on request.
+        app.state.participant_contact_service = ParticipantContactService(
+            uow, clock, app.state.admin_service
+        )
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
         app.state.readiness_service = ReadinessService(uow, clock, app.state.admin_service)

@@ -39,6 +39,22 @@ class RejectedRequest(Exception):  # noqa: N818 - reads as an outcome, like HTTP
         self.reason = reason
 
 
+OWN_SITE = frozenset({"same-origin", "none"})
+"""``Sec-Fetch-Site`` values of a request from this site's own pages, or typed by the person."""
+
+
+def cross_site(request: Request) -> bool:
+    """Return whether the browser marks ``request`` as started from another site.
+
+    For a page that writes an audit event when it is opened (the participant's contact
+    details, ADR 0044 §2): a link on another site must not put an action in a staff member's
+    name. A request without ``Sec-Fetch-Site`` (an older browser) counts as the site's own,
+    as in ``require_same_origin``.
+    """
+    site = request.headers.get("sec-fetch-site")
+    return site is not None and site not in OWN_SITE
+
+
 def require_same_origin(request: Request) -> None:
     """FastAPI dependency: refuse POSTs that a browser marks as cross-site.
 
@@ -51,7 +67,7 @@ def require_same_origin(request: Request) -> None:
     """
     site = request.headers.get("sec-fetch-site")
     if site is not None:
-        if site in ("same-origin", "none"):
+        if site in OWN_SITE:
             return
         log.info("request.rejected", reason=CROSS_SITE, sec_fetch_site=site[:32])
         raise RejectedRequest(403, CROSS_SITE)

@@ -1292,7 +1292,7 @@ msgid "admin.form.error.planner_change_min_lead_minutes"
 msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."
 
 msgid "admin.form.error.planner_too_late"
-msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Bel de deelnemer."
+msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Neem zelf contact op met de deelnemer: kies bij de afspraak Details en dan Contactgegevens tonen."
 
 msgid "admin.form.error.booking_limit_reached"
 msgstr "Dit e-mailadres heeft al een afspraak in dat tijdslot, of al het maximum aantal afspraken bij dit team (zie Afspraken per e-mailadres in de instellingen). Kies een ander tijdslot."
@@ -6698,6 +6698,36 @@ msgstr "Antwoorden op het formulier"
 msgid "admin.booking.answers_lead"
 msgstr "Persoonsgegevens; ze worden gewist met de rest van de afspraak."
 
+msgid "admin.booking.contact"
+msgstr "Contactgegevens"
+
+msgid "admin.booking.contact_lead"
+msgstr "Toon ze alleen als u de deelnemer moet bereiken. Het auditlog legt elke keer vast wie ze bekeek."
+
+msgid "admin.booking.contact_shown"
+msgstr "Het auditlog heeft vastgelegd dat u ze bekeek. Verberg ze voordat u een schermafdruk maakt."
+
+msgid "admin.booking.contact_show"
+msgstr "Contactgegevens tonen"
+
+msgid "admin.booking.contact_hide"
+msgstr "Contactgegevens verbergen"
+
+msgid "admin.booking.contact_name"
+msgstr "Naam"
+
+msgid "admin.booking.contact_email"
+msgstr "E-mailadres"
+
+msgid "admin.booking.contact_phone"
+msgstr "Telefoonnummer"
+
+msgid "admin.booking.contact_no_phone"
+msgstr "Niet opgegeven"
+
+msgid "admin.booking.contact_deleted"
+msgstr "De persoonsgegevens van deze afspraak zijn verwijderd."
+
 msgid "admin.settings.secret_hint"
 msgstr "Leeg laten houdt de huidige waarde; die wordt nooit getoond."
 
@@ -10693,6 +10723,9 @@ msgstr "{Agents}: {agents}, afspraken: {booked} (waarvan {pending} niet bevestig
 
 msgid "admin.audit.detail.booking_confirmed_by_staff"
 msgstr "Afspraak bevestigd namens de deelnemer"
+
+msgid "admin.audit.detail.booking_contact_viewed"
+msgstr "Contactgegevens van de deelnemer getoond"
 
 msgid "reports.view.volume"
 msgstr "Volume"

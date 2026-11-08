@@ -101,7 +101,10 @@ groups, and a group blocks the delete until the erase sweep above has removed it
 The fields below are the fixed list of `app/domain/privacy.py` (ADR 0063): personal data is
 shown in the admin portal only on the booking detail page and the queue item (first name only
 on the group's agenda and queue), never on overview, list, export or alert pages, and no list
-filter matches on it. The list and the rule are constants, not settings.
+filter matches on it. The booking detail page shows the answers, and the name, email address
+and phone number only after *Show contact details*; each request is an audit event with the
+actor, the group and the booking id, never the data (ADR 0044 §2, the product owner's choice of
+2026-11-08). The list and the rule are constants, not settings.
 
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|

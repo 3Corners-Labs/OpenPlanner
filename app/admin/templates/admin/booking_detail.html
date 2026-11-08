@@ -18,6 +18,28 @@
     <div><dt>{{ _("admin.agenda.participants") }}</dt><dd>{{ status.participants }}</dd></div>
   </dl>
 </section>
+<section class="card" id="contact" aria-labelledby="contact-heading">
+  <div class="card__header">
+    <h2 id="contact-heading">{{ _("admin.booking.contact") }}</h2>
+    {% if contact %}<p class="card__lead">{{ _("admin.booking.contact_shown") }}</p>
+    {% elif not contact_deleted %}<p class="card__lead">{{ _("admin.booking.contact_lead") }}</p>{% endif %}
+  </div>
+  {% if contact %}
+  <dl class="facts">
+    <div><dt>{{ _("admin.booking.contact_name") }}</dt><dd>{{ contact.name }}</dd></div>
+    <div><dt>{{ _("admin.booking.contact_email") }}</dt><dd><a href="mailto:{{ contact.email }}">{{ contact.email }}</a></dd></div>
+    <div><dt>{{ _("admin.booking.contact_phone") }}</dt><dd>{% if contact.phone %}<a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>{% else %}{{ _("admin.booking.contact_no_phone") }}{% endif %}</dd></div>
+  </dl>
+  <p><a href="{{ contact_hide }}">{{ _("admin.booking.contact_hide") }}</a></p>
+  {% elif contact_deleted %}
+  <p class="empty-state">{{ _("admin.booking.contact_deleted") }}</p>
+  {% else %}
+  <form method="get" action="#contact">
+    <input type="hidden" name="contact" value="show">
+    <button type="submit" class="button button--secondary">{{ _("admin.booking.contact_show") }}</button>
+  </form>
+  {% endif %}
+</section>
 {% if answers %}
 <section class="card" aria-labelledby="answers-heading">
   <div class="card__header">
