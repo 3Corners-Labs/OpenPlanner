@@ -1428,7 +1428,7 @@ class Transaction(Protocol):
         """Return every alert target, of the platform and of every organisation (ADR 0082)."""
         ...
 
-    async def list_alert_targets(self, organisation_id: int | None) -> list[AlertTarget]:
+    async def alert_targets_of(self, organisation_id: int | None) -> list[AlertTarget]:
         """Return the alert targets of one organisation, or of the platform (``None``)."""
         ...
 
@@ -1440,7 +1440,7 @@ class Transaction(Protocol):
         """Remove an alert target and what was sent to it."""
         ...
 
-    async def list_alert_deliveries(self) -> list[DeliveryState]:
+    async def alert_delivery_states(self) -> list[DeliveryState]:
         """Return what was sent of each alert to each target."""
         ...
 

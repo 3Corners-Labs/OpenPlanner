@@ -1,7 +1,8 @@
 """Alert targets and what was delivered to them (ADR 0082 step 3).
 
 Creates ``alert_targets`` (an email address or a Webex room id per scope, with a minimum level)
-and ``alert_deliveries`` (per target and alert: the streak sent, when, and the retry state). Neither holds participant data. The downgrade drops both.
+and ``alert_deliveries`` (per target and alert: the streak sent, when, and the retry state).
+Neither holds participant data. The downgrade drops both.
 
 Revision ID: 0092
 Revises: 0091

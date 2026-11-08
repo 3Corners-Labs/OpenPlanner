@@ -34,7 +34,7 @@ class AlertTargetQueries:
         rows = await self._session.scalars(select(AlertTargetRow).order_by(AlertTargetRow.id))
         return [_target(row) for row in rows]
 
-    async def list_alert_targets(
+    async def alert_targets_of(
         self: _Transaction, organisation_id: int | None
     ) -> list[AlertTarget]:
         """Return the targets of one organisation, or of the platform (``None``)."""
@@ -67,7 +67,7 @@ class AlertTargetQueries:
         )
         await self._session.execute(delete(AlertTargetRow).where(AlertTargetRow.id == target_id))
 
-    async def list_alert_deliveries(self: _Transaction) -> list[DeliveryState]:
+    async def alert_delivery_states(self: _Transaction) -> list[DeliveryState]:
         """Return what was sent of each alert to each target."""
         rows = await self._session.scalars(select(AlertDeliveryRow))
         return [

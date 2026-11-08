@@ -23,15 +23,15 @@ async def test_targets_and_deliveries_round_trip_and_go_together(engine: AsyncEn
         )
         await tx.save_alert_delivery(DeliveryState(org_target, "a|demo||", "tok", NOW, 2))
     async with uow.read() as tx:
-        assert [t.id for t in await tx.list_alert_targets(demo.id)] == [org_target]
-        assert [t.id for t in await tx.list_alert_targets(None)] == [platform]
+        assert [t.id for t in await tx.alert_targets_of(demo.id)] == [org_target]
+        assert [t.id for t in await tx.alert_targets_of(None)] == [platform]
         assert len(await tx.all_alert_targets()) == 2
-        (state,) = await tx.list_alert_deliveries()
+        (state,) = await tx.alert_delivery_states()
     assert (state.token, state.sent_at, state.attempts) == ("tok", NOW, 2)
     async with uow.locked() as tx:
         await tx.delete_alert_target(org_target)
     async with uow.read() as tx:
-        assert await tx.list_alert_deliveries() == []
+        assert await tx.alert_delivery_states() == []
         assert [t.id for t in await tx.all_alert_targets()] == [platform]
 
 

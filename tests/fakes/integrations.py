@@ -188,3 +188,19 @@ class FakeBotTokens:
             self.tokens[organisation_id] = token
         else:
             self.tokens.pop(organisation_id, None)
+
+
+class FakeSecrets:
+    """The encrypted credential store (``CredentialStore``) in memory, for the bot tokens."""
+
+    def __init__(self) -> None:
+        self.values: dict[str, dict[str, object]] = {}
+
+    async def get(self, name: str) -> dict[str, object] | None:
+        return self.values.get(name)
+
+    async def put(self, name: str, value: dict[str, object], now: datetime) -> None:
+        self.values[name] = value
+
+    async def delete(self, name: str) -> None:
+        self.values.pop(name, None)

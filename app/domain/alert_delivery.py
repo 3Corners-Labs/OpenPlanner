@@ -154,7 +154,7 @@ class AlertNotifier:
             events = await condition_events(tx, (rule.action for rule in ALERT_RULES))
             targets = await tx.all_alert_targets()
             organisations = {o.id: o for o in await tx.list_organisations(Scope(True))}
-            states = {(s.target_id, s.key): s for s in await tx.list_alert_deliveries()}
+            states = {(s.target_id, s.key): s for s in await tx.alert_delivery_states()}
         alerts = open_alerts(events)
         sent = 0
         for target in targets:
@@ -283,7 +283,7 @@ class AlertTargetService:
         """
         organisation_id, _ = await self._authorize(principal, organisation)
         async with self._uow.read() as tx:
-            return await tx.list_alert_targets(organisation_id)
+            return await tx.alert_targets_of(organisation_id)
 
     async def add(
         self,
@@ -305,7 +305,7 @@ class AlertTargetService:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "kind")
         target = AlertTarget(None, organisation_id, AlertChannelKind(kind), address, min_level)
         async with self._uow.locked() as tx:
-            if len(await tx.list_alert_targets(organisation_id)) >= MAX_TARGETS:
+            if len(await tx.alert_targets_of(organisation_id)) >= MAX_TARGETS:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "targets")
             target_id = await tx.add_alert_target(target)
             await record_change(
@@ -393,7 +393,7 @@ class AlertTargetService:
         self, tx: Transaction, organisation_id: int | None, target_id: int
     ) -> AlertTarget:
         """Return the target ``target_id`` of the scope, or refuse naming ``target``."""
-        for target in await tx.list_alert_targets(organisation_id):
+        for target in await tx.alert_targets_of(organisation_id):
             if target.id == target_id:
                 return target
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "target")

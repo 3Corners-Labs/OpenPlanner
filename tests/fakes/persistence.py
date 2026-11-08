@@ -414,7 +414,7 @@ class InMemoryTransaction:
     async def all_alert_targets(self) -> list[AlertTarget]:
         return [self.state.alert_targets[i] for i in sorted(self.state.alert_targets)]
 
-    async def list_alert_targets(self, organisation_id: int | None) -> list[AlertTarget]:
+    async def alert_targets_of(self, organisation_id: int | None) -> list[AlertTarget]:
         return [t for t in await self.all_alert_targets() if t.organisation_id == organisation_id]
 
     async def add_alert_target(self, target: AlertTarget) -> int:
@@ -427,7 +427,7 @@ class InMemoryTransaction:
         for key in [k for k in self.state.alert_deliveries if k[0] == target_id]:
             del self.state.alert_deliveries[key]
 
-    async def list_alert_deliveries(self) -> list[DeliveryState]:
+    async def alert_delivery_states(self) -> list[DeliveryState]:
         return list(self.state.alert_deliveries.values())
 
     async def save_alert_delivery(self, state: DeliveryState) -> None:
