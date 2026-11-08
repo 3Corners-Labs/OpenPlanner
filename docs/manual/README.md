@@ -18,6 +18,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Rights matrix / rechtenmatrix | [Rechtenmatrix](nl/rights-matrix.md) | [Rights matrix](en/rights-matrix.md) |
 | Custom roles / eigen rollen | [Eigen rollen](nl/roles.md) | [Custom roles](en/roles.md) |
 | Retention / bewaartermijnen | [Bewaartermijnen](nl/retention.md) | [Retention](en/retention.md) |
+| Reports / rapporten (gebruik) | [Rapporten](nl/reports.md) | [Reports](en/reports.md) |
 | Staff / medewerkers | [Medewerkers](nl/staff.md) | [Staff](en/staff.md) |
 | My sessions / mijn sessies (ADR 0098) | [Mijn sessies](nl/my-sessions.md) | [My sessions](en/my-sessions.md) |
 | Identity provider mapping / koppeling identiteitsprovider (ADR 0049) | [Koppeling identiteitsprovider](nl/idp-mapping.md) | [Identity provider mapping](en/idp-mapping.md) |

@@ -15,6 +15,7 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 | Overview | `/admin/` | `dashboard.view` | wide | – |
 | Audit log | `/admin/audit` | `audit.view` | wide | – |
 | Retention | `/admin/retention` | `retention.view` | standard | – |
+| Reports | `/admin/reports` | `reports.view` | wide | – |
 
 ### Manage
 
@@ -63,6 +64,7 @@ Side navigation: *Organisations*. A row *Tab › Sub-tab* is a sub-tab of that t
 | Overview › Settings | `/admin/organisations/{org}/settings` | `settings.organisation.manage` | standard | – |
 | Overview › Embedding | `/admin/organisations/{org}/embedding` | `embedding.manage` | standard | – |
 | Overview › Login | `/admin/organisations/{org}/login` | `identity_providers.view` | standard | `/admin/organisations/{org}/login/new`, `/admin/organisations/{org}/login/{idp_key}` |
+| Overview › Usage | `/admin/organisations/{org}/usage` | `reports.view` | wide | – |
 | Participants | `/admin/organisations/{org}/branding` | `branding.manage` | standard | – |
 | Participants › Channels | `/admin/organisations/{org}/channels` | `integrations.manage` | standard | – |
 | Participants › Texts | `/admin/organisations/{org}/texts` | `texts.organisation.manage` | standard | `/admin/organisations/{org}/texts/{text_locale}` |
@@ -77,6 +79,7 @@ Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
 | Overview | `/admin/groups/{slug}` | `group.view` | wide | – |
+| Overview › Usage | `/admin/groups/{slug}/usage` | `reports.view` | wide | – |
 | Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | wide | `/admin/groups/{slug}/bookings/{booking_id}`, `/admin/groups/{slug}/agenda/week`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/move`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/rebook`, `/admin/groups/{slug}/agenda/slot-rebook`, `/admin/groups/{slug}/agenda/waiting` |
 | Agenda › Queue | `/admin/groups/{slug}/queue` | `queue.work` | wide | `/admin/groups/{slug}/queue/{booking_id}` |
 | Planning | `/admin/groups/{slug}/staffing` | `schedule.manage` | wide | `/admin/groups/{slug}/staffing/{rule_id}`, `/admin/groups/{slug}/staffing/{rule_id}/split` |

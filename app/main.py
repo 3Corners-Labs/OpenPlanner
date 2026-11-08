@@ -138,6 +138,7 @@ from app.domain.tls import public_address
 from app.domain.tls_check import CertificateStatus, TlsWatch
 from app.domain.tls_source import CertificateSourceService
 from app.domain.trial_call_service import TrialCallService
+from app.domain.usage_report_service import UsageReportService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
@@ -422,6 +423,13 @@ def create_app(
         app.state.participant_link_service = ParticipantLinkService(uow, clock)
         app.state.admin_service = AdminService(
             uow, clock, app.state.live_settings.closure_retention
+        )
+        app.state.usage_report_service = UsageReportService(
+            uow,
+            app.state.admin_service,
+            clock,
+            lambda: live().reporting_min_cell_size,
+            lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
         )
         app.state.log_destination_service = LogDestinationService(
             uow,

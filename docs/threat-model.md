@@ -960,6 +960,23 @@ worker's stale heartbeat; it carries codes, slugs and times only.
 | Tampering | Simulated ids overwrite a real meeting or task | `prepare` sets ids only where none exist; stand-ins are marked `simulated` on the timeline | `tests/domain/test_simulation.py::test_real_platform_ids_are_never_overwritten` |
 | Tampering (CSRF) | A third-party site triggers a check or a simulated event | Fetch Metadata check on both POSTs | `tests/admin/test_check_routes.py::test_cross_site_check_is_refused`, `tests/admin/test_simulator_routes.py::test_unknown_events_and_cross_site_posts_are_refused` |
 
+## Flow: usage reports (ADR 0117)
+
+`GET /admin/reports`, `GET /admin/organisations/{org}/usage` and `GET /admin/groups/{slug}/usage`
+read the hourly counts the worker builds from the facts of booking changes (`usage_hour`). Inputs
+from outside: the path slugs and the `from` and `to` query dates. The tables hold counts and sums
+per hour and cut, never one line per booking; the pages show no name, address, number or booking.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Information disclosure | An admin reads another organisation's or group's figures | `reports.view` on the route, decided again in the service with the scope it gives; the adapter filters every read by that scope through `scope_filter`; a denial is audited | `tests/adapters/db/test_usage_reports.py::test_another_organisations_group_is_out_of_scope_and_audited`, `tests/admin/test_usage_routes.py::test_another_organisations_group_is_refused`, `test_an_organisation_admin_cannot_read_another_organisations_page` |
+| Information disclosure | A small cell points at one person | Every count below the threshold (platform value, raised by the organisation, never under 3) is shown as `< n`; one hidden cell takes the next smallest with it, and a total that would give a hidden cell back is hidden too | `tests/domain/test_usage_suppress.py` (the property tests), `tests/domain/test_usage_report.py::test_a_day_below_the_threshold_is_hidden_with_its_neighbour`, `tests/admin/test_usage_routes.py::test_a_small_count_reads_less_than_the_minimum` |
+| Information disclosure | A report is rebuilt into one booking | The facts hold the hour and allow-listed codes only, times to the quarter hour; no booking id, reference or free text; the tables hold no line per booking | `tests/domain/test_usage_recording.py::test_no_fact_holds_a_name_an_address_a_number_or_a_token`, `tests/domain/test_usage.py::test_no_usage_field_is_a_personal_data_field` |
+| Information disclosure | Two reports over adjacent ranges are subtracted into one day | Ranges are whole days; a table's total is hidden when it would give a hidden cell back; a single day shows nothing below the threshold. **Residual risk, accepted for this step:** each range is suppressed on its own, so a reader who may ask for any range can subtract two ranges that differ by one day and learn that day's count in the outcome, lead-time, cancellation and reschedule tables; the day series itself stays suppressed per day. The reader holds `reports.view` and sees the group anyway; a minimum range for the cuts comes with the screens of ADR 0117 point 8 | `tests/domain/test_usage_report.py` |
+| Elevation of privilege | An agent or a role without `reports.view` opens a report | The route's permission and the service's check; the matrix grants it to the superuser, organisation admin, group admin and auditor only | `tests/admin/test_usage_routes.py::test_the_agent_has_no_reports`, `tests/domain/test_authorization.py::test_matrix_follows_handover_section_6` |
+| Denial of service | A huge range or repeated requests load the database | A range is at most 400 days; the page reads the small hourly table with an index, never the bookings | `tests/adapters/db/test_usage_reports.py::test_a_backwards_or_too_wide_range_is_refused` |
+| Tampering | A crafted `from` or `to` | Parsed as a date; anything else is refused with a code (400) and no echo of the value | `tests/admin/test_usage_routes.py::test_a_date_that_is_no_date_is_refused` |
+
 ## Flow: troubleshooting per booking (ADR 0068)
 
 `POST /admin/groups/{slug}/bookings/{id}/retry` plans a failed meeting or work item job again;

@@ -141,6 +141,31 @@
       ]
     },
     {
+      "name": "reports list",
+      "path": "/admin/reports",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "group usage",
+      "path": "/admin/groups/demo/usage",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "organisation usage",
+      "path": "/admin/organisations/demo/usage",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
       "name": "organisation page",
       "path": "/admin/organisations/demo",
       "user": "super",
