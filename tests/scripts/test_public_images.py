@@ -1,4 +1,4 @@
-"""Public images of a minor or major release (ADR 0108): the rule, the check and the notes."""
+"""Public images of every release (ADR 0108, 0116 point 10): the rule, the check and the notes."""
 
 import os
 import shutil
@@ -58,11 +58,11 @@ def test_the_notes_carry_the_references_and_the_identity_of_the_tag() -> None:
     assert "token.actions.githubusercontent.com" in notes
 
 
-def test_only_a_minor_or_major_tag_selects_the_public_packages() -> None:
+def test_every_release_tag_and_no_candidate_selects_the_public_packages() -> None:
     workflow = yaml.safe_load((REPO / ".github/workflows/main.yml").read_text())
     steps = workflow["jobs"]["publish"]["steps"]
     rule = next(s for s in steps if s.get("id") == "public")["run"]
-    assert "^v[0-9]+\\.[0-9]+\\.0$" in rule
+    assert "^v[0-9]+\\.[0-9]+\\.[0-9]+$" in rule  # vX.Y.Z: patches too, never -rc.N
     # the release-candidate job never gets a public image
     candidate = workflow["jobs"]["candidate"]["steps"] if "candidate" in workflow["jobs"] else []
     assert all("public-image" not in s.get("with", {}) for s in candidate)
