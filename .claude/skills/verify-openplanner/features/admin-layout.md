@@ -32,6 +32,9 @@ Preconditions:
 
 - A stack that is up. A booking of this run in `state.json` (from `booking`) puts a row in the
   agenda day; without one the journey takes the next working day, which has slots but no rows.
+- For the widest agenda rows, the e2e examples as well: `stack.sh compose exec -T web python -m
+  app.cli seed-closures > /dev/null` adds bookings awaiting confirmation on the next weekday,
+  each with the chip "Niet bevestigd, uiterlijk …" (its output holds booking links: discard it).
 - The development users `super` and `auditor` (`dev/keycloak/README.md`).
 
 - **Set the window.** The journey sets the viewport to 1280 × 800 before the first page.
