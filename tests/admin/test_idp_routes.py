@@ -11,36 +11,14 @@ import re
 import pytest
 
 from app.domain.audit import Outcome
-from app.domain.entitlements import LoginClaims
 from app.domain.identity_provider_service import TEST_LOGIN_EVENT
 from app.domain.ports import LoginTestReport
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.admin.test_admin_flow import audit_events
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.identity_providers import DISCOVERY_URL, discovery_document
-
-LOGIN = "/admin/organisations/demo/login"
-NEW_PROVIDER = {
-    "key": "org-a",
-    "name": "Acme A",
-    "discovery_url": DISCOVERY_URL,
-    "client_id": "openplanner",
-    "client_auth": "private_key_jwt",
-    "scopes": "openid profile email",
-    "entitlement_claim": "openplanner_entitlements",
-    "entitlement_prefix": "openplanner",
-}
-
-
-async def register(site: Site, **overrides: str) -> str:
-    """Register a provider through the form; return the page of the provider."""
-    response = await site.client.post(
-        LOGIN, data={**NEW_PROVIDER, **overrides}, headers=SAME_ORIGIN
-    )
-    assert response.status_code == 303, response.text
-    location = response.headers["location"]
-    assert location.startswith(f"{LOGIN}/{overrides.get('key', 'org-a')}?done=idp_created")
-    return location.split("?")[0]
+from tests.support.admin_site import audit_events
+from tests.support.organisation_login import LOGIN, register
+from tests.support.organisation_providers import NEW_PROVIDER, organisation_claims
 
 
 @pytest.fixture
@@ -199,18 +177,6 @@ async def test_b13_the_organisation_admin_sees_the_status_but_changes_nothing(si
 
 
 # --- the guided test login (point 9) ---------------------------------------------------------
-
-
-def organisation_claims(entitlements: frozenset[str] = frozenset()) -> LoginClaims:
-    return LoginClaims(
-        subject="idp:org-a:ada",
-        display_name="Ada",
-        roles=frozenset(),
-        organisations=frozenset(),
-        groups=frozenset(),
-        role_claims=frozenset(),
-        entitlements=entitlements,
-    )
 
 
 async def start_test(site: Site) -> str:

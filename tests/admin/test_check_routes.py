@@ -13,12 +13,12 @@ from app.config import Settings
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.main import create_app
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.admin.test_admin_flow import audit_events
-from tests.admin.test_group_routes import SETTINGS_FORM
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.integrations import FakeChecker
+from tests.support.admin_site import audit_events
 from tests.support.domain import NOW
+from tests.support.group_settings import SETTINGS_FORM
 
 SETTINGS = "/admin/groups/demo/settings"
 FINDINGS = [

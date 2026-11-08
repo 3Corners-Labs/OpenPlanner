@@ -30,20 +30,9 @@ from app.domain.identity_providers import ClientAuth
 from app.domain.mfa import MfaPolicy
 from app.domain.ports import IdentityError
 from app.domain.settings_registry import lookup
+from tests.support.oidc import CLIENT, MAPPING, REDIRECT
 
 ISSUER = "https://idp.example.nl"
-CLIENT = "openplanner-admin"
-MAPPING = ClaimMapping(
-    role_claim="roles",
-    organisation_claim="org",
-    group_claim="groups",
-    role_values={
-        "op-superuser": Role.SUPERUSER,
-        "op-org-admin": Role.ORG_ADMIN,
-        "op-group-admin": Role.GROUP_ADMIN,
-    },
-)
-REDIRECT = "https://afspraak.example.nl/admin/callback"
 
 
 class FakeProvider:

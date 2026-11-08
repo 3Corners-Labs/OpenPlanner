@@ -13,7 +13,7 @@ from app.config import Settings
 from app.domain.audit import Outcome
 from app.domain.log_destinations import Reason
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
-from tests.admin.test_admin_flow import audit_events
+from tests.support.admin_site import audit_events
 
 LOGGING = "/admin/logging"
 TOKEN = "hec-token-0123456789"

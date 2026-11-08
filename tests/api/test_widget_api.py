@@ -5,19 +5,15 @@ is open on weekdays 09:00-12:00 and 13:00-17:00 Amsterdam time, two places per s
 group is switched on for embedding and ``SITE`` is on the demo organisation's list.
 """
 
-from collections.abc import AsyncIterator
-
 import httpx
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import (
     AuditEventRow,
     BookingRow,
-    GroupRow,
-    OrganisationOriginRow,
     OrganisationRow,
     OrganisationTextRow,
 )
@@ -28,30 +24,10 @@ from app.domain.maintenance_service import MaintenanceService
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
+from tests.support.participant import FRIDAY_0900
+from tests.support.widget import ADA, BASE, SITE, embed
 
-SITE = "https://www.acme.example"
 EVIL = "https://evil.example"
-BASE = "/api/v1/widget/demo/demo"
-FRIDAY_0900 = "2026-01-02T08:00:00Z"
-ADA = {
-    "start": FRIDAY_0900,
-    "first_name": "Ada",
-    "last_name": "Lovelace",
-    "email": "ada@example.org",
-}
-
-
-async def _embed(settings: Settings, *, enabled: bool = True) -> None:
-    engine = create_engine(settings.database_url)
-    async with AsyncSession(engine) as session, session.begin():
-        demo = await session.scalar(
-            select(OrganisationRow.id).where(OrganisationRow.slug == "demo")
-        )
-        await session.execute(
-            update(GroupRow).where(GroupRow.slug == "demo").values(embedding_enabled=enabled)
-        )
-        session.add(OrganisationOriginRow(organisation_id=demo, origin=SITE, position=0))
-    await engine.dispose()
 
 
 async def _bookings(settings: Settings) -> int:
@@ -60,13 +36,6 @@ async def _bookings(settings: Settings) -> int:
         count = len((await session.scalars(select(BookingRow.id))).all())
     await engine.dispose()
     return count
-
-
-@pytest.fixture
-async def site(demo_settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
-    await _embed(demo_settings)
-    async with app_client(demo_settings, FixedClock(NOW)) as client:
-        yield client
 
 
 async def _book(
@@ -182,7 +151,7 @@ async def test_reads_without_an_origin_get_no_cors_header(site: httpx.AsyncClien
 async def test_a_group_that_is_off_or_in_another_organisation_is_not_found(
     demo_settings: Settings,
 ) -> None:
-    await _embed(demo_settings, enabled=False)
+    await embed(demo_settings, enabled=False)
     async with app_client(demo_settings, FixedClock(NOW)) as client:
         off = await client.get(f"{BASE}/", headers={"origin": SITE})
         other = await client.get("/api/v1/widget/andere/demo/", headers={"origin": SITE})
@@ -251,7 +220,7 @@ async def test_the_preflight_answers_only_allowed_origins(site: httpx.AsyncClien
 async def test_slot_exhaustion_from_a_host_page_hits_the_same_rate_limit(
     demo_settings: Settings,
 ) -> None:
-    await _embed(demo_settings)
+    await embed(demo_settings)
     limited = demo_settings.model_copy(
         update={"rate_limit_enabled": True, "rate_limit_bookings": "2/hour"}
     )
@@ -290,7 +259,7 @@ async def test_a_rate_limit_hit_is_a_security_event_of_the_widget(
     slowapi's own line of the hit is not logged (it carries the address and the path), so
     without the event a flood on the widget would leave no trace at all.
     """
-    await _embed(demo_settings)
+    await embed(demo_settings)
     limited = demo_settings.model_copy(
         update={"rate_limit_enabled": True, "rate_limit_reads": "1/minute"}
     )
@@ -368,7 +337,7 @@ async def test_during_maintenance_the_group_routes_close_but_texts_and_preflight
 async def test_the_group_introduction_uses_the_organisations_own_text(
     demo_settings: Settings,
 ) -> None:
-    await _embed(demo_settings)
+    await embed(demo_settings)
     engine = create_engine(demo_settings.database_url)
     async with AsyncSession(engine) as session, session.begin():
         demo = await session.scalar(

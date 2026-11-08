@@ -11,8 +11,9 @@ import httpx
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, Site
-from tests.admin.test_closure_routes import CLOSURE, _book
+from tests.support.closure_pages import CLOSURE
 from tests.support.images import SECRET, jpeg, png
+from tests.support.participant import booked_page
 
 ORG = "/admin/organisations/demo/closure/scenarios"
 GROUP = "/admin/groups/demo/closure/scenarios"
@@ -129,7 +130,7 @@ async def test_a_group_admin_uses_but_cannot_change_an_organisation_scenario(
 
 
 async def test_start_closure_picks_a_scenario_and_copies_it(site: Site) -> None:
-    manage = await _book(site)
+    manage = await booked_page(site.client)
     await site.login_as(GROUP_ADMIN)
     page = await _create(site, GROUP, STRIKE)
     scenario_id = page.rsplit("/", 1)[1]

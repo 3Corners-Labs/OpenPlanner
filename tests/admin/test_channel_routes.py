@@ -15,8 +15,8 @@ from app.admin.channel_routes import (
 from app.domain.channel_settings import SmsProvider
 from app.domain.mail_domain import REASONS, Record, Verdict
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
-from tests.admin.test_admin_flow import audit_events
 from tests.fakes.smtp import FakeSmtpServer
+from tests.support.admin_site import audit_events
 
 PAGE = "/admin/organisations/demo/channels"
 SMTP = {

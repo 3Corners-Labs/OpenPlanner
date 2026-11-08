@@ -6,7 +6,7 @@ from datetime import date, timedelta
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.booking import Booking, BookingStatus, Contact, MeetingRef
+from app.domain.booking import Booking, BookingStatus, MeetingRef
 from app.domain.calls import (
     CallState,
     EventKind,
@@ -20,22 +20,15 @@ from app.domain.errors import DomainError
 from app.domain.integration import IntegrationService
 from app.domain.meeting_status_service import MAX_POLLS_PER_VIEW, MeetingStatusService
 from app.domain.ports import IntegrationError
-from app.domain.scheduling import PhoneMode
-from tests.domain.test_integration import GROUP, GROUP_ADMIN, OUTSIDER
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeVideo
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.domain import SLOT_0900
+from tests.support.admin import GROUP_ADMIN, OUTSIDER
+from tests.support.domain import ADA_CONTACT, SLOT_0900
+from tests.support.integration import GROUP
 
 WINDOW = timedelta(seconds=30)
 DAY = date(2026, 1, 5)
-ADA = Contact.create(
-    first_name="Ada",
-    last_name="Lovelace",
-    email="ada@example.org",
-    phone=None,
-    phone_mode=PhoneMode.OPTIONAL,
-)
 HOST_IN = MeetingStatus(
     CallState.IN_PROGRESS, participants=2, host_joined=True, started_at=SLOT_0900
 )
@@ -49,7 +42,7 @@ def _booking(number: int = 1, **changes: object) -> Booking:
         start=SLOT_0900,
         end=SLOT_0900 + timedelta(minutes=30),
         status=BookingStatus.CONFIRMED,
-        contact=ADA,
+        contact=ADA_CONTACT,
         locale="nl",
         token_hash=f"h{number}",
         created_at=SLOT_0900 - timedelta(days=1),
