@@ -453,8 +453,6 @@ def page(
             "alert_popup_options": [
                 (key, locale.gettext(label)) for key, label in ALERT_POPUP_LABELS.items()
             ],
-            # A message page (refusal, not found) has no help link: ``help_link=False``.
-            "help_topic": help_topic,
             # ADR 0060 §7: which sign-in the top-bar mark settles for once (brand-motion.js).
             "brand_signed_in": _signed_in_key(request),
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
