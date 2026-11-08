@@ -7,8 +7,11 @@ lists every recorded event with its reason code; nothing about participants beyo
 The booking page shows the answers to the group's form, and the participant's name, email
 address and phone number only on request: *Show contact details* opens the page again with
 ``?contact=show``, and ``ParticipantContactService`` audits each request (ADR 0044 §2, the
-product owner's choice of 2026-11-08). A link from another site shows the page without them,
-so it cannot write a request in a staff member's name into the audit log.
+product owner's choice of 2026-11-08). Only the button on the page itself counts
+(``from_own_page``): the same address shared in a mail or chat, bookmarked, typed, followed
+from another site or prefetched shows the page without them and writes nothing, so it never
+puts a request in someone else's name. The ``mailto:`` link percent-encodes the address, so
+characters a participant may type before the ``@`` cannot fill other fields of the draft.
 
     GET  /admin/groups/{slug}/bookings/{booking_id}         bookings.view
     GET  /admin/groups/{slug}/bookings/{booking_id}?contact=show   bookings.view, audited
@@ -23,6 +26,7 @@ meeting or work item job again.
 from dataclasses import dataclass
 from datetime import datetime, timedelta, tzinfo
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
@@ -56,7 +60,7 @@ from app.web.call_labels import (
     TASK_STATE_LABELS,
     failure_hint,
 )
-from app.web.protection import RejectedRequest, cross_site
+from app.web.protection import RejectedRequest, from_own_page
 from app.web.routing_labels import routing_summary
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -317,9 +321,10 @@ async def booking_detail(
     can_retry = booking.is_active and can_function(context.principal)(
         Permission.BOOKINGS_MANAGE, context.group
     )
-    shown = None
-    if contact == SHOW_CONTACT and booking.contact is not None and not cross_site(request):
+    shown, deleted = None, booking.contact is None
+    if contact == SHOW_CONTACT and not deleted and from_own_page(request):
         shown = await participant_contacts(request).reveal(context.principal, slug, booking_id)
+        deleted = shown is None  # deleted since the timeline was read
     return group_page(
         request,
         locale,
@@ -341,7 +346,8 @@ async def booking_detail(
             "requests": _request_views(request, locale, timeline.requests),
             "retry_action": f"/admin/groups/{slug}/bookings/{booking_id}/retry",
             "contact": shown,
-            "contact_deleted": booking.contact is None,
+            "contact_mailto": f"mailto:{quote(shown.email, safe='@')}" if shown else "",
+            "contact_deleted": deleted,
             "contact_hide": f"/admin/groups/{slug}/bookings/{booking_id}#contact",
             "answers": labelled_answers(
                 booking.contact.answers if booking.contact else None,

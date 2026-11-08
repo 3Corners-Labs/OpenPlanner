@@ -85,8 +85,9 @@ number or the address calls or mails from your own program.
   (*Participant's contact details shown*). The details themselves are not in it.
 - **Hide contact details** takes them off the screen again, for example before you take a
   screenshot for Webex support.
-- When you reach the page through a link on another website, they are not shown; choose **Show
-  contact details** yourself.
+- Only the button on the page itself shows them. When you open the page through a shared link
+  (in a mail or chat), a bookmark or a link on another website, they are not shown and nothing
+  goes into the audit log; choose **Show contact details** yourself.
 - When the booking's personal data have been deleted (see
   [Data fields and personal data](data-fields.md)), the page says so and there is nothing left
   to show.

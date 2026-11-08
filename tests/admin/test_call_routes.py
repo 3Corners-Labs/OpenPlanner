@@ -17,7 +17,7 @@ from app.adapters.registrations import (
 )
 from app.adapters.webhook_selftest import Delivery, Outcome, deliveries_to_report
 from app.domain.admin import AdminService
-from app.domain.authorization import Principal, Scope
+from app.domain.authorization import Principal
 from app.domain.booking import MeetingRef
 from app.domain.calls import EventKind
 from app.domain.event_context import bind_booking, bind_level, trace_scope
@@ -26,20 +26,20 @@ from app.domain.job_plan import JobType
 from app.domain.participant_contact import CONTACT_VIEWED
 from app.domain.ports import RequestRecord
 from app.domain.request_log import RequestEvents
-from app.domain.services import BookingService
+from app.domain.services import BookingService, ContactInput
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_uow
+from tests.support.admin_site import audit_log, site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 
 
-async def _book(site: Site, slug: str) -> int:
+async def _book(site: Site, slug: str, contact: ContactInput = ADA) -> int:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     uow = SqlUnitOfWork(app.state.engine)
     receipt = await book_confirmed(
         BookingService(uow, site.clock, TEST_TOKEN_KEY),
         group_slug=slug,
         start=FRIDAY_0900,
-        contact=ADA,
+        contact=contact,
         locale="nl",
     )
     booking_id = receipt.booking.id or 0
@@ -340,13 +340,7 @@ async def test_a_booking_without_a_meeting_shows_no_meeting_id(site: Site) -> No
 
 async def _contact_views(site: Site) -> list[tuple[str, int | None]]:
     """Return actor and booking of every *contact details shown* audit event, oldest first."""
-    async with site_uow(site).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [
-        (e.event.actor, e.event.booking_id)
-        for e in reversed(events)
-        if e.event.detail == CONTACT_VIEWED
-    ]
+    return [(e.actor, e.booking_id) for e in await audit_log(site) if e.detail == CONTACT_VIEWED]
 
 
 async def test_the_contact_details_show_only_on_request_and_each_request_is_audited(
@@ -373,22 +367,73 @@ async def test_the_contact_details_show_only_on_request_and_each_request_is_audi
     assert await _contact_views(site) == [(GROUP_ADMIN.subject, booking_id)]
 
 
-async def test_a_link_from_another_site_shows_no_contact_details_and_audits_nothing(
-    site: Site,
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"sec-fetch-site": "cross-site"},
+        {"sec-fetch-site": "same-site"},
+        {"sec-fetch-site": "none"},
+        {},
+        {"referer": "https://elders.example/"},
+        {"sec-fetch-site": "same-origin", "sec-purpose": "prefetch;prerender"},
+    ],
+    ids=[
+        "cross-site",
+        "same-site",
+        "typed-shared-or-bookmarked",
+        "no-header",
+        "foreign-referer",
+        "prerender",
+    ],
+)
+async def test_only_the_button_on_the_page_shows_the_contact_details(
+    site: Site, headers: dict[str, str]
 ) -> None:
-    """A crafted link cannot write a view in a planner's name into the audit log."""
+    """A shared, bookmarked or crafted address shows nothing and writes nothing in anyone's name."""
     booking_id = await _book(site, "demo")
     await site.login_as(GROUP_ADMIN)
 
     response = await site.client.get(
-        f"/admin/groups/demo/bookings/{booking_id}?contact=show",
-        headers={"sec-fetch-site": "cross-site"},
+        f"/admin/groups/demo/bookings/{booking_id}?contact=show", headers=headers
     )
 
     assert response.status_code == 200
     assert "ada@example.org" not in response.text
     assert ">Contactgegevens tonen</button>" in response.text
     assert await _contact_views(site) == []
+
+
+async def test_an_older_browser_shows_them_from_the_portals_own_page(site: Site) -> None:
+    """Without Fetch Metadata the portal's own address as referrer stands in for the button."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+    page = f"/admin/groups/demo/bookings/{booking_id}"
+
+    text = (
+        await site.client.get(
+            f"{page}?contact=show", headers={"referer": f"http://testserver{page}"}
+        )
+    ).text
+
+    assert '<a href="mailto:ada@example.org">ada@example.org</a>' in text
+    assert await _contact_views(site) == [(GROUP_ADMIN.subject, booking_id)]
+
+
+async def test_the_mail_link_encodes_what_could_fill_other_fields_of_the_draft(
+    site: Site,
+) -> None:
+    """RFC 6068: ``?``, ``=`` and ``&`` before the ``@`` must not become cc, subject or body."""
+    booking_id = await _book(site, "demo", replace(ADA, email="ada?cc=x&body=y@example.org"))
+    await site.login_as(GROUP_ADMIN)
+
+    text = (
+        await site.client.get(
+            f"/admin/groups/demo/bookings/{booking_id}?contact=show", headers=SAME_ORIGIN
+        )
+    ).text
+
+    assert 'href="mailto:ada%3Fcc%3Dx%26body%3Dy@example.org"' in text
+    assert ">ada?cc=x&amp;body=y@example.org</a>" in text
 
 
 async def test_after_the_purge_the_page_says_the_contact_details_are_deleted(site: Site) -> None:

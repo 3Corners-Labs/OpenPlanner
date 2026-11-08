@@ -511,12 +511,24 @@ async def record_change(
     organisation: str | None,
     group: str | None,
     detail: str = "",
+    *,
+    booking_id: int | None = None,
 ) -> None:
-    """Record a successful change in the same transaction as the change itself.
+    """Record a successful admin action in the same transaction as the action itself.
 
-    ``detail`` names what changed (field names, ``rule.add``-style keys), never values.
+    Mostly a change; also a request worth accounting for, such as showing a participant's
+    contact details (ADR 0044 §2). ``detail`` names what changed or was asked for (field
+    names, ``rule.add``-style keys), never values; ``booking_id`` names the booking it is about.
     """
     event = AuditEvent(
-        at, principal.subject, permission.value, Outcome.SUCCESS, "", organisation, group, detail
+        at,
+        principal.subject,
+        permission.value,
+        Outcome.SUCCESS,
+        "",
+        organisation,
+        group,
+        detail,
+        booking_id=booking_id,
     )
     await tx.add_audit_event(event)

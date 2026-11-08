@@ -8,18 +8,18 @@ or a screenshot of it for support, carries none. The product owner chose this on
 so that a planner can call a participant whose booking is too late to change while each look
 stays accountable. Every request is an audit event under ``bookings.view`` with the detail
 ``booking.contact_viewed``, the actor, the group and the booking id, never the data itself.
-After the purge there is nothing to show, so nothing is audited. It is a protection, so there
-is no setting to switch it off (ADR 0042).
+After the purge there is nothing to show, so nothing is audited. What counts as a request is
+the web edge's call: only the button on the booking page itself (``app.web.protection.
+from_own_page``), never a shared or bookmarked address. It is a protection, so there is no
+setting to switch it off (ADR 0042).
 
     reveal  bookings.view  group level  the contact details of one booking of the group
 """
 
-from app.domain.admin import AdminService, require
-from app.domain.audit import AuditEvent, Outcome
+from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Contact
-from app.domain.errors import DomainError, ErrorCode
-from app.domain.lookups import group_by_slug
+from app.domain.lookups import group_booking
 from app.domain.ports import Clock, UnitOfWork
 
 CONTACT_VIEWED = "booking.contact_viewed"
@@ -52,30 +52,25 @@ class ParticipantContactService:
             (nothing is audited then).
 
         Raises:
-            DomainError: ``not_permitted``, ``group_not_found`` or ``booking_not_found`` (also
-                for a booking of another group, the same answer as for an unknown id).
+            DomainError: ``not_permitted``, ``group_not_found`` (from the authorisation) or
+                ``booking_not_found`` (also for a booking of another group, the same answer as
+                for an unknown id).
         """
         target = require(
             await self._admin.authorize(principal, Permission.BOOKINGS_VIEW, group_slug=slug)
         ).target
         async with self._uow.locked() as tx:
-            group = await group_by_slug(tx, slug)
-            booking = await tx.get_booking(booking_id)
-            if booking is None or booking.group_id != group.id:
-                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+            booking, _ = await group_booking(tx, slug, booking_id)
             if booking.contact is None:
                 return None
-            await tx.add_audit_event(
-                AuditEvent(
-                    self._clock.now(),
-                    principal.subject,
-                    Permission.BOOKINGS_VIEW.value,
-                    Outcome.SUCCESS,
-                    "",
-                    target.organisation,
-                    target.group,
-                    CONTACT_VIEWED,
-                    booking_id=booking_id,
-                )
+            await record_change(
+                tx,
+                self._clock.now(),
+                principal,
+                Permission.BOOKINGS_VIEW,
+                target.organisation,
+                target.group,
+                CONTACT_VIEWED,
+                booking_id=booking_id,
             )
         return booking.contact

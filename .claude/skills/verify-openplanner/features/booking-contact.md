@@ -22,8 +22,9 @@ themselves (ADR 0044 §2, the product owner's choice of 2026-11-08).
 
 - Admin portal, Groepen, "Demo: videogesprek", tab `Agenda`, the link `Details` in the row of a
   booking; then the button `Contactgegevens tonen` in the card "Contactgegevens".
-- The address `/admin/groups/demo/bookings/<id>`, and `?contact=show` for the request; a link to
-  that address from another site opens the page without the details.
+- The address `/admin/groups/demo/bookings/<id>`; the button leads to `?contact=show`, but that
+  address opened any other way (typed, bookmarked, shared, from another site) shows the page
+  without the details.
 
 ## Driving it with journey.mjs
 
@@ -58,9 +59,10 @@ Command: `node .claude/skills/verify-openplanner/scripts/journey.mjs booking con
 - The `tel:` link is not driven: the run's made-up participant has no phone number, because no
   fictitious number range exists that is safe to type. The HTTP tests
   (`tests/admin/test_call_routes.py`) cover the link.
-- The request counts only from the portal's own pages or a typed address: a browser that marks
-  the request as cross-site (`Sec-Fetch-Site`) gets the page without the details. The journey
-  presses the button, so it is the portal's own.
+- Only the button on the page itself counts (`Sec-Fetch-Site: same-origin`): opening
+  `?contact=show` by typing, a bookmark, a shared link or `page.goto` sends `none` and gets the
+  page without the details and without an audit line. Press the button; never `goto` the
+  address to save a step.
 - After the purge (24 hours after the end or the cancellation of the booking) the card says the
   personal data have been deleted and has no button; this stack never gets there within a run.
 - Screenshot only this stack's booking pages: the made-up participant is the only one on it.

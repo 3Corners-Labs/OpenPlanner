@@ -13,7 +13,7 @@ from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM
-from tests.support.domain import ADA, SLOT_0900, book_confirmed
+from tests.support.domain import book
 
 ADA_VALUES = ("Ada", "Lovelace", "ada@example.org", "612345678")
 """Ada's name, address and the digits of her number: none of them may reach an audit event."""
@@ -25,10 +25,7 @@ def contacts(uow: InMemoryUnitOfWork, clock: FixedClock) -> ParticipantContactSe
 
 
 async def _book(bookings: BookingService, slug: str = "demo") -> int:
-    receipt = await book_confirmed(
-        bookings, group_slug=slug, start=SLOT_0900, contact=ADA, locale="nl"
-    )
-    return receipt.booking.id or 0
+    return (await book(bookings, slug=slug)).booking.id or 0
 
 
 def _views(uow: InMemoryUnitOfWork) -> list[AuditEvent]:
