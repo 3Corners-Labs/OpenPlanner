@@ -771,6 +771,7 @@ def create_app(
                 "security_log",
                 "client_pseudonyms",
                 "configuration_packages",  # ADR 0089 point 7: the same service as the portal
+                "configuration_documents",  # ADR 0099: the document service, same as the portal
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
             agent_api.state.settings = app.state.settings

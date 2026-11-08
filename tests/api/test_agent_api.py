@@ -1,19 +1,22 @@
 """The machine API over HTTP (ADR 0023): token endpoint, routes, errors, docs, switches."""
 
+from pathlib import Path
+
 import httpx
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import AuditEventRow, GroupRow, SlotRow
+from app.adapters.db.models import AuditEventRow
+from app.adapters.integrations import secret_box
 from app.api.agent.auth import RequireScope
 from app.config import Settings
 from app.domain.api_clients import IssuedSecret
 from app.domain.audit import Outcome
 from app.domain.services import BookingService
 from tests.support.agent_api import BASE, FORM, OPEN_ROUTES, SUPER, TRANSFER, Agent, agent_api
-from tests.support.configuration_package import PASSPHRASE
-from tests.support.domain import NOW
+from tests.support.configuration_package import PASSPHRASE, database_path
+from tests.support.legacy_package import export_package
 from tests.support.routes import all_routes
 
 
@@ -241,6 +244,8 @@ async def test_docs_exist_only_while_published(agent: Agent) -> None:
         "/groups",
         "/groups/{slug}/availability",
         "/configuration",
+        "/configuration/plan",
+        "/configuration/apply",
     }
     assert spec.json()["servers"] == [{"url": BASE}]
     schemes = spec.json()["components"]["securitySchemes"]
@@ -289,7 +294,9 @@ async def test_booking_service_is_shared(agent: Agent) -> None:
     assert mounted.app.state.booking_service is agent.app.state.booking_service  # type: ignore[attr-defined]
 
 
-# --- configuration package (ADR 0089 point 7) ---------------------------------------------
+# --- configuration document (ADR 0099, ADR 0089 point 7) ----------------------------------
+
+DOCUMENT = "application/vnd.openplanner.config+json"
 
 
 async def _audit(agent: Agent) -> list[AuditEventRow]:
@@ -297,82 +304,178 @@ async def _audit(agent: Agent) -> list[AuditEventRow]:
         return list(await session.scalars(select(AuditEventRow).order_by(AuditEventRow.id)))
 
 
+async def _document(agent: Agent, headers: dict[str, str]) -> dict[str, object]:
+    exported = await agent.client.get(f"{BASE}/configuration", headers=headers)
+    assert exported.status_code == 200, exported.text
+    return exported.json()  # type: ignore[no-any-return]
+
+
+def _renamed(document: dict[str, object], name: str) -> dict[str, object]:
+    organisations = document["organisations"]
+    assert isinstance(organisations, list)
+    organisations[0]["name"] = name
+    return document
+
+
 async def test_the_configuration_routes_need_the_transfer_scope(agent: Agent) -> None:
     reader = await agent.bearer(await agent.register())
 
-    exported = await agent.client.get(
-        f"{BASE}/configuration", headers={**reader, "x-passphrase": PASSPHRASE}
-    )
-    imported = await agent.client.put(
-        f"{BASE}/configuration", headers={**reader, "x-passphrase": PASSPHRASE}, content=b"x"
-    )
+    answers = [
+        await agent.client.get(f"{BASE}/configuration", headers=reader),
+        await agent.client.post(f"{BASE}/configuration/plan", headers=reader, content=b"{}"),
+        await agent.client.post(f"{BASE}/configuration/apply", headers=reader, content=b"{}"),
+        await agent.client.put(f"{BASE}/configuration", headers=reader, content=b"{}"),
+    ]
 
-    for response in (exported, imported):
+    for response in answers:
         assert (response.status_code, response.json()) == (403, {"error": "insufficient_scope"})
         assert 'error="insufficient_scope"' in response.headers["www-authenticate"]
     events = [e for e in await _audit(agent) if e.action == "configuration:transfer"]
-    assert [(e.outcome, e.reason) for e in events] == [(Outcome.DENIED, "not_permitted")] * 2
+    assert [(e.outcome, e.reason) for e in events] == [(Outcome.DENIED, "not_permitted")] * 4
 
 
-async def test_the_configuration_package_round_trips_over_the_api(agent: Agent) -> None:
+async def test_the_configuration_is_exported_as_a_document(agent: Agent) -> None:
     # A client of another organisation, narrowed to one of its groups, still acts on the
     # whole installation: the scope is global (ADR 0089 point 7).
     issued = await agent.register(organisation="andere", groups=["andere-team"], **TRANSFER)
-    headers = {**await agent.bearer(issued), "x-passphrase": PASSPHRASE}
+    headers = await agent.bearer(issued)
 
     exported = await agent.client.get(f"{BASE}/configuration", headers=headers)
 
     assert exported.status_code == 200, exported.text
-    assert exported.headers["content-type"] == "application/vnd.sqlite3"
+    assert exported.headers["content-type"] == DOCUMENT
     assert exported.headers["content-disposition"].startswith(
         'attachment; filename="openplanner-configuration-'
     )
+    assert exported.headers["content-disposition"].endswith('.json"')
     assert exported.headers["cache-control"] == "no-store"
-    assert exported.content.startswith(b"SQLite format 3\x00")
+    document = exported.json()
+    assert document["format"] == "openplanner.config/v1"
+    assert sorted(o["slug"] for o in document["organisations"]) == ["andere", "demo"]
+    assert "seal" not in document, "without a passphrase the document holds no secret"
 
-    imported = await agent.client.put(
-        f"{BASE}/configuration", headers=headers, content=exported.content
+
+async def test_an_exported_document_plans_to_nothing_and_a_change_is_applied(agent: Agent) -> None:
+    issued = await agent.register(**TRANSFER)
+    headers = await agent.bearer(issued)
+    document = await _document(agent, headers)
+
+    same = await agent.client.post(f"{BASE}/configuration/plan", headers=headers, json=document)
+    assert same.status_code == 200, same.text
+    assert same.json()["ok"] is True
+    assert same.json()["changes"] == []
+
+    changed = _renamed(document, "Hernoemd")
+    plan = await agent.client.post(f"{BASE}/configuration/plan", headers=headers, json=changed)
+    assert plan.status_code == 200, plan.text
+    body = plan.json()
+    assert set(body) == {"ok", "plan_hash", "changes", "refusals"}
+    assert [(c["action"], c["kind"]) for c in body["changes"]] == [("update", "organisation")]
+    assert "Hernoemd" not in plan.text, "a plan names fields, never values"
+
+    applied = await agent.client.post(
+        f"{BASE}/configuration/apply",
+        headers={**headers, "x-plan-hash": body["plan_hash"]},
+        json=changed,
     )
 
-    assert imported.status_code == 200, imported.text
-    body = imported.json()
-    assert body["counts"] == {
-        "organisations": 2,
-        "groups": 2,
-        "identity_providers": 0,
-        "api_clients": 1,
-    }
-    assert set(body) == {
-        "installation",
-        "app_version",
-        "created_at",
-        "revision",
-        "counts",
-        "secrets",
-    }
-    rows = await _audit(agent)
-    events = [e for e in rows if e.detail.startswith("configuration.")]
-    assert [(e.actor, e.action, e.outcome) for e in events] == [
-        (issued.client.client_id, "settings.platform.manage", Outcome.SUCCESS)
-    ] * 2
-    assert events[1].detail.startswith("configuration.import,organisations:2,")
-    assert all(PASSPHRASE not in e.detail + e.reason for e in rows)
-    # Tokens are state and go with the import; the client itself travels in the package, so
-    # the same secret gets a new token.
-    assert (await agent.client.get(f"{BASE}/me", headers=headers)).status_code == 401
-    renewed = await agent.bearer(issued)
-    assert (await agent.client.get(f"{BASE}/me", headers=renewed)).status_code == 200
+    assert applied.status_code == 200, applied.text
+    result = applied.json()
+    assert result["applied"] is True
+    assert result["settings_version"] >= 1
+    assert result["plan"]["changes"] == body["changes"]
+    exported_again = await _document(agent, headers)
+    assert exported_again["organisations"][0]["name"] == "Hernoemd"  # type: ignore[index]
+    events = [e for e in await _audit(agent) if e.detail.startswith("configuration.apply")]
+    assert events, "every applied change is an audit event"
+    assert {e.actor for e in events} == {issued.client.client_id}
+    assert all("Hernoemd" not in e.detail + e.reason for e in events)
+
+
+async def test_an_apply_is_refused_when_the_plan_is_not_the_reviewed_one(agent: Agent) -> None:
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+    changed = _renamed(await _document(agent, headers), "Anders")
+
+    stale = await agent.client.post(
+        f"{BASE}/configuration/apply", headers={**headers, "x-plan-hash": "0" * 64}, json=changed
+    )
+
+    assert (stale.status_code, stale.json()) == (409, {"error": "configuration_plan_stale"})
+    assert (await _document(agent, headers))["organisations"][0]["name"] != "Anders"  # type: ignore[index]
+
+
+async def test_a_plan_that_deletes_needs_the_reviewed_hash(agent: Agent) -> None:
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+    document = await _document(agent, headers)
+    organisations = document["organisations"]
+    assert isinstance(organisations, list)
+    organisations[0]["groups"] = []
+    document["mode"] = "replace"
+
+    plan = await agent.client.post(f"{BASE}/configuration/plan", headers=headers, json=document)
+    without = await agent.client.post(f"{BASE}/configuration/apply", headers=headers, json=document)
+    reviewed = await agent.client.post(
+        f"{BASE}/configuration/apply",
+        headers={**headers, "x-plan-hash": plan.json()["plan_hash"]},
+        json=document,
+    )
+
+    assert [(c["action"], c["kind"]) for c in plan.json()["changes"]] == [("delete", "group")]
+    assert plan.json()["changes"][0]["fields"] == []
+    assert (without.status_code, without.json()) == (409, {"error": "configuration_plan_stale"})
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["applied"] is True
+
+
+async def test_a_refused_plan_is_a_422_with_its_refusals_and_writes_nothing(agent: Agent) -> None:
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+    document = await _document(agent, headers)
+    organisations = document["organisations"]
+    assert isinstance(organisations, list)
+    organisations[0]["groups"][0]["slot_minutes"] = 7  # a length the portal refuses
+
+    plan = await agent.client.post(f"{BASE}/configuration/plan", headers=headers, json=document)
+    applied = await agent.client.post(f"{BASE}/configuration/apply", headers=headers, json=document)
+
+    assert plan.status_code == 200
+    assert plan.json()["ok"] is False
+    assert plan.json()["refusals"] == [
+        {
+            "path": "organisations[demo].groups[demo]",
+            "code": "invalid_configuration",
+            "field": "slot_minutes",
+        }
+    ]
+    assert applied.status_code == 422
+    assert applied.json()["applied"] is False
+    assert applied.json()["settings_version"] is None
+    assert applied.json()["plan"]["refusals"] == plan.json()["refusals"]
+
+
+async def test_a_sealed_document_needs_its_passphrase(agent: Agent) -> None:
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+
+    exported = await agent.client.get(
+        f"{BASE}/configuration", headers={**headers, "x-passphrase": PASSPHRASE}
+    )
+
+    assert exported.status_code == 200, exported.text
+    assert PASSPHRASE not in exported.text
+    plan = await agent.client.post(
+        f"{BASE}/configuration/plan",
+        headers={**headers, "x-passphrase": PASSPHRASE},
+        content=exported.content,
+    )
+    assert plan.status_code == 200, plan.text
+    assert plan.json()["changes"] == []
 
 
 @pytest.mark.parametrize(
-    ("headers", "body", "expected"),
-    [
-        ({}, b"", (422, "invalid_request")),  # no passphrase header
-        ({"x-passphrase": "tooshort9"}, b"", (422, "configuration_passphrase_short")),
-    ],
+    ("headers", "expected"),
+    [({"x-passphrase": "tooshort9"}, (422, "configuration_passphrase_short"))],
 )
-async def test_an_export_without_a_usable_passphrase_is_refused_by_code(
-    agent: Agent, headers: dict[str, str], body: bytes, expected: tuple[int, str]
+async def test_an_export_with_a_short_passphrase_is_refused_by_code(
+    agent: Agent, headers: dict[str, str], expected: tuple[int, str]
 ) -> None:
     token = await agent.bearer(await agent.register(**TRANSFER))
 
@@ -382,61 +485,106 @@ async def test_an_export_without_a_usable_passphrase_is_refused_by_code(
     assert "tooshort9" not in response.text
 
 
-async def test_an_import_is_refused_by_code_never_echoing_the_file(agent: Agent) -> None:
+@pytest.mark.parametrize("route", ["plan", "apply"])
+async def test_a_document_is_refused_by_code_never_echoing_the_file(
+    agent: Agent, route: str
+) -> None:
     token = await agent.bearer(await agent.register(**TRANSFER))
-    headers = {**token, "x-passphrase": PASSPHRASE}
-    package = (await agent.client.get(f"{BASE}/configuration", headers=headers)).content
     limit = agent.app.state.settings.configuration_package_max_mb * 1024 * 1024
+    url = f"{BASE}/configuration/{route}"
 
-    rubbish = await agent.client.put(f"{BASE}/configuration", headers=headers, content=b"nope")
-    wrong = await agent.client.put(
-        f"{BASE}/configuration",
-        headers={**token, "x-passphrase": "not the passphrase"},
-        content=package,
+    rubbish = await agent.client.post(url, headers=token, content=b"nope")
+    empty = await agent.client.post(url, headers=token, content=b"")
+    foreign = await agent.client.post(
+        url,
+        headers=token,
+        json={"format": "openplanner.config/v1", "scope": {"organisation": "demo"}},
     )
-    empty = await agent.client.put(f"{BASE}/configuration", headers=headers, content=b"")
-    huge = await agent.client.put(
-        f"{BASE}/configuration", headers=headers, content=b"\0" * (limit + 1)
-    )
-    declared = await agent.client.put(
-        f"{BASE}/configuration",
-        headers={**headers, "content-length": str(limit + 1)},
-        content=b"",
+    huge = await agent.client.post(url, headers=token, content=b"\0" * (limit + 1))
+    declared = await agent.client.post(
+        url, headers={**token, "content-length": str(limit + 1)}, content=b""
     )
 
-    assert (rubbish.status_code, rubbish.json()) == (
-        422,
-        {"error": "configuration_package_invalid"},
-    )
-    assert (wrong.status_code, wrong.json()) == (422, {"error": "configuration_passphrase_wrong"})
-    assert (empty.status_code, empty.json()) == (422, {"error": "configuration_package_invalid"})
+    for refused in (rubbish, empty):
+        assert refused.status_code == 422
+        assert "nope" not in refused.text
+    assert (foreign.status_code, foreign.json()) == (422, {"error": "configuration_out_of_scope"})
     assert (huge.status_code, huge.json()) == (413, {"error": "configuration_package_too_large"})
     assert (declared.status_code, declared.json()) == (
         413,
         {"error": "configuration_package_too_large"},
     )
-    assert "nope" not in rubbish.text
 
 
-async def test_an_import_into_an_installation_in_use_is_a_conflict(agent: Agent) -> None:
+def _legacy_package(agent: Agent, tmp_path: Path) -> bytes:
+    """A SQLite package of the installation, as ADR 0089 exported it."""
+    settings = agent.app.state.settings
+    box = secret_box(settings)
+    assert box is not None
+    return export_package(
+        database_path(settings.database_url),
+        box,
+        PASSPHRASE,
+        created_at=agent.app.state.clock.now(),
+        installation="bron",
+        app_version="1.2.3",
+        environment={},
+        work_dir=tmp_path,
+    )
+
+
+async def test_a_sqlite_package_is_still_read_as_a_replacing_document(
+    agent: Agent, tmp_path: Path
+) -> None:
+    issued = await agent.register(**TRANSFER)
+    headers = await agent.bearer(issued)
+    package = _legacy_package(agent, tmp_path)
+
+    imported = await agent.client.put(
+        f"{BASE}/configuration", headers={**headers, "x-passphrase": PASSPHRASE}, content=package
+    )
+
+    assert imported.status_code == 200, imported.text
+    body = imported.json()
+    assert set(body) == {
+        "installation",
+        "app_version",
+        "created_at",
+        "revision",
+        "counts",
+        "secrets",
+    }
+    assert body["counts"]["organisations"] == 2
+    rows = await _audit(agent)
+    details = [e.detail for e in rows if e.detail.startswith("configuration.import")]
+    assert details
+    assert details[-1].startswith("configuration.import,organisations:2,")
+    assert all(PASSPHRASE not in e.detail + e.reason for e in rows)
+
+
+async def test_a_sqlite_package_is_refused_by_code(agent: Agent, tmp_path: Path) -> None:
     token = await agent.bearer(await agent.register(**TRANSFER))
-    headers = {**token, "x-passphrase": PASSPHRASE}
-    package = (await agent.client.get(f"{BASE}/configuration", headers=headers)).content
-    async with AsyncSession(agent.app.state.engine) as session, session.begin():
-        group = await session.scalar(select(GroupRow.id).where(GroupRow.slug == "demo"))
-        session.add(
-            SlotRow(group_id=group, start=NOW, end=NOW, capacity_snapshot=1, kind="scheduled")
-        )
+    package = _legacy_package(agent, tmp_path)
+    url = f"{BASE}/configuration"
 
-    response = await agent.client.put(f"{BASE}/configuration", headers=headers, content=package)
+    wrong = await agent.client.put(
+        url, headers={**token, "x-passphrase": "not the passphrase"}, content=package
+    )
+    missing = await agent.client.put(url, headers=token, content=package)
 
-    assert (response.status_code, response.json()) == (
-        409,
-        {"error": "configuration_installation_in_use"},
+    assert (wrong.status_code, wrong.json()) == (422, {"error": "configuration_passphrase_wrong"})
+    assert (missing.status_code, missing.json()) == (
+        422,
+        {"error": "configuration_passphrase_short"},
     )
-    event = (await _audit(agent))[-1]
-    assert (event.outcome, event.reason, event.detail) == (
-        Outcome.DENIED,
-        "configuration_installation_in_use",
-        "configuration.import",
-    )
+
+
+async def test_put_applies_a_document_exactly_as_apply_does(agent: Agent) -> None:
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+    changed = _renamed(await _document(agent, headers), "Via PUT")
+
+    response = await agent.client.put(f"{BASE}/configuration", headers=headers, json=changed)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["applied"] is True
+    assert (await _document(agent, headers))["organisations"][0]["name"] == "Via PUT"  # type: ignore[index]

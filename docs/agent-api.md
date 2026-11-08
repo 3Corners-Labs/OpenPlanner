@@ -22,7 +22,7 @@ it (**API-koppelingen → Documentatie publiceren**).
 |---|---|
 | Name | The bot's name in Webex, for your own overview |
 | Organisation | The one organisation the bot works for (cannot change later) |
-| Scopes | `availability:read` (read groups and free times); `configuration:transfer` (export and import the configuration package of the whole installation, section 6) |
+| Scopes | `availability:read` (read groups and free times); `configuration:transfer` (export, plan and apply the configuration document of the whole installation, section 6) |
 | Teams | Leave empty for every team of the organisation, or tick only the teams the bot serves |
 | Allowed networks | Optional: the egress IP ranges of your WxCC region, one per line (CIDR) |
 | Secret lifetime | 90, 180 or 365 days; rotate before it ends |
@@ -92,59 +92,84 @@ Every refusal is `{"error": "<code>"}`; it never repeats input.
 | 401 | `invalid_token` | Token missing, expired or revoked: get a new one |
 | 403 | `insufficient_scope` | The client may not do this, or not for this team |
 | 404 | `group_not_found`, `not_found` | Unknown team or path |
-| 409 | `configuration_installation_in_use`, `configuration_package_version` | The installation has bookings, slots or an active closure; the package is of another schema revision |
+| 409 | `configuration_plan_stale`, `configuration_package_version` | The plan is not the one named by `X-Plan-Hash`, or a plan that deletes came without it; a SQLite package is of another schema revision |
 | 413 | `configuration_package_too_large` | Above the platform setting *Largest configuration package* |
-| 422 | `invalid_request`, `invalid_range` | Bad dates or language; no `X-Passphrase` header |
-| 422 | `configuration_passphrase_short`, `configuration_passphrase_wrong`, `configuration_package_invalid` | The passphrase is under 16 characters or wrong; the body is not a package |
+| 422 | `invalid_request`, `invalid_range` | Bad dates or language |
+| 422 | `configuration_passphrase_short`, `configuration_passphrase_wrong`, `configuration_package_invalid`, `invalid_configuration`, `configuration_out_of_scope`, `configuration_too_many_changes` | The passphrase is under 16 characters or wrong; the body is not a package or a valid document, or names another scope; the plan holds too many changes |
 | 429 | `rate_limited` | Too many requests (token endpoint: per IP; calls: per client) |
 | 503 | `temporarily_unavailable` | The API is switched off (emergency stop) |
 
-## 6. Provision an installation: the configuration package
+## 6. Provision an installation: the configuration document
 
-A pipeline can set up a new installation without a person in the portal (ADR 0089 point 7).
-Register a client with the scope `configuration:transfer`. That scope acts on the **whole
-installation**, whatever organisation the client is registered under and whatever teams it
-is narrowed to; only the superuser registers clients, so grant it to a provisioning client
-only, never to a bot.
+A pipeline can set up or change an installation without a person in the portal (ADR 0099, ADR
+0089 point 7). Register a client with the scope `configuration:transfer`. That scope acts on
+the **whole installation**, whatever organisation the client is registered under and whatever
+teams it is narrowed to, and the matrix does not bind it per object; only the superuser
+registers clients, so grant it to a provisioning client only, never to a bot.
+
+The configuration is one JSON document (`docs/configuration-document.md`, schema in
+`docs/configuration-schema/v1.json`; media type `application/vnd.openplanner.config+json`).
 
 ```http
 GET /api/agent/v1/configuration
 Authorization: Bearer opa_…
-X-Passphrase: <at least 16 characters>
+X-Passphrase: <at least 16 characters>   (optional)
 ```
 
-Answers `200` with the package as `application/vnd.sqlite3` (a SQLite file, see
-`docs/adr/0089-…`): every configuration table of this installation, with its secrets sealed
-under the passphrase. No booking, slot or other participant data is in it.
+Answers `200` with the document of the platform. With `X-Passphrase` the secrets are in it,
+sealed under the passphrase; without, it holds none. No booking, slot or other participant
+data is in it.
+
+Read what a document would do before you write it:
 
 ```http
-PUT /api/agent/v1/configuration
+POST /api/agent/v1/configuration/plan
 Authorization: Bearer opa_…
-X-Passphrase: <the passphrase the package was exported with>
-Content-Type: application/vnd.sqlite3
+X-Passphrase: <only if the document holds sealed secrets>
 
-<the package>
+<the document>
 ```
-
-Answers `200` with what was imported (counts only):
 
 ```json
-{"installation": "bron", "app_version": "1.2.3", "created_at": "2026-11-01T12:00:00Z",
- "revision": "0089", "counts": {"organisations": 2, "groups": 2, "identity_providers": 1,
- "api_clients": 1}, "secrets": 3}
+{"ok": true, "plan_hash": "9c1e…",
+ "changes": [{"action": "update", "kind": "group", "path": "organisations[acme].groups[helpdesk]",
+              "fields": ["slot_minutes"]}],
+ "refusals": []}
 ```
 
-The rules are the portal's: an import replaces every configuration table in one transaction
-and is refused with `409 configuration_installation_in_use` while the installation has a
-booking, slot or active closure, and with `409 configuration_package_version` when the package
-is of another schema revision. Both calls are audited under `settings.platform.manage` with
-the client id as actor and never the passphrase. The passphrase travels in a header, never in
-the URL. Access tokens are state, not configuration: after a successful `PUT` every token is
-gone, so request a new one; the client itself (and its secret) travels in the package, and so
-does the registration of the client that imports it when the package came from the same
-installation. `PUT` is a write, so it is refused with `503 maintenance` while maintenance
-mode is on (ADR 0038). The host can do the same with `python -m app.cli config
-export|import`, and `scripts/install.sh --configuration` (ADR 0089 step 4) uses it.
+The plan names kinds, paths and fields, never a value. A plan with a refusal (a value outside
+its bounds, an object that bookings or closures still refer to, a document of another scope)
+has `"ok": false` and writes nothing.
+
+```http
+POST /api/agent/v1/configuration/apply
+Authorization: Bearer opa_…
+X-Passphrase: <only if the document holds sealed secrets>
+X-Plan-Hash: <the plan_hash you reviewed>
+
+<the document>
+```
+
+Plans again inside the write lock and writes all or nothing; answers `200`
+`{"applied": true, "settings_version": 42, "plan": {…}}`. A plan that deletes anything needs the
+`X-Plan-Hash`, and any apply is refused with `409 configuration_plan_stale` when the plan is no
+longer that one. A plan with a refusal answers `422` with `"applied": false` and the plan.
+A plan above the platform setting *Most changes in one configuration document* is refused
+with `422 configuration_too_many_changes`.
+
+`PUT /api/agent/v1/configuration` stays for pipelines that already use it. A JSON document in
+the body is applied exactly as `POST …/apply` does (with the document's own `mode`). A SQLite
+package of ADR 0089 (`Content-Type: application/vnd.sqlite3`, `X-Passphrase` required) is still
+read for one more release: it is converted to a document in `replace` mode and applied, and the
+answer is the old summary (counts only). A package exported from another schema revision is
+refused with `409 configuration_package_version`.
+
+All four calls are audited under the client id, one event per applied change with the plan hash
+prefix, kind and natural key, never a value and never the passphrase. The passphrase travels in
+a header, never in the URL. `POST` and `PUT` are refused with `503 maintenance` while
+maintenance mode is on (ADR 0038); only the export (`GET`) still answers. The host can do the same with `python -m app.cli config
+export|plan|apply`, and `scripts/install.sh --configuration` applies a document to a new
+installation.
 
 ## 7. What comes next
 
