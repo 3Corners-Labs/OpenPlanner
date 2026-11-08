@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 
+from app.domain.slot_close import SHORTFALL_ACCEPTED, SHORTFALL_OPEN, SHORTFALL_RESOLVED
 from app.domain.usage import UsageCell
 from app.domain.usage_report import (
     CountTable,
@@ -31,13 +32,12 @@ from app.domain.usage_report import (
     local_cells,
     zones_of,
 )
+from app.domain.usage_rollup import FILL_CLASSES
 from app.domain.usage_suppress import suppress_line, suppress_table
 
 BOOKED = "booked"
 CAPACITY = "capacity"
 """The ``reason_code`` words of the two cells a closed slot feeds to metric C1."""
-FILL_CLASSES: tuple[str, ...] = ("empty", "under_half", "under_full", "full")
-"""The fill classes of metric C2, in order."""
 HOUR_CUT_MIN_DAYS = 7
 """The weekday-by-hour table is offered only over this many days or more (ADR 0117 point 8)."""
 GROUP_TOTAL_FACTOR = 5
@@ -232,7 +232,7 @@ def capacity_report(
         if series.total is not None
         else None
     )
-    shortfall_codes = ["open", "accepted", "resolved"]
+    shortfall_codes = [SHORTFALL_OPEN, SHORTFALL_ACCEPTED, SHORTFALL_RESOLVED]
     shortfall_codes += sorted(set(shortfall) - set(shortfall_codes))
     return CapacityReport(
         first_day=first_day,
