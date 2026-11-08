@@ -131,6 +131,7 @@ FIELD_ERROR_KEYS: dict[str, str] = {
 }
 
 HTTP_STATUS: dict[ErrorCode, int] = {
+    ErrorCode.UPDATE_APPLY_AFTER_INVALID: 422,
     ErrorCode.INVALID_CONTACT: 422,
     ErrorCode.INVALID_ANSWER: 422,
     ErrorCode.INVALID_FORM_FIELD: 422,

@@ -254,3 +254,26 @@ async def test_a_failing_latest_request_fails_the_check() -> None:
 
     with pytest.raises(IntegrationError):
         await _releases(handler).listing()
+
+
+# ADR 0116 point 9: the support index.
+
+
+async def test_the_support_index_is_read_raw_from_the_repository() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, text='{"lines": []}')
+
+    text = await _releases(handler).support()
+
+    assert text == '{"lines": []}'
+    assert seen[0].url.path == "/repos/acme/openplanner/contents/support.json"
+    assert seen[0].headers["accept"] == "application/vnd.github.raw+json"
+
+
+async def test_no_support_index_is_none_and_a_failure_is_an_integration_error() -> None:
+    assert await _releases(lambda _: httpx.Response(404)).support() is None
+    with pytest.raises(IntegrationError):
+        await _releases(lambda _: httpx.Response(500)).support()

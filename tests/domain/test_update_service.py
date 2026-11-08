@@ -6,6 +6,7 @@ and an updater report that claims success for the wrong version.
 """
 
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -13,6 +14,7 @@ from app.domain.admin import AdminService
 from app.domain.audit import Outcome, Source
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import IntegrationError
+from app.domain.update_policy import LineStatus, SupportLine, UpdateWindow, parse_window
 from app.domain.update_service import SYSTEM_ACTOR, UPDATER_ACTOR, UpdateService
 from app.domain.updates import (
     CHECK_INTERVAL,
@@ -631,3 +633,123 @@ async def test_a_check_cannot_be_requested_when_nobody_checks(
     with pytest.raises(DomainError) as caught:
         await service(uow, clock).request_check(DEMO_SUPERUSER)
     assert caught.value.code is ErrorCode.UPDATE_NOT_AVAILABLE
+
+
+# ADR 0116 point 9: line, window, apply_after and the support index.
+
+AMSTERDAM = ZoneInfo("Europe/Amsterdam")
+# NOW is Thursday 2026-01-01 09:00 in Amsterdam.
+OPEN_NOW = parse_window("thu 08:00-10:00", AMSTERDAM)
+CLOSED_NOW = parse_window("sun 03:00-05:00", AMSTERDAM)
+PATCH = Release(Version(1, 3, 2), "https://github.com/acme/openplanner/releases/tag/v1.3.2")
+
+
+def policy_service(
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
+    releases: FakeReleases,
+    *,
+    window: UpdateWindow = OPEN_NOW,
+    line: str = "",
+    auto_apply: bool = True,
+) -> UpdateService:
+    return UpdateService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=V1,
+        releases=releases,
+        auto_apply=auto_apply,
+        window=window,
+        line=line,
+    )
+
+
+async def test_auto_apply_requests_only_inside_the_window(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    closed = policy_service(uow, clock, releases, window=CLOSED_NOW)
+    assert await closed.check_if_due()
+    assert (await closed.overview(DEMO_SUPERUSER)).open is None
+
+    clock.advance(CHECK_INTERVAL)
+    opened = policy_service(uow, clock, releases, window=parse_window("thu 09:00-11:00", AMSTERDAM))
+    assert await opened.check_if_due()
+    assert (await opened.overview(DEMO_SUPERUSER)).open is not None
+
+
+async def test_a_line_offers_the_patches_of_its_minor_only(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    releases = FakeReleases(RELEASE, more=[PATCH])
+    pinned = policy_service(uow, clock, releases, line="1.3", auto_apply=False)
+    await pinned.check_if_due()
+
+    overview = await pinned.overview(DEMO_SUPERUSER)
+
+    assert overview.available == PATCH
+    assert [item.version for item in overview.offered] == [PATCH.version]
+    assert overview.line == "1.3"
+    with pytest.raises(DomainError):
+        await pinned.request_update(DEMO_SUPERUSER, V2)
+
+
+async def test_a_superusers_request_may_wait_until_apply_after(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    updates = policy_service(uow, clock, releases, window=CLOSED_NOW, auto_apply=False)
+    await updates.check_if_due()
+    later = NOW + timedelta(hours=2)
+
+    request = await updates.request_update(DEMO_SUPERUSER, V2, later)
+
+    assert request.apply_after == later
+    assert await updates.claim() is None
+    clock.advance(timedelta(hours=2))
+    claimed = await updates.claim()
+    assert claimed is not None
+    assert claimed.status is UpdateStatus.RUNNING
+
+
+async def test_an_apply_after_in_the_past_means_now(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    updates = policy_service(uow, clock, releases, auto_apply=False)
+    await updates.check_if_due()
+
+    request = await updates.request_update(DEMO_SUPERUSER, V2, NOW - timedelta(hours=1))
+
+    assert request.apply_after is None
+
+
+async def test_the_updater_claims_an_automatic_request_only_in_the_window(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await policy_service(uow, clock, releases).check_if_due()  # requested inside the window
+    clock.advance(timedelta(hours=2))  # 11:00 local: the window has closed
+
+    waiting = policy_service(uow, clock, releases, window=OPEN_NOW)
+
+    assert await waiting.claim() is None
+    clock.advance(timedelta(days=7) - timedelta(hours=2))
+    assert await waiting.claim() is not None
+
+
+async def test_the_support_index_is_kept_and_names_the_running_line(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    releases.support_json = '{"lines": [{"line": "1.4", "status": "supported"}]}'
+    updates = policy_service(uow, clock, releases, auto_apply=False)
+    await updates.check_if_due()
+    releases.support_json = "not json"
+    clock.advance(CHECK_INTERVAL)
+    await updates.check_if_due()
+
+    overview = await updates.overview(DEMO_SUPERUSER)
+
+    assert overview.check is not None
+    assert overview.check.support == '{"lines": [{"line": "1.4", "status": "supported"}]}'
+    assert overview.support == SupportLine("1.3", LineStatus.ENDED)
+    # 10:00 local after the second check: the window has just closed, next Thursday 08:00.
+    assert overview.next_window == NOW + timedelta(days=7, hours=-1)
+    assert overview.window == OPEN_NOW
