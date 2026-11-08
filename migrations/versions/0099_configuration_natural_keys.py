@@ -55,20 +55,14 @@ def upgrade() -> None:
             sa.text("UPDATE closure_scenarios SET name = :name WHERE id = :id"),
             {"name": name, "id": row.id},
         )
-    bind.execute(
-        sa.text(
-            "DELETE FROM alert_targets WHERE id NOT IN ("
-            "SELECT MIN(id) FROM alert_targets GROUP BY organisation_id, kind, address)"
-            " AND organisation_id IS NOT NULL"
-        )
+    # Foreign keys are not enforced while Alembic runs, so the deliveries of a target that is
+    # deleted here are deleted with it, as ON DELETE CASCADE does in the application.
+    repeated = (
+        "SELECT id FROM alert_targets WHERE id NOT IN ("
+        "SELECT MIN(id) FROM alert_targets GROUP BY COALESCE(organisation_id, 0), kind, address)"
     )
-    bind.execute(
-        sa.text(
-            "DELETE FROM alert_targets WHERE organisation_id IS NULL AND id NOT IN ("
-            "SELECT MIN(id) FROM alert_targets WHERE organisation_id IS NULL"
-            " GROUP BY kind, address)"
-        )
-    )
+    bind.execute(sa.text(f"DELETE FROM alert_deliveries WHERE target_id IN ({repeated})"))  # noqa: S608  # nosec B608 - fixed text
+    bind.execute(sa.text(f"DELETE FROM alert_targets WHERE id IN ({repeated})"))  # noqa: S608  # nosec B608 - fixed text
     op.create_index(
         "uq_closure_scenarios_organisation_name",
         "closure_scenarios",

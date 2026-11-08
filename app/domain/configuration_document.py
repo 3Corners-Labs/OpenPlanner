@@ -205,11 +205,11 @@ def _read_keys(coll: Collection, raw: object, parent: str) -> tuple[Entity, ...]
     for index, item in enumerate(raw):
         if not isinstance(item, str) or not item:
             raise _invalid(f"{where}[{index}]")
-        _read_value(spec, item, f"{where}[{index}]")
-        path = path_of(parent, coll.name, (item,))
-        if item in entities:
+        text = _key_text(spec, item, f"{where}[{index}]")
+        path = path_of(parent, coll.name, (text,))
+        if text in entities:
             raise _invalid(path)
-        entities[item] = Entity(coll.kind.name, (item,), Action.UPSERT, {}, {}, path)
+        entities[text] = Entity(coll.kind.name, (text,), Action.UPSERT, {}, {}, path)
     return tuple(entities.values())
 
 
@@ -221,9 +221,16 @@ def _read_key(kind: Kind, raw: Mapping[object, object], position: str) -> tuple[
         spec = kind.field(name)
         if not isinstance(value, str) or not value:
             raise _invalid(f"{position}.{name}")
-        _read_value(spec, value, f"{position}.{name}")
-        parts.append(value)
+        parts.append(_key_text(spec, value, f"{position}.{name}"))
     return tuple(parts)
+
+
+def _key_text(spec: FieldSpec, raw: str, path: str) -> str:
+    """Read one part of a natural key trimmed, as every text is, so " acme" is the key "acme"."""
+    key = _read_text(spec, raw, path)
+    if not key:
+        raise _invalid(path)
+    return key
 
 
 def _read_entity(
@@ -267,9 +274,9 @@ def _read_map(coll: Collection, raw: Mapping[object, object], parent: str) -> tu
         for part, value in level.items():
             if not isinstance(part, str) or not part:
                 raise _invalid(path_of(parent, coll.name, key))
-            here = (*key, part)
+            text = _key_text(kind.field(kind.key[len(key)]), part, path_of(parent, coll.name, key))
+            here = (*key, text)
             where = path_of(parent, coll.name, here)
-            _read_value(kind.field(kind.key[len(key)]), part, where)
             if len(here) < len(kind.key):
                 if not isinstance(value, Mapping):
                     raise _invalid(where)

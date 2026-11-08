@@ -22,6 +22,7 @@ INSERT INTO alert_targets (id, organisation_id, kind, address, min_level)
            (2, NULL, 'email', 'ops@voorbeeld.nl', 'outage'),
            (3, 1, 'email', 'ops@voorbeeld.nl', 'warning'),
            (4, 1, 'email', 'ops@voorbeeld.nl', 'warning');
+INSERT INTO alert_deliveries (target_id, alert_key, token) VALUES (1, 'a', 't'), (2, 'a', 't');
 """
 SCENARIO = (
     "INSERT INTO closure_scenarios (organisation_id, group_id, name, notices)"
@@ -58,6 +59,9 @@ def test_duplicates_are_made_distinct_and_the_names_are_then_unique(
         6: "Storing (2)",
     }
     assert targets == [1, 3]  # the first of each repeated kind and address stays
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        deliveries = [r[0] for r in database.execute("SELECT target_id FROM alert_deliveries")]
+    assert deliveries == [1]  # the deleted target's delivery went with it
 
 
 def test_a_long_name_keeps_its_suffix_within_the_column(

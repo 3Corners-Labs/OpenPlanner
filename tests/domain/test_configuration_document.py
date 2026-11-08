@@ -414,3 +414,20 @@ def test_a_key_part_of_a_map_is_checked_against_its_field() -> None:
         {**base(), "boxes": [{"slug": "a", "texts": {"x" * 9: {"k": "x"}}}]},
         ErrorCode.INVALID_CONFIGURATION,
     )
+
+
+def test_a_natural_key_is_trimmed_like_every_text() -> None:
+    document = parse(
+        {**base(), "boxes": [{"slug": " a ", "texts": {" nl ": {" k ": "x"}}, "tags": [" t "]}]}
+    )
+
+    (box,) = document.root.children["boxes"]
+    assert box.key == ("a",)
+    assert box.children["texts"][0].key == ("nl", "k")
+    assert box.children["tags"][0].key == ("t",)
+    refused(
+        {**base(), "boxes": [{"slug": "   "}]}, ErrorCode.INVALID_CONFIGURATION, "boxes[0].slug"
+    )
+    refused(
+        {**base(), "boxes": [{"slug": "a", "tags": ["x", " x "]}]}, ErrorCode.INVALID_CONFIGURATION
+    )
