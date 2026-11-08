@@ -1378,8 +1378,6 @@ async def _config(settings: Settings, args: argparse.Namespace) -> tuple[str, in
     """Run a ``config`` command; return the report and exit code. Never prints a secret."""
     if args.action in ("export", "plan", "apply"):
         return await run_document(settings, args)
-    if getattr(args, "organisation", None):
-        return "Refused (invalid_configuration): --organisation needs a document.\n", 2
     passphrase = _passphrase(args.passphrase_file) or ""
     async with httpx.AsyncClient(timeout=10.0) as http:
         service, engine, transfer = package_service(settings, http)

@@ -1,45 +1,87 @@
-"""The rules of a configuration package (ADR 0089): passphrase, size, in use, audit."""
+"""Reading a SQLite package as a document (ADR 0099 point 14): size, rights, audit."""
 
 from datetime import UTC, datetime
 
 import pytest
 
+from app.adapters.configuration_json import JsonCodec
+from app.adapters.configuration_seal import PassphraseSealing
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
+from app.domain.authorization import Role
+from app.domain.configuration_changes import ConfigurationSnapshot, RuleContext, Usage
+from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
 from app.domain.configuration_package import (
-    EXPORT_DETAIL,
     IMPORT_DETAIL,
     MIN_PASSPHRASE_LENGTH,
     PackageSummary,
     check_passphrase,
 )
 from app.domain.configuration_service import ConfigurationPackageService
+from app.domain.configuration_tree import Entity
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
 from tests.fakes.configuration_package import FakeTransfer
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.principals import principal
 
 NOW = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
 PASSPHRASE = "x" * MIN_PASSPHRASE_LENGTH
 SUMMARY = PackageSummary(1, NOW, "bron", "1.0.0", "abc", {"organisations": 2, "groups": 3}, 4)
+HOST = Actor.host()
+
+
+def organisation() -> Entity:
+    fields = {
+        "name": "Acme",
+        "idp_key": None,
+        "default_locale": "nl",
+        "display_name": None,
+        "accent_color": "#01689B",
+        "header_style": "standard",
+        "theme_tokens": {},
+        "contacts": None,
+        "origins": [],
+        "holiday_calendars": [],
+    }
+    return Entity("organisation", ("acme",), fields=fields)
 
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
-    return InMemoryUnitOfWork()
+    unit = InMemoryUnitOfWork()
+    root = Entity("installation", children={"platform": (Entity("platform"),)})
+    unit.state.configuration = ConfigurationSnapshot(root, Usage(), 0)
+    return unit
 
 
 @pytest.fixture
 def transfer() -> FakeTransfer:
-    return FakeTransfer(SUMMARY)
+    root = Entity(
+        "installation",
+        children={"platform": (Entity("platform"),), "organisations": (organisation(),)},
+    )
+    return FakeTransfer(SUMMARY, root)
 
 
 @pytest.fixture
 def service(uow: InMemoryUnitOfWork, transfer: FakeTransfer) -> ConfigurationPackageService:
     clock = FixedClock(NOW)
-    return ConfigurationPackageService(
-        transfer, clock, AdminService(uow, clock), max_bytes=lambda: 100
+    admin = AdminService(uow, clock)
+    documents = ConfigurationDocumentService(
+        uow,
+        clock,
+        admin,
+        JsonCodec(),
+        PassphraseSealing(),
+        installation="test",
+        app_version="1.0.0",
+        context=lambda: RuleContext(),
+        locked=frozenset,
+        max_bytes=lambda: 100_000,
+        max_changes=lambda: 500,
     )
+    return ConfigurationPackageService(transfer, documents, clock, admin, max_bytes=lambda: 100)
 
 
 def test_a_short_passphrase_is_refused() -> None:
@@ -56,51 +98,11 @@ def test_the_summary_detail_names_counts_only() -> None:
     )
 
 
-async def test_export_is_audited_and_never_carries_the_passphrase(
-    service: ConfigurationPackageService, transfer: FakeTransfer, uow: InMemoryUnitOfWork
-) -> None:
-    package = await service.export("sub-super", PASSPHRASE)
-
-    assert package.startswith(b"SQLite")
-    assert transfer.exported == [PASSPHRASE]
-    event = uow.state.audit[-1]
-    assert (event.actor, event.outcome, event.detail) == (
-        "sub-super",
-        Outcome.SUCCESS,
-        EXPORT_DETAIL,
-    )
-    assert PASSPHRASE not in event.detail + event.reason
-
-
-async def test_a_refused_export_is_audited_with_its_code(
-    service: ConfigurationPackageService, transfer: FakeTransfer, uow: InMemoryUnitOfWork
-) -> None:
-    with pytest.raises(DomainError):
-        await service.export("sub-super", "short")
-
-    assert transfer.exported == []
-    event = uow.state.audit[-1]
-    assert (event.outcome, event.reason) == (Outcome.DENIED, "configuration_passphrase_short")
-
-
-async def test_import_is_refused_while_the_installation_is_in_use(
-    service: ConfigurationPackageService, transfer: FakeTransfer, uow: InMemoryUnitOfWork
-) -> None:
-    transfer.busy = True
-
-    with pytest.raises(DomainError) as refused:
-        await service.import_("sub-super", b"package", PASSPHRASE)
-
-    assert refused.value.code is ErrorCode.CONFIGURATION_INSTALLATION_IN_USE
-    assert transfer.imported == []
-    assert uow.state.audit[-1].reason == "configuration_installation_in_use"
-
-
 async def test_import_refuses_an_empty_or_oversized_package(
     service: ConfigurationPackageService,
 ) -> None:
     with pytest.raises(DomainError) as empty:
-        await service.import_("sub-super", b"", PASSPHRASE)
+        await service.import_(HOST, b"", PASSPHRASE)
     with pytest.raises(DomainError) as large:
         await service.inspect(b"x" * 101, PASSPHRASE)
 
@@ -108,12 +110,27 @@ async def test_import_refuses_an_empty_or_oversized_package(
     assert large.value.code is ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE
 
 
-async def test_import_is_audited_with_the_counts(
+async def test_import_applies_the_converted_document_and_audits_the_counts(
     service: ConfigurationPackageService, transfer: FakeTransfer, uow: InMemoryUnitOfWork
 ) -> None:
-    summary = await service.import_("sub-super", b"package", PASSPHRASE)
+    summary = await service.import_(HOST, b"package", PASSPHRASE)
 
     assert summary is SUMMARY
-    assert transfer.imported == [(b"package", PASSPHRASE)]
+    assert transfer.converted == [(b"package", PASSPHRASE)]
+    assert [c.kind for c in uow.state.applied_configuration[0]] == ["organisation"]
     assert uow.state.audit[-1].detail == SUMMARY.detail
     assert uow.state.audit[-1].outcome is Outcome.SUCCESS
+
+
+async def test_import_is_refused_for_an_actor_without_the_rights_and_audited(
+    service: ConfigurationPackageService, uow: InMemoryUnitOfWork
+) -> None:
+    nobody = Actor("group", principal("group", "G", [Role.GROUP_ADMIN], groups=["demo"]))
+
+    with pytest.raises(DomainError) as refused:
+        await service.import_(nobody, b"package", PASSPHRASE)
+
+    assert refused.value.code is ErrorCode.NOT_PERMITTED
+    assert uow.state.applied_configuration == []
+    assert uow.state.audit[-1].outcome is Outcome.DENIED
+    assert uow.state.audit[-1].reason == "not_permitted"

@@ -125,12 +125,3 @@ def test_a_document_above_the_size_limit_is_refused_before_it_is_read(
 
     assert main(["config", "plan", str(document)]) == 2
     assert "configuration_package_too_large" in capsys.readouterr().out
-
-
-def test_an_organisation_needs_the_json_format(
-    seeded: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    code = main(["config", "export", str(tmp_path / "x"), "--organisation", "demo"])
-
-    assert code == 2
-    assert "--format json" in capsys.readouterr().out

@@ -1,17 +1,23 @@
-"""``python -m app.cli config export|show|import|env`` (ADR 0089 point 6)."""
+"""``python -m app.cli config`` on the host: documents (ADR 0099) and old SQLite packages (ADR 0089)."""
 
 import asyncio
+import json
 import sqlite3
 import stat
 from contextlib import closing
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from app.adapters.db.backup import database_path
 from app.adapters.db.engine import create_engine
 from app.adapters.db.seed import seed_demo
+from app.adapters.integrations import secret_box
 from app.cli import main
+from app.config import Settings
 from tests.support.database import migrated_database
+from tests.support.legacy_package import export_package
 
 PASSPHRASE = "a passphrase of sixteen chars"  # noqa: S105 - a test passphrase
 
@@ -45,18 +51,56 @@ def seeded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     return url
 
 
-def test_export_show_env_and_import_round_trip(
+def _package(url: str, tmp_path: Path) -> Path:
+    """Write the old SQLite package of the seeded database (the app no longer does)."""
+    settings = Settings()  # type: ignore[call-arg]
+    box = secret_box(settings)
+    assert box is not None
+    path = tmp_path / "config.sqlite"
+    path.write_bytes(
+        export_package(
+            database_path(url),
+            box,
+            PASSPHRASE,
+            created_at=datetime(2026, 11, 8, tzinfo=UTC),
+            installation="bron",
+            app_version="1.0.0",
+            environment={
+                "OIDC_DISCOVERY_URL": settings.oidc_discovery_url or "",
+                "OIDC_CLIENT_SECRET": "dev-only-secret-value",
+            },
+            work_dir=tmp_path / "work",
+        )
+    )
+    return path
+
+
+def test_export_writes_the_json_document_only(
+    seeded: str,
+    passphrase_file: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    document = tmp_path / "config.json"
+
+    assert main(["config", "export", str(document), "--no-secrets"]) == 0
+
+    assert stat.S_IMODE(document.stat().st_mode) == 0o600
+    assert json.loads(document.read_text())["format"] == "openplanner.config/v1"
+    with pytest.raises(SystemExit):  # the SQLite package is no longer written
+        main(["config", "export", str(tmp_path / "x.sqlite"), "--format", "sqlite"])
+
+
+def test_show_env_and_import_read_an_old_package(
     seeded: str,
     passphrase_file: Path,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    package = tmp_path / "config.sqlite"
+    package = _package(seeded, tmp_path)
     args = ["--passphrase-file", str(passphrase_file)]
 
-    assert main(["config", "export", str(package), *args]) == 0
-    assert stat.S_IMODE(package.stat().st_mode) == 0o600
     assert main(["config", "show", str(package), *args]) == 0
     out = capsys.readouterr().out
     assert "organisations       2" in out
@@ -78,7 +122,7 @@ def test_export_show_env_and_import_round_trip(
     with closing(sqlite3.connect(target.removeprefix("sqlite+aiosqlite:///"))) as db:
         assert db.execute("SELECT COUNT(*) FROM organisations").fetchone()[0] == 2
         actors = [r[0] for r in db.execute("SELECT actor FROM audit_events")]
-    assert actors == ["system:cli"]
+    assert set(actors) == {"system:cli"}
 
 
 def test_a_wrong_passphrase_is_refused_by_code(
@@ -87,8 +131,7 @@ def test_a_wrong_passphrase_is_refused_by_code(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    package = tmp_path / "config.sqlite"
-    assert main(["config", "export", str(package), "--passphrase-file", str(passphrase_file)]) == 0
+    package = _package(seeded, tmp_path)
     wrong = tmp_path / "wrong"
     wrong.write_text("another passphrase entirely\n")
 
@@ -97,14 +140,14 @@ def test_a_wrong_passphrase_is_refused_by_code(
     assert "Refused (configuration_passphrase_wrong)." in capsys.readouterr().out
 
 
-def test_a_short_passphrase_writes_nothing(
+def test_a_short_passphrase_for_sealed_secrets_writes_nothing(
     seeded: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     short = tmp_path / "short"
     short.write_text("short\n")
-    package = tmp_path / "config.sqlite"
+    document = tmp_path / "config.json"
 
-    assert main(["config", "export", str(package), "--passphrase-file", str(short)]) == 2
+    assert main(["config", "export", str(document), "--passphrase-file", str(short)]) == 2
 
-    assert not package.exists()
+    assert not document.exists()
     assert "Refused (configuration_passphrase_short)." in capsys.readouterr().out
