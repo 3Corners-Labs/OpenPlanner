@@ -121,9 +121,9 @@ def test_every_built_in_role_meets_its_own_requirements() -> None:
 
 def test_every_view_permission_is_a_read_permission_and_nothing_else_is() -> None:
     # A new ``*.view`` permission must be classified here before a read-only copy can hold it.
-    # The audit export only downloads what ``audit.view`` shows, so it reads too.
+    # The exports only download what the view permission shows, so they read too.
     views = {p for p in Permission if p.value.endswith(".view")}
-    assert views | {Permission.AUDIT_EXPORT} == READ_PERMISSIONS
+    assert views | {Permission.AUDIT_EXPORT, Permission.REPORTS_EXPORT} == READ_PERMISSIONS
 
 
 def test_custom_roles_copy_the_three_templates_but_never_the_superuser() -> None:

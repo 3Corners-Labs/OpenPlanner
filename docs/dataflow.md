@@ -619,6 +619,14 @@ and a recipient are never in a fact. `completed` and `no_show` are derived from 
 The new columns hold no personal data: `call_status.peak_participants` and `guest_joined_at`,
 `bookings.rebook_requested_at`, `usage_rollup_state.slots_closed_until`.
 
+From step 8 a holder of `reports.export` downloads what a page shows, or the hourly cells, as CSV:
+
+    reports.export ─► the page's load (scope, threshold) ─► the suppressed tables or cells ─► CSV (counts, codes, slugs)
+                                                           └► audit event reports.export (family, range, rows, SHA-256)
+
+The file holds no personal data and no free text; nothing of it is stored, and the audit event holds
+the checksum, not the content. A cell below the threshold is not written.
+
 A fact holds the hour and the allow-listed codes and numbers only (`privacy.USAGE_FIELDS`): no
 name, address, phone number, join link, booking id, reference, token or free text. A failing
 insert is rolled back to its savepoint and dropped with a log line that names the kind and no

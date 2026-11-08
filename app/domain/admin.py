@@ -22,13 +22,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 
 from app.domain.audit import ANONYMOUS_ACTOR, AuditEntry, AuditEvent, AuditFilter, Outcome
-from app.domain.audit_export import (
-    EXPORT_EVENT,
-    ExportLimits,
-    ExportRefused,
-    export_window,
-    to_csv,
-)
+from app.domain.audit_export import EXPORT_EVENT, audit_csv
 from app.domain.authorization import (
     LEVELS,
     MATRIX,
@@ -49,6 +43,7 @@ from app.domain.authorization import (
     scope_for,
 )
 from app.domain.closure_retention import ClosureRetentionOf, default_closure_retention
+from app.domain.csv_export import ExportLimits, ExportRefused, export_window
 from app.domain.entitlements import Refusal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_schema import Envelope, to_record
@@ -406,7 +401,7 @@ class AdminService:
             await self._record_export(principal, scope, narrow, Outcome.FAILURE, refused.code)
             raise
         await self._record_export(principal, scope, narrow, Outcome.SUCCESS, "", len(entries))
-        return to_csv(to_record(entry.event, envelope) for entry in entries), len(entries)
+        return audit_csv(to_record(entry.event, envelope) for entry in entries), len(entries)
 
     async def _record_export(
         self,

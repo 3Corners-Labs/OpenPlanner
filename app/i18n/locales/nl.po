@@ -10430,11 +10430,20 @@ msgstr "Vul het id van een Webex-ruimte in: letters, cijfers, - en _, 10 tot 200
 msgid "authz.permission.reports_view"
 msgstr "Gebruiksrapporten bekijken"
 
+msgid "authz.permission.reports_export"
+msgstr "Gebruiksrapporten downloaden"
+
 msgid "settings.field.reporting_min_cell_size.label"
 msgstr "Kleinste aantal dat een rapport toont"
 
 msgid "settings.field.reporting_org_min_cell_size.label"
 msgstr "Kleinste aantal in de rapporten van de organisatie"
+
+msgid "settings.field.reporting_export_max_rows.label"
+msgstr "Meeste rijen in een CSV-export van een gebruiksrapport"
+
+msgid "settings.field.reporting_export_max_days.label"
+msgstr "Meeste dagen in een CSV-export van een gebruiksrapport"
 
 msgid "admin.nav.reports"
 msgstr "Rapporten"
@@ -11191,3 +11200,15 @@ msgstr "Gegevens aanpassen"
 
 msgid "manage.notice.details"
 msgstr "Uw gegevens zijn aangepast."
+
+msgid "reports.export.screen"
+msgstr "Dit rapport downloaden als CSV"
+
+msgid "reports.export.tidy"
+msgstr "Alle uurcijfers downloaden als CSV (openplanner.usage/1)"
+
+msgid "reports.export.refused.too_many_days"
+msgstr "De export beslaat te veel dagen. Kies een korter tijdvak."
+
+msgid "reports.export.refused.too_many_rows"
+msgstr "De export heeft te veel rijen. Kies een korter tijdvak of één groep."

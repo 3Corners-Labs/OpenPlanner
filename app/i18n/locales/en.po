@@ -10417,11 +10417,20 @@ msgstr "Enter the id of a Webex space: letters, digits, - and _, 10 to 200 chara
 msgid "authz.permission.reports_view"
 msgstr "View usage reports"
 
+msgid "authz.permission.reports_export"
+msgstr "Download usage reports"
+
 msgid "settings.field.reporting_min_cell_size.label"
 msgstr "Smallest count a report shows"
 
 msgid "settings.field.reporting_org_min_cell_size.label"
 msgstr "Smallest count in the organisation's reports"
+
+msgid "settings.field.reporting_export_max_rows.label"
+msgstr "Most rows in a CSV export of a usage report"
+
+msgid "settings.field.reporting_export_max_days.label"
+msgstr "Most days in a CSV export of a usage report"
 
 msgid "admin.nav.reports"
 msgstr "Reports"
@@ -11178,3 +11187,15 @@ msgstr "Change your details"
 
 msgid "manage.notice.details"
 msgstr "Your details have been changed."
+
+msgid "reports.export.screen"
+msgstr "Download this report as CSV"
+
+msgid "reports.export.tidy"
+msgstr "Download all hourly figures as CSV (openplanner.usage/1)"
+
+msgid "reports.export.refused.too_many_days"
+msgstr "The export covers too many days. Choose a shorter period."
+
+msgid "reports.export.refused.too_many_rows"
+msgstr "The export has too many rows. Choose a shorter period or one group."

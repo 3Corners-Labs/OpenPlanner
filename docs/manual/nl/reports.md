@@ -108,6 +108,15 @@ niets over het echte getal. De grafieken hebben geen script nodig, schuiven op e
 zijwaarts in hun kader en blijven weg bij het afdrukken; de tabellen blijven. Is voor een familie
 in de periode niets vastgelegd, dan zegt de pagina dat.
 
+## Downloaden als bestand
+
+Wie mag exporteren (de superuser, organisatiebeheerders, groepsbeheerders en de rol Compliance en privacy) ziet onder de periode op een Gebruik-pagina twee koppelingen.
+
+- **Dit rapport downloaden als CSV** geeft precies de tabellen van de familie waar u naar kijkt, na de regel voor kleine aantallen: een verborgen cijfer is een lege waarde met de opmerking *hidden*. Het bestand bevat geen interfacetekst, alleen codes (een dag, een uitkomst, een bucketnummer), dus het leest in elke taal hetzelfde.
+- **Alle uurcijfers downloaden als CSV** geeft één rij per uur, groep, maat en snede, voor analyse in uw eigen hulpmiddel (het formaat `openplanner.usage/1`, beschreven in `docs/reporting.md`). Een cel onder het minimum staat helemaal niet in het bestand.
+
+Beide openen in Excel (UTF-8, `;` als scheidingsteken). De platformbeheerder bepaalt hoeveel rijen en dagen één bestand mag bevatten; een langere periode wordt met een melding geweigerd en het bestand wordt niet afgekapt. Elke download staat in het auditlog met wie, welke familie, welke periode, hoeveel rijen en een controlegetal van het bestand, nooit de cijfers. Het controlegetal staat ook in de header `X-Content-SHA256` van het antwoord.
+
 ## Wat hier nog niet staat
 
-Per teamlid, de samenvatting per e-mail en de export naar een bestand. Die volgen in latere stappen van hetzelfde ontwerp.
+Per teamlid en de samenvatting per e-mail. Die volgen in latere stappen van hetzelfde ontwerp.

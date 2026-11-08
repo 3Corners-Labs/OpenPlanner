@@ -16,8 +16,9 @@ the admin may view it.
 
 ADR 0040, part 3: filters for minimum level, category, period (days in ``ADMIN_TIMEZONE``) and
 trace id; a trace id shows the whole chain of one request or job. The export writes exactly
-the current filter inside the admin's scope as CSV (``app.domain.audit_export``) and is itself
-an audit event; an export over a limit is refused on the page, never cut short.
+the current filter inside the admin's scope as CSV (``app.domain.audit_export``, written by
+``app.domain.csv_export``) and is itself an audit event; an export over a limit is refused on
+the page, never cut short.
 
 ADR 0040, part 4: the superuser switches diagnostic mode on for one group or organisation
 (``app.domain.diagnostics``); the page lists the modes that are on, each with when it ends.
@@ -66,7 +67,6 @@ from app.domain.audit import (
     Source,
     Subject,
 )
-from app.domain.audit_export import ExportLimits, ExportRefused
 from app.domain.authorization import (
     API_SCOPES,
     ApiScope,
@@ -78,6 +78,7 @@ from app.domain.authorization import (
     decide,
 )
 from app.domain.booking import ChangeReason
+from app.domain.csv_export import ExportLimits, ExportRefused
 from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
 from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID

@@ -117,6 +117,8 @@ class Permission(StrEnum):
     RETENTION_VIEW = "retention.view"
     REPORTS_VIEW = "reports.view"
     """ADR 0117: the usage reports, as counts without personal data, for the groups in scope."""
+    REPORTS_EXPORT = "reports.export"
+    """ADR 0117 point 12: download a report as CSV; audited with the checksum of the file."""
     ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
     STAFF_MANAGE = "staff.manage"
@@ -181,6 +183,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.RETENTION_VIEW: Level.ORGANISATION,
     # ADR 0117: usage reports per group (counts only, small cells hidden).
     Permission.REPORTS_VIEW: Level.GROUP,
+    Permission.REPORTS_EXPORT: Level.GROUP,
     # ADR 0039: create, change and delete custom roles.
     Permission.ROLES_MANAGE: Level.GLOBAL,
     # ADR 0046: who uses the portal; group level so a group admin sees their own team.
@@ -259,6 +262,7 @@ READ_PERMISSIONS = frozenset(
         Permission.BOOKINGS_VIEW,
         Permission.RETENTION_VIEW,
         Permission.REPORTS_VIEW,
+        Permission.REPORTS_EXPORT,
         Permission.STAFF_VIEW,
         Permission.SETTINGS_PLATFORM_VIEW,
         Permission.IDP_MAPPING_VIEW,
@@ -285,6 +289,8 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
     Permission.STAFF_MANAGE: frozenset({Permission.STAFF_VIEW}),
     Permission.STAFF_RESET_PASSWORD: frozenset({Permission.STAFF_VIEW}),
     Permission.STAFF_ERASE: frozenset({Permission.STAFF_VIEW}),
+    # ADR 0117 point 12: a file holds what the screen shows, so exporting presumes seeing.
+    Permission.REPORTS_EXPORT: frozenset({Permission.REPORTS_VIEW}),
 }
 """ADR 0039: permissions a permission depends on; a custom role must hold them too."""
 
@@ -326,6 +332,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.RETENTION_VIEW,
         # ADR 0117: how the organisation's groups are used.
         Permission.REPORTS_VIEW,
+        Permission.REPORTS_EXPORT,
         # ADR 0046: the staff of the own organisations.
         Permission.STAFF_VIEW,
         # ADR 0095: invite, change and disable them in the bundled identity provider.
@@ -362,6 +369,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.STAFF_VIEW,
         # ADR 0117: how the own groups are used.
         Permission.REPORTS_VIEW,
+        Permission.REPORTS_EXPORT,
         # ADR 0043: can step in as an agent in the own queue.
         Permission.QUEUE_WORK,
     },
@@ -376,6 +384,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.RETENTION_VIEW,
         # ADR 0117: usage as counts, for an overview of how the service is used.
         Permission.REPORTS_VIEW,
+        Permission.REPORTS_EXPORT,
         # ADR 0046: who has access, for an access review.
         Permission.STAFF_VIEW,
         # ADR 0042 §5: how the installation is configured, without secret values.
