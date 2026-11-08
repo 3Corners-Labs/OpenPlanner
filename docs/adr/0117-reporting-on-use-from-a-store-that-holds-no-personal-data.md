@@ -455,7 +455,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | | planned |
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | | planned |
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | | planned |
-| 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | | planned |
+| 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | #675 | merged |
 | 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
 | 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
