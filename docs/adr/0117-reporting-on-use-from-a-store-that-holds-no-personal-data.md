@@ -451,7 +451,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | #619 | merged |
 | 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | #632 | merged |
 | 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | | planned |
-| 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | | planned |
+| 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | #652 | merged |
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | | planned |
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | | planned |
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | | planned |
