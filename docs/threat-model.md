@@ -833,7 +833,8 @@ flow, "embedded booking".
 Public: `GET /b/m/{ref}/join`, `GET /b/m/{ref}/join/go`, `GET/POST /g/{slug}/direct`,
 `GET /b/m/{ref}/wait`, `GET /b/m/{ref}/wait/status` (the fragment the page polls, ADR 0072), all
 with the participant cookie (ADR 0093).
-Machine: `POST /webhooks/webex`, `POST /webhooks/wxcc`. Outbound:
+Machine: `POST /webhooks/webex`, `POST /webhooks/contact-center/{kind}` (alias
+`POST /webhooks/wxcc`, ADR 0032). Outbound:
 Webex Meetings API, WxCC Create Task v2. Inputs from outside: tokens in paths, the contact
 form, webhook bodies and headers, API responses.
 

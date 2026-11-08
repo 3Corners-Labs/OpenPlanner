@@ -285,7 +285,12 @@ application holds one `ContactCenterDispatcher` per kind (`ContactCenterDispatch
 platform's adapter describes its routing attributes (`ProviderDescriptor`) and its inbound
 webhooks (`InboundWebhook`). `adapters.contact_centers` is the one list of both; the webhook route
 `/webhooks/contact-center/{kind}` and the group's routing read from it. Webex Contact Center is
-the only platform today; `/webhooks/wxcc` is its older address.
+the only platform today; `/webhooks/wxcc` is its older address. Where a routing or a task is
+stored is decided in one place, `app/adapters/db/contact_center_rows.py`, by the expand step of
+ADR 0116: for WxCC every write fills both the old `groups.wxcc_*` and `bookings.wxcc_task_id`
+columns and the new `group_contact_center` table and `bookings.contact_center_*` columns, and
+every read takes the old columns; the new places are read only for another kind. The next minor
+switches the read order, the one after drops the old columns.
 
 Tests replace every adapter with a fake from `tests/fakes/`. The in-memory unit of work has the
 same commit and rollback behaviour as the SQL one.
@@ -403,12 +408,14 @@ erDiagram
         bool queue_free_pick_allowed
         int max_bookings_per_email
         string phone_mode
-        string wxcc_queue_id "read for WxCC until dropped (ADR 0116)"
+        string wxcc_routing_value "WxCC: still the source of truth"
+        string wxcc_business_address "WxCC: still the source of truth"
+        string wxcc_channel "WxCC: still the source of truth"
         string holiday_source "inherit | own"
     }
     GROUP_CONTACT_CENTER {
         int group_id
-        string kind "webex_cc"
+        string kind "webex_cc; written alongside, read only for another kind"
         string routing_value
         string attributes "JSON, keys from the ProviderDescriptor"
     }
@@ -460,7 +467,8 @@ erDiagram
         string guest_join_url "PII"
         string host_join_url "PII"
         string trial_join_url "PII"
-        string contact_center_task_id "provider link, purged"
+        string wxcc_task_id "provider link, purged; WxCC: still the source of truth"
+        string contact_center_task_id "provider link, purged; written alongside"
         string contact_center_kind
         datetime pii_purged_at
     }

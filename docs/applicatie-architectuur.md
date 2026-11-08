@@ -644,7 +644,7 @@ de invoer voor de DPIA.
 | Widget-API | `/api/v1/widget/{org}/{group}/…` | website van de organisatie | CORS op toegestane origins, dezelfde limieten en honeypot |
 | Machine-API | `/api/agent/v1/…` | contactcenter-bot | uit tenzij ingeschakeld, client credentials, token van tien minuten, `RequireScope`, optionele IP-allowlist |
 | Instantie | `/api/v1/instance` | de worker, een beheerder | publiek, zonder cookie, leeslimiet |
-| Webhooks | `/webhooks/webex`, `/webhooks/wxcc` | Webex, Webex Contact Center | handtekening over de ruwe body, replay-sleutel, tijdvenster van 300 seconden; alleen met een geconfigureerd secret |
+| Webhooks | `/webhooks/webex`, `/webhooks/contact-center/{kind}` (alias `/webhooks/wxcc`) | Webex, Webex Contact Center | handtekening over de ruwe body, replay-sleutel, tijdvenster van 300 seconden; alleen met een geconfigureerd secret |
 | Beheerportaal | `/admin/…` | beheerders | OIDC-login, serversessie, één permissie per route, CSRF |
 | Health | `/healthz`, `/readyz` | orkestratie, monitoring | geen |
 | OpenAPI | `/openapi.json`, `/api/agent/v1/openapi.json` | ontwikkelaars | interactieve documentatie uit; de machine-API alleen zolang de superuser haar publiceert |
@@ -957,7 +957,7 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 | Een berichtkanaal | `ChannelKind` + `MessageSender` | e-mail, sms; WhatsApp als waarde met toestemmingsregel, zonder adapter. Gevraagd: RCS, WhatsApp, Signal en iMessage naar keuze van de deelnemer, elk gevalideerd (O17) | per kanaal ja; de keuze door de deelnemer en de validatie per kanaal raken het domein | ADR 0009, 0056 |
 | Een sms-gateway | `SmsProvider` + `SMS_GATEWAYS` | Webex Connect; gevraagd: gateways via de open standaard SMPP (O18) | ja | ADR 0028 |
 | Een logbestemming | `DestinationKind` + `build_sender` | syslog, Splunk HEC, Elastic, HTTP NDJSON | ja | ADR 0085 |
-| Een contactcenterplatform | `ContactCenterDispatcher` | Webex Contact Center; de poort is neutraal van naam, het contract en de groepsvelden zijn WxCC-vormig; gevraagd: Genesys Engage via GMS nu en Genesys Cloud CX later (O15) | nee: ADR 0032 beschrijft de neutrale vorm (soort per organisatie, routering per groep, descriptor per adapter), niet gebouwd | ADR 0032 |
+| Een contactcenterplatform | `ContactCenterDispatcher` | Webex Contact Center; poort, taak, routering en webhookroute zijn neutraal (`ContactCenterKind`, `ContactCenterTask`, `ProviderDescriptor`, `/webhooks/contact-center/{kind}`); gevraagd: Genesys Engage via GMS nu en Genesys Cloud CX later (O15) | deels: ADR 0032 CC-1 tot en met CC-3 gebouwd; de koppeling per organisatie en het formulier uit de descriptor (CC-4) zijn open | ADR 0032 |
 | Een videoplatform | `VideoProvider` | Webex Meetings | beperkt: poort bestaat, contract volgt Webex; tweede platform vraagt een ADR naar het model van 0032 | ADR 0017 |
 | Een wachtrijgedrag | `DispatchKind` | contactcenter, eigen wachtrij | een derde soort raakt het domein (regels voor zicht en claim) | ADR 0043 |
 | Een identity provider | registratie in het portaal, geen code | elke OIDC-provider met asymmetrische handtekening; keuze op e-maildomein met DNS-bewijs | ja | ADR 0083 |
@@ -999,7 +999,9 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 1. Bouw eerst ADR 0032: `ContactCenterKind` in het domein, één verbinding per organisatie,
    neutrale routering per groep in een eigen tabel, een descriptor per adapter die het
    beheerformulier aanstuurt, `ContactCenterTask` als neutrale taak, webhooks op
-   `/webhooks/contact-center/{kind}`. Eén omkeerbare migratie neemt de WxCC-velden over.
+   `/webhooks/contact-center/{kind}`. Migratie 0098 neemt de WxCC-velden over als
+   uitbreidingsstap (ADR 0116): de oude kolommen blijven geschreven en gelezen tot de volgende
+   minor, de minor daarna verwijdert ze.
 2. Daarna is een platform één adapter plus descriptor, opgenomen fixtures en een eigen ADR voor
    API, authenticatie en webhooks (CC-6 in `docs/backlog-architecture-gaps.md`).
 3. De privacyregel voor uitgaande berichten (alleen referentie, voornaam, startlabel, groepsnaam,
