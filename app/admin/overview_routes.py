@@ -48,6 +48,7 @@ from app.admin.authz import (
     can_function,
     maintenance_service,
 )
+from app.admin.closure_routes import closure_service
 from app.admin.live import key
 from app.admin.overview_charts import (
     ChartView,
@@ -757,12 +758,22 @@ async def overview(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.DASHBOARD_VIEW))],
+    closures: Annotated[str, Query(max_length=1)] = "",
 ) -> HTMLResponse:
-    """The overview: the visible widgets as a grid, then the groups in scope with shortfalls."""
+    """The overview: the visible widgets as a grid, then the groups in scope with shortfalls.
+
+    ``?closures=1`` narrows the groups to those with a closure in force now (ADR 0047 §4), each
+    linking to its *Closure* tab; any other value shows every group.
+    """
     principal = context.principal
     views = await _views(request, locale, principal)
     choice, in_scope = await scope_of(request, principal)
     groups = [g for g in in_scope if choice.keeps(g.organisation_slug, g.group.slug)]
+    closed = await closure_service(request).active([g.group for g in groups])
+    only_closed = closures == "1"
+    total = len(groups)
+    if only_closed:
+        groups = [g for g in groups if g.group.slug in closed]
     summaries = await agenda_service(request).summaries(principal)
     shortfalls = {
         g.group.slug: shortfall_view(summaries[g.group.slug], g.group, locale)
@@ -782,6 +793,9 @@ async def overview(
             "popup_level": floor.value if floor else None,
             "views": views,
             "groups": groups,
+            "closed": set(closed),
+            "only_closed": only_closed,
+            "total_groups": total,
             "shortfalls": shortfalls,
             "scope_filter": filter_view(
                 choice,

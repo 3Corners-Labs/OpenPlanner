@@ -2,7 +2,8 @@
 
 import re
 
-from app.admin.group_list_routes import MAX_QUERY_LENGTH, narrow
+from app.admin.group_list_routes import narrow
+from app.admin.list_search import MAX_QUERY_LENGTH
 from app.domain.scheduling import Group, GroupSummary
 from tests.admin.conftest import AGENT, GROUP_ADMIN, ORG_ADMIN, SUPER, Site
 

@@ -21,6 +21,11 @@ Every client has a row with its name and client ID, its organisation and teams, 
 whether it is on, until when its secret is valid and when it last asked for a token. **Expires
 soon** appears when the secret ends within 30 days. A name leads to the client's page.
 
+Above the table you search by name or client ID and, with clients of several organisations,
+pick an organisation. The count says how many clients match and how many there are in all.
+The search text does not come back onto the screen; the page only says that a search is
+active.
+
 ## A new client
 
 Choose **New API client**.

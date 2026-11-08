@@ -17,6 +17,7 @@ from starlette.responses import HTMLResponse
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
 from app.admin.forms import Option, done_message
+from app.admin.list_search import QUERY_PARAM, matches, search_text
 from app.admin.pages import Locale, page
 from app.admin.shortfalls import ShortfallView, agenda_service, shortfall_view
 from app.domain.agenda_service import ShortfallSummary
@@ -26,10 +27,6 @@ from app.web.locale import RequestLocale
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
-MAX_QUERY_LENGTH = 100
-"""Longest search text the list reads; a group name is shorter, the rest is cut off."""
-
-QUERY_PARAM = "q"
 ORGANISATION_PARAM = "org"
 
 
@@ -72,18 +69,17 @@ def narrow(
     """Return the groups that match ``query`` and ``organisation``, and the checked filter.
 
     ``organisation`` counts only when it is the organisation of one of ``groups``; any other
-    value is dropped. ``query`` is cut to ``MAX_QUERY_LENGTH`` and matched case-insensitively
+    value is dropped. ``query`` follows the search rule of ``app.admin.list_search``, matched
     against the name and the slug.
     """
     organisations = {g.organisation_slug: g.organisation_name for g in groups}
     chosen = organisation if organisation in organisations else ""
-    text = query[:MAX_QUERY_LENGTH].strip()
-    needle = text.casefold()
+    text = search_text(query)
     rows = [
         g
         for g in groups
         if (not chosen or g.organisation_slug == chosen)
-        and (not needle or needle in g.group.name.casefold() or needle in g.group.slug)
+        and matches(text, g.group.name, g.group.slug)
     ]
     options = [Option(slug, name) for slug, name in organisations.items()]
     return rows, GroupFilterView(text, chosen, options)

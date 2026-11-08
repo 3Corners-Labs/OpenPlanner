@@ -62,6 +62,7 @@ from app.admin.pages import (
     page,
     with_manual,
 )
+from app.admin.readiness_view import GROUP_LINKS, allowed_on, checklist_view, readiness_service
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
@@ -515,6 +516,13 @@ async def group(
         context,
         "admin/group.html",
         {
+            "readiness": checklist_view(
+                await readiness_service(request).group(context.principal, slug),
+                locale,
+                GROUP_LINKS,
+                allowed_on(context.principal, summary.organisation_slug, summary.group.slug),
+                {"slug": summary.group.slug, "org": summary.organisation_slug},
+            ),
             "phone_label": _(PHONE_LABELS[summary.group.phone_mode]),
             "group_rights": group_rights,
             "week": _week(schedule, locale),

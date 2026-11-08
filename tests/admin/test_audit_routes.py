@@ -3,6 +3,7 @@
 import io
 import json
 import logging
+import re
 from dataclasses import replace
 from datetime import timedelta
 
@@ -431,3 +432,12 @@ def test_events_from_before_the_rename_still_name_the_participant_change_lead() 
         DETAIL_LABELS["participant_change_lead_minutes"]
         == DETAIL_LABELS["participant_change_lead_minutes"]
     )
+
+
+async def test_the_audit_list_says_how_many_events_it_shows(logged: Site) -> None:
+    """ADR 0047 step 5: the list pattern has a count."""
+    await logged.login_as(GROUP_ADMIN)
+
+    text = (await logged.client.get("/admin/audit?lang=en")).text
+
+    assert re.search(r"Events: \d+", text)

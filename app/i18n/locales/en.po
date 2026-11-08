@@ -9675,3 +9675,81 @@ msgstr "Planning"
 msgid "admin.tab.group_messages"
 msgstr "Messages"
 
+
+msgid "admin.readiness.title"
+msgstr "Ready for bookings"
+
+msgid "admin.readiness.ready"
+msgstr "Everything is set up to take appointments."
+
+msgid "admin.readiness.missing"
+msgstr "Left to set up before appointments can be taken: {count}."
+
+msgid "admin.readiness.staffing"
+msgstr "Staffing for the coming weeks"
+
+msgid "admin.readiness.texts"
+msgstr "Message texts"
+
+msgid "admin.readiness.texts_own"
+msgstr "The group's own texts"
+
+msgid "admin.readiness.texts_default"
+msgstr "Default texts"
+
+msgid "admin.readiness.channels"
+msgstr "A channel to send messages (email or SMS)"
+
+msgid "admin.readiness.check"
+msgstr "Connection check without failures"
+
+msgid "admin.readiness.branding"
+msgstr "Own branding"
+
+msgid "admin.readiness.contact"
+msgstr "Alternative contact options for a closure"
+
+msgid "admin.readiness.state.done"
+msgstr "Done"
+
+msgid "admin.readiness.state.missing"
+msgstr "Missing"
+
+msgid "admin.readiness.state.not_needed"
+msgstr "Not needed"
+
+msgid "admin.dashboard.filter"
+msgstr "Filter groups"
+
+msgid "admin.dashboard.only_closed"
+msgstr "Only groups with an active emergency closure"
+
+msgid "admin.dashboard.closed_count"
+msgstr "Groups with an active emergency closure: {count} of {total}"
+
+msgid "admin.dashboard.closed"
+msgstr "Emergency closure active"
+
+msgid "admin.dashboard.no_closed"
+msgstr "No group has an active emergency closure right now."
+
+msgid "admin.api.filter"
+msgstr "Filter API clients"
+
+msgid "admin.api.search"
+msgstr "Search by name or client id"
+
+msgid "admin.api.count"
+msgstr "Number of clients: {count}"
+
+msgid "admin.api.count_of"
+msgstr "Clients that match: {count} of {total}"
+
+msgid "admin.api.no_match"
+msgstr "No client matches this filter."
+
+msgid "admin.audit.count"
+msgstr "Events: {count}"
+
+msgid "admin.audit.count_newest"
+msgstr "The newest {count} events. Narrow the filter or export for more."

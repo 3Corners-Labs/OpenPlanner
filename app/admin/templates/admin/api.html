@@ -1,5 +1,6 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_icons.html" import icon %}
+{% from "admin/_filters.html" import filter_select with context %}
 {% block title %}{{ _("admin.api.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -39,6 +40,25 @@
     <h2 id="clients-heading">{{ _("admin.api.clients") }}</h2>
     <p class="card__lead">{{ _("admin.api.clients_lead") }}</p>
   </div>
+  {#- The list pattern (ADR 0047 §4, step 5): GET search and organisation filter, a count, the table; the search text is never shown again. -#}
+  {% if total %}
+  <form method="get" action="/admin/api" aria-labelledby="clients-filter-heading">
+    <h3 id="clients-filter-heading" class="visually-hidden">{{ _("admin.api.filter") }}</h3>
+    <div class="inline-forms">
+      <div class="field">
+        <label for="clients-query">{{ _("admin.api.search") }}</label>
+        <input type="search" id="clients-query" name="q" maxlength="100"{% if filters.searching %} aria-describedby="clients-query-active"{% endif %}>
+        {% if filters.searching %}<p class="hint" id="clients-query-active">{{ _("admin.groups.search_active") }}</p>{% endif %}
+      </div>
+      {% if filters.organisations | length > 1 %}
+      {{ filter_select("clients-organisation", "org", _("admin.api.organisation"), filters.organisations, filters.organisation) }}
+      {% endif %}
+      <button type="submit" class="button button--secondary">{{ icon("filter") }}<span>{{ _("admin.groups.apply") }}</span></button>
+      {% if filters.active %}<a href="/admin/api">{{ _("admin.groups.clear") }}</a>{% endif %}
+    </div>
+  </form>
+  <p role="status">{% if filters.active %}{{ _("admin.api.count_of", count=clients | length, total=total) }}{% else %}{{ _("admin.api.count", count=total) }}{% endif %}</p>
+  {% endif %}
   {% if clients %}
   <div class="table-scroll" role="region" aria-labelledby="clients-heading" tabindex="0">
   <table class="data-table">
@@ -65,6 +85,8 @@
     </tbody>
   </table>
   </div>
+  {% elif total %}
+  <p class="empty-state">{{ _("admin.api.no_match") }}</p>
   {% else %}
   <p class="empty-state">{{ _("admin.api.none") }}</p>
   {% endif %}

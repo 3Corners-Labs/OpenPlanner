@@ -41,6 +41,7 @@ from app.domain import staff
 from app.domain.admin import (
     AMBIGUOUS_CLAIMS_EVENT,
     ANONYMOUS,
+    AUDIT_LOG_LIMIT,
     ENTITLEMENT_MISMATCH_EVENT,
     ENTITLEMENT_REFUSED_EVENT,
     LOGIN_EVENT,
@@ -672,6 +673,7 @@ async def _audit_page(
         context.principal,
         {
             "events": audit_views(request, locale, context.principal, events),
+            "limit": AUDIT_LOG_LIMIT,
             "filters": _filter_view(narrow, in_scope, zone, locale.gettext),
             "export_error": locale.gettext(EXPORT_REFUSALS[error]) if error else None,
             "diagnostics": await _diagnostics_view(request, locale, context),

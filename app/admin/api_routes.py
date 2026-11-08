@@ -5,7 +5,7 @@ Changes are POST forms with the Fetch Metadata check. A new or rotated secret is
 in the response to the POST itself (never in a URL, never cached); afterwards only its expiry
 is visible. ``ApiAccessService`` authorises again, validates and audits.
 
-    GET  /admin/api                            switches and clients
+    GET  /admin/api                            switches and clients (search ``q``, ``org``)
     POST /admin/api/settings                   API on/off, documentation on/off
     GET  /admin/api/clients/new                form for a new client
     POST /admin/api/clients                    register → secret page
@@ -26,11 +26,13 @@ from starlette.responses import HTMLResponse, Response
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import (
     FormData,
+    Option,
     done_message,
     raise_refusal,
     read_form,
     redirect_done,
 )
+from app.admin.list_search import QUERY_PARAM, matches, search_text
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.config import AGENT_API_PREFIX as PREFIX
@@ -223,11 +225,55 @@ def _url(client_id: str | None = None) -> str:
     return f"/admin/api/clients/{client_id}" if client_id else "/admin/api"
 
 
+ORGANISATION_PARAM = "org"
+"""The organisation filter of the client list."""
+
+
+@dataclass(frozen=True)
+class ClientFilterView:
+    """The list's GET filter: a search on name or client id, and the organisation.
+
+    The search text is never shown again (``app.admin.list_search``); the organisation counts
+    only when one of the listed clients belongs to it, and is otherwise dropped.
+    """
+
+    searching: bool
+    organisation: str
+    organisations: list[Option]
+
+    @property
+    def active(self) -> bool:
+        """Whether anything narrows the list."""
+        return self.searching or bool(self.organisation)
+
+
+def narrow_clients(
+    clients: list[ApiClient], names: dict[str, str], query: str, organisation: str
+) -> tuple[list[ApiClient], ClientFilterView]:
+    """Return the clients matching ``query`` and ``organisation``, and the checked filter."""
+    present = {c.organisation: names.get(c.organisation, c.organisation) for c in clients}
+    chosen = organisation if organisation in present else ""
+    text = search_text(query)
+    rows = [
+        c
+        for c in clients
+        if (not chosen or c.organisation == chosen) and matches(text, c.name, c.client_id)
+    ]
+    options = [Option(slug, name) for slug, name in sorted(present.items())]
+    return rows, ClientFilterView(bool(text), chosen, options)
+
+
 @router.get("/api", response_class=HTMLResponse)
 async def overview(request: Request, locale: Locale, context: Manage) -> HTMLResponse:
-    """Show the switches and every registered client."""
+    """Show the switches and the registered clients, in the list pattern (ADR 0047 step 5)."""
     found = await api_access(request).overview(context.principal)
     names = {o.slug: o.name for o in found.organisations}
+    rows, filters = narrow_clients(
+        list(found.clients),
+        names,
+        request.query_params.get(QUERY_PARAM, ""),
+        request.query_params.get(ORGANISATION_PARAM, ""),
+    )
     base = request.app.state.settings.public_base_url.rstrip("/")
     return _page(
         request,
@@ -236,7 +282,9 @@ async def overview(request: Request, locale: Locale, context: Manage) -> HTMLRes
         context.principal,
         {
             "overview": found,
-            "clients": [_view(request, locale, c, names) for c in found.clients],
+            "clients": [_view(request, locale, c, names) for c in rows],
+            "total": len(found.clients),
+            "filters": filters,
             "docs_url": f"{base}{PREFIX}/docs",
             "token_minutes": int(ACCESS_TOKEN_LIFETIME.total_seconds() // 60),
             "done": done_message(request, locale.gettext),

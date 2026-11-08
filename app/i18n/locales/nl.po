@@ -9687,3 +9687,81 @@ msgstr "Planning"
 msgid "admin.tab.group_messages"
 msgstr "Berichten"
 
+
+msgid "admin.readiness.title"
+msgstr "Klaar om te boeken"
+
+msgid "admin.readiness.ready"
+msgstr "Alles is ingesteld om afspraken aan te nemen."
+
+msgid "admin.readiness.missing"
+msgstr "Nog te regelen voordat afspraken kunnen worden aangenomen: {count}."
+
+msgid "admin.readiness.staffing"
+msgstr "Bezetting voor de komende weken"
+
+msgid "admin.readiness.texts"
+msgstr "Berichtteksten"
+
+msgid "admin.readiness.texts_own"
+msgstr "Eigen teksten van de groep"
+
+msgid "admin.readiness.texts_default"
+msgstr "Standaardteksten"
+
+msgid "admin.readiness.channels"
+msgstr "Kanaal om berichten te versturen (e-mail of sms)"
+
+msgid "admin.readiness.check"
+msgstr "Controle van de koppeling zonder fouten"
+
+msgid "admin.readiness.branding"
+msgstr "Eigen huisstijl"
+
+msgid "admin.readiness.contact"
+msgstr "Contactalternatieven voor een sluiting"
+
+msgid "admin.readiness.state.done"
+msgstr "Klaar"
+
+msgid "admin.readiness.state.missing"
+msgstr "Ontbreekt"
+
+msgid "admin.readiness.state.not_needed"
+msgstr "Niet nodig"
+
+msgid "admin.dashboard.filter"
+msgstr "Groepen filteren"
+
+msgid "admin.dashboard.only_closed"
+msgstr "Alleen groepen met een actieve noodsluiting"
+
+msgid "admin.dashboard.closed_count"
+msgstr "Groepen met een actieve noodsluiting: {count} van {total}"
+
+msgid "admin.dashboard.closed"
+msgstr "Noodsluiting actief"
+
+msgid "admin.dashboard.no_closed"
+msgstr "Geen enkele groep heeft nu een actieve noodsluiting."
+
+msgid "admin.api.filter"
+msgstr "API-clients filteren"
+
+msgid "admin.api.search"
+msgstr "Zoeken op naam of client-id"
+
+msgid "admin.api.count"
+msgstr "Aantal clients: {count}"
+
+msgid "admin.api.count_of"
+msgstr "Clients die passen: {count} van {total}"
+
+msgid "admin.api.no_match"
+msgstr "Geen client past bij dit filter."
+
+msgid "admin.audit.count"
+msgstr "Gebeurtenissen: {count}"
+
+msgid "admin.audit.count_newest"
+msgstr "De nieuwste {count} gebeurtenissen. Verfijn het filter of exporteer voor meer."
