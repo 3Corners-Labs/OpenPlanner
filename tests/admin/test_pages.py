@@ -167,6 +167,48 @@ async def test_a_group_admin_sees_the_organisation_in_the_path_without_a_link(si
     assert "Demo-acme" in crumbs
 
 
+def _tabs(page: str) -> list[str]:
+    """Return the hrefs of the first tab row of ``page``."""
+    return _hrefs(page.split('<nav class="tabs"', 1)[1].split("</nav>", 1)[0])
+
+
+async def test_a_group_page_has_six_tabs_and_marks_its_sub_tab(site: Site) -> None:
+    """ADR 0047 step 4: six tabs; a sub-tab keeps its tab current and marks itself."""
+    await site.login_as(SUPER)
+
+    exceptions = (await site.client.get("/admin/groups/demo/exceptions")).text
+    texts = (await site.client.get("/admin/groups/demo/messages/nl")).text
+
+    assert _tabs(exceptions) == [
+        "/admin/groups/demo",
+        "/admin/groups/demo/agenda",
+        "/admin/groups/demo/staffing",
+        "/admin/groups/demo/reminders",
+        "/admin/groups/demo/settings",
+        "/admin/groups/demo/closure",
+    ]
+    assert _current_links(exceptions) == [
+        "/admin/groups",
+        "/admin/groups/demo/staffing",
+        "/admin/groups/demo/exceptions",
+    ]
+    row = texts.split('class="tabs tabs--sub"', 1)[1].split("</nav>", 1)[0]
+    assert _hrefs(row) == [
+        "/admin/groups/demo/reminders",
+        "/admin/groups/demo/messages",
+        "/admin/groups/demo/contact",
+    ]
+
+
+async def test_the_old_contact_path_redirects_to_messages_contact(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    response = await site.client.get("/admin/groups/demo/closure/contacts?next=//evil.example")
+
+    assert response.status_code == 308
+    assert response.headers["location"] == "/admin/groups/demo/contact"
+
+
 def _panel(page: str) -> str:
     """Return the profile panel of ``page``."""
     return page.split('<div class="admin-profile__panel">', 1)[1].split("</details>", 1)[0]

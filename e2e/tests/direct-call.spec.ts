@@ -61,7 +61,7 @@ test('a participant starts a call right away and the admin sees it', async ({ pa
   await page.getByLabel('Tijdzone', { exact: true }).selectOption(zoneAwayFromMidnight());
   await page.getByRole('button', { name: 'Groep aanmaken' }).press('Enter');
   await expect(page.getByRole('status')).toContainText('De groep is aangemaakt');
-  await tabs.getByRole('link', { name: 'Bezetting', exact: true }).click();
+  await tabs.getByRole('link', { name: 'Planning', exact: true }).click();
   await addAllDayHours(page);
   await expect(page.locator('.window__offer', { hasText: 'Afspraken en direct gesprek' })).toHaveCount(WEEKDAYS.length);
   await expectNoAxeViolations(page);
