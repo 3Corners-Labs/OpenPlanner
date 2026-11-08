@@ -7,8 +7,8 @@ time (``rebook_requested_at``, the time to accept of metric U8); to ``usage_roll
 end of the last slot whose closing facts were written (``slots_closed_until``, metrics C1 to C5
 and the outcome counts). None of them holds personal data.
 
-Revision ID: 0099
-Revises: 0098
+Revision ID: 0100
+Revises: 0099
 Create Date: 2026-11-08 20:00:00.000000
 """
 
@@ -17,8 +17,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0099"
-down_revision: str | None = "0098"
+revision: str = "0100"
+down_revision: str | None = "0099"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

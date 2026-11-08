@@ -560,7 +560,7 @@ which never fails the action) and each pure builder in its own module.
   as `usage.message_failed` and never changes the job.
 - *Rebooking.* `rebook.proposed` (planner-asked; the reason is the planner's fixed reason; the assistant of
   ADR 0057 is not built, its facts will carry the actor class `system`), `rebook.accepted` when the
-  participant moves a booking that awaits a new time (the quarter hours since the request; migration 0099
+  participant moves a booking that awaits a new time (the quarter hours since the request; migration 0100
   adds `bookings.rebook_requested_at`, a request made before it has no time) and `rebook.expired` when it
   lapses. A planner moving a waiting booking is no acceptance. The accepted fact has no proposer, so the
   planner-asked and assistant-proposed split of U8 is on the proposed count only until the assistant exists.

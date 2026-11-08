@@ -18,6 +18,7 @@ from tests.fakes.persistence import InMemoryTransaction, InMemoryUnitOfWork, Sta
 from tests.support.admin import GROUP_ADMIN
 from tests.support.domain import ADA, SLOT_0900, TEST_TOKEN_KEY, make_group, window
 from tests.support.integration import GROUP, make_booking
+from tests.support.webhooks import WXCC
 
 DAY = date(2026, 1, 5)
 
@@ -117,7 +118,7 @@ async def test_a_redelivered_work_item_event_writes_no_second_fact(
     await service.record(1, EventKind.TASK_CREATED)
     for _ in range(2):
         await service.record_task_event(
-            "task-1", EventKind.TASK_CONNECTED, clock.now(), event_key="e-9"
+            "task-1", EventKind.TASK_CONNECTED, clock.now(), event_key="e-9", **WXCC
         )
 
     assert _kinds(uow) == [FactKind.CALL_CREATED, FactKind.CALL_CONNECTED]
