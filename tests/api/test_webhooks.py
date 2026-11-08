@@ -19,11 +19,11 @@ from app.domain.booking import MeetingRef
 from app.domain.calls import CallState, TaskState
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
-from tests.adapters.test_webhooks import SECRET, sign, timestamp, wxcc_body
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.database import migrated_database
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book
+from tests.support.webhooks import SECRET, sign, timestamp, wxcc_body
 
 
 @pytest.fixture

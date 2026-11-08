@@ -566,3 +566,20 @@ async def test_the_details_of_a_booking_on_hold_say_when_its_data_is_deleted_at_
     await closures.update(GROUP_ADMIN, "demo", NEXT_MONDAY, NOTICES, notify=False)
     soon = await bookings.find(receipt.management_token)
     assert soon.delete_by == NEXT_MONDAY + RETENTION_AFTER_CLOSURE  # the earlier of the two
+
+
+async def test_active_names_only_groups_closed_now(
+    closures: ClosureService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0047 §4: the overview's filter; an upcoming closure is not active yet."""
+    groups = list(uow.state.groups.values())
+    assert await closures.active(groups) == frozenset()
+
+    await closures.close_group(
+        GROUP_ADMIN, "demo", ClosureInput(SLOT_0930, SLOT_0930 + timedelta(hours=1), NOTICES)
+    )
+    assert await closures.active(groups) == frozenset()
+
+    await closures.lift(GROUP_ADMIN, "demo", reinstate=False)
+    await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
+    assert await closures.active(groups) == {"demo"}

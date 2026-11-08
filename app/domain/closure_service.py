@@ -25,7 +25,7 @@ A suspended booking can only be handled through the group it belongs to: the boo
 the URL is checked against the authorised group, so one group's admin cannot reach another's.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 
@@ -180,6 +180,21 @@ class ClosureService:
             suspended = await tx.list_suspended_bookings(self._scope(principal), group.id)
             ahead = await tx.find_confirmed_bookings(group.id, now, None)
         return ClosureOverview(closures[0] if closures else None, suspended, len(ahead))
+
+    async def active(self, groups: Sequence[Group]) -> frozenset[str]:
+        """Return the slugs of ``groups`` that are closed now.
+
+        For the overview's filter *active closures* (ADR 0047 §4). The caller passes the groups
+        already in the reader's scope; that a group is closed is public on its booking page, so
+        no further permission is needed to say so.
+        """
+        now = self._clock.now()
+        closed = set()
+        async with self._uow.read() as tx:
+            for group in groups:
+                if covering(await tx.get_closures(group.id, now), now) is not None:
+                    closed.add(group.slug)
+        return frozenset(closed)
 
     async def close_group(self, principal: Principal, slug: str, closure: ClosureInput) -> int:
         """Close the group and suspend the confirmed bookings inside the closure.

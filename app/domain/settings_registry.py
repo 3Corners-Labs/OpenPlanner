@@ -1736,6 +1736,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=15,
     ),
     S(
+        "max_subjects_per_group",
+        K.INT,
+        20,
+        _C,
+        T.BOOKING_FORM,
+        "Subjects a group may give participants to choose from at most (ADR 0081).",
+        minimum=1,
+        maximum=100,
+    ),
+    S(
         "phone_default_region",
         K.ENUM,
         "NL",

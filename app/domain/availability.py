@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.routing import offers
 from app.domain.scheduling import Group, ScheduleOverride, ScheduleRule, TimeWindow, windows_on
 
 MAX_RANGE_DAYS = 62
@@ -37,11 +38,20 @@ MAX_RANGE_DAYS = 62
 
 @dataclass(frozen=True)
 class SlotTime:
-    """A start time the schedule offers, in UTC, with the capacity of its window."""
+    """A start time the schedule offers, in UTC, with the capacity of its window.
+
+    ``subjects`` are the subject codes every window the slot covers offers (ADR 0081 point 4);
+    ``None`` when all of them offer every subject.
+    """
 
     start: datetime
     end: datetime
     capacity: int
+    subjects: frozenset[str] | None = None
+
+    def offers_subject(self, code: str | None) -> bool:
+        """Return whether a participant who chose ``code`` may book this slot."""
+        return offers(self.subjects, code)
 
 
 @dataclass(frozen=True)
@@ -81,19 +91,28 @@ def slots_on(group: Group, day: date, windows: Sequence[TimeWindow]) -> list[Slo
             start = local.replace(tzinfo=tz).astimezone(UTC)
             # A local time that does not exist does not survive the round trip.
             if start.astimezone(tz).replace(tzinfo=None) == local:
-                capacity = _lowest_capacity(run, day, local, local + length)
-                slots.append(SlotTime(start, start + length, capacity))
+                covered = _covered(run, day, local, local + length)
+                capacity = min(w.capacity for w in covered)
+                slots.append(SlotTime(start, start + length, capacity, _subjects(covered)))
             local += length
     return slots
 
 
-def _lowest_capacity(run: Sequence[TimeWindow], day: date, start: datetime, end: datetime) -> int:
-    """Return the lowest agent count among the windows of ``run`` that ``start``–``end`` covers."""
-    return min(
-        w.capacity
+def _covered(
+    run: Sequence[TimeWindow], day: date, start: datetime, end: datetime
+) -> list[TimeWindow]:
+    """Return the windows of ``run`` that ``start``–``end`` covers."""
+    return [
+        w
         for w in run
         if datetime.combine(day, w.opens) < end and start < datetime.combine(day, w.closes)
-    )
+    ]
+
+
+def _subjects(windows: Sequence[TimeWindow]) -> frozenset[str] | None:
+    """Return the subject codes all ``windows`` offer; ``None`` when none of them narrows."""
+    bound = [frozenset(w.subjects) for w in windows if w.subjects]
+    return frozenset.intersection(*bound) if bound else None
 
 
 def overlapping_active(
@@ -131,8 +150,9 @@ def offered_slot(
     rules: Sequence[ScheduleRule],
     overrides: Sequence[ScheduleOverride],
     start: datetime,
+    subject: str | None = None,
 ) -> SlotTime | None:
-    """Return the slot starting exactly at ``start`` if the schedule offers it.
+    """Return the slot starting exactly at ``start`` if the schedule offers it for ``subject``.
 
     Raises:
         ValueError: If ``start`` is naive.
@@ -142,7 +162,7 @@ def offered_slot(
     day = start.astimezone(group.tz).date()
     for slot in slots_on(group, day, windows_on(day, rules, overrides)):
         if slot.start == start:
-            return slot
+            return slot if slot.offers_subject(subject) else None
     return None
 
 
@@ -185,6 +205,7 @@ def available_slots(
     now: datetime,
     booked: Mapping[datetime, int],
     snapshots: Mapping[datetime, int],
+    subject: str | None = None,
 ) -> list[AvailableSlot]:
     """Return the slots participants can book between two local dates (inclusive).
 
@@ -198,6 +219,8 @@ def available_slots(
         booked: Active bookings per slot start; those of other overlapping slots (an old
             grid) count too.
         snapshots: Capacity snapshot per existing slot start; wins over the window.
+        subject: The subject the participant chose (ADR 0081 point 4); only slots whose
+            blocks offer it are returned. ``None`` returns every slot.
 
     Raises:
         DomainError: ``invalid_range`` if the range is reversed or too long.
@@ -210,7 +233,7 @@ def available_slots(
     for offset in range(days):
         day = first_day + timedelta(days=offset)
         for slot in slots_on(group, day, windows_on(day, rules, overrides)):
-            if not earliest <= slot.start <= latest:
+            if not earliest <= slot.start <= latest or not slot.offers_subject(subject):
                 continue
             capacity = snapshots.get(slot.start, slot.capacity)
             remaining = (

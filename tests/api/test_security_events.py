@@ -14,10 +14,8 @@ from app.main import create_app
 from tests.fakes.clock import FixedClock
 from tests.support.admin import SUPER
 from tests.support.domain import NOW
+from tests.support.participant import ADA, FRIDAY_0900, SAME_ORIGIN
 
-FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam, a free slot of the demo group
-ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
-SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
 CLIENT = re.compile(r"client:[0-9a-f]{16}")
 
 

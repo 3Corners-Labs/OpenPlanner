@@ -691,6 +691,19 @@ _OPERATIONS = (
         _FAILED,
     ),
     _e(
+        "routing.entry_skipped",
+        _OPS,
+        "warning",
+        "part count",
+        "Skipped {count} stored routing {part} that no longer validate.",
+        "A group's stored subjects, attributes or mapping (ADR 0081) hold an entry this release "
+        "does not accept, for example an attribute a newer release added; the rest is used. The "
+        "next change on the group's *Subjects and routing* screen saves the routing without it.",
+        "Check the group's *Subjects and routing* screen; after a rollback, move forward again "
+        "before changing it.",
+        never="the labels, the values",
+    ),
+    _e(
         "storage.degraded",
         _OPS,
         "warning error",

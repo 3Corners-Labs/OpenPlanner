@@ -4,18 +4,21 @@
 side itself (branch, push, pull request, tag). Everything that touches a file or decides a
 number is here and tested in ``tests/scripts/test_release_pr.py``:
 
-- ``plan [--version X.Y.Z]``: the number (given, or what ``scripts/release_plan.py`` gives),
-  the previous release, the branch and title, and whether the release needs the audit of
-  ADR 0078 (a minor or major version, ``X.Y.0``). Printed as ``key=value`` lines for
-  ``$GITHUB_OUTPUT``.
-- ``prepare --version X.Y.Z --body FILE``: sets the version in ``pyproject.toml`` and
-  ``uv.lock``, the version and the date in ``publiccode.yml`` (ADR 0054), moves *Unreleased*
-  in ``CHANGELOG.md`` under ``## X.Y.Z (date)`` and writes the pull request body, the PR
-  template filled in, to ``FILE``.
+- ``plan [--version X.Y.Z] [--base release/X.Y]``: the number (given, or what
+  ``scripts/release_plan.py`` gives; on a maintenance line always a patch of that line, ADR
+  0116 point 3), the previous release, the PR's base, branch and title, and whether the
+  release needs the audit of ADR 0078 (a minor or major version, ``X.Y.0``). Printed as
+  ``key=value`` lines for ``$GITHUB_OUTPUT``.
+- ``prepare --version X.Y.Z --body FILE [--base release/X.Y]``: sets the version in
+  ``pyproject.toml`` and ``uv.lock``, the version and the date in ``publiccode.yml`` (ADR 0054),
+  moves *Unreleased* in ``CHANGELOG.md`` under ``## X.Y.Z (date)``, takes over the released
+  sections of every maintenance line on ``origin`` that ``main`` lacks, and writes the pull
+  request body, the PR template filled in, to ``FILE``.
 - ``audit --body FILE --findings FILE``: puts the audit's findings into the body under
   ``## Release audit``, ending with ``Verdict: open``. Changing that line to ``Verdict: pass``
   stays the product owner's act (ADR 0078 point 4).
-- ``tag-check --version X.Y.Z``: finds the squash-merged release PR on ``main``, checks that
+- ``tag-check --version X.Y.Z [--ref release/X.Y]``: finds the squash-merged release PR on
+  ``origin/main`` (or on the version's own line), checks that
   ``pyproject.toml`` at that commit says the version and that the tag does not exist yet, and
   prints ``commit=``, ``number=`` and the tag ``message=`` (who dispatched, when) for the tag
   step (ADR 0052 points 3 and 4).
@@ -33,14 +36,16 @@ from pathlib import Path
 
 from scripts.adr_tables import overview_rows
 from scripts.release_plan import (
+    MAIN,
+    LineError,
+    Target,
     git,
     last_release,
     messages_since,
     migrations_changed_since,
-    next_version,
+    parse_version,
 )
 
-VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 _PYPROJECT_VERSION = re.compile(r'^(version = ")[^"]+(")$', re.M)
 _LOCK_VERSION = re.compile(r'(\[\[package\]\]\nname = "openplanner"\nversion = ")[^"]+(")')
 _UNRELEASED = re.compile(r"^## Unreleased\n", re.M)
@@ -48,19 +53,11 @@ _PUBLICCODE_VERSION = re.compile(r'^(softwareVersion: ")[^"]+(")$', re.M)
 _PUBLICCODE_DATE = re.compile(r'^(releaseDate: ")[^"]+(")$', re.M)
 _AUDIT_SECTION = re.compile(r"^## Release audit\n.*?(?=^## |\Z)", re.M | re.S)
 _HEADING = re.compile(r"^#+\s+(.*)$", re.M)
+_SECTION = re.compile(r"^## (\d+\.\d+\.\d+) \([^)]*\)\n", re.M)
 
 AUDIT_HEADING = "## Release audit"
 VERDICT_OPEN = "Verdict: open"
 """The audit section's last line until the product owner changes it to ``Verdict: pass``."""
-
-
-def parse_version(version: str) -> tuple[int, int, int]:
-    """Return ``X.Y.Z`` as numbers, or raise ``ValueError`` when it is not a version."""
-    found = VERSION.match(version)
-    if not found:
-        raise ValueError(f"{version!r} is not a version X.Y.Z")
-    major, minor, patch = (int(part) for part in found.groups())
-    return major, minor, patch
 
 
 def needs_audit(version: str) -> bool:
@@ -73,6 +70,7 @@ def plan(
     messages: Sequence[str],
     requested: str | None,
     migrations_changed: bool = False,
+    target: Target = MAIN,
 ) -> str:
     """Return the version to release.
 
@@ -81,16 +79,21 @@ def plan(
         messages: The commit messages since that release.
         requested: A version the product owner typed, or ``None`` for the rules of ADR 0052.
         migrations_changed: Whether ``migrations/versions/`` changed since that release.
+        target: ``main`` or the maintenance line the release is made on (ADR 0116 point 3).
 
     Returns:
         ``requested`` when it is a version above the last release, else the version the
-        commits call for (MINOR at least when a migration changed, ADR 0116 point 4).
+        commits call for (MINOR at least when a migration changed, ADR 0116 point 4). On a
+        line always a patch of that line.
 
     Raises:
         ValueError: ``requested`` is no version or not above the last release, is a patch
-            although a migration changed, or nothing was merged since the last release.
+            although a migration changed, is not a patch of the line, or nothing was merged
+            since the last release.
     """
     last = previous.removeprefix("v")
+    if requested and not target.admits(requested):
+        raise LineError(f"{requested} is not a patch of line {target.line}")
     if requested:
         if parse_version(requested) <= parse_version(last):
             raise ValueError(f"{requested} is not above the last release {previous}")
@@ -100,7 +103,7 @@ def plan(
                 "a patch carries no migration (ADR 0116 point 4)"
             )
         return requested
-    proposed = next_version(last, messages, migrations_changed)
+    proposed = target.next_version(last, messages, migrations_changed)
     if proposed is None:
         raise ValueError(f"nothing merged since {previous}; nothing to release")
     return proposed
@@ -151,6 +154,34 @@ def release_changelog(text: str, version: str, date: str) -> str:
     if count != 1:
         raise ValueError("CHANGELOG.md has no `## Unreleased` heading")
     return text
+
+
+def merge_changelogs(text: str, others: Sequence[str]) -> str:
+    """Return ``CHANGELOG.md`` with the released sections of ``others`` it lacks, in order.
+
+    A line's patch releases have their own sections in the line's ``CHANGELOG.md``; the next
+    release PR on ``main`` takes them over (ADR 0116 point 3). Sections are ordered by version,
+    newest first, under ``## Unreleased``; a section ``main`` already has is left as it is.
+    """
+    head, sections = _changelog_sections(text)
+    for other in others:
+        for version, body in _changelog_sections(other)[1].items():
+            sections.setdefault(version, body)
+    ordered = sorted(sections, key=parse_version, reverse=True)
+    return (head + "".join(sections[version] for version in ordered)).rstrip("\n") + "\n"
+
+
+def _changelog_sections(text: str) -> tuple[str, dict[str, str]]:
+    """Return the text before the first released section, and the sections by version."""
+    matches = list(_SECTION.finditer(text))
+    if not matches:
+        return text, {}
+    bounds = [m.start() for m in matches] + [len(text)]
+    sections = {
+        match[1]: text[bounds[i] : bounds[i + 1]].rstrip("\n") + "\n\n"
+        for i, match in enumerate(matches)
+    }
+    return text[: matches[0].start()], sections
 
 
 def adr_progress(before: str, after: str, previous: str) -> str:
@@ -310,15 +341,20 @@ def _today() -> str:
 
 def _plan(args: argparse.Namespace) -> None:
     previous = last_release()
+    target = Target.from_ref(args.base)
     version = plan(
         previous,
         messages_since(previous),
         args.version or None,
         migrations_changed_since(previous),
+        target,
     )
     for key, value in (
         ("version", version),
         ("previous", previous),
+        # A dry run from a feature branch plans as main does; its PR would go to that branch
+        # (nothing is opened), while `tag-check` from it looks on origin/main (Target.branch).
+        ("base", target.branch if target.line else args.base),
         ("branch", f"release/v{version}"),
         ("title", f"chore(release): v{version}"),
         ("audit", "true" if needs_audit(version) else "false"),
@@ -343,7 +379,12 @@ def _prepare(args: argparse.Namespace) -> None:
         ("pyproject.toml", bump_pyproject),
         ("uv.lock", bump_lock),
         ("publiccode.yml", lambda text, v: bump_publiccode(text, v, date)),
-        ("CHANGELOG.md", lambda text, v: release_changelog(text, v, date)),
+        (
+            "CHANGELOG.md",
+            lambda text, v: merge_changelogs(
+                release_changelog(text, v, date), _line_changelogs(Target.from_ref(args.base))
+            ),
+        ),
     ):
         path = Path(name)
         path.write_text(edit(path.read_text(), version))
@@ -357,6 +398,18 @@ def _prepare(args: argparse.Namespace) -> None:
     sys.stdout.write(f"prepared v{version} ({date}); body in {args.body}\n")
 
 
+def _line_changelogs(target: Target) -> list[str]:
+    """Return ``CHANGELOG.md`` of every maintenance line on ``origin`` (ADR 0116 point 3).
+
+    Only for a release on ``main``: a line's file already holds its own sections and takes no
+    other line's.
+    """
+    if target.line is not None:
+        return []
+    refs = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/release/")
+    return [git("show", f"{ref}:CHANGELOG.md") for ref in refs.split() if Target.from_ref(ref).line]
+
+
 def _audit(args: argparse.Namespace) -> None:
     body = Path(args.body)
     body.write_text(with_audit(body.read_text(), Path(args.findings).read_text()))
@@ -368,7 +421,10 @@ def _tag_check(args: argparse.Namespace) -> None:
     parse_version(version)
     if git("tag", "--list", f"v{version}").strip():
         raise ValueError(f"tag v{version} exists already; a release is never re-tagged")
-    sha, number = release_commit(version, args.branch)
+    target = Target.from_ref(args.ref)
+    if not target.admits(version):
+        raise LineError(f"{version} is not a patch of line {target.line}; it is not tagged there")
+    sha, number = release_commit(version, f"origin/{target.branch}")
     message = tag_message(version, args.actor, args.date or _today())
     sys.stdout.write(f"commit={sha}\nnumber={number}\nmessage={message}\n")
 
@@ -379,8 +435,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     plan_parser = commands.add_parser("plan", help="the number, branch, title and audit need")
     plan_parser.add_argument("--version", default="", help="X.Y.Z; empty for the rules")
+    plan_parser.add_argument(
+        "--base", default="main", help="where the release PR goes: main or a line release/X.Y"
+    )
     prepare = commands.add_parser("prepare", help="edit the three files and write the PR body")
     prepare.add_argument("--version", required=True)
+    prepare.add_argument(
+        "--base", default="main", help="where the release PR goes: main or a line release/X.Y"
+    )
     prepare.add_argument("--body", required=True, help="where to write the PR body")
     prepare.add_argument("--actor", default="the product owner", help="who dispatched")
     prepare.add_argument("--date", default="", help="YYYY-MM-DD; default today (UTC)")
@@ -389,7 +451,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     audit.add_argument("--findings", required=True, help="the audit's output")
     tag_check = commands.add_parser("tag-check", help="find and check the merged release")
     tag_check.add_argument("--version", required=True)
-    tag_check.add_argument("--branch", default="origin/main", help="where the release PR merged")
+    tag_check.add_argument(
+        "--ref", default="main", help="the dispatched branch: main or a line release/X.Y"
+    )
     tag_check.add_argument("--actor", default="the product owner", help="who dispatched")
     tag_check.add_argument("--date", default="", help="YYYY-MM-DD; default today (UTC)")
     args = parser.parse_args(argv)

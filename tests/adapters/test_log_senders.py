@@ -18,8 +18,8 @@ from app.adapters.db.log_destinations import LogTarget
 from app.adapters.log_senders import build_sender, syslog_message
 from app.adapters.log_shipping import LogTester
 from app.domain.log_destinations import DeliveryError, DestinationKind, Reason
-from tests.domain.test_log_destinations import destination
 from tests.fakes.clock import FixedClock
+from tests.support.log_destinations import destination
 
 LINE = json.dumps(
     {

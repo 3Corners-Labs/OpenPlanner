@@ -5,6 +5,7 @@
 {% block content %}
 {% include "admin/_organisation_header.html" %}
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "admin/_readiness.html" %}
 <section class="card" aria-labelledby="groups-heading">
   <div class="card__header">
     <h2 id="groups-heading">{{ _("admin.organisation.groups") }}</h2>

@@ -1,7 +1,6 @@
 """Agenda and booking timeline in the admin portal (ADR 0010)."""
 
 from dataclasses import replace
-from datetime import UTC, datetime
 
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
@@ -25,9 +24,7 @@ from app.domain.ports import RequestRecord
 from app.domain.request_log import RequestEvents
 from app.domain.services import BookingService
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed
-
-FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekdays
+from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 
 
 async def _book(site: Site, slug: str) -> int:

@@ -55,7 +55,10 @@ task id, stored as `wxcc_task_id`).
   "destination": {"id": "<business address of the work item asset>", "type": "businessAddress"},
   "channelType": "workItem",
   "channel": "<work item channel name>",
-  "flowSettings": {"openplannerGroup": "<routing value of the group>"},
+  "flowSettings": {
+    "openplannerGroup": "<routing value of the group>",
+    "<variable name>": "<mapped value>"
+  },
   "channelParams": {
     "type": "work-item-form",
     "message": {
@@ -76,7 +79,16 @@ task id, stored as `wxcc_task_id`).
 
 Limits: `workItemData` ≤ 50 keys (≤ 100 bytes), values ≤ 1024 bytes; `flowSettings` ≤ 15
 tuples (key ≤ 200, value ≤ 512 bytes). Only first name and the meeting link leave OpenPlanner
-(CLAUDE.md).
+(CLAUDE.md), plus the routing variables of ADR 0081.
+
+**Routing variables** (ADR 0081): per group the organisation admin maps the subject and each
+switched-on routing attribute (`preferred_language`, `channel_preference`) to a flow variable
+name (`[A-Za-z_][A-Za-z0-9_]{0,63}`, never `openplannerGroup`) and a value per code
+(`[A-Za-z0-9_.:-]{1,64}`). Only mapped codes are sent, as extra keys of `flowSettings`; the
+participant's labels, form answers and any other booking field never are. The catalogue has two
+attributes and a group one subject question, so at most four keys of the fifteen are used.
+`openplannerGroup` is written last and cannot be overwritten. Create a flow variable of type
+string with the same name in the client's flow to read a value.
 
 **Ending a cancelled booking's task** (ADR 0021), v2 first. **Primary:** a Task Messages v2
 snapshot, `POST /v2/tasks/{taskId}/messages` (`cjp:task_write`, beta, `202`), marks the task

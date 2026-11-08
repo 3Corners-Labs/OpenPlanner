@@ -12,9 +12,14 @@ from app.domain.planning import PlanningService
 from app.domain.scheduling import ScheduleOverride, TimeWindow
 from app.domain.services import BookingService
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.admin.test_agenda_routes import FRIDAY
-from tests.admin.test_call_routes import FRIDAY_0900
-from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed, participant
+from tests.support.domain import (
+    ADA,
+    FRIDAY,
+    FRIDAY_0900,
+    TEST_TOKEN_KEY,
+    book_confirmed,
+    participant,
+)
 
 FRIDAY_0930 = datetime(2026, 1, 2, 8, 30, tzinfo=UTC)
 AGENDA = "/admin/groups/demo/agenda"

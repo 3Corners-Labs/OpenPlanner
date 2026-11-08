@@ -1,0 +1,91 @@
+name: backport
+
+# ADR 0116 point 3: a fix merges to main first; the label `backport:X.Y` on its pull request
+# opens the cherry-pick pull request onto the maintenance line release/X.Y, which then runs the
+# full lane in the merge queue under the line's ruleset (and the decision gate, as on main).
+# The label may be set before or after the merge. A cherry-pick that does not apply cleanly
+# opens nothing: the job comments on the pull request, and a Claude Code session (or a person)
+# makes the backport by hand with `git cherry-pick -x`.
+#
+# `pull_request_target` runs this file and its checkout from main, never from the pull request;
+# the only thing taken from the pull request is its merge commit on main, which is git data,
+# not code that runs here. The release app's token (ADR 0107, environment `release`) pushes
+# the branch and opens the pull request, so its CI starts (a pull request opened with
+# GITHUB_TOKEN starts no workflow).
+on:
+  pull_request_target:
+    types: [closed, labeled]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  backport:
+    name: cherry-pick onto the maintenance lines
+    if: >-
+      github.event.pull_request.merged == true
+      && contains(join(github.event.pull_request.labels.*.name, ' '), 'backport:')
+      && (github.event.action == 'closed' || startsWith(github.event.label.name, 'backport:'))
+    runs-on: ubuntu-26.04
+    environment: release
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write   # the comment when a cherry-pick does not apply
+    steps:
+      - id: app
+        name: a short-lived token from the release app (ADR 0107)
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0   # the merge commit and the lines
+          token: ${{ steps.app.outputs.token }}
+      - name: one cherry-pick pull request per line
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          COMMENT_TOKEN: ${{ github.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+          ONLY: ${{ github.event.action == 'labeled' && github.event.label.name || '' }}
+        run: |
+          set -euo pipefail
+          set -f   # label names are never globbed
+          scripts/release-git-identity.sh
+          # shellcheck disable=SC2086 # LABELS is a space-separated list of label names
+          lines="$(python3 -m scripts.release_line backport-lines -- ${ONLY:-$LABELS})"
+          for line in $lines; do
+            branch="backport/$line/pr-$NUMBER"
+            if ! git rev-parse --verify --quiet "origin/release/$line" >/dev/null; then
+              GH_TOKEN="$COMMENT_TOKEN" gh pr comment "$NUMBER" --body "Backport to \`release/$line\`: that line does not exist (cut it with the \`cut-line\` step of the release workflow, ADR 0116)."
+              continue
+            fi
+            if [ -n "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
+              echo "::notice::$branch has a pull request already"
+              continue
+            fi
+            git switch -q -C "$branch" "origin/release/$line"
+            if ! git cherry-pick -x "$COMMIT"; then
+              git cherry-pick --abort
+              GH_TOKEN="$COMMENT_TOKEN" gh pr comment "$NUMBER" --body "Backport to \`release/$line\` does not apply cleanly. Make it by hand: \`git switch -c $branch origin/release/$line && git cherry-pick -x $COMMIT\`, resolve, and open the pull request against \`release/$line\` (ADR 0116)."
+              continue
+            fi
+            git push --force origin "$branch"
+            url="$(gh pr create --base "release/$line" --head "$branch" \
+              --title "$TITLE (backport to $line)" \
+              --body "Cherry-pick of #$NUMBER ($COMMIT) onto \`release/$line\` (ADR 0116 point 3), opened by the backport workflow for the label \`backport:$line\`. The review questions and the security review are those of #$NUMBER; the line's merge queue runs the full lane.")"
+            gh pr merge --auto --squash "$url"
+            echo "::notice::opened $url"
+          done

@@ -42,6 +42,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, can_function
+from app.admin.block_subjects import block_subject_values, read_block_subjects, subject_choices
 from app.admin.check_routes import check_service, check_view
 from app.admin.form_summary import form_summary
 from app.admin.forms import (
@@ -58,10 +59,12 @@ from app.admin.pages import (
     Locale,
     SameOrigin,
     current_home,
+    group_shows,
     object_tabs,
     page,
     with_manual,
 )
+from app.admin.readiness_view import checklist_view, readiness_service
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
@@ -85,6 +88,7 @@ from app.domain.scheduling import (
     MAX_TRIAL_CALLS_PER_BOOKING,
     MIN_TRIAL_CALL_MINUTES,
     DispatchKind,
+    Group,
     GroupSummary,
     JoinClient,
     Offer,
@@ -179,10 +183,6 @@ INTEGRATION_LABELS: dict[str, str] = {
 }
 
 
-OWN_QUEUE_TABS = frozenset({"group.queue"})
-"""Tabs shown only on a group that dispatches to OpenPlanner's own queue (ADR 0043)."""
-
-
 def planning_service(request: Request) -> PlanningService:
     """Return the application's planning service."""
     service: PlanningService = request.app.state.planning_service
@@ -204,15 +204,11 @@ def group_page(
     ``scripts=True`` allows the page's own script (the queue's live region, ADR 0072).
     """
     summary = context.group
-    can = can_function(context.principal)
     tabs, subtabs = object_tabs(
         locale,
         object_page("group"),
         summary.group.slug,
-        lambda screen: (
-            can(screen.permission, summary)
-            and (summary.group.has_own_queue or screen.key not in OWN_QUEUE_TABS)
-        ),
+        group_shows(context.principal, summary),
         current_home(request),
     )
     response = page(
@@ -515,6 +511,12 @@ async def group(
         context,
         "admin/group.html",
         {
+            "readiness": checklist_view(
+                await readiness_service(request).group(context.principal, slug),
+                locale,
+                group_shows(context.principal, summary),
+                {"slug": summary.group.slug, "org": summary.organisation_slug},
+            ),
             "phone_label": _(PHONE_LABELS[summary.group.phone_mode]),
             "group_rights": group_rights,
             "week": _week(schedule, locale),
@@ -1016,7 +1018,7 @@ def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
     ]
 
 
-def _read_rule(form: FormData) -> ScheduleRule | None:
+def _read_rule(form: FormData, group: Group) -> ScheduleRule | None:
     """Parse the window form into a rule; ``None`` (with form errors) when it is incomplete."""
     weekday = form.choice("weekday", WEEKDAYS)
     opens, closes = form.clock("opens"), form.clock("closes")
@@ -1026,7 +1028,14 @@ def _read_rule(form: FormData) -> ScheduleRule | None:
     if form.errors or not (weekday and opens and closes and offer and capacity is not None):
         return None
     try:
-        window = TimeWindow(opens, closes, capacity, form.optional_text("label"), Offer(offer))
+        window = TimeWindow(
+            opens,
+            closes,
+            capacity,
+            form.optional_text("label"),
+            Offer(offer),
+            read_block_subjects(form, group),
+        )
         return ScheduleRule(int(weekday), window, valid_from, valid_to)
     except DomainError as error:
         form.refusal(error)
@@ -1044,6 +1053,7 @@ def _rule_values(rule: ScheduleRule) -> dict[str, str]:
         "label": rule.window.label or "",
         "valid_from": rule.valid_from.isoformat() if rule.valid_from else "",
         "valid_to": rule.valid_to.isoformat() if rule.valid_to else "",
+        **block_subject_values(rule.window),
     }
 
 
@@ -1060,6 +1070,7 @@ async def _hours_response(
         {
             "week": _week(schedule, locale),
             "fields": _hours_fields(form, locale),
+            "subject_choices": subject_choices(form, context.group.group, locale),
             "errors": form.errors,
             "shortfalls": await group_shortfalls(request, locale, context),
         },
@@ -1092,7 +1103,7 @@ async def add_hours(
 ) -> Response:
     """Add a weekly staffing block."""
     form = await read_form(request, locale)
-    rule = _read_rule(form)
+    rule = _read_rule(form, context.group.group)
     if rule is not None:
         try:
             await planning_service(request).add_rule(context.principal, slug, rule)
@@ -1118,7 +1129,12 @@ def _edit_hours_response(
         locale,
         context,
         "admin/group_hours_edit.html",
-        {"rule_id": rule_id, "fields": _hours_fields(form, locale), "errors": form.errors},
+        {
+            "rule_id": rule_id,
+            "fields": _hours_fields(form, locale),
+            "subject_choices": subject_choices(form, context.group.group, locale),
+            "errors": form.errors,
+        },
         status,
     )
 
@@ -1150,7 +1166,7 @@ async def update_hours(
 ) -> Response:
     """Change a weekly block; existing bookings keep their slots."""
     form = await read_form(request, locale)
-    rule = _read_rule(form)
+    rule = _read_rule(form, context.group.group)
     if rule is not None:
         try:
             changed = await planning_service(request).update_rule(
@@ -1325,6 +1341,7 @@ async def _exceptions_response(
         {
             "exceptions": _exceptions(schedule, locale),
             "fields": _exception_fields(form, locale),
+            "subject_choices": subject_choices(form, context.group.group, locale),
             "kind": form.text("kind") or "closed",
             "kind_error": form.error_for("kind"),
             "errors": form.errors,
@@ -1348,7 +1365,7 @@ async def add_exception(
 ) -> Response:
     """Close a date or give it its own hours."""
     form = await read_form(request, locale)
-    override = _read_override(form)
+    override = _read_override(form, context.group.group)
     if override is not None:
         try:
             await planning_service(request).add_override(context.principal, slug, override)
@@ -1360,7 +1377,7 @@ async def add_exception(
     return await _exceptions_response(request, locale, context, form, 422)
 
 
-def _read_override(form: FormData) -> ScheduleOverride | None:
+def _read_override(form: FormData, group: Group) -> ScheduleOverride | None:
     """Parse the exception form; ``None`` (with form errors) when it is incomplete."""
     day = form.day("day")
     kind = form.choice("kind", {"closed", "hours"})
@@ -1375,7 +1392,12 @@ def _read_override(form: FormData) -> ScheduleOverride | None:
         if opens and closes and offer and capacity is not None:
             try:
                 window = TimeWindow(
-                    opens, closes, capacity, form.optional_text("label"), Offer(offer)
+                    opens,
+                    closes,
+                    capacity,
+                    form.optional_text("label"),
+                    Offer(offer),
+                    read_block_subjects(form, group),
                 )
             except DomainError as error:
                 form.refusal(error)
@@ -1395,6 +1417,7 @@ def _override_values(override: ScheduleOverride) -> dict[str, str]:
             "capacity": str(window.capacity),
             "offer": window.offer.value,
             "label": window.label or "",
+            **block_subject_values(window),
         }
     return values
 
@@ -1416,6 +1439,7 @@ def _edit_exception_response(
         {
             "override_id": override_id,
             "fields": _exception_fields(form, locale),
+            "subject_choices": subject_choices(form, context.group.group, locale),
             "kind": form.text("kind") or "closed",
             "kind_error": form.error_for("kind"),
             "errors": form.errors,
@@ -1449,7 +1473,7 @@ async def update_exception(
 ) -> Response:
     """Change an exception; bookings made on the old day keep their slots."""
     form = await read_form(request, locale)
-    override = _read_override(form)
+    override = _read_override(form, context.group.group)
     if override is not None:
         try:
             changed = await planning_service(request).update_override(

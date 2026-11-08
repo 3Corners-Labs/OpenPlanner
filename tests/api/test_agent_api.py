@@ -1,100 +1,27 @@
 """The machine API over HTTP (ADR 0023): token endpoint, routes, errors, docs, switches."""
 
-import base64
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
-from urllib.parse import quote
-
 import httpx
 import pytest
-from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.engine import create_engine
 from app.adapters.db.models import AuditEventRow, GroupRow, SlotRow
-from app.adapters.db.seed import seed_demo
 from app.api.agent.auth import RequireScope
 from app.config import Settings
-from app.domain.api_access import ApiAccessService
-from app.domain.api_clients import ClientDraft, IssuedSecret
+from app.domain.api_clients import IssuedSecret
 from app.domain.audit import Outcome
-from app.domain.authorization import Role
 from app.domain.services import BookingService
-from app.main import create_app
-from tests.fakes.clock import FixedClock
+from tests.support.agent_api import BASE, FORM, OPEN_ROUTES, SUPER, TRANSFER, Agent, agent_api
+from tests.support.configuration_package import PASSPHRASE
 from tests.support.domain import NOW
-from tests.support.principals import principal
 from tests.support.routes import all_routes
-
-SUPER = principal("sub-super", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-BASE = "/api/agent/v1"
-FORM = {"content-type": "application/x-www-form-urlencoded"}
-OPEN_ROUTES = {"/oauth/token", "/openapi.json", "/docs"}
-
-
-@dataclass
-class Agent:
-    client: httpx.AsyncClient
-    app: FastAPI
-    service: ApiAccessService
-
-    async def register(self, **overrides: object) -> IssuedSecret:
-        fields: dict[str, object] = {
-            "name": "WxCC AI Agent",
-            "organisation": "demo",
-            "groups": [],
-            "scopes": ["availability:read"],
-            "networks": [],
-        }
-        fields.update(overrides)
-        return await self.service.create_client(SUPER, ClientDraft.create(**fields), 180)  # type: ignore[arg-type]
-
-    async def token(self, issued: IssuedSecret, **form: str) -> httpx.Response:
-        basic = base64.b64encode(
-            f"{quote(issued.client.client_id)}:{quote(issued.secret)}".encode()
-        ).decode()
-        return await self.client.post(
-            f"{BASE}/oauth/token",
-            content=httpx.QueryParams({"grant_type": "client_credentials", **form}).__str__(),
-            headers={**FORM, "authorization": f"Basic {basic}"},
-        )
-
-    async def bearer(self, issued: IssuedSecret) -> dict[str, str]:
-        response = await self.token(issued)
-        assert response.status_code == 200, response.text
-        return {"authorization": f"Bearer {response.json()['access_token']}"}
-
-
-async def _agent(settings: Settings, *, enabled: bool) -> AsyncIterator[Agent]:
-    engine = create_engine(settings.database_url)
-    await seed_demo(engine)
-    await engine.dispose()
-    app = create_app(settings, FixedClock(NOW))
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
-        service: ApiAccessService = app.state.api_access
-        if enabled:
-            await service.save_settings(SUPER, enabled=True, docs_public=False)
-        yield Agent(client, app, service)
-
-
-@pytest.fixture
-async def agent(settings: Settings, database_url: str) -> AsyncIterator[Agent]:
-    on = settings.model_copy(update={"database_url": database_url, "agent_api_enabled": True})
-    async for agent in _agent(on, enabled=True):
-        yield agent
 
 
 async def test_without_the_environment_switch_the_api_does_not_exist(
     settings: Settings, database_url: str
 ) -> None:
     off = settings.model_copy(update={"database_url": database_url})
-    async for agent in _agent(off, enabled=True):
+    async for agent in agent_api(off, enabled=True):
         response = await agent.client.post(f"{BASE}/oauth/token", content="", headers=FORM)
         assert response.status_code == 404
 
@@ -338,7 +265,7 @@ async def test_tokens_are_rate_limited_per_ip(settings: Settings, database_url: 
             "rate_limit_agent_tokens": "2/minute",
         }
     )
-    async for agent in _agent(limited, enabled=True):
+    async for agent in agent_api(limited, enabled=True):
         wrong = IssuedSecret((await agent.register()).client, "ops_guess")
         statuses = [(await agent.token(wrong)).status_code for _ in range(3)]
         assert statuses == [401, 401, 429]
@@ -363,9 +290,6 @@ async def test_booking_service_is_shared(agent: Agent) -> None:
 
 
 # --- configuration package (ADR 0089 point 7) ---------------------------------------------
-
-PASSPHRASE = "correct horse battery staple"  # noqa: S105 - a test passphrase
-TRANSFER = {"scopes": ["configuration:transfer"]}
 
 
 async def _audit(agent: Agent) -> list[AuditEventRow]:
