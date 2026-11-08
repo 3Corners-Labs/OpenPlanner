@@ -791,6 +791,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             404, 404, 404, 403, 403, 403, 403
         ),
     },
+    # ADR 0056 point 11: confirming on the participant's behalf (bookings.manage).
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/confirm": {
+        "/admin/groups/demo/agenda/bookings/999999/confirm": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/confirm": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
     "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
         "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(
             404, 404, 404, 403, 403, 403, 403

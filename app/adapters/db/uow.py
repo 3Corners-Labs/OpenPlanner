@@ -133,6 +133,7 @@ from app.domain.audit import (
 from app.domain.authorization import Scope
 from app.domain.booking import (
     HOLDS_PLACE,
+    IN_AGENDA,
     Booking,
     BookingKind,
     BookingStatus,
@@ -2112,12 +2113,28 @@ class SqlTransaction(
         self, group_id: int, lower: datetime, upper: datetime | None
     ) -> list[Booking]:
         """Return the group's confirmed scheduled bookings with lower <= start < upper."""
+        return await self._scheduled(group_id, lower, upper, {BookingStatus.CONFIRMED})
+
+    async def find_agenda_bookings(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[Booking]:
+        """Return the group's scheduled bookings in the agenda (``IN_AGENDA``) in [lower, upper)."""
+        return await self._scheduled(group_id, lower, upper, IN_AGENDA)
+
+    async def _scheduled(
+        self,
+        group_id: int,
+        lower: datetime,
+        upper: datetime | None,
+        statuses: Collection[BookingStatus],
+    ) -> list[Booking]:
+        """Return the group's scheduled bookings with one of ``statuses``, by start."""
         query = (
             select(BookingRow, SlotRow)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
             .where(
                 BookingRow.group_id == group_id,
-                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.status.in_([status.value for status in statuses]),
                 SlotRow.kind == BookingKind.SCHEDULED.value,
                 SlotRow.start >= lower,
             )

@@ -15,19 +15,20 @@ meeting or work item job again.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AccessDenied, AdminContext, RequirePermission, can_function
-from app.admin.forms import raise_refusal, read_form, redirect_done
+from app.admin.forms import moment_label, raise_refusal, read_form, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.simulator_routes import simulator_view
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Permission
+from app.domain.booking import Booking
 from app.domain.call_retry import CallRetryService
 from app.domain.calls import BookingOverview, CallStatus, EventKind, not_picked_up
 from app.domain.errors import DomainError, ErrorCode
@@ -92,6 +93,16 @@ class AgendaRow:
     """The participant's subject and attributes in words (ADR 0081); not personal data."""
     fallback: bool = False
     """The booking is in the own queue as a fallback (ADR 0082 point 11)."""
+    pending_until: str = ""
+    """When the booking awaits the participant's confirmation: until when (ADR 0056 point 11);
+    empty otherwise."""
+
+
+def pending_until(booking: Booking, tz: tzinfo, code: str) -> str:
+    """Return until when a booking awaits confirmation (ADR 0056 point 11); else ``""``."""
+    if not booking.awaits_confirmation or booking.confirm_by is None:
+        return ""
+    return moment_label(booking.confirm_by, tz, code)
 
 
 def integration_service(request: Request) -> IntegrationService:
@@ -130,11 +141,14 @@ def agenda_row(
         host_joined=status.host_joined,
         participants=status.participants,
         not_picked_up=booking.is_active and not_picked_up(status, booking.start, now, limit),
-        cancelled=not booking.is_active and not booking.awaits_rebook,
+        cancelled=not booking.is_active
+        and not booking.awaits_rebook
+        and not booking.awaits_confirmation,
         waiting=booking.awaits_rebook,
         meeting_id=booking.meeting.id if booking.meeting else "",
         routing=routing_summary(group.routing, booking.routing, _, code),
         fallback=status.fallback,
+        pending_until=pending_until(booking, tz, code),
     )
 
 
@@ -293,6 +307,7 @@ async def booking_detail(
             f"{format_clock(booking.start, tz, code)}–{format_clock(booking.end, tz, code)}",
             "kind": _(KIND_LABELS[booking.kind]),
             "routing": routing_summary(group.routing, booking.routing, _, code),
+            "pending_until": pending_until(booking, tz, code),
             "call": call,
             "task": task,
             "status": status,

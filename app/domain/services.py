@@ -402,32 +402,44 @@ class BookingService:
             booking = await self._booking(tx, management_token)
             if not booking.awaits_confirmation:
                 return booking
-            now = self._clock.now()
-            if booking.confirm_by is not None and now >= booking.confirm_by:
-                await lapse_unconfirmed(tx, booking, now)
-                return booking.expire(now)
             group = await self._group_by_id(tx, booking.group_id)
-            confirmed = booking.confirm(now)
-            closure = covering(await tx.get_closures(group.id, now), booking.start)
-            if closure is not None:
-                # A closure declared after the booking was made (ADR 0024): confirming puts
-                # it on hold at once, as it would have been had it been confirmed before.
-                held = confirmed.suspend(_id(closure))
-                await tx.save_booking(held)
-                await record_confirmed(tx, booking, group, now)
-                await record_closure_change(tx, FactKind.BOOKING_SUSPENDED, held, group, now)
-                purge_at = closure.purge_at(
-                    booking.end, self._closure_retention(group.organisation_id)
-                )
-                jobs = plan_for_suspension(
-                    now=now, purge_at=purge_at, team_invite=group.sends_team_invite
-                )
-                await tx.replace_jobs(_id(booking), jobs)
-                return held
-            await tx.save_booking(confirmed)
-            await record_confirmed(tx, booking, group, now)
-            await tx.replace_jobs(_id(booking), await self._booked_jobs(tx, group, confirmed))
-            return confirmed
+            return await self.confirm_in(tx, booking, group, self._clock.now())
+
+    async def confirm_in(
+        self,
+        tx: Transaction,
+        booking: Booking,
+        group: Group,
+        now: datetime,
+        actor: ActorClass = ActorClass.PARTICIPANT,
+    ) -> Booking:
+        """Confirm a pending booking inside ``tx``: by its email link, or by a planner (ADR 0056).
+
+        After ``confirm_by`` it lapses instead; under a closure it is confirmed and put on hold.
+        The caller has checked that the booking awaits confirmation.
+        """
+        if booking.confirm_by is not None and now >= booking.confirm_by:
+            await lapse_unconfirmed(tx, booking, now)
+            return booking.expire(now)
+        confirmed = booking.confirm(now)
+        closure = covering(await tx.get_closures(group.id, now), booking.start)
+        if closure is not None:
+            # A closure declared after the booking was made (ADR 0024): confirming puts
+            # it on hold at once, as it would have been had it been confirmed before.
+            held = confirmed.suspend(_id(closure))
+            await tx.save_booking(held)
+            await record_confirmed(tx, booking, group, now, actor)
+            await record_closure_change(tx, FactKind.BOOKING_SUSPENDED, held, group, now)
+            purge_at = closure.purge_at(booking.end, self._closure_retention(group.organisation_id))
+            jobs = plan_for_suspension(
+                now=now, purge_at=purge_at, team_invite=group.sends_team_invite
+            )
+            await tx.replace_jobs(_id(booking), jobs)
+            return held
+        await tx.save_booking(confirmed)
+        await record_confirmed(tx, booking, group, now, actor)
+        await tx.replace_jobs(_id(booking), await self._booked_jobs(tx, group, confirmed))
+        return confirmed
 
     async def cancel(self, management_token: str | PublicRef) -> Booking:
         """Cancel the booking; its pending jobs become a cancellation mail and the purge.

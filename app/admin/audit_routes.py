@@ -273,6 +273,7 @@ DETAIL_LABELS: dict[str, str] = {
     "booking.cancel_all": "admin.audit.detail.booking_cancel_all",
     "booking.move": "admin.audit.detail.booking_move",
     "planner.move": "admin.audit.detail.planner_move",
+    "booking.confirmed_by_staff": "admin.audit.detail.booking_confirmed_by_staff",
     "planner.cancel": "admin.audit.detail.planner_cancel",
     "planner.rebook": "admin.audit.detail.planner_rebook",
     "bulk": "admin.audit.detail.bulk",
