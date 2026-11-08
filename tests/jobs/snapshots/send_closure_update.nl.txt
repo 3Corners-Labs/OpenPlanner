@@ -12,7 +12,7 @@ We bellen <niet>.
 Zo bereikt u ons:
 - Telefoon: 012 345 6789 (ma-vr 8-17)
 - Website: https://acme.example/contact
-- Balie: Voorbeeldstraat 1, 1234 AB Voorbeeldstad
+- Bezoekadres: Voorbeeldstraat 1, 1234 AB Voorbeeldstad
 
 Alle informatie en de andere manieren om ons te bereiken staan ook op onze sluitingspagina.
 Naar de sluitingspagina: https://afspraak.example.nl/g/balie/closure

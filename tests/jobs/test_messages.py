@@ -250,7 +250,7 @@ CONTACTS = ContactBlock(
         ContactOption.create(
             ContactKind.ADDRESS,
             "Voorbeeldstraat 1\n1234 AB Voorbeeldstad",
-            labels={"nl": "Balie", "en": "Desk"},
+            labels={"nl": "Bezoekadres", "en": "Visiting address"},
         ),
     ),
     {"nl": "Zo bereikt u ons", "en": "How to reach us"},
@@ -297,7 +297,7 @@ def test_the_plain_text_part_has_the_contact_options_and_the_closure_page(
     assert "Zo bereikt u ons:" in message.text
     assert "- Telefoon: 012 345 6789 (ma-vr 8-17)" in message.text
     assert "- Website: https://acme.example/contact" in message.text
-    assert "- Balie: Voorbeeldstraat 1, 1234 AB Voorbeeldstad" in message.text
+    assert "- Bezoekadres: Voorbeeldstraat 1, 1234 AB Voorbeeldstad" in message.text
     assert "https://afspraak.example.nl/g/balie/closure" in message.text
     html = message.html or ""
     assert '<a href="tel:0123456789">012 345 6789</a>' in html
