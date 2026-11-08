@@ -8,10 +8,12 @@ only moves forwards, and a fact the rollup has not read is never pruned.
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 
+from app.domain.authorization import Scope
 from app.domain.usage import StaffFact, UsageCell, UsageFact
 from app.domain.usage_backfill import BackfillBooking
+from app.domain.usage_report import DayStatusCount, ReportGroup
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState, merge
 
 
@@ -26,6 +28,8 @@ class UsageData:
     backfilled_at: datetime | None = None
     cutoff: datetime | None = None
     bookings: list[BackfillBooking] = field(default_factory=list)
+    groups: list[ReportGroup] = field(default_factory=list)
+    day_counts: list[DayStatusCount] = field(default_factory=list)
     done: set[int] = field(default_factory=set)
     next_id: int = 1
     enabled: bool = True
@@ -60,6 +64,29 @@ class InMemoryUsageStore:
     async def advance_usage_watermark(self, last_event_id: int, at: datetime) -> None:
         self.data.last_event_id = max(self.data.last_event_id, last_event_id)
         self.data.rolled_at = at
+
+    async def list_report_groups(self, scope: Scope) -> list[ReportGroup]:
+        return [g for g in self.data.groups if scope.contains(g.organisation_slug, g.slug)]
+
+    async def read_usage_cells(
+        self, scope: Scope, group_ids: Sequence[int], first_hour: datetime, last_hour: datetime
+    ) -> list[UsageCell]:
+        allowed = {g.group_id for g in await self.list_report_groups(scope)} & set(group_ids)
+        return [
+            c
+            for c in self.data.cells
+            if c.group_id in allowed and first_hour <= c.bucket_hour < last_hour
+        ]
+
+    async def read_day_status_counts(
+        self, scope: Scope, group_ids: Sequence[int], first_day: date, last_day: date
+    ) -> list[DayStatusCount]:
+        allowed = {g.group_id for g in await self.list_report_groups(scope)} & set(group_ids)
+        return [
+            d
+            for d in self.data.day_counts
+            if d.group_id in allowed and first_day <= d.day <= last_day
+        ]
 
     async def find_unbackfilled(self, after_id: int, limit: int) -> list[BackfillBooking]:
         found = [b for b in self.data.bookings if b.id > after_id and b.id not in self.data.done]

@@ -10286,3 +10286,246 @@ msgstr "{time}: {first_name} staat in de wachtrij. {link}"
 
 msgid "admin.form.error.fallback_space_room_id"
 msgstr "Vul het id van een Webex-ruimte in: letters, cijfers, - en _, 10 tot 200 tekens."
+
+msgid "authz.permission.reports_view"
+msgstr "Gebruiksrapporten bekijken"
+
+msgid "settings.field.reporting_min_cell_size.label"
+msgstr "Kleinste aantal dat een rapport toont"
+
+msgid "settings.field.reporting_org_min_cell_size.label"
+msgstr "Kleinste aantal in de rapporten van de organisatie"
+
+msgid "admin.nav.reports"
+msgstr "Rapporten"
+
+msgid "admin.tab.usage"
+msgstr "Gebruik"
+
+msgid "reports.list.title"
+msgstr "Rapporten"
+
+msgid "reports.list.intro"
+msgstr "Hoe de groepen die u mag zien worden gebruikt: boekingen van de laatste vier weken. Open een groep voor alle cijfers."
+
+msgid "reports.list.group"
+msgstr "Groep"
+
+msgid "reports.list.created"
+msgstr "Boekingen gemaakt (28 dagen)"
+
+msgid "reports.list.open"
+msgstr "Gebruik openen"
+
+msgid "reports.list.empty"
+msgstr "Er is geen groep waarvan u de rapporten mag zien."
+
+msgid "reports.list.rule"
+msgstr "Een aantal onder het minimum wordt verborgen; er is geen totaal over groepen."
+
+msgid "reports.usage.title"
+msgstr "Gebruik"
+
+msgid "reports.usage.heading"
+msgstr "Gebruik"
+
+msgid "reports.usage.lead"
+msgstr "Alleen aantallen, geen persoonsgegevens. Dagen zijn hele dagen in de tijdzone van de groep zelf."
+
+msgid "reports.usage.from"
+msgstr "Van"
+
+msgid "reports.usage.to"
+msgstr "Tot"
+
+msgid "reports.usage.apply"
+msgstr "Tonen"
+
+msgid "reports.usage.as_of"
+msgstr "Cijfers van"
+
+msgid "reports.usage.not_yet"
+msgstr "Nog niet verwerkt"
+
+msgid "reports.usage.groups"
+msgstr "Meegeteld"
+
+msgid "reports.usage.rule"
+msgstr "Een aantal onder {n} wordt verborgen en geschreven als < {n}. Ook een totaal blijft verborgen als het een verborgen aantal zou verraden."
+
+msgid "reports.hidden"
+msgstr "< {n}"
+
+msgid "reports.count"
+msgstr "Aantal"
+
+msgid "reports.total"
+msgstr "Totaal"
+
+msgid "reports.provisional"
+msgstr "voorlopig"
+
+msgid "reports.created.title"
+msgstr "Boekingen gemaakt per dag"
+
+msgid "reports.created.day"
+msgstr "Dag"
+
+msgid "reports.outcomes.title"
+msgstr "Hoe boekingen eindigden"
+
+msgid "reports.outcomes.outcome"
+msgstr "Uitkomst"
+
+msgid "reports.lead.title"
+msgstr "Hoe ver vooruit boekingen worden gemaakt"
+
+msgid "reports.lead.bucket"
+msgstr "Tijd voor de afspraak"
+
+msgid "reports.lead.mean"
+msgstr "Gemiddelde termijn vooraf"
+
+msgid "reports.mean.minutes"
+msgstr "{n} min"
+
+msgid "reports.mean.hours"
+msgstr "{n} uur"
+
+msgid "reports.mean.days"
+msgstr "{n} dagen"
+
+msgid "reports.cancel.title"
+msgstr "Annuleringen door deelnemers"
+
+msgid "reports.cancel.left"
+msgstr "Tijd die nog restte voor de afspraak"
+
+msgid "reports.reschedule.title"
+msgstr "Verplaatste boekingen"
+
+msgid "reports.reschedule.actor"
+msgstr "Verplaatst door"
+
+msgid "reports.confirmation.title"
+msgstr "Bevestiging per e-mail"
+
+msgid "reports.confirmation.status"
+msgstr "Resultaat"
+
+msgid "reports.confirmation.conversion"
+msgstr "{percent}% van de boekingen die bevestigd moesten worden, is bevestigd."
+
+msgid "reports.closure.title"
+msgstr "Noodsluitingen"
+
+msgid "reports.closure.change"
+msgstr "Wijziging"
+
+msgid "reports.before.title"
+msgstr "Boekingen van voor de rapportage"
+
+msgid "reports.before.status"
+msgstr "Status"
+
+msgid "reports.before.note"
+msgstr "Deze aantallen komen van boekingen die al in dagtellingen waren samengevoegd voordat het gebruik werd bijgehouden; meer is er niet van bekend."
+
+msgid "reports.outcome.completed"
+msgstr "Afgerond"
+
+msgid "reports.outcome.no_show"
+msgstr "Niet verschenen"
+
+msgid "reports.outcome.cancelled_by_participant"
+msgstr "Geannuleerd door de deelnemer"
+
+msgid "reports.outcome.cancelled_by_planner"
+msgstr "Geannuleerd door de planner"
+
+msgid "reports.outcome.cancelled_by_closure"
+msgstr "Geannuleerd na een sluiting"
+
+msgid "reports.outcome.cancelled_by_system"
+msgstr "Geannuleerd door het systeem"
+
+msgid "reports.outcome.expired_unconfirmed"
+msgstr "Niet op tijd bevestigd"
+
+msgid "reports.actor.participant"
+msgstr "Deelnemer"
+
+msgid "reports.actor.planner"
+msgstr "Planner"
+
+msgid "reports.actor.closure"
+msgstr "Sluiting"
+
+msgid "reports.actor.system"
+msgstr "Systeem"
+
+msgid "reports.actor.unknown"
+msgstr "Niet bekend"
+
+msgid "reports.bucket.0"
+msgstr "Minder dan 1 minuut"
+
+msgid "reports.bucket.1"
+msgstr "1 tot 5 minuten"
+
+msgid "reports.bucket.2"
+msgstr "5 tot 15 minuten"
+
+msgid "reports.bucket.3"
+msgstr "15 tot 30 minuten"
+
+msgid "reports.bucket.4"
+msgstr "30 tot 60 minuten"
+
+msgid "reports.bucket.5"
+msgstr "1 tot 2 uur"
+
+msgid "reports.bucket.6"
+msgstr "2 tot 6 uur"
+
+msgid "reports.bucket.7"
+msgstr "6 tot 24 uur"
+
+msgid "reports.bucket.8"
+msgstr "1 tot 7 dagen"
+
+msgid "reports.bucket.9"
+msgstr "Meer dan 7 dagen"
+
+msgid "reports.confirmation.confirmed"
+msgstr "Bevestigd"
+
+msgid "reports.confirmation.expired"
+msgstr "Niet op tijd bevestigd"
+
+msgid "reports.closure.suspended"
+msgstr "In de wacht gezet"
+
+msgid "reports.closure.resumed"
+msgstr "Weer bevestigd"
+
+msgid "reports.status.confirmed"
+msgstr "Bevestigd"
+
+msgid "reports.status.cancelled"
+msgstr "Geannuleerd"
+
+msgid "reports.status.completed"
+msgstr "Afgerond"
+
+msgid "reports.status.no_show"
+msgstr "Niet verschenen"
+
+msgid "reports.status.suspended"
+msgstr "In de wacht"
+
+msgid "reports.status.awaiting_rebook"
+msgstr "Wacht op een nieuwe tijd"
+
+msgid "reports.status.pending_confirmation"
+msgstr "Wacht op bevestiging"

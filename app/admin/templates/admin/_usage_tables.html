@@ -1,0 +1,21 @@
+{#- Tables of the usage report (ADR 0117 step 5). A hidden count shows "< n"; a table's total is hidden too when showing it would give a hidden cell back. -#}
+{% macro cell(value, threshold) -%}
+{%- if value is none %}<span class="muted">{{ _("reports.hidden", n=threshold) }}</span>{% else %}{{ value }}{% endif -%}
+{%- endmacro %}
+{% macro count_table(id, title, head, table, kind, threshold, total_label) %}
+<section class="card" aria-labelledby="{{ id }}-heading">
+  <h2 id="{{ id }}-heading">{{ title }}</h2>
+  <div class="table-scroll" role="region" aria-labelledby="{{ id }}-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ title }}</caption>
+    <thead><tr><th scope="col">{{ head }}</th><th scope="col">{{ _("reports.count") }}</th></tr></thead>
+    <tbody>
+      {% for row in table.rows %}
+      <tr><th scope="row">{{ label(kind, row.code) }}</th><td>{{ cell(row.count, threshold) }}</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot><tr><th scope="row">{{ total_label }}</th><td>{{ cell(table.total, threshold) }}</td></tr></tfoot>
+  </table>
+  </div>
+</section>
+{% endmacro %}

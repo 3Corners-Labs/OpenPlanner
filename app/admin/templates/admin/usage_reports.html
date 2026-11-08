@@ -1,0 +1,37 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_usage_tables.html" import cell with context %}
+{% block title %}{{ _("reports.list.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("reports.list.title") }}</h1>
+    <p class="page-header__lead">{{ _("reports.list.intro") }}</p>
+  </div>
+</div>
+{% if rows %}
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("reports.list.title") }}</caption>
+  <thead>
+    <tr>
+      <th scope="col">{{ _("reports.list.group") }}</th>
+      <th scope="col">{{ _("reports.list.created") }}</th>
+      <th scope="col"><span class="visually-hidden">{{ _("reports.list.open") }}</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <th scope="row">{{ row.group.name }}<br><span class="muted">{{ row.group.organisation_name }}</span></th>
+      <td>{{ cell(row.created, row.threshold) }}</td>
+      <td><a href="/admin/groups/{{ row.group.slug }}/usage">{{ _("reports.list.open") }}<span class="visually-hidden"> – {{ row.group.name }}</span></a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted">{{ _("reports.list.rule") }}</p>
+{% else %}
+<p class="empty-state">{{ _("reports.list.empty") }}</p>
+{% endif %}
+{% endblock %}

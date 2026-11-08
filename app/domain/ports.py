@@ -96,6 +96,7 @@ from app.domain.updates import (
 )
 from app.domain.usage import StaffFact, UsageCell, UsageFact
 from app.domain.usage_backfill import BackfillBooking
+from app.domain.usage_report import DayStatusCount, ReportGroup
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 from app.domain.worker_check import WorkerHeartbeat
 
@@ -2010,14 +2011,31 @@ class Transaction(Protocol):
 
 
 class UsageStore(Protocol):
-    """The rollup's reads and writes within one transaction (ADR 0117 point 4).
+    """What the rollup, the backfill and the usage reports read and write (ADR 0117).
 
     Kept apart from ``Transaction``, which only gained ``record_usage``: the web path writes
-    facts, and only the worker's rollup, retention and the System status card use these.
+    facts, and only the worker's rollup, retention and backfill, the System status card and the
+    reports (filtered by the reader's ``Scope``, ADR 0117 point 11) use these.
     """
 
     async def record_usage(self, fact: UsageFact | StaffFact) -> bool:
         """Write one usage fact in a savepoint (the same method as ``Transaction``'s)."""
+        ...
+
+    async def list_report_groups(self, scope: Scope) -> list[ReportGroup]:
+        """Return the groups inside ``scope``, archived ones too, by organisation and name."""
+        ...
+
+    async def read_usage_cells(
+        self, scope: Scope, group_ids: Sequence[int], first_hour: datetime, last_hour: datetime
+    ) -> list[UsageCell]:
+        """Return the hourly cells of ``group_ids`` in ``scope`` in the half-open hour range."""
+        ...
+
+    async def read_day_status_counts(
+        self, scope: Scope, group_ids: Sequence[int], first_day: date, last_day: date
+    ) -> list[DayStatusCount]:
+        """Return the day counts from before reporting of ``group_ids`` in ``scope``."""
         ...
 
     async def read_usage_events(self, after_id: int, limit: int) -> UsageBatch:

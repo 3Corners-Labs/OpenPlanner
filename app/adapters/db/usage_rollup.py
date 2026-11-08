@@ -25,6 +25,7 @@ from app.adapters.db.models import (
     UsageRollupStateRow,
 )
 from app.adapters.db.types import plain
+from app.adapters.db.usage_rows import enum_of
 from app.domain.booking import BookingKind, BookingStatus
 from app.domain.channels import ChannelKind
 from app.domain.scheduling import DispatchKind
@@ -81,11 +82,6 @@ _CUTS = (
 """The cut columns of a cell, compared with ``IS`` so an empty cut matches an empty cut."""
 
 
-def _enum[E](kind: type[E], value: str | None) -> E | None:
-    """Return the enum member stored as ``value``; ``None`` stays ``None``."""
-    return kind(value) if value is not None else None  # type: ignore[call-arg]
-
-
 def _fact_of(row: UsageEventRow) -> UsageFact | StaffFact:
     """Rebuild the fact a row holds; a value this version does not know raises ``ValueError``."""
     kind = FactKind(row.kind)
@@ -103,13 +99,13 @@ def _fact_of(row: UsageEventRow) -> UsageFact | StaffFact:
         row.bucket_hour,
         row.organisation_id,
         row.group_id,
-        booking_kind=_enum(BookingKind, row.booking_kind),
-        dispatch_kind=_enum(DispatchKind, row.dispatch_kind),
+        booking_kind=enum_of(BookingKind, row.booking_kind),
+        dispatch_kind=enum_of(DispatchKind, row.dispatch_kind),
         subject_code=row.subject_code,
         locale=row.locale,
-        channel_kind=_enum(ChannelKind, row.channel_kind),
-        outcome=_enum(UsageOutcome, row.outcome),
-        actor_class=_enum(ActorClass, row.actor_class),
+        channel_kind=enum_of(ChannelKind, row.channel_kind),
+        outcome=enum_of(UsageOutcome, row.outcome),
+        actor_class=enum_of(ActorClass, row.actor_class),
         reason_code=row.reason_code,
         value_seconds=row.value_seconds,
         participants=row.participants,

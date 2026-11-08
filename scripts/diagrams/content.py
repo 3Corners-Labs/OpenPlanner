@@ -634,7 +634,13 @@ LANES = (
         "versies met releasenotes; pull + cosign-controle door de host-updater",
     ),
     Lane(
-        ("Transaction", "UnitOfWork", "UsageStore", "UsageUnitOfWork", "ConfigurationTransfer"),
+        (
+            "Transaction",
+            "UnitOfWork",
+            "UsageStore",
+            "UsageUnitOfWork",
+            "ConfigurationTransfer",
+        ),
         Family.PLATFORM,
         "B13 B12",
         "Database",

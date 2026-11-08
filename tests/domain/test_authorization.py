@@ -84,6 +84,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.CLOSURE_MANAGE,
         Permission.ORGANISATION_CLOSURE,
         Permission.RETENTION_VIEW,
+        Permission.REPORTS_VIEW,  # ADR 0117
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.STAFF_MANAGE,  # ADR 0095
         Permission.STAFF_RESET_PASSWORD,  # ADR 0095
@@ -107,6 +108,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.BOOKINGS_MANAGE,  # ADR 0044: the team's own planner
         Permission.CLOSURE_MANAGE,
         Permission.STAFF_VIEW,  # ADR 0046: read-only, the own groups
+        Permission.REPORTS_VIEW,  # ADR 0117: how the own groups are used
         Permission.QUEUE_WORK,  # ADR 0043
     }
     # ADR 0043: the agent works the own queue of its groups and reads its own rights.
@@ -127,6 +129,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.ORGANISATION_VIEW,  # ADR 0047 step 3: the organisations' pages, read-only
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
+        Permission.REPORTS_VIEW,  # ADR 0117: counts only
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042: system status, read-only
         Permission.IDP_MAPPING_VIEW,  # ADR 0049
@@ -145,6 +148,7 @@ def test_the_auditor_never_holds_personal_data_or_a_change() -> None:
         Permission.ORGANISATION_VIEW,  # ADR 0047 step 3: the organisation's page, read-only
         Permission.GROUP_VIEW,
         Permission.RETENTION_VIEW,
+        Permission.REPORTS_VIEW,  # ADR 0117
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.SETTINGS_PLATFORM_VIEW,  # ADR 0042
         Permission.IDP_MAPPING_VIEW,  # ADR 0049

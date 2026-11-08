@@ -124,6 +124,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_EVENT_RETENTION_DAYS` | int | `35` | 7–90 | `settings.platform.manage` | Days a usage fact stays as the outbox of the rollup and the source for a rebuild (ADR 0117). |
 | `REPORTING_RETENTION_MONTHS` | int | `25` | 13–60 | `settings.platform.manage` | Months the hourly usage rollup is kept; 25 gives two full years and the running one (ADR 0117). |
 | `REPORTING_ROLLUP_INTERVAL_MINUTES` | int | `15` | 5–240 | `settings.platform.manage` | Minutes between two rollups of usage facts into the hourly table; System status warns when the rollup is four times this behind (ADR 0117). |
+| `REPORTING_MIN_CELL_SIZE` | int | `5` | 3–20 | `settings.platform.manage` | The smallest count a usage report shows; a smaller cell reads < n and its sum and mean are hidden. Never below 3 (ADR 0117 point 8). |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |
@@ -196,6 +197,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 
 | Variable | Kind | Default | Portal bounds | Permission | Note |
 |---|---|---|---|---|---|
+| `REPORTING_ORG_MIN_CELL_SIZE` | int | `3` | 3–50 | `settings.organisation.manage` | The smallest count the organisation's own usage reports show. It can only raise the platform value; the larger of the two applies (ADR 0117 point 8). |
 | `TIME_FORMAT` | enum | `24h` | 24h, 12h, locale | `settings.organisation.manage` | How clock times are written. |
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
 | `PRODUCT_FOOTER` | bool | `true` | — | `settings.organisation.manage` | "Appointments via OpenPlanner" with the product mark at the foot of the booking pages and in the HTML part of emails (ADR 0060 §6). |

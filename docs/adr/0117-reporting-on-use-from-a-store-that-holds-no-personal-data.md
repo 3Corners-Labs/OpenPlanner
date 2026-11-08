@@ -1,8 +1,8 @@
 # 0117. Reporting on use, from a store that holds no personal data
 
 Status: accepted (2026-11-06, PR #558), requested by the product owner (open point O16). Partly built:
-steps 1 (the domain), 2 (the store and the booking facts) and 4 (rollup, retention, backfill, lag)
-are merged; the rest is planned.
+steps 1 (the domain), 2 (the store and the booking facts), 4 (rollup, retention, backfill, lag) and 5
+(permission, navigation, query layer, the *Volume* screen) are merged; the rest is planned.
 Extends
 ADR 0102 (what remains after a purge; step 4 is its first statistics table), ADR 0014
 (authorisation), ADR 0023 (machine API), ADR 0047 (admin structure), ADR 0042 (settings) and
@@ -446,7 +446,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 2 | Migration (five tables, expand-only), `record_usage` on `Transaction`, settings and registry entries, facts for booking create, confirm, expire, cancel, move, outcome, suspend/resume | #597 | merged |
 | 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | | planned |
 | 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | #608 | merged |
-| 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | | planned |
+| 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | PR_NUMBER5 | merged |
 | 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | | planned |
 | 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | | planned |
 | 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | | planned |
@@ -511,6 +511,21 @@ the runbook names). Settings added: `reporting_event_retention_days` (C, 35, 7 t
 rollup lag is on *System status*; the dropped-fact count stays a log line. Not done, with reason: an
 `INSERT ... ON CONFLICT` upsert needs a unique index over expressions, which the model/migration drift test
 cannot hold; the read-then-write per cell inside a bounded batch is correct and bounded.
+
+**Step 5 notes (no change of a decision):** `reports.view` (level group) is in the matrix for the superuser,
+organisation admin, group admin and auditor; the other permissions of point 11 come with the steps that
+need them (export, team view, digest). *Reports* is the fourth entry of *Monitor* (`monitor.reports`), and
+*Usage* the last sub-tab under *Overview* of the organisation and of the group, as the ADR placed them. The
+organisation page adds up the groups of that organisation inside the reader's scope; the group page shows
+one group. `UsageStore` also carries the three report reads (groups in scope, hourly cells, the day counts
+from before reporting), every one filtered by the reader's `Scope` through `scope_filter`; a separate port
+would have had a single-method unit of work that the one-fake-per-port test cannot tell from any other. The
+*Volume* tables are bookings created per day, how bookings ended, lead time, cancellations by participants,
+reschedules, confirmation, closures and the bookings from before reporting; **completed and no show stay
+empty** (nothing records them) and U8 and U11 wait for step 3. The settings `reporting_min_cell_size` (C, 5,
+3 to 20) and `reporting_org_min_cell_size` (D, 3, 3 to 50; the larger of the two applies) are added. Not
+done here, with reason: hour cuts and the group-total rule belong to the screens that cut by hour and by
+subject (steps 6 and 7); the *Volume* screen has none.
 
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:

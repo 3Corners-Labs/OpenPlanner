@@ -577,7 +577,7 @@ Every state change of a booking writes one small fact in the transaction that ma
 
     booking placed / confirmed / cancelled / moved / lapsed / suspended / resumed
        ─► UsageFact (hour, organisation, group, kind, codes) ─► usage_events    (this step)
-       ─► worker rollup ─► usage_hour ─► reports                                 (steps 4 and 5)
+       ─► worker rollup ─► usage_hour ─► reports                                 (steps 4 and 5; the report pages read counts only, filtered by the reader's scope, and show no booking or person)
 
 From step 4 the worker adds the facts to `usage_hour` (cells per hour, group, metric and cut, with the
 watermark moved in the same transaction), deletes facts past their term and hourly rows past theirs, and
