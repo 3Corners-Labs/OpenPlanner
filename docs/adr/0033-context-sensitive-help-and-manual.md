@@ -1,8 +1,6 @@
 # 0033. Context-sensitive help from one manual
 
-Status: accepted (2026-10-27), requested by the product owner. Built (checked 2026-11-08): every
-admin page route has a manual topic in `nl` and `en` (39 topics), `NOT_YET_DOCUMENTED` is empty,
-and the (i) disclosures run on the screens whose fields are marked; see `docs/adr-status.md`.
+Status: accepted (2026-10-27), requested by the product owner. Built (checked 2026-11-08): every admin page route has a manual topic in `nl` and `en` (39 topics, `NOT_YET_DOCUMENTED` empty since #613); see `docs/adr-status.md`.
 
 ## Context
 
@@ -62,11 +60,3 @@ help has to be on the page itself, never a link to GitHub.
   organisation needs its own wording, that becomes a new decision.
 - Only the group settings screen is documented at first. The rest is listed in
   `NOT_YET_DOCUMENTED` and documented screen by screen.
-
-## Build status
-
-| Step | What | PR | State |
-|---|---|---|---|
-| 1 | Manual module, help pages, (i) disclosures, the topic test with `NOT_YET_DOCUMENTED`; group settings documented | #43 | merged |
-| 2 | Topics screen by screen as screens were built | many | merged |
-| 3 | The last five routes: *Overview of a group* (new), *Emergency closure of an organisation* (new), new group under *Groups*, the booking detail under *Agenda*, moving a booking on hold under *Emergency closure of a team*; `NOT_YET_DOCUMENTED` empty | #613 | merged |
