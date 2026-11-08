@@ -9,7 +9,7 @@ from app.admin.routes import PUBLIC_ADMIN_PATHS
 from app.config import Settings
 from app.main import create_app
 from app.web.help import topic_for_path
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SUPER, Site
+from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
 from tests.support.routes import all_routes
 
 SETTINGS = "/admin/groups/demo/settings"
@@ -63,6 +63,16 @@ async def test_a_page_with_a_topic_links_to_it(site: Site) -> None:
 
     assert 'href="/admin/help/group-settings"' in settings_page
     assert 'class="page-help"' not in dashboard
+
+
+async def test_a_refusal_in_the_portal_links_no_topic_of_the_page_it_refused(site: Site) -> None:
+    """A message page (refused, not found) passes ``help_link=False``: the manual, no topic."""
+    await site.login_as(OUTSIDER)
+
+    refused = await site.client.get(SETTINGS)
+
+    assert refused.status_code == 403
+    assert 'href="/admin/help/group-settings"' not in refused.text
 
 
 async def test_help_page_renders_the_manual_in_the_admin_language(site: Site) -> None:
