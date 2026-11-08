@@ -21,19 +21,20 @@ FORM_KIND = ContactCenterKind.WEBEX_CC
 organisation's connection kind here, CC-6)."""
 _DESCRIPTOR = DESCRIPTORS[FORM_KIND]
 
-ROUTING_ATTRIBUTE_FIELDS: Mapping[str, str] = {
-    f"wxcc_{spec.name}": spec.name for spec in _DESCRIPTOR.attributes
-}
+_ATTRIBUTE_INPUTS = tuple((f"wxcc_{spec.name}", spec) for spec in _DESCRIPTOR.attributes)
+"""Each attribute's input name with its specification: the one place the input names are made."""
+
+ROUTING_ATTRIBUTE_FIELDS: Mapping[str, str] = {name: spec.name for name, spec in _ATTRIBUTE_INPUTS}
 """Input name → routing attribute it fills."""
 ROUTING_VALUE_FIELD = "wxcc_routing_value"
 """The input of the routing value."""
 ROUTING_LABELS: Mapping[str, str] = {
-    **{f"wxcc_{spec.name}": spec.label_key for spec in _DESCRIPTOR.attributes},
+    **{name: spec.label_key for name, spec in _ATTRIBUTE_INPUTS},
     ROUTING_VALUE_FIELD: _DESCRIPTOR.routing_value_label_key,
 }
 """Input name → i18n key of its label."""
 ROUTING_HINTS: Mapping[str, str | None] = {
-    **{f"wxcc_{spec.name}": spec.hint_key for spec in _DESCRIPTOR.attributes},
+    **{name: spec.hint_key for name, spec in _ATTRIBUTE_INPUTS},
     ROUTING_VALUE_FIELD: _DESCRIPTOR.routing_value_hint_key,
 }
 """Input name → i18n key of its hint, if any."""

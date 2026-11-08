@@ -6,6 +6,7 @@ from datetime import timedelta
 import pytest
 
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.wxcc import DESCRIPTOR
 from app.domain.authorization import Scope
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.support.admin_site import audit_events
@@ -60,6 +61,20 @@ async def test_time_zone_is_a_select_with_amsterdam_preselected(site: Site) -> N
     assert '<option value="America/New_York">America/New York</option>' in form
     assert 'value="Etc/GMT+1"' not in form  # fixed offsets ignore summer time
     assert form.index("Europe/Amsterdam") < form.index("Africa/Abidjan")
+
+
+async def test_the_contact_center_inputs_follow_the_descriptor(site: Site) -> None:
+    """ADR 0032 CC-4c: the inputs, their order, labels and hint come from the descriptor."""
+    await site.login_as(ORG_ADMIN)
+
+    form = (await site.client.get(f"{GROUP}/settings")).text.split('<main id="content"', 1)[1]
+
+    names = [*(f"wxcc_{spec.name}" for spec in DESCRIPTOR.attributes), "wxcc_routing_value"]
+    places = [form.index(f'name="{name}"') for name in names]
+    assert places == sorted(places)
+    for label in ("WxCC business address", "WxCC work item-kanaal", "Routeringswaarde voor de"):
+        assert label in form
+    assert 'id="wxcc_routing_value-hint"' in form
 
 
 async def test_settings_preselect_the_group_time_zone(site: Site) -> None:

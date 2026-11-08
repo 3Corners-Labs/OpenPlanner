@@ -4,16 +4,15 @@ Status: accepted for the organisation connection (2026-11-08, the product owner:
 per organisatie is inderdaad wat moet kunnen"; see *Amendment: the organisation connection*);
 proposed (2026-10-25) for the rest until CC-0 names the next platform. Renumbered from 0021 on
 2026-10-27: two ADRs were given number 0021 in parallel; ADR 0021 is "Ending the work item of a
-cancelled booking". Extends ADR 0007 and ADR 0018; it replaces their per-group mapping (ADR
-0018 point 1) with the model below. Partly built: steps CC-1 and CC-2 (domain, schema, port and
-registry), CC-3 (webhook route per kind), CC-4a (the organisation's connection), CC-4b
-(dispatch through it), CC-4c (the group form from the descriptor), CC-4d (registering its webhook address) and CC-5
-(docs)
-are merged, see *Build status* and `docs/adr-status.md`.
-Note (2026-11-01 review): point 8 (first name and host join URL only) contradicts point 5 and
-ADR 0018 §2, whose payload is what is sent (`app/adapters/wxcc.py`: booking reference, first
-name, start label, group name, meeting link, kind). Point 8 amended by ADR 0081 §6. ADR 0043
-was built without this ADR. ADR 0028 cites this ADR as ADR 0021 (its number before renumbering).
+cancelled booking". Extends ADR 0007 and ADR 0018; it replaces their per-group mapping (ADR 0018
+point 1) with the model below. Partly built: steps CC-1 and CC-2 (domain, schema, port and
+registry), CC-3 (webhook route per kind), CC-4a (the organisation's connection), CC-4b (dispatch
+through it), CC-4c (the group form from the descriptor), CC-4d (registering its webhook address)
+and CC-5 (docs) are merged, see *Build status* and `docs/adr-status.md`. Note (2026-11-01
+review): point 8 (first name and host join URL only) contradicts point 5 and ADR 0018 §2, whose
+payload is what is sent (`app/adapters/wxcc.py`: booking reference, first name, start label,
+group name, meeting link, kind). Point 8 amended by ADR 0081 §6. ADR 0043 was built without this
+ADR. ADR 0028 cites this ADR as ADR 0021 (its number before renumbering).
 
 ## Context
 

@@ -10629,6 +10629,3 @@ msgstr "Opgeslagen. Het webhookadres wordt aangemeld zodra het clientgeheim en h
 
 msgid "admin.done.contact_center_not_registered"
 msgstr "Opgeslagen, maar het contactcenter weigerde het webhookadres of was niet bereikbaar. Controleer de rechten van de Service App en maak daarna een nieuw webhookgeheim; dat meldt het adres opnieuw aan."
-
-msgid "admin.field.routing_value"
-msgstr "Routeringswaarde"

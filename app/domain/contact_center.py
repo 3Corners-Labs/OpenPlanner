@@ -109,7 +109,7 @@ class ProviderDescriptor:
     label_key: str
     attributes: tuple[AttributeSpec, ...]
     routing_value_max_length: int
-    routing_value_label_key: str = "admin.field.routing_value"
+    routing_value_label_key: str
     routing_value_hint_key: str | None = None
 
     def __post_init__(self) -> None:

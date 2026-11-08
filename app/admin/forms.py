@@ -20,7 +20,7 @@ from starlette.responses import RedirectResponse
 
 from app.admin.authz import AccessDenied
 from app.admin.connection_inputs import CONNECTION_MESSAGES, CONNECTION_TARGETS
-from app.admin.routing_inputs import ROUTING_MESSAGE, ROUTING_TARGETS
+from app.admin.routing_inputs import ROUTING_FIELDS, ROUTING_MESSAGE, ROUTING_TARGETS
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.theme import TOKENS, TokenKind
 from app.i18n import BoundGettext
@@ -173,9 +173,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "fallback_space_room_id": "admin.form.error.fallback_space_room_id",
     "phone_mode": "admin.form.error.phone_mode",
     "video_host_email": "admin.form.error.video_host_email",
-    "wxcc_business_address": "admin.form.error.integration_text",
-    "wxcc_channel": "admin.form.error.integration_text",
-    "wxcc_routing_value": "admin.form.error.integration_text",
+    **dict.fromkeys(ROUTING_FIELDS, ROUTING_MESSAGE),
     # ADR 0032: the routing's own refusals, linked to the settings form's inputs (FIELD_TARGET).
     **dict.fromkeys(ROUTING_TARGETS, ROUTING_MESSAGE),
     **CONNECTION_MESSAGES,

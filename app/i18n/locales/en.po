@@ -10616,6 +10616,3 @@ msgstr "Saved. The webhook address is registered once the client secret and the 
 
 msgid "admin.done.contact_center_not_registered"
 msgstr "Saved, but the contact center refused the webhook address or could not be reached. Check the Service App's rights, then make a new webhook secret; that registers the address again."
-
-msgid "admin.field.routing_value"
-msgstr "Routing value"
