@@ -290,11 +290,17 @@ def apply_polled(status: CallStatus, polled: MeetingStatus, at: datetime) -> Cal
     is lost. A meeting that has ended stays ended, and a host who joined once stays joined.
     """
     ended = polled.state is CallState.ENDED
+    participants = 0 if ended else polled.participants
+    host_joined = status.host_joined or polled.host_joined
+    lobby_since = None
+    if participants > 0 and not host_joined:
+        lobby_since = status.lobby_since or at
     return replace(
         status,
         call=CallState.ENDED if status.call is CallState.ENDED else polled.state,
-        participants=0 if ended else polled.participants,
-        host_joined=status.host_joined or polled.host_joined,
+        participants=participants,
+        host_joined=host_joined,
+        lobby_since=lobby_since if participants > 0 else None,
         host_joined_at=status.host_joined_at or (at if polled.host_joined else None),
         started_at=status.started_at or polled.started_at,
         ended_at=status.ended_at or polled.ended_at or (at if ended else None),

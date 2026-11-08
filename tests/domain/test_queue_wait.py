@@ -177,3 +177,18 @@ async def test_a_claimed_booking_or_a_contact_center_group_is_never_reported(
 
     assert await watch.check() == 0
     assert _unpicked(state) == []
+
+
+async def test_an_agent_who_joined_without_claiming_is_not_reported_nor_counted(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """The event, the queue chip and the overview count follow one rule (quality review)."""
+    booking_id = await _waiting(uow, clock)
+    status = uow.state.call_status[booking_id]
+    uow.state.call_status[booking_id] = replace(status, host_joined=True)
+    watch = NotPickedUpWatch(uow, clock, SystemLog(uow, clock))
+
+    clock.advance(timedelta(minutes=30))
+
+    assert await watch.check() == 0
+    assert _unpicked(uow) == []

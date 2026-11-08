@@ -39,8 +39,6 @@ from app.domain.own_queue import (
     QueueEntry,
     VideoState,
     next_up,
-    not_claimed_in_time,
-    not_picked_up,
     participant_state,
     summarise,
     video_state,
@@ -182,7 +180,7 @@ class QueueService:
         nxt = next_up(entries)
         return QueueView(
             group,
-            [_row(e, me, not_claimed_in_time(e, now, limit)) for e in entries],
+            [_row(e, me, e.not_picked_up(now, limit)) for e in entries],
             nxt.booking.id if nxt else None,
             group.queue_free_pick_allowed,
             _supervises(principal, summary),
@@ -223,7 +221,7 @@ class QueueService:
                         queue.waiting,
                         queue.longest_wait,
                         available,
-                        not_picked_up(entries, now, limit),
+                        sum(1 for e in entries if e.not_picked_up(now, limit)),
                     )
                 )
         return sorted(rows, key=lambda r: (-r.waiting, -r.longest_wait, r.summary.group.name))

@@ -92,22 +92,46 @@ class SystemLog:
             message: The provider's own reason for a failure (ADR 0065), if it gave one.
         """
         async with self._uow.locked() as tx:
-            organisation, group = await _level(tx, booking_id, group_slug)
-            await tx.add_audit_event(
-                AuditEvent(
-                    self._clock.now(),
-                    SYSTEM_ACTOR,
-                    action,
-                    outcome,
-                    reason,
-                    organisation,
-                    group,
-                    detail,
-                    Source.SYSTEM,
-                    booking_id,
-                    message=message,
-                )
+            await self.record_in(
+                tx,
+                action,
+                outcome,
+                booking_id=booking_id,
+                group_slug=group_slug,
+                reason=reason,
+                detail=detail,
+                message=message,
             )
+
+    async def record_in(
+        self,
+        tx: Transaction,
+        action: str,
+        outcome: Outcome,
+        *,
+        booking_id: int | None = None,
+        group_slug: str | None = None,
+        reason: str = "",
+        detail: str = "",
+        message: str = "",
+    ) -> None:
+        """Write one system event inside ``tx``, with the change it reports (as ``record``)."""
+        organisation, group = await _level(tx, booking_id, group_slug)
+        await tx.add_audit_event(
+            AuditEvent(
+                self._clock.now(),
+                SYSTEM_ACTOR,
+                action,
+                outcome,
+                reason,
+                organisation,
+                group,
+                detail,
+                Source.SYSTEM,
+                booking_id,
+                message=message,
+            )
+        )
 
     async def bind_level(self, booking_id: int | None) -> None:
         """Tag the current trace with the organisation and group of ``booking_id`` (ADR 0040)."""

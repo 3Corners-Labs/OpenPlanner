@@ -44,8 +44,6 @@ __all__ = [
     "VideoState",
     "participant_state",
     "next_up",
-    "not_claimed_in_time",
-    "not_picked_up",
     "summarise",
     "video_state",
     "visible",
@@ -133,6 +131,16 @@ class QueueEntry:
             return False
         return self.in_lobby or (self.is_direct and self.status.call is not CallState.ENDED)
 
+    def not_picked_up(self, now: datetime, limit: timedelta) -> bool:
+        """Whether nobody took the booking within ``limit`` after its start (ADR 0043 point 8).
+
+        Taken means claimed, or an agent joined the meeting without claiming it. The one rule
+        behind the queue's chip, the overview's count and the ``queue.not_picked_up`` event.
+        """
+        if self.claimed or self.status.host_joined:
+            return False
+        return now - self.booking.start > limit
+
     @property
     def waiting_since(self) -> datetime:
         """When the participant started waiting.
@@ -201,16 +209,11 @@ def next_up(entries: Iterable[QueueEntry]) -> QueueEntry | None:
 
 
 def _pick_order(entry: QueueEntry) -> tuple[bool, datetime, datetime, int]:
-    """Order for "pick up next": in the lobby first, the longest waiting first, then by start."""
-    since = entry.waiting_since if entry.in_lobby else entry.booking.start
+    """Order for "pick up next": in the lobby first, the longest waiting first, then by start.
+
+    The wait counts from the start at the earliest, so joining early never moves a participant
+    ahead of an earlier appointment; the overview still shows the whole wait.
+    """
+    start = entry.booking.start
+    since = max(entry.waiting_since, start) if entry.in_lobby else start
     return (not entry.in_lobby, since, entry.booking.start, entry.booking.id or 0)
-
-
-def not_claimed_in_time(entry: QueueEntry, now: datetime, limit: timedelta) -> bool:
-    """Return whether nobody claimed ``entry`` within ``limit`` after its start."""
-    return not entry.claimed and now - entry.booking.start > limit
-
-
-def not_picked_up(entries: Iterable[QueueEntry], now: datetime, limit: timedelta) -> int:
-    """Return how many entries nobody claimed within ``limit`` after their start (ADR 0043 §8)."""
-    return sum(1 for e in entries if not_claimed_in_time(e, now, limit))

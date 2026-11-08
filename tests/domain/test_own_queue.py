@@ -13,8 +13,6 @@ from app.domain.own_queue import (
     QueueSummary,
     VideoState,
     next_up,
-    not_claimed_in_time,
-    not_picked_up,
     participant_state,
     summarise,
     video_state,
@@ -93,10 +91,19 @@ def test_next_in_the_lobby_is_the_one_who_joined_first_not_the_earliest_start() 
     assert nxt.waiting_since == NOW - timedelta(minutes=6)
 
 
-def test_a_booking_counts_as_not_picked_up_after_its_limit() -> None:
-    entries = [entry(1, -11), entry(2, -10), entry(3, -30, claimed=True)]
+def test_joining_early_does_not_move_ahead_of_an_earlier_appointment() -> None:
+    """Security review: the lobby wait counts from the start at the earliest."""
+    early_start = entry(1, -5, lobby=True)
+    early_join = entry(2, 25, lobby=True)
+    early_start = replace(
+        early_start, status=replace(early_start.status, lobby_since=NOW - timedelta(minutes=1))
+    )
+    early_join = replace(
+        early_join, status=replace(early_join.status, lobby_since=NOW - timedelta(minutes=4))
+    )
 
-    assert not_picked_up(entries, NOW, timedelta(minutes=10)) == 1
+    assert (nxt := next_up([early_join, early_start])) is not None
+    assert nxt.booking.id == 1
 
 
 def test_next_is_the_earliest_start_when_nobody_waits() -> None:
@@ -119,9 +126,12 @@ def test_a_host_in_the_meeting_is_not_a_waiting_participant() -> None:
 def test_not_claimed_in_time_after_the_groups_limit() -> None:
     limit = timedelta(minutes=10)
 
-    assert not_claimed_in_time(entry(1, -11), NOW, limit)
-    assert not not_claimed_in_time(entry(2, -10), NOW, limit)
-    assert not not_claimed_in_time(entry(3, -11, claimed=True), NOW, limit)
+    assert entry(1, -11).not_picked_up(NOW, limit)
+    assert not entry(2, -10).not_picked_up(NOW, limit)
+    assert not entry(3, -11, claimed=True).not_picked_up(NOW, limit)
+    joined = entry(4, -11)
+    joined = replace(joined, status=replace(joined.status, host_joined=True))
+    assert not joined.not_picked_up(NOW, limit)  # an agent joined without claiming
 
 
 def test_direct_calls_are_marked() -> None:
