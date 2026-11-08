@@ -2167,7 +2167,13 @@ account): keep it with the host, or let Caddy obtain a certificate again.
 ## Configuration document (ADR 0099)
 
 The readable successor of the package below: a JSON file (`docs/configuration-document.md`) that
-works across versions and on an installation in use. On the host:
+works across versions and on an installation in use. The superuser exports, plans and applies
+one on *Advanced settings › Configuration package*, an organisation admin the organisation's own
+on *Overview › Configuration*; every step needs a recent login, and the plan page shows what
+changes before **Apply plan** writes it. An uploaded document is kept in the memory of the web
+process for `CONFIGURATION_REVIEW_MINUTES` (30 by default) between its plan and its apply; a
+restart of the web container loses it and the plan is shown again from a new upload. On the
+host:
 
 ```bash
 python -m app.cli config export --format json --passphrase-file pass.txt config.json

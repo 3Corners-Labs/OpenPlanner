@@ -216,6 +216,35 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/package/import": {
         "/admin/settings/package/import": statuses(422, 403, 403, 403, 403, 403, 403),
     },
+    # ADR 0099: the configuration document. The platform's is the superuser's, the
+    # organisation's its admin's (and the superuser's). An export without secrets succeeds, an
+    # empty upload has no document (422) and an apply without a reviewed plan is stale (409).
+    "POST /admin/settings/configuration/export": {
+        "/admin/settings/configuration/export": statuses(200, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/configuration/plan": {
+        "/admin/settings/configuration/plan": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/configuration/apply": {
+        "/admin/settings/configuration/apply": statuses(409, 403, 403, 403, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/configuration": {
+        "/admin/organisations/demo/configuration": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/configuration": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/configuration/export": {
+        "/admin/organisations/demo/configuration/export": statuses(
+            200, 200, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/configuration/plan": {
+        "/admin/organisations/demo/configuration/plan": statuses(422, 422, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/configuration/apply": {
+        "/admin/organisations/demo/configuration/apply": statuses(
+            409, 409, 403, 403, 403, 403, 403
+        ),
+    },
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
     "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
     # ADR 0049 point 17: the mapping page is an input for the access review (organisation

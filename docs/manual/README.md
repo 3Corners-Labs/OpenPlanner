@@ -39,6 +39,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Data fields and personal data / gegevensvelden en persoonsgegevens | [Gegevensvelden en persoonsgegevens](nl/data-fields.md) | [Data fields and personal data](en/data-fields.md) |
 | Organisation settings / organisatie-instellingen | [Organisatie-instellingen](nl/organisation-settings.md) | [Organisation settings](en/organisation-settings.md) |
 | Texts for participants / teksten voor deelnemers | [Teksten voor deelnemers](nl/organisation-texts.md) | [Texts for participants](en/organisation-texts.md) |
+| Configuration: an organisation as a JSON document / configuratie (ADR 0099) | [Configuratie: de organisatie als JSON-document](nl/organisation-configuration.md) | [Configuration: the organisation as a JSON document](en/organisation-configuration.md) |
 | Login: identity providers of an organisation / inloggen (ADR 0083) | [Inloggen: identity providers](nl/organisation-login.md) | [Login: identity providers](en/organisation-login.md) |
 | Log destinations / logbestemmingen (ADR 0085) | [Logbestemmingen](nl/logging.md) | [Log destinations](en/logging.md) |
 | Platform integrations / integraties van het platform | [Integraties](nl/integrations.md) | [Integrations](en/integrations.md) |

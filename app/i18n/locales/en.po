@@ -8814,6 +8814,9 @@ msgstr "Largest configuration package (MB)"
 msgid "settings.field.configuration_apply_max_changes.label"
 msgstr "Most changes in one configuration document"
 
+msgid "settings.field.configuration_review_minutes.label"
+msgstr "Minutes an uploaded configuration document is kept after its plan"
+
 msgid "admin.done.package_imported"
 msgstr "The configuration package has been imported: {count} organisation(s). The processes pick up the new settings within ten seconds."
 
@@ -11064,6 +11067,96 @@ msgstr "Followed the link, of those made"
 
 msgid "reports.channels.trial.entered_share"
 msgstr "Entered the meeting, of those who followed the link"
+
+msgid "admin.tab.configuration"
+msgstr "Configuration"
+
+msgid "admin.done.configuration_applied"
+msgstr "The configuration document was applied: {count} change(s). The processes pick up the new settings within ten seconds."
+
+msgid "admin.configuration.title"
+msgstr "Configuration document"
+
+msgid "admin.configuration.intro_platform"
+msgstr "Export the configuration of the platform and all organisations as a JSON file, or read a file in. You see what changes first; only then is it applied."
+
+msgid "admin.configuration.intro_organisation"
+msgstr "Export this organisation's configuration as a JSON file, or read a file in. You see what changes first; only then is it applied."
+
+msgid "admin.configuration.export.title"
+msgstr "Export"
+
+msgid "admin.configuration.export.secrets"
+msgstr "Include secrets, sealed with a passphrase"
+
+msgid "admin.configuration.export.secrets_hint"
+msgstr "Without secrets the file needs no passphrase. With secrets the passphrase is at least {length} characters; keep it safe, it cannot be recovered."
+
+msgid "admin.configuration.export.button"
+msgstr "Export document"
+
+msgid "admin.configuration.upload.title"
+msgstr "Upload and plan"
+
+msgid "admin.configuration.upload.intro"
+msgstr "Choose a configuration document (JSON, at most {max_mb} MB). You get a plan to read; nothing changes yet."
+
+msgid "admin.configuration.upload.file"
+msgstr "Configuration document"
+
+msgid "admin.configuration.upload.passphrase"
+msgstr "Document passphrase (only for sealed secrets)"
+
+msgid "admin.configuration.upload.button"
+msgstr "Show plan"
+
+msgid "admin.configuration.plan.title"
+msgstr "Plan"
+
+msgid "admin.configuration.plan.summary"
+msgstr "This document changes {count} object(s):"
+
+msgid "admin.configuration.plan.refused"
+msgstr "The document cannot be applied: {count} reason(s)."
+
+msgid "admin.configuration.plan.action"
+msgstr "Action"
+
+msgid "admin.configuration.plan.kind"
+msgstr "Kind"
+
+msgid "admin.configuration.plan.path"
+msgstr "Place in the document"
+
+msgid "admin.configuration.plan.fields"
+msgstr "Fields"
+
+msgid "admin.configuration.plan.nothing"
+msgstr "The document changes nothing: the configuration already is as described."
+
+msgid "admin.configuration.plan.apply"
+msgstr "Apply plan"
+
+msgid "admin.configuration.plan.back"
+msgstr "Back to the configuration"
+
+msgid "admin.configuration.action.create"
+msgstr "Create"
+
+msgid "admin.configuration.action.update"
+msgstr "Update"
+
+msgid "admin.configuration.action.delete"
+msgstr "Delete"
+
+msgid "admin.configuration.warning.deletes"
+msgstr "Note: this plan deletes {count} object(s). That cannot be undone."
+
+msgid "admin.configuration.warning.claims"
+msgstr "Note: this plan changes a claim value (the key of an organisation or group, or a role's claim value). People who match the old value lose access until the identity provider sends the new value."
+
+msgid "admin.configuration.warning.webex"
+msgstr "Note: this plan replaces the tokens of the Webex Service App. The installation the document came from can no longer connect."
 
 msgid "details.title"
 msgstr "Change your details"

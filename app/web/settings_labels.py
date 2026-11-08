@@ -74,6 +74,7 @@ SETTING_LABELS: dict[str, str] = {
     "max_font_unpacked_bytes": "settings.field.max_font_unpacked_bytes.label",
     "configuration_package_max_mb": "settings.field.configuration_package_max_mb.label",
     "configuration_apply_max_changes": "settings.field.configuration_apply_max_changes.label",
+    "configuration_review_minutes": "settings.field.configuration_review_minutes.label",
     "embedding_max_origins": "settings.field.embedding_max_origins.label",
     "storage_low_free_percent": "settings.field.storage_low_free_percent.label",
     "storage_critical_free_percent": "settings.field.storage_critical_free_percent.label",
