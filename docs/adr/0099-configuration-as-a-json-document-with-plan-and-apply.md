@@ -202,6 +202,40 @@ completes the numbered point it names.
   `log_level`, none (it is temporary by design). A setting the environment locks cannot be
   changed by a document either (`setting_locked`).
 
+- **Claim values.** The claim mapping is not changed by a document, but an organisation's or
+  group's `idp_key` and a custom role's `claim_value` are: they decide who matches an
+  entitlement. The plan screen (step 3) shows, as the portal does, how many people lose access
+  until the identity provider sends the new value.
+- **Personal data in a document.** A document holds no participant data, but it does hold
+  business addresses (a group's video host and invitation address, alert targets, contact
+  blocks). An alert target's address is its natural key, so the audit detail of an applied
+  change (point 12) names such a target by kind and ordinal, never by address.
+- **The plan hash** covers the document, the settings version *and* the list of changes
+  (action, kind, address, field names), because a change to a group or an organisation does not
+  move the settings version: an apply whose recomputed plan differs from the reviewed one is
+  refused (`configuration_plan_stale`).
+- **Dropped from the portal's behaviour.** A document deletes groups and organisations the
+  portal only archives or refuses; the in-use rule (any booking row, slot, closure, shortfall
+  acceptance or API-client reference) is what keeps data safe, so the adapter must define "in
+  use" exactly as the group eraser does. A deleted group's slug is released.
+
+## Requirements for steps 2 to 4 (from the step 1 review)
+
+- Step 2 builds `RuleContext` and `Usage` from the real installation and tests that it does;
+  none of their defaults may stand in for a missing fact. It caps the decoded size, refuses
+  duplicate keys, NaN and infinity, and deep nesting; it pins the scrypt parameters and does not
+  take them from the document's `seal` header; it binds each sealed value to its object and
+  field; it fetches discovery documents through the SSRF guard, outside the write lock, and
+  reads the plan inputs again after taking the lock.
+- Steps 3 and 4 pin a document's scope to the route's scope (platform route: platform; an
+  organisation route: that organisation; the agent API as ADR 0089 point 7) and require a recent
+  login wherever the portal does for the changed kind (a `fresh` attribute on the kind, checked
+  against the portal's routes by a test), not only for deletions and secrets.
+- Export leaves out what the actor may not view; the registry gains a view permission per kind
+  when step 2 builds the export.
+- Webex service-app tokens rotate: applying them on a second installation invalidates the
+  first's copy, so the export says so and the plan shows it.
+
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
