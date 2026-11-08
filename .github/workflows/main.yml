@@ -180,6 +180,8 @@ jobs:
       - id: where
         name: release tag on main or its own line, and matches pyproject.toml
         run: |
+          # pipefail: a refused tag must fail this step through `| tee` (bash -e alone does not).
+          set -euo pipefail
           case "$GITHUB_REF_NAME" in
             *-rc.*) echo "::error::$GITHUB_REF_NAME: release candidates are made by CI (ADR 0059)"; exit 1 ;;
           esac
