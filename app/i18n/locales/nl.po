@@ -1088,7 +1088,7 @@ msgid "admin.field.slug"
 msgstr "Webadres"
 
 msgid "admin.field.slug_hint"
-msgstr "Wordt /g/<webadres>. Leeg laten maakt het uit de naam; hoofdletters, spaties en accenten worden omgezet, bijvoorbeeld Vergunningen Loket → vergunningen-loket."
+msgstr "Wordt /g/<webadres>. Leeg laten maakt het uit de naam; hoofdletters, spaties en accenten worden omgezet, bijvoorbeeld Klantenservice Noord → klantenservice-noord."
 
 msgid "admin.field.slug_fixed"
 msgstr "Het webadres verandert niet, zodat links op websites blijven werken."
@@ -1292,7 +1292,7 @@ msgid "admin.form.error.planner_change_min_lead_minutes"
 msgstr "Vul een aantal minuten in van het doorzetten naar de wachtrij tot 1440."
 
 msgid "admin.form.error.planner_too_late"
-msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Bel de deelnemer."
+msgstr "Deze afspraak begint binnenkort of is al naar het contactcenter. Neem zelf contact op met de deelnemer: kies bij de afspraak Details en dan Contactgegevens tonen."
 
 msgid "admin.form.error.booking_limit_reached"
 msgstr "Dit e-mailadres heeft al een afspraak in dat tijdslot, of al het maximum aantal afspraken bij dit team (zie Afspraken per e-mailadres in de instellingen). Kies een ander tijdslot."
@@ -6474,7 +6474,7 @@ msgid "admin.form_fields.title"
 msgstr "Boekingsformulier"
 
 msgid "admin.form_fields.lead"
-msgstr "Extra vragen die inwoners beantwoorden als ze een afspraak maken. Vraag alleen wat het team echt nodig heeft."
+msgstr "Extra vragen die deelnemers beantwoorden als ze een afspraak maken. Vraag alleen wat het team echt nodig heeft."
 
 msgid "admin.form_fields.settings_lead"
 msgstr "Extra vragen op het formulier, met controles en een markering voor persoonsgegevens."
@@ -6606,7 +6606,7 @@ msgid "admin.form_fields.options"
 msgstr "Keuzes"
 
 msgid "admin.form_fields.options_hint"
-msgstr "Alleen bij een keuzelijst. Eén keuze per regel: sleutel; Nederlands; Engels. Bijvoorbeeld: huur; Huurtoeslag; Rent benefit"
+msgstr "Alleen bij een keuzelijst. Eén keuze per regel: sleutel; Nederlands; Engels. Bijvoorbeeld: algemeen; Algemene vraag; General question"
 
 msgid "admin.form_fields.minimum"
 msgstr "Ondergrens"
@@ -6697,6 +6697,36 @@ msgstr "Antwoorden op het formulier"
 
 msgid "admin.booking.answers_lead"
 msgstr "Persoonsgegevens; ze worden gewist met de rest van de afspraak."
+
+msgid "admin.booking.contact"
+msgstr "Contactgegevens"
+
+msgid "admin.booking.contact_lead"
+msgstr "Toon ze alleen als u de deelnemer moet bereiken. Het auditlog legt elke keer vast wie ze bekeek."
+
+msgid "admin.booking.contact_shown"
+msgstr "Het auditlog heeft vastgelegd dat u ze bekeek. Verberg ze voordat u een schermafdruk maakt."
+
+msgid "admin.booking.contact_show"
+msgstr "Contactgegevens tonen"
+
+msgid "admin.booking.contact_hide"
+msgstr "Contactgegevens verbergen"
+
+msgid "admin.booking.contact_name"
+msgstr "Naam"
+
+msgid "admin.booking.contact_email"
+msgstr "E-mailadres"
+
+msgid "admin.booking.contact_phone"
+msgstr "Telefoonnummer"
+
+msgid "admin.booking.contact_no_phone"
+msgstr "Niet opgegeven"
+
+msgid "admin.booking.contact_deleted"
+msgstr "De persoonsgegevens van deze afspraak zijn verwijderd."
 
 msgid "admin.settings.secret_hint"
 msgstr "Leeg laten houdt de huidige waarde; die wordt nooit getoond."
@@ -8831,7 +8861,7 @@ msgid "settings.field.configuration_review_minutes.label"
 msgstr "Minuten dat een geüpload configuratiedocument bewaard blijft na het plan"
 
 msgid "admin.done.package_imported"
-msgstr "Het configuratiepakket is geïmporteerd: {count} organisatie(s). De processen nemen de nieuwe instellingen binnen tien seconden over."
+msgstr "Het configuratiepakket is als document toegepast: {count} organisatie(s). De processen nemen de nieuwe instellingen binnen tien seconden over."
 
 msgid "admin.form.error.configuration_passphrase_short"
 msgstr "De wachtwoordzin is te kort, of de herhaling verschilt. Gebruik minstens 16 tekens."
@@ -8847,9 +8877,6 @@ msgstr "Dit pakket is gemaakt met een andere versie van OpenPlanner. Exporteer h
 
 msgid "admin.form.error.configuration_package_too_large"
 msgstr "Het pakket is groter dan de maximale grootte van een configuratiepakket."
-
-msgid "admin.form.error.configuration_installation_in_use"
-msgstr "Deze installatie is in gebruik: er zijn afspraken, tijdsloten of een actieve sluiting. Een pakket kan alleen in een nieuwe installatie worden geïmporteerd."
 
 msgid "admin.form.error.configuration_format_unsupported"
 msgstr "Dit configuratiedocument heeft een formaat dat deze versie van OpenPlanner niet kent."
@@ -8885,19 +8912,13 @@ msgid "admin.form.error.configuration_capacity_below_booked"
 msgstr "De capaciteit is lager dan het aantal plaatsen dat al is geboekt."
 
 msgid "admin.settings.package.title"
-msgstr "Configuratiepakket"
+msgstr "SQLite-pakket (oud formaat)"
 
 msgid "admin.settings.package.intro"
-msgstr "Een configuratiepakket bevat alle instellingen van deze installatie: organisaties, teams, openingstijden, teksten, kanalen, identity providers, API-clients en platforminstellingen, met hun geheimen. Afspraken, het auditlog en medewerkers gaan niet mee. Zo zet u een nieuwe installatie (test of productie) in één keer op."
+msgstr "Een SQLite-pakket uit een eerdere versie wordt nog één release gelezen. Het wordt omgezet in een document dat de configuratie van het platform vervangt en dan net als elk document gepland en toegepast, met uw rechten per wijziging; wat in gebruik is (afspraken, tijdsloten, API-toegang) wordt nooit verwijderd. Nieuwe pakketten worden niet meer gemaakt: exporteer hierboven een document."
 
 msgid "admin.settings.package.warning"
-msgstr "Met de wachtwoordzin bevat het pakket elk geheim van het platform. Bewaar het bestand en de wachtwoordzin gescheiden en alleen zolang u ze nodig heeft. Elke export en import staat in het auditlog."
-
-msgid "admin.settings.package.export.title"
-msgstr "Exporteren"
-
-msgid "admin.settings.package.passphrase_hint"
-msgstr "Kies een wachtwoordzin van minstens {length} tekens. Die wordt nergens bewaard: zonder de wachtwoordzin is het pakket niet te importeren."
+msgstr "Het pakket wordt niet eerst als plan getoond: de wijzigingen volgen uit het plan dat nu wordt berekend. Elke wijziging en elke import staat in het auditlog."
 
 msgid "admin.settings.package.passphrase"
 msgstr "Wachtwoordzin"
@@ -8905,23 +8926,20 @@ msgstr "Wachtwoordzin"
 msgid "admin.settings.package.passphrase_repeat"
 msgstr "Wachtwoordzin (herhaling)"
 
-msgid "admin.settings.package.export.button"
-msgstr "Pakket downloaden"
-
 msgid "admin.settings.package.import.title"
 msgstr "Importeren"
 
 msgid "admin.settings.package.import.intro"
-msgstr "Alleen in een installatie zonder afspraken, tijdsloten of actieve sluiting. Alle huidige configuratie wordt vervangen door die uit het pakket; medewerkers en het auditlog blijven. Maximaal {max_mb} MB; het pakket moet van deze versie van OpenPlanner zijn."
+msgstr "Maximaal {max_mb} MB; het pakket moet van deze versie van OpenPlanner zijn. Medewerkers en het auditlog blijven."
 
 msgid "admin.settings.package.import.file"
 msgstr "Pakketbestand (.sqlite)"
 
 msgid "admin.settings.package.import.confirm"
-msgstr "Ik begrijp dat alle configuratie van deze installatie wordt vervangen."
+msgstr "Ik begrijp dat de configuratie van het platform wordt vervangen door die uit het pakket."
 
 msgid "admin.settings.package.import.button"
-msgstr "Pakket importeren"
+msgstr "Pakket toepassen"
 
 msgid "admin.audit.detail.configuration_export"
 msgstr "Configuratiepakket geëxporteerd"
@@ -10778,6 +10796,9 @@ msgstr "{Agents}: {agents}, afspraken: {booked} (waarvan {pending} niet bevestig
 msgid "admin.audit.detail.booking_confirmed_by_staff"
 msgstr "Afspraak bevestigd namens de deelnemer"
 
+msgid "admin.audit.detail.booking_contact_viewed"
+msgstr "Contactgegevens van de deelnemer getoond"
+
 msgid "reports.view.volume"
 msgstr "Volume"
 
@@ -11272,3 +11293,110 @@ msgstr "Gegevens aanpassen"
 
 msgid "manage.notice.details"
 msgstr "Uw gegevens zijn aangepast."
+msgid "error.proposal_not_open"
+msgstr "Deze voorgestelde tijd is niet meer beschikbaar. U kunt nog wel zelf een nieuwe tijd kiezen."
+
+msgid "settings.field.reschedule_proposal_confirm_hours.label"
+msgstr "Voorgestelde tijd vastgehouden (uren)"
+
+msgid "settings.field.reschedule_proposal_reminder_hours.label"
+msgstr "Herinnering aan voorstel voor de termijn (uren, 0 = geen)"
+
+msgid "settings.field.reschedule_search_days.label"
+msgstr "Zoeken naar een nieuwe tijd binnen (dagen)"
+
+msgid "settings.field.reschedule_time_tolerance_minutes.label"
+msgstr "Verschil in tijdstip ten hoogste (minuten)"
+
+msgid "message.reschedule_proposal.subject"
+msgstr "Nieuwe tijd voorgesteld voor uw videogesprek"
+
+msgid "message.reschedule_proposal.intro"
+msgstr "Uw videogesprek met {group_name} op {date} om {time} kan niet doorgaan. Wij stellen een nieuwe tijd voor: {new_date} om {new_time}. Wij houden die tijd voor u vast tot {deadline}. Bevestig de nieuwe tijd, kies zelf een andere tijd of annuleer de afspraak. Zonder uw bevestiging verplaatsen wij niets."
+
+msgid "message.reschedule_proposal.sms"
+msgstr "Beste {first_name}, uw videogesprek met {group_name} op {date} om {time} kan niet doorgaan. {reason} Voorstel: {new_date} om {new_time}. Bevestig voor {deadline} of kies een andere tijd: {manage_url}"
+
+msgid "message.proposal_reminder.subject"
+msgstr "Herinnering: bevestig de voorgestelde tijd"
+
+msgid "message.proposal_reminder.intro"
+msgstr "U hebt de voorgestelde nieuwe tijd voor uw videogesprek met {group_name}, {new_date} om {new_time}, nog niet bevestigd. Wij houden die tijd voor u vast tot {deadline}."
+
+msgid "message.proposal_reminder.sms"
+msgstr "Beste {first_name}, bevestig voor {deadline} de voorgestelde tijd {new_date} om {new_time} bij {group_name}, of kies een andere: {manage_url}"
+
+msgid "message.proposal_released.subject"
+msgstr "De voorgestelde tijd is vrijgegeven"
+
+msgid "message.proposal_released.intro"
+msgstr "U hebt de voorgestelde nieuwe tijd voor uw videogesprek met {group_name} niet op tijd bevestigd. Wij houden die tijd niet langer voor u vast. U kunt nog tot {deadline} zelf een nieuwe tijd kiezen; daarna vervalt de afspraak."
+
+msgid "message.proposal_released.sms"
+msgstr "Beste {first_name}, de voorgestelde tijd bij {group_name} is vrijgegeven. Kies voor {deadline} zelf een nieuwe tijd: {manage_url}"
+
+msgid "message.manage_proposal"
+msgstr "Bevestig de nieuwe tijd, kies een andere tijd of annuleer, uiterlijk {deadline}:"
+
+msgid "message.proposal_link"
+msgstr "Nieuwe tijd bekijken"
+
+msgid "message.proposed_when"
+msgstr "Voorgestelde tijd"
+
+msgid "manage.proposal.title"
+msgstr "Er is een nieuwe tijd voor u voorgesteld"
+
+msgid "manage.proposal.text"
+msgstr "Voorgestelde tijd: {slot}. Wij houden die tijd voor u vast tot {deadline}. Zonder uw bevestiging verplaatsen wij niets."
+
+msgid "manage.proposal.confirm"
+msgstr "Nieuwe tijd bevestigen"
+
+msgid "manage.proposal.other"
+msgstr "Een andere tijd kiezen"
+
+msgid "manage.notice.proposal_gone"
+msgstr "De voorgestelde tijd is niet meer beschikbaar. U kunt nog wel zelf een nieuwe tijd kiezen."
+
+msgid "proposal.title"
+msgstr "Nieuwe tijd bevestigen"
+
+msgid "proposal.new"
+msgstr "Nieuwe tijd"
+
+msgid "proposal.old"
+msgstr "Oorspronkelijke tijd"
+
+msgid "proposal.text"
+msgstr "Bevestigt u de nieuwe tijd, dan verplaatsen wij uw afspraak en krijgt u een bevestiging met een agenda-uitnodiging. Wij houden de tijd vast tot {deadline}."
+
+msgid "proposal.submit"
+msgstr "Ja, deze tijd past mij"
+
+msgid "reschedule.suggested.title"
+msgstr "Voorgestelde tijden"
+
+msgid "reschedule.suggested.hint"
+msgstr "Deze tijden liggen het dichtst bij uw oorspronkelijke afspraak. Ze worden niet voor u vastgehouden."
+
+msgid "admin.messages.purpose_reschedule_proposal"
+msgstr "Nieuwe tijd voorgesteld"
+
+msgid "admin.messages.purpose_proposal_reminder"
+msgstr "Herinnering aan voorgestelde tijd"
+
+msgid "admin.messages.purpose_proposal_released"
+msgstr "Voorgestelde tijd vrijgegeven"
+
+msgid "audit.job.send_reschedule_proposal"
+msgstr "Voorstel nieuwe tijd sturen"
+
+msgid "audit.job.send_proposal_reminder"
+msgstr "Herinnering aan voorstel sturen"
+
+msgid "audit.job.expire_proposal"
+msgstr "Voorgestelde tijd vrijgeven"
+
+msgid "audit.job.send_proposal_released"
+msgstr "Melding vrijgegeven voorstel sturen"

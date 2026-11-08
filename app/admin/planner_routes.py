@@ -117,11 +117,13 @@ def _agenda(slug: str, day: date) -> str:
     return f"/admin/groups/{slug}/agenda?day={day.isoformat()}"
 
 
-async def _changeable(request: Request, context: AdminContext, booking_id: int) -> Booking:
+async def _changeable(
+    request: Request, context: AdminContext, booking_id: int, *, rebook: bool = False
+) -> Booking:
     """Return the booking if it may still be changed; refusals become the HTTP error."""
     try:
         return await _planner(request).booking(
-            context.principal, context.group.group.slug, booking_id
+            context.principal, context.group.group.slug, booking_id, rebook=rebook
         )
     except DomainError as error:
         raise_refusal(error)
@@ -353,7 +355,7 @@ async def rebook_form(
     request: Request, locale: Locale, slug: str, booking_id: int, context: ManageBookings
 ) -> HTMLResponse:
     """Ask for the reason before asking the participant to choose a new time."""
-    booking = await _changeable(request, context, booking_id)
+    booking = await _changeable(request, context, booking_id, rebook=True)
     form = FormData({}, locale.gettext)
     return _reason_response(request, locale, context, booking, form, REBOOK)
 

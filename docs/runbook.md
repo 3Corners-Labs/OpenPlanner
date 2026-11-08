@@ -2190,22 +2190,18 @@ from disk, never from the command line.
 
 ## Configuration package (ADR 0089)
 
-A package is every setting of an installation (organisations, groups, texts, channels, identity
-providers, API clients, platform settings) with its secrets, and nothing that happened on it
-(no bookings, no log, no staff). It sets up a new test or production installation in one go.
-The superuser makes and imports one on *Advanced settings*; on the host the same runs as:
+The SQLite package of ADR 0089 is **no longer written** (ADR 0099 step 4): export the
+configuration as a JSON document (*Configuration document* above; on the host
+`python -m app.cli config export --format json`). A package that already exists is still read
+for one release: it is opened with its passphrase, its secrets are sealed under this
+installation's key, and it is converted into a `replace` document of the platform that is
+planned and applied like any other (rights per change, the in-use rules, one write
+transaction, an audit event per change). On the host:
 
 ```sh
 cd ~/openplanner
-printf '%s\n' 'a passphrase of at least sixteen characters' > secrets/package.passphrase
+printf '%s\n' 'the passphrase of the package' > secrets/package.passphrase
 chmod 600 secrets/package.passphrase
-docker compose --env-file .env.update exec web python -m app.cli config export /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
-docker compose --env-file .env.update cp web:/srv/data/config.sqlite ./config.sqlite
-```
-
-On the new installation, after `install.sh` and before anyone creates a group:
-
-```sh
 docker compose --env-file .env.update cp ./config.sqlite web:/srv/data/config.sqlite
 docker compose --env-file .env.update exec web python -m app.cli config show /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
 docker compose --env-file .env.update exec web python -m app.cli config import /srv/data/config.sqlite --passphrase-file /dev/stdin < secrets/package.passphrase
@@ -2213,19 +2209,30 @@ docker compose --env-file .env.update exec web python -m app.cli config import /
 
 `config env PACKAGE --passphrase-file PATH --out FILE` writes the package's `OIDC_*` variables
 (the login) as an env file, for a `.env` that is not yet filled in (`--out -` prints them,
-for the installer's one-off container). An import is refused on an installation with
-bookings, slots or an active closure, and on another version of OpenPlanner (export again
-from an installation on this version). Delete the package and the passphrase file when done:
-together they are every secret of the platform. Both commands are audited as `system:cli`.
+for the installer's one-off container). An import is no longer refused because the installation
+is in use; the document's own rules decide: what is in use (a group with bookings, an active
+closure, a shortfall acceptance, API access) is never deleted and refuses the whole import, and
+a package of another version of OpenPlanner is refused (use a document instead). Where it creates or moves an identity provider it needs the
+provider to answer its discovery address, because the issuer is
+fetched, not stored. Delete the package and the passphrase file when done: together they are
+every secret of the platform. Both commands are audited as `system:cli`.
 
 A new host does all of this in one go: `./scripts/install.sh --mode production
 --configuration PACKAGE --passphrase-file PATH` (ADR 0089 point 8; `docs/install.md`,
-*Installing from a configuration package*). It writes the login to `secrets/config.env`, which
-Compose reads before `.env` (a value in `.env` wins), leaves the identity provider's questions
-out, and imports the package once web is healthy. Running it again with the two options writes
-`config.env` again and imports again, which is refused once the installation is in use; a run
-without them leaves `config.env` as it is. Removing `config.env` and running the installer
-again asks the login questions as before.
+*Installing from a SQLite configuration package*). It writes the login to `secrets/config.env`,
+which Compose reads before `.env` (a value in `.env` wins), leaves the identity provider's
+questions out, and imports the package once web is healthy (converted to a replacing document
+and applied by the rules of the portal, ADR 0099 point 14). Running it again with the two
+options writes `config.env` again and imports again; a run without them leaves `config.env`
+as it is. Removing `config.env` and running the installer again asks the login questions as
+before.
+
+The same command installs from a JSON document: `./scripts/install.sh --mode production
+--configuration DOCUMENT.json` (add `--passphrase-file PATH` when it holds sealed secrets;
+`docs/install.md`, *Installing from a configuration document*). The installer plans it in the
+web container, prints the plan and its hash, and applies it with `--plan-hash` once web is
+healthy; a plan with a refusal stops it with nothing applied. A document carries no login, so
+the identity provider is asked for as usual.
 
 ## Guardrail drift (ADR 0109)
 

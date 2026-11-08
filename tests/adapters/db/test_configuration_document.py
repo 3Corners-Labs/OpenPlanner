@@ -222,3 +222,14 @@ async def test_a_plan_says_whether_the_document_held_sealed_secrets(
 
     assert sealed.sealed
     assert not plain.sealed
+
+
+async def test_an_export_without_secrets_survives_a_secret_that_cannot_be_opened(
+    source: AsyncEngine,
+) -> None:
+    wrong_key = SecretBox(b"z" * 32)  # the rows were sealed under another key (a rotation)
+
+    exported = await service(source, wrong_key).export(HOST, Scope(), None, secrets=False)
+
+    assert json.loads(exported)["format"] == "openplanner.config/v1"
+    assert b"sealed" not in exported

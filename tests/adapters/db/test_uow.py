@@ -134,7 +134,7 @@ async def test_reschedule_into_another_groups_slot(
     engine: AsyncEngine, service: BookingService
 ) -> None:
     await seed_group(engine, slug="aangifte", weekday=0)
-    await seed_group(engine, slug="toeslagen", weekday=1)
+    await seed_group(engine, slug="helpdesk", weekday=1)
     receipt = await book(service)
 
     with pytest.raises(DomainError, match="slot_unavailable"):
@@ -291,12 +291,12 @@ async def test_upcoming_starts_for_email_counts_place_holding_bookings_only(
     engine: AsyncEngine, service: BookingService
 ) -> None:
     group_id = await seed_group(engine, capacity=3)
-    await seed_group(engine, slug="toeslagen", capacity=3)
+    await seed_group(engine, slug="helpdesk", capacity=3)
     kept = await book(service)
     cancelled = await book(service, SLOT_0930, contact=participant(2))
     await service.cancel(cancelled.management_token)
     await book(service, SLOT_0930, contact=participant(3))
-    await book(service, SLOT_0930, "toeslagen")
+    await book(service, SLOT_0930, "helpdesk")
 
     async with SqlUnitOfWork(engine).read() as tx:
         ada = await tx.upcoming_starts_for_email(group_id, "ADA@example.ORG", NOW)

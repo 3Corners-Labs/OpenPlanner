@@ -16,6 +16,7 @@ from app.domain.form_fields import (
     derive_key,
     format_options,
     labelled_answers,
+    mailto_href,
     normalise_email,
     normalise_phone,
     parse_options,
@@ -270,9 +271,9 @@ def test_invalid_postcodes_are_refused(raw: str) -> None:
 
 
 def test_choice_accepts_only_its_options() -> None:
-    f = field("topic", type=FieldType.CHOICE, options=("rent", "benefits"))
+    f = field("topic", type=FieldType.CHOICE, options=("order", "invoice"))
 
-    assert answer(f, "rent") == "rent"
+    assert answer(f, "order") == "order"
     refused(f, "something else")
 
 
@@ -389,13 +390,20 @@ def test_normalisers_name_the_field_they_were_given() -> None:
         normalise_phone("123", "NL", "phone")
 
 
-def test_options_are_parsed_from_lines_and_formatted_back() -> None:
-    keys, labels = parse_options("rent; Huur; Rent\n\n benefits ; Uitkering ; Benefits \n")
+def test_a_mailto_link_encodes_what_would_start_its_own_fields() -> None:
+    address = normalise_email("ada?cc=x&body=y#z%@example.org", "email")  # legal before the @
 
-    assert keys == ("rent", "benefits")
-    assert labels["benefits"] == {"nl": "Uitkering", "en": "Benefits"}
+    assert mailto_href(address) == "mailto:ada%3Fcc%3Dx%26body%3Dy%23z%25@example.org"
+    assert mailto_href("ada@example.org") == "mailto:ada@example.org"
+
+
+def test_options_are_parsed_from_lines_and_formatted_back() -> None:
+    keys, labels = parse_options("order; Bestelling; Order\n\n invoice ; Factuur ; Invoice \n")
+
+    assert keys == ("order", "invoice")
+    assert labels["invoice"] == {"nl": "Factuur", "en": "Invoice"}
     f = field("topic", type=FieldType.CHOICE, options=keys, option_labels=labels)
-    assert format_options(f) == "rent; Huur; Rent\nbenefits; Uitkering; Benefits"
+    assert format_options(f) == "order; Bestelling; Order\ninvoice; Factuur; Invoice"
 
 
 @pytest.mark.parametrize("text", ["rent; Huur", "rent;;Rent", "a; b; c; d"])

@@ -9,6 +9,7 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.closure_service import ClosureService
+from app.domain.planner_service import PlannerService
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity_providers import (
@@ -36,6 +37,12 @@ def clock() -> FixedClock:
 @pytest.fixture
 def bookings(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
     return BookingService(uow, clock, TEST_TOKEN_KEY)
+
+
+@pytest.fixture
+def planner(uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService) -> PlannerService:
+    """Return the planner service on these bookings, with the settings' defaults."""
+    return PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=50)
 
 
 @pytest.fixture

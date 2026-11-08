@@ -45,10 +45,11 @@ from app.domain.booking import (
     Booking,
     BookingKind,
     BookingStatus,
+    ChangeReason,
     Contact,
     Slot,
 )
-from app.domain.booking_changes import lapse_unconfirmed
+from app.domain.booking_changes import ProposalTiming, lapse_unconfirmed
 from app.domain.call_usage import record_call_event
 from app.domain.calls import apply_event, new_status
 from app.domain.channels import ChannelKind
@@ -79,6 +80,8 @@ from app.domain.job_plan import (
 )
 from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.rebooking import DEFAULT_REACH, Reach, may_take, suggested
+from app.domain.reschedule_proposal import HeldProposal
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, open_for_direct
@@ -142,6 +145,8 @@ class BookingDetails:
     delete_by: datetime | None = None
     correctable: bool = False
     """Whether the participant may still correct name, phone and answers (ADR 0056 point 10)."""
+    proposal: HeldProposal | None = None
+    """The proposed new time that still holds its place, before its deadline (ADR 0057)."""
 
 
 @dataclass(frozen=True)
@@ -177,6 +182,7 @@ class BookingService:
         confirm_policy: ConfirmPolicy | Callable[[int], ConfirmPolicy] = DEFAULT_CONFIRM_POLICY,
         previous_token_key: bytes | None = None,
         closure_retention: ClosureRetentionOf = default_closure_retention,
+        reach: Reach | Callable[[int], Reach] = DEFAULT_REACH,
     ) -> None:
         """Store the collaborators.
 
@@ -189,6 +195,9 @@ class BookingService:
                 organisation id when it is a function (class D settings, read live).
             previous_token_key: ``MANAGEMENT_TOKEN_KEY_PREVIOUS`` during a rotation (ADR 0094).
             closure_retention: The organisation's maximum for bookings on hold (ADR 0102).
+            reach: How far suggested new times may lie (ADR 0057 settings
+                ``reschedule_search_days``, ``reschedule_time_tolerance_minutes``), per
+                organisation id when it is a function.
         """
         if len(token_key) < MIN_KEY_BYTES:
             raise ValueError(f"the token key must be at least {MIN_KEY_BYTES} bytes")
@@ -200,6 +209,7 @@ class BookingService:
         self._confirm_policy = confirm_policy
         self._phone_region = phone_region
         self._closure_retention = closure_retention
+        self._reach = reach
 
     async def get_group(self, group_slug: str) -> Group:
         """Return the group behind a booking page.
@@ -256,12 +266,52 @@ class BookingService:
         validate_range(first_day, last_day)
         async with self._uow.read() as tx:
             group = await self._group(tx, group_slug)
-            rules, overrides = await effective_schedule(tx, group, first_day, last_day)
-            lower, upper = utc_bounds(group, first_day, last_day)
-            # One slot length beyond the range, for slots of an old grid overlapping its edges.
-            margin = timedelta(minutes=group.slot_minutes)
-            usage = await tx.get_slot_usage(group.id, lower - margin, upper + margin)
-            closures = await tx.get_closures(group.id, self._clock.now())
+            known = subject if group.routing.subject(subject) else None
+            return await self._free_slots(tx, group, first_day, last_day, known)
+
+    async def suggestions(self, management_token: str | PublicRef) -> list[datetime]:
+        """Return the free times the reschedule page marks as suggested (ADR 0057 point 8).
+
+        Only for a booking that awaits a new time: the best free starts by the assistant's
+        ranking within the organisation's reach, without the time already proposed (it is held
+        for the participant anyway). They are not held.
+
+        Raises:
+            DomainError: ``booking_not_found``.
+        """
+        async with self._uow.read() as tx:
+            booking = await self._booking(tx, management_token)
+            if not booking.awaits_rebook:
+                return []
+            group = await self._group_by_id(tx, booking.group_id)
+            proposal = await tx.get_open_proposal(_id(booking))
+            reach = value_for(self._reach, group.organisation_id)
+            old_day = booking.start.astimezone(group.tz).date()
+            first_day = max(
+                group.today(self._clock.now()), old_day - timedelta(days=reach.search_days)
+            )
+            last_day = old_day + timedelta(days=reach.search_days)
+            if first_day > last_day:
+                return []
+            free = await self._free_slots(tx, group, first_day, last_day, booking.subject)
+        held = {proposal.start} if proposal is not None else set()
+        return suggested(group, booking.start, [s.start for s in free], reach, held)
+
+    async def _free_slots(
+        self,
+        tx: Transaction,
+        group: Group,
+        first_day: date,
+        last_day: date,
+        subject: str | None,
+    ) -> list[AvailableSlot]:
+        """Return the group's bookable slots between two local dates, outside any closure."""
+        rules, overrides = await effective_schedule(tx, group, first_day, last_day)
+        lower, upper = utc_bounds(group, first_day, last_day)
+        # One slot length beyond the range, for slots of an old grid overlapping its edges.
+        margin = timedelta(minutes=group.slot_minutes)
+        usage = await tx.get_slot_usage(group.id, lower - margin, upper + margin)
+        closures = await tx.get_closures(group.id, self._clock.now())
         slots = available_slots(
             group=group,
             rules=rules,
@@ -271,7 +321,7 @@ class BookingService:
             now=self._clock.now(),
             booked={u.start: u.active for u in usage},
             snapshots={u.start: u.capacity_snapshot for u in usage},
-            subject=subject if group.routing.subject(subject) else None,
+            subject=subject,
         )
         return [slot for slot in slots if covering(closures, slot.start) is None]
 
@@ -380,6 +430,7 @@ class BookingService:
                 if booking.is_suspended and booking.closure_id is not None
                 else None
             )
+            proposal = await tx.get_open_proposal(_id(booking))
         now = self._clock.now()
         deadline = group.change_deadline(booking.start)
         changeable = booking.on_hold or (booking.is_active and now < deadline)
@@ -402,6 +453,7 @@ class BookingService:
             cancellable,
             delete_by,
             correctable,
+            proposal if proposal is not None and not proposal.is_due(now) else None,
         )
 
     async def confirm(self, management_token: str | PublicRef) -> Booking:
@@ -601,12 +653,16 @@ class BookingService:
         if new_start == old.start:
             raise DomainError(ErrorCode.SAME_SLOT)
         now = self._clock.now()
+        await booking_changes.answer_proposal(tx, old, now, new_start)  # ADR 0057: frees the hold
         await tx.save_booking(old.cancel(now))
         await record_moved(tx, old, group, now, actor)
         if old.awaits_rebook and actor is ActorClass.PARTICIPANT:
             await record_rebook_accepted(tx, old, group, now)
         jobs = plan_for_cancellation(
-            cancelled_at=now, notify=False, team_invite=group.sends_team_invite
+            cancelled_at=now,
+            notify=False,
+            # A pending booking was never sent to the team (ADR 0056): nothing to withdraw.
+            team_invite=group.sends_team_invite and not old.awaits_confirmation,
         )
         await tx.replace_jobs(_id(old), jobs)
         return await self._place(
@@ -734,31 +790,8 @@ class BookingService:
             DomainError: ``group_not_found`` for an archived group (ADR 0084), the window,
                 schedule, closure, capacity and address errors of a booking.
         """
-        if start.tzinfo is None:
-            raise ValueError("start must be timezone-aware")
-        if group.is_archived:  # ADR 0084: archiving can pass while a booking awaits a new time
-            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
         now = self._clock.now()
-        earliest, latest = booking_window(group, now)
-        if not earliest <= start <= latest:
-            raise DomainError(ErrorCode.OUTSIDE_BOOKING_WINDOW)
-        day = start.astimezone(group.tz).date()
-        rules, overrides = await effective_schedule(tx, group, day, day)
-        offered = offered_slot(group, rules, overrides, start, routing.subject if routing else None)
-        if offered is None:
-            raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
-        if covering(await tx.get_closures(group.id, now), offered.start) is not None:
-            raise DomainError(ErrorCode.GROUP_CLOSED)
-        slot = await tx.get_slot(group.id, offered.start)
-        if slot is None:
-            slot = await tx.add_slot(
-                Slot(None, group.id, offered.start, offered.end, offered.capacity)
-            )
-        length = offered.end - offered.start
-        usage = await tx.get_slot_usage(group.id, offered.start - length, offered.start + length)
-        overlap = overlapping_active(offered.start, length, {u.start: u.active for u in usage})
-        if await tx.count_active_bookings(_id(slot)) + overlap >= slot.capacity_snapshot:
-            raise DomainError(ErrorCode.SLOT_FULL)
+        slot = await self._reserve(tx, group, start, routing)
         await _check_address_limit(tx, group, contact, slot.start, now)
         window = (
             confirm_window(
@@ -800,6 +833,110 @@ class BookingService:
         await tx.replace_jobs(_id(booking), jobs)
         await record_placed(tx, booking, group, moved=rescheduled_from is not None)
         return BookingReceipt(booking, token)
+
+    async def _reserve(
+        self, tx: Transaction, group: Group, start: datetime, routing: RoutingChoice | None
+    ) -> Slot:
+        """Return the slot at ``start`` with a free place, creating it on first use.
+
+        Shared by a booking (``_place``) and a held proposal (``propose_in``, ADR 0057), so a
+        proposal meets every rule a booking meets: the booking window, the schedule and the
+        subject's blocks (ADR 0081 point 4), no closure, and room after counting bookings that
+        hold a place and open proposals.
+
+        Raises:
+            DomainError: ``group_not_found`` for an archived group (ADR 0084),
+                ``outside_booking_window``, ``slot_unavailable``, ``group_closed`` or
+                ``slot_full``.
+        """
+        if start.tzinfo is None:
+            raise ValueError("start must be timezone-aware")
+        if group.is_archived:  # ADR 0084: archiving can pass while a booking awaits a new time
+            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+        now = self._clock.now()
+        earliest, latest = booking_window(group, now)
+        if not earliest <= start <= latest:
+            raise DomainError(ErrorCode.OUTSIDE_BOOKING_WINDOW)
+        day = start.astimezone(group.tz).date()
+        rules, overrides = await effective_schedule(tx, group, day, day)
+        offered = offered_slot(group, rules, overrides, start, routing.subject if routing else None)
+        if offered is None:
+            raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
+        if covering(await tx.get_closures(group.id, now), offered.start) is not None:
+            raise DomainError(ErrorCode.GROUP_CLOSED)
+        slot = await tx.get_slot(group.id, offered.start)
+        if slot is None:
+            slot = await tx.add_slot(
+                Slot(None, group.id, offered.start, offered.end, offered.capacity)
+            )
+        length = offered.end - offered.start
+        usage = await tx.get_slot_usage(group.id, offered.start - length, offered.start + length)
+        overlap = overlapping_active(offered.start, length, {u.start: u.active for u in usage})
+        if await tx.count_active_bookings(_id(slot)) + overlap >= slot.capacity_snapshot:
+            raise DomainError(ErrorCode.SLOT_FULL)
+        return slot
+
+    async def propose_in(
+        self,
+        tx: Transaction,
+        booking: Booking,
+        group: Group,
+        start: datetime,
+        *,
+        reason: ChangeReason,
+        timing: ProposalTiming,
+    ) -> HeldProposal:
+        """Propose ``start`` as the new time of ``booking`` and hold a place there (ADR 0057).
+
+        Inside the caller's locked transaction; the caller checks who may do it. The proposed
+        slot must be another start of the same group that a planner may still fill
+        (``rebooking.may_take``) and that has room like a booking would (``_reserve``).
+
+        Raises:
+            DomainError: ``same_slot``, ``booking_locked`` (the slot is too close),
+                ``booking_not_active`` (the booking is not confirmed) or any error of
+                ``_reserve``.
+        """
+        now = self._clock.now()
+        if start == booking.start:
+            raise DomainError(ErrorCode.SAME_SLOT)
+        if not may_take(group, start, now):
+            raise DomainError(ErrorCode.BOOKING_LOCKED)
+        if not booking.is_active:
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        slot = await self._reserve(tx, group, start, booking.routing)
+        return await booking_changes.hold_proposal(
+            tx,
+            booking,
+            group,
+            slot,
+            now,
+            reason=reason,
+            timing=timing,
+            team_invite=group.sends_team_invite,
+        )
+
+    async def confirm_proposal(self, management_token: str | PublicRef) -> BookingReceipt:
+        """Take the proposed new time (ADR 0057 point 8): the booking moves into it.
+
+        Through the same move as a reschedule (``relocate``): a new booking in the proposed slot
+        with the usual change message and calendar file; the held place is released in the same
+        transaction, so the move never competes with its own hold.
+
+        Raises:
+            DomainError: ``booking_not_found``, ``proposal_not_open`` (answered, withdrawn or
+                past its deadline) or any error of ``relocate``.
+        """
+        async with self._uow.locked() as tx:
+            booking = await self._booking(tx, management_token)
+            proposal = await tx.get_open_proposal(_id(booking))
+            now = self._clock.now()
+            if proposal is None or proposal.is_due(now):
+                raise DomainError(ErrorCode.PROPOSAL_NOT_OPEN)
+            group = await self._group_by_id(tx, booking.group_id)
+            return await self.relocate(
+                tx, booking, group, proposal.start, actor=ActorClass.PARTICIPANT
+            )
 
     async def _booked_jobs(
         self, tx: Transaction, group: Group, booking: Booking, *, sms: bool = False

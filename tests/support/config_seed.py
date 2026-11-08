@@ -75,7 +75,7 @@ async def seed(engine: AsyncEngine) -> None:
             holiday_source="own",
             idp_key="helpdesk-idp",
             routing=json.dumps(
-                {"subjects": [{"code": "tax", "labels": {"nl": "Belasting", "en": "Tax"}}]}
+                {"subjects": [{"code": "billing", "labels": {"nl": "Facturen", "en": "Billing"}}]}
             ),
         )
         loket = GroupRow(
@@ -102,7 +102,7 @@ async def seed(engine: AsyncEngine) -> None:
                     opens=time(9),
                     closes=time(12),
                     capacity=2,
-                    subjects="tax",
+                    subjects="billing",
                     valid_from=date(2026, 1, 1),
                 ),
                 ScheduleOverrideRow(group_id=gid, day=date(2026, 12, 24)),

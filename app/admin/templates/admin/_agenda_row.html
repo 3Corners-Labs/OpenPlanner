@@ -15,7 +15,7 @@
     {% endif %}
     {% if changeable is defined and row.id in changeable %}
     <br><a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.id }}/move">{{ _("admin.agenda.move") }}<span class="visually-hidden"> {{ row.time }}, {{ row.first_name }}</span></a>
-    {% if not row.waiting %}<br><a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.id }}/rebook">{{ _("admin.agenda.rebook") }}<span class="visually-hidden"> {{ row.time }}, {{ row.first_name }}</span></a>{% endif %}
+    {% if rebookable is defined and row.id in rebookable %}<br><a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.id }}/rebook">{{ _("admin.agenda.rebook") }}<span class="visually-hidden"> {{ row.time }}, {{ row.first_name }}</span></a>{% endif %}
     <br><a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.id }}/cancel">{{ _("admin.agenda.cancel") }}<span class="visually-hidden"> {{ row.time }}, {{ row.first_name }}</span></a>
     {% endif %}
   </td>

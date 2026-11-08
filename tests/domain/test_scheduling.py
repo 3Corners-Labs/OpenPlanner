@@ -372,7 +372,7 @@ def test_the_label_takes_no_part_in_equality_or_ordering() -> None:
     ("text", "slug"),
     [
         ("ACMEVIDEOGROEP1", "acmevideogroep1"),
-        ("Vergunningen loket", "vergunningen-loket"),
+        ("Klantenservice Noord", "klantenservice-noord"),
         ("  Café & Crème -- Zuid!  ", "cafe-creme-zuid"),
         ("Ĳsselmonde/Oost_2", "ijsselmonde-oost-2"),
         ("already-a-slug", "already-a-slug"),

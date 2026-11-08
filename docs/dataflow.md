@@ -41,7 +41,7 @@ worker ──HTTPS──> SMS API of the organisation's provider ──> mobile 
 
 | Data item | Destination | When | Legal basis owner | Retention at the processor |
 |---|---|---|---|---|
-| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, and on a planner's move, cancellation or request to rebook (ADR 0044), only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
+| Phone number | the organisation's SMS provider (today only Webex Connect, Cisco), mobile operators | per SMS reminder rule of the group, and on a planner's move, cancellation, request to rebook (ADR 0044) or proposed new time (ADR 0057), only for bookings with a phone number | organisation (controller) | per Cisco processor agreement; to be fixed contractually (HANDOVER §7, B6) |
 | First name, date, time, team, management link | as above (message text) | as above | as above | as above |
 
 A planner's move, cancellation or request to choose a new time, its one reminder and its lapse (ADR 0044) are sent by SMS as well, to bookings with a phone
@@ -101,13 +101,16 @@ groups, and a group blocks the delete until the erase sweep above has removed it
 The fields below are the fixed list of `app/domain/privacy.py` (ADR 0063): personal data is
 shown in the admin portal only on the booking detail page and the queue item (first name only
 on the group's agenda and queue), never on overview, list, export or alert pages, and no list
-filter matches on it. The list and the rule are constants, not settings.
+filter matches on it. The booking detail page shows the answers, and the name, email address
+and phone number only after *Show contact details*; each request is an audit event with the
+actor, the group and the booking id, never the data (ADR 0044 §2, the product owner's choice of
+2026-11-08). The list and the rule are constants, not settings.
 
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
-| Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4) |
-| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
+| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6). Shown to staff with `bookings.view` on the booking page on request, audited (ADR 0044 §2) |
+| Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4). Shown to staff with `bookings.view` on the booking page on request, audited; its `mailto:` link hands it to the staff member's own mail program, to contact the participant (ADR 0044 §2) |
+| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028). Shown to staff with `bookings.view` on the booking page on request, audited; its `tel:` link hands it to the staff member's own phone, to call the participant (ADR 0044 §2) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055); correction page, which shows the participant their own answers, all of them (`Purpose.PARTICIPANT_SELF`, ADR 0056 point 10) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
 | An organisation's own contact-center connection (ADR 0032 point 9) | one sealed record `contact-center:{organisation id}` in `integration_credentials`: kind, API host, client id; client secret, refresh token and the generated webhook secret | the superuser on organisation → *Kanalen*; the webhook secret is made by the server | until removed, or the organisation is deleted (deleted in the same transaction) | no personal data; the secrets are write-only and never shown. Dispatch through it follows in CC-4b |
 | A group's contact-center routing (ADR 0032) | `group_contact_center` (`kind`, `routing_value`, `attributes`: codes from the platform's descriptor); for WxCC also, and still read, `groups.wxcc_routing_value`, `wxcc_business_address`, `wxcc_channel` | the group's settings | as long as the group | no personal data; the values go to the contact center in each task |
@@ -117,7 +120,8 @@ filter matches on it. The list and the rule are constants, not settings.
 | Provider links | `bookings.video_room_id`, `trial_room_id`, `contact_center_task_id` (and the older `wxcc_task_id`, written alongside until it is dropped, ADR 0032/0116) | video provider, WxCC | as above (deleted by the purge, ADR 0102 point 11) | no. Each is the key to a meeting or work item at Cisco that holds the participant's name and email address |
 | Management token | `bookings.management_token_hash` (SHA-256 only) | generated | replaced by a random value by the purge, so the link stops working; the salt stays and identifies nothing without the token | token itself only in the confirmation mail |
 
-Jobs, slots, schedules and audit events carry no personal data of participants. A failed meeting
+Jobs, slots, schedules, held proposals of a new time (`reschedule_proposals`: booking, slot,
+times, deadline and outcome, ADR 0057) and audit events carry no personal data of participants. A failed meeting
 job keeps Webex's own reason (`message`, ADR 0065): only from the meeting request, which carries
 the group name and the host's address (masked), never a participant's data; the system event of the
 automatic group check (ADR 0065 step 2) carries the same masked reason of the probe meeting,
@@ -455,20 +459,40 @@ Not outbound but listed so the picture is complete: webhooks from Webex and WxCC
 inbound and are verified by signature or token (`docs/webhooks.md`); the container logs leave
 the host only if the host ships them (`docs/runbook.md`).
 
-## Configuration package (ADR 0089)
+## Configuration package (ADR 0089), read for one release
+
+The SQLite package is no longer written (ADR 0099 step 4); an existing one is still read, and
+what it holds leaves the file only as a document that is planned and applied.
 
 ```
-superuser ──POST /admin/settings/package/export (passphrase)──> web ──SQLite backup API──> temporary copy (data/transfer, mode 600)
-web ──DELETE state tables, VACUUM; secrets opened with SETTINGS_ENCRYPTION_KEY, sealed under scrypt(passphrase)──> package file ──download──> superuser
-superuser ──POST /admin/settings/package/import (file, passphrase)──> web ──verify, re-seal under SETTINGS_ENCRYPTION_KEY──> temporary copy ──ATTACH, one transaction──> configuration tables
-host ──python -m app.cli config export|show|import|env──> the same, actor system:cli; `env` writes OIDC_* to a file (mode 600)
-API client (scope configuration:transfer) ──GET / PUT /api/agent/v1/configuration (X-Passphrase header, package body)──> the same service, actor the client id (ADR 0089 point 7)
+superuser ──POST /admin/settings/package/import (file, passphrase)──> web ──verify, open with scrypt(passphrase), seal under SETTINGS_ENCRYPTION_KEY──> temporary copy (data/transfer, mode 600)
+web ──read the copy with the readers of the live database──> a replace document (platform scope) ──plan, apply with the admin's rights, one transaction──> configuration tables
+host ──python -m app.cli config show|import|env──> the same, actor system:cli; `env` writes OIDC_* to a file (mode 600)
+API client (scope configuration:transfer) ──PUT /api/agent/v1/configuration (X-Passphrase header, package body)──> the same service, actor the client id (ADR 0089 point 7)
 ```
 
 A package holds no participant data: the state tables (`bookings` with every PII field,
-`slots`, `jobs`, `booking_events`, `call_status`, `audit_events`, `staff`, …) are emptied and
-the file is vacuumed. It holds every integration secret of the platform, sealed under the
-passphrase only. The temporary copies never outlive the request.
+`slots`, `jobs`, `booking_events`, `call_status`, `audit_events`, `staff`, …) were emptied when
+it was exported, and the conversion reads configuration tables only. It holds every
+integration secret of the platform, sealed under the passphrase only. The temporary copy never
+outlives the request, and the converted document is not kept anywhere.
+
+## Configuration document (ADR 0099)
+
+```
+admin ──POST …/configuration/export (secrets? passphrase)──> web ──read configuration tree, keep what the admin may change, seal secrets under scrypt(passphrase)──> JSON document ──download──> admin
+admin ──POST …/configuration/plan (document, passphrase)──> web ──parse, open sealed values, plan against the tree──> plan page (paths, field names, no values)
+web ──keep the uploaded document (still sealed) in process memory, one per admin and scope, CONFIGURATION_REVIEW_MINUTES──> token in the apply form
+admin ──POST …/configuration/apply (token, passphrase)──> web ──plan again in the write lock, write all or nothing, one audit event per change──> configuration tables
+web ──guarded GET──> a new or moved identity provider's /.well-known/openid-configuration (issuer only, before the lock)
+host ──python -m app.cli config export --format json|plan|apply──> the same service, actor system:cli
+```
+
+A document holds configuration only: no participant data, no state tables, no staff, and the
+secrets sealed under the passphrase alone, so a document exported without secrets holds none.
+It holds business addresses (a group's video host and invitation address, alert targets,
+contact blocks). The uploaded document lives in the web process's memory until it is applied,
+discarded or lapsed; it is written nowhere, and the passphrase is kept nowhere.
 
 ## Configuration document (ADR 0099)
 
