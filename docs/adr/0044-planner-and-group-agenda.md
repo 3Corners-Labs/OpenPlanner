@@ -11,7 +11,7 @@ there is no SMS consent: SMS goes when a phone number is known (ADR 0009,
 detail page "as today", but that page never showed them. The product owner chose on 2026-11-08
 that it shows the participant's name, email address and phone number on request (*Show contact
 details*), never by default, each request an audit event `booking.contact_viewed`
-(`app/domain/participant_contact.py`).
+(`app/domain/participant_contact.py`, #648).
 
 ## Context
 

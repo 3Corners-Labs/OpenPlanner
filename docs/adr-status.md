@@ -63,7 +63,7 @@ from the rows below.
 | 0041 | Extended branding | BUILT | #49; migration 0023 | – |
 | 0042 | Settings layers, env lock | PARTIAL | steps 1–5, 6a, 6b-1, 7, 8 (#77 … #126) | Step 6b-2: generated, rotatable webhook secrets; the move to the organisation connection waits on ADR 0032 |
 | 0043 | Own queue per group | PARTIAL | #88, #89, #90; refresh with ADR 0072 (#155); step 4 (#628): lobby join time (migration 0101), system event `queue.not_picked_up`, count on the overview | Point 1's organisation-connection check waits for ADR 0032 CC-4 |
-| 0044 | Planner agenda | BUILT | #81, #92, #98; migrations 0045, 0046 | – |
+| 0044 | Planner agenda | BUILT | #81, #92, #98; migrations 0045, 0046; contact details on the booking page on request, audited (§2): #648 | – |
 | 0045 | Dedicated Webex site, meeting policy | NOT BUILT | none | Everything |
 | 0046 | Staff directory, SCIM | PARTIAL | step 1 #61; migration 0026; end sessions via ADR 0098 (#350, #381, #399); step 2: suspend and reinstate, `staff.erase`, retention by the worker (`staff_retention_days`), `app/domain/staff_lifecycle.py`, `app/admin/staff_status_routes.py`, migration 0086 (#402) | CSV export (step 2d), step 3 (SCIM) |
 | 0047 | Admin information architecture | PARTIAL | steps 1–6 (#62, #80, #219, #594, #600, #602): `web/navigation.py`, `docs/admin-map.md` (with *Settings topics*), the organisation page with tabs and sub-tabs, `organisation.view`, `/admin/groups`, the six group tabs with sub-tabs, the readiness checklist, active closures as an overview filter, search and count on the API clients and audit lists, every portal setting placed by topic | `return` keys of §5 (follow-up, outside the build order) |
