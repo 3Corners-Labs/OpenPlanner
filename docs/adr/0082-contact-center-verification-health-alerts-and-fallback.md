@@ -1,6 +1,6 @@
 # 0082. Contact-center integration: verification, health, alerts to administrators and a fallback per group
 
-Status: proposed (2026-10-31), requested by the product owner; partly built (step 1 merged in #245, step 2 in #603, step 3 in #610, step 4 in #PRNUM). Extends ADR 0018
+Status: proposed (2026-10-31), requested by the product owner; partly built (step 1 merged in #245, step 2 in #603, step 3 in #610, step 4 in #614). Extends ADR 0018
 (work items), ADR 0021 (ending a work item), ADR 0043 (own queue), ADR 0061 (alerts on the
 overview, OV-6 and OV-7), ADR 0065 and ADR 0068 (group check, request events). Written on the
 neutral port of ADR 0032, which stays as it is. Merged in #238 on 2026-10-31 without
@@ -230,7 +230,7 @@ bot's single scope `spark:messages_write`.
 | 1 | Verification: `read_task` on the port and the WxCC adapter; probe work item and probe-branch rule in the group check and `wxcc-config-check`; Service App probes on *Koppelingen*; `worker.no_dispatch_jobs`; automatic check for every mapped group | #245 | merged |
 | 2 | Health: last inbound event per platform, WxCC event dedupe, reconcile job, health state with its events, *System status* and *Koppelingen* | #603 | merged |
 | 3 | Alerts: the alert model, banner and pop-ups of ADR 0061 OV-6/OV-7 (updates that ADR's table); `AlertSender` with the email and Webex-bot adapters; targets and test alert on *Koppelingen*; repeat and dedupe | #610 | merged |
-| 4 | Fallback per group: setting, per-booking and per-group activation, queue flag and banners, space messages, return to the contact center | #PRNUM | merged |
+| 4 | Fallback per group: setting, per-booking and per-group activation, queue flag and banners, space messages, return to the contact center | #614 | merged |
 | 5 | Manual topic *Contactcenter inrichten* (nl, en) with the bot; runbook, `docs/threat-model.md`, `docs/dataflow.md`, `docs/webhooks.md`, `docs/architecture.md` | | planned |
 
 ## Consequences
