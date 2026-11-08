@@ -43,16 +43,19 @@ crypto parameters).
 ## Build status
 
 <!--
-Required (ADR 0059 point 7). One row per step; the PR that builds a step updates its row, and
-the Status line at the top says what is built (`proposed`, `accepted`, partly built, not
-built). States: `planned`, `in PR`, `merged`, `built`, `live on …`, `follow-up`. A new ADR also
-gets its row in `docs/adr-status.md`; a test fails when it is missing.
+Required (ADR 0059 point 7). One row per step; the PR that builds a step writes its row as
+`merged` with its own number (true once it merges; `in PR` never reaches `main`, ADR 0119),
+and the Status line at the top says what is built (`proposed`, `accepted`, partly built, not
+built). States: `planned`, `merged`, `built`, `live on …`, `follow-up`, `superseded`. A new
+ADR merges together with its first build step (the decision gate refuses it otherwise, ADR
+0119) and gets its row in `docs/adr-status.md`; a test fails when it is missing.
 -->
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #NNN | in PR |
-| 1 | The first build step | | planned |
+| 0 | ADR proposed | #NNN | merged |
+| 1 | The first build step, in the same PR as this ADR | #NNN | merged |
+| 2 | The next step | | planned |
 
 ## Consequences
 

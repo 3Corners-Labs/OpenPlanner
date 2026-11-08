@@ -2,13 +2,13 @@
 
 De bezetting zegt wanneer de medewerkers van een groep dienst hebben en hoeveel het er zijn.
 Deelnemers kunnen alleen een afspraak boeken, of een direct gesprek starten, als de bezetting
-dat toestaat. Drie tabbladen van een groep horen bij elkaar:
+dat toestaat. Het tabblad **Planning** van een groep heeft drie onderdelen:
 
 - **Bezetting**: de tijdblokken van de week.
 - **Afwijkende bezetting**: één datum die anders is dan de week.
 - **Feestdagen**: welke feestdagenkalenders voor de groep gelden.
 
-U opent ze via **Groepen → groep → Bezetting** (of **Afwijkende bezetting**, **Feestdagen**).
+U opent ze via **Groepen → groep → Planning** en kiest daar het onderdeel in de tweede rij.
 Groepsbeheerders, organisatiebeheerders en de superuser kunnen ze wijzigen, en een eigen rol met
 het recht om de bezetting te beheren. Compliance en privacy (alleen lezen) en medewerkers
 kunnen dat niet. Voor het opslaan vraagt het portaal soms opnieuw om in te loggen.

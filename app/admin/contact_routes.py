@@ -7,8 +7,9 @@ again, validates and audits.
 
     GET  /admin/organisations/{org}/contacts     organisation.closure   form and preview
     POST /admin/organisations/{org}/contacts     organisation.closure   save; all rows empty removes
-    GET  /admin/groups/{slug}/closure/contacts   closure.manage         the group's own block
-    POST /admin/groups/{slug}/closure/contacts   closure.manage         save; empty: default applies
+    GET  /admin/groups/{slug}/contact            closure.manage         the group's own block
+    POST /admin/groups/{slug}/contact            closure.manage         save; empty: default applies
+    GET  /admin/groups/{slug}/closure/contacts   closure.manage         308 to the path above
 
 The form has ``MAX_OPTIONS`` fixed rows (no JavaScript): kind, details, and a label and opening
 hours per locale. A row whose inputs are all empty is skipped. ``read_block``,
@@ -21,6 +22,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import RedirectResponse
 from starlette.responses import HTMLResponse, Response
 
 from app.admin import forms
@@ -106,7 +108,7 @@ def _url(org: str) -> str:
 
 def _group_url(slug: str) -> str:
     """Return the contact block page of group ``slug``."""
-    return f"/admin/groups/{slug}/closure/contacts"
+    return f"/admin/groups/{slug}/contact"
 
 
 def _name(number: int, part: str) -> str:
@@ -307,7 +309,16 @@ async def save_contacts(
     return redirect_done(_url(org), "saved" if changed else "unchanged")
 
 
-@router.get("/groups/{slug}/closure/contacts", response_class=HTMLResponse)
+@router.get("/groups/{slug}/closure/contacts")
+async def old_group_contacts(slug: str, context: ManageGroup) -> RedirectResponse:
+    """Send the old path permanently to *Messages › Contact* (ADR 0047 §4, step 4).
+
+    Same permission as the target; the location is built from the authorised group's slug.
+    """
+    return RedirectResponse(_group_url(context.group.group.slug), status_code=308)
+
+
+@router.get("/groups/{slug}/contact", response_class=HTMLResponse)
 async def group_contacts_form(
     request: Request, locale: Locale, slug: str, context: ManageGroup
 ) -> Response:
@@ -315,7 +326,7 @@ async def group_contacts_form(
     return await _group_form_page(request, locale, context, forms.FormData({}, locale.gettext))
 
 
-@router.post("/groups/{slug}/closure/contacts", response_class=HTMLResponse)
+@router.post("/groups/{slug}/contact", response_class=HTMLResponse)
 async def save_group_contacts(
     request: Request, locale: Locale, slug: str, _: SameOrigin, context: ManageGroup
 ) -> Response:

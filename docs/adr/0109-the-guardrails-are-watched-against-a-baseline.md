@@ -64,9 +64,9 @@ title and label, and the app's permissions. They are process constants of the fo
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; environment `audit` created with branch policy `main` (2026-11-02) | #454 | in PR |
+| 0 | ADR proposed; environment `audit` created with branch policy `main` (2026-11-02) | #454 | merged |
 | 1 | The product owner creates the audit app, installs it on this repository and stores its client ID and key in the environment `audit` | GitHub setting | built 2026-11-02: app `3corners-openplanner-audit` (ID 5584789), administration read on the repository and the organisation, installed on this repository only |
-| 2 | `.github/guardrails.json`, `scripts/guardrail_audit.py`, `scripts/report_issue.py` (shared with `scripts/adr_issues.py`), `.github/workflows/guardrail-audit.yml`; tests; runbook, threat model | #454 | in PR |
+| 2 | `.github/guardrails.json`, `scripts/guardrail_audit.py`, `scripts/report_issue.py` (shared with `scripts/adr_issues.py`), `.github/workflows/guardrail-audit.yml`; tests; runbook, threat model | #454 | merged |
 | 3 | The first scheduled run after the merge reads every section; anything it cannot read is fixed in the workflow or the baseline | #458, #461, #465 | built 2026-11-02: merge settings through GraphQL, collaborators per user (#458); bypass actors without their mode are unseen, not a failed section (#461); `known_unseen` in the baseline for the tag ruleset's bypass actors, so a value that can never be seen does not keep the issue open (#465) |
 
 ## Consequences

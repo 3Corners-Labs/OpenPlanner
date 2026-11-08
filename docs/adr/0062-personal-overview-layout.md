@@ -33,10 +33,10 @@ With widgets on the overview (ADR 0061), admins want to choose what they see, in
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed; backlog section 6; waits for ADR 0046 step 2 | #130 | merged |
-| 1 | LY-1: `staff_members.overview_layout`, schema `openplanner.layout/1`, server-side validation | | planned |
-| 2 | LY-2: *Customise overview* form without script | | planned |
-| 3 | LY-3: the same controls live with the ADR 0061 script; pointer resize as an extra | | planned |
-| 4 | LY-4: `OVERVIEW_LOCKED_WIDGETS` and the lock in the form | | planned |
+| 1 | LY-1: `staff_members.overview_layout`, schema `openplanner.layout/1`, server-side validation |  | superseded (ADR 0096) |
+| 2 | LY-2: *Customise overview* form without script |  | superseded (ADR 0096) |
+| 3 | LY-3: the same controls live with the ADR 0061 script; pointer resize as an extra |  | superseded (ADR 0096) |
+| 4 | LY-4: `OVERVIEW_LOCKED_WIDGETS` and the lock in the form |  | superseded (ADR 0096) |
 
 ## Consequences
 
