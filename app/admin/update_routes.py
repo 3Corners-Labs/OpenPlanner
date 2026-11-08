@@ -369,7 +369,8 @@ async def _overview(
                         if item.published_at
                         else ""
                     ),
-                    "notes": item.notes.splitlines(),
+                    "lines": item.lines,
+                    "docs_only": item.docs_only,
                 }
                 for item in found.offered
             ],

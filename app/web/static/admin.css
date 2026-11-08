@@ -1195,6 +1195,11 @@ fieldset.card {
   color: var(--adm-warning);
 }
 
+/* A chip with a label of several words: it wraps on a narrow screen instead of overflowing. */
+.chip--wrap {
+  white-space: normal;
+}
+
 /* The readiness checklist of an overview tab (ADR 0047 §5): one line per item, the status in
    words in a chip, then the link to the tab that fixes it. */
 .checklist {
