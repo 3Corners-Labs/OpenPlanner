@@ -47,6 +47,17 @@ async def test_the_queue_shows_first_names_and_hides_the_meeting_link(site: Site
     assert 'aria-live="polite"' in text
 
 
+async def test_a_group_without_the_own_queue_shows_no_queue_link(site: Site) -> None:
+    """ADR 0047 step 4: the *Queue* sub-tab of *Agenda* applies only to the own queue."""
+    await site.login_as(AGENT)
+    agent_view = (await site.client.get("/admin/groups/demo")).text
+    await site.login_as(GROUP_ADMIN)
+    agenda = (await site.client.get("/admin/groups/demo/agenda")).text
+
+    assert QUEUE not in agent_view
+    assert QUEUE not in agenda
+
+
 async def test_pick_up_next_opens_the_meeting_for_that_agent_only(site: Site) -> None:
     booking_id = await _own_queue(site)
     await site.login_as(AGENT)

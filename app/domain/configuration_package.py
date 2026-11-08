@@ -110,6 +110,9 @@ STATE_TABLES = frozenset(
         "staff_memberships",
         "staff_refused_entitlements",
         "update_requests",
+        "usage_events",
+        "usage_hour",
+        "usage_staff_hour",
         "webhook_events",
     }
 )

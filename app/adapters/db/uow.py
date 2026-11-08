@@ -9,7 +9,7 @@ All mapping between rows and domain objects lives in this module.
 
 import json
 import secrets
-from collections.abc import AsyncIterator, Collection, Sequence
+from collections.abc import AsyncIterator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import date, datetime
@@ -96,6 +96,7 @@ from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
+from app.adapters.db.usage import UsageQueries
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.audit import (
@@ -465,6 +466,7 @@ class SqlTransaction(
     UpdateQueries,
     RetentionQueries,
     RollupQueries,
+    UsageQueries,
     StaffQueries,
     MaintenanceQueries,
     RoleQueries,
@@ -492,12 +494,19 @@ class SqlTransaction(
     Args:
         session: The open session.
         box: Seals and opens channel secrets; ``None`` when no settings key is configured.
+        usage_enabled: Whether usage facts are written (``reporting_enabled``, read live).
     """
 
-    def __init__(self, session: AsyncSession, box: SecretBox | None = None) -> None:
-        """Wrap ``session``."""
+    def __init__(
+        self,
+        session: AsyncSession,
+        box: SecretBox | None = None,
+        usage_enabled: Callable[[], bool] = lambda: True,
+    ) -> None:
+        """Wrap ``session``; ``usage_enabled`` tells whether usage facts are written."""
         self._session = session
         self._box = box
+        self._usage_enabled = usage_enabled
         self.written_events: list[AuditEvent] = []
         """Audit events added in this transaction, for the post-commit emit (ADR 0034)."""
 
@@ -2133,22 +2142,29 @@ class SqlUnitOfWork:
         engine: Engine created by ``app.adapters.db.engine.create_engine``.
         box: Seals channel secrets (ADR 0008); without it they cannot be stored or read.
         sink: Receives committed audit events; ``None`` ships nothing (tests, the CLI).
+        usage_enabled: Whether usage facts are written (``reporting_enabled``, read live);
+            on by default, so the CLI and tests write them like the web process does.
     """
 
     def __init__(
-        self, engine: AsyncEngine, box: SecretBox | None = None, sink: EventSink | None = None
+        self,
+        engine: AsyncEngine,
+        box: SecretBox | None = None,
+        sink: EventSink | None = None,
+        usage_enabled: Callable[[], bool] = lambda: True,
     ) -> None:
-        """Store the engine, the secret box and the sink."""
+        """Store the engine, the secret box, the sink and the usage switch."""
         self._engine = engine
         self._box = box
         self._sink = sink
+        self._usage_enabled = usage_enabled
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[SqlTransaction]:
         """Open a read transaction (deferred ``BEGIN``)."""
         async with AsyncSession(self._engine, expire_on_commit=False) as session:
             async with session.begin():
-                tx = SqlTransaction(session, self._box)
+                tx = SqlTransaction(session, self._box, self._usage_enabled)
                 yield tx
         self._emit(tx)
 
@@ -2160,7 +2176,7 @@ class SqlUnitOfWork:
             DomainError: ``database_busy`` if the write lock is not obtained in time.
         """
         async with locked_session(self._engine) as session:
-            tx = SqlTransaction(session, self._box)
+            tx = SqlTransaction(session, self._box, self._usage_enabled)
             yield tx
         self._emit(tx)
 

@@ -81,6 +81,7 @@ from app.domain.staff import (
 from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.usage import StaffFact, UsageFact
 from app.domain.worker_check import WorkerHeartbeat
 from tests.support.domain import NOW
 
@@ -93,6 +94,7 @@ class State:
     reminder_rules: dict[int, list[ReminderRule]] = field(default_factory=dict)
     slots: dict[int, Slot] = field(default_factory=dict)
     bookings: dict[int, Booking] = field(default_factory=dict)
+    usage_facts: list[UsageFact | StaffFact] = field(default_factory=list)
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
     claimed_jobs: dict[tuple[int, JobType], PlannedJob] = field(default_factory=dict)
     active_jobs: list[ActiveJob] = field(default_factory=list)
@@ -872,6 +874,10 @@ class InMemoryTransaction:
 
     async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
         self.state.groups[group_id] = replace(self.state.groups[group_id], routing=routing)
+
+    async def record_usage(self, fact: UsageFact | StaffFact) -> bool:
+        self.state.usage_facts.append(fact)
+        return True
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(

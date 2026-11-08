@@ -8,7 +8,7 @@ import httpx
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
 
 CLOSURE = "/admin/groups/demo/closure"
-TEAM_CONTACTS = f"{CLOSURE}/contacts"
+TEAM_CONTACTS = "/admin/groups/demo/contact"
 ORGANISATION_CONTACTS = "/admin/organisations/demo/contacts"
 CLOSE = {
     "notice_nl": "Door een stroomstoring zijn wij gesloten.",

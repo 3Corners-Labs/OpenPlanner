@@ -5141,9 +5141,6 @@ msgstr "This team has no block of its own. The organisation's default applies ({
 msgid "admin.group_contacts.none"
 msgstr "This team has no block of its own and the organisation has set no default."
 
-msgid "admin.group_contacts.back"
-msgstr "Back to this team's closure"
-
 msgid "admin.group_contacts.preview_lead"
 msgstr "How participants see the block that applies to this team now: its own block, or else the organisation's default."
 
@@ -9357,6 +9354,9 @@ msgstr "Use only lower-case letters, digits, dots and hyphens for the user name,
 msgid "admin.form.error.staff_user_name_in_use"
 msgstr "This user name is already in use. Choose another."
 
+msgid "settings.field.reporting_enabled.label"
+msgstr "Usage reports are fed"
+
 msgid "settings.field.overview_live_enabled.label"
 msgstr "Overview refreshes itself"
 
@@ -9836,3 +9836,10 @@ msgstr "Nothing ticked: the block offers every subject. A participant who choose
 
 msgid "settings.field.max_subjects_per_group.label"
 msgstr "Subjects per group (at most)"
+
+msgid "admin.tab.planning"
+msgstr "Planning"
+
+msgid "admin.tab.group_messages"
+msgstr "Messages"
+

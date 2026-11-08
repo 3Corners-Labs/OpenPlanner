@@ -1,14 +1,16 @@
 # Herinneringen en berichtteksten
 
-Twee tabbladen van een groep bepalen wat deelnemers rond hun afspraak ontvangen:
+Het tabblad **Berichten** van een groep bepaalt wat deelnemers rond hun afspraak ontvangen:
 
 - **Herinneringen**: wanneer een herinnering gaat en via welk kanaal.
 - **Berichtteksten**: wat de berichten zeggen.
+- **Contact**: hoe deelnemers de groep tijdens een sluiting anders bereiken (zie
+  *Contactalternatieven van een team*).
 
-U opent ze via **Groepen → groep → Herinneringen** of **Berichtteksten**. Voor het opslaan
+U opent ze via **Groepen → groep → Berichten** en kiest het onderdeel in de tweede rij. Voor het opslaan
 vraagt het portaal soms opnieuw om in te loggen.
 
-| Tabblad | Wie kan het wijzigen |
+| Onderdeel | Wie kan het wijzigen |
 |---|---|
 | Herinneringen | organisatiebeheerders en de superuser, en een eigen rol met het recht om herinneringen te beheren |
 | Berichtteksten | groepsbeheerders, organisatiebeheerders en de superuser, en een eigen rol met het recht om teksten te beheren |

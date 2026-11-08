@@ -27,9 +27,6 @@ from tests.support.routes import all_routes
 
 DOC = Path(__file__).resolve().parents[2] / "docs" / "admin-map.md"
 
-OVER_TAB_LIMIT = frozenset({"group"})
-"""Objects that still have more than ``MAX_TABS`` tabs. Only shrinks (ADR 0047 build step 4)."""
-
 
 def _page_routes(settings: Settings) -> set[str]:
     """Return every admin GET route that renders a portal page.
@@ -79,7 +76,32 @@ def test_the_structure_stays_within_its_limits() -> None:
 
     assert len(SECTIONS) <= MAX_SECTIONS
     assert all(section.entries for section in SECTIONS)
-    assert over == OVER_TAB_LIMIT, "remove an object from OVER_TAB_LIMIT once it fits"
+    assert over == set(), "a seventh tab is a structural change and needs an ADR (ADR 0047 §7)"
+
+
+def test_the_group_has_the_six_tabs_of_adr_0047() -> None:
+    """ADR 0047 §3, step 4: the group's tabs and the sub-tabs each groups together."""
+    group = object_page("group")
+    rows = {tab.key: tuple(sub.key for sub in tab.subtabs) for tab in group.tabs}
+
+    assert list(rows) == [
+        "group.overview",
+        "group.agenda",
+        "group.planning",
+        "group.messages",
+        "group.settings",
+        "group.closure",
+    ]
+    assert rows["group.agenda"] == ("group.queue",)
+    assert rows["group.planning"] == ("group.exceptions", "group.holidays")
+    assert rows["group.messages"] == ("group.texts", "group.contact")
+
+
+def test_the_contact_block_lives_under_messages() -> None:
+    contact = home_of("/admin/groups/{slug}/contact")
+
+    assert contact == Home("manage.groups", "group.messages", "group.contact")
+    assert home_of("/admin/groups/{slug}/closure/contacts") is None
 
 
 def test_every_object_page_belongs_to_a_side_navigation_entry() -> None:
@@ -176,7 +198,7 @@ def test_home_of_finds_entries_tabs_and_sub_pages() -> None:
     assert overview.tab is None
     assert staffing_rule is not None
     assert staffing_rule.entry == "manage.groups"
-    assert staffing_rule.tab == "group.staffing"
+    assert staffing_rule.tab == "group.planning"
     assert staffing_rule.subtab is None
     assert texts == Home("manage.organisations", "organisation.participants", "organisation.texts")
     assert home_of("/admin/organisations/{org}/branding") == Home(

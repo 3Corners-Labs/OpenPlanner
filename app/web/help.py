@@ -114,9 +114,7 @@ TOPICS = (
         ),
         Permission.IDENTITY_PROVIDERS_VIEW,
     ),
-    HelpTopic(
-        "group-contacts", ("/admin/groups/{slug}/closure/contacts",), Permission.CLOSURE_MANAGE
-    ),
+    HelpTopic("group-contacts", ("/admin/groups/{slug}/contact",), Permission.CLOSURE_MANAGE),
     HelpTopic("group-closure", ("/admin/groups/{slug}/closure",), Permission.CLOSURE_MANAGE),
     HelpTopic(
         "group-booking-form",

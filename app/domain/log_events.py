@@ -289,6 +289,16 @@ _OPERATIONS = (
         "Housekeeping removed back-ups older than the retention.",
     ),
     _e(
+        "usage.fact_dropped",
+        _OPS,
+        "warning",
+        "kind",
+        "A usage fact of kind {kind} could not be written.",
+        "A booking change committed but its fact for the reports was dropped (ADR 0117); "
+        "reporting never fails a participant's action.",
+        _CHECK_HOST,
+    ),
+    _e(
         "booking_rows.rollup_failed",
         _OPS,
         "error",

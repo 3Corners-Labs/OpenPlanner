@@ -55,7 +55,14 @@ from app.admin.forms import (
     redirect_done,
 )
 from app.admin.idp_mapping_routes import GroupIdpView, group_idp_view, idp_mapping_service
-from app.admin.pages import Locale, NavView, SameOrigin, current_home, page, with_manual
+from app.admin.pages import (
+    Locale,
+    SameOrigin,
+    current_home,
+    object_tabs,
+    page,
+    with_manual,
+)
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
@@ -200,24 +207,28 @@ def group_page(
     """
     summary = context.group
     can = can_function(context.principal)
-    home = current_home(request)
-    tabs = [
-        NavView(
-            locale.gettext(t.label_key),
-            t.path.replace("{slug}", summary.group.slug),
-            home is not None and home.tab == t.key,
-            t.icon,
-        )
-        for t in object_page("group").tabs
-        if can(t.permission, summary)
-        and (summary.group.has_own_queue or t.key not in OWN_QUEUE_TABS)
-    ]
+    tabs, subtabs = object_tabs(
+        locale,
+        object_page("group"),
+        summary.group.slug,
+        lambda screen: (
+            can(screen.permission, summary)
+            and (summary.group.has_own_queue or screen.key not in OWN_QUEUE_TABS)
+        ),
+        current_home(request),
+    )
     response = page(
         request,
         locale,
         template,
         context.principal,
-        {"summary": summary, "tabs": tabs, "done": done_message(request, locale.gettext), **extra},
+        {
+            "summary": summary,
+            "tabs": tabs,
+            "subtabs": subtabs,
+            "done": done_message(request, locale.gettext),
+            **extra,
+        },
         scripts=scripts,
     )
     response.status_code = status

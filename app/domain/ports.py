@@ -80,6 +80,7 @@ from app.domain.staff_directory import DirectoryUser, NewStaffMember, StaffActio
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.usage import StaffFact, UsageFact
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -1276,6 +1277,15 @@ class Transaction(Protocol):
 
     async def get_booking(self, booking_id: int) -> Booking | None:
         """Return the booking with ``booking_id``."""
+        ...
+
+    async def record_usage(self, fact: UsageFact | StaffFact) -> bool:
+        """Write one usage fact in a savepoint of this transaction (ADR 0117 point 1).
+
+        Returns whether it was written. ``False`` when ``reporting_enabled`` is off, or when the
+        insert failed: then the failure is logged without content and the transaction goes on, so
+        reporting never fails a participant's action.
+        """
         ...
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:

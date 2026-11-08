@@ -297,7 +297,10 @@ def create_app(
         app.state.http = http  # ADR 0082: the Service App check runs the probes from here
         # ADR 0034: committed audit events also go to stdout for the log platform.
         uow = SqlUnitOfWork(
-            app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
+            app.state.engine,
+            secret_box(settings),
+            StdoutEventSink(settings.event_envelope),
+            usage_enabled=lambda: live().reporting_enabled,  # ADR 0117, read at each write
         )
         # ADR 0068: every request to Webex and WxCC becomes a system event of the booking.
         request_log = RequestEvents(uow, clock, settings.app_version)

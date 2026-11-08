@@ -137,6 +137,19 @@ class UsageOutcome(StrEnum):
     EXPIRED_UNCONFIRMED = "expired_unconfirmed"
 
 
+_CANCELLED_BY = {
+    ActorClass.PARTICIPANT: UsageOutcome.CANCELLED_BY_PARTICIPANT,
+    ActorClass.PLANNER: UsageOutcome.CANCELLED_BY_PLANNER,
+    ActorClass.CLOSURE: UsageOutcome.CANCELLED_BY_CLOSURE,
+    ActorClass.SYSTEM: UsageOutcome.CANCELLED_BY_SYSTEM,
+}
+
+
+def cancelled_outcome(actor: ActorClass) -> UsageOutcome:
+    """Return the outcome of a booking cancelled by ``actor`` (metric U2)."""
+    return _CANCELLED_BY[actor]
+
+
 class Aggregation(StrEnum):
     """How a metric's facts add up in one hour: a count, a sum, or the largest value."""
 
@@ -246,6 +259,15 @@ def hour_of(moment: datetime) -> datetime:
     if moment.tzinfo is None:
         raise ValueError("a moment needs a timezone")
     return moment.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+
+
+def usable_locale(text: str | None) -> str | None:
+    """Return ``text`` when it is a short language tag a fact accepts, else ``None``.
+
+    A booking's locale comes from the participant's browser; a fact never refuses the
+    participant's action over it, so a value that is no tag is left out of the fact.
+    """
+    return text if text is not None and _LOCALE.match(text) else None
 
 
 def _hour(moment: datetime) -> None:

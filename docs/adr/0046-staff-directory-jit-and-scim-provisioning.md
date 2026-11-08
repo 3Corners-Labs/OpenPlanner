@@ -173,8 +173,8 @@ rule that the stricter of claims and SCIM state applies.
 |---|---|---|---|
 | 1 | `staff` table, JIT upsert at login, overview and detail pages, memberships, refused values | #61 | built |
 | 2a | End sessions (points 8 and 10): moved to ADR 0098 (the server-side register, `staff.manage` on a person's page) | #350, #381, #399 | built |
-| 2b | Suspend and reinstate (point 7): `staff.status`, login refused, sessions ended in the same transaction, a superuser only touched by a superuser, `staff.suspended` / `staff.reinstated` | #402 | in PR |
-| 2c | Erase (point 9): `staff.erase` (superuser, locked), automatic after `staff_retention_days` in the worker's daily housekeeping, `staff.erased`, "erased staff member" in the audit log | #402 | in PR |
+| 2b | Suspend and reinstate (point 7): `staff.status`, login refused, sessions ended in the same transaction, a superuser only touched by a superuser, `staff.suspended` / `staff.reinstated` | #402 | merged |
+| 2c | Erase (point 9): `staff.erase` (superuser, locked), automatic after `staff_retention_days` in the worker's daily housekeeping, `staff.erased`, "erased staff member" in the audit log | #402 | merged |
 | 2d | CSV export of the listing for an access review (point 6, `staff.exported`) | | follow-up |
 | 3 | SCIM 2.0 (points 11 to 14) | | planned |
 
