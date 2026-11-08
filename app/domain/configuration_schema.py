@@ -82,8 +82,9 @@ type FieldCheck = Callable[[Value, RuleContext], Value]
 type KindCheck = Callable[
     [Mapping[str, Value], Mapping[str, Value] | None, RuleContext], Mapping[str, Value]
 ]
-"""A rule for the whole object: gets every field as it will be and the current fields (``None``
-on create), returns the fields normalised or raises ``DomainError``."""
+"""A rule for the whole object: gets every field as it will be, the key fields among them, and
+the current fields in the same form (``None`` on create); returns the fields normalised or
+raises ``DomainError``."""
 
 
 @dataclass(frozen=True)

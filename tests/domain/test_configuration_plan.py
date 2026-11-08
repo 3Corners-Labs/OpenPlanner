@@ -628,6 +628,8 @@ def test_a_rule_of_the_kind_runs_on_the_fields_as_they_will_be_and_may_normalise
     refused = plan({"shops": [{"slug": "s", "boxes": [{"slug": "b", "name": "bad"}]}]}, fmt=fmt)
 
     assert created.changes[0].values["name"] == "New Box"
+    assert created.changes[0].values.get("slug") is None
+    assert seen[0][0]["slug"] == "n"
     assert seen[0][1] is None
     assert codes(refused) == [("shops[s].boxes[b]", ErrorCode.INVALID_CONFIGURATION, "name")]
     assert seen[1][1] is not None

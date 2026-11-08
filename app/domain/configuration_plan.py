@@ -251,12 +251,11 @@ class _Planner:
             valid = self._defaults(kind, given, base, path) and valid
         merged = {**base, **given}
         if valid and kind.check is not None and (create or _differs(kind, current, given)):
+            keys = dict(zip(kind.key, wanted.key, strict=True))
+            before = None if current is None else {**keys, **current.fields}
             try:
-                merged = dict(
-                    kind.check(
-                        merged, None if current is None else dict(current.fields), self._context
-                    )
-                )
+                checked = kind.check({**keys, **merged}, before, self._context)
+                merged = {name: value for name, value in checked.items() if name not in keys}
             except DomainError as error:
                 self._refuse(path, error.code, error.field)
         names = [name for name in given if create or _changed(kind, current, name, merged)]
