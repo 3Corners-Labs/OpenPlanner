@@ -43,6 +43,9 @@ from app.domain.worker_check import worker_findings
 CHECK_EVENT = "integration.check"
 """Audit action of a check; the reason is the overall status (by hand) or the failing code."""
 SERVICE_APP_CHECK_EVENT = "integration.service_app_check"
+PROBE_REASON_PREFIX = "wxcc.probe."
+"""A check failure whose reason starts with this failed on the probe work item (ADR 0082
+point 2; the finding codes of ``app.adapters.group_check``); the health counts it as down."""
 """Audit action of the Service App check from *Koppelingen* (ADR 0082 point 3); the reason is
 ``passed`` or ``failed``."""
 

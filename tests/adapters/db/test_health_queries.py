@@ -8,7 +8,6 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.calls import CallStatus, TaskState
 from app.domain.connection_health import (
-    WEBHOOKS_MISSING,
     HealthEntry,
     HealthState,
     InboundEvent,
@@ -41,6 +40,9 @@ async def test_samples_probes_and_token_failures_are_read(engine: AsyncEngine) -
         await tx.add_audit_event(_event(REQUEST_EVENT, Outcome.SUCCESS, "method:GET,path:/old"))
         await tx.add_audit_event(_event(CHECK_EVENT, Outcome.FAILURE, reason="wxcc.probe.failed"))
         await tx.add_audit_event(_event(CHECK_EVENT, Outcome.FAILURE, reason="webex.host", org="x"))
+        passed_later = _event(CHECK_EVENT, Outcome.FAILURE, reason="wxcc.probe.failed", org="y")
+        await tx.add_audit_event(passed_later)
+        await tx.add_audit_event(_event(CHECK_EVENT, Outcome.SUCCESS, reason="pass", org="y"))
     async with uow.read() as tx:
         samples = await tx.request_samples(NOW - timedelta(minutes=1))
         later = await tx.request_samples(NOW + timedelta(minutes=1))
@@ -75,7 +77,7 @@ async def test_health_and_inbound_events_round_trip(engine: AsyncEngine) -> None
         )
 
 
-async def test_stale_tasks_and_open_misses(engine: AsyncEngine) -> None:
+async def test_stale_tasks_carry_their_organisation_and_group(engine: AsyncEngine) -> None:
     await seed_group(engine, slug="aangifte")
     uow = SqlUnitOfWork(engine)
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
@@ -94,12 +96,5 @@ async def test_stale_tasks_and_open_misses(engine: AsyncEngine) -> None:
         (booking_id, "task-1", TaskState.QUEUED)
     ]
     assert stale[0].organisation
+    assert stale[0].group == "aangifte"
     assert early == []
-    async with uow.locked() as tx:
-        await tx.add_audit_event(_event(WEBHOOKS_MISSING, Outcome.FAILURE, "count:1", "missed"))
-        await tx.add_audit_event(
-            _event(WEBHOOKS_MISSING, Outcome.FAILURE, "count:1", "missed", "x")
-        )
-        await tx.add_audit_event(_event(WEBHOOKS_MISSING, Outcome.SUCCESS, "count:0", org="x"))
-    async with uow.read() as tx:
-        assert await tx.organisations_missing_webhooks() == frozenset({"demo"})

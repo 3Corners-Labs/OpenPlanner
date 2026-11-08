@@ -94,3 +94,18 @@ async def test_a_booking_found_through_a_public_page_gets_its_organisation() -> 
 
     event = uow.state.audit[-1]
     assert (event.organisation, event.group) == ("demo", "demo")
+
+
+def test_the_platform_and_the_failure_rule_are_read_from_the_detail() -> None:
+    """ADR 0082 point 7: which connection a request counts for, and whether it failed."""
+    from app.domain.connection_health import Platform
+    from app.domain.request_log import counts_as_failure, request_platform
+
+    assert request_platform("method:POST,path:/v2/tasks,platform:wxcc") is Platform.WXCC
+    assert request_platform("method:GET,platform:webex") is Platform.WEBEX
+    assert request_platform("method:GET,path:/x") is None
+    assert request_platform("method:GET,platform:other") is None
+    assert counts_as_failure(True, "server_error", "method:GET,platform:wxcc")
+    assert counts_as_failure(True, "rejected_404", "method:POST,platform:wxcc")
+    assert not counts_as_failure(True, "rejected_404", "method:GET,platform:wxcc")
+    assert not counts_as_failure(False, "", "method:GET")

@@ -49,7 +49,6 @@ from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.alerts import QUEUE_WAIT_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
-from app.domain.calls import EventKind
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.group_erase import GroupEraser
@@ -186,16 +185,13 @@ async def run_worker(
         )
         integration = IntegrationService(uow, clock, AdminService(uow, clock), version)
 
-        async def record(booking_id: int, kind: EventKind, detail: str) -> None:
-            await integration.record(booking_id, kind, detail=detail)
-
         # ADR 0082 points 6 and 7: reconcile stale tasks, then recompute the health.
         health_watch = IntegrationHealthWatch(
             TaskReconciler(
                 uow,
                 clock,
                 wired.dispatcher,
-                record,
+                integration,
                 lambda: timedelta(minutes=live.settings.task_reconcile_after_minutes),
             ),
             health,

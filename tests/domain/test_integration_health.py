@@ -33,6 +33,7 @@ from tests.support.domain import SLOT_0900
 
 NOW = SLOT_0900 + timedelta(hours=1)
 POLICY = HealthPolicy(timedelta(minutes=15), 25, 75, timedelta(minutes=10))
+EXPECTED_404 = "method:GET,path:/v1/tasks/x,status:404,ms:3,tracking:,version:1,platform:wxcc"
 
 
 @pytest.fixture
@@ -112,6 +113,13 @@ async def test_a_failed_probe_takes_the_organisations_contact_center_down(
     assert (entry.platform, entry.state, entry.reason) == (Platform.WXCC, HealthState.DOWN, "probe")
 
 
+async def test_an_expected_404_of_a_task_read_is_no_failure(uow: InMemoryUnitOfWork) -> None:
+    gone = replace(request_event(True), reason="rejected_404", detail=EXPECTED_404)
+    uow.state.audit += [gone] * 5
+    (entry,) = await IntegrationHealthService(uow, FixedClock(NOW), POLICY).evaluate()
+    assert entry.state is HealthState.OK
+
+
 async def test_old_requests_fall_out_of_the_window(uow: InMemoryUnitOfWork) -> None:
     uow.state.audit += [replace(request_event(True), at=NOW - timedelta(hours=1))] * 5
     assert await IntegrationHealthService(uow, FixedClock(NOW), POLICY).evaluate() == ()
@@ -120,7 +128,12 @@ async def test_old_requests_fall_out_of_the_window(uow: InMemoryUnitOfWork) -> N
 async def test_the_last_inbound_event_is_kept_per_platform(uow: InMemoryUnitOfWork) -> None:
     service = IntegrationHealthService(uow, FixedClock(NOW), POLICY)
     await service.note_inbound(InboundEvent(Platform.WXCC, NOW, "task:ended", "recorded"))
-    await service.note_inbound(InboundEvent(Platform.WXCC, NOW, "task:connected", "duplicate"))
+    later = NOW + timedelta(seconds=3)  # within NOTE_EVERY: not written again
+    await service.note_inbound(InboundEvent(Platform.WXCC, later, "task:new", "ignored"))
+    _, inbound = await service.overview()
+    assert [e.kind for e in inbound] == ["task:ended"]
+    later = NOW + timedelta(seconds=11)
+    await service.note_inbound(InboundEvent(Platform.WXCC, later, "task:connected", "duplicate"))
     await service.note_inbound(InboundEvent(Platform.WEBEX, NOW, "meetings:started", "unknown"))
     _, inbound = await service.overview()
     assert [(e.platform, e.kind) for e in inbound] == [
@@ -138,15 +151,28 @@ def with_task(uow: InMemoryUnitOfWork, task: TaskState, booking_id: int = 10) ->
     )
 
 
+class Recorder:
+    """Stands in for ``IntegrationService.record``: keeps what the reconcile writes."""
+
+    def __init__(self) -> None:
+        self.written: list[tuple[int, EventKind, str]] = []
+
+    async def record(self, booking_id: int, kind: EventKind, *, detail: str = "") -> None:
+        self.written.append((booking_id, kind, detail))
+
+
 def reconciler(
-    uow: InMemoryUnitOfWork, dispatcher: FakeDispatcher | None
+    uow: InMemoryUnitOfWork, dispatcher: FakeDispatcher | None, clock: FixedClock | None = None
 ) -> tuple[TaskReconciler, list[tuple[int, EventKind, str]]]:
-    written: list[tuple[int, EventKind, str]] = []
-
-    async def record(booking_id: int, kind: EventKind, detail: str) -> None:
-        written.append((booking_id, kind, detail))
-
-    return TaskReconciler(uow, FixedClock(NOW), dispatcher, record, timedelta(minutes=10)), written
+    recorder = Recorder()
+    run = TaskReconciler(
+        uow,
+        clock or FixedClock(NOW),
+        dispatcher,
+        recorder,
+        timedelta(minutes=10),  # type: ignore[arg-type]
+    )
+    return run, recorder.written
 
 
 async def test_a_missed_state_is_written_and_reported(uow: InMemoryUnitOfWork) -> None:
@@ -169,9 +195,13 @@ async def test_a_clean_run_after_a_miss_closes_the_alert(uow: InMemoryUnitOfWork
     with_task(uow, TaskState.QUEUED)
     dispatcher = FakeDispatcher()
     dispatcher.snapshots["t-10"] = TaskSnapshot(TaskState.CONNECTED, "connected")
-    run, _ = reconciler(uow, dispatcher)
+    clock = FixedClock(NOW)
+    run, _ = reconciler(uow, dispatcher, clock)
     await run.run()
     uow.state.call_status[10] = replace(uow.state.call_status[10], task=TaskState.CONNECTED)
+    assert await run.run() == 0  # read in the last run: skipped, and nothing open is closed
+    assert len(events(uow, WEBHOOKS_MISSING)) == 1
+    clock.advance(timedelta(hours=2))
     assert await run.run() == 0
     assert [e.outcome for e in events(uow, WEBHOOKS_MISSING)] == [Outcome.FAILURE, Outcome.SUCCESS]
     await run.run()  # nothing open any more: no further event
@@ -182,14 +212,48 @@ async def test_unreadable_or_unknown_tasks_are_left_alone(uow: InMemoryUnitOfWor
     with_task(uow, TaskState.QUEUED)
     with_task(uow, TaskState.ENDED, booking_id=11)  # not watched
     dispatcher = FakeDispatcher()
-    run, written = reconciler(uow, dispatcher)
+    clock = FixedClock(NOW)
+    run, written = reconciler(uow, dispatcher, clock)
     assert await run.run() == 0  # NONE: WxCC does not know it
     assert dispatcher.read == ["t-10"]
+    assert await run.run() == 0  # read in the last run: not read again yet
+    assert dispatcher.read == ["t-10"]
+    clock.advance(timedelta(hours=2))
     dispatcher.read_error = IntegrationError("unreachable", retryable=True)
     assert await run.run() == 0
     assert written == []
     assert events(uow, WEBHOOKS_MISSING) == []
     assert await reconciler(uow, None)[0].run() == 0
+
+
+async def test_a_read_carries_the_bookings_trace(uow: InMemoryUnitOfWork) -> None:
+    """The reconcile's request lands at the booking and its organisation (ADR 0068)."""
+    from app.domain.event_context import current
+
+    with_task(uow, TaskState.QUEUED)
+    seen = []
+
+    class Tracing(FakeDispatcher):
+        async def read_task(self, task_id: str) -> TaskSnapshot:
+            context = current()
+            seen.append((context.booking_id, context.organisation, context.group))
+            return await super().read_task(task_id)
+
+    await reconciler(uow, Tracing())[0].run()
+    assert seen == [(10, "demo", "demo")]
+
+
+async def test_tasks_read_before_make_room_for_newer_ones(uow: InMemoryUnitOfWork) -> None:
+    from app.domain.connection_health import RECONCILE_LIMIT
+
+    for booking_id in range(10, 10 + RECONCILE_LIMIT + 5):
+        with_task(uow, TaskState.QUEUED, booking_id)
+    dispatcher = FakeDispatcher()
+    run, _ = reconciler(uow, dispatcher)
+    await run.run()
+    await run.run()
+    assert len(dispatcher.read) == RECONCILE_LIMIT + 5
+    assert len(set(dispatcher.read)) == RECONCILE_LIMIT + 5
 
 
 async def test_a_recent_task_is_not_read_yet(uow: InMemoryUnitOfWork) -> None:

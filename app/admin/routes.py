@@ -796,9 +796,7 @@ async def integrations(
         inbound,
         locale.gettext,
         lambda at: admin_moment(request, locale, at),
-        lambda organisation: (
-            reach.everything or (organisation is not None and reach.contains(organisation, None))
-        ),
+        lambda organisation: reach.contains(organisation, None),
     )
     return _page(
         request,

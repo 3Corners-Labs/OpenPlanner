@@ -23,6 +23,7 @@ import httpx
 import structlog
 
 from app.domain.audit import Outcome
+from app.domain.connection_health import Platform
 from app.domain.ports import REASON_LIMIT, Clock, IntegrationError, RequestLog, RequestRecord
 from app.domain.security_log import TOKEN_REFRESH_FAILED, SecurityLog
 
@@ -283,7 +284,7 @@ def _record(
     response: httpx.Response,
     error: str,
     started: float,
-    platform: str = "",
+    platform: Platform | None = None,
 ) -> RequestRecord:
     """Describe a finished request: the tracking id from the header or, failing that, the body."""
     tracking_id = response.headers.get("trackingid", "") or _refusal(response)[1]
@@ -292,13 +293,13 @@ def _record(
     )
 
 
-def platform_of_host(host: str) -> str:
+def platform_of_host(host: str) -> Platform:
     """Return the connection of a request host: ``wxcc`` or ``webex`` (ADR 0082 point 7).
 
     The contact center's API lives at ``api.wxcc-<region>.cisco.com``; everything else the
     Service App calls is Webex.
     """
-    return "wxcc" if "wxcc" in host.lower() else "webex"
+    return Platform.WXCC if "wxcc" in host.lower() else Platform.WEBEX
 
 
 def http_failure(response: httpx.Response, *, explain: bool = False) -> IntegrationError:

@@ -50,6 +50,10 @@ Fixed on purpose (ADR 0082, *Fixed on purpose*)."""
 RECONCILE_LIMIT = 50
 """Tasks one reconcile run reads at most, the longest unchanged first; the rest wait for the
 next run, so an outage cannot make the worker hammer the contact center. A fixed protection."""
+RECHECK_RUNS = 6
+"""A task read once is read again only after this many ``task_reconcile_after_minutes``; the
+stale list is read this many times ``RECONCILE_LIMIT`` deep, so tasks that stay as they are
+cannot keep newer ones out. A fixed protection, like the limit."""
 WATCHED_TASKS = frozenset({TaskState.QUEUED, TaskState.CONNECTED})
 """Task states a webhook should still move on; only these are reconciled."""
 TASK_EVENTS: Mapping[TaskState, EventKind] = {
@@ -80,6 +84,11 @@ class HealthState(StrEnum):
         """Whether the state is a problem (an alert, ADR 0061)."""
         return self in (HealthState.DEGRADED, HealthState.DOWN)
 
+    @property
+    def severity(self) -> int:
+        """Position from best (``ok``) to worst (``down``), to show the worst of several."""
+        return tuple(HealthState).index(self)
+
 
 @dataclass(frozen=True)
 class InboundEvent:
@@ -103,21 +112,16 @@ class RequestSample:
 
 @dataclass(frozen=True)
 class HealthPolicy:
-    """The thresholds of the health state (class C settings of ADR 0082).
+    """The thresholds of the health state: the class C settings of ADR 0082.
 
-    Raises:
-        ValueError: When ``down_percent`` is below ``degraded_percent``.
+    Built by ``Settings.health_policy``, which holds the defaults, the bounds and the rule that
+    the down share is at least the degraded share.
     """
 
-    window: timedelta = timedelta(minutes=15)
-    degraded_percent: int = 25
-    down_percent: int = 75
-    recovery: timedelta = timedelta(minutes=10)
-
-    def __post_init__(self) -> None:
-        """Require ``degraded_percent <= down_percent``."""
-        if self.down_percent < self.degraded_percent:
-            raise ValueError("down_percent must be at least degraded_percent")
+    window: timedelta
+    degraded_percent: int
+    down_percent: int
+    recovery: timedelta
 
 
 @dataclass(frozen=True)
@@ -144,15 +148,6 @@ class HealthEntry:
     def key(self) -> tuple[str, str]:
         """Which connection this is."""
         return (self.organisation or "", self.platform.value)
-
-
-def platform_of(detail: str) -> Platform | None:
-    """Return the platform a request event's ``detail`` names (``platform:wxcc``), if any."""
-    for part in detail.split(","):
-        key, _, value = part.partition(":")
-        if key == "platform" and value in {p.value for p in Platform}:
-            return Platform(value)
-    return None
 
 
 def classify(
@@ -224,8 +219,9 @@ def evaluate(
         probe_failed: Organisations whose probe of the group check failed in the window.
 
     Returns:
-        The entries to store, and ``(before, after)`` for each state that changed. A first
-        sighting that is not failing is no transition: nothing was wrong before either.
+        The entries to store, and ``(before, after)`` for each change into, out of or between
+        the failing states (``_news``). A connection without requests in the window that is
+        not failing is dropped, so organisations that went quiet do not pile up.
     """
     by_key: dict[tuple[str, str], list[RequestSample]] = {}
     for sample in samples:
@@ -245,6 +241,8 @@ def evaluate(
             probe_failed=(organisation, platform_value) in probed,
         )
         state, reason = settle(before, candidate, reason, window, now, policy)
+        if not window and not state.failing:
+            continue  # a connection without requests that is not failing has nothing to show
         since = before.since if before is not None and before.state is state else now
         entry = HealthEntry(
             organisation or None,
@@ -256,10 +254,21 @@ def evaluate(
             reason,
         )
         entries.append(entry)
-        changed = before is None or before.state is not state
-        if changed and (before is not None or state.failing):
+        if _news(before.state if before else None, state):
             changes.append((before, entry))
     return tuple(entries), tuple(changes)
+
+
+def _news(before: HealthState | None, after: HealthState) -> bool:
+    """Whether a change is worth an event: into, out of, or between the failing states.
+
+    ``ok`` and ``unknown`` say nothing is wrong; moving between them (traffic stopped or
+    started) is no news, and neither is a first sighting that is not failing.
+    """
+    was_failing = before is not None and before.failing
+    if not (was_failing or after.failing):
+        return False
+    return before is not after
 
 
 def health_event(before: HealthEntry | None, after: HealthEntry, now: datetime) -> AuditEvent:
@@ -291,3 +300,4 @@ class StaleTask:
     task_id: str
     state: TaskState
     organisation: str | None
+    group: str | None = None

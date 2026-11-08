@@ -34,13 +34,11 @@ from app.domain.checks import GroupCheck
 from app.domain.closure import Closure
 from app.domain.connection_health import (
     WATCHED_TASKS,
-    WEBHOOKS_MISSING,
     HealthEntry,
     InboundEvent,
     Platform,
     RequestSample,
     StaleTask,
-    platform_of,
 )
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
@@ -56,7 +54,7 @@ from app.domain.identity_providers import (
     SigningKey,
 )
 from app.domain.images import ImageFile, ImageText
-from app.domain.integration_check import CHECK_EVENT
+from app.domain.integration_check import CHECK_EVENT, PROBE_REASON_PREFIX
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
 from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.login_domains import DomainClaim
@@ -65,7 +63,7 @@ from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import OwnCertificate
 from app.domain.participant_links import new_public_ref
 from app.domain.public_address import AddressCheck, AddressKind
-from app.domain.request_log import REQUEST_EVENT
+from app.domain.request_log import REQUEST_EVENT, counts_as_failure, request_platform
 from app.domain.retention import (
     DueBooking,
     GroupRetentionCounts,
@@ -412,11 +410,10 @@ class InMemoryTransaction:
     async def request_samples(self, since: datetime) -> list[RequestSample]:
         samples = []
         for e in self.state.audit:
-            platform = platform_of(e.detail) if e.action == REQUEST_EVENT else None
+            platform = request_platform(e.detail) if e.action == REQUEST_EVENT else None
             if platform is not None and e.at >= since:
-                samples.append(
-                    RequestSample(e.organisation, platform, e.outcome is Outcome.FAILURE, e.at)
-                )
+                failed = counts_as_failure(e.outcome is Outcome.FAILURE, e.reason, e.detail)
+                samples.append(RequestSample(e.organisation, platform, failed, e.at))
         return samples
 
     async def token_refresh_failed_since(self, since: datetime) -> bool:
@@ -426,13 +423,15 @@ class InMemoryTransaction:
         )
 
     async def failed_probe_organisations(self, since: datetime) -> frozenset[str]:
+        latest: dict[tuple[str | None, str | None], AuditEvent] = {}
+        for e in self.state.audit:
+            if e.action == CHECK_EVENT and e.at >= since:
+                latest[(e.organisation, e.group)] = e
         return frozenset(
             e.organisation
-            for e in self.state.audit
-            if e.action == CHECK_EVENT
-            and e.outcome is Outcome.FAILURE
-            and e.reason.startswith("wxcc.probe.")
-            and e.at >= since
+            for e in latest.values()
+            if e.outcome is Outcome.FAILURE
+            and e.reason.startswith(PROBE_REASON_PREFIX)
             and e.organisation
         )
 
@@ -465,17 +464,12 @@ class InMemoryTransaction:
                 found.append(
                     (
                         changed or booking.start,
-                        StaleTask(booking_id, booking.wxcc_task_id, status.task, organisation),
+                        StaleTask(
+                            booking_id, booking.wxcc_task_id, status.task, organisation, group.slug
+                        ),
                     )
                 )
         return [task for _, task in sorted(found, key=lambda item: item[0])[:limit]]
-
-    async def organisations_missing_webhooks(self) -> frozenset[str | None]:
-        latest: dict[str | None, AuditEvent] = {}
-        for e in self.state.audit:
-            if e.action == WEBHOOKS_MISSING:
-                latest[e.organisation] = e
-        return frozenset(o for o, e in latest.items() if e.outcome is Outcome.FAILURE)
 
     async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
         return self.state.organisations.get(organisation_id)

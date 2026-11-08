@@ -148,9 +148,9 @@ def test_a_wxcc_event_is_keyed_for_deduplication() -> None:
     assert first.event_key == again.event_key != other.event_key
     assert len(first.event_key) == 64
     without_id = {"type": "task:ended", "data": {"taskId": "t", "createdTime": 1}}
-    keyed = parse_wxcc(without_id)
-    assert keyed is not None
-    assert keyed.event_key
+    unkeyed = parse_wxcc(without_id)  # a time could be the task's own: no key without an id
+    assert unkeyed is not None
+    assert unkeyed.event_key == ""
     bare = parse_wxcc({"type": "task:ended", "data": {"taskId": "t"}})
     assert bare is not None
     assert bare.event_key == ""

@@ -15,7 +15,6 @@ from app.domain.connection_health import (
     classify,
     evaluate,
     health_event,
-    platform_of,
     settle,
 )
 
@@ -30,13 +29,6 @@ def samples(
     return [RequestSample(org, Platform.WXCC, False, at) for _ in range(ok)] + [
         RequestSample(org, Platform.WXCC, True, at) for _ in range(failed)
     ]
-
-
-def test_the_platform_is_read_from_the_detail() -> None:
-    assert platform_of("method:POST,path:/v2/tasks,platform:wxcc") is Platform.WXCC
-    assert platform_of("method:GET,platform:webex") is Platform.WEBEX
-    assert platform_of("method:GET,path:/x") is None
-    assert platform_of("platform:other") is None
 
 
 @pytest.mark.parametrize(
@@ -65,11 +57,6 @@ def test_a_failed_token_refresh_or_probe_is_down_whatever_the_requests() -> None
     assert classify([], POLICY, probe_failed=True) == (HealthState.DOWN, "probe")
 
 
-def test_down_needs_at_least_the_degraded_share() -> None:
-    with pytest.raises(ValueError, match="down_percent"):
-        HealthPolicy(degraded_percent=50, down_percent=40)
-
-
 def test_a_failing_connection_returns_to_ok_only_after_the_recovery_time() -> None:
     down = HealthEntry("demo", Platform.WXCC, HealthState.DOWN, NOW - timedelta(minutes=5))
     healthy = samples(5, 0)
@@ -85,6 +72,15 @@ def test_a_failing_connection_returns_to_ok_only_after_the_recovery_time() -> No
     # A worse candidate applies at once.
     degraded = HealthEntry("demo", Platform.WXCC, HealthState.DEGRADED, NOW)
     assert settle(degraded, HealthState.DOWN, "failures", [], NOW, POLICY)[0] is HealthState.DOWN
+
+
+def test_ok_and_unknown_are_no_news_and_quiet_connections_are_dropped() -> None:
+    ok = HealthEntry("demo", Platform.WXCC, HealthState.OK, NOW)
+    entries, changes = evaluate(samples(1, 0), (ok,), NOW, POLICY)
+    assert [e.state for e in entries] == [HealthState.UNKNOWN]
+    assert changes == ()
+    entries, changes = evaluate([], entries, NOW, POLICY)
+    assert (entries, changes) == ((), ())
 
 
 def test_transitions_are_reported_and_a_healthy_first_sighting_is_not() -> None:

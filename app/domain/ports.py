@@ -46,6 +46,7 @@ from app.domain.configuration_package import PackageSummary
 from app.domain.connection_health import (
     HealthEntry,
     InboundEvent,
+    Platform,
     RequestSample,
     StaleTask,
 )
@@ -284,8 +285,8 @@ class RequestRecord:
         error: The ``IntegrationError`` code the request ended in; empty on success.
         tracking_id: The platform's id of the request (Webex ``trackingId``), for its support.
         duration_ms: How long the request took.
-        platform: ``webex`` or ``wxcc``, the connection whose health the request counts for
-            (ADR 0082 point 7); empty for a request that counts for neither.
+        platform: The connection whose health the request counts for (ADR 0082 point 7);
+            ``None`` for one that counts for neither (a visit to a Webex page).
     """
 
     method: str
@@ -294,7 +295,7 @@ class RequestRecord:
     error: str = ""
     tracking_id: str = ""
     duration_ms: int = 0
-    platform: str = ""
+    platform: Platform | None = None
 
 
 class RequestLog(Protocol):
@@ -1428,10 +1429,6 @@ class Transaction(Protocol):
         ``unchanged_before`` and its status has not changed since then; the booking still has
         its task id (not purged). The longest unchanged come first (ADR 0082 point 6).
         """
-        ...
-
-    async def organisations_missing_webhooks(self) -> frozenset[str | None]:
-        """Return the organisations whose latest ``integration.webhooks_missing`` is a failure."""
         ...
 
     async def save_worker_heartbeat(self, heartbeat: WorkerHeartbeat) -> None:

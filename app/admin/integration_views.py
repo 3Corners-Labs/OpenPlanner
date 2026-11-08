@@ -254,6 +254,5 @@ def health_view(
 
 def worst_health(entries: tuple[HealthEntry, ...], platform: Platform) -> HealthState | None:
     """Return the worst state of ``platform`` over every organisation, ``None`` without any."""
-    order = (HealthState.OK, HealthState.UNKNOWN, HealthState.DEGRADED, HealthState.DOWN)
     states = [e.state for e in entries if e.platform is platform]
-    return max(states, key=order.index) if states else None
+    return max(states, key=lambda state: state.severity) if states else None

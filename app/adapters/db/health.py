@@ -28,23 +28,19 @@ from app.domain.audit import Outcome
 from app.domain.calls import TaskState
 from app.domain.connection_health import (
     WATCHED_TASKS,
-    WEBHOOKS_MISSING,
     HealthEntry,
     HealthState,
     InboundEvent,
     Platform,
     RequestSample,
     StaleTask,
-    platform_of,
 )
-from app.domain.integration_check import CHECK_EVENT
-from app.domain.request_log import REQUEST_EVENT
+from app.domain.integration_check import CHECK_EVENT, PROBE_REASON_PREFIX
+from app.domain.request_log import REQUEST_EVENT, counts_as_failure, request_platform
 from app.domain.security_log import TOKEN_REFRESH_FAILED
 
 HEALTH_NAME = "integration-health"
 """The integration report that holds the health of every connection."""
-PROBE_REASON = "wxcc.probe."
-"""Prefix of a check failure on the probe work item (``app.adapters.group_check``)."""
 
 
 class _Transaction(Protocol):
@@ -80,17 +76,20 @@ class HealthQueries:
     async def request_samples(self: _Transaction, since: datetime) -> list[RequestSample]:
         """Return the request events since ``since`` that name a platform."""
         rows = await self._session.execute(
-            select(AuditEventRow.organisation, AuditEventRow.detail, AuditEventRow.outcome)
-            .add_columns(AuditEventRow.at)
-            .where(AuditEventRow.action == REQUEST_EVENT, AuditEventRow.at >= since)
+            select(
+                AuditEventRow.organisation,
+                AuditEventRow.detail,
+                AuditEventRow.outcome,
+                AuditEventRow.reason,
+                AuditEventRow.at,
+            ).where(AuditEventRow.action == REQUEST_EVENT, AuditEventRow.at >= since)
         )
         samples: list[RequestSample] = []
-        for organisation, detail, outcome, at in rows:
-            platform = platform_of(detail)
+        for organisation, detail, outcome, reason, at in rows:
+            platform = request_platform(detail)
             if platform is not None:
-                samples.append(
-                    RequestSample(organisation, platform, outcome == Outcome.FAILURE.value, at)
-                )
+                failed = counts_as_failure(outcome == Outcome.FAILURE.value, reason, detail)
+                samples.append(RequestSample(organisation, platform, failed, at))
         return samples
 
     async def token_refresh_failed_since(self: _Transaction, since: datetime) -> bool:
@@ -105,13 +104,22 @@ class HealthQueries:
         return bool(found)
 
     async def failed_probe_organisations(self: _Transaction, since: datetime) -> frozenset[str]:
-        """Return the organisations with a group check failing on its probe since ``since``."""
+        """Return the organisations with a group whose latest check since ``since`` failed.
+
+        Only a failure on the probe work item counts; a later passing check clears the group.
+        """
+        latest = (
+            select(func.max(AuditEventRow.id).label("last"))
+            .where(AuditEventRow.action == CHECK_EVENT, AuditEventRow.at >= since)
+            .group_by(AuditEventRow.organisation, AuditEventRow.group)
+            .subquery()
+        )
         rows = await self._session.scalars(
-            select(AuditEventRow.organisation).where(
-                AuditEventRow.action == CHECK_EVENT,
+            select(AuditEventRow.organisation)
+            .join(latest, AuditEventRow.id == latest.c.last)
+            .where(
                 AuditEventRow.outcome == Outcome.FAILURE.value,
-                AuditEventRow.reason.startswith(PROBE_REASON),
-                AuditEventRow.at >= since,
+                AuditEventRow.reason.startswith(PROBE_REASON_PREFIX),
             )
         )
         return frozenset(organisation for organisation in rows if organisation)
@@ -179,7 +187,13 @@ class HealthQueries:
         """Return the tasks still queued or connected that have not changed since then."""
         changed = func.coalesce(CallStatusRow.connected_at, CallStatusRow.task_created_at)
         rows = await self._session.execute(
-            select(BookingRow.id, BookingRow.wxcc_task_id, CallStatusRow.task, OrganisationRow.slug)
+            select(
+                BookingRow.id,
+                BookingRow.wxcc_task_id,
+                CallStatusRow.task,
+                OrganisationRow.slug,
+                GroupRow.slug,
+            )
             .join(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
             .join(GroupRow, GroupRow.id == BookingRow.group_id)
@@ -194,21 +208,6 @@ class HealthQueries:
             .limit(limit)
         )
         return [
-            StaleTask(booking_id, task_id or "", TaskState(task), organisation)
-            for booking_id, task_id, task, organisation in rows
+            StaleTask(booking_id, task_id or "", TaskState(task), organisation, group)
+            for booking_id, task_id, task, organisation, group in rows
         ]
-
-    async def organisations_missing_webhooks(self: _Transaction) -> frozenset[str | None]:
-        """Return the organisations whose latest ``integration.webhooks_missing`` is a failure."""
-        latest = (
-            select(AuditEventRow.organisation, func.max(AuditEventRow.id).label("last"))
-            .where(AuditEventRow.action == WEBHOOKS_MISSING)
-            .group_by(AuditEventRow.organisation)
-            .subquery()
-        )
-        rows = await self._session.execute(
-            select(AuditEventRow.organisation)
-            .join(latest, AuditEventRow.id == latest.c.last)
-            .where(AuditEventRow.outcome == Outcome.FAILURE.value)
-        )
-        return frozenset(organisation for (organisation,) in rows)

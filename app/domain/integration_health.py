@@ -6,13 +6,15 @@ left stale; ``IntegrationHealthWatch`` runs both every ``task_reconcile_interval
 model and its rules are in ``app.domain.connection_health``.
 """
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
 
+from app.domain.alerts import open_conditions
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.calls import EventKind
 from app.domain.connection_health import (
     MISSED,
+    RECHECK_RUNS,
     RECONCILE_LIMIT,
     RECONCILED,
     TASK_EVENTS,
@@ -20,11 +22,19 @@ from app.domain.connection_health import (
     HealthEntry,
     HealthPolicy,
     InboundEvent,
+    Platform,
+    StaleTask,
     evaluate,
     health_event,
 )
+from app.domain.event_context import bind_booking, bind_level, trace_scope
+from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, ContactCenterDispatcher, IntegrationError, UnitOfWork
 from app.domain.tunable import value_of
+
+NOTE_EVERY = timedelta(seconds=10)
+"""Shortest gap between two notes of a platform's last webhook in one process (a fixed
+protection of the write lock; the line is shown in minutes)."""
 
 
 class IntegrationHealthService:
@@ -46,6 +56,7 @@ class IntegrationHealthService:
         self._uow = uow
         self._clock = clock
         self._policy = policy
+        self._noted: dict[Platform, datetime] = {}
 
     async def evaluate(self) -> tuple[HealthEntry, ...]:
         """Recompute every connection's health, store it and write its transitions."""
@@ -67,7 +78,16 @@ class IntegrationHealthService:
         return entries
 
     async def note_inbound(self, event: InboundEvent) -> None:
-        """Store ``event`` as its platform's latest verified webhook."""
+        """Store ``event`` as its platform's latest verified webhook, at most every few seconds.
+
+        Org-wide Webex webhooks report every meeting of the organisation; writing each would
+        take the write lock once more per event. A note within ``NOTE_EVERY`` of this process's
+        previous one for the platform is skipped, so the line is at most that stale.
+        """
+        last = self._noted.get(event.platform)
+        if last is not None and event.at - last < NOTE_EVERY:
+            return
+        self._noted[event.platform] = event.at
         async with self._uow.locked() as tx:
             await tx.save_inbound_event(event)
 
@@ -80,12 +100,16 @@ class IntegrationHealthService:
 class TaskReconciler:
     """Reads stale tasks at the contact center and writes what the webhooks missed.
 
+    Each read runs in a trace bound to the booking, its organisation and group, so its request
+    event lands on the booking's page and counts for the right organisation (ADR 0068). A task
+    read once is not read again for ``RECHECK_RUNS`` runs, so tasks the contact center no longer
+    knows, or keeps in the same state, cannot crowd out newer ones under ``RECONCILE_LIMIT``.
+
     Args:
         uow: Opens database transactions.
         clock: Current time.
         dispatcher: Reads a task's state (``read_task``); ``None`` without a contact center.
-        record: Writes a timeline event and the call status of a booking
-            (``IntegrationService.record``), as ``record(booking_id, kind, detail)``.
+        integration: Writes a timeline event and the call status (``IntegrationService``).
         after: How long a task may go without a change (``task_reconcile_after_minutes``).
     """
 
@@ -94,48 +118,64 @@ class TaskReconciler:
         uow: UnitOfWork,
         clock: Clock,
         dispatcher: ContactCenterDispatcher | None,
-        record: Callable[[int, EventKind, str], Awaitable[None]],
+        integration: IntegrationService,
         after: timedelta | Callable[[], timedelta],
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators; nothing has been read yet."""
         self._uow = uow
         self._clock = clock
         self._dispatcher = dispatcher
-        self._record = record
+        self._integration = integration
         self._after = after
+        self._read_at: dict[int, datetime] = {}
 
     async def run(self) -> int:
         """Reconcile the stale tasks; return how many states the webhooks had missed.
 
         A task the contact center no longer knows, or cannot be asked about now, is left as
         it is. Each organisation with a missed state gets one ``integration.webhooks_missing``
-        failure with the count; one whose run found none after an open failure gets the
-        success that closes the alert.
+        failure with the count; one with an open failure whose run found none gets the success
+        that closes the alert.
         """
         if self._dispatcher is None:
             return 0
         now = self._clock.now()
+        after = value_of(self._after)
         async with self._uow.read() as tx:
-            stale = await tx.stale_tasks(now - value_of(self._after), RECONCILE_LIMIT)
+            stale = await tx.stale_tasks(now - after, RECONCILE_LIMIT * RECHECK_RUNS)
+        rest = now - after * RECHECK_RUNS
+        self._read_at = {b: at for b, at in self._read_at.items() if at > rest}
+        due = [t for t in stale if t.booking_id not in self._read_at][:RECONCILE_LIMIT]
         missed: dict[str | None, int] = {}
-        for task in stale:
-            try:
-                snapshot = await self._dispatcher.read_task(task.task_id)
-            except IntegrationError:
-                continue
+        for task in due:
+            self._read_at[task.booking_id] = now
+            kind = await self._read(task)
             missed.setdefault(task.organisation, 0)
-            kind = TASK_EVENTS.get(snapshot.state)
-            if kind is None or snapshot.state is task.state:
-                continue
-            await self._record(task.booking_id, kind, RECONCILED)
-            missed[task.organisation] += 1
+            if kind is not None:
+                await self._integration.record(task.booking_id, kind, detail=RECONCILED)
+                missed[task.organisation] += 1
         await self._report(missed, now)
         return sum(missed.values())
 
+    async def _read(self, task: StaleTask) -> EventKind | None:
+        """Return the event that brings the booking to the task's state, if it differs."""
+        if self._dispatcher is None:  # pragma: no cover - run() returns before
+            return None
+        with trace_scope():
+            bind_level(task.organisation, task.group)
+            bind_booking(task.booking_id)
+            try:
+                snapshot = await self._dispatcher.read_task(task.task_id)
+            except IntegrationError:
+                return None
+        if snapshot.state is task.state:
+            return None
+        return TASK_EVENTS.get(snapshot.state)
+
     async def _report(self, missed: Mapping[str | None, int], now: datetime) -> None:
         """Write the failure per organisation with a miss, and the success that ends one."""
+        open_before = {a.organisation for a in await open_conditions(self._uow, WEBHOOKS_MISSING)}
         async with self._uow.locked() as tx:
-            open_before = await tx.organisations_missing_webhooks()
             for organisation, count in missed.items():
                 if count == 0 and organisation not in open_before:
                     continue

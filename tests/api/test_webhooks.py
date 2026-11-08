@@ -276,6 +276,7 @@ async def test_a_replayed_wxcc_event_changes_the_timeline_once_and_is_noted(
     async with SqlUnitOfWork(engine).read() as tx:
         inbound = await tx.get_inbound_events()
     await engine.dispose()
+    # The first is noted; the replay seconds later is not written again (NOTE_EVERY).
     assert [(e.platform.value, e.kind, e.outcome) for e in inbound] == [
-        ("wxcc", "task:connected", "duplicate")
+        ("wxcc", "task:connected", "recorded")
     ]

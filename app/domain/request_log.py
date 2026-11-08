@@ -15,6 +15,7 @@ that made them (same trace id); the log platform receives them with the other sy
 """
 
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
+from app.domain.connection_health import Platform
 from app.domain.event_context import current
 from app.domain.ports import Clock, RequestRecord, Transaction, UnitOfWork
 
@@ -40,9 +41,25 @@ def request_detail(record: RequestRecord, version: str) -> str:
         f"tracking:{record.tracking_id[:TRACKING_LIMIT]}",
         f"version:{version}",
     ]
-    if record.platform:
-        parts.append(f"platform:{record.platform}")
+    if record.platform is not None:
+        parts.append(f"platform:{record.platform.value}")
     return ",".join(parts)
+
+
+def request_platform(detail: str) -> Platform | None:
+    """Return the connection a request event counts for (``platform:wxcc``), if any."""
+    value = request_fields(detail).get("platform", "")
+    return Platform(value) if value in {p.value for p in Platform} else None
+
+
+def counts_as_failure(failed: bool, reason: str, detail: str) -> bool:
+    """Return whether a request event is a failure for the connection's health (ADR 0082).
+
+    A ``GET`` answered 404 is an expected answer, not a failure: reading a task the contact
+    center no longer knows (``read_task``) is how the reconcile learns that.
+    """
+    expected = reason == "rejected_404" and request_fields(detail).get("method") == "GET"
+    return failed and not expected
 
 
 def request_fields(detail: str) -> dict[str, str]:

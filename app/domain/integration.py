@@ -145,10 +145,8 @@ class IntegrationService:
                     return EventOutcome.IGNORED
                 detail = "host" if kind is EventKind.HOST_JOINED else detail
                 kind = TRIAL_MEETING_EVENTS[kind]
-            if event_key:
-                await tx.forget_webhook_events(at - WEBHOOK_MEMORY)
-                if not await tx.claim_webhook_event(WEBEX_SOURCE, event_key, at):
-                    return EventOutcome.DUPLICATE
+            if not await _claim(tx, WEBEX_SOURCE, event_key, at):
+                return EventOutcome.DUPLICATE
             await self._record(tx, booking.id, kind, at, detail)
         return EventOutcome.RECORDED
 
@@ -173,10 +171,8 @@ class IntegrationService:
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED
-                if event_key:
-                    await tx.forget_webhook_events(at - WEBHOOK_MEMORY)
-                    if not await tx.claim_webhook_event(WXCC_SOURCE, event_key, at):
-                        return EventOutcome.DUPLICATE
+                if not await _claim(tx, WXCC_SOURCE, event_key, at):
+                    return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
                 return EventOutcome.RECORDED
         # Outside the write lock: the registry writes in a transaction of its own.
@@ -250,3 +246,15 @@ class IntegrationService:
         )
         status = await tx.get_call_status(booking_id) or new_status(booking_id)
         await tx.save_call_status(apply_event(status, kind, at))
+
+
+async def _claim(tx: Transaction, source: str, event_key: str, at: datetime) -> bool:
+    """Remember ``event_key`` of ``source``; ``False`` when it was seen before (a replay).
+
+    Without a key there is nothing to remember and the event always counts. Keys older than
+    ``WEBHOOK_MEMORY`` are forgotten in the same transaction.
+    """
+    if not event_key:
+        return True
+    await tx.forget_webhook_events(at - WEBHOOK_MEMORY)
+    return await tx.claim_webhook_event(source, event_key, at)
