@@ -445,7 +445,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 0 | ADR proposed | #558 | merged |
 | 1 | Domain only: `app/domain/usage.py` (fact kinds, allow-list `USAGE_FIELDS`, metric table, buckets, `suppress()`), `privacy.py` list and test, `docs/reporting.md` generated; no database | #592 | merged |
 | 2 | Migration (five tables, expand-only), `record_usage` on `Transaction`, settings and registry entries, facts for booking create, confirm, expire, cancel, move, outcome, suspend/resume | #597 | merged |
-| 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | PR_NUMBER3 | merged |
+| 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | #628 | merged |
 | 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | #608 | merged |
 | 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | #619 | merged |
 | 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | | planned |

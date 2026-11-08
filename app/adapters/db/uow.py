@@ -460,9 +460,6 @@ def _contacts_column(block: ContactBlock | None) -> str | None:
     return contacts_json(block) if block else None
 
 
-_call_status = call_status_of
-
-
 def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
     """Map the JSON of a channel settings row back to the domain (validating it again)."""
     values = json.loads(settings)
@@ -1487,7 +1484,7 @@ class SqlTransaction(
         return [
             BookingOverview(
                 _booking(booking, slot),
-                _call_status(status) if status else new_status(booking.id),
+                call_status_of(status) if status else new_status(booking.id),
             )
             for booking, slot, status in rows
         ]
@@ -1518,18 +1515,18 @@ class SqlTransaction(
                 start,
                 end,
                 status == BookingStatus.CONFIRMED.value,
-                _call_status(call) if call else new_status(booking_id),
+                call_status_of(call) if call else new_status(booking_id),
                 claimed=claimed_at is not None,
             )
             for booking_id, status, start, end, call, claimed_at in rows
         ]
 
-    async def get_call_status(self, booking_id: int) -> CallStatus | None:
+    async def getcall_status_of(self, booking_id: int) -> CallStatus | None:
         """Return the booking's aggregated call status."""
         row = await self._session.get(CallStatusRow, booking_id)
-        return _call_status(row) if row else None
+        return call_status_of(row) if row else None
 
-    async def save_call_status(self, status: CallStatus) -> None:
+    async def savecall_status_of(self, status: CallStatus) -> None:
         """Create or replace the booking's aggregated call status."""
         await self._session.merge(
             CallStatusRow(
