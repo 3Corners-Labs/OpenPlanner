@@ -341,6 +341,7 @@ same commit and rollback behaviour as the SQL one.
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
+| Where an admin comes back to after login, re-login or a "return to" form (`next`): the redirect guard and the allow-list of view parameters | `app/admin/return_to.py` |
 | Machine API for bots: clients, credentials, tokens, scopes (ADR 0023) | `app/domain/api_clients.py`, `app/domain/api_access.py`, `app/adapters/db/api_clients.py` |
 | Machine API over HTTP: token endpoint, `RequireScope`, routes, JSON errors, docs page | `app/api/agent/` |
 | API clients and switches in the admin portal (superuser) | `app/admin/api_routes.py` |

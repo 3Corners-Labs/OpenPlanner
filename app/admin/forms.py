@@ -587,23 +587,6 @@ def done_message(request: Request, _: BoundGettext) -> str | None:
     return _(DONE_MESSAGES[key], count=count) if key in DONE_MESSAGES else None
 
 
-def safe_next(value: str | None) -> str:
-    """Return ``value`` if it is an admin path on this site; otherwise the dashboard.
-
-    For every "return to" target that arrives with a request (login, re-login, the update
-    banner's snooze), so none can send the admin off the portal.
-    """
-    if (
-        value
-        and value.startswith("/admin")
-        and not value.startswith("//")
-        and "\\" not in value
-        and "://" not in value
-    ):
-        return value
-    return "/admin/"
-
-
 def redirect_done(
     url: str, done: str, count: int | None = None, *, anchor: str = ""
 ) -> RedirectResponse:
