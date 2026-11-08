@@ -51,7 +51,7 @@ from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService
@@ -490,7 +490,9 @@ async def confirm_proposal(
     ref = await authorise(request, public_ref)
     try:
         receipt = await _service(request).confirm_proposal(ref)
-    except DomainError:
+    except DomainError as error:
+        if error.code is ErrorCode.DATABASE_BUSY:  # a retry may still work: not "gone"
+            raise
         return RedirectResponse(_manage_url(public_ref, "proposal_gone"), status_code=303)
     new = receipt.booking
     return await start(request, new.id or 0, _manage_url(new.public_ref, "rescheduled"))

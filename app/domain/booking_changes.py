@@ -232,7 +232,12 @@ async def hold_proposal(
 async def release_proposal(
     tx: Transaction, booking: Booking, now: datetime, outcome: ProposalOutcome
 ) -> HeldProposal | None:
-    """Release the booking's open proposal with ``outcome``; return it, or ``None`` if none."""
+    """Release the booking's open proposal with ``outcome``; return it, or ``None`` if none.
+
+    Only a booking awaiting a new time can have one, so no other booking costs a query.
+    """
+    if not booking.awaits_rebook:
+        return None
     proposal = await tx.get_open_proposal(_id(booking))
     if proposal is None:
         return None
@@ -245,7 +250,7 @@ async def answer_proposal(
     tx: Transaction, booking: Booking, now: datetime, new_start: datetime
 ) -> None:
     """Release the open proposal of a booking that moves to ``new_start`` (taken or not)."""
-    proposal = await tx.get_open_proposal(_id(booking))
+    proposal = await tx.get_open_proposal(_id(booking)) if booking.awaits_rebook else None
     if proposal is not None:
         await tx.save_proposal(proposal.answered(new_start, now))
 
