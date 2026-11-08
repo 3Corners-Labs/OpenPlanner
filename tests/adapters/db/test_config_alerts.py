@@ -13,7 +13,9 @@ from app.domain.configuration_document import Document, Mode, Scope, parse_docum
 from app.domain.configuration_plan import plan_document
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_v1 import FORMATS, V1
+from app.domain.configuration_values import Value
 from app.domain.errors import DomainError, ErrorCode
+from tests.support.config_changes import apply_changes, planned
 from tests.support.configuration import allow
 
 PLATFORM = "platform_alert_target"
@@ -27,22 +29,12 @@ def change(
     level: str | None = None,
     owner: str | None = None,
 ) -> Change:
-    values = {} if level is None else {"min_level": level}
-    return Change(
-        kind=kind,
-        key=key,
-        address=(owner, *key) if owner else key,  # type: ignore[arg-type]
-        path="",
-        action=action,
-        fields=tuple(values),
-        values=values,
-    )
+    values: dict[str, Value] = {} if level is None else {"min_level": level}
+    return planned(kind, (owner, *key) if owner else key, action, values, key=key)
 
 
 async def apply(engine: AsyncEngine, *changes: Change) -> None:
-    async with AsyncSession(engine) as session, session.begin():
-        for item in changes:
-            await WRITERS[item.kind](session, None, item)
+    await apply_changes(engine, WRITERS, None, *changes)
 
 
 async def read(engine: AsyncEngine) -> dict[str | None, tuple[Entity, ...]]:

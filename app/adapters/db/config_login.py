@@ -12,14 +12,23 @@ an audit event is written here; the caller does both once per apply.
 
 import json
 import secrets
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Mapping
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
-from app.adapters.db.identity_providers import _key_name, _secret_name
+from app.adapters.db.config_common import (
+    Writer,
+    find_organisation_id,
+    invalid,
+    moment,
+    opened,
+    row_or_refuse,
+    seal,
+)
+from app.adapters.db.identity_providers import key_name, secret_name
 from app.adapters.db.models import (
     IdentityProviderDomainRow,
     IdentityProviderKeyRow,
@@ -31,13 +40,10 @@ from app.domain import configuration_v1_names as names
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Action, Entity
 from app.domain.configuration_values import Secret, Value
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import ErrorCode
 from app.domain.identity_provider_service import TOKEN_BYTES
 from app.domain.identity_providers import ClientAuth
 from app.domain.login_domains import DomainState
-
-type Writer = Callable[[AsyncSession, SecretBox | None, Change], Awaitable[None]]
-"""Applies one planned change inside the caller's transaction."""
 
 _PROVIDER_FIELDS = (
     "name",
@@ -52,51 +58,6 @@ _PROVIDER_FIELDS = (
     "mfa_amr_values",
     "mfa_acr_values",
 )
-
-
-def _invalid(field: str) -> DomainError:
-    """Return the refusal that names ``field``."""
-    return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
-
-
-async def organisation_id(session: AsyncSession, slug: str) -> int:
-    """Return the id of the organisation ``slug``.
-
-    Raises:
-        DomainError: ``invalid_configuration`` naming ``organisation`` when there is none.
-    """
-    found = await session.scalar(select(OrganisationRow.id).where(OrganisationRow.slug == slug))
-    if found is None:
-        raise _invalid("organisation")
-    return int(found)
-
-
-def seal(box: SecretBox | None, name: str, value: Value) -> tuple[bytes, bytes]:
-    """Seal an opened secret under ``name``.
-
-    Raises:
-        DomainError: ``integration_not_ready`` without a settings key; ``invalid_configuration``
-            when the value is not an opened secret.
-    """
-    if not isinstance(value, Secret):
-        raise _invalid("secret")
-    if box is None:
-        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
-    return box.seal(name, value.reveal().encode())
-
-
-def moment(value: datetime | None) -> str | None:
-    """Return a stored time as UTC ISO text, as the kinds write it."""
-    return None if value is None else value.astimezone(UTC).isoformat()
-
-
-def _opened(
-    box: SecretBox | None, name: str, nonce: bytes | None, cipher: bytes | None
-) -> Secret | None:
-    """Return a sealed value opened as ``Secret``; ``None`` when unset or without a key."""
-    if box is None or nonce is None or cipher is None:
-        return None
-    return Secret(box.open(name, nonce, cipher).decode())
 
 
 async def read_identity_providers(
@@ -120,9 +81,9 @@ async def read_identity_providers(
         provider = provider_keys[key_row.provider_id]
         fields: dict[str, Value] = {
             "public_jwk": json.loads(key_row.public_jwk),
-            "private_key": _opened(
+            "private_key": opened(
                 box,
-                _key_name(provider, key_row.kid),
+                key_name(provider, key_row.kid),
                 key_row.key_nonce,
                 key_row.key_ciphertext,
             ),
@@ -142,8 +103,8 @@ async def read_identity_providers(
     found: dict[str, list[Entity]] = {}
     for row, slug in rows:
         fields = {name: getattr(row, name) for name in _PROVIDER_FIELDS}
-        fields["client_secret"] = _opened(
-            box, _secret_name(row.key), row.secret_nonce, row.secret_ciphertext
+        fields["client_secret"] = opened(
+            box, secret_name(row.key), row.secret_nonce, row.secret_ciphertext
         )
         found.setdefault(slug, []).append(
             Entity(
@@ -166,10 +127,12 @@ async def _provider_row(session: AsyncSession, key: str) -> IdentityProviderRow:
     Raises:
         DomainError: ``invalid_configuration`` naming ``key`` when there is none.
     """
-    row = await session.scalar(select(IdentityProviderRow).where(IdentityProviderRow.key == key))
-    if row is None:
-        raise _invalid("key")
-    return row
+    return await row_or_refuse(
+        session,
+        select(IdentityProviderRow).where(IdentityProviderRow.key == key),
+        ErrorCode.INVALID_CONFIGURATION,
+        "key",
+    )
 
 
 def _write_client_secret(
@@ -179,7 +142,7 @@ def _write_client_secret(
     if value is None:
         row.secret_nonce = row.secret_ciphertext = None
         return
-    row.secret_nonce, row.secret_ciphertext = seal(box, _secret_name(key), value)
+    row.secret_nonce, row.secret_ciphertext = seal(box, secret_name(key), value)
 
 
 async def write_identity_provider(
@@ -207,9 +170,9 @@ async def write_identity_provider(
     issuer = change.values.get("issuer")
     if change.action is ChangeAction.CREATE:
         if not isinstance(issuer, str) or not issuer:
-            raise _invalid("issuer")
+            raise invalid("issuer")
         row = IdentityProviderRow(
-            organisation_id=await organisation_id(session, change.address[0]),
+            organisation_id=await find_organisation_id(session, change.address[0]),
             key=key,
             issuer=issuer,
             created_at=now,
@@ -257,7 +220,7 @@ async def write_signing_key(session: AsyncSession, box: SecretBox | None, change
     values = change.values
     if change.action is ChangeAction.CREATE:
         provider_row = await _provider_row(session, provider)
-        nonce, cipher = seal(box, _key_name(provider, kid), values.get("private_key"))
+        nonce, cipher = seal(box, key_name(provider, kid), values.get("private_key"))
         session.add(
             IdentityProviderKeyRow(
                 kid=kid,
@@ -271,12 +234,12 @@ async def write_signing_key(session: AsyncSession, box: SecretBox | None, change
         )
     else:
         if row is None:
-            raise _invalid("kid")
+            raise invalid("kid")
         if "public_jwk" in change.fields:
             row.public_jwk = json.dumps(values["public_jwk"], sort_keys=True)
         if "private_key" in change.fields:
             row.key_nonce, row.key_ciphertext = seal(
-                box, _key_name(provider, kid), values.get("private_key")
+                box, key_name(provider, kid), values.get("private_key")
             )
         if "created_at" in change.fields:
             row.created_at = (
@@ -339,7 +302,7 @@ async def ensure_signing_keys(session: AsyncSession, box: SecretBox | None) -> l
         if has_key is not None:
             continue
         generated = EcSigningKeys().generate()
-        nonce, cipher = seal(box, _key_name(row.key, generated.kid), Secret(generated.private_pem))
+        nonce, cipher = seal(box, key_name(row.key, generated.kid), Secret(generated.private_pem))
         session.add(
             IdentityProviderKeyRow(
                 kid=generated.kid,

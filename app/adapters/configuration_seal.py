@@ -11,7 +11,7 @@ against them, never obeyed: a hostile document cannot ask for a different cost.
 import base64
 import binascii
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import replace
 
 from cryptography.exceptions import InvalidTag
@@ -25,7 +25,7 @@ from app.adapters.db.configuration_package import (
     package_box,
 )
 from app.domain.configuration_document import Document
-from app.domain.configuration_tree import Address, Entity
+from app.domain.configuration_tree import Address, Entity, any_field, drop_fields, map_fields
 from app.domain.configuration_values import Json, Sealed, Secret, Value
 from app.domain.errors import DomainError, ErrorCode
 
@@ -130,28 +130,13 @@ class DocumentSealer:
         return Secret(plain.decode())
 
 
-type Change = Callable[[str, Address, str, Value], Value]
-
-
-def _map(entity: Entity, address: Address, change: Change) -> Entity:
-    """Return ``entity`` with every field passed through ``change``, children included."""
-    fields = {
-        name: change(entity.kind, address, name, value) for name, value in entity.fields.items()
-    }
-    children = {
-        group: tuple(_map(child, (*address, *child.key), change) for child in members)
-        for group, members in entity.children.items()
-    }
-    return replace(entity, fields=fields, children=children)
-
-
 def seal_document(document: Document, sealer: DocumentSealer) -> Document:
     """Return the document with every opened secret sealed and the header written."""
 
     def change(kind: str, address: Address, field: str, value: Value) -> Value:
         return sealer.seal(kind, address, field, value) if isinstance(value, Secret) else value
 
-    return replace(document, root=_map(document.root, (), change), seal=sealer.header())
+    return replace(document, root=map_fields(document.root, change), seal=sealer.header())
 
 
 def open_document(document: Document, passphrase: str | None) -> Document:
@@ -164,7 +149,7 @@ def open_document(document: Document, passphrase: str | None) -> Document:
             passphrase is missing; ``configuration_passphrase_wrong`` when it does not open
             them; ``configuration_package_invalid`` for sealed values without a header.
     """
-    if not _has_sealed(document.root):
+    if not any_field(document.root, lambda value: isinstance(value, Sealed)):
         return document
     if document.seal is None:
         raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "seal")
@@ -175,24 +160,12 @@ def open_document(document: Document, passphrase: str | None) -> Document:
     def change(kind: str, address: Address, field: str, value: Value) -> Value:
         return sealer.open(kind, address, field, value) if isinstance(value, Sealed) else value
 
-    return replace(document, root=_map(document.root, (), change))
-
-
-def _has_sealed(entity: Entity) -> bool:
-    """Whether any field below ``entity`` is still a sealed value."""
-    return any(isinstance(value, Sealed) for value in entity.fields.values()) or any(
-        _has_sealed(child) for members in entity.children.values() for child in members
-    )
+    return replace(document, root=map_fields(document.root, change))
 
 
 def drop_secrets(entity: Entity) -> Entity:
     """Return ``entity`` without any secret field: an export without secrets."""
-    fields = {n: v for n, v in entity.fields.items() if not isinstance(v, Secret | Sealed)}
-    children = {
-        group: tuple(drop_secrets(child) for child in members)
-        for group, members in entity.children.items()
-    }
-    return replace(entity, fields=fields, children=children)
+    return drop_fields(entity, lambda value: isinstance(value, Secret | Sealed))
 
 
 class PassphraseSealing:

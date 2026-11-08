@@ -12,6 +12,7 @@ from app.domain.channels import ChannelKind
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_values import Secret, Value
 from app.domain.errors import DomainError, ErrorCode
+from tests.support.config_changes import apply_changes, planned
 from tests.support.config_roundtrip import document_of, organisations, plan_against
 
 BOX = SecretBox(b"k" * 32)
@@ -38,22 +39,11 @@ SMS: dict[str, Value] = {
 def change(
     kind: str, action: ChangeAction, values: dict[str, Value], *fields: str, org: str = "acme"
 ) -> Change:
-    return Change(
-        kind=kind,
-        key=(),
-        address=(org,),
-        path="x",
-        action=action,
-        fields=fields or tuple(values),
-        values=values,
-        organisation=org,
-    )
+    return planned(kind, (org,), action, values, fields or None, key=(), organisation=org)
 
 
 async def apply(engine: AsyncEngine, box: SecretBox | None, *changes: Change) -> None:
-    async with AsyncSession(engine) as session, session.begin():
-        for one in changes:
-            await WRITERS[one.kind](session, box, one)
+    await apply_changes(engine, WRITERS, box, *changes)
 
 
 async def read(engine: AsyncEngine, box: SecretBox | None = BOX) -> dict[str, tuple]:  # type: ignore[type-arg]
@@ -204,7 +194,7 @@ async def test_an_unknown_organisation_or_a_second_create_is_refused(
     with pytest.raises(DomainError) as twice:
         await apply(installation, BOX, change("email_channel", ChangeAction.CREATE, EMAIL))
 
-    assert unknown.value.code is ErrorCode.INVALID_CONFIGURATION
+    assert unknown.value.code is ErrorCode.ORGANISATION_NOT_FOUND
     assert twice.value.code is ErrorCode.CONFIGURATION_OBJECT_EXISTS
 
 

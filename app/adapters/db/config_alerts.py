@@ -6,12 +6,11 @@ its owner; its deliveries (state) go with it when it is deleted. Neither side bu
 version or writes an audit event: the caller does both once per apply.
 """
 
-from collections.abc import Awaitable, Callable
-
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
+from app.adapters.db.config_common import Writer, find_organisation_id
 from app.adapters.db.models import AlertDeliveryRow, AlertTargetRow, OrganisationRow
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Entity
@@ -19,10 +18,6 @@ from app.domain.configuration_v1_names import (
     ORGANISATION_ALERT_TARGET_KIND,
     PLATFORM_ALERT_TARGET_KIND,
 )
-from app.domain.errors import DomainError, ErrorCode
-
-type Writer = Callable[[AsyncSession, SecretBox | None, Change], Awaitable[None]]
-"""Applies one planned change of one kind inside the caller's transaction."""
 
 
 async def read_alert_targets(session: AsyncSession) -> dict[str | None, tuple[Entity, ...]]:
@@ -49,12 +44,7 @@ async def _owner_id(session: AsyncSession, change: Change) -> int | None:
     """
     if change.kind == PLATFORM_ALERT_TARGET_KIND:
         return None
-    found = await session.scalar(
-        select(OrganisationRow.id).where(OrganisationRow.slug == change.address[0])
-    )
-    if found is None:
-        raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
-    return int(found)
+    return await find_organisation_id(session, change.address[0])
 
 
 async def _find(session: AsyncSession, owner: int | None, change: Change) -> AlertTargetRow | None:

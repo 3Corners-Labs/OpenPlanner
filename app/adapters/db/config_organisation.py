@@ -11,13 +11,14 @@ version and never audit: the apply does both once. Raw SQL is not used; the mode
 """
 
 import json
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Mapping
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
+from app.adapters.db.config_common import Writer, find_organisation_id, invalid
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.models import (
     ApiClientRow,
@@ -34,6 +35,7 @@ from app.adapters.db.models import (
     OrganisationTextRow,
     SlotRow,
 )
+from app.adapters.db.record_names import bot_credential_name
 from app.domain.branding import FontFile, FontRole, Logo
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Entity
@@ -46,10 +48,8 @@ from app.domain.configuration_v1_names import (
 )
 from app.domain.configuration_values import Binary, Json, Value
 from app.domain.contacts import block_to_json
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.images import recognise
 
-type Writer = Callable[[AsyncSession, SecretBox | None, Change], Awaitable[None]]
 """Applies one change of a plan inside the caller's transaction."""
 
 FONT_MEDIA_TYPE = "font/woff2"
@@ -206,19 +206,6 @@ async def _texts(session: AsyncSession) -> dict[int, tuple[Entity, ...]]:
 # --- writing -------------------------------------------------------------------------------
 
 
-def _missing(field: str) -> DomainError:
-    """Return the refusal for a parent that does not exist."""
-    return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
-
-
-async def _organisation_id(session: AsyncSession, slug: str) -> int:
-    """Return the id of the organisation ``slug``; refuse when there is none."""
-    found = await session.scalar(select(OrganisationRow.id).where(OrganisationRow.slug == slug))
-    if found is None:
-        raise _missing("organisation")
-    return int(found)
-
-
 def _text(value: Value) -> str:
     """Return a field value that the kind checked to be a text."""
     return str(value)
@@ -228,7 +215,7 @@ async def _write_organisation(session: AsyncSession, box: SecretBox | None, chan
     """Create, update or delete an organisation with the rows that belong to it."""
     slug = change.key[0]
     if change.action is ChangeAction.DELETE:
-        await _delete_organisation(session, await _organisation_id(session, slug))
+        await _delete_organisation(session, await find_organisation_id(session, slug))
         return
     names = set(change.values) if change.action is ChangeAction.CREATE else set(change.fields)
     values = change.values
@@ -247,7 +234,7 @@ async def _write_organisation(session: AsyncSession, box: SecretBox | None, chan
         await session.flush()
         organisation_id = row.id
     else:
-        organisation_id = await _organisation_id(session, slug)
+        organisation_id = await find_organisation_id(session, slug)
         columns = _columns(names, values, slug)
         if columns:
             await session.execute(
@@ -336,7 +323,7 @@ async def _write_calendars(session: AsyncSession, organisation_id: int, value: V
         ).all()
     )
     if len(ids) != len(set(slugs)):
-        raise _missing("holiday_calendars")
+        raise invalid("holiday_calendars")
     session.add_all(
         OrganisationHolidayCalendarRow(organisation_id=organisation_id, calendar_id=ids[slug])
         for slug in sorted(set(slugs))
@@ -352,8 +339,6 @@ async def _delete_organisation(session: AsyncSession, organisation_id: int) -> N
     group links, by cascade) and its groups with their slots. The sealed Webex bot token has no
     foreign key and goes too, so a later organisation never inherits it by a reused id.
     """
-    from app.adapters.db.uow import bot_credential_name  # noqa: PLC0415 - uow imports this slice
-
     group_ids = list(
         await session.scalars(
             select(GroupRow.id).where(GroupRow.organisation_id == organisation_id)
@@ -375,7 +360,7 @@ async def _delete_organisation(session: AsyncSession, organisation_id: int) -> N
 
 async def _write_setting(session: AsyncSession, box: SecretBox | None, change: Change) -> None:
     """Set or remove one class D value of an organisation."""
-    organisation_id = await _organisation_id(session, change.address[0])
+    organisation_id = await find_organisation_id(session, change.address[0])
     key = change.key[0]
     if change.action is ChangeAction.DELETE:
         await session.execute(
@@ -398,7 +383,7 @@ async def _write_setting(session: AsyncSession, box: SecretBox | None, change: C
 
 async def _write_text(session: AsyncSession, box: SecretBox | None, change: Change) -> None:
     """Set or remove the organisation's own text of one key in one locale."""
-    organisation_id = await _organisation_id(session, change.address[0])
+    organisation_id = await find_organisation_id(session, change.address[0])
     locale, key = change.key
     if change.action is ChangeAction.DELETE:
         await session.execute(
@@ -424,13 +409,13 @@ def _binary(change: Change) -> Binary:
     """Return the file a change writes."""
     data = change.values["data"]
     if not isinstance(data, Binary):
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "data")
+        raise invalid("data")
     return data
 
 
 async def _write_logo(session: AsyncSession, box: SecretBox | None, change: Change) -> None:
     """Replace or remove the logo and keep its type and digest on the organisation."""
-    organisation_id = await _organisation_id(session, change.address[0])
+    organisation_id = await find_organisation_id(session, change.address[0])
     logo = None if change.action is ChangeAction.DELETE else _logo_of(_binary(change))
     await session.execute(
         delete(OrganisationLogoRow).where(OrganisationLogoRow.organisation_id == organisation_id)
@@ -454,7 +439,7 @@ def _logo_of(binary: Binary) -> Logo:
 
 async def _write_font(session: AsyncSession, box: SecretBox | None, change: Change) -> None:
     """Replace or remove the font of one role and keep the digests on the organisation."""
-    organisation_id = await _organisation_id(session, change.address[0])
+    organisation_id = await find_organisation_id(session, change.address[0])
     role = FontRole(change.key[0])
     font = None if change.action is ChangeAction.DELETE else FontFile(role, _binary(change).data)
     await session.execute(

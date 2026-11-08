@@ -11,7 +11,7 @@ both once per apply). Raw SQL is not used; the rows are the ORM's. No value is l
 
 import json
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import cast
@@ -20,6 +20,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
+from app.adapters.db.config_common import Writer, find_organisation_id, row_or_refuse
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.form_fields import FormFieldQueries
 from app.adapters.db.models import (
@@ -45,8 +46,8 @@ from app.adapters.db.routing_json import (
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_v1_group_parts import (
-    _definition,
-    _form_json,
+    definition,
+    form_json,
     items_of,
     override_json,
     rule_json,
@@ -60,9 +61,6 @@ from app.domain.form_fields import FieldDefinition, FormDefinition
 from app.domain.routing_codec import routing_from_json as strict_routing
 from app.domain.routing_codec import routing_to_json
 from app.domain.scheduling import Offer, ScheduleOverride, ScheduleRule, TimeWindow
-
-type Writer = Callable[[AsyncSession, SecretBox | None, Change], Awaitable[None]]
-"""Applies one planned change inside the caller's transaction (the contract of step 2)."""
 
 COLUMNS = (
     "name",
@@ -220,7 +218,7 @@ async def read_groups(session: AsyncSession) -> dict[str, tuple[Entity, ...]]:
         fields["archived"] = row.archived_at is not None
         fields["holiday_calendars"] = _list(calendars.get(row.id, []))
         fields["holiday_open_days"] = _list(open_days.get(row.id, []))
-        fields["form_fields"] = _list(_form_json(f) for f in (*form.fields, *form.retired))
+        fields["form_fields"] = _list(form_json(f) for f in (*form.fields, *form.retired))
         fields["schedule_rules"] = _list(rule_json(_rule_of(r)) for r in rules.get(row.id, []))
         fields["schedule_overrides"] = _list(
             override_json(_override_of(o)) for o in overrides.get(row.id, [])
@@ -247,25 +245,11 @@ async def read_groups(session: AsyncSession) -> dict[str, tuple[Entity, ...]]:
 # --- writing ------------------------------------------------------------------------------
 
 
-def _invalid(field: str) -> DomainError:
-    """Return the refusal for a value the database cannot take, naming the field."""
-    return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
-
-
-async def _organisation_id(session: AsyncSession, slug: str) -> int:
-    """Return the id of an organisation by slug."""
-    found = await session.scalar(select(OrganisationRow.id).where(OrganisationRow.slug == slug))
-    if found is None:
-        raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND, "organisation")
-    return int(found)
-
-
 async def _group_row(session: AsyncSession, slug: str) -> GroupRow:
     """Return the group row with ``slug``."""
-    row = await session.scalar(select(GroupRow).where(GroupRow.slug == slug))
-    if row is None:
-        raise DomainError(ErrorCode.GROUP_NOT_FOUND, "group")
-    return row
+    return await row_or_refuse(
+        session, select(GroupRow).where(GroupRow.slug == slug), ErrorCode.GROUP_NOT_FOUND, "group"
+    )
 
 
 def _items(values: Mapping[str, Value], name: str) -> list[dict[str, Json]]:
@@ -374,9 +358,9 @@ async def _write_form(session: AsyncSession, group_id: int, values: Mapping[str,
     active: list[FieldDefinition] = []
     retired: list[FieldDefinition] = []
     for item in _items(values, "form_fields"):
-        definition = _definition(item)
+        parsed = definition(item)
         (retired if item.get("retired") else active).append(
-            replace(definition, retired=bool(item.get("retired")))
+            replace(parsed, retired=bool(item.get("retired")))
         )
     listed = {f.key for f in (*active, *retired)}
     retired.extend(
@@ -425,7 +409,7 @@ async def write_group(session: AsyncSession, box: SecretBox | None, change: Chan
     if change.action is ChangeAction.CREATE:
         names = set(values)
         row = GroupRow(
-            organisation_id=await _organisation_id(session, change.address[0]),
+            organisation_id=await find_organisation_id(session, change.address[0]),
             slug=slug,
             idp_key=slug,
             **{name: values[name] for name in COLUMNS if name in values},

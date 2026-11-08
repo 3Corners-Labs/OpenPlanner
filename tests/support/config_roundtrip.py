@@ -13,7 +13,7 @@ from dataclasses import replace
 from app.domain.configuration_changes import RuleContext, Usage
 from app.domain.configuration_document import Document, Mode, Scope, parse_document, to_json
 from app.domain.configuration_plan import Plan, plan_document
-from app.domain.configuration_tree import Entity
+from app.domain.configuration_tree import Entity, drop_fields, map_fields
 from app.domain.configuration_v1 import FORMATS, V1
 from app.domain.configuration_values import Sealed, Secret, Value
 from tests.support.configuration import allow
@@ -32,16 +32,6 @@ def organisations(**children: Mapping[str, tuple[Entity, ...]]) -> Entity:
     )
 
 
-def _map(node: Entity, convert: object) -> Entity:
-    """Return ``node`` with ``convert`` applied to every field value, below it too."""
-    fields = {name: convert(value) for name, value in node.fields.items()}  # type: ignore[operator]
-    children = {
-        name: tuple(_map(child, convert) for child in group)
-        for name, group in node.children.items()
-    }
-    return replace(node, fields=fields, children=children)
-
-
 def _seal(value: Value) -> Value:
     """Seal a secret the way these tests do: base64 of its plain text."""
     if isinstance(value, Secret):
@@ -56,31 +46,17 @@ def _open(value: Value) -> Value:
     return value
 
 
-def _strip(value: Value) -> Value:
-    """Mark a secret for removal."""
-    return value
-
-
 def document_of(current: Entity, *, secrets: bool) -> Document:
     """Write ``current`` as a document, read it back, and open its secrets again.
 
     Without ``secrets`` the secret fields are left out, as an export without secrets does.
     """
-    sealed = _map(current, _seal)
+    sealed = map_fields(current, lambda _kind, _at, _name, value: _seal(value))
     if not secrets:
-        sealed = _drop_sealed(sealed)
+        sealed = drop_fields(sealed, lambda value: isinstance(value, Sealed))
     document = Document(V1.name, Mode.MERGE, Scope(), sealed, "unused", V1)
     read = parse_document(to_json(document), FORMATS)
-    return replace(read, root=_map(read.root, _open))
-
-
-def _drop_sealed(node: Entity) -> Entity:
-    """Return ``node`` without its sealed fields, below it too."""
-    fields = {n: v for n, v in node.fields.items() if not isinstance(v, Sealed)}
-    children = {
-        name: tuple(_drop_sealed(child) for child in group) for name, group in node.children.items()
-    }
-    return replace(node, fields=fields, children=children)
+    return replace(read, root=map_fields(read.root, lambda _kind, _at, _name, value: _open(value)))
 
 
 def plan_against(document: Document, current: Entity) -> Plan:

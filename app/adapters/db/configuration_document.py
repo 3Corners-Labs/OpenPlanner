@@ -25,12 +25,13 @@ from app.adapters.db import (
     config_platform,
     config_scenarios,
 )
+from app.adapters.db.config_common import Writer
 from app.adapters.db.config_usage import read_usage
 from app.domain.configuration_changes import Change, ConfigurationSnapshot
 from app.domain.configuration_tree import Entity
 from app.domain.errors import DomainError, ErrorCode
 
-WRITERS: dict[str, config_platform.Writer] = {
+WRITERS: dict[str, Writer] = {
     **config_platform.WRITERS,
     **config_alerts.WRITERS,
     **config_organisation.WRITERS,

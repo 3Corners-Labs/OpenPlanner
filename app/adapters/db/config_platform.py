@@ -9,13 +9,14 @@ settings version or writes an audit event: the caller does both once per apply.
 """
 
 import json
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
+from app.adapters.db.config_common import Writer, invalid, need_box, opened, row_or_refuse
 from app.adapters.db.log_destinations import secret_name as log_secret_name
 from app.adapters.db.models import (
     ApiSettingsRow,
@@ -27,6 +28,7 @@ from app.adapters.db.models import (
     PlatformSettingRow,
     RoleRow,
 )
+from app.adapters.db.platform_settings import SECRET_PREFIX
 from app.domain.authorization import Permission
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Entity
@@ -42,12 +44,8 @@ from app.domain.configuration_v1_names import (
 )
 from app.domain.configuration_v1_platform import SECRET_NAMES, WEBEX_SERVICE_APP, editable_setting
 from app.domain.configuration_values import Json, Secret, Value
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import ErrorCode
 
-type Writer = Callable[[AsyncSession, SecretBox | None, Change], Awaitable[None]]
-"""Applies one planned change of one kind inside the caller's transaction."""
-
-_SETTING_PREFIX = "setting:"  # noqa: S105  # nosec B105 - a record name prefix, not a secret
 _API_SETTINGS_ID = 1
 _PERMISSIONS = frozenset(p.value for p in Permission)
 
@@ -55,18 +53,6 @@ _PERMISSIONS = frozenset(p.value for p in Permission)
 def _now() -> datetime:
     """Return the time stamped on the bookkeeping columns of a written row."""
     return datetime.now(UTC)
-
-
-def _invalid(field: str) -> DomainError:
-    """Return the refusal naming a field."""
-    return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
-
-
-def _need_box(box: SecretBox | None) -> SecretBox:
-    """Return the box, or refuse: without a settings key no secret can be written."""
-    if box is None:
-        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
-    return box
 
 
 def _entity(kind: str, key: tuple[str, ...], fields: Mapping[str, Value]) -> Entity:
@@ -106,7 +92,7 @@ async def _read_settings(session: AsyncSession) -> tuple[Entity, ...]:
     return tuple(found)
 
 
-def _credential_text(name: str, plaintext: bytes) -> str | None:
+def _credential_text(name: str, plaintext: str) -> str | None:
     """Return the secret of a credential row as the document holds it, or ``None``."""
     try:
         opened = json.loads(plaintext)
@@ -123,8 +109,8 @@ def _secret_key(record: str) -> str | None:
     """Return the document name of a credential row, or ``None`` if a document does not hold it."""
     if record == WEBEX_SERVICE_APP:
         return record
-    key = record.removeprefix(_SETTING_PREFIX)
-    held = record.startswith(_SETTING_PREFIX) and key in SECRET_NAMES and key != WEBEX_SERVICE_APP
+    key = record.removeprefix(SECRET_PREFIX)
+    held = record.startswith(SECRET_PREFIX) and key in SECRET_NAMES and key != WEBEX_SERVICE_APP
     return key if held else None
 
 
@@ -140,10 +126,8 @@ async def _read_secrets(session: AsyncSession, box: SecretBox | None) -> tuple[E
         key = _secret_key(row.name)
         if key is None:
             continue
-        try:
-            text = _credential_text(key, box.open(row.name, row.nonce, row.ciphertext))
-        except Exception:  # noqa: S112  # nosec B112 - another key or a broken row: leave it out
-            continue
+        secret = opened(box, row.name, row.nonce, row.ciphertext)
+        text = None if secret is None else _credential_text(key, secret.reveal())
         if text is not None:
             found.append(_entity(PLATFORM_SECRET_KIND, (key,), {"secret": Secret(text)}))
     return tuple(found)
@@ -181,12 +165,9 @@ async def _read_log_destinations(
             "enabled": row.enabled,
             "ca_pem": row.ca_pem,
         }
-        if box is not None and row.secret_nonce is not None and row.secret_ciphertext is not None:
-            try:
-                plain = box.open(log_secret_name(row.id), row.secret_nonce, row.secret_ciphertext)
-                fields["secret"] = Secret(plain.decode())
-            except Exception:  # noqa: S110  # nosec B110 - another key: treat as not set
-                pass
+        secret = opened(box, log_secret_name(row.id), row.secret_nonce, row.secret_ciphertext)
+        if secret is not None:
+            fields["secret"] = secret
         found.append(_entity(LOG_DESTINATION_KIND, (row.name,), fields))
     return tuple(found)
 
@@ -239,7 +220,7 @@ def _json_scalar(value: Value, field: str) -> Json:
     if isinstance(value, Secret) or not (
         value is None or isinstance(value, bool | int | float | str | list | dict)
     ):
-        raise _invalid(field)
+        raise invalid(field)
     return value
 
 
@@ -261,7 +242,7 @@ async def _write_setting(session: AsyncSession, box: SecretBox | None, change: C
 
 def _credential_name(key: str) -> str:
     """Return the record name a platform secret is sealed under."""
-    return key if key == WEBEX_SERVICE_APP else _SETTING_PREFIX + key
+    return key if key == WEBEX_SERVICE_APP else SECRET_PREFIX + key
 
 
 async def _write_secret(session: AsyncSession, box: SecretBox | None, change: Change) -> None:
@@ -275,15 +256,15 @@ async def _write_secret(session: AsyncSession, box: SecretBox | None, change: Ch
         )
         return
     if not isinstance(value, Secret):
-        raise _invalid("secret")
-    sealer = _need_box(box)
+        raise invalid("secret")
+    sealer = need_box(box)
     if key == WEBEX_SERVICE_APP:
         try:
             payload = json.loads(value.reveal())
         except ValueError:
-            raise _invalid("secret") from None
+            raise invalid("secret") from None
         if not isinstance(payload, dict):
-            raise _invalid("secret")
+            raise invalid("secret")
     else:
         payload = {"value": value.reveal()}
     nonce, ciphertext = sealer.seal(name, json.dumps(payload).encode())
@@ -337,10 +318,11 @@ async def _log_row(session: AsyncSession, name: str) -> LogDestinationRow:
     Raises:
         DomainError: ``log_destination_not_found``.
     """
-    row = await session.scalar(select(LogDestinationRow).where(LogDestinationRow.name == name))
-    if row is None:
-        raise DomainError(ErrorCode.LOG_DESTINATION_NOT_FOUND)
-    return row
+    return await row_or_refuse(
+        session,
+        select(LogDestinationRow).where(LogDestinationRow.name == name),
+        ErrorCode.LOG_DESTINATION_NOT_FOUND,
+    )
 
 
 async def _write_log_destination(
@@ -375,11 +357,11 @@ async def _write_log_destination(
         if value is None:
             row.secret_nonce = row.secret_ciphertext = None
         elif isinstance(value, Secret):
-            row.secret_nonce, row.secret_ciphertext = _need_box(box).seal(
+            row.secret_nonce, row.secret_ciphertext = need_box(box).seal(
                 log_secret_name(row.id), value.reveal().encode()
             )
         else:
-            raise _invalid("secret")
+            raise invalid("secret")
     await session.flush()
 
 
@@ -389,10 +371,11 @@ async def _role_row(session: AsyncSession, claim_value: str) -> RoleRow:
     Raises:
         DomainError: ``role_not_found``.
     """
-    row = await session.scalar(select(RoleRow).where(RoleRow.claim_value == claim_value))
-    if row is None:
-        raise DomainError(ErrorCode.ROLE_NOT_FOUND)
-    return row
+    return await row_or_refuse(
+        session,
+        select(RoleRow).where(RoleRow.claim_value == claim_value),
+        ErrorCode.ROLE_NOT_FOUND,
+    )
 
 
 async def _write_role(session: AsyncSession, box: SecretBox | None, change: Change) -> None:
@@ -416,7 +399,7 @@ async def _write_role(session: AsyncSession, box: SecretBox | None, change: Chan
     if "permissions" in names:
         listed = change.values["permissions"]
         if not isinstance(listed, list):
-            raise _invalid("permissions")
+            raise invalid("permissions")
         row.permissions = " ".join(sorted(str(p) for p in listed))
     await session.flush()
 
@@ -427,10 +410,11 @@ async def _calendar_row(session: AsyncSession, slug: str) -> HolidayCalendarRow:
     Raises:
         DomainError: ``holiday_calendar_not_found``.
     """
-    row = await session.scalar(select(HolidayCalendarRow).where(HolidayCalendarRow.slug == slug))
-    if row is None:
-        raise DomainError(ErrorCode.HOLIDAY_CALENDAR_NOT_FOUND)
-    return row
+    return await row_or_refuse(
+        session,
+        select(HolidayCalendarRow).where(HolidayCalendarRow.slug == slug),
+        ErrorCode.HOLIDAY_CALENDAR_NOT_FOUND,
+    )
 
 
 async def _write_calendar(session: AsyncSession, box: SecretBox | None, change: Change) -> None:

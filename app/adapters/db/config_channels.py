@@ -16,8 +16,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
-from app.adapters.db.config_login import Writer, organisation_id, seal
+from app.adapters.db.config_common import Writer, find_organisation_id, opened, seal
 from app.adapters.db.models import ChannelSettingsRow, OrganisationRow
+from app.adapters.db.record_names import channel_secret_name
 from app.domain import configuration_v1_names as names
 from app.domain.channel_settings import (
     SmsProvider,
@@ -28,7 +29,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Action, Entity
-from app.domain.configuration_values import Secret, Value
+from app.domain.configuration_values import Value
 from app.domain.errors import DomainError, ErrorCode
 
 _SETTINGS_FIELDS: dict[ChannelKind, tuple[str, ...]] = {
@@ -48,11 +49,6 @@ _KINDS = {ChannelKind.EMAIL: names.EMAIL_CHANNEL_KIND, ChannelKind.SMS: names.SM
 _CHANNEL_OF_KIND = {kind: channel for channel, kind in _KINDS.items()}
 
 
-def _secret_name(organisation: int, channel: ChannelKind) -> str:
-    """Return the record name a channel secret is sealed under (associated data, ADR 0008)."""
-    return f"channel:{organisation}:{channel.value}"
-
-
 async def read_channels(
     session: AsyncSession, box: SecretBox | None
 ) -> dict[str, dict[str, tuple[Entity, ...]]]:
@@ -69,18 +65,11 @@ async def read_channels(
         channel = ChannelKind(row.channel)
         stored = json.loads(row.settings)
         fields: dict[str, Value] = {name: stored.get(name) for name in _SETTINGS_FIELDS[channel]}
-        fields["secret"] = (
-            Secret(
-                box.open(
-                    _secret_name(row.organisation_id, channel),
-                    row.secret_nonce,
-                    row.secret_ciphertext,
-                ).decode()
-            )
-            if box is not None
-            and row.secret_nonce is not None
-            and row.secret_ciphertext is not None
-            else None
+        fields["secret"] = opened(
+            box,
+            channel_secret_name(row.organisation_id, channel),
+            row.secret_nonce,
+            row.secret_ciphertext,
         )
         found.setdefault(slug, {})[channel.value] = (
             Entity(_KINDS[channel], (), Action.UPSERT, fields),
@@ -126,7 +115,7 @@ async def write_channel(session: AsyncSession, box: SecretBox | None, change: Ch
             secret, ``integration_not_ready`` for a secret and no settings key.
     """
     channel = _CHANNEL_OF_KIND[change.kind]
-    organisation = await organisation_id(session, change.address[0])
+    organisation = await find_organisation_id(session, change.address[0])
     row = await session.get(ChannelSettingsRow, (organisation, channel.value))
     if change.action is ChangeAction.DELETE:
         if row is not None:
@@ -148,7 +137,7 @@ async def write_channel(session: AsyncSession, box: SecretBox | None, change: Ch
             row.secret_nonce = row.secret_ciphertext = None
         else:
             row.secret_nonce, row.secret_ciphertext = seal(
-                box, _secret_name(organisation, channel), value
+                box, channel_secret_name(organisation, channel), value
             )
     row.updated_at = datetime.now(UTC)
     await session.flush()

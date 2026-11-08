@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.api_clients import ApiClientQueries
-from app.adapters.db.config_group import Writer
+from app.adapters.db.config_common import Writer, invalid, moment
 from app.adapters.db.models import ApiClientGroupRow, ApiClientRow, GroupRow, OrganisationRow
 from app.domain.api_clients import ApiClient
 from app.domain.authorization import ApiScope
@@ -33,11 +33,6 @@ class _Clients(ApiClientQueries):
     def __init__(self, session: AsyncSession) -> None:
         """Keep the session the queries run on."""
         self._session = session
-
-
-def _moment(value: datetime) -> str:
-    """Write a stored time as the UTC ISO text a document carries."""
-    return value.astimezone(UTC).isoformat()
 
 
 def _texts(value: Value) -> list[str]:
@@ -77,7 +72,7 @@ async def read_api_clients(session: AsyncSession, box: SecretBox | None) -> tupl
             "enabled": row.enabled,
             "groups": cast("list[Json]", sorted(grants.get(row.id, []))),
             "secret_hash": Secret(row.secret_hash),
-            "secret_expires_at": _moment(row.secret_expires_at),
+            "secret_expires_at": moment(row.secret_expires_at),
         }
         clients.append(Entity(API_CLIENT_KIND, (row.client_id,), fields=fields))
     return tuple(clients)
@@ -86,7 +81,7 @@ async def read_api_clients(session: AsyncSession, box: SecretBox | None) -> tupl
 def _hash(value: Value) -> str:
     """Return the stored hash from an opened secret."""
     if not isinstance(value, Secret):
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "secret_hash")
+        raise invalid("secret_hash")
     return value.reveal()
 
 
@@ -125,14 +120,14 @@ async def write_api_client(session: AsyncSession, box: SecretBox | None, change:
         try:
             await queries.add_api_client(client)
         except LookupError:
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "organisation") from None
+            raise invalid("organisation") from None
         return
     current = await queries.get_api_client(client_id)
     if current is None:
         raise DomainError(ErrorCode.API_CLIENT_NOT_FOUND, "client_id")
     named = set(change.fields)
     if "organisation" in named and values["organisation"] != current.organisation:
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "organisation")
+        raise invalid("organisation")
     updated = replace(
         current,
         name=str(values["name"]) if "name" in named else current.name,
@@ -150,7 +145,7 @@ async def write_api_client(session: AsyncSession, box: SecretBox | None, change:
     try:
         await queries.save_api_client(updated)
     except LookupError:
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "groups") from None
+        raise invalid("groups") from None
     if updated != current and named - {"name"}:
         await queries.revoke_access_tokens(client_id)
 

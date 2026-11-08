@@ -11,6 +11,7 @@ from app.domain.configuration_tree import Entity
 from app.domain.configuration_values import Binary, Value
 from app.domain.errors import DomainError, ErrorCode
 from tests.adapters.db.conftest import seed_group
+from tests.support.config_changes import apply_changes, planned
 from tests.support.config_roundtrip import document_of, organisations, plan_against
 from tests.support.images import png
 
@@ -41,16 +42,9 @@ def change(
     group: str | None = None,
 ) -> Change:
     address = (ORG, name) if group is None else (ORG, group, name)
-    return Change(
-        kind=kind,
-        key=() if kind == "scenario_image" else (name,),
-        address=address,
-        path="x",
-        action=action,
-        fields=fields or tuple(values),
-        values=values,
-        organisation=ORG,
-        group=group,
+    key = () if kind == "scenario_image" else (name,)
+    return planned(
+        kind, address, action, values, fields or None, key=key, organisation=ORG, group=group
     )
 
 
@@ -77,9 +71,7 @@ def image(
 
 
 async def apply(engine: AsyncEngine, *changes: Change) -> None:
-    async with AsyncSession(engine) as session, session.begin():
-        for one in changes:
-            await WRITERS[one.kind](session, None, one)
+    await apply_changes(engine, WRITERS, None, *changes)
 
 
 async def read(

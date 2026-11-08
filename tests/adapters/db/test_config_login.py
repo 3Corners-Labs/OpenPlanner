@@ -25,6 +25,7 @@ from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_values import Secret, Value
 from app.domain.errors import DomainError, ErrorCode
+from tests.support.config_changes import apply_changes, planned
 from tests.support.config_roundtrip import document_of, organisations, plan_against
 
 BOX = SecretBox(b"k" * 32)
@@ -64,16 +65,7 @@ def change(
     values: dict[str, Value],
     fields: tuple[str, ...] | None = None,
 ) -> Change:
-    return Change(
-        kind=kind,
-        key=address[-1:],
-        address=address,
-        path="x",
-        action=action,
-        fields=tuple(values) if fields is None else fields,
-        values=values,
-        organisation=address[0],
-    )
+    return planned(kind, address, action, values, fields, organisation=address[0])
 
 
 def provider(key: str, action: ChangeAction, values: dict[str, Value], *fields: str) -> Change:
@@ -83,11 +75,9 @@ def provider(key: str, action: ChangeAction, values: dict[str, Value], *fields: 
 async def apply(
     engine: AsyncEngine, box: SecretBox | None, *changes: Change, ensure: bool = False
 ) -> None:
-    async with AsyncSession(engine) as session, session.begin():
-        for one in changes:
-            await WRITERS[one.kind](session, box, one)
-        if ensure:
-            await ensure_signing_keys(session, box)
+    await apply_changes(
+        engine, WRITERS, box, *changes, after=ensure_signing_keys if ensure else None
+    )
 
 
 async def read(engine: AsyncEngine, box: SecretBox | None = BOX) -> tuple[Entity, ...]:
@@ -305,12 +295,6 @@ async def test_a_secret_without_a_settings_key_is_refused(installation: AsyncEng
 def _bad_changes() -> list[Change]:
     jwk: dict[str, Value] = {"public_jwk": {}, "private_key": Secret("p")}
     return [
-        change(
-            "identity_provider",
-            ("zzz", "x"),
-            ChangeAction.CREATE,
-            {**BASIC, "issuer": "https://i"},
-        ),
         provider("nope", ChangeAction.UPDATE, dict(BASIC), "name"),
         provider("nope", ChangeAction.DELETE, {}),
         change("identity_provider_key", ("acme", "nope", "k"), ChangeAction.CREATE, jwk),
@@ -339,6 +323,17 @@ async def test_an_unknown_organisation_provider_key_or_secret_is_refused(
         with pytest.raises(DomainError) as refused:
             await apply(installation, BOX, one)
         assert refused.value.code is ErrorCode.INVALID_CONFIGURATION
+
+
+async def test_an_unknown_organisation_is_refused_as_such(installation: AsyncEngine) -> None:
+    unknown = change(
+        "identity_provider", ("zzz", "x"), ChangeAction.CREATE, {**BASIC, "issuer": "https://i"}
+    )
+
+    with pytest.raises(DomainError) as refused:
+        await apply(installation, BOX, unknown)
+
+    assert refused.value.code is ErrorCode.ORGANISATION_NOT_FOUND
 
 
 async def test_deleting_what_is_already_gone_is_not_an_error(installation: AsyncEngine) -> None:

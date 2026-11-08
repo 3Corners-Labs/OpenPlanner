@@ -39,6 +39,7 @@ from app.domain.configuration_plan import Plan, plan_document
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_v1 import FORMATS, V1
 from app.domain.configuration_values import Value
+from tests.support.config_changes import planned
 from tests.support.configuration import allow
 from tests.support.configuration_parts import opened
 
@@ -221,13 +222,5 @@ def change(
     fields: tuple[str, ...] | None = None,
 ) -> Change:
     """Return a planned change as the planner hands it to a writer."""
-    given = values or {}
-    return Change(
-        kind=kind,
-        key=address[-1:] if kind not in ("group_text",) else address[-2:],
-        address=address,
-        path="",
-        action=action,
-        fields=tuple(given) if fields is None else fields,
-        values=given,
-    )
+    key = address[-2:] if kind == "group_text" else address[-1:]
+    return planned(kind, address, action, values, fields, key=key)

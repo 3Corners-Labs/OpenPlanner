@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db import images
-from app.adapters.db.config_login import Writer, organisation_id
+from app.adapters.db.config_common import Writer, find_organisation_id, invalid
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.models import (
     ClosureImageRow,
@@ -36,11 +36,6 @@ type Scenarios = tuple[
     dict[tuple[str, str], tuple[Entity, ...]],
 ]
 """Organisation scenarios by organisation slug, group scenarios by (organisation, group) slugs."""
-
-
-def _invalid(field: str) -> DomainError:
-    """Return the refusal that names ``field``."""
-    return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
 
 
 async def read_scenarios(session: AsyncSession) -> Scenarios:
@@ -92,7 +87,7 @@ async def read_scenarios(session: AsyncSession) -> Scenarios:
 
 async def _scenario_row(session: AsyncSession, change: Change) -> ClosureScenarioRow | None:
     """Return the scenario a scenario or image change is about; ``None`` when there is none."""
-    organisation = await organisation_id(session, change.address[0])
+    organisation = await find_organisation_id(session, change.address[0])
     name = change.address[-1] if change.kind == names.SCENARIO_IMAGE_KIND else change.key[0]
     group = await _group_id(session, organisation, change)
     owner = (
@@ -119,7 +114,7 @@ async def _group_id(session: AsyncSession, organisation: int, change: Change) ->
         )
     )
     if found is None:
-        raise _invalid("group")
+        raise invalid("group")
     return int(found)
 
 
@@ -155,7 +150,7 @@ async def write_scenario(session: AsyncSession, box: SecretBox | None, change: C
     if change.action is ChangeAction.CREATE:
         if row is not None:
             raise DomainError(ErrorCode.CONFIGURATION_OBJECT_EXISTS)
-        organisation = await organisation_id(session, change.address[0])
+        organisation = await find_organisation_id(session, change.address[0])
         session.add(
             ClosureScenarioRow(
                 organisation_id=organisation,
@@ -168,7 +163,7 @@ async def write_scenario(session: AsyncSession, box: SecretBox | None, change: C
         )
     else:
         if row is None:
-            raise _invalid("name")
+            raise invalid("name")
         if "notices" in change.fields:
             row.notices = _dump(values["notices"])
         if "headings" in change.fields:
@@ -188,7 +183,7 @@ async def write_scenario_image(
     """
     row = await _scenario_row(session, change)
     if row is None or row.id is None:
-        raise _invalid("name")
+        raise invalid("name")
     if change.action is ChangeAction.DELETE:
         await images.remove_image(session, ClosureScenarioRow, row.id)
         return
@@ -200,7 +195,7 @@ async def write_scenario_image(
     file = None
     if change.action is ChangeAction.CREATE or "data" in change.fields:
         if not isinstance(data, Binary):
-            raise _invalid("image")
+            raise invalid("image")
         file = ImageFile(data.media_type, data.data)
     await images.save_image(session, ClosureScenarioRow, row.id, text, file)
 

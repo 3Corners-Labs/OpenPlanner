@@ -36,6 +36,7 @@ from app.domain.configuration_values import Binary, Value
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.woff2 import make_woff2
+from tests.support.config_changes import planned
 from tests.support.configuration import allow
 from tests.support.images import png
 
@@ -107,9 +108,7 @@ def change(
     values: dict[str, Value],
     fields: tuple[str, ...] = (),
 ) -> Change:
-    return Change(
-        kind=kind, key=key, address=address, path="x", action=action, fields=fields, values=values
-    )
+    return planned(kind, address, action, values, fields, key=key)
 
 
 async def apply(session: AsyncSession, *changes: Change) -> None:

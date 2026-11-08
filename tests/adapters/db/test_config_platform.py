@@ -27,6 +27,7 @@ from app.domain.configuration_tree import Entity
 from app.domain.configuration_v1 import FORMATS, V1
 from app.domain.configuration_values import Secret, Value
 from app.domain.errors import DomainError, ErrorCode
+from tests.support.config_changes import apply_changes, planned
 from tests.support.configuration import allow
 
 BOX = SecretBox(b"s" * 32)
@@ -41,22 +42,11 @@ def change(
     fields: tuple[str, ...] | None = None,
     address: tuple[str, ...] | None = None,
 ) -> Change:
-    given = values or {}
-    return Change(
-        kind=kind,
-        key=key,
-        address=address or key,
-        path="",
-        action=action,
-        fields=tuple(given) if fields is None else fields,
-        values=given,
-    )
+    return planned(kind, address or key, action, values, fields, key=key)
 
 
 async def apply(engine: AsyncEngine, box: SecretBox | None, *changes: Change) -> None:
-    async with AsyncSession(engine) as session, session.begin():
-        for item in changes:
-            await WRITERS[item.kind](session, box, item)
+    await apply_changes(engine, WRITERS, box, *changes)
 
 
 async def read(engine: AsyncEngine, box: SecretBox | None = BOX) -> Entity:
@@ -189,10 +179,23 @@ async def test_without_a_settings_key_no_secret_is_read(engine: AsyncEngine) -> 
     assert "secret" not in children(platform, "log_destinations")[("splunk",)].fields
 
 
-async def test_a_credential_that_does_not_open_is_left_out(engine: AsyncEngine) -> None:
+async def test_a_credential_that_another_key_sealed_is_refused_not_left_out(
+    engine: AsyncEngine,
+) -> None:
     await seed(engine)
 
-    platform = await read(engine, SecretBox(b"x" * 32))
+    with pytest.raises(DomainError) as refused:
+        await read(engine, SecretBox(b"x" * 32))
+
+    assert refused.value.code is ErrorCode.INTEGRATION_NOT_READY
+
+
+async def test_without_a_settings_key_the_secrets_are_reported_as_not_set(
+    engine: AsyncEngine,
+) -> None:
+    await seed(engine)
+
+    platform = await read(engine, None)
 
     assert platform.children["secrets"] == ()
     assert "secret" not in children(platform, "log_destinations")[("splunk",)].fields

@@ -26,7 +26,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.credentials import CredentialStore
-from app.adapters.db.uow import bot_credential_name
+from app.adapters.db.record_names import bot_credential_name
 from app.adapters.integrations import secret_box
 from app.adapters.webex_auth import http_failure
 from app.config import Settings

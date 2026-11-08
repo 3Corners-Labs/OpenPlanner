@@ -82,12 +82,7 @@ def encode(document: Json) -> bytes:
 
 
 class JsonCodec:
-    """The ``DocumentCodec`` port on JSON text."""
+    """The ``DocumentCodec`` port on JSON text: ``decode`` and ``encode`` of this module."""
 
-    def decode(self, data: bytes, max_bytes: int) -> object:
-        """Return the JSON in ``data``; refuse what is not one document."""
-        return decode(data, max_bytes)
-
-    def encode(self, document: Json) -> bytes:
-        """Return the text of a document."""
-        return encode(document)
+    decode = staticmethod(decode)
+    encode = staticmethod(encode)
