@@ -213,8 +213,8 @@ async def _plan(
         PLAN_TEMPLATE,
         {
             "plan": plan_view(plan, locale.gettext),
-            "token": entry.token,
-            "needs_passphrase": plan.sealed,
+            "review_id": entry.token,
+            "needs_seal": plan.sealed,
         },
     )
 
@@ -247,8 +247,8 @@ async def _apply(
     if not result.applied:
         shown = {
             "plan": plan_view(result.plan, locale.gettext),
-            "token": "",
-            "needs_passphrase": False,
+            "review_id": "",
+            "needs_seal": False,
         }
         return await _render(request, locale, context, scope, PLAN_TEMPLATE, shown, 422)
     return redirect_done(block_home(scope), "configuration_applied", len(result.plan.changes))
