@@ -134,6 +134,10 @@ namens deelnemer**. De deelnemer krijgt dan dezelfde bevestiging met alle gegeve
 eigen bevestigen, en het auditlog legt vast wie bevestigde. Na het moment van vervallen kan dat
 niet meer.
 
+Een niet bevestigde afspraak kunt u ook **Verplaatsen** of **Annuleren** zoals een bevestigde.
+Een verplaatste afspraak blijft niet bevestigd en krijgt een nieuw moment van vervallen. Om een
+nieuwe tijd vragen kan niet: die afspraak vervalt vanzelf als niemand bevestigt.
+
 ## Afspraken wijzigen
 
 Met het recht **Boekingen wijzigen** (groepsbeheerders, organisatiebeheerders en een eigen

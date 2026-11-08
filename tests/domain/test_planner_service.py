@@ -447,3 +447,60 @@ async def test_a_confirmation_by_a_planner_is_counted_as_the_planners(
         if isinstance(f, UsageFact) and f.kind is FactKind.BOOKING_CONFIRMED
     ]
     assert fact.actor_class is ActorClass.PLANNER
+
+
+# --- move and cancel a pending booking (ADR 0056 step 3b) -----------------------------------
+
+
+async def test_a_moved_pending_booking_stays_pending_with_its_own_deadline(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book_pending(bookings, slug="demo", contact=another_participant())
+
+    moved = await planner.move(GROUP_ADMIN, "demo", receipt.booking.id or 0, SLOT_0930)
+
+    assert moved.status is BookingStatus.PENDING_CONFIRMATION
+    assert moved.start == SLOT_0930
+    assert moved.confirm_by is not None
+    old = uow.state.bookings[receipt.booking.id or 0]
+    assert old.status is not BookingStatus.PENDING_CONFIRMATION
+
+
+async def test_a_pending_booking_can_be_cancelled_but_not_asked_to_rebook(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    first = await book_pending(bookings, slug="demo", contact=another_participant())
+    second = await book_pending(bookings, slug="demo", contact=another_participant())
+
+    await planner.cancel(GROUP_ADMIN, "demo", first.booking.id or 0, ChangeReason.STAFFING)
+    with pytest.raises(DomainError, match="booking_not_active"):
+        await planner.request_rebook(
+            GROUP_ADMIN, "demo", second.booking.id or 0, ChangeReason.STAFFING
+        )
+
+    assert uow.state.bookings[first.booking.id or 0].status is BookingStatus.CANCELLED
+    assert uow.state.bookings[second.booking.id or 0].status is BookingStatus.PENDING_CONFIRMATION
+
+
+async def test_a_pending_booking_is_told_by_email_only_and_the_team_gets_no_withdrawal(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0056: never sent to the team nor by SMS, so nothing of either on a change."""
+    uow.state.groups[1] = with_team_invite(uow.state.groups[1])
+    contact = replace(another_participant(), phone="+31612345678")
+    moving = await book_pending(bookings, slug="demo", contact=another_participant())
+    cancelling = await book_pending(bookings, slug="demo", contact=contact)
+
+    moved = await planner.move(GROUP_ADMIN, "demo", moving.booking.id or 0, SLOT_0930)
+    await planner.cancel(GROUP_ADMIN, "demo", cancelling.booking.id or 0, ChangeReason.STAFFING)
+
+    old_jobs = {j.type for j in uow.state.jobs[moving.booking.id or 0]}
+    new_jobs = {j.type for j in uow.state.jobs[moved.id or 0]}
+    cancel_jobs = _messages(uow, cancelling.booking.id or 0)
+    assert JobType.SEND_TEAM_CANCEL not in old_jobs
+    assert JobType.SEND_CONFIRM_REQUEST in new_jobs
+    assert JobType.SEND_CHANGE not in new_jobs
+    assert cancel_jobs == {(JobType.SEND_CANCELLATION, ChannelKind.EMAIL)}
+    assert JobType.SEND_TEAM_CANCEL not in {
+        j.type for j in uow.state.jobs[cancelling.booking.id or 0]
+    }

@@ -659,7 +659,10 @@ class BookingService:
         if old.awaits_rebook and actor is ActorClass.PARTICIPANT:
             await record_rebook_accepted(tx, old, group, now)
         jobs = plan_for_cancellation(
-            cancelled_at=now, notify=False, team_invite=group.sends_team_invite
+            cancelled_at=now,
+            notify=False,
+            # A pending booking was never sent to the team (ADR 0056): nothing to withdraw.
+            team_invite=group.sends_team_invite and not old.awaits_confirmation,
         )
         await tx.replace_jobs(_id(old), jobs)
         return await self._place(
