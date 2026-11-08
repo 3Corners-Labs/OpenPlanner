@@ -5,8 +5,7 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import AuditEvent, Outcome, Source
-from app.domain.authorization import Role
-from app.domain.booking import Booking, BookingStatus, Contact, MeetingRef, TrialCall
+from app.domain.booking import BookingStatus, MeetingRef, TrialCall
 from app.domain.calls import (
     CallState,
     EventKind,
@@ -21,54 +20,18 @@ from app.domain.errors import DomainError
 from app.domain.integration import WEBHOOK_MEMORY, EventOutcome, IntegrationService
 from app.domain.job_plan import JobStatus, JobType, PlannedJob
 from app.domain.request_log import REQUEST_EVENT
-from app.domain.scheduling import PhoneMode
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeProbes
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.domain import NOW, SLOT_0900, make_group
-from tests.support.principals import principal
-
-GROUP = make_group(
-    id=1,
-    organisation_id=1,
-    slug="demo",
-    name="Demo: videogesprek",
-    video_host_email="host-demo@example.nl",
-    wxcc_business_address="openplanner@example.biz",
-    wxcc_channel="openplanner-video",
-)
-ADA = Contact.create(
-    first_name="Ada",
-    last_name="Lovelace",
-    email="ada@example.org",
-    phone=None,
-    phone_mode=PhoneMode.OPTIONAL,
-)
-GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
-OUTSIDER = principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), frozenset())
-
-
-def _booking(**changes: object) -> Booking:
-    booking = Booking(
-        id=123,
-        group_id=1,
-        slot_id=7,
-        start=SLOT_0900,
-        end=SLOT_0900 + timedelta(minutes=30),
-        status=BookingStatus.CONFIRMED,
-        contact=ADA,
-        locale="nl",
-        token_hash="h",
-        created_at=NOW,
-    )
-    return replace(booking, **changes)  # type: ignore[arg-type]
-
+from tests.support.admin import GROUP_ADMIN, OUTSIDER
+from tests.support.domain import NOW, SLOT_0900
+from tests.support.integration import GROUP, make_booking
 
 # --- what leaves OpenPlanner -------------------------------------------------------------
 
 
 def test_meeting_request_carries_no_personal_data() -> None:
-    request = meeting_request(_booking(), GROUP)
+    request = meeting_request(make_booking(), GROUP)
 
     assert request.title == "Videogesprek Demo: videogesprek"
     assert (request.start, request.end) == (SLOT_0900, SLOT_0900 + timedelta(minutes=30))
@@ -78,7 +41,7 @@ def test_meeting_request_carries_no_personal_data() -> None:
 
 
 def test_work_item_carries_only_first_name_and_meeting_link() -> None:
-    booking = _booking(meeting=MeetingRef("m-1", "https://site.webex.com/meet/abc"))
+    booking = make_booking(meeting=MeetingRef("m-1", "https://site.webex.com/meet/abc"))
 
     item = work_item(booking, GROUP, start_label="5 jan 2026, 09:00")
 
@@ -97,10 +60,10 @@ def test_work_item_carries_only_first_name_and_meeting_link() -> None:
 
 def test_work_item_needs_a_meeting_and_contact_data() -> None:
     with pytest.raises(DomainError, match="integration_not_ready: meeting"):
-        work_item(_booking(), GROUP, start_label="x")
+        work_item(make_booking(), GROUP, start_label="x")
     with pytest.raises(DomainError, match="integration_not_ready: contact"):
         work_item(
-            _booking(meeting=MeetingRef("m", "https://x.webex.com/m"), contact=None),
+            make_booking(meeting=MeetingRef("m", "https://x.webex.com/m"), contact=None),
             GROUP,
             start_label="x",
         )
@@ -167,7 +130,7 @@ def uow() -> InMemoryUnitOfWork:
     state = State()
     state.organisation_slugs = {1: "demo", 2: "andere"}
     state.groups[1] = GROUP
-    state.bookings[123] = _booking(
+    state.bookings[123] = make_booking(
         meeting=MeetingRef("meeting-1", "https://site.webex.com/m"), wxcc_task_id="task-1"
     )
     return InMemoryUnitOfWork(state)
@@ -236,7 +199,9 @@ async def test_day_overview_covers_the_whole_local_day_across_dst(
 ) -> None:
     before, after = first - timedelta(minutes=30), last + timedelta(minutes=30)
     for booking_id, start in enumerate((before, first, last, after), start=200):
-        uow.state.bookings[booking_id] = _booking(id=booking_id, start=start.replace(tzinfo=UTC))
+        uow.state.bookings[booking_id] = make_booking(
+            id=booking_id, start=start.replace(tzinfo=UTC)
+        )
 
     overview = await service.day_overview(GROUP_ADMIN, "demo", day)
 
@@ -246,7 +211,7 @@ async def test_day_overview_covers_the_whole_local_day_across_dst(
 def test_join_window_opens_fifteen_minutes_before_and_closes_after_the_end() -> None:
     from app.domain.calls import JoinState, join_state
 
-    booking = _booking(meeting=MeetingRef("m", "https://site.webex.com/m"))
+    booking = make_booking(meeting=MeetingRef("m", "https://site.webex.com/m"))
     start, end = booking.start, booking.end
 
     assert join_state(booking, start - timedelta(minutes=16)) is JoinState.TOO_EARLY
@@ -328,7 +293,7 @@ async def test_day_overview_covers_the_25_hour_day_when_clocks_go_back(
 ) -> None:
     # 25 October 2026 lasts 25 hours in Europe/Amsterdam; 23:30 local is 22:30 UTC.
     late = datetime(2026, 10, 25, 22, 30, tzinfo=UTC)
-    uow.state.bookings[123] = _booking(start=late, end=late + timedelta(minutes=30))
+    uow.state.bookings[123] = make_booking(start=late, end=late + timedelta(minutes=30))
 
     on_the_day = await service.day_overview(GROUP_ADMIN, "demo", date(2026, 10, 25))
     next_day = await service.day_overview(GROUP_ADMIN, "demo", date(2026, 10, 26))

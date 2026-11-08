@@ -15,8 +15,6 @@ from app.adapters.wxcc_config import (
     PROJECT_ID,
     Asset,
     Channel,
-    EntryPoint,
-    FlowSummary,
     GroupRouting,
     Queue,
     WxccConfig,
@@ -26,49 +24,9 @@ from app.adapters.wxcc_config import (
     names_match,
     parse_flow,
 )
+from tests.support.wxcc_config import FLOW_DOC, OPENPLANNER_SCHEMA, recorded_config
 
 ORG = "11111111-2222-3333-4444-555555555555"
-OPENPLANNER_SCHEMA = {
-    "bookingReference": (True, True),
-    "firstName": (False, True),
-    "startTime": (False, True),
-    "groupName": (False, True),
-    "meetingLink": (False, True),
-    "kind": (False, True),
-}
-FLOW_DOC: dict[str, Any] = {
-    "name": "videoafspraak_prototype",
-    "variables": [],
-    "nodes": [
-        {"name": "NewContact", "properties": {"activityName": "NewContact"}},
-        {"name": "Queue", "properties": {"activityName": "queue-contact", "destination": "q-1"}},
-        {"name": "End", "properties": {"activityName": "end"}},
-    ],
-    "edges": [],
-}
-
-
-def _config(
-    *,
-    schema: dict[str, tuple[bool, bool]] | None = None,
-    flow: FlowSummary | None = None,
-    queues: tuple[Queue, ...] = (Queue("q-1", "videoafspraak_prototype", "WORK_ITEM"),),
-) -> WxccConfig:
-    return WxccConfig(
-        channels=(Channel("ch-1", "videoafspraak-prototype", "WORK_ITEM"),),
-        assets=(
-            Asset(
-                "as-1",
-                "videoafspraak-prototype",
-                "ch-1",
-                "videoafspraak@example.video",
-                OPENPLANNER_SCHEMA if schema is None else schema,
-            ),
-        ),
-        entry_points=(EntryPoint("ep-1", "videoafspraak_prototype", "as-1", "fl-1", True),),
-        queues=queues,
-        flows={"fl-1": flow if flow is not None else parse_flow(FLOW_DOC)},
-    )
 
 
 GROUP = GroupRouting(
@@ -83,7 +41,7 @@ def _by_name(results: list[CheckResult]) -> dict[str, CheckResult]:
 def test_the_recorded_prototype_asset_schema_is_refused() -> None:
     recorded = {"videoafspraak_Naam": (True, True), "videoafspraak_MeetingURL": (True, True)}
 
-    results = _by_name(check_groups([GROUP], _config(schema=recorded)))
+    results = _by_name(check_groups([GROUP], recorded_config(schema=recorded)))
 
     schema = results["asset schema"]
     assert not schema.ok
@@ -93,7 +51,7 @@ def test_the_recorded_prototype_asset_schema_is_refused() -> None:
 
 
 def test_a_matching_setup_passes_and_names_the_queue() -> None:
-    results = check_groups([GROUP], _config())
+    results = check_groups([GROUP], recorded_config())
 
     by_name = _by_name(results)
     assert by_name["channel"].ok
@@ -107,7 +65,7 @@ def test_a_matching_setup_passes_and_names_the_queue() -> None:
 def test_a_flow_without_the_routing_variable_fails_once_groups_share_the_asset() -> None:
     other = GroupRouting("paspoort", GROUP.channel, GROUP.business_address, "paspoort")
 
-    results = check_groups([GROUP, other], _config())
+    results = check_groups([GROUP, other], recorded_config())
 
     routing = _by_name(results[: len(results) // 2])["flow routing"]
     assert not routing.ok
@@ -126,7 +84,7 @@ def test_a_routing_flow_needs_a_branch_per_value() -> None:
         ],
     }
 
-    results = _by_name(check_groups([GROUP], _config(flow=parse_flow(doc))))
+    results = _by_name(check_groups([GROUP], recorded_config(flow=parse_flow(doc))))
 
     assert results["flow routing"].ok
     branch = results["flow branch"]
@@ -138,7 +96,7 @@ def test_a_routing_flow_needs_a_branch_per_value() -> None:
 def test_missing_channel_asset_and_entry_point_are_failures() -> None:
     wrong = GroupRouting("aangifte", "openplanner-video", "openplanner@example.nl", "aangifte")
 
-    results = _by_name(check_groups([wrong], _config()))
+    results = _by_name(check_groups([wrong], recorded_config()))
 
     assert not results["channel"].ok
     assert "videoafspraak-prototype" in results["channel"].hint  # what exists instead
@@ -147,7 +105,7 @@ def test_missing_channel_asset_and_entry_point_are_failures() -> None:
 
 
 def test_an_asset_on_another_channel_fails() -> None:
-    config = _config()
+    config = recorded_config()
     moved = WxccConfig(
         channels=(*config.channels, Channel("ch-2", "andere", "WORK_ITEM")),
         assets=(Asset("as-1", "x", "ch-2", "videoafspraak@example.video", OPENPLANNER_SCHEMA),),
@@ -184,7 +142,7 @@ def test_naming_rule_warns_when_several_queues_and_none_named_after_the_group() 
         ],
     }
 
-    naming = _by_name(check_groups([GROUP], _config(flow=parse_flow(doc), queues=queues)))[
+    naming = _by_name(check_groups([GROUP], recorded_config(flow=parse_flow(doc), queues=queues)))[
         "queue naming"
     ]
 
@@ -196,7 +154,7 @@ def test_naming_rule_warns_when_several_queues_and_none_named_after_the_group() 
 def test_screen_pop_and_non_work_item_queues_are_reported() -> None:
     queues = (Queue("q-1", "videoafspraak_prototype", "CHAT"),)
 
-    results = _by_name(check_groups([GROUP], _config(queues=queues)))
+    results = _by_name(check_groups([GROUP], recorded_config(queues=queues)))
 
     assert not results["flow queues"].ok
     assert "CHAT" in results["flow queues"].hint
@@ -315,13 +273,13 @@ async def test_config_is_fetched_with_selected_fields_and_no_secrets() -> None:
 
 
 def test_report_lines_carry_the_group() -> None:
-    report = format_report(check_groups([GROUP], _config()))
+    report = format_report(check_groups([GROUP], recorded_config()))
 
     assert "[aangifte] channel" in report
 
 
 def test_the_probe_branch_is_advice_until_the_flow_ends_probes_itself() -> None:
-    without = _by_name(check_groups([GROUP], _config()))
+    without = _by_name(check_groups([GROUP], recorded_config()))
     with_branch = parse_flow(
         {
             **FLOW_DOC,
@@ -335,7 +293,7 @@ def test_the_probe_branch_is_advice_until_the_flow_ends_probes_itself() -> None:
     assert not without["probe branch"].ok
     assert not without["probe branch"].required  # ADR 0082: OpenPlanner ends the probe itself
     assert without["probe branch"].code == "probe.missing"
-    assert _by_name(check_groups([GROUP], _config(flow=with_branch)))["probe branch"].ok
+    assert _by_name(check_groups([GROUP], recorded_config(flow=with_branch)))["probe branch"].ok
 
 
 def test_a_screen_pop_in_an_event_flow_and_a_queue_by_name_are_found() -> None:
@@ -353,7 +311,7 @@ def test_a_screen_pop_in_an_event_flow_and_a_queue_by_name_are_found() -> None:
     }
     queues = (Queue("q-9", "teams", "WORK_ITEM"),)
 
-    results = _by_name(check_groups([GROUP], _config(flow=parse_flow(doc), queues=queues)))
+    results = _by_name(check_groups([GROUP], recorded_config(flow=parse_flow(doc), queues=queues)))
 
     assert results["screen pop"].ok
     assert results["flow queues"].ok

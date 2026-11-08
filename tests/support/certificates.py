@@ -1,7 +1,11 @@
-"""Self-signed certificate pairs for the own-certificate tests (ADR 0070); test material only."""
+"""Self-signed certificates for the own-certificate (ADR 0070) and TLS probe tests (ADR 0064).
+
+Test material only.
+"""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -53,3 +57,22 @@ def make_pair(
             serialization.NoEncryption(),
         ),
     )
+
+
+def self_signed(tmp_path: Path, *, days: int = 60) -> tuple[Path, Path]:
+    """Write a self-signed certificate for ``localhost`` and its key; return their paths.
+
+    It is valid from a day ago until ``days`` days from now on the real clock, as a TLS server
+    started in the test presents it.
+    """
+    now = datetime.now(UTC)
+    pair = make_pair(
+        "localhost",
+        not_before=now - timedelta(days=1),
+        not_after=now + timedelta(days=days),
+        organisation="OpenPlanner test",
+    )
+    cert_path, key_path = tmp_path / "cert.pem", tmp_path / "key.pem"
+    cert_path.write_bytes(pair.chain)
+    key_path.write_bytes(pair.key)
+    return cert_path, key_path

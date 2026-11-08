@@ -4,69 +4,22 @@ from datetime import timedelta
 
 import pytest
 
-from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.calls import CallState, EventKind, TaskState
-from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
-from app.domain.scheduling import DispatchKind, ScheduleRule
-from app.domain.services import BookingService
+from app.domain.scheduling import DispatchKind
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
-from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeDispatcher, FakeVideo
 from tests.fakes.jobs import FakeQueue, job
-from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book, make_group, window
-
-WIRED = {
-    "video_host_email": "host@example.nl",
-    "wxcc_business_address": "openplanner@example.biz",
-    "wxcc_channel": "openplanner-video",
-}
-
-
-def _uow(**group: object) -> InMemoryUnitOfWork:
-    state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte", name="Aangifte", **group)
-    state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
-    return InMemoryUnitOfWork(state)
-
-
-class Setup:
-    def __init__(self, uow: InMemoryUnitOfWork) -> None:
-        self.uow = uow
-        self.clock = FixedClock(NOW)
-        self.video = FakeVideo()
-        self.dispatcher = FakeDispatcher()
-        self.integration = IntegrationService(uow, self.clock, AdminService(uow, self.clock))
-
-    def runner(self, queue: FakeQueue) -> JobRunner:
-        composer = MessageComposer(Translator(load_catalogues()), TEST_TOKEN_KEY, "http://x")
-        return JobRunner(
-            queue,
-            self.uow,
-            self.clock,
-            None,
-            composer,
-            video=self.video,
-            dispatcher=self.dispatcher,
-            integration=self.integration,
-        )
-
-    async def booking(self) -> int:
-        receipt = await book(BookingService(self.uow, self.clock, TEST_TOKEN_KEY))
-        return receipt.booking.id or 0
-
-    def events(self, booking_id: int) -> list[EventKind]:
-        return [e.kind for e in self.uow.state.booking_events.get(booking_id, [])]
+from tests.support.call_jobs import WIRED, Setup, group_uow
+from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY
 
 
 @pytest.fixture
 def setup() -> Setup:
-    return Setup(_uow(**WIRED))
+    return Setup(group_uow(**WIRED))
 
 
 async def test_meeting_then_work_item(setup: Setup) -> None:
@@ -108,7 +61,7 @@ async def test_cancellation_deletes_the_meeting(setup: Setup) -> None:
 
 
 async def test_groups_without_integrations_are_skipped() -> None:
-    setup = Setup(_uow())
+    setup = Setup(group_uow())
     bid = await setup.booking()
     queue = FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])
 
@@ -343,7 +296,7 @@ async def test_a_job_with_nothing_to_do_is_skipped_with_its_reason(setup: Setup)
 async def test_a_group_that_wants_no_meeting_or_task_skips_the_job(
     group: dict[str, object], job_type: JobType, reason: str
 ) -> None:
-    setup = Setup(_uow(**group))
+    setup = Setup(group_uow(**group))
     bid = await setup.booking()
 
     await setup.runner(FakeQueue([job(bid, job_type)])).run_due()

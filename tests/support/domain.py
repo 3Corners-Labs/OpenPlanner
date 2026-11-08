@@ -2,6 +2,7 @@
 
 All tests use the same calendar: "now" is Thursday 1 January 2026 08:00 UTC; the group is
 open on Monday 5 January 09:00-10:00 Amsterdam time (08:00-09:00 UTC) in 30-minute slots.
+The demo group that the HTTP tests seed is open on weekdays (``FRIDAY``, ``FRIDAY_0900``).
 """
 
 from dataclasses import replace
@@ -18,6 +19,10 @@ MONDAY = date(2026, 1, 5)
 SLOT_0900 = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)  # 09:00 Amsterdam (CET)
 SLOT_0930 = datetime(2026, 1, 5, 8, 30, tzinfo=UTC)
 TUESDAY_0900 = datetime(2026, 1, 6, 8, 0, tzinfo=UTC)
+FRIDAY = date(2026, 1, 2)
+"""Friday 2 January, the day after now: a weekday, so the demo group is open."""
+FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)
+"""Friday 2 January 09:00 Amsterdam, a slot of the demo group."""
 ADA = ContactInput(
     first_name="Ada", last_name="Lovelace", email="ada@example.org", phone="06 1234 5678"
 )

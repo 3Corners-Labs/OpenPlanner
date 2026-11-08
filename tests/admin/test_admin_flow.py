@@ -3,9 +3,8 @@ from datetime import timedelta
 
 import pytest
 
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.audit import Outcome
-from app.domain.authorization import LOCKED_PERMISSIONS, PII_PERMISSIONS, Scope
+from app.domain.authorization import LOCKED_PERMISSIONS, PII_PERMISSIONS
 from tests.admin.conftest import (
     GROUP_ADMIN,
     NO_ROLE,
@@ -15,17 +14,8 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
+from tests.support.admin_site import audit_events
 from tests.support.principals import legacy_claims
-
-
-async def audit_events(site: Site) -> list[tuple[str, str, Outcome, str]]:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    uow = SqlUnitOfWork(app.state.engine)
-    async with uow.read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [
-        (e.event.actor, e.event.action, e.event.outcome, e.event.reason) for e in reversed(events)
-    ]
 
 
 async def test_login_redirects_to_the_identity_provider(site: Site) -> None:

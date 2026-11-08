@@ -14,8 +14,8 @@ import pytest
 from app.config import Settings
 from app.domain.entitlements import LoginClaims
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site, _running_site
-from tests.admin.test_idp_routes import register
 from tests.fakes.identity import FakeIdentityProvider
+from tests.support.organisation_login import register
 
 P = "openplanner"
 ADDRESS = "jan@acme-a.nl"

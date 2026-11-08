@@ -28,6 +28,7 @@ from app.domain.privacy import PII_FIELDS
 from app.domain.tokens import derive_token, hash_token
 from app.web.protection import booking_limit, unknown_link_limit
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
+from tests.support.configuration_package import PACKAGE_PASSPHRASE
 from tests.support.principals import principal
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
@@ -552,7 +553,6 @@ async def test_the_topic_form_sets_a_boolean_and_an_empty_secret_keeps_the_curre
 
 
 # ADR 0089: the configuration package block.
-PACKAGE_PASSPHRASE = "a passphrase of sixteen chars"  # noqa: S105 - a test passphrase
 
 
 async def _export(site: Site) -> bytes:

@@ -18,17 +18,12 @@ from app.domain.identity_provider_service import (
     IdentityProviderService,
 )
 from app.domain.login_domains import DomainState
-from tests.domain.test_identity_provider_service import (
-    AUDITOR,
-    ORG_ADMIN,
-    PLATFORM_DISCOVERY,
-    SUPER,
-    draft,
-)
 from tests.fakes.clock import FixedClock
 from tests.fakes.dns import FakeTxtResolver
 from tests.fakes.identity_providers import FakeDiscoveryFetcher, FakeSigningKeys
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.admin import AUDITOR, ORG_ADMIN, SUPER
+from tests.support.organisation_providers import PLATFORM_DISCOVERY, draft
 
 pytest_plugins = ["tests.domain.test_identity_provider_service"]
 
