@@ -594,7 +594,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/integrations/alerts/targets": statuses(303, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/integrations/alerts/targets/{target_id}/remove": {
-        "/admin/integrations/alerts/targets/999/remove": statuses(303, 403, 403, 403, 403, 403, 403),
+        "/admin/integrations/alerts/targets/999/remove": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
     },
     "POST /admin/integrations/alerts/targets/{target_id}/test": {
         "/admin/integrations/alerts/targets/999/test": statuses(303, 403, 403, 403, 403, 403, 403),
@@ -603,16 +605,24 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/integrations/alerts/bot": statuses(303, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/channels/alerts/targets": {
-        "/admin/organisations/demo/channels/alerts/targets": statuses(303, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels/alerts/targets": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
     },
     "POST /admin/organisations/{org}/channels/alerts/targets/{target_id}/remove": {
-        "/admin/organisations/demo/channels/alerts/targets/999/remove": statuses(303, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels/alerts/targets/999/remove": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
     },
     "POST /admin/organisations/{org}/channels/alerts/targets/{target_id}/test": {
-        "/admin/organisations/demo/channels/alerts/targets/999/test": statuses(303, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels/alerts/targets/999/test": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
     },
     "POST /admin/organisations/{org}/channels/alerts/bot": {
-        "/admin/organisations/demo/channels/alerts/bot": statuses(303, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/channels/alerts/bot": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
     },
     # "Koppeling controleren": whoever edits the group's settings (incl. routing) may check them.
     "POST /admin/groups/{slug}/check": {
