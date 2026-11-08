@@ -5,20 +5,17 @@ Calendar: "now" is Thursday 1 January 2026 08:00 UTC; group ``demo`` is staffed 
 09:30 slots of two places each.
 """
 
-import itertools
 from datetime import timedelta
 
 import pytest
 
 from app.domain import booking_changes
-from app.domain.admin import AdminService
 from app.domain.booking import BookingStatus, ChangeReason
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
 from app.domain.planner_service import PlannerService
 from app.domain.reschedule_proposal import (
     HeldProposal,
-    ProposalHours,
     ProposalOutcome,
     proposal_deadline,
     proposal_reminder,
@@ -27,35 +24,15 @@ from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import AUDITOR, GROUP_ADMIN
-from tests.support.domain import NOW, SLOT_0900, SLOT_0930, book_confirmed, participant
+from tests.support.domain import NOW, SLOT_0900, SLOT_0930, book_another
 
 NEXT_0900 = SLOT_0900 + timedelta(days=7)
 NEXT_0930 = SLOT_0930 + timedelta(days=7)
 CONFIRM_BY = NOW + timedelta(hours=48)
 
-_PARTICIPANTS = itertools.count(1)
-
-
-@pytest.fixture
-def planner(uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService) -> PlannerService:
-    return PlannerService(
-        uow,
-        clock,
-        AdminService(uow, clock),
-        bookings,
-        alert_per_hour=50,
-        proposal_hours=ProposalHours(confirm=48, reminder=12),
-    )
-
 
 async def _book(bookings: BookingService, start=SLOT_0900) -> tuple[int, str]:
-    receipt = await book_confirmed(
-        bookings,
-        group_slug="demo",
-        start=start,
-        contact=participant(next(_PARTICIPANTS)),
-        locale="nl",
-    )
+    receipt = await book_another(bookings, start)
     return receipt.booking.id or 0, receipt.management_token
 
 
@@ -66,9 +43,11 @@ def _jobs(uow: InMemoryUnitOfWork, booking_id: int) -> list[tuple[JobType, objec
 # --- the pure rules -------------------------------------------------------------------------
 
 
-def test_the_deadline_never_passes_the_change_deadline_of_the_proposed_slot() -> None:
-    assert proposal_deadline(NOW, 48, NOW + timedelta(days=5)) == NOW + timedelta(hours=48)
-    assert proposal_deadline(NOW, 48, NOW + timedelta(hours=6)) == NOW + timedelta(hours=6)
+def test_the_deadline_never_passes_the_change_deadline_or_the_lapse() -> None:
+    later = NOW + timedelta(days=5)
+    assert proposal_deadline(NOW, 48, later, later) == NOW + timedelta(hours=48)
+    assert proposal_deadline(NOW, 48, NOW + timedelta(hours=6), later) == NOW + timedelta(hours=6)
+    assert proposal_deadline(NOW, 48, later, NOW + timedelta(hours=30)) == NOW + timedelta(hours=30)
 
 
 def test_the_reminder_goes_before_the_deadline_unless_off_or_past() -> None:

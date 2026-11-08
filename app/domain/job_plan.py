@@ -36,6 +36,7 @@ from enum import StrEnum
 from app.domain.booking import Booking, Contact
 from app.domain.channels import ChannelKind, ReminderRule, reachable
 from app.domain.confirmation import ConfirmWindow
+from app.domain.reschedule_proposal import HeldProposal
 
 
 def dispatch_moment(start: datetime, dispatch_lead: timedelta) -> datetime:
@@ -126,8 +127,7 @@ released while the participant can still choose (ADR 0057 point 9); sent only wh
 
 PROPOSAL_NOTICES = frozenset({JobType.SEND_RESCHEDULE_PROPOSAL, JobType.SEND_PROPOSAL_REMINDER})
 """A proposed new time and its reminder (ADR 0057 point 8), pinned to the proposed start: sent
-only while the booking awaits a new time and that proposal still holds its place (the runner
-checks the proposal)."""
+only while the booking awaits a new time and that proposal still holds its place."""
 
 CONFIRM_NOTICES = frozenset({JobType.SEND_CONFIRM_REQUEST, JobType.SEND_CONFIRM_REMINDER})
 """Requests to confirm a booking by email link (ADR 0056); sent only while it is pending."""
@@ -234,19 +234,30 @@ def plan_for_booking(
 
 
 def is_stale(
-    pinned_start: datetime | None, booking: Booking, job_type: JobType | None = None
+    pinned_start: datetime | None,
+    booking: Booking,
+    job_type: JobType | None = None,
+    *,
+    proposal: HeldProposal | None = None,
+    now: datetime | None = None,
 ) -> bool:
     """Return whether a job pinned to ``pinned_start`` must do nothing for ``booking``.
 
     Pinned jobs only act on a confirmed booking whose start is unchanged and whose personal
     data still exists (CLAUDE.md). Closure notices only act on a booking that is still
     suspended; requests to rebook only while the booking still awaits a new time; requests to
-    confirm only while it still awaits confirmation. Other unpinned jobs (cancellation mail,
-    lapse, purge) always run.
+    confirm only while it still awaits confirmation; a proposed new time and its reminder only
+    while that ``proposal`` is open, in time and the one the job was pinned to (ADR 0057).
+    Other unpinned jobs (cancellation mail, lapse, purge) always run.
     """
     if job_type in CLOSURE_NOTICES:
         return not booking.is_suspended or booking.contact is None
-    if job_type in REBOOK_NOTICES or job_type in PROPOSAL_NOTICES:
+    if job_type in PROPOSAL_NOTICES:
+        current = (
+            proposal is not None and now is not None and proposal.is_current(pinned_start, now)
+        )
+        return not booking.awaits_rebook or booking.contact is None or not current
+    if job_type in REBOOK_NOTICES:
         return not booking.awaits_rebook or booking.contact is None
     if job_type in CONFIRM_NOTICES:
         return not booking.awaits_confirmation or booking.contact is None

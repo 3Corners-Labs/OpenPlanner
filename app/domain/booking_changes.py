@@ -37,6 +37,7 @@ from app.domain.job_plan import (
 from app.domain.ports import Transaction
 from app.domain.reschedule_proposal import (
     HeldProposal,
+    ProposalHours,
     ProposalOutcome,
     proposal_deadline,
     proposal_reminder,
@@ -59,15 +60,12 @@ class ProposalTiming:
         rebook_days: ``planner_rebook_days``: the request to choose lapses this long after the
             original start.
         rebook_reminder_days: ``planner_rebook_reminder_days``: its one reminder before the lapse.
-        confirm_hours: ``reschedule_proposal_confirm_hours``: how long the place is held.
-        reminder_hours: ``reschedule_proposal_reminder_hours``: the proposal's reminder before
-            its deadline; 0 sends none.
+        hours: How long the proposed place is held and when its reminder goes.
     """
 
     rebook_days: int
     rebook_reminder_days: int
-    confirm_hours: int
-    reminder_hours: int
+    hours: ProposalHours
 
 
 def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> None:
@@ -211,7 +209,9 @@ async def hold_proposal(
     waiting = booking.request_rebook(reason, rebook_by, now)
     await tx.save_booking(waiting)
     await record_rebook_proposed(tx, waiting, group, now, ActorClass.PLANNER)
-    confirm_by = proposal_deadline(now, timing.confirm_hours, group.change_deadline(slot.start))
+    confirm_by = proposal_deadline(
+        now, timing.hours.confirm, group.change_deadline(slot.start), rebook_by
+    )
     proposal = await tx.add_proposal(
         HeldProposal(None, _id(booking), _slot_id(slot), slot.start, slot.end, confirm_by, now)
     )
@@ -221,7 +221,7 @@ async def hold_proposal(
         rebook_reminder_at=rebook_by - timedelta(days=timing.rebook_reminder_days),
         proposed_start=slot.start,
         confirm_by=confirm_by,
-        proposal_reminder_at=proposal_reminder(now, confirm_by, timing.reminder_hours),
+        proposal_reminder_at=proposal_reminder(now, confirm_by, timing.hours.reminder),
         sms=sms_reachable(booking),
         team_invite=team_invite,
     )
@@ -233,14 +233,21 @@ async def release_proposal(
     tx: Transaction, booking: Booking, now: datetime, outcome: ProposalOutcome
 ) -> HeldProposal | None:
     """Release the booking's open proposal with ``outcome``; return it, or ``None`` if none."""
-    if booking.id is None or not booking.awaits_rebook:
-        return None
-    proposal = await tx.get_open_proposal(booking.id)
+    proposal = await tx.get_open_proposal(_id(booking))
     if proposal is None:
         return None
     released = proposal.released(now, outcome)
     await tx.save_proposal(released)
     return released
+
+
+async def answer_proposal(
+    tx: Transaction, booking: Booking, now: datetime, new_start: datetime
+) -> None:
+    """Release the open proposal of a booking that moves to ``new_start`` (taken or not)."""
+    proposal = await tx.get_open_proposal(_id(booking))
+    if proposal is not None:
+        await tx.save_proposal(proposal.answered(new_start, now))
 
 
 async def expire_proposal(tx: Transaction, booking: Booking, now: datetime) -> bool:
@@ -250,13 +257,11 @@ async def expire_proposal(tx: Transaction, booking: Booking, now: datetime) -> b
     the short message that the proposed time was released and that they can still choose
     (ADR 0057 point 9). A proposal answered, withdrawn or replaced in time is left alone.
     """
-    if not booking.awaits_rebook or booking.id is None:
-        return False
-    proposal = await tx.get_open_proposal(booking.id)
+    proposal = await tx.get_open_proposal(_id(booking))
     if proposal is None or not proposal.is_due(now):
         return False
     await tx.save_proposal(proposal.released(now, ProposalOutcome.EXPIRED))
-    await tx.add_jobs(booking.id, plan_for_released_proposal(now=now, sms=sms_reachable(booking)))
+    await tx.add_jobs(_id(booking), plan_for_released_proposal(now=now, sms=sms_reachable(booking)))
     return True
 
 

@@ -1,4 +1,3 @@
-import itertools
 from dataclasses import replace
 from datetime import timedelta
 
@@ -26,9 +25,10 @@ from tests.support.domain import (
     NOW,
     SLOT_0900,
     SLOT_0930,
+    another_participant,
+    book_another,
     book_confirmed,
     book_pending,
-    participant,
     window,
     with_team_invite,
 )
@@ -36,27 +36,10 @@ from tests.support.domain import (
 SMS = frozenset({ChannelKind.SMS})
 
 
-@pytest.fixture
-def planner(uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService) -> PlannerService:
-    return PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=50)
-
-
-_PARTICIPANTS = itertools.count(1)
-"""Each booking of ``_book`` is another participant, so the address limit (ADR 0066) stays out."""
-
-
 async def _book(
     bookings: BookingService, start=SLOT_0900, slug: str = "demo", consents=frozenset()
 ) -> int:
-    receipt = await book_confirmed(
-        bookings,
-        group_slug=slug,
-        start=start,
-        contact=participant(next(_PARTICIPANTS)),
-        locale="nl",
-        consents=consents,
-    )
-    return receipt.booking.id or 0
+    return (await book_another(bookings, start, slug, consents)).booking.id or 0
 
 
 def _staff(uow: InMemoryUnitOfWork, agents: int) -> None:
@@ -375,7 +358,7 @@ async def test_only_who_may_manage_asks_to_rebook(
 async def test_a_planner_confirms_for_the_participant_who_gets_the_full_confirmation(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
-    receipt = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    receipt = await book_pending(bookings, slug="demo", contact=another_participant())
     booking_id = receipt.booking.id or 0
 
     confirmed = await planner.confirm(GROUP_ADMIN, "demo", booking_id)
@@ -410,7 +393,7 @@ async def test_only_a_pending_booking_of_the_own_group_can_be_confirmed(
 async def test_after_its_deadline_a_pending_booking_lapses_instead(
     planner: PlannerService, bookings: BookingService, clock: FixedClock, uow: InMemoryUnitOfWork
 ) -> None:
-    receipt = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    receipt = await book_pending(bookings, slug="demo", contact=another_participant())
     booking_id = receipt.booking.id or 0
     confirm_by = receipt.booking.confirm_by
     assert confirm_by is not None
@@ -427,7 +410,7 @@ async def test_a_pending_booking_holds_its_place_in_the_agenda(
 ) -> None:
     """ADR 0056 point 11: counted towards occupancy and shortfall, and marked as pending."""
     await _book(bookings)
-    await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    await book_pending(bookings, slug="demo", contact=another_participant())
 
     agenda = AgendaService(uow, clock, AdminService(uow, clock), horizon_days=14)
     days = await agenda.days(GROUP_ADMIN, "demo", SLOT_0900.date(), 1)
@@ -442,7 +425,7 @@ async def test_a_bulk_request_never_asks_an_older_booking_for_a_newer_pending_on
     """ADR 0044 §5: the last made go first, a pending one too; it is left to lapse or confirm."""
     older = await _book(bookings)
     clock.advance(timedelta(minutes=1))
-    await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    await book_pending(bookings, slug="demo", contact=another_participant())
     _staff(uow, 1)
 
     candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
@@ -454,7 +437,7 @@ async def test_a_confirmation_by_a_planner_is_counted_as_the_planners(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     """The reports tell a planner's confirmation from the participant's own (metric U9)."""
-    receipt = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    receipt = await book_pending(bookings, slug="demo", contact=another_participant())
 
     await planner.confirm(GROUP_ADMIN, "demo", receipt.booking.id or 0)
 

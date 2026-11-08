@@ -66,9 +66,18 @@ class HeldProposal:
         """Whether it is open and its deadline has passed."""
         return self.is_open and now >= self.confirm_by
 
+    def is_current(self, pinned_start: datetime | None, now: datetime) -> bool:
+        """Whether a message pinned to ``pinned_start`` is still about this open proposal."""
+        return self.is_open and self.start == pinned_start and not self.is_due(now)
+
     def released(self, now: datetime, outcome: ProposalOutcome) -> "HeldProposal":
         """Return it released at ``now`` with ``outcome``."""
         return replace(self, released_at=now, outcome=outcome)
+
+    def answered(self, new_start: datetime, now: datetime) -> "HeldProposal":
+        """Return it released because the booking moved to ``new_start``: taken or not."""
+        outcome = ProposalOutcome.CONFIRMED if new_start == self.start else ProposalOutcome.CHOSEN
+        return self.released(now, outcome)
 
 
 @dataclass(frozen=True)
@@ -89,13 +98,17 @@ DEFAULT_PROPOSAL_HOURS = ProposalHours(confirm=48, reminder=12)
 """The settings' defaults."""
 
 
-def proposal_deadline(now: datetime, confirm_hours: int, change_deadline: datetime) -> datetime:
+def proposal_deadline(
+    now: datetime, confirm_hours: int, change_deadline: datetime, rebook_by: datetime
+) -> datetime:
     """Return when an unanswered proposal is released (ADR 0057 point 7).
 
     ``reschedule_proposal_confirm_hours`` after ``now``, never beyond the proposed slot's change
-    deadline (``Group.change_deadline``), so the participant can still move it after confirming.
+    deadline (``Group.change_deadline``), so the participant can still move it after confirming,
+    and never beyond ``rebook_by``, when the booking itself lapses (ADR 0044), so the deadline
+    the message names holds.
     """
-    return min(now + timedelta(hours=confirm_hours), change_deadline)
+    return min(now + timedelta(hours=confirm_hours), change_deadline, rebook_by)
 
 
 def proposal_reminder(now: datetime, confirm_by: datetime, reminder_hours: int) -> datetime | None:

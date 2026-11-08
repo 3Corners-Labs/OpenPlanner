@@ -1471,7 +1471,11 @@ class Transaction(Protocol):
         ...
 
     async def get_open_proposal(self, booking_id: int) -> HeldProposal | None:
-        """Return the booking's proposal that still holds its place, if any (ADR 0057)."""
+        """Return the booking's open proposal, if any (ADR 0057).
+
+        Open: not released, and the booking still awaits a new time; the same rule that makes a
+        proposal take a place in ``get_slot_usage`` and ``count_active_bookings``.
+        """
         ...
 
     async def save_proposal(self, proposal: HeldProposal) -> None:

@@ -19,6 +19,7 @@ again.
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -40,6 +41,23 @@ from app.web.templates import create_environment
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 
+class ManageLink(Enum):
+    """Where a message's link to the booking goes, and the words on it.
+
+    A request to confirm (ADR 0056 §8) and a proposed new time (ADR 0057 §8) link to a page that
+    acts only on its POST, so a mail scanner opening the link changes nothing.
+    """
+
+    MANAGE = ("", "message.manage_link")
+    CONFIRM = ("/confirm", "message.confirm_link")
+    PROPOSAL = ("/proposal", "message.proposal_link")
+
+    def __init__(self, suffix: str, text_key: str) -> None:
+        """Bind the path after the management link and the catalogue key of the link text."""
+        self.suffix = suffix
+        self.text_key = text_key
+
+
 @dataclass(frozen=True)
 class MessageKind:
     """Catalogue keys of one message type, written out so the catalogue test can see them.
@@ -59,9 +77,8 @@ class MessageKind:
         confirm: A request to confirm a new booking (ADR 0056): no name, link to the confirm
             page, and the deadline in the texts is ``Booking.confirm_by``.
         book_again: Whether the message links to the group page to make a new appointment.
-        proposal: A proposed new time (ADR 0057): no join link, the texts name the proposed
-            moment (``new_date``, ``new_time``), the link goes to the page that confirms it on
-            its POST, and the deadline is the proposal's ``confirm_by``.
+        link: Where the link to the booking goes (``ManageLink``); only the plain management
+            link carries the join and trial links.
     """
 
     subject_key: str
@@ -75,7 +92,16 @@ class MessageKind:
     calendar: bool = True
     confirm: bool = False
     book_again: bool = False
-    proposal: bool = False
+    link: ManageLink = ManageLink.MANAGE
+
+    @property
+    def proposal(self) -> bool:
+        """Whether it is about a proposed new time (ADR 0057).
+
+        Its texts name the proposed moment (``new_date``, ``new_time``) and its deadline is the
+        proposal's ``confirm_by``.
+        """
+        return self.link is ManageLink.PROPOSAL
 
 
 MESSAGE_KINDS: dict[JobType, MessageKind] = {
@@ -153,6 +179,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         manage_key="message.manage_confirm",
         calendar=False,
         confirm=True,
+        link=ManageLink.CONFIRM,
     ),
     JobType.SEND_CONFIRM_REMINDER: MessageKind(
         "message.confirm_reminder.subject",
@@ -162,6 +189,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         manage_key="message.manage_confirm",
         calendar=False,
         confirm=True,
+        link=ManageLink.CONFIRM,
     ),
     # ADR 0057: a proposed new time, held until its deadline; the old time leaves the calendar.
     JobType.SEND_RESCHEDULE_PROPOSAL: MessageKind(
@@ -171,7 +199,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         True,
         "message.reschedule_proposal.sms",
         manage_key="message.manage_proposal",
-        proposal=True,
+        link=ManageLink.PROPOSAL,
     ),
     JobType.SEND_PROPOSAL_REMINDER: MessageKind(
         "message.proposal_reminder.subject",
@@ -181,7 +209,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         "message.proposal_reminder.sms",
         manage_key="message.manage_proposal",
         calendar=False,
-        proposal=True,
+        link=ManageLink.PROPOSAL,
     ),
     # ADR 0057 point 9: the proposed time was released; choosing stays possible until the lapse.
     JobType.SEND_PROPOSAL_RELEASED: MessageKind(
@@ -348,11 +376,9 @@ class MessageComposer:
             params["new_time"] = format_clock(proposal.start, tz, locale)
             new_end = format_clock(proposal.end, tz, locale)
             when = f"{params['new_date']}, {params['new_time']}–{new_end}"
-        manage_url = self.manage_url(booking) if kind.includes_manage_link else None
-        if manage_url and kind.confirm:  # ADR 0056 §8: the page confirms only on its POST
-            manage_url = f"{manage_url}/confirm"
-        if manage_url and kind.proposal:  # ADR 0057 §8: the same, for the proposed time
-            manage_url = f"{manage_url}/proposal"
+        manage_url = (
+            f"{self.manage_url(booking)}{kind.link.suffix}" if kind.includes_manage_link else None
+        )
         on_hold = kind.closure_notice
         join_url = (
             f"{manage_url}/join"
@@ -360,8 +386,7 @@ class MessageComposer:
             and group.video_enabled
             and not on_hold
             and not kind.rebook
-            and not kind.confirm
-            and not kind.proposal
+            and kind.link is ManageLink.MANAGE
             else None
         )
         greeting = (
@@ -391,13 +416,7 @@ class MessageComposer:
             "reason_label": _("message.reason"),
             "reason": _reason(booking, _),
             "manage_text": _(kind.manage_key, deadline=deadline_text),
-            "manage_link": _(
-                "message.confirm_link"
-                if kind.confirm
-                else "message.proposal_link"
-                if kind.proposal
-                else "message.manage_link"
-            ),
+            "manage_link": _(kind.link.text_key),
             "book_url": f"{self._base_url}/g/{group.slug}" if kind.book_again else None,
             "book_text": _("message.book_again"),
             "book_link": _("message.book_again_link"),
@@ -541,20 +560,25 @@ class MessageComposer:
         contact = booking.contact
         if kind.sms_key is None or contact is None or contact.phone is None:
             raise ValueError("message has no SMS form or the booking no phone number")
-        manage_url = self.manage_url(booking)
-        moment = proposal.start if proposal is not None else booking.start
+        moments = (
+            {
+                "new_date": format_day(local_day(proposal.start, group.tz), booking.locale),
+                "new_time": format_clock(proposal.start, group.tz, booking.locale),
+            }
+            if proposal is not None
+            else {}
+        )
         text = _(
             kind.sms_key,
             first_name=contact.first_name,
             date=format_day(local_day(booking.start, group.tz), booking.locale),
             time=format_clock(booking.start, group.tz, booking.locale),
             group_name=group.name,
-            manage_url=f"{manage_url}/proposal" if kind.proposal else manage_url,
+            manage_url=f"{self.manage_url(booking)}{kind.link.suffix}",
             reason=_reason(booking, _) or "",
             deadline=format_day(
                 local_day(_deadline(kind, booking, group, proposal), group.tz), booking.locale
             ),
-            new_date=format_day(local_day(moment, group.tz), booking.locale),
-            new_time=format_clock(moment, group.tz, booking.locale),
+            **moments,
         )
         return OutboundMessage(ChannelKind.SMS, contact.phone, "", text)

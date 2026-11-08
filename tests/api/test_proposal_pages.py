@@ -10,18 +10,20 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
+from sqlalchemy import text
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.booking import ChangeReason
 from app.domain.booking_changes import ProposalTiming
+from app.domain.reschedule_proposal import DEFAULT_PROPOSAL_HOURS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
 from tests.support.participant import SAME_ORIGIN, booked, open_link
 
 MONDAY_0900 = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)
-TIMING = ProposalTiming(rebook_days=14, rebook_reminder_days=3, confirm_hours=48, reminder_hours=12)
+TIMING = ProposalTiming(rebook_days=14, rebook_reminder_days=3, hours=DEFAULT_PROPOSAL_HOURS)
 
 
 @pytest.fixture
@@ -111,3 +113,16 @@ async def test_a_cross_site_confirmation_is_refused(site: httpx.AsyncClient) -> 
     response = await site.post(f"{base}/proposal", headers={"origin": "https://evil.example"})
 
     assert response.status_code == 403
+
+
+async def test_a_proposed_slot_that_closed_since_sends_the_participant_back(
+    site: httpx.AsyncClient,
+) -> None:
+    base = await _propose(site, await booked(site))
+    app = site._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with app.state.engine.begin() as conn:
+        await conn.execute(text("DELETE FROM schedule_rules WHERE weekday = 0"))  # no Mondays
+
+    response = await site.post(f"{base}/proposal", headers=SAME_ORIGIN)
+
+    assert response.headers["location"] == f"{base}?status=proposal_gone"

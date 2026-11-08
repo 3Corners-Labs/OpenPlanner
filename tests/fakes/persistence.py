@@ -998,10 +998,10 @@ class InMemoryTransaction:
         return stored
 
     async def get_open_proposal(self, booking_id: int) -> HeldProposal | None:
-        open_ = [
-            p for p in self.state.proposals.values() if p.booking_id == booking_id and p.is_open
-        ]
-        return max(open_, key=lambda p: p.id or 0, default=None)
+        if not self.state.bookings[booking_id].awaits_rebook:
+            return None
+        mine = [p for p in self.state.proposals.values() if p.booking_id == booking_id]
+        return max((p for p in mine if p.is_open), key=lambda p: p.id or 0, default=None)
 
     async def save_proposal(self, proposal: HeldProposal) -> None:
         self.state.proposals[proposal.id or 0] = proposal

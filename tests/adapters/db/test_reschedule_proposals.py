@@ -9,13 +9,14 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import ChangeReason
 from app.domain.booking_changes import ProposalTiming
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.reschedule_proposal import ProposalOutcome
+from app.domain.reschedule_proposal import DEFAULT_PROPOSAL_HOURS, ProposalOutcome
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import ADA, NOW, SLOT_0900, TEST_TOKEN_KEY, book, participant
 
 NEXT_0900 = SLOT_0900 + timedelta(days=7)
+TIMING = ProposalTiming(rebook_days=14, rebook_reminder_days=3, hours=DEFAULT_PROPOSAL_HOURS)
 
 
 async def test_an_open_proposal_takes_its_place_until_it_is_released(engine: AsyncEngine) -> None:
@@ -36,9 +37,7 @@ async def test_an_open_proposal_takes_its_place_until_it_is_released(engine: Asy
             group,
             NEXT_0900,
             reason=ChangeReason.STAFFING,
-            timing=ProposalTiming(
-                rebook_days=14, rebook_reminder_days=3, confirm_hours=48, reminder_hours=12
-            ),
+            timing=TIMING,
         )
 
     async with uow.read() as tx:

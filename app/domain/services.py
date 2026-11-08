@@ -80,7 +80,7 @@ from app.domain.job_plan import (
 from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.rebooking import DEFAULT_REACH, Reach, may_take, suggested
-from app.domain.reschedule_proposal import HeldProposal, ProposalOutcome
+from app.domain.reschedule_proposal import HeldProposal
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, open_for_direct
@@ -422,7 +422,7 @@ class BookingService:
                 if booking.is_suspended and booking.closure_id is not None
                 else None
             )
-            proposal = await tx.get_open_proposal(_id(booking)) if booking.awaits_rebook else None
+            proposal = await tx.get_open_proposal(_id(booking))
         now = self._clock.now()
         deadline = group.change_deadline(booking.start)
         changeable = booking.on_hold or (booking.is_active and now < deadline)
@@ -606,12 +606,7 @@ class BookingService:
         if new_start == old.start:
             raise DomainError(ErrorCode.SAME_SLOT)
         now = self._clock.now()
-        proposal = await tx.get_open_proposal(_id(old)) if old.awaits_rebook else None
-        if proposal is not None:  # ADR 0057: answering a proposal releases its held place
-            outcome = (
-                ProposalOutcome.CONFIRMED if new_start == proposal.start else ProposalOutcome.CHOSEN
-            )
-            await tx.save_proposal(proposal.released(now, outcome))
+        await booking_changes.answer_proposal(tx, old, now, new_start)  # ADR 0057: frees the hold
         await tx.save_booking(old.cancel(now))
         await record_moved(tx, old, group, now, actor)
         if old.awaits_rebook and actor is ActorClass.PARTICIPANT:
@@ -884,7 +879,7 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
-            proposal = await tx.get_open_proposal(_id(booking)) if booking.awaits_rebook else None
+            proposal = await tx.get_open_proposal(_id(booking))
             now = self._clock.now()
             if proposal is None or proposal.is_due(now):
                 raise DomainError(ErrorCode.PROPOSAL_NOT_OPEN)

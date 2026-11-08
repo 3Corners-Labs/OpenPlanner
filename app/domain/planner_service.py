@@ -252,12 +252,10 @@ class PlannerService:
     def _timing(self, group: Group) -> ProposalTiming:
         """Return the organisation's periods for a proposal."""
         organisation_id = group.organisation_id
-        hours = value_for(self._proposal_hours, organisation_id)
         return ProposalTiming(
             rebook_days=self.rebook_days(organisation_id),
             rebook_reminder_days=self.reminder_days(organisation_id),
-            confirm_hours=hours.confirm,
-            reminder_hours=hours.reminder,
+            hours=value_for(self._proposal_hours, organisation_id),
         )
 
     async def slot_candidates(

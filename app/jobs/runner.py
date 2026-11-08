@@ -54,7 +54,6 @@ from app.domain.ports import (
     UnitOfWork,
     VideoProvider,
 )
-from app.domain.reschedule_proposal import HeldProposal
 from app.domain.system_log import EventRetention, SystemLog
 from app.domain.tunable import value_of
 from app.i18n import DEFAULT_LOCALE
@@ -309,9 +308,7 @@ class JobRunner:
         ):
             log.info("job.skipped", job_id=job.id, reason=NO_RECIPIENT)
             return NO_RECIPIENT
-        if is_stale(job.pinned_start, booking, job.type) or (
-            job.type in PROPOSAL_NOTICES and not _proposal_current(proposal, job, now)
-        ):
+        if is_stale(job.pinned_start, booking, job.type, proposal=proposal, now=now):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
         if job.type in TEAM_INVITES and not group.sends_team_invite:
@@ -421,12 +418,3 @@ class JobRunner:
             return
         if removed:
             log.info("system_log.pruned", removed=removed)
-
-
-def _proposal_current(proposal: HeldProposal | None, job: ClaimedJob, now: datetime) -> bool:
-    """Return whether a proposal message still has its proposal: open, same time, in time.
-
-    The jobs are pinned to the proposed start (ADR 0057): a proposal answered, withdrawn, past
-    its deadline or replaced by another time leaves its messages unsent.
-    """
-    return proposal is not None and proposal.start == job.pinned_start and not proposal.is_due(now)

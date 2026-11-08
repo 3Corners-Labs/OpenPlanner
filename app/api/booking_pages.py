@@ -51,7 +51,7 @@ from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import DomainError
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService
@@ -483,15 +483,14 @@ async def confirm_proposal(
 ) -> Response:
     """Take the proposed time: the booking moves there with a new reference, as a reschedule.
 
-    A proposal answered, withdrawn or past its deadline sends the browser back to the booking
-    page, which says so and still offers to choose a time.
+    A proposal answered, withdrawn or past its deadline, or a proposed slot that can no longer
+    take the booking (a closure or a schedule change since), sends the browser back to the
+    booking page, which says so and still offers to choose a time.
     """
     ref = await authorise(request, public_ref)
     try:
         receipt = await _service(request).confirm_proposal(ref)
-    except DomainError as error:
-        if error.code is not ErrorCode.PROPOSAL_NOT_OPEN:
-            raise
+    except DomainError:
         return RedirectResponse(_manage_url(public_ref, "proposal_gone"), status_code=303)
     new = receipt.booking
     return await start(request, new.id or 0, _manage_url(new.public_ref, "rescheduled"))

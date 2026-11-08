@@ -29,8 +29,6 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlalchemy.orm import aliased
-from sqlalchemy.sql.selectable import ScalarSelect
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.admin_sessions import AdminSessionQueries
@@ -87,7 +85,6 @@ from app.adapters.db.models import (
     OrganisationTextRow,
     ParticipantLinkBookingRow,
     ReminderRuleRow,
-    RescheduleProposalRow,
     ScheduleOverrideRow,
     ScheduleRuleRow,
     ShortfallAcceptanceRow,
@@ -99,6 +96,7 @@ from app.adapters.db.overview_layouts import OverviewLayoutQueries
 from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
+from app.adapters.db.proposals import ProposalQueries, places_taken
 from app.adapters.db.public_address import PublicAddressQueries
 from app.adapters.db.record_names import bot_credential_name, channel_secret_name
 from app.adapters.db.retention import RetentionQueries
@@ -185,7 +183,6 @@ from app.domain.job_plan import (
 from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
 from app.domain.privacy import PURGED_FIELDS
-from app.domain.reschedule_proposal import HeldProposal, ProposalOutcome
 from app.domain.routing import GroupRouting
 from app.domain.scheduling import (
     DispatchFallback,
@@ -209,44 +206,6 @@ _PENDING = "pending"
 _RUNNING = "running"
 _DONE = "done"
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
-
-_HELD = aliased(BookingRow)
-
-_PROPOSAL_OPEN = (
-    RescheduleProposalRow.released_at.is_(None),
-    BookingRow.status == BookingStatus.AWAITING_REBOOK.value,
-)
-"""An open proposal holds its place while its booking still awaits a new time (ADR 0057)."""
-
-
-def _held_in_slot() -> ScalarSelect[int]:
-    """Return the count of open proposals in the outer query's slot, correlated to ``SlotRow``."""
-    return (
-        select(func.count(RescheduleProposalRow.id))
-        .join(_HELD, _HELD.id == RescheduleProposalRow.booking_id)
-        .where(
-            RescheduleProposalRow.slot_id == SlotRow.id,
-            RescheduleProposalRow.released_at.is_(None),
-            _HELD.status == BookingStatus.AWAITING_REBOOK.value,
-        )
-        .correlate(SlotRow)
-        .scalar_subquery()
-    )
-
-
-def _proposal(row: RescheduleProposalRow) -> HeldProposal:
-    """Map a proposal row."""
-    return HeldProposal(
-        row.id,
-        row.booking_id,
-        row.slot_id,
-        row.start,
-        row.end,
-        row.confirm_by,
-        row.created_at,
-        row.released_at,
-        ProposalOutcome(row.outcome) if row.outcome else None,
-    )
 
 
 def _check_name(group_id: int) -> str:
@@ -510,6 +469,7 @@ def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
 
 class SqlTransaction(
     AdminSessionQueries,
+    ProposalQueries,
     AlertTargetQueries,
     ConfigurationDocumentQueries,
     HealthQueries,
@@ -1767,17 +1727,13 @@ class SqlTransaction(
 
         A place is taken by a booking that holds one and by an open proposal (ADR 0057).
         """
-        active = func.count(case((BookingRow.status.in_(_HOLDS_PLACE), 1)))
         rows = await self._session.execute(
-            select(SlotRow.start, SlotRow.capacity_snapshot, active + _held_in_slot())
-            .outerjoin(BookingRow, BookingRow.slot_id == SlotRow.id)
-            .where(
+            select(SlotRow.start, SlotRow.capacity_snapshot, places_taken()).where(
                 SlotRow.group_id == group_id,
                 SlotRow.start >= lower,
                 SlotRow.start < upper,
                 SlotRow.kind == BookingKind.SCHEDULED.value,
             )
-            .group_by(SlotRow.id)
         )
         return [SlotUsage(start, capacity, int(count)) for start, capacity, count in rows]
 
@@ -1810,56 +1766,9 @@ class SqlTransaction(
     async def count_active_bookings(self, slot_id: int) -> int:
         """Return the places taken in the slot: bookings holding one and open proposals."""
         count = await self._session.scalar(
-            select(func.count()).where(
-                BookingRow.slot_id == slot_id,
-                BookingRow.status.in_(_HOLDS_PLACE),
-            )
+            select(places_taken()).select_from(SlotRow).where(SlotRow.id == slot_id)
         )
-        held = await self._session.scalar(
-            select(func.count())
-            .select_from(RescheduleProposalRow)
-            .join(BookingRow, BookingRow.id == RescheduleProposalRow.booking_id)
-            .where(RescheduleProposalRow.slot_id == slot_id, *_PROPOSAL_OPEN)
-        )
-        return int(count or 0) + int(held or 0)
-
-    async def add_proposal(self, proposal: HeldProposal) -> HeldProposal:
-        """Insert a held proposal and return it with its ID (ADR 0057)."""
-        row = RescheduleProposalRow(
-            booking_id=proposal.booking_id,
-            slot_id=proposal.slot_id,
-            start=proposal.start,
-            end=proposal.end,
-            confirm_by=proposal.confirm_by,
-            created_at=proposal.created_at,
-        )
-        self._session.add(row)
-        await self._session.flush()
-        return replace(proposal, id=row.id)
-
-    async def get_open_proposal(self, booking_id: int) -> HeldProposal | None:
-        """Return the booking's proposal that still holds its place (ADR 0057)."""
-        row = await self._session.scalar(
-            select(RescheduleProposalRow)
-            .where(
-                RescheduleProposalRow.booking_id == booking_id,
-                RescheduleProposalRow.released_at.is_(None),
-            )
-            .order_by(RescheduleProposalRow.id.desc())
-            .limit(1)
-        )
-        return _proposal(row) if row is not None else None
-
-    async def save_proposal(self, proposal: HeldProposal) -> None:
-        """Persist a proposal's release."""
-        await self._session.execute(
-            update(RescheduleProposalRow)
-            .where(RescheduleProposalRow.id == proposal.id)
-            .values(
-                released_at=proposal.released_at,
-                outcome=proposal.outcome.value if proposal.outcome else None,
-            )
-        )
+        return int(count or 0)
 
     async def upcoming_starts_for_email(
         self, group_id: int, email: str, after: datetime
