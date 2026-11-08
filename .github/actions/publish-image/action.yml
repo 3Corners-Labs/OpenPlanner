@@ -30,8 +30,8 @@ inputs:
   public-image:
     description: >-
       Registry name of the public package (ghcr.io/owner/repo-public) that receives the same
-      push as `image` (one digest, ADR 0108). Empty for everything but a minor or major
-      release; the rule lives in main.yml.
+      push as `image` (one digest, ADR 0108). Empty for release candidates; every release
+      gets one (ADR 0116 point 10). The rule lives in main.yml.
     required: false
     default: ""
   flavor:
