@@ -15,7 +15,7 @@ so the previous image keeps working and the downgrade drops the new table and co
 losing anything. Dropping the old columns is the contract step, a minor later.
 
 Revision ID: 0098
-Revises: 0096
+Revises: 0097
 Create Date: 2026-11-08 20:00:00.000000
 """
 
@@ -26,7 +26,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0098"
-down_revision: str | None = "0096"
+down_revision: str | None = "0097"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
