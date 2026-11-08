@@ -69,6 +69,8 @@ from app.admin.readiness_view import checklist_view, readiness_service
 from app.admin.routing_inputs import (
     FORM_KIND,
     ROUTING_ATTRIBUTE_FIELDS,
+    ROUTING_FIELDS,
+    ROUTING_HINTS,
     ROUTING_LABELS,
     ROUTING_VALUE_FIELD,
 )
@@ -691,13 +693,7 @@ def _settings_fields(
     routing_inputs = _routing_inputs(current.contact_center)
     integrations = [
         text("video_host_email", current.video_host_email, "admin.field.video_host_email_hint"),
-        text("wxcc_business_address", routing_inputs["wxcc_business_address"]),
-        text("wxcc_channel", routing_inputs["wxcc_channel"]),
-        text(
-            ROUTING_VALUE_FIELD,
-            routing_inputs[ROUTING_VALUE_FIELD],
-            "admin.field.wxcc_routing_value_hint",
-        ),
+        *(text(name, routing_inputs[name], ROUTING_HINTS[name]) for name in ROUTING_FIELDS),
         Field(
             "trial_call_enabled",
             _("admin.field.trial_call_enabled"),
