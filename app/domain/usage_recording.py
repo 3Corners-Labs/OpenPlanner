@@ -14,11 +14,14 @@ nothing but the allow-listed fields of ``usage.UsageFact`` leaves this module.
     moved      ─► ``booking.moved`` (the new booking is a ``booking.created`` with reason ``move``)
     suspended / resumed by a closure ─► ``booking.suspended`` / ``booking.resumed``
 
-A booking that is completed or went unattended has no producer yet: nothing in the application
-sets ``completed`` or ``no_show`` (ADR 0117 build status, step 3 derives them from the call).
+    rebooking  ─► ``rebook.proposed`` / ``rebook.accepted`` / ``rebook.expired`` (metric U8)
+
+How a booking ended ``completed`` or ``no_show`` is not written here: nothing in the
+application sets those statuses, so ``slot_close`` derives the ``booking.outcome`` fact from the
+call after the slot has ended (ADR 0117 step 3).
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.domain import booking_facts
 from app.domain.booking import Booking, ChangeReason
@@ -105,3 +108,52 @@ async def record_closure_change(
     """Record a booking suspended or resumed by an emergency closure (metric U10)."""
     fact = booking_facts.closure_change(kind, facts_of_booking(booking, group), now)
     await tx.record_usage(fact)
+
+
+async def record_rebook_proposed(
+    tx: Transaction, booking: Booking, group: Group, now: datetime, actor_class: ActorClass
+) -> None:
+    """Record a planner's request for a new time (metric U8); ``booking`` is the waiting one."""
+    await tx.record_usage(
+        booking_facts.rebook_proposed(facts_of_booking(booking, group), now, actor_class)
+    )
+
+
+async def record_rebook_accepted(
+    tx: Transaction, booking: Booking, group: Group, now: datetime
+) -> None:
+    """Record the participant's choice of a new time, with the time it took (metric U8)."""
+    fact = booking_facts.rebook_accepted(
+        facts_of_booking(booking, group), now, booking.rebook_requested_at
+    )
+    await tx.record_usage(fact)
+
+
+async def record_rebook_expired(
+    tx: Transaction, booking: Booking, group: Group, now: datetime
+) -> None:
+    """Record a request for a new time that lapsed (metric U8)."""
+    await tx.record_usage(booking_facts.rebook_expired(facts_of_booking(booking, group), now))
+
+
+async def record_queue_claimed(
+    tx: Transaction, booking: Booking, group: Group, now: datetime
+) -> None:
+    """Record a claim in the own queue (metric Q7).
+
+    The queue shows a booking from ``queue_visible_from_minutes`` before its start, or from the
+    moment it was made if that is later; the fact carries the seconds from then to the claim.
+    """
+    visible = max(
+        booking.created_at, booking.start - timedelta(minutes=group.queue_visible_from_minutes)
+    )
+    await tx.record_usage(
+        booking_facts.queue_claimed(facts_of_booking(booking, group), now, visible)
+    )
+
+
+async def record_queue_released(
+    tx: Transaction, booking: Booking, group: Group, now: datetime
+) -> None:
+    """Record a claimed booking put back in the queue (metric Q7)."""
+    await tx.record_usage(booking_facts.queue_released(facts_of_booking(booking, group), now))

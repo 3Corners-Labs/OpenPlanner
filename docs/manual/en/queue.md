@@ -16,6 +16,8 @@ appointment reference and the status:
 - **Participant waiting**: the participant is in the call and waits for an agent.
 - **Picked up by a colleague** or **Picked up by you**.
 - **Not picked up**: nobody picked the appointment up within the time set for the group.
+  OpenPlanner records this once per appointment as the system event `queue.not_picked_up` in
+  the audit log, and the overview counts these appointments per group.
 
 Direct calls are in the same list, with **Direct call** below the time. You never see the
 participant's email address or phone number.

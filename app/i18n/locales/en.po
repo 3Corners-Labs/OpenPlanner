@@ -6743,6 +6743,9 @@ msgstr "Waiting"
 msgid "admin.overview.widget.queue.longest_wait"
 msgstr "Longest wait"
 
+msgid "admin.overview.widget.queue.not_picked_up"
+msgstr "Not picked up"
+
 msgid "admin.overview.widget.queue.staff"
 msgstr "Signed in"
 
@@ -10585,3 +10588,387 @@ msgstr "{Agents}: {agents}, bookings: {booked} (of which {pending} not confirmed
 
 msgid "admin.audit.detail.booking_confirmed_by_staff"
 msgstr "Appointment confirmed for the participant"
+
+msgid "reports.view.volume"
+msgstr "Volume"
+
+msgid "reports.view.queue"
+msgstr "Queue and calls"
+
+msgid "reports.view.capacity"
+msgstr "Capacity"
+
+msgid "reports.view.channels"
+msgstr "Channels"
+
+msgid "reports.views.label"
+msgstr "Report"
+
+msgid "reports.empty"
+msgstr "Nothing has been recorded for this report in this period yet. Choose another period, or come back when the group has been used."
+
+msgid "reports.unavailable"
+msgstr "not available"
+
+msgid "reports.mean"
+msgstr "Mean"
+
+msgid "reports.mean.seconds"
+msgstr "{n} s"
+
+msgid "reports.mean.early"
+msgstr "{value} early"
+
+msgid "reports.mean.late"
+msgstr "{value} late"
+
+msgid "reports.bucket.early"
+msgstr "{range} early"
+
+msgid "reports.chart.table"
+msgstr "{title}: the same numbers as a table"
+
+msgid "reports.chart.gap"
+msgstr "Count hidden ({hidden})"
+
+msgid "reports.chart.desc.column"
+msgstr "Column chart: {title}. The same numbers follow in the table below. A count below the minimum is not drawn and reads {hidden}."
+
+msgid "reports.chart.desc.stacked"
+msgstr "Stacked column chart: {title}. The same numbers follow in the table below. A count below the minimum is not drawn and reads {hidden}."
+
+msgid "reports.chart.desc.line"
+msgstr "Line chart: {title}. The same numbers follow in the table below. A day with a count below the minimum breaks the line and reads {hidden}."
+
+msgid "reports.chart.unit.calls"
+msgstr "calls"
+
+msgid "reports.chart.unit.slots"
+msgstr "slots"
+
+msgid "reports.chart.unit.percent"
+msgstr "percent"
+
+msgid "reports.chart.unit.messages"
+msgstr "messages"
+
+msgid "reports.chart.unit.trials"
+msgstr "trial calls"
+
+msgid "reports.dispatch.contact_center"
+msgstr "Contact center"
+
+msgid "reports.dispatch.openplanner_queue"
+msgstr "Own queue"
+
+msgid "reports.kind.scheduled"
+msgstr "Scheduled"
+
+msgid "reports.kind.direct"
+msgstr "Direct call"
+
+msgid "reports.channel.email"
+msgstr "Email"
+
+msgid "reports.channel.sms"
+msgstr "SMS"
+
+msgid "reports.channel.whatsapp"
+msgstr "WhatsApp"
+
+msgid "reports.purpose.confirmation"
+msgstr "Confirmation"
+
+msgid "reports.purpose.reminder"
+msgstr "Reminder"
+
+msgid "reports.purpose.change"
+msgstr "Change"
+
+msgid "reports.purpose.cancellation"
+msgstr "Cancellation"
+
+msgid "reports.failure.task_failed"
+msgstr "Task not created"
+
+msgid "reports.failure.meeting_failed"
+msgstr "Meeting not created"
+
+msgid "reports.failure.integration_error"
+msgstr "Integration error"
+
+msgid "reports.rebook.proposed_planner"
+msgstr "Proposed after a planner asked"
+
+msgid "reports.rebook.proposed_assistant"
+msgstr "Proposed by the assistant"
+
+msgid "reports.fill.empty"
+msgstr "Empty"
+
+msgid "reports.fill.under_half"
+msgstr "Under half full"
+
+msgid "reports.fill.under_full"
+msgstr "More than half, not full"
+
+msgid "reports.fill.full"
+msgstr "Full"
+
+msgid "reports.shortfall.open"
+msgstr "Still short of staff"
+
+msgid "reports.shortfall.accepted"
+msgstr "Short, accepted by a planner"
+
+msgid "reports.shortfall.resolved"
+msgstr "Resolved"
+
+msgid "reports.trial.created"
+msgstr "Trial call made"
+
+msgid "reports.trial.joined"
+msgstr "Followed the link"
+
+msgid "reports.trial.entered"
+msgstr "Entered the meeting"
+
+msgid "reports.trial.failed"
+msgstr "Failed"
+
+msgid "reports.locale.nl"
+msgstr "Dutch"
+
+msgid "reports.locale.en"
+msgstr "English"
+
+msgid "reports.weekday.0"
+msgstr "Monday"
+
+msgid "reports.weekday.1"
+msgstr "Tuesday"
+
+msgid "reports.weekday.2"
+msgstr "Wednesday"
+
+msgid "reports.weekday.3"
+msgstr "Thursday"
+
+msgid "reports.weekday.4"
+msgstr "Friday"
+
+msgid "reports.weekday.5"
+msgstr "Saturday"
+
+msgid "reports.weekday.6"
+msgstr "Sunday"
+
+msgid "reports.queue.mix.title"
+msgstr "How bookings reach staff"
+
+msgid "reports.queue.mix.method"
+msgstr "Queue method"
+
+msgid "reports.queue.task_wait.title"
+msgstr "Wait until a call connects"
+
+msgid "reports.queue.task_wait.bucket"
+msgstr "Wait"
+
+msgid "reports.queue.punctuality.title"
+msgstr "When the host joined, against the start"
+
+msgid "reports.queue.punctuality.bucket"
+msgstr "Host against the start"
+
+msgid "reports.queue.guest_wait.title"
+msgstr "Participant waiting for the host"
+
+msgid "reports.queue.guest_wait.bucket"
+msgstr "Wait in the meeting"
+
+msgid "reports.queue.length.title"
+msgstr "How long calls last"
+
+msgid "reports.queue.length.bucket"
+msgstr "Call length"
+
+msgid "reports.queue.calls_ended"
+msgstr "Finished calls"
+
+msgid "reports.queue.participants_per_call"
+msgstr "People per call (mean)"
+
+msgid "reports.queue.direct.title"
+msgstr "Direct calls"
+
+msgid "reports.queue.direct.created"
+msgstr "Started"
+
+msgid "reports.queue.direct.left"
+msgstr "Left while waiting"
+
+msgid "reports.queue.direct.not_picked_up"
+msgstr "Not picked up in time"
+
+msgid "reports.queue.direct.abandoned"
+msgstr "Share that left while waiting"
+
+msgid "reports.queue.abandon_wait.title"
+msgstr "Wait before leaving"
+
+msgid "reports.queue.abandon_wait.bucket"
+msgstr "Wait when leaving"
+
+msgid "reports.queue.claims.title"
+msgstr "Own queue: claims"
+
+msgid "reports.queue.claims.claimed"
+msgstr "Claimed"
+
+msgid "reports.queue.claims.released"
+msgstr "Given back"
+
+msgid "reports.queue.claims.per_claim"
+msgstr "Given back per claim"
+
+msgid "reports.queue.claim_wait.title"
+msgstr "Time until a booking is claimed"
+
+msgid "reports.queue.claim_wait.bucket"
+msgstr "Time until claimed"
+
+msgid "reports.queue.failures.title"
+msgstr "Dispatch failures"
+
+msgid "reports.queue.failures.code"
+msgstr "Failure"
+
+msgid "reports.queue.peak.title"
+msgstr "Direct calls at once, highest per day"
+
+msgid "reports.queue.peak.series"
+msgstr "Highest number at once"
+
+msgid "reports.queue.peak.highest"
+msgstr "Highest in the period"
+
+msgid "reports.queue.rebook.title"
+msgstr "New times proposed"
+
+msgid "reports.queue.rebook.proposed_by"
+msgstr "Proposed"
+
+msgid "reports.queue.rebook.result"
+msgstr "What came of the proposals"
+
+msgid "reports.queue.rebook.accepted"
+msgstr "Accepted"
+
+msgid "reports.queue.rebook.expired"
+msgstr "Lapsed"
+
+msgid "reports.queue.rebook.conversion"
+msgstr "Accepted of those proposed"
+
+msgid "reports.queue.rebook_wait.title"
+msgstr "Time until a proposal is accepted"
+
+msgid "reports.queue.rebook_wait.bucket"
+msgstr "Time until accepted"
+
+msgid "reports.capacity.utilisation.title"
+msgstr "Utilisation per day"
+
+msgid "reports.capacity.utilisation.series"
+msgstr "Utilisation (percent)"
+
+msgid "reports.capacity.utilisation.total"
+msgstr "Utilisation in the period"
+
+msgid "reports.capacity.slots"
+msgstr "Slots that started"
+
+msgid "reports.capacity.idle.series"
+msgstr "Places not booked"
+
+msgid "reports.capacity.idle.total"
+msgstr "Places not booked in the period"
+
+msgid "reports.capacity.days.title"
+msgstr "Slots, utilisation and free places per day"
+
+msgid "reports.capacity.fill.title"
+msgstr "How full the slots were"
+
+msgid "reports.capacity.fill.class"
+msgstr "Fill"
+
+msgid "reports.capacity.heat.title"
+msgstr "Busiest days and hours"
+
+msgid "reports.capacity.heat.hour"
+msgstr "Hour"
+
+msgid "reports.capacity.heat.range"
+msgstr "The busiest hours are shown for a period of at least {n} days."
+
+msgid "reports.capacity.heat.none"
+msgstr "No booking was placed in a group that is big enough to be cut by hour."
+
+msgid "reports.capacity.heat.left_out"
+msgstr "{n} group(s) are too small to be cut by hour and are left out of this table."
+
+msgid "reports.capacity.heat.rule"
+msgstr "Hours are shown only for a group with at least {n} bookings in the period. Hours are local to each group. The number is in every cell; the shade only helps the eye."
+
+msgid "reports.capacity.shortfall.title"
+msgstr "Blocks short of staff"
+
+msgid "reports.capacity.shortfall.state"
+msgstr "State"
+
+msgid "reports.channels.messages.title"
+msgstr "Messages sent and failed"
+
+msgid "reports.channels.sent"
+msgstr "Sent"
+
+msgid "reports.channels.failed"
+msgstr "Failed"
+
+msgid "reports.channels.failure_rate"
+msgstr "Share that failed"
+
+msgid "reports.channels.purpose"
+msgstr "Purpose"
+
+msgid "reports.channels.channel"
+msgstr "Channel"
+
+msgid "reports.channels.by_channel.title"
+msgstr "Messages per channel"
+
+msgid "reports.channels.by_purpose.title"
+msgstr "Messages per purpose"
+
+msgid "reports.channels.locales.title"
+msgstr "Bookings per language"
+
+msgid "reports.channels.locales.locale"
+msgstr "Language"
+
+msgid "reports.channels.locales.left_out"
+msgstr "{n} group(s) are too small to be cut by language and are left out of this table."
+
+msgid "reports.channels.trial.title"
+msgstr "Trial calls"
+
+msgid "reports.channels.trial.step"
+msgstr "Step"
+
+msgid "reports.channels.trial.joined_share"
+msgstr "Followed the link, of those made"
+
+msgid "reports.channels.trial.entered_share"
+msgstr "Entered the meeting, of those who followed the link"

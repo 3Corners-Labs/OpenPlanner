@@ -38,6 +38,7 @@ from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.rebooking import last_made
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
+from app.domain.slot_close import shortfall_resolved
 from app.domain.tunable import value_for, value_of
 from app.domain.usage import ActorClass
 
@@ -253,6 +254,9 @@ class PlannerService:
                 waiting.append(await self._request(tx, group, booking, reason))
                 detail = f"planner.rebook,reason:{reason.value},bulk"
                 await self._audit(tx, principal, authorization, detail, booking.id)
+            after = await self._slot(tx, group, start)
+            if after is not None and not after.shortfall:  # ADR 0117 metric C5
+                await tx.record_usage(shortfall_resolved(group, start, after.agents, after.booked))
         return waiting
 
     async def waiting(self, principal: Principal, slug: str) -> list[Booking]:
@@ -295,6 +299,7 @@ class PlannerService:
         return await booking_changes.request_rebook(
             tx,
             booking,
+            group,
             self._clock.now(),
             reason=reason,
             rebook_days=self.rebook_days(group.organisation_id),

@@ -16,7 +16,8 @@ het afspraaknummer en de status:
 - **Deelnemer wacht**: de deelnemer zit in het gesprek en wacht op een medewerker.
 - **Opgepakt door een collega** of **Door u opgepakt**.
 - **Niet opgepakt**: niemand heeft de afspraak opgepakt binnen de tijd die bij de groep is
-  ingesteld.
+  ingesteld. OpenPlanner legt dat per afspraak één keer vast als systeemgebeurtenis
+  `queue.not_picked_up` in het auditlog, en het overzicht telt deze afspraken per groep.
 
 Direct gesprekken staan in dezelfde lijst, met **Direct gesprek** onder de tijd. U ziet nooit
 het e-mailadres of telefoonnummer van de deelnemer.

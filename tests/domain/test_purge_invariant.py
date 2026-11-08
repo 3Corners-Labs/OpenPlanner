@@ -90,8 +90,16 @@ async def test_every_transition_leaves_one_purge_at_the_retention_moment(
         assert booking is not None
         from app.domain.booking import ChangeReason
 
+        group = await tx.get_group_by_id(booking.group_id)
+        assert group is not None
         await request_rebook(
-            tx, booking, clock.now(), reason=ChangeReason.STAFFING, rebook_days=14, reminder_days=3
+            tx,
+            booking,
+            group,
+            clock.now(),
+            reason=ChangeReason.STAFFING,
+            rebook_days=14,
+            reminder_days=3,
         )
     seen |= assert_one_purge_at_the_retention_moment(uow)
 

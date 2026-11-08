@@ -35,8 +35,9 @@ The overview never shows participants' personal data: only counts, group names a
   full list** opens the audit log itself.
 
 - **Queue across my groups**: for each group with an own queue within your reach, how many
-  participants wait, how long the longest wait has been and how many staff who may work the queue
-  are signed in now. A participant with an appointment counts once they are in the lobby; a
+  participants wait, how long the longest wait has been, how many appointments nobody picked up
+  in time (**Not picked up**, the time set for the group) and how many staff who may work the
+  queue are signed in now. A participant with an appointment counts once they are in the lobby; a
   direct call counts from the request, even before the link is opened. The group name opens
   the queue. Counts and minutes only, never names. Under the longest wait it says whether it is
   within the target, above it, or above the limit at which an alert is raised (*Target wait* and

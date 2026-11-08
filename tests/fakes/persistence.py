@@ -85,6 +85,7 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.security_log import TOKEN_REFRESH_FAILED
+from app.domain.slot_close import ClosedBooking, EndedSlot, EndedSlots
 from app.domain.staff import (
     GrantHolders,
     Membership,
@@ -111,6 +112,7 @@ class State:
     slots: dict[int, Slot] = field(default_factory=dict)
     bookings: dict[int, Booking] = field(default_factory=dict)
     usage_facts: list[UsageFact | StaffFact] = field(default_factory=list)
+    slots_closed_until: datetime | None = None
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
     claimed_jobs: dict[tuple[int, JobType], PlannedJob] = field(default_factory=dict)
     active_jobs: list[ActiveJob] = field(default_factory=list)
@@ -1033,6 +1035,47 @@ class InMemoryTransaction:
     async def record_usage(self, fact: UsageFact | StaffFact) -> bool:
         self.state.usage_facts.append(fact)
         return True
+
+    async def ended_slots(self, after: datetime, until: datetime, limit: int) -> EndedSlots:
+        found = sorted(
+            (s for s in self.state.slots.values() if after < s.end <= until),
+            key=lambda s: (s.end, s.id or 0),
+        )
+        covered = until
+        if len(found) >= limit:
+            covered = found[limit - 1].end
+            found = [s for s in found if s.end <= covered]
+        slots = tuple(
+            EndedSlot(
+                s.id or 0,
+                s.group_id,
+                s.kind,
+                s.start,
+                s.end,
+                s.capacity_snapshot,
+                tuple(
+                    ClosedBooking(
+                        b.status,
+                        b.locale,
+                        b.created_at,
+                        b.start,
+                        b.claim is not None,
+                        self.state.call_status.get(b.id or 0) or new_status(b.id or 0),
+                    )
+                    for b in sorted(self.state.bookings.values(), key=lambda b: b.id or 0)
+                    if b.slot_id == s.id
+                ),
+            )
+            for s in found
+        )
+        return EndedSlots(slots, covered)
+
+    async def slots_closed_until(self) -> datetime | None:
+        return self.state.slots_closed_until
+
+    async def set_slots_closed_until(self, until: datetime) -> None:
+        current = self.state.slots_closed_until
+        self.state.slots_closed_until = until if current is None else max(current, until)
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(
