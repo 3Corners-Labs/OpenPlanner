@@ -87,3 +87,22 @@ async def test_the_masking_of_the_stream_has_nothing_to_mask_in_a_usage_line(
     assert masked == line
     assert not set(line) & PII_FIELDS
     assert MASK not in json.dumps(masked, default=str)
+
+
+async def test_a_failing_line_is_logged_without_content_and_never_fails_the_commit(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(_fact: UsageFact) -> dict[str, object]:
+        raise ValueError("secret detail")
+
+    monkeypatch.setattr("app.adapters.db.uow.fact_fields", broken)
+    uow = SqlUnitOfWork(engine, usage_to_log=lambda: True)
+
+    with capture_logs() as logs:
+        async with uow.locked() as tx:
+            await tx.record_usage(FACT)
+
+    assert [e for e in logs if e["event"] == "usage.emit_failed"] == [
+        {"event": "usage.emit_failed", "log_level": "error", "error": "ValueError"}
+    ]
+    assert "secret detail" not in repr(logs)

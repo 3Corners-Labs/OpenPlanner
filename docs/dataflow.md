@@ -658,6 +658,10 @@ written as one structured line after the commit:
 The line holds no personal data, so the masking processor has nothing to mask; the customer's
 retention of it is theirs.
 
+No small-cell threshold applies to these lines: they are the facts at the grain the customer chose to
+receive them, and a group so small that an hour and a code point at one person is a risk the
+superuser accepts by switching the setting on (ADR 0117 point 15; threat model).
+
 ## Planned flows
 
 Purge sweep (retention): the worker's daily housekeeping reads the bookings that still hold
