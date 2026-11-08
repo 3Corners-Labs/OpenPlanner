@@ -634,8 +634,13 @@ def create_app(
             lambda: timedelta(seconds=live().meeting_status_refresh_seconds),
             settings.app_version,
         )
+
+        def changes_alert_per_hour() -> int:
+            # ADR 0044: one threshold for every writer of a bookings.manage change.
+            return live().planner_changes_alert_per_hour
+
         app.state.call_retry_service = CallRetryService(
-            uow, clock, app.state.admin_service, lambda: live().planner_changes_alert_per_hour
+            uow, clock, app.state.admin_service, changes_alert_per_hour
         )
         # ADR 0044 §2: the participant's contact details on the booking page, on request.
         app.state.participant_contact_service = ParticipantContactService(
@@ -724,7 +729,7 @@ def create_app(
             app.state.integration_service,
             BotSpacePoster(app.state.bot_tokens, http, live().webex_api_base_url, request_log),
             SpaceTexts(app.state.translator.gettext, settings.public_base_url),
-            lambda: live().planner_changes_alert_per_hour,
+            changes_alert_per_hour,
         )
         text_overrides.attach(uow)
         app.state.organisation_text_service = OrganisationTextService(
@@ -764,7 +769,7 @@ def create_app(
             clock,
             app.state.admin_service,
             app.state.booking_service,
-            lambda: live().planner_changes_alert_per_hour,
+            changes_alert_per_hour,
             rebook_days=lambda org: per_organisation(org).planner_rebook_days,
             reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
             proposal_hours=lambda org: _proposal_hours(per_organisation(org)),

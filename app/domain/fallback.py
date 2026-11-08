@@ -22,7 +22,6 @@ from collections.abc import Callable, Iterable
 from datetime import datetime
 from typing import Protocol
 
-from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService, record_change, require
 from app.domain.alert_delivery import DEFAULT_LOCALE
 from app.domain.alerts import FALLBACK_EVENT
@@ -197,7 +196,7 @@ class FallbackService:
             await tx.save_group_fallback(group.id, None)
             await tx.add_audit_event(_event(group, organisation, Outcome.SUCCESS, now))
             if principal is not None:
-                event = await record_change(
+                await record_change(
                     tx,
                     now,
                     principal,
@@ -205,8 +204,8 @@ class FallbackService:
                     organisation,
                     group.slug,
                     "fallback.off",
+                    alert_threshold=value_of(self._alert_per_hour),
                 )
-                await CHANGES_ALERT.check(tx, event, value_of(self._alert_per_hour))
             waiting = [
                 b
                 for b in await tx.fallback_bookings(group.id, now)

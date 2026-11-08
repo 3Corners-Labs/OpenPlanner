@@ -25,7 +25,6 @@ stopped.
 
 from collections.abc import Callable
 
-from app.domain.activity_alert import REVEALS_ALERT
 from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Contact
@@ -83,7 +82,7 @@ class ParticipantContactService:
             booking, _ = await group_booking(tx, slug, booking_id)
             if booking.contact is None:
                 return None
-            event = await record_change(
+            await record_change(
                 tx,
                 self._clock.now(),
                 principal,
@@ -92,6 +91,6 @@ class ParticipantContactService:
                 target.group,
                 CONTACT_VIEWED,
                 booking_id=booking_id,
+                alert_threshold=value_of(self._alert_per_hour),
             )
-            await REVEALS_ALERT.check(tx, event, value_of(self._alert_per_hour))
         return booking.contact

@@ -1454,7 +1454,7 @@ _AUDIT = (
         "`contact_reveals_alert_per_hour` times within an hour (ADR 0044 §2). The detail names "
         "the actor and the count; nothing was refused.",
         "Ask the person whether the requests were theirs; if not, use *End all sessions* on their "
-        "page under Staff and look up the bookings in the audit log.",
+        "page under Staff, which also lists what they did.",
     ),
     _e(
         "booking_rows.rollup",
@@ -1729,8 +1729,8 @@ _AUDIT = (
         "One person made more than `planner_changes_alert_per_hour` changes under "
         "`bookings.manage` within an hour (ADR 0044): changes to bookings, retried calls, "
         "fallbacks ended by hand. The detail names the actor and the count; nothing was refused.",
-        "Ask the planner whether the changes were theirs; if not, use *End all sessions* on their "
-        "page under Staff and look up the bookings in the audit log.",
+        "Ask the person whether the changes were theirs; if not, use *End all sessions* on their "
+        "page under Staff, which also lists what they did.",
     ),
     _e(
         "public_address",

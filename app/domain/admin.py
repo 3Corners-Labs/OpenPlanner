@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 
+from app.domain.activity_alert import alert_for
 from app.domain.audit import ANONYMOUS_ACTOR, AuditEntry, AuditEvent, AuditFilter, Outcome
 from app.domain.audit_export import (
     EXPORT_EVENT,
@@ -527,16 +528,22 @@ async def record_change(
     detail: str = "",
     *,
     booking_id: int | None = None,
-) -> AuditEvent:
+    alert_threshold: int | None = None,
+) -> None:
     """Record a successful admin action in the same transaction as the action itself.
 
     Mostly a change; also a request worth accounting for, such as showing a participant's
     contact details (ADR 0044 §2). ``detail`` names what changed or was asked for (field
     names, ``rule.add``-style keys), never values; ``booking_id`` names the booking it is about.
+    A permission that an hourly alert counts (``app.domain.activity_alert``) needs that alert's
+    ``alert_threshold``: the alert is checked right after the event, in this transaction.
 
-    Returns:
-        The event, for an hourly alert that counts it (``app.domain.activity_alert``).
+    Raises:
+        ValueError: If ``permission`` is counted by an alert and no ``alert_threshold`` is given.
     """
+    alert = alert_for(permission)
+    if alert is not None and alert_threshold is None:
+        raise ValueError(f"{permission.value} is counted by {alert.action}: pass its threshold")
     event = AuditEvent(
         at,
         principal.subject,
@@ -549,4 +556,5 @@ async def record_change(
         booking_id=booking_id,
     )
     await tx.add_audit_event(event)
-    return event
+    if alert is not None and alert_threshold is not None:
+        await alert.check(tx, event, alert_threshold)

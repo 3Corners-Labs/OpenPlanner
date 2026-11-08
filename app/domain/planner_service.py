@@ -27,7 +27,6 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from app.domain import booking_changes
-from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService, Authorization, record_change, require
 from app.domain.agenda import AgendaSlot, ShortfallAcceptance
 from app.domain.agenda_service import agenda_days
@@ -409,7 +408,7 @@ class PlannerService:
     ) -> None:
         """Record the change; warn once when the planner passes the hourly threshold."""
         target = authorization.target
-        event = await record_change(
+        await record_change(
             tx,
             self._clock.now(),
             principal,
@@ -418,8 +417,8 @@ class PlannerService:
             target.group,
             detail,
             booking_id=booking_id,
+            alert_threshold=value_of(self._alert_per_hour),
         )
-        await CHANGES_ALERT.check(tx, event, value_of(self._alert_per_hour))
 
 
 def _ids(bookings: list[Booking]) -> list[int]:

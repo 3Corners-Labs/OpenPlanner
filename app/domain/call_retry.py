@@ -15,7 +15,6 @@ it counts toward the hourly alert on many changes by one person (``planner_chang
 from collections.abc import Callable
 from datetime import datetime
 
-from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Booking
@@ -77,7 +76,7 @@ class CallRetryService:
             await tx.add_jobs(
                 booking_id, [PlannedJob(job, _run_at(booking, group, job, now), booking.start)]
             )
-            event = await record_change(
+            await record_change(
                 tx,
                 now,
                 principal,
@@ -85,8 +84,9 @@ class CallRetryService:
                 authorization.target.organisation,
                 slug,
                 f"retry.{job.value}",
+                booking_id=booking_id,
+                alert_threshold=value_of(self._alert_per_hour),
             )
-            await CHANGES_ALERT.check(tx, event, value_of(self._alert_per_hour))
 
 
 def _missing(booking: Booking, group: Group, job: JobType) -> bool:

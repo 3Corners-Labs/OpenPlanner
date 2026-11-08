@@ -17,7 +17,7 @@ from app.adapters.registrations import (
 )
 from app.adapters.webhook_selftest import Delivery, Outcome, deliveries_to_report
 from app.config import Settings
-from app.domain.activity_alert import REVEALS_ALERT
+from app.domain.activity_alert import CHANGES_ALERT, REVEALS_ALERT
 from app.domain.admin import AdminService
 from app.domain.authorization import Principal
 from app.domain.booking import MeetingRef
@@ -314,6 +314,27 @@ async def test_retry_plans_the_meeting_again_and_says_so(site: Site) -> None:
     assert 'name="job" value="create_video_room"' not in page  # pending now: no second button
     again = await site.client.post(url, data={"job": "send_confirmation"}, headers=SAME_ORIGIN)
     assert "done=retry_not_possible" in again.headers["location"]
+
+
+async def test_a_retry_counts_toward_the_planners_alert_with_its_platform_setting(
+    settings: Settings, admin_db: str
+) -> None:
+    """ADR 0044: a retried call is a change; past ``planner_changes_alert_per_hour``, a warning."""
+    limited = settings.model_copy(update={"planner_changes_alert_per_hour": 5})
+    async with _running_site(limited, admin_db) as site:
+        booking_id = await _failed_meeting(site)
+        await site.login_as(GROUP_ADMIN)
+        url = f"/admin/groups/demo/bookings/{booking_id}/retry"
+        for _ in range(7):
+            response = await site.client.post(
+                url, data={"job": "create_video_room"}, headers=SAME_ORIGIN
+            )
+            assert "done=retried" in response.headers["location"]
+        alerts = [e for e in await audit_log(site) if e.action == CHANGES_ALERT.action]
+
+    assert [(e.group, e.detail) for e in alerts] == [
+        ("demo", f"actor:{GROUP_ADMIN.subject},changes:6")
+    ]
 
 
 async def _with_meeting(site: Site, booking_id: int, meeting_id: str) -> None:

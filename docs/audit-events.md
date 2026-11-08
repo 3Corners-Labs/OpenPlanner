@@ -135,8 +135,8 @@ log platform is what turns them into a page:
 
 | `event.action` | `reason` | `detail` | Counts |
 |---|---|---|---|
-| `planner.changes_alert` | `too_many_changes` | `actor:<subject>,changes:<n>` | `bookings.manage` changes, above `planner_changes_alert_per_hour` |
-| `booking.contact_reveals_alert` | `too_many_contact_reveals` | `actor:<subject>,reveals:<n>` | requests for a participant's contact details (`bookings.view`, detail `booking.contact_viewed`), above `contact_reveals_alert_per_hour` |
+| `planner.changes_alert` | `too_many_changes` | `actor:<subject>,changes:<n>` | `bookings.manage` changes (a planner's change, a retried call, a fallback ended by hand), above `planner_changes_alert_per_hour` |
+| `booking.contact_reveals_alert` | `too_many_contact_reveals` | `actor:<subject>,reveals:<n>` | requests for a participant's contact details (detail `booking.contact_viewed`, the only audited success under `bookings.view`), above `contact_reveals_alert_per_hour` |
 
 ## What never appears
 
