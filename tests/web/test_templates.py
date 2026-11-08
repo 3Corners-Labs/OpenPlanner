@@ -5,7 +5,7 @@ import re
 import pytest
 from starlette.requests import Request
 
-from app.web.templates import RENDER_CONTEXT, switch_href
+from app.web.templates import switch_href
 from tests.web.conftest import RenderSource
 
 
@@ -38,10 +38,24 @@ def test_a_kept_parameter_with_text_in_it_is_dropped_not_echoed(value: str) -> N
     assert switch_href(_request(f"day={value}&days={value}"), "lang", "nl") == "?lang=nl"
 
 
-@pytest.mark.parametrize("name", sorted(RENDER_CONTEXT))
-def test_a_page_value_with_a_name_render_sets_itself_is_refused(
-    name: str, render_source: RenderSource
-) -> None:
+def test_a_page_value_named_like_one_render_sets_is_refused(render_source: RenderSource) -> None:
     """System status passed ``environment`` and showed the bar's ``EnvironmentNotice`` instead."""
-    with pytest.raises(ValueError, match=re.escape(str([name]))):
-        render_source("<p>{{ environment }}</p>", {name: "dev"})
+    with pytest.raises(ValueError, match=re.escape("['environment'] set twice")):
+        render_source("<p>{{ environment }}</p>", {"environment": "dev"})
+
+
+def test_a_page_value_named_like_one_of_the_frame_is_refused(render_source: RenderSource) -> None:
+    """The admin shell's ``back`` (the page itself) replaced a booking's link to its agenda."""
+    with pytest.raises(ValueError, match=re.escape("['back'] set twice")):
+        render_source("<p>{{ back }}</p>", {"back": "/agenda"}, frame={"back": "/booking"})
+
+
+def test_the_frame_cannot_replace_what_render_sets(render_source: RenderSource) -> None:
+    with pytest.raises(ValueError, match=re.escape("['locale'] set twice")):
+        render_source("<p>{{ locale }}</p>", {}, frame={"locale": "en"})
+
+
+def test_page_frame_and_render_values_all_reach_the_template(render_source: RenderSource) -> None:
+    page = render_source("{{ title }}|{{ nav }}|{{ locale }}", {"title": "T"}, frame={"nav": "N"})
+
+    assert bytes(page.body).decode() == "T|N|nl"

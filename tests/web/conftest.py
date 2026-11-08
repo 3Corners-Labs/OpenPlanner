@@ -16,20 +16,24 @@ from tests.admin.conftest import admin_db, site  # noqa: F401 - re-exported fixt
 
 __all__ = ["admin_db", "render_source", "site"]
 
-RenderSource = Callable[[str, Mapping[str, object]], HTMLResponse]
+RenderSource = Callable[..., HTMLResponse]
+"""``(source, context, frame=None)``: render a template written in the test."""
 
 
 @pytest.fixture
 def render_source(tmp_path: Path) -> RenderSource:
-    """Return a function that renders template ``source`` with ``context`` through ``render``."""
+    """Return a function that renders template ``source`` with ``context`` (and ``frame``)."""
     translator = Translator(load_catalogues())
     locale = RequestLocale(translator.bind("nl"), remember=False, translator=translator)
     request = Request(
         {"type": "http", "app": FastAPI(), "headers": [], "query_string": b"", "path": "/x"}
     )
 
-    def rendered(source: str, context: Mapping[str, object]) -> HTMLResponse:
+    def rendered(
+        source: str, context: Mapping[str, object], frame: Mapping[str, object] | None = None
+    ) -> HTMLResponse:
         (tmp_path / "page.html").write_text(source)
-        return render(create_templates([tmp_path]), request, "page.html", locale, context)
+        templates = create_templates([tmp_path])
+        return render(templates, request, "page.html", locale, context, frame=frame)
 
     return rendered

@@ -43,6 +43,7 @@ async def test_a_closed_team_a_planned_closure_and_a_suspended_booking(
     async with uow.read() as tx:
         closed = await tx.get_group(CLOSED_GROUP_SLUG)
         planned = await tx.get_group(PLANNED_GROUP_SLUG)
+        demo = await tx.get_group("demo")
         assert closed is not None
         assert planned is not None
         (active,) = await tx.get_closures(closed.id, NOW)
@@ -73,6 +74,12 @@ async def test_a_closed_team_a_planned_closure_and_a_suspended_booking(
     assert booking.status is BookingStatus.SUSPENDED
     assert booking.closure_id == active.id
     assert [b.status if b else None for b in pending] == [BookingStatus.PENDING_CONFIRMATION] * 4
+    first = pending[0]
+    assert first is not None
+    assert demo is not None
+    assert examples.demo_agenda == (
+        f"/admin/groups/demo/agenda?day={first.start.astimezone(demo.tz).date()}"
+    )
     assert examples.correct_details == examples.pending_confirm.replace("/confirm", "/details")
     assert len({b.start for b in pending if b}) == 4  # one per slot
     assert examples.closed_group == f"/g/{CLOSED_GROUP_SLUG}"

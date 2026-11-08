@@ -1,7 +1,8 @@
 /**
- * What "runs past its box" means on an admin page: the one check behind tests/admin-layout.spec.ts
- * and the admin-layout journey of the verify-openplanner skill. Plain JavaScript, so both the
- * Playwright specs and the skill's Node script import it.
+ * What "runs past its box" means on an admin page: the one check behind the desktop run of
+ * tests/admin-shell.spec.ts (every admin page of pages.json) and the admin-layout journey of
+ * the verify-openplanner skill. Plain JavaScript, so both the Playwright specs and the skill's
+ * Node script import it.
  */
 
 /**

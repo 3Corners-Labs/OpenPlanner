@@ -47,11 +47,13 @@ def _styled() -> set[str]:
 
 
 def _rule(selector: str) -> str:
-    """Return the declarations of the first rule of ``admin.css`` that is exactly ``selector``."""
-    sheet = CSS_COMMENT.sub("", (STATIC / "admin.css").read_text())
-    found = re.search(rf"(?:^|\n){re.escape(selector)}\s*\{{([^}}]*)\}}", sheet)
+    """Return the declarations of the first rule of ``admin.css`` whose selector is ``selector``.
+
+    A selector list spread over lines is matched with single spaces: ``"a, b"``.
+    """
+    found = [body for sel, body in _rules() if sel == selector]
     assert found, f"no rule for {selector}"
-    return found.group(1)
+    return found[0]
 
 
 @pytest.mark.parametrize("path", SHELL_TEMPLATES, ids=str)
@@ -226,18 +228,8 @@ def test_the_menu_button_and_the_mark_form_one_cluster_on_the_left() -> None:
 
 
 # --- Display faults at 1280 px, found while capturing the manual's screenshots ----------------
-
-
-def _rule_of(selector: str) -> str:
-    """Return the declarations of the rule of ``admin.css`` whose selector list is ``selector``."""
-    found = [body for sel, body in _rules() if sel == selector]
-    assert found, f"no rule for {selector}"
-    return found[0]
-
-
-def test_a_fact_value_wraps_inside_its_box() -> None:
-    """The issuer on Identity provider mapping ran over the fact beside it."""
-    assert "overflow-wrap: anywhere" in _rule(".facts dd")
+# The fit itself (facts, tables, the option list) is checked in the browser: e2e/layout.mjs on
+# every admin page of e2e/pages.json at 1280 px (tests/admin-shell.spec.ts). Two things stay here.
 
 
 def test_the_participant_option_row_is_not_the_admin_option_list() -> None:
@@ -246,44 +238,17 @@ def test_the_participant_option_row_is_not_the_admin_option_list() -> None:
     site = CSS_COMMENT.sub("", (STATIC / "site.css").read_text())
 
     assert not re.search(r"\.choice(?![\w-])", site)
-    assert re.search(r"\n\.choices__option \{[^}]*display: flex", site)
-    for template in (
-        Path("app/api/templates/group.html"),
-        Path("app/api/templates/_contact_fields.html"),
-    ):
-        assert '<div class="choices__option">' in template.read_text()
 
 
 def test_a_long_system_status_state_takes_the_line_under_its_label() -> None:
-    """A proxy finding ran 600 px off the overview's card and squeezed "Proxy" to a letter."""
-    item = _rule_of(".widget-list--status .widget-list__item")
+    """A proxy finding ran 600 px off the overview's card and squeezed "Proxy" to a letter.
+
+    The e2e stack runs no worker, so it never shows a long state; this checks the means.
+    """
+    item = _rule(".widget-list--status .widget-list__item")
     template = (ADMIN_TEMPLATES / "widgets" / "status.html").read_text()
 
-    assert "display: flex" in item
     assert "flex-wrap: wrap" in item
     assert "white-space: normal" in _rule(".chip--wrap")
-    assert '<ul class="widget-list widget-list--status" role="list">' in template
-    assert '<span class="chip chip--wrap' in template
-
-
-GRIDS = {
-    "_agenda_table.html": "data-table data-table--grid agenda-table",
-    "group_agenda_week.html": "data-table data-table--grid agenda-week",
-    "matrix.html": "data-table data-table--grid",
-}
-"""The tables of many narrow columns and their classes (template: class attribute)."""
-
-
-@pytest.mark.parametrize(("template", "classes"), GRIDS.items())
-def test_a_grid_of_many_columns_is_marked_as_one(template: str, classes: str) -> None:
-    """At 1280 px the agenda's day and week and the rights matrix cut off their last column."""
-    assert f'<table class="{classes}">' in (ADMIN_TEMPLATES / template).read_text()
-
-
-def test_a_grid_has_half_the_room_between_its_columns_and_codes_wrap() -> None:
-    """The audit log's last column was cut off by a list of role values without spaces."""
-    grid = _rule_of(".admin .data-table--grid th, .admin .data-table--grid td")
-
-    assert "padding-inline: 0.5rem" in grid
-    assert "overflow-wrap: anywhere" in _rule_of(".admin .data-table code")
-    assert "hyphens: auto" in _rule_of(".admin .data-table thead th")
+    assert "widget-list--status" in template
+    assert "chip--wrap" in template

@@ -149,6 +149,8 @@ class ClosureExamples:
         trial_page: The trial call page of that booking. It shows the page's "not available
             for this appointment" state; its other states are covered by the API tests.
         journeys: The participant's journey per e2e browser (``BROWSERS``), new each run.
+        demo_agenda: The demo group's agenda on the day of the bookings awaiting
+            confirmation (the next weekday): a day with slots and rows, for the page checks.
     """
 
     closed_group: str
@@ -162,6 +164,7 @@ class ClosureExamples:
     proposal_page: str
     trial_page: str
     journeys: dict[str, JourneyExample]
+    demo_agenda: str
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -266,6 +269,7 @@ async def seed_closure_examples(
             await tx.add_usage_cells(usage_example_cells(demo.organisation_id, demo.id, now))
         pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
         proposed = await _proposed_booking(tx, demo, now, token_key)
+        pending_day = _next_weekday(demo, now, PENDING_TIMES[0]).astimezone(demo.tz).date()
         journey_group = await seeded_group(tx, JOURNEY_GROUP_SLUG)
         journeys = {
             browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
@@ -282,6 +286,7 @@ async def seed_closure_examples(
         proposal_page=f"/b/{proposed}/proposal",
         trial_page=f"/b/{token}/test",
         journeys=journeys,
+        demo_agenda=f"/admin/groups/{DEMO_SLUG}/agenda?day={pending_day}",
     )
 
 

@@ -58,8 +58,10 @@ Command: `node .claude/skills/verify-openplanner/scripts/journey.mjs admin-layou
   menu collapsed to the rail (the top bar's menu button) the tables have 180 px more. The
   journey uses a fresh context, so the menu is expanded.
 - The fonts decide by how much a table fits. The journey proves it in the browser of this
-  machine (Google Chrome, or the `PLAYWRIGHT_CHROMIUM_CHANNEL` you set); the e2e suite checks
-  the same pages in its own browsers and fonts.
+  machine (Google Chrome, or the `PLAYWRIGHT_CHROMIUM_CHANNEL` you set). The same check
+  (`e2e/layout.mjs`) runs in `e2e/tests/admin-shell.spec.ts` on every admin page of
+  `e2e/pages.json` at 1280 px, in the e2e suite's browsers and fonts; the journey adds the text
+  checks and the long proxy state, which the e2e stack (no worker) never shows.
 - The proxy finding exists only because this stack's worker cannot reach 127.0.0.1 of the host
   (see *Stand-in versus a real installation* in `../SKILL.md`); it is the long status the
   overview must wrap. On a stack where the round trip succeeds, the row is absent and the step
