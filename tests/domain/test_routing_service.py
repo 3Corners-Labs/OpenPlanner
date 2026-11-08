@@ -99,13 +99,13 @@ async def test_attributes_and_mapping_are_set_and_audited_by_source(
     await service.set_attributes(ORG_ADMIN, "demo", {Attribute.PREFERRED_LANGUAGE})
     await service.set_attributes(ORG_ADMIN, "demo", {Attribute.PREFERRED_LANGUAGE})  # unchanged
     await service.set_mapping(
-        ORG_ADMIN, "demo", SUBJECT_SOURCE, RouteVariable("topic", (("move", "MV"),))
+        ORG_ADMIN, "demo", SUBJECT_SOURCE, "topic", {"move": "MV", "gone": "X", "general": ""}
     )
-    await service.set_mapping(ORG_ADMIN, "demo", "preferred_language", RouteVariable("lang"))
+    await service.set_mapping(ORG_ADMIN, "demo", "preferred_language", "lang", {})
     routing = uow.state.groups[1].routing
     assert routing.attributes == (Attribute.PREFERRED_LANGUAGE,)
     assert routing.variable(SUBJECT_SOURCE) == RouteVariable("topic", (("move", "MV"),))
-    await service.set_mapping(ORG_ADMIN, "demo", "preferred_language", None)
+    await service.set_mapping(ORG_ADMIN, "demo", "preferred_language", "", {})
     assert uow.state.groups[1].routing.variable("preferred_language") is None
     assert details(uow)[1:] == [
         "attributes.set,on:preferred_language",
@@ -114,7 +114,7 @@ async def test_attributes_and_mapping_are_set_and_audited_by_source(
         "mapping.set,source:preferred_language",
     ]
     with pytest.raises(DomainError):
-        await service.set_mapping(ORG_ADMIN, "demo", "channel_preference", RouteVariable("ch"))
+        await service.set_mapping(ORG_ADMIN, "demo", "channel_preference", "ch", {})
 
 
 @pytest.mark.parametrize("principal", [GROUP_ADMIN, OUTSIDER])

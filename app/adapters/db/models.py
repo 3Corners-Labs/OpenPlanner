@@ -530,8 +530,8 @@ class BookingRow(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     # ADR 0055: answers to the group's custom fields as JSON; PII, purged as a whole.
     form_answers: Mapped[str | None] = mapped_column(Text)
-    # ADR 0081: the chosen subject's code and the attribute codes (JSON); no PII, so they
-    # stay after the purge and reporting (ADR 0117) cuts by the subject.
+    # ADR 0081: the chosen subject's code and the attribute codes (JSON); no PII, purged with
+    # the booking all the same (privacy.ROUTING_FIELDS).
     subject_code: Mapped[str | None] = mapped_column(String(40))
     routing_answers: Mapped[str | None] = mapped_column(String(500))
 

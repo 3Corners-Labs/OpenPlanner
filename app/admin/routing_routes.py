@@ -34,15 +34,13 @@ from app.domain.routing import (
     REQUIRED_LOCALES,
     SUBJECT_SOURCE,
     Attribute,
-    GroupRouting,
-    RouteVariable,
     Subject,
 )
 from app.domain.routing_service import GroupRoutingView, RoutingService
 from app.i18n import BoundGettext
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
-from app.web.routing_labels import question_key, value_key
+from app.web.routing_labels import option_label, question_key, source_label, value_key
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -85,11 +83,14 @@ def _url(slug: str) -> str:
     return f"/admin/groups/{slug}/settings/routing"
 
 
-def _refusal(form: FormData, error: DomainError) -> None:
-    """Add the message for a refused change, linked to its input."""
+def _refusal(form: FormData, error: DomainError, variable: str = "variable") -> None:
+    """Add the message for a refused change, linked to its input.
+
+    ``variable`` is the input of the mapping form that was sent; each source has its own.
+    """
     if error.code is ErrorCode.INVALID_CONFIGURATION and error.field in ERROR_KEYS:
         target, key = ERROR_KEYS[error.field]
-        form.errors.append(FormError(target, form._(key)))
+        form.errors.append(FormError(variable if target == "variable" else target, form._(key)))
     else:
         form.refusal(error)
 
@@ -129,25 +130,11 @@ def _subject_inputs(_: BoundGettext, form: FormData, current: Subject | None) ->
     return fields
 
 
-def _source_label(_: BoundGettext, source: str) -> str:
-    """Return the name of a mapping source for the administrator."""
-    if source == SUBJECT_SOURCE:
-        return _("admin.routing.source.subject")
-    return _(question_key(source))
-
-
-def _code_label(routing: GroupRouting, source: str, code: str, locale: RequestLocale) -> str:
-    """Return the label of one code of ``source``."""
-    if source == SUBJECT_SOURCE:
-        subject = routing.subject(code)
-        return subject.label(locale.code) if subject else code
-    return locale.gettext(value_key(source, code))
-
-
 def _mappings(
     found: GroupRoutingView, locale: RequestLocale, form: FormData, posted: str | None
 ) -> list[dict[str, object]]:
     """Return one mapping form per source, filled from the stored or the refused input."""
+    _ = locale.gettext
     routing = found.routing
     views: list[dict[str, object]] = []
     for source in routing.sources:
@@ -160,13 +147,15 @@ def _mappings(
         views.append(
             {
                 "source": source,
-                "label": _source_label(locale.gettext, source),
+                "label": _("admin.routing.source.subject")
+                if source == SUBJECT_SOURCE
+                else source_label(source, _),
                 "variable": value(f"variable_{source}", variable.name if variable else ""),
                 "error": form.error_for(f"variable_{source}") if mine else None,
                 "codes": [
                     {
                         "code": code,
-                        "label": _code_label(routing, source, code, locale),
+                        "label": option_label(routing, source, code, _, locale.code),
                         "value": value(
                             f"value_{source}_{code}",
                             (variable.value(code) or "") if variable else "",
@@ -360,31 +349,16 @@ async def save_mapping(
 ) -> Response:
     """Save the routing variable of one source; an empty name sends nothing for it."""
     form = await read_form(request, locale)
-    service = routing_service(request)
-    found = await service.view(context.principal, slug)
-    if source not in found.routing.sources:
-        return redirect_done(_url(slug), "unchanged")
-    name = form.text(f"variable_{source}")
+    prefix = f"value_{source}_"
+    values = {k.removeprefix(prefix): v for k, v in form.values.items() if k.startswith(prefix)}
     try:
-        variable = (
-            RouteVariable(
-                name,
-                tuple(
-                    (code, form.text(f"value_{source}_{code}"))
-                    for code in found.routing.codes(source)
-                    if form.text(f"value_{source}_{code}")
-                ),
-            )
-            if name
-            else None
+        await routing_service(request).set_mapping(
+            context.principal, slug, source, form.text(f"variable_{source}"), values
         )
-        await service.set_mapping(context.principal, slug, source, variable)
     except DomainError as error:
         raise_refusal(error)
-        _refusal(form, error)
-        form.errors = [
-            FormError(f"variable_{source}", e.message) if e.field == "variable" else e
-            for e in form.errors
-        ]
+        if error.field == "mapping":  # the source is gone: nothing to show an error on
+            return redirect_done(_url(slug), "unchanged")
+        _refusal(form, error, f"variable_{source}")
         return await _page(request, locale, context, slug, form, 422, source)
     return redirect_done(_url(slug), "saved", anchor="mapping")

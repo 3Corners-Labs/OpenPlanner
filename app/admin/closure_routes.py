@@ -540,8 +540,9 @@ async def _move_response(
     group = context.group.group
     booking = await closure_service(request).booking(context.principal, group.slug, booking_id)
     today = local_day(_clock(request).now(), group.tz)
+    subject = booking.routing.subject if booking.routing else None  # ADR 0081: it stays
     free = await _booking_service(request).availability(
-        group.slug, today, today + timedelta(days=MOVE_DAYS)
+        group.slug, today, today + timedelta(days=MOVE_DAYS), subject
     )
     _ = locale.gettext
     options = slot_options([slot.start for slot in free], group.tz, locale.code)

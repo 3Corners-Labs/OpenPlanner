@@ -60,6 +60,8 @@ class AgendaSlot:
         booked: Confirmed scheduled bookings in the slot.
         closed: Whether an emergency closure covers the slot (ADR 0024).
         accepted: Whether a planner accepted the shortfall at exactly these counts.
+        subjects: The subject codes all blocks of the slot offer (ADR 0081 point 4); ``None``
+            when none of them narrows.
     """
 
     start: datetime
@@ -68,6 +70,11 @@ class AgendaSlot:
     booked: int
     closed: bool = False
     accepted: bool = False
+    subjects: frozenset[str] | None = None
+
+    def offers_subject(self, code: str | None) -> bool:
+        """Return whether a booking with subject ``code`` may move into this slot."""
+        return self.subjects is None or code is None or code in self.subjects
 
     @property
     def shortfall(self) -> int:
@@ -133,13 +140,16 @@ def agenda_day(
     """
     length = timedelta(minutes=group.slot_minutes)
     known = list(closures)
-    starts = {s.start for s in slots_on(group, day, windows)}
+    offered = {s.start: s.subjects for s in slots_on(group, day, windows)}
+    starts = set(offered)
     starts |= {s.astimezone(UTC) for s in booked if s.astimezone(group.tz).date() == day}
     result = []
     for start in sorted(starts):
         closed = covering(known, start) is not None
         agents = 0 if closed else agents_for(group, start, start + length, day, windows)
-        slot = AgendaSlot(start, start + length, agents, booked.get(start, 0), closed)
+        slot = AgendaSlot(
+            start, start + length, agents, booked.get(start, 0), closed, subjects=offered.get(start)
+        )
         acceptance = (acceptances or {}).get(start)
         if slot.shortfall and acceptance is not None and slot.matches(acceptance):
             slot = replace(slot, accepted=True)

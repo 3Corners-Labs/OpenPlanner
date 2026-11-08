@@ -585,10 +585,16 @@ def open_for_direct(
     rules: Iterable[ScheduleRule],
     overrides: Iterable[ScheduleOverride],
     now: datetime,
+    subject: str | None = None,
 ) -> bool:
-    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0072)."""
+    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0072).
+
+    With ``subject`` the block must offer that subject too (ADR 0081 point 4).
+    """
     local = now.astimezone(group.tz)
     return any(
-        window.offers_direct and window.opens <= local.time() < window.closes
+        window.offers_direct
+        and window.offers_subject(subject)
+        and window.opens <= local.time() < window.closes
         for window in windows_on(local.date(), rules, overrides)
     )

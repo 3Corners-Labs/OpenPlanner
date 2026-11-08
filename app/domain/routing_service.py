@@ -17,7 +17,7 @@ screens show the code when no label is left.
 """
 
 from collections.abc import Callable, Collection, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal
@@ -182,16 +182,35 @@ class RoutingService:
         await self._change(principal, slug, change)
 
     async def set_mapping(
-        self, principal: Principal, slug: str, source: str, variable: RouteVariable | None
+        self,
+        principal: Principal,
+        slug: str,
+        source: str,
+        name: str,
+        values: Mapping[str, str],
     ) -> None:
-        """Map ``source`` to ``variable``; ``None`` sends nothing for it.
+        """Map ``source`` to the variable ``name``; an empty name sends nothing for it.
+
+        ``values`` are the submitted values per code; only the source's own codes with a
+        non-empty value are read, inside the lock, so a subject removed meanwhile drops out.
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found``, ``group_archived`` or
-                ``invalid_configuration`` naming ``mapping`` or ``variable_name``.
+                ``invalid_configuration`` naming ``mapping``, ``variable_name`` or
+                ``variable_value``.
         """
 
         def change(routing: GroupRouting, _: frozenset[str]) -> tuple[GroupRouting, str] | None:
+            variable = (
+                RouteVariable(
+                    name,
+                    tuple(
+                        (code, values[code]) for code in routing.codes(source) if values.get(code)
+                    ),
+                )
+                if name
+                else None
+            )
             updated = routing.with_mapping(source, variable)
             if updated == routing:
                 return None
@@ -216,7 +235,7 @@ class RoutingService:
             if result is None:
                 return
             routing, detail = result
-            await tx.save_group(replace(group, routing=routing))
+            await tx.save_group_routing(group.id, routing)
             await record_change(
                 tx,
                 self._clock.now(),

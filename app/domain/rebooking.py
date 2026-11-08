@@ -84,11 +84,13 @@ def ranked(
     slots: Iterable[AgendaSlot],
     reach: Reach,
     now: datetime,
+    subject: str | None = None,
 ) -> list[AgendaSlot]:
     """Return the slots that could take a booking now at ``old_start``, best first.
 
     A slot qualifies when it is not ``old_start`` itself, is not closed, has room, may still be
-    taken (``may_take``) and lies within ``reach``. The order follows the module's ranking.
+    taken (``may_take``), lies within ``reach`` and offers the booking's ``subject`` (ADR 0081
+    point 4). The order follows the module's ranking.
     """
     fitting = [
         slot
@@ -98,6 +100,7 @@ def ranked(
         and slot.agents > slot.booked
         and may_take(group, slot.start, now)
         and _within(group, old_start, slot.start, reach)
+        and slot.offers_subject(subject)
     ]
     return sorted(fitting, key=lambda slot: _rank(group, old_start, slot.start))
 
@@ -131,7 +134,14 @@ def propose(
         best = next(
             (
                 slot
-                for slot in ranked(group, booking.start, open_slots, reach, now)
+                for slot in ranked(
+                    group,
+                    booking.start,
+                    open_slots,
+                    reach,
+                    now,
+                    booking.routing.subject if booking.routing else None,
+                )
                 if room[slot.start] > 0
             ),
             None,

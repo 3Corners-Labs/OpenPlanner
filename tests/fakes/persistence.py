@@ -60,6 +60,7 @@ from app.domain.retention import (
     PurgeCandidate,
     RetentionFacts,
 )
+from app.domain.routing import GroupRouting
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
     Group,
@@ -869,6 +870,9 @@ class InMemoryTransaction:
     async def get_booking(self, booking_id: int) -> Booking | None:
         return self.state.bookings.get(booking_id)
 
+    async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
+        self.state.groups[group_id] = replace(self.state.groups[group_id], routing=routing)
+
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(
             self.state.bookings[booking_id],
@@ -877,6 +881,7 @@ class InMemoryTransaction:
             trial=None,
             meeting=None,
             wxcc_task_id=None,
+            routing=None,
         )
         self.state.booking_events[booking_id] = [
             replace(e, message="") for e in self.state.booking_events.get(booking_id, [])

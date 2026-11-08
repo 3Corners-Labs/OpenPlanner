@@ -153,3 +153,21 @@ async def test_a_block_may_only_offer_the_groups_subjects(uow: InMemoryUnitOfWor
         "demo",
         ScheduleRule(1, TimeWindow(time(9), time(10), 1, subjects=("move",))),
     )
+
+
+async def test_a_direct_call_needs_a_block_that_offers_its_subject(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    from app.domain.scheduling import Offer
+
+    # NOW is Thursday 09:00 in Amsterdam; this block takes direct calls about moves only.
+    uow.state.rules[1].append(
+        ScheduleRule(3, TimeWindow(time(9), time(10), 1, offer=Offer.BOTH, subjects=("move",)))
+    )
+    bookings = BookingService(uow, FixedClock(NOW), b"k" * 32)
+    with pytest.raises(DomainError) as refused:
+        await bookings.start_direct(group_slug="demo", contact=answers("general"), locale="nl")
+    assert refused.value.code is ErrorCode.DIRECT_CALL_UNAVAILABLE
+    receipt = await bookings.start_direct(group_slug="demo", contact=answers("move"), locale="nl")
+    assert receipt.booking.routing is not None
+    assert receipt.booking.routing.subject == "move"

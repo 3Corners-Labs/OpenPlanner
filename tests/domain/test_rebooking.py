@@ -207,3 +207,19 @@ def test_proposals_never_overfill_a_slot_and_ignore_input_order(seed: int) -> No
     assert all(count <= room[start] for start, count in taken.items())
     assert all(p.new_start != p.old_start for p in proposals)
     assert propose(GROUP, movers[::-1], slots[::-1], REACH, NOW) == proposals
+
+
+def test_a_proposal_offers_only_slots_whose_blocks_offer_the_bookings_subject() -> None:
+    """ADR 0081 point 4: a move keeps the subject, so the proposal must fit it."""
+    from app.domain.routing import RoutingChoice
+
+    booking = replace(_booking(1), routing=RoutingChoice("general"))
+    nearest = replace(_slot(MON_0930), subjects=frozenset({"move"}))
+    later = _slot(TUE_0900)
+    (proposal,) = propose(GROUP, [booking], [nearest, later], REACH, NOW)
+    assert proposal.new_start == TUE_0900
+    # A booking without a subject fits every block.
+    assert MON_0930 in _starts(ranked(GROUP, MON_0900, [nearest, later], REACH, NOW))
+    assert MON_0930 not in _starts(
+        ranked(GROUP, MON_0900, [nearest, later], REACH, NOW, "general")
+    )

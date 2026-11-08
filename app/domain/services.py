@@ -313,12 +313,13 @@ class BookingService:
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
             now = self._clock.now()
-            if not await self._direct_open(tx, group, now):
+            routing = _routing(group, contact)
+            subject = routing.subject if routing else None
+            if not await self._direct_open(tx, group, now, subject):
                 raise DomainError(ErrorCode.DIRECT_CALL_UNAVAILABLE)
             if not await self._direct_room(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_FULL)
             details = await self._contact(tx, group, contact)
-            routing = _routing(group, contact)
             end = now + timedelta(minutes=group.slot_minutes)
             slot = await tx.add_slot(Slot(None, group.id, now, end, 1, BookingKind.DIRECT))
             salt = new_token_salt()
@@ -519,17 +520,20 @@ class BookingService:
             routing=old.routing,
         )
 
-    async def _direct_open(self, tx: Transaction, group: Group, now: datetime) -> bool:
-        """Return whether the group is open for a direct call at ``now``.
+    async def _direct_open(
+        self, tx: Transaction, group: Group, now: datetime, subject: str | None = None
+    ) -> bool:
+        """Return whether the group is open for a direct call at ``now`` (for ``subject``).
 
-        That takes a staffed block that offers direct calls (ADR 0072). Holidays count as
-        closed days (ADR 0025), and so does an active emergency closure.
+        That takes a staffed block that offers direct calls (ADR 0072) and the subject
+        (ADR 0081 point 4). Holidays count as closed days (ADR 0025), and so does an active
+        emergency closure.
         """
         today = group.today(now)
         rules, overrides = await effective_schedule(tx, group, today, today)
         if any(c.is_active(now) for c in await tx.get_closures(group.id, now)):
             return False
-        return open_for_direct(group, rules, overrides, now)
+        return open_for_direct(group, rules, overrides, now, subject)
 
     async def _direct_room(self, tx: Transaction, group: Group, now: datetime) -> bool:
         """Return whether another direct call fits under the group's cap at ``now``."""

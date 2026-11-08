@@ -19,14 +19,14 @@ from app.domain.form_fields import (
     FormDefinition,
 )
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
-from app.domain.routing import SUBJECT_SOURCE, GroupRouting
+from app.domain.routing import GroupRouting
 from app.domain.scheduling import Group, PhoneMode
 from app.domain.security_log import HONEYPOT
 from app.domain.services import BookingService, ContactInput
 from app.web.errors import FormError, form_errors
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
-from app.web.routing_labels import question_key, value_key
+from app.web.routing_labels import option_label, source_label
 
 HONEYPOT_FIELD = "website"
 MAX_VALUE_LENGTH = 300
@@ -124,7 +124,7 @@ class ContactForm:
         """Return the messages for ``error``; a refused answer names its field's label."""
         if error.code is ErrorCode.INVALID_ANSWER and error.field in routing_keys(self.group):
             source = str(error.field).removeprefix(ROUTING_PREFIX)
-            label = locale.gettext(question_key(source))
+            label = source_label(source, locale.gettext)
             message = locale.gettext("error.invalid_answer_field", label=label)
             return [FormError(f"{ANSWER_PREFIX}{error.field}", message)]
         if error.code is ErrorCode.INVALID_ANSWER and error.field:
@@ -176,16 +176,16 @@ def routing_fields(routing: GroupRouting, locale: RequestLocale) -> list[FieldVi
     _ = locale.gettext
     views: list[FieldView] = []
     for source in routing.sources:
-        if source == SUBJECT_SOURCE:
-            options = tuple((s.code, s.label(locale.code)) for s in routing.subjects)
-        else:
-            options = tuple((c, _(value_key(source, c))) for c in routing.codes(source))
+        options = tuple(
+            (code, option_label(routing, source, code, _, locale.code))
+            for code in routing.codes(source)
+        )
         views.append(
             FieldView(
                 f"{ANSWER_PREFIX}{ROUTING_PREFIX}{source}",
                 "radio",
                 "off",
-                _(question_key(source)),
+                source_label(source, _),
                 True,
                 "",
                 None,

@@ -4,10 +4,12 @@
 document; ``bookings.routing_answers`` the attribute codes the participant chose, next to
 ``bookings.subject_code``; ``schedule_rules.subjects`` and ``schedule_overrides.subjects`` the
 subject codes a staffing block offers, comma-separated. None of it is personal data. A stored
-value that no longer validates (a hand-edited row) reads as empty rather than failing the page.
+entry that no longer validates is skipped rather than failing the page.
 """
 
+import contextlib
 import json
+from collections.abc import Callable, Iterator
 from typing import Any
 
 from app.domain.errors import DomainError
@@ -36,26 +38,56 @@ def routing_json(routing: GroupRouting) -> str | None:
 
 
 def routing_from_json(raw: str | None) -> GroupRouting:
-    """Return the routing stored in ``groups.routing``; empty for ``None`` or a broken row."""
+    """Return the routing stored in ``groups.routing``; empty for ``None``.
+
+    Read entry by entry: a subject, attribute or mapping that no longer validates (an attribute
+    an older release does not know, a rule tightened since) is left out, the rest is kept. The
+    column is written only by ``save_group_routing``, so reading never erases what it skips.
+    """
     if not raw:
         return GroupRouting()
     try:
         body = json.loads(raw)
-        subjects = tuple(
-            Subject(item["code"], tuple(sorted(item["labels"].items())))
-            for item in body.get("subjects", [])
-        )
-        attributes = tuple(Attribute(value) for value in body.get("attributes", []))
-        mapping = tuple(
-            (
-                source,
-                RouteVariable(item["name"], tuple(sorted(item.get("values", {}).items()))),
-            )
-            for source, item in body.get("mapping", {}).items()
-        )
-        return GroupRouting(subjects, attributes, mapping)
-    except (ValueError, KeyError, TypeError, AttributeError, DomainError):
+    except ValueError:
         return GroupRouting()
+    if not isinstance(body, dict):
+        return GroupRouting()
+    subjects = tuple(_entries(body.get("subjects"), _subject))
+    attributes = tuple(_entries(body.get("attributes"), Attribute))
+    mapping = body.get("mapping")
+    variables = tuple(
+        _entries(list(mapping.items()) if isinstance(mapping, dict) else [], _variable)
+    )
+    by_code = {s.code: s for s in reversed(subjects)}  # the first of a duplicate code wins
+    routing = GroupRouting(
+        tuple(s for s in subjects if by_code[s.code] is s), tuple(dict.fromkeys(attributes))
+    )
+    for source, variable in variables:
+        allowed = routing.codes(source)
+        values = tuple((code, value) for code, value in variable.values if code in allowed)
+        with contextlib.suppress(DomainError):
+            routing = routing.with_mapping(source, RouteVariable(variable.name, values))
+    return routing
+
+
+def _entries[T](items: object, read: Callable[[Any], T]) -> Iterator[T]:
+    """Yield ``read(item)`` for every item that reads; a broken item is skipped."""
+    for item in items if isinstance(items, list) else []:
+        try:
+            yield read(item)
+        except (ValueError, KeyError, TypeError, AttributeError, DomainError):
+            continue
+
+
+def _subject(item: Any) -> Subject:
+    """Read one stored subject."""
+    return Subject(item["code"], tuple(sorted(item["labels"].items())))
+
+
+def _variable(item: Any) -> tuple[str, RouteVariable]:
+    """Read one stored mapping entry ``(source, {name, values})``."""
+    source, body = item
+    return str(source), RouteVariable(body["name"], tuple(sorted(body.get("values", {}).items())))
 
 
 def choice_json(choice: RoutingChoice | None) -> str | None:

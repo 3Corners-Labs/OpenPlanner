@@ -4,7 +4,7 @@ Shared by the participant's contact form (``app.api``) and the admin routing scr
 (``app.admin``), which may not import each other.
 """
 
-from app.domain.routing import GroupRouting, RoutingChoice
+from app.domain.routing import SUBJECT_SOURCE, GroupRouting, RoutingChoice
 from app.i18n import BoundGettext
 
 CATALOGUE_KEYS = (
@@ -30,6 +30,24 @@ def value_key(source: str, code: str) -> str:
     return f"booking.routing.{source}.value.{code}"
 
 
+def source_label(source: str, gettext: BoundGettext) -> str:
+    """Return the question of a routing source (``subject`` or an attribute) in words."""
+    return gettext(question_key(source))
+
+
+def option_label(
+    routing: GroupRouting, source: str, code: str, gettext: BoundGettext, locale: str
+) -> str:
+    """Return the label of one code: the group's subject label, or the catalogue value's.
+
+    A subject code no longer in the group's list shows the code itself.
+    """
+    if source == SUBJECT_SOURCE:
+        subject = routing.subject(code)
+        return subject.label(locale) if subject else code
+    return gettext(value_key(source, code))
+
+
 def routing_summary(
     routing: GroupRouting, choice: RoutingChoice | None, gettext: BoundGettext, locale: str
 ) -> str:
@@ -42,9 +60,8 @@ def routing_summary(
         return ""
     parts: list[str] = []
     if choice.subject is not None:
-        subject = routing.subject(choice.subject)
-        parts.append(subject.label(locale) if subject else choice.subject)
+        parts.append(option_label(routing, SUBJECT_SOURCE, choice.subject, gettext, locale))
     for source, code in choice.attributes:
-        question = gettext(question_key(source))
-        parts.append(f"{question}: {gettext(value_key(source, code))}")
+        answer = option_label(routing, source, code, gettext, locale)
+        parts.append(f"{source_label(source, gettext)}: {answer}")
     return " · ".join(parts)

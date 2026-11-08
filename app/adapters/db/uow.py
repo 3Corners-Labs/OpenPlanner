@@ -155,6 +155,7 @@ from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, Plann
 from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
 from app.domain.privacy import PURGED_FIELDS
+from app.domain.routing import GroupRouting
 from app.domain.scheduling import (
     DispatchKind,
     Group,
@@ -352,7 +353,6 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "calendar_invite_address": group.calendar_invite_address,
         "idp_key": group.idp_key,
         "archived_at": group.archived_at,
-        "routing": routing_json(group.routing),
     }
 
 
@@ -985,6 +985,12 @@ class SqlTransaction(
         )
         if block is not None:
             self._session.add(GroupContactsRow(group_id=group_id, body=contacts_json(block)))
+
+    async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
+        """Store the group's routing (ADR 0081); the other settings stay as they are."""
+        await self._session.execute(
+            update(GroupRow).where(GroupRow.id == group_id).values(routing=routing_json(routing))
+        )
 
     async def add_group(self, group: Group) -> Group:
         """Insert a group and return it with its ID; its IdP value starts as its slug."""

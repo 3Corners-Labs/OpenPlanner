@@ -20,7 +20,7 @@ from datetime import UTC, date, datetime, timedelta, tzinfo
 from urllib.parse import urlencode
 
 from app.domain.availability import MAX_RANGE_DAYS, AvailableSlot
-from app.domain.routing import SUBJECT_CODE
+from app.domain.routing import GroupRouting
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.i18n.dates import (
@@ -103,8 +103,13 @@ def _hour(value: str, low: int, high: int) -> int | None:
     return int(value) if value.isdigit() and len(value) <= 2 and low <= int(value) <= high else None
 
 
-def parse_filter(params: Sequence[tuple[str, str]]) -> SlotFilter:
-    """Read the filter from query parameters; values that make no sense are ignored."""
+def parse_filter(
+    params: Sequence[tuple[str, str]], routing: GroupRouting | None = None
+) -> SlotFilter:
+    """Read the filter from query parameters; values that make no sense are ignored.
+
+    A ``subject`` is kept only when it is one of ``routing``'s codes (ADR 0081).
+    """
     days = frozenset(
         int(value) for key, value in params if key == "days" and value in WEEKDAY_VALUES
     )
@@ -112,8 +117,8 @@ def parse_filter(params: Sequence[tuple[str, str]]) -> SlotFilter:
     start = _hour(values.get("from", ""), 0, 23)
     end = _hour(values.get("until", ""), 1, 24)
     invalid = start is not None and end is not None and end <= start
-    subject = values.get("subject", "")
-    chosen = subject if SUBJECT_CODE.fullmatch(subject) else None
+    found = routing.subject(values.get("subject")) if routing else None
+    chosen = found.code if found else None
     return SlotFilter(days, start, None if invalid else end, invalid, chosen)
 
 

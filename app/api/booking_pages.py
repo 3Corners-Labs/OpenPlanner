@@ -144,9 +144,7 @@ async def group_page(
         deleted_by = await service.closure_delete_by(group, closure)
         banner = closure_view(closure, group, locale, now, deleted_by)
         return await participant_page(request, locale, "closure.html", group, {"closure": banner})
-    slot_filter = parse_filter(request.query_params.multi_items())
-    if group.routing.subject(slot_filter.subject) is None:
-        slot_filter = replace(slot_filter, subject=None)
+    slot_filter = parse_filter(request.query_params.multi_items(), group.routing)
     view = await picker(
         service,
         group,
@@ -253,11 +251,12 @@ async def booking_form(
     service = _service(request)
     group = await service.get_group(slug)
     parsed = parse_start(start)
-    slot = await _available(service, group, parsed) if parsed else None
+    chosen = group.routing.subject(subject)
+    code = chosen.code if chosen else None
+    slot = await _available(service, group, parsed, code) if parsed else None
     if parsed is None or slot is None:
         return RedirectResponse(f"/g/{group.slug}?status=unavailable", status_code=303)
     contact = await load_contact_form(service, group, _clock(request).now())
-    chosen = group.routing.subject(subject)
     values = {SUBJECT_INPUT: chosen.code} if chosen else {}
     context = _book_context(contact, parsed, slot, locale, [], values)
     return await participant_page(request, locale, "book.html", group, context)
