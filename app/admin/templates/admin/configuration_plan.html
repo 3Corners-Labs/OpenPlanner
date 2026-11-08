@@ -45,10 +45,10 @@
   {% elif not plan.refusals %}
   <p class="empty-state">{{ _("admin.configuration.plan.nothing") }}</p>
   {% endif %}
-  {% if plan.can_apply and token %}
+  {% if plan.can_apply and review_id %}
   <form method="post" action="{{ document.prefix }}/apply" novalidate>
-    <input type="hidden" name="token" value="{{ token }}">
-    {% if needs_passphrase %}
+    <input type="hidden" name="token" value="{{ review_id }}">
+    {% if needs_seal %}
     <div class="field">
       <label for="apply-passphrase">{{ _("admin.configuration.upload.passphrase") }}</label>
       <input id="apply-passphrase" name="passphrase" type="password" autocomplete="off">
