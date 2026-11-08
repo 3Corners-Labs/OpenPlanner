@@ -1017,7 +1017,7 @@ repository's `pre-pr-review` skill before the PR (`docs/skills.md`).
 | 0096 | Overview widgets chosen by the admin (accepted, step 1 built) |
 | 0097 | The OIDC issuer is pinned |
 | 0098 | Admin sessions held on the server |
-| 0099 | Configuration as a JSON document with plan and apply (the domain is built; adapter, CLI, portal and API follow) |
+| 0099 | Configuration as a JSON document with plan and apply (domain, adapter, host commands and portal are built; API and installer follow) |
 | 0100 | Admin login requires a second factor, shown by the identity provider |
 | 0101 | Sub-tabs on a side-navigation entry; Advanced settings in three |
 | 0102 | Retention: open closures, back-ups, and what remains after a purge |

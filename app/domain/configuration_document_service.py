@@ -31,6 +31,7 @@ from app.domain.configuration_schema import Format
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_v1 import FORMATS, V1
 from app.domain.configuration_values import Json
+from app.domain.configuration_visibility import visible_to
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, UnitOfWork
 
@@ -187,7 +188,7 @@ class ConfigurationDocumentService:
             format=V1.name,
             mode=Mode.MERGE,
             scope=scope,
-            root=_confined(snapshot.root, scope),
+            root=visible_to(_confined(snapshot.root, scope), V1, actor.may_change),
             digest="",
             schema=V1,
             meta={
@@ -296,8 +297,8 @@ class ConfigurationDocumentService:
         """Refuse an export the actor may not make (ADR 0099 point 11).
 
         A document of the platform, or any with secrets, needs the platform's manage
-        permission; one of an organisation, that organisation's. The view of single kinds
-        by narrower roles comes with the portal (step 3).
+        permission; one of an organisation, that organisation's. What the actor may not manage
+        is left out of the document (``visible_to``).
         """
         if scope.is_platform or secrets:
             allowed = actor.may_change(Permission.SETTINGS_PLATFORM_MANAGE, Target.everything())

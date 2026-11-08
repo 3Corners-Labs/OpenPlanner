@@ -15,6 +15,7 @@ import copy
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from typing import cast
 
@@ -37,6 +38,20 @@ _SHA256 = re.compile(r"[0-9a-f]{64}")
 _SEALED_KEYS = frozenset({"sealed"})
 _BINARY_KEYS = frozenset({"media_type", "sha256", "data"})
 _SCALARS = (str, int, float, bool)
+
+
+DOCUMENT_FILENAME = "openplanner-configuration-{installation}-{date}.json"
+"""The download name of an exported document."""
+
+
+def document_filename(installation: str, exported_at: datetime) -> str:
+    """Return the download name of a document exported on ``exported_at``.
+
+    The installation name is turned into a slug (lower case, every character outside
+    ``[a-z0-9.-]`` becomes ``-``) so the name always passes the filename rule.
+    """
+    slug = re.sub(r"[^a-z0-9.-]", "-", (installation or "openplanner").lower())
+    return DOCUMENT_FILENAME.format(installation=slug, date=exported_at.strftime("%Y%m%d"))
 
 
 class Mode(StrEnum):

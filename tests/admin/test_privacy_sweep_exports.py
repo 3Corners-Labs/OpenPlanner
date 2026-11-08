@@ -41,6 +41,7 @@ CLEAR_SECRETS = (LOG_DESTINATION["secret"],)
 EXPORTS = {
     "admin/audit_routes.py": "the audit export, per role below",
     "admin/branding_routes.py": "theme.css: colours of the organisation, swept as a page",
+    "admin/configuration_routes.py": "the configuration document, below",
     "admin/idp_mapping_routes.py": "the claim mapping text, swept as a page",
     "admin/settings_routes.py": "the configuration package, below",
     "api/agent/routes.py": "the machine API, tests/api/test_privacy_sweep_api.py",
@@ -168,3 +169,28 @@ async def test_every_state_table_of_the_package_is_empty_and_every_other_table_i
     assert state == {}, "a state table with rows in the package"
     assert counts["organisations"] == 2
     assert CONFIGURATION_TABLES <= tables
+
+
+async def test_the_configuration_document_holds_no_personal_data_no_state_and_no_clear_secret(
+    audited: Site,
+) -> None:
+    await audited.login_as(SUPER)
+
+    response = await audited.client.post(
+        "/admin/settings/configuration/export",
+        data={
+            "secrets": "yes",
+            "passphrase": PACKAGE_PASSPHRASE,
+            "passphrase_repeat": PACKAGE_PASSPHRASE,
+        },
+        headers=SAME_ORIGIN,
+    )
+
+    assert response.status_code == 200, response.text
+    document = response.content
+    assert not marker_leaks(document.decode(), set()), "personal data in the document"
+    for secret in CLEAR_SECRETS:
+        assert secret.encode() not in document, "a secret in clear text in the document"
+    for name in (STAFF_NAME, DEMO_MARKER, OTHER_MARKER):
+        assert name.encode() not in document, f"state in the document: {name}"
+    assert b'"sealed"' in document, "the document holds no sealed secret: the sweep proves nothing"

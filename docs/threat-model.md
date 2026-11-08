@@ -1189,8 +1189,10 @@ vacuumed away.
 ## Flow: configuration document, plan and apply (ADR 0099)
 
 Host: `python -m app.cli config export --format json|plan|apply` (actor `system:cli`, which the
-matrix does not bind; the passphrase from a file). The portal and the machine API follow in
-steps 3 and 4 under the same `ConfigurationDocumentService`. A document is JSON that states the
+matrix does not bind; the passphrase from a file). The portal (step 3) is *Advanced settings ›
+Configuration package* and *Organisation › Overview › Configuration*: export, upload → plan table
+→ apply, every POST needing a recent login; the machine API follows in step 4. All use the same
+`ConfigurationDocumentService`. A document is JSON that states the
 desired configuration by natural keys; a plan reads it and the installation's configuration and
 returns the changes and the refusals without writing; an apply plans again inside the write
 lock and writes all or nothing. Input from outside: the document (bytes up to
@@ -1207,6 +1209,11 @@ No participant data: a document holds configuration only, and business addresses
 | Tampering | A document that was reviewed deletes or changes something else when it is applied | The apply plans again inside the write lock; the plan hash covers the document, the settings version and the list of changes; a plan with deletions needs the hash | `tests/adapters/db/test_configuration_document.py::test_a_document_with_deletions_needs_the_hash_of_the_reviewed_plan` |
 | Denial of service | A mistaken `replace` document deletes or rewrites too much | Objects that bookings, closures or API grants refer to are never deleted; a plan above `CONFIGURATION_APPLY_MAX_CHANGES` is refused | `tests/adapters/db/test_configuration_document.py::test_a_plan_with_more_changes_than_the_limit_is_refused` |
 | Repudiation | Who applied which change is lost | Every applied change is an audit event under the permission that allowed it, with the plan hash prefix, action, kind and natural key | `tests/domain/test_configuration_document_service.py` |
+| Tampering (portal) | An admin applies a document other than the one whose plan they read, or another admin's | The upload is kept server-side under a random 192-bit token bound to the admin and the scope, one per admin and scope, for `CONFIGURATION_REVIEW_MINUTES`; the apply form carries only the token, the apply plans again and refuses a plan that is not the reviewed one (`configuration_plan_stale`) | `tests/admin/test_configuration_routes.py::test_an_apply_needs_the_token_of_the_plan_that_was_shown`, `test_the_next_upload_replaces_the_one_under_review`, `test_a_token_belongs_to_the_admin_who_uploaded_the_document`, `tests/admin/test_reviewed_documents.py` |
+| Elevation (portal) | An organisation admin plans a platform document, another organisation's, or uses a stale session | Each route pins the scope (`configuration_out_of_scope`); the routes declare `settings.platform.manage` or `settings.organisation.manage` on `{org}`; export, plan and apply need a recent login | `tests/admin/test_configuration_routes.py::test_a_document_of_another_scope_is_refused`, `test_an_organisation_admin_exports_and_plans_only_their_own_organisation`, `test_export_plan_and_apply_need_a_recent_login`, `tests/admin/test_authorization_matrix.py` |
+| Information disclosure (portal) | A secret or value reaches the plan page, the response cache or the passphrase is echoed or kept | The plan lists paths and field names, never values; the page is `no-store`; the passphrase is read from the form per request and kept nowhere; the kept upload holds secrets still sealed | `tests/admin/test_configuration_routes.py::test_a_plan_page_is_not_cached_and_holds_no_value`, `tests/admin/test_privacy_sweep.py`, `tests/admin/test_privacy_sweep_exports.py::test_the_configuration_document_holds_no_personal_data_no_state_and_no_clear_secret` |
+| Information disclosure | An export carries objects or secrets the exporting admin could not change | `visible_to` removes the objects and fields whose permission the actor lacks, on the target they sit on | `tests/domain/test_configuration_visibility.py`, `tests/adapters/db/test_configuration_document.py::test_an_organisation_admin_exports_what_they_may_change_and_no_integration_secrets` |
+| Server-side request forgery | A document names a discovery address that points inside the network | The issuer of a new or moved provider is fetched through the outbound guard (https, public address, no redirect) outside the write lock; a refusal is `discovery_refused` and refuses the plan | `tests/adapters/test_configuration_discovery.py`, `tests/domain/test_configuration_document_service.py` |
 
 ## Flow: personal data in the admin portal (ADR 0063)
 

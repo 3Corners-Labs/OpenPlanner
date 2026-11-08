@@ -68,6 +68,7 @@ from app.adapters.settings_report import SettingState
 from app.admin.address_view import address_view
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.backup_view import backup_view
+from app.admin.configuration_routes import DOCUMENT_KEY, document_block
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
@@ -77,6 +78,7 @@ from app.admin.uploads import read_uploads
 from app.admin.usage_view import usage_view
 from app.config import Settings
 from app.domain.authorization import Permission
+from app.domain.configuration_document import Scope
 from app.domain.configuration_package import (
     MEDIA_TYPE,
     MIN_PASSPHRASE_LENGTH,
@@ -661,7 +663,12 @@ async def _overview(
         "done": done_message(request, locale.gettext),
         "manage": manage,
         "unknown_error": next(
-            (m for k, m in errors.items() if k not in BY_KEY and k != PACKAGE_KEY), None
+            (
+                m
+                for k, m in errors.items()
+                if k not in BY_KEY and k not in (PACKAGE_KEY, DOCUMENT_KEY)
+            ),
+            None,
         ),
     }
     if tab is Tab.STATUS:
@@ -702,6 +709,7 @@ async def _overview(
             "login_form": _login_form(context, current, live, errors, locale),
         }
     else:
+        values["document"] = document_block(request, Scope(), errors.get(DOCUMENT_KEY))
         values["package"] = {
             "error": errors.get(PACKAGE_KEY),
             "min_length": MIN_PASSPHRASE_LENGTH,

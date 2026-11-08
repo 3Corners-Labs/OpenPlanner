@@ -356,7 +356,7 @@ class _Planner:
             action=action,
             fields=names,
             values=dict(values),
-            permissions=_permissions(kind, here.permission, action, names),
+            permissions=permissions_of(kind, here.permission, action, names),
             organisation=here.organisation,
             group=here.group,
         )
@@ -383,7 +383,7 @@ class _Planner:
                 path=wanted.path,
                 action=ChangeAction.UPDATE,
                 fields=names,
-                permissions=_permissions(kind, here.permission, ChangeAction.UPDATE, names),
+                permissions=permissions_of(kind, here.permission, ChangeAction.UPDATE, names),
                 organisation=here.organisation,
                 group=here.group,
             )
@@ -392,7 +392,7 @@ class _Planner:
     def _authorise(self, change: Change) -> None:
         """Refuse the change when the actor lacks any permission its screens require."""
         for permission in sorted(change.permissions):
-            target = _target(permission, change.organisation, change.group)
+            target = target_for(permission, change.organisation, change.group)
             if not self._may_change(permission, target):
                 self._refuse(change.path, ErrorCode.NOT_PERMITTED)
                 return
@@ -450,7 +450,7 @@ def _same(spec: FieldSpec, before: Value, after: Value) -> bool:
     return bool(before == after)
 
 
-def _permissions(
+def permissions_of(
     kind: Kind, base: Permission | None, action: ChangeAction, names: tuple[str, ...]
 ) -> frozenset[Permission]:
     """Return what the admin screens of an object's fields require to make a change."""
@@ -472,7 +472,7 @@ def _permissions(
     return frozenset(permissions)
 
 
-def _target(permission: Permission, organisation: str | None, group: str | None) -> Target:
+def target_for(permission: Permission, organisation: str | None, group: str | None) -> Target:
     """Return the target a permission is checked against, from where the object sits.
 
     Raises:

@@ -1,0 +1,39 @@
+{#- The configuration document block (ADR 0099 point 13): export, and upload to plan. Expects
+    ``document`` (prefix of the form targets, error, min_length, max_mb, platform). The same
+    block sits on the platform's Configuration package tab and on the organisation's tab. -#}
+{% from "_error_message.html" import error_message %}
+<section class="card" id="document" aria-labelledby="document-heading">
+  <h2 id="document-heading">{{ _("admin.configuration.title") }}</h2>
+  <p>{{ _("admin.configuration.intro_platform" if document.platform else "admin.configuration.intro_organisation") }}</p>
+  {{ error_message(document.error, "error-document") }}
+  <h3 id="document-export-heading">{{ _("admin.configuration.export.title") }}</h3>
+  <form method="post" action="{{ document.prefix }}/export" novalidate aria-labelledby="document-export-heading">
+    <div class="field field--checkbox">
+      <input id="document-secrets" name="secrets" type="checkbox" value="yes" aria-describedby="document-secrets-hint">
+      <label for="document-secrets">{{ _("admin.configuration.export.secrets") }}</label>
+    </div>
+    <p class="hint" id="document-secrets-hint">{{ _("admin.configuration.export.secrets_hint", length=document.min_length) }}</p>
+    <div class="field">
+      <label for="document-passphrase">{{ _("admin.settings.package.passphrase") }}</label>
+      <input id="document-passphrase" name="passphrase" type="password" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label for="document-passphrase-repeat">{{ _("admin.settings.package.passphrase_repeat") }}</label>
+      <input id="document-passphrase-repeat" name="passphrase_repeat" type="password" autocomplete="new-password">
+    </div>
+    <button type="submit" class="button">{{ _("admin.configuration.export.button") }}</button>
+  </form>
+  <h3 id="document-upload-heading">{{ _("admin.configuration.upload.title") }}</h3>
+  <p>{{ _("admin.configuration.upload.intro", max_mb=document.max_mb) }}</p>
+  <form method="post" action="{{ document.prefix }}/plan" enctype="multipart/form-data" novalidate aria-labelledby="document-upload-heading">
+    <div class="field">
+      <label for="document-file">{{ _("admin.configuration.upload.file") }}</label>
+      <input id="document-file" name="document" type="file" accept=".json,application/json">
+    </div>
+    <div class="field">
+      <label for="document-upload-passphrase">{{ _("admin.configuration.upload.passphrase") }}</label>
+      <input id="document-upload-passphrase" name="passphrase" type="password" autocomplete="off">
+    </div>
+    <button type="submit" class="button">{{ _("admin.configuration.upload.button") }}</button>
+  </form>
+</section>

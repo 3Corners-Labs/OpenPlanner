@@ -266,6 +266,14 @@
       ]
     },
     {
+      "name": "organisation: configuration document",
+      "path": "/admin/organisations/demo/configuration",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
       "name": "advanced settings: configuration package",
       "path": "/admin/settings/package",
       "user": "super",

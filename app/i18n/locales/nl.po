@@ -8827,6 +8827,9 @@ msgstr "Maximale grootte van een configuratiepakket (MB)"
 msgid "settings.field.configuration_apply_max_changes.label"
 msgstr "Maximaal aantal wijzigingen in één configuratiedocument"
 
+msgid "settings.field.configuration_review_minutes.label"
+msgstr "Minuten dat een geüpload configuratiedocument bewaard blijft na het plan"
+
 msgid "admin.done.package_imported"
 msgstr "Het configuratiepakket is geïmporteerd: {count} organisatie(s). De processen nemen de nieuwe instellingen binnen tien seconden over."
 
@@ -11077,3 +11080,93 @@ msgstr "Link gevolgd, van de aangemaakte"
 
 msgid "reports.channels.trial.entered_share"
 msgstr "In de vergadering, van wie de link volgde"
+
+msgid "admin.tab.configuration"
+msgstr "Configuratie"
+
+msgid "admin.done.configuration_applied"
+msgstr "Het configuratiedocument is toegepast: {count} wijziging(en). De processen nemen de nieuwe instellingen binnen tien seconden over."
+
+msgid "admin.configuration.title"
+msgstr "Configuratiedocument"
+
+msgid "admin.configuration.intro_platform"
+msgstr "Exporteer de configuratie van het platform en alle organisaties als JSON-bestand, of lees een bestand in. Je ziet eerst wat er verandert; pas daarna wordt het toegepast."
+
+msgid "admin.configuration.intro_organisation"
+msgstr "Exporteer de configuratie van deze organisatie als JSON-bestand, of lees een bestand in. Je ziet eerst wat er verandert; pas daarna wordt het toegepast."
+
+msgid "admin.configuration.export.title"
+msgstr "Exporteren"
+
+msgid "admin.configuration.export.secrets"
+msgstr "Geheimen opnemen, verzegeld met een wachtwoord"
+
+msgid "admin.configuration.export.secrets_hint"
+msgstr "Zonder geheimen heeft het bestand geen wachtwoord nodig. Met geheimen is het wachtwoord minstens {length} tekens; bewaar het veilig, het is niet terug te halen."
+
+msgid "admin.configuration.export.button"
+msgstr "Document exporteren"
+
+msgid "admin.configuration.upload.title"
+msgstr "Inlezen en plannen"
+
+msgid "admin.configuration.upload.intro"
+msgstr "Kies een configuratiedocument (JSON, maximaal {max_mb} MB). Je krijgt een plan te zien; er wordt nog niets gewijzigd."
+
+msgid "admin.configuration.upload.file"
+msgstr "Configuratiedocument"
+
+msgid "admin.configuration.upload.passphrase"
+msgstr "Wachtwoord van het document (alleen bij verzegelde geheimen)"
+
+msgid "admin.configuration.upload.button"
+msgstr "Plan tonen"
+
+msgid "admin.configuration.plan.title"
+msgstr "Plan"
+
+msgid "admin.configuration.plan.summary"
+msgstr "Dit document wijzigt {count} object(en):"
+
+msgid "admin.configuration.plan.refused"
+msgstr "Het document kan niet worden toegepast: {count} reden(en)."
+
+msgid "admin.configuration.plan.action"
+msgstr "Actie"
+
+msgid "admin.configuration.plan.kind"
+msgstr "Soort"
+
+msgid "admin.configuration.plan.path"
+msgstr "Plaats in het document"
+
+msgid "admin.configuration.plan.fields"
+msgstr "Velden"
+
+msgid "admin.configuration.plan.nothing"
+msgstr "Het document wijzigt niets: de configuratie is al zoals beschreven."
+
+msgid "admin.configuration.plan.apply"
+msgstr "Plan toepassen"
+
+msgid "admin.configuration.plan.back"
+msgstr "Terug naar de configuratie"
+
+msgid "admin.configuration.action.create"
+msgstr "Aanmaken"
+
+msgid "admin.configuration.action.update"
+msgstr "Wijzigen"
+
+msgid "admin.configuration.action.delete"
+msgstr "Verwijderen"
+
+msgid "admin.configuration.warning.deletes"
+msgstr "Let op: dit plan verwijdert {count} object(en). Dat kan niet ongedaan worden gemaakt."
+
+msgid "admin.configuration.warning.claims"
+msgstr "Let op: dit plan wijzigt een claimwaarde (de sleutel van een organisatie of groep, of de claimwaarde van een rol). Wie op de oude waarde matcht, verliest toegang totdat de identiteitsprovider de nieuwe waarde stuurt."
+
+msgid "admin.configuration.warning.webex"
+msgstr "Let op: dit plan vervangt de tokens van de Webex Service App. De installatie waar het document vandaan komt, kan daardoor geen verbinding meer maken."

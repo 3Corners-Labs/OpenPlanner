@@ -12,12 +12,16 @@ import json
 import os
 from pathlib import Path
 
+import httpx
+
 from app.adapters.clock import SystemClock
 from app.adapters.configuration_context import locked_settings, rule_context
+from app.adapters.configuration_discovery import issuer_fetcher
 from app.adapters.configuration_json import JsonCodec
 from app.adapters.configuration_seal import PassphraseSealing
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.discovery import GuardedDiscoveryFetcher
 from app.adapters.integrations import secret_box
 from app.config import Settings
 from app.domain.admin import AdminService
@@ -65,8 +69,13 @@ def passphrase_from(path: Path | None) -> str | None:
         return handle.readline().rstrip("\r\n")
 
 
-def _service(settings: Settings) -> tuple[ConfigurationDocumentService, object]:
-    """Build the service on the installation's database; return it with the engine."""
+def _service(
+    settings: Settings, http: httpx.AsyncClient
+) -> tuple[ConfigurationDocumentService, object]:
+    """Build the service on the installation's database; return it with the engine.
+
+    ``http`` is the client the guarded discovery fetch of a new or moved provider uses.
+    """
     engine = create_engine(settings.database_url)
     clock = SystemClock()
     uow = SqlUnitOfWork(engine, secret_box(settings))
@@ -82,6 +91,10 @@ def _service(settings: Settings) -> tuple[ConfigurationDocumentService, object]:
         locked=locked_settings,
         max_bytes=lambda: settings.configuration_package_max_mb * 1024 * 1024,
         max_changes=lambda: settings.configuration_apply_max_changes,
+        issuer_of=issuer_fetcher(
+            GuardedDiscoveryFetcher(http, allow_private=settings.environment != "prod"),
+            production=settings.environment == "prod",
+        ),
     )
     return service, engine
 
@@ -100,7 +113,18 @@ def _report(plan: Plan) -> str:
 async def run(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
     """Run ``config export --format json``, ``config plan`` or ``config apply``."""
     scope = Scope(args.organisation) if args.organisation else Scope()
-    service, engine = _service(settings)
+    async with httpx.AsyncClient(timeout=10.0) as http:
+        return await _run(settings, args, scope, *_service(settings, http))
+
+
+async def _run(
+    settings: Settings,
+    args: argparse.Namespace,
+    scope: Scope,
+    service: ConfigurationDocumentService,
+    engine: object,
+) -> tuple[str, int]:
+    """Run the command on a built service; dispose the engine at the end."""
     try:
         passphrase = passphrase_from(args.passphrase_file)
         if args.action == "export":

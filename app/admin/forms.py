@@ -108,6 +108,7 @@ DONE_MESSAGES: dict[str, str] = {
     "fallback_ended": "admin.done.fallback_ended",
     "certificate_uploaded": "admin.done.certificate_uploaded",
     "package_imported": "admin.done.package_imported",
+    "configuration_applied": "admin.done.configuration_applied",
     "certificate_removed": "admin.done.certificate_removed",
     "certificate_checked": "admin.done.certificate_checked",
     "csr_generated": "admin.done.csr_generated",

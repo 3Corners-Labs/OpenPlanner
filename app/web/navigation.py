@@ -460,6 +460,14 @@ OBJECTS = (
                             f"{_ORGANISATION}/login/{{idp_key}}",
                         ),
                     ),
+                    # ADR 0099: the organisation's configuration as a JSON document, whole.
+                    Screen(
+                        "organisation.configuration",
+                        "admin.tab.configuration",
+                        f"{_ORGANISATION}/configuration",
+                        Permission.SETTINGS_ORGANISATION_MANAGE,
+                        "export",
+                    ),
                     # ADR 0117 point 11: how the organisation's groups are used (counts only).
                     Screen(
                         "organisation.usage",
