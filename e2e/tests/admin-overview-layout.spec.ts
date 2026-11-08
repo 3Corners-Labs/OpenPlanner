@@ -14,10 +14,14 @@ requireKeycloak();
 test.skip(({ browserName }) => browserName !== 'chromium', 'one layout per user: chromium only');
 
 test('the auditor removes, moves, adds back and restores with the keyboard', async ({ page }) => {
-  await loginAs(page, 'auditor', '/admin/');
+  await loginAs(page, 'auditor', '/admin/overview/edit');
+  // Start from the role's default, whatever an earlier, interrupted run left behind.
+  const restore = page.getByRole('button', { name: 'Standaardindeling herstellen' });
+  if (await restore.count()) await restore.click();
+  await page.goto('/admin/');
   const widgets = page.locator('[data-widget]');
   const before = await widgets.evaluateAll((els) => els.map((el) => el.getAttribute('data-widget')));
-  expect(before.length).toBeGreaterThan(1);
+  expect(before.length).toBeGreaterThan(2); // remove one, then move the last one up
 
   await tabTo(page, page.getByRole('link', { name: 'Overzicht aanpassen' }));
   await page.keyboard.press('Enter');

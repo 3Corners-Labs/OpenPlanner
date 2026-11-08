@@ -100,7 +100,8 @@ At the top of the overview, next to **Refresh**, are two buttons:
 
 As soon as you change something it is your own layout; only you see it, and it stays when you
 log in again. **Restore default layout** removes your own layout, so you see your role's default
-again. If you lose the right to a widget, it disappears from your overview by itself. The number
+again. The *Tasks* and *Alerts* shortcuts in the top bar follow your layout: remove that widget
+and its shortcut goes too. If you lose the right to a widget, it disappears from your overview by itself. The number
 of widgets has a maximum the superuser sets (*Most widgets on an own overview*, 12 by default). A
 layout is a personal preference: it does not go into the audit log, and it holds no personal
 data.

@@ -24,7 +24,7 @@ from app.admin.forms import done_message, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, page
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
-from app.domain.overview_layout import addable
+from app.domain.overview_layout import addable, effective
 from app.web.locale import RequestLocale
 from app.web.widgets import OVERVIEW_PATH, allowed_keys, default_keys, widget
 
@@ -71,17 +71,10 @@ def _title(locale: RequestLocale, key: str) -> str:
     return locale.gettext(item.title_key) if item else key
 
 
-async def _state(
-    request: Request, context: AdminContext
-) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], bool]:
-    """Return the shown layout, the allowed keys, the default keys and whether it is own."""
+def _keys(context: AdminContext) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Return the admin's default layout and the widgets the matrix grants them."""
     principal = context.principal
-    allowed = allowed_keys(can_function(principal))
-    default = default_keys(principal)
-    service = overview_layout_service(request)
-    stored = await service.stored(principal.subject)
-    shown = await service.layout(principal.subject, default, allowed)
-    return shown, allowed, default, stored is not None
+    return default_keys(principal), allowed_keys(can_function(principal))
 
 
 async def _page(
@@ -92,7 +85,9 @@ async def _page(
     error: str | None = None,
 ) -> HTMLResponse:
     """Render one of the two pages, with a refused change's message when there is one."""
-    shown, allowed, _default, own = await _state(request, context)
+    default, allowed = _keys(context)
+    stored = await overview_layout_service(request).stored(context.principal.subject)
+    shown = effective(stored, default, allowed)
     rows = [
         WidgetRow(key, _title(locale, key), i == 0, i == len(shown) - 1)
         for i, key in enumerate(shown)
@@ -107,7 +102,7 @@ async def _page(
         {
             "rows": rows,
             "offer": offer,
-            "own": own,
+            "own": stored is not None,
             "full": len(shown) >= maximum,
             "maximum": maximum,
             "error": locale.gettext(error) if error else None,
@@ -134,13 +129,10 @@ async def add_form(request: Request, locale: Locale, context: View) -> HTMLRespo
 async def add_widget(request: Request, locale: Locale, _: SameOrigin, context: View) -> Response:
     """Add one widget at the end of the admin's own layout, then show the overview."""
     form = await read_form(request, locale)
-    principal = context.principal
+    default, allowed = _keys(context)
     try:
         await overview_layout_service(request).add(
-            principal.subject,
-            form.text("widget"),
-            default_keys(principal),
-            allowed_keys(can_function(principal)),
+            context.principal.subject, form.text("widget"), default, allowed
         )
     except DomainError as error:
         return await _page(request, locale, context, "admin/overview_add.html", _refusal(error))
@@ -159,23 +151,25 @@ async def edit_layout(request: Request, locale: Locale, _: SameOrigin, context: 
     """Move one widget a place up or down, or remove it."""
     form = await read_form(request, locale)
     step, key = form.text("step"), form.text("widget")
-    principal = context.principal
+    subject = context.principal.subject
     service = overview_layout_service(request)
-    default, allowed = default_keys(principal), allowed_keys(can_function(principal))
+    default, allowed = _keys(context)
     try:
         if step == "remove":
-            await service.remove(principal.subject, key, default, allowed)
+            await service.remove(subject, key, default, allowed)
         elif step in STEPS:
             offset = -1 if step == "up" else 1
-            await service.move(principal.subject, key, offset, default, allowed)
+            await service.move(subject, key, offset, default, allowed)
         else:
             return await _page(
                 request, locale, context, "admin/overview_edit.html", "admin.layout.error.widget"
             )
     except DomainError as error:
         return await _page(request, locale, context, "admin/overview_edit.html", _refusal(error))
-    done = "widget_removed" if step == "remove" else "widget_moved"
-    return redirect_done(EDIT_PATH, done, anchor="layout-heading")
+    if step == "remove":
+        return redirect_done(EDIT_PATH, "widget_removed", anchor="layout-heading")
+    # The key passed the layout check above; focus stays on the moved widget (WCAG 2.4.3).
+    return redirect_done(EDIT_PATH, "widget_moved", anchor=f"layout-{key}")
 
 
 @router.post("/overview/reset", response_class=HTMLResponse)

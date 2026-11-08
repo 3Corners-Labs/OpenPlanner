@@ -107,7 +107,8 @@ Bovenaan het overzicht staan naast **Verversen** twee knoppen:
 
 Zodra u iets verandert, is het uw eigen indeling; alleen u ziet hem, en hij blijft bewaard als u
 opnieuw inlogt. **Standaardindeling herstellen** haalt uw eigen indeling weg, zodat u weer de
-standaard van uw rol ziet. Raakt u het recht op een widget kwijt, dan verdwijnt hij vanzelf van
+standaard van uw rol ziet. De snelkoppelingen *Taken* en *Meldingen* in de balk bovenin volgen uw
+indeling: haalt u die widget weg, dan verdwijnt ook de snelkoppeling. Raakt u het recht op een widget kwijt, dan verdwijnt hij vanzelf van
 uw overzicht. Het aantal widgets heeft een maximum dat de superuser instelt (*Meeste widgets op
 een eigen overzicht*, standaard 12). Een indeling is een persoonlijke voorkeur: ze komt niet in
 het auditlog, en ze bevat geen persoonsgegevens.

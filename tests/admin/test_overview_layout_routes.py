@@ -87,3 +87,21 @@ async def test_the_edit_page_has_a_button_per_step_and_no_script(site: Site) -> 
     assert "Remove " in page
     assert "<script" not in page.split("<main", 1)[1]
     assert "Restore default layout" not in page  # only with an own layout
+
+
+async def test_a_move_keeps_focus_on_the_widget_and_a_no_op_stores_nothing(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    shown = _widgets((await site.client.get("/admin/")).text)
+
+    nothing = await site.client.post(
+        EDIT, data={"widget": shown[0], "step": "up"}, headers=SAME_ORIGIN
+    )
+    page = (await site.client.get(f"{EDIT}?lang=en")).text
+    moved = await site.client.post(
+        EDIT, data={"widget": shown[1], "step": "up"}, headers=SAME_ORIGIN
+    )
+
+    assert "default layout of your role" in page  # the first widget up changed nothing
+    assert nothing.status_code == 303
+    assert moved.headers["location"].endswith(f"#layout-{shown[1]}")
+    assert f'id="layout-{shown[1]}" tabindex="-1"' in (await site.client.get(EDIT)).text

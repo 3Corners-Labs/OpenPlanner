@@ -210,7 +210,7 @@ def overview_layout_service(request: Request) -> OverviewLayoutService:
 
 
 def overview_layout(request: Request) -> tuple[str, ...] | None:
-    """Return the signed-in admin's own layout as read for this request, or ``None``."""
+    """Return the signed-in admin's own layout as ``load_top_counts`` read it, or ``None``."""
     stored: tuple[str, ...] | None = getattr(request.state, "overview_layout", None)
     return stored
 
@@ -339,10 +339,6 @@ class RequirePermission:
             )
         if not authorization.decision.allowed:
             raise AccessDenied
-        # ADR 0096: the page shell shows top-bar shortcuts only for widgets on the overview.
-        request.state.overview_layout = await overview_layout_service(request).stored(
-            principal.subject
-        )
         if authorization.group is None:
             await _scope_to_organisation(service, principal, authorization, locale)
         if request.method not in READ_METHODS:

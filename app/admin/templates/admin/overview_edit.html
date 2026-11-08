@@ -1,10 +1,13 @@
 {#- *Edit overview* (ADR 0096 §2, §4): the widgets in their order, each with Up, Down and Remove buttons (no drag, WCAG 2.5.7), and Restore default layout; no script. -#}
 {% extends "admin/layout.html" %}
 {% from "admin/_icons.html" import icon %}
+{% from "admin/_page_header.html" import page_header with context %}
 {% block title %}{{ _("admin.layout.edit.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% set heading = _("admin.layout.edit.title") %}{% set lead = _("admin.layout.edit.lead") %}
-{% include "admin/_layout_header.html" %}
+{{ page_header("/admin/", _("admin.dashboard.title"), heading, heading, lead) }}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if error %}<div class="alert alert--error" role="alert"><p>{{ error }}</p></div>{% endif %}
 <section class="card" aria-labelledby="layout-heading">
   <div class="card__header">
     <h2 id="layout-heading" tabindex="-1">{{ _("admin.layout.edit.order") }}</h2>
@@ -13,7 +16,7 @@
   {% if rows %}
   <ol class="layout-list">
     {% for item in rows %}
-    <li class="layout-list__item">
+    <li class="layout-list__item" id="layout-{{ item.key }}" tabindex="-1">
       <span class="layout-list__title">{{ item.title }}</span>
       <span class="layout-list__actions">
         {% if not item.first %}

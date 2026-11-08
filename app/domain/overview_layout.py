@@ -166,6 +166,8 @@ class OverviewLayoutService:
         async with self._uow.locked() as tx:
             current = effective(await tx.get_overview_layout(subject), default, allowed)
             changed = step(current)
+            if changed == current:
+                return  # nothing moved (the first up, the last down): keep what is stored
             if not set(changed) <= self._known:
                 raise _refuse("widget")
             if not await tx.save_overview_layout(subject, changed, self._clock.now()):
