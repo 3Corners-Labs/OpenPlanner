@@ -22,6 +22,7 @@ from app.domain.booking import (
     BookingKind,
     BookingStatus,
     Claim,
+    Contact,
     MeetingRef,
     Slot,
     SlotUsage,
@@ -1217,6 +1218,9 @@ class InMemoryTransaction:
 
     async def save_booking(self, booking: Booking) -> None:
         self.state.bookings[booking.id or 0] = booking
+
+    async def save_contact(self, booking_id: int, contact: Contact) -> None:
+        self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], contact=contact)
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         self.state.jobs[booking_id] = list(jobs)

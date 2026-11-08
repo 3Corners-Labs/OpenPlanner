@@ -22,6 +22,8 @@ Server-rendered and usable without JavaScript. Every response goes through
     GET  /b/m/{ref}/cancel         confirm ─► POST ─► 303 /b/m/{ref}?status=cancelled
     GET  /b/m/{ref}/reschedule     slot picker ─► ?start= confirm ─► POST
                                    ─► 303 /b/m/{new ref}?status=rescheduled
+    GET  /b/m/{ref}/details        correct name, phone and answers (ADR 0056 point 10) ─► POST
+                                   ─► 303 /b/m/{ref}?status=details
 The cookie rule is in ``app.api.link_session``; the join, trial and waiting pages are in
 ``join_pages``, ``trial_pages`` and ``direct_pages``.
 """
@@ -38,6 +40,7 @@ from app.api.contact_form import (
     SUBJECT_INPUT,
     ContactForm,
     contact_input,
+    contact_values,
     load_contact_form,
     read_contact,
 )
@@ -77,6 +80,7 @@ STATUS_NOTICES: dict[str, str] = {
     "cancelled": "manage.notice.cancelled",
     "confirmed": "manage.notice.confirmed",
     "lapsed": "manage.notice.lapsed",
+    "details": "manage.notice.details",
 }
 
 STATUS_LABELS: dict[BookingStatus, str] = {
@@ -345,6 +349,7 @@ def _manage_context(
         "status_label": locale.gettext(STATUS_LABELS[booking.status]),
         "active": booking.is_active,
         "changeable": details.changeable,
+        "correctable": details.correctable,
         "trial_offered": group.trial_call_enabled and group.video_enabled,
         "deadline": _moment(deadline, group, locale),
         "notice": locale.gettext(STATUS_NOTICES[status]) if status in STATUS_NOTICES else None,
@@ -358,6 +363,7 @@ LEGACY_SUBPATHS = (
     "/confirm",
     "/cancel",
     "/reschedule",
+    "/details",
     "/wait",
     "/wait/status",
     "/wait/leave",
@@ -505,6 +511,57 @@ async def _reschedule_response(
         )
         name = "reschedule.html"
     return await participant_page(request, locale, name, group, context, status_code)
+
+
+async def _details_response(
+    request: Request,
+    public_ref: str,
+    locale: RequestLocale,
+    values: dict[str, str] | None = None,
+    error: DomainError | None = None,
+) -> Response:
+    """Render the correction form, prefilled from the booking or with what was sent.
+
+    Goes back to the booking page when it can no longer be corrected.
+    """
+    details = await _details(request, public_ref)
+    contact = details.booking.contact
+    if not details.correctable or contact is None:
+        return RedirectResponse(f"/b/m/{public_ref}", status_code=303)
+    service = _service(request)
+    form = await load_contact_form(service, details.group, _clock(request).now())
+    errors = form.errors(error, locale) if error is not None else []
+    context = _page_context(details, locale, public_ref, None, _clock(request).now())
+    context |= {
+        "fields": form.correction_fields(locale, errors, values or contact_values(contact)),
+        "errors": errors,
+        "email": contact.email,
+        "honeypot": HONEYPOT_FIELD,
+    }
+    status = status_for(error) if error is not None else 200
+    return await participant_page(request, locale, "details.html", details.group, context, status)
+
+
+@router.get("/b/m/{public_ref}/details", response_class=HTMLResponse)
+@limiter.limit(read_limit)
+async def details_page(request: Request, public_ref: str, locale: Locale) -> Response:
+    """Show the correction form for name, phone and answers (ADR 0056 point 10)."""
+    return await _details_response(request, public_ref, locale)
+
+
+@router.post("/b/m/{public_ref}/details", response_class=HTMLResponse)
+@limiter.limit(booking_limit)
+async def correct_details(
+    request: Request, public_ref: str, locale: Locale, _: SameOrigin
+) -> Response:
+    """Correct the details; the email address stays, another one is another booking."""
+    ref = await authorise(request, public_ref)
+    values = read_contact(await request.form())
+    try:
+        await _service(request).correct_details(ref, contact_input(values))
+    except DomainError as error:  # one no longer correctable goes back to the booking page
+        return await _details_response(request, public_ref, locale, values, error)
+    return RedirectResponse(_manage_url(public_ref, "details"), status_code=303)
 
 
 @router.get("/b/m/{public_ref}/reschedule", response_class=HTMLResponse)

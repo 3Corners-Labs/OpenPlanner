@@ -127,6 +127,8 @@ class Purpose(StrEnum):
     AUDIT = "audit"
     LOG = "log"
     DISPATCH = "dispatch"
+    PARTICIPANT_SELF = "participant_self"
+    """The participant correcting their own booking (ADR 0056 point 10)."""
 
 
 class _Visibility(StrEnum):
@@ -147,6 +149,8 @@ _VISIBILITY: Mapping[Purpose, _Visibility] = MappingProxyType(
         Purpose.AUDIT: _Visibility.NOT_PII_ONLY,
         Purpose.LOG: _Visibility.NOT_PII_ONLY,
         Purpose.DISPATCH: _Visibility.NOTHING,
+        # ADR 0056 point 10: the participant sees and corrects their own answers.
+        Purpose.PARTICIPANT_SELF: _Visibility.ALL,
     }
 )
 

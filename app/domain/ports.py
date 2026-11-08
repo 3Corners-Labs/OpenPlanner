@@ -23,6 +23,7 @@ from app.domain.booking import (
     Booking,
     BookingStatus,
     Claim,
+    Contact,
     MeetingRef,
     Slot,
     SlotUsage,
@@ -1448,6 +1449,10 @@ class Transaction(Protocol):
 
     async def save_booking(self, booking: Booking) -> None:
         """Persist changes to an existing booking (status, cancelled_at)."""
+        ...
+
+    async def save_contact(self, booking_id: int, contact: Contact) -> None:
+        """Replace the participant's details on a booking (ADR 0056 point 10)."""
         ...
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:

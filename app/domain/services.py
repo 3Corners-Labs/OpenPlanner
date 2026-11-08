@@ -26,10 +26,11 @@ also needs room under the group's cap of open direct calls (``direct_call_full``
 """
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 
 from app.domain import booking_changes
+from app.domain.audit import Outcome
 from app.domain.availability import (
     AvailableSlot,
     available_slots,
@@ -81,6 +82,7 @@ from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, open_for_direct
+from app.domain.system_log import SystemLog
 from app.domain.tokens import (
     MIN_KEY_BYTES,
     derive_token,
@@ -98,6 +100,9 @@ from app.domain.usage_recording import (
     record_placed,
     record_rebook_accepted,
 )
+
+DETAILS_CORRECTED = "booking.details_corrected"
+"""The system event of a participant correcting their details (ADR 0056 point 10)."""
 
 
 @dataclass(frozen=True)
@@ -135,6 +140,8 @@ class BookingDetails:
     closure: Closure | None = None
     cancellable: bool = False
     delete_by: datetime | None = None
+    correctable: bool = False
+    """Whether the participant may still correct name, phone and answers (ADR 0056 point 10)."""
 
 
 @dataclass(frozen=True)
@@ -187,6 +194,7 @@ class BookingService:
             raise ValueError(f"the token key must be at least {MIN_KEY_BYTES} bytes")
         self._uow = uow
         self._clock = clock
+        self._events = SystemLog(uow, clock)
         self._token_key = token_key
         self._token_keys = (token_key, *([previous_token_key] if previous_token_key else []))
         self._confirm_policy = confirm_policy
@@ -384,7 +392,17 @@ class BookingService:
             if closure is not None
             else None
         )
-        return BookingDetails(booking, group, deadline, changeable, closure, cancellable, delete_by)
+        correctable = _correctable(booking, group, now)
+        return BookingDetails(
+            booking,
+            group,
+            deadline,
+            changeable,
+            closure,
+            cancellable,
+            delete_by,
+            correctable,
+        )
 
     async def confirm(self, management_token: str | PublicRef) -> Booking:
         """Confirm a booking by its email link (ADR 0056) and return it as it now is.
@@ -498,6 +516,43 @@ class BookingService:
             await tx.add_booking_event(plan.event)
             await tx.save_call_status(after)
             return DirectLeft(plan.booking, changed=True, agent_present=plan.agent_present)
+
+    async def correct_details(
+        self, management_token: str | PublicRef, contact: ContactInput
+    ) -> Booking:
+        """Correct the participant's name, phone and answers (ADR 0056 point 10).
+
+        With the same validation as the booking form; the email address stays (another address
+        is another booking). Allowed until the change deadline, like moving. The change is a
+        system event at the booking naming the changed fields, never their values. A task or
+        queue entry that already exists keeps the first name it was sent (CLAUDE.md).
+
+        Raises:
+            DomainError: ``booking_not_found``, ``booking_locked``, ``booking_not_active``,
+                ``invalid_contact`` or ``invalid_answer`` naming the field.
+        """
+        async with self._uow.locked() as tx:
+            booking = await self._booking(tx, management_token)
+            group = await self._group_by_id(tx, booking.group_id)
+            if booking.contact is None or not _correctable(booking, group, self._clock.now()):
+                holds_place = booking.is_active or booking.awaits_confirmation
+                raise DomainError(
+                    ErrorCode.BOOKING_LOCKED if holds_place else ErrorCode.BOOKING_NOT_ACTIVE
+                )
+            email = booking.contact.email
+            corrected = await self._contact(tx, group, replace(contact, email=email))
+            changed = _changed_fields(booking.contact, corrected)
+            if not changed:
+                return booking
+            await tx.save_contact(_id(booking), corrected)
+            await self._events.record_in(
+                tx,
+                DETAILS_CORRECTED,
+                Outcome.SUCCESS,
+                booking_id=_id(booking),
+                detail="fields:" + "+".join(changed),
+            )
+            return replace(booking, contact=corrected)
 
     async def reschedule(
         self, management_token: str | PublicRef, new_start: datetime
@@ -787,6 +842,30 @@ async def _check_address_limit(
     starts = await tx.upcoming_starts_for_email(group.id, contact.email, now)
     if start in starts or len(starts) >= group.max_bookings_per_email:
         raise DomainError(ErrorCode.BOOKING_LIMIT_REACHED)
+
+
+def _changed_fields(before: Contact, after: Contact) -> list[str]:
+    """Return the names of the contact fields that differ (for the event; never values)."""
+    pairs = (
+        ("first_name", before.first_name != after.first_name),
+        ("last_name", before.last_name != after.last_name),
+        ("phone", before.phone != after.phone),
+        ("answers", before.answers != after.answers),
+    )
+    return [name for name, changed in pairs if changed]
+
+
+def _correctable(booking: Booking, group: Group, now: datetime) -> bool:
+    """Return whether the participant may still correct their details (ADR 0056 point 10).
+
+    While the booking holds its place (confirmed or awaiting confirmation), still has the
+    participant's details, and until the change deadline, like moving (ADR 0069).
+    """
+    return (
+        booking.contact is not None
+        and (booking.is_active or booking.awaits_confirmation)
+        and now < group.change_deadline(booking.start)
+    )
 
 
 def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
