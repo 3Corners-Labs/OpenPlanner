@@ -22,6 +22,7 @@ from datetime import datetime
 from typing import Protocol
 
 import httpx
+import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.credentials import CredentialStore
@@ -41,6 +42,7 @@ from app.domain.ports import (
     SenderDirectory,
 )
 
+log = structlog.get_logger()
 MESSAGES_PATH = "/v1/messages"
 TIMEOUT_SECONDS = 15.0
 
@@ -173,8 +175,8 @@ class WebexSpaceSender:
         record = RequestRecord("POST", MESSAGES_PATH, status, error, tracking, millis)
         try:
             await self._request_log.record(record)
-        except Exception:  # noqa: S110 - the delivery is what counts; the log is best effort
-            pass
+        except Exception as exc:  # the delivery is what counts; the log is best effort
+            log.warning("request_log.failed", error=type(exc).__name__)
 
 
 class ConfiguredAlertSenders:
