@@ -83,8 +83,11 @@ def test_production_is_the_default_and_refuses_development_defaults(
     # ADR 0059: production follows releases, on a superuser's click.
     with pytest.raises(ValueError, match="UPDATE_CHANNEL"):
         Settings(**production, update_channel="rc")  # type: ignore[arg-type]
-    with pytest.raises(ValueError, match="UPDATE_AUTO_APPLY"):
+    with pytest.raises(ValueError, match="UPDATE_AUTO_APPLY needs UPDATE_WINDOW"):
         Settings(**production, update_auto_apply=True)  # type: ignore[arg-type]
+    # ADR 0116 point 9: with a window, production may update itself.
+    windowed = Settings(**production, update_auto_apply=True, update_window="sun 03:00-05:00")  # type: ignore[arg-type]
+    assert windowed.update_auto_apply
 
     settings = Settings(**production)  # type: ignore[arg-type]
     assert settings.environment == "prod"
@@ -268,3 +271,12 @@ def test_web_tls_needs_both_files_or_neither_adr_0091() -> None:
     for only in pair:
         with pytest.raises(ValidationError, match="WEB_TLS_CERT_FILE and WEB_TLS_KEY_FILE"):
             Settings(environment="dev", **{only: pair[only]})
+
+
+def test_an_update_window_or_line_the_code_cannot_read_is_refused() -> None:
+    """ADR 0116 point 9: UPDATE_WINDOW and UPDATE_LINE have a format of their own."""
+    with pytest.raises(ValueError, match="UPDATE_WINDOW"):
+        Settings(environment="dev", update_window="nightly")
+    with pytest.raises(ValueError, match="update_line"):
+        Settings(environment="dev", update_line="1.4.0")
+    assert Settings(environment="dev", update_line="1.4").update_line == "1.4"

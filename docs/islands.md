@@ -92,3 +92,28 @@ roles and live regions, the browser features used, what happens without the scri
   Each new alert is read out once; focus is never moved.
 - **Keyboard:** Escape closes a pop-up; its button is reachable with Tab.
 - **Without the script:** the alerts are in the widget and, for outages, in the banner.
+
+### `brand-motion.js`
+
+- **ADR:** 0060 §7 (build step 2); the first island in the form ADR 0118 asks for: an ES module
+  defining the custom element `op-brand-mark`.
+- **Server renders:** the product mark as inline SVG (`_brand.html`, macro `brand_mark`) inside
+  `<op-brand-mark data-sign-in="…">` in the admin top bar; `data-sign-in` is the session's sign-in
+  moment in epoch seconds (no secret). The animation itself is CSS (`brand-mark--settle`, in
+  `admin.css` and `site.css`), so the loading loop and the one-shot settle on the booking
+  confirmation run without any script.
+- **Does:** on connect, unless `prefers-reduced-motion: reduce` is set, adds `brand-mark--settle`
+  once per sign-in and tab (remembered in `sessionStorage`; refused storage means no motion), so
+  the open tile crosses the grid once and settles in its place.
+- **Keyboard:** none; the mark is decorative (`aria-hidden`) and never takes focus.
+- **Live regions:** none; nothing is announced.
+- **Browser features:** custom elements, ES modules, `matchMedia`, `sessionStorage`, CSS animation
+  of `transform` on SVG (all Baseline widely available); `forced-colors` gets system colours and no
+  change of meaning. The shared rules are in `brand-mark.css`.
+- **Without the script:** the static mark, exactly as before.
+- **Used by:** the overview (loaded with the page's other scripts when the overview refreshes
+  itself).
+- **Size:** under 1 KB gzipped.
+- **Open:** the island checks of ADR 0118 point 10 run once that ADR's step 2 adds the `island`
+  flag to `e2e/pages.json`; the overview is listed there already for axe and keyboard runs.
+

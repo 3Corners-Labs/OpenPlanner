@@ -68,4 +68,4 @@
 <p class="empty-state">{{ _("admin.dashboard.no_groups") }}</p>
 {% endif %}
 {% endblock %}
-{% block scripts %}{% if live %}<script src="{{ static_url('live-region.js') }}" defer></script><script src="{{ static_url('alert-popups.js') }}" defer></script>{% endif %}{% endblock %}
+{% block scripts %}{% if live %}<script src="{{ static_url('live-region.js') }}" defer></script><script src="{{ static_url('alert-popups.js') }}" defer></script><script type="module" src="{{ static_url('brand-motion.js') }}"></script>{% endif %}{% endblock %}

@@ -2,14 +2,20 @@
 
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.db.updates import last_running_version
 from app.domain.updates import (
+    LineStatus,
     Release,
     ReleaseCheck,
+    RunningVersion,
+    SupportLine,
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
@@ -72,3 +78,47 @@ async def test_update_requests_newest_first_and_saved_changes(uow: SqlUnitOfWork
     async with uow.read() as tx:
         assert await tx.get_update_requests() == [second, done]
         assert await tx.get_update_requests(limit=1) == [second]
+
+
+# ADR 0116: apply_after, the support index, and the version that last ran.
+
+
+async def test_apply_after_and_the_support_index_round_trip(uow: SqlUnitOfWork) -> None:
+    later = NOW + timedelta(hours=3)
+    async with uow.locked() as tx:
+        stored = await tx.add_update_request(
+            UpdateRequest(
+                None,
+                UpdateAction.UPDATE,
+                Version(1, 4, 0),
+                Version(1, 3, 0),
+                "s-1",
+                NOW,
+                UpdateStatus.REQUESTED,
+                apply_after=later,
+            )
+        )
+        support = (SupportLine("1.2", LineStatus.EXTENDED, "2027-12-31"),)
+        await tx.save_release_check(ReleaseCheck(NOW, None, support=support))
+    async with uow.read() as tx:
+        (found,) = await tx.get_update_requests()
+        check = await tx.get_release_check()
+    assert found.apply_after == later == stored.apply_after
+    assert check is not None
+    assert check.support == (SupportLine("1.2", LineStatus.EXTENDED, "2027-12-31"),)
+
+
+async def test_the_last_running_version_is_none_for_a_new_database(
+    uow: SqlUnitOfWork, engine: AsyncEngine, tmp_path: Path
+) -> None:
+    assert await last_running_version(engine) is None
+    async with uow.locked() as tx:
+        await tx.add_running_version(RunningVersion("0.9.4", "", NOW, None))
+        await tx.add_running_version(RunningVersion("1.0.1", "", NOW, None))
+    assert await last_running_version(engine) == "1.0.1"
+
+    empty = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'empty.db'}")
+    try:
+        assert await last_running_version(empty) is None
+    finally:
+        await empty.dispose()
