@@ -147,7 +147,7 @@ The product owner chose on 2026-10-30, out of the options put to them:
 |---|---|---|---|
 | 1 | Ranking and assignment of new times (`domain/rebooking.py`) | #129 | merged |
 | 2 | Held proposal: table `reschedule_proposals` (migration 0102) counted with the bookings that hold a place; hold, confirm, choose another time, cancel and expiry (`EXPIRE_PROPOSAL`); the proposal, reminder and release messages (nl/en, email and SMS); the participant's confirm page and suggested times; `PlannerService.propose`; the four organisation settings `reschedule_proposal_confirm_hours`, `reschedule_proposal_reminder_hours`, `reschedule_search_days`, `reschedule_time_tolerance_minutes` | #644 | merged |
-| 3 | Planner review page in the agenda (single and bulk), bulk send with fresh login, overview in *Awaiting a new time* with withdraw and confirm on behalf; the agenda counts held proposals | #PRNUM | merged |
+| 3 | Planner review page in the agenda (single and bulk), bulk send with fresh login, overview in *Awaiting a new time* with withdraw and confirm on behalf; the agenda counts held proposals | #673 | merged |
 | 4 | Automatic mode per group: `reschedule_auto_send`, `reschedule_auto_delay_minutes`, `reschedule_auto_max_bookings`, the `reschedule_proposals` job with the staffing-version pin |  | planned |
 
 (State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
