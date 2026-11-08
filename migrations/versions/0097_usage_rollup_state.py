@@ -9,11 +9,11 @@ turned into facts by ``python -m app.cli usage-backfill`` (idempotence); it hold
 and nothing else, and a booking row goes with its row. Both are expand-only and hold no
 personal data.
 
-Revises 0095 (alert targets). Open PRs also claim numbers, so recheck the head before
+Revises 0096 (dispatch fallback). Open PRs also claim numbers, so recheck the head before
 merging.
 
-Revision ID: 0096
-Revises: 0095
+Revision ID: 0097
+Revises: 0096
 Create Date: 2026-11-08 14:00:00.000000
 """
 
@@ -22,8 +22,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0096"
-down_revision: str | None = "0095"
+revision: str = "0097"
+down_revision: str | None = "0096"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
