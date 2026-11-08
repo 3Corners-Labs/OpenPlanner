@@ -43,7 +43,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 200, 403)},
     # ADR 0096: every admin who opens the overview arranges their own; an empty form is refused.
     "GET /admin/overview/add": {"/admin/overview/add": statuses(200, 200, 200, 200, 200, 200, 403)},
-    "POST /admin/overview/add": {"/admin/overview/add": statuses(422, 422, 422, 422, 422, 422, 403)},
+    "POST /admin/overview/add": {
+        "/admin/overview/add": statuses(422, 422, 422, 422, 422, 422, 403)
+    },
     "GET /admin/overview/edit": {
         "/admin/overview/edit": statuses(200, 200, 200, 200, 200, 200, 403)
     },
