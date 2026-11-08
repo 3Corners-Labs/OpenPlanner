@@ -25,6 +25,7 @@ from tests.support.queue import own_queue
 
 BANNER = 'class="alert alert-banner"'
 POLL = re.compile(r'data-poll="([^"]+)"')
+ALERTS_LINK = r'<a class="admin-topbar__link" href="/admin/#widget-alerts"([^>]*)>(.*?)</a>'
 
 
 async def _condition(
@@ -267,15 +268,20 @@ async def test_system_status_shows_the_storage(site: Site) -> None:
     assert "% vrij, database" in text
 
 
+@pytest.mark.parametrize(("lang", "name"), [("nl", "Meldingen 2 open"), ("en", "Alerts 2 open")])
 async def test_the_alerts_link_counts_the_open_alerts_for_the_screen_reader_too(
-    site: Site,
+    site: Site, lang: str, name: str
 ) -> None:
+    """WCAG 2.5.3: the link's name is its visible text and count, no aria-label replaces it."""
     await _disk_full(site)
     await _condition(site, "tls.certificate", Outcome.FAILURE, "expiring")
     await site.login_as(SUPER)
-    text = (await site.client.get("/admin/audit?lang=en")).text
+    text = (await site.client.get(f"/admin/audit?lang={lang}")).text
 
-    assert 'aria-label="Alerts, 2 open"' in text
+    link = re.search(ALERTS_LINK, text, re.DOTALL)
+    assert link is not None
+    assert "aria-label" not in link.group(1)
+    assert " ".join(re.sub(r"<[^>]+>", " ", link.group(2)).split()) == name
 
 
 def test_every_alert_text_names_only_placeholders_the_page_provides() -> None:

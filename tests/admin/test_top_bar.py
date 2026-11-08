@@ -9,7 +9,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-import pytest
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +22,6 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
-from tests.admin.test_alert_routes import _disk_full
 from tests.support.admin_site import site_uow
 from tests.support.queue import own_queue
 
@@ -213,24 +211,3 @@ def test_no_template_or_route_offers_a_role_switcher() -> None:
 def test_the_check_finds_a_role_switcher() -> None:
     assert ROLE_SWITCHER.search('<select name="role_switcher">')
     assert ROLE_SWITCHER.search("def switch_role(request):")
-
-
-@pytest.mark.parametrize(
-    ("lang", "label", "suffix"), [("nl", "Meldingen", "open"), ("en", "Alerts", "open")]
-)
-async def test_open_alerts_name_the_link_with_its_visible_text_first(
-    site: Site, lang: str, label: str, suffix: str
-) -> None:
-    """WCAG 2.5.3: the accessible name contains the visible text, so no aria-label replaces it."""
-    await _disk_full(site)
-    await site.login_as(SUPER)
-
-    alerts = next(
-        link
-        for link in _top_bar((await site.client.get(f"/admin/?lang={lang}")).text)
-        if link.href == "/admin/#widget-alerts"
-    )
-
-    assert alerts.count is not None
-    assert alerts.aria_label is None
-    assert alerts.name == f"{label} {alerts.count} {suffix}"
