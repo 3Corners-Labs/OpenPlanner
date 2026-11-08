@@ -111,7 +111,12 @@ async def run_worker(
     engine = create_engine(settings.database_url)
     http = httpx.AsyncClient(timeout=15.0, transport=traced_transport(transport))
     # ADR 0034: committed audit events also go to stdout for the log platform.
-    uow = SqlUnitOfWork(engine, secret_box(settings), StdoutEventSink(settings.event_envelope))
+    uow = SqlUnitOfWork(
+        engine,
+        secret_box(settings),
+        StdoutEventSink(settings.event_envelope),
+        usage_enabled=lambda: live.settings.reporting_enabled,  # ADR 0117, read at each write
+    )
     # ADR 0042 §6: portal values, reloaded once per loop when settings_version moved; the
     # services below read theirs through ``live`` each time they need them.
     live = LiveSettings(

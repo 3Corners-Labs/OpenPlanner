@@ -1041,6 +1041,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=3650,
     ),
     S(
+        "reporting_enabled",
+        K.BOOL,
+        True,
+        _C,
+        T.RETENTION,
+        "Writes a usage fact for every booking state change, for the reports; off writes nothing "
+        "and hides the report screens (ADR 0117). A feature switch, not a protection.",
+    ),
+    S(
         "security_event_retention_days",
         K.INT,
         365,

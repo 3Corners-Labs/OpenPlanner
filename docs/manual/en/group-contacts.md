@@ -3,7 +3,7 @@
 The organisation records once how participants can reach it otherwise (the organisation's
 **Alternative contact options** screen). Does a team have its own desk, another phone number or
 other opening hours? Then fill in a block of its own for that team here. Open it through
-**team → Closure → Manage alternative contact options**. A group admin, organisation admin or
+**group → Messages → Contact**; the **Emergency closure** screen links to it too. A group admin, organisation admin or
 superuser can change it.
 
 ## Which block applies

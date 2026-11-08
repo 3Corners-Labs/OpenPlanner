@@ -685,7 +685,9 @@ Inputs from outside: notice texts, date-times, booking ids in paths, a chosen sl
 ## Flow: alternative contact options (ADR 0037 §2)
 
 Admins: `GET/POST /admin/organisations/{org}/contacts` (`organisation.closure`) and a group's
-own block at `GET/POST /admin/groups/{slug}/closure/contacts` (`closure.manage`); a closure
+own block at `GET/POST /admin/groups/{slug}/contact` (`closure.manage`; *Messages › Contact*,
+ADR 0047 step 4, the old `GET …/closure/contacts` answers 308 under the same permission and
+builds the location from the authorised group's slug only); a closure
 copies the block that applies when it starts, with an optional heading per locale (CL-1).
 Participants (CL-2): the closure page `GET /g/{slug}/closure`, shown in place of the calendar on
 `GET /g/{slug}` while the team is closed and linked from the banner before; the management page

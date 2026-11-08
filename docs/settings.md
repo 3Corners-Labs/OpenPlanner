@@ -118,6 +118,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `GROUP_ERASE_AFTER_DAYS` | int | `30` | 1–365 | `settings.platform.manage` | Days after a group was archived before the worker erases its row, once nothing refers to it any more (ADR 0084); the audit log keeps the slug meanwhile. |
 | `AUDIT_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after which admin actions leave the audit log (ADR 0040). |
 | `BOOKING_ROW_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after the personal data of a booking was deleted before its row is merged into a daily count per group and removed (ADR 0102). |
+| `REPORTING_ENABLED` | bool | `true` | — | `settings.platform.manage` | Writes a usage fact for every booking state change, for the reports; off writes nothing and hides the report screens (ADR 0117). A feature switch, not a protection. |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |

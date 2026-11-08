@@ -3,7 +3,7 @@
 De organisatie legt één keer vast hoe deelnemers haar anders kunnen bereiken (het scherm
 **Contactalternatieven** van de organisatie). Heeft een team een eigen loket, een ander
 telefoonnummer of andere openingstijden? Dan vult u hier een eigen blok in voor dat team. U
-opent het via **team → Sluiting → Contactalternatieven beheren**. Een teambeheerder,
+opent het via **groep → Berichten → Contact**; het scherm **Noodsluiting** linkt er ook naar. Een teambeheerder,
 organisatiebeheerder of superuser kan het wijzigen.
 
 ## Welk blok geldt
