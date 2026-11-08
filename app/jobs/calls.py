@@ -18,6 +18,7 @@ from app.adapters.db.jobs import ClaimedJob
 from app.domain.booking import Booking
 from app.domain.call_service import CallService
 from app.domain.calls import EventKind
+from app.domain.fallback import FALLBACK
 from app.domain.job_plan import JobType, is_stale
 from app.domain.ports import UnitOfWork
 from app.domain.scheduling import Group
@@ -106,6 +107,10 @@ class CallJobs:
         elif is_stale(job.pinned_start, booking):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
+        elif job.type is JobType.DISPATCH_WXCC_TASK and await self._calls.diverts(booking, group):
+            # ADR 0082 point 11: the contact center is down; the booking went to the own queue.
+            log.info("job.skipped", job_id=job.id, reason=FALLBACK)
+            return FALLBACK
         elif (reason := nothing_to_do(job.type, booking, group)) is not None:
             log.info("job.skipped", job_id=job.id, reason=reason)
             return reason
@@ -119,6 +124,8 @@ class CallJobs:
         """Put a job's final failure on the booking's timeline, with the provider's reason."""
         kind = FAILURE_EVENTS.get(job.type, EventKind.INTEGRATION_ERROR)
         await self._calls.record_failure(job.booking_id, code, kind, message)
+        if job.type is JobType.DISPATCH_WXCC_TASK:
+            await self._calls.dispatch_failed(job.booking_id)
 
 
 def nothing_to_do(job_type: JobType, booking: Booking, group: Group) -> str | None:

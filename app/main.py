@@ -14,6 +14,7 @@ from fastapi import Depends, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.adapters import internal_ca
+from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, alert_bots
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
@@ -47,7 +48,7 @@ from app.adapters.log_shipping import LogShipper, LogTester, SenderFactory, ship
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
-from app.adapters.senders import ConfiguredSenders, fallback_mail
+from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
 from app.adapters.signing_keys import EcSigningKeys
 from app.admin.routes import register_admin
 from app.admin.session import session_cookie_for
@@ -73,6 +74,7 @@ from app.domain.address_check import AddressStatus, InstanceService
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.agenda_service import AgendaService
+from app.domain.alert_delivery import AlertTargetService
 from app.domain.alerts import AlertService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
@@ -88,6 +90,7 @@ from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
 from app.domain.entitlements import ClaimMode
 from app.domain.event_context import set_service
+from app.domain.fallback import FallbackService
 from app.domain.form_service import FormService
 from app.domain.holiday_service import HolidayService
 from app.domain.identity_provider_service import IdentityProviderService
@@ -146,9 +149,11 @@ from app.keys import (
     session_secret,
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
+from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
+from app.web.fallback_text import SpaceTexts
 from app.web.organisation_settings import ClockScopeMiddleware
 from app.web.protection import configure_rate_limits, limiter, set_rate_limits
 from app.web.proxy_headers import ProxyHeaderMiddleware
@@ -351,6 +356,7 @@ def create_app(
                 wired.video,
                 wired.dispatcher,
                 agent_start_label,
+                app.state.fallback_service,
             )
             app.state.trial_call_service = TrialCallService(
                 uow, wired.video, app.state.integration_service, clock
@@ -641,6 +647,37 @@ def create_app(
             lambda: live().mail_from if live().smtp_host else None,
             production=settings.environment == "prod",
             plaintext_relay_allowed=settings.smtp_plaintext_relay_allowed,
+        )
+        # ADR 0082 point 9: alerts to email addresses and Webex spaces, and the bot tokens.
+        app.state.bot_tokens = alert_bots(app.state.engine, settings)
+        app.state.alert_target_service = AlertTargetService(
+            uow,
+            clock,
+            app.state.admin_service,
+            ConfiguredAlertSenders(
+                senders,
+                lambda: fallback_sender(live()),
+                app.state.bot_tokens,
+                http,
+                live().webex_api_base_url,
+                request_log,
+            ),
+            alert_composer(
+                app.state.translator.gettext,
+                settings.public_base_url,
+                settings.app_version,
+                settings.admin_timezone,
+            ),
+            app.state.bot_tokens,
+        )
+        # ADR 0082 point 11: a group admin ends a fallback by hand; the worker switches it.
+        app.state.fallback_service = FallbackService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.integration_service,
+            BotSpacePoster(app.state.bot_tokens, http, live().webex_api_base_url, request_log),
+            SpaceTexts(app.state.translator.gettext, settings.public_base_url),
         )
         text_overrides.attach(uow)
         app.state.organisation_text_service = OrganisationTextService(

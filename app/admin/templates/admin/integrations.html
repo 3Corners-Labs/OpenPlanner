@@ -110,6 +110,7 @@
   <p class="empty-state">{{ _("admin.integrations.health_none") }}</p>
   {% endif %}
 </section>
+{% include "admin/_alert_targets.html" %}
 <section class="card" aria-labelledby="webhooks-heading">
   <div class="card__header">
     <h2 id="webhooks-heading">{{ _("admin.integrations.webhooks") }}</h2>

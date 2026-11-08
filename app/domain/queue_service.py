@@ -86,6 +86,7 @@ class QueueRow:
     overdue: bool
     video: VideoState = VideoState.PENDING
     routing: RoutingChoice | None = None
+    fallback: bool = False
 
 
 @dataclass(frozen=True)
@@ -196,7 +197,7 @@ class QueueService:
         scope = scope_for(principal, Permission.QUEUE_WORK)
         now = self._clock.now()
         async with self._uow.read() as tx:
-            groups = [g for g in await tx.list_groups(scope) if g.group.has_own_queue]
+            groups = [g for g in await tx.list_groups(scope) if g.group.queue_open]
             staff = {
                 organisation: await tx.list_staff(
                     Scope(organisations=frozenset({organisation})),
@@ -241,6 +242,11 @@ class QueueService:
             raise DomainError(ErrorCode.FREE_PICK_NOT_ALLOWED)
         async with self._uow.locked() as tx:
             booking = await _booking_of(tx, summary.group, booking_id)
+            status = await tx.get_call_status(booking_id)
+            if not summary.group.has_own_queue and not (status is not None and status.fallback):
+                # A fallback queue (ADR 0082) holds only the bookings that fell back; any other
+                # booking of the group is at the contact center and not ours to hand out.
+                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
             if booking.claim is not None:
                 raise DomainError(ErrorCode.ALREADY_CLAIMED)
             return await self._claim(tx, principal, summary, booking, self._clock.now())
@@ -290,7 +296,7 @@ class QueueService:
         )
         if authorization.group is None:
             raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-        if not authorization.group.group.has_own_queue:
+        if not authorization.group.group.queue_open:
             raise DomainError(ErrorCode.QUEUE_NOT_ENABLED)
         return authorization.group
 
@@ -355,7 +361,10 @@ async def load_entries(
     lower = now - timedelta(minutes=group.slot_minutes)
     upper = now + timedelta(minutes=group.queue_visible_from_minutes, seconds=1)
     overviews = await tx.list_bookings(scope, group.id, lower, upper)
-    return visible((QueueEntry(o.booking, o.status) for o in overviews), group, now)
+    entries = (QueueEntry(o.booking, o.status) for o in overviews)
+    if not group.has_own_queue:  # a fallback queue (ADR 0082): only the bookings that fell back
+        entries = (e for e in entries if e.status.fallback)
+    return visible(entries, group, now)
 
 
 def _signed_in_for(
@@ -395,6 +404,7 @@ def _row(entry: QueueEntry, me: tuple[str, ...], overdue: bool) -> QueueRow:
         overdue=overdue,
         video=entry.video,
         routing=booking.routing,
+        fallback=entry.status.fallback,
     )
 
 

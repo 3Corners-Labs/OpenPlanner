@@ -12,6 +12,7 @@ from app.domain import holidays as holiday_model
 from app.domain.admin_sessions import AdminSession, EndReason
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
+from app.domain.alert_model import AlertTarget, DeliveryState
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category, Outcome
 from app.domain.authorization import CustomRole, RoleCatalogue, Scope
@@ -173,6 +174,8 @@ class State:
     failed_jobs: dict[int, list[JobSummary]] = field(default_factory=dict)
     worker_heartbeat: WorkerHeartbeat | None = None
     health: tuple[HealthEntry, ...] = ()
+    alert_targets: dict[int, AlertTarget] = field(default_factory=dict)
+    alert_deliveries: dict[tuple[int, str], DeliveryState] = field(default_factory=dict)
     inbound: dict[Platform, InboundEvent] = field(default_factory=dict)
     next_id: int = 1
 
@@ -423,6 +426,28 @@ class InMemoryTransaction:
 
     async def get_worker_heartbeat(self) -> WorkerHeartbeat | None:
         return self.state.worker_heartbeat
+
+    async def all_alert_targets(self) -> list[AlertTarget]:
+        return [self.state.alert_targets[i] for i in sorted(self.state.alert_targets)]
+
+    async def alert_targets_of(self, organisation_id: int | None) -> list[AlertTarget]:
+        return [t for t in await self.all_alert_targets() if t.organisation_id == organisation_id]
+
+    async def add_alert_target(self, target: AlertTarget) -> int:
+        target_id = self._new_id()
+        self.state.alert_targets[target_id] = replace(target, id=target_id)
+        return target_id
+
+    async def delete_alert_target(self, target_id: int) -> None:
+        self.state.alert_targets.pop(target_id, None)
+        for key in [k for k in self.state.alert_deliveries if k[0] == target_id]:
+            del self.state.alert_deliveries[key]
+
+    async def alert_delivery_states(self) -> list[DeliveryState]:
+        return list(self.state.alert_deliveries.values())
+
+    async def save_alert_delivery(self, state: DeliveryState) -> None:
+        self.state.alert_deliveries[(state.target_id, state.key)] = state
 
     async def request_samples(self, since: datetime) -> list[RequestSample]:
         samples = []
@@ -964,6 +989,26 @@ class InMemoryTransaction:
 
     async def get_booking(self, booking_id: int) -> Booking | None:
         return self.state.bookings.get(booking_id)
+
+    async def fallback_bookings(self, group_id: int, after: datetime) -> list[Booking]:
+        return sorted(
+            (
+                b
+                for b in self.state.bookings.values()
+                if b.group_id == group_id
+                and b.status is BookingStatus.CONFIRMED
+                and b.wxcc_task_id is None
+                and b.start > after
+                and (status := self.state.call_status.get(b.id or 0)) is not None
+                and status.fallback
+            ),
+            key=lambda b: b.start,
+        )
+
+    async def save_group_fallback(self, group_id: int, since: datetime | None) -> None:
+        self.state.groups[group_id] = replace(
+            self.state.groups[group_id], fallback_active_since=since
+        )
 
     async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
         self.state.groups[group_id] = replace(self.state.groups[group_id], routing=routing)

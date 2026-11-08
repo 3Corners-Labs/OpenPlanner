@@ -29,6 +29,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | A team's booking form / boekingsformulier van een team | [Boekingsformulier van een team](nl/group-booking-form.md) | [A team's booking form](en/group-booking-form.md) |
 | A team's subjects and routing / onderwerpen en routing van een team | [Onderwerpen en routing van een team](nl/group-routing.md) | [A team's subjects and routing](en/group-routing.md) |
 | Emergency closure of a team / noodsluiting van een team | [Noodsluiting van een team](nl/group-closure.md) | [Emergency closure of a team](en/group-closure.md) |
+| Emergency closure of an organisation / noodsluiting van een organisatie | [Noodsluiting van een organisatie](nl/organisation-closure.md) | [Emergency closure of an organisation](en/organisation-closure.md) |
 | Closure scenarios / scenario's voor een noodsluiting | [Scenario's voor een noodsluiting](nl/closure-scenarios.md) | [Scenarios for an emergency closure](en/closure-scenarios.md) |
 | Group agenda / agenda van de groep | [Agenda van de groep](nl/group-agenda.md) | [Group agenda](en/group-agenda.md) |
 | Maintenance mode / onderhoudsmodus | [Onderhoudsmodus](nl/maintenance.md) | [Maintenance mode](en/maintenance.md) |
@@ -43,10 +44,12 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | API clients / API-clients (ADR 0023) | [API-clients](nl/api-clients.md) | [API clients](en/api-clients.md) |
 | Holiday calendars / feestdagenkalenders (ADR 0025) | [Feestdagenkalenders](nl/holidays.md) | [Holiday calendars](en/holidays.md) |
 | Updates / updates (ADR 0029) | [Updates](nl/updates.md) | [Updates](en/updates.md) |
+| Overview of a group / overzicht van een groep | [Overzicht van een groep](nl/group-overview.md) | [A group's overview](en/group-overview.md) |
 | Staffing, exceptions and holidays of a team / bezetting, uitzonderingen en feestdagen van een team | [Bezetting, uitzonderingen en feestdagen van een team](nl/group-staffing.md) | [Staffing, exceptions and holidays of a team](en/group-staffing.md) |
 | Reminders and message texts of a team / herinneringen en berichtteksten van een team | [Herinneringen en berichtteksten van een team](nl/group-reminders-messages.md) | [Reminders and message texts of a team](en/group-reminders-messages.md) |
 | Holidays of an organisation / feestdagen van een organisatie | [Feestdagen van een organisatie](nl/organisation-holidays.md) | [Holidays of an organisation](en/organisation-holidays.md) |
 | My rights / mijn rechten | [Mijn rechten](nl/rights.md) | [My rights](en/rights.md) |
+| Setting up the contact center / contactcenter inrichten (ADR 0082) | [Contactcenter inrichten](nl/contact-center-setup.md) | [Setting up the contact center](en/contact-center-setup.md) |
 
 ## Writing a topic
 

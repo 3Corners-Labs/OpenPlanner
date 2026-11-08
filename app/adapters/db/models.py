@@ -223,6 +223,10 @@ class GroupRow(Base):
     # ADR 0066: future bookings one email address may hold in this group.
     max_bookings_per_email: Mapped[int] = mapped_column(Integer, server_default=text("3"))
     calendar_invite_address: Mapped[str | None] = mapped_column(String(254))
+    # ADR 0082 point 11: the fallback to the own queue, the team's space, and its state.
+    dispatch_fallback: Mapped[str] = mapped_column(String(16), server_default=text("'none'"))
+    fallback_space_room_id: Mapped[str | None] = mapped_column(String(200))
+    fallback_active_since: Mapped[datetime | None] = mapped_column(UTCDateTime())
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
     form_version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
     # ADR 0049: what the identity provider names the group by, unique in its organisation.
@@ -958,6 +962,8 @@ class CallStatusRow(Base):
     task_created_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0082 point 11: the booking is in the own queue as a fallback.
+    fallback: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
 
 
 class IntegrationCredentialRow(Base):
@@ -1489,3 +1495,40 @@ class ParticipantLinkBookingRow(Base):
             "session_id", "booking_id", name="uq_participant_link_bookings_session_booking"
         ),
     )
+
+
+class AlertTargetRow(Base):
+    """Where alerts go (ADR 0082 point 9): an administrator's email address or a Webex room.
+
+    ``organisation_id`` NULL is a target of the platform. No participant data.
+    """
+
+    __tablename__ = "alert_targets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    address: Mapped[str] = mapped_column(String(320))
+    min_level: Mapped[str] = mapped_column(String(16))
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('email', 'webex_space')", name="kind"),
+        CheckConstraint("min_level IN ('warning', 'outage')", name="min_level"),
+    )
+
+
+class AlertDeliveryRow(Base):
+    """What was sent of one alert to one target: repeat, dedupe and retry (ADR 0082 point 9)."""
+
+    __tablename__ = "alert_deliveries"
+
+    target_id: Mapped[int] = mapped_column(
+        ForeignKey("alert_targets.id", ondelete="CASCADE"), primary_key=True
+    )
+    alert_key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    token: Mapped[str] = mapped_column(String(32))
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    retry_at: Mapped[datetime | None] = mapped_column(UTCDateTime())

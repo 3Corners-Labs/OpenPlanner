@@ -93,6 +93,26 @@ from *Koppelingen*, outcome `success` or `failure`, reason `passed` or `failed`;
 are in `integration_reports`, not in the event. The probe work item of a group check is
 recorded as `integration.request` events at the group's level, like the probe meeting.
 
+ADR 0082 steps 2 to 4 add these system events (category `system`; each failure is an alert of
+ADR 0061 until the matching success closes it; never participant data):
+
+| `event.action` | `outcome` and `reason` | `detail` | Level |
+|---|---|---|---|
+| `integration.health` | failure with reason `degraded` or `down`; success on the return to `ok` (after `integration_recovery_minutes`) or `unknown` | `platform:webex` or `platform:wxcc`, `from:<state>`, `to:<state>`, `requests:<n>`, `failures:<n>`, `why:` `failures`, `token_refresh`, `probe`, `recovering`, `recovered` or `few_requests` | organisation |
+| `integration.webhooks_missing` | failure with reason `missed` when the reconcile found task states the webhooks did not bring; success when a run finds none | `count:<n>` | organisation |
+| `integration.check` with reason `wxcc.probe.*` | the probe work item of a group check (ADR 0082 point 2); there is no separate `integration.probe` action: a failed probe is an `integration.check` failure whose reason starts with `wxcc.probe.` (for example `wxcc.probe.no_events`), and it makes the organisation's WxCC health `down` (`why:probe`) | the check's detail | group |
+| `dispatch.fallback` | failure with reason `on` when a group falls back to its own queue; success when it returns (health `ok` again, or ended by hand) | `fallback.on` or `fallback.off` | group |
+| `alert.delivery_failed` | failure, reason the sender's error code (`no_sender`, `unauthorized`, `rejected_404`, ...) | `target:<id>`, `kind:email` or `kind:webex_space`, `alert:<event.action>` | organisation (or global) |
+
+Ending a fallback by hand is also an admin event `bookings.manage` with detail `fallback.off`.
+Alert targets and the bot token are admin events under the scope's permission
+(`settings.platform.manage` or `integrations.manage`) with detail `alert_target.add,id:<n>,kind:<kind>`,
+`alert_target.remove,id:<n>`, `alert_target.test,id:<n>,outcome:<sent or code>`,
+`alert_bot.set` or `alert_bot.remove`; the address and the token never appear. A booking that
+lands in the queue during a fallback gets the timeline event `fallback_queued` (detail
+`dispatch_failed` or `contact_center_down`), and `fallback_ended` when it goes back to the
+contact center; a reconciled task state carries the detail `reconciled`.
+
 ADR 0053 adds the attempts on public entry points, all with outcome `denied` and a caller
 pseudonym `client:<16 hex>` in `detail` (also on `webhook.rejected`); the window then counts
 per kind and caller:

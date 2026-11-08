@@ -60,7 +60,9 @@ TOPICS = (
         Permission.DASHBOARD_VIEW,
     ),
     # ADR 0047 steps 3 and 5: the groups list and the organisation's own page.
-    HelpTopic("groups", ("/admin/groups",), Permission.GROUP_VIEW),
+    HelpTopic("groups", ("/admin/groups", "/admin/groups/new"), Permission.GROUP_VIEW),
+    # ADR 0047 step 4: the group's first tab, with the readiness checklist.
+    HelpTopic("group-overview", ("/admin/groups/{slug}",), Permission.GROUP_VIEW),
     HelpTopic(
         "organisation",
         (
@@ -119,7 +121,19 @@ TOPICS = (
         Permission.IDENTITY_PROVIDERS_VIEW,
     ),
     HelpTopic("group-contacts", ("/admin/groups/{slug}/contact",), Permission.CLOSURE_MANAGE),
-    HelpTopic("group-closure", ("/admin/groups/{slug}/closure",), Permission.CLOSURE_MANAGE),
+    HelpTopic(
+        "group-closure",
+        (
+            "/admin/groups/{slug}/closure",
+            "/admin/groups/{slug}/closure/bookings/{booking_id}/move",
+        ),
+        Permission.CLOSURE_MANAGE,
+    ),
+    HelpTopic(
+        "organisation-closure",
+        ("/admin/organisations/{org}/closure",),
+        Permission.ORGANISATION_CLOSURE,
+    ),
     HelpTopic(
         "group-booking-form",
         ("/admin/groups/{slug}/settings/form", "/admin/groups/{slug}/settings/form/{key}"),
@@ -147,6 +161,7 @@ TOPICS = (
         "group-agenda",
         (
             "/admin/groups/{slug}/agenda",
+            "/admin/groups/{slug}/bookings/{booking_id}",
             "/admin/groups/{slug}/agenda/week",
             "/admin/groups/{slug}/agenda/bookings/{booking_id}/move",
             "/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel",
@@ -224,6 +239,9 @@ TOPICS = (
         Permission.HOLIDAYS_ASSIGN,
     ),
     HelpTopic("rights", ("/admin/rights",), Permission.RIGHTS_VIEW),
+    # ADR 0082 point 14: the step-by-step set-up of the contact center; no route of its own, it
+    # is linked from the group's contact-center fields and from the alert targets.
+    HelpTopic("contact-center-setup", (), Permission.GROUP_EDIT),
 )
 """Every topic of the manual; a test checks the files and the admin pages against it."""
 

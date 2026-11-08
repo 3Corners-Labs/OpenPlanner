@@ -68,6 +68,13 @@ OpenPlanner checks tasks the contact center did not report back itself: a task t
 background process. A difference goes on the appointment's timeline as `reconciled`, followed
 by the alert *Events from the contact center*: then look at the registrations below.
 
+## Alerts to administrators
+
+The addresses and the Webex bot for alerts of the whole platform (updates, certificates, the
+background process, requests of no organisation). They work as for an organisation: see
+[Channels](channels.md). Creating the bot is step 11 of
+[Setting up the contact center](contact-center-setup.md).
+
 ## Webhooks
 
 The two addresses that receive the events of Webex and WxCC, each with whether a secret is

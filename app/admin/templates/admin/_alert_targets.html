@@ -1,0 +1,70 @@
+{#- Alert targets of one scope (ADR 0082 point 9): the platform's on Koppelingen, an organisation's on its Kanalen page. -#}
+<section class="card" id="alerts" aria-labelledby="alerts-heading">
+  <div class="card__header">
+    <h2 id="alerts-heading">{{ _("admin.alerts.targets.title") }}</h2>
+    <p class="card__lead">{{ _("admin.alerts.targets.lead") }}</p>
+  </div>
+  {% if alerts.targets %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.alerts.targets.title") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.alerts.target.kind") }}</th><th scope="col">{{ _("admin.alerts.target.address") }}</th><th scope="col">{{ _("admin.alerts.target.level") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th></tr></thead>
+    <tbody>
+      {% for t in alerts.targets %}
+      <tr>
+        <th scope="row">{{ t.kind }}</th>
+        <td><code>{{ t.address }}</code></td>
+        <td>{{ t.level }}</td>
+        <td>
+          <form class="inline-form" method="post" action="{{ alerts.action }}/targets/{{ t.id }}/test">
+            <button type="submit" class="button button--quiet">{{ _("admin.alerts.target.test") }}<span class="visually-hidden"> {{ t.address }}</span></button>
+          </form>
+          <form class="inline-form" method="post" action="{{ alerts.action }}/targets/{{ t.id }}/remove">
+            <button type="submit" class="button button--quiet">{{ _("admin.alerts.target.remove") }}<span class="visually-hidden"> {{ t.address }}</span></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.alerts.targets.none") }}</p>
+  {% endif %}
+  <form class="form-section" method="post" action="{{ alerts.action }}/targets" aria-labelledby="alert-add-heading">
+    <h3 id="alert-add-heading">{{ _("admin.alerts.target.add") }}</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label for="alert-kind">{{ _("admin.alerts.target.kind") }}</label>
+        <select id="alert-kind" name="kind">{% for value, label in alerts.kinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+      </div>
+      <div class="field">
+        <label for="alert-address">{{ _("admin.alerts.target.address") }}</label>
+        <p class="hint" id="alert-address-hint">{{ _("admin.alerts.target.address_hint") }}</p>
+        <input type="text" id="alert-address" name="address" maxlength="320" autocomplete="off" spellcheck="false" aria-describedby="alert-address-hint">
+      </div>
+      <div class="field">
+        <label for="alert-level">{{ _("admin.alerts.target.level") }}</label>
+        <select id="alert-level" name="min_level">{% for value, label in alerts.levels %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+      </div>
+    </div>
+    <div class="form-actions"><button type="submit" class="button button--secondary">{{ _("admin.alerts.target.add_button") }}</button></div>
+  </form>
+  <form class="form-section" method="post" action="{{ alerts.action }}/bot" aria-labelledby="alert-bot-heading">
+    <h3 id="alert-bot-heading">{{ _("admin.alerts.bot.title") }}</h3>
+    {% if alerts.has_bot is none %}
+    <p>{{ _("admin.alerts.bot.no_key") }}</p>
+    {% else %}
+    <p>{% if alerts.has_bot %}<span class="chip chip--success">{{ _("admin.alerts.bot.set") }}</span>{% else %}<span class="chip">{{ _("admin.alerts.bot.not_set") }}</span>{% endif %} {{ _("admin.alerts.bot.lead") }}</p>
+    <div class="field">
+      <label for="alert-bot-token">{{ _("admin.alerts.bot.token") }}</label>
+      <p class="hint" id="alert-bot-token-hint">{{ _("admin.alerts.bot.token_hint") }}</p>
+      <input type="password" id="alert-bot-token" name="token" autocomplete="off" spellcheck="false" aria-describedby="alert-bot-token-hint">
+    </div>
+    {% if alerts.has_bot %}
+    <div class="choice__option"><input type="checkbox" id="alert-bot-remove" name="remove" value="yes"><label for="alert-bot-remove">{{ _("admin.alerts.bot.remove") }}</label></div>
+    {% endif %}
+    <div class="form-actions"><button type="submit" class="button button--secondary">{{ _("admin.alerts.bot.save") }}</button></div>
+    {% endif %}
+  </form>
+</section>

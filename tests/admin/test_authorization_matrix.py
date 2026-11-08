@@ -62,6 +62,12 @@ WRITABLE_IN_MAINTENANCE = frozenset(
         "POST /admin/maintenance/off",
         "POST /admin/groups/{slug}/check",
         "POST /admin/integrations/service-app-check",
+        # ADR 0082 point 9: an organisation's alert targets fall under integrations.manage, which
+        # stays writable for the superuser during maintenance (a repaired channel is tested).
+        "POST /admin/organisations/{org}/channels/alerts/targets",
+        "POST /admin/organisations/{org}/channels/alerts/targets/{target_id}/remove",
+        "POST /admin/organisations/{org}/channels/alerts/targets/{target_id}/test",
+        "POST /admin/organisations/{org}/channels/alerts/bot",
     }
 )
 

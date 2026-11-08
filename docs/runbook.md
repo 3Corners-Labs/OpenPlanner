@@ -86,18 +86,19 @@ images (`OPENPLANNER_IMAGE` and `OPENPLANNER_PROXY_IMAGE` in `.env.update`).
 
 ### As an outsider (public images, ADR 0108)
 
-A minor or major release (`vX.Y.0`, from 0.4.0) is also pushed, with the same digest and the
-same signature, to two public packages: `ghcr.io/<owner>/<repo>-public` and
+Every release (`vX.Y.Z`; minor and major releases from 0.4.0, patches from the first release
+after ADR 0116 step 6, also patches from a maintenance line) is also pushed, with the same digest
+and the same signature, to two public packages: `ghcr.io/<owner>/<repo>-public` and
 `ghcr.io/<owner>/<repo>-proxy-public`. No account or login is needed to pull or verify them.
-Release candidates and patch releases are never public. The release notes of the release list
+Release candidates are never public. The release notes of the release list
 both references with their digests and the exact commands; they come down to:
 
 ```sh
 cosign verify ghcr.io/<owner>/<repo>-public@sha256:<digest> \
-  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.Z \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 cosign verify-attestation ghcr.io/<owner>/<repo>-public@sha256:<digest> --type cyclonedx \
-  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.Z \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -1006,7 +1007,16 @@ render and a restart of `idp` and `web`.
 
 Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
 Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (work items),
-0019 (direct call), 0026 (cap on open direct calls).
+0019 (direct call), 0026 (cap on open direct calls), 0082 (verification, health, alerts,
+fallback).
+
+**The set-up for the organisation's contact-center administrator** (Service App and scopes,
+the Control Hub items, the group's fields, *Koppeling controleren* and what its lines mean, the
+fallback per group and the bot for alerts) is the manual topic *Contactcenter inrichten* /
+*Setting up the contact center*: [nl](manual/nl/contact-center-setup.md),
+[en](manual/en/contact-center-setup.md), also in the portal under **Handleiding** and behind
+the (i) of the group's contact-center fields. The sections below keep what the host team does
+on the server (secrets, tokens, CLI commands) and the detail behind the checks.
 
 ### 1. Webex Service App
 
@@ -1081,12 +1091,16 @@ calendar a few minutes after it closes.
 
 ### 3. WxCC work items (Control Hub)
 
-Work Items is in beta; the organisation must be enabled by Cisco.
+Work Items is in beta; the organisation must be enabled by Cisco. The contact-center
+administrator creates the channel, asset, entry point, flow and queues in Control Hub, one
+screen per step, as the manual topic *Contactcenter inrichten* (steps 2 to 6) describes. What
+the host team needs to know about them:
 
-1. **Work Item channel**: e.g. `openplanner-video`. Enter it per group as *WxCC work
+1. **Work Item channel**: e.g. `openplanner-video`. Entered per group as *WxCC work
    item-kanaal*.
 2. **Work Item asset** on that channel with a unique **business address** (e.g.
-   `openplanner@<your domain>`; per group as *WxCC business address*) and exactly this schema:
+   `openplanner@<your domain>`; per group as *WxCC business address*) and exactly this schema
+   (the reference for `wxcc-config-check`, section 7):
 
    | Field key | Display name | Required | Viewable |
    |---|---|---|---|
@@ -1097,15 +1111,12 @@ Work Items is in beta; the organisation must be enabled by Cisco.
    | `meetingLink` | Videogesprek | no | yes |
    | `kind` | Soort (scheduled/direct/cancelled/probe) | no | yes |
 
-3. **Entry point and flow** for the asset. The flow reads the flow setting
-   `openplannerGroup` (the group's routing value, by default its web address) and routes with
-   **Queue Contact** to the right queue. Add a **Screen Pop** of `meetingLink` so the agent opens
-   the meeting in one click (in the Webex app, signed in: cohost). Direct calls can get a higher
-   priority with **Set Contact Priority** on `kind = direct`. Add a **Case** on `kind = probe`
-   that ends the contact before any queue (ADR 0082): **Koppeling controleren** sends a probe
-   work item through the asset and the flow and waits for its `task:new` and `task:ended`;
-   without the branch OpenPlanner ends the probe itself (End Task, `cjp:user`) and warns, and
-   an agent may see it for a moment. **To verify on the test tenant:** that the flow can read
+3. **Entry point and flow** for the asset: `openplannerGroup` Case to **Queue Contact**,
+   **Screen Pop** of `meetingLink`, and a **Case** on `kind = probe` that ends the contact
+   before any queue (ADR 0082; the manual topic, step 5). Direct calls can get a higher
+   priority with **Set Contact Priority** on `kind = direct`. Without the probe branch
+   OpenPlanner ends the probe itself (End Task, `cjp:user`) and warns, and an agent may see it
+   for a moment. **To verify on the test tenant:** that the flow can read
    `kind` from the work item data; if it cannot, route the probe on a flow setting instead
    (the Case value stays `probe`).
    **Sample flow.** `python -m app.cli wxcc-sample-flow --group <slug>` prints a flow with all of
@@ -1439,12 +1450,42 @@ it) runs this way in CI: `e2e/tests/video-journey.spec.ts`, on the bookings that
 Webex itself: entering the meeting, the lobby and the Webex app on the tester's computer
 (ADR 0075 step 3) stay a check by a person against the real Webex site.
 
-### 11. When the contact center is down: the own queue (ADR 0043)
+### 11. When the contact center is down: the fallback and the own queue (ADR 0082, ADR 0043)
 
-When Webex Connect or Webex Contact Center cannot take tasks, a group admin with
-`group.edit` (organisation admin or superuser) can switch a group to OpenPlanner's own queue:
-**Groepen › (groep) › Instellingen › Hoe afspraken bij medewerkers komen › Eigen wachtrij van
-OpenPlanner**. From then on:
+**Automatic fallback (ADR 0082 point 11).** A group with **Terugval als het contactcenter
+uitvalt** set to *Eigen wachtrij* (`dispatch_fallback = own_queue`, `group.edit`) falls back
+to OpenPlanner's own queue by itself; its `dispatch_kind` stays *Contactcenter*:
+
+- **per booking**: when a booking's `dispatch_wxcc_task` job fails for good after its retries
+  (ADR 0068), the booking lands in the group's **Wachtrij**, flagged *Terugval*, with the
+  timeline event `fallback_queued` (detail `dispatch_failed`);
+- **per group**: while the organisation's WxCC health is `down` (*Koppelingen*, *Gezondheid*:
+  failures above `integration_down_failure_percent`, a refused token refresh, or a failed
+  probe of the group check), the worker sets the group in fallback (`groups.fallback_active_since`).
+  Dispatch jobs that come due meanwhile skip with reason `fallback` and their bookings land in
+  the queue (detail `contact_center_down`); the queue shows the banner *Terugval actief*, the agenda the
+  *Terugval* flag, and the system event `dispatch.fallback` (failure `on`, detail
+  `fallback.on`) is an alert to the organisation's targets and, when the group set
+  `fallback_space_room_id`, a message in the team's Webex space through the organisation's bot;
+- **return**: once the health is `ok` again (after `integration_recovery_minutes` of healthy
+  requests, platform setting, default 10), the fallback ends (`dispatch.fallback` success,
+  detail `fallback.off`): bookings not yet claimed in the queue get a fresh dispatch job and go
+  to the contact center after all (timeline `fallback_ended`); claimed ones stay with their
+  agent;
+- **by hand**: whoever has `bookings.manage` on the group (organisation or group admin) can end
+  it earlier with **Terugval beëindigen** on the group's **Wachtrij** (fresh login; audited as
+  `bookings.manage`, detail `fallback.off`). While the contact center is still down, the next
+  health sweep puts the group back in fallback.
+
+The team's space receives per booking the start time, the first name and a link to the queue,
+never the host join link; those messages stay in Webex after the purge (the privacy note is in
+the manual topic, step 10, and in `docs/dataflow.md`). Direct calls follow the same rule and
+take the own-queue path while the fallback is on. The participant notices nothing.
+
+**Manual switch (ADR 0043).** For a group without the fallback, or for a longer outage, a group
+admin with `group.edit` (organisation admin or superuser) can switch a group to OpenPlanner's
+own queue: **Groepen › (groep) › Instellingen › Hoe afspraken bij medewerkers komen › Eigen
+wachtrij van OpenPlanner**. From then on:
 
 - bookings whose dispatch job has not run yet create no WxCC task; already dispatched ones keep
   theirs;
@@ -2746,7 +2787,9 @@ Bookings keep working: they are stored first, and meetings and work items are jo
   that the job fails and the timeline shows `integration_error` or `task_failed` with the code.
   The agenda shows the affected bookings.
 - **A work item cannot be created at T−5:** the participant still has the join link and can wait
-  in the lobby. Pick the booking from the agenda and contact the participant another way, or
+  in the lobby. A group with the fallback (`dispatch_fallback = own_queue`) puts the booking in
+  its own queue by itself (section 11 under *Webex meetings and Webex Contact Center*). For
+  another group, pick the booking from the agenda and contact the participant another way, or
   re-run the job once WxCC is back (set the job's status to `pending` in the `jobs` table).
 - **Direct calls** during an outage show "no agent available" after the group's
   not-picked-up limit and offer to book instead.

@@ -10014,6 +10014,141 @@ msgstr "Standaardteksten"
 msgid "admin.list.search_active"
 msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
 
+msgid "alert.message.level.info"
+msgstr "Informatie"
+
+msgid "alert.message.level.warning"
+msgstr "Waarschuwing"
+
+msgid "alert.message.level.outage"
+msgstr "Storing"
+
+msgid "alert.message.subject"
+msgstr "OpenPlanner: {level} ({action})"
+
+msgid "alert.message.what"
+msgstr "Melding {action}, reden {reason}."
+
+msgid "alert.message.since"
+msgstr "Sinds {time}."
+
+msgid "alert.message.organisation"
+msgstr "Organisatie: {organisation}."
+
+msgid "alert.message.group"
+msgstr "Groep: {group}."
+
+msgid "alert.message.repeated"
+msgstr "Sinds het vorige bericht nog {count} keer gemeld."
+
+msgid "alert.message.link"
+msgstr "Bekijk in het portaal: {link}"
+
+msgid "alert.message.version"
+msgstr "OpenPlanner {version}"
+
+msgid "alert.message.test.subject"
+msgstr "OpenPlanner: testmelding"
+
+msgid "alert.message.test.text"
+msgstr "Dit is een testmelding. Komt deze aan, dan krijgt dit adres de meldingen van OpenPlanner."
+
+msgid "admin.alerts.targets.title"
+msgstr "Meldingen aan beheerders"
+
+msgid "admin.alerts.targets.lead"
+msgstr "Waar OpenPlanner meldingen heen stuurt als er iets misgaat: een e-mailadres of een Webex-ruimte. Een melding die blijft, komt opnieuw na het herhaalinterval; tussendoor wordt alleen geteld."
+
+msgid "admin.alerts.targets.none"
+msgstr "Nog geen adressen voor meldingen."
+
+msgid "admin.alerts.target.kind"
+msgstr "Soort"
+
+msgid "admin.alerts.target.kind.email"
+msgstr "E-mail"
+
+msgid "admin.alerts.target.kind.webex_space"
+msgstr "Webex-ruimte"
+
+msgid "admin.alerts.target.address"
+msgstr "Adres of ruimte-id"
+
+msgid "admin.alerts.target.address_hint"
+msgstr "Een e-mailadres van beheerders, of het id van de Webex-ruimte waar de bot in zit."
+
+msgid "admin.alerts.target.level"
+msgstr "Vanaf"
+
+msgid "admin.alerts.target.level.warning"
+msgstr "Waarschuwingen en storingen"
+
+msgid "admin.alerts.target.level.outage"
+msgstr "Alleen storingen"
+
+msgid "admin.alerts.target.test"
+msgstr "Testmelding sturen"
+
+msgid "admin.alerts.target.remove"
+msgstr "Verwijderen"
+
+msgid "admin.alerts.target.add"
+msgstr "Adres toevoegen"
+
+msgid "admin.alerts.target.add_button"
+msgstr "Toevoegen"
+
+msgid "admin.alerts.bot.title"
+msgstr "Webex-bot"
+
+msgid "admin.alerts.bot.lead"
+msgstr "Meldingen naar een Webex-ruimte gaan via een eigen bot met alleen het recht om berichten te sturen."
+
+msgid "admin.alerts.bot.set"
+msgstr "Token ingesteld"
+
+msgid "admin.alerts.bot.not_set"
+msgstr "Geen token"
+
+msgid "admin.alerts.bot.token"
+msgstr "Token van de bot"
+
+msgid "admin.alerts.bot.token_hint"
+msgstr "Plak het token uit het Webex-ontwikkelaarsportaal. Het wordt versleuteld bewaard en nooit meer getoond."
+
+msgid "admin.alerts.bot.remove"
+msgstr "Token verwijderen"
+
+msgid "admin.alerts.bot.save"
+msgstr "Opslaan"
+
+msgid "admin.alerts.bot.no_key"
+msgstr "Een bot-token kan pas worden bewaard als de installatie een sleutel voor geheimen heeft (SETTINGS_ENCRYPTION_KEY)."
+
+msgid "admin.done.alert_target_added"
+msgstr "Het adres voor meldingen is toegevoegd."
+
+msgid "admin.done.alert_target_removed"
+msgstr "Het adres voor meldingen is verwijderd."
+
+msgid "admin.done.alert_test_sent"
+msgstr "De testmelding is verstuurd."
+
+msgid "admin.done.alert_test_failed"
+msgstr "De testmelding kon niet worden verstuurd. Controleer het mailkanaal of het token van de bot en het ruimte-id."
+
+msgid "admin.done.alert_bot_saved"
+msgstr "Het token van de bot is opgeslagen."
+
+msgid "admin.done.alert_bot_removed"
+msgstr "Het token van de bot is verwijderd."
+
+msgid "admin.done.alert_refused"
+msgstr "Dat kon niet: controleer het adres, het token, of het maximum van tien adressen."
+
+msgid "settings.field.alert_repeat_hours.label"
+msgstr "Melding opnieuw sturen na (uren)"
+
 msgid "admin.updates.line"
 msgstr "Lijn"
 
@@ -10154,3 +10289,56 @@ msgstr "De widget is weggehaald."
 
 msgid "admin.done.layout_reset"
 msgstr "U ziet weer de standaardindeling van uw rol."
+msgid "admin.field.dispatch_fallback"
+msgstr "Terugval als het contactcenter uitvalt"
+
+msgid "admin.field.dispatch_fallback_hint"
+msgstr "Met eigen wachtrij: een afspraak waarvan het doorzetten mislukt, en zolang het contactcenter onbereikbaar is elke afspraak, komt in de wachtrij van OpenPlanner. Het team moet die wachtrij dan kennen en werken."
+
+msgid "admin.field.fallback_space_room_id"
+msgstr "Webex-ruimte van het team (terugval)"
+
+msgid "admin.field.fallback_space_room_id_hint"
+msgstr "Optioneel. Het id van de ruimte waar de bot van de organisatie bij terugval een bericht plaatst, en per afspraak de begintijd en voornaam. Nooit de link naar het gesprek."
+
+msgid "admin.fallback.none"
+msgstr "Geen"
+
+msgid "admin.fallback.own_queue"
+msgstr "Eigen wachtrij"
+
+msgid "admin.fallback.banner.title"
+msgstr "Terugval actief"
+
+msgid "admin.fallback.banner.text"
+msgstr "Het contactcenter is onbereikbaar sinds {time}. De afspraken van deze groep komen nu in deze wachtrij."
+
+msgid "admin.fallback.end"
+msgstr "Terugval beëindigen"
+
+msgid "admin.fallback.chip"
+msgstr "Terugval"
+
+msgid "admin.done.fallback_ended"
+msgstr "De terugval is beëindigd. Afspraken die nog niet zijn opgepakt, gaan alsnog naar het contactcenter."
+
+msgid "admin.alerts.source.fallback"
+msgstr "Terugval naar de eigen wachtrij"
+
+msgid "admin.alerts.text.fallback"
+msgstr "Deze groep valt terug op haar eigen wachtrij, omdat het contactcenter onbereikbaar is. Open de wachtrij om afspraken op te pakken."
+
+msgid "call.event.fallback_queued"
+msgstr "In de eigen wachtrij gezet (terugval)"
+
+msgid "call.event.fallback_ended"
+msgstr "Terugval beëindigd: naar het contactcenter"
+
+msgid "fallback.space.activated"
+msgstr "**{group}** valt terug op de eigen wachtrij: het contactcenter is onbereikbaar. Pak afspraken op in de wachtrij: {link}"
+
+msgid "fallback.space.queued"
+msgstr "{time}: {first_name} staat in de wachtrij. {link}"
+
+msgid "admin.form.error.fallback_space_room_id"
+msgstr "Vul het id van een Webex-ruimte in: letters, cijfers, - en _, 10 tot 200 tekens."

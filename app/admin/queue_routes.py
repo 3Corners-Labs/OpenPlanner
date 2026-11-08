@@ -23,13 +23,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission
+from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.forms import raise_refusal, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.live import Seen, fragment, key
-from app.admin.pages import Locale, SameOrigin
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.fallback import FallbackService
 from app.domain.own_queue import ParticipantState, VideoState
 from app.domain.queue_service import ClaimedBooking, QueueRow, QueueService, QueueView
 from app.domain.routing import GroupRouting
@@ -95,6 +96,7 @@ class RowView:
     video: str | None
     video_tone: str
     routing: str = ""
+    fallback: bool = False
 
 
 @dataclass(frozen=True)
@@ -172,6 +174,7 @@ def _row(
         video=locale.gettext(video_key) if video_key else None,
         video_tone=video_tone,
         routing=routing_summary(routing, row.routing, locale.gettext, locale.code),
+        fallback=row.fallback,
     )
 
 
@@ -222,6 +225,15 @@ async def _list(
         {
             **_list_context(request, slug, view),
             "refusal": locale.gettext(ERROR_KEYS[refusal]) if refusal else None,
+            # ADR 0082 point 11: the group falls back to this queue while the contact center
+            # is down; who may manage its bookings may end it by hand.
+            "fallback_since": admin_moment(request, locale, since)
+            if (since := context.group.group.fallback_active_since)
+            and context.group.group.fallback_active
+            else None,
+            "can_end_fallback": can_function(context.principal)(
+                Permission.BOOKINGS_MANAGE, context.group
+            ),
         },
         409 if refusal else 200,
         scripts=True,
@@ -303,6 +315,27 @@ async def queue_live(
         view.key,
         _list_context(request, slug, view),
     )
+
+
+EndFallback = Annotated[
+    AdminContext,
+    Depends(RequirePermission(Permission.BOOKINGS_MANAGE, group_param="slug", fresh=True)),
+]
+"""Ending a group's fallback by hand (ADR 0082 point 11): who manages its bookings."""
+
+
+@router.post("/groups/{slug}/queue/fallback/end", response_class=HTMLResponse)
+async def end_fallback(
+    request: Request, slug: str, _: SameOrigin, context: EndFallback
+) -> Response:
+    """End the group's fallback: bookings not yet claimed go to the contact center after all."""
+    service: FallbackService = request.app.state.fallback_service
+    try:
+        ended = await service.end(context.principal, slug)
+    except DomainError as error:
+        raise_refusal(error)
+        raise
+    return redirect_done(_url(slug), "fallback_ended" if ended else "unchanged")
 
 
 @router.post("/groups/{slug}/queue/next", response_class=HTMLResponse)

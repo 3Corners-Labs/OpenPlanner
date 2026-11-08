@@ -40,12 +40,16 @@ from app.domain.connection_health import HEALTH_EVENT as CONNECTION_HEALTH
 from app.domain.connection_health import WEBHOOKS_MISSING, HealthState
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.log_destinations import HEALTH_EVENT
-from app.domain.ports import Clock, UnitOfWork
+from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.public_address import EVENT as ADDRESS_EVENT
 from app.domain.retention_sweep import SWEPT
 from app.domain.storage import FREE_SPACE_CRITICAL, STORAGE_EVENT
 from app.domain.tls import EVENT as CERTIFICATE_EVENT
 from app.domain.tls import Finding
+
+FALLBACK_EVENT = "dispatch.fallback"
+"""System event of a group's fallback to the own queue (ADR 0082 point 11); written by
+``app.domain.fallback``, which imports it from here."""
 
 QUEUE_WAIT_EVENT = "queue.wait"
 """System event of a group's longest wait crossing ``queue_wait_warning_minutes`` (OV-7)."""
@@ -163,6 +167,8 @@ ALERT_RULES: tuple[AlertRule, ...] = (
     ),
     # ADR 0082 point 6: the reconcile found states the webhooks did not bring.
     AlertRule(WEBHOOKS_MISSING, Permission.AUDIT_VIEW),
+    # ADR 0082 point 11: a group falls back to its own queue; its team must work it.
+    AlertRule(FALLBACK_EVENT, Permission.QUEUE_WORK),
 )
 """Every condition event that raises an alert; a test checks that each watch writes one."""
 
@@ -361,6 +367,35 @@ class AlertService:
         return alerts
 
 
+async def condition_events(tx: Transaction, actions: Iterable[str]) -> list[AuditEvent]:
+    """Return the newest events of each condition action, in every scope (a system reader)."""
+    events: list[AuditEvent] = []
+    for action in actions:
+        entries = await tx.list_audit_events(
+            Scope(everything=True),
+            EVENTS_PER_RULE,
+            AuditFilter(source=Source.SYSTEM, action=action),
+        )
+        events.extend(entry.event for entry in entries)
+    return events
+
+
+def reports_since(events: Iterable[AuditEvent], alert: Alert, since: datetime) -> int:
+    """Return how many failure events of ``alert``'s condition came in after ``since``."""
+    rule = RULES_BY_ACTION.get(alert.action)
+    subject = rule.subject if rule else ""
+    return sum(
+        1
+        for e in events
+        if e.action == alert.action
+        and e.organisation == alert.organisation
+        and e.group == alert.group
+        and _subject(e.detail, subject) == alert.subject
+        and e.outcome is Outcome.FAILURE
+        and e.at > since
+    )
+
+
 async def open_conditions(uow: UnitOfWork, action: str) -> list[Alert]:
     """Return every open alert of one condition event, for a watch that starts.
 
@@ -368,9 +403,4 @@ async def open_conditions(uow: UnitOfWork, action: str) -> list[Alert]:
     here, so a condition that ended while the process was down is closed with a success.
     """
     async with uow.read() as tx:
-        entries = await tx.list_audit_events(
-            Scope(everything=True),
-            EVENTS_PER_RULE,
-            AuditFilter(source=Source.SYSTEM, action=action),
-        )
-    return open_alerts(entry.event for entry in entries)
+        return open_alerts(await condition_events(tx, (action,)))

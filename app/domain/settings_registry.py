@@ -903,6 +903,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=120,
     ),
     S(
+        "alert_repeat_hours",
+        K.INT,
+        4,
+        _C,
+        T.OPERATIONS,
+        "A lasting alert is sent to its email addresses and Webex spaces again after this many "
+        "hours; reports in between are counted, not sent (ADR 0082).",
+        minimum=1,
+        maximum=168,
+    ),
+    S(
         "integration_probe_timeout_seconds",
         K.INT,
         60,

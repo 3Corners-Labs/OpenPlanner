@@ -41,8 +41,9 @@ from app.domain.channels import ChannelKind
 from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import bind_booking, current, trace_scope
+from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
-from app.domain.job_plan import TEAM_INVITES, JobType, is_stale
+from app.domain.job_plan import BACKOFF, TEAM_INVITES, JobType, is_stale
 from app.domain.ports import (
     Clock,
     ContactCenterDispatcher,
@@ -62,9 +63,6 @@ from app.logging import tracer
 from app.web.call_labels import agent_start_label
 
 log = structlog.get_logger()
-
-BACKOFF = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=15))
-"""Delay before attempt 2, 3 and 4; after that the job fails."""
 
 
 PRUNE_EVERY = timedelta(hours=1)
@@ -150,6 +148,7 @@ class JobRunner:
         clock_style: Callable[[int], str] | None = None,
         product_footer: Callable[[int], bool] | None = None,
         after_purge: Callable[[], Awaitable[None]] | None = None,
+        fallback: FallbackService | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
@@ -168,7 +167,10 @@ class JobRunner:
         if senders is not None:
             self._types |= set(MESSAGE_KINDS) | TEAM_INVITES
         self._calls = (
-            CallJobs(uow, CallService(uow, integration, video, dispatcher, agent_start_label))
+            CallJobs(
+                uow,
+                CallService(uow, integration, video, dispatcher, agent_start_label, fallback),
+            )
             if integration is not None
             else None
         )

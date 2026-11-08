@@ -68,6 +68,13 @@ starttijd te lang *in wachtrij* of *verbonden* blijft, vraagt het achtergrondpro
 contactcenter. Wijkt die af, dan komt dat met `reconciled` op de tijdlijn van de afspraak en
 volgt de melding *Meldingen van het contactcenter*: kijk dan bij de registraties hieronder.
 
+## Meldingen aan beheerders
+
+De adressen en de Webex-bot voor meldingen van het hele platform (updates, certificaten, het
+achtergrondproces, verzoeken zonder organisatie). Ze werken zoals bij een organisatie: zie
+[Kanalen](channels.md). Het aanmaken van de bot is stap 11 van
+[Contactcenter inrichten](contact-center-setup.md).
+
 ## Webhooks
 
 De twee adressen die de meldingen van Webex en WxCC ontvangen, elk met de vermelding of er een

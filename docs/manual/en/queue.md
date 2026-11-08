@@ -55,3 +55,10 @@ appointment goes back into the queue. A group admin can also release a colleague
 for example when that colleague had to leave.
 
 Picking up and releasing are in the audit log, with your name and the appointment reference.
+
+## Fallback
+
+A contact-center group can fall back to this queue (setting *Fallback when the contact center
+fails*). Appointments that come in this way carry the label **Fallback**. While the whole group
+falls back, a banner shows at the top; **End the fallback** sends appointments not yet picked up
+to the contact center after all.
