@@ -43,6 +43,7 @@ from app.adapters.registrations import Expected, Listing, list_registrations
 from app.adapters.webex_auth import AuthorizedClient, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
 from app.adapters.webhook_selftest import self_test
+from app.adapters.webhooks import WXCC_INBOUND
 from app.adapters.wxcc import channel_and_address
 from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
 from app.domain.calls import (
@@ -375,7 +376,9 @@ class PlatformChecker:
             ]
         host = (group.video_host_email or "").strip().lower()
         wxcc_target = (
-            f"{base}/webhooks/wxcc" if config.wxcc_base_url and config.wxcc_secret else None
+            f"{base}{WXCC_INBOUND.registered_path}"
+            if config.wxcc_base_url and config.wxcc_secret
+            else None
         )
         expected = Expected(f"{base}/webhooks/webex", wxcc_target, (host,) if host else ())
         listing = await list_registrations(

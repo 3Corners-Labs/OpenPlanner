@@ -163,7 +163,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
-from app.domain.contact_center import ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -1414,9 +1414,9 @@ class SqlTransaction(
             .values(claimed_at=None, claimed_by=None)
         )
 
-    async def get_booking_by_task(self, task_id: str) -> Booking | None:
-        """Return the booking whose contact-center task has ``task_id`` (either column)."""
-        return await self._booking_where(has_task(task_id))
+    async def get_booking_by_task(self, task_id: str, kind: ContactCenterKind) -> Booking | None:
+        """Return the booking whose task is ``task_id`` at platform ``kind`` (either column)."""
+        return await self._booking_where(has_task(task_id, kind))
 
     async def _booking_where(self, condition: ColumnElement[bool]) -> Booking | None:
         """Return the one booking matching ``condition``, with its slot."""

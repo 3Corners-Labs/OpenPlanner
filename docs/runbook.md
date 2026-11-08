@@ -1331,7 +1331,7 @@ is current and nothing is missing.
 | State | Meaning | Reasons |
 |---|---|---|
 | `CURRENT` | OpenPlanner's, on `WEBHOOK_BASE_URL`, for a host account a group uses | – |
-| `STALE` | OpenPlanner's (path `/webhooks/webex` or `/webhooks/wxcc`, or named "OpenPlanner …") but no longer right | other address (old tunnel or base URL), no `hostEmail` filter, host account no group uses, event not used, inactive, duplicate |
+| `STALE` | OpenPlanner's (path `/webhooks/webex`, `/webhooks/wxcc` or `/webhooks/contact-center/webex_cc`, or named "OpenPlanner …") but no longer right | other address (old tunnel or base URL), no `hostEmail` filter, host account no group uses, event not used, inactive, duplicate |
 | `FOREIGN` | another application's | never touched |
 
 **`webhooks-reset`** deletes the `STALE` registrations. Without `--yes` it only prints

@@ -168,6 +168,7 @@ from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
 from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
+from app.adapters.webhooks import WXCC_INBOUND
 from app.adapters.wxcc import channel_and_address, wxcc_mapping
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.adapters.wxcc_sample_flow import Route, sample_flow
@@ -384,7 +385,7 @@ async def _register_webhooks(
                 await register_wxcc(
                     client,
                     settings.wxcc_api_base_url,
-                    f"{base}/webhooks/wxcc",
+                    f"{base}{WXCC_INBOUND.registered_path}",
                     settings.wxcc_webhook_secret.get_secret_value(),
                 )
             )
@@ -910,7 +911,7 @@ async def _listing(settings: Settings, client: AuthorizedClient) -> Listing:
     wxcc_wired = settings.wxcc_api_base_url and settings.wxcc_webhook_secret is not None
     expected = Expected(
         webex_target=f"{base}/webhooks/webex",
-        wxcc_target=f"{base}/webhooks/wxcc" if wxcc_wired else None,
+        wxcc_target=f"{base}{WXCC_INBOUND.registered_path}" if wxcc_wired else None,
         hosts=tuple(_hosts(await _groups(settings))),
     )
     listing = await list_registrations(

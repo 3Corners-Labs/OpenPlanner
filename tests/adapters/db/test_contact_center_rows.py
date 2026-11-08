@@ -163,7 +163,7 @@ async def test_a_task_is_stored_in_both_columns_and_an_old_one_still_found(
             .values(contact_center_task_id=None, contact_center_kind=None, wxcc_task_id="t-old")
         )
     async with uow.read() as tx:
-        found = await tx.get_booking_by_task("t-old")
+        found = await tx.get_booking_by_task("t-old", WEBEX_CC)
     assert found is not None
     assert found.contact_center_task == ContactCenterTaskRef("t-old", WEBEX_CC)
 
@@ -189,7 +189,7 @@ async def test_a_purge_by_the_previous_image_leaves_no_task_behind(engine: Async
 
     async with uow.read() as tx:
         booking = await tx.get_booking(booking_id)
-        found = await tx.get_booking_by_task("task-new")
+        found = await tx.get_booking_by_task("task-new", WEBEX_CC)
         rollable = await tx.find_rollable(NOW + timedelta(days=1), 0, 10)
     assert booking is not None
     assert booking.contact_center_task is None
@@ -210,8 +210,9 @@ async def test_for_a_wxcc_task_the_new_column_never_wins_over_the_old_one(
             .values(contact_center_task_id="t-other", wxcc_task_id="t-wxcc")
         )
     async with uow.read() as tx:
-        assert await tx.get_booking_by_task("t-other") is None  # webex_cc: the old column wins
-        found = await tx.get_booking_by_task("t-wxcc")
+        # webex_cc: the old column wins
+        assert await tx.get_booking_by_task("t-other", WEBEX_CC) is None
+        found = await tx.get_booking_by_task("t-wxcc", WEBEX_CC)
     assert found is not None
     assert found.contact_center_task == ContactCenterTaskRef("t-wxcc", WEBEX_CC)
 
@@ -241,3 +242,18 @@ async def test_a_dispatch_job_keeps_the_value_the_previous_image_reads(
             .all()
         )
     assert "dispatch_wxcc_task" in types  # this image writes the old value (ADR 0116 §5)
+
+
+async def test_a_task_id_is_found_only_at_its_own_platform(engine: AsyncEngine) -> None:
+    """ADR 0032 point 6: a row whose task is at another platform is not a WxCC task."""
+    uow, booking_id = await _booking_with_task(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(
+                wxcc_task_id=None, contact_center_task_id="t-1", contact_center_kind="elsewhere"
+            )
+        )
+    async with uow.read() as tx:
+        assert await tx.get_booking_by_task("t-1", WEBEX_CC) is None
