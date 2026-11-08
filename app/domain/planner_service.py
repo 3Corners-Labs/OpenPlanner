@@ -27,11 +27,10 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from app.domain import booking_changes
-from app.domain.activity_alert import ActivityAlert
-from app.domain.admin import AdminService, Authorization, require
+from app.domain.activity_alert import CHANGES_ALERT
+from app.domain.admin import AdminService, Authorization, record_change, require
 from app.domain.agenda import AgendaSlot, ShortfallAcceptance
 from app.domain.agenda_service import agenda_days
-from app.domain.audit import AuditEvent, Outcome, Source
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.booking import Booking, BookingStatus, ChangeReason
 from app.domain.booking_changes import ProposalTiming
@@ -49,18 +48,6 @@ from app.domain.services import BookingService
 from app.domain.slot_close import shortfall_resolved
 from app.domain.tunable import value_for, value_of
 from app.domain.usage import ActorClass
-
-CHANGES_ALERT = ActivityAlert(
-    "planner.changes_alert",
-    "too_many_changes",
-    "changes",
-    frozenset({Permission.BOOKINGS_MANAGE.value}),
-)
-"""The warning above ``planner_changes_alert_per_hour`` changes by one planner in an hour."""
-
-ALERT_ACTION = CHANGES_ALERT.action
-"""System event key of the warning about many changes by one planner."""
-
 
 CONFIRMED_BY_STAFF = "booking.confirmed_by_staff"
 """The audit detail of a planner confirming for the participant (ADR 0056 point 11)."""
@@ -421,27 +408,18 @@ class PlannerService:
         booking_id: int | None,
     ) -> None:
         """Record the change; warn once when the planner passes the hourly threshold."""
-        now = self._clock.now()
-        summary = authorization.group
-        organisation = summary.organisation_slug if summary else None
-        group = summary.group.slug if summary else None
-        action = Permission.BOOKINGS_MANAGE.value
-        await tx.add_audit_event(
-            AuditEvent(
-                now,
-                principal.subject,
-                action,
-                Outcome.SUCCESS,
-                "",
-                organisation,
-                group,
-                detail,
-                Source.ADMIN,
-                booking_id,
-            )
+        target = authorization.target
+        event = await record_change(
+            tx,
+            self._clock.now(),
+            principal,
+            Permission.BOOKINGS_MANAGE,
+            target.organisation,
+            target.group,
+            detail,
+            booking_id=booking_id,
         )
-        threshold = value_of(self._alert_per_hour)
-        await CHANGES_ALERT.check(tx, now, principal.subject, threshold, organisation, group)
+        await CHANGES_ALERT.check(tx, event, value_of(self._alert_per_hour))
 
 
 def _ids(bookings: list[Booking]) -> list[int]:

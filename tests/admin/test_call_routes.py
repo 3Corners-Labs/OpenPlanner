@@ -16,6 +16,8 @@ from app.adapters.registrations import (
     listing_to_report,
 )
 from app.adapters.webhook_selftest import Delivery, Outcome, deliveries_to_report
+from app.config import Settings
+from app.domain.activity_alert import REVEALS_ALERT
 from app.domain.admin import AdminService
 from app.domain.authorization import Principal
 from app.domain.booking import MeetingRef
@@ -27,7 +29,15 @@ from app.domain.participant_contact import CONTACT_VIEWED
 from app.domain.ports import RequestRecord
 from app.domain.request_log import RequestEvents
 from app.domain.services import BookingService, ContactInput
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.admin.conftest import (
+    AUDITOR,
+    GROUP_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    _running_site,
+)
 from tests.support.admin_site import audit_log, site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 
@@ -370,6 +380,25 @@ async def test_the_contact_details_show_only_on_request_and_each_request_is_audi
     assert f'<a href="{page}#contact">Contactgegevens verbergen</a>' in shown
     assert ">Show contact details</button>" in english
     assert await _contact_views(site) == [(GROUP_ADMIN.subject, booking_id)]
+
+
+async def test_the_alert_on_many_requests_follows_the_platform_setting(
+    settings: Settings, admin_db: str
+) -> None:
+    """ADR 0044 §2: past ``contact_reveals_alert_per_hour`` requests, one system event."""
+    limited = settings.model_copy(update={"contact_reveals_alert_per_hour": 5})
+    async with _running_site(limited, admin_db) as site:
+        booking_id = await _book(site, "demo")
+        await site.login_as(GROUP_ADMIN)
+        page = f"/admin/groups/demo/bookings/{booking_id}"
+        for _ in range(7):
+            shown = await site.client.get(f"{page}?contact=show", headers=_from(page))
+            assert "ada@example.org" in shown.text
+        alerts = [e for e in await audit_log(site) if e.action == REVEALS_ALERT.action]
+
+    assert [(e.group, e.detail) for e in alerts] == [
+        ("demo", f"actor:{GROUP_ADMIN.subject},reveals:6")
+    ]
 
 
 @pytest.mark.parametrize(

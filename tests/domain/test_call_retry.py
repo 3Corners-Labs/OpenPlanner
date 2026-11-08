@@ -5,6 +5,7 @@ from datetime import timedelta
 
 import pytest
 
+from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService
 from app.domain.authorization import Permission
 from app.domain.booking import BookingStatus, MeetingRef
@@ -24,7 +25,7 @@ WIRED = {
 }
 
 
-async def _setup() -> tuple[InMemoryUnitOfWork, CallRetryService, int]:
+async def _setup(alert_per_hour: int = 50) -> tuple[InMemoryUnitOfWork, CallRetryService, int]:
     state = two_organisations()
     state.groups[1] = replace(state.groups[1], **WIRED)  # type: ignore[arg-type]
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
@@ -33,7 +34,8 @@ async def _setup() -> tuple[InMemoryUnitOfWork, CallRetryService, int]:
     receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY), slug="demo")
     booking_id = receipt.booking.id or 0
     uow.state.jobs[booking_id] = []  # the first attempts ran and failed
-    return uow, CallRetryService(uow, clock, AdminService(uow, clock)), booking_id
+    service = CallRetryService(uow, clock, AdminService(uow, clock), alert_per_hour)
+    return uow, service, booking_id
 
 
 async def test_a_failed_meeting_is_planned_again_now_and_audited() -> None:
@@ -52,6 +54,16 @@ async def test_a_failed_meeting_is_planned_again_now_and_audited() -> None:
         "demo",
         "retry.create_video_room",
     )
+
+
+async def test_a_retry_counts_toward_the_alert_on_many_changes_by_one_person() -> None:
+    uow, service, booking_id = await _setup(alert_per_hour=1)
+
+    await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.CREATE_VIDEO_ROOM)
+    await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.CREATE_VIDEO_ROOM)
+
+    alerts = [e for e in uow.state.audit if e.action == CHANGES_ALERT.action]
+    assert [(e.group, e.detail) for e in alerts] == [("demo", "actor:g-1,changes:2")]
 
 
 async def test_a_work_item_is_planned_at_the_dispatch_moment() -> None:

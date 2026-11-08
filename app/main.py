@@ -634,7 +634,9 @@ def create_app(
             lambda: timedelta(seconds=live().meeting_status_refresh_seconds),
             settings.app_version,
         )
-        app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
+        app.state.call_retry_service = CallRetryService(
+            uow, clock, app.state.admin_service, lambda: live().planner_changes_alert_per_hour
+        )
         # ADR 0044 §2: the participant's contact details on the booking page, on request.
         app.state.participant_contact_service = ParticipantContactService(
             uow, clock, app.state.admin_service, lambda: live().contact_reveals_alert_per_hour
@@ -722,6 +724,7 @@ def create_app(
             app.state.integration_service,
             BotSpacePoster(app.state.bot_tokens, http, live().webex_api_base_url, request_log),
             SpaceTexts(app.state.translator.gettext, settings.public_base_url),
+            lambda: live().planner_changes_alert_per_hour,
         )
         text_overrides.attach(uow)
         app.state.organisation_text_service = OrganisationTextService(

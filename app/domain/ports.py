@@ -1634,13 +1634,10 @@ class Transaction(Protocol):
         """Store a planner's acceptance; it replaces an earlier one for the same slot."""
         ...
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime, *, detail: str | None = None
-    ) -> int:
-        """Return how many of ``actor``'s events with one of ``actions`` happened since then.
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
+        """Return how many successful events with ``action`` ``actor`` has had since then.
 
-        With ``detail``, only the events with exactly that detail count (for example the
-        requests for contact details among the ``bookings.view`` events, not the refusals).
+        A refusal or a failure never counts (``app.domain.activity_alert``).
         """
         ...
 

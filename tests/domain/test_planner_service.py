@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import pytest
 
+from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.audit import SYSTEM_ACTOR, Outcome, Source
@@ -12,7 +13,7 @@ from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
 from app.domain.job_plan import JobType
-from app.domain.planner_service import ALERT_ACTION, PlannerService
+from app.domain.planner_service import PlannerService
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from app.domain.usage import ActorClass, FactKind, UsageFact
@@ -245,7 +246,7 @@ async def test_many_changes_by_one_planner_raise_one_system_event(
     for booking_id in ids:
         await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.UNFORESEEN)
 
-    alerts = [e for e in uow.state.audit if e.action == ALERT_ACTION]
+    alerts = [e for e in uow.state.audit if e.action == CHANGES_ALERT.action]
     assert len(alerts) == 1
     (alert,) = alerts
     assert (alert.actor, alert.source, alert.outcome, alert.group) == (

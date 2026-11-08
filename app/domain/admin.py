@@ -527,12 +527,15 @@ async def record_change(
     detail: str = "",
     *,
     booking_id: int | None = None,
-) -> None:
+) -> AuditEvent:
     """Record a successful admin action in the same transaction as the action itself.
 
     Mostly a change; also a request worth accounting for, such as showing a participant's
     contact details (ADR 0044 §2). ``detail`` names what changed or was asked for (field
     names, ``rule.add``-style keys), never values; ``booking_id`` names the booking it is about.
+
+    Returns:
+        The event, for an hourly alert that counts it (``app.domain.activity_alert``).
     """
     event = AuditEvent(
         at,
@@ -546,3 +549,4 @@ async def record_change(
         booking_id=booking_id,
     )
     await tx.add_audit_event(event)
+    return event

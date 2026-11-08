@@ -2065,22 +2065,19 @@ class SqlTransaction(
             )
         )
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime, *, detail: str | None = None
-    ) -> int:
-        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
-        query = (
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
+        """Return how many successful events with ``action`` ``actor`` has had since then."""
+        count = await self._session.scalar(
             select(func.count())
             .select_from(AuditEventRow)
             .where(
                 AuditEventRow.actor == actor,
-                AuditEventRow.action.in_(list(actions)),
+                AuditEventRow.action == action,
+                AuditEventRow.outcome == Outcome.SUCCESS.value,
                 AuditEventRow.at >= since,
             )
         )
-        if detail is not None:
-            query = query.where(AuditEventRow.detail == detail)
-        return int(await self._session.scalar(query) or 0)
+        return int(count or 0)
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
         """Return the group's closures that have not ended at ``now``, earliest first."""

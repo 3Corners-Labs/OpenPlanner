@@ -12,7 +12,8 @@ ADR 0043, flagged *Terugval*, in two ways:
 
 ``dispatch_kind`` never changes: the fallback is a state. Each transition is the system event
 ``dispatch.fallback`` (failure ``on``, success ``off``), an alert of ADR 0061, and a group
-admin may end it by hand (audited). A team space (``fallback_space_room_id``) gets a message on
+admin may end it by hand (audited, and counted toward the hourly alert on many changes by one
+person, ``app.domain.activity_alert``). A team space (``fallback_space_room_id``) gets a message on
 activation and one line per booking: start time, first name and a link to the queue, never
 the host join link (claiming gives that, ADR 0043 point 6). The participant notices nothing.
 """
@@ -21,6 +22,7 @@ from collections.abc import Callable, Iterable
 from datetime import datetime
 from typing import Protocol
 
+from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService, record_change, require
 from app.domain.alert_delivery import DEFAULT_LOCALE
 from app.domain.alerts import FALLBACK_EVENT
@@ -34,6 +36,7 @@ from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.ports import Clock, IntegrationError, UnitOfWork
 from app.domain.scheduling import Group
+from app.domain.tunable import value_of
 
 ON = "on"
 """Reason of the ``dispatch.fallback`` failure."""
@@ -75,6 +78,8 @@ class FallbackService:
         integration: Writes timeline events and the call status.
         poster: Posts to a team space.
         texts: The messages for the space.
+        alert_per_hour: ``planner_changes_alert_per_hour`` (class C): ending a fallback by hand
+            counts toward the hourly alert on many changes by one person.
     """
 
     def __init__(
@@ -85,6 +90,7 @@ class FallbackService:
         integration: IntegrationService,
         poster: SpacePoster,
         texts: FallbackTexts,
+        alert_per_hour: int | Callable[[], int],
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -93,6 +99,7 @@ class FallbackService:
         self._integration = integration
         self._poster = poster
         self._texts = texts
+        self._alert_per_hour = alert_per_hour
 
     async def diverts(self, booking: Booking, group: Group) -> bool:
         """Put a booking due for dispatch in the own queue while its group is in fallback.
@@ -190,7 +197,7 @@ class FallbackService:
             await tx.save_group_fallback(group.id, None)
             await tx.add_audit_event(_event(group, organisation, Outcome.SUCCESS, now))
             if principal is not None:
-                await record_change(
+                event = await record_change(
                     tx,
                     now,
                     principal,
@@ -199,6 +206,7 @@ class FallbackService:
                     group.slug,
                     "fallback.off",
                 )
+                await CHANGES_ALERT.check(tx, event, value_of(self._alert_per_hour))
             waiting = [
                 b
                 for b in await tx.fallback_bookings(group.id, now)

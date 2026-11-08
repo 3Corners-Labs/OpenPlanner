@@ -25,7 +25,7 @@ stopped.
 
 from collections.abc import Callable
 
-from app.domain.activity_alert import ActivityAlert
+from app.domain.activity_alert import REVEALS_ALERT
 from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Contact
@@ -35,15 +35,6 @@ from app.domain.tunable import value_of
 
 CONTACT_VIEWED = "booking.contact_viewed"
 """The audit detail of a request for a participant's contact details."""
-
-REVEALS_ALERT = ActivityAlert(
-    "booking.contact_reveals_alert",
-    "too_many_contact_reveals",
-    "reveals",
-    frozenset({Permission.BOOKINGS_VIEW.value}),
-    CONTACT_VIEWED,
-)
-"""The warning above ``contact_reveals_alert_per_hour`` requests by one person in an hour."""
 
 
 class ParticipantContactService:
@@ -92,10 +83,9 @@ class ParticipantContactService:
             booking, _ = await group_booking(tx, slug, booking_id)
             if booking.contact is None:
                 return None
-            now = self._clock.now()
-            await record_change(
+            event = await record_change(
                 tx,
-                now,
+                self._clock.now(),
                 principal,
                 Permission.BOOKINGS_VIEW,
                 target.organisation,
@@ -103,8 +93,5 @@ class ParticipantContactService:
                 CONTACT_VIEWED,
                 booking_id=booking_id,
             )
-            threshold = value_of(self._alert_per_hour)
-            await REVEALS_ALERT.check(
-                tx, now, principal.subject, threshold, target.organisation, target.group
-            )
+            await REVEALS_ALERT.check(tx, event, value_of(self._alert_per_hour))
         return booking.contact

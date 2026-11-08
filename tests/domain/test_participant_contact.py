@@ -5,15 +5,12 @@ from datetime import timedelta
 
 import pytest
 
+from app.domain.activity_alert import REVEALS_ALERT
 from app.domain.admin import AdminService
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.authorization import Principal
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.participant_contact import (
-    CONTACT_VIEWED,
-    REVEALS_ALERT,
-    ParticipantContactService,
-)
+from app.domain.participant_contact import CONTACT_VIEWED, ParticipantContactService
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
