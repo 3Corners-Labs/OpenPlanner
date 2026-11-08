@@ -9667,6 +9667,174 @@ msgstr "Continue to the login service"
 msgid "admin.alerts.text.check"
 msgstr "The check of this group's integration found a problem ({code}). Open the group and choose Check integration for the explanation."
 
+msgid "booking.routing.subject.label"
+msgstr "What is your appointment about?"
+
+msgid "booking.routing.subject.choose_hint"
+msgstr "Choose a subject first. You will then only see the times when someone is available for it."
+
+msgid "booking.routing.subject.show_times"
+msgstr "Show times"
+
+msgid "booking.routing.preferred_language.label"
+msgstr "In which language would you like to talk?"
+
+msgid "booking.routing.preferred_language.value.nl"
+msgstr "Dutch"
+
+msgid "booking.routing.preferred_language.value.en"
+msgstr "English"
+
+msgid "booking.routing.channel_preference.label"
+msgstr "How would you like to talk?"
+
+msgid "booking.routing.channel_preference.value.video"
+msgstr "With video"
+
+msgid "booking.routing.channel_preference.value.phone"
+msgstr "By phone"
+
+msgid "admin.routing.title"
+msgstr "Subjects and routing"
+
+msgid "admin.routing.settings_lead"
+msgstr "Let participants choose a subject, ask for a preferred language or way of contact, and pass those choices to the contact center as codes."
+
+msgid "admin.routing.summary"
+msgstr "{subjects} subjects, {attributes} routing questions, {mapped} passed to the contact center."
+
+msgid "admin.routing.summary_none"
+msgstr "This group asks no subject and no routing questions."
+
+msgid "admin.routing.open"
+msgstr "Open subjects and routing"
+
+msgid "admin.routing.back"
+msgstr "Back to the settings"
+
+msgid "admin.routing.subjects.title"
+msgstr "Subjects"
+
+msgid "admin.routing.subjects.lead"
+msgstr "With one or more subjects the form first asks the participant what the appointment is about. The code never changes: bookings and reports keep it."
+
+msgid "admin.routing.subjects.none"
+msgstr "No subjects yet. The form then asks for none."
+
+msgid "admin.routing.subject.label"
+msgstr "Subject"
+
+msgid "admin.routing.subject.code"
+msgstr "Code"
+
+msgid "admin.routing.subject.code_hint"
+msgstr "Lower-case letters, digits and hyphens, at most 40 characters, for example general-question. Cannot be changed later."
+
+msgid "admin.routing.subject.label_nl"
+msgstr "Name (Dutch)"
+
+msgid "admin.routing.subject.label_en"
+msgstr "Name (English)"
+
+msgid "admin.routing.subject.bound"
+msgstr "bound to a block"
+
+msgid "admin.routing.subject.remove"
+msgstr "Remove"
+
+msgid "admin.routing.subject.remove_label"
+msgstr "Remove subject {label}"
+
+msgid "admin.routing.subject.add"
+msgstr "Add a subject"
+
+msgid "admin.routing.subject.add_lead"
+msgstr "A group has at most {count} subjects."
+
+msgid "admin.routing.subject.add_button"
+msgstr "Add subject"
+
+msgid "admin.routing.subject.limit_reached"
+msgstr "This group has the maximum of {count} subjects."
+
+msgid "admin.routing.subject.edit_lead"
+msgstr "Code {code}; it stays the same."
+
+msgid "admin.routing.attributes.title"
+msgstr "Routing questions"
+
+msgid "admin.routing.attributes.lead"
+msgstr "Questions from a fixed OpenPlanner list. The answer is a code, never free text, and no personal data."
+
+msgid "admin.routing.attributes.values"
+msgstr "Choices: {values}."
+
+msgid "admin.routing.attribute.preferred_language.help"
+msgstr "Asks the language of the conversation."
+
+msgid "admin.routing.attribute.channel_preference.help"
+msgstr "Asks whether the participant wants to talk with video or by phone."
+
+msgid "admin.routing.mapping.title"
+msgstr "Pass on to the contact center"
+
+msgid "admin.routing.mapping.lead"
+msgstr "Per subject and routing question: the name of the variable the contact center's flow reads, and the value per choice. Whatever stays empty here is not sent."
+
+msgid "admin.routing.mapping.none"
+msgstr "Add a subject or routing question first."
+
+msgid "admin.routing.mapping.variable"
+msgstr "Variable name"
+
+msgid "admin.routing.mapping.variable_hint"
+msgstr "Letters, digits and underscores, starting with a letter, for example subject. Empty: send nothing."
+
+msgid "admin.routing.mapping.values"
+msgstr "Values for {source}"
+
+msgid "admin.routing.mapping.code"
+msgstr "Choice"
+
+msgid "admin.routing.mapping.value"
+msgstr "Value sent"
+
+msgid "admin.routing.mapping.save"
+msgstr "Save {source}"
+
+msgid "admin.routing.source.subject"
+msgstr "Subject"
+
+msgid "admin.routing.error.subject_code"
+msgstr "Choose a code of lower-case letters, digits and hyphens that this group does not have yet."
+
+msgid "admin.routing.error.subject_label"
+msgstr "Enter the name, at most 80 characters."
+
+msgid "admin.routing.error.subjects"
+msgstr "This group already has the maximum number of subjects."
+
+msgid "admin.routing.error.subject_in_use"
+msgstr "A block still offers this subject. Remove it from that block first."
+
+msgid "admin.routing.error.variable_name"
+msgstr "Use letters, digits and underscores, starting with a letter, and no name that is already used."
+
+msgid "admin.routing.error.variable_value"
+msgstr "A value is a code: letters, digits, dot, colon, hyphen or underscore, at most 64 characters."
+
+msgid "admin.routing.error.mapping"
+msgstr "This subject or question no longer exists."
+
+msgid "admin.field.block_subjects"
+msgstr "Subjects in this block"
+
+msgid "admin.field.block_subjects_hint"
+msgstr "Nothing ticked: the block offers every subject. A participant who chooses a subject only sees the times of blocks that offer it."
+
+msgid "settings.field.max_subjects_per_group.label"
+msgstr "Subjects per group (at most)"
+
 msgid "admin.tab.planning"
 msgstr "Planning"
 

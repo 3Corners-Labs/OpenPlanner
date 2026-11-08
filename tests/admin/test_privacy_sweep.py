@@ -63,6 +63,10 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/settings": "/admin/groups/demo/settings",
     "/admin/groups/{slug}/settings/form": "/admin/groups/demo/settings/form",
     "/admin/groups/{slug}/settings/form/{key}": "/admin/groups/demo/settings/form/onderwerp",
+    "/admin/groups/{slug}/settings/routing": "/admin/groups/demo/settings/routing",
+    "/admin/groups/{slug}/settings/routing/subjects/{code}": (
+        "/admin/groups/demo/settings/routing/subjects/onderwerp"
+    ),
     "/admin/groups/{slug}/settings/archive": "/admin/groups/demo/settings/archive",
     "/admin/groups/{slug}/staffing": "/admin/groups/demo/staffing",
     "/admin/groups/{slug}/staffing/{rule_id}": "/admin/groups/demo/staffing/{rule}",
@@ -244,6 +248,22 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
             await post_form(site, "/admin/staff/directory/reset", {"subject": "nobody"}),
         ),
     ):
+        assert not marker_leaks(response.text, set()), path
+
+    # ADR 0081: with a subject the routing pages, its edit page and the block checkboxes render.
+    await post_form(
+        site,
+        "/admin/groups/demo/settings/routing/subjects",
+        {"code": "onderwerp", "label_nl": "Onderwerp", "label_en": "Subject"},
+    )
+    for path in (
+        "/admin/groups/demo/settings/routing",
+        "/admin/groups/demo/settings/routing/subjects/onderwerp",
+        "/admin/groups/demo/staffing",
+        "/admin/groups/demo/exceptions",
+    ):
+        response = await site.client.get(path)
+        assert response.status_code == 200, path
         assert not marker_leaks(response.text, set()), path
 
     # ADR 0061 §7: the alert banner shows only with an open outage; codes and slugs, no marker.

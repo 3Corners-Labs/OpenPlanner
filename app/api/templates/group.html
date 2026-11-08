@@ -19,6 +19,23 @@
   {% endif %}
 </section>
 {% endif %}
+{% if subjects %}
+<form method="get" action="/g/{{ group.slug }}" class="subject-choice">
+  <div class="field">
+    <fieldset class="choices" aria-describedby="subject-hint">
+      <legend>{{ _("booking.routing.subject.label") }}</legend>
+      <p class="hint" id="subject-hint">{{ _("booking.routing.subject.choose_hint") }}</p>
+      {% for option in subjects %}
+      <div class="choice">
+        <input id="subject-{{ option.value }}" name="subject" type="radio" value="{{ option.value }}"{% if option.selected %} checked{% endif %}>
+        <label for="subject-{{ option.value }}">{{ option.label }}</label>
+      </div>
+      {% endfor %}
+    </fieldset>
+  </div>
+  <p><button type="submit" class="button button--secondary">{{ _("booking.routing.subject.show_times") }}</button></p>
+</form>
+{% endif %}
 {% set action = "/g/" ~ group.slug ~ "/book" %}
 {% set method = "get" %}
 {% include "_slot_picker.html" %}

@@ -190,6 +190,7 @@ FLOWS: dict[str, Flow] = {
     "## Flow: emergency closure (ADR 0024)": Flow(ADMIN),
     "## Flow: alternative contact options (ADR 0037 §2)": Flow(ADMIN),
     "## Flow: custom booking form fields (ADR 0055)": Flow((PUBLIC, DENIED, CHANGE)),
+    "## Flow: subjects and routing attributes (ADR 0081)": Flow((PUBLIC, DENIED, CHANGE)),
     "## Flow: embedded booking (ADR 0035, EM-2)": Flow((PUBLIC, OWN_FAILURE)),
     "## Flow: widget script on host websites (ADR 0035, EM-3)": Flow(
         no_event="a static script file; the booking it posts is refused by the booking flow"

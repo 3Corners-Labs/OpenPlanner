@@ -43,8 +43,11 @@ function stylesheet() {
   return sheet;
 }
 
+/** The input of the subject question (ADR 0081): `q_` plus the routing answer key `_subject`. */
+const SUBJECT_FIELD = 'q__subject';
+
 class OpenplannerBooking extends HTMLElement {
-  static observedAttributes = ['organisation', 'group', 'lang'];
+  static observedAttributes = ['organisation', 'group', 'lang', 'subject'];
 
   connectedCallback() {
     if (!this.shadowRoot) {
@@ -158,7 +161,7 @@ class OpenplannerBooking extends HTMLElement {
   async calendar(month, day, focus = 'title') {
     let data;
     try {
-      data = await this.api.availability(month, day);
+      data = await this.api.availability(month, day, this.subject());
     } catch (error) {
       this.unavailable(error);
       return;
@@ -169,7 +172,7 @@ class OpenplannerBooking extends HTMLElement {
       selectedDay: () => this.day,
       month: (target, fromGrid) => this.calendar(target, undefined, fromGrid ? 'grid' : 'month'),
       day: (date) => this.calendar(this.month, date, 'times'),
-      time: (start, label) => this.form({ start, label, values: {}, errors: [] }),
+      time: (start, label) => this.form({ start, label, values: this.preset(), errors: [] }),
     });
     const more = h('p', { class: 'more' }, h('a', { href: this.group.page_url, part: 'link' }, this.t('widget.more')));
     this.show(h('div', {},
@@ -182,6 +185,19 @@ class OpenplannerBooking extends HTMLElement {
     ), focus === 'title' ? null : focus === 'times' ? 'times-heading' : focus === 'month' ? 'month-heading' : null);
     if (focus === 'grid') this.shadowRoot.querySelector('.calendar__day[tabindex="0"]')?.focus();
     if (focus === 'times') this.announce(data.times ? `${data.times.heading}: ${data.times.count}` : this.t('picker.no_times'));
+  }
+
+  /** The subject the host page chose (ADR 0081), if the group offers it; else null. */
+  subject() {
+    const code = this.getAttribute('subject');
+    const field = this.group?.fields.find((f) => f.name === SUBJECT_FIELD);
+    return code && field?.options.some((o) => o.value === code) ? code : null;
+  }
+
+  /** The form values the host page chose in advance: the subject question pre-selected. */
+  preset() {
+    const code = this.subject();
+    return code ? { [SUBJECT_FIELD]: code } : {};
   }
 
   form(state) {

@@ -23,7 +23,7 @@
       {% for item in rows %}
       <tr>
         <th scope="row">{{ item.time }}</th>
-        <td>{{ item.first_name }}<br><span class="muted">{{ item.reference }}{% if item.direct %} · {{ _("admin.queue.direct") }}{% endif %}</span></td>
+        <td>{{ item.first_name }}<br><span class="muted">{{ item.reference }}{% if item.direct %} · {{ _("admin.queue.direct") }}{% endif %}</span>{% if item.routing %}<br><span class="muted">{{ item.routing }}</span>{% endif %}</td>
         <td><span class="chip{% if item.tone %} chip--{{ item.tone }}{% endif %}">{{ item.state }}</span>{% if item.overdue %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}{% if item.video %}<br><span class="chip{% if item.video_tone %} chip--{{ item.video_tone }}{% endif %}">{{ item.video }}</span>{% endif %}</td>
         <td>
           {% if item.mine %}

@@ -18,17 +18,22 @@ from app.domain.form_fields import (
     FieldType,
     FormDefinition,
 )
+from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
+from app.domain.routing import GroupRouting
 from app.domain.scheduling import Group, PhoneMode
 from app.domain.security_log import HONEYPOT
 from app.domain.services import BookingService, ContactInput
 from app.web.errors import FormError, form_errors
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
+from app.web.routing_labels import option_label, source_label
 
 HONEYPOT_FIELD = "website"
 MAX_VALUE_LENGTH = 300
 ANSWER_PREFIX = "q_"
 SYSTEM_FIELDS = ("first_name", "last_name", "email", "phone")
+SUBJECT_INPUT = f"{ANSWER_PREFIX}_subject"
+"""The input of the subject question (ADR 0081): ``q_`` plus the routing answer key."""
 
 # The HTML input of each type: (kind, type, autocomplete, inputmode).
 _INPUTS: dict[FieldType, tuple[str, str, str, str | None]] = {
@@ -89,11 +94,16 @@ class ContactForm:
     def fields(
         self, locale: RequestLocale, errors: list[FormError], values: Mapping[str, str]
     ) -> list[FieldView]:
-        """Return the inputs: the system fields, then the group's custom fields in order."""
+        """Return the inputs: the routing questions, the system fields, the custom fields.
+
+        The subject is the first question (ADR 0081 point 2), then the switched-on routing
+        attributes; each is a radio group of codes, so nothing typed can reach the routing.
+        """
         _ = locale.gettext
         by_field = {error.field: error.message for error in errors if error.field}
         email_hint = _("form.email_hint")
-        fields = [
+        fields = routing_fields(self.group.routing, locale)
+        fields += [
             FieldView(
                 "first_name", "text", "given-name", _("form.first_name"), True, "", None, None
             ),
@@ -112,6 +122,11 @@ class ContactForm:
 
     def errors(self, error: DomainError, locale: RequestLocale) -> list[FormError]:
         """Return the messages for ``error``; a refused answer names its field's label."""
+        if error.code is ErrorCode.INVALID_ANSWER and error.field in routing_keys(self.group):
+            source = str(error.field).removeprefix(ROUTING_PREFIX)
+            label = source_label(source, locale.gettext)
+            message = locale.gettext("error.invalid_answer_field", label=label)
+            return [FormError(f"{ANSWER_PREFIX}{error.field}", message)]
         if error.code is ErrorCode.INVALID_ANSWER and error.field:
             field = self.form.get(error.field)
             if field is not None:
@@ -149,6 +164,37 @@ def _custom(field: FieldDefinition, locale: str, today: date) -> FieldView:
         maximum,
         inputmode,
     )
+
+
+def routing_keys(group: Group) -> frozenset[str]:
+    """Return the answer keys of the group's routing questions (``_subject``, ``_<attr>``)."""
+    return frozenset(f"{ROUTING_PREFIX}{source}" for source in group.routing.sources)
+
+
+def routing_fields(routing: GroupRouting, locale: RequestLocale) -> list[FieldView]:
+    """Return the radio groups of the subject and the switched-on attributes, in that order."""
+    _ = locale.gettext
+    views: list[FieldView] = []
+    for source in routing.sources:
+        options = tuple(
+            (code, option_label(routing, source, code, _, locale.code))
+            for code in routing.codes(source)
+        )
+        views.append(
+            FieldView(
+                f"{ANSWER_PREFIX}{ROUTING_PREFIX}{source}",
+                "radio",
+                "off",
+                source_label(source, _),
+                True,
+                "",
+                None,
+                None,
+                "radio",
+                options,
+            )
+        )
+    return views
 
 
 def _day(today: date, days: int | None) -> str | None:
