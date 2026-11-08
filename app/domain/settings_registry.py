@@ -1649,6 +1649,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=60,
     ),
     S(
+        "overview_max_widgets",
+        K.INT,
+        12,
+        _C,
+        T.DISPLAY,
+        "Most widgets an admin's own overview layout may hold; adding beyond it is refused "
+        "(ADR 0096).",
+        minimum=4,
+        maximum=24,
+    ),
+    S(
         "queue_wait_warning_minutes",
         K.INT,
         8,

@@ -78,6 +78,7 @@ from app.adapters.db.models import (
     StaffRow,
     WebhookEventRow,
 )
+from app.adapters.db.overview_layouts import OverviewLayoutQueries
 from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
@@ -461,6 +462,7 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 class SqlTransaction(
     AdminSessionQueries,
     HealthQueries,
+    OverviewLayoutQueries,
     ParticipantLinkQueries,
     ApiClientQueries,
     IdentityProviderQueries,
@@ -491,7 +493,7 @@ class SqlTransaction(
     (ADR 0042), the certificate check from ``CertificateQueries`` (ADR 0064), the organisation
     identity providers from ``IdentityProviderQueries`` (ADR 0083), the log destinations from
     ``LogDestinationQueries`` (ADR 0085), the admin sessions from ``AdminSessionQueries``
-    (ADR 0098).
+    (ADR 0098), the own overview layouts from ``OverviewLayoutQueries`` (ADR 0096).
 
     Args:
         session: The open session.
