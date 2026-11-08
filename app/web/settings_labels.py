@@ -29,6 +29,7 @@ SETTING_LABELS: dict[str, str] = {
     "tls_certificate_source": "settings.field.tls_certificate_source.label",
     "integration_check_interval_hours": "settings.field.integration_check_interval_hours.label",
     "integration_probe_timeout_seconds": "settings.field.integration_probe_timeout_seconds.label",
+    "alert_repeat_hours": "settings.field.alert_repeat_hours.label",
     "task_reconcile_interval_minutes": "settings.field.task_reconcile_interval_minutes.label",
     "task_reconcile_after_minutes": "settings.field.task_reconcile_after_minutes.label",
     "integration_health_window_minutes": "settings.field.integration_health_window_minutes.label",

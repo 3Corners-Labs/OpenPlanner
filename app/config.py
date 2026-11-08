@@ -541,6 +541,8 @@ class Settings(BaseSettings):
     integration_degraded_failure_percent: int = Field(default=25, ge=1, le=100)
     integration_down_failure_percent: int = Field(default=75, ge=1, le=100)
     integration_recovery_minutes: int = Field(default=10, ge=1, le=120)
+    # Class C (ADR 0082 point 9): a lasting alert is sent to its targets again at this interval.
+    alert_repeat_hours: int = Field(default=4, ge=1, le=168)
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":

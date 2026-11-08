@@ -48,6 +48,11 @@ PURGE_AFTER = timedelta(hours=24)
 """Personal data retention after the slot end or the cancellation."""
 
 
+BACKOFF = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=15))
+"""Delay before attempt 2, 3 and 4 of a job (ADR 0068); after that it fails. Also the retries
+of an alert delivery (ADR 0082 point 9)."""
+
+
 class JobType(StrEnum):
     """Every kind of background job."""
 

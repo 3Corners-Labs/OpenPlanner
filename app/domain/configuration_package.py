@@ -42,6 +42,7 @@ VERSION_TABLE = "alembic_version"
 
 CONFIGURATION_TABLES = frozenset(
     {
+        "alert_targets",
         "api_client_groups",
         "api_clients",
         "api_settings",
@@ -94,6 +95,7 @@ STATE_TABLES = frozenset(
         "diagnostic_modes",
         "instance",
         "integration_reports",
+        "alert_deliveries",
         "jobs",
         "log_destination_status",
         "maintenance_state",

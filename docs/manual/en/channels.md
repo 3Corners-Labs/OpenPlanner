@@ -79,3 +79,21 @@ without one.
 Every change goes to the audit log with the names of the changed fields, never the values. Of
 a test email the log holds the outcome, not the address; of a domain check the verdict, not the
 records.
+
+## Alerts to administrators
+
+Where OpenPlanner sends alerts when something goes wrong with this organisation's connections or
+its groups' tasks: an administrators' email address or a Webex space. Per address you choose
+**From**: all warnings and outages, or outages only. At most ten addresses. **Send a test
+alert** checks an address at once.
+
+A lasting alert comes again after the repeat interval (setting *Send an alert again after*,
+four hours by default); in between OpenPlanner only counts, and the next message says how often.
+When sending fails, OpenPlanner tries again after 1, 5 and 15 minutes. A message holds only codes,
+the organisation, the group, the time and a link into the portal: never participants' data.
+
+**Email** goes through the mail channel above (or the platform's fallback).
+
+**Webex space**: create a bot in the Webex developer portal (only the right
+`spark:messages_write`), add the bot to the space, paste the bot's token under **Webex bot** and
+enter the space's id as the address. The token is stored encrypted and never shown again.
