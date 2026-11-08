@@ -39,6 +39,7 @@ from app.domain.rebooking import last_made
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
 from app.domain.tunable import value_for, value_of
+from app.domain.usage import ActorClass
 
 ALERT_ACTION = "planner.changes_alert"
 """System event key of the warning about many changes by one planner."""
@@ -127,7 +128,9 @@ class PlannerService:
             target = await self._slot(tx, group, new_start)
             if target is not None and target.booked + 1 > target.agents and not accept_shortfall:
                 raise DomainError(ErrorCode.MOVE_CAUSES_SHORTFALL)
-            receipt = await self._bookings.relocate(tx, booking, group, new_start, sms=True)
+            receipt = await self._bookings.relocate(
+                tx, booking, group, new_start, sms=True, actor=ActorClass.PLANNER
+            )
             await self._audit(tx, principal, authorization, "planner.move", booking_id)
         return receipt.booking
 

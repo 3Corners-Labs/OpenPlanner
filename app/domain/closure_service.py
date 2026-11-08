@@ -56,6 +56,8 @@ from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scenario_service import usable_scenario
 from app.domain.scheduling import Group, GroupSummary, Organisation
 from app.domain.services import BookingService
+from app.domain.usage import ActorClass, FactKind
+from app.domain.usage_recording import record_closure_change
 
 
 @dataclass(frozen=True)
@@ -369,7 +371,9 @@ class ClosureService:
         async with self._uow.locked() as tx:
             group = await _group(tx, slug)
             booking = await _suspended(tx, group, booking_id)
-            receipt = await self._bookings.relocate(tx, booking, group, new_start)
+            receipt = await self._bookings.relocate(
+                tx, booking, group, new_start, actor=ActorClass.CLOSURE
+            )
             await self._audit(tx, principal, authorization, slug, "booking.move")
         return receipt.booking
 
@@ -512,6 +516,7 @@ class ClosureService:
         bookings = await tx.find_confirmed_bookings(group.id, closure.starts_at, closure.ends_at)
         for booking in bookings:
             await tx.save_booking(booking.suspend(closure_id))
+            await record_closure_change(tx, FactKind.BOOKING_SUSPENDED, booking, group, now)
             jobs = plan_for_suspension(
                 now=now,
                 purge_at=closure.purge_at(booking.end, self._retention_of(group.organisation_id)),
@@ -560,6 +565,7 @@ class ClosureService:
         if booking.contact is None:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
         await tx.save_booking(booking.reinstate())
+        await record_closure_change(tx, FactKind.BOOKING_RESUMED, booking, group, now)
         jobs = plan_for_booking(
             start=booking.start,
             end=booking.end,
@@ -576,7 +582,9 @@ class ClosureService:
     async def _cancel(self, tx: Transaction, group: Group, booking: Booking) -> None:
         """Cancel ``booking`` with the cancellation mail, the team's withdrawal and the purge."""
         now = self._clock.now()
-        await booking_changes.cancel(tx, booking, now, team_invite=group.sends_team_invite)
+        await booking_changes.cancel(
+            tx, booking, now, team_invite=group.sends_team_invite, actor=ActorClass.CLOSURE
+        )
 
     async def _closure_bookings(
         self, tx: Transaction, principal: Principal, group: Group, closure: Closure

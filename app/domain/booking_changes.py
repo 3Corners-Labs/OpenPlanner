@@ -29,6 +29,11 @@ from app.domain.job_plan import (
 )
 from app.domain.ports import Transaction
 from app.domain.scheduling import Group
+from app.domain.usage import ActorClass
+from app.domain.usage_recording import (
+    record_cancelled,
+    record_confirm_expired,
+)
 
 
 def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> None:
@@ -76,6 +81,7 @@ async def cancel(
     reason: ChangeReason | None = None,
     sms: bool = False,
     team_invite: bool = False,
+    actor: ActorClass = ActorClass.PLANNER,
 ) -> Booking:
     """Cancel ``booking`` with the cancellation message and the usual purge; return it.
 
@@ -86,12 +92,15 @@ async def cancel(
         reason: The planner's fixed reason, shown in the message.
         sms: Also send the cancellation as an SMS when the participant is reachable there.
         team_invite: Withdraw the calendar invite of the group's team (ADR 0043).
+        actor: Who cancels, as a class, for the usage facts (ADR 0117): the planner, or the
+            closure when an admin cancels a booking on hold.
 
     Raises:
         DomainError: ``booking_not_active`` if it holds no place.
     """
     cancelled = booking.cancel(now, reason)
     await tx.save_booking(cancelled)
+    await record_cancelled(tx, booking, now, actor, reason=reason)
     jobs = plan_for_cancellation(
         cancelled_at=now, sms=sms and sms_reachable(booking), team_invite=team_invite
     )
@@ -146,6 +155,7 @@ async def lapse(tx: Transaction, booking: Booking, now: datetime) -> bool:
     if not booking.awaits_rebook:
         return False
     await tx.save_booking(booking.cancel(now))
+    await record_cancelled(tx, booking, now, ActorClass.SYSTEM)
     await tx.add_jobs(_id(booking), plan_for_lapse(now=now, sms=sms_reachable(booking)))
     return True
 
@@ -160,6 +170,7 @@ async def lapse_unconfirmed(tx: Transaction, booking: Booking, now: datetime) ->
     if not booking.awaits_confirmation:
         return False
     await tx.save_booking(booking.expire(now))
+    await record_confirm_expired(tx, booking, now)
     await tx.add_jobs(_id(booking), plan_for_unconfirmed_lapse(now=now))
     return True
 

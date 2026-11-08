@@ -85,6 +85,14 @@ from app.domain.tokens import (
     token_matches,
 )
 from app.domain.tunable import value_for
+from app.domain.usage import ActorClass, FactKind
+from app.domain.usage_recording import (
+    record_cancelled,
+    record_closure_change,
+    record_confirmed,
+    record_moved,
+    record_placed,
+)
 
 
 @dataclass(frozen=True)
@@ -332,6 +340,7 @@ class BookingService:
                 )
             )
             await tx.replace_jobs(_id(booking), plan_for_direct(start=now, end=end))
+            await record_placed(tx, booking, group, now)
         return BookingReceipt(booking, token)
 
     async def find(self, management_token: str | PublicRef) -> BookingDetails:
@@ -390,6 +399,8 @@ class BookingService:
                 # it on hold at once, as it would have been had it been confirmed before.
                 held = confirmed.suspend(_id(closure))
                 await tx.save_booking(held)
+                await record_confirmed(tx, booking, group, now)
+                await record_closure_change(tx, FactKind.BOOKING_SUSPENDED, held, group, now)
                 purge_at = closure.purge_at(
                     booking.end, self._closure_retention(group.organisation_id)
                 )
@@ -399,6 +410,7 @@ class BookingService:
                 await tx.replace_jobs(_id(booking), jobs)
                 return held
             await tx.save_booking(confirmed)
+            await record_confirmed(tx, booking, group, now)
             await tx.replace_jobs(_id(booking), await self._booked_jobs(tx, group, confirmed))
             return confirmed
 
@@ -416,6 +428,7 @@ class BookingService:
             _ensure_cancellable(booking, group, now)
             cancelled = booking.cancel(now)
             await tx.save_booking(cancelled)
+            await record_cancelled(tx, booking, now, ActorClass.PARTICIPANT, group=group)
             jobs = plan_for_cancellation(cancelled_at=now, team_invite=group.sends_team_invite)
             await tx.replace_jobs(_id(booking), jobs)
             return cancelled
@@ -441,6 +454,7 @@ class BookingService:
             status = await tx.get_call_status(booking.id) or new_status(booking.id)
             plan = plan_leave(booking, status, now)
             await tx.save_booking(plan.booking)
+            await record_cancelled(tx, booking, now, ActorClass.PARTICIPANT)
             await tx.replace_jobs(booking.id, plan.jobs)
             await tx.add_booking_event(plan.event)
             await tx.save_call_status(apply_event(status, plan.event.kind, now))
@@ -475,13 +489,15 @@ class BookingService:
         new_start: datetime,
         *,
         sms: bool = False,
+        actor: ActorClass = ActorClass.PARTICIPANT,
     ) -> BookingReceipt:
         """Move ``old`` to ``new_start`` inside the caller's locked transaction.
 
         Shared by the participant's reschedule, an admin moving a suspended booking
         (``ClosureService.move``) and a planner (``PlannerService.move``, which passes
         ``sms`` so the change also goes out as an SMS where the participant agreed to it); the
-        caller checks who may do it.
+        caller checks who may do it. ``actor`` says which of them, as a class, for the usage
+        facts (ADR 0117).
 
         Raises:
             DomainError: ``booking_not_active``, ``same_slot`` or any error of ``book``.
@@ -492,6 +508,7 @@ class BookingService:
             raise DomainError(ErrorCode.SAME_SLOT)
         now = self._clock.now()
         await tx.save_booking(old.cancel(now))
+        await record_moved(tx, old, group, now, actor)
         jobs = plan_for_cancellation(
             cancelled_at=now, notify=False, team_invite=group.sends_team_invite
         )
@@ -676,6 +693,7 @@ class BookingService:
             else await self._booked_jobs(tx, group, booking, sms=sms)
         )
         await tx.replace_jobs(_id(booking), jobs)
+        await record_placed(tx, booking, group, now, moved=rescheduled_from is not None)
         return BookingReceipt(booking, token)
 
     async def _booked_jobs(

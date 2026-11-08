@@ -9369,6 +9369,9 @@ msgstr "Gebruik voor de inlognaam alleen kleine letters, cijfers, punten en stre
 msgid "admin.form.error.staff_user_name_in_use"
 msgstr "Deze inlognaam is al in gebruik. Kies een andere."
 
+msgid "settings.field.reporting_enabled.label"
+msgstr "Gebruiksrapportages worden gevuld"
+
 msgid "settings.field.overview_live_enabled.label"
 msgstr "Overzicht ververst zichzelf"
 

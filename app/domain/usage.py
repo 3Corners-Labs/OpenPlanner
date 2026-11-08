@@ -248,6 +248,15 @@ def hour_of(moment: datetime) -> datetime:
     return moment.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
 
 
+def usable_locale(text: str | None) -> str | None:
+    """Return ``text`` when it is a short language tag a fact accepts, else ``None``.
+
+    A booking's locale comes from the participant's browser; a fact never refuses the
+    participant's action over it, so a value that is no tag is left out of the fact.
+    """
+    return text if text is not None and _LOCALE.match(text) else None
+
+
 def _hour(moment: datetime) -> None:
     """Refuse a ``bucket_hour`` that is not exactly a UTC hour: no minutes, no exact time."""
     if moment.tzinfo is None or moment != hour_of(moment) or moment.utcoffset() != timedelta(0):
