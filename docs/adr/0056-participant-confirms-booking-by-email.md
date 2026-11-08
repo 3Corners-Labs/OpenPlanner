@@ -142,7 +142,7 @@ by POST only (point 8).
 |---|---|---|---|
 | 1 | Domain: confirmation policy, `pending_confirmation`, job plan, settings | #115 | merged |
 | 2 | Persistence, jobs, mails, confirm page and POST; bookings start `pending_confirmation` (migration 0058) | #134 | merged |
-| 3 | Planner: status *Not confirmed* with its deadline in agenda and booking detail (no longer shown as cancelled), counted in a slot's occupancy and shortfall (not in a closed slot) and marked, the filter *Not confirmed only*, and confirming on behalf of the participant (`bookings.manage`, audited `booking.confirmed_by_staff`, the full confirmation mail; after `confirm_by` it lapses and the planner is told so) | #PRNUM | merged |
+| 3 | Planner: status *Not confirmed* with its deadline in agenda and booking detail (no longer shown as cancelled), counted in a slot's occupancy and shortfall (not in a closed slot) and marked, the filter *Not confirmed only*, and confirming on behalf of the participant (`bookings.manage`, audited `booking.confirmed_by_staff`, the full confirmation mail; after `confirm_by` it lapses and the planner is told so) | #638 | merged |
 | 3b | Moving and cancelling a pending booking as a confirmed one; a moved pending booking stays pending with its own `confirm_by` (point 11, last sentence) |  | planned |
 | 4 | The participant corrects details |  | planned |
 
