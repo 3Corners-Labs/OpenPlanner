@@ -758,7 +758,7 @@ class StaffRow(Base):
 class OverviewLayoutRow(Base):
     """An admin's own overview layout (ADR 0096): widget keys in order, comma-separated.
 
-    Keys only, never personal data; the row goes with the staff record.
+    Keys only, never personal data; erasing the staff record (ADR 0046) deletes it.
     """
 
     __tablename__ = "overview_layouts"

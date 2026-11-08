@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.uow import SqlUnitOfWork
@@ -45,14 +44,12 @@ async def test_without_a_staff_record_nothing_is_stored(engine: AsyncEngine) -> 
         assert await tx.get_overview_layout("nobody") is None
 
 
-async def test_the_layout_goes_with_the_staff_record(engine: AsyncEngine) -> None:
+async def test_erasing_the_staff_member_deletes_the_layout(engine: AsyncEngine) -> None:
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         await tx.save_staff(_person("sub-2"))
         await tx.save_overview_layout("sub-2", ("queue",), NOW)
-    async with engine.begin() as connection:
-        await connection.execute(text("PRAGMA foreign_keys = ON"))
-        await connection.execute(text("DELETE FROM staff WHERE subject = 'sub-2'"))
-        rows = await connection.scalar(text("SELECT COUNT(*) FROM overview_layouts"))
-
-    assert rows == 0
+    async with uow.locked() as tx:
+        await tx.erase_staff("sub-2", NOW)
+    async with uow.read() as tx:
+        assert await tx.get_overview_layout("sub-2") is None

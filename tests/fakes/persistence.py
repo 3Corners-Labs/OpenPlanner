@@ -302,6 +302,7 @@ class InMemoryTransaction:
         member = self.state.staff.get(subject)
         if member is not None and member.status is not StaffStatus.ERASED:
             self.state.staff[subject] = member.erased(at)
+            self.state.overview_layouts.pop(subject, None)
 
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
         if subject in self.state.staff:

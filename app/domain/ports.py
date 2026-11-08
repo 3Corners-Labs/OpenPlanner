@@ -770,7 +770,8 @@ class Transaction(Protocol):
     async def erase_staff(self, subject: str, at: datetime) -> None:
         """Erase the record of ``subject`` (ADR 0046 point 9); the subject and times stay.
 
-        The name, roles, memberships and refused values go and the status becomes ``erased``;
+        The name, roles, memberships, refused values and the own overview layout (ADR 0096)
+        go and the status becomes ``erased``;
         an unknown or already erased subject is ignored, so the retention job can run twice.
         """
         ...

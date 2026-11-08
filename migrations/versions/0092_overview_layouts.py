@@ -1,8 +1,8 @@
 """Admins' own overview layouts (ADR 0096 step 2).
 
 ``overview_layouts`` holds one row per staff member who arranged their overview: the widget
-keys in order (comma-separated) and when they last changed. Keys only, no personal data; the
-row is deleted with the staff record. Without a row the role's default layout applies.
+keys in order (comma-separated) and when they last changed. Keys only, no personal data;
+erasing the staff member deletes it. Without a row the role's default layout applies.
 
 Revises 0090 (usage reporting, ADR 0117). Number 0091 is claimed by #598 (ADR 0081); whichever
 merges second rebases its ``down_revision`` onto the other, so recheck the head before merging.

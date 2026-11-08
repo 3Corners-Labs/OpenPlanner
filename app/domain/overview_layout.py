@@ -83,7 +83,12 @@ def move(current: Layout, key: str, offset: int) -> Layout:
 
 
 class OverviewLayoutService:
-    """Reads, saves and resets the layout of the admin who is signed in.
+    """Changes the layout of the admin who is signed in, one step at a time.
+
+    Each change reads the stored layout (or the role's default), applies one rule of this
+    module and stores the result in the same transaction, so two tabs cannot overwrite each
+    other's step. The maximum applies only when a widget is added: a layout above a lowered
+    maximum can still be shortened or reordered.
 
     Args:
         uow: Opens database transactions.
@@ -110,29 +115,58 @@ class OverviewLayoutService:
         """The most widgets a layout may hold now."""
         return self._maximum()
 
-    async def stored(self, subject: str) -> Layout | None:
-        """Return the own layout of ``subject``, or ``None`` when the role's default applies."""
+    async def layout(self, subject: str, default: Layout, allowed: Sequence[str]) -> Layout:
+        """Return what ``subject``'s overview shows (``effective``)."""
         async with self._uow.read() as tx:
-            return await tx.get_overview_layout(subject)
+            return effective(await tx.get_overview_layout(subject), default, allowed)
 
-    async def save(self, subject: str, layout: Sequence[str]) -> None:
-        """Store ``layout`` as ``subject``'s own.
+    async def is_own(self, subject: str) -> bool:
+        """Whether ``subject`` has a layout of their own (else the role's default applies)."""
+        async with self._uow.read() as tx:
+            return await tx.get_overview_layout(subject) is not None
+
+    async def add(self, subject: str, key: str, default: Layout, allowed: Sequence[str]) -> None:
+        """Add ``key`` at the end of ``subject``'s layout (``add``).
 
         Raises:
-            DomainError: ``invalid_configuration`` on ``widget`` for an unknown or repeated
-                key, on ``widget_count`` above the maximum, on ``staff`` when ``subject`` has
-                no staff record (a person who never logged in).
+            DomainError: as ``add``, or ``invalid_configuration`` on ``staff``.
         """
-        keys = tuple(layout)
-        if len(set(keys)) != len(keys) or not set(keys) <= self._known:
-            raise _refuse("widget")
-        if len(keys) > self._maximum():
-            raise _refuse("widget_count")
-        async with self._uow.locked() as tx:
-            if not await tx.save_overview_layout(subject, keys, self._clock.now()):
-                raise _refuse("staff")
+        await self._change(
+            subject, default, allowed, lambda c: add(c, key, allowed, self._maximum())
+        )
+
+    async def remove(self, subject: str, key: str, default: Layout, allowed: Sequence[str]) -> None:
+        """Remove ``key`` from ``subject``'s layout (``remove``)."""
+        await self._change(subject, default, allowed, lambda c: remove(c, key))
+
+    async def move(
+        self, subject: str, key: str, offset: int, default: Layout, allowed: Sequence[str]
+    ) -> None:
+        """Move ``key`` one place up or down in ``subject``'s layout (``move``)."""
+        await self._change(subject, default, allowed, lambda c: move(c, key, offset))
 
     async def reset(self, subject: str) -> None:
         """Delete ``subject``'s own layout, so the role's default applies again (§4)."""
         async with self._uow.locked() as tx:
             await tx.save_overview_layout(subject, None, self._clock.now())
+
+    async def _change(
+        self,
+        subject: str,
+        default: Layout,
+        allowed: Sequence[str],
+        step: Callable[[Layout], Layout],
+    ) -> None:
+        """Apply ``step`` to the shown layout and store the result as ``subject``'s own.
+
+        Raises:
+            DomainError: ``invalid_configuration`` on ``widget`` for a key outside the
+                register, on ``staff`` when ``subject`` has no staff record.
+        """
+        async with self._uow.locked() as tx:
+            current = effective(await tx.get_overview_layout(subject), default, allowed)
+            changed = step(current)
+            if not set(changed) <= self._known:
+                raise _refuse("widget")
+            if not await tx.save_overview_layout(subject, changed, self._clock.now()):
+                raise _refuse("staff")

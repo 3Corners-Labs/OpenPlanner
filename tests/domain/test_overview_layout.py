@@ -77,44 +77,76 @@ def uow() -> InMemoryUnitOfWork:
     return InMemoryUnitOfWork(state)
 
 
+KNOWN = ("alerts", "queue", "bookings-today", "rights", "status")
+SEEN = ("alerts", "queue", "rights")
+"""What Gina's rights let her see."""
+
+
 @pytest.fixture
 def service(uow: InMemoryUnitOfWork) -> OverviewLayoutService:
-    return OverviewLayoutService(uow, FixedClock(NOW), ("alerts", "queue", "rights"), lambda: 2)
+    return OverviewLayoutService(uow, FixedClock(NOW), KNOWN, lambda: 3)
 
 
-async def test_the_service_saves_and_resets_the_own_layout(service: OverviewLayoutService) -> None:
-    assert await service.stored("sub-gina") is None
+async def test_each_step_starts_from_what_the_overview_shows_and_is_kept(
+    service: OverviewLayoutService,
+) -> None:
+    default = ("alerts", "status", "queue")
+    assert await service.layout("sub-gina", default, SEEN) == ("alerts", "queue")
+    assert not await service.is_own("sub-gina")
 
-    await service.save("sub-gina", ["queue", "alerts"])
-    assert await service.stored("sub-gina") == ("queue", "alerts")
+    await service.move("sub-gina", "queue", -1, default, SEEN)
+    assert await service.layout("sub-gina", default, SEEN) == ("queue", "alerts")
+    await service.add("sub-gina", "rights", default, SEEN)
+    await service.remove("sub-gina", "alerts", default, SEEN)
+    assert await service.layout("sub-gina", default, SEEN) == ("queue", "rights")
+    assert await service.is_own("sub-gina")
 
     await service.reset("sub-gina")
-    assert await service.stored("sub-gina") is None
-    assert service.maximum == 2
+    assert await service.layout("sub-gina", default, SEEN) == ("alerts", "queue")
+    assert service.maximum == 3
 
 
-@pytest.mark.parametrize(
-    ("keys", "field"),
-    [
-        (["queue", "queue"], "widget"),
-        (["queue", "secret-widget"], "widget"),
-        (["queue", "alerts", "rights"], "widget_count"),
-    ],
-)
-async def test_the_service_stores_only_known_keys_once_and_within_the_maximum(
-    service: OverviewLayoutService, keys: list[str], field: str
+async def test_the_maximum_stops_adding_but_never_shortening(
+    service: OverviewLayoutService, uow: InMemoryUnitOfWork
 ) -> None:
-    with pytest.raises(DomainError) as refused:
-        await service.save("sub-gina", keys)
+    uow.state.overview_layouts["sub-gina"] = ("alerts", "queue", "rights")  # at the maximum
 
-    assert _field(refused) == field
-    assert await service.stored("sub-gina") is None
+    with pytest.raises(DomainError) as full:
+        await service.add("sub-gina", "status", (), KNOWN)
+    uow.state.overview_layouts["sub-gina"] = KNOWN  # above a lowered maximum
+    await service.move("sub-gina", "status", -1, (), KNOWN)
+    await service.remove("sub-gina", "alerts", (), KNOWN)
+
+    assert _field(full) == "widget_count"
+    assert uow.state.overview_layouts["sub-gina"] == ("queue", "bookings-today", "status", "rights")
+
+
+async def test_a_widget_outside_the_register_is_never_stored(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    service = OverviewLayoutService(uow, FixedClock(NOW), ("queue",), lambda: 5)
+
+    with pytest.raises(DomainError) as refused:
+        await service.add("sub-gina", "secret-widget", (), ("queue", "secret-widget"))
+
+    assert _field(refused) == "widget"
+    assert "sub-gina" not in uow.state.overview_layouts
 
 
 async def test_a_person_without_a_staff_record_has_no_layout(
     service: OverviewLayoutService,
 ) -> None:
     with pytest.raises(DomainError) as refused:
-        await service.save("sub-unknown", ["queue"])
+        await service.add("sub-unknown", "queue", (), SEEN)
 
     assert _field(refused) == "staff"
+
+
+async def test_erasing_the_person_removes_the_layout(
+    service: OverviewLayoutService, uow: InMemoryUnitOfWork
+) -> None:
+    await service.add("sub-gina", "queue", (), SEEN)
+    async with uow.locked() as tx:
+        await tx.erase_staff("sub-gina", NOW)
+
+    assert not await service.is_own("sub-gina")
