@@ -254,7 +254,7 @@ portal); the requirement of a plan hash for deletions in the portal.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #345 | merged |
-| 1 | Domain: format `v1` (registry of kinds, strict reading and writing), natural keys (migration 0099 for closure scenarios and alert targets), planner with actions, mode, scope, per-change rights and the integrity rules; tests per aggregate | #PR | merged |
+| 1 | Domain: format `v1` (registry of kinds, strict reading and writing), natural keys (migration 0099 for closure scenarios and alert targets), planner with actions, mode, scope, per-change rights and the integrity rules; tests per aggregate | #618 | merged |
 | 2 | Adapter: export with and without secrets, plan and apply in one transaction, sealed values with associated data, inline binaries; `config export\|plan\|apply` on the host; `config-schema` and `docs/configuration-schema/v1.json`; setting `configuration_apply_max_changes` | | planned |
 | 3 | Portal: *Configuration* on *Advanced settings* (upload → plan table → apply) and the organisation sub-tab *Configuration*; per-change permission checks; manual topics nl/en | | planned |
 | 4 | API `plan`/`apply`, `PUT` mapped to apply; installer applies a document; SQLite export removed, SQLite import converted for one release; `docs/agent-api.md`, `docs/install.md` | | planned |
