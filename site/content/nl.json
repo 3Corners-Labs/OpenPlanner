@@ -368,8 +368,8 @@
       {
         "key": "messaging",
         "name": "Webex Messaging",
-        "tag": "gepland",
-        "text": "Gepland: een bot meldt beheerders in Webex wanneer de koppeling hapert, een wachtrij volloopt of een controle faalt. Nooit persoonsgegevens, altijd een link naar het portaal.",
+        "tag": "meldingen",
+        "text": "Een bot meldt beheerders in een Webex-ruimte, of per e-mail, wanneer de koppeling hapert, een wachtrij volloopt of een controle faalt; valt het contact center uit, dan valt een team terug op de eigen wachtrij van OpenPlanner en krijgt de ruimte een regel per afspraak (voornaam en tijd, nooit de deelnamelink). Meldingen bevatten nooit persoonsgegevens, altijd een link naar het portaal.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0082-contact-center-verification-health-alerts-and-fallback.md",
         "link": "Technische achtergrond"
       },

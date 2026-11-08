@@ -20,7 +20,7 @@ copy the checklist into the release PR's conversation or an issue titled `Releas
 - [ ] Latest release candidate on `main` is green, runs on the test host (docker01), and the
       walk-through of `docs/runbook.md` (booking, confirm, join, cancel, closure, update) was done
       on it, by a person.
-- [ ] **Minor or major:** ADR 0108 is built (public images on `vX.Y.0`), both `-public` packages
+- [ ] **Minor or major:** ADR 0108 is built (public images on every release), both `-public` packages
       are set to *Public* by an organisation administrator after the first push, and the website
       deploy of ADR 0113 has its environment `website` (key, variables, TransIP AutoGit).
 - [ ] Settings that were added are in the ADRs' *Settings* sections; `docs/settings.md`,
@@ -54,10 +54,10 @@ copy the checklist into the release PR's conversation or an issue titled `Releas
 ## D. Tag and publish
 
 1. [ ] *Run workflow* with `step = tag`, `version = X.Y.Z`. Never "Draft a new release".
-2. [ ] Watch `main.yml` for the tag: tag check, ZAP, mutation, build, push, sign. For `vX.Y.0`:
-       anonymous pull of the public images, and the `deploy-site` job.
-3. [ ] The GitHub release has `sbom.cdx.json`, `sbom-proxy.cdx.json`, and for `vX.Y.0` the public
-       image references with `cosign verify` commands.
+2. [ ] Watch `main.yml` for the tag: tag check, ZAP, mutation, build, push, sign, anonymous pull
+       of the public images. For `vX.Y.0` also the `deploy-site` job.
+3. [ ] The GitHub release has `sbom.cdx.json`, `sbom-proxy.cdx.json`, and the public image
+       references with `cosign verify` commands.
 4. [ ] Delete the candidates of the released version (command in the runbook).
 
 ## E. After the tag

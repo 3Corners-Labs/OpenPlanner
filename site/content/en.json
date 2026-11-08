@@ -368,8 +368,8 @@
       {
         "key": "messaging",
         "name": "Webex Messaging",
-        "tag": "planned",
-        "text": "Planned: a bot tells administrators in Webex when the integration falters, a queue fills up or a check fails. Never personal data, always a link to the portal.",
+        "tag": "alerts",
+        "text": "A bot tells administrators in a Webex space, or by email, when the integration falters, a queue fills up or a check fails; when the contact center is down, a team falls back to OpenPlanner's own queue and its space gets a line per booking (first name and time, never the join link). Alerts never carry personal data, always a link to the portal.",
         "href": "https://github.com/3Corners-Labs/OpenPlanner/blob/main/docs/adr/0082-contact-center-verification-health-alerts-and-fallback.md",
         "link": "Technical background"
       },

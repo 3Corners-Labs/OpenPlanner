@@ -7,6 +7,8 @@ ADR 0108 (public images); sits beside ADR 0050 (the host installer) as a second 
 same signed images.
 Note (2026-11-05): ADR 0116 point 9 withdraws the channel level `minor` of point 11 in favour of
 the line pin `update_line`; the rest of point 11 stands.
+Note (2026-11-08): ADR 0116 point 10 (built in #612) makes the public package hold every
+release, patches included; point 9's "minor releases only" no longer holds.
 
 ## Context
 
