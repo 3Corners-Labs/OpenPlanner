@@ -28,6 +28,7 @@ from app.adapters.configuration_json import MEDIA_TYPE
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.configuration_view import (
     DOCUMENT_KEY,
+    block_home,
     document_block,
     plan_view,
 )
@@ -250,8 +251,7 @@ async def _apply(
             "needs_passphrase": False,
         }
         return await _render(request, locale, context, scope, PLAN_TEMPLATE, shown, 422)
-    home = document_block(request.app.state.settings, scope, can_seal=False).home
-    return redirect_done(home, "configuration_applied", len(result.plan.changes))
+    return redirect_done(block_home(scope), "configuration_applied", len(result.plan.changes))
 
 
 # --- rendering -------------------------------------------------------------------------

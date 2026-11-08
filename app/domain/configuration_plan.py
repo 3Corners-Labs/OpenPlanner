@@ -57,8 +57,9 @@ class Plan:
         refusals: Everything that stops the plan; it can only be applied when there is none.
         digest: The plan hash: SHA-256 over the document's digest and the settings version it
             was computed against, so an apply is refused when the configuration moved on.
-        sealed: Whether the document held sealed secrets (set by the service, which opens them),
-            so a caller knows to ask for the passphrase again at the apply.
+        sealed: Whether the document held sealed secrets, so a caller knows to ask for the
+            passphrase again at the apply. Set by ``ConfigurationDocumentService.plan`` only; the
+            plan inside an apply result leaves it ``False``.
     """
 
     changes: tuple[Change, ...]

@@ -137,11 +137,16 @@ class DocumentBlock:
     can_seal: bool
 
 
+def block_home(scope: Scope) -> str:
+    """Return the page the block of ``scope`` sits on."""
+    return PLATFORM_HOME if scope.is_platform else organisation_home(str(scope.organisation))
+
+
 def document_block(
     settings: Settings, scope: Scope, *, can_seal: bool, error: str | None = None
 ) -> DocumentBlock:
     """Return the block for ``scope``; the one place that tells the two scopes apart."""
-    home = PLATFORM_HOME if scope.is_platform else organisation_home(str(scope.organisation))
+    home = block_home(scope)
     return DocumentBlock(
         PLATFORM_PREFIX if scope.is_platform else home,
         home,

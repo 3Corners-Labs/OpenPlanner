@@ -243,3 +243,18 @@ async def test_an_organisation_admin_is_not_offered_the_secrets_they_may_not_exp
     assert 'name="secrets"' not in org
     assert 'name="passphrase_repeat"' not in org
     assert 'name="secrets"' in org_as_superuser
+
+
+async def test_an_organisation_admin_cannot_ask_for_secrets_with_a_crafted_post(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    response = await site.client.post(
+        f"{ORGANISATION}/export",
+        data={"secrets": "yes", "passphrase": PASSPHRASE, "passphrase_repeat": PASSPHRASE},
+        headers=SAME_ORIGIN,
+    )
+
+    assert response.status_code == 403
+    assert b"sealed" not in response.content

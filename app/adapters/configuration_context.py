@@ -75,7 +75,9 @@ def document_service(
         uow: Opens database transactions.
         clock: Current time.
         admin: Writes the audit events of an export.
-        settings: The effective settings, read on each use (the portal's follow the database).
+        settings: The effective settings: the limits and the rules are read on each use (the
+            portal's follow the database); the installation name, release and environment when
+            the service is built.
         discovery: Fetches the discovery document of a new or moved identity provider.
         locked: The settings the environment locks.
     """

@@ -1,5 +1,6 @@
 {#- The configuration document block (ADR 0099 point 13): export, and upload to plan. Expects
-    ``document`` (prefix of the form targets, error, min_length, max_mb, platform). The same
+    ``document`` (a ``DocumentBlock``: prefix of the form targets, home, error, min_length, max_mb,
+    platform, can_seal). The same
     block sits on the platform's Configuration package tab and on the organisation's tab. -#}
 {% from "_error_message.html" import error_message %}
 <section class="card" id="document" aria-labelledby="document-heading">
