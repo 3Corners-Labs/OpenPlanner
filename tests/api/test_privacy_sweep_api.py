@@ -31,6 +31,7 @@ SWEPT = frozenset(
         "POST /configuration/plan",
         "POST /configuration/apply",
         "PUT /configuration",
+        "PUT /configuration/package",
     }
 )
 """Every route of the agent API except the open ones (token, docs); a new one is added here."""
