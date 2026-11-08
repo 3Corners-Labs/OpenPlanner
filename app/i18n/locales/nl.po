@@ -9297,6 +9297,33 @@ msgstr "Gegevens wissen"
 msgid "admin.rights.sections"
 msgstr "Onderdelen van Mijn rechten"
 
+msgid "admin.settings.usage.title"
+msgstr "Gebruiksrapportage"
+
+msgid "admin.settings.usage.intro"
+msgstr "Elke wijziging van een boeking laat een klein feit zonder persoonsgegevens achter. De worker telt de feiten op in de uurcijfers die de rapporten lezen; loopt hij achter, dan tonen de rapporten oude cijfers."
+
+msgid "admin.settings.usage.pending"
+msgstr "Wachtende feiten"
+
+msgid "admin.settings.usage.last_run"
+msgstr "Laatst verwerkt"
+
+msgid "admin.settings.usage.never"
+msgstr "Nog niet"
+
+msgid "admin.settings.usage.chip"
+msgstr "Let op"
+
+msgid "admin.settings.usage.behind"
+msgstr "De gebruiksfeiten wachten al langer dan {minutes} minuten: de worker loopt achter of draait niet, en de rapporten tonen oudere cijfers."
+
+msgid "admin.settings.usage.unreadable"
+msgstr "De gebruiksgegevens konden niet uit de database worden gelezen."
+
+msgid "admin.settings.usage.off"
+msgstr "Gebruiksrapportage staat uit: er worden geen feiten vastgelegd."
+
 msgid "admin.settings.backups.title"
 msgstr "Back-ups van updates"
 
@@ -9371,6 +9398,15 @@ msgstr "Deze inlognaam is al in gebruik. Kies een andere."
 
 msgid "settings.field.reporting_enabled.label"
 msgstr "Gebruiksrapportages worden gevuld"
+
+msgid "settings.field.reporting_event_retention_days.label"
+msgstr "Gebruiksfeiten bewaard (dagen)"
+
+msgid "settings.field.reporting_retention_months.label"
+msgstr "Gebruikscijfers bewaard (maanden)"
+
+msgid "settings.field.reporting_rollup_interval_minutes.label"
+msgstr "Gebruik verwerken elke (minuten)"
 
 msgid "settings.field.overview_live_enabled.label"
 msgstr "Overzicht ververst zichzelf"

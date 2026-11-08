@@ -121,6 +121,9 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `AUDIT_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after which admin actions leave the audit log (ADR 0040). |
 | `BOOKING_ROW_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after the personal data of a booking was deleted before its row is merged into a daily count per group and removed (ADR 0102). |
 | `REPORTING_ENABLED` | bool | `true` | — | `settings.platform.manage` | Writes a usage fact for every booking state change, for the reports; off writes nothing and hides the report screens (ADR 0117). A feature switch, not a protection. |
+| `REPORTING_EVENT_RETENTION_DAYS` | int | `35` | 7–90 | `settings.platform.manage` | Days a usage fact stays as the outbox of the rollup and the source for a rebuild (ADR 0117). |
+| `REPORTING_RETENTION_MONTHS` | int | `25` | 13–60 | `settings.platform.manage` | Months the hourly usage rollup is kept; 25 gives two full years and the running one (ADR 0117). |
+| `REPORTING_ROLLUP_INTERVAL_MINUTES` | int | `15` | 5–240 | `settings.platform.manage` | Minutes between two rollups of usage facts into the hourly table; System status warns when the rollup is four times this behind (ADR 0117). |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |

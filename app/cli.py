@@ -22,6 +22,7 @@ Usage:
     ``python -m app.cli settings-doc``  print the settings reference (docs/settings.md)
     ``python -m app.cli logging-doc``  print the logging reference (docs/logging.md, ADR 0103)
     ``python -m app.cli reporting-doc``  print the metric catalogue (docs/reporting.md, ADR 0117)
+    ``python -m app.cli usage-backfill``  turn existing bookings into usage facts (ADR 0117 point 5)
     ``python -m app.cli init [--out PATH]``  generate the bootstrap keys (secrets/secrets.env)
 
 Host updater (ADR 0029; run inside the ``web`` container by ``scripts/updater``):
@@ -216,6 +217,7 @@ from app.domain.tls_check import TlsWatch
 from app.domain.update_policy import upgrade_stop
 from app.domain.update_service import UpdateService
 from app.domain.updates import OUTCOMES, REPORTED_STEPS, Version
+from app.domain.usage_backfill_service import UsageBackfill
 from app.i18n import Translator, load_catalogues
 from app.keys import client_pseudonym_key, management_token_key
 from app.web import navigation
@@ -648,6 +650,24 @@ async def _sessions_end_all(settings: Settings, reason: EndReason) -> str:
     finally:
         await engine.dispose()
     return f"ended {count} sessions ({reason.value})\n"
+
+
+async def _usage_backfill(settings: Settings) -> str:
+    """Turn the existing booking rows into usage facts (ADR 0117 point 5); one line of counts.
+
+    Safe to run again: a booking already done is not done twice. The worker runs it once by
+    itself after the upgrade; this is for a host that wants to see it done or run it again.
+    """
+    engine = create_engine(settings.database_url)
+    try:
+        run = await UsageBackfill(
+            SqlUnitOfWork(engine), SystemClock(), lambda: settings.reporting_enabled
+        ).run()
+    finally:
+        await engine.dispose()
+    if run.skipped:
+        return "usage-backfill: reporting is switched off (REPORTING_ENABLED); nothing done\n"
+    return f"usage-backfill: {run.bookings} bookings looked at, {run.facts} facts written\n"
 
 
 REKEY_DETAIL = "secrets.rekey"
@@ -1769,6 +1789,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("settings-doc", help="print the settings reference as Markdown")
     commands.add_parser("logging-doc", help="print the logging reference as Markdown")
     commands.add_parser("reporting-doc", help="print the reporting metric catalogue as Markdown")
+    commands.add_parser("usage-backfill", help="turn existing bookings into usage facts (ADR 0117)")
     init_cmd = commands.add_parser("init", help="generate the bootstrap keys (first install)")
     init_cmd.add_argument("--out", type=Path, default=DEFAULT_PATH, metavar="PATH")
     args = parser.parse_args(argv)
@@ -1824,6 +1845,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "logging-doc":
         sys.stdout.write(render_logging_doc())
+        return 0
+    if args.command == "usage-backfill":
+        sys.stdout.write(asyncio.run(_usage_backfill(Settings())))
         return 0
     if args.command == "reporting-doc":
         sys.stdout.write(render_reporting_doc())

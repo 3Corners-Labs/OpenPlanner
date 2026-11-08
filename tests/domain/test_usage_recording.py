@@ -13,8 +13,17 @@ from app.domain.errors import DomainError
 from app.domain.privacy import USAGE_FIELDS
 from app.domain.scheduling import DispatchKind
 from app.domain.services import BookingService
-from app.domain.usage import ActorClass, FactKind, StaffFact, UsageFact, UsageOutcome, hour_of
-from app.domain.usage_recording import LEAD_GRAIN_SECONDS, MOVE_REASON, coarse
+from app.domain.usage import (
+    LEAD_GRAIN_SECONDS,
+    MOVE_REASON,
+    ActorClass,
+    FactKind,
+    StaffFact,
+    UsageFact,
+    UsageOutcome,
+    coarse,
+    hour_of,
+)
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.closures import NOTICES
