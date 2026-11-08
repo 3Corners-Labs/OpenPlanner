@@ -1990,9 +1990,13 @@ class Transaction(Protocol):
         ...
 
     async def read_configuration(
-        self, now: datetime, locked_settings: frozenset[str]
+        self, now: datetime, locked_settings: frozenset[str], *, secrets: bool = True
     ) -> ConfigurationSnapshot:
-        """Return the configuration as a tree of the document's shape, with its usage facts."""
+        """Return the configuration as a tree of the document's shape, with its usage facts.
+
+        With ``secrets`` false no sealed value is opened, so an export without secrets cannot
+        fail on a value that cannot be opened here (a rotated key, a damaged row).
+        """
         ...
 
     async def apply_configuration(self, changes: Sequence[Change]) -> int:
