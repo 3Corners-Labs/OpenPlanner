@@ -569,10 +569,11 @@ async def test_the_wxcc_host_must_use_https(uow: InMemoryUnitOfWork, clock: Fixe
     assert caught.value.code is ErrorCode.SETTING_INVALID
 
 
-async def test_production_refuses_the_rc_channel_and_auto_apply(
+async def test_production_refuses_the_rc_channel_but_takes_auto_apply(
     uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    """ADR 0067: the portal cannot move a production installation onto candidates."""
+    """ADR 0067: the portal cannot move production onto candidates; ADR 0116 point 9 lets it
+    store auto-apply, which works there only with an update window."""
     production = SettingsService(
         uow,
         clock,
@@ -583,8 +584,10 @@ async def test_production_refuses_the_rc_channel_and_auto_apply(
     )
     with pytest.raises(DomainError, match="setting_invalid"):
         await production.change(SUPER, "update_channel", "rc")
+    await production.change(SUPER, "update_auto_apply", "true")
+    await production.change(SUPER, "update_window", "sun 03:00-05:00")
     with pytest.raises(DomainError, match="setting_invalid"):
-        await production.change(SUPER, "update_auto_apply", "true")
+        await production.change(SUPER, "update_window", "sunday night")
     await production.change(SUPER, "update_channel", "release")
 
     # Outside production both are ordinary class C changes.

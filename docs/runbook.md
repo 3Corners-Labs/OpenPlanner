@@ -1973,8 +1973,30 @@ in `updater.env` (default: the application image's name plus `-proxy`).
 
 | Request | Steps | When something fails |
 |---|---|---|
-| Update | pull `<image>:<version>` and, where the proxy runs, `<image>-proxy:<version>`, take their digests, `cosign verify` both (release tag of this repository), note the current digests and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digests, `up -d` (`web`, `worker` and `proxy`), wait up to `HEALTH_TIMEOUT` for `/readyz`, a healthy worker and a healthy proxy | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digests, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
+| Update | pull `<image>:<version>` and, where the proxy runs, `<image>-proxy:<version>`, take their digests, `cosign verify` both (release tag of this repository), check the upgrade path (the new image's `MIN_UPGRADE_FROM` against the version that last ran, ADR 0116), note the current digests and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digests, `up -d` (`web`, `worker` and `proxy`), wait up to `HEALTH_TIMEOUT` for `/readyz`, a healthy worker and a healthy proxy | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `upgrade_path_required`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digests, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
 | Restore previous version (≤ 24 h after an update) | switch maintenance on, back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digests (application and proxy), start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
+
+### Line, window and upgrade path (ADR 0116)
+
+- **Line** (`UPDATE_LINE`, Advanced settings, class C): `X.Y` offers only the patches of that
+  minor; empty offers everything on the channel. A customer on an extended or the previous
+  line sets it.
+- **Window** (`UPDATE_WINDOW`, class C): up to seven ranges such as `sun 03:00-05:00` in
+  `ADMIN_TIMEZONE`. With auto-apply on, the worker files a request only inside a range and the
+  updater claims a request the worker filed only inside one; a superuser's request is claimed
+  at once or from its *Apply after* moment. In production auto-apply works only with a window
+  (the portal stores it, it has no effect without one; `UPDATE_AUTO_APPLY` in the environment
+  without `UPDATE_WINDOW` stops the start). This is ring 2 of ADR 0116 point 12: a dedicated
+  installation updates itself in its own window.
+- **Upgrade path** (`MIN_UPGRADE_FROM`, baked into the image, default `1.0.0`): `web` runs
+  `python -m app.cli upgrade-path-check` before `alembic upgrade`, and the updater asks the
+  running version the same about the new image before it backs up. A database last run by a
+  version older than the stop is refused (`upgrade_path_required`, naming the stop): update to
+  the stop first, then on. Images before the stop know no stop, and an image from before the
+  check has no such command, which `web` lets pass.
+- **Support status**: the updates page shows the running line's status from `support.json` on
+  `main` (the release PR keeps it current; every release carries a copy signed with
+  `cosign sign-blob`).
 
 Before each step the updater reports it (`python -m app.cli update-progress ID STEP`: pulling,
 verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the end the outcome

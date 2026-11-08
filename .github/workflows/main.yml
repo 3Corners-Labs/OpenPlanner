@@ -260,7 +260,11 @@ jobs:
           IMAGE_REF: ${{ steps.image.outputs.name }}@${{ steps.publish.outputs.digest }}
           VERSION: ${{ steps.image.outputs.version }}
         run: scripts/upgrade-matrix.sh fixture "$IMAGE_REF" "$VERSION"
-      - name: attach the SBOMs and the upgrade fixture to the release
+      # ADR 0116 point 9: the support index the release was made with, signed keyless with the
+      # release's identity, so an offline installation can check it (step 7, the bundle).
+      - name: sign the support index
+        run: cosign sign-blob --yes --bundle support.json.sigstore.json support.json
+      - name: attach the SBOMs, the upgrade fixture and the support index to the release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.image.outputs.version }}
@@ -271,6 +275,7 @@ jobs:
           [ ! -s release-notes.md ] || notes=(--notes-file release-notes.md)
           gh release create "$GITHUB_REF_NAME" --latest="$LATEST" sbom.cdx.json sbom-proxy.cdx.json \
             "upgrade-fixture-$VERSION.sqlite" "upgrade-fixture-$VERSION.sqlite.sha256" \
+            support.json support.json.sigstore.json \
             --verify-tag --generate-notes "${notes[@]}"
 
   # ADR 0087 step 3: the recorded walkthrough, attached to every release.
