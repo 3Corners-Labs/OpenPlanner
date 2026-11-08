@@ -20,12 +20,8 @@ def migrated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
     return Settings(database_url=url, app_version="0.6.0", app_commit="abc1234")
 
 
-def _file(settings: Settings) -> Path:
-    return Path(settings.database_url.removeprefix("sqlite+aiosqlite:///"))
-
-
 async def _state(settings: Settings) -> FixtureState:
-    return await inspect_fixture(_file(settings), NOW + UPGRADE_CHECK_AHEAD)
+    return await inspect_fixture(settings.database_url, NOW + UPGRADE_CHECK_AHEAD)
 
 
 async def test_the_seed_writes_the_fixture_once(migrated: Settings) -> None:
@@ -82,7 +78,7 @@ def test_both_commands_run_from_the_command_line(
     monkeypatch.setenv("DATABASE_URL", url)
 
     assert main(["seed", "--upgrade-fixture", "--bookings", "4"]) == 0
-    assert main(["upgrade-check", url.removeprefix("sqlite+aiosqlite:///")]) == 0
+    assert main(["upgrade-check"]) == 0
 
     out = capsys.readouterr().out
     assert "upgrade fixture written (4 extra bookings)" in out

@@ -23,8 +23,11 @@ UPGRADE_BUDGET_SECONDS="${UPGRADE_BUDGET_SECONDS:-300}"
 LARGE_BOOKINGS="${LARGE_BOOKINGS:-100000}"
 PORT="${UPGRADE_PORT:-8011}"
 read -r -a PY <<<"${PYTHON:-uv run python}"
+# Development mode for this checkout's alembic, cli and app: a throwaway database, generated keys.
+export ENVIRONMENT=dev
+# The released image runs as this account, so it writes the work directory without opening it up.
+AS_ME=(--user "$(id -u):$(id -g)")
 work="$(mktemp -d "${TMPDIR:-/tmp}/upgrade-matrix.XXXXXX")"
-chmod 777 "$work"   # the released image runs as uid 10001 and writes the database
 trap 'docker rm -f upgrade-app >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
 
 alembic() { "${PY[@]}" -m alembic "$@"; }
@@ -44,7 +47,7 @@ wait_ready() {
 }
 
 start_checkout() {
-  ENVIRONMENT=dev "${PY[@]}" -m uvicorn app.main:create_app --factory --port "$PORT" \
+  "${PY[@]}" -m uvicorn app.main:create_app --factory --port "$PORT" \
     >"$work/uvicorn.log" 2>&1 &
   local pid=$!
   if ! wait_ready "this checkout"; then
@@ -58,10 +61,10 @@ start_checkout() {
 
 start_released() {
   local image="$1" name="$2"
-  docker run -d --name upgrade-app --read-only --tmpfs /tmp --cap-drop ALL \
+  docker run -d --name upgrade-app "${AS_ME[@]}" --read-only --tmpfs /tmp --cap-drop ALL \
     --security-opt no-new-privileges -e ENVIRONMENT=dev \
     -e "DATABASE_URL=sqlite+aiosqlite:////srv/data/$name" -v "$work:/srv/data" \
-    -p "$PORT:8000" "$image" >/dev/null
+    -p "127.0.0.1:$PORT:8000" "$image" >/dev/null
   if ! wait_ready "$image"; then
     docker logs upgrade-app >&2
     return 1
@@ -73,29 +76,28 @@ one() {
   local fixture="$1" image="${2:-}" name
   name="$(basename "$fixture")"
   cp "$fixture" "$work/$name"
-  chmod 666 "$work/$name"
   export DATABASE_URL="sqlite+aiosqlite:///$work/$name"
   echo "== $name"
-  cli upgrade-check "$work/$name" --save "$work/before.json"
+  cli upgrade-check --save "$work/before.json"
   local revision
   revision="$("${PY[@]}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["revision"])' "$work/before.json")"
   alembic upgrade head
-  cli upgrade-check "$work/$name" --compare "$work/before.json"
+  cli upgrade-check --compare "$work/before.json"
   start_checkout
   if [ -n "$image" ]; then
     alembic downgrade "$revision"
     start_released "$image" "$name"
     alembic upgrade head
-    cli upgrade-check "$work/$name" --compare "$work/before.json"
+    cli upgrade-check --compare "$work/before.json"
   fi
   unset DATABASE_URL
 }
 
 window() {
-  local repo="$1" tags tag version stop
-  stop="$("${PY[@]}" -c 'from app.config import Settings; print(getattr(Settings(), "min_upgrade_from", ""))' 2>/dev/null || true)"
+  local repo="$1" tags tag version
   gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -s 'add' >"$work/releases.json"
-  tags="$("${PY[@]}" -m scripts.upgrade_window ${stop:+--stop "$stop"} <"$work/releases.json")"
+  # The stop (MIN_UPGRADE_FROM, --stop) joins the window once ADR 0116 step 5 bakes it in.
+  tags="$("${PY[@]}" -m scripts.upgrade_window <"$work/releases.json")"
   if [ -z "$tags" ]; then
     echo "::notice::no release carries an upgrade fixture yet (ADR 0116 step 3); nothing to run"
     return 0
@@ -115,8 +117,7 @@ window() {
 seed_with() {
   local image="$1" name="$2" bookings="$3"
   : >"$work/$name"
-  chmod 666 "$work/$name"
-  local run=(docker run --rm --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges
+  local run=(docker run --rm "${AS_ME[@]}" --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges
     -v "$work:/srv/data" -e ENVIRONMENT=dev -e "DATABASE_URL=sqlite+aiosqlite:////srv/data/$name")
   # `|| return 1`: `budget` calls this inside `if`, where `set -e` does not apply.
   "${run[@]}" "$image" alembic upgrade head || return 1

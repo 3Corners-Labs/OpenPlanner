@@ -5,8 +5,8 @@ Usage:
     ``python -m app.cli seed-closures``  add the closure examples (e2e pages); not in production
     ``python -m app.cli seed --upgrade-fixture [--bookings N]``  fill a migrated, empty database
         with the generated data of the upgrade fixture (ADR 0116 point 7); not in production
-    ``python -m app.cli upgrade-check FILE [--save STATE] [--compare STATE]``  read the state of
-        a database file for the upgrade matrix; with ``--compare`` exit 1 on a broken invariant
+    ``python -m app.cli upgrade-check [--save STATE] [--compare STATE]``  read the state of the
+        database for the upgrade matrix; with ``--compare`` exit 1 on a broken invariant
     ``python -m app.cli authz-matrix``  print the authorisation matrix (docs/authorization.md)
     ``python -m app.cli admin-map``  print the admin structure (docs/admin-map.md, ADR 0047)
     ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
@@ -1610,7 +1610,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--bookings", type=int, default=0, help="extra generated bookings (duration budget)"
     )
     check_cmd = commands.add_parser("upgrade-check", help="state of a database for the matrix")
-    check_cmd.add_argument("file", type=Path, help="the SQLite file")
     check_cmd.add_argument("--save", type=Path, help="write the state as JSON")
     check_cmd.add_argument("--compare", type=Path, help="an earlier state; exit 1 on a finding")
     commands.add_parser("authz-matrix", help="print the authorisation matrix as Markdown")
@@ -1819,7 +1818,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "seed":
         return _write(asyncio.run(_seed_upgrade_fixture(Settings(), args.bookings)))
     if args.command == "upgrade-check":
-        state = asyncio.run(inspect_fixture(args.file, SystemClock().now() + UPGRADE_CHECK_AHEAD))
+        state = asyncio.run(
+            inspect_fixture(Settings().database_url, SystemClock().now() + UPGRADE_CHECK_AHEAD)
+        )
         return _write(_upgrade_check(state, args.save, args.compare))
     if args.command == "authz-matrix":
         sys.stdout.write(render_markdown(Translator(load_catalogues())))

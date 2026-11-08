@@ -21,10 +21,11 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import column, func, insert, inspect, select, table
-from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.engine import Connection, make_url
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+from sqlalchemy.sql.elements import ColumnElement
 
-from app.adapters.db.backup import backup_database
+from app.adapters.db.backup import backup_database, database_path
 from app.adapters.db.engine import create_engine
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.models import BookingRow, JobRow, SlotRow
@@ -46,12 +47,15 @@ from app.domain.booking import BookingStatus
 from app.domain.channels import ChannelKind
 from app.domain.identity_providers import ClientAuth, OrganisationProvider
 from app.domain.job_plan import JobType, PlannedJob
+from app.domain.platform_settings import usable
 from app.domain.ports import Transaction
 from app.domain.privacy import PURGED_FIELDS
-from app.domain.settings_registry import REGISTRY, Kind, SettingClass, lookup, within_bounds
+from app.domain.settings_registry import REGISTRY, Kind, SettingClass, lookup
 from app.domain.tokens import hash_token, new_token_salt
 from app.domain.updates import RunningVersion
 
+_ALEMBIC = "alembic_version"
+"""Alembic's own table: holds the revision, not counted with the data."""
 FIXTURE_PROVIDER_KEY = "fixture-idp"
 """Key of the organisation identity provider in the fixture (disabled, no secret)."""
 _BULK_BATCH = 2_000
@@ -77,7 +81,7 @@ class FixtureState:
         purged_with_data: Purged bookings that still hold a personal field (should be 0).
         pending_jobs: Jobs waiting for the worker.
         claimable_jobs: Of those, how many the worker's claim takes on a copy of the file.
-        settings_out_of_bounds: Stored class C and D keys the current code rejects.
+        settings_unusable: Stored class C and D keys the current code would not apply.
         settings_unknown: Stored keys the current code does not know (renamed or dropped).
     """
 
@@ -89,7 +93,7 @@ class FixtureState:
     purged_with_data: int
     pending_jobs: int
     claimable_jobs: int
-    settings_out_of_bounds: list[str] = field(default_factory=list)
+    settings_unusable: list[str] = field(default_factory=list)
     settings_unknown: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
@@ -271,7 +275,7 @@ def _bulk_start(base: datetime, n: int) -> datetime:
 
 
 async def _slot_ids(
-    connection: Any, group_id: int, base: datetime, numbers: range
+    connection: AsyncConnection, group_id: int, base: datetime, numbers: range
 ) -> dict[datetime, int]:
     """Return the ids of the generated slots of ``numbers`` by start."""
     starts = sorted({_bulk_start(base, n) for n in numbers})
@@ -313,30 +317,36 @@ def _bulk_booking(
     }
 
 
-async def inspect_fixture(path: Path, now: datetime) -> FixtureState:
-    """Read the state of the database file at ``path`` for the upgrade matrix.
+async def inspect_fixture(database_url: str, now: datetime) -> FixtureState:
+    """Read the state of the SQLite database at ``database_url`` for the upgrade matrix.
 
     The claim of pending jobs runs on a copy, so the file itself is not changed.
 
     Args:
-        path: The SQLite file.
+        database_url: ``DATABASE_URL`` of an existing SQLite file.
         now: The moment to claim at; pass a time after every job's ``run_at``.
+
+    Raises:
+        FileNotFoundError: The file does not exist (SQLite would create an empty one).
     """
-    engine = create_engine(_url(path))
+    path = database_path(database_url)
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    engine = create_engine(database_url)
     try:
         async with engine.connect() as connection:
-            names = await connection.run_sync(_tables)
-            rows = {name: await _count(connection, name) for name in names}
+            names = await connection.run_sync(_table_names)
+            rows = {name: await _count(connection, name) for name in names if name != _ALEMBIC}
             revision = (
-                await connection.scalar(select(table("alembic_version", column("version_num"))))
-                if "alembic_version" in await connection.run_sync(_all_tables)
+                await connection.scalar(select(table(_ALEMBIC, column("version_num"))))
+                if _ALEMBIC in names
                 else ""
             ) or ""
             privacy = await _privacy_counts(connection)
             pending = await connection.scalar(
                 select(func.count()).select_from(JobRow).where(JobRow.status == "pending")
             )
-        out_of_bounds, unknown = await _settings_findings(engine)
+        unusable, unknown = await _settings_findings(engine)
     finally:
         await engine.dispose()
     return FixtureState(
@@ -344,8 +354,8 @@ async def inspect_fixture(path: Path, now: datetime) -> FixtureState:
         rows=rows,
         **privacy,
         pending_jobs=int(pending or 0),
-        claimable_jobs=await _claimable(path, now),
-        settings_out_of_bounds=out_of_bounds,
+        claimable_jobs=await _claimable(database_url, now),
+        settings_unusable=unusable,
         settings_unknown=unknown,
     )
 
@@ -385,37 +395,29 @@ def _state_findings(state: FixtureState) -> list[str]:
         findings.append(
             f"{state.pending_jobs} pending jobs, but the worker claims {state.claimable_jobs}"
         )
-    findings += [f"setting {key} is outside its bounds" for key in state.settings_out_of_bounds]
+    findings += [
+        f"setting {key} holds a value the code would not apply" for key in state.settings_unusable
+    ]
     return findings
 
 
-def _url(path: Path) -> str:
-    """Return the database URL of an SQLite file."""
-    return f"sqlite+aiosqlite:///{path}"
-
-
-def _all_tables(connection: Connection) -> list[str]:
+def _table_names(connection: Connection) -> list[str]:
     """Return every table name of the database."""
     return sorted(inspect(connection).get_table_names())
 
 
-def _tables(connection: Connection) -> list[str]:
-    """Return the table names to count: all but Alembic's own."""
-    return [name for name in _all_tables(connection) if name != "alembic_version"]
-
-
-async def _count(connection: Any, name: str) -> int:
+async def _count(connection: AsyncConnection, name: str) -> int:
     """Return the number of rows of table ``name``."""
     return int(await connection.scalar(select(func.count()).select_from(table(name))) or 0)
 
 
-async def _privacy_counts(connection: Any) -> dict[str, int]:
+async def _privacy_counts(connection: AsyncConnection) -> dict[str, int]:
     """Count bookings by whether they are purged and whether they hold personal data."""
     live = BookingRow.pii_purged_at.is_(None)
     has_data = BookingRow.first_name.is_not(None) & BookingRow.email.is_not(None)
     any_data = func.coalesce(*(getattr(BookingRow, name) for name in PURGED_FIELDS))
 
-    async def count(*where: Any) -> int:
+    async def count(*where: ColumnElement[bool]) -> int:
         query = select(func.count()).select_from(BookingRow).where(*where)
         return int(await connection.scalar(query) or 0)
 
@@ -428,28 +430,31 @@ async def _privacy_counts(connection: Any) -> dict[str, int]:
 
 
 async def _settings_findings(engine: AsyncEngine) -> tuple[list[str], list[str]]:
-    """Return the stored settings keys outside their bounds and those the code does not know."""
+    """Return the stored settings keys the code would not apply, and those it does not know.
+
+    "Would not apply" is ``platform_settings.usable``, the rule the running code uses.
+    """
     uow = SqlUnitOfWork(engine)
     async with uow.read() as tx:
         stored = [await tx.platform_settings()]
         stored += list((await tx.organisation_settings()).values())
-    out_of_bounds: set[str] = set()
+    unusable: set[str] = set()
     unknown: set[str] = set()
     for values in stored:
         for key, value in values.items():
             spec = lookup(key)
             if spec is None:
                 unknown.add(key)
-            elif not within_bounds(spec, value):
-                out_of_bounds.add(key)
-    return sorted(out_of_bounds), sorted(unknown)
+            elif not usable(spec, value):
+                unusable.add(key)
+    return sorted(unusable), sorted(unknown)
 
 
-async def _claimable(path: Path, now: datetime) -> int:
-    """Claim every due job on a copy of ``path`` as the worker would; return how many."""
+async def _claimable(database_url: str, now: datetime) -> int:
+    """Claim every due job on a copy of the database as the worker would; return how many."""
     with tempfile.TemporaryDirectory() as directory:
-        copy = backup_database(path, Path(directory), "claim")
-        engine = create_engine(_url(copy))
+        copy = backup_database(database_path(database_url), Path(directory), "claim")
+        engine = create_engine(make_url(database_url).set(database=str(copy)).render_as_string())
         try:
             claimed = await SqlJobQueue(engine).claim_due(
                 now, list(JobType), list(ChannelKind), limit=1_000_000

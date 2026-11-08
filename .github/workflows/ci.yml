@@ -332,6 +332,8 @@ jobs:
   # Runs in the merge queue, and on a pull request that touches the schema or its adapter.
   upgrade-matrix:
     name: upgrade matrix (released fixtures)
+    # Not on a push to main: the merge queue ran it on that commit.
+    if: github.event_name != 'push'
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
@@ -359,8 +361,9 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - if: steps.scope.outputs.run == 'true'
         run: uv sync --locked
+      # A fork's pull request runs its own code here; it gets no login to the private images.
       - name: log in to the image registry
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && !github.event.pull_request.head.repo.fork
         env:
           GH_TOKEN: ${{ github.token }}
         run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
