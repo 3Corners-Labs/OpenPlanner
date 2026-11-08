@@ -30,7 +30,7 @@ None. The mark is product identity, not tunable per installation.
 |---|---|---|---|
 | 0 | ADR proposed; backlog section 1 | #130 | merged |
 | 1 | LG-1, LG-2, LG-3: brand files, `--op-brand-slot`, mark in the admin top bar, favicons, participant and email footer | #135 | merged |
-| 2 | LG-4: optional motion (`brand-motion.js`, CSS-only loader): inline mark (`_brand.html`), loop on the sign-in hand-off, settle on a confirmed booking and once per sign-in on the overview, island entry in `docs/islands.md` | #PRNUM | merged |
+| 2 | LG-4: optional motion (`brand-motion.js`, CSS-only loader): inline mark (`_brand.html`), loop on the sign-in hand-off, settle on a confirmed booking and once per sign-in on the overview, island entry in `docs/islands.md` | #611 | merged |
 
 ## Consequences
 

@@ -79,7 +79,7 @@ from the rows below.
 | 0057 | Rebooking assistant | PARTIAL | step 1 #129 (`domain/rebooking.py`) | Steps 2–4: held proposal, message, confirm and expiry, review page, automatic mode, `reschedule_*` settings |
 | 0058 | Fast PR lane, full queue lane | PARTIAL | #122, #124 | Decision 6 (cheaper matrix sweep); unsure: GitHub required check and the `ci:full` label |
 | 0059 | Release candidates, update channels | BUILT | #131, #132, #140 | Points 4 and 6 amended by ADR 0067 |
-| 0060 | Product logo | BUILT | #135 (LG-1 to LG-3), #PRNUM (LG-4 optional motion: `brand-motion.js`, CSS loop and settle) | – |
+| 0060 | Product logo | BUILT | #135 (LG-1 to LG-3), #611 (LG-4 optional motion: `brand-motion.js`, CSS loop and settle) | – |
 | 0061 | Live overview with widgets | BUILT | #141, #150, #153, #161; steps 3 and 4 (#449): `app/domain/alerts.py` (alert rules, open streaks, `AlertService`), `app/domain/queue_wait.py` (`queue.wait`), `app/admin/alerts.py` (banner on every admin page, close per streak), widget *Alerts* with level filter and chart, live widgets through `live-region.js`, `alert-popups.js`, `OVERVIEW_*` (C) and `QUEUE_WAIT_*` (D), migration 0089 | – (pop-ups only on the overview, the one page with the live script; the banner covers every other page) |
 | 0062 | Personal overview layout | SUPERSEDED by ADR 0096 | none; superseded by ADR 0096 (2026-11-01) | Nothing: the per-admin layout is ADR 0096 (its steps 2 and 3) |
 | 0063 | Personal data in the portal | BUILT | #143 | – |
