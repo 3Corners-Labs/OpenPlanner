@@ -1,9 +1,10 @@
 # Queue
 
 In a group with **OpenPlanner's own queue**, agents pick up video appointments on this screen
-instead of in the contact center. You open it from the group's **Queue** tab. Agents, group
-admins and organisation admins of the group can see it. A group that works with the contact
-center has no such tab.
+instead of in the contact center. You open it through **group → Agenda → Queue**. Agents, group
+admins and organisation admins of the group can see it; someone who may open only the queue
+lands here straight from the **Agenda** tab. A group that works with the contact center has no
+such part.
 
 ## What you see
 

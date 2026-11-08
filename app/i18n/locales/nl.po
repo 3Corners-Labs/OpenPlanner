@@ -9680,3 +9680,12 @@ msgstr "Doorgaan naar de inlogdienst"
 
 msgid "admin.alerts.text.check"
 msgstr "De controle van de koppeling van deze groep vond een probleem ({code}). Open de groep en kies Koppeling controleren voor de uitleg."
+
+msgid "admin.tab.planning"
+msgstr "Planning"
+
+msgid "admin.tab.group_messages"
+msgstr "Berichten"
+
+msgid "admin.group.subsections"
+msgstr "Onderdelen van dit tabblad"

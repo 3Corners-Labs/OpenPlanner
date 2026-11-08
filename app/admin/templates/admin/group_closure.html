@@ -51,7 +51,7 @@
     <h2 id="contacts-heading">{{ _("admin.contacts.title") }}</h2>
     <p class="card__lead">{% if own_contacts %}{{ _("admin.group_contacts.summary_own", count=contact_count) }}{% elif contact_count %}{{ _("admin.group_contacts.summary_default", count=contact_count) }}{% else %}{{ _("admin.contacts.empty") }}{% endif %}</p>
   </div>
-  <p><a href="/admin/groups/{{ summary.group.slug }}/closure/contacts">{{ _("admin.contacts.manage") }}</a></p>
+  <p><a href="/admin/groups/{{ summary.group.slug }}/contact">{{ _("admin.contacts.manage") }}</a></p>
 </section>
 <section class="card" aria-labelledby="suspended-heading">
   <div class="card__header">

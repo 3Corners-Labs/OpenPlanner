@@ -9668,3 +9668,12 @@ msgstr "Continue to the login service"
 
 msgid "admin.alerts.text.check"
 msgstr "The check of this group's integration found a problem ({code}). Open the group and choose Check integration for the explanation."
+
+msgid "admin.tab.planning"
+msgstr "Planning"
+
+msgid "admin.tab.group_messages"
+msgstr "Messages"
+
+msgid "admin.group.subsections"
+msgstr "Sections of this tab"

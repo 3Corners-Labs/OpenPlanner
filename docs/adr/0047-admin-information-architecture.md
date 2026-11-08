@@ -5,7 +5,8 @@ Status: accepted (2026-10-28), requested by the product owner. Builds on ADR 001
 (context-sensitive help and manual) and ADR 0042 (settings registry). Leaves the portal's logo
 open (see *Open points*). Partly built, checked on 2026-10-31: the register, the shell, the
 organisation page with its tabs, the groups list and the redirects of the old lists are built
-(*Build status* below); the six group tabs and the readiness checklist are not. See
+(*Build status* below), and so are the six group tabs with sub-tabs (step 4); the readiness
+checklist and the remaining lists are not. See
 `docs/adr-status.md` for what is built.
 Open point *Logo* closed by ADR 0060. Note (2026-11-01 review): §2's section table has drifted:
 *My rights* and *Rights matrix* are separate entries, top-level entries were added by ADR 0038
@@ -291,7 +292,7 @@ The readiness checklist (§5) uses existing data and adds no thresholds.
 | 1 | This ADR, review question 7 | #60 | merged |
 | 2 | Register and shell, `admin-map` | #62, #80 | merged |
 | 3 | Organisation page: six tabs, sub-tabs, `organisation.view`, the menu entries *Branding*, *Embedding*, *Organisation settings* and *Emergency closure* removed, 308 redirects of the old lists, *Holiday calendars* under Platform | #219 | merged |
-| 4 | Group page: six tabs with sub-tabs, contact into *Messages*, the check into *Settings* | | planned (the group still has ten tabs) |
+| 4 | Group page: six tabs with sub-tabs (*Agenda* › *Queue*, *Planning* › *Exceptions*, *Holidays*, *Messages* › *Texts*, *Contact*), contact moved to `/contact` with a 308 from the old path, the check a section of *Settings* | #PRNUM | merged |
 | 5 | Lists: *Groups* with search and organisation filter, path *Groups › organisation › group* | #219 | merged |
 | 5 | Lists: readiness checklist, active closures as a filter, lists for API clients and the audit log | | planned |
 | 6 | ADR 0042 registry `topic` and the settings test | | planned |
