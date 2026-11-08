@@ -9939,3 +9939,5 @@ msgstr "Standaardteksten"
 
 msgid "admin.list.search_active"
 msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
+msgid "settings.field.overview_max_widgets.label"
+msgstr "Meeste widgets op een eigen overzicht"
