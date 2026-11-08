@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.adapters.db.backup import backup_database, database_path
+from app.adapters.db.contact_center_rows import purge_columns
 from app.adapters.db.engine import create_engine
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.models import BookingRow, JobRow, SlotRow
@@ -49,7 +50,6 @@ from app.domain.identity_providers import ClientAuth, OrganisationProvider
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.platform_settings import usable
 from app.domain.ports import Transaction
-from app.domain.privacy import PURGED_FIELDS
 from app.domain.settings_registry import REGISTRY, Kind, SettingClass, lookup
 from app.domain.tokens import hash_token, new_token_salt
 from app.domain.updates import RunningVersion
@@ -415,7 +415,7 @@ async def _privacy_counts(connection: AsyncConnection) -> dict[str, int]:
     """Count bookings by whether they are purged and whether they hold personal data."""
     live = BookingRow.pii_purged_at.is_(None)
     has_data = BookingRow.first_name.is_not(None) & BookingRow.email.is_not(None)
-    any_data = func.coalesce(*(getattr(BookingRow, name) for name in PURGED_FIELDS))
+    any_data = func.coalesce(*purge_columns())
 
     async def count(*where: ColumnElement[bool]) -> int:
         query = select(func.count()).select_from(BookingRow).where(*where)

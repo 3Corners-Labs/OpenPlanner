@@ -112,6 +112,16 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     # ADR 0039: retention counts per organisation; no group admins, never personal data.
     "GET /admin/retention": {"/admin/retention": statuses(200, 200, 403, 200, 200, 403, 403)},
+    # ADR 0117: usage reports. reports.view for the superuser, organisation admin, group admin
+    # and auditor; the organisation's page adds up its groups, so a group admin has only the
+    # pages of the own groups; never the agent.
+    "GET /admin/reports": {"/admin/reports": statuses(200, 200, 200, 200, 200, 403, 403)},
+    "GET /admin/groups/{slug}/usage": {
+        "/admin/groups/demo/usage": statuses(200, 200, 200, 403, 200, 403, 403)
+    },
+    "GET /admin/organisations/{org}/usage": {
+        "/admin/organisations/demo/usage": statuses(200, 200, 403, 403, 200, 403, 403)
+    },
     # ADR 0042 §5, §11: System status and Advanced settings, read-only: superuser and auditor.
     "GET /admin/settings": {"/admin/settings": statuses(200, 403, 403, 403, 200, 403, 403)},
     # ADR 0101: the Settings sub-tab is read like the status; the package is the superuser's.

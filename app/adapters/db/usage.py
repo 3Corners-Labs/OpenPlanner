@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import UsageEventRow
+from app.adapters.db.types import plain
 from app.domain.usage import StaffFact, UsageFact
 
 log = structlog.get_logger()
@@ -35,7 +36,7 @@ class UsageQueries:
         """
         if not self._usage_enabled():
             return False
-        values = {name: _plain(value) for name, value in asdict(fact).items()}
+        values = {name: plain(value) for name, value in asdict(fact).items()}
         try:
             async with self._session.begin_nested():
                 self._session.add(UsageEventRow(**values))
@@ -44,8 +45,3 @@ class UsageQueries:
             log.warning("usage.fact_dropped", kind=fact.kind.value)
             return False
         return True
-
-
-def _plain(value: object) -> object:
-    """Return an enum member as its value, anything else as it is."""
-    return getattr(value, "value", value)

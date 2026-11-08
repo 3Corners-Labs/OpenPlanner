@@ -87,6 +87,12 @@ TOPICS = (
         Permission.ROLES_MANAGE,
     ),
     HelpTopic("retention", ("/admin/retention",), Permission.RETENTION_VIEW),
+    # ADR 0117: how the groups are used, as counts without personal data.
+    HelpTopic(
+        "reports",
+        ("/admin/reports", "/admin/organisations/{org}/usage", "/admin/groups/{slug}/usage"),
+        Permission.REPORTS_VIEW,
+    ),
     HelpTopic(
         "staff",
         ("/admin/staff", "/admin/staff/invite", "/admin/staff/{member_id}"),

@@ -353,7 +353,7 @@ class BookingService:
                 )
             )
             await tx.replace_jobs(_id(booking), plan_for_direct(start=now, end=end))
-            await record_placed(tx, booking, group, now)
+            await record_placed(tx, booking, group)
         return BookingReceipt(booking, token)
 
     async def find(self, management_token: str | PublicRef) -> BookingDetails:
@@ -723,7 +723,7 @@ class BookingService:
             else await self._booked_jobs(tx, group, booking, sms=sms)
         )
         await tx.replace_jobs(_id(booking), jobs)
-        await record_placed(tx, booking, group, now, moved=rescheduled_from is not None)
+        await record_placed(tx, booking, group, moved=rescheduled_from is not None)
         return BookingReceipt(booking, token)
 
     async def _booked_jobs(

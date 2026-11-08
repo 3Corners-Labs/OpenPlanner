@@ -1,0 +1,58 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_usage_tables.html" import cell, count_table with context %}
+{% block title %}{{ _("reports.usage.title") }} · {% if summary is defined %}{{ summary.group.name }}{% else %}{{ org_header.name }}{% endif %} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% if summary is defined %}{% include "admin/_group_header.html" %}{% else %}{% include "admin/_organisation_header.html" %}{% endif %}
+<section class="card" aria-labelledby="usage-heading">
+  <div class="card__header">
+    <h2 id="usage-heading">{{ _("reports.usage.heading") }}</h2>
+    <p class="card__lead">{{ _("reports.usage.lead") }}</p>
+  </div>
+  <form method="get" action="{{ base }}" class="filters">
+    <div class="field">
+      <label for="usage-from">{{ _("reports.usage.from") }}</label>
+      <input id="usage-from" name="from" type="date" value="{{ form_from }}">
+    </div>
+    <div class="field">
+      <label for="usage-to">{{ _("reports.usage.to") }}</label>
+      <input id="usage-to" name="to" type="date" value="{{ form_to }}">
+    </div>
+    <div class="form-actions"><button type="submit" class="button">{{ _("reports.usage.apply") }}</button></div>
+  </form>
+  <dl class="facts">
+    <div><dt>{{ _("reports.usage.as_of") }}</dt><dd>{% if as_of %}{{ as_of }}{% else %}{{ _("reports.usage.not_yet") }}{% endif %}</dd></div>
+    {% if summary is not defined %}<div><dt>{{ _("reports.usage.groups") }}</dt><dd>{{ usage.groups|map(attribute="name")|join(", ") }}</dd></div>{% endif %}
+  </dl>
+  <p class="muted">{{ _("reports.usage.rule", n=report.threshold) }}</p>
+</section>
+<section class="card" aria-labelledby="created-heading">
+  <h2 id="created-heading">{{ _("reports.created.title") }}</h2>
+  <div class="table-scroll" role="region" aria-labelledby="created-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("reports.created.title") }}</caption>
+    <thead><tr><th scope="col">{{ _("reports.created.day") }}</th><th scope="col">{{ _("reports.count") }}</th></tr></thead>
+    <tbody>
+      {% for row in report.days %}
+      <tr><th scope="row">{{ row.day.isoformat() }}{% if row.provisional %} <span class="chip">{{ _("reports.provisional") }}</span>{% endif %}</th><td>{{ cell(row.count, report.threshold) }}</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot><tr><th scope="row">{{ _("reports.total") }}</th><td>{{ cell(report.created_total, report.threshold) }}</td></tr></tfoot>
+  </table>
+  </div>
+</section>
+{{ count_table("outcomes", _("reports.outcomes.title"), _("reports.outcomes.outcome"), report.outcomes, "outcomes", report.threshold, _("reports.total")) }}
+{{ count_table("lead", _("reports.lead.title"), _("reports.lead.bucket"), report.lead_time, "buckets", report.threshold, _("reports.total")) }}
+{% if report.lead_mean_minutes is not none %}
+{% set m = report.lead_mean_minutes %}
+<p>{{ _("reports.lead.mean") }}: {% if m >= 2880 %}{{ _("reports.mean.days", n=m // 1440) }}{% elif m >= 120 %}{{ _("reports.mean.hours", n=m // 60) }}{% else %}{{ _("reports.mean.minutes", n=m) }}{% endif %}</p>
+{% endif %}
+{{ count_table("cancel", _("reports.cancel.title"), _("reports.cancel.left"), report.participant_cancellations, "buckets", report.threshold, _("reports.total")) }}
+{{ count_table("reschedule", _("reports.reschedule.title"), _("reports.reschedule.actor"), report.reschedules, "actors", report.threshold, _("reports.total")) }}
+{{ count_table("confirmation", _("reports.confirmation.title"), _("reports.confirmation.status"), report.confirmation, "confirmation", report.threshold, _("reports.total")) }}
+{% if report.conversion_percent is not none %}<p>{{ _("reports.confirmation.conversion", percent=report.conversion_percent) }}</p>{% endif %}
+{{ count_table("closure", _("reports.closure.title"), _("reports.closure.change"), report.closure, "closure", report.threshold, _("reports.total")) }}
+{% if report.before_reporting.rows|selectattr("count", "ne", none)|list %}
+{{ count_table("before", _("reports.before.title"), _("reports.before.status"), report.before_reporting, "statuses", report.threshold, _("reports.total")) }}
+<p class="muted">{{ _("reports.before.note") }}</p>
+{% endif %}
+{% endblock %}

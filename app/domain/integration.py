@@ -25,6 +25,7 @@ from app.domain.calls import (
     apply_event,
     new_status,
 )
+from app.domain.contact_center import ContactCenterKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobSummary
 from app.domain.ports import REASON_LIMIT, Clock, ProbeRegistry, Transaction, UnitOfWork
@@ -34,7 +35,7 @@ WEBHOOK_MEMORY = timedelta(days=30)
 """How long a Webex event key is remembered; older keys are forgotten on the next event."""
 
 WEBEX_SOURCE = "webex"
-WXCC_SOURCE = "wxcc"
+
 
 REQUEST_LIMIT = 100
 """How many of a booking's request events its page lists (the newest; ADR 0068)."""
@@ -158,8 +159,14 @@ class IntegrationService:
         detail: str = "",
         *,
         event_key: str = "",
+        provider: ContactCenterKind,
+        source: str,
     ) -> EventOutcome:
         """Record a work item event once per ``event_key``; ``UNKNOWN`` for foreign tasks.
+
+        The task is looked up at ``provider`` only (ADR 0032 point 6): a task id of one
+        platform never finds a booking whose task is at another. ``source`` is the platform's
+        code from its adapter, under which its event keys are remembered.
 
         A ``task:new`` of a booking's task is ``IGNORED``: the dispatch job recorded the
         creation when it got the id. An unknown task may be the group check's probe (ADR
@@ -167,11 +174,11 @@ class IntegrationService:
         event, a replayed or redelivered WxCC event is ``DUPLICATE`` (ADR 0082 point 5).
         """
         async with self._uow.locked() as tx:
-            booking = await tx.get_booking_by_task(task_id)
+            booking = await tx.get_booking_by_task(task_id, provider)
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED
-                if not await _claim(tx, WXCC_SOURCE, event_key, at):
+                if not await _claim(tx, source, event_key, at):
                     return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
                 return EventOutcome.RECORDED

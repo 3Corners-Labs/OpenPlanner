@@ -1504,6 +1504,12 @@ msgstr "Webex host (email address)"
 msgid "admin.field.video_host_email_hint"
 msgstr "Licensed account the meetings are scheduled on. {Agents} with an organisation account become cohost."
 
+msgid "admin.field.contact_center"
+msgstr "Contact center routing"
+
+msgid "admin.contact_center.webex_cc"
+msgstr "Webex Contact Center"
+
 msgid "admin.field.wxcc_business_address"
 msgstr "WxCC business address"
 
@@ -8823,6 +8829,33 @@ msgstr "The package is larger than the largest configuration package allowed."
 msgid "admin.form.error.configuration_installation_in_use"
 msgstr "This installation is in use: it has bookings, slots or an active closure. A package can only be imported into a new installation."
 
+msgid "admin.form.error.configuration_format_unsupported"
+msgstr "This configuration document uses a format this version of OpenPlanner does not know."
+
+msgid "admin.form.error.configuration_unknown_field"
+msgstr "The document contains a field that does not exist. Check the name at the path shown."
+
+msgid "admin.form.error.configuration_object_exists"
+msgstr "This object already exists, while the document asks to create it."
+
+msgid "admin.form.error.configuration_object_missing"
+msgstr "This object does not exist, while the document asks to change it."
+
+msgid "admin.form.error.configuration_out_of_scope"
+msgstr "The document names something outside the organisation it applies to."
+
+msgid "admin.form.error.configuration_object_in_use"
+msgstr "This object is still used by bookings, slots or an active closure and cannot be deleted."
+
+msgid "admin.form.error.scenario_name_taken"
+msgstr "A scenario with this name already exists. Choose another name."
+
+msgid "admin.form.error.alert_target_taken"
+msgstr "This alert target already exists."
+
+msgid "admin.form.error.configuration_capacity_below_booked"
+msgstr "The capacity is lower than the number of places already booked."
+
 msgid "admin.settings.package.title"
 msgstr "Configuration package"
 
@@ -9278,6 +9311,33 @@ msgstr "Erase data"
 msgid "admin.rights.sections"
 msgstr "Parts of My rights"
 
+msgid "admin.settings.usage.title"
+msgstr "Usage reporting"
+
+msgid "admin.settings.usage.intro"
+msgstr "Every booking change leaves a small fact without personal data. The worker adds the facts to the hourly figures the reports read; if it falls behind, the reports show old figures."
+
+msgid "admin.settings.usage.pending"
+msgstr "Facts waiting"
+
+msgid "admin.settings.usage.last_run"
+msgstr "Last rolled up"
+
+msgid "admin.settings.usage.never"
+msgstr "Not yet"
+
+msgid "admin.settings.usage.chip"
+msgstr "Warning"
+
+msgid "admin.settings.usage.behind"
+msgstr "The usage facts have waited longer than {minutes} minutes: the worker is behind or not running, and the reports show older figures."
+
+msgid "admin.settings.usage.unreadable"
+msgstr "The usage figures could not be read from the database."
+
+msgid "admin.settings.usage.off"
+msgstr "Usage reporting is switched off: no facts are written."
+
 msgid "admin.settings.backups.title"
 msgstr "Update back-ups"
 
@@ -9352,6 +9412,15 @@ msgstr "This user name is already in use. Choose another."
 
 msgid "settings.field.reporting_enabled.label"
 msgstr "Usage reports are fed"
+
+msgid "settings.field.reporting_event_retention_days.label"
+msgstr "Usage facts kept (days)"
+
+msgid "settings.field.reporting_retention_months.label"
+msgstr "Usage figures kept (months)"
+
+msgid "settings.field.reporting_rollup_interval_minutes.label"
+msgstr "Usage rollup every (minutes)"
 
 msgid "settings.field.overview_live_enabled.label"
 msgstr "Overview refreshes itself"
@@ -10329,3 +10398,246 @@ msgstr "{time}: {first_name} is in the queue. {link}"
 
 msgid "admin.form.error.fallback_space_room_id"
 msgstr "Enter the id of a Webex space: letters, digits, - and _, 10 to 200 characters."
+
+msgid "authz.permission.reports_view"
+msgstr "View usage reports"
+
+msgid "settings.field.reporting_min_cell_size.label"
+msgstr "Smallest count a report shows"
+
+msgid "settings.field.reporting_org_min_cell_size.label"
+msgstr "Smallest count in the organisation's reports"
+
+msgid "admin.nav.reports"
+msgstr "Reports"
+
+msgid "admin.tab.usage"
+msgstr "Usage"
+
+msgid "reports.list.title"
+msgstr "Reports"
+
+msgid "reports.list.intro"
+msgstr "How the groups you may see are used: bookings created in the last four weeks. Open a group for the full figures."
+
+msgid "reports.list.group"
+msgstr "Group"
+
+msgid "reports.list.created"
+msgstr "Bookings created (28 days)"
+
+msgid "reports.list.open"
+msgstr "Open usage"
+
+msgid "reports.list.empty"
+msgstr "There is no group you may see reports for."
+
+msgid "reports.list.rule"
+msgstr "A count below the minimum is hidden; there is no total across groups."
+
+msgid "reports.usage.title"
+msgstr "Usage"
+
+msgid "reports.usage.heading"
+msgstr "Usage"
+
+msgid "reports.usage.lead"
+msgstr "Counts only, no personal data. Days are whole days in the group's own time zone."
+
+msgid "reports.usage.from"
+msgstr "From"
+
+msgid "reports.usage.to"
+msgstr "To"
+
+msgid "reports.usage.apply"
+msgstr "Show"
+
+msgid "reports.usage.as_of"
+msgstr "Figures as of"
+
+msgid "reports.usage.not_yet"
+msgstr "Not rolled up yet"
+
+msgid "reports.usage.groups"
+msgstr "Groups included"
+
+msgid "reports.usage.rule"
+msgstr "A count below {n} is hidden and written as < {n}. A total is hidden too when it would give a hidden count back."
+
+msgid "reports.hidden"
+msgstr "< {n}"
+
+msgid "reports.count"
+msgstr "Count"
+
+msgid "reports.total"
+msgstr "Total"
+
+msgid "reports.provisional"
+msgstr "provisional"
+
+msgid "reports.created.title"
+msgstr "Bookings created per day"
+
+msgid "reports.created.day"
+msgstr "Day"
+
+msgid "reports.outcomes.title"
+msgstr "How bookings ended"
+
+msgid "reports.outcomes.outcome"
+msgstr "Outcome"
+
+msgid "reports.lead.title"
+msgstr "How far ahead bookings are made"
+
+msgid "reports.lead.bucket"
+msgstr "Time before the appointment"
+
+msgid "reports.lead.mean"
+msgstr "Mean lead time"
+
+msgid "reports.mean.minutes"
+msgstr "{n} min"
+
+msgid "reports.mean.hours"
+msgstr "{n} h"
+
+msgid "reports.mean.days"
+msgstr "{n} days"
+
+msgid "reports.cancel.title"
+msgstr "Cancellations by participants"
+
+msgid "reports.cancel.left"
+msgstr "Time left before the appointment"
+
+msgid "reports.reschedule.title"
+msgstr "Rescheduled bookings"
+
+msgid "reports.reschedule.actor"
+msgstr "Moved by"
+
+msgid "reports.confirmation.title"
+msgstr "Confirmation by email"
+
+msgid "reports.confirmation.status"
+msgstr "Result"
+
+msgid "reports.confirmation.conversion"
+msgstr "{percent}% of the bookings that needed confirmation were confirmed."
+
+msgid "reports.closure.title"
+msgstr "Emergency closures"
+
+msgid "reports.closure.change"
+msgstr "Change"
+
+msgid "reports.before.title"
+msgstr "Bookings from before reporting"
+
+msgid "reports.before.status"
+msgstr "Status"
+
+msgid "reports.before.note"
+msgstr "These counts come from bookings that were merged into daily counts before usage reporting started; nothing more is known about them."
+
+msgid "reports.outcome.completed"
+msgstr "Completed"
+
+msgid "reports.outcome.no_show"
+msgstr "No show"
+
+msgid "reports.outcome.cancelled_by_participant"
+msgstr "Cancelled by the participant"
+
+msgid "reports.outcome.cancelled_by_planner"
+msgstr "Cancelled by the planner"
+
+msgid "reports.outcome.cancelled_by_closure"
+msgstr "Cancelled after a closure"
+
+msgid "reports.outcome.cancelled_by_system"
+msgstr "Cancelled by the system"
+
+msgid "reports.outcome.expired_unconfirmed"
+msgstr "Not confirmed in time"
+
+msgid "reports.actor.participant"
+msgstr "Participant"
+
+msgid "reports.actor.planner"
+msgstr "Planner"
+
+msgid "reports.actor.closure"
+msgstr "Closure"
+
+msgid "reports.actor.system"
+msgstr "System"
+
+msgid "reports.actor.unknown"
+msgstr "Not known"
+
+msgid "reports.bucket.0"
+msgstr "Under 1 minute"
+
+msgid "reports.bucket.1"
+msgstr "1 to 5 minutes"
+
+msgid "reports.bucket.2"
+msgstr "5 to 15 minutes"
+
+msgid "reports.bucket.3"
+msgstr "15 to 30 minutes"
+
+msgid "reports.bucket.4"
+msgstr "30 to 60 minutes"
+
+msgid "reports.bucket.5"
+msgstr "1 to 2 hours"
+
+msgid "reports.bucket.6"
+msgstr "2 to 6 hours"
+
+msgid "reports.bucket.7"
+msgstr "6 to 24 hours"
+
+msgid "reports.bucket.8"
+msgstr "1 to 7 days"
+
+msgid "reports.bucket.9"
+msgstr "Over 7 days"
+
+msgid "reports.confirmation.confirmed"
+msgstr "Confirmed"
+
+msgid "reports.confirmation.expired"
+msgstr "Not confirmed in time"
+
+msgid "reports.closure.suspended"
+msgstr "Put on hold"
+
+msgid "reports.closure.resumed"
+msgstr "Confirmed again"
+
+msgid "reports.status.confirmed"
+msgstr "Confirmed"
+
+msgid "reports.status.cancelled"
+msgstr "Cancelled"
+
+msgid "reports.status.completed"
+msgstr "Completed"
+
+msgid "reports.status.no_show"
+msgstr "No show"
+
+msgid "reports.status.suspended"
+msgstr "On hold"
+
+msgid "reports.status.awaiting_rebook"
+msgstr "Waiting for a new time"
+
+msgid "reports.status.pending_confirmation"
+msgstr "Waiting for confirmation"

@@ -1,9 +1,13 @@
 # 0099. Configuration as a JSON document, with a plan and per-object actions
 
-Status: proposed (2026-11-01), requested by the product owner. Not built. Supersedes ADR 0089
-points 1 (the package is a SQLite file) and 5 (import only into an installation not in use)
-once step 4 is built; ADR 0089 points 2–4 and 6–8 carry over as amended below. Extends ADR
-0008 (secrets at rest), ADR 0014 (authorisation) and ADR 0042 (settings classes).
+Status: accepted (2026-11-08), build ordered by the product owner in the conversation of
+2026-11-08 ("je mag alle stappen bouwen, testen, mergen en fixen", with `po:approved` for the
+pull requests). Partly built: step 1 (the domain: format `v1`, strict reading, planner, rules,
+natural keys) is built; steps 2 to 5 are not; see *Build status*. Supersedes ADR 0089 points 1
+(the package is a SQLite file) and 5 (import only into an installation not in use) once step 4
+is built; ADR 0089 points 2–4 and 6–8 carry over as amended below. Extends ADR 0008 (secrets at
+rest), ADR 0014 (authorisation) and ADR 0042 (settings classes). Amended by the section
+*Amendments from building step 1* below.
 
 ## Context
 
@@ -147,6 +151,91 @@ control over create, update and delete, on a fresh installation and on one in us
     to a `replace` document in the platform scope, and is then removed with ADR 0089 step 5
     dropped. A package exported before this ADR keeps working within that one release.
 
+## Amendments from building step 1 (2026-11-08)
+
+Building the domain against the code as it is on `main` showed these points; each replaces or
+completes the numbered point it names.
+
+- **Point 3, the shape of the tree.** The platform section is `platform`; its settings,
+  secrets, log destinations, roles, holiday calendars (with `days`) and alert targets are maps
+  or lists as the format registry declares (`app/domain/configuration_v1*.py`, the one home of
+  the format). Texts and settings are maps (`{"nl": {"key": "text"}}`, `{"key": value}`),
+  `null` in a map removes the entry (ADR 0042: back to the default). Form fields, schedule
+  rules, overrides and reminder rules are lists on the group, replaced as a whole when named;
+  a form field the list leaves out is *retired*, never deleted (ADR 0055). Closure scenarios sit
+  on the organisation or the group they belong to, each with at most one `image`; alert targets
+  (ADR 0082, a table that did not exist when this ADR was written) sit on the platform and on
+  every organisation, keyed by kind and address. Identity-provider domains
+  (`identity_provider_domains`, ADR 0083) are a list of domains on the provider; their token
+  and verification state are *not* in a document: a domain applied from a document starts
+  `pending` on the installation that applies it, because a verification proved to another
+  installation proves nothing here.
+- **Point 2, natural keys.** Only two tables lacked one: closure scenarios (the name within the
+  organisation or the group) and alert targets (kind and address within the platform or the
+  organisation). Migration 0099 adds partial unique indexes; existing duplicates are made
+  distinct first (a scenario gets ` (2)`, ` (3)`; a repeated alert target is deleted, it only
+  repeated an address). `ScenarioService` and `AlertTargetService` refuse a duplicate with
+  `scenario_name_taken` and `alert_target_taken`. Fonts, logos and images have their keys
+  already (organisation and role; organisation; the scenario).
+- **Point 4, actions.** `delete` of an object that is not there is no change (a plan is
+  repeatable). A document may not name children of an object it deletes.
+- **Point 6, order.** A plan lists writes first, parents before children, then deletions in the
+  order found; references from surviving objects (an API client's groups) are thereby released
+  before the object they name is deleted. Creating an object whose natural key the same plan
+  deletes elsewhere is refused (`slug_taken`): do it in two applies.
+- **Point 7, integrity.** The rule *removing the last enabled login* is dropped: the platform's
+  own provider (from the environment, ADR 0083) always remains, so there is nothing to refuse,
+  and the claim mapping, the one thing that can lock people out, is not changed by a document
+  (settings of the topic *login mapping* are not editable, as in the portal). The rule *capacity
+  below booked* is stricter than the portal, which never refuses a lower capacity (it shows a
+  shortfall, ADR 0044): a document is refused when the schedule it would leave gives a future
+  slot fewer places than are booked *and* fewer than the schedule now gives (it creates or
+  worsens a shortfall). A new group may be created archived and an archived group is read-only,
+  as in the portal (`group_archived`); un-archiving is refused.
+- **Point 8, secrets.** The adapter opens a document's sealed values before planning; the
+  planner holds them as `Secret` (never printed, compared by a keyed digest, so an unchanged
+  secret is no change). A new API client must carry its sealed `secret_hash`; a client's secret
+  is issued once by the portal, never by a document. An identity provider's `issuer` is not in
+  the document: the adapter fetches the discovery document when it creates a provider or
+  changes its discovery address (as the portal does) and not while holding the write lock.
+- **Settings in a document.** Only settings the portal edits (`editable`) and, for
+  `log_level`, none (it is temporary by design). A setting the environment locks cannot be
+  changed by a document either (`setting_locked`).
+
+- **Claim values.** The claim mapping is not changed by a document, but an organisation's or
+  group's `idp_key` and a custom role's `claim_value` are: they decide who matches an
+  entitlement. The plan screen (step 3) shows, as the portal does, how many people lose access
+  until the identity provider sends the new value.
+- **Personal data in a document.** A document holds no participant data, but it does hold
+  business addresses (a group's video host and invitation address, alert targets, contact
+  blocks). An alert target's address is its natural key, so the audit detail of an applied
+  change (point 12) names such a target by kind and ordinal, never by address.
+- **The plan hash** covers the document, the settings version *and* the list of changes
+  (action, kind, address, field names), because a change to a group or an organisation does not
+  move the settings version: an apply whose recomputed plan differs from the reviewed one is
+  refused (`configuration_plan_stale`).
+- **Dropped from the portal's behaviour.** A document deletes groups and organisations the
+  portal only archives or refuses; the in-use rule (any booking row, slot, closure, shortfall
+  acceptance or API-client reference) is what keeps data safe, so the adapter must define "in
+  use" exactly as the group eraser does. A deleted group's slug is released.
+
+## Requirements for steps 2 to 4 (from the step 1 review)
+
+- Step 2 builds `RuleContext` and `Usage` from the real installation and tests that it does;
+  none of their defaults may stand in for a missing fact. It caps the decoded size, refuses
+  duplicate keys, NaN and infinity, and deep nesting; it pins the scrypt parameters and does not
+  take them from the document's `seal` header; it binds each sealed value to its object and
+  field; it fetches discovery documents through the SSRF guard, outside the write lock, and
+  reads the plan inputs again after taking the lock.
+- Steps 3 and 4 pin a document's scope to the route's scope (platform route: platform; an
+  organisation route: that organisation; the agent API as ADR 0089 point 7) and require a recent
+  login wherever the portal does for the changed kind (a `fresh` attribute on the kind, checked
+  against the portal's routes by a test), not only for deletions and secrets.
+- Export leaves out what the actor may not view; the registry gains a view permission per kind
+  when step 2 builds the export.
+- Webex service-app tokens rotate: applying them on a second installation invalidates the
+  first's copy, so the export says so and the plan shows it.
+
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
@@ -165,7 +254,7 @@ portal); the requirement of a plan hash for deletions in the portal.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #345 | merged |
-| 1 | Domain: document types `v1`, natural keys (with the unique constraints and migration for the tables without one), planner with actions, mode, scope and the integrity rules; tests per aggregate | | planned |
+| 1 | Domain: format `v1` (registry of kinds, strict reading and writing), natural keys (migration 0099 for closure scenarios and alert targets), planner with actions, mode, scope, per-change rights and the integrity rules; tests per aggregate | #618 | merged |
 | 2 | Adapter: export with and without secrets, plan and apply in one transaction, sealed values with associated data, inline binaries; `config export\|plan\|apply` on the host; `config-schema` and `docs/configuration-schema/v1.json`; setting `configuration_apply_max_changes` | | planned |
 | 3 | Portal: *Configuration* on *Advanced settings* (upload → plan table → apply) and the organisation sub-tab *Configuration*; per-change permission checks; manual topics nl/en | | planned |
 | 4 | API `plan`/`apply`, `PUT` mapped to apply; installer applies a document; SQLite export removed, SQLite import converted for one release; `docs/agent-api.md`, `docs/install.md` | | planned |

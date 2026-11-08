@@ -127,7 +127,9 @@ async def test_a_token_cancels_only_its_own_call() -> None:
     assert uow.state.bookings[mine.booking.id or 0].status is BookingStatus.CANCELLED
     assert uow.state.bookings[theirs.booking.id or 0].status is BookingStatus.CONFIRMED
     assert uow.state.booking_events.get(theirs.booking.id or 0) is None
-    assert JobType.DISPATCH_WXCC_TASK in [j.type for j in uow.state.jobs[theirs.booking.id or 0]]
+    assert JobType.DISPATCH_CONTACT_CENTER_TASK in [
+        j.type for j in uow.state.jobs[theirs.booking.id or 0]
+    ]
 
 
 async def test_a_scheduled_booking_cannot_be_left_this_way() -> None:

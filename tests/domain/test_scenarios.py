@@ -286,3 +286,20 @@ async def test_closing_the_organisation_uses_one_organisation_scenario_for_every
     other = (await closures.overview(ORG_ADMIN, "demo-twee")).closure
     assert other is not None
     assert other.image == image.ref(TEXT)
+
+
+async def test_a_scenario_name_is_taken_within_its_owner_only(scenarios: ScenarioService) -> None:
+    await scenarios.save(ORG_ADMIN, ORGANISATION, OUTAGE)
+    first = await scenarios.save(ORG_ADMIN, GROUP, OUTAGE)  # a group may reuse the name
+
+    with pytest.raises(DomainError) as refused:
+        await scenarios.save(ORG_ADMIN, ORGANISATION, ScenarioInput(" Storing ", NOTICES))
+    other = await scenarios.save(ORG_ADMIN, GROUP, STRIKE)
+    with pytest.raises(DomainError) as renamed:
+        await scenarios.save(ORG_ADMIN, GROUP, ScenarioInput("Storing", NOTICES), other.id)
+
+    assert refused.value.code is ErrorCode.SCENARIO_NAME_TAKEN
+    assert refused.value.field == "scenario_name"
+    assert renamed.value.code is ErrorCode.SCENARIO_NAME_TAKEN
+    # saving a scenario under its own name is not a clash
+    await scenarios.save(ORG_ADMIN, GROUP, OUTAGE, first.id)

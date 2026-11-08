@@ -16,6 +16,7 @@ from app.domain.connection_health import (
     InboundEvent,
     Platform,
 )
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.integration_health import (
     IntegrationHealthService,
@@ -26,7 +27,7 @@ from app.domain.ports import IntegrationError
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.security_log import TOKEN_REFRESH_FAILED
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeDispatcher
+from tests.fakes.integrations import FakeDispatcher, webex_cc
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.closures import confirmed_booking, three_groups
 from tests.support.domain import SLOT_0900
@@ -144,7 +145,8 @@ async def test_the_last_inbound_event_is_kept_per_platform(uow: InMemoryUnitOfWo
 
 def with_task(uow: InMemoryUnitOfWork, task: TaskState, booking_id: int = 10) -> None:
     uow.state.bookings[booking_id] = confirmed_booking(
-        id=booking_id, wxcc_task_id=f"t-{booking_id}"
+        id=booking_id,
+        contact_center_task=ContactCenterTaskRef(f"t-{booking_id}", ContactCenterKind.WEBEX_CC),
     )
     uow.state.call_status[booking_id] = CallStatus(
         booking_id, task=task, task_created_at=SLOT_0900 - timedelta(minutes=5)
@@ -168,7 +170,7 @@ def reconciler(
     run = TaskReconciler(
         uow,
         clock or FixedClock(NOW),
-        dispatcher,
+        webex_cc(dispatcher) if dispatcher else {},
         recorder,
         timedelta(minutes=10),  # type: ignore[arg-type]
     )

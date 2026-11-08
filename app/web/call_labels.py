@@ -117,7 +117,7 @@ JOB_LABELS: dict[JobType, str] = {
     JobType.SEND_CHANGE: "audit.job.send_change",
     JobType.SEND_REMINDER: "audit.job.send_reminder",
     JobType.SEND_CANCELLATION: "audit.job.send_cancellation",
-    JobType.DISPATCH_WXCC_TASK: "audit.job.dispatch_wxcc_task",
+    JobType.DISPATCH_CONTACT_CENTER_TASK: "audit.job.dispatch_wxcc_task",
     JobType.END_WXCC_TASK: "audit.job.end_wxcc_task",
     JobType.PURGE_PII: "audit.job.purge_pii",
     JobType.SEND_SUSPENSION: "audit.job.send_suspension",

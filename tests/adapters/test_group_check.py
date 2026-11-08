@@ -25,7 +25,7 @@ from app.domain.scheduling import JoinClient
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeProbes
 from tests.fakes.tokens import webex_client
-from tests.support.domain import make_group
+from tests.support.domain import make_group, webex_routing
 from tests.support.wxcc_config import FLOW_DOC, recorded_config
 
 BASE = "https://op.example.nl"
@@ -43,8 +43,7 @@ GROUP = make_group(
     slug="aangifte",
     name="Aangifte",
     video_host_email=HOST,
-    wxcc_channel="videoafspraak-prototype",
-    wxcc_business_address="videoafspraak@example.video",
+    contact_center=webex_routing("videoafspraak@example.video", "videoafspraak-prototype"),
 )
 
 
@@ -269,7 +268,7 @@ async def test_a_refused_probe_fails_with_webexs_reason(status: int, code: str) 
 
 @pytest.mark.usefixtures("wxcc_ok")
 async def test_without_host_or_wxcc_mapping_the_check_warns() -> None:
-    bare = replace(GROUP, video_host_email=None, wxcc_channel=None, wxcc_business_address=None)
+    bare = replace(GROUP, video_host_email=None, contact_center=None)
 
     codes = _codes(await _checker(Platforms()).check_group(bare, [bare]))
 
@@ -341,7 +340,14 @@ async def test_a_base_url_without_https_stops_the_webhook_checks() -> None:
 
 @pytest.mark.usefixtures("wxcc_ok")
 async def test_groups_sharing_an_asset_are_named_only_from_the_peers_given() -> None:
-    twin = replace(GROUP, id=2, slug="vergunning", wxcc_routing_value="vergunning")
+    twin = replace(
+        GROUP,
+        id=2,
+        slug="vergunning",
+        contact_center=webex_routing(
+            "videoafspraak@example.video", "videoafspraak-prototype", "vergunning"
+        ),
+    )
 
     findings = await _checker(Platforms()).check_group(GROUP, [GROUP, twin])
     shared = [f for f in findings if f.code == "wxcc.routing.shared"]
@@ -618,11 +624,8 @@ async def test_the_probe_work_item_is_a_bookings_work_item_without_a_participant
     assert item.first_name == "Probe"
     assert item.reference.startswith("probe-")
     assert item.meeting_link == "https://w.example/j"  # the probe meeting's link
-    assert (item.business_address, item.channel, item.routing_value) == (
-        GROUP.wxcc_business_address,
-        GROUP.wxcc_channel,
-        "aangifte",
-    )
+    assert item.routing == GROUP.contact_center
+    assert item.routing_value == "aangifte"
     assert item.group_name == GROUP.name
     assert dispatcher.ended == []  # the flow ended it; nothing left to clean up
     ok = next(f for f in findings if f.code == "wxcc.probe.ok")

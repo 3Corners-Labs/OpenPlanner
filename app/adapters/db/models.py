@@ -67,8 +67,10 @@ __all__ = [
     "IntegrationReportRow",
     "BookingEventRow",
     "CallStatusRow",
+    "UsageBackfillRow",
     "UsageEventRow",
     "UsageHourRow",
+    "UsageRollupStateRow",
     "UsageStaffHourRow",
     "ChannelSettingsRow",
     "GroupTextRow",
@@ -200,6 +202,8 @@ class GroupRow(Base):
     horizon_days: Mapped[int] = mapped_column(Integer)
     phone_mode: Mapped[str] = mapped_column(String(16))
     video_host_email: Mapped[str | None] = mapped_column(String(254))
+    # Before ADR 0032: the WxCC routing. Written alongside ``group_contact_center`` and, for
+    # WxCC, the source of truth on read this minor (ADR 0116 §5, contact_center_rows.py).
     wxcc_business_address: Mapped[str | None] = mapped_column(String(255))
     wxcc_channel: Mapped[str | None] = mapped_column(String(255))
     wxcc_routing_value: Mapped[str | None] = mapped_column(String(512))
@@ -283,6 +287,29 @@ class GroupFormFieldRow(Base):
     __table_args__ = (
         UniqueConstraint("group_id", "key"),
         CheckConstraint("classification IN ('pii', 'not_pii')", name="classification"),
+    )
+
+
+class GroupContactCenterRow(Base):
+    """A group's routing at its contact-center platform (ADR 0032 point 3); no personal data.
+
+    ``attributes`` is a JSON object of strings, validated against the platform's descriptor
+    when it is read (``app.adapters.contact_centers``).
+    """
+
+    __tablename__ = "group_contact_center"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(String(32))
+    routing_value: Mapped[str | None] = mapped_column(String(512))
+    attributes: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+
+    __table_args__ = (
+        CheckConstraint(
+            "json_valid(attributes) AND json_type(attributes) = 'object'", name="attributes"
+        ),
     )
 
 
@@ -513,6 +540,12 @@ class BookingRow(Base):
     guest_join_url: Mapped[str | None] = mapped_column(String(2048))
     host_join_url: Mapped[str | None] = mapped_column(String(2048))
     video_room_id: Mapped[str | None] = mapped_column(String(255))
+    # ADR 0032: the task at the contact center and the platform that holds it; a provider
+    # link, purged with the contact (privacy.DERIVED_FIELDS).
+    contact_center_task_id: Mapped[str | None] = mapped_column(String(255))
+    contact_center_kind: Mapped[str | None] = mapped_column(String(32))
+    # Before ADR 0032; written for a Webex Contact Center task and, for that platform, the
+    # source of truth on read this minor (ADR 0116 §5, contact_center_rows.py).
     wxcc_task_id: Mapped[str | None] = mapped_column(String(255))
     # ADR 0071: the trial call on Webex; the link is PII and purged with the contact.
     trial_room_id: Mapped[str | None] = mapped_column(String(255))
@@ -547,6 +580,7 @@ class BookingRow(Base):
         Index("ix_bookings_video_room_id", "video_room_id"),
         Index("ix_bookings_trial_room_id", "trial_room_id"),
         Index("ix_bookings_wxcc_task_id", "wxcc_task_id"),
+        Index("ix_bookings_contact_center_task_id", "contact_center_task_id"),
         CheckConstraint(
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended', "
             "'awaiting_rebook', 'pending_confirmation')",
@@ -627,6 +661,24 @@ class ClosureScenarioRow(Base):
     contacts: Mapped[str | None] = mapped_column(Text)
     image_id: Mapped[int | None] = mapped_column(
         ForeignKey("closure_images.id", ondelete="SET NULL")
+    )
+
+    # ADR 0099 point 2: the name is the natural key within the organisation or the group.
+    __table_args__ = (
+        Index(
+            "uq_closure_scenarios_organisation_name",
+            "organisation_id",
+            "name",
+            unique=True,
+            sqlite_where=text("group_id IS NULL"),
+        ),
+        Index(
+            "uq_closure_scenarios_group_name",
+            "group_id",
+            "name",
+            unique=True,
+            sqlite_where=text("group_id IS NOT NULL"),
+        ),
     )
 
 
@@ -881,6 +933,7 @@ class UsageEventRow(Base):
     __table_args__ = (
         Index("ix_usage_events_scope_hour", "organisation_id", "group_id", "bucket_hour"),
         Index("ix_usage_events_bucket_hour", "bucket_hour"),
+        {"sqlite_autoincrement": True},  # an id below the watermark must never come back
     )
 
 
@@ -941,6 +994,28 @@ class UsageStaffHourRow(Base):
             "metric",
             "bucket_hour",
         ),
+    )
+
+
+class UsageRollupStateRow(Base):
+    """The rollup's watermark: the last usage fact rolled into ``usage_hour`` (one row, id 1)."""
+
+    __tablename__ = "usage_rollup_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    last_event_id: Mapped[int] = mapped_column(Integer)
+    rolled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    backfilled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    backfill_cutoff: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+
+class UsageBackfillRow(Base):
+    """A booking already turned into usage facts by the backfill: a booking id, nothing else."""
+
+    __tablename__ = "usage_backfill"
+
+    booking_id: Mapped[int] = mapped_column(
+        ForeignKey("bookings.id", ondelete="CASCADE"), primary_key=True, autoincrement=False
     )
 
 
@@ -1516,6 +1591,22 @@ class AlertTargetRow(Base):
     __table_args__ = (
         CheckConstraint("kind IN ('email', 'webex_space')", name="kind"),
         CheckConstraint("min_level IN ('warning', 'outage')", name="min_level"),
+        # ADR 0099 point 2: kind and address are the natural key within the owner.
+        Index(
+            "uq_alert_targets_organisation_address",
+            "organisation_id",
+            "kind",
+            "address",
+            unique=True,
+            sqlite_where=text("organisation_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_alert_targets_platform_address",
+            "kind",
+            "address",
+            unique=True,
+            sqlite_where=text("organisation_id IS NULL"),
+        ),
     )
 
 

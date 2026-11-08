@@ -41,6 +41,7 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -493,7 +494,7 @@ class InMemoryTransaction:
         found = []
         for booking_id, booking in sorted(self.state.bookings.items()):
             status = self.state.call_status.get(booking_id)
-            if booking.wxcc_task_id is None or status is None:
+            if booking.contact_center_task is None or status is None:
                 continue
             changed = status.connected_at or status.task_created_at
             if (
@@ -507,7 +508,11 @@ class InMemoryTransaction:
                     (
                         changed or booking.start,
                         StaleTask(
-                            booking_id, booking.wxcc_task_id, status.task, organisation, group.slug
+                            booking_id,
+                            booking.contact_center_task,
+                            status.task,
+                            organisation,
+                            group.slug,
                         ),
                     )
                 )
@@ -769,9 +774,9 @@ class InMemoryTransaction:
     async def clear_trial_call(self, booking_id: int) -> None:
         self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], trial=None)
 
-    async def save_task_id(self, booking_id: int, task_id: str) -> None:
+    async def save_task(self, booking_id: int, task: ContactCenterTaskRef) -> None:
         booking = self.state.bookings[booking_id]
-        self.state.bookings[booking_id] = replace(booking, wxcc_task_id=task_id)
+        self.state.bookings[booking_id] = replace(booking, contact_center_task=task)
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
         return next(
@@ -800,8 +805,15 @@ class InMemoryTransaction:
         booking = self.state.bookings[booking_id]
         self.state.bookings[booking_id] = replace(booking, claim=None)
 
-    async def get_booking_by_task(self, task_id: str) -> Booking | None:
-        return next((b for b in self.state.bookings.values() if b.wxcc_task_id == task_id), None)
+    async def get_booking_by_task(self, task_id: str, kind: ContactCenterKind) -> Booking | None:
+        return next(
+            (
+                b
+                for b in self.state.bookings.values()
+                if b.contact_center_task == ContactCenterTaskRef(task_id, kind)
+            ),
+            None,
+        )
 
     async def claim_webhook_event(self, source: str, key: str, at: datetime) -> bool:
         if (source, key) in self.state.webhook_events:
@@ -997,7 +1009,7 @@ class InMemoryTransaction:
                 for b in self.state.bookings.values()
                 if b.group_id == group_id
                 and b.status is BookingStatus.CONFIRMED
-                and b.wxcc_task_id is None
+                and b.contact_center_task is None
                 and b.start > after
                 and (status := self.state.call_status.get(b.id or 0)) is not None
                 and status.fallback
@@ -1024,7 +1036,7 @@ class InMemoryTransaction:
             claim=None,
             trial=None,
             meeting=None,
-            wxcc_task_id=None,
+            contact_center_task=None,
             routing=None,
         )
         self.state.booking_events[booking_id] = [

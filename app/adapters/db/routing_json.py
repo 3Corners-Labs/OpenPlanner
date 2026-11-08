@@ -22,23 +22,15 @@ from app.domain.routing import (
     RoutingChoice,
     Subject,
 )
+from app.domain.routing_codec import routing_to_json
 
 log = structlog.get_logger()
 
 
 def routing_json(routing: GroupRouting) -> str | None:
     """Return the JSON stored in ``groups.routing``; ``None`` for a group without routing."""
-    if routing == GroupRouting():
-        return None
-    body: dict[str, Any] = {
-        "subjects": [{"code": s.code, "labels": dict(s.labels)} for s in routing.subjects],
-        "attributes": [a.value for a in routing.attributes],
-        "mapping": {
-            source: {"name": variable.name, "values": dict(variable.values)}
-            for source, variable in routing.mapping
-        },
-    }
-    return json.dumps(body, sort_keys=True)
+    body = routing_to_json(routing)
+    return None if body is None else json.dumps(body, sort_keys=True)
 
 
 def routing_from_json(raw: str | None) -> GroupRouting:

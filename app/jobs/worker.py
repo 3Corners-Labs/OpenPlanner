@@ -75,12 +75,15 @@ from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.system_log import SystemLog
 from app.domain.tls_check import TlsWatch
 from app.domain.update_service import UpdateService
+from app.domain.usage_backfill_service import UsageBackfill
+from app.domain.usage_rollup_service import UsageRollup
 from app.domain.worker_check import WorkerHeartbeat, heartbeat_due
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
+from app.jobs.usage import backfill_usage, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.web.alert_text import alert_composer
@@ -209,7 +212,7 @@ async def run_worker(
             TaskReconciler(
                 uow,
                 clock,
-                wired.dispatcher,
+                wired.dispatchers,
                 integration,
                 lambda: timedelta(minutes=live.settings.task_reconcile_after_minutes),
             ),
@@ -232,7 +235,7 @@ async def run_worker(
                     management_token_key_previous(settings),
                 ),
                 video=wired.video,
-                dispatcher=wired.dispatcher,
+                dispatchers=wired.dispatchers,
                 integration=integration,
                 fallback=fallback,
                 retention=lambda: live.settings.event_retention,
@@ -287,6 +290,15 @@ async def run_worker(
             uow, clock, lambda: timedelta(days=live.settings.booking_row_retention_days)
         ).run,
     )
+    # ADR 0117: usage facts into the hourly table, and the retention of both.
+    usage = UsageRollup(
+        uow,
+        clock,
+        lambda: timedelta(minutes=live.settings.reporting_rollup_interval_minutes),
+        lambda: live.settings.reporting_event_retention_days,
+        lambda: live.settings.reporting_retention_months,
+    )
+    backfill = UsageBackfill(uow, clock, lambda: live.settings.reporting_enabled)
     updates = update_service(settings, uow, clock, http, live=lambda: live.settings)
     maintenance = MaintenanceWatch(
         uow,
@@ -364,7 +376,7 @@ async def run_worker(
         poll_seconds=settings.worker_poll_seconds,
         fallback_mail=fallback_mail(settings) is not None,
         video_enabled=wired.video is not None,
-        dispatch_enabled=wired.dispatcher is not None,
+        dispatch_enabled=bool(wired.dispatchers),
         release_check=settings.update_repository is not None,
     )
     try:
@@ -386,6 +398,8 @@ async def run_worker(
                     # Before the group check, which reads it (ADR 0068).
                     heartbeat_at = await _heartbeat(uow, clock, runner, version, heartbeat_at)
                     await housekeeping.run()
+                    await backfill_usage(backfill)  # ADR 0117: bounded, until complete
+                    await roll_up_usage(usage)  # ADR 0117; logs a failure, never raises
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)
                     await _watch_certificate(tls)

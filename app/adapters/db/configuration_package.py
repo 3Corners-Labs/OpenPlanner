@@ -25,6 +25,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from pydantic import SecretStr
 
+from app.adapters.contact_centers import attributes_from_json, routing
 from app.adapters.crypto import SecretBox
 from app.adapters.db.sealed import SEALED, reseal
 from app.config import Settings
@@ -38,6 +39,7 @@ from app.domain.configuration_package import (
     VERSION_TABLE,
     PackageSummary,
 )
+from app.domain.contact_center import ContactCenterKind
 from app.domain.errors import DomainError, ErrorCode
 
 SCRYPT_N = 2**16
@@ -367,10 +369,27 @@ def _replace_configuration(db: sqlite3.Connection) -> None:
         db.execute("INSERT INTO settings_version (id, version) VALUES (1, ?)", (version,))
         if db.execute("PRAGMA foreign_key_check").fetchone() is not None:
             raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package")
+        _check_contact_center_rows(db)
         db.execute("COMMIT")
     except BaseException:
         db.execute("ROLLBACK")
         raise
+
+
+def _check_contact_center_rows(db: sqlite3.Connection) -> None:
+    """Refuse imported group routings their platform's descriptor refuses (ADR 0032).
+
+    A bad row would otherwise break every read of its group after the import.
+
+    Raises:
+        DomainError: ``configuration_package_invalid`` for an unknown kind or invalid values.
+    """
+    rows = db.execute("SELECT kind, routing_value, attributes FROM main.group_contact_center")
+    for kind, routing_value, attributes in rows:
+        try:
+            routing(ContactCenterKind(kind), routing_value, attributes_from_json(attributes))
+        except (ValueError, KeyError, DomainError) as error:
+            raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package") from error
 
 
 def portable_environment(settings: Settings) -> dict[str, str]:

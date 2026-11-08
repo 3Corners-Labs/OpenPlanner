@@ -200,6 +200,16 @@ SECTIONS = (
                 Permission.RETENTION_VIEW,
                 "clock",
             ),
+            # ADR 0117 point 11: the cross-object list of how the groups in scope are used; each
+            # row links to the group's own *Usage* sub-tab. No edit forms (ADR 0047).
+            Screen(
+                "monitor.reports",
+                "admin.nav.reports",
+                "/admin/reports",
+                Permission.REPORTS_VIEW,
+                "analytics",
+                width=Width.WIDE,
+            ),
         ),
     ),
     Section(
@@ -450,6 +460,15 @@ OBJECTS = (
                             f"{_ORGANISATION}/login/{{idp_key}}",
                         ),
                     ),
+                    # ADR 0117 point 11: how the organisation's groups are used (counts only).
+                    Screen(
+                        "organisation.usage",
+                        "admin.tab.usage",
+                        f"{_ORGANISATION}/usage",
+                        Permission.REPORTS_VIEW,
+                        "analytics",
+                        width=Width.WIDE,
+                    ),
                 ),
             ),
             # ADR 0105: what participants see and receive. The tab's own page is the branding;
@@ -521,6 +540,17 @@ OBJECTS = (
                 Permission.GROUP_VIEW,
                 "dashboard",
                 width=Width.WIDE,
+                subtabs=(
+                    # ADR 0117 point 11: how the group is used (counts only).
+                    Screen(
+                        "group.usage",
+                        "admin.tab.usage",
+                        f"{_GROUP}/usage",
+                        Permission.REPORTS_VIEW,
+                        "analytics",
+                        width=Width.WIDE,
+                    ),
+                ),
             ),
             # The bookings: the day and week agenda, and the own queue's working list (ADR
             # 0043, shown only on a group that dispatches to it).
