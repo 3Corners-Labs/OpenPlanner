@@ -11,7 +11,7 @@ import httpx
 import pytest
 
 from app.adapters.db.engine import create_engine
-from app.adapters.db.seed import ClosureExamples, seed_closure_examples
+from app.adapters.db.seed import EXAMPLE_PARTICIPANT, ClosureExamples, seed_closure_examples
 from app.config import Settings
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
@@ -119,7 +119,8 @@ async def test_a_booking_on_hold_shows_the_contact_options_above_its_actions(
     assert "<p><strong>Storing bij het loket</strong></p>" in page
     assert PHONE_LINK in page
     assert page.index(PHONE_LINK) < page.index(f'href="{base}/reschedule"')
-    assert "@example.org" not in page  # the page never shows the participant's email address
+    domain = EXAMPLE_PARTICIPANT.email.partition("@")[2]
+    assert f"@{domain}" not in page  # the page never shows the participant's email address
 
 
 async def test_the_closure_page_names_the_day_the_details_are_deleted_by(
