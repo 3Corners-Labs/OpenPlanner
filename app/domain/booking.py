@@ -22,6 +22,7 @@ from enum import StrEnum
 from app.domain.channels import ChannelKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import Answers, normalise_email, normalise_phone
+from app.domain.routing import RoutingChoice
 from app.domain.scheduling import PhoneMode
 
 MAX_NAME_LENGTH = 100
@@ -239,6 +240,13 @@ class Booking:
     claim: Claim | None = None
     confirm_by: datetime | None = None
     confirmed_at: datetime | None = None
+    routing: RoutingChoice | None = None
+    """The subject and attribute codes the participant chose (ADR 0081); not personal data."""
+
+    @property
+    def subject(self) -> str | None:
+        """The code of the subject the participant chose (ADR 0081), or ``None``."""
+        return self.routing.subject if self.routing else None
 
     @property
     def reference(self) -> str:

@@ -1,9 +1,12 @@
 """``ContactCenterDispatcher`` on the WxCC Create Task API v2, work items (ADR 0018, 0021).
 
 The work item goes to the group's business address and channel; the flow behind the entry
-point chooses the queue from ``flowSettings.openplannerGroup``. ``workItemData`` carries the
-booking reference, first name, start time, group name, meeting link and kind; nothing else
-(CLAUDE.md). The asset's schema in Control Hub must define exactly these keys (runbook).
+point chooses the queue from ``flowSettings.openplannerGroup``. The routing variables of
+ADR 0081 (mapped subject and attribute codes) go next to it in ``flowSettings``, where the
+flow reads them as flow variables; ``openplannerGroup`` is reserved and always wins.
+``workItemData`` carries the booking reference, first name, start time, group name, meeting
+link and kind; nothing else (CLAUDE.md). The asset's schema in Control Hub must define
+exactly these keys (runbook).
 
 A cancelled booking's task is first marked with a Task Messages v2 append
 (``cjp:task_write``) that sets ``kind`` to ``cancelled`` with only the booking reference, so
@@ -71,7 +74,7 @@ def task_body(item: WorkItem, alias_id: str, timestamp_ms: int) -> dict[str, Any
         "destination": {"id": item.business_address, "type": "businessAddress"},
         "channelType": "workItem",
         "channel": item.channel,
-        "flowSettings": {ROUTING_KEY: item.routing_value},
+        "flowSettings": {**dict(item.variables), ROUTING_KEY: item.routing_value},
         "channelParams": {
             "type": "work-item-form",
             "message": {

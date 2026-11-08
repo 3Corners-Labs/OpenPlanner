@@ -178,3 +178,31 @@ async def test_audit_detail_is_stored(engine: AsyncEngine) -> None:
         entries = await tx.list_audit_events(EVERYTHING)
 
     assert entries[0].event == event
+
+
+async def test_routing_has_its_own_write_and_survives_a_settings_save(engine: AsyncEngine) -> None:
+    """ADR 0081: saving the other settings never touches the group's routing."""
+    from app.domain.routing import Attribute, GroupRouting, Subject
+
+    await seed_demo(engine)
+    uow = SqlUnitOfWork(engine)
+    routing = GroupRouting(
+        (Subject.create("move", {"nl": "Verhuizing", "en": "Moving"}),),
+        (Attribute.CHANNEL_PREFERENCE,),
+    )
+    async with uow.locked() as tx:
+        group = await tx.get_group("demo")
+        assert group is not None
+        await tx.save_group_routing(group.id, routing)
+    async with uow.locked() as tx:
+        await tx.save_group(replace(group, name="Demo-team"))  # a copy that has no routing
+    async with uow.read() as tx:
+        saved = await tx.get_group("demo")
+    assert saved is not None
+    assert (saved.name, saved.routing) == ("Demo-team", routing)
+    window_rule = ScheduleRule(6, TimeWindow(time(9), time(10), 1, subjects=("move",)))
+    async with uow.locked() as tx:
+        rule_id = await tx.add_schedule_rule(saved.id, window_rule)
+    async with uow.read() as tx:
+        rules, _ = await tx.get_schedule_items(saved.id)
+    assert next(r for r in rules if r.id == rule_id).window.subjects == ("move",)

@@ -85,5 +85,5 @@ Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 | Messages | `/admin/groups/{slug}/reminders` | `reminders.manage` | standard | `/admin/groups/{slug}/reminders/{channel}/{minutes}` |
 | Messages › Message texts | `/admin/groups/{slug}/messages` | `texts.manage` | standard | `/admin/groups/{slug}/messages/{text_locale}` |
 | Messages › Contact | `/admin/groups/{slug}/contact` | `closure.manage` | standard | – |
-| Settings | `/admin/groups/{slug}/settings` | `group.edit` | standard | `/admin/groups/{slug}/settings/form`, `/admin/groups/{slug}/settings/form/{key}`, `/admin/groups/{slug}/settings/archive` |
+| Settings | `/admin/groups/{slug}/settings` | `group.edit` | standard | `/admin/groups/{slug}/settings/form`, `/admin/groups/{slug}/settings/form/{key}`, `/admin/groups/{slug}/settings/routing`, `/admin/groups/{slug}/settings/routing/subjects/{code}`, `/admin/groups/{slug}/settings/archive` |
 | Emergency closure | `/admin/groups/{slug}/closure` | `closure.manage` | standard | `/admin/groups/{slug}/closure/bookings/{booking_id}/move`, `/admin/groups/{slug}/closure/scenarios`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}/contacts` |

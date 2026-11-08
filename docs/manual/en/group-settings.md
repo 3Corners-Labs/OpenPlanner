@@ -149,6 +149,12 @@ Whether the booking form asks for a phone number:
 Only ask for a number if the team actually uses it. Like the name and email address, the
 number is erased 24 hours after the appointment.
 
+## Subjects and routing
+
+Let participants choose a subject, ask for a preferred language or way of contact, and pass those
+choices to the contact center as codes. You set that up on a screen of its own: see
+[Subjects and routing](group-routing.md).
+
 ## Integrations: video and contact centre
 
 Leave these fields empty while the integration is not set up. Appointments then still work, but

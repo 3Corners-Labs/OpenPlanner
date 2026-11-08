@@ -155,6 +155,12 @@ Of het boekingsformulier om een telefoonnummer vraagt:
 Vraag alleen om een nummer als het team het echt gebruikt. Het nummer wordt, net als naam en
 e-mailadres, 24 uur na de afspraak gewist.
 
+## Onderwerpen en routing
+
+Laat deelnemers een onderwerp kiezen, vraag een voorkeurstaal of manier van contact, en geef die
+keuzes als codes door aan het contactcenter. Dat stelt u in op een eigen scherm: zie
+[Onderwerpen en routing](group-routing.md).
+
 ## Koppelingen: video en contactcenter
 
 Laat deze velden leeg zolang de koppeling niet is ingericht. Afspraken werken dan gewoon, maar

@@ -9,8 +9,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-MAX_ANSWERS = 15
-"""At most as many answers as the platform's highest field limit (ADR 0055)."""
+from app.domain.routing import Attribute
+
+MAX_ANSWERS = 15 + 1 + len(Attribute)
+"""At most the platform's highest field limit (ADR 0055) plus the routing questions: the
+subject and every catalogue attribute (ADR 0081)."""
 MAX_KEY_LENGTH = 40
 MAX_ANSWER_LENGTH = 1001
 """One more than a long text allows, so the domain refuses it rather than this cut it short."""

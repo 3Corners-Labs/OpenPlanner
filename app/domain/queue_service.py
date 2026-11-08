@@ -47,6 +47,7 @@ from app.domain.own_queue import (
     works_queue,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, GroupSummary
 from app.domain.staff import StaffFilter, StaffMember
 from app.domain.tokens import agent_pseudonym, agent_pseudonyms
@@ -71,6 +72,7 @@ class QueueRow:
         direct: A direct call (ADR 0019) rather than a scheduled appointment.
         overdue: Not claimed ``not_picked_up_minutes`` after its start.
         video: Whether the meeting is ready, pending or failed (ADR 0072).
+        routing: The subject and attribute codes the participant chose (ADR 0081 point 4).
     """
 
     booking_id: int
@@ -83,6 +85,7 @@ class QueueRow:
     direct: bool
     overdue: bool
     video: VideoState = VideoState.PENDING
+    routing: RoutingChoice | None = None
 
 
 @dataclass(frozen=True)
@@ -391,6 +394,7 @@ def _row(entry: QueueEntry, me: tuple[str, ...], overdue: bool) -> QueueRow:
         direct=entry.is_direct,
         overdue=overdue,
         video=entry.video,
+        routing=booking.routing,
     )
 
 
