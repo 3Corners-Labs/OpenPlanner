@@ -67,6 +67,9 @@ __all__ = [
     "IntegrationReportRow",
     "BookingEventRow",
     "CallStatusRow",
+    "UsageEventRow",
+    "UsageHourRow",
+    "UsageStaffHourRow",
     "ChannelSettingsRow",
     "GroupTextRow",
     "OrganisationTextRow",
@@ -815,6 +818,101 @@ class BookingDayCountRow(Base):
     status: Mapped[str] = mapped_column(String(24), primary_key=True)
     count: Mapped[int] = mapped_column(Integer)
     last_purged_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class UsageEventRow(Base):
+    """One usage fact as written, the outbox of the rollup (ADR 0117 point 3).
+
+    Hour-truncated time and the allow-listed codes and numbers only: no booking id, no
+    reference, no free text, so a row cannot be joined back to an appointment. Staff facts
+    carry ``staff_id``; every other row leaves it empty.
+    """
+
+    __tablename__ = "usage_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    bucket_hour: Mapped[datetime] = mapped_column(UTCDateTime())
+    organisation_id: Mapped[int] = mapped_column(Integer)
+    group_id: Mapped[int] = mapped_column(Integer)
+    booking_kind: Mapped[str | None] = mapped_column(String(16))
+    dispatch_kind: Mapped[str | None] = mapped_column(String(24))
+    subject_code: Mapped[str | None] = mapped_column(String(40))
+    locale: Mapped[str | None] = mapped_column(String(12))
+    channel_kind: Mapped[str | None] = mapped_column(String(16))
+    outcome: Mapped[str | None] = mapped_column(String(32))
+    actor_class: Mapped[str | None] = mapped_column(String(16))
+    reason_code: Mapped[str | None] = mapped_column(String(40))
+    value_seconds: Mapped[int | None] = mapped_column(Integer)
+    participants: Mapped[int | None] = mapped_column(Integer)
+    capacity: Mapped[int | None] = mapped_column(Integer)
+    booked: Mapped[int | None] = mapped_column(Integer)
+    staff_id: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        Index("ix_usage_events_scope_hour", "organisation_id", "group_id", "bucket_hour"),
+        Index("ix_usage_events_bucket_hour", "bucket_hour"),
+    )
+
+
+class UsageHourRow(Base):
+    """The long-lived rollup: one row per hour, group, metric and cut (ADR 0117 point 3)."""
+
+    __tablename__ = "usage_hour"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bucket_hour: Mapped[datetime] = mapped_column(UTCDateTime())
+    organisation_id: Mapped[int] = mapped_column(Integer)
+    group_id: Mapped[int] = mapped_column(Integer)
+    metric: Mapped[str] = mapped_column(String(8))
+    booking_kind: Mapped[str | None] = mapped_column(String(16))
+    dispatch_kind: Mapped[str | None] = mapped_column(String(24))
+    subject_code: Mapped[str | None] = mapped_column(String(40))
+    locale: Mapped[str | None] = mapped_column(String(12))
+    channel_kind: Mapped[str | None] = mapped_column(String(16))
+    outcome: Mapped[str | None] = mapped_column(String(32))
+    actor_class: Mapped[str | None] = mapped_column(String(16))
+    reason_code: Mapped[str | None] = mapped_column(String(40))
+    bucket: Mapped[int | None] = mapped_column(Integer)
+    count: Mapped[int] = mapped_column(Integer)
+    sum_value: Mapped[int] = mapped_column(Integer)
+    max_value: Mapped[int] = mapped_column(Integer)
+
+    __table_args__ = (
+        Index(
+            "ix_usage_hour_scope_metric_hour",
+            "organisation_id",
+            "group_id",
+            "metric",
+            "bucket_hour",
+        ),
+    )
+
+
+class UsageStaffHourRow(Base):
+    """The rollup per team member (ADR 0117 point 9); ``staff_id`` empty is *former members*."""
+
+    __tablename__ = "usage_staff_hour"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bucket_hour: Mapped[datetime] = mapped_column(UTCDateTime())
+    organisation_id: Mapped[int] = mapped_column(Integer)
+    group_id: Mapped[int] = mapped_column(Integer)
+    staff_id: Mapped[int | None] = mapped_column(Integer)
+    metric: Mapped[str] = mapped_column(String(8))
+    count: Mapped[int] = mapped_column(Integer)
+    sum_value: Mapped[int] = mapped_column(Integer)
+    max_value: Mapped[int] = mapped_column(Integer)
+
+    __table_args__ = (
+        Index(
+            "ix_usage_staff_hour_scope_metric_hour",
+            "organisation_id",
+            "group_id",
+            "metric",
+            "bucket_hour",
+        ),
+    )
 
 
 class CallStatusRow(Base):
