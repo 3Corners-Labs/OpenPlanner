@@ -1831,8 +1831,8 @@ line candidate offered on the `rc` channel; line candidates are tried on a host 
 by hand, and the line's release tag installs everywhere as usual.
 
 A line lives as long as its minor is in the support window (`N-1` from 1.0.0, `SECURITY.md`),
-or longer as a paid extended line. Deleting a line needs an administrator (the ruleset forbids
-it otherwise); its tags stay.
+or longer as a paid extended line. Deleting a line means an administrator switches the
+ruleset `release lines` off for it, as on `main` (it has no bypass); its tags stay.
 
 ### Release candidates (ADR 0059)
 

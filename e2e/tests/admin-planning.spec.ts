@@ -53,11 +53,16 @@ function tabs(page: Page) {
   return page.getByRole('navigation', { name: 'Onderdelen van de groep' });
 }
 
+// ADR 0047 step 4: the second row of the current tab (Planning: Staffing, Exceptions, Holidays).
+function subtabs(page: Page) {
+  return page.getByRole('navigation', { name: 'Onderdelen van dit tabblad' });
+}
+
 test('group admin manages staffing and staffing exceptions, not the settings', async ({ page }, testInfo) => {
   const mine = plan(testInfo);
   await loginAs(page, 'groupadmin', GROUP);
 
-  await expect(tabs(page).getByRole('link', { name: 'Bezetting', exact: true })).toBeVisible();
+  await expect(tabs(page).getByRole('link', { name: 'Planning', exact: true })).toBeVisible();
   await expect(tabs(page).getByRole('link', { name: 'Instellingen' })).toHaveCount(0);
   await expectNoAxeViolations(page);
   await expectForbidden(page, `${GROUP}/settings`);
@@ -97,7 +102,7 @@ test('group admin manages staffing and staffing exceptions, not the settings', a
 
   // Exceptions: close this browser's day, see it, remove it again.
   const day = dayAhead(mine.daysAhead);
-  await tabs(page).getByRole('link', { name: 'Afwijkende bezetting', exact: true }).click();
+  await subtabs(page).getByRole('link', { name: 'Afwijkende bezetting', exact: true }).click();
   await expectNoAxeViolations(page);
   await page.getByLabel('Datum dd-mm-jjjj', { exact: true }).fill(day.value);
   await page.getByLabel('Hele dag geen bezetting').check();
@@ -134,7 +139,7 @@ test('organisation admin creates a group and gives it staffing blocks', async ({
   await expect(page.getByLabel('Webadres', { exact: true })).toHaveAttribute('readonly', '');
   await expectNoAxeViolations(page);
 
-  await tabs(page).getByRole('link', { name: 'Bezetting', exact: true }).click();
+  await tabs(page).getByRole('link', { name: 'Planning', exact: true }).click();
   await page.getByLabel('Dag', { exact: true }).selectOption({ label: 'dinsdag' });
   await page.getByLabel('Van uu:mm', { exact: true }).fill('09:00');
   await page.getByLabel('Tot uu:mm', { exact: true }).fill('10:00');

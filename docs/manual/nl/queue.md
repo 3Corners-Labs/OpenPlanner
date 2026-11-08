@@ -1,9 +1,10 @@
 # Wachtrij
 
 Bij een groep met de **eigen wachtrij van OpenPlanner** pakken medewerkers videoafspraken op in
-dit scherm, in plaats van in het contactcenter. U opent het via het tabblad **Wachtrij** van de
-groep. Medewerkers, groepsbeheerders en organisatiebeheerders van de groep zien het. Bij een
-groep die met het contactcenter werkt, bestaat dit tabblad niet.
+dit scherm, in plaats van in het contactcenter. U opent het via **groep → Agenda → Wachtrij**.
+Medewerkers, groepsbeheerders en organisatiebeheerders van de groep zien het; wie alleen de
+wachtrij mag openen, komt via het tabblad **Agenda** direct hier. Bij een groep die met het
+contactcenter werkt, bestaat dit onderdeel niet.
 
 ## Wat u ziet
 

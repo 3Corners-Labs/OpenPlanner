@@ -102,10 +102,20 @@ class Target:
     def candidate_base(
         self, current: str, project: str, messages: Sequence[str], migrations_changed: bool
     ) -> str | None:
-        """Return the release a candidate here is a candidate of (``main``: ``candidate_base``)."""
-        if self.line is None:
-            return candidate_base(current, project, messages, migrations_changed)
-        return self.next_version(current, messages, migrations_changed)
+        """Return the release a candidate here is a candidate of (ADR 0059 point 1).
+
+        One rule for both targets (``candidate_base``: a release PR's raised ``pyproject.toml``
+        wins), and on a line the result must be a patch of the line.
+
+        Raises:
+            LineError: As ``next_version``, for a candidate a line does not admit.
+        """
+        if self.line is not None:
+            self.next_version(current, [], migrations_changed)  # the line and migration rules
+        base = candidate_base(current, project, messages, migrations_changed)
+        if base is not None and not self.admits(base):
+            raise LineError(f"line {self.line} takes fixes only, but its commits call for {base}")
+        return base
 
 
 MAIN = Target()

@@ -9,6 +9,7 @@ from scripts.release_plan import LineError, Target
 from scripts.release_pr import (
     AUDIT_HEADING,
     VERDICT_OPEN,
+    adr_progress,
     bump_lock,
     bump_publiccode,
     bump_pyproject,
@@ -23,7 +24,7 @@ from scripts.release_pr import (
     tag_message,
     with_audit,
 )
-from tests.scripts.conftest import Git, commit_all
+from tests.scripts.conftest import Git, commit_all, cut_line
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / ".github" / "pull_request_template.md"
@@ -112,7 +113,7 @@ def _template_headings() -> list[str]:
 
 
 def test_the_body_answers_every_section_of_the_pr_template() -> None:
-    body = pr_body("0.4.0", "v0.3.0", ["feat: a", "fix: b"], "cyberbeuk", "2026-11-02")
+    body = pr_body("0.4.0", "v0.3.0", ["feat: a", "fix: b"], "cyberbeuk", "2026-11-02", "")
 
     for heading in _template_headings():
         assert heading in body, heading
@@ -125,8 +126,8 @@ def test_the_body_answers_every_section_of_the_pr_template() -> None:
 
 
 def test_a_minor_release_body_carries_an_open_audit_section_a_patch_does_not() -> None:
-    minor = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02")
-    patch = pr_body("0.4.1", "v0.4.0", ["fix: a"], "po", "2026-11-02")
+    minor = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", "")
+    patch = pr_body("0.4.1", "v0.4.0", ["fix: a"], "po", "2026-11-02", "")
 
     assert AUDIT_HEADING in minor
     assert VERDICT_OPEN in minor
@@ -136,7 +137,7 @@ def test_a_minor_release_body_carries_an_open_audit_section_a_patch_does_not() -
 
 
 def test_the_audit_section_is_added_or_replaced_and_ends_open() -> None:
-    body = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02")
+    body = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", "")
 
     first = with_audit(body, "## Findings\n\nP1: a bug in x.py:3\nP2: a nit\n")
 
@@ -295,7 +296,7 @@ def test_prepare_edits_the_four_files_and_writes_the_body(
 
 def test_audit_writes_the_findings_into_the_body_file(released: Path) -> None:
     body, findings = released / "body.md", released / "findings.md"
-    body.write_text(pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02"))
+    body.write_text(pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", ""))
     findings.write_text("P2: a nit\n")
 
     assert main(["audit", "--body", str(body), "--findings", str(findings)]) == 0
@@ -334,6 +335,28 @@ def test_plan_refuses_a_patch_that_carries_a_migration() -> None:
     assert plan("v0.4.0", ["fix: a"], "0.4.1", migrations_changed=False) == "0.4.1"
 
 
+def test_the_release_pr_lists_the_adrs_this_release_finishes() -> None:
+    """ADR 0119: the product owner reads which decisions became built, and what is still open."""
+    before = "\n".join(
+        [
+            "| 0001 | One | BUILT | e | – |",
+            "| 0002 | Two | PARTIAL | e | x |",
+            "| 0003 | Three | NOT BUILT | e | x |",
+        ]
+    )
+    after = before.replace("| 0002 | Two | PARTIAL |", "| 0002 | Two | BUILT |") + (
+        "\n| 0004 | Four | NOT BUILT (policy part) | e | x |"
+    )
+
+    section = adr_progress(before, after, "v0.5.0")
+
+    assert section.startswith("## ADRs\n\nBuilt since v0.5.0 (1):\n\n- ADR 0002 Two\n")
+    assert "Still open (2): 0003, 0004; of these nothing built yet: 0003, 0004." in section
+    body = pr_body("0.6.0", "v0.5.0", ["feat: a"], "po", "2026-11-08", section)
+    assert section in body
+    assert "## ADRs" not in pr_body("0.6.0", "v0.5.0", ["feat: a"], "po", "2026-11-08", "")
+
+
 # Maintenance lines (ADR 0116 point 3): the release PR and tag on a line, and the line's
 # changelog taken over by the next release on main.
 
@@ -369,19 +392,10 @@ def test_the_lines_sections_join_main_in_version_order() -> None:
     assert merge_changelogs(CHANGELOG, []) == CHANGELOG
 
 
-def _cut_line(git: Git, root: Path) -> None:
-    """Line release/0.3 from v0.3.0 (main has a feature since), with one fix on it."""
-    git("update-ref", "refs/remotes/origin/main", "main")
-    git("switch", "-q", "-c", "release/0.3", "v0.3.0")
-    (root / "fix.txt").write_text("fix\n")
-    commit_all(git, "fix: the security fix (#21)")
-    git("update-ref", "refs/remotes/origin/release/0.3", "HEAD")
-
-
 def test_the_release_pr_and_tag_on_a_line(
     git: Git, released: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _cut_line(git, released)
+    cut_line(git, released, "0.3", "v0.3.0")
 
     assert main(["plan", "--base", "release/0.3"]) == 0
     out = capsys.readouterr().out
@@ -411,7 +425,7 @@ def test_a_dry_run_from_a_feature_branch_plans_and_tags_as_main(
 def test_the_next_release_on_main_takes_over_the_lines_changelog(
     git: Git, released: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _cut_line(git, released)
+    cut_line(git, released, "0.3", "v0.3.0")
     (released / "CHANGELOG.md").write_text(
         CHANGELOG.replace("## 0.3.0", "## 0.3.1 (2026-11-09)\n\n- The security fix.\n\n## 0.3.0")
     )

@@ -275,3 +275,22 @@ def test_the_repositorys_baseline_names_why_each_value_is_known_unseen() -> None
         "rulesets/release line creation/bypass_actors",
     ]
     assert all(len(why) > 20 for why in known.values())
+
+
+# ADR 0116 point 3: the rulesets of a maintenance line release/X.Y.
+
+
+def test_a_line_has_mains_rules_without_a_bypass_and_only_creation_is_bypassed() -> None:
+    rulesets = json.loads(BASELINE.read_text())["rulesets"]
+    main, line, creation = (
+        rulesets["main"],
+        rulesets["release lines"],
+        rulesets["release line creation"],
+    )
+    expected = json.loads(json.dumps(main["rules"]))
+    expected["required_status_checks"]["do_not_enforce_on_create"] = True
+
+    assert line["rules"] == expected
+    assert line["bypass_actors"] == main["bypass_actors"] == []
+    assert line["conditions"] == creation["conditions"]
+    assert creation["rules"] == {"creation": {}}

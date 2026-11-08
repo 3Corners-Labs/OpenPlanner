@@ -1,6 +1,5 @@
 """Maintenance lines release/X.Y (ADR 0116 point 3): the target, cutting, candidates, tags."""
 
-import json
 from pathlib import Path
 
 import pytest
@@ -8,7 +7,7 @@ import pytest
 from scripts import release_line, release_plan
 from scripts.release_line import backport_lines, may_cut, newest_release, tag_target
 from scripts.release_plan import MAIN, LineError, Target
-from tests.scripts.conftest import Git, commit_all
+from tests.scripts.conftest import Git, commit_all, cut_line
 
 # The target: main or a line.
 
@@ -102,13 +101,6 @@ def lined(git: Git, tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _cut_line(git: Git, root: Path) -> None:
-    git("switch", "-q", "-c", "release/0.5", "v0.5.0")
-    (root / "fix.txt").write_text("fix\n")
-    commit_all(git, "fix: the security fix (#21)")
-    git("update-ref", "refs/remotes/origin/release/0.5", "HEAD")
-
-
 def test_cut_is_allowed_once_and_only_after_a_feature(
     git: Git, lined: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -119,7 +111,7 @@ def test_cut_is_allowed_once_and_only_after_a_feature(
     assert release_line.main(["cut", "--line", "five"]) == 1
     assert "not a line X.Y" in capsys.readouterr().err
 
-    _cut_line(git, lined)
+    cut_line(git, lined, "0.5", "v0.5.0")
 
     assert release_line.main(["cut", "--line", "0.5"]) == 1
     assert "exists already" in capsys.readouterr().err
@@ -173,7 +165,7 @@ def test_a_push_to_the_line_becomes_a_patch_candidate(
 def test_a_cherry_picked_feature_makes_no_candidate(
     git: Git, lined: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _cut_line(git, lined)
+    cut_line(git, lined, "0.5", "v0.5.0")
     (lined / "more.txt").write_text("m\n")
     commit_all(git, "feat: does not belong on a line")
 
@@ -184,7 +176,7 @@ def test_a_cherry_picked_feature_makes_no_candidate(
 def test_a_tag_is_allowed_on_main_or_its_own_line(
     git: Git, lined: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _cut_line(git, lined)
+    cut_line(git, lined, "0.5", "v0.5.0")
     fix = git("rev-parse", "HEAD").strip()
     feature = git("rev-parse", "origin/main").strip()
 
@@ -197,22 +189,14 @@ def test_a_tag_is_allowed_on_main_or_its_own_line(
     assert "not on main and not a patch" in capsys.readouterr().err
 
 
-# The rulesets of a line (.github/guardrails.json; applied as the runbook says).
+def test_every_step_that_pipes_into_tee_fails_with_its_command() -> None:
+    """main.yml has no default shell: `bash -e` without pipefail lets a refused tag through."""
+    workflow = (
+        Path(__file__).resolve().parents[2] / ".github" / "workflows" / "main.yml"
+    ).read_text()
+    blocks = workflow.split("\n      - ")
 
+    piped = [block for block in blocks if '| tee -a "$GITHUB_OUTPUT"' in block]
 
-def test_a_line_has_mains_rules_without_a_bypass_and_only_creation_is_bypassed() -> None:
-    rulesets = json.loads(
-        (Path(__file__).resolve().parents[2] / ".github" / "guardrails.json").read_text()
-    )["rulesets"]
-    main, line, creation = (
-        rulesets["main"],
-        rulesets["release lines"],
-        rulesets["release line creation"],
-    )
-    expected = json.loads(json.dumps(main["rules"]))
-    expected["required_status_checks"]["do_not_enforce_on_create"] = True
-
-    assert line["rules"] == expected
-    assert line["bypass_actors"] == main["bypass_actors"] == []
-    assert line["conditions"] == creation["conditions"]
-    assert creation["rules"] == {"creation": {}}
+    assert piped
+    assert all("pipefail" in block for block in piped)

@@ -1,5 +1,6 @@
-{#- Header of every group page: breadcrumbs, name, chips, public link, tabs, confirmation. -#}
+{#- Header of every group page: breadcrumbs, name, chips, public link, tabs and the current tab's second row (ADR 0047 step 4), confirmation. -#}
 {% from "admin/_icons.html" import icon %}
+{% from "admin/_subtabs.html" import subtab_row %}
 <nav class="breadcrumbs" aria-label="{{ _("admin.breadcrumbs") }}">
   <ol>
     <li><a href="/admin/groups">{{ _("admin.nav.groups") }}</a></li>
@@ -25,6 +26,7 @@
   </ul>
 </nav>
 {% endif %}
+{{ subtab_row(subtabs, _("admin.organisation.subsections")) }}
 {% if summary.group.is_archived %}
 <div class="alert alert--info" role="status"><p>{{ _("admin.group.archived_notice") }}</p></div>
 {% endif %}

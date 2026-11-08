@@ -54,8 +54,8 @@ None. The sub-tabs and the list of links are structure, not tunable values.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #347 | in PR #347 |
-| 1 | Sub-tabs on an entry in the register, Advanced settings in three, "On this page" on *Settings*, manual | #347 | in PR #347 |
+| 0 | ADR | #347 | merged |
+| 1 | Sub-tabs on an entry in the register, Advanced settings in three, "On this page" on *Settings*, manual | #347 | merged |
 
 ## Consequences
 
