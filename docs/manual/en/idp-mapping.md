@@ -51,4 +51,5 @@ the staff member's page (**Staff**) shows the same.
 
 **Download as text** gives the same list as a text file, one value per line, with a comment
 line per organisation and group, for the IdP team. Every download is in the audit log. As
-with the audit log export, a link to it on another website gets an error page.
+with the audit log export, a link to it on another website gets an error page in a current
+browser.

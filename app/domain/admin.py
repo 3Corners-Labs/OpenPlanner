@@ -25,6 +25,7 @@ from app.domain.audit import ANONYMOUS_ACTOR, AuditEntry, AuditEvent, AuditFilte
 from app.domain.audit_export import (
     EXPORT_EVENT,
     ExportLimits,
+    ExportRefusal,
     ExportRefused,
     export_window,
     to_csv,
@@ -415,7 +416,7 @@ class AdminService:
                     scope, limits.max_rows + 1, replace(narrow, since=since, until=until)
                 )
             if len(entries) > limits.max_rows:
-                raise ExportRefused("too_many_rows")
+                raise ExportRefused(ExportRefusal.TOO_MANY_ROWS)
         except ExportRefused as refused:
             await self._record_export(principal, scope, narrow, Outcome.FAILURE, refused.code)
             raise

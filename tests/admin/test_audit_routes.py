@@ -11,7 +11,9 @@ import pytest
 import structlog
 
 from app.adapters.db.uow import SqlUnitOfWork
+from app.admin.audit_routes import EXPORT_REFUSALS
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Level, Outcome, Source
+from app.domain.audit_export import ExportRefusal
 from app.domain.authorization import Scope
 from app.domain.diagnostics import DiagnosticLog
 from app.domain.event_context import TRACE_ID
@@ -326,7 +328,9 @@ async def test_each_event_links_to_its_whole_chain(traced: Site) -> None:
 async def test_the_export_is_the_current_filter_inside_the_scope(traced: Site) -> None:
     await traced.login_as(ORG_ADMIN)
     page = (await traced.client.get("/admin/audit", params={"category": "system"})).text
-    assert 'href="/admin/audit/export.csv?category=system"' in page
+    # No ``download`` attribute: the file comes from ``content-disposition``, and a refused
+    # export's redirect back to this page is shown as a page, not saved as a file.
+    assert '<a href="/admin/audit/export.csv?category=system">' in page
 
     response = await traced.client.get("/admin/audit/export.csv", params={"category": "system"})
 
@@ -378,14 +382,35 @@ async def test_an_export_over_the_period_limit_is_refused_on_the_page(traced: Si
     assert "De export beslaat te veel dagen." in page.text
 
 
-async def test_an_unknown_refusal_code_shows_nothing_and_is_not_echoed(site: Site) -> None:
+async def test_a_refused_export_goes_back_with_the_checked_filter_only(traced: Site) -> None:
+    await traced.login_as(SUPER)
+    typed = {"from": "2024-01-01", "to": "2026-01-01", "level": "loud", "group": "nope"}
+
+    response = await traced.client.get(
+        "/admin/audit/export.csv", params={**typed, "trace": "x" * 40}
+    )
+
+    # Values the filter does not accept are dropped, never carried into the address.
+    assert response.headers["location"] == (
+        "/admin/audit?from=2024-01-01&to=2026-01-01&refused=too_many_days"
+    )
+
+
+@pytest.mark.parametrize("refused", ["zz_marker", "x" * 200])
+async def test_an_unknown_refusal_code_shows_nothing_and_is_not_echoed(
+    site: Site, refused: str
+) -> None:
     await site.login_as(SUPER)
 
-    page = await site.client.get("/admin/audit", params={"refused": "zz_marker"})
+    page = await site.client.get("/admin/audit", params={"refused": refused})
 
     assert page.status_code == 200
-    assert "zz_marker" not in page.text
-    assert "De export beslaat te veel" not in page.text
+    assert refused not in page.text
+    assert 'class="error-message"' not in page.text
+
+
+def test_every_refusal_code_has_a_text() -> None:
+    assert set(EXPORT_REFUSALS) == set(ExportRefusal)
 
 
 async def test_the_superuser_switches_diagnostic_mode_and_the_group_sees_its_debug_lines(

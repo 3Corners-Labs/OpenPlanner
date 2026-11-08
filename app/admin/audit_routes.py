@@ -68,7 +68,7 @@ from app.domain.audit import (
     Source,
     Subject,
 )
-from app.domain.audit_export import ExportLimits, ExportRefused
+from app.domain.audit_export import ExportLimits, ExportRefusal, ExportRefused
 from app.domain.authorization import (
     API_SCOPES,
     ApiScope,
@@ -418,11 +418,11 @@ CATEGORY_LABELS: dict[Category, str] = {
 }
 """Label per category in the filter (ADR 0040)."""
 
-EXPORT_REFUSALS: dict[str, str] = {
-    "too_many_days": "admin.audit.export.too_many_days",
-    "too_many_rows": "admin.audit.export.too_many_rows",
+EXPORT_REFUSALS: dict[ExportRefusal, str] = {
+    ExportRefusal.TOO_MANY_DAYS: "admin.audit.export.too_many_days",
+    ExportRefusal.TOO_MANY_ROWS: "admin.audit.export.too_many_rows",
 }
-"""Why an export was refused, per refusal code."""
+"""Why an export was refused, per refusal code (every member; literal keys for the catalogue)."""
 
 
 @dataclass(frozen=True)
@@ -673,40 +673,6 @@ def audit_views(
     ]
 
 
-async def _audit_page(
-    request: Request,
-    locale: RequestLocale,
-    context: AdminContext,
-    query: AuditQuery,
-    refused: str | None = None,
-) -> HTMLResponse:
-    """Render the audit page for ``query``, with an export refusal when there is one.
-
-    ``refused`` is the code the export sent the admin back with; only a code of
-    ``EXPORT_REFUSALS`` shows a text, anything else nothing (never echoed).
-    """
-    error = refused if refused in EXPORT_REFUSALS else None
-    service = admin_service(request)
-    zone = ZoneInfo(settings_for(request).admin_timezone)
-    in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
-    narrow = query.narrow({g.group.slug for g in in_scope}, zone)
-    events = await service.audit_log(context.principal, narrow, AUDIT_LOG_LIMIT)
-    return _page(
-        request,
-        locale,
-        "admin/audit.html",
-        context.principal,
-        {
-            "events": audit_views(request, locale, context.principal, events),
-            "limit": AUDIT_LOG_LIMIT,
-            "filters": _filter_view(narrow, in_scope, zone, locale.gettext),
-            "export_error": locale.gettext(EXPORT_REFUSALS[error]) if error else None,
-            "diagnostics": await _diagnostics_view(request, locale, context),
-            "done": done_message(request, locale.gettext),
-        },
-    )
-
-
 async def _diagnostics_view(
     request: Request, locale: RequestLocale, context: AdminContext
 ) -> DiagnosticsView | None:
@@ -787,19 +753,39 @@ async def audit(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_VIEW))],
     query: Annotated[AuditQuery, Depends()],
-    refused: Annotated[str | None, Query(max_length=32)] = None,
+    refused: str | None = None,
 ) -> HTMLResponse:
     """Show the newest audit events and system events in scope, optionally filtered.
 
-    ``refused`` carries why the export just sent the admin back here (``export``).
+    ``refused`` is why the export just sent the admin back here (``export``): a code of
+    ``ExportRefusal`` shows its text; anything else shows nothing, never an error and never
+    echoed, like the filters.
     """
-    return await _audit_page(request, locale, context, query, refused)
+    refusal = ExportRefusal(refused) if refused in set(ExportRefusal) else None
+    service = admin_service(request)
+    zone = ZoneInfo(settings_for(request).admin_timezone)
+    in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
+    narrow = query.narrow({g.group.slug for g in in_scope}, zone)
+    events = await service.audit_log(context.principal, narrow, AUDIT_LOG_LIMIT)
+    return _page(
+        request,
+        locale,
+        "admin/audit.html",
+        context.principal,
+        {
+            "events": audit_views(request, locale, context.principal, events),
+            "limit": AUDIT_LOG_LIMIT,
+            "filters": _filter_view(narrow, in_scope, zone, locale.gettext),
+            "export_error": locale.gettext(EXPORT_REFUSALS[refusal]) if refusal else None,
+            "diagnostics": await _diagnostics_view(request, locale, context),
+            "done": done_message(request, locale.gettext),
+        },
+    )
 
 
 @router.get("/audit/export.csv", response_model=None)
 async def export(
     request: Request,
-    locale: Locale,
     _: SameOrigin,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_EXPORT))],
     query: Annotated[AuditQuery, Depends()],

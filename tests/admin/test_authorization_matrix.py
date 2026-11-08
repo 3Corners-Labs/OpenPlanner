@@ -11,13 +11,15 @@ end of this file run everywhere, so a route without a permission is still caught
 
 import pytest
 
+from app.admin.authz import RequirePermission
 from app.admin.routes import PUBLIC_ADMIN_PATHS
 from app.domain.authorization import Principal
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
+from app.web.route_dependencies import guards
 from tests.admin.conftest import SAME_ORIGIN, Site
 from tests.support.authorization_matrix import EXPECTED, ROLES
-from tests.support.routes import all_routes, requirements, scoped_routes
+from tests.support.routes import all_routes, scoped_routes
 
 CASES = [
     (role, key.split(" ", 1)[0], path, status)
@@ -169,9 +171,11 @@ def test_every_admin_route_declares_one_permission_and_is_in_the_table(site: Sit
 
     assert set(protected) == set(EXPECTED), "admin route missing from the matrix test"
     for path, route in protected.items():
-        assert len(requirements(route)) == 1, f"{path} must declare exactly one permission"
+        assert len(guards(route, RequirePermission)) == 1, (
+            f"{path} must declare exactly one permission"
+        )
     for path in PUBLIC_ADMIN_PATHS:
-        assert not any(requirements(r) for r in routes if r.path == path), path
+        assert not any(guards(r, RequirePermission) for r in routes if r.path == path), path
 
 
 def test_expectations_cover_every_role(site: Site) -> None:

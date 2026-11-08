@@ -46,9 +46,9 @@ groepsbeheerders niet.
   regels wordt geweigerd: maak het filter dan nauwer.
 - Elke export komt zelf in het auditlog, met het aantal regels.
 - De download start met de knop, of met een adres dat u intypt, als bladwijzer bewaart of uit
-  een ander programma opent. Een link ernaar op een andere website (ook mail of chat in de
-  browser) geeft een foutmelding, zodat een andere website geen export op uw naam in het log
-  kan zetten.
+  een ander programma opent. In een actuele browser geeft een link ernaar op een andere website
+  (ook mail of chat in de browser) een foutmelding, zodat een andere website geen export op uw
+  naam in het log kan zetten.
 
 Een export bevat de identificatie (subject) van beheerders. Bewaar het bestand volgens het
 beleid van uw organisatie.

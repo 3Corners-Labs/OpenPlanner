@@ -19,6 +19,7 @@ import io
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum
 
 from app.domain.event_schema import FIELDS, Value
 
@@ -31,10 +32,17 @@ BOM = "﻿"
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 
 
-class ExportRefused(Exception):  # noqa: N818 - a refusal with a code, like DomainError
-    """The export is over a limit; ``code`` says which (``too_many_days``, ``too_many_rows``)."""
+class ExportRefusal(StrEnum):
+    """Why an export is refused: which limit the filter goes over."""
 
-    def __init__(self, code: str) -> None:
+    TOO_MANY_DAYS = "too_many_days"
+    TOO_MANY_ROWS = "too_many_rows"
+
+
+class ExportRefused(Exception):  # noqa: N818 - a refusal with a code, like DomainError
+    """The export is over a limit; ``code`` says which."""
+
+    def __init__(self, code: ExportRefusal) -> None:
         """Store the code."""
         super().__init__(code)
         self.code = code
@@ -64,7 +72,7 @@ def export_window(
     end = until or now
     start = since or end - timedelta(days=limits.max_days)
     if end - start > timedelta(days=limits.max_days):
-        raise ExportRefused("too_many_days")
+        raise ExportRefused(ExportRefusal.TOO_MANY_DAYS)
     return start, end
 
 
