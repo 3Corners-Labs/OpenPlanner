@@ -15,7 +15,6 @@ from app.config import Settings
 from app.domain.configuration_document import document_filename
 from app.domain.configuration_package import package_filename
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
-from tests.support.configuration_package import PACKAGE_PASSPHRASE
 from tests.support.downloads import DOWNLOAD_MODULES
 
 SAFE_FILENAME = re.compile(r"^[a-z0-9.-]+$")
@@ -51,19 +50,6 @@ async def test_an_admin_download_has_a_safe_filename(site: Site, download: str) 
     await site.login_as(SUPER)
 
     response = await site.client.get(download)
-
-    assert response.status_code == 200
-    assert SAFE_FILENAME.fullmatch(_filename(response.headers["content-disposition"]))
-
-
-async def test_the_configuration_package_download_has_a_safe_filename(site: Site) -> None:
-    await site.login_as(SUPER)
-
-    response = await site.client.post(
-        "/admin/settings/package/export",
-        data={"passphrase": PACKAGE_PASSPHRASE, "passphrase_repeat": PACKAGE_PASSPHRASE},
-        headers=SAME_ORIGIN,
-    )
 
     assert response.status_code == 200
     assert SAFE_FILENAME.fullmatch(_filename(response.headers["content-disposition"]))

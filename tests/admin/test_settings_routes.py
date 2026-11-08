@@ -6,21 +6,23 @@ from pathlib import Path
 
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
+from app.adapters.db.backup import database_path
 from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import (
     AuditEventRow,
     BookingRow,
+    ClosureRow,
     GroupRow,
     PlatformSettingRow,
     SettingsVersionRow,
     SlotRow,
 )
-from app.adapters.integrations import installation_box
+from app.adapters.integrations import installation_box, secret_box
 from app.admin.settings_routes import _FIELD_LABELS
 from app.config import Settings
 from app.domain.authorization import Principal
@@ -29,6 +31,7 @@ from app.domain.tokens import derive_token, hash_token
 from app.web.protection import booking_limit, unknown_link_limit
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
 from tests.support.configuration_package import PACKAGE_PASSPHRASE
+from tests.support.legacy_package import export_package
 from tests.support.principals import principal
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
@@ -552,70 +555,107 @@ async def test_the_topic_form_sets_a_boolean_and_an_empty_secret_keeps_the_curre
     assert app.state.settings.smtp_password.get_secret_value() == SECRET
 
 
-# ADR 0089: the configuration package block.
+# ADR 0089 / ADR 0099 point 14: the old SQLite package is read for one release, no longer written.
 
 
-async def _export(site: Site) -> bytes:
-    response = await site.client.post(
+def _legacy_package(site: Site, tmp_path: Path) -> bytes:
+    """Return a SQLite package of the site, as the old export wrote it."""
+    settings: Settings = site.client._transport.app.state.settings  # type: ignore[attr-defined]  # noqa: SLF001
+    box = secret_box(settings)
+    assert box is not None
+    return export_package(
+        database_path(settings.database_url),
+        box,
+        PACKAGE_PASSPHRASE,
+        created_at=site.clock.now(),
+        installation="bron",
+        app_version="1.2.3",
+        environment={},
+        work_dir=tmp_path,
+    )
+
+
+async def test_the_package_block_offers_the_old_import_and_no_export(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/settings/package")).text
+    export = await site.client.post(
         "/admin/settings/package/export",
         data={"passphrase": PACKAGE_PASSPHRASE, "passphrase_repeat": PACKAGE_PASSPHRASE},
         headers=SAME_ORIGIN,
     )
-    assert response.status_code == 200, response.text
-    return response.content
 
-
-async def test_the_superuser_exports_a_package_and_imports_it_again(site: Site) -> None:
-    await site.login_as(SUPER)
-    page = (await site.client.get("/admin/settings/package")).text
     assert 'id="package-heading"' in page
+    assert 'action="/admin/settings/package/import"' in page
+    assert 'action="/admin/settings/package/export"' not in page
+    assert 'action="/admin/settings/configuration/export"' in page  # the document replaces it
+    assert export.status_code in (404, 405)
 
-    package = await _export(site)
 
-    assert package.startswith(b"SQLite format 3\x00")
+async def test_the_superuser_applies_an_old_package_as_a_replacing_document(
+    site: Site, tmp_path: Path
+) -> None:
+    await site.login_as(SUPER)
+    package = _legacy_package(site, tmp_path)
+
     response = await site.client.post(
         "/admin/settings/package/import",
         data={"passphrase": PACKAGE_PASSPHRASE, "confirm": "yes"},
         files={"package": ("config.sqlite", package, "application/vnd.sqlite3")},
         headers=SAME_ORIGIN,
     )
+
     assert response.status_code == 303, response.text
     assert (
         response.headers["location"]
         == "/admin/settings/package?done=package_imported&count=2#package-heading"
     )
     page = (await site.client.get(response.headers["location"])).text
-    assert "Het configuratiepakket is geïmporteerd: 2 organisatie(s)." in page
+    assert "Het configuratiepakket is als document toegepast: 2 organisatie(s)." in page
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     async with AsyncSession(app.state.engine) as session:
         rows = list(await session.scalars(select(AuditEventRow).order_by(AuditEventRow.id)))
     details = [row.detail for row in rows if row.detail.startswith("configuration.")]
-    assert details == [
-        "configuration.export",
-        "configuration.import,organisations:2,groups:2,identity_providers:0,api_clients:0,"
-        "secrets:0",
-    ]
+    assert details[-1] == (
+        "configuration.import,organisations:2,groups:2,identity_providers:0,api_clients:0,secrets:0"
+    )
+    assert "configuration.export" not in details
     assert all(PACKAGE_PASSPHRASE not in row.detail + row.reason for row in rows)
 
 
-async def test_a_mismatched_or_short_passphrase_refuses_the_export(site: Site) -> None:
+async def test_an_old_package_that_would_delete_what_is_in_use_is_refused_in_words(
+    site: Site, tmp_path: Path
+) -> None:
     await site.login_as(SUPER)
+    package = _legacy_package(site, tmp_path)
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    # The installation now has a group the package does not know, with an active closure.
+    async with AsyncSession(app.state.engine) as session, session.begin():
+        original = await session.scalar(select(GroupRow).order_by(GroupRow.id).limit(1))
+        assert original is not None
+        columns = {attr.key: getattr(original, attr.key) for attr in inspect(GroupRow).column_attrs}
+        columns.update(id=None, slug="kopie", idp_key="kopie", name="Kopie")
+        clone = GroupRow(**columns)
+        session.add(clone)
+        await session.flush()
+        session.add(
+            ClosureRow(
+                group_id=clone.id,
+                starts_at=site.clock.now() - timedelta(days=1),
+                ends_at=None,
+                created_at=site.clock.now() - timedelta(days=1),
+            )
+        )
 
-    mismatch = await site.client.post(
-        "/admin/settings/package/export",
-        data={"passphrase": PACKAGE_PASSPHRASE, "passphrase_repeat": "something else"},
+    response = await site.client.post(
+        "/admin/settings/package/import",
+        data={"passphrase": PACKAGE_PASSPHRASE, "confirm": "yes"},
+        files={"package": ("config.sqlite", package, "application/vnd.sqlite3")},
         headers=SAME_ORIGIN,
     )
-    short = await site.client.post(
-        "/admin/settings/package/export",
-        data={"passphrase": "short", "passphrase_repeat": "short"},
-        headers=SAME_ORIGIN,
-    )
 
-    assert mismatch.status_code == 422
-    assert short.status_code == 422
-    assert 'id="error-package" tabindex="-1" autofocus' in short.text  # opens at the error
-    assert "minstens 16 tekens" in short.text
+    assert response.status_code == 422
+    assert 'id="error-package" tabindex="-1" autofocus' in response.text
 
 
 async def test_an_import_without_the_confirmation_or_with_rubbish_is_refused(site: Site) -> None:
