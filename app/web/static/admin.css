@@ -1195,6 +1195,11 @@ fieldset.card {
   color: var(--adm-warning);
 }
 
+/* A chip with a label of several words: it wraps on a narrow screen instead of overflowing. */
+.chip--wrap {
+  white-space: normal;
+}
+
 .link-with-icon {
   display: inline-flex;
   align-items: center;
