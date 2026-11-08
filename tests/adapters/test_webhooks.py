@@ -110,3 +110,22 @@ def test_webex_event_key_identifies_one_event_without_personal_data() -> None:
     assert len(joined.event_key) == 64
     assert "a@x.nl" not in joined.event_key
     assert no_id.event_key == ""  # nothing to deduplicate on
+
+
+def test_a_wxcc_event_is_keyed_for_deduplication() -> None:
+    """ADR 0082 point 5: a replay of the same body has the same key; another event another."""
+    first = parse_wxcc(json.loads(wxcc_body("task:connected")))
+    again = parse_wxcc(json.loads(wxcc_body("task:connected")))
+    other = parse_wxcc(json.loads(wxcc_body("task:ended")))
+    assert first is not None
+    assert again is not None
+    assert other is not None
+    assert first.event_key == again.event_key != other.event_key
+    assert len(first.event_key) == 64
+    without_id = {"type": "task:ended", "data": {"taskId": "t", "createdTime": 1}}
+    unkeyed = parse_wxcc(without_id)  # a time could be the task's own: no key without an id
+    assert unkeyed is not None
+    assert unkeyed.event_key == ""
+    bare = parse_wxcc({"type": "task:ended", "data": {"taskId": "t"}})
+    assert bare is not None
+    assert bare.event_key == ""

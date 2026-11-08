@@ -43,6 +43,13 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.configuration_package import PackageSummary
+from app.domain.connection_health import (
+    HealthEntry,
+    InboundEvent,
+    Platform,
+    RequestSample,
+    StaleTask,
+)
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -279,6 +286,8 @@ class RequestRecord:
         error: The ``IntegrationError`` code the request ended in; empty on success.
         tracking_id: The platform's id of the request (Webex ``trackingId``), for its support.
         duration_ms: How long the request took.
+        platform: The connection whose health the request counts for (ADR 0082 point 7);
+            ``None`` for one that counts for neither (a visit to a Webex page).
     """
 
     method: str
@@ -287,6 +296,7 @@ class RequestRecord:
     error: str = ""
     tracking_id: str = ""
     duration_ms: int = 0
+    platform: Platform | None = None
 
 
 class RequestLog(Protocol):
@@ -1393,6 +1403,54 @@ class Transaction(Protocol):
 
     async def count_group_jobs(self, group_id: int, overdue_before: datetime) -> JobCounts:
         """Count the group's failed jobs and its pending jobs planned before ``overdue_before``."""
+        ...
+
+    async def request_samples(self, since: datetime) -> list[RequestSample]:
+        """Return the ``integration.request`` events at or after ``since`` that name a platform.
+
+        ADR 0082 point 7: the health state is computed from these (outcome, organisation,
+        platform, time); events written before the platform was recorded are left out.
+        """
+        ...
+
+    async def token_refresh_failed_since(self, since: datetime) -> bool:
+        """Return whether a Webex token refresh failed at or after ``since``.
+
+        The security event ``webex.token_refresh``; the Service App is shared, so it counts for
+        every organisation.
+        """
+        ...
+
+    async def failed_probe_organisations(self, since: datetime) -> frozenset[str]:
+        """Return the organisations whose group check failed on its probe work item since ``since``.
+
+        An ``integration.check`` failure with a ``wxcc.probe.*`` reason (ADR 0082 point 2).
+        """
+        ...
+
+    async def get_health(self) -> tuple[HealthEntry, ...]:
+        """Return the health of every connection as last evaluated (ADR 0082 point 7)."""
+        ...
+
+    async def save_health(self, entries: Sequence[HealthEntry], at: datetime) -> None:
+        """Replace the stored health of every connection."""
+        ...
+
+    async def save_inbound_event(self, event: InboundEvent) -> None:
+        """Store ``event`` as its platform's latest verified webhook (ADR 0082 point 5)."""
+        ...
+
+    async def get_inbound_events(self) -> tuple[InboundEvent, ...]:
+        """Return each platform's latest verified webhook, if any came in."""
+        ...
+
+    async def stale_tasks(self, unchanged_before: datetime, limit: int) -> list[StaleTask]:
+        """Return up to ``limit`` bookings whose task a webhook should have moved by now.
+
+        Their call status is ``queued`` or ``connected``, the booking started before
+        ``unchanged_before`` and its status has not changed since then; the booking still has
+        its task id (not purged). The longest unchanged come first (ADR 0082 point 6).
+        """
         ...
 
     async def save_worker_heartbeat(self, heartbeat: WorkerHeartbeat) -> None:

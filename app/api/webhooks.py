@@ -3,8 +3,9 @@
 Authenticated by signature, not by an admin session: the secret is configured per
 installation (``WEBEX_WEBHOOK_SECRET``, ``WXCC_WEBHOOK_SECRET``); without it the endpoint
 does not exist (404). The body is size-capped and verified before it is parsed. Unknown
-meetings, tasks and event types, and Webex events seen before (replays), are acknowledged and
-ignored, so the platforms do not retry.
+meetings, tasks and event types, and events seen before (replays), are acknowledged and
+ignored, so the platforms do not retry. Every verified webhook is noted as its platform's latest
+inbound event, for *Koppelingen* and *System status* (ADR 0082 point 5).
 
     POST /webhooks/webex   meetings started/ended, participants joined/left
     POST /webhooks/wxcc    task:new, task:connected, task:ended, task:failed
@@ -18,7 +19,9 @@ from fastapi import APIRouter, Request
 from starlette.responses import Response
 
 from app.adapters.webhooks import parse_webex, parse_wxcc, verify_webex, verify_wxcc
-from app.domain.integration import IntegrationService
+from app.domain.connection_health import InboundEvent, Platform
+from app.domain.integration import EventOutcome, IntegrationService
+from app.domain.integration_health import IntegrationHealthService
 from app.domain.ports import Clock
 from app.domain.security_log import INVALID_SIGNATURE, WEBHOOK_REJECTED
 from app.web.protection import limiter
@@ -79,8 +82,9 @@ async def webex(request: Request) -> Response:
     if payload is None:
         return Response(status_code=400)
     event = parse_webex(payload)
+    clock: Clock = request.app.state.clock
+    outcome = EventOutcome.IGNORED
     if event is not None:
-        clock: Clock = request.app.state.clock
         outcome = await _service(request).record_meeting_event(
             event.target_id, event.kind, clock.now(), event_key=event.event_key
         )
@@ -90,6 +94,7 @@ async def webex(request: Request) -> Response:
             outcome=outcome.value,
             meeting_id=event.target_id.split("_I_", 1)[0],
         )
+    await _note(request, Platform.WEBEX, _webex_kind(payload), outcome)
     return Response(status_code=204)
 
 
@@ -118,9 +123,26 @@ async def wxcc(request: Request) -> Response:
     if payload is None:  # pragma: no cover - verify_wxcc already requires an object
         return Response(status_code=400)
     event = parse_wxcc(payload)
+    outcome = EventOutcome.IGNORED
     if event is not None:
         outcome = await _service(request).record_task_event(
-            event.target_id, event.kind, clock.now(), event.detail
+            event.target_id, event.kind, clock.now(), event.detail, event_key=event.event_key
         )
         log.info("webhook.wxcc", kind=event.kind.value, outcome=outcome.value)
+    await _note(request, Platform.WXCC, str(payload.get("type", ""))[:64], outcome)
     return Response(status_code=204)
+
+
+def _webex_kind(payload: dict[str, Any]) -> str:
+    """Return a Webex event's type as ``resource:event`` (codes only)."""
+    return f"{payload.get('resource', '')}:{payload.get('event', '')}"[:64]
+
+
+async def _note(request: Request, platform: Platform, kind: str, outcome: EventOutcome) -> None:
+    """Note a verified webhook as its platform's latest (ADR 0082 point 5); never fails it."""
+    health: IntegrationHealthService = request.app.state.health_service
+    clock: Clock = request.app.state.clock
+    try:
+        await health.note_inbound(InboundEvent(platform, clock.now(), kind, outcome.value))
+    except Exception as exc:  # the event is recorded; its note must not turn into a 500
+        log.warning("webhook.note_failed", source=platform.value, error=type(exc).__name__)

@@ -9685,6 +9685,90 @@ msgstr "Doorgaan naar de inlogdienst"
 msgid "admin.alerts.text.check"
 msgstr "De controle van de koppeling van deze groep vond een probleem ({code}). Open de groep en kies Koppeling controleren voor de uitleg."
 
+msgid "settings.field.task_reconcile_interval_minutes.label"
+msgstr "Taakstatus nalopen elke (minuten)"
+
+msgid "settings.field.task_reconcile_after_minutes.label"
+msgstr "Taak nalopen na stilte van (minuten)"
+
+msgid "settings.field.integration_health_window_minutes.label"
+msgstr "Venster voor de gezondheid van koppelingen (minuten)"
+
+msgid "settings.field.integration_degraded_failure_percent.label"
+msgstr "Verstoord boven dit aandeel mislukte verzoeken (%)"
+
+msgid "settings.field.integration_down_failure_percent.label"
+msgstr "Onbereikbaar boven dit aandeel mislukte verzoeken (%)"
+
+msgid "settings.field.integration_recovery_minutes.label"
+msgstr "Hersteld na zoveel minuten zonder fouten"
+
+msgid "admin.alerts.source.connection"
+msgstr "Koppeling met Webex of het contactcenter"
+
+msgid "admin.alerts.source.webhooks_missing"
+msgstr "Meldingen van het contactcenter"
+
+msgid "admin.alerts.text.connection"
+msgstr "Een koppeling van deze organisatie is verstoord of onbereikbaar ({code}). Open Koppelingen voor de staat per platform."
+
+msgid "admin.alerts.text.webhooks_missing"
+msgstr "Het contactcenter meldde taken niet terug; OpenPlanner heeft ze zelf nagelopen. Controleer de webhook-registratie op Koppelingen."
+
+msgid "admin.integrations.health.ok"
+msgstr "In orde"
+
+msgid "admin.integrations.health.unknown"
+msgstr "Onbekend (te weinig verzoeken)"
+
+msgid "admin.integrations.health.degraded"
+msgstr "Verstoord"
+
+msgid "admin.integrations.health.down"
+msgstr "Onbereikbaar"
+
+msgid "admin.integrations.health.platform_wide"
+msgstr "Hele platform"
+
+msgid "admin.integrations.platform.webex"
+msgstr "Webex"
+
+msgid "admin.integrations.platform.wxcc"
+msgstr "Contactcenter (WxCC)"
+
+msgid "admin.integrations.health"
+msgstr "Gezondheid en laatste meldingen"
+
+msgid "admin.integrations.health_lead"
+msgstr "Hoe het met de koppelingen gaat, berekend uit de verzoeken van het afgelopen kwartier, en wanneer elk platform voor het laatst iets meldde."
+
+msgid "admin.integrations.inbound"
+msgstr "Laatste melding per platform"
+
+msgid "admin.integrations.inbound_at"
+msgstr "laatste melding {time}"
+
+msgid "admin.integrations.inbound_none"
+msgstr "Nog geen melding binnengekomen."
+
+msgid "admin.integrations.health_states"
+msgstr "Gezondheid per organisatie"
+
+msgid "admin.integrations.health_none"
+msgstr "Nog niet berekend; de worker doet dat elke paar minuten."
+
+msgid "admin.integrations.col.organisation"
+msgstr "Organisatie"
+
+msgid "admin.integrations.col.since"
+msgstr "Sinds"
+
+msgid "admin.integrations.col.failures"
+msgstr "Mislukt"
+
+msgid "admin.integrations.failures_of"
+msgstr "{failures} van {requests}"
+
 msgid "booking.routing.subject.label"
 msgstr "Waarover gaat uw afspraak?"
 

@@ -215,3 +215,16 @@ booking. `task:connected` carries no agent identity, which is why the
 agent's host role comes from `allowAnyUserToBeCoHost` (ADR 0017). `task:failed` carries
 `reason` (for example `ENTRY_POINT_NOT_FOUND`, `ORG_DIGITAL_CONTACT_LIMIT_EXCEEDED`), shown to
 admins on the booking's timeline.
+
+Deduplication and last event (ADR 0082 point 5): every verified WxCC event of a booking's task is
+keyed by a SHA-256 digest of its type, `data.taskId` and the CloudEvent `id` (without an `id`:
+the event's own time), stored in `webhook_events` for 30 days like the Webex keys. A redelivered
+or replayed event is acknowledged with 204, logged with outcome `duplicate` and changes nothing.
+Every verified webhook of either platform is noted as that platform's last inbound event (time,
+type, outcome), shown on **Koppelingen** and *System status*.
+
+Reconcile (ADR 0082 point 6): when a task stays `queued` or `connected` longer than
+`task_reconcile_after_minutes` past its start and its last change, the worker reads it with
+`GET /v1/tasks/{taskId}` (status word and times only). A different state is written on the
+booking's timeline as the matching event with detail `reconciled`, and the organisation gets the
+system event `integration.webhooks_missing` (an alert) until a run finds nothing missed.

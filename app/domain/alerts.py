@@ -36,6 +36,8 @@ from app.domain.authorization import (
     decide,
     scope_for,
 )
+from app.domain.connection_health import HEALTH_EVENT as CONNECTION_HEALTH
+from app.domain.connection_health import WEBHOOKS_MISSING, HealthState
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.log_destinations import HEALTH_EVENT
 from app.domain.ports import Clock, UnitOfWork
@@ -155,6 +157,12 @@ ALERT_RULES: tuple[AlertRule, ...] = (
     AlertRule(CHECK_EVENT, Permission.AUDIT_VIEW),
     # ADR 0061 OV-7: participants wait longer than the organisation's warning threshold.
     AlertRule(QUEUE_WAIT_EVENT, Permission.QUEUE_WORK),
+    # ADR 0082 point 7: a connection of the organisation is degraded (warning) or down.
+    AlertRule(
+        CONNECTION_HEALTH, Permission.AUDIT_VIEW, frozenset({HealthState.DOWN.value}), "platform"
+    ),
+    # ADR 0082 point 6: the reconcile found states the webhooks did not bring.
+    AlertRule(WEBHOOKS_MISSING, Permission.AUDIT_VIEW),
 )
 """Every condition event that raises an alert; a test checks that each watch writes one."""
 

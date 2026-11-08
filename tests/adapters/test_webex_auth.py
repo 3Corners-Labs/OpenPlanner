@@ -315,3 +315,11 @@ async def test_a_failing_request_log_never_fails_the_request() -> None:
     response = await client.request("GET", "https://webexapis.com/v1/meetings")
 
     assert response.status_code == 200
+
+
+def test_a_request_host_names_its_platform() -> None:
+    """ADR 0082 point 7: the health counts a request for the connection its host belongs to."""
+    from app.adapters.webex_auth import platform_of_host
+
+    assert platform_of_host("api.wxcc-eu1.cisco.com") == "wxcc"
+    assert platform_of_host("webexapis.com") == "webex"
