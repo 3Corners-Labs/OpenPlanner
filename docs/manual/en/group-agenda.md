@@ -87,7 +87,9 @@ number or the address calls or mails from your own program.
   screenshot for Webex support.
 - Only the button on the page itself shows them. When you open the page through a shared link
   (in a mail or chat), a bookmark or a link on another website or page, they are not shown and
-  nothing goes into the audit log; choose **Show contact details** yourself.
+  nothing goes into the audit log; choose **Show contact details** yourself. If the button
+  does not show them either, your browser or the network does not pass on which page you came
+  from (the *referrer*); ask your administrator to allow it for the portal.
 - When the booking's personal data have been deleted (see
   [Data fields and personal data](data-fields.md)), the page says so and there is nothing left
   to show.

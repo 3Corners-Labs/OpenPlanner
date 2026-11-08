@@ -90,7 +90,9 @@ het nummer of het adres belt of mailt u vanuit uw eigen programma.
   schermafdruk maakt voor Webex-support.
 - Alleen de knop op de pagina zelf toont ze. Opent u de pagina via een gedeelde link (in een
   mail of chat), een bladwijzer of een link op een andere website of pagina, dan staan ze er
-  niet en komt er niets in het auditlog; kies dan zelf **Contactgegevens tonen**.
+  niet en komt er niets in het auditlog; kies dan zelf **Contactgegevens tonen**. Toont ook de
+  knop ze niet, dan geeft uw browser of het netwerk niet door vanaf welke pagina u kwam (de
+  *referrer*); vraag uw beheerder dat voor het portaal toe te staan.
 - Zijn de persoonsgegevens van de afspraak verwijderd (zie
   [Gegevensvelden en persoonsgegevens](data-fields.md)), dan staat dat er en is er niets meer
   te tonen.

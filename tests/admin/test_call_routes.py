@@ -381,9 +381,10 @@ async def test_the_contact_details_show_only_on_request_and_each_request_is_audi
         ({}, ""),
         ({}, "https://elders.example/"),
         (SAME_ORIGIN, ""),
-        (SAME_ORIGIN, "/admin/groups/demo/agenda"),
+        (SAME_ORIGIN, "http://testserver/admin/groups/demo/agenda"),
         ({}, "http://testserver.example/admin/groups/demo/bookings/ID"),
         ({**SAME_ORIGIN, "sec-purpose": "prefetch;prerender"}, "PAGE"),
+        ({**SAME_ORIGIN, "purpose": "prefetch"}, "PAGE"),
     ],
     ids=[
         "cross-site",
@@ -395,6 +396,7 @@ async def test_the_contact_details_show_only_on_request_and_each_request_is_audi
         "other-page-of-the-portal",
         "look-alike-host",
         "prerender",
+        "legacy-prefetch",
     ],
 )
 async def test_only_the_button_on_the_page_shows_the_contact_details(
