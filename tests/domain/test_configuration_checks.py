@@ -119,13 +119,13 @@ def test_a_setting_outside_its_type_or_bounds_is_refused_by_key(key: str, value:
 
 
 def test_a_value_that_production_never_uses_is_refused_only_there() -> None:
-    spec = BY_KEY["update_auto_apply"]
+    spec = BY_KEY["update_channel"]
 
-    assert setting_value(spec, True) is True
+    assert setting_value(spec, "rc") == "rc"
     with pytest.raises(DomainError) as error:
-        setting_value(spec, True, production=True)
+        setting_value(spec, "rc", production=True)
     assert error.value.code is ErrorCode.SETTING_INVALID
-    assert setting_value(spec, False, production=True) is False
+    assert setting_value(spec, "release", production=True) == "release"
 
 
 def test_a_secret_setting_is_not_a_plain_value() -> None:

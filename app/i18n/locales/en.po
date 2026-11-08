@@ -8841,6 +8841,12 @@ msgstr "The document names something outside the organisation it applies to."
 msgid "admin.form.error.configuration_object_in_use"
 msgstr "This object is still used by bookings, slots or an active closure and cannot be deleted."
 
+msgid "admin.form.error.scenario_name_taken"
+msgstr "A scenario with this name already exists. Choose another name."
+
+msgid "admin.form.error.alert_target_taken"
+msgstr "This alert target already exists."
+
 msgid "admin.form.error.configuration_capacity_below_booked"
 msgstr "The capacity is lower than the number of places already booked."
 

@@ -8854,6 +8854,12 @@ msgstr "Het document noemt iets buiten de organisatie waarvoor het geldt."
 msgid "admin.form.error.configuration_object_in_use"
 msgstr "Dit object wordt nog gebruikt door afspraken, tijdsloten of een actieve sluiting en kan niet worden verwijderd."
 
+msgid "admin.form.error.scenario_name_taken"
+msgstr "Er is al een scenario met deze naam. Kies een andere naam."
+
+msgid "admin.form.error.alert_target_taken"
+msgstr "Dit alarmdoel bestaat al."
+
 msgid "admin.form.error.configuration_capacity_below_booked"
 msgstr "De capaciteit is lager dan het aantal plaatsen dat al is geboekt."
 
