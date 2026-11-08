@@ -209,9 +209,11 @@ def group_page(
         locale,
         object_page("group"),
         summary.group.slug,
-        lambda permission: can(permission, summary),
+        lambda screen: (
+            can(screen.permission, summary)
+            and (summary.group.has_own_queue or screen.key not in OWN_QUEUE_TABS)
+        ),
         current_home(request),
-        frozenset() if summary.group.has_own_queue else OWN_QUEUE_TABS,
     )
     response = page(
         request,

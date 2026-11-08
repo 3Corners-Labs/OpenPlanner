@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 
+from app.admin.group_routes import OWN_QUEUE_TABS
 from app.admin.pages import object_tabs
 from app.domain.authorization import Permission
 from app.web.navigation import Home, home_of, object_page
@@ -17,7 +18,7 @@ def _tabs(granted: set[Permission], home: Home | None) -> tuple[dict[str, str], 
         LOCALE,  # type: ignore[arg-type]
         object_page("organisation"),
         "demo",
-        lambda permission: permission in granted,
+        lambda screen: screen.permission in granted,
         home,
     )
     return {t.label: t.href for t in tabs}, [r.label for r in row]
@@ -60,3 +61,29 @@ def test_without_any_of_its_pages_there_is_no_participants_tab() -> None:
     tabs, _ = _tabs({Permission.ORGANISATION_VIEW}, None)
 
     assert "admin.tab.participants" not in tabs
+
+
+def test_every_own_queue_key_is_a_screen_of_the_group() -> None:
+    """``OWN_QUEUE_TABS`` names register keys; a renamed key must not show the queue to all."""
+    group = object_page("group")
+    keys = {s.key for tab in group.tabs for s in (tab, *tab.subtabs)}
+
+    assert keys >= OWN_QUEUE_TABS
+
+
+def test_a_hidden_sub_tab_leaves_its_tab_without_a_second_row() -> None:
+    """ADR 0047 step 4: on a group without the own queue, *Agenda* has no *Queue* row."""
+    granted = {Permission.BOOKINGS_VIEW, Permission.QUEUE_WORK}
+
+    def row(shows_queue: bool) -> list[str]:
+        _, sub = object_tabs(
+            LOCALE,  # type: ignore[arg-type]
+            object_page("group"),
+            "demo",
+            lambda s: s.permission in granted and (shows_queue or s.key not in OWN_QUEUE_TABS),
+            home_of("/admin/groups/{slug}/agenda"),
+        )
+        return [r.label for r in sub]
+
+    assert row(True) == ["admin.tab.agenda", "admin.tab.queue"]
+    assert row(False) == []

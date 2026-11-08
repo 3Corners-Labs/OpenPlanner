@@ -93,19 +93,17 @@ def object_tabs(
     locale: RequestLocale,
     obj: ObjectPage,
     slug: str,
-    can: Callable[[Permission], bool],
+    shows: Callable[[Screen], bool],
     home: Home | None,
-    hidden: frozenset[str] = frozenset(),
 ) -> tuple[list[NavView], list[NavView]]:
     """Return the visible tabs of ``obj`` for the object ``slug``, and the current tab's row.
 
-    A tab or sub-tab shows only if the matrix grants its permission (``can``). A tab with
+    A tab or sub-tab shows only if ``shows`` says so: the matrix grants its permission, and
+    the caller may add a rule of the object (the own queue of a group, ADR 0043). A tab with
     sub-tabs also shows when only one of its sub-tabs is granted (ADR 0105): it then leads to
     the first page the admin may open, so nobody loses the way to a page they were allowed.
     The second row holds the current tab's own page, when granted, followed by its visible
-    sub-tabs, and is empty when it would hold fewer than two. A screen whose key is in
-    ``hidden`` does not apply to this object (the own queue of a group that dispatches
-    elsewhere, ADR 0043) and never shows.
+    sub-tabs, and is empty when it would hold fewer than two.
     """
     placeholder = obj.path.rsplit("/", 1)[-1]
 
@@ -120,13 +118,9 @@ def object_tabs(
             screen.icon,
         )
 
-    def shown(screen: Screen) -> bool:
-        """Return whether ``screen`` applies to this object and the matrix grants it."""
-        return screen.key not in hidden and can(screen.permission)
-
     def first_page(tab: Screen) -> Screen | None:
         """Return the first page of ``tab`` the matrix grants, its own page first."""
-        return next((s for s in (tab, *tab.subtabs) if shown(s)), None)
+        return next((s for s in (tab, *tab.subtabs) if shows(s)), None)
 
     tabs = [
         view(tab, home is not None and home.tab == tab.key, first_page(tab))
@@ -139,9 +133,9 @@ def object_tabs(
     row = [
         view(sub, home is not None and home.subtab == sub.key)
         for sub in current.subtabs
-        if shown(sub)
+        if shows(sub)
     ]
-    if shown(current):
+    if shows(current):
         row.insert(0, view(current, home is not None and home.subtab is None, own=True))
     return tabs, row if len(row) > 1 else []
 
@@ -177,8 +171,13 @@ def organisation_header(
     request: Request, locale: RequestLocale, principal: Principal, name: str, slug: str
 ) -> ObjectHeader:
     """Return the header of organisation ``slug``'s pages, with the tabs the matrix allows."""
+    can = can_function(principal)
     tabs, subtabs = object_tabs(
-        locale, object_page("organisation"), slug, can_function(principal), current_home(request)
+        locale,
+        object_page("organisation"),
+        slug,
+        lambda screen: can(screen.permission),
+        current_home(request),
     )
     return ObjectHeader(name, slug, tabs, subtabs)
 
