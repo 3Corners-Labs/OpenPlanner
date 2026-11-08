@@ -67,6 +67,17 @@
   {% else %}
   <p>{{ _("admin.settings.backups.none") }}</p>
   {% endif %}
+  <h3 id="usage-heading">{{ _("admin.settings.usage.title") }}</h3>
+  <p>{{ _("admin.settings.usage.intro") }}</p>
+  {% if usage.warning %}<p role="alert"><span class="chip chip--warning">{{ _("admin.settings.usage.chip") }}</span> {{ usage.warning }}</p>{% endif %}
+  {% if usage.enabled %}
+  <dl class="facts" aria-labelledby="usage-heading">
+    <div><dt>{{ _("admin.settings.usage.pending") }}</dt><dd>{{ usage.pending }}</dd></div>
+    <div><dt>{{ _("admin.settings.usage.last_run") }}</dt><dd>{% if usage.last_run %}{{ usage.last_run }}{% else %}{{ _("admin.settings.usage.never") }}{% endif %}</dd></div>
+  </dl>
+  {% else %}
+  <p>{{ _("admin.settings.usage.off") }}</p>
+  {% endif %}
   <h3 id="address-heading">{{ _("admin.settings.address.title") }}</h3>
   <p>{{ _("admin.settings.address.intro") }}</p>
   {% if address.hop_warning %}<p><span class="chip chip--warning">{{ _("admin.overview.widget.status.proxy") }}</span> {{ address.hop_warning }}</p>{% endif %}

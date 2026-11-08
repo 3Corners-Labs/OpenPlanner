@@ -74,6 +74,7 @@ from app.admin.pages import page as _page
 from app.admin.session import save_login_trial
 from app.admin.staff_directory_routes import directory_service
 from app.admin.uploads import read_uploads
+from app.admin.usage_view import usage_view
 from app.config import Settings
 from app.domain.authorization import Permission
 from app.domain.configuration_package import (
@@ -668,6 +669,7 @@ async def _overview(
             "environment": current.environment,
             "address": await address_view(request, locale, current),
             "backups": backup_view(request, locale, current),
+            "usage": await usage_view(request, locale, current),
             "certificate": await _certificate(request, locale),
             "log_summary": await _log_summary(request, context),
             "directory": await _directory_status(request, locale),

@@ -9278,6 +9278,33 @@ msgstr "Erase data"
 msgid "admin.rights.sections"
 msgstr "Parts of My rights"
 
+msgid "admin.settings.usage.title"
+msgstr "Usage reporting"
+
+msgid "admin.settings.usage.intro"
+msgstr "Every booking change leaves a small fact without personal data. The worker adds the facts to the hourly figures the reports read; if it falls behind, the reports show old figures."
+
+msgid "admin.settings.usage.pending"
+msgstr "Facts waiting"
+
+msgid "admin.settings.usage.last_run"
+msgstr "Last rolled up"
+
+msgid "admin.settings.usage.never"
+msgstr "Not yet"
+
+msgid "admin.settings.usage.chip"
+msgstr "Warning"
+
+msgid "admin.settings.usage.behind"
+msgstr "The usage facts have waited longer than {minutes} minutes: the worker is behind or not running, and the reports show older figures."
+
+msgid "admin.settings.usage.unreadable"
+msgstr "The usage figures could not be read from the database."
+
+msgid "admin.settings.usage.off"
+msgstr "Usage reporting is switched off: no facts are written."
+
 msgid "admin.settings.backups.title"
 msgstr "Update back-ups"
 
@@ -9352,6 +9379,15 @@ msgstr "This user name is already in use. Choose another."
 
 msgid "settings.field.reporting_enabled.label"
 msgstr "Usage reports are fed"
+
+msgid "settings.field.reporting_event_retention_days.label"
+msgstr "Usage facts kept (days)"
+
+msgid "settings.field.reporting_retention_months.label"
+msgstr "Usage figures kept (months)"
+
+msgid "settings.field.reporting_rollup_interval_minutes.label"
+msgstr "Usage rollup every (minutes)"
 
 msgid "settings.field.overview_live_enabled.label"
 msgstr "Overview refreshes itself"

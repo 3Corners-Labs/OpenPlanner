@@ -67,8 +67,10 @@ __all__ = [
     "IntegrationReportRow",
     "BookingEventRow",
     "CallStatusRow",
+    "UsageBackfillRow",
     "UsageEventRow",
     "UsageHourRow",
+    "UsageRollupStateRow",
     "UsageStaffHourRow",
     "ChannelSettingsRow",
     "GroupTextRow",
@@ -881,6 +883,7 @@ class UsageEventRow(Base):
     __table_args__ = (
         Index("ix_usage_events_scope_hour", "organisation_id", "group_id", "bucket_hour"),
         Index("ix_usage_events_bucket_hour", "bucket_hour"),
+        {"sqlite_autoincrement": True},  # an id below the watermark must never come back
     )
 
 
@@ -941,6 +944,28 @@ class UsageStaffHourRow(Base):
             "metric",
             "bucket_hour",
         ),
+    )
+
+
+class UsageRollupStateRow(Base):
+    """The rollup's watermark: the last usage fact rolled into ``usage_hour`` (one row, id 1)."""
+
+    __tablename__ = "usage_rollup_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    last_event_id: Mapped[int] = mapped_column(Integer)
+    rolled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    backfilled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    backfill_cutoff: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+
+class UsageBackfillRow(Base):
+    """A booking already turned into usage facts by the backfill: a booking id, nothing else."""
+
+    __tablename__ = "usage_backfill"
+
+    booking_id: Mapped[int] = mapped_column(
+        ForeignKey("bookings.id", ondelete="CASCADE"), primary_key=True, autoincrement=False
     )
 
 

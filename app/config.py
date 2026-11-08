@@ -239,6 +239,11 @@ class Settings(BaseSettings):
     # ADR 0117 (class C, platform): whether state changes are written as usage facts for the
     # reports. A feature switch, not a protection: off writes nothing and hides the screens.
     reporting_enabled: bool = True
+    # ADR 0117 (class C, platform): how long a usage fact stays as the outbox and rebuild source,
+    # how long the hourly rollup lives, and how often the worker rolls facts up.
+    reporting_event_retention_days: int = Field(default=35, ge=7, le=90)
+    reporting_retention_months: int = Field(default=25, ge=13, le=60)
+    reporting_rollup_interval_minutes: int = Field(default=15, ge=5, le=240)
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
