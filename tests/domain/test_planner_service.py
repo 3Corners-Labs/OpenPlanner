@@ -497,3 +497,27 @@ async def test_a_pending_booking_can_be_cancelled_but_not_asked_to_rebook(
 
     assert uow.state.bookings[first.booking.id or 0].status is BookingStatus.CANCELLED
     assert uow.state.bookings[second.booking.id or 0].status is BookingStatus.PENDING_CONFIRMATION
+
+
+async def test_a_pending_booking_is_told_by_email_only_and_the_team_gets_no_withdrawal(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0056: never sent to the team nor by SMS, so nothing of either on a change."""
+    uow.state.groups[1] = with_team_invite(uow.state.groups[1])
+    contact = replace(participant(next(_PARTICIPANTS)), phone="+31612345678")
+    moving = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    cancelling = await book_pending(bookings, slug="demo", contact=contact)
+
+    moved = await planner.move(GROUP_ADMIN, "demo", moving.booking.id or 0, SLOT_0930)
+    await planner.cancel(GROUP_ADMIN, "demo", cancelling.booking.id or 0, ChangeReason.STAFFING)
+
+    old_jobs = {j.type for j in uow.state.jobs[moving.booking.id or 0]}
+    new_jobs = {j.type for j in uow.state.jobs[moved.id or 0]}
+    cancel_jobs = _messages(uow, cancelling.booking.id or 0)
+    assert JobType.SEND_TEAM_CANCEL not in old_jobs
+    assert JobType.SEND_CONFIRM_REQUEST in new_jobs
+    assert JobType.SEND_CHANGE not in new_jobs
+    assert cancel_jobs == {(JobType.SEND_CANCELLATION, ChannelKind.EMAIL)}
+    assert JobType.SEND_TEAM_CANCEL not in {
+        j.type for j in uow.state.jobs[cancelling.booking.id or 0]
+    }
