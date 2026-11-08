@@ -45,6 +45,7 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.configuration_changes import Change, ConfigurationSnapshot
+from app.domain.configuration_document import Document
 from app.domain.configuration_package import PackageSummary
 from app.domain.connection_health import (
     HealthEntry,
@@ -580,20 +581,12 @@ class CertificateVolume(Protocol):
 
 
 class ConfigurationTransfer(Protocol):
-    """Reads and writes configuration packages (ADR 0089): SQLite files, secrets re-sealed.
+    """Reads configuration packages (ADR 0089), SQLite files, for one release (ADR 0099).
 
-    The adapter opens the installation's sealed values with its own key and seals them under
-    the package's passphrase on export, and the other way round on import. It never logs or
-    returns a passphrase or an opened value.
+    The adapter opens a package with its passphrase, seals its secrets under the
+    installation's key and returns it as a document. It never logs or returns a passphrase or
+    an opened value outside the document's secrets.
     """
-
-    async def export(self, passphrase: str) -> bytes:
-        """Return a package of this installation sealed under ``passphrase``.
-
-        Raises:
-            DomainError: ``integration_not_ready`` without a settings key.
-        """
-        ...
 
     async def inspect(self, package: bytes, passphrase: str) -> PackageSummary:
         """Return what ``package`` holds, once ``passphrase`` opens it.
@@ -604,17 +597,13 @@ class ConfigurationTransfer(Protocol):
         """
         ...
 
-    async def import_(self, package: bytes, passphrase: str) -> PackageSummary:
-        """Replace every configuration table with the package's; return its summary.
+    async def to_document(self, package: bytes, passphrase: str) -> tuple[Document, PackageSummary]:
+        """Return the package as a ``replace`` document of the platform, and its summary.
 
         Raises:
             DomainError: The codes of ``inspect``; ``configuration_package_version`` when the
                 schema revisions differ; ``integration_not_ready`` without a settings key.
         """
-        ...
-
-    async def in_use(self) -> bool:
-        """Return whether the installation has bookings, slots or an active closure."""
         ...
 
 
