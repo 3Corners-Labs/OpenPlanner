@@ -2164,6 +2164,24 @@ until then the proxy serves Let's Encrypt. The same holds for `proxy-data` (the 
 account): keep it with the host, or let Caddy obtain a certificate again.
 
 
+## Configuration document (ADR 0099)
+
+The readable successor of the package below: a JSON file (`docs/configuration-document.md`) that
+works across versions and on an installation in use. On the host:
+
+```bash
+python -m app.cli config export --format json --passphrase-file pass.txt config.json
+python -m app.cli config plan config.json --passphrase-file pass.txt
+python -m app.cli config apply config.json --passphrase-file pass.txt --plan-hash HASH
+```
+
+Read the plan first: it lists every change by action, kind and natural key, and every refusal.
+A refusal (`configuration_object_in_use`, `configuration_capacity_below_booked`,
+`configuration_out_of_scope`, `not_permitted`) means nothing is applied. After an apply the web
+and worker processes reload the settings within ten seconds. The audit log holds one event per
+changed object (`configuration.apply`, with the plan hash prefix). A passphrase file is read
+from disk, never from the command line.
+
 ## Configuration package (ADR 0089)
 
 A package is every setting of an installation (organisations, groups, texts, channels, identity

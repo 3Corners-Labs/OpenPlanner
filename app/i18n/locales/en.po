@@ -8808,6 +8808,9 @@ msgstr "Largest unpacked size of an uploaded font (bytes)"
 msgid "settings.field.configuration_package_max_mb.label"
 msgstr "Largest configuration package (MB)"
 
+msgid "settings.field.configuration_apply_max_changes.label"
+msgstr "Most changes in one configuration document"
+
 msgid "admin.done.package_imported"
 msgstr "The configuration package has been imported: {count} organisation(s). The processes pick up the new settings within ten seconds."
 
@@ -8846,6 +8849,12 @@ msgstr "The document names something outside the organisation it applies to."
 
 msgid "admin.form.error.configuration_object_in_use"
 msgstr "This object is still used by bookings, slots or an active closure and cannot be deleted."
+
+msgid "admin.form.error.configuration_plan_stale"
+msgstr "The configuration changed since the plan was made, or the plan is missing. Make the plan again and check it."
+
+msgid "admin.form.error.configuration_too_many_changes"
+msgstr "This document changes more objects at once than allowed. Split the document or raise the setting."
 
 msgid "admin.form.error.scenario_name_taken"
 msgstr "A scenario with this name already exists. Choose another name."

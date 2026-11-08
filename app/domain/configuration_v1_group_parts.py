@@ -187,7 +187,7 @@ def check_reminders(
     return rules
 
 
-def _definition(raw: Mapping[str, Json]) -> FieldDefinition:
+def definition(raw: Mapping[str, Json]) -> FieldDefinition:
     """Build a form field from its item, which runs every check of the form screen."""
     options = raw.get("option_labels", {})
     if not isinstance(options, dict):
@@ -208,7 +208,7 @@ def _definition(raw: Mapping[str, Json]) -> FieldDefinition:
     )
 
 
-def _form_json(definition: FieldDefinition) -> dict[str, Json]:
+def form_json(definition: FieldDefinition) -> dict[str, Json]:
     """Write a form field as the item the document and the export hold."""
     return {
         "key": definition.key,
@@ -256,7 +256,7 @@ def check_form(
             raise invalid("type", ErrorCode.INVALID_FORM_FIELD)
         if old is not None and old.get("retired") and not item.get("retired"):
             raise invalid("key", ErrorCode.INVALID_FORM_FIELD)
-        (retired if item.get("retired") else active).append(_definition(item))
+        (retired if item.get("retired") else active).append(definition(item))
     was_active = {key for key, old in existing.items() if not old.get("retired")}
     added = [d for d in active if d.key not in was_active]
     form = FormDefinition.create(
@@ -266,7 +266,7 @@ def check_form(
         retired=retired,
     )
     return [
-        *(_form_json(d) for d in form.fields),
-        *(_form_json(d) for d in form.retired),
+        *(form_json(d) for d in form.fields),
+        *(form_json(d) for d in form.retired),
         *kept,
     ]
