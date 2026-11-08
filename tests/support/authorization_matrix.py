@@ -757,6 +757,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             400, 400, 400, 403, 403, 403, 403
         ),
     },
+    # ADR 0082 point 11: who manages a group's bookings may end its fallback by hand; without a
+    # fallback on, the page answers "unchanged" (303).
+    "POST /admin/groups/{slug}/queue/fallback/end": {
+        "/admin/groups/demo/queue/fallback/end": statuses(303, 303, 303, 403, 403, 403, 403),
+    },
     "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
         "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(
             404, 404, 404, 403, 403, 403, 403
