@@ -1521,12 +1521,12 @@ class SqlTransaction(
             for booking_id, status, start, end, call, claimed_at in rows
         ]
 
-    async def getcall_status_of(self, booking_id: int) -> CallStatus | None:
+    async def get_call_status(self, booking_id: int) -> CallStatus | None:
         """Return the booking's aggregated call status."""
         row = await self._session.get(CallStatusRow, booking_id)
         return call_status_of(row) if row else None
 
-    async def savecall_status_of(self, status: CallStatus) -> None:
+    async def save_call_status(self, status: CallStatus) -> None:
         """Create or replace the booking's aggregated call status."""
         await self._session.merge(
             CallStatusRow(
