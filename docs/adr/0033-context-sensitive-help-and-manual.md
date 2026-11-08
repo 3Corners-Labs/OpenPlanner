@@ -1,6 +1,6 @@
 # 0033. Context-sensitive help from one manual
 
-Status: accepted (2026-10-27), requested by the product owner. Partly built; see `docs/adr-status.md` for what is built.
+Status: accepted (2026-10-27), requested by the product owner. Built (checked 2026-11-08): every admin page route has a manual topic in `nl` and `en` (39 topics, `NOT_YET_DOCUMENTED` empty since #613); see `docs/adr-status.md`.
 
 ## Context
 

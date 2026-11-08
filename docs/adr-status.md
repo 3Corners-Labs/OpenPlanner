@@ -52,7 +52,7 @@ from the rows below.
 | 0030 | HTTPS via ACME (Caddy) | BUILT | #35; `deploy/proxy/`; reworked by ADR 0064 | – |
 | 0031 | Audit log per level | BUILT | #34; migration 0021 | – |
 | 0032 | Provider-neutral contact center | NOT BUILT | no `ContactCenterKind`, `group_contact_center` or `ContactCenterTask`; `wxcc_*` remain | Everything (CC-0 to CC-6) |
-| 0033 | Context-sensitive help | PARTIAL | #43; 20 topics nl/en; `(i)` markers on 8 topics | 28 admin routes still in `NOT_YET_DOCUMENTED` |
+| 0033 | Context-sensitive help | BUILT | #43, #613; 39 topics nl/en, every admin page route documented (`NOT_YET_DOCUMENTED` empty); `(i)` markers on 18 topics | – |
 | 0034 | Audit events to a log platform | BUILT | #72; `adapters/event_sink.py` | – (the client's security review AU-3 is not code) |
 | 0035 | Embedding | BUILT | #83, #85, #86, #87; migration 0037 | – |
 | 0036 | Scaling envelope | NOT BUILT (policy part: document only) | `adapters/db/backup.py` is the SQLite backup of ADR 0029 | SC-1 rate-limit storage, SC-3 backup interface, SC-4 metrics, SC-5 runbook triggers; SC-2 unsure |
