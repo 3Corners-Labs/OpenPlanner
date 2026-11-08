@@ -139,7 +139,9 @@ async def test_a_planner_cancels_with_a_fixed_reason(site: Site) -> None:
     assert await _status(site, booking_id) == (BookingStatus.CANCELLED, ChangeReason.TECHNICAL)
 
 
-async def test_a_booking_that_starts_soon_needs_a_phone_call(site: Site) -> None:
+async def test_a_booking_that_starts_soon_needs_a_call_with_the_details_on_request(
+    site: Site,
+) -> None:
     booking_id = await _book(site)
     site.clock.advance(FRIDAY_0900 - timedelta(minutes=30) - site.clock.now())
     await site.login_as(GROUP_ADMIN)
@@ -148,7 +150,8 @@ async def test_a_booking_that_starts_soon_needs_a_phone_call(site: Site) -> None
     agenda = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
 
     assert response.status_code == 409
-    assert "Bel de deelnemer" in response.text
+    assert "Neem zelf contact op met de deelnemer" in response.text
+    assert "Details en dan Contactgegevens tonen" in response.text  # where the number is
     assert f"/bookings/{booking_id}/move" not in agenda
 
 

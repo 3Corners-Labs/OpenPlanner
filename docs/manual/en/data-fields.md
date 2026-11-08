@@ -23,7 +23,10 @@ The answers to a team's own questions count as personal data unless the question
 ## Where personal data is shown
 
 - **The appointment page** of a team's agenda (behind *Details*) shows the answers to the
-  team's questions, for roles that may view appointments.
+  team's questions, for roles that may view appointments. It shows the first and last name,
+  the email address and the phone number only after **Show contact details**, and each time the
+  audit log records who looked at them, without the details themselves (see
+  [Group agenda](group-agenda.md)).
 - **The queue** shows the first name of the participant whose turn it is, and the picked-up
   appointment shows the link to join the call, for agents who work the queue.
 - **The agenda** and the planner's pages show the first name only.

@@ -1292,7 +1292,7 @@ msgid "admin.form.error.planner_change_min_lead_minutes"
 msgstr "Enter a number of minutes from the send-to-queue time up to 1440."
 
 msgid "admin.form.error.planner_too_late"
-msgstr "This booking starts soon or has already gone to the contact center. Call the participant."
+msgstr "This booking starts soon or has already gone to the contact center. Contact the participant yourself: choose Details at the booking, then Show contact details."
 
 msgid "admin.form.error.booking_limit_reached"
 msgstr "This email address already has an appointment in that slot, or already the maximum number of appointments with this team (see Appointments per email address in the settings). Choose another slot."
@@ -6698,6 +6698,36 @@ msgstr "Answers on the form"
 msgid "admin.booking.answers_lead"
 msgstr "Personal data; erased with the rest of the booking."
 
+msgid "admin.booking.contact"
+msgstr "Contact details"
+
+msgid "admin.booking.contact_lead"
+msgstr "Show them only when you need to reach the participant. The audit log records each time who looked at them."
+
+msgid "admin.booking.contact_shown"
+msgstr "The audit log has recorded that you looked at them. Hide them before you take a screenshot."
+
+msgid "admin.booking.contact_show"
+msgstr "Show contact details"
+
+msgid "admin.booking.contact_hide"
+msgstr "Hide contact details"
+
+msgid "admin.booking.contact_name"
+msgstr "Name"
+
+msgid "admin.booking.contact_email"
+msgstr "Email address"
+
+msgid "admin.booking.contact_phone"
+msgstr "Phone number"
+
+msgid "admin.booking.contact_no_phone"
+msgstr "Not given"
+
+msgid "admin.booking.contact_deleted"
+msgstr "The personal data of this booking have been deleted."
+
 msgid "admin.settings.secret_hint"
 msgstr "Leave empty to keep the current value; it is never shown."
 
@@ -10752,6 +10782,9 @@ msgstr "{Agents}: {agents}, bookings: {booked} (of which {pending} not confirmed
 
 msgid "admin.audit.detail.booking_confirmed_by_staff"
 msgstr "Appointment confirmed for the participant"
+
+msgid "admin.audit.detail.booking_contact_viewed"
+msgstr "Participant's contact details shown"
 
 msgid "reports.view.volume"
 msgstr "Volume"

@@ -17,6 +17,7 @@ from datetime import date, timedelta
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Any
+from urllib.parse import quote
 
 import phonenumbers
 
@@ -232,6 +233,16 @@ def normalise_email(raw: str, field_name: str, code: ErrorCode = ErrorCode.INVAL
     ):
         raise DomainError(code, field_name)
     return email
+
+
+def mailto_href(address: str) -> str:
+    """Return the ``mailto:`` link to ``address``, percent-encoded as RFC 6068 asks.
+
+    ``?``, ``=``, ``&``, ``#`` and ``%`` are legal before the ``@`` of an address that
+    ``normalise_email`` accepts, but in a link they would start its own fields (cc, subject,
+    body) or break it. Everything but the ``@`` is encoded; mail programs decode it again.
+    """
+    return f"mailto:{quote(address, safe='@')}"
 
 
 def normalise_phone(
