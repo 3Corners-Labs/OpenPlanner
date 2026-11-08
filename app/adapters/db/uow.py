@@ -163,6 +163,7 @@ from app.domain.ports import EventSink
 from app.domain.privacy import PURGED_FIELDS
 from app.domain.routing import GroupRouting
 from app.domain.scheduling import (
+    DispatchFallback,
     DispatchKind,
     Group,
     GroupSummary,
@@ -255,6 +256,9 @@ def _group(row: GroupRow) -> Group:
         queue_free_pick_allowed=row.queue_free_pick_allowed,
         max_bookings_per_email=row.max_bookings_per_email,
         calendar_invite_address=row.calendar_invite_address,
+        dispatch_fallback=DispatchFallback(row.dispatch_fallback),
+        fallback_space_room_id=row.fallback_space_room_id,
+        fallback_active_since=row.fallback_active_since,
         idp_key=row.idp_key or row.slug,
         archived_at=row.archived_at,
         routing=routing_from_json(row.routing),
@@ -364,6 +368,8 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
         "max_bookings_per_email": group.max_bookings_per_email,
         "calendar_invite_address": group.calendar_invite_address,
+        "dispatch_fallback": group.dispatch_fallback.value,
+        "fallback_space_room_id": group.fallback_space_room_id,
         "idp_key": group.idp_key,
         "archived_at": group.archived_at,
     }
@@ -453,6 +459,7 @@ def _call_status(row: CallStatusRow) -> CallStatus:
         task_created_at=row.task_created_at,
         connected_at=row.connected_at,
         updated_at=row.updated_at,
+        fallback=row.fallback,
     )
 
 
@@ -1020,6 +1027,29 @@ class SqlTransaction(
         if block is not None:
             self._session.add(GroupContactsRow(group_id=group_id, body=contacts_json(block)))
 
+    async def fallback_bookings(self, group_id: int, after: datetime) -> list[Booking]:
+        """Return the group's confirmed bookings flagged as fallback, after ``after``, no task."""
+        result = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .join(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.wxcc_task_id.is_(None),
+                CallStatusRow.fallback.is_(True),
+                SlotRow.start > after,
+            )
+            .order_by(SlotRow.start)
+        )
+        return [_booking(row, slot) for row, slot in result]
+
+    async def save_group_fallback(self, group_id: int, since: datetime | None) -> None:
+        """Store since when the whole group is in fallback, or ``None`` (ADR 0082 point 11)."""
+        await self._session.execute(
+            update(GroupRow).where(GroupRow.id == group_id).values(fallback_active_since=since)
+        )
+
     async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
         """Store the group's routing (ADR 0081); the other settings stay as they are."""
         await self._session.execute(
@@ -1502,6 +1532,7 @@ class SqlTransaction(
                 task_created_at=status.task_created_at,
                 connected_at=status.connected_at,
                 updated_at=status.updated_at,
+                fallback=status.fallback,
             )
         )
         await self._session.flush()

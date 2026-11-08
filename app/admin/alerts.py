@@ -33,6 +33,7 @@ from app.admin.pages import admin_moment
 from app.admin.session import close_alert, session_alert_prefs, session_closed_alerts
 from app.admin.top_bar import COUNTS_ATTRIBUTE
 from app.domain.alerts import (
+    FALLBACK_EVENT,
     QUEUE_WAIT_EVENT,
     WORKER_ALERT,
     Alert,
@@ -76,6 +77,7 @@ SOURCE_LABELS: dict[str, str] = {
     WORKER_ALERT: "admin.alerts.source.worker",
     CONNECTION_HEALTH: "admin.alerts.source.connection",
     WEBHOOKS_MISSING: "admin.alerts.source.webhooks_missing",
+    FALLBACK_EVENT: "admin.alerts.source.fallback",
 }
 """What an alert is about, per action; the group-level ones name the group."""
 
@@ -94,6 +96,7 @@ OWN_TEXTS: dict[str, str] = {
     CHECK_EVENT: "admin.alerts.text.check",
     CONNECTION_HEALTH: "admin.alerts.text.connection",
     WEBHOOKS_MISSING: "admin.alerts.text.webhooks_missing",
+    FALLBACK_EVENT: "admin.alerts.text.fallback",
 }
 """Actions whose sentence is the alert's own rather than the reason's label."""
 

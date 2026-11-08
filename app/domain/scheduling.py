@@ -133,6 +133,20 @@ class DispatchKind(StrEnum):
     """OpenPlanner's own queue: agents sign in and pick up a booking."""
 
 
+class DispatchFallback(StrEnum):
+    """What a contact-center group falls back to while the contact center fails (ADR 0082)."""
+
+    NONE = "none"
+    """No fallback: a failed dispatch stays a failed dispatch."""
+    OWN_QUEUE = "own_queue"
+    """The own queue of ADR 0043: a booking whose dispatch fails, and while the contact center
+    is down every booking, appears there, flagged as fallback."""
+
+
+ROOM_ID = re.compile(r"^[A-Za-z0-9_=-]{10,200}$")
+"""A Webex room id, as the Messaging API gives it (base64url)."""
+
+
 class JoinClient(StrEnum):
     """Which Webex page a participant's join link opens (ADR 0075, per group)."""
 
@@ -246,6 +260,12 @@ class Group:
             may have in this group, 1 to ``MAX_BOOKINGS_PER_EMAIL`` (ADR 0066). Above 1 so
             participants can book on behalf of others; the same address twice in one slot is
             always refused.
+        dispatch_fallback: What a contact-center group falls back to while the contact center
+            fails (ADR 0082 point 11): nothing, or the own queue.
+        fallback_space_room_id: The team's own Webex space for fallback messages (ADR 0082
+            point 12), posted to by the organisation's bot; ``None`` posts nothing per booking.
+        fallback_active_since: Since when the whole group is in fallback because the
+            organisation's contact center is down (state, written by the worker), or ``None``.
         calendar_invite_address: Own queue: the team's shared mailbox or list that gets an
             iCalendar invite per booking (ADR 0043 point 9); ``None`` sends none.
         idp_key: The value the identity provider names the group by in an entitlement
@@ -288,6 +308,9 @@ class Group:
     queue_free_pick_allowed: bool = False
     max_bookings_per_email: int = DEFAULT_MAX_BOOKINGS_PER_EMAIL
     calendar_invite_address: str | None = None
+    dispatch_fallback: DispatchFallback = DispatchFallback.NONE
+    fallback_space_room_id: str | None = None
+    fallback_active_since: datetime | None = None
     idp_key: str = ""
     archived_at: datetime | None = None
     routing: GroupRouting = field(default_factory=GroupRouting)
@@ -332,6 +355,9 @@ class Group:
             raise _invalid("max_bookings_per_email")
         if self.video_host_email is not None and not _EMAIL.fullmatch(self.video_host_email):
             raise _invalid("video_host_email")
+        room = self.fallback_space_room_id
+        if room is not None and not ROOM_ID.fullmatch(room):
+            raise _invalid("fallback_space_room_id")
         invite = self.calendar_invite_address
         if invite is not None and (len(invite) > MAX_EMAIL_LENGTH or not _EMAIL.fullmatch(invite)):
             raise _invalid("calendar_invite_address")
@@ -389,6 +415,23 @@ class Group:
     def has_own_queue(self) -> bool:
         """Whether agents pick up this group's bookings in OpenPlanner (ADR 0043)."""
         return self.dispatch_kind is DispatchKind.OPENPLANNER_QUEUE
+
+    @property
+    def falls_back(self) -> bool:
+        """Whether this contact-center group may fall back to the own queue (ADR 0082)."""
+        return self.dispatch_kind is DispatchKind.CONTACT_CENTER and (
+            self.dispatch_fallback is DispatchFallback.OWN_QUEUE
+        )
+
+    @property
+    def fallback_active(self) -> bool:
+        """Whether the whole group is in fallback now (the contact center is down)."""
+        return self.falls_back and self.fallback_active_since is not None
+
+    @property
+    def queue_open(self) -> bool:
+        """Whether the group has a queue in OpenPlanner: its own, or one to fall back to."""
+        return self.has_own_queue or self.falls_back
 
     @property
     def sends_team_invite(self) -> bool:

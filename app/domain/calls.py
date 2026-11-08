@@ -65,6 +65,11 @@ class EventKind(StrEnum):
     END_NOT_POSSIBLE = "end_not_possible"
     """WxCC refused to end the task (detail: the code, e.g. ``rejected_403``)."""
     TASK_MARKED_CANCELLED = "task_marked_cancelled"
+    FALLBACK_QUEUED = "fallback_queued"
+    """The booking went to the own queue instead of the contact center (ADR 0082 point 11;
+    detail: ``dispatch_failed`` or ``contact_center_down``)."""
+    FALLBACK_ENDED = "fallback_ended"
+    """The fallback ended before the booking was claimed: it goes to the contact center."""
     WAITING_LEFT = "waiting_left"
     """The participant stopped waiting for a direct call (detail: ``waiting`` or ``agent``)."""
     MEETING_STARTED = "meeting_started"
@@ -207,6 +212,8 @@ class CallStatus:
     task_created_at: datetime | None = None
     connected_at: datetime | None = None
     updated_at: datetime | None = None
+    fallback: bool = False
+    """The booking is in the own queue as a fallback (ADR 0082 point 11)."""
 
 
 def new_status(booking_id: int) -> CallStatus:
@@ -241,6 +248,10 @@ def apply_event(status: CallStatus, kind: EventKind, at: datetime) -> CallStatus
         changes["task"] = TaskState.FAILED
     elif kind is EventKind.TASK_MARKED_CANCELLED:
         changes["task"] = TaskState.CANCELLED
+    elif kind is EventKind.FALLBACK_QUEUED:
+        changes["fallback"] = True
+    elif kind is EventKind.FALLBACK_ENDED:
+        changes["fallback"] = False
     return replace(status, **changes)  # type: ignore[arg-type]
 
 

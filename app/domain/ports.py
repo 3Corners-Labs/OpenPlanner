@@ -1055,6 +1055,20 @@ class Transaction(Protocol):
         """Store or, with ``None``, remove the group's own contact block."""
         ...
 
+    async def fallback_bookings(self, group_id: int, after: datetime) -> list[Booking]:
+        """Return the group's active fallback bookings starting after ``after``, without a task.
+
+        These are in the own queue as a fallback (ADR 0082 point 11); used when it ends.
+        """
+        ...
+
+    async def save_group_fallback(self, group_id: int, since: datetime | None) -> None:
+        """Store since when the whole group is in fallback, or ``None`` (ADR 0082 point 11).
+
+        Its own write: saving the settings never touches this state.
+        """
+        ...
+
     async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
         """Store the group's subjects, routing attributes and mapping (ADR 0081).
 

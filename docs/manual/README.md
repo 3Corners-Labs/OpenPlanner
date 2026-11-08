@@ -49,6 +49,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Reminders and message texts of a team / herinneringen en berichtteksten van een team | [Herinneringen en berichtteksten van een team](nl/group-reminders-messages.md) | [Reminders and message texts of a team](en/group-reminders-messages.md) |
 | Holidays of an organisation / feestdagen van een organisatie | [Feestdagen van een organisatie](nl/organisation-holidays.md) | [Holidays of an organisation](en/organisation-holidays.md) |
 | My rights / mijn rechten | [Mijn rechten](nl/rights.md) | [My rights](en/rights.md) |
+| Setting up the contact center / contactcenter inrichten (ADR 0082) | [Contactcenter inrichten](nl/contact-center-setup.md) | [Setting up the contact center](en/contact-center-setup.md) |
 
 ## Writing a topic
 

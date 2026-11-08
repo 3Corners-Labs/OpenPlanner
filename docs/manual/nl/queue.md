@@ -56,3 +56,10 @@ afspraak staat dan weer in de wachtrij. Een groepsbeheerder kan ook de afspraak 
 collega vrijgeven, bijvoorbeeld als die collega weg moest.
 
 Oppakken en vrijgeven staan in het auditlog, met uw naam en het afspraaknummer.
+
+## Terugval
+
+Een groep met het contactcenter kan terugvallen op deze wachtrij (instelling *Terugval als het
+contactcenter uitvalt*). Afspraken die zo binnenkomen, hebben het label **Terugval**. Zolang de
+hele groep terugvalt, staat bovenaan een banner; met **Terugval beëindigen** gaan afspraken die
+nog niet zijn opgepakt alsnog naar het contactcenter.

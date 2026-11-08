@@ -22,7 +22,7 @@ import httpx
 import structlog
 
 from app.adapters import internal_ca
-from app.adapters.alert_senders import ConfiguredAlertSenders, alert_bots
+from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, alert_bots
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable, set_slow_query_ms
 from app.adapters.db.jobs import SqlJobQueue
@@ -53,6 +53,7 @@ from app.domain.alerts import QUEUE_WAIT_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
+from app.domain.fallback import FallbackService
 from app.domain.group_erase import GroupEraser
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService, IntegrationWatch
@@ -86,6 +87,7 @@ from app.jobs.usage import backfill_usage, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.web.alert_text import alert_composer
+from app.web.fallback_text import SpaceTexts
 
 log = structlog.get_logger()
 
@@ -190,6 +192,20 @@ async def run_worker(
             lambda: timedelta(hours=live.settings.integration_check_interval_hours),
         )
         integration = IntegrationService(uow, clock, AdminService(uow, clock), version)
+        # ADR 0082 point 11: bookings to the own queue when the contact center fails.
+        fallback = FallbackService(
+            uow,
+            clock,
+            AdminService(uow, clock),
+            integration,
+            BotSpacePoster(
+                alert_bots(engine, settings), http, settings.webex_api_base_url, request_log
+            ),
+            SpaceTexts(
+                Translator(load_catalogues(), CachedTextOverrides(uow)).gettext,
+                settings.public_base_url,
+            ),
+        )
 
         # ADR 0082 points 6 and 7: reconcile stale tasks, then recompute the health.
         health_watch = IntegrationHealthWatch(
@@ -203,6 +219,7 @@ async def run_worker(
             health,
             clock,
             lambda: timedelta(minutes=live.settings.task_reconcile_interval_minutes),
+            fallback.sweep,
         )
         return (
             wired,
@@ -220,6 +237,7 @@ async def run_worker(
                 video=wired.video,
                 dispatcher=wired.dispatcher,
                 integration=integration,
+                fallback=fallback,
                 retention=lambda: live.settings.event_retention,
                 clock_style=lambda organisation: live.for_organisation(organisation).time_format,
                 product_footer=lambda organisation: (
