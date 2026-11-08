@@ -1,0 +1,63 @@
+{% extends "admin/usage_base.html" %}
+{% from "admin/_usage_tables.html" import cell, count_table, grid_table, figure, mean_line, nothing_yet with context %}
+{% from "admin/_report_chart.html" import report_chart with context %}
+{% block report %}
+{% if report.empty %}
+{{ nothing_yet() }}
+{% else %}
+{{ grid_table("mix", _("reports.queue.mix.title"), _("reports.queue.mix.method"), report.mix, "dispatch", "booking_kinds", report.threshold, _("reports.total")) }}
+<section class="card" aria-labelledby="task-wait-heading">
+  <h2 id="task-wait-heading">{{ _("reports.queue.task_wait.title") }}</h2>
+  {{ report_chart(charts.task_wait) }}
+  {{ mean_line(_("reports.mean"), report.task_wait.mean_seconds) }}
+</section>
+{{ count_table("punctuality", _("reports.queue.punctuality.title"), _("reports.queue.punctuality.bucket"), report.punctuality.table, "buckets", report.threshold, _("reports.total")) }}
+{{ mean_line(_("reports.mean"), report.punctuality.mean_seconds, true) }}
+{{ count_table("guest-wait", _("reports.queue.guest_wait.title"), _("reports.queue.guest_wait.bucket"), report.guest_wait.table, "buckets", report.threshold, _("reports.total")) }}
+{{ mean_line(_("reports.mean"), report.guest_wait.mean_seconds) }}
+<section class="card" aria-labelledby="call-length-heading">
+  <h2 id="call-length-heading">{{ _("reports.queue.length.title") }}</h2>
+  {{ report_chart(charts.call_length) }}
+  {{ mean_line(_("reports.mean"), report.call_length.mean_seconds) }}
+  <dl class="facts">
+    <div><dt>{{ _("reports.queue.calls_ended") }}</dt><dd>{{ cell(report.calls_ended, report.threshold) }}</dd></div>
+    <div><dt>{{ _("reports.queue.participants_per_call") }}</dt><dd>{% if report.participants_per_call_tenths is none %}{{ figure(none) }}{% else %}{{ "%.1f"|format(report.participants_per_call_tenths / 10) }}{% endif %}</dd></div>
+  </dl>
+</section>
+<section class="card" aria-labelledby="direct-heading">
+  <h2 id="direct-heading">{{ _("reports.queue.direct.title") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("reports.queue.direct.created") }}</dt><dd>{{ cell(report.direct_created, report.threshold) }}</dd></div>
+    <div><dt>{{ _("reports.queue.direct.left") }}</dt><dd>{{ cell(report.direct_left, report.threshold) }}</dd></div>
+    <div><dt>{{ _("reports.queue.direct.not_picked_up") }}</dt><dd>{{ cell(report.direct_not_picked_up, report.threshold) }}</dd></div>
+    <div><dt>{{ _("reports.queue.direct.abandoned") }}</dt><dd>{{ figure(report.abandoned_percent, "%") }}</dd></div>
+  </dl>
+</section>
+{{ count_table("abandon-wait", _("reports.queue.abandon_wait.title"), _("reports.queue.abandon_wait.bucket"), report.abandon_wait.table, "buckets", report.threshold, _("reports.total")) }}
+<section class="card" aria-labelledby="claims-heading">
+  <h2 id="claims-heading">{{ _("reports.queue.claims.title") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("reports.queue.claims.claimed") }}</dt><dd>{{ cell(report.claimed, report.threshold) }}</dd></div>
+    <div><dt>{{ _("reports.queue.claims.released") }}</dt><dd>{{ cell(report.released, report.threshold) }}</dd></div>
+    <div><dt>{{ _("reports.queue.claims.per_claim") }}</dt><dd>{% if report.releases_per_claim_tenths is none %}{{ figure(none) }}{% else %}{{ "%.1f"|format(report.releases_per_claim_tenths / 10) }}{% endif %}</dd></div>
+  </dl>
+</section>
+{{ count_table("claim-wait", _("reports.queue.claim_wait.title"), _("reports.queue.claim_wait.bucket"), report.claim_wait.table, "buckets", report.threshold, _("reports.total")) }}
+{{ count_table("failures", _("reports.queue.failures.title"), _("reports.queue.failures.code"), report.failures, "failures", report.threshold, _("reports.total")) }}
+<section class="card" aria-labelledby="peak-heading">
+  <h2 id="peak-heading">{{ _("reports.queue.peak.title") }}</h2>
+  {{ report_chart(charts.peak) }}
+  <p>{{ _("reports.queue.peak.highest") }}: {{ figure(report.peak) }}</p>
+</section>
+{{ count_table("rebook", _("reports.queue.rebook.title"), _("reports.queue.rebook.proposed_by"), report.rebook_proposed, "rebook", report.threshold, _("reports.total")) }}
+<section class="card" aria-labelledby="rebook-result-heading">
+  <h2 id="rebook-result-heading">{{ _("reports.queue.rebook.result") }}</h2>
+  <dl class="facts">
+    <div><dt>{{ _("reports.queue.rebook.accepted") }}</dt><dd>{{ cell(report.rebook_accepted, report.threshold) }}</dd></div>
+    <div><dt>{{ _("reports.queue.rebook.expired") }}</dt><dd>{{ cell(report.rebook_expired, report.threshold) }}</dd></div>
+    <div><dt>{{ _("reports.queue.rebook.conversion") }}</dt><dd>{{ figure(report.rebook_conversion_percent, "%") }}</dd></div>
+  </dl>
+</section>
+{{ count_table("rebook-wait", _("reports.queue.rebook_wait.title"), _("reports.queue.rebook_wait.bucket"), report.rebook_wait.table, "buckets", report.threshold, _("reports.total")) }}
+{% endif %}
+{% endblock %}
