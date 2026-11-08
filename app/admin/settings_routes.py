@@ -110,6 +110,7 @@ from app.domain.tls import Finding
 from app.domain.tls_check import CertificateStatus
 from app.domain.tls_source import CertificateSourceService
 from app.web.locale import RequestLocale
+from app.web.navigation import screen, topic_anchor
 from app.web.protection import RejectedRequest
 from app.web.settings_labels import (
     CLASS_LABELS,
@@ -249,11 +250,31 @@ class SourceView:
 
 @dataclass(frozen=True)
 class TopicSection:
-    """The settings of one topic."""
+    """The settings of one topic: a section of its screen (ADR 0047 §5)."""
 
     key: str
     heading: str
     rows: list[SettingRow]
+
+    @property
+    def anchor(self) -> str:
+        """The section's id on the page; ``topic_anchor`` without the ``#``."""
+        return topic_anchor(Topic(self.key))[1:]
+
+
+def topic_sections(
+    screen_key: str, by_topic: dict[Topic, list[SettingRow]], locale: RequestLocale
+) -> list[TopicSection]:
+    """Return the sections of the settings screen ``screen_key``, in the register's order.
+
+    The register declares which topics a screen shows (ADR 0047 step 6); a topic without rows
+    here is left out.
+    """
+    return [
+        TopicSection(topic.value, locale.gettext(TOPIC_LABELS[topic]), by_topic[topic])
+        for topic in screen(screen_key).topics
+        if topic in by_topic
+    ]
 
 
 @dataclass(frozen=True)
@@ -381,7 +402,7 @@ async def change_topic(
             raise_refusal(error)
             return await _overview(request, locale, context, Tab.VALUES, (spec.key, error), 422)
         changed += 1
-    anchor = f"topic-{topic}" if topic in {t.value for t in Topic} else ""
+    anchor = topic_anchor(Topic(topic))[1:] if topic in {t.value for t in Topic} else ""
     return redirect_done(VALUES_URL, "saved" if changed else "unchanged", anchor=anchor)
 
 
@@ -874,7 +895,7 @@ def _sections(
     errors: dict[str, str] | None = None,
     stored: frozenset[str] = frozenset(),
 ) -> list[TopicSection]:
-    """Group the class C and D settings by topic, in the registry's topic order.
+    """Group the class C and D settings by topic, in the order the register declares.
 
     ``stored`` names the keys the portal holds a value for, so a locked one that was taken
     over says which variable to remove.
@@ -910,11 +931,7 @@ def _sections(
                 boolean=state.spec.kind is Kind.BOOL,
             )
         )
-    return [
-        TopicSection(topic.value, _(TOPIC_LABELS[topic]), by_topic[topic])
-        for topic in Topic
-        if topic in by_topic
-    ]
+    return topic_sections("platform.settings.values", by_topic, locale)
 
 
 def _value(state: SettingState, locale: RequestLocale) -> str:

@@ -17,10 +17,10 @@ from app.adapters.db.models import BookingRow, GroupRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.form_fields import Classification, FieldDefinition, FieldType, FormDefinition
-from tests.api.test_widget_api import _embed
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
+from tests.support.widget import embed
 
 FRIDAY_0900 = "2026-01-02T08:00:00Z"
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
@@ -65,7 +65,7 @@ async def _with_form(settings: Settings) -> None:
 @pytest.fixture
 async def site(demo_settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
     await _with_form(demo_settings)
-    await _embed(demo_settings)
+    await embed(demo_settings)
     async with app_client(demo_settings, FixedClock(NOW)) as client:
         yield client
 

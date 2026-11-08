@@ -87,3 +87,33 @@ Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 | Messages › Contact | `/admin/groups/{slug}/contact` | `closure.manage` | standard | – |
 | Settings | `/admin/groups/{slug}/settings` | `group.edit` | standard | `/admin/groups/{slug}/settings/form`, `/admin/groups/{slug}/settings/form/{key}`, `/admin/groups/{slug}/settings/routing`, `/admin/groups/{slug}/settings/routing/subjects/{code}`, `/admin/groups/{slug}/settings/archive` |
 | Emergency closure | `/admin/groups/{slug}/closure` | `closure.manage` | standard | `/admin/groups/{slug}/closure/bookings/{booking_id}/move`, `/admin/groups/{slug}/closure/scenarios`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}/contacts` |
+
+## Settings topics
+
+A settings screen declares the ADR 0042 topics it shows, as sections in this order
+(ADR 0047 §5). A class C setting's topic is declared on a platform screen, a class D
+setting's on an organisation screen; a test fails otherwise.
+
+| Topic | Screen | Section |
+|---|---|---|
+| `operations` | Settings | `/admin/settings/values#topic-operations` |
+| `retention` | Settings | `/admin/settings/values#topic-retention` |
+| `storage` | Settings | `/admin/settings/values#topic-storage` |
+| `rate_limits` | Settings | `/admin/settings/values#topic-rate_limits` |
+| `admin_session` | Settings | `/admin/settings/values#topic-admin_session` |
+| `login_mapping` | Settings | `/admin/settings/values#topic-login_mapping` |
+| `mail` | Settings | `/admin/settings/values#topic-mail` |
+| `webex` | Settings | `/admin/settings/values#topic-webex` |
+| `updates` | Settings | `/admin/settings/values#topic-updates` |
+| `display` | Settings | `/admin/settings/values#topic-display` |
+| `staff` | Settings | `/admin/settings/values#topic-staff` |
+| `planner` | Settings | `/admin/settings/values#topic-planner` |
+| `booking_form` | Settings | `/admin/settings/values#topic-booking_form` |
+| `confirmation` | Settings | `/admin/settings/values#topic-confirmation` |
+| `participant_link` | Settings | `/admin/settings/values#topic-participant_link` |
+| `retention` | Settings | `/admin/organisations/{org}/settings#topic-retention` |
+| `display` | Settings | `/admin/organisations/{org}/settings#topic-display` |
+| `staff` | Settings | `/admin/organisations/{org}/settings#topic-staff` |
+| `planner` | Settings | `/admin/organisations/{org}/settings#topic-planner` |
+| `booking_form` | Settings | `/admin/organisations/{org}/settings#topic-booking_form` |
+| `confirmation` | Settings | `/admin/organisations/{org}/settings#topic-confirmation` |

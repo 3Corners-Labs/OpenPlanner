@@ -10,11 +10,11 @@ from app.domain.identity_providers import ClientAuth, OrganisationProvider
 from app.domain.login_domain_watch import EVENT, DomainWatch
 from app.domain.login_domains import DomainClaim, DomainState, route
 from app.domain.system_log import SystemLog
-from tests.domain.test_identity_provider_service import ORGANISATIONS
 from tests.fakes.clock import FixedClock
 from tests.fakes.dns import FakeTxtResolver
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW
+from tests.support.organisation_providers import ORGANISATIONS
 
 INTERVAL = timedelta(hours=24)
 GRACE = timedelta(days=7)

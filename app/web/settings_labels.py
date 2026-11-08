@@ -15,6 +15,7 @@ SETTING_LABELS: dict[str, str] = {
     "queue_refresh_seconds": "settings.field.queue_refresh_seconds.label",
     "overview_live_enabled": "settings.field.overview_live_enabled.label",
     "overview_poll_seconds": "settings.field.overview_poll_seconds.label",
+    "overview_max_widgets": "settings.field.overview_max_widgets.label",
     "queue_wait_warning_minutes": "settings.field.queue_wait_warning_minutes.label",
     "queue_wait_target_minutes": "settings.field.queue_wait_target_minutes.label",
     "meeting_status_refresh_seconds": "settings.field.meeting_status_refresh_seconds.label",

@@ -23,8 +23,8 @@ from app.domain.configuration_package import CONFIGURATION_TABLES
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.privacy import PII_FIELDS
 from app.domain.services import BookingService, ContactInput
-from tests.adapters.db.test_configuration_package import NOW, PASSPHRASE, SOURCE_BOX, _path
 from tests.fakes.clock import FixedClock
+from tests.support.configuration_package import NOW, PASSPHRASE, SOURCE_BOX, database_path
 from tests.support.domain import NOW as DOMAIN_NOW
 from tests.support.domain import SLOT_0900, TEST_TOKEN_KEY, book_confirmed
 
@@ -62,7 +62,7 @@ async def package(engine: AsyncEngine, database_url: str, tmp_path: Path) -> byt
         "webex_service_app", {"t": CLEAR["credential"]}, NOW
     )
     return export_package(
-        _path(database_url),
+        database_path(database_url),
         SOURCE_BOX,
         PASSPHRASE,
         created_at=NOW,

@@ -20,7 +20,8 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
-from tests.support.queue import own_queue, site_uow
+from tests.support.admin_site import site_uow
+from tests.support.queue import own_queue
 
 WIDGET = re.compile(r'<section class="widget[^"]*" data-widget="([a-z-]+)"')
 

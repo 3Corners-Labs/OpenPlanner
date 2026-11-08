@@ -1,4 +1,7 @@
-"""The participant's side of the booking pages in HTTP tests: the emailed link and confirming it.
+"""The participant's side of the booking pages in HTTP tests: booking and the emailed link.
+
+``book`` posts the demo group's booking form for Ada; the demo group is open on weekdays, so
+``FRIDAY_0900`` is free the day after "now" (Thursday 1 January 2026 08:00 UTC).
 
 Since ADR 0056 the management token reaches the participant by email only; the booking page
 redirects to "check your email". Tests read the newest booking's salt from the database and
@@ -16,6 +19,34 @@ from app.domain.tokens import derive_token
 from app.keys import management_token_key
 
 SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
+"""The headers of a form the browser posts from the page itself."""
+FRIDAY_0900 = "2026-01-02T08:00:00Z"
+"""Friday 2 January 09:00 Amsterdam, a free slot of the demo group, as the form sends it."""
+FRIDAY_0930 = "2026-01-02T08:30:00Z"
+"""The slot after ``FRIDAY_0900``."""
+ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
+"""Ada's details as the booking form sends them, without a phone number."""
+
+
+async def book(
+    client: httpx.AsyncClient, start: str = FRIDAY_0900, **fields: str
+) -> httpx.Response:
+    """Post the demo group's booking form for Ada at ``start``, with ``fields`` added or changed."""
+    return await client.post(
+        "/g/demo/book", data={"start": start, **ADA, **fields}, headers=SAME_ORIGIN
+    )
+
+
+async def booked(client: httpx.AsyncClient, start: str = FRIDAY_0900, **fields: str) -> str:
+    """Book, confirm by the emailed link and return the management token."""
+    response = await book(client, start, **fields)
+    assert response.status_code == 303
+    return await confirm_newest(client)
+
+
+async def booked_page(client: httpx.AsyncClient, start: str = FRIDAY_0900) -> str:
+    """Book and confirm Ada at ``start``; return the management page ``/b/m/{ref}`` (ADR 0093)."""
+    return await open_link(client, await booked(client, start))
 
 
 async def emailed_token(client: httpx.AsyncClient) -> str:

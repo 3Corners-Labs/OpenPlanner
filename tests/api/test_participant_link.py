@@ -11,11 +11,17 @@ import httpx
 import pytest
 
 from app.config import Settings
-from tests.api.test_booking_pages import ADA, FRIDAY_0900, SAME_ORIGIN
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
-from tests.support.participant import confirm_by_link, emailed_token, open_link
+from tests.support.participant import (
+    ADA,
+    FRIDAY_0900,
+    SAME_ORIGIN,
+    confirm_by_link,
+    emailed_token,
+    open_link,
+)
 
 COOKIE = "op_link"
 

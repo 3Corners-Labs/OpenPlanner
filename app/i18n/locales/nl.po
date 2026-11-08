@@ -311,7 +311,6 @@ msgstr "Gekozen moment"
 msgid "book.change_slot"
 msgstr "Ander moment kiezen"
 
-
 msgid "form.email"
 msgstr "E-mailadres"
 
@@ -344,7 +343,6 @@ msgstr "Er is een probleem"
 
 msgid "error.title"
 msgstr "Er ging iets mis"
-
 
 msgid "error.field.email"
 msgstr "Vul een geldig e-mailadres in, bijvoorbeeld naam@voorbeeld.nl."
@@ -517,7 +515,6 @@ msgstr "Afspraak verplaatsen"
 msgid "manage.cancel"
 msgstr "Afspraak annuleren"
 
-
 msgid "manage.notice.rescheduled"
 msgstr "Uw afspraak is verplaatst. U ontvangt een bevestiging per e-mail."
 
@@ -661,9 +658,6 @@ msgstr "Wat nu aandacht vraagt, en de groepen waarvoor u rechten heeft."
 msgid "admin.dashboard.groups"
 msgstr "Uw groepen"
 
-
-
-
 msgid "admin.dashboard.no_groups"
 msgstr "U heeft (nog) geen rechten op een groep. Vraag uw beheerder om toegang."
 
@@ -756,7 +750,6 @@ msgstr "Optioneel"
 
 msgid "admin.group.phone_required"
 msgstr "Verplicht"
-
 
 msgid "admin.group.your_rights"
 msgstr "Uw rechten voor deze groep"
@@ -1229,8 +1222,6 @@ msgstr "Tot dit moment kan een planner een afspraak verplaatsen of annuleren; da
 msgid "admin.field.phone_mode"
 msgstr "Telefoonnummer op het formulier"
 
-
-
 msgid "admin.field.weekday"
 msgstr "Dag"
 
@@ -1320,7 +1311,6 @@ msgstr "Vul een aantal minuten in van 0 tot 120."
 
 msgid "admin.form.error.phone_mode"
 msgstr "Kies of het telefoonnummer verborgen, optioneel of verplicht is."
-
 
 msgid "admin.form.error.future_bookings"
 msgstr "Dit kan niet zolang er afspraken in de toekomst staan. Wijzig het nadat die zijn geweest of geannuleerd."
@@ -2167,7 +2157,6 @@ msgstr "Groepen"
 
 msgid "join.refresh"
 msgstr "Status verversen"
-
 
 # --- WxCC work item lifecycle (ADR 0021) ---
 
@@ -6454,7 +6443,6 @@ msgstr "Voornaam"
 msgid "form.last_name"
 msgstr "Achternaam"
 
-
 msgid "error.field.first_name"
 msgstr "Vul uw voornaam in, maximaal 100 tekens."
 
@@ -8007,7 +7995,6 @@ msgstr "Geen"
 
 msgid "admin.groups.public_page"
 msgstr "Openbare pagina"
-
 
 msgid "term.agent"
 msgstr "medewerker"
@@ -9865,7 +9852,6 @@ msgstr "Planning"
 msgid "admin.tab.group_messages"
 msgstr "Berichten"
 
-
 msgid "admin.readiness.title"
 msgstr "Klaar om te boeken"
 
@@ -9880,8 +9866,6 @@ msgstr "Bezetting voor de komende weken"
 
 msgid "admin.readiness.texts"
 msgstr "Berichtteksten"
-
-
 
 msgid "admin.readiness.channels"
 msgstr "Kanaal om berichten te versturen (e-mail of sms)"
@@ -9961,13 +9945,6 @@ msgstr "Altijd (geen venster ingesteld)"
 msgid "admin.updates.window.next"
 msgstr "Volgende opening: {at}"
 
-
-
-
-
-
-
-
 msgid "admin.updates.support"
 msgstr "Ondersteuning van deze lijn"
 
@@ -9995,6 +9972,8 @@ msgstr "Datum en tijd in de tijdzone van het portaal. Leeg: de updater begint zo
 msgid "admin.updates.waits_until"
 msgstr "De updater begint vanaf {at} aan dit verzoek."
 
-
 msgid "admin.updates.reason.upgrade_path_required"
 msgstr "Deze database is te oud voor die versie: update eerst naar de versie die in het logboek staat."
+
+msgid "settings.field.overview_max_widgets.label"
+msgstr "Meeste widgets op een eigen overzicht"

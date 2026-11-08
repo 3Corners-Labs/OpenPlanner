@@ -9,13 +9,13 @@
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% if unknown_error %}<div class="alert alert--error" role="alert"><p>{{ unknown_error }}</p></div>{% endif %}
 {% set topics = [] %}
-{% for section in sections %}{% set added = topics.append(("#topic-" ~ section.key, section.heading)) %}{% endfor %}
+{% for section in sections %}{% set added = topics.append(("#" ~ section.anchor, section.heading)) %}{% endfor %}
 {{ page_toc(topics) }}
 <form method="post" action="/admin/organisations/{{ organisation.slug }}/settings" novalidate class="card settings-group" aria-labelledby="settings-heading">
   <h2 id="settings-heading">{{ _("admin.org_settings.settings") }}</h2>
   {% for section in sections %}
-  <section class="settings-topic" id="topic-{{ section.key }}" aria-labelledby="topic-{{ section.key }}-heading">
-    <h3 id="topic-{{ section.key }}-heading">{{ section.heading }}</h3>
+  <section class="settings-topic" id="{{ section.anchor }}" aria-labelledby="{{ section.anchor }}-heading">
+    <h3 id="{{ section.anchor }}-heading">{{ section.heading }}</h3>
     <div class="settings-list">
       {{ setting_head() }}
       {% for row in section.rows %}

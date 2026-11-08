@@ -9,7 +9,7 @@ from app.admin.frozen_forms import BAR_ID, LEFT_ALONE, freeze_forms, requirement
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
 from tests.admin.conftest import ORG_ADMIN, SUPER, Site
-from tests.admin.test_authorization_matrix import EXPECTED, ROLES
+from tests.support.authorization_matrix import EXPECTED, ROLES
 
 FROZEN = f'disabled aria-describedby="{BAR_ID}"'
 FORM = re.compile(r"<form\b([^>]*)>(.*?)</form>", re.DOTALL)

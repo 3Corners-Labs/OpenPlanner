@@ -2,6 +2,7 @@
 
 All tests use the same calendar: "now" is Thursday 1 January 2026 08:00 UTC; the group is
 open on Monday 5 January 09:00-10:00 Amsterdam time (08:00-09:00 UTC) in 30-minute slots.
+The demo group that the HTTP tests seed is open on weekdays (``FRIDAY``, ``FRIDAY_0900``).
 """
 
 from dataclasses import replace
@@ -9,7 +10,8 @@ from datetime import UTC, date, datetime, time
 from typing import Any
 
 from app.domain.authorization import Role
-from app.domain.scheduling import DispatchKind, Group, Offer, TimeWindow
+from app.domain.booking import Contact
+from app.domain.scheduling import DispatchKind, Group, Offer, PhoneMode, TimeWindow
 from app.domain.services import BookingReceipt, BookingService, ContactInput
 from tests.support.principals import principal
 
@@ -18,9 +20,21 @@ MONDAY = date(2026, 1, 5)
 SLOT_0900 = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)  # 09:00 Amsterdam (CET)
 SLOT_0930 = datetime(2026, 1, 5, 8, 30, tzinfo=UTC)
 TUESDAY_0900 = datetime(2026, 1, 6, 8, 0, tzinfo=UTC)
+FRIDAY = date(2026, 1, 2)
+"""Friday 2 January, the day after now: a weekday, so the demo group is open."""
+FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)
+"""Friday 2 January 09:00 Amsterdam, a slot of the demo group."""
 ADA = ContactInput(
     first_name="Ada", last_name="Lovelace", email="ada@example.org", phone="06 1234 5678"
 )
+ADA_CONTACT = Contact.create(
+    first_name="Ada",
+    last_name="Lovelace",
+    email="ada@example.org",
+    phone=None,
+    phone_mode=PhoneMode.OPTIONAL,
+)
+"""Ada as a booking stores her, without a phone number."""
 DEMO_SUPERUSER = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 DEMO_ORG_ADMIN = principal(
     "o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset()

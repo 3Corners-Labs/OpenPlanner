@@ -13,9 +13,9 @@ from app.domain.ports import IntegrationError
 from app.web.static_assets import ASSETS
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, Site
 from tests.fakes.integrations import FakeVideo
-from tests.support.queue import FRIDAY_0900
+from tests.support.admin_site import site_uow as _uow
+from tests.support.domain import FRIDAY_0900
 from tests.support.queue import own_queue as _own_queue
-from tests.support.queue import site_uow as _uow
 
 AGENDA = "/admin/groups/demo/agenda?day=2026-01-02"
 LIVE = "/admin/groups/demo/agenda/live?day=2026-01-02"

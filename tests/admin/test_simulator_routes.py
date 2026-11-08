@@ -16,11 +16,10 @@ from app.domain.services import BookingService
 from app.domain.simulation import SIMULATED_LINK
 from app.main import create_app
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
-from tests.admin.test_admin_flow import audit_events
-from tests.admin.test_call_routes import FRIDAY_0900
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
-from tests.support.domain import ADA, NOW, TEST_TOKEN_KEY, book_confirmed
+from tests.support.admin_site import audit_events
+from tests.support.domain import ADA, FRIDAY_0900, NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.participant import open_link
 
 HOST = "host@example.nl"

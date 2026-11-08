@@ -1,22 +1,14 @@
 """An own queue with one booking at its start, for the queue and overview tests (ADR 0043)."""
 
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import MeetingRef
 from app.domain.scheduling import DispatchKind
 from app.domain.services import BookingService
 from tests.admin.conftest import Site
-from tests.support.domain import ADA, TEST_TOKEN_KEY, book_confirmed
-
-FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekdays
-
-
-def site_uow(site: Site) -> SqlUnitOfWork:
-    """Return a unit of work on the site's database."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    return SqlUnitOfWork(app.state.engine)
+from tests.support.admin_site import site_uow
+from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 
 
 async def own_queue(site: Site, *, meeting: bool = True, **changes: object) -> int:

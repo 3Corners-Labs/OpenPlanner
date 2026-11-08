@@ -311,7 +311,6 @@ msgstr "Selected time"
 msgid "book.change_slot"
 msgstr "Choose another time"
 
-
 msgid "form.email"
 msgstr "Email address"
 
@@ -344,7 +343,6 @@ msgstr "There is a problem"
 
 msgid "error.title"
 msgstr "Something went wrong"
-
 
 msgid "error.field.email"
 msgstr "Enter a valid email address, for example name@example.com."
@@ -517,7 +515,6 @@ msgstr "Move appointment"
 msgid "manage.cancel"
 msgstr "Cancel appointment"
 
-
 msgid "manage.notice.rescheduled"
 msgstr "Your appointment has been moved. You will receive a confirmation by email."
 
@@ -661,9 +658,6 @@ msgstr "What needs attention now, and the groups you have rights for."
 msgid "admin.dashboard.groups"
 msgstr "Your groups"
 
-
-
-
 msgid "admin.dashboard.no_groups"
 msgstr "You have no rights for any group yet. Ask your administrator for access."
 
@@ -756,7 +750,6 @@ msgstr "Optional"
 
 msgid "admin.group.phone_required"
 msgstr "Required"
-
 
 msgid "admin.group.your_rights"
 msgstr "Your rights for this group"
@@ -1229,8 +1222,6 @@ msgstr "Until this moment a planner can move or cancel a booking; after it you c
 msgid "admin.field.phone_mode"
 msgstr "Phone number on the form"
 
-
-
 msgid "admin.field.weekday"
 msgstr "Day"
 
@@ -1320,7 +1311,6 @@ msgstr "Enter a number of minutes from 0 to 120."
 
 msgid "admin.form.error.phone_mode"
 msgstr "Choose whether the phone number is hidden, optional or required."
-
 
 msgid "admin.form.error.future_bookings"
 msgstr "This is not possible while appointments lie ahead. Change it after they have taken place or were cancelled."
@@ -2167,7 +2157,6 @@ msgstr "Groups"
 
 msgid "join.refresh"
 msgstr "Refresh status"
-
 
 # --- WxCC work item lifecycle (ADR 0021) ---
 
@@ -6454,7 +6443,6 @@ msgstr "First name"
 msgid "form.last_name"
 msgstr "Last name"
 
-
 msgid "error.field.first_name"
 msgstr "Enter your first name, at most 100 characters."
 
@@ -6900,7 +6888,6 @@ msgstr "Send calendar invite to the team"
 
 msgid "audit.job.send_team_cancel"
 msgstr "Send calendar cancellation to the team"
-
 
 msgid "admin.booking.version"
 msgstr "version {version}"
@@ -7995,7 +7982,6 @@ msgstr "None"
 
 msgid "admin.groups.public_page"
 msgstr "Public page"
-
 
 msgid "term.agent"
 msgstr "agent"
@@ -9853,7 +9839,6 @@ msgstr "Planning"
 msgid "admin.tab.group_messages"
 msgstr "Messages"
 
-
 msgid "admin.readiness.title"
 msgstr "Ready for bookings"
 
@@ -9868,8 +9853,6 @@ msgstr "Staffing for the coming weeks"
 
 msgid "admin.readiness.texts"
 msgstr "Message texts"
-
-
 
 msgid "admin.readiness.channels"
 msgstr "A channel to send messages (email or SMS)"
@@ -9949,13 +9932,6 @@ msgstr "Any time (no window set)"
 msgid "admin.updates.window.next"
 msgstr "Next opening: {at}"
 
-
-
-
-
-
-
-
 msgid "admin.updates.support"
 msgstr "Support of this line"
 
@@ -9983,6 +9959,8 @@ msgstr "Date and time in the portal's time zone. Empty: the updater starts as so
 msgid "admin.updates.waits_until"
 msgstr "The updater starts this request from {at}."
 
-
 msgid "admin.updates.reason.upgrade_path_required"
 msgstr "This database is too old for that version: update to the version named in the log first."
+
+msgid "settings.field.overview_max_widgets.label"
+msgstr "Most widgets on an own overview"
