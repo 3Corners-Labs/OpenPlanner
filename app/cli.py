@@ -170,6 +170,9 @@ from app.adapters.webhook_registration import register_webex, register_wxcc
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.adapters.wxcc_sample_flow import Route, sample_flow
+from app.cli_config import add_arguments as add_document_arguments
+from app.cli_config import render_schema as render_config_schema
+from app.cli_config import run as run_document
 from app.config import Settings, environment
 from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
@@ -1306,6 +1309,9 @@ def _config_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser
         "import", help="replace this installation's configuration (not in use only)"
     )
     import_cmd.add_argument("path", type=Path, help="the package file")
+    plan_cmd = actions.add_parser("plan", help="what a configuration document would change")
+    apply_cmd = actions.add_parser("apply", help="apply a configuration document (ADR 0099)")
+    add_document_arguments(export_cmd, plan_cmd, apply_cmd)
     env_cmd = actions.add_parser("env", help="write the package's login variables as an env file")
     env_cmd.add_argument("path", type=Path, help="the package file")
     env_cmd.add_argument(
@@ -1315,7 +1321,13 @@ def _config_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser
         help="the env file to write (600), or - for standard output (the installer's one-off "
         "container, whose filesystem is read-only; ADR 0089 point 8)",
     )
-    for sub in (export_cmd, show_cmd, import_cmd, env_cmd):
+    export_cmd.add_argument(
+        "--passphrase-file",
+        type=Path,
+        metavar="PATH",
+        help="a file whose first line is the passphrase (never on the command line)",
+    )
+    for sub in (show_cmd, import_cmd, env_cmd):
         sub.add_argument(
             "--passphrase-file",
             type=Path,
@@ -1355,6 +1367,12 @@ def _summary_lines(summary: PackageSummary) -> str:
 
 async def _config(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
     """Run a ``config`` command; return the report and exit code. Never prints a secret."""
+    if args.action in ("plan", "apply") or (
+        args.action == "export" and getattr(args, "format", "sqlite") == "json"
+    ):
+        return await run_document(settings, args)
+    if args.passphrase_file is None:
+        return "Refused (configuration_passphrase_short).\n", 2
     passphrase = _passphrase(args.passphrase_file)
     engine = create_engine(settings.database_url)
     clock = SystemClock()
@@ -1763,6 +1781,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     target.add_argument("key", nargs="?", help="variable name")
     target.add_argument("--all-class-c", action="store_true", help="every changeable value")
     commands.add_parser("settings-doc", help="print the settings reference as Markdown")
+    commands.add_parser(
+        "config-schema", help="print the JSON Schema of the configuration document (ADR 0099)"
+    )
     commands.add_parser("logging-doc", help="print the logging reference as Markdown")
     commands.add_parser("reporting-doc", help="print the reporting metric catalogue as Markdown")
     init_cmd = commands.add_parser("init", help="generate the bootstrap keys (first install)")
@@ -1817,6 +1838,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return code
     if args.command == "settings-doc":
         sys.stdout.write(render_settings_doc())
+        return 0
+    if args.command == "config-schema":
+        sys.stdout.write(render_config_schema())
         return 0
     if args.command == "logging-doc":
         sys.stdout.write(render_logging_doc())

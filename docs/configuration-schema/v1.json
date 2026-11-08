@@ -1,0 +1,1980 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openplanner.nl/schema/configuration/v1.json",
+  "title": "OpenPlanner configuration document, openplanner.config/v1",
+  "type": "object",
+  "properties": {
+    "api_clients": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/api_client"
+      },
+      "description": "Bot clients."
+    },
+    "format": {
+      "const": "openplanner.config/v1"
+    },
+    "meta": {
+      "type": "object"
+    },
+    "mode": {
+      "enum": [
+        "merge",
+        "replace"
+      ],
+      "default": "merge"
+    },
+    "organisations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/organisation"
+      },
+      "description": "The client organisations."
+    },
+    "platform": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/platform"
+        }
+      ],
+      "description": "What the whole installation shares."
+    },
+    "scope": {
+      "oneOf": [
+        {
+          "const": "platform"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "organisation": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "organisation"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "default": "platform"
+    },
+    "seal": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "format"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "api_client": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "client_id": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "networks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "organisation": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secret_expires_at": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secret_hash": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sealed"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "client_id"
+      ],
+      "description": "A bot of the machine API: organisation, groups, scopes and sealed secret hash."
+    },
+    "api_settings": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "docs_public": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "description": "The superuser's switches for the machine API."
+    },
+    "binary": {
+      "type": "object",
+      "properties": {
+        "media_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "data": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      },
+      "required": [
+        "media_type",
+        "sha256",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "email_channel": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "dkim_selector": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 253
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "host": {
+          "type": "string",
+          "maxLength": 253
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "reply_to_address": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 254
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secret": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sealed"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "security": {
+          "type": "string",
+          "enum": [
+            "starttls",
+            "tls",
+            "none"
+          ]
+        },
+        "sender_address": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "sender_name": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "username": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 254
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "description": "The organisation's SMTP server and sender (ADR 0022, 0073)."
+    },
+    "group": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "calendar_invite_address": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 254
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "closure_scenarios": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/group_scenario"
+          },
+          "description": "The group's own scenarios."
+        },
+        "contacts": {
+          "oneOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "direct_call_max_concurrent": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dispatch_fallback": {
+          "type": "string",
+          "enum": [
+            "none",
+            "own_queue"
+          ]
+        },
+        "dispatch_kind": {
+          "type": "string",
+          "enum": [
+            "contact_center",
+            "openplanner_queue"
+          ]
+        },
+        "dispatch_lead_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60
+        },
+        "embedding_enabled": {
+          "type": "boolean"
+        },
+        "fallback_space_room_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "form_fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "short_text",
+                  "long_text",
+                  "email",
+                  "phone",
+                  "number",
+                  "date",
+                  "postcode_nl",
+                  "choice",
+                  "checkbox"
+                ]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "classification": {
+                "type": "string",
+                "enum": [
+                  "pii",
+                  "not_pii"
+                ]
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "minimum": {
+                "oneOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maximum": {
+                "oneOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "labels": {
+                "type": "object"
+              },
+              "hints": {
+                "type": "object"
+              },
+              "option_labels": {
+                "type": "object"
+              },
+              "retired": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "key",
+              "type",
+              "labels"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "holiday_calendars": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "holiday_open_days": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "holiday_source": {
+          "type": "string",
+          "enum": [
+            "inherit",
+            "own"
+          ]
+        },
+        "horizon_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 366
+        },
+        "idp_key": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "join_client": {
+          "type": "string",
+          "enum": [
+            "browser",
+            "choice"
+          ]
+        },
+        "max_bookings_per_email": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "min_notice_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "not_picked_up_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "participant_change_lead_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440
+        },
+        "phone_mode": {
+          "type": "string",
+          "enum": [
+            "hidden",
+            "optional",
+            "required"
+          ]
+        },
+        "planner_change_min_lead_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440
+        },
+        "queue_free_pick_allowed": {
+          "type": "boolean"
+        },
+        "queue_visible_from_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "reminder_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "email",
+                  "sms"
+                ]
+              },
+              "minutes_before": {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 43200
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "channel",
+              "minutes_before"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "routing": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "Subjects, switched-on routing attributes and their mapping."
+        },
+        "schedule_overrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": {
+                "type": "string"
+              },
+              "opens": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "closes": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "capacity": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "label": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 50
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "offer": {
+                "type": "string",
+                "enum": [
+                  "scheduled",
+                  "direct",
+                  "both"
+                ]
+              },
+              "subjects": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "day"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "schedule_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "weekday": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              },
+              "opens": {
+                "type": "string"
+              },
+              "closes": {
+                "type": "string"
+              },
+              "capacity": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "label": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 50
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "offer": {
+                "type": "string",
+                "enum": [
+                  "scheduled",
+                  "direct",
+                  "both"
+                ]
+              },
+              "subjects": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "valid_from": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "valid_to": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "weekday",
+              "opens",
+              "closes",
+              "capacity"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "slot_minutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 480
+        },
+        "slug": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "texts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "timezone": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "trial_call_enabled": {
+          "type": "boolean"
+        },
+        "trial_call_minutes": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 60
+        },
+        "trial_calls_per_booking": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "video_host_email": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wxcc_business_address": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 255
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wxcc_channel": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 255
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wxcc_routing_value": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 512
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "slug"
+      ],
+      "description": "A bookable team: its settings, form, staffing, reminders, texts and contacts."
+    },
+    "group_scenario": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "contacts": {
+          "oneOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "headings": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "Optional heading per locale."
+        },
+        "image": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/scenario_image"
+            }
+          ],
+          "description": "The scenario's image."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "notices": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "The notice per locale; nl and en are required."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "description": "Closure content only this group may start from."
+    },
+    "group_text": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "locale": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "locale",
+        "key"
+      ],
+      "description": "A group's own text of one message block in one locale."
+    },
+    "holiday": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "day": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "day"
+      ],
+      "description": "One closed date of a holiday calendar."
+    },
+    "holiday_calendar": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "days": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "slug": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "slug"
+      ],
+      "description": "A reusable set of closed days."
+    },
+    "identity_provider": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "client_auth": {
+          "type": "string",
+          "enum": [
+            "private_key_jwt",
+            "client_secret_basic"
+          ]
+        },
+        "client_id": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "client_secret": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sealed"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "discovery_url": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "entitlement_claim": {
+          "type": "string"
+        },
+        "entitlement_prefix": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identity_provider_key"
+          }
+        },
+        "mfa_acr_values": {
+          "type": "string",
+          "maxLength": 1100
+        },
+        "mfa_amr_values": {
+          "type": "string",
+          "maxLength": 1100
+        },
+        "mfa_policy": {
+          "type": "string",
+          "enum": [
+            "off",
+            "record",
+            "require"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "scopes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "description": "An organisation's OpenID Connect provider (ADR 0083)."
+    },
+    "identity_provider_domain": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "domain": {
+          "type": "string",
+          "maxLength": 253
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "domain"
+      ],
+      "description": "An e-mail domain the provider claims; its DNS verification is the installation's."
+    },
+    "identity_provider_key": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "created_at": {
+          "allOf": [
+            {
+              "type": "string"
+            }
+          ],
+          "description": "When the key was generated (ISO 8601, with zone)."
+        },
+        "kid": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "private_key": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sealed"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "public_jwk": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "The public key as a JWK (texts only)."
+        },
+        "retired_at": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "When a rotation retired it."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kid"
+      ],
+      "description": "A signing key pair of a private_key_jwt provider; only with secrets."
+    },
+    "log_destination": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "ca_pem": {
+          "type": "string"
+        },
+        "categories": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "include_diagnostic": {
+          "type": "boolean"
+        },
+        "include_trace": {
+          "type": "boolean"
+        },
+        "index_name": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "syslog",
+            "splunk_hec",
+            "elastic",
+            "http"
+          ]
+        },
+        "min_level": {
+          "type": "string",
+          "enum": [
+            "trace",
+            "debug",
+            "info",
+            "warning",
+            "error",
+            "critical"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "secret": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sealed"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 120
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "description": "A place where copies of the log lines go."
+    },
+    "organisation": {
+      "type": "object",
+      "properties": {
+        "accent_color": {
+          "type": "string",
+          "maxLength": 7
+        },
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "alert_targets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "warning",
+                    "outage"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "closure_scenarios": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/organisation_scenario"
+          },
+          "description": "The organisation's scenarios."
+        },
+        "contacts": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "The default contact block shown when participants cannot book."
+        },
+        "default_locale": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "display_name": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/email_channel"
+            }
+          ],
+          "description": "The mail server and sender."
+        },
+        "fonts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/organisation_font"
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/group"
+          },
+          "description": "The organisation's bookable teams."
+        },
+        "header_style": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "accent",
+            "logo"
+          ]
+        },
+        "holiday_calendars": {
+          "allOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "Slugs of the holiday calendars the organisation's groups follow."
+        },
+        "identity_providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identity_provider"
+          },
+          "description": "The organisation's identity providers."
+        },
+        "idp_key": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "What the identity provider calls the organisation; none is the slug."
+        },
+        "logo": {
+          "$ref": "#/$defs/organisation_logo"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "origins": {
+          "allOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "Websites allowed to embed the groups, in order."
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "slug": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "sms": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/sms_channel"
+            }
+          ],
+          "description": "The SMS gateway."
+        },
+        "texts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "theme_tokens": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "Design tokens by name (without --booking-) to value."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "slug"
+      ],
+      "description": "A client organisation, addressed by its slug."
+    },
+    "organisation_alert_target": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "email",
+            "webex_space"
+          ]
+        },
+        "min_level": {
+          "type": "string",
+          "enum": [
+            "warning",
+            "outage"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "address"
+      ],
+      "description": "Where alerts go: an email address or a Webex room, and the least level."
+    },
+    "organisation_font": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "data": {
+          "$ref": "#/$defs/binary"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "text",
+            "text-bold",
+            "heading"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "role"
+      ],
+      "description": "An uploaded WOFF2 font of the organisation, one per role."
+    },
+    "organisation_logo": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "data": {
+          "$ref": "#/$defs/binary"
+        }
+      },
+      "additionalProperties": false,
+      "description": "The organisation's logo: PNG, JPEG or WebP."
+    },
+    "organisation_scenario": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "contacts": {
+          "oneOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "headings": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "Optional heading per locale."
+        },
+        "image": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/scenario_image"
+            }
+          ],
+          "description": "The scenario's image."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "notices": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "The notice per locale; nl and en are required."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "description": "Closure content every group of the organisation may start from."
+    },
+    "organisation_setting": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "description": "The value of one class D setting of the organisation; null removes it."
+    },
+    "organisation_text": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "locale": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "locale",
+        "key"
+      ],
+      "description": "The organisation's own text for one catalogue key in one locale."
+    },
+    "platform": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "alert_targets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "warning",
+                    "outage"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "api": {
+          "$ref": "#/$defs/api_settings"
+        },
+        "holiday_calendars": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/holiday_calendar"
+          }
+        },
+        "log_destinations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/log_destination"
+          }
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/role"
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/sealed"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "What the superuser configures for the whole installation."
+    },
+    "platform_alert_target": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "email",
+            "webex_space"
+          ]
+        },
+        "min_level": {
+          "type": "string",
+          "enum": [
+            "warning",
+            "outage"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "address"
+      ],
+      "description": "Where alerts go: an email address or a Webex room, and the least level."
+    },
+    "platform_secret": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "secret": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sealed"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "description": "A sealed platform secret: a class C secret setting or the Webex Service App."
+    },
+    "platform_setting": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "description": "The portal value of one class C setting."
+    },
+    "role": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "claim_value": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name_en": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "name_nl": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "template": {
+          "type": "string",
+          "maxLength": 32
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "claim_value"
+      ],
+      "description": "A custom role: a copy of a built-in template within its bounds."
+    },
+    "scenario_image": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "alts": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "The text alternative per locale."
+        },
+        "data": {
+          "$ref": "#/$defs/binary"
+        },
+        "decorative": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "description": "The image of a scenario, metadata stripped, with its text alternative."
+    },
+    "sealed": {
+      "type": "object",
+      "properties": {
+        "sealed": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "sealed"
+      ],
+      "additionalProperties": false,
+      "description": "A secret sealed under the document's passphrase."
+    },
+    "sms_channel": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "api_base_url": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "country_code": {
+          "type": "string",
+          "maxLength": 5
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "webex_connect"
+          ]
+        },
+        "secret": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sealed"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sender_id": {
+          "type": "string",
+          "maxLength": 15
+        }
+      },
+      "additionalProperties": false,
+      "description": "The organisation's SMS gateway (ADR 0022)."
+    }
+  }
+}

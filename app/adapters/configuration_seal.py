@@ -125,7 +125,7 @@ class DocumentSealer:
             size = raw[0]
             nonce, ciphertext = raw[1 : 1 + size], raw[1 + size :]
             plain = self._box.open(_name(kind, address, field), nonce, ciphertext)
-        except (InvalidTag, IndexError, UnicodeDecodeError):
+        except (InvalidTag, IndexError, ValueError):
             raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_WRONG, "passphrase") from None
         return Secret(plain.decode())
 

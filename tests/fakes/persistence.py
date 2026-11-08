@@ -33,6 +33,8 @@ from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import GroupCheck
 from app.domain.closure import Closure
+from app.domain.configuration_changes import Change, ConfigurationSnapshot, Usage
+from app.domain.configuration_tree import Entity
 from app.domain.connection_health import (
     WATCHED_TASKS,
     HealthEntry,
@@ -162,6 +164,8 @@ class State:
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
     custom_roles: dict[int, CustomRole] = field(default_factory=dict)
     settings_version: int = 0
+    configuration: ConfigurationSnapshot | None = None
+    applied_configuration: list[list[Change]] = field(default_factory=list)
     platform_settings: dict[str, object] = field(default_factory=dict)
     platform_expiries: dict[str, datetime] = field(default_factory=dict)
     organisation_settings: dict[int, dict[str, object]] = field(default_factory=dict)
@@ -1642,6 +1646,23 @@ class InMemoryTransaction:
         self.state.custom_roles.pop(role_id, None)
 
     async def settings_version(self) -> int:
+        return self.state.settings_version
+
+    async def read_configuration(
+        self, now: datetime, locked_settings: frozenset[str]
+    ) -> ConfigurationSnapshot:
+        snapshot = self.state.configuration or ConfigurationSnapshot(
+            Entity("installation", children={"platform": (Entity("platform"),)}), Usage(), 0
+        )
+        return replace(
+            snapshot,
+            version=self.state.settings_version,
+            usage=replace(snapshot.usage, locked_settings=locked_settings),
+        )
+
+    async def apply_configuration(self, changes: Sequence[Change]) -> int:
+        self.state.applied_configuration.append(list(changes))
+        self.state.settings_version += 1
         return self.state.settings_version
 
     async def platform_settings(self) -> dict[str, object]:

@@ -2,8 +2,9 @@
 
 Status: accepted (2026-11-08), build ordered by the product owner in the conversation of
 2026-11-08 ("je mag alle stappen bouwen, testen, mergen en fixen", with `po:approved` for the
-pull requests). Partly built: step 1 (the domain: format `v1`, strict reading, planner, rules,
-natural keys) is built; steps 2 to 5 are not; see *Build status*. Supersedes ADR 0089 points 1
+pull requests). Partly built: steps 1 (the domain: format `v1`, strict reading, planner, rules, natural
+keys) and 2 (the adapter, the host commands and the JSON Schema) are built; steps 3 to 5 are
+not; see *Build status*. Supersedes ADR 0089 points 1
 (the package is a SQLite file) and 5 (import only into an installation not in use) once step 4
 is built; ADR 0089 points 2–4 and 6–8 carry over as amended below. Extends ADR 0008 (secrets at
 rest), ADR 0014 (authorisation) and ADR 0042 (settings classes). Amended by the section
@@ -209,7 +210,7 @@ completes the numbered point it names.
 - **Personal data in a document.** A document holds no participant data, but it does hold
   business addresses (a group's video host and invitation address, alert targets, contact
   blocks). An alert target's address is its natural key, so the audit detail of an applied
-  change (point 12) names such a target by kind and ordinal, never by address.
+  change (point 12) names such a target by a short digest, never by address.
 - **The plan hash** covers the document, the settings version *and* the list of changes
   (action, kind, address, field names), because a change to a group or an organisation does not
   move the settings version: an apply whose recomputed plan differs from the reviewed one is
@@ -255,7 +256,7 @@ portal); the requirement of a plan hash for deletions in the portal.
 |---|---|---|---|
 | 0 | ADR proposed | #345 | merged |
 | 1 | Domain: format `v1` (registry of kinds, strict reading and writing), natural keys (migration 0099 for closure scenarios and alert targets), planner with actions, mode, scope, per-change rights and the integrity rules; tests per aggregate | #618 | merged |
-| 2 | Adapter: export with and without secrets, plan and apply in one transaction, sealed values with associated data, inline binaries; `config export\|plan\|apply` on the host; `config-schema` and `docs/configuration-schema/v1.json`; setting `configuration_apply_max_changes` | | planned |
+| 2 | Adapter: export with and without secrets, plan and apply in one transaction, sealed values with associated data, inline binaries; host commands `config export --format json\|plan\|apply`; `config-schema` and `docs/configuration-schema/v1.json`; setting `configuration_apply_max_changes` | #PR | merged |
 | 3 | Portal: *Configuration* on *Advanced settings* (upload → plan table → apply) and the organisation sub-tab *Configuration*; per-change permission checks; manual topics nl/en | | planned |
 | 4 | API `plan`/`apply`, `PUT` mapped to apply; installer applies a document; SQLite export removed, SQLite import converted for one release; `docs/agent-api.md`, `docs/install.md` | | planned |
 | 5 | SQLite import removed after the release that converts it | | planned |
