@@ -70,7 +70,9 @@ class Plan:
         """Describe each change by its action, kind, address and field names, never values."""
         lines: list[str] = []
         for change in self.changes:
-            line = f"{change.action.value} {change.kind} {'/'.join(change.address)}"
+            line = " ".join(
+                filter(None, (change.action.value, change.kind, "/".join(change.address)))
+            )
             if change.fields and change.action is not ChangeAction.DELETE:
                 line += f": {', '.join(change.fields)}"
             lines.append(line)
