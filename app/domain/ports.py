@@ -43,6 +43,7 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.configuration_package import PackageSummary
+from app.domain.alert_model import AlertTarget, DeliveryState, RenderedAlert
 from app.domain.connection_health import (
     HealthEntry,
     InboundEvent,
@@ -154,6 +155,26 @@ class MessageSender(Protocol):
 
     async def send(self, message: OutboundMessage) -> None:
         """Deliver ``message``; raise on failure so the job is retried."""
+        ...
+
+
+class AlertSender(Protocol):
+    """Delivers an alert to one address of its channel (ADR 0082 point 9).
+
+    Email through the organisation's mail channel, a Webex space through the organisation's
+    bot. Raises ``IntegrationError`` on failure, so the delivery is retried.
+    """
+
+    async def send(self, address: str, alert: RenderedAlert) -> None:
+        """Deliver ``alert`` to ``address`` (an email address or a Webex room id)."""
+        ...
+
+
+class AlertSenders(Protocol):
+    """Finds the sender of an alert target, or ``None`` when its channel is not set up."""
+
+    async def sender(self, target: AlertTarget) -> AlertSender | None:
+        """Return the sender of ``target``'s channel in its scope."""
         ...
 
 
@@ -1381,6 +1402,30 @@ class Transaction(Protocol):
 
     async def count_group_jobs(self, group_id: int, overdue_before: datetime) -> JobCounts:
         """Count the group's failed jobs and its pending jobs planned before ``overdue_before``."""
+        ...
+
+    async def all_alert_targets(self) -> list[AlertTarget]:
+        """Return every alert target, of the platform and of every organisation (ADR 0082)."""
+        ...
+
+    async def list_alert_targets(self, organisation_id: int | None) -> list[AlertTarget]:
+        """Return the alert targets of one organisation, or of the platform (``None``)."""
+        ...
+
+    async def add_alert_target(self, target: AlertTarget) -> int:
+        """Store a new alert target and return its id."""
+        ...
+
+    async def delete_alert_target(self, target_id: int) -> None:
+        """Remove an alert target and what was sent to it."""
+        ...
+
+    async def list_alert_deliveries(self) -> list[DeliveryState]:
+        """Return what was sent of each alert to each target."""
+        ...
+
+    async def save_alert_delivery(self, state: DeliveryState) -> None:
+        """Store what was sent of one alert to one target."""
         ...
 
     async def request_samples(self, since: datetime) -> list[RequestSample]:
