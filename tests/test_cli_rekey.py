@@ -15,6 +15,7 @@ from app.adapters.integrations import installation_box
 from app.cli import main
 from app.config import Settings
 from tests.support.database import migrated_database
+from tests.support.legacy_package import export_package
 
 OLD = "o" * 40
 NEW = "n" * 40
@@ -112,16 +113,27 @@ def test_a_configuration_package_survives_a_rotation(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """ADR 0089 and ADR 0094 share the re-sealing: export during and import after a rotation."""
+    """ADR 0089 and ADR 0094 share the re-sealing: a package made during a rotation, read after."""
     passphrase = tmp_path / "passphrase"
     passphrase.write_text(PASSPHRASE + "\n")
     package = tmp_path / "config.sqlite"
     args = ["--passphrase-file", str(passphrase)]
     monkeypatch.setenv("SETTINGS_ENCRYPTION_KEY", NEW)
     monkeypatch.setenv("SETTINGS_ENCRYPTION_KEY_PREVIOUS", OLD)
-
-    assert main(["config", "export", str(package), *args]) == 0  # opens the value under OLD
-    capsys.readouterr()
+    # The old export is gone from the app; the test helper makes the package, opening the
+    # value under OLD through the rotation box.
+    package.write_bytes(
+        export_package(
+            Path(installation.removeprefix("sqlite+aiosqlite:///")),
+            installation_box(Settings()),
+            PASSPHRASE,
+            created_at=NOW,
+            installation="bron",
+            app_version="1.0.0",
+            environment={},
+            work_dir=tmp_path / "work",
+        )
+    )
     target = migrated_database(tmp_path, monkeypatch, "rekey-target")
     monkeypatch.delenv("SETTINGS_ENCRYPTION_KEY_PREVIOUS")
     assert main(["config", "import", str(package), *args]) == 0

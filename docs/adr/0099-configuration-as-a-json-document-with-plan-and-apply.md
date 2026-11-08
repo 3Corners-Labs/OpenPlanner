@@ -3,12 +3,13 @@
 Status: accepted (2026-11-08), build ordered by the product owner in the conversation of
 2026-11-08 ("je mag alle stappen bouwen, testen, mergen en fixen", with `po:approved` for the
 pull requests). Partly built: steps 1 (the domain: format `v1`, strict reading, planner, rules, natural
-keys), 2 (the adapter, the host commands and the JSON Schema) and 3 (the portal) are built;
-steps 4 and 5 are not; see *Build status*. Supersedes ADR 0089 points 1
+keys), 2 (the adapter, the host commands and the JSON Schema), 3 (the portal) and 4 (the API,
+the installer and the retirement of the SQLite export) are built; step 5, the removal of the
+SQLite import after one release, is not; see *Build status*. Supersedes ADR 0089 points 1
 (the package is a SQLite file) and 5 (import only into an installation not in use) once step 4
 is built; ADR 0089 points 2–4 and 6–8 carry over as amended below. Extends ADR 0008 (secrets at
 rest), ADR 0014 (authorisation) and ADR 0042 (settings classes). Amended by the section
-*Amendments from building step 1* and *Amendments from building step 3* below.
+*Amendments from building step 1*, *step 3* and *step 4* below.
 
 ## Context
 
@@ -272,6 +273,33 @@ completes the numbered point it names.
   the descriptor of each platform the installation has an adapter for, and written the way the
   portal writes it (the old columns for Webex Contact Center, ADR 0116 expand step).
 
+## Amendments from building step 4 (2026-11-08)
+
+- **Point 14, what changed for the SQLite package.** Nothing writes it any more: the portal's
+  export form, `config export` (now `--format json` only) and the agent API's `GET` are gone or
+  produce the document. A package is still *read* for one release, through
+  `SqliteConfigurationTransfer.to_document`: the package is opened on a temporary copy, its
+  secrets are sealed under the installation's key, the copy is read with the readers of the live
+  database, and the result is a `replace` document of the platform that
+  `ConfigurationPackageService.import_` plans and applies with the actor's rights. The old
+  gate "import only into an installation not in use" is gone; the planner's in-use rules
+  (bookings, closures, shortfall acceptances, API grants) and the rights per change replace it.
+  An import has no review step, as the package import never had: the plan it applies is the one
+  it computes. `configuration_installation_in_use` is gone from the error codes. `config show`
+  and `config env` keep reading the package (the installer takes the login from it).
+  The package export helper lives in `tests/support/legacy_package.py`, so the tests can still
+  make packages to read.
+- **The agent API.** `GET /api/agent/v1/configuration` exports the platform document (secrets
+  sealed only when `X-Passphrase` is given), `POST …/plan` and `POST …/apply` take a document
+  (`X-Plan-Hash` pins the reviewed plan), `PUT` applies a document as given, or converts a
+  package. The scope `configuration:transfer` stays global; its client acts as
+  `Actor.api_client`, which the matrix does not bind, like the host.
+- **The installer.** `--configuration FILE` takes a document (planned, then applied with the
+  plan hash) or an old package; a document carries no login, so the identity provider is asked
+  for as without a file.
+- **Step 5 stays.** The package import is removed in the release after the one that ships this
+  step (ADR 0116), together with `config show|env|import` and the converter.
+
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
@@ -294,7 +322,7 @@ portal); the requirement of a plan hash for deletions in the portal.
 | 1 | Domain: format `v1` (registry of kinds, strict reading and writing), natural keys (migration 0099 for closure scenarios and alert targets), planner with actions, mode, scope, per-change rights and the integrity rules; tests per aggregate | #618 | merged |
 | 2 | Adapter: export with and without secrets, plan and apply in one transaction, sealed values with associated data, inline binaries; host commands `config export --format json\|plan\|apply`; `config-schema` and `docs/configuration-schema/v1.json`; setting `configuration_apply_max_changes` | #625 | merged |
 | 3 | Portal: *Configuration* on *Advanced settings* (upload → plan table → apply) and the organisation sub-tab *Configuration*; per-change permission checks; export by rights; manual topics nl/en; setting `configuration_review_minutes` | #642 | merged |
-| 4 | API `plan`/`apply`, `PUT` mapped to apply; installer applies a document; SQLite export removed, SQLite import converted for one release; `docs/agent-api.md`, `docs/install.md` | | planned |
+| 4 | API `plan`/`apply`, `PUT` mapped to apply; installer applies a document; SQLite export removed, SQLite import converted for one release; `docs/agent-api.md`, `docs/install.md` | #STEP4 | merged |
 | 5 | SQLite import removed after the release that converts it | | planned |
 
 ## Consequences
