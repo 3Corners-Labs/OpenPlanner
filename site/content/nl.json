@@ -853,11 +853,6 @@
         "text": "Dezelfde overdracht naar andere platforms dan Webex Contact Center, achter de adapter die er al is."
       },
       {
-        "adr": "0082",
-        "title": "Gezondheidscontrole en terugval",
-        "text": "De koppeling met het contact center wordt voortdurend gecontroleerd; beheerders krijgen een melding per e-mail of in een Webex-ruimte, en een team kan terugvallen op de eigen wachtrij van OpenPlanner als het contact center uitvalt."
-      },
-      {
         "adr": "0057",
         "title": "Herplan-assistent",
         "text": "Als een team tekortschiet, krijgt de deelnemer een nieuw moment voorgesteld en houdt de plek vast tot het antwoord er is."

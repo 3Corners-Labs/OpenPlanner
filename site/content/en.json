@@ -853,11 +853,6 @@
         "text": "The same hand-over to platforms other than Webex Contact Center, behind the adapter that already exists."
       },
       {
-        "adr": "0082",
-        "title": "Health checks and fallback",
-        "text": "The connection to the contact center is checked all the time; administrators get an alert by email or in a Webex space, and a team can fall back to OpenPlanner's own queue when the contact center is down."
-      },
-      {
         "adr": "0057",
         "title": "Rebooking assistant",
         "text": "When a team falls short, the participant is offered a new time and keeps the place until they answer."
