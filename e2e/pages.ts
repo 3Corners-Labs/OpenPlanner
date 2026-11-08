@@ -81,7 +81,9 @@ export function islandVariants(): { title: string; path: string; user?: TestUser
   const { pages, admin } = JSON.parse(readFileSync(file, 'utf8')) as { pages: PageUnderTest[]; admin: AdminPageUnderTest[] };
   return [
     ...variants(pages.filter((p) => p.island)),
-    ...admin.filter((p) => p.island).flatMap((p) => variants([p]).map((v) => ({ ...v, user: p.user }))),
+    ...admin
+      .filter((p) => p.island)
+      .flatMap((p) => variants([p]).map((v) => ({ ...v, title: `admin ${v.title}`, user: p.user }))),
   ];
 }
 
