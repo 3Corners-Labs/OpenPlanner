@@ -1155,7 +1155,7 @@ setting) and `settings_version`; written by `POST /admin/settings/{key}` and
 | Tampering (CSRF) | A third-party site changes a setting in the superuser's browser | Fetch Metadata check (`SameOrigin`) and a recent login on both POST routes | `tests/admin/test_authorization_matrix.py` (POST rows), `tests/admin/test_settings_routes.py::test_the_superuser_changes_a_setting_and_it_applies_at_once` |
 | Repudiation / information disclosure | Who changed what is lost, or the audit log carries arbitrary text from a crafted request | `settings.platform.manage` events carry the key, old and new value (numbers, rates, codes; no personal data); a refusal carries the code and a registered key or `unknown`, never the submitted text | `tests/domain/test_settings_service.py::test_an_invalid_value_never_reaches_the_store_or_the_audit_detail`, `tests/test_cli_settings.py::test_set_refuses_a_value_outside_the_bounds_by_name_only` |
 
-## Flow: configuration package (ADR 0089), read for one release (ADR 0099 point 14)
+## Flow: configuration package (ADR 0089)
 
 Admin (superuser, recent login): `POST /admin/settings/package/import` (the file, the passphrase,
 a confirmation) applies an old SQLite package as a replacing document of the platform. The
