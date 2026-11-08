@@ -138,6 +138,8 @@ class ClosureExamples:
         suspended_booking: The management page of a booking on hold (a new link each run).
         pending_confirm: The confirm page of a demo booking that awaits confirmation
             (ADR 0056), for the page checks; never confirmed by them.
+        correct_details: The page where that booking's participant corrects their details
+            (ADR 0056 point 10), for the page checks; never sent by them.
         pending_flow_chromium: Another such confirm page, which the keyboard flow confirms in
             Chromium; the flow runs in each browser, and each confirms its own booking.
         pending_flow_firefox: The same for Firefox.
@@ -153,6 +155,7 @@ class ClosureExamples:
     planned_closure: str
     suspended_booking: str
     pending_confirm: str
+    correct_details: str
     pending_flow_chromium: str
     pending_flow_firefox: str
     pending_flow_webkit: str
@@ -272,6 +275,7 @@ async def seed_closure_examples(
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
         suspended_booking=f"/b/{token}",
         pending_confirm=f"/b/{pending[0]}/confirm",
+        correct_details=f"/b/{pending[0]}/details",
         pending_flow_chromium=f"/b/{pending[1]}/confirm",
         pending_flow_firefox=f"/b/{pending[2]}/confirm",
         pending_flow_webkit=f"/b/{pending[3]}/confirm",

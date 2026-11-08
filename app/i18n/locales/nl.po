@@ -11078,6 +11078,26 @@ msgstr "Link gevolgd, van de aangemaakte"
 msgid "reports.channels.trial.entered_share"
 msgstr "In de vergadering, van wie de link volgde"
 
+msgid "details.title"
+msgstr "Gegevens aanpassen"
+
+msgid "details.email"
+msgstr "E-mailadres"
+
+msgid "details.email_hint"
+msgstr "Het e-mailadres kunt u hier niet wijzigen. Wilt u een ander adres gebruiken, annuleer dan deze afspraak en maak een nieuwe."
+
+msgid "details.save"
+msgstr "Wijzigingen opslaan"
+
+msgid "details.back"
+msgstr "Terug naar uw afspraak"
+
+msgid "manage.details"
+msgstr "Gegevens aanpassen"
+
+msgid "manage.notice.details"
+msgstr "Uw gegevens zijn aangepast."
 msgid "error.proposal_not_open"
 msgstr "Deze voorgestelde tijd is niet meer beschikbaar. U kunt nog wel zelf een nieuwe tijd kiezen."
 

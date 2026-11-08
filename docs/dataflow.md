@@ -105,10 +105,10 @@ filter matches on it. The list and the rule are constants, not settings.
 
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
-| Email | `bookings.email` | booking form | as above | mail provider (WP4) |
-| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
-| Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
+| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
+| Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4) |
+| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
+| Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055); correction page, which shows the participant their own answers, all of them (`Purpose.PARTICIPANT_SELF`, ADR 0056 point 10) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
 | A group's contact-center routing (ADR 0032) | `group_contact_center` (`kind`, `routing_value`, `attributes`: codes from the platform's descriptor); for WxCC also, and still read, `groups.wxcc_routing_value`, `wxcc_business_address`, `wxcc_channel` | the group's settings | as long as the group | no personal data; the values go to the contact center in each task |
 | Subject and routing attributes (ADR 0081) | `bookings.subject_code`, `bookings.routing_answers` (codes); the group's list and mapping in `groups.routing`; the codes a block offers in `schedule_rules.subjects`, `schedule_overrides.subjects` | booking form: the subject question and the switched-on routing questions, answered with one of a closed list of codes | not personal data, purged with the booking all the same (`privacy.ROUTING_FIELDS` in `PURGED_FIELDS`, ADR 0081); reporting by subject (ADR 0117) must copy the code into its fact before the purge | no. Shown in the agenda, on the booking page and in the own queue; the mapped codes leave the system only as routing variables in the contact-center task (`flowSettings`), next to the first name and the host join URL |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
@@ -383,7 +383,7 @@ superuser ──POST /admin/maintenance/on|off (reason code, expected end)──
 host (CLI, updater) ──docker exec python -m app.cli maintenance──> web ──SQL──> maintenance_state, audit_events
 operator ──MAINTENANCE_MODE (environment)──> web (no database read)
 admin ──POST (any change) during maintenance──> web ──refused──> audit_events (permission, target slugs)
-participant ──GET/POST /g/{slug}…, /b/m/{public_ref}/cancel|reschedule──> web ──503 maintenance page (no write)
+participant ──GET/POST /g/{slug}…, /b/m/{public_ref}/cancel|details|reschedule──> web ──503 maintenance page (no write)
 bot ──non-GET /api/agent/v1/… (not the token)──> web ──503 {"error": "maintenance"} (no write)
 ```
 

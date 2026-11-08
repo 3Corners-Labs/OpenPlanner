@@ -74,6 +74,14 @@
       ]
     },
     {
+      "name": "correct your details",
+      "path": "{correct_details}",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "confirm a proposed new time",
       "path": "{proposal_page}",
       "locales": [

@@ -1898,6 +1898,20 @@ class SqlTransaction(
             )
         )
 
+    async def save_contact(self, booking_id: int, contact: Contact) -> None:
+        """Replace the booking's contact columns and answers (ADR 0056 point 10)."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(
+                first_name=contact.first_name,
+                last_name=contact.last_name,
+                email=contact.email,
+                phone=contact.phone,
+                form_answers=answers_json(contact.answers),
+            )
+        )
+
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         """Delete the booking's pending jobs and insert ``jobs``."""
         await self._session.execute(
