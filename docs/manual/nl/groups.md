@@ -40,13 +40,13 @@ uw organisaties. Daarna stelt u op de pagina van de groep de bezetting, teksten 
 
 Het tabblad **Overzicht** van een groep begint met de checklist **Klaar om te boeken**: wat nog
 ontbreekt voordat de groep afspraken kan aannemen. Elke regel zegt in woorden *Klaar*,
-*Ontbreekt* of *Niet nodig*, en linkt naar het tabblad waar u het regelt, als u dat tabblad mag
+*Ontbreekt*, *Standaardteksten* of *Niet nodig*, en linkt naar het tabblad waar u het regelt, als u dat tabblad mag
 openen.
 
 - **Bezetting voor de komende weken**: minstens één tijdblok in de week dat nog niet is
   afgelopen.
-- **Berichtteksten**: altijd klaar, want er zijn standaardteksten; de regel zegt of de groep
-  eigen teksten heeft.
+- **Berichtteksten**: ontbreekt nooit, want er zijn standaardteksten. *Klaar* als de groep eigen
+  teksten heeft, anders *Standaardteksten*.
 - **Kanaal om berichten te versturen**: de organisatie heeft een mailserver of sms-gateway die
   klaar is om te versturen.
 - **Controle van de koppeling zonder fouten**: de laatste controle onder *Instellingen* vond geen

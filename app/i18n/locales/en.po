@@ -9691,11 +9691,7 @@ msgstr "Staffing for the coming weeks"
 msgid "admin.readiness.texts"
 msgstr "Message texts"
 
-msgid "admin.readiness.texts_own"
-msgstr "The group's own texts"
 
-msgid "admin.readiness.texts_default"
-msgstr "Default texts"
 
 msgid "admin.readiness.channels"
 msgstr "A channel to send messages (email or SMS)"
@@ -9753,3 +9749,6 @@ msgstr "Events: {count}"
 
 msgid "admin.audit.count_newest"
 msgstr "The newest {count} events. Narrow the filter or export for more."
+
+msgid "admin.readiness.state.defaults"
+msgstr "Default texts"

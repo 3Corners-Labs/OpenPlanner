@@ -33,7 +33,7 @@ rename of phase C.
 The group's holiday tab (``/admin/groups/{slug}/holidays``) lives in ``holiday_routes``.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Annotated
 
@@ -62,10 +62,10 @@ from app.admin.pages import (
     page,
     with_manual,
 )
-from app.admin.readiness_view import GROUP_LINKS, allowed_on, checklist_view, readiness_service
+from app.admin.readiness_view import checklist_view, readiness_service
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
-from app.domain.authorization import LEVELS, Level, Permission
+from app.domain.authorization import LEVELS, Level, Permission, Principal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.planning import (
     GroupSettings,
@@ -105,7 +105,7 @@ from app.i18n.dates import (
 )
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
-from app.web.navigation import object_page
+from app.web.navigation import Screen, object_page
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 log = structlog.get_logger()
@@ -184,6 +184,23 @@ OWN_QUEUE_TABS = frozenset({"group.queue"})
 """Tabs shown only on a group that dispatches to OpenPlanner's own queue (ADR 0043)."""
 
 
+def group_shows(principal: Principal, summary: GroupSummary) -> Callable[[Screen], bool]:
+    """Return whether a screen of the register shows for ``principal`` on this group's pages.
+
+    The one predicate for the group's tabs and the links of its readiness checklist: the
+    matrix grants the screen's permission, and the own queue shows only on a group that
+    dispatches to it (ADR 0043).
+    """
+    can = can_function(principal)
+
+    def shows(screen: Screen) -> bool:
+        return can(screen.permission, summary) and (
+            summary.group.has_own_queue or screen.key not in OWN_QUEUE_TABS
+        )
+
+    return shows
+
+
 def planning_service(request: Request) -> PlanningService:
     """Return the application's planning service."""
     service: PlanningService = request.app.state.planning_service
@@ -205,15 +222,11 @@ def group_page(
     ``scripts=True`` allows the page's own script (the queue's live region, ADR 0072).
     """
     summary = context.group
-    can = can_function(context.principal)
     tabs, subtabs = object_tabs(
         locale,
         object_page("group"),
         summary.group.slug,
-        lambda screen: (
-            can(screen.permission, summary)
-            and (summary.group.has_own_queue or screen.key not in OWN_QUEUE_TABS)
-        ),
+        group_shows(context.principal, summary),
         current_home(request),
     )
     response = page(
@@ -519,8 +532,7 @@ async def group(
             "readiness": checklist_view(
                 await readiness_service(request).group(context.principal, slug),
                 locale,
-                GROUP_LINKS,
-                allowed_on(context.principal, summary.organisation_slug, summary.group.slug),
+                group_shows(context.principal, summary),
                 {"slug": summary.group.slug, "org": summary.organisation_slug},
             ),
             "phone_label": _(PHONE_LABELS[summary.group.phone_mode]),

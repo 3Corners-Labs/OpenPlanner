@@ -167,16 +167,24 @@ def entry_subtabs(
     return [own, *row]
 
 
+def organisation_shows(principal: Principal) -> Callable[[Screen], bool]:
+    """Return whether a screen shows for ``principal`` on an organisation's pages.
+
+    The one predicate for the organisation's tabs and the links of its readiness checklist.
+    """
+    can = can_function(principal)
+    return lambda screen: bool(can(screen.permission))
+
+
 def organisation_header(
     request: Request, locale: RequestLocale, principal: Principal, name: str, slug: str
 ) -> ObjectHeader:
     """Return the header of organisation ``slug``'s pages, with the tabs the matrix allows."""
-    can = can_function(principal)
     tabs, subtabs = object_tabs(
         locale,
         object_page("organisation"),
         slug,
-        lambda screen: can(screen.permission),
+        organisation_shows(principal),
         current_home(request),
     )
     return ObjectHeader(name, slug, tabs, subtabs)

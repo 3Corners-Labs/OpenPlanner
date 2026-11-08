@@ -2,7 +2,7 @@
 
 import re
 
-from app.admin.group_list_routes import narrow
+from app.admin.group_list_routes import narrow_groups as narrow
 from app.admin.list_search import MAX_QUERY_LENGTH
 from app.domain.scheduling import Group, GroupSummary
 from tests.admin.conftest import AGENT, GROUP_ADMIN, ORG_ADMIN, SUPER, Site
@@ -107,7 +107,7 @@ def test_narrow_matches_name_or_slug_and_drops_an_unknown_organisation() -> None
     by_org, chosen = narrow(groups, "", "andere")
 
     assert [g.group.slug for g in rows] == ["demo"]
-    assert (filters.query, filters.organisation, filters.active) == ("Video", "", True)
+    assert (filters.searching, filters.organisation, filters.active) == (True, "", True)
     assert [o.value for o in filters.organisations] == ["demo", "andere"]
     assert [g.group.slug for g in by_slug] == ["team"]
     assert [g.group.slug for g in by_org] == ["team"]

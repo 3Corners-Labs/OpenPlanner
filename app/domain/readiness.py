@@ -8,9 +8,9 @@ user-facing text (CLAUDE.md).
 A group is ready when it has staffing that is still valid, its organisation has a channel
 that can send, and, for a group that calls a platform (a Webex host or a contact-center
 mapping), its latest connection check did not fail. Its texts always have a value (the
-catalogue, then the organisation and the group, ADR 0009), so that item is informative: it
-says whether the group has texts of its own. An organisation is ready when it has a channel
-that can send, its own branding and a contact block for closures.
+catalogue, then the organisation and the group, ADR 0009), so that item is never missing: it
+is done with texts of its own, or runs on the defaults. An organisation is ready when it has a
+channel that can send, its own branding and a contact block for closures.
 """
 
 from collections.abc import Sequence
@@ -41,7 +41,7 @@ class Item(StrEnum):
 
 
 class State(StrEnum):
-    """Where an item stands."""
+    """Where an item stands; only ``MISSING`` keeps an object from taking bookings."""
 
     DONE = "done"
     """Nothing left to do."""
@@ -49,23 +49,19 @@ class State(StrEnum):
     MISSING = "missing"
     """Needed before bookings can be taken."""
 
+    DEFAULTS = "defaults"
+    """Not missing: the defaults apply (the texts of a group without texts of its own)."""
+
     NOT_NEEDED = "not_needed"
     """Does not apply to this object (a check for a group that calls no platform)."""
 
 
 @dataclass(frozen=True)
 class Line:
-    """One item of a checklist and where it stands.
-
-    Attributes:
-        item: What the line is about.
-        state: Done, missing or not needed.
-        own: For the texts: whether the group has texts of its own (else the defaults apply).
-    """
+    """One item of a checklist and where it stands."""
 
     item: Item
     state: State
-    own: bool = False
 
 
 @dataclass(frozen=True)
@@ -73,11 +69,6 @@ class Checklist:
     """The lines of one object's checklist, in the order the portal shows them."""
 
     lines: tuple[Line, ...]
-
-    @property
-    def ready(self) -> bool:
-        """Whether no line is missing."""
-        return all(line.state is not State.MISSING for line in self.lines)
 
     @property
     def missing(self) -> int:
@@ -91,8 +82,8 @@ def _done(condition: bool) -> State:
 
 
 def has_staffing(rules: Sequence[ScheduleRule], today: date) -> bool:
-    """Whether any weekly rule still applies on ``today`` or later."""
-    return any(rule.valid_to is None or rule.valid_to >= today for rule in rules)
+    """Whether any weekly rule still applies on ``today`` (the group's date) or later."""
+    return any(rule.applies_from(today) for rule in rules)
 
 
 def can_send(channels: Sequence[ChannelSettings]) -> bool:
@@ -124,7 +115,7 @@ def group_checklist(
     return Checklist(
         (
             Line(Item.STAFFING, _done(staffed)),
-            Line(Item.TEXTS, State.DONE, own=own_texts),
+            Line(Item.TEXTS, State.DONE if own_texts else State.DEFAULTS),
             Line(Item.CHANNELS, _done(sends)),
             Line(Item.CHECK, check_state),
         )
@@ -170,11 +161,11 @@ class ReadinessService:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
         require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
-        today = self._clock.now().date()
         async with self._uow.read() as tx:
             group = await tx.get_group(slug)
             if group is None:
                 raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+            today = group.today(self._clock.now())
             rules, _ = await tx.get_schedule(group.id, today, today)
             texts = await tx.get_group_texts(group.id)
             channels = await tx.get_channel_settings(group.organisation_id)

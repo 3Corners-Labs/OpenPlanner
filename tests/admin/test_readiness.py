@@ -2,7 +2,15 @@
 
 import re
 
-from tests.admin.conftest import AGENT, GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.admin.conftest import (
+    AGENT,
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+)
 
 
 def _checklist(page: str) -> str:
@@ -19,11 +27,13 @@ async def test_the_group_overview_shows_what_is_missing_with_links(site: Site) -
 
     card = _checklist((await site.client.get("/admin/groups/demo?lang=en")).text)
 
+    channels = card.split("A channel to send messages", 1)[0].rsplit("<li", 1)[1]
+
     assert "Ready for bookings" in card
-    assert "Message texts" in card
-    assert "/admin/groups/demo/staffing" in _links(card) or "Done" in card
-    for href in _links(card):
-        assert href.startswith(("/admin/groups/demo/", "/admin/organisations/demo/"))
+    assert "Missing" in channels  # the demo organisation has no channel that can send
+    assert '<a href="/admin/organisations/demo/channels">' in card
+    assert '<a href="/admin/groups/demo/settings#check">' in card or "Not needed" in card
+    assert "Default texts" in card or '<a href="/admin/groups/demo/messages">' in card
 
 
 async def test_a_line_links_only_when_the_reader_may_open_the_tab(site: Site) -> None:
@@ -101,3 +111,14 @@ async def test_a_closed_group_shows_under_the_filter_with_a_link_to_its_closure(
 
     assert 'href="/admin/groups/demo/closure"' in groups
     assert "Emergency closure active" in groups
+
+    # An agent sees the label without the link; an outsider's filter never shows demo.
+    await site.login_as(AGENT)
+    agent = (await site.client.get("/admin/?closures=1&lang=en")).text.split('id="groups-heading"')[
+        1
+    ]
+    assert "Emergency closure active" in agent
+    assert 'href="/admin/groups/demo/closure"' not in agent
+    await site.login_as(OUTSIDER)
+    outsider = (await site.client.get("/admin/?closures=1&lang=en")).text
+    assert 'href="/admin/groups/demo"' not in outsider

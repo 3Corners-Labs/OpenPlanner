@@ -665,7 +665,7 @@ async def _audit_page(
     zone = ZoneInfo(settings_for(request).admin_timezone)
     in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
     narrow = query.narrow({g.group.slug for g in in_scope}, zone)
-    events = await service.audit_log(context.principal, narrow)
+    events = await service.audit_log(context.principal, narrow, AUDIT_LOG_LIMIT)
     response = _page(
         request,
         locale,

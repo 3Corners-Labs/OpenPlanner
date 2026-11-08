@@ -63,11 +63,10 @@ def test_a_group_without_a_platform_needs_no_check() -> None:
 
     assert _states(checklist.lines) == {
         Item.STAFFING: State.DONE,
-        Item.TEXTS: State.DONE,
+        Item.TEXTS: State.DEFAULTS,
         Item.CHANNELS: State.DONE,
         Item.CHECK: State.NOT_NEEDED,
     }
-    assert checklist.ready
     assert checklist.missing == 0
 
 
@@ -95,10 +94,8 @@ def test_missing_staffing_and_channels_are_counted() -> None:
 
     checklist = group_checklist(group, staffed=False, own_texts=True, sends=False, check=None)
 
-    assert not checklist.ready
     assert checklist.missing == 2
-    texts = next(line for line in checklist.lines if line.item is Item.TEXTS)
-    assert texts.own
+    assert _states(checklist.lines)[Item.TEXTS] is State.DONE  # texts of its own
 
 
 def test_an_organisation_needs_channels_its_own_branding_and_contact() -> None:
@@ -107,7 +104,7 @@ def test_an_organisation_needs_channels_its_own_branding_and_contact() -> None:
 
     assert [line.item for line in bare.lines] == [Item.CHANNELS, Item.BRANDING, Item.CONTACT]
     assert bare.missing == 3
-    assert done.ready
+    assert done.missing == 0
 
 
 @pytest.fixture
@@ -126,7 +123,7 @@ async def test_a_new_group_misses_staffing_and_channels(service: ReadinessServic
 
     assert _states(checklist.lines) == {
         Item.STAFFING: State.MISSING,
-        Item.TEXTS: State.DONE,
+        Item.TEXTS: State.DEFAULTS,
         Item.CHANNELS: State.MISSING,
         Item.CHECK: State.NOT_NEEDED,
     }
@@ -142,8 +139,8 @@ async def test_the_service_reads_rules_texts_and_channels(
 
     checklist = await service.group(SUPER, "demo")
 
-    assert checklist.ready
-    assert next(line for line in checklist.lines if line.item is Item.TEXTS).own
+    assert checklist.missing == 0
+    assert _states(checklist.lines)[Item.TEXTS] is State.DONE
 
 
 async def test_the_organisation_checklist_reads_branding_and_contact(
@@ -174,3 +171,17 @@ async def test_outsiders_and_unknown_objects_are_refused(service: ReadinessServi
     assert group_refused.value.code is ErrorCode.NOT_PERMITTED
     assert org_refused.value.code is ErrorCode.NOT_PERMITTED
     assert unknown.value.code in {ErrorCode.GROUP_NOT_FOUND, ErrorCode.NOT_PERMITTED}
+
+
+async def test_staffing_that_ends_today_counts_on_the_groups_own_date(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    """At 23:30 UTC on 1 January it is already 2 January in Amsterdam: the rule has ended."""
+    late = NOW.replace(hour=23, minute=30)
+    clock = FixedClock(late)
+    service = ReadinessService(uow, clock, AdminService(uow, clock))
+    uow.state.rules[1] = [ScheduleRule(0, window(), valid_to=late.date())]
+
+    checklist = await service.group(SUPER, "demo")
+
+    assert _states(checklist.lines)[Item.STAFFING] is State.MISSING

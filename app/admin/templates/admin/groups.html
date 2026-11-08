@@ -1,7 +1,7 @@
 {#- The groups list (ADR 0047 §4): GET filter form, count, table with a link to each group's page; never an edit form. -#}
 {% extends "admin/layout.html" %}
 {% from "admin/_icons.html" import icon %}
-{% from "admin/_filters.html" import filter_select with context %}
+{% from "admin/_filters.html" import filter_select, search_field with context %}
 {% block title %}{{ _("admin.groups.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -19,11 +19,7 @@
 <form class="card" method="get" action="/admin/groups" aria-labelledby="filter-heading">
   <h2 id="filter-heading" class="visually-hidden">{{ _("admin.groups.filter") }}</h2>
   <div class="inline-forms">
-    <div class="field">
-      <label for="groups-query">{{ _("admin.groups.search") }}</label>
-      <input type="search" id="groups-query" name="q" maxlength="100"{% if filters.query %} aria-describedby="groups-query-active"{% endif %}>
-      {% if filters.query %}<p class="hint" id="groups-query-active">{{ _("admin.groups.search_active") }}</p>{% endif %}
-    </div>
+    {{ search_field("groups-query", _("admin.groups.search"), filters) }}
     {% if filters.organisations | length > 1 %}
     {{ filter_select("groups-organisation", "org", _("admin.groups.organisation"), filters.organisations, filters.organisation) }}
     {% endif %}

@@ -1,6 +1,6 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_icons.html" import icon %}
-{% from "admin/_filters.html" import filter_select with context %}
+{% from "admin/_filters.html" import filter_select, search_field with context %}
 {% block title %}{{ _("admin.api.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -45,11 +45,7 @@
   <form method="get" action="/admin/api" aria-labelledby="clients-filter-heading">
     <h3 id="clients-filter-heading" class="visually-hidden">{{ _("admin.api.filter") }}</h3>
     <div class="inline-forms">
-      <div class="field">
-        <label for="clients-query">{{ _("admin.api.search") }}</label>
-        <input type="search" id="clients-query" name="q" maxlength="100"{% if filters.searching %} aria-describedby="clients-query-active"{% endif %}>
-        {% if filters.searching %}<p class="hint" id="clients-query-active">{{ _("admin.groups.search_active") }}</p>{% endif %}
-      </div>
+      {{ search_field("clients-query", _("admin.api.search"), filters) }}
       {% if filters.organisations | length > 1 %}
       {{ filter_select("clients-organisation", "org", _("admin.api.organisation"), filters.organisations, filters.organisation) }}
       {% endif %}

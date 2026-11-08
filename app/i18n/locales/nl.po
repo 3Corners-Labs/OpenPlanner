@@ -9703,11 +9703,7 @@ msgstr "Bezetting voor de komende weken"
 msgid "admin.readiness.texts"
 msgstr "Berichtteksten"
 
-msgid "admin.readiness.texts_own"
-msgstr "Eigen teksten van de groep"
 
-msgid "admin.readiness.texts_default"
-msgstr "Standaardteksten"
 
 msgid "admin.readiness.channels"
 msgstr "Kanaal om berichten te versturen (e-mail of sms)"
@@ -9765,3 +9761,6 @@ msgstr "Gebeurtenissen: {count}"
 
 msgid "admin.audit.count_newest"
 msgstr "De nieuwste {count} gebeurtenissen. Verfijn het filter of exporteer voor meer."
+
+msgid "admin.readiness.state.defaults"
+msgstr "Standaardteksten"

@@ -758,12 +758,12 @@ async def overview(
     request: Request,
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.DASHBOARD_VIEW))],
-    closures: Annotated[str, Query(max_length=1)] = "",
+    closures: Annotated[str, Query(max_length=8)] = "",
 ) -> HTMLResponse:
     """The overview: the visible widgets as a grid, then the groups in scope with shortfalls.
 
     ``?closures=1`` narrows the groups to those with a closure in force now (ADR 0047 §4), each
-    linking to its *Closure* tab; any other value shows every group.
+    linking to its *Closure* tab; any other value (at most 8 characters) shows every group.
     """
     principal = context.principal
     views = await _views(request, locale, principal)
@@ -793,7 +793,7 @@ async def overview(
             "popup_level": floor.value if floor else None,
             "views": views,
             "groups": groups,
-            "closed": set(closed),
+            "closed": closed,
             "only_closed": only_closed,
             "total_groups": total,
             "shortfalls": shortfalls,

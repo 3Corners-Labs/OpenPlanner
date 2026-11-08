@@ -39,12 +39,12 @@ organisations. You then set up staffing, texts and channels on the group's page.
 ## Ready for bookings
 
 The group's **Overview** tab starts with the checklist **Ready for bookings**: what is still
-missing before the group can take appointments. Each line says *Done*, *Missing* or *Not
-needed* in words, and links to the tab that fixes it when you may open that tab.
+missing before the group can take appointments. Each line says *Done*, *Missing*, *Default
+texts* or *Not needed* in words, and links to the tab that fixes it when you may open that tab.
 
 - **Staffing for the coming weeks**: at least one weekly block that has not ended.
-- **Message texts**: always done, because default texts exist; the line says whether the group
-  has texts of its own.
+- **Message texts**: never missing, because default texts exist. *Done* when the group has
+  texts of its own, otherwise *Default texts*.
 - **A channel to send messages**: the organisation has a mail server or SMS gateway that is
   ready to send.
 - **Connection check without failures**: the group's latest check under *Settings* found no

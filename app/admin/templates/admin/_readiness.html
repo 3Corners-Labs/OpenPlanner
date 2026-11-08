@@ -10,7 +10,6 @@
     <li class="checklist__item">
       <span class="chip {% if line.done %}chip--success{% else %}chip--warning{% endif %}">{% if line.done %}{{ icon("check") }}{% else %}{{ icon("alert") }}{% endif %}<span>{{ line.status }}</span></span>
       {% if line.href %}<a href="{{ line.href }}">{{ line.label }}</a>{% else %}<span>{{ line.label }}</span>{% endif %}
-      {% if line.detail %}<span class="hint">{{ line.detail }}</span>{% endif %}
     </li>
     {% endfor %}
   </ul>

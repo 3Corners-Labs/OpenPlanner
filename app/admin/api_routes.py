@@ -26,13 +26,12 @@ from starlette.responses import HTMLResponse, Response
 from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import (
     FormData,
-    Option,
     done_message,
     raise_refusal,
     read_form,
     redirect_done,
 )
-from app.admin.list_search import QUERY_PARAM, matches, search_text
+from app.admin.list_search import ORGANISATION_PARAM, QUERY_PARAM, ListFilter, narrow
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.config import AGENT_API_PREFIX as PREFIX
@@ -225,42 +224,17 @@ def _url(client_id: str | None = None) -> str:
     return f"/admin/api/clients/{client_id}" if client_id else "/admin/api"
 
 
-ORGANISATION_PARAM = "org"
-"""The organisation filter of the client list."""
-
-
-@dataclass(frozen=True)
-class ClientFilterView:
-    """The list's GET filter: a search on name or client id, and the organisation.
-
-    The search text is never shown again (``app.admin.list_search``); the organisation counts
-    only when one of the listed clients belongs to it, and is otherwise dropped.
-    """
-
-    searching: bool
-    organisation: str
-    organisations: list[Option]
-
-    @property
-    def active(self) -> bool:
-        """Whether anything narrows the list."""
-        return self.searching or bool(self.organisation)
-
-
 def narrow_clients(
     clients: list[ApiClient], names: dict[str, str], query: str, organisation: str
-) -> tuple[list[ApiClient], ClientFilterView]:
-    """Return the clients matching ``query`` and ``organisation``, and the checked filter."""
-    present = {c.organisation: names.get(c.organisation, c.organisation) for c in clients}
-    chosen = organisation if organisation in present else ""
-    text = search_text(query)
-    rows = [
-        c
-        for c in clients
-        if (not chosen or c.organisation == chosen) and matches(text, c.name, c.client_id)
-    ]
-    options = [Option(slug, name) for slug, name in sorted(present.items())]
-    return rows, ClientFilterView(bool(text), chosen, options)
+) -> tuple[list[ApiClient], ListFilter]:
+    """Return the clients matching ``query`` (name or client id) and ``organisation``."""
+    return narrow(
+        sorted(clients, key=lambda c: (c.organisation, c.name)),
+        query,
+        organisation,
+        organisation_of=lambda c: (c.organisation, names.get(c.organisation, c.organisation)),
+        fields=lambda c: (c.name, c.client_id),
+    )
 
 
 @router.get("/api", response_class=HTMLResponse)

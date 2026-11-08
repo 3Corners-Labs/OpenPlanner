@@ -573,13 +573,13 @@ async def test_active_names_only_groups_closed_now(
 ) -> None:
     """ADR 0047 §4: the overview's filter; an upcoming closure is not active yet."""
     groups = list(uow.state.groups.values())
-    assert await closures.active(groups) == {}
+    assert await closures.active(groups) == frozenset()
 
     await closures.close_group(
         GROUP_ADMIN, "demo", ClosureInput(SLOT_0930, SLOT_0930 + timedelta(hours=1), NOTICES)
     )
-    assert await closures.active(groups) == {}
+    assert await closures.active(groups) == frozenset()
 
     await closures.lift(GROUP_ADMIN, "demo", reinstate=False)
     await closures.close_group(GROUP_ADMIN, "demo", ClosureInput(None, None, NOTICES))
-    assert set(await closures.active(groups)) == {"demo"}
+    assert await closures.active(groups) == {"demo"}
