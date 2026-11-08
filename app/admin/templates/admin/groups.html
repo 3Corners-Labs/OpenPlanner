@@ -21,7 +21,7 @@
   <div class="inline-forms">
     {{ search_field("groups-query", _("admin.groups.search"), filters) }}
     {% if filters.organisations | length > 1 %}
-    {{ filter_select("groups-organisation", "org", _("admin.groups.organisation"), filters.organisations, filters.organisation) }}
+    {{ filter_select("groups-organisation", filters.organisation_param, _("admin.groups.organisation"), filters.organisations, filters.organisation) }}
     {% endif %}
     <div class="choice__option">
       <input type="checkbox" id="groups-archived" name="archived" value="1"{% if filters.archived %} checked{% endif %}>

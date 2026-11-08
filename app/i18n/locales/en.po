@@ -7984,8 +7984,6 @@ msgstr "None"
 msgid "admin.groups.public_page"
 msgstr "Public page"
 
-msgid "admin.groups.search_active"
-msgstr "A search is active. Clear the filters to see everything again."
 
 msgid "term.agent"
 msgstr "agent"
@@ -9752,3 +9750,6 @@ msgstr "The newest {count} events. Narrow the filter or export for more."
 
 msgid "admin.readiness.state.defaults"
 msgstr "Default texts"
+
+msgid "admin.list.search_active"
+msgstr "A search is active. Clear the filters to see everything again."

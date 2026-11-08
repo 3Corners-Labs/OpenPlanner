@@ -47,7 +47,7 @@
     <div class="inline-forms">
       {{ search_field("clients-query", _("admin.api.search"), filters) }}
       {% if filters.organisations | length > 1 %}
-      {{ filter_select("clients-organisation", "org", _("admin.api.organisation"), filters.organisations, filters.organisation) }}
+      {{ filter_select("clients-organisation", filters.organisation_param, _("admin.api.organisation"), filters.organisations, filters.organisation) }}
       {% endif %}
       <button type="submit" class="button button--secondary">{{ icon("filter") }}<span>{{ _("admin.groups.apply") }}</span></button>
       {% if filters.active %}<a href="/admin/api">{{ _("admin.groups.clear") }}</a>{% endif %}

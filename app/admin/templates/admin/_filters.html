@@ -13,7 +13,7 @@
 {% macro search_field(id, label, filters) -%}
 <div class="field">
   <label for="{{ id }}">{{ label }}</label>
-  <input type="search" id="{{ id }}" name="q" maxlength="{{ filters.max_length }}"{% if filters.searching %} aria-describedby="{{ id }}-active"{% endif %}>
-  {% if filters.searching %}<p class="hint" id="{{ id }}-active">{{ _("admin.groups.search_active") }}</p>{% endif %}
+  <input type="search" id="{{ id }}" name="{{ filters.query_param }}" maxlength="{{ filters.max_length }}"{% if filters.searching %} aria-describedby="{{ id }}-active"{% endif %}>
+  {% if filters.searching %}<p class="hint" id="{{ id }}-active">{{ _("admin.list.search_active") }}</p>{% endif %}
 </div>
 {%- endmacro %}

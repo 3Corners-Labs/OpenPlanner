@@ -64,7 +64,9 @@ def narrow_groups(
         organisation_of=lambda g: (g.organisation_slug, g.organisation_name),
         fields=lambda g: (g.group.name, g.group.slug),
     )
-    return rows, GroupFilterView(**vars(found), archived=archived)
+    return rows, GroupFilterView(
+        found.searching, found.organisation, found.organisations, archived=archived
+    )
 
 
 @router.get("/groups", response_class=HTMLResponse)

@@ -2,6 +2,7 @@
 
 import re
 
+from app.domain.authorization import Role
 from tests.admin.conftest import (
     AGENT,
     GROUP_ADMIN,
@@ -11,6 +12,7 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
+from tests.support.principals import principal
 
 
 def _checklist(page: str) -> str:
@@ -122,3 +124,19 @@ async def test_a_closed_group_shows_under_the_filter_with_a_link_to_its_closure(
     await site.login_as(OUTSIDER)
     outsider = (await site.client.get("/admin/?closures=1&lang=en")).text
     assert 'href="/admin/groups/demo"' not in outsider
+
+
+async def test_an_organisation_permission_counts_only_on_its_own_organisation(site: Site) -> None:
+    """Admin of ``andere`` and group admin in ``demo``: no link to demo's channels."""
+    both = principal(
+        "sub-both",
+        "Bo Beide",
+        frozenset({Role.ORG_ADMIN, Role.GROUP_ADMIN}),
+        frozenset({"andere"}),
+        frozenset({"demo"}),
+    )
+    await site.login_as(both)
+
+    card = _checklist((await site.client.get("/admin/groups/demo?lang=en")).text)
+
+    assert "/admin/organisations/demo/channels" not in _links(card)

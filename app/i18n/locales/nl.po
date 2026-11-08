@@ -7996,8 +7996,6 @@ msgstr "Geen"
 msgid "admin.groups.public_page"
 msgstr "Openbare pagina"
 
-msgid "admin.groups.search_active"
-msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
 
 msgid "term.agent"
 msgstr "medewerker"
@@ -9764,3 +9762,6 @@ msgstr "De nieuwste {count} gebeurtenissen. Verfijn het filter of exporteer voor
 
 msgid "admin.readiness.state.defaults"
 msgstr "Standaardteksten"
+
+msgid "admin.list.search_active"
+msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."

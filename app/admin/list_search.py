@@ -32,12 +32,16 @@ class ListFilter:
         organisation: The chosen organisation's slug, or empty.
         organisations: The organisations of the rows, to choose from.
         max_length: The longest search text, for the field's ``maxlength``.
+        query_param: The search field's name.
+        organisation_param: The organisation choice's name.
     """
 
     searching: bool
     organisation: str
     organisations: list[Option]
     max_length: int = MAX_QUERY_LENGTH
+    query_param: str = QUERY_PARAM
+    organisation_param: str = ORGANISATION_PARAM
 
     @property
     def active(self) -> bool:

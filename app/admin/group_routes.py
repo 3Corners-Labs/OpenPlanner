@@ -33,7 +33,7 @@ rename of phase C.
 The group's holiday tab (``/admin/groups/{slug}/holidays``) lives in ``holiday_routes``.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import Annotated
 
@@ -58,6 +58,7 @@ from app.admin.pages import (
     Locale,
     SameOrigin,
     current_home,
+    group_shows,
     object_tabs,
     page,
     with_manual,
@@ -65,7 +66,7 @@ from app.admin.pages import (
 from app.admin.readiness_view import checklist_view, readiness_service
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
-from app.domain.authorization import LEVELS, Level, Permission, Principal
+from app.domain.authorization import LEVELS, Level, Permission
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.planning import (
     GroupSettings,
@@ -105,7 +106,7 @@ from app.i18n.dates import (
 )
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
-from app.web.navigation import Screen, object_page
+from app.web.navigation import object_page
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 log = structlog.get_logger()
@@ -178,27 +179,6 @@ INTEGRATION_LABELS: dict[str, str] = {
     "wxcc_channel": "admin.field.wxcc_channel",
     "wxcc_routing_value": "admin.field.wxcc_routing_value",
 }
-
-
-OWN_QUEUE_TABS = frozenset({"group.queue"})
-"""Tabs shown only on a group that dispatches to OpenPlanner's own queue (ADR 0043)."""
-
-
-def group_shows(principal: Principal, summary: GroupSummary) -> Callable[[Screen], bool]:
-    """Return whether a screen of the register shows for ``principal`` on this group's pages.
-
-    The one predicate for the group's tabs and the links of its readiness checklist: the
-    matrix grants the screen's permission, and the own queue shows only on a group that
-    dispatches to it (ADR 0043).
-    """
-    can = can_function(principal)
-
-    def shows(screen: Screen) -> bool:
-        return can(screen.permission, summary) and (
-            summary.group.has_own_queue or screen.key not in OWN_QUEUE_TABS
-        )
-
-    return shows
 
 
 def planning_service(request: Request) -> PlanningService:

@@ -248,7 +248,7 @@ async def organisation(request: Request, locale: Locale, org: str, context: Read
             "readiness": checklist_view(
                 await readiness_service(request).organisation(principal, org),
                 locale,
-                organisation_shows(principal),
+                organisation_shows(principal, org),
                 {"org": org},
             ),
             "language_name": names.get(current.default_locale, current.default_locale),
