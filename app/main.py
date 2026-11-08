@@ -18,6 +18,7 @@ from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, a
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
+from app.adapters.contact_center_connections import sealed_connections
 from app.adapters.db.backup import database_path
 from app.adapters.db.configuration_package import (
     SqliteConfigurationTransfer,
@@ -85,6 +86,7 @@ from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.confirmation import ConfirmPolicy
+from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.contact_service import ContactService
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
@@ -658,6 +660,11 @@ def create_app(
         )
         # ADR 0082 point 9: alerts to email addresses and Webex spaces, and the bot tokens.
         app.state.bot_tokens = alert_bots(app.state.engine, settings)
+        # ADR 0032 point 9: each organisation's own contact-center connection, sealed.
+        app.state.contact_center_connections = sealed_connections(app.state.engine, settings)
+        app.state.contact_center_connection_service = ContactCenterConnectionService(
+            uow, clock, app.state.admin_service, app.state.contact_center_connections
+        )
         app.state.alert_target_service = AlertTargetService(
             uow,
             clock,

@@ -10,6 +10,7 @@ webhook is noted as its platform's latest inbound event, for *Koppelingen* and *
 (ADR 0082 point 5).
 
     POST /webhooks/webex                   meetings started/ended, participants joined/left
+    POST /webhooks/contact-center/{kind}/{org}  an organisation's own connection (ADR 0032)
     POST /webhooks/contact-center/{kind}   task created/connected/ended/failed
     POST /webhooks/wxcc                    alias of /webhooks/contact-center/webex_cc
 """
@@ -21,13 +22,16 @@ import structlog
 from fastapi import APIRouter, Request
 from starlette.responses import Response
 
+from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.contact_centers import INBOUND, inbound
 from app.adapters.webhooks import InboundWebhook, parse_webex, verify_webex
 from app.domain.connection_health import InboundEvent, Platform
 from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.integration import EventOutcome, IntegrationService
 from app.domain.integration_health import IntegrationHealthService
 from app.domain.ports import Clock
+from app.domain.scheduling import is_slug
 from app.domain.security_log import INVALID_SIGNATURE, WEBHOOK_REJECTED
 from app.web.protection import limiter
 from app.web.security_events import report
@@ -128,16 +132,49 @@ async def wxcc(request: Request) -> Response:
     return await _contact_center(request, INBOUND[ContactCenterKind.WEBEX_CC])
 
 
+@router.post("/contact-center/{kind}/{org}")
+@limiter.shared_limit(WEBHOOK_LIMIT, scope=CONTACT_CENTER_SCOPE)
+async def organisation_contact_center(request: Request, kind: str, org: str) -> Response:
+    """Record a task event of an organisation's own connection (ADR 0032 point 10).
+
+    Verified with that organisation's webhook secret; the task is looked up in its bookings
+    only. An unknown kind or organisation, or one without that connection, is a 404.
+    """
+    handling = inbound(kind)
+    connections: SealedConnections | None = request.app.state.contact_center_connections
+    if handling is None or connections is None or not is_slug(org):
+        return Response(status_code=404)
+    service: ContactCenterConnectionService = request.app.state.contact_center_connection_service
+    organisation_id = await service.organisation_of(org)
+    if organisation_id is None:
+        return Response(status_code=404)
+    secret = await connections.webhook_secret(organisation_id, handling.kind)
+    if secret is None:
+        return Response(status_code=404)
+    return await _verified(request, handling, secret, organisation_id)
+
+
 async def _contact_center(request: Request, handling: InboundWebhook) -> Response:
-    """Verify, parse and record one contact-center webhook with its platform's handling."""
+    """Verify with the installation's secret (the fallback of ADR 0032 point 11)."""
     secret = handling.secret(request.app.state.settings)
     if secret is None:
         return Response(status_code=404)
+    return await _verified(request, handling, secret.get_secret_value(), None)
+
+
+async def _verified(
+    request: Request, handling: InboundWebhook, secret: str, organisation_id: int | None
+) -> Response:
+    """Verify, parse and record one contact-center webhook with its platform's handling.
+
+    ``organisation_id`` limits the task lookup to that organisation's bookings; ``None`` is the
+    installation's address, which still finds a task of any organisation.
+    """
     body = await _body(request)
     if body is None:
         return Response(status_code=413)
     clock: Clock = request.app.state.clock
-    if not handling.verify(body, request.headers, secret.get_secret_value(), clock.now()):
+    if not handling.verify(body, request.headers, secret, clock.now()):
         log.warning("webhook.rejected", source=handling.source)
         await _record_rejection(request, handling.source)
         return Response(status_code=401)
@@ -155,6 +192,7 @@ async def _contact_center(request: Request, handling: InboundWebhook) -> Respons
             event_key=event.event_key,
             provider=handling.kind,
             source=handling.source,
+            organisation_id=organisation_id,
         )
         log.info(
             "webhook.contact_center",

@@ -212,6 +212,11 @@ def _check_name(group_id: int) -> str:
 HEARTBEAT_NAME = "worker-heartbeat"
 
 
+def contact_center_credential_name(organisation_id: int) -> str:
+    """Return the credential name of an organisation's contact-center connection (ADR 0032)."""
+    return f"contact-center:{organisation_id}"
+
+
 def bot_credential_name(organisation_id: int | None) -> str:
     """Return the credential name of a Webex bot token: an organisation's or the platform's."""
     return f"webex-bot:{organisation_id if organisation_id is not None else 'platform'}"
@@ -896,12 +901,18 @@ class SqlTransaction(
     async def delete_organisation(self, organisation_id: int) -> None:
         """Erase the organisation's row; the schema's cascades take the rest.
 
-        The sealed Webex bot token (ADR 0082 point 9) has no foreign key, so it is deleted here
-        in the same transaction: a later organisation with a reused id never inherits it.
+        The sealed Webex bot token (ADR 0082 point 9) and contact-center connection (ADR 0032
+        point 9) have no foreign key, so they are deleted here in the same transaction: a later
+        organisation with a reused id never inherits them.
         """
         await self._session.execute(
             delete(IntegrationCredentialRow).where(
-                IntegrationCredentialRow.name == bot_credential_name(organisation_id)
+                IntegrationCredentialRow.name.in_(
+                    (
+                        bot_credential_name(organisation_id),
+                        contact_center_credential_name(organisation_id),
+                    )
+                )
             )
         )
         await self._session.execute(

@@ -74,6 +74,25 @@ Choose the provider, enter the API host and the API key, and the sender particip
 at most eleven characters or a registered number. The country code applies to numbers entered
 without one.
 
+## Contact center
+
+Only the superuser sets this. An organisation can connect its own contact center, also when that
+is another environment (tenant) than the installation's. Choose the **Platform**, enter the **API
+address** of your region (https only), the Service App's **Client ID** and its **Client secret**.
+The **Refresh token** is the token the Service App received when your environment's administrator
+authorised it. The secrets are stored encrypted and never shown again; an empty field keeps the
+stored secret.
+
+After saving you see this organisation's **Webhook address**. The contact center reports the
+status of tasks there. OpenPlanner checks every report with a secret the server makes itself;
+nobody types or sees it. **Make a new webhook secret** replaces it, for example when you suspect
+it leaked; the old one stops working at once. **Remove the own connection** erases the connection
+and its secrets.
+
+As long as an organisation has no connection of its own, it uses the installation's. That
+fallback goes away in a later version. Sending tasks through the own connection comes in the next
+step; until then this card records the connection and the webhook address.
+
 ## What is recorded
 
 Every change goes to the audit log with the names of the changed fields, never the values. Of

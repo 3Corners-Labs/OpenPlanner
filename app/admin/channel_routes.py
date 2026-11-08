@@ -29,6 +29,8 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
+from app.adapters.contact_centers import DESCRIPTORS
+from app.adapters.webhooks import CONTACT_CENTER_PATH
 from app.admin import forms
 from app.admin.alert_routes import alert_view
 from app.admin.authz import AdminContext, RequirePermission
@@ -46,6 +48,8 @@ from app.domain.channel_settings import (
     SmtpSettings,
 )
 from app.domain.channels import ChannelKind
+from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
+from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.mail_domain import DomainReport, Record, Verdict
 from app.i18n import BoundGettext
@@ -122,6 +126,8 @@ REASON_LABELS: dict[str, str] = {
 }
 """Explanation per reason code of ``app.domain.mail_domain``; a test checks every reason."""
 
+CONNECTION_ANCHOR = "contact-center"
+"""The id of the contact-center card, so a confirmation scrolls to it."""
 CHANNEL_PATHS = {"email": ChannelKind.EMAIL, "sms": ChannelKind.SMS}
 """The channels in URLs; anything else is a 404."""
 
@@ -343,6 +349,89 @@ def _status(stored: ChannelSettings | None, locale: RequestLocale, tz: ZoneInfo)
     return {"label": _("admin.channels.ready"), "tone": "success", "changed": changed}
 
 
+def connection_service(request: Request) -> ContactCenterConnectionService:
+    """Return the application's contact-center connection service (ADR 0032 point 9)."""
+    service: ContactCenterConnectionService = request.app.state.contact_center_connection_service
+    return service
+
+
+def _connection_fields(
+    form: FormData, stored: OrganisationConnection | None, _: BoundGettext
+) -> list[Field]:
+    """Return the contact-center connection inputs; the secrets are write-only."""
+    secret_hint = _("admin.channels.secret_hint_set")
+    return [
+        Field(
+            "cc_kind",
+            _("admin.channels.cc_kind"),
+            "select",
+            form.values.get("cc_kind", stored.kind.value if stored else ContactCenterKind.WEBEX_CC),
+            error=form.error_for("cc_kind"),
+            options=tuple(
+                forms.Option(kind.value, _(d.label_key)) for kind, d in DESCRIPTORS.items()
+            ),
+        ),
+        Field(
+            "cc_api_base_url",
+            _("admin.channels.cc_api_base_url"),
+            "url",
+            _value(form, "cc_api_base_url", stored.api_base_url if stored else None),
+            hint=_("admin.channels.cc_api_base_url_hint"),
+            error=form.error_for("cc_api_base_url"),
+            attributes={"autocapitalize": "none", "spellcheck": "false"},
+        ),
+        Field(
+            "cc_client_id",
+            _("admin.channels.cc_client_id"),
+            value=_value(form, "cc_client_id", stored.client_id if stored else None),
+            hint=_("admin.channels.cc_client_id_hint"),
+            error=form.error_for("cc_client_id"),
+            attributes={"autocapitalize": "none", "spellcheck": "false"},
+        ),
+        _secret_field(
+            "cc_client_secret",
+            _("admin.channels.cc_client_secret"),
+            secret_hint
+            if stored and stored.has_client_secret
+            else _("admin.channels.cc_client_secret_hint"),
+            form,
+            required=not (stored and stored.has_client_secret),
+        ),
+        _secret_field(
+            "cc_refresh_token",
+            _("admin.channels.cc_refresh_token"),
+            secret_hint
+            if stored and stored.has_refresh_token
+            else _("admin.channels.cc_refresh_token_hint"),
+            form,
+            required=False,
+        ),
+    ]
+
+
+async def _connection_view(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    org: str,
+    form: FormData,
+    tz: ZoneInfo,
+) -> dict[str, object]:
+    """Return the contact-center card: its form, webhook address and when its secret was made."""
+    service = connection_service(request)
+    _ = locale.gettext
+    stored = await service.view(context.principal, org)
+    base = request.app.state.settings.webhook_base
+    made = stored.webhook_secret_at if stored else None
+    return {
+        "available": service.available,
+        "stored": stored is not None,
+        "fields": _connection_fields(form, stored, _),
+        "webhook": f"{base}{CONTACT_CENTER_PATH}/{stored.kind.value}/{org}" if stored else "",
+        "secret_made": moment_label(made, tz, locale.code) if made else "",
+    }
+
+
 async def _form_page(
     request: Request,
     locale: RequestLocale,
@@ -353,6 +442,7 @@ async def _form_page(
     test: FormData | None = None,
     domain: FormData | None = None,
     report: DomainReport | None = None,
+    connection: FormData | None = None,
 ) -> HTMLResponse:
     """Render both channel forms, the test email form and the domain check (with its report)."""
     overview: ChannelOverview = await channel_service(request).overview(context.principal, org)
@@ -362,6 +452,7 @@ async def _form_page(
     sms = submitted.get(ChannelKind.SMS) or FormData({}, _)
     test = test or FormData({}, _)
     domain = domain or FormData({}, _)
+    connection = connection or FormData({}, _)
     stored_email = overview.channels[ChannelKind.EMAIL]
     stored_sms = overview.channels[ChannelKind.SMS]
     response = _page(
@@ -388,9 +479,10 @@ async def _form_page(
             "test_fields": _test_fields(test, _),
             "domain_error": domain.error_for(DOMAIN_FIELD),
             "domain_report": _domain_view(report, _) if report else None,
-            "errors": email.errors + sms.errors + test.errors + domain.errors,
+            "errors": email.errors + sms.errors + test.errors + domain.errors + connection.errors,
             "done": forms.done_message(request, _),
             "alerts": await alert_view(request, _, context.principal, org),
+            "contact_center": await _connection_view(request, locale, context, org, connection, tz),
         },
     )
     response.status_code = status
@@ -544,6 +636,57 @@ async def save_sms(
             form.refusal(error)
     secret = form.values.get("sms_api_key") or None
     return await _save(request, locale, context, org, ChannelKind.SMS, form, config, secret)
+
+
+@router.post("/organisations/{org}/channels/contact-center", response_class=HTMLResponse)
+async def save_contact_center(
+    request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Save the organisation's own contact-center connection; blank secrets keep the stored ones."""
+    form = await forms.read_form(request, locale)
+    kind = form.choice("cc_kind", {k.value for k in ContactCenterKind})
+    if kind is not None:
+        try:
+            change = ConnectionChange(
+                ContactCenterKind(kind),
+                form.text("cc_api_base_url"),
+                form.text("cc_client_id"),
+                client_secret=form.values.get("cc_client_secret") or None,
+                refresh_token=form.values.get("cc_refresh_token") or None,
+            )
+            await connection_service(request).save(context.principal, org, change)
+        except DomainError as error:
+            forms.raise_refusal(error)
+            form.refusal(error)
+        else:
+            return forms.redirect_done(_url(org), "saved", anchor=CONNECTION_ANCHOR)
+    return await _form_page(request, locale, context, org, {}, 422, connection=form)
+
+
+@router.post("/organisations/{org}/channels/contact-center/webhook-secret")
+async def rotate_contact_center_secret(
+    request: Request, org: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Generate a new webhook secret for the organisation's connection."""
+    try:
+        await connection_service(request).rotate_webhook_secret(context.principal, org)
+    except DomainError as error:
+        forms.raise_refusal(error)
+        return forms.redirect_done(_url(org), "contact_center_refused", anchor=CONNECTION_ANCHOR)
+    return forms.redirect_done(_url(org), "webhook_secret_rotated", anchor=CONNECTION_ANCHOR)
+
+
+@router.post("/organisations/{org}/channels/contact-center/delete")
+async def remove_contact_center(
+    request: Request, org: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Remove the organisation's connection; it falls back to the installation's."""
+    try:
+        await connection_service(request).remove(context.principal, org)
+    except DomainError as error:
+        forms.raise_refusal(error)
+        return forms.redirect_done(_url(org), "contact_center_refused", anchor=CONNECTION_ANCHOR)
+    return forms.redirect_done(_url(org), "removed", anchor=CONNECTION_ANCHOR)
 
 
 @router.post("/organisations/{org}/channels/{channel}/remove", response_class=HTMLResponse)

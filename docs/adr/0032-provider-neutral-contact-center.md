@@ -93,12 +93,12 @@ organisatie is inderdaad wat moet kunnen".
    - a webhook secret that the server generates and rotates with a button, never typed and
      never shown (ADR 0042 §6, the inventory's "generated and rotated").
 
-   The secrets are sealed with AES-256-GCM, write-only and audited (ADR 0008), in
-   `integration_credentials` under the name `contact-center:{organisation id}`; the
-   non-secret fields are a row of `organisation_contact_center`. The connection is edited under
-   `integrations.manage` for that organisation, on its own page (ADR 0047: organisation →
-   *Deelnemers* → *Kanalen*, next to its mail, SMS and alert bot), never on a platform page that
-   asks "which organisation?".
+   The whole connection is one record, sealed with AES-256-GCM, write-only and audited (ADR
+   0008), in `integration_credentials` under the name `contact-center:{organisation id}`; no
+   table is added. The connection is edited under `integrations.manage` for that organisation,
+   which ADR 0039 keeps for the superuser, on the organisation's own page (ADR 0047:
+   organisation → *Deelnemers* → *Kanalen*, next to its mail, SMS and alert bot), never on a
+   platform page that asks "which organisation?".
 10. **One webhook address per organisation.** The platform calls
     `/webhooks/contact-center/{kind}/{organisation}`. The address names the organisation by its
     slug, so its own secret verifies the event; a task is then looked up within that
@@ -118,7 +118,7 @@ organisatie is inderdaad wat moet kunnen".
 | CC-1 | Domain and schema: `ContactCenterKind`, `ContactCenterRouting`, table `group_contact_center`, `bookings.contact_center_task_id`/`contact_center_kind`, job member `DISPATCH_CONTACT_CENTER_TASK`. Built as the expand step of ADR 0116, not as the single renaming migration of the *Consequences* below (ADR 0116 is the newer rule; its §5 keeps the previous image working on the new schema): migration 0098 copies the `wxcc_*` values forward; the application writes both the new and the old places, and for Webex Contact Center the old columns stay the source of truth on read. The stored job value stays `dispatch_wxcc_task` in this minor (`dispatch_contact_center_task` already reads); the next minor writes the new value, and the minor after that drops the old columns and the old job value | #616 | merged |
 | CC-2 | Port and registry: `ContactCenterTask`, `ContactCenterDispatchers` (one dispatcher per kind), `ProviderDescriptor` per adapter with generic validation in the domain; the WxCC adapter maps the neutral task to Create Task v2 unchanged; recorded-payload test on the allow-list of CLAUDE.md (point 8 as amended by ADR 0081 §6) | #616 | merged |
 | CC-3 | Webhooks at `/webhooks/contact-center/{kind}`, verified by the adapter within 300 s; `/webhooks/wxcc` kept as alias. Each adapter defines its `InboundWebhook` (check, parsing, secret), listed in `contact_centers.INBOUND`; a task is looked up with its platform. OpenPlanner still registers the WxCC subscription at `/webhooks/wxcc`; moving the registration comes with the organisation connection (CC-4) | #626 | merged |
-| CC-4a | The organisation's connection (points 9–11): table `organisation_contact_center` (migration 0101), secrets sealed under `contact-center:{id}`, the card on organisation → *Kanalen* (`integrations.manage`, audited, write-only), the generated and rotatable webhook secret (ADR 0042 step 6b-2 for the organisation), and `/webhooks/contact-center/{kind}/{organisation}` verified with it | #PRNUM | merged |
+| CC-4a | The organisation's connection (points 9–11): one sealed record under `contact-center:{id}` (no migration), the card on organisation → *Kanalen* (`integrations.manage`, audited, write-only), the generated and rotatable webhook secret (ADR 0042 step 6b-2 for the organisation), and `/webhooks/contact-center/{kind}/{organisation}` verified with it | #PRNUM | merged |
 | CC-4b | Dispatch, end and reconcile with the organisation's own credentials and API host, the installation's as fallback; rotating the secret re-registers the organisation's subscription | – | planned |
 | CC-4c | The group form rendered from the adapter's `ProviderDescriptor` | – | planned |
 | CC-5 | Docs: architecture, dataflow, webhooks, threat model, `scripts/diagrams/content.py`. Describes what CC-1 to CC-3 built (webhooks and threat model largely came with CC-3, #626); the organisation connection of CC-4 updates the same places when it lands | #627 | merged |
