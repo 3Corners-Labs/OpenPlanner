@@ -264,6 +264,8 @@ participant ──GET /b/m/{public_ref}/join/go (cookie)──> OpenPlanner ─�
 participant ──POST /b/m/{public_ref}/test (cookie)──> OpenPlanner ──meeting (group name, times)──> Webex ──id, link──> OpenPlanner (ADR 0071)
 participant ──GET /b/m/{public_ref}/test/go (cookie)──> OpenPlanner ──303──> the trial meeting in the Webex web app
 Webex, WxCC ──signed webhooks──> OpenPlanner: meeting/participant/task events → booking_events, call_status
+                (Webex at /webhooks/webex; WxCC at /webhooks/contact-center/webex_cc or its alias /webhooks/wxcc, ADR 0032;
+                 a task is looked up together with its platform)
 web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex (ADR 0010, when an admin opens or polls the agenda and a status is older than MEETING_STATUS_REFRESH_SECONDS): meeting id and the group's host address out; state and participant list back, reduced in the adapter to state, count, host flag, first join and last leave → call_status. Participant names, addresses and IPs are processed in memory only, never stored or logged
 ```
 

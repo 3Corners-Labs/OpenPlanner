@@ -405,7 +405,7 @@ LAYERS = (
             C(Family.CORE, "B6", "SMS", "senders · sms · webex_connect_sms"),
             C(Family.CORE, "B6", "DNS", "mail_dns (dnspython)"),
             C(Family.CORE, "B7", "Webex Meetings", "webex_meetings · webex_auth"),
-            C(Family.CORE, "B7", "WxCC", "wxcc · wxcc_config · webhooks"),
+            C(Family.CORE, "B7", "WxCC", "wxcc · wxcc_config · webhooks · contact_centers"),
             C(Family.CORE, "B7", "Controle", "group_check · service_app_check · diagnostics"),
             C(Family.ADMIN, "B17", "OIDC", "oidc · discovery · idp_registry · signing_keys"),
             C(Family.ADMIN, "B17", "Personeel", "keycloak_directory (admin-API)"),
@@ -588,7 +588,7 @@ LANES = (
         Family.CORE,
         "B7",
         "WxCC",
-        "wxcc · webex_auth · group_check",
+        "wxcc · contact_centers · webex_auth · group_check",
         "Create Task v2 · Task Messages v2 · End/Get Task v1<br>Service App, scopes cjp:*",
         "Webex Contact Center",
         "flow routeert op openplannerGroup",
@@ -715,7 +715,8 @@ SHARED_PARTS = (
         Family.CORE,
         "Webhooks in",
         "webhooks.py · api/webhooks",
-        "handtekening over de ruwe body vóór het parsen; replay-sleutel per Webex-event",
+        "handtekening over de ruwe body vóór het parsen; replay-sleutel per event; "
+        "contactcenter op /webhooks/contact-center/{kind} (alias /webhooks/wxcc)",
     ),
     SharedPart(
         Family.PLATFORM,
