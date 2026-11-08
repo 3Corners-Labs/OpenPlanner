@@ -47,10 +47,11 @@ async def test_a_failed_meeting_is_planned_again_now_and_audited() -> None:
         PlannedJob(JobType.CREATE_VIDEO_ROOM, NOW, booking.start)
     ]  # a second click replaces the pending job
     event = uow.state.audit[-1]
-    assert (event.action, event.group, event.detail) == (
+    assert (event.action, event.group, event.detail, event.booking_id) == (
         Permission.BOOKINGS_MANAGE.value,
         "demo",
         "retry.create_video_room",
+        booking_id,  # the audit log links the retry to its booking
     )
 
 

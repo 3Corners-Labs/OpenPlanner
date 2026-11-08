@@ -21,8 +21,7 @@ Every row and the claimed booking carry the video link's state and the participa
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from app.domain.admin import AdminService, require
-from app.domain.audit import AuditEvent, Outcome
+from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal, Scope, Target, decide, scope_for
 from app.domain.booking import Booking, Claim
 from app.domain.calls import CallStatus, new_status
@@ -34,6 +33,7 @@ from app.domain.form_fields import (
     Purpose,
     labelled_answers,
 )
+from app.domain.lookups import group_booking
 from app.domain.own_queue import (
     ParticipantState,
     QueueEntry,
@@ -252,7 +252,7 @@ class QueueService:
         if not summary.group.queue_free_pick_allowed:
             raise DomainError(ErrorCode.FREE_PICK_NOT_ALLOWED)
         async with self._uow.locked() as tx:
-            booking = await _booking_of(tx, summary.group, booking_id)
+            booking = await _booking_of(tx, slug, booking_id)
             status = await tx.get_call_status(booking_id)
             if not summary.group.has_own_queue and not (status is not None and status.fallback):
                 # A fallback queue (ADR 0082) holds only the bookings that fell back; any other
@@ -274,7 +274,7 @@ class QueueService:
         """
         group = (await self._group(principal, slug)).group
         async with self._uow.read() as tx:
-            booking = await _booking_of(tx, group, booking_id)
+            booking = await _booking_of(tx, slug, booking_id)
             form = await tx.get_form(group.id)
             status = await tx.get_call_status(booking_id)
         if not self._holds(principal, booking):
@@ -293,7 +293,7 @@ class QueueService:
         summary = await self._group(principal, slug)
         supervisor = _supervises(principal, summary)
         async with self._uow.locked() as tx:
-            booking = await _booking_of(tx, summary.group, booking_id)
+            booking = await _booking_of(tx, slug, booking_id)
             mine = self._holds(principal, booking)
             if booking.claim is None or not (mine or supervisor):
                 raise DomainError(ErrorCode.NOT_CLAIMED)
@@ -350,17 +350,15 @@ class QueueService:
         detail: str,
     ) -> None:
         """Record a claim or release in the same transaction, with the booking id."""
-        await tx.add_audit_event(
-            AuditEvent(
-                self._clock.now(),
-                principal.subject,
-                Permission.QUEUE_WORK.value,
-                Outcome.SUCCESS,
-                organisation=summary.organisation_slug,
-                group=summary.group.slug,
-                detail=detail,
-                booking_id=booking_id,
-            )
+        await record_change(
+            tx,
+            self._clock.now(),
+            principal,
+            Permission.QUEUE_WORK,
+            summary.organisation_slug,
+            summary.group.slug,
+            detail,
+            booking_id=booking_id,
         )
 
 
@@ -447,11 +445,9 @@ def _claimed(
     )
 
 
-async def _booking_of(tx: Transaction, group: Group, booking_id: int) -> Booking:
-    """Return the group's booking ``booking_id``; another group's booking does not exist."""
-    booking = await tx.get_booking(booking_id)
-    if booking is None or booking.group_id != group.id:
-        raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+async def _booking_of(tx: Transaction, slug: str, booking_id: int) -> Booking:
+    """Return the group's active booking ``booking_id``; another group's booking does not exist."""
+    booking, _ = await group_booking(tx, slug, booking_id)
     if not booking.is_active:
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     return booking

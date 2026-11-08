@@ -27,7 +27,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from app.domain import booking_changes
-from app.domain.admin import AdminService, Authorization, require
+from app.domain.admin import AdminService, Authorization, record_change, require
 from app.domain.agenda import AgendaSlot, ShortfallAcceptance
 from app.domain.agenda_service import agenda_days
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
@@ -35,7 +35,7 @@ from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.booking import Booking, BookingStatus, ChangeReason
 from app.domain.booking_changes import ProposalTiming
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.lookups import group_by_slug
+from app.domain.lookups import group_booking, group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.rebooking import last_made
 from app.domain.reschedule_proposal import (
@@ -120,8 +120,8 @@ class PlannerService:
         """
         await self._authorize(principal, slug)
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
-            return await self._changeable(tx, group, booking_id, rebook=rebook)
+            booking, _ = await self._changeable(tx, slug, booking_id, rebook=rebook)
+        return booking
 
     async def move(
         self,
@@ -143,8 +143,7 @@ class PlannerService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await group_by_slug(tx, slug)
-            booking = await self._changeable(tx, group, booking_id)
+            booking, group = await self._changeable(tx, slug, booking_id)
             target = await self._slot(tx, group, new_start)
             if target is not None and target.booked + 1 > target.agents and not accept_shortfall:
                 raise DomainError(ErrorCode.MOVE_CAUSES_SHORTFALL)
@@ -166,10 +165,7 @@ class PlannerService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await group_by_slug(tx, slug)
-            booking = await tx.get_booking(booking_id)
-            if booking is None or booking.group_id != group.id:  # never another group's booking
-                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+            booking, group = await group_booking(tx, slug, booking_id)
             if not booking.awaits_confirmation:
                 raise DomainError(ErrorCode.BOOKING_NOT_PENDING)
             now = self._clock.now()
@@ -190,8 +186,7 @@ class PlannerService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await group_by_slug(tx, slug)
-            booking = await self._changeable(tx, group, booking_id)
+            booking, group = await self._changeable(tx, slug, booking_id)
             now = self._clock.now()
             await booking_changes.cancel(
                 tx,
@@ -220,8 +215,7 @@ class PlannerService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await group_by_slug(tx, slug)
-            booking = await self._changeable(tx, group, booking_id, rebook=True)
+            booking, group = await self._changeable(tx, slug, booking_id, rebook=True)
             waiting = await self._request(tx, group, booking, reason)
             detail = f"planner.rebook,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
@@ -248,8 +242,7 @@ class PlannerService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await group_by_slug(tx, slug)
-            booking = await self._changeable(tx, group, booking_id)
+            booking, group = await self._changeable(tx, slug, booking_id)
             proposal = await self._bookings.propose_in(
                 tx, booking, group, start, reason=reason, timing=self._timing(group)
             )
@@ -380,19 +373,18 @@ class PlannerService:
         return [b for b in last if booking_changes.planner_may_request_rebook(b, group, now)]
 
     async def _changeable(
-        self, tx: Transaction, group: Group, booking_id: int, *, rebook: bool = False
-    ) -> Booking:
+        self, tx: Transaction, slug: str, booking_id: int, *, rebook: bool = False
+    ) -> tuple[Booking, Group]:
         """Return the group's booking ``booking_id`` if a planner may change it now.
 
-        With ``rebook``, only if its participant may also be asked to choose a new time.
+        With ``rebook``, only if its participant may also be asked to choose a new time. The
+        group comes with it, so the caller needs no second look-up.
         """
-        booking = await tx.get_booking(booking_id)
-        if booking is None or booking.group_id != group.id:  # never another group's booking
-            raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+        booking, group = await group_booking(tx, slug, booking_id)
         booking_changes.ensure_planner_may_change(booking, group, self._clock.now())
         if rebook and not booking.is_active:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
-        return booking
+        return booking, group
 
     async def _slot(self, tx: Transaction, group: Group, start: datetime) -> AgendaSlot | None:
         """Return the agenda slot of ``group`` that starts at ``start``, if any."""
@@ -419,22 +411,13 @@ class PlannerService:
         summary = authorization.group
         organisation = summary.organisation_slug if summary else None
         group = summary.group.slug if summary else None
-        action = Permission.BOOKINGS_MANAGE.value
-        await tx.add_audit_event(
-            AuditEvent(
-                now,
-                principal.subject,
-                action,
-                Outcome.SUCCESS,
-                "",
-                organisation,
-                group,
-                detail,
-                Source.ADMIN,
-                booking_id,
-            )
+        permission = Permission.BOOKINGS_MANAGE
+        await record_change(
+            tx, now, principal, permission, organisation, group, detail, booking_id=booking_id
         )
-        count = await tx.count_audit_events(principal.subject, {action}, now - ALERT_WINDOW)
+        count = await tx.count_audit_events(
+            principal.subject, {permission.value}, now - ALERT_WINDOW
+        )
         if count == value_of(self._alert_per_hour) + 1:
             await tx.add_audit_event(
                 AuditEvent(

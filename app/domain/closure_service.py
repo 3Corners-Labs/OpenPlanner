@@ -52,6 +52,7 @@ from app.domain.job_plan import (
     plan_for_suspension,
     plan_purge,
 )
+from app.domain.lookups import group_booking
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scenario_service import usable_scenario
 from app.domain.scheduling import Group, GroupSummary, Organisation
@@ -325,8 +326,7 @@ class ClosureService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
-            booking = await _suspended(tx, group, booking_id)
+            booking, group = await _suspended(tx, slug, booking_id)
             await self._reinstate(tx, group, booking)
             await self._audit(tx, principal, authorization, slug, "booking.reinstate")
 
@@ -353,8 +353,8 @@ class ClosureService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
-            await self._cancel(tx, group, await _suspended(tx, group, booking_id))
+            booking, group = await _suspended(tx, slug, booking_id)
+            await self._cancel(tx, group, booking)
             await self._audit(tx, principal, authorization, slug, "booking.cancel")
 
     async def cancel_all(self, principal: Principal, slug: str) -> BulkOutcome:
@@ -384,8 +384,7 @@ class ClosureService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            group = await _group(tx, slug)
-            booking = await _suspended(tx, group, booking_id)
+            booking, group = await _suspended(tx, slug, booking_id)
             receipt = await self._bookings.relocate(
                 tx, booking, group, new_start, actor=ActorClass.CLOSURE
             )
@@ -400,7 +399,8 @@ class ClosureService:
         """
         await self._authorize(principal, slug)
         async with self._uow.read() as tx:
-            return await _suspended(tx, await _group(tx, slug), booking_id)
+            booking, _ = await _suspended(tx, slug, booking_id)
+        return booking
 
     # --- a whole organisation -------------------------------------------------------------
 
@@ -719,19 +719,17 @@ async def _visible(tx: Transaction, group: Group, now: datetime) -> Closure:
     return closures[0]
 
 
-async def _suspended(tx: Transaction, group: Group, booking_id: int) -> Booking:
-    """Return a suspended booking of ``group``.
+async def _suspended(tx: Transaction, slug: str, booking_id: int) -> tuple[Booking, Group]:
+    """Return a suspended booking of group ``slug``, with the group.
 
     Raises:
         DomainError: ``booking_not_found`` when it belongs to another group (no hint that it
             exists), ``booking_not_active`` when it is not on hold.
     """
-    booking = await tx.get_booking(booking_id)
-    if booking is None or booking.group_id != group.id:
-        raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+    booking, group = await group_booking(tx, slug, booking_id)
     if not booking.is_suspended:
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
-    return booking
+    return booking, group
 
 
 def _id(entity: Booking | Closure) -> int:

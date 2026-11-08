@@ -4,8 +4,8 @@ Whoever holds ``bookings.manage`` on the group may plan ``create_video_room`` or
 ``dispatch_wxcc_task`` again for an active booking that still lacks the result. The pending
 job of that type, if any, is replaced, so a click never doubles a job; the new job runs
 now (the meeting) or at the dispatch moment (the work item), pinned to the booking's start as
-every call job is. The retry is audited as a ``bookings.manage`` change with the job type;
-the job's own outcome lands on the timeline when the worker runs it.
+every call job is. The retry is audited as a ``bookings.manage`` change with the job type and
+the booking id; the job's own outcome lands on the timeline when the worker runs it.
 
     retry(principal, slug, booking_id, type) ─► authorise ─► booking active, result missing
                                               ─► replace pending job ─► audit
@@ -18,6 +18,7 @@ from app.domain.authorization import Permission, Principal
 from app.domain.booking import Booking
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import RETRYABLE_JOBS, JobType, PlannedJob
+from app.domain.lookups import group_booking
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.scheduling import Group
 
@@ -53,10 +54,7 @@ class CallRetryService:
             raise DomainError(ErrorCode.NOTHING_TO_RETRY, job.value)
         now = self._clock.now()
         async with self._uow.locked() as tx:
-            booking = await tx.get_booking(booking_id)
-            group = await tx.get_group(slug)
-            if booking is None or group is None or booking.group_id != group.id:
-                raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+            booking, group = await group_booking(tx, slug, booking_id)
             if not booking.is_active:
                 raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
             if not _missing(booking, group, job):
@@ -73,6 +71,7 @@ class CallRetryService:
                 authorization.target.organisation,
                 slug,
                 f"retry.{job.value}",
+                booking_id=booking_id,
             )
 
 
