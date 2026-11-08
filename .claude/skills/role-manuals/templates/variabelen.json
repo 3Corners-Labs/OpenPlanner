@@ -1,0 +1,27 @@
+{
+  "product": "de afsprakenplanner",
+  "Product": "De afsprakenplanner",
+  "helpdesk": "[contactgegevens servicedesk invullen]",
+  "softwareversie": "[versie en commit van de schermafdrukken]",
+  "commit": "",
+  "accentkleur": "1F4E79",
+  "lettertype": "Arial",
+  "eindgebruikers": "deelnemers",
+  "Eindgebruikers": "Deelnemers",
+  "niet_noemen": [],
+  "schermteksten_extra": [
+    "English",
+    "Nederlands",
+    "Webex Meetings",
+    "polled",
+    "< 5"
+  ],
+  "opnames_zonder_webex": {
+    "bb-09-mail-bevestiging": "de links naar het gesprek en het proefgesprek ontbreken",
+    "bb-10-uw-afspraak": "de links naar het gesprek en het proefgesprek ontbreken",
+    "mw-02-wachtrij": "bij de afspraak staat Videolink wordt klaargezet",
+    "mw-03-opgepakt": "de knop Deelnemen aan het gesprek ontbreekt",
+    "pl-07-agenda-dag": "bij de afspraken staat Geen meeting",
+    "pl-09-afspraak-details": "het verloop is nog leeg"
+  }
+}
