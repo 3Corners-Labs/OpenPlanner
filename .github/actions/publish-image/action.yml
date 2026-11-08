@@ -34,6 +34,12 @@ inputs:
       release; the rule lives in main.yml.
     required: false
     default: ""
+  flavor:
+    description: >-
+      Flavor for docker/metadata-action; `latest=false` keeps `:latest` where it is (a patch
+      from a maintenance line, ADR 0116). Empty for the action's default.
+    required: false
+    default: ""
   sbom-file:
     description: Where the CycloneDX SBOM is written, relative to the workspace.
     required: false
@@ -60,6 +66,7 @@ runs:
           ${{ inputs.image }}
           ${{ inputs.public-image }}
         tags: ${{ inputs.tags }}
+        flavor: ${{ inputs.flavor }}
     - id: build
       uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
       with:

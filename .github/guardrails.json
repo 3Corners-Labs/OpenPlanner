@@ -8,10 +8,16 @@
       "actor": "3corners-openplanner-release[bot]",
       "ref_prefix": "refs/tags/v",
       "why": "the release app creates the release and candidate tags (ADR 0107)"
+    },
+    {
+      "actor": "3corners-openplanner-release[bot]",
+      "ref_prefix": "refs/heads/release/",
+      "why": "the release app creates a maintenance line release/X.Y (cut-line, ADR 0116 point 3)"
     }
   ],
   "known_unseen": {
-    "rulesets/release tags/bypass_actors": "A read-only token sees the bypass actors through GraphQL without their mode (first audit runs, 2026-11-02). Every use of a bypass is still checked in the rule suites; only the release app's tag bypass is expected."
+    "rulesets/release tags/bypass_actors": "A read-only token sees the bypass actors through GraphQL without their mode (first audit runs, 2026-11-02). Every use of a bypass is still checked in the rule suites; only the release app's tag bypass is expected.",
+    "rulesets/release line creation/bypass_actors": "As for the release tags: a read-only token sees the bypass actors without their mode. Only the release app's creation of a line is expected (ADR 0116)."
   },
   "actions": {
     "allowed_actions": "all",
@@ -229,36 +235,7 @@
       },
       "target": "branch"
     },
-    "release tags": {
-      "bypass_actors": [
-        {
-          "actor_id": 5579411,
-          "actor_type": "Integration",
-          "bypass_mode": "always"
-        },
-        {
-          "actor_id": 5,
-          "actor_type": "RepositoryRole",
-          "bypass_mode": "always"
-        }
-      ],
-      "conditions": {
-        "ref_name": {
-          "exclude": [],
-          "include": [
-            "refs/tags/v*"
-          ]
-        }
-      },
-      "enforcement": "active",
-      "rules": {
-        "creation": {},
-        "deletion": {},
-        "update": {}
-      },
-      "target": "tag"
-    },
-    "release lines": {
+    "release line creation": {
       "bypass_actors": [
         {
           "actor_id": 5579411,
@@ -281,7 +258,22 @@
       },
       "enforcement": "active",
       "rules": {
-        "creation": {},
+        "creation": {}
+      },
+      "target": "branch"
+    },
+    "release lines": {
+      "bypass_actors": [],
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "refs/heads/release/[0-9]*"
+          ]
+        }
+      },
+      "enforcement": "active",
+      "rules": {
         "deletion": {},
         "merge_queue": {
           "check_response_timeout_minutes": 60,
@@ -311,7 +303,7 @@
         },
         "required_linear_history": {},
         "required_status_checks": {
-          "do_not_enforce_on_create": false,
+          "do_not_enforce_on_create": true,
           "required_status_checks": [
             {
               "context": "accessibility (Playwright, axe-core, Lighthouse)",
@@ -362,6 +354,35 @@
         }
       },
       "target": "branch"
+    },
+    "release tags": {
+      "bypass_actors": [
+        {
+          "actor_id": 5579411,
+          "actor_type": "Integration",
+          "bypass_mode": "always"
+        },
+        {
+          "actor_id": 5,
+          "actor_type": "RepositoryRole",
+          "bypass_mode": "always"
+        }
+      ],
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "refs/tags/v*"
+          ]
+        }
+      },
+      "enforcement": "active",
+      "rules": {
+        "creation": {},
+        "deletion": {},
+        "update": {}
+      },
+      "target": "tag"
     }
   },
   "workflow_token": {

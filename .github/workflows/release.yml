@@ -116,7 +116,8 @@ jobs:
       - name: pyproject.toml, uv.lock, publiccode.yml, CHANGELOG.md and the PR body
         env:
           VERSION: ${{ steps.plan.outputs.version }}
-        run: python3 -m scripts.release_pr prepare --version "$VERSION" --body "$RUNNER_TEMP/body.md" --actor "$GITHUB_ACTOR"
+          BASE: ${{ github.ref_name }}
+        run: python3 -m scripts.release_pr prepare --version "$VERSION" --base "$BASE" --body "$RUNNER_TEMP/body.md" --actor "$GITHUB_ACTOR"
       - name: what would change (step summary)
         env:
           TITLE: ${{ steps.plan.outputs.title }}
@@ -262,8 +263,8 @@ jobs:
         name: the merged release PR on main (or its line), pyproject.toml agrees, no tag yet
         env:
           VERSION: ${{ inputs.version }}
-          BRANCH: origin/${{ github.ref_name }}
-        run: python3 -m scripts.release_pr tag-check --version "$VERSION" --branch "$BRANCH" --actor "$GITHUB_ACTOR" | tee -a "$GITHUB_OUTPUT"
+          REF: ${{ github.ref_name }}
+        run: python3 -m scripts.release_pr tag-check --version "$VERSION" --ref "$REF" --actor "$GITHUB_ACTOR" | tee -a "$GITHUB_OUTPUT"
       - name: a minor or major release carries its audit with Verdict pass (ADR 0078)
         env:
           GH_TOKEN: ${{ github.token }}

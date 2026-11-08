@@ -45,6 +45,8 @@ jobs:
 
   mutation:
     name: mutation score >= 80% on app/domain and app/i18n
+    # Not on a maintenance line: its fixes ran it on main first (ADR 0116 point 3).
+    if: github.ref_name == 'main' || github.ref_type == 'tag'
     runs-on: ubuntu-26.04
     timeout-minutes: 60   # took 22 to 30+ minutes at v0.5.1 (the first run hit the old limit of 30)
     steps:
@@ -96,11 +98,7 @@ jobs:
         name: next candidate number
         run: |
           set -euo pipefail
-          if [ "$GITHUB_REF_NAME" = main ]; then
-            version="$(python3 -m scripts.release_plan --candidate)"
-          else
-            version="$(python3 -m scripts.release_line candidate --branch "$GITHUB_REF_NAME")"
-          fi
+          version="$(python3 -m scripts.release_plan --candidate --branch "$GITHUB_REF_NAME")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if [ -n "$version" ]; then
             echo "::notice::release candidate $version"
@@ -179,12 +177,13 @@ jobs:
       # ADR 0052: a release tag must sit on main and match pyproject.toml, or nothing is pushed.
       # ADR 0116 point 3: or it is a patch X.Y.Z on its own line release/X.Y.
       # ADR 0059: release candidates are tagged by the candidate job, never by hand.
-      - name: release tag on main or its own line, and matches pyproject.toml
+      - id: where
+        name: release tag on main or its own line, and matches pyproject.toml
         run: |
           case "$GITHUB_REF_NAME" in
             *-rc.*) echo "::error::$GITHUB_REF_NAME: release candidates are made by CI (ADR 0059)"; exit 1 ;;
           esac
-          python3 -m scripts.release_line tag-allowed --version "${GITHUB_REF_NAME#v}" --commit "$GITHUB_SHA"
+          python3 -m scripts.release_line tag-allowed --version "${GITHUB_REF_NAME#v}" --commit "$GITHUB_SHA" | tee -a "$GITHUB_OUTPUT"
           project="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           [ "v$project" = "$GITHUB_REF_NAME" ] \
             || { echo "::error::tag $GITHUB_REF_NAME but pyproject.toml says $project"; exit 1; }
@@ -214,6 +213,8 @@ jobs:
           image: ${{ steps.image.outputs.name }}
           public-image: ${{ steps.public.outputs.app }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
+          # ADR 0116: a patch from a line never moves :latest (a newer minor may exist).
+          flavor: latest=${{ steps.where.outputs.latest == 'true' && 'auto' || 'false' }}
           build-args: |
             APP_VERSION=${{ steps.image.outputs.version }}
             APP_COMMIT=${{ github.sha }}
@@ -226,6 +227,8 @@ jobs:
           image: ${{ steps.image.outputs.proxy }}
           public-image: ${{ steps.public.outputs.proxy }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
+          # ADR 0116: a patch from a line never moves :latest (a newer minor may exist).
+          flavor: latest=${{ steps.where.outputs.latest == 'true' && 'auto' || 'false' }}
           context: deploy/proxy
           sbom-file: sbom-proxy.cdx.json
           tags: |
@@ -248,10 +251,12 @@ jobs:
       - name: attach the SBOMs to the release
         env:
           GH_TOKEN: ${{ github.token }}
+          # ADR 0116: a patch from a line is never GitHub's latest release.
+          LATEST: ${{ steps.where.outputs.latest }}
         run: |
           notes=()
           [ ! -s release-notes.md ] || notes=(--notes-file release-notes.md)
-          gh release create "$GITHUB_REF_NAME" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes "${notes[@]}"
+          gh release create "$GITHUB_REF_NAME" --latest="$LATEST" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes "${notes[@]}"
 
   # ADR 0087 step 3: the recorded walkthrough, attached to every release.
   tour:

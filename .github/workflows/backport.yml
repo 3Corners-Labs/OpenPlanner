@@ -65,7 +65,7 @@ jobs:
           set -f   # label names are never globbed
           scripts/release-git-identity.sh
           # shellcheck disable=SC2086 # LABELS is a space-separated list of label names
-          lines="$(python3 -m scripts.release_line backport-lines ${ONLY:-$LABELS})"
+          lines="$(python3 -m scripts.release_line backport-lines -- ${ONLY:-$LABELS})"
           for line in $lines; do
             branch="backport/$line/pr-$NUMBER"
             if ! git rev-parse --verify --quiet "origin/release/$line" >/dev/null; then
@@ -84,7 +84,7 @@ jobs:
             fi
             git push --force origin "$branch"
             url="$(gh pr create --base "release/$line" --head "$branch" \
-              --title "$TITLE (backport to $line)" --label ci:full \
+              --title "$TITLE (backport to $line)" \
               --body "Cherry-pick of #$NUMBER ($COMMIT) onto \`release/$line\` (ADR 0116 point 3), opened by the backport workflow for the label \`backport:$line\`. The review questions and the security review are those of #$NUMBER; the line's merge queue runs the full lane.")"
             gh pr merge --auto --squash "$url"
             echo "::notice::opened $url"
