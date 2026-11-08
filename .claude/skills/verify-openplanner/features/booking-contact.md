@@ -59,10 +59,10 @@ Command: `node .claude/skills/verify-openplanner/scripts/journey.mjs booking con
 - The `tel:` link is not driven: the run's made-up participant has no phone number, because no
   fictitious number range exists that is safe to type. The HTTP tests
   (`tests/admin/test_call_routes.py`) cover the link.
-- Only the button on the page itself counts (`Sec-Fetch-Site: same-origin`): opening
-  `?contact=show` by typing, a bookmark, a shared link or `page.goto` sends `none` and gets the
-  page without the details and without an audit line. Press the button; never `goto` the
-  address to save a step.
+- Only the button on the page itself counts (`Sec-Fetch-Site: same-origin` and the booking
+  page as `Referer`): opening `?contact=show` by typing, a bookmark, a shared link, a link on
+  another page or `page.goto` gets the page without the details and without an audit line.
+  Press the button; never `goto` the address to save a step.
 - After the purge (24 hours after the end or the cancellation of the booking) the card says the
   personal data have been deleted and has no button; this stack never gets there within a run.
 - Screenshot only this stack's booking pages: the made-up participant is the only one on it.

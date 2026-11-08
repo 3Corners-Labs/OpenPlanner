@@ -208,7 +208,9 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
     # audit log then holds a view of the marker booking before the log and its export are swept.
     detail = (await site.client.get(found.fill(DETAIL))).text
     assert MARKERS["form_answers"] in detail, "the detail page does not show the answer"
-    shown = await site.client.get(found.fill(DETAIL_CONTACT), headers=SAME_ORIGIN)
+    page = found.fill(DETAIL)
+    button = {**SAME_ORIGIN, "referer": f"http://testserver{page}"}  # the page's own button
+    shown = await site.client.get(found.fill(DETAIL_CONTACT), headers=button)
     assert MARKERS["phone"] in shown.text, "the detail page does not show the contact on request"
     assert not marker_leaks(shown.text, _allowed(found.fill(DETAIL_CONTACT), found))
     queue_item = (await site.client.get(found.fill(QUEUE_ITEM))).text

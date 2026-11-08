@@ -89,8 +89,8 @@ het nummer of het adres belt of mailt u vanuit uw eigen programma.
 - Met **Contactgegevens verbergen** haalt u ze weer van het scherm, bijvoorbeeld voordat u een
   schermafdruk maakt voor Webex-support.
 - Alleen de knop op de pagina zelf toont ze. Opent u de pagina via een gedeelde link (in een
-  mail of chat), een bladwijzer of een link op een andere website, dan staan ze er niet en komt
-  er niets in het auditlog; kies dan zelf **Contactgegevens tonen**.
+  mail of chat), een bladwijzer of een link op een andere website of pagina, dan staan ze er
+  niet en komt er niets in het auditlog; kies dan zelf **Contactgegevens tonen**.
 - Zijn de persoonsgegevens van de afspraak verwijderd (zie
   [Gegevensvelden en persoonsgegevens](data-fields.md)), dan staat dat er en is er niets meer
   te tonen.

@@ -8,11 +8,11 @@ The booking page shows the answers to the group's form, and the participant's na
 address and phone number only on request: *Show contact details* opens the page again with
 ``?contact=show``, and ``ParticipantContactService`` audits each request (ADR 0044 §2, the
 product owner's choice of 2026-11-08). Only the button on the page itself counts
-(``from_own_page``): the same address shared in a mail or chat, bookmarked, typed, followed
-from another site or prefetched shows the page without them and writes nothing, so it never
-puts a request in someone else's name. The ``mailto:`` link percent-encodes the address
-(``Contact.mailto``), so what a participant may type before the ``@`` cannot fill other fields
-of the draft.
+(``from_this_page``): the same address shared in a mail or chat, bookmarked, typed, followed
+from another site or from another page of the portal, or prefetched, shows the page without
+them and writes nothing, so it never puts a request in someone else's name. The ``mailto:``
+link percent-encodes the address (``Contact.mailto``), so what a participant may type before
+the ``@`` cannot fill other fields of the draft.
 
     GET  /admin/groups/{slug}/bookings/{booking_id}         bookings.view
     GET  /admin/groups/{slug}/bookings/{booking_id}?contact=show   bookings.view, audited
@@ -60,7 +60,7 @@ from app.web.call_labels import (
     TASK_STATE_LABELS,
     failure_hint,
 )
-from app.web.protection import RejectedRequest, from_own_page
+from app.web.protection import RejectedRequest, from_this_page
 from app.web.routing_labels import routing_summary
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -322,7 +322,7 @@ async def booking_detail(
         Permission.BOOKINGS_MANAGE, context.group
     )
     shown, deleted = None, booking.contact is None
-    if contact == SHOW_CONTACT and not deleted and from_own_page(request):
+    if contact == SHOW_CONTACT and not deleted and from_this_page(request):
         shown = await participant_contacts(request).reveal(context.principal, slug, booking_id)
         deleted = shown is None  # deleted since the timeline was read
     return group_page(

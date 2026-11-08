@@ -338,6 +338,11 @@ async def test_a_booking_without_a_meeting_shows_no_meeting_id(site: Site) -> No
     assert "Meeting-ID" not in detail
 
 
+def _from(page: str) -> dict[str, str]:
+    """Return the headers of the button on ``page``: same origin, and the page as referrer."""
+    return {**SAME_ORIGIN, "referer": f"http://testserver{page}"}
+
+
 async def _contact_views(site: Site) -> list[tuple[str, int | None]]:
     """Return actor and booking of every *contact details shown* audit event, oldest first."""
     return [(e.actor, e.booking_id) for e in await audit_log(site) if e.detail == CONTACT_VIEWED]
@@ -352,7 +357,7 @@ async def test_the_contact_details_show_only_on_request_and_each_request_is_audi
     page = f"/admin/groups/demo/bookings/{booking_id}"
 
     plain = (await site.client.get(page)).text
-    shown = (await site.client.get(f"{page}?contact=show", headers=SAME_ORIGIN)).text
+    shown = (await site.client.get(f"{page}?contact=show", headers=_from(page))).text
     english = (await site.client.get(f"{page}?lang=en")).text
 
     assert '<form method="get" action="#contact">' in plain
@@ -368,14 +373,17 @@ async def test_the_contact_details_show_only_on_request_and_each_request_is_audi
 
 
 @pytest.mark.parametrize(
-    "headers",
+    ("headers", "referer"),
     [
-        {"sec-fetch-site": "cross-site"},
-        {"sec-fetch-site": "same-site"},
-        {"sec-fetch-site": "none"},
-        {},
-        {"referer": "https://elders.example/"},
-        {"sec-fetch-site": "same-origin", "sec-purpose": "prefetch;prerender"},
+        ({"sec-fetch-site": "cross-site"}, "PAGE"),
+        ({"sec-fetch-site": "same-site"}, "PAGE"),
+        ({"sec-fetch-site": "none"}, ""),
+        ({}, ""),
+        ({}, "https://elders.example/"),
+        (SAME_ORIGIN, ""),
+        (SAME_ORIGIN, "/admin/groups/demo/agenda"),
+        ({}, "http://testserver.example/admin/groups/demo/bookings/ID"),
+        ({**SAME_ORIGIN, "sec-purpose": "prefetch;prerender"}, "PAGE"),
     ],
     ids=[
         "cross-site",
@@ -383,19 +391,24 @@ async def test_the_contact_details_show_only_on_request_and_each_request_is_audi
         "typed-shared-or-bookmarked",
         "no-header",
         "foreign-referer",
+        "no-referer",
+        "other-page-of-the-portal",
+        "look-alike-host",
         "prerender",
     ],
 )
 async def test_only_the_button_on_the_page_shows_the_contact_details(
-    site: Site, headers: dict[str, str]
+    site: Site, headers: dict[str, str], referer: str
 ) -> None:
-    """A shared, bookmarked or crafted address shows nothing and writes nothing in anyone's name."""
+    """A shared, bookmarked, crafted or planted address shows and writes nothing."""
     booking_id = await _book(site, "demo")
     await site.login_as(GROUP_ADMIN)
+    page = f"/admin/groups/demo/bookings/{booking_id}"
+    if referer:
+        referer = referer.replace("PAGE", f"http://testserver{page}").replace("ID", str(booking_id))
+        headers = {**headers, "referer": referer}
 
-    response = await site.client.get(
-        f"/admin/groups/demo/bookings/{booking_id}?contact=show", headers=headers
-    )
+    response = await site.client.get(f"{page}?contact=show", headers=headers)
 
     assert response.status_code == 200
     assert "ada@example.org" not in response.text
@@ -403,8 +416,21 @@ async def test_only_the_button_on_the_page_shows_the_contact_details(
     assert await _contact_views(site) == []
 
 
-async def test_an_older_browser_shows_them_from_the_portals_own_page(site: Site) -> None:
-    """Without Fetch Metadata the portal's own address as referrer stands in for the button."""
+async def test_behind_a_proxy_the_path_of_the_page_is_enough(site: Site) -> None:
+    """With Fetch Metadata the browser vouches for the origin; a proxy may change the scheme."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+    page = f"/admin/groups/demo/bookings/{booking_id}"
+    button = {**SAME_ORIGIN, "referer": f"https://portal.voorbeeld.nl{page}"}
+
+    text = (await site.client.get(f"{page}?contact=show", headers=button)).text
+
+    assert '<a href="mailto:ada@example.org">ada@example.org</a>' in text
+    assert await _contact_views(site) == [(GROUP_ADMIN.subject, booking_id)]
+
+
+async def test_an_older_browser_shows_them_from_the_page_itself(site: Site) -> None:
+    """Without Fetch Metadata the page's own address as referrer stands in for the button."""
     booking_id = await _book(site, "demo")
     await site.login_as(GROUP_ADMIN)
     page = f"/admin/groups/demo/bookings/{booking_id}"
@@ -428,7 +454,8 @@ async def test_the_mail_link_encodes_what_could_fill_other_fields_of_the_draft(
 
     text = (
         await site.client.get(
-            f"/admin/groups/demo/bookings/{booking_id}?contact=show", headers=SAME_ORIGIN
+            f"/admin/groups/demo/bookings/{booking_id}?contact=show",
+            headers=_from(f"/admin/groups/demo/bookings/{booking_id}"),
         )
     ).text
 
@@ -444,7 +471,8 @@ async def test_after_the_purge_the_page_says_the_contact_details_are_deleted(sit
 
     text = (
         await site.client.get(
-            f"/admin/groups/demo/bookings/{booking_id}?contact=show", headers=SAME_ORIGIN
+            f"/admin/groups/demo/bookings/{booking_id}?contact=show",
+            headers=_from(f"/admin/groups/demo/bookings/{booking_id}"),
         )
     ).text
 
@@ -461,7 +489,8 @@ async def test_without_bookings_view_the_contact_details_are_refused(
     await site.login_as(principal)
 
     response = await site.client.get(
-        f"/admin/groups/demo/bookings/{booking_id}?contact=show", headers=SAME_ORIGIN
+        f"/admin/groups/demo/bookings/{booking_id}?contact=show",
+        headers=_from(f"/admin/groups/demo/bookings/{booking_id}"),
     )
 
     assert response.status_code == 403

@@ -9,9 +9,9 @@ so that a planner can call a participant whose booking is too late to change whi
 stays accountable. Every request is an audit event under ``bookings.view`` with the detail
 ``booking.contact_viewed``, the actor, the group and the booking id, never the data itself.
 After the purge there is nothing to show, so nothing is audited. What counts as a request is
-the web edge's call: only the button on the booking page itself (``app.web.protection.
-from_own_page``), never a shared or bookmarked address. It is a protection, so there is no
-setting to switch it off (ADR 0042).
+the web edge's call: only the button on the booking page itself
+(``app.web.protection.from_this_page``), never a shared or bookmarked address or a link on
+another page. It is a protection, so there is no setting to switch it off (ADR 0042).
 
     reveal  bookings.view  group level  the contact details of one booking of the group
 """
