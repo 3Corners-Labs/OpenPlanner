@@ -126,6 +126,12 @@ TOPICS = (
         ),
         Permission.IDENTITY_PROVIDERS_VIEW,
     ),
+    # ADR 0099: the organisation's configuration as a JSON document.
+    HelpTopic(
+        "organisation-configuration",
+        ("/admin/organisations/{org}/configuration",),
+        Permission.SETTINGS_ORGANISATION_MANAGE,
+    ),
     HelpTopic("group-contacts", ("/admin/groups/{slug}/contact",), Permission.CLOSURE_MANAGE),
     HelpTopic(
         "group-closure",

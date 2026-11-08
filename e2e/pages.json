@@ -74,6 +74,14 @@
       ]
     },
     {
+      "name": "correct your details",
+      "path": "{correct_details}",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "trial call (not available)",
       "path": "{trial_page}",
       "locales": [
@@ -260,6 +268,14 @@
     {
       "name": "advanced settings: settings",
       "path": "/admin/settings/values",
+      "user": "super",
+      "locales": [
+        "nl"
+      ]
+    },
+    {
+      "name": "organisation: configuration document",
+      "path": "/admin/organisations/demo/configuration",
       "user": "super",
       "locales": [
         "nl"

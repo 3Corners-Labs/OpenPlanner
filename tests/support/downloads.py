@@ -3,6 +3,7 @@
 DOWNLOAD_MODULES = {
     "admin/audit_routes.py",
     "admin/branding_routes.py",
+    "admin/configuration_routes.py",
     "admin/idp_mapping_routes.py",
     "admin/settings_routes.py",
     "api/agent/routes.py",

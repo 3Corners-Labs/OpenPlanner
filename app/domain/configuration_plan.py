@@ -17,7 +17,9 @@ hash.
 
 import copy
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from app.domain.authorization import LEVELS, Level, Permission, Target
 from app.domain.configuration_changes import (
@@ -55,11 +57,15 @@ class Plan:
         refusals: Everything that stops the plan; it can only be applied when there is none.
         digest: The plan hash: SHA-256 over the document's digest and the settings version it
             was computed against, so an apply is refused when the configuration moved on.
+        sealed: Whether the document held sealed secrets, so a caller knows to ask for the
+            passphrase again at the apply. Set by ``ConfigurationDocumentService.plan`` only; the
+            plan inside an apply result leaves it ``False``.
     """
 
     changes: tuple[Change, ...]
     refusals: tuple[Refusal, ...]
     digest: str
+    sealed: bool = False
 
     @property
     def ok(self) -> bool:
@@ -322,20 +328,15 @@ class _Planner:
 
     def _place(self, kind: Kind, wanted: Entity, fields: dict[str, Value], above: _Place) -> _Place:
         """Return where an object sits: its address and the organisation and group over it."""
-        organisation, group = above.organisation, above.group
-        if kind.anchor is Anchor.ORGANISATION:
-            organisation = wanted.key[0]
-        elif kind.anchor is Anchor.GROUP:
-            group = wanted.key[0]
-        if kind.organisation_field is not None:
-            owner = fields.get(kind.organisation_field)
-            organisation = owner if isinstance(owner, str) else organisation
+        found = placement(
+            kind, wanted.key, fields, above.organisation, above.group, above.permission
+        )
         return _Place(
             wanted.path,
             above.address + wanted.key,
-            organisation,
-            group,
-            kind.permission or above.permission,
+            found.organisation,
+            found.group,
+            found.permission,
         )
 
     def _emit(
@@ -356,7 +357,7 @@ class _Planner:
             action=action,
             fields=names,
             values=dict(values),
-            permissions=_permissions(kind, here.permission, action, names),
+            permissions=permissions_of(kind, here.permission, action, names),
             organisation=here.organisation,
             group=here.group,
         )
@@ -383,7 +384,7 @@ class _Planner:
                 path=wanted.path,
                 action=ChangeAction.UPDATE,
                 fields=names,
-                permissions=_permissions(kind, here.permission, ChangeAction.UPDATE, names),
+                permissions=permissions_of(kind, here.permission, ChangeAction.UPDATE, names),
                 organisation=here.organisation,
                 group=here.group,
             )
@@ -392,7 +393,7 @@ class _Planner:
     def _authorise(self, change: Change) -> None:
         """Refuse the change when the actor lacks any permission its screens require."""
         for permission in sorted(change.permissions):
-            target = _target(permission, change.organisation, change.group)
+            target = target_for(permission, change.organisation, change.group)
             if not self._may_change(permission, target):
                 self._refuse(change.path, ErrorCode.NOT_PERMITTED)
                 return
@@ -450,7 +451,7 @@ def _same(spec: FieldSpec, before: Value, after: Value) -> bool:
     return bool(before == after)
 
 
-def _permissions(
+def permissions_of(
     kind: Kind, base: Permission | None, action: ChangeAction, names: tuple[str, ...]
 ) -> frozenset[Permission]:
     """Return what the admin screens of an object's fields require to make a change."""
@@ -472,7 +473,44 @@ def _permissions(
     return frozenset(permissions)
 
 
-def _target(permission: Permission, organisation: str | None, group: str | None) -> Target:
+class Placement(NamedTuple):
+    """Where an object sits for the purpose of rights.
+
+    Attributes:
+        organisation: The slug of the organisation it belongs to, if any.
+        group: The slug of the group it belongs to, if any.
+        permission: The permission its screen requires (its own, else the one above).
+    """
+
+    organisation: str | None
+    group: str | None
+    permission: Permission | None
+
+
+def placement(
+    kind: Kind,
+    key: tuple[str, ...],
+    fields: Mapping[str, Value],
+    organisation: str | None,
+    group: str | None,
+    permission: Permission | None,
+) -> Placement:
+    """Return where an object of ``kind`` with natural ``key`` sits, given what is above it.
+
+    The one rule the planner and the export filter share, so a document exports exactly what
+    it could apply.
+    """
+    if kind.anchor is Anchor.ORGANISATION:
+        organisation = key[0]
+    elif kind.anchor is Anchor.GROUP:
+        group = key[0]
+    if kind.organisation_field is not None:
+        owner = fields.get(kind.organisation_field)
+        organisation = owner if isinstance(owner, str) else organisation
+    return Placement(organisation, group, kind.permission or permission)
+
+
+def target_for(permission: Permission, organisation: str | None, group: str | None) -> Target:
     """Return the target a permission is checked against, from where the object sits.
 
     Raises:

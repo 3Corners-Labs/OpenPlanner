@@ -27,14 +27,19 @@ PACKAGE_FILENAME = "openplanner-configuration-{installation}-{date}.sqlite"
 """The download name of an exported package, in the portal and over the API."""
 
 
-def package_filename(installation: str, exported_at: datetime) -> str:
-    """Return the download name of a package exported on ``exported_at``.
+def filename_slug(installation: str) -> str:
+    """Return the installation name as a slug, so a download name passes the filename rule.
 
-    The installation name is turned into a slug (lower case, every character outside
-    ``[a-z0-9.-]`` becomes ``-``) so the name always passes the filename rule.
+    Lower case; every character outside ``[a-z0-9.-]`` becomes ``-``.
     """
-    slug = re.sub(r"[^a-z0-9.-]", "-", (installation or "openplanner").lower())
-    return PACKAGE_FILENAME.format(installation=slug, date=exported_at.strftime("%Y%m%d"))
+    return re.sub(r"[^a-z0-9.-]", "-", (installation or "openplanner").lower())
+
+
+def package_filename(installation: str, exported_at: datetime) -> str:
+    """Return the download name of a package exported on ``exported_at``."""
+    return PACKAGE_FILENAME.format(
+        installation=filename_slug(installation), date=exported_at.strftime("%Y%m%d")
+    )
 
 
 VERSION_TABLE = "alembic_version"
