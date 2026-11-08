@@ -80,6 +80,31 @@ PURGED_FIELDS: tuple[str, ...] = (*(f.name for f in DATA_FIELDS), *DERIVED_FIELD
 from this list, so there is no second one to drift (ADR 0102 point 13). What the purge does is
 *delete fields from the appointment*; it does not make the booking anonymous."""
 
+USAGE_FIELDS: tuple[str, ...] = (
+    "kind",
+    "bucket_hour",
+    "organisation_id",
+    "group_id",
+    "booking_kind",
+    "dispatch_kind",
+    "subject_code",
+    "locale",
+    "channel_kind",
+    "outcome",
+    "actor_class",
+    "reason_code",
+    "value_seconds",
+    "participants",
+    "capacity",
+    "booked",
+    "staff_id",
+)
+"""The one allow-list of what a reporting fact may hold (ADR 0117 point 2): the fields of
+``usage.UsageFact`` and, for the separate ``usage.StaffFact``, ``staff_id``. No field of
+``DATA_FIELDS``, ``DERIVED_FIELDS`` or ``ALIASES`` is in it, and a test checks that and that the
+fact types hold exactly these fields. The statistics hold no personal data; they are not a copy
+of the appointments with the names taken out."""
+
 ENTITY = "Booking"
 """The only entity that holds personal data (CLAUDE.md privacy rules)."""
 
