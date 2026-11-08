@@ -84,7 +84,7 @@ EXAMPLE_CONTACTS = ContactBlock(
     (
         ContactOption.create(
             ContactKind.PHONE,
-            "14 020",
+            "012 345 6789",
             labels={"nl": "Bel ons", "en": "Call us"},
             hours={
                 "nl": "Maandag tot en met vrijdag, 9:00 tot 17:00",
@@ -92,7 +92,9 @@ EXAMPLE_CONTACTS = ContactBlock(
             },
         ),
         ContactOption.create(ContactKind.WEBSITE, "https://www.example.org/contact"),
-        ContactOption.create(ContactKind.ADDRESS, "Stadhuis\nAmstel 1\n1011 PN Amsterdam"),
+        ContactOption.create(
+            ContactKind.ADDRESS, "Kantoor\nVoorbeeldstraat 1\n1234 AB Voorbeeldstad"
+        ),
     )
 )
 # A made-up participant: the booking on hold exists only in development and test databases.

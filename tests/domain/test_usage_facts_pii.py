@@ -187,12 +187,12 @@ async def _queue_scenario() -> list[UsageFact]:
 async def _direct_scenario() -> list[UsageFact]:
     """A participant who gives up waiting for a direct call, with the call's creation."""
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte", direct_call_max_concurrent=3)
+    state.groups[1] = make_group(id=1, slug="balie", direct_call_max_concurrent=3)
     state.rules[1] = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 2, Offer.BOTH))]
     uow = InMemoryUnitOfWork(state)
     clock = FixedClock(datetime(2026, 1, 5, 8, 15, tzinfo=UTC))
     service = BookingService(uow, clock, TEST_TOKEN_KEY)
-    receipt = await service.start_direct(group_slug="aangifte", contact=_person(9), locale="nl")
+    receipt = await service.start_direct(group_slug="balie", contact=_person(9), locale="nl")
     integration = IntegrationService(uow, clock, AdminService(uow, clock))
     await integration.record(receipt.booking.id or 0, EventKind.TASK_CREATED)
     await service.leave_direct(receipt.management_token)

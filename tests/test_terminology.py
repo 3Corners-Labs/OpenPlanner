@@ -44,6 +44,7 @@ SECTOR = re.compile(
             _w("toe", "slag"),
             _w("inwo", "ner"),
             _w("vergun", "ning"),
+            _w("aan", "gifte"),
         ]
     ),
     re.IGNORECASE,
@@ -165,6 +166,9 @@ def test_the_guard_sees_the_words() -> None:
     assert sector_words_in(_w("Belas", "tingen"))
     assert sector_words_in("vragen die " + _w("inwo", "ners") + " beantwoorden")
     assert sector_words_in(_w("Vergun", "ningen") + " Loket")
+    # The default slug of the test groups, and so of many example addresses (2026-11-08).
+    assert sector_words_in("/g/" + _w("aan", "gifte") + "-2026")
+    assert sector_words_in("team-" + _w("Aan", "giftes") + "@example.org")
 
 
 def test_the_guard_reads_the_text_of_an_office_file(tmp_path: Path) -> None:

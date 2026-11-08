@@ -270,7 +270,7 @@ async def test_the_end_of_a_polled_meeting_carries_the_peak_not_the_empty_room(
 
 def _direct_site() -> tuple[BookingService, InMemoryUnitOfWork]:
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte", direct_call_max_concurrent=3)
+    state.groups[1] = make_group(id=1, slug="balie", direct_call_max_concurrent=3)
     from app.domain.scheduling import Offer, ScheduleRule
 
     state.rules[1] = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 2, Offer.BOTH))]
@@ -283,7 +283,7 @@ def _direct_site() -> tuple[BookingService, InMemoryUnitOfWork]:
 
 async def test_leaving_a_direct_call_writes_the_wait_and_it_is_not_repeated() -> None:
     service, uow = _direct_site()
-    receipt = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    receipt = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
 
     await service.leave_direct(receipt.management_token)
     await service.leave_direct(receipt.management_token)
@@ -297,8 +297,8 @@ async def test_leaving_a_direct_call_writes_the_wait_and_it_is_not_repeated() ->
 
 async def test_a_direct_call_created_carries_the_calls_open_at_that_moment() -> None:
     service, uow = _direct_site()
-    first = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
-    second = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    first = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
+    second = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
     integration = IntegrationService(
         uow, FixedClock(SLOT_0900), AdminService(uow, FixedClock(SLOT_0900))
     )

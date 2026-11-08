@@ -39,23 +39,23 @@ async def test_options_are_saved_previewed_and_audited_with_counts(site: Site) -
         site,
         heading_nl="Bereik ons anders",
         contact_1_kind="phone",
-        contact_1_value="14 020",
+        contact_1_value="012 345 6789",
         contact_1_hours_nl="ma-vr 9:00-17:00",
         contact_2_kind="website",
         contact_2_value="https://www.acme.example/contact",
         contact_2_label_nl="Contactformulier",
         contact_4_kind="address",
-        contact_4_value="Stadhuis\r\nAmstel 1\r\n1011 PN Amsterdam",
+        contact_4_value="Kantoor\r\nVoorbeeldstraat 1\r\n1234 AB Voorbeeldstad",
     )
 
     assert response.status_code == 303
     assert response.headers["location"] == f"{PAGE}?done=saved"
     page = (await site.client.get(response.headers["location"])).text
     assert "Bereik ons anders" in page
-    assert '<a class="contact-block__link" href="tel:14020">14 020</a>' in page
+    assert '<a class="contact-block__link" href="tel:0123456789">012 345 6789</a>' in page
     assert 'href="https://www.acme.example/contact">www.acme.example/contact</a>' in page
     assert "Contactformulier" in page
-    assert "Stadhuis<br>Amstel 1<br>1011 PN Amsterdam" in page
+    assert "Kantoor<br>Voorbeeldstraat 1<br>1234 AB Voorbeeldstad" in page
     # saved in order: row 4 became the third option, and the form shows it there
     assert 'name="contact_3_kind"' in page
     assert (
@@ -71,13 +71,13 @@ async def test_options_are_saved_previewed_and_audited_with_counts(site: Site) -
         site,
         heading_nl="Bereik ons anders",
         contact_1_kind="phone",
-        contact_1_value="14  020",
+        contact_1_value="012  345  6789",
         contact_1_hours_nl="ma-vr 9:00-17:00",
         contact_2_kind="website",
         contact_2_value="https://www.acme.example/contact",
         contact_2_label_nl="Contactformulier",
         contact_3_kind="address",
-        contact_3_value="Stadhuis\nAmstel 1\n1011 PN Amsterdam",
+        contact_3_value="Kantoor\nVoorbeeldstraat 1\n1234 AB Voorbeeldstad",
     )
     assert again.headers["location"] == f"{PAGE}?done=unchanged"
 
@@ -102,7 +102,7 @@ async def test_a_javascript_link_is_refused_with_a_message_linked_to_its_row(sit
 async def test_details_without_a_kind_are_refused(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    response = await _save(site, contact_5_value="14 020")
+    response = await _save(site, contact_5_value="012 345 6789")
 
     assert response.status_code == 422
     assert 'href="#contact_5_kind"' in response.text
@@ -113,10 +113,10 @@ async def test_a_label_and_a_heading_that_are_too_long_are_refused(site: Site) -
     await site.login_as(ORG_ADMIN)
 
     label = await _save(
-        site, contact_1_kind="phone", contact_1_value="14 020", contact_1_label_en="x" * 81
+        site, contact_1_kind="phone", contact_1_value="012 345 6789", contact_1_label_en="x" * 81
     )
     heading = await _save(
-        site, heading_en="x" * 121, contact_1_kind="phone", contact_1_value="14 020"
+        site, heading_en="x" * 121, contact_1_kind="phone", contact_1_value="012 345 6789"
     )
 
     assert 'href="#contact_1_label_nl"' in label.text
@@ -128,7 +128,9 @@ async def test_group_admins_cannot_open_the_page(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
     assert (await site.client.get(PAGE)).status_code == 403
-    assert (await _save(site, contact_1_kind="phone", contact_1_value="14 020")).status_code == 403
+    assert (
+        await _save(site, contact_1_kind="phone", contact_1_value="012 345 6789")
+    ).status_code == 403
 
 
 async def test_cross_site_posts_are_refused(site: Site) -> None:
@@ -136,7 +138,7 @@ async def test_cross_site_posts_are_refused(site: Site) -> None:
 
     response = await site.client.post(
         PAGE,
-        data={"contact_1_kind": "phone", "contact_1_value": "14 020"},
+        data={"contact_1_kind": "phone", "contact_1_value": "012 345 6789"},
         headers={"sec-fetch-site": "cross-site"},
     )
 

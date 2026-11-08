@@ -35,7 +35,7 @@ async def engine(database_url: str) -> AsyncIterator[AsyncEngine]:
 async def seed_group(
     engine: AsyncEngine,
     *,
-    slug: str = "aangifte",
+    slug: str = "balie",
     weekday: int = 0,
     capacity: int = 1,
     phone_mode: str = "optional",

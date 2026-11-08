@@ -37,7 +37,7 @@ SINCE = FieldDefinition.create(
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte")
+    state.groups[1] = make_group(id=1, slug="balie")
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=2))]
     state.forms[1] = FormDefinition(2, (CUSTOMER, SINCE))
     return InMemoryUnitOfWork(state)
@@ -49,7 +49,7 @@ def _service(uow: InMemoryUnitOfWork, region: str = "NL") -> BookingService:
 
 async def _book(service: BookingService, **answers: str) -> object:
     return await service.book(
-        group_slug="aangifte",
+        group_slug="balie",
         start=SLOT_0900,
         contact=replace(ADA, answers=answers),
         locale="nl",
@@ -110,7 +110,7 @@ async def test_the_organisation_region_reads_the_phone_number(uow: InMemoryUnitO
     service = _service(uow, region="BE")
 
     receipt = await service.book(
-        group_slug="aangifte",
+        group_slug="balie",
         start=SLOT_0900,
         contact=replace(ADA, phone="0470 12 34 56"),
         locale="nl",

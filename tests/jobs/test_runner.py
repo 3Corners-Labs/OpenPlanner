@@ -46,7 +46,7 @@ def merge_context(_logger: WrappedLogger, _method: str, event_dict: EventDict) -
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte")
+    state.groups[1] = make_group(id=1, slug="balie")
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     return InMemoryUnitOfWork(state)
 
@@ -235,7 +235,7 @@ async def test_a_sent_message_is_a_system_event_of_the_group(
     await JobRunner(queue, uow, FixedClock(NOW), RecordingSender(), composer).run_due()
 
     assert system_events(uow) == [
-        ("job.send_reminder", Outcome.SUCCESS, "", "attempt:1,channel:sms", "aangifte")
+        ("job.send_reminder", Outcome.SUCCESS, "", "attempt:1,channel:sms", "balie")
     ]
     assert uow.state.audit[-1].booking_id == bid
 
@@ -249,7 +249,7 @@ async def test_a_stale_job_is_recorded_as_skipped_with_the_reason(
     await JobRunner(queue, uow, FixedClock(NOW), RecordingSender(), composer).run_due()
 
     assert system_events(uow) == [
-        ("job.send_reminder", Outcome.SKIPPED, "stale", "attempt:1,channel:email", "aangifte")
+        ("job.send_reminder", Outcome.SKIPPED, "stale", "attempt:1,channel:email", "balie")
     ]
 
 
@@ -309,7 +309,7 @@ async def test_each_job_runs_in_its_own_trace_tagged_with_its_group(
     assert first.trace_id != second.trace_id
     sent = [entry for entry in logs if entry["event"] == "job.sent"]
     assert [entry["trace_id"] for entry in sent] == [first.trace_id, second.trace_id]
-    assert {entry["group"] for entry in sent} == {"aangifte"}
+    assert {entry["group"] for entry in sent} == {"balie"}
     assert current_trace_id() == ""
 
 
@@ -318,16 +318,14 @@ async def test_a_job_of_a_group_in_diagnostic_mode_writes_a_debug_event(
 ) -> None:
     # ADR 0040, part 4: one debug event per job, at the job's group, with its trace.
     bid = await booking_id(uow)
-    uow.state.diagnostic_modes = [
-        DiagnosticMode("org", "aangifte", NOW + timedelta(hours=1), "s-1")
-    ]
+    uow.state.diagnostic_modes = [DiagnosticMode("org", "balie", NOW + timedelta(hours=1), "s-1")]
     queue = FakeQueue([job(bid, JobType.SEND_CONFIRMATION)])
 
     await JobRunner(queue, uow, FixedClock(NOW), RecordingSender(), composer).run_due()
 
     (debug,) = [e for e in uow.state.audit if e.category is Category.DIAGNOSTIC]
     (done,) = [e for e in uow.state.audit if e.category is Category.SYSTEM]
-    assert (debug.action, debug.group, debug.booking_id) == ("job.run", "aangifte", bid)
+    assert (debug.action, debug.group, debug.booking_id) == ("job.run", "balie", bid)
     assert debug.detail.startswith("type:send_confirmation,attempt:1,ms:")
     assert debug.trace_id == done.trace_id
 
@@ -578,7 +576,7 @@ async def test_the_request_to_confirm_goes_only_while_it_is_pending(
     await service.confirm(receipt.management_token)
     await JobRunner(FakeQueue([request]), uow, FixedClock(NOW), sender, composer).run_due()
 
-    assert [m.subject for m in sender.sent] == ["Bevestig uw afspraak met Aangifte"]
+    assert [m.subject for m in sender.sent] == ["Bevestig uw afspraak met Balie"]
 
 
 # ADR 0085 point 9: ``job.run`` and ``job.step`` trace points.

@@ -79,7 +79,7 @@ async def test_health_and_inbound_events_round_trip(engine: AsyncEngine) -> None
 
 
 async def test_stale_tasks_carry_their_organisation_and_group(engine: AsyncEngine) -> None:
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     booking_id = receipt.booking.id or 0
@@ -97,5 +97,5 @@ async def test_stale_tasks_carry_their_organisation_and_group(engine: AsyncEngin
         (booking_id, "task-1", TaskState.QUEUED)
     ]
     assert stale[0].organisation
-    assert stale[0].group == "aangifte"
+    assert stale[0].group == "balie"
     assert early == []

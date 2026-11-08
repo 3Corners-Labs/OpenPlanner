@@ -26,7 +26,7 @@ def _setup() -> tuple[DiagnosticsService, DiagnosticLog, InMemoryUnitOfWork, Fix
     state = State()
     state.organisations[1] = Organisation(1, "Demo", "demo")
     state.organisation_slugs[1] = "demo"
-    state.groups[1] = make_group(id=1, organisation_id=1, slug="aangifte")
+    state.groups[1] = make_group(id=1, organisation_id=1, slug="balie")
     state.groups[2] = make_group(id=2, organisation_id=1, slug="paspoort")
     uow, clock = InMemoryUnitOfWork(state), FixedClock(NOW)
     service = DiagnosticsService(uow, clock, AdminService(uow, clock), HOURS)
@@ -36,16 +36,16 @@ def _setup() -> tuple[DiagnosticsService, DiagnosticLog, InMemoryUnitOfWork, Fix
 async def test_debug_events_are_written_only_for_a_group_in_diagnostic_mode() -> None:
     service, debug, uow, _ = _setup()
 
-    assert not await debug.debug("job.run", "demo", "aangifte", detail="type:x")
-    await service.switch_on(SUPER, "demo", "aangifte")
-    assert await debug.debug("job.run", "demo", "aangifte", booking_id=7, detail="type:x")
+    assert not await debug.debug("job.run", "demo", "balie", detail="type:x")
+    await service.switch_on(SUPER, "demo", "balie")
+    assert await debug.debug("job.run", "demo", "balie", booking_id=7, detail="type:x")
     assert not await debug.debug("job.run", "demo", "paspoort")
 
     (event,) = [e for e in uow.state.audit if e.category is Category.DIAGNOSTIC]
     assert (event.level, event.source, event.group, event.booking_id) == (
         Level.DEBUG,
         Source.SYSTEM,
-        "aangifte",
+        "balie",
         7,
     )
 
@@ -63,27 +63,27 @@ async def test_an_organisation_mode_covers_all_its_groups() -> None:
 
 async def test_the_mode_ends_by_itself() -> None:
     service, debug, _, clock = _setup()
-    await service.switch_on(SUPER, "demo", "aangifte")
+    await service.switch_on(SUPER, "demo", "balie")
 
     clock.advance(HOURS)
 
     assert await service.active() == []
-    assert not await debug.debug("job.run", "demo", "aangifte")
+    assert not await debug.debug("job.run", "demo", "balie")
 
 
 async def test_switching_is_audited_and_off_ends_it() -> None:
     service, debug, uow, _ = _setup()
 
-    mode = await service.switch_on(SUPER, "demo", "aangifte")
-    await service.switch_off(SUPER, "demo", "aangifte")
-    await service.switch_off(SUPER, "demo", "aangifte")  # already off: nothing to audit
+    mode = await service.switch_on(SUPER, "demo", "balie")
+    await service.switch_off(SUPER, "demo", "balie")
+    await service.switch_off(SUPER, "demo", "balie")  # already off: nothing to audit
 
     assert mode.until == NOW + HOURS
     assert [(e.action, e.detail, e.actor) for e in uow.state.audit] == [
         ("diagnostics.manage", "diagnostics.on", "super-1"),
         ("diagnostics.manage", "diagnostics.off", "super-1"),
     ]
-    assert not await debug.debug("job.run", "demo", "aangifte")
+    assert not await debug.debug("job.run", "demo", "balie")
 
 
 async def test_only_the_superuser_may_switch() -> None:
@@ -91,7 +91,7 @@ async def test_only_the_superuser_may_switch() -> None:
     service, _, uow, _ = _setup()
 
     with pytest.raises(DomainError) as refused:
-        await service.switch_on(ORG_ADMIN, "demo", "aangifte")
+        await service.switch_on(ORG_ADMIN, "demo", "balie")
 
     assert refused.value.code is ErrorCode.NOT_PERMITTED
     assert uow.state.diagnostic_modes == []
@@ -101,7 +101,7 @@ async def test_only_the_superuser_may_switch() -> None:
     ("organisation", "group", "code"),
     [
         ("demo", "onbekend", ErrorCode.GROUP_NOT_FOUND),
-        ("andere", "aangifte", ErrorCode.GROUP_NOT_FOUND),
+        ("andere", "balie", ErrorCode.GROUP_NOT_FOUND),
         ("onbekend", None, ErrorCode.ORGANISATION_NOT_FOUND),
     ],
 )
@@ -118,7 +118,7 @@ async def test_an_unknown_target_is_refused(
 
 async def test_the_brake_ends_every_mode_and_says_so() -> None:
     service, debug, uow, _ = _setup()
-    await service.switch_on(SUPER, "demo", "aangifte")
+    await service.switch_on(SUPER, "demo", "balie")
     await service.switch_on(SUPER, "demo")
 
     assert await service.brake("free_space_critical") == 2
@@ -128,4 +128,4 @@ async def test_the_brake_ends_every_mode_and_says_so() -> None:
     assert [(e.reason, e.detail, e.organisation) for e in brakes] == [
         ("free_space_critical", "modes:2", None)
     ]
-    assert not await debug.debug("job.run", "demo", "aangifte")
+    assert not await debug.debug("job.run", "demo", "balie")

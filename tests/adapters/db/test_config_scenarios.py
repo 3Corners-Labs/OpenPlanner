@@ -15,11 +15,11 @@ from tests.support.config_changes import apply_changes, planned
 from tests.support.config_roundtrip import document_of, organisations, plan_against
 from tests.support.images import png
 
-ORG, GROUP = "org-aangifte", "aangifte"
+ORG, GROUP = "org-balie", "balie"
 NOTICES = {"nl": "Wegens een storing zijn wij gesloten.", "en": "Closed because of an outage."}
 CONTACTS = {
     "headings": {"nl": "Bel ons"},
-    "options": [{"kind": "phone", "value": "14 020", "labels": {}, "hours": {}}],
+    "options": [{"kind": "phone", "value": "012 345 6789", "labels": {}, "hours": {}}],
 }
 SCENARIO: dict[str, Value] = {
     "notices": NOTICES,
@@ -132,7 +132,7 @@ async def test_a_document_of_what_was_read_changes_nothing(
     group = Entity(
         "group",
         (GROUP,),
-        fields={"name": "Aangifte"},
+        fields={"name": "Balie"},
         children={"closure_scenarios": by_group[(ORG, GROUP)]},
     )
     tree = organisations(**{ORG: {"closure_scenarios": by_organisation[ORG], "groups": (group,)}})

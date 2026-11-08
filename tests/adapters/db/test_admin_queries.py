@@ -337,7 +337,7 @@ async def test_the_sql_filter_narrows_by_level_category_period_and_trace(
 async def test_diagnostic_modes_round_trip_replace_and_end(engine: AsyncEngine) -> None:
     # ADR 0040, part 4: one mode per target; ended modes are not active.
     uow = SqlUnitOfWork(engine)
-    group = DiagnosticMode("demo", "aangifte", NOW + timedelta(hours=24), "s-1")
+    group = DiagnosticMode("demo", "balie", NOW + timedelta(hours=24), "s-1")
     organisation = DiagnosticMode("demo", None, NOW + timedelta(hours=1), "s-1")
     async with uow.locked() as tx:
         await tx.save_diagnostic_mode(group)

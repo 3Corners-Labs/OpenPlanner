@@ -22,14 +22,14 @@ def _lines(out: io.StringIO) -> list[dict[str, object]]:
 
 def test_a_shipped_event_is_one_line_with_exactly_the_schema_fields() -> None:
     out = io.StringIO()
-    event = _event(organisation="demo", group="aangifte")
+    event = _event(organisation="demo", group="balie")
 
     StdoutEventSink(ENVELOPE, out).emit([event])
 
     (line,) = _lines(out)
     assert set(line) == {*FIELDS, "log_type"}
     assert line["log_type"] == "audit"
-    assert (line["event_id"], line["actor"], line["group"]) == (event.event_id, "sub-1", "aangifte")
+    assert (line["event_id"], line["actor"], line["group"]) == (event.event_id, "sub-1", "balie")
     assert line["installation"] == "acme-test"
     assert not PII_FIELDS & set(line)
 

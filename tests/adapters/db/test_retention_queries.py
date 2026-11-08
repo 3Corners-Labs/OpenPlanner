@@ -19,8 +19,8 @@ LATER = SLOT_0930 + timedelta(days=3)
 
 
 async def _two_bookings(engine: AsyncEngine) -> tuple[SqlUnitOfWork, int, int]:
-    """Book 09:00 and 09:30 in "aangifte"; purge the first, fail the second's purge job."""
-    await seed_group(engine, slug="aangifte", capacity=2)
+    """Book 09:00 and 09:30 in "balie"; purge the first, fail the second's purge job."""
+    await seed_group(engine, slug="balie", capacity=2)
     await seed_group(engine, slug="elders")
     uow = SqlUnitOfWork(engine)
     service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
@@ -46,7 +46,7 @@ async def test_counts_and_candidates_per_group(engine: AsyncEngine) -> None:
 
     assert [
         (c.group.group.slug, c.holding, c.failed_purges, c.last_purged_at) for c in facts.groups
-    ] == [("aangifte", 1, 1, LATER), ("elders", 0, 0, None)]
+    ] == [("balie", 1, 1, LATER), ("elders", 0, 0, None)]
     # Only the booking that still holds personal data; the purged one's failure is history.
     assert [(c.status, c.end, c.cancelled_at, c.closure_ends_at) for c in facts.candidates] == [
         (BookingStatus.CONFIRMED, SLOT_0930 + timedelta(minutes=30), None, None)
@@ -99,7 +99,7 @@ async def test_a_suspended_candidate_carries_its_organisation_and_closure(
 
     async with uow.read() as tx:
         [due] = await tx.due_for_purge(NOW)
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
 
     assert group is not None
     assert (due.candidate.organisation_id, due.candidate.closure_id) == (

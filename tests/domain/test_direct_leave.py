@@ -19,7 +19,7 @@ from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import ADA, TEST_TOKEN_KEY, book, make_group, window
 
 MONDAY_0915 = datetime(2026, 1, 5, 8, 15, tzinfo=UTC)  # 09:15 Amsterdam
-GROUP = make_group(id=1, slug="aangifte", direct_call_max_concurrent=1)
+GROUP = make_group(id=1, slug="balie", direct_call_max_concurrent=1)
 RULES = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 1, Offer.BOTH))]
 
 
@@ -33,7 +33,7 @@ def _service() -> tuple[BookingService, InMemoryUnitOfWork]:
 
 async def _started() -> tuple[BookingService, InMemoryUnitOfWork, str, int]:
     service, uow = _service()
-    receipt = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    receipt = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
     return service, uow, receipt.management_token, receipt.booking.id or 0
 
 
@@ -62,11 +62,11 @@ async def test_leaving_a_waiting_call_cancels_it_and_ends_the_work_item() -> Non
 
 async def test_leaving_frees_the_place_under_the_cap() -> None:
     service, _, token, _ = await _started()
-    assert await service.direct_call_availability("aangifte") is DirectAvailability.FULL
+    assert await service.direct_call_availability("balie") is DirectAvailability.FULL
 
     await service.leave_direct(token)
 
-    assert await service.direct_call_availability("aangifte") is DirectAvailability.AVAILABLE
+    assert await service.direct_call_availability("balie") is DirectAvailability.AVAILABLE
 
 
 @pytest.mark.parametrize("how", ["task", "claim", "host"])
@@ -115,12 +115,12 @@ async def test_a_wrong_token_finds_nothing_and_changes_nothing() -> None:
 
 async def test_a_token_cancels_only_its_own_call() -> None:
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte")  # no cap: two calls at once
+    state.groups[1] = make_group(id=1, slug="balie")  # no cap: two calls at once
     state.rules[1] = list(RULES)
     uow = InMemoryUnitOfWork(state)
     service = BookingService(uow, FixedClock(MONDAY_0915), TEST_TOKEN_KEY)
-    mine = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
-    theirs = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    mine = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
+    theirs = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
 
     await service.leave_direct(mine.management_token)
 
@@ -173,10 +173,10 @@ async def test_an_agent_still_in_the_meeting_keeps_the_place_taken_until_it_ends
     uow.state.call_status[booking_id] = CallStatus(booking_id, host_joined=True)
     await service.leave_direct(token)
 
-    assert await service.direct_call_availability("aangifte") is DirectAvailability.FULL
+    assert await service.direct_call_availability("balie") is DirectAvailability.FULL
 
     uow.state.call_status[booking_id] = CallStatus(
         booking_id, host_joined=True, call=CallState.ENDED
     )
 
-    assert await service.direct_call_availability("aangifte") is DirectAvailability.AVAILABLE
+    assert await service.direct_call_availability("balie") is DirectAvailability.AVAILABLE

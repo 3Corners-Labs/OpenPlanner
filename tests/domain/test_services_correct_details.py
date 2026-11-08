@@ -38,7 +38,7 @@ ADA_WITH_ANSWER = replace(ADA, answers={"customer_no": "A-12"})
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte")
+    state.groups[1] = make_group(id=1, slug="balie")
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=2))]
     state.forms[1] = FormDefinition(1, (CUSTOMER,))
     return InMemoryUnitOfWork(state)

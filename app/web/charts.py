@@ -154,7 +154,7 @@ def series_of(index: int) -> int:
 def describe(title: str, data: list[Datum], item: Callable[[Datum], str], joiner: str) -> str:
     """Return the text summary: the title, then every value.
 
-    ``item`` writes one value as a translated sentence (e.g. "Aangifte: 4 waiting"), ``joiner``
+    ``item`` writes one value as a translated sentence (e.g. "Balie: 4 waiting"), ``joiner``
     is what separates two values (e.g. ``"; "``). The summary goes in the SVG's ``aria-label``
     and names every value, so nothing depends on seeing the picture.
     """
