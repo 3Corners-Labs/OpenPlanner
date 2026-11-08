@@ -203,15 +203,27 @@ async def _note_activity(request: Request, principal: Principal) -> None:
 
 
 def can_function(principal: Principal) -> Callable[..., bool]:
-    """Return ``can(permission, group=None)`` for templates (same matrix as the server)."""
+    """Return ``can(permission, group=None, organisation=None)`` for templates (same matrix).
 
-    def can(permission: Permission, group: GroupSummary | None = None) -> bool:
+    With a group (or an organisation slug) an organisation-level permission is decided on that
+    group's organisation, and a group-level one on that group; without an object a permission
+    of a lower level asks whether the principal holds it anywhere (a menu entry, a list).
+    """
+
+    def can(
+        permission: Permission,
+        group: GroupSummary | None = None,
+        organisation: str | None = None,
+    ) -> bool:
         level = LEVELS[permission]
         if level is Level.GLOBAL:
             return decide(principal, permission, Target.everything()).allowed
         if group is not None and level is Level.GROUP:
             target = Target.for_group(group.group.slug, group.organisation_slug)
             return decide(principal, permission, target).allowed
+        org = group.organisation_slug if group is not None else organisation
+        if org is not None and level is Level.ORGANISATION:
+            return decide(principal, permission, Target.for_organisation(org)).allowed
         return not scope_for(principal, permission).is_empty
 
     return can

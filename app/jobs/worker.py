@@ -4,7 +4,8 @@ Run with ``python -m app.jobs.worker``. Each iteration checks the database, runs
 (``app.jobs.runner``), watches the data volume and reclaims freed database pages
 (``app.jobs.housekeeping``, ADR 0040), looks up the latest release when that is due (hourly,
 ADR 0029), reports maintenance that has been on too long (ADR 0038), checks every group's
-integration chain once per ``integration_check_interval_hours`` (ADR 0065), probes the
+integration chain once per ``integration_check_interval_hours`` (ADR 0065), reconciles stale
+tasks and recomputes the health of the connections (ADR 0082), probes the
 certificate of the public address when that is due (ADR 0064) and writes the heartbeat.
 The worker never pauses for maintenance: confirmed appointments and the privacy jobs go on.
 It reloads the portal settings when they changed (ADR 0042 §6); the poll interval follows at
@@ -21,6 +22,7 @@ import httpx
 import structlog
 
 from app.adapters import internal_ca
+from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, alert_bots
 from app.adapters.clock import SystemClock
 from app.adapters.db.engine import create_engine, is_reachable, set_slow_query_ms
 from app.adapters.db.jobs import SqlJobQueue
@@ -41,18 +43,25 @@ from app.adapters.log_senders import build_sender
 from app.adapters.log_shipping import LogShipper, ship_settings
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.releases import update_service
-from app.adapters.senders import ConfiguredSenders, fallback_mail
+from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
 from app.config import Settings, environment, loose_secret_files
 from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
+from app.domain.alert_delivery import AlertNotifier
 from app.domain.alerts import QUEUE_WAIT_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
+from app.domain.fallback import FallbackService
 from app.domain.group_erase import GroupEraser
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService, IntegrationWatch
+from app.domain.integration_health import (
+    IntegrationHealthService,
+    IntegrationHealthWatch,
+    TaskReconciler,
+)
 from app.domain.login_domain_watch import DomainWatch
 from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.participant_link_service import ParticipantLinkService
@@ -74,6 +83,8 @@ from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
+from app.web.alert_text import alert_composer
+from app.web.fallback_text import SpaceTexts
 
 log = structlog.get_logger()
 
@@ -104,7 +115,12 @@ async def run_worker(
     engine = create_engine(settings.database_url)
     http = httpx.AsyncClient(timeout=15.0, transport=traced_transport(transport))
     # ADR 0034: committed audit events also go to stdout for the log platform.
-    uow = SqlUnitOfWork(engine, secret_box(settings), StdoutEventSink(settings.event_envelope))
+    uow = SqlUnitOfWork(
+        engine,
+        secret_box(settings),
+        StdoutEventSink(settings.event_envelope),
+        usage_enabled=lambda: live.settings.reporting_enabled,  # ADR 0117, read at each write
+    )
     # ADR 0042 §6: portal values, reloaded once per loop when settings_version moved; the
     # services below read theirs through ``live`` each time they need them.
     live = LiveSettings(
@@ -141,7 +157,11 @@ async def run_worker(
     # ADR 0068: every request to Webex and WxCC becomes a system event of the booking.
     request_log = RequestEvents(uow, clock, version)
 
-    def build_runner(current: Settings) -> tuple[Integrations, JobRunner, IntegrationWatch]:
+    health = IntegrationHealthService(uow, clock, lambda: live.settings.health_policy())
+
+    def build_runner(
+        current: Settings,
+    ) -> tuple[Integrations, JobRunner, IntegrationWatch, IntegrationHealthWatch]:
         wired = integrations or build_integrations(
             current,
             engine,
@@ -168,6 +188,36 @@ async def run_worker(
             clock,
             lambda: timedelta(hours=live.settings.integration_check_interval_hours),
         )
+        integration = IntegrationService(uow, clock, AdminService(uow, clock), version)
+        # ADR 0082 point 11: bookings to the own queue when the contact center fails.
+        fallback = FallbackService(
+            uow,
+            clock,
+            AdminService(uow, clock),
+            integration,
+            BotSpacePoster(
+                alert_bots(engine, settings), http, settings.webex_api_base_url, request_log
+            ),
+            SpaceTexts(
+                Translator(load_catalogues(), CachedTextOverrides(uow)).gettext,
+                settings.public_base_url,
+            ),
+        )
+
+        # ADR 0082 points 6 and 7: reconcile stale tasks, then recompute the health.
+        health_watch = IntegrationHealthWatch(
+            TaskReconciler(
+                uow,
+                clock,
+                wired.dispatcher,
+                integration,
+                lambda: timedelta(minutes=live.settings.task_reconcile_after_minutes),
+            ),
+            health,
+            clock,
+            lambda: timedelta(minutes=live.settings.task_reconcile_interval_minutes),
+            fallback.sweep,
+        )
         return (
             wired,
             JobRunner(
@@ -183,7 +233,8 @@ async def run_worker(
                 ),
                 video=wired.video,
                 dispatcher=wired.dispatcher,
-                integration=IntegrationService(uow, clock, AdminService(uow, clock), version),
+                integration=integration,
+                fallback=fallback,
                 retention=lambda: live.settings.event_retention,
                 clock_style=lambda organisation: live.for_organisation(organisation).time_format,
                 product_footer=lambda organisation: (
@@ -192,9 +243,10 @@ async def run_worker(
                 after_purge=lambda: checkpoint_wal(engine),
             ),
             watch,
+            health_watch,
         )
 
-    wired, runner, watch = build_runner(settings)
+    wired, runner, watch, health_watch = build_runner(settings)
     wired_with = webex_fingerprint(settings)
     heartbeat_at: datetime | None = None
     diagnostics = DiagnosticsService(
@@ -277,6 +329,26 @@ async def run_worker(
         ),
         reported=partial(_open_waits, uow),
     )
+    # ADR 0082 point 9: the open alerts to their email addresses and Webex spaces.
+    notifier = AlertNotifier(
+        uow,
+        clock,
+        ConfiguredAlertSenders(
+            ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
+            lambda: fallback_sender(live.settings),
+            alert_bots(engine, settings),
+            http,
+            settings.webex_api_base_url,
+            request_log,
+        ),
+        alert_composer(
+            Translator(load_catalogues(), CachedTextOverrides(uow)).gettext,
+            settings.public_base_url,
+            version,
+            settings.admin_timezone,
+        ),
+        lambda: timedelta(hours=live.settings.alert_repeat_hours),
+    )
     # ADR 0083 point 12: the TXT records of the routing login domains.
     domains = DomainWatch(
         uow,
@@ -303,7 +375,7 @@ async def run_worker(
                         live.settings, uow, clock, http, live=lambda: live.settings
                     )
                     if webex_fingerprint(live.settings) != wired_with:  # ADR 0042 step 6b
-                        wired, runner, watch = build_runner(live.settings)
+                        wired, runner, watch, health_watch = build_runner(live.settings)
                         wired_with = webex_fingerprint(live.settings)
                 # One trace per round for housekeeping; every job gets its own inside it.
                 with trace_scope():
@@ -320,6 +392,8 @@ async def run_worker(
                     await _watch_address(address)
                     await _watch_domains(domains)
                     await _check_integrations(watch)
+                    await _watch_health(health_watch)
+                    await _notify(notifier)
                     await _watch_waits(waits)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
@@ -387,6 +461,29 @@ async def _watch_certificate(watch: TlsWatch) -> None:
         return
     if check is not None and not check.ok:
         log.warning("tls.certificate", finding=check.finding.value, host=check.host)
+
+
+async def _notify(notifier: AlertNotifier) -> None:
+    """Deliver the due alerts when a run is due (ADR 0082 point 9); never stops the loop.
+
+    Each failed delivery is a system event (``alert.delivery_failed``) of the notifier itself.
+    """
+    try:
+        await notifier.run()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("alert.notify_failed", error=type(exc).__name__)
+
+
+async def _watch_health(watch: IntegrationHealthWatch) -> None:
+    """Reconcile stale tasks and recompute the health when due; a failure never stops the loop.
+
+    Transitions are system events (``integration.health``, ``integration.webhooks_missing``),
+    written by the services themselves.
+    """
+    try:
+        await watch.run()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("integration.health_watch_failed", error=type(exc).__name__)
 
 
 async def _watch_domains(watch: DomainWatch) -> None:

@@ -22,13 +22,13 @@ from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, organisation_header, organisation_redirect
 from app.admin.pages import page as _page
-from app.admin.settings_routes import SettingRow, TopicSection, _input, _value
+from app.admin.settings_routes import SettingRow, _input, _value, topic_sections
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
 from app.domain.settings_registry import BY_KEY, Kind, Topic
 from app.domain.settings_service import SettingsService
 from app.web.locale import RequestLocale
-from app.web.settings_labels import SETTING_LABELS, SOURCE_LABELS, TOPIC_LABELS
+from app.web.settings_labels import SETTING_LABELS, SOURCE_LABELS
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -166,11 +166,7 @@ async def _overview(
                 boolean=state.spec.kind is Kind.BOOL,
             )
         )
-    sections = [
-        TopicSection(topic.value, _(TOPIC_LABELS[topic]), by_topic[topic])
-        for topic in Topic
-        if topic in by_topic
-    ]
+    sections = topic_sections("organisation.settings", by_topic, locale)
     response = _page(
         request,
         locale,

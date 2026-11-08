@@ -23,6 +23,7 @@ import httpx
 import structlog
 
 from app.domain.audit import Outcome
+from app.domain.connection_health import Platform
 from app.domain.ports import REASON_LIMIT, Clock, IntegrationError, RequestLog, RequestRecord
 from app.domain.security_log import TOKEN_REFRESH_FAILED, SecurityLog
 
@@ -230,7 +231,8 @@ class AuthorizedClient:
             IntegrationError: ``unauthorized``, ``rejected`` (4xx; not retryable),
                 ``rate_limited``, ``server_error`` or ``unreachable`` (retryable).
         """
-        path = httpx.URL(url).path
+        parsed = httpx.URL(url)
+        path, platform = parsed.path, platform_of_host(parsed.host)
         for attempt in (0, 1):
             token = await self._tokens.access_token(refresh=attempt == 1)
             started = time.monotonic()
@@ -244,16 +246,20 @@ class AuthorizedClient:
                 )
             except httpx.HTTPError as exc:
                 log.warning("integration.unreachable", error=type(exc).__name__)
-                await self._report(RequestRecord(method, path, 0, "unreachable", "", _ms(started)))
+                await self._report(
+                    RequestRecord(method, path, 0, "unreachable", "", _ms(started), platform)
+                )
                 raise IntegrationError("unreachable", retryable=True) from exc
             if response.status_code == 401 and attempt == 0:
-                await self._report(_record(method, path, response, "unauthorized", started))
+                await self._report(
+                    _record(method, path, response, "unauthorized", started, platform)
+                )
                 continue
             if response.status_code in ok:
-                await self._report(_record(method, path, response, "", started))
+                await self._report(_record(method, path, response, "", started, platform))
                 return response
             failure = http_failure(response, explain=explain)
-            await self._report(_record(method, path, response, failure.code, started))
+            await self._report(_record(method, path, response, failure.code, started, platform))
             raise failure
         raise IntegrationError("unauthorized", retryable=False)  # pragma: no cover - loop ends
 
@@ -273,11 +279,27 @@ def _ms(started: float) -> int:
 
 
 def _record(
-    method: str, path: str, response: httpx.Response, error: str, started: float
+    method: str,
+    path: str,
+    response: httpx.Response,
+    error: str,
+    started: float,
+    platform: Platform | None = None,
 ) -> RequestRecord:
     """Describe a finished request: the tracking id from the header or, failing that, the body."""
     tracking_id = response.headers.get("trackingid", "") or _refusal(response)[1]
-    return RequestRecord(method, path, response.status_code, error, tracking_id, _ms(started))
+    return RequestRecord(
+        method, path, response.status_code, error, tracking_id, _ms(started), platform
+    )
+
+
+def platform_of_host(host: str) -> Platform:
+    """Return the connection of a request host: ``wxcc`` or ``webex`` (ADR 0082 point 7).
+
+    The contact center's API lives at ``api.wxcc-<region>.cisco.com``; everything else the
+    Service App calls is Webex.
+    """
+    return Platform.WXCC if "wxcc" in host.lower() else Platform.WEBEX
 
 
 def http_failure(response: httpx.Response, *, explain: bool = False) -> IntegrationError:

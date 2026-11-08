@@ -15,14 +15,8 @@ from app.domain.ports import IntegrationError
 from tests.fakes.clock import FixedClock
 from tests.fakes.tokens import authorized_client
 from tests.support.domain import NOW, SLOT_0900
+from tests.support.meetings import REQUEST
 
-REQUEST = MeetingRequest(
-    "Videogesprek Demo",
-    SLOT_0900,
-    SLOT_0900 + timedelta(minutes=30),
-    "Europe/Amsterdam",
-    "host@example.nl",
-)
 CREATED = {  # recorded shape of POST /v1/meetings (trimmed)
     "id": "870f51ff287b41be84648412901e0402",
     "meetingNumber": "25869964567",

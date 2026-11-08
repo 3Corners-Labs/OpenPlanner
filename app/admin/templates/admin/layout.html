@@ -1,6 +1,7 @@
 {#- Logged-in portal: top bar (menu button, help, profile with theme, language and alert choices) and the navigation from the register (ADR 0047) through the matrix: side navigation in sections (an icon rail on tablet, or wherever the admin collapsed it from the menu button), and on phone a bottom bar with the first entries and the rest behind *More* (SH-1). Which one shows is CSS only. -#}
 {% extends "admin/_shell.html" %}
 {% from "admin/_icons.html" import icon %}
+{% from "_brand.html" import brand_mark %}
 {% macro nav_entry(item) -%}
 <a href="{{ item.href }}"{% if item.current %} aria-current="page"{% endif %}>{{ icon(item.icon) }}<span>{{ item.label }}</span></a>
 {%- endmacro %}
@@ -39,7 +40,7 @@
     </form>
     {% endif %}
     {#- Without a menu (no role) the overview would only loop back to the refusal. -#}
-    {% if nav %}<a class="admin-brand" href="/admin/">{% else %}<span class="admin-brand">{% endif %}<img class="admin-brand__mark" src="{{ static_url('brand/mark.svg') }}" alt="" width="26" height="26"><span>{{ _("admin.title") }}</span>{% if nav %}</a>{% else %}</span>{% endif %}
+    {% if nav %}<a class="admin-brand" href="/admin/">{% else %}<span class="admin-brand">{% endif %}<op-brand-mark{% if brand_signed_in %} data-sign-in="{{ brand_signed_in }}"{% endif %}>{{ brand_mark("admin-brand__mark", 26) }}</op-brand-mark><span>{{ _("admin.title") }}</span>{% if nav %}</a>{% else %}</span>{% endif %}
     {% if scope_filter is defined %}{% include "admin/_scope_filter.html" %}{% endif %}
     <div class="admin-topbar__end">
       {% for link in top_links %}

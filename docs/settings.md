@@ -65,6 +65,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `APP_VERSION` | string | `""` | Baked into release images (ADR 0029). |
 | `APP_COMMIT` | string | `""` | Git commit baked into every image (ADR 0052). |
 | `APP_IMAGE_DIGEST` | string | `""` | Registry digest the host pinned this image at, for the evidence report (WP-C2). |
+| `MIN_UPGRADE_FROM` | string | `1.0.0` | Baked into the image (ADR 0116 point 6): a database last run by an older version upgrades through this release first (`upgrade_path_required`); images before it know no stop. |
 | `INSTALLATION_NAME` | string | `""` | Name of this installation in every log line and event record (ADR 0040/0034). |
 | `WEBEX_API_BASE_URL` | url | `https://webexapis.com/v1` | Webex API endpoint; changed only for test doubles. |
 | `SIMULATOR_ENABLED` | bool | `false` | Platform-event simulator on admin booking pages; refused in production. |
@@ -100,6 +101,13 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `TLS_ALERT_REPEAT_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | A lasting certificate finding is reported again at this interval (ADR 0064). |
 | `TLS_CERTIFICATE_SOURCE` | enum | `acme` | acme, own | `settings.platform.manage` | Where the bundled proxy's certificate comes from: Let's Encrypt (acme) or the pair uploaded in the portal (own); 'own' needs an upload (ADR 0072). |
 | `INTEGRATION_CHECK_INTERVAL_HOURS` | int | `24` | 1–168 | `settings.platform.manage` | The worker checks every group with a Webex host or a contact-center mapping this often and reports a broken chain as a system event (ADR 0065, 0082). |
+| `TASK_RECONCILE_INTERVAL_MINUTES` | int | `5` | 1–60 | `settings.platform.manage` | How often the worker reads the state of tasks the webhooks left queued or connected, and recomputes the health of the connections (ADR 0082). |
+| `TASK_RECONCILE_AFTER_MINUTES` | int | `10` | 1–120 | `settings.platform.manage` | A task still queued or connected this long after its start and its last change is read at the contact center (ADR 0082). |
+| `INTEGRATION_HEALTH_WINDOW_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | The window of request events the health of a connection is computed over (ADR 0082). |
+| `INTEGRATION_DEGRADED_FAILURE_PERCENT` | int | `25` | 1–100 | `settings.platform.manage` | Share of failed requests above which a connection is degraded, a warning (ADR 0082). |
+| `INTEGRATION_DOWN_FAILURE_PERCENT` | int | `75` | 1–100 | `settings.platform.manage` | Share of failed requests above which a connection is down, an outage; at least the degraded share (ADR 0082). |
+| `INTEGRATION_RECOVERY_MINUTES` | int | `10` | 1–120 | `settings.platform.manage` | A failing connection is healthy this long, without a failed request, before it counts as ok again (ADR 0082). |
+| `ALERT_REPEAT_HOURS` | int | `4` | 1–168 | `settings.platform.manage` | A lasting alert is sent to its email addresses and Webex spaces again after this many hours; reports in between are counted, not sent (ADR 0082). |
 | `INTEGRATION_PROBE_TIMEOUT_SECONDS` | int | `60` | 10–300 | `settings.platform.manage` | How long a group check waits for the task:new and task:ended events of its probe work item before it reports the webhook path broken (ADR 0082). |
 | `JOB_OVERDUE_MINUTES` | int | `10` | 1–1440 | `settings.platform.manage` | A pending job this many minutes past its planned time counts as overdue in a group's integration check (ADR 0068). |
 | `STAFF_INVITE_EXPIRY_DAYS` | int | `7` | 1–30 | `settings.platform.manage` | Days an invitation or password reset link of a staff member stays valid (ADR 0095). |
@@ -112,6 +120,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `GROUP_ERASE_AFTER_DAYS` | int | `30` | 1–365 | `settings.platform.manage` | Days after a group was archived before the worker erases its row, once nothing refers to it any more (ADR 0084); the audit log keeps the slug meanwhile. |
 | `AUDIT_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after which admin actions leave the audit log (ADR 0040). |
 | `BOOKING_ROW_RETENTION_DAYS` | int | `730` | 365–3650 | `settings.platform.manage` | Days after the personal data of a booking was deleted before its row is merged into a daily count per group and removed (ADR 0102). |
+| `REPORTING_ENABLED` | bool | `true` | — | `settings.platform.manage` | Writes a usage fact for every booking state change, for the reports; off writes nothing and hides the report screens (ADR 0117). A feature switch, not a protection. |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |
@@ -165,14 +174,18 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_REPOSITORY` | string | — | — | `settings.platform.manage` | owner/name of the release repository (ADR 0029). |
 | `UPDATE_CHECK_TOKEN` | secret | — | — | `settings.platform.manage` | Read token for a private repository; write-only. |
 | `UPDATE_CHANNEL` | enum | `release` | release, rc | `settings.platform.manage` | What the installation follows (ADR 0059, 0065): releases only, or release candidates (`rc`) too; `rc` is not usable in production. |
-| `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); not usable in production. |
+| `UPDATE_AUTO_APPLY` | bool | `false` | — | `settings.platform.manage` | The worker requests a newer version itself as soon as the check finds one (ADR 0059, 0065); in production only with `update_window` set (ADR 0116). |
+| `UPDATE_LINE` | string | `""` | — | `settings.platform.manage` | Follow the patches of one minor `X.Y` only (ADR 0116 point 9); empty follows everything the channel offers. |
+| `UPDATE_WINDOW` | string | `""` | — | `settings.platform.manage` | When automatic updates happen, in `admin_timezone`: up to 7 ranges such as `mon 02:00-04:00, sat 01:00-05:00`, each at least 30 minutes (ADR 0116 point 9); empty is any time. A superuser's click is immediate. |
 | `UPDATE_CHECK_MINUTES` | int | `60` | 5–1440 | `settings.platform.manage` | Minutes between two release checks by the worker (ADR 0067); "Check now" on the updates page asks for one ahead of time. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the participant's waiting page (ADR 0072). |
 | `OVERVIEW_LIVE_ENABLED` | bool | `true` | — | `settings.platform.manage` | Lets the overview's widgets refresh themselves and pop up new alerts; off, the page shows what it loaded with and a Refresh link (ADR 0061 §3, §4). |
 | `OVERVIEW_POLL_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of a live widget on the overview (ADR 0061 §4). |
+| `OVERVIEW_MAX_WIDGETS` | int | `12` | 4–24 | `settings.platform.manage` | Most widgets an admin's own overview layout may hold; adding beyond it is refused (ADR 0096). |
 | `MEETING_STATUS_REFRESH_SECONDS` | int | `30` | 10–300 | `settings.platform.manage` | Seconds a meeting status on the agenda may be old before the video provider is asked (webhooks come first), and between two refreshes of the agenda's status columns (ADR 0010). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
+| `MAX_SUBJECTS_PER_GROUP` | int | `20` | 1–100 | `settings.platform.manage` | Subjects a group may give participants to choose from at most (ADR 0081). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
 | `PARTICIPANT_LINK_SESSION_HOURS` | int | `24` | 20–168 | `settings.platform.manage` | Hours after its last use that a participant's browser may still use a booking it opened from the emailed link (ADR 0093); the email link always works again. |
 

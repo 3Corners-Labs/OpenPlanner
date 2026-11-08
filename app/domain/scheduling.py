@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.domain.branding import Branding
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.routing import SUBJECT_CODE, GroupRouting, offers
 
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _NOT_SLUG = re.compile(r"[^a-z0-9]+")
@@ -130,6 +131,20 @@ class DispatchKind(StrEnum):
     """A task in the contact-center queue at the dispatch lead (WxCC today, ADR 0007)."""
     OPENPLANNER_QUEUE = "openplanner_queue"
     """OpenPlanner's own queue: agents sign in and pick up a booking."""
+
+
+class DispatchFallback(StrEnum):
+    """What a contact-center group falls back to while the contact center fails (ADR 0082)."""
+
+    NONE = "none"
+    """No fallback: a failed dispatch stays a failed dispatch."""
+    OWN_QUEUE = "own_queue"
+    """The own queue of ADR 0043: a booking whose dispatch fails, and while the contact center
+    is down every booking, appears there, flagged as fallback."""
+
+
+ROOM_ID = re.compile(r"^[A-Za-z0-9_=-]{10,200}$")
+"""A Webex room id, as the Messaging API gives it (base64url)."""
 
 
 class JoinClient(StrEnum):
@@ -245,6 +260,12 @@ class Group:
             may have in this group, 1 to ``MAX_BOOKINGS_PER_EMAIL`` (ADR 0066). Above 1 so
             participants can book on behalf of others; the same address twice in one slot is
             always refused.
+        dispatch_fallback: What a contact-center group falls back to while the contact center
+            fails (ADR 0082 point 11): nothing, or the own queue.
+        fallback_space_room_id: The team's own Webex space for fallback messages (ADR 0082
+            point 12), posted to by the organisation's bot; ``None`` posts nothing per booking.
+        fallback_active_since: Since when the whole group is in fallback because the
+            organisation's contact center is down (state, written by the worker), or ``None``.
         calendar_invite_address: Own queue: the team's shared mailbox or list that gets an
             iCalendar invite per booking (ADR 0043 point 9); ``None`` sends none.
         idp_key: The value the identity provider names the group by in an entitlement
@@ -252,6 +273,8 @@ class Group:
         archived_at: When the group was archived (ADR 0084 point 3), or ``None`` while it is
             in use. An archived group takes no bookings, answers 404 on its public page, is
             read-only in the portal and keeps its slug until the nightly sweep erases it.
+        routing: Subjects, switched-on routing attributes and their mapping to the contact
+            center (ADR 0081); empty by default, and then the form is as before.
 
     Raises:
         DomainError: ``invalid_configuration`` with the offending field.
@@ -285,8 +308,12 @@ class Group:
     queue_free_pick_allowed: bool = False
     max_bookings_per_email: int = DEFAULT_MAX_BOOKINGS_PER_EMAIL
     calendar_invite_address: str | None = None
+    dispatch_fallback: DispatchFallback = DispatchFallback.NONE
+    fallback_space_room_id: str | None = None
+    fallback_active_since: datetime | None = None
     idp_key: str = ""
     archived_at: datetime | None = None
+    routing: GroupRouting = field(default_factory=GroupRouting)
 
     @property
     def is_archived(self) -> bool:
@@ -328,6 +355,9 @@ class Group:
             raise _invalid("max_bookings_per_email")
         if self.video_host_email is not None and not _EMAIL.fullmatch(self.video_host_email):
             raise _invalid("video_host_email")
+        room = self.fallback_space_room_id
+        if room is not None and not ROOM_ID.fullmatch(room):
+            raise _invalid("fallback_space_room_id")
         invite = self.calendar_invite_address
         if invite is not None and (len(invite) > MAX_EMAIL_LENGTH or not _EMAIL.fullmatch(invite)):
             raise _invalid("calendar_invite_address")
@@ -387,6 +417,23 @@ class Group:
         return self.dispatch_kind is DispatchKind.OPENPLANNER_QUEUE
 
     @property
+    def falls_back(self) -> bool:
+        """Whether this contact-center group may fall back to the own queue (ADR 0082)."""
+        return self.dispatch_kind is DispatchKind.CONTACT_CENTER and (
+            self.dispatch_fallback is DispatchFallback.OWN_QUEUE
+        )
+
+    @property
+    def fallback_active(self) -> bool:
+        """Whether the whole group is in fallback now (the contact center is down)."""
+        return self.falls_back and self.fallback_active_since is not None
+
+    @property
+    def queue_open(self) -> bool:
+        """Whether the group has a queue in OpenPlanner: its own, or one to fall back to."""
+        return self.has_own_queue or self.falls_back
+
+    @property
     def sends_team_invite(self) -> bool:
         """Whether each booking is also sent as a calendar invite to the team (ADR 0043)."""
         return self.has_own_queue and self.calendar_invite_address is not None
@@ -427,6 +474,8 @@ class TimeWindow:
         label: Optional admin note such as "Lunch"; admin content only, never shown to
             participants or logged, and no part of equality or ordering.
         offer: Slots, direct calls or both (ADR 0072); ``scheduled`` by default.
+        subjects: The codes of the group's subjects this block offers (ADR 0081 point 4),
+            sorted; empty offers every subject. A code the group no longer has offers nothing.
     """
 
     opens: time
@@ -434,6 +483,7 @@ class TimeWindow:
     capacity: int
     label: str | None = field(default=None, compare=False)
     offer: Offer = Offer.SCHEDULED
+    subjects: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Require ``opens < closes``, ``0 <= capacity <= MAX_CAPACITY`` and a valid label."""
@@ -448,6 +498,18 @@ class TimeWindow:
             or _LINE_BREAKS.search(self.label)
         ):
             raise _invalid("label")
+        if tuple(sorted(set(self.subjects))) != self.subjects or any(
+            not SUBJECT_CODE.fullmatch(code) for code in self.subjects
+        ):
+            raise _invalid("subjects")
+
+    def offers_subject(self, code: str | None) -> bool:
+        """Return whether a participant who chose ``code`` may book in this block.
+
+        A block without subjects offers all of them, and a booking without a subject (the
+        group asks none) fits every block.
+        """
+        return offers(self.subjects, code)
 
     @property
     def staffed(self) -> bool:
@@ -496,6 +558,10 @@ class ScheduleRule:
             and (self.valid_from is None or day >= self.valid_from)
             and (self.valid_to is None or day <= self.valid_to)
         )
+
+    def applies_from(self, day: date) -> bool:
+        """Return whether this rule still opens the group on ``day`` or a later day."""
+        return self.valid_to is None or self.valid_to >= day
 
     def _validity_overlaps(self, other: "ScheduleRule") -> bool:
         """Return whether both rules can apply on a common date."""
@@ -566,10 +632,16 @@ def open_for_direct(
     rules: Iterable[ScheduleRule],
     overrides: Iterable[ScheduleOverride],
     now: datetime,
+    subject: str | None = None,
 ) -> bool:
-    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0072)."""
+    """Return whether ``now`` falls inside a staffed block that offers direct calls (ADR 0072).
+
+    With ``subject`` the block must offer that subject too (ADR 0081 point 4).
+    """
     local = now.astimezone(group.tz)
     return any(
-        window.offers_direct and window.opens <= local.time() < window.closes
+        window.offers_direct
+        and window.offers_subject(subject)
+        and window.opens <= local.time() < window.closes
         for window in windows_on(local.date(), rules, overrides)
     )

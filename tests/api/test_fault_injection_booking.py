@@ -21,12 +21,12 @@ from app.config import Settings
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.security_log import DATABASE_ERROR, DATABASE_FAILED
 from app.main import create_app
-from tests.api.test_security_events import ADA, FRIDAY_0900, SAME_ORIGIN
-from tests.api.test_widget_api import ADA as WIDGET_ADA
-from tests.api.test_widget_api import BASE, SITE, _embed
 from tests.fakes.clock import FixedClock
 from tests.support.admin import SUPER
 from tests.support.domain import NOW
+from tests.support.participant import ADA, FRIDAY_0900, SAME_ORIGIN
+from tests.support.widget import ADA as WIDGET_ADA
+from tests.support.widget import BASE, SITE, embed
 
 COUNTS = {
     "slots": "SELECT COUNT(*) FROM slots",
@@ -155,7 +155,7 @@ async def test_the_error_page_is_translated_and_repeats_nothing(faulty: Faulty) 
 async def test_a_database_fault_in_the_widget_api_is_a_503_with_a_code_and_an_event(
     faulty: Faulty, demo_settings: Settings
 ) -> None:
-    await _embed(demo_settings)
+    await embed(demo_settings)
     faulty.break_booking_insert()
 
     response = await faulty.client.post(

@@ -1,0 +1,60 @@
+/* The product mark inline (ADR 0060 §7, build step 2), shared by the portal and the participant
+   pages; each sheet sets --op-brand-tile and --op-brand-slot, the brand colours are the fallback.
+   Only the open tile moves, one grid step (7.25 units) at a time: the loading loop jumps every
+   0.48 s and stops after two rounds (4.8 s, WCAG 2.2.2); the settle crosses the grid once in
+   1.2 s. Nothing flashes (WCAG 2.3.1), nothing moves under prefers-reduced-motion. */
+.brand-mark__tiles {
+  fill: var(--op-brand-tile, #01689b);
+}
+
+.brand-mark__slot {
+  fill: var(--op-brand-slot, #ee7f01);
+}
+
+@keyframes brand-mark-cross {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  20% {
+    transform: translate(0, -7.25px);
+  }
+
+  40% {
+    transform: translate(-7.25px, -7.25px);
+  }
+
+  60% {
+    transform: translate(-14.5px, -7.25px);
+  }
+
+  80% {
+    transform: translate(-7.25px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brand-mark--loading .brand-mark__slot {
+    animation: brand-mark-cross 2.4s steps(1, end) 2;
+  }
+
+  .brand-mark--settle .brand-mark__slot {
+    animation: brand-mark-cross 1.2s ease-in-out 1 both;
+  }
+}
+
+@media (forced-colors: active) {
+  .brand-mark__tiles {
+    fill: CanvasText;
+  }
+
+  .brand-mark__slot {
+    fill: Highlight;
+  }
+}
+
+/* The custom element only wraps the mark for brand-motion.js; it adds no box of its own. */
+op-brand-mark {
+  display: contents;
+}

@@ -20,31 +20,23 @@ from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
-from tests.support.participant import confirm_by_link, confirm_newest, emailed_token, open_link
-
-FRIDAY_0900 = "2026-01-02T08:00:00Z"  # 09:00 Amsterdam
-FRIDAY_0930 = "2026-01-02T08:30:00Z"
-SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
-ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
+from tests.support.participant import (
+    ADA,
+    FRIDAY_0900,
+    FRIDAY_0930,
+    SAME_ORIGIN,
+    book,
+    booked,
+    confirm_by_link,
+    emailed_token,
+    open_link,
+)
 
 
 @pytest.fixture
 async def site(demo_settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
     async with app_client(demo_settings, FixedClock(NOW)) as client:
         yield client
-
-
-async def book(site: httpx.AsyncClient, start: str = FRIDAY_0900, **fields: str) -> httpx.Response:
-    return await site.post(
-        "/g/demo/book", data={"start": start, **ADA, **fields}, headers=SAME_ORIGIN
-    )
-
-
-async def booked(site: httpx.AsyncClient, start: str = FRIDAY_0900, **fields: str) -> str:
-    """Book, confirm by the emailed link and return the management token."""
-    response = await book(site, start, **fields)
-    assert response.status_code == 303
-    return await confirm_newest(site)
 
 
 def page_of(response: httpx.Response) -> str:
@@ -191,6 +183,9 @@ async def test_full_booking_flow(site: httpx.AsyncClient) -> None:
     assert confirmed.headers["location"] == f"{base}?status=confirmed"
     page = await site.get(confirmed.headers["location"])
     assert "Uw afspraak is bevestigd" in page.text
+    # ADR 0060 §7: the footer mark settles once on the confirmation, by CSS alone.
+    assert 'class="brand-mark product-footer__mark brand-mark--settle"' in page.text
+    assert "brand-mark--settle" not in pending.text
     assert "vrijdag 2 januari 2026, 09:00–09:30" in page.text
     assert "Bevestigd" in page.text
     assert f'href="{base}/reschedule"' in page.text

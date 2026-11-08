@@ -30,6 +30,7 @@ from sqlalchemy.sql.elements import SQLCoreOperations
 from app.adapters.db.models import (
     GroupRow,
     OrganisationRow,
+    OverviewLayoutRow,
     StaffMembershipRow,
     StaffRefusalRow,
     StaffRow,
@@ -198,7 +199,10 @@ class StaffQueries:
             await self._session.flush()
 
     async def erase_staff(self: _Transaction, subject: str, at: datetime) -> None:
-        """Erase the record of ``subject``; the subject, the id and the times stay."""
+        """Erase the record of ``subject``; the subject, the id and the times stay.
+
+        The name, roles, memberships, refused values and the own overview layout go.
+        """
         row = await self._session.scalar(select(StaffRow).where(StaffRow.subject == subject))
         if row is None or row.status == StaffStatus.ERASED.value:
             return
@@ -211,6 +215,10 @@ class StaffQueries:
         )
         await self._session.execute(
             delete(StaffRefusalRow).where(StaffRefusalRow.staff_id == row.id)
+        )
+        # ADR 0096: the own overview layout goes with the person (keys only, but theirs).
+        await self._session.execute(
+            delete(OverviewLayoutRow).where(OverviewLayoutRow.staff_id == row.id)
         )
         await self._session.flush()
 

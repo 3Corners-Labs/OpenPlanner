@@ -109,6 +109,7 @@ filter matches on it. The list and the rule are constants, not settings.
 | Email | `bookings.email` | booking form | as above | mail provider (WP4) |
 | Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
+| Subject and routing attributes (ADR 0081) | `bookings.subject_code`, `bookings.routing_answers` (codes); the group's list and mapping in `groups.routing`; the codes a block offers in `schedule_rules.subjects`, `schedule_overrides.subjects` | booking form: the subject question and the switched-on routing questions, answered with one of a closed list of codes | not personal data, purged with the booking all the same (`privacy.ROUTING_FIELDS` in `PURGED_FIELDS`, ADR 0081); reporting by subject (ADR 0117) must copy the code into its fact before the purge | no. Shown in the agenda, on the booking page and in the own queue; the mapped codes leave the system only as routing variables in the contact-center task (`flowSettings`), next to the first name and the host join URL |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
 | Video join URLs | `bookings.guest_join_url`, `host_join_url`, `trial_join_url` | video provider (WP5) | as above | guest URL to the participant, host URL to WxCC |
 | Provider links | `bookings.video_room_id`, `trial_room_id`, `wxcc_task_id` | video provider, WxCC | as above (deleted by the purge, ADR 0102 point 11) | no. Each is the key to a meeting or work item at Cisco that holds the participant's name and email address |
@@ -273,7 +274,10 @@ web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex
 | First name | `bookings.first_name` | booking form | as the contact | to WxCC (`firstName`, `origin.name`) |
 | Meeting and task ids, timeline, call status | `bookings.video_room_id`, `wxcc_task_id`, `booking_events`, `call_status` | Webex, WxCC | kept for statistics (no personal data) | no |
 | Participant names/emails in webhook payloads | processed in memory only; webhooks filtered on the groups' host accounts, so other meetings of the organisation are not delivered | Webex | not stored, not logged | no |
-| Webex event keys (SHA-256 of resource, event, event id, join/leave time) | `webhook_events` | OpenPlanner | 30 days, removed on a later event | no |
+| Webex event keys (SHA-256 of resource, event, event id, join/leave time) and WxCC event keys (SHA-256 of type, task id and CloudEvent id, ADR 0082) | `webhook_events` | OpenPlanner | 30 days, removed on a later event | no |
+| Fallback per group (ADR 0082 points 11 and 12): the choice, the team's Webex room id and since when the group is in fallback; per booking the flag `fallback` | `groups.dispatch_fallback`, `groups.fallback_space_room_id`, `groups.fallback_active_since`, `call_status.fallback` | the group's settings; the worker from the health state | the settings until changed; the state until the fallback ends; the flag with the call status | **the first name** of a booking that lands in the queue during a fallback, with its start time and a link to the queue, leaves to the Webex Messaging API, only for a group that chose the fallback and set its own space (the organisation chooses this by switching it on); never the host join link. **Retention:** those messages stay in the Webex space after OpenPlanner purges the booking (`slot.end + 24h`): OpenPlanner cannot delete Webex messages, so they fall under the organisation's own Webex retention. The manual topic *Contactcenter inrichten* (step 10) tells the administrator so |
+| Alert targets and deliveries (ADR 0082 point 9): an administrator's email address or a Webex room id, a minimum level; per target and alert the streak sent, when, counts and retry state; the bot token sealed in `integration_credentials` (`webex-bot:<organisation>`) | `alert_targets`, `alert_deliveries`, `integration_credentials` | the superuser on *Koppelingen* and an organisation's *Kanalen* | until the target is removed (its deliveries go with it); the token until replaced or removed | no participant data; an administrator's address is staff data. The alert message (codes, slugs, times, a count, the version, a portal link) leaves to the organisation's mail server or the Webex Messaging API |
+| Last inbound event per platform and connection health (ADR 0082): time, event type, outcome code; per organisation and platform the state, since when and the request counts | `integration_reports` (`inbound-webex`, `inbound-wxcc`, `integration-health`) | the webhooks; the worker from the `integration.request` events | replaced by the next event or evaluation | no; shown on **Koppelingen** and *System status* |
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
 | Last webhook listing and delivery test (registration ids, events, host account filters, target URLs without query, statuses, outcome codes) | `integration_reports` | Webex, WxCC, the self-test | replaced by the next check | no; shown read-only on **Koppelingen** |
 
@@ -351,6 +355,8 @@ worker ──GET releases?per_page=30; the channel is applied in the domain (ADR
         no data sent; optional read-only token)──> api.github.com
         <── tag, release page, publication time, notes ── stored in release_checks and
             release_listing (notes as PR titles and numbers only; authors stripped, ADR 0067)
+worker ──GET contents/support.json (ADR 0116; no data sent)──> api.github.com
+        <── the support index: lines and their status ── stored in release_checks.support
 superuser ──POST update / restore / cancel──> web ──SQL──> update_requests (versions, subject id)
 superuser's browser ──GET /admin/updates/progress (every 5 s while open; ADR 0048)──> web
         <── steps and status of the request (no personal data) ──
@@ -426,13 +432,14 @@ and must be https (or the named secure transport) in production.
 | Mail | worker → the organisation's SMTP server; else the `SMTP_HOST` fallback | SMTP, port 587 (STARTTLS) or 465 (implicit TLS) | Required: saving a server without TLS is refused (ADR 0091 point 4); exception `SMTP_PLAINTEXT_RELAY_ALLOWED` (B) for a relay on a trusted network | The superuser per organisation (`integrations.manage`); fallback B | no | Participant name, email address, dates, join and management links |
 | SMS | worker → the provider's API (today Webex Connect) | HTTPS | Required: https only, no credentials in the address | The superuser per organisation (`integrations.manage`; address, API key sealed, ADR 0008) | no | Phone number, first name, date, time, team, management link |
 | Webex Meetings | web, worker → `webexapis.com/v1` (OAuth token from the same host) | HTTPS | Required | B (`WEBEX_API_BASE_URL`, default Webex; changed only for test doubles); credentials A/B or sealed | no | Group name and times; host, never participants |
+| Webex Messaging API | worker → `webexapis.com/v1/messages` with the bot token of the platform or the organisation (ADR 0082 points 9 and 12) | HTTPS | Required | The superuser on *Koppelingen* and per organisation on *Kanalen* (token sealed, write-only); the room id per alert target or per group (`fallback_space_room_id`, `group.edit`) | no | Alerts: codes, slugs, times, a count, the version, a portal link (no participant data). During a fallback: a booking's start time and first name and a link to the queue, never the host join link; kept in Webex after the purge |
 | Webex Contact Center | web, worker → the WxCC API of the region | HTTPS | Required: https only | C (`WXCC_API_BASE_URL`, superuser); service app sealed | no | First name, host join URL, routing variables (ADR 0081) |
 | Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |
 | Identity providers, organisation | web → discovery, token and key endpoints of an organisation's IdP (ADR 0083) | HTTPS | Required | The superuser per organisation (`identity_providers.manage`; confined to its own domains) | yes | OIDC protocol only |
 | Log destinations | web, worker → syslog, Splunk, Elastic or an HTTP collector (ADR 0085) | `syslog+tls` or `https`; `syslog+tcp`, `syslog+udp` and `http` only outside production | Required: production refuses clear-text transports when saving | C (superuser, portal; credentials sealed) | no | Masked log lines and audit, system and security events: no PII fields (ADR 0034, 0040) |
 | ACME | proxy → the ACME CA (Let's Encrypt) and CA → proxy challenge on 80/443 | HTTPS (ACME); HTTP-01 on 80 | Required towards the CA | B (`ACME_CA`, `ACME_EMAIL` in `proxy.env`) | no | Domain name, operator email address, public key |
 | Public website (hosted at TransIP, ADR 0113) release list | visitor's browser → `api.github.com` (`openplanner.nl`, ADR 0110) | HTTPS | Not required (a copy is built into the page) | Fixed in `site/static/site.js` and the page's CSP | no | The visitor's IP address reaches GitHub; nothing about participants, no cookie |
-| Release channel | worker → `api.github.com` (release list); host updater → GHCR and GitHub (images, signatures; cosign verifies keyless against Sigstore) | HTTPS | Required | Repository: C (`UPDATE_REPOSITORY`); the hosts are fixed in the code and the updater | no | Nothing about participants; optional read-only token |
+| Release channel | worker → `api.github.com` (release list, and `support.json` through the contents API, ADR 0116); host updater → GHCR and GitHub (images, signatures; cosign verifies keyless against Sigstore) | HTTPS | Required | Repository: C (`UPDATE_REPOSITORY`); the hosts are fixed in the code and the updater | no | Nothing about participants; optional read-only token |
 | Certificate probe | worker → the public address, port 443 | TLS handshake, no request | Is the TLS check itself | B (`PUBLIC_BASE_URL`) | no | Nothing; reads the public certificate (ADR 0064) |
 | Public address round trip | worker, and `address-check` → `PUBLIC_BASE_URL` and, when set, `WEBHOOK_BASE_URL`: `GET /api/v1/instance?probe={nonce}` | HTTPS | Required: the address must be https in production; the certificate is verified against the host's CA bundle | B (`PUBLIC_BASE_URL`, `WEBHOOK_BASE_URL`); kill switch `PUBLIC_ADDRESS_CHECK_ENABLED` (B) | no | Nothing about participants: a random nonce out, the instance id (a random UUID), the scheme seen and whether the forwarded headers were honoured back; no address in the answer (ADR 0086) |
 | DNS checks | worker → the host's resolver (`/etc/resolv.conf`): TXT lookups of the sender domain (SPF, DKIM, DMARC; ADR 0073) and, from ADR 0083 step 3, the organisation's domain claims | DNS (UDP/TCP 53) | Not encrypted by the application; the answers only fill a status, they gate nothing | Names: the superuser (sender domain, domain claims); resolver: the host | no | Domain names only, never personal data |
@@ -504,6 +511,8 @@ with data held elsewhere. The row itself is deleted `booking_row_retention_days`
 | `bookings` | `first_name`, `last_name`, `email`, `phone`, `form_answers`, `guest_join_url`, `host_join_url`, `trial_join_url`; provider links `video_room_id`, `trial_room_id`, `wxcc_task_id`; `claimed_by` (the list `privacy.PURGED_FIELDS`) | slot end + 24 h, cancellation + 24 h; a suspended booking at most until the earlier of closure end + 30 days and `closure_max_retention_days` after the slot end | the `purge_pii` job, else the daily retention sweep, else `python -m app.cli purge-overdue`; `management_token_hash` is replaced by a random value, `booking_events.message` emptied | `purge-overdue` runs before the system is back |
 | `bookings` (what stays after the purge) | `management_token_salt`, `public_ref` (random, names no one), `locale`, `consents`, times, `closure_id`, `change_reason`, status | until `booking_row_retention_days` (class C, default 730 days, 365 to 3650) after `pii_purged_at` | the worker's daily housekeeping (`booking_rows.rollup`): merges the row into a count per group, day and status, then deletes it with its events, call status and finished jobs; never a row that still holds personal data or has an open job | `purge-overdue` first; rows already merged stay merged |
 | `booking_day_counts` | none: group, UTC day of the slot, final status, a count and the latest `pii_purged_at` among them | for good: statistics without a person or an identifier | deleted with the group (cascade) | as the live system |
+| `usage_events` | none: fact kind, the UTC hour (never an exact time), organisation, group and the codes and numbers of `privacy.USAGE_FIELDS`; no booking id, reference or free text, so a row cannot be joined back to an appointment | the outbox of the rollup (ADR 0117, built from step 2): until the worker rolls it up and deletes it after `reporting_event_retention_days` (step 4; until then rows stay) | the worker's rollup (step 4); no cascade, statistics outlive the group | as the live system |
+| `usage_hour`, `usage_staff_hour` | none: counts and sums per hour, group, metric and cut; `usage_staff_hour` holds a team member's row id (`staff_id`) and exists for the team view, which is off by default (ADR 0117 point 9) | `reporting_retention_months` (step 4) | the worker's housekeeping (step 4); a removed team member's rows fold into one *former team members* row | as the live system |
 | `booking_events` | `message` (provider reason, up to 300 characters, masked); kind, time and reason code carry no personal data | `message`: as the booking's purge; the rest with the booking row | the purge empties `message`; the row goes with the booking (cascade) | as `bookings` |
 | `call_status` | none: states and times of the meeting and the work item, by booking id | with the booking row | cascade with the booking | as `bookings` |
 | `jobs` | none: booking id, type, run time, status, last error as a reason code (no payload with personal data) | pending jobs until they run; the row with the booking | the purge job is the last job of every plan; cascade with the booking | restored jobs find their booking purged or stale and end silently |
@@ -553,18 +562,29 @@ flowchart LR
 | Keys in `.env` | None by themselves; with the database they open tokens and integration secrets | Until rotation (ADR 0094) | Host team |
 | Cisco tenant | First name, join URL and routing codes of all organisations' calls | Cisco's own retention; see the processor questionnaire (WP-C1) | Controller (Cisco contract) |
 | Platform SMTP (fallback) | Name, email address and message content of organisations without their own SMTP | Mail provider's retention | Controller / mail provider |
+| Webex spaces of teams with a fallback (ADR 0082) | First name and start time of bookings that landed in the own queue during a fallback | The organisation's Webex retention; not deleted by the purge | Controller (Cisco contract) |
 | Log platform | No personal data; ids, slugs, codes | Log platform's retention | Controller |
 | Superuser and host team | Everything above, by role | While they hold the role; audited | Controller |
 
 The reasoning and the criteria for an installation of its own are in `docs/threat-model.md`,
 section *Shared trust boundaries*.
 
-## Planned flows
+## Usage facts (ADR 0117, step 2)
 
-Subjects and routing attributes (ADR 0081, not built): the participant's chosen subject and the
-switched-on attributes (preferred language, channel preference) are stored on the booking as codes
-from a closed list and leave the system only as routing variables in the contact-center task,
-next to the first name and the host join URL; purged with the booking.
+Every state change of a booking writes one small fact in the transaction that makes the change
+(`app/domain/usage_recording.py` builds it, `Transaction.record_usage` stores it in a savepoint):
+
+    booking placed / confirmed / cancelled / moved / lapsed / suspended / resumed
+       ─► UsageFact (hour, organisation, group, kind, codes) ─► usage_events    (this step)
+       ─► worker rollup ─► usage_hour ─► reports                                 (steps 4 and 5)
+
+A fact holds the hour and the allow-listed codes and numbers only (`privacy.USAGE_FIELDS`): no
+name, address, phone number, join link, booking id, reference, token or free text. A failing
+insert is rolled back to its savepoint and dropped with a log line that names the kind and no
+value, so reporting never fails a participant's action; `reporting_enabled` (class C) off writes
+nothing. Nothing in this path reads a purged column.
+
+## Planned flows
 
 Purge sweep (retention): the worker's daily housekeeping reads the bookings that still hold
 personal data past their purge moment (times and status only), sets the PII columns of each to NULL

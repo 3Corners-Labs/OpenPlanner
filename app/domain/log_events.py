@@ -289,6 +289,16 @@ _OPERATIONS = (
         "Housekeeping removed back-ups older than the retention.",
     ),
     _e(
+        "usage.fact_dropped",
+        _OPS,
+        "warning",
+        "kind",
+        "A usage fact of kind {kind} could not be written.",
+        "A booking change committed but its fact for the reports was dropped (ADR 0117); "
+        "reporting never fails a participant's action.",
+        _CHECK_HOST,
+    ),
+    _e(
         "booking_rows.rollup_failed",
         _OPS,
         "error",
@@ -681,6 +691,19 @@ _OPERATIONS = (
         _FAILED,
     ),
     _e(
+        "routing.entry_skipped",
+        _OPS,
+        "warning",
+        "part count",
+        "Skipped {count} stored routing {part} that no longer validate.",
+        "A group's stored subjects, attributes or mapping (ADR 0081) hold an entry this release "
+        "does not accept, for example an attribute a newer release added; the rest is used. The "
+        "next change on the group's *Subjects and routing* screen saves the routing without it.",
+        "Check the group's *Subjects and routing* screen; after a rollback, move forward again "
+        "before changing it.",
+        never="the labels, the values",
+    ),
+    _e(
         "storage.degraded",
         _OPS,
         "warning error",
@@ -856,6 +879,35 @@ _OPERATIONS = (
         "The proxy falls back to its default certificate.",
     ),
     _e(
+        "alert.notify_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The delivery of alerts did not run: {error}.",
+        "The worker could not read the open alerts or the alert targets (ADR 0082 point 9).",
+        _CHECK_HOST,
+    ),
+    _e(
+        "alert.delivery_failed",
+        _SYS,
+        "outcome",
+        "target kind alert",
+        "An alert ({alert}) could not be delivered to target {target} ({kind}): {reason}.",
+        "Sending an alert to an email address or a Webex space failed (ADR 0082 point 9); it is "
+        "retried after 1, 5 and 15 minutes and then at the repeat interval. Never an alert itself.",
+        "`no_sender`: set up the mail channel or the bot token. `unauthorized`: paste a new bot "
+        "token. `rejected_404`: the bot is not in the space, or the room id is wrong.",
+    ),
+    _e(
+        "integration.health_watch_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The reconcile and health sweep did not run: {error}.",
+        "The worker could not reconcile stale tasks or recompute the connection health (ADR 0082).",
+        _CHECK_HOST,
+    ),
+    _e(
         "idp.domain_watch_failed",
         _OPS,
         "warning",
@@ -897,6 +949,15 @@ _OPERATIONS = (
         "reason",
         "A release in the feed was ignored: {reason}.",
         "The release feed held an entry that is not a version or points elsewhere.",
+    ),
+    _e(
+        "updates.support_ignored",
+        _OPS,
+        "warning",
+        "reason",
+        "The support index was ignored: {reason}.",
+        "support.json on the repository's default branch does not parse (ADR 0116 point 9); "
+        "the updates page keeps the last good one.",
     ),
     _e(
         "updates.version_note_failed",
@@ -941,6 +1002,16 @@ _OPERATIONS = (
         "kind meeting_id outcome",
         "Webex reported {kind} for meeting {meeting_id}: {outcome}.",
         "A verified webhook of Webex Meetings was processed.",
+    ),
+    _e(
+        "webhook.note_failed",
+        _OPS,
+        "warning",
+        "source error",
+        "The last {source} webhook could not be noted: {error}.",
+        "A verified webhook was processed, but storing it as the platform's latest inbound "
+        "event failed (ADR 0082 point 5); the event itself is recorded.",
+        _CHECK_HOST,
     ),
     _e(
         "webhook.wxcc",
@@ -1460,10 +1531,48 @@ _AUDIT = (
         "On failure: open the group's *Integrations*; it names the provider's reason.",
     ),
     _e(
+        "dispatch.fallback",
+        _SYS,
+        "outcome",
+        "",
+        "The group's fallback to the own queue is {outcome} ({reason}).",
+        "ADR 0082 point 11: a contact-center group with `dispatch_fallback = own_queue` falls "
+        "back while its organisation's contact center is `down` (failure `on`), and returns "
+        "when it is `ok` again or a group admin ends it (success).",
+        "While it is on: the team works the group's queue (*Wachtrij*). After it: bookings not "
+        "yet claimed go to the contact center.",
+    ),
+    _e(
+        "integration.health",
+        _SYS,
+        "outcome",
+        "platform from to requests failures why",
+        "The {platform} connection went from {from} to {to}: {failures} of {requests} requests "
+        "failed ({why}).",
+        "The health of a connection changed (ADR 0082 point 7), computed from the request events "
+        "of the last `integration_health_window_minutes`; `down` is an outage, `degraded` a "
+        "warning, and the return to `ok` after `integration_recovery_minutes` closes the alert.",
+        "`down` with `token_refresh`: authorise the Service App again on *Koppelingen*. With "
+        "`failures`: the booking timelines name the provider's reasons. With `probe`: run the "
+        "group check.",
+    ),
+    _e(
+        "integration.webhooks_missing",
+        _SYS,
+        "outcome",
+        "count",
+        "The reconcile found {count} task states the webhooks did not bring.",
+        "The worker asked the contact center about tasks that stayed queued or connected (ADR "
+        "0082 point 6) and found a different state: the webhook subscription may be `inactive` "
+        "or the webhook address unreachable. A run that finds none closes the alert.",
+        "On *Koppelingen*, check the webhook subscription and *Last events*; re-register the "
+        "webhook (runbook, section 6).",
+    ),
+    _e(
         "integration.request",
         _SYS,
         "outcome",
-        "method path status ms tracking version",
+        "method path status ms tracking version platform",
         "{method} {path} for booking {booking_id} answered {status} in {ms} ms: {outcome}.",
         "One request in a booking's chain to Webex or Contact Center (ADR 0065).",
         "On failure: the booking's timeline shows the provider's reason.",

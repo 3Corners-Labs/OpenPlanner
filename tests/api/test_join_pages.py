@@ -12,12 +12,11 @@ from app.domain.booking import MeetingRef
 from app.domain.calls import EventKind
 from app.domain.scheduling import JoinClient
 from app.domain.tokens import hash_token
-from tests.api.test_booking_pages import FRIDAY_0900
-from tests.api.test_booking_pages import booked as book_and_confirm
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
-from tests.support.participant import open_link
+from tests.support.participant import FRIDAY_0900, open_link
+from tests.support.participant import booked as book_and_confirm
 
 START = datetime.fromisoformat(FRIDAY_0900.replace("Z", "+00:00"))
 LINK = "https://site.webex.com/site/j.php?MTID=m123"

@@ -14,15 +14,7 @@ from tests.support.routes import all_routes
 
 SETTINGS = "/admin/groups/demo/settings"
 
-NOT_YET_DOCUMENTED: frozenset[str] = frozenset(
-    {
-        "/admin/groups/new",
-        "/admin/groups/{slug}",
-        "/admin/groups/{slug}/bookings/{booking_id}",
-        "/admin/groups/{slug}/closure/bookings/{booking_id}/move",
-        "/admin/organisations/{org}/closure",
-    }
-)
+NOT_YET_DOCUMENTED: frozenset[str] = frozenset()
 """Admin pages without a manual topic yet. Only shrinks: document a screen, remove it here."""
 
 

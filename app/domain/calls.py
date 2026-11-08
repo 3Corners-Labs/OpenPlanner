@@ -65,6 +65,11 @@ class EventKind(StrEnum):
     END_NOT_POSSIBLE = "end_not_possible"
     """WxCC refused to end the task (detail: the code, e.g. ``rejected_403``)."""
     TASK_MARKED_CANCELLED = "task_marked_cancelled"
+    FALLBACK_QUEUED = "fallback_queued"
+    """The booking went to the own queue instead of the contact center (ADR 0082 point 11;
+    detail: ``dispatch_failed`` or ``contact_center_down``)."""
+    FALLBACK_ENDED = "fallback_ended"
+    """The fallback ended before the booking was claimed: it goes to the contact center."""
     WAITING_LEFT = "waiting_left"
     """The participant stopped waiting for a direct call (detail: ``waiting`` or ``agent``)."""
     MEETING_STARTED = "meeting_started"
@@ -207,6 +212,8 @@ class CallStatus:
     task_created_at: datetime | None = None
     connected_at: datetime | None = None
     updated_at: datetime | None = None
+    fallback: bool = False
+    """The booking is in the own queue as a fallback (ADR 0082 point 11)."""
 
 
 def new_status(booking_id: int) -> CallStatus:
@@ -241,6 +248,10 @@ def apply_event(status: CallStatus, kind: EventKind, at: datetime) -> CallStatus
         changes["task"] = TaskState.FAILED
     elif kind is EventKind.TASK_MARKED_CANCELLED:
         changes["task"] = TaskState.CANCELLED
+    elif kind is EventKind.FALLBACK_QUEUED:
+        changes["fallback"] = True
+    elif kind is EventKind.FALLBACK_ENDED:
+        changes["fallback"] = False
     return replace(status, **changes)  # type: ignore[arg-type]
 
 
@@ -327,7 +338,11 @@ class MeetingRequest:
 
 @dataclass(frozen=True)
 class WorkItem:
-    """What WxCC receives for a booking: reference, first name and meeting link only."""
+    """What WxCC receives for a booking: reference, first name and meeting link only.
+
+    ``variables`` are the routing variables of ADR 0081: the mapped codes of the participant's
+    subject and attributes, ``{name: value}``, never a label, a form answer or another field.
+    """
 
     reference: str
     first_name: str = field(repr=False)
@@ -338,6 +353,7 @@ class WorkItem:
     business_address: str
     channel: str
     routing_value: str
+    variables: tuple[tuple[str, str], ...] = ()
 
 
 def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
@@ -382,4 +398,5 @@ def work_item(booking: Booking, group: Group, *, start_label: str) -> WorkItem:
         business_address=group.wxcc_business_address,
         channel=group.wxcc_channel,
         routing_value=group.routing_value,
+        variables=tuple(sorted(group.routing.variables(booking.routing).items())),
     )

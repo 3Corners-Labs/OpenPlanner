@@ -88,6 +88,15 @@ DONE_MESSAGES: dict[str, str] = {
     "scenario_created": "admin.done.scenario_created",
     "scenario_deleted": "admin.done.scenario_deleted",
     "checked": "admin.done.checked",
+    # ADR 0082 point 9: alert targets, the test alert and the bot token.
+    "alert_target_added": "admin.done.alert_target_added",
+    "alert_target_removed": "admin.done.alert_target_removed",
+    "alert_test_sent": "admin.done.alert_test_sent",
+    "alert_test_failed": "admin.done.alert_test_failed",
+    "alert_bot_saved": "admin.done.alert_bot_saved",
+    "alert_bot_removed": "admin.done.alert_bot_removed",
+    "alert_refused": "admin.done.alert_refused",
+    "fallback_ended": "admin.done.fallback_ended",
     "certificate_uploaded": "admin.done.certificate_uploaded",
     "package_imported": "admin.done.package_imported",
     "certificate_removed": "admin.done.certificate_removed",
@@ -154,6 +163,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "queue_free_pick_allowed": "admin.form.error.choice",
     "max_bookings_per_email": "admin.form.error.max_bookings_per_email",
     "calendar_invite_address": "admin.form.error.calendar_invite_address",
+    "fallback_space_room_id": "admin.form.error.fallback_space_room_id",
     "phone_mode": "admin.form.error.phone_mode",
     "video_host_email": "admin.form.error.video_host_email",
     "wxcc_business_address": "admin.form.error.integration_text",
@@ -477,7 +487,11 @@ class FormData:
         if day is None or clock is None:
             self._fail(name, "admin.form.error.moment")
             return None
-        return datetime.combine(day, clock, tz).astimezone(UTC)
+        try:
+            return datetime.combine(day, clock, tz).astimezone(UTC)
+        except OverflowError:  # year 1 or 9999 beyond UTC: no moment this service can hold
+            self._fail(name, "admin.form.error.moment")
+            return None
 
     def moment_value(self, name: str, default: str = "") -> str:
         """Return a submitted ``datetime`` field as ``dayTtime`` to re-render, or ``default``."""

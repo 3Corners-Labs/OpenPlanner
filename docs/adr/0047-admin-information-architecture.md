@@ -3,9 +3,12 @@
 Status: accepted (2026-10-28), requested by the product owner. Builds on ADR 0014 and 0039
 (authorisation matrix, adjustable roles), ADR 0016 (HTMX only where needed), ADR 0033
 (context-sensitive help and manual) and ADR 0042 (settings registry). Leaves the portal's logo
-open (see *Open points*). Partly built, checked on 2026-10-31: the register, the shell, the
+open (see *Open points*). Partly built, checked on 2026-11-08: the register, the shell, the
 organisation page with its tabs, the groups list and the redirects of the old lists are built
-(*Build status* below); the six group tabs and the readiness checklist are not. See
+(*Build status* below), and so are the six group tabs with sub-tabs (step 4) and the readiness
+checklist, the active-closures filter and the remaining lists (step 5), and every portal
+setting's topic is declared on a settings screen of its scope in the register (step 6). The `return` keys of §5
+are not built (a follow-up outside the build order). See
 `docs/adr-status.md` for what is built.
 Open point *Logo* closed by ADR 0060. Note (2026-11-01 review): §2's section table has drifted:
 *My rights* and *Rights matrix* are separate entries, top-level entries were added by ADR 0038
@@ -291,10 +294,11 @@ The readiness checklist (§5) uses existing data and adds no thresholds.
 | 1 | This ADR, review question 7 | #60 | merged |
 | 2 | Register and shell, `admin-map` | #62, #80 | merged |
 | 3 | Organisation page: six tabs, sub-tabs, `organisation.view`, the menu entries *Branding*, *Embedding*, *Organisation settings* and *Emergency closure* removed, 308 redirects of the old lists, *Holiday calendars* under Platform | #219 | merged |
-| 4 | Group page: six tabs with sub-tabs, contact into *Messages*, the check into *Settings* | | planned (the group still has ten tabs) |
+| 4 | Group page: six tabs with sub-tabs (*Agenda* › *Queue*, *Planning* › *Exceptions*, *Holidays*, *Messages* › *Texts*, *Contact*), contact moved to `/contact` with a 308 from the old path, the check a section of *Settings* | #594 | merged |
 | 5 | Lists: *Groups* with search and organisation filter, path *Groups › organisation › group* | #219 | merged |
-| 5 | Lists: readiness checklist, active closures as a filter, lists for API clients and the audit log | | planned |
-| 6 | ADR 0042 registry `topic` and the settings test | | planned |
+| 5 | Lists: readiness checklist on the group and organisation overview, active closures as a filter on *Overview* (old `/admin/closures` 308s there), search/filter/count on API clients, count on the audit log | #600 | merged |
+| 6 | ADR 0042 registry `topic` and the settings test: a settings screen declares its topics (`Screen.topics`; `topic_home`, `topic_anchor` in `app/web/navigation.py`), both settings pages render their sections from that declaration, *Settings topics* in `docs/admin-map.md`, test `tests/web/test_settings_topics.py` | #602 | merged |
+| – | §5 `return` keys ("back to …" after fixing something elsewhere) | | follow-up: not in the build order; the readiness checklist links straight to the fixing tab and the tab row leads back, so no page needs it yet |
 
 ## Open points
 

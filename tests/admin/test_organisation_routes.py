@@ -6,7 +6,7 @@ import re
 import httpx
 
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.admin.test_admin_flow import audit_events
+from tests.support.admin_site import audit_events
 
 LIST = "/admin/organisations"
 
@@ -103,7 +103,6 @@ async def test_the_old_lists_redirect_permanently_into_the_organisation(site: Si
     own = {
         "/admin/organisation-settings": f"{LIST}/demo/settings",
         "/admin/embedding": f"{LIST}/demo/embedding",
-        "/admin/closures": f"{LIST}/demo/closure",
     }
     for old, new in own.items():
         response = await site.client.get(old)

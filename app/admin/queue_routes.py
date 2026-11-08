@@ -23,20 +23,23 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission
+from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.forms import raise_refusal, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.live import Seen, fragment, key
-from app.admin.pages import Locale, SameOrigin
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.fallback import FallbackService
 from app.domain.own_queue import ParticipantState, VideoState
 from app.domain.queue_service import ClaimedBooking, QueueRow, QueueService, QueueView
+from app.domain.routing import GroupRouting
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock
 from app.web.errors import ERROR_KEYS
 from app.web.locale import RequestLocale
 from app.web.organisation_settings import settings_for
+from app.web.routing_labels import routing_summary
 from app.web.templates import FragmentResponse
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -92,6 +95,8 @@ class RowView:
     can_release: bool
     video: str | None
     video_tone: str
+    routing: str = ""
+    fallback: bool = False
 
 
 @dataclass(frozen=True)
@@ -148,7 +153,9 @@ def _state(row: QueueRow, _: BoundGettext) -> tuple[str, str]:
     return _("admin.queue.state.upcoming"), ""
 
 
-def _row(row: QueueRow, view: QueueView, locale: RequestLocale, tz: tzinfo) -> RowView:
+def _row(
+    row: QueueRow, view: QueueView, locale: RequestLocale, tz: tzinfo, routing: GroupRouting
+) -> RowView:
     """Write one queue row out for the template."""
     label, tone = _state(row, locale.gettext)
     video_key, video_tone = VIDEO_LABELS[row.video]
@@ -166,6 +173,8 @@ def _row(row: QueueRow, view: QueueView, locale: RequestLocale, tz: tzinfo) -> R
         can_release=view.can_release_any and row.claimed and not row.mine,
         video=locale.gettext(video_key) if video_key else None,
         video_tone=video_tone,
+        routing=routing_summary(routing, row.routing, locale.gettext, locale.code),
+        fallback=row.fallback,
     )
 
 
@@ -175,7 +184,7 @@ async def _list_view(
     """Load the queue and write it out; the key changes whenever a row would look different."""
     _ = locale.gettext
     view = await _service(request).view(context.principal, slug)
-    rows = [_row(r, view, locale, view.group.tz) for r in view.rows]
+    rows = [_row(r, view, locale, view.group.tz, view.group.routing) for r in view.rows]
     waiting = sum(1 for r in view.rows if r.in_lobby and not r.claimed)
     has_next = view.next_booking_id is not None
     shown = [(r.id, r.state, r.overdue, r.video, r.mine, r.can_claim, r.can_release) for r in rows]
@@ -216,6 +225,15 @@ async def _list(
         {
             **_list_context(request, slug, view),
             "refusal": locale.gettext(ERROR_KEYS[refusal]) if refusal else None,
+            # ADR 0082 point 11: the group falls back to this queue while the contact center
+            # is down; who may manage its bookings may end it by hand.
+            "fallback_since": admin_moment(request, locale, since)
+            if (since := context.group.group.fallback_active_since)
+            and context.group.group.fallback_active
+            else None,
+            "can_end_fallback": can_function(context.principal)(
+                Permission.BOOKINGS_MANAGE, context.group
+            ),
         },
         409 if refusal else 200,
         scripts=True,
@@ -297,6 +315,27 @@ async def queue_live(
         view.key,
         _list_context(request, slug, view),
     )
+
+
+EndFallback = Annotated[
+    AdminContext,
+    Depends(RequirePermission(Permission.BOOKINGS_MANAGE, group_param="slug", fresh=True)),
+]
+"""Ending a group's fallback by hand (ADR 0082 point 11): who manages its bookings."""
+
+
+@router.post("/groups/{slug}/queue/fallback/end", response_class=HTMLResponse)
+async def end_fallback(
+    request: Request, slug: str, _: SameOrigin, context: EndFallback
+) -> Response:
+    """End the group's fallback: bookings not yet claimed go to the contact center after all."""
+    service: FallbackService = request.app.state.fallback_service
+    try:
+        ended = await service.end(context.principal, slug)
+    except DomainError as error:
+        raise_refusal(error)
+        raise
+    return redirect_done(_url(slug), "fallback_ended" if ended else "unchanged")
 
 
 @router.post("/groups/{slug}/queue/next", response_class=HTMLResponse)

@@ -25,10 +25,11 @@ rendering the chart; the first real cluster run is step 3 of the ADR.
 - `kubectl` and Helm 3, and the chart from this repository (`deploy/helm/openplanner`).
 - A public name for the installation, DNS pointing at the ingress, and the settings of
   `.env.example` for production: the login, the mail server, `PUBLIC_BASE_URL`.
-- The image: the public package `ghcr.io/3corners-labs/openplanner-public` has the minor
-  releases (`0.4.0`, `0.5.0`). A patch release is only in the private package
-  `ghcr.io/3corners-labs/openplanner`: create an image pull secret with a token that has
-  `read:packages` and set `imagePullSecrets` (ADR 0108, ADR 0114 point 9).
+- The image: the public package `ghcr.io/3corners-labs/openplanner-public` has every release:
+  the minor releases from `0.4.0` and the patches from the first patch after ADR 0116 step 6
+  (ADR 0108, ADR 0116 point 10). Only a release candidate is in the private package
+  `ghcr.io/3corners-labs/openplanner` alone: for one, create an image pull secret with a token
+  that has `read:packages` and set `imagePullSecrets`.
 
 ## Install
 

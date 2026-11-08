@@ -8,7 +8,8 @@ import pytest
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.admin.test_admin_flow import audit_events
+from tests.support.admin_site import audit_events
+from tests.support.group_settings import SETTINGS_FORM
 from tests.support.participant import SAME_ORIGIN as PARTICIPANT
 from tests.support.participant import confirm_newest
 
@@ -69,9 +70,9 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     # The profile menu in the top bar has a select of its own; the form is in the main part.
     form = page.split('<main id="content"', 1)[1]
     assert '<option value="Europe/Amsterdam" selected>' in form
-    # time zone, dispatch kind, free pick, phone mode, trial call, Webex page (ADR 0075),
-    # embedding (the direct call is offered per staffing block since ADR 0072)
-    assert form.count(" selected>") == 7
+    # time zone, dispatch kind, fallback (ADR 0082), free pick, phone mode, trial call, Webex
+    # page (ADR 0075), embedding (the direct call is offered per staffing block since ADR 0072)
+    assert form.count(" selected>") == 8
 
 
 async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
@@ -192,34 +193,6 @@ async def test_outsider_cannot_create_a_group_in_another_organisation(site: Site
     assert (await site.client.get("/admin/groups/kaping")).status_code == 404
 
 
-SETTINGS_FORM = {
-    "name": "Demo-team",
-    "timezone": "Europe/Amsterdam",
-    "slot_minutes": "30",
-    "min_notice_minutes": "60",
-    "horizon_days": "30",
-    "dispatch_lead_minutes": "5",
-    "dispatch_kind": "contact_center",
-    "participant_change_lead_minutes": "60",
-    "trial_call_enabled": "yes",
-    "join_client": "browser",
-    "trial_call_minutes": "30",
-    "trial_calls_per_booking": "3",
-    "planner_change_min_lead_minutes": "60",
-    "queue_visible_from_minutes": "15",
-    "max_bookings_per_email": "3",
-    "queue_free_pick_allowed": "no",
-    "phone_mode": "required",
-    "video_host_email": "host-demo@example.nl",
-    "wxcc_business_address": "openplanner@example.biz",
-    "wxcc_channel": "openplanner-video",
-    "wxcc_routing_value": "team-42",
-    "not_picked_up_minutes": "10",
-    "embedding_enabled": "yes",
-}
-"""A complete, valid settings form for the demo group."""
-
-
 async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     form = dict(SETTINGS_FORM)
@@ -255,6 +228,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "participant_change_lead_minutes": "120",
         "trial_call_enabled": "yes",
         "join_client": "browser",
+        "dispatch_fallback": "none",
         "trial_call_minutes": "30",
         "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
@@ -312,6 +286,7 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, 
         "participant_change_lead_minutes": minutes,
         "trial_call_enabled": "yes",
         "join_client": "browser",
+        "dispatch_fallback": "none",
         "trial_call_minutes": "30",
         "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
@@ -346,6 +321,7 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "participant_change_lead_minutes": "60",
             "trial_call_enabled": "yes",
             "join_client": "browser",
+            "dispatch_fallback": "none",
             "trial_call_minutes": "30",
             "trial_calls_per_booking": "3",
             "planner_change_min_lead_minutes": "60",
@@ -663,6 +639,7 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "participant_change_lead_minutes": "60",
             "trial_call_enabled": "yes",
             "join_client": "browser",
+            "dispatch_fallback": "none",
             "trial_call_minutes": "30",
             "trial_calls_per_booking": "3",
             "planner_change_min_lead_minutes": "60",
@@ -704,6 +681,7 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "participant_change_lead_minutes": "60",
         "trial_call_enabled": "yes",
         "join_client": "browser",
+        "dispatch_fallback": "none",
         "trial_call_minutes": "30",
         "trial_calls_per_booking": "3",
         "planner_change_min_lead_minutes": "60",

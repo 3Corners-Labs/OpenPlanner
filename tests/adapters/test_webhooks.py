@@ -1,34 +1,9 @@
-import hashlib
-import hmac
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from app.adapters.webhooks import parse_webex, parse_wxcc, verify_webex, verify_wxcc
 from app.domain.calls import EventKind
-
-SECRET = "webhook-secret"
-NOW = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)
-
-
-def wxcc_body(event_type: str = "task:connected", at: datetime = NOW, **data: object) -> bytes:
-    ms = int(at.timestamp() * 1000)
-    return json.dumps(
-        {
-            "id": "4c2c4890",
-            "specversion": "1.0",
-            "type": event_type,
-            "comciscotimestamp": ms,
-            "data": {"taskId": "task-1", **data},
-        }
-    ).encode()
-
-
-def sign(body: bytes, algorithm: str = "sha256") -> str:
-    return hmac.new(SECRET.encode(), body, getattr(hashlib, algorithm)).hexdigest()
-
-
-def timestamp(body: bytes) -> str:
-    return str(json.loads(body)["comciscotimestamp"])
+from tests.support.webhooks import NOW, SECRET, sign, timestamp, wxcc_body
 
 
 def test_wxcc_signature_timestamp_and_window() -> None:
@@ -135,3 +110,22 @@ def test_webex_event_key_identifies_one_event_without_personal_data() -> None:
     assert len(joined.event_key) == 64
     assert "a@x.nl" not in joined.event_key
     assert no_id.event_key == ""  # nothing to deduplicate on
+
+
+def test_a_wxcc_event_is_keyed_for_deduplication() -> None:
+    """ADR 0082 point 5: a replay of the same body has the same key; another event another."""
+    first = parse_wxcc(json.loads(wxcc_body("task:connected")))
+    again = parse_wxcc(json.loads(wxcc_body("task:connected")))
+    other = parse_wxcc(json.loads(wxcc_body("task:ended")))
+    assert first is not None
+    assert again is not None
+    assert other is not None
+    assert first.event_key == again.event_key != other.event_key
+    assert len(first.event_key) == 64
+    without_id = {"type": "task:ended", "data": {"taskId": "t", "createdTime": 1}}
+    unkeyed = parse_wxcc(without_id)  # a time could be the task's own: no key without an id
+    assert unkeyed is not None
+    assert unkeyed.event_key == ""
+    bare = parse_wxcc({"type": "task:ended", "data": {"taskId": "t"}})
+    assert bare is not None
+    assert bare.event_key == ""

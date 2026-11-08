@@ -26,11 +26,14 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
+from app.domain.connection_health import HealthPolicy
 from app.domain.event_schema import Envelope
 from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
 from app.domain.staff_directory import ADMIN_URL_PATTERN
 from app.domain.system_log import EventRetention
+from app.domain.update_policy import valid_line, valid_window
+from app.domain.updates import valid_release
 from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
 from app.i18n.dates import ClockStyle
 
@@ -233,6 +236,9 @@ class Settings(BaseSettings):
     # ADR 0102 point 12 (class C, platform): days after pii_purged_at until a booking row is
     # merged into a daily count per group and deleted.
     booking_row_retention_days: int = Field(default=730, ge=365, le=3650)
+    # ADR 0117 (class C, platform): whether state changes are written as usage facts for the
+    # reports. A feature switch, not a protection: off writes nothing and hides the screens.
+    reporting_enabled: bool = True
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
@@ -261,6 +267,8 @@ class Settings(BaseSettings):
     # Class C platform.
     overview_live_enabled: bool = True
     overview_poll_seconds: int = Field(default=10, ge=5, le=60)
+    # ADR 0096: the most widgets a personal overview layout may hold. Class C platform.
+    overview_max_widgets: int = Field(default=12, ge=4, le=24)
     # ADR 0061 OV-7: the longest wait in an own queue above which a warning alert is raised,
     # and the target the queue widget compares against. Class D organisation.
     queue_wait_warning_minutes: int = Field(default=8, ge=1, le=120)
@@ -281,6 +289,8 @@ class Settings(BaseSettings):
     # ADR 0055: custom fields per group's booking form at most (class C platform), and the
     # country of phone numbers typed without a country code (class D organisation).
     booking_form_max_custom_fields: int = Field(default=5, ge=0, le=15)
+    # ADR 0081: subjects a group may give participants to choose from (class C platform).
+    max_subjects_per_group: int = Field(default=20, ge=1, le=100)
     phone_default_region: str = Field(default="NL", pattern=r"^[A-Z]{2}$")
     # ADR 0056: a participant confirms a booking by email link within the earlier of this many
     # hours after booking and this many hours before the start, with this many reminders.
@@ -462,6 +472,16 @@ class Settings(BaseSettings):
     # Neither is allowed in production, from the environment or from the portal.
     update_channel: Literal["release", "rc"] = "release"
     update_auto_apply: bool = False
+    # ADR 0116 point 9 (class C): UPDATE_LINE ``X.Y`` follows the patches of one minor only;
+    # UPDATE_WINDOW (``mon 02:00-04:00, sat 01:00-05:00`` in ``admin_timezone``) bounds when
+    # the worker requests and the updater claims an automatic update. Auto-apply works in
+    # production only with a window set.
+    update_line: str = ""
+    update_window: str = ""
+    # ADR 0116 point 6 (class B, build: baked into the image next to APP_VERSION): a database
+    # last run by an older version must upgrade through this stop first. It applies only to
+    # images at or above it, so images before 1.0.0 know no stop.
+    min_upgrade_from: str = "1.0.0"
     # Class C: minutes between two release checks by the worker; "Check now" on the updates
     # page asks for one ahead of time. GitHub allows 60 anonymous calls per hour per address,
     # so the portal floor is 5 minutes.
@@ -512,6 +532,17 @@ class Settings(BaseSettings):
     # Class C: how long the group check waits for the webhook events of its probe work item
     # (ADR 0082 point 2).
     integration_probe_timeout_seconds: int = Field(default=60, ge=10, le=300)
+    # Class C (ADR 0082 points 6 and 7): how often the worker reconciles stale tasks and
+    # recomputes the health of the connections, how long a task may go without a change, and
+    # the health thresholds.
+    task_reconcile_interval_minutes: int = Field(default=5, ge=1, le=60)
+    task_reconcile_after_minutes: int = Field(default=10, ge=1, le=120)
+    integration_health_window_minutes: int = Field(default=15, ge=5, le=120)
+    integration_degraded_failure_percent: int = Field(default=25, ge=1, le=100)
+    integration_down_failure_percent: int = Field(default=75, ge=1, le=100)
+    integration_recovery_minutes: int = Field(default=10, ge=1, le=120)
+    # Class C (ADR 0082 point 9): a lasting alert is sent to its targets again at this interval.
+    alert_repeat_hours: int = Field(default=4, ge=1, le=168)
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":
@@ -520,6 +551,15 @@ class Settings(BaseSettings):
         if problem:
             raise ValueError(problem)
         return self
+
+    def health_policy(self) -> HealthPolicy:
+        """Return the thresholds of the connection health (ADR 0082 point 7)."""
+        return HealthPolicy(
+            timedelta(minutes=self.integration_health_window_minutes),
+            self.integration_degraded_failure_percent,
+            self.integration_down_failure_percent,
+            timedelta(minutes=self.integration_recovery_minutes),
+        )
 
     def cross_field_problem(self) -> str | None:
         """Return the first rule that combined values break, or ``None``.
@@ -530,6 +570,11 @@ class Settings(BaseSettings):
             return "STORAGE_CRITICAL_FREE_PERCENT must be below STORAGE_LOW_FREE_PERCENT"
         if self.planner_rebook_reminder_days >= self.planner_rebook_days:
             return "PLANNER_REBOOK_REMINDER_DAYS must be below PLANNER_REBOOK_DAYS"
+        if self.integration_down_failure_percent < self.integration_degraded_failure_percent:
+            return (
+                "INTEGRATION_DOWN_FAILURE_PERCENT must not be below "
+                "INTEGRATION_DEGRADED_FAILURE_PERCENT"
+            )
         if self.queue_wait_target_minutes > self.queue_wait_warning_minutes:
             return "QUEUE_WAIT_TARGET_MINUTES must not be above QUEUE_WAIT_WARNING_MINUTES"
         if (self.web_tls_cert_file is None) != (self.web_tls_key_file is None):
@@ -541,6 +586,30 @@ class Settings(BaseSettings):
         ):
             return "SMTP_USERNAME needs SMTP_STARTTLS or SMTP_TLS"
         return None
+
+    @field_validator("update_window")
+    @classmethod
+    def _valid_window(cls, value: str) -> str:
+        """Refuse an ``UPDATE_WINDOW`` that is no list of weekly ranges (ADR 0116)."""
+        if not valid_window(value):
+            raise ValueError("UPDATE_WINDOW needs ranges like 'mon 02:00-04:00, sat 01:00-05:00'")
+        return value
+
+    @field_validator("update_line")
+    @classmethod
+    def _valid_line(cls, value: str) -> str:
+        """Refuse an ``UPDATE_LINE`` that is neither empty nor ``X.Y`` (ADR 0116)."""
+        if not valid_line(value):
+            raise ValueError("UPDATE_LINE must be empty or a minor such as 1.4")
+        return value
+
+    @field_validator("min_upgrade_from")
+    @classmethod
+    def _valid_stop(cls, value: str) -> str:
+        """Refuse a ``MIN_UPGRADE_FROM`` that is neither empty nor a release ``X.Y.Z``."""
+        if value and not valid_release(value):
+            raise ValueError("MIN_UPGRADE_FROM must be empty or a release such as 1.0.0")
+        return value
 
     @model_validator(mode="after")
     def _production_requirements(self) -> "Settings":
@@ -575,10 +644,10 @@ class Settings(BaseSettings):
             "UPDATE_CHANNEL must be release in production (ADR 0059)",
         )
         check(
-            self.update_auto_apply,
+            self.update_auto_apply and not self.update_window.strip(),
             "update_auto_apply",
             "UPDATE_AUTO_APPLY",
-            "UPDATE_AUTO_APPLY is not allowed in production (ADR 0059)",
+            "UPDATE_AUTO_APPLY needs UPDATE_WINDOW in production (ADR 0116)",
         )
         check(
             self.management_token_key is None,

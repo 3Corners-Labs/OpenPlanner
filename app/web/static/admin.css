@@ -23,6 +23,7 @@
   /* ADR 0060: the open tile of the product mark. 3:1 or more against --adm-surface on both
      sides (#d46e00 on white 3.5:1; the ADR's #ee7f01 reaches only 2.7:1; #f39a3a on dark 7.6:1). */
   --op-brand-slot: light-dark(#d46e00, #f39a3a);
+  --op-brand-tile: var(--adm-accent);
   --adm-accent-strong: light-dark(#004f78, #a5d2f5);
   --adm-accent-soft: light-dark(#e5f0f6, #15324a);
   --adm-on-accent: light-dark(#ffffff, #0b1a26);
@@ -1193,6 +1194,29 @@ fieldset.card {
   border-color: transparent;
   background: var(--adm-warning-soft);
   color: var(--adm-warning);
+}
+
+/* A chip with a label of several words: it wraps on a narrow screen instead of overflowing. */
+.chip--wrap {
+  white-space: normal;
+}
+
+/* The readiness checklist of an overview tab (ADR 0047 §5): one line per item, the status in
+   words in a chip, then the link to the tab that fixes it. */
+.checklist {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checklist__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 24px;
 }
 
 .link-with-icon {
@@ -2890,4 +2914,10 @@ fieldset.card {
   .setting__state {
     padding-top: 0;
   }
+}
+
+/* The loading mark on the page that moves on to the identity provider. */
+.logging-in__mark {
+  display: block;
+  margin-bottom: 1rem;
 }

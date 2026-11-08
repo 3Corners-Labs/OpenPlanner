@@ -564,6 +564,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Registry digest the host pinned this image at, for the evidence report (WP-C2).",
     ),
     S(
+        "min_upgrade_from",
+        K.STRING,
+        "1.0.0",
+        _B,
+        T.HOST,
+        "Baked into the image (ADR 0116 point 6): a database last run by an older version "
+        "upgrades through this release first (`upgrade_path_required`); images before it "
+        "know no stop.",
+        optional=True,
+    ),
+    S(
         "installation_name",
         K.STRING,
         "",
@@ -828,6 +839,81 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=168,
     ),
     S(
+        "task_reconcile_interval_minutes",
+        K.INT,
+        5,
+        _C,
+        T.OPERATIONS,
+        "How often the worker reads the state of tasks the webhooks left queued or "
+        "connected, and recomputes the health of the connections (ADR 0082).",
+        minimum=1,
+        maximum=60,
+    ),
+    S(
+        "task_reconcile_after_minutes",
+        K.INT,
+        10,
+        _C,
+        T.OPERATIONS,
+        "A task still queued or connected this long after its start and its last change "
+        "is read at the contact center (ADR 0082).",
+        minimum=1,
+        maximum=120,
+    ),
+    S(
+        "integration_health_window_minutes",
+        K.INT,
+        15,
+        _C,
+        T.OPERATIONS,
+        "The window of request events the health of a connection is computed over (ADR 0082).",
+        minimum=5,
+        maximum=120,
+    ),
+    S(
+        "integration_degraded_failure_percent",
+        K.INT,
+        25,
+        _C,
+        T.OPERATIONS,
+        "Share of failed requests above which a connection is degraded, a warning (ADR 0082).",
+        minimum=1,
+        maximum=100,
+    ),
+    S(
+        "integration_down_failure_percent",
+        K.INT,
+        75,
+        _C,
+        T.OPERATIONS,
+        "Share of failed requests above which a connection is down, an outage; at least "
+        "the degraded share (ADR 0082).",
+        minimum=1,
+        maximum=100,
+    ),
+    S(
+        "integration_recovery_minutes",
+        K.INT,
+        10,
+        _C,
+        T.OPERATIONS,
+        "A failing connection is healthy this long, without a failed request, before it "
+        "counts as ok again (ADR 0082).",
+        minimum=1,
+        maximum=120,
+    ),
+    S(
+        "alert_repeat_hours",
+        K.INT,
+        4,
+        _C,
+        T.OPERATIONS,
+        "A lasting alert is sent to its email addresses and Webex spaces again after this many "
+        "hours; reports in between are counted, not sent (ADR 0082).",
+        minimum=1,
+        maximum=168,
+    ),
+    S(
         "integration_probe_timeout_seconds",
         K.INT,
         60,
@@ -975,6 +1061,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "daily count per group and removed (ADR 0102).",
         minimum=365,
         maximum=3650,
+    ),
+    S(
+        "reporting_enabled",
+        K.BOOL,
+        True,
+        _C,
+        T.RETENTION,
+        "Writes a usage fact for every booking state change, for the reports; off writes nothing "
+        "and hides the report screens (ADR 0117). A feature switch, not a protection.",
     ),
     S(
         "security_event_retention_days",
@@ -1474,7 +1569,28 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _C,
         T.UPDATES,
         "The worker requests a newer version itself as soon as the check finds one "
-        "(ADR 0059, 0065); not usable in production.",
+        "(ADR 0059, 0065); in production only with `update_window` set (ADR 0116).",
+    ),
+    S(
+        "update_line",
+        K.STRING,
+        "",
+        _C,
+        T.UPDATES,
+        "Follow the patches of one minor `X.Y` only (ADR 0116 point 9); empty follows "
+        "everything the channel offers.",
+        optional=True,
+    ),
+    S(
+        "update_window",
+        K.STRING,
+        "",
+        _C,
+        T.UPDATES,
+        "When automatic updates happen, in `admin_timezone`: up to 7 ranges such as "
+        "`mon 02:00-04:00, sat 01:00-05:00`, each at least 30 minutes (ADR 0116 point 9); "
+        "empty is any time. A superuser's click is immediate.",
+        optional=True,
     ),
     S(
         "update_check_minutes",
@@ -1576,6 +1692,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=60,
     ),
     S(
+        "overview_max_widgets",
+        K.INT,
+        12,
+        _C,
+        T.DISPLAY,
+        "Most widgets an admin's own overview layout may hold; adding beyond it is refused "
+        "(ADR 0096).",
+        minimum=4,
+        maximum=24,
+    ),
+    S(
         "queue_wait_warning_minutes",
         K.INT,
         8,
@@ -1661,6 +1788,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055).",
         minimum=0,
         maximum=15,
+    ),
+    S(
+        "max_subjects_per_group",
+        K.INT,
+        20,
+        _C,
+        T.BOOKING_FORM,
+        "Subjects a group may give participants to choose from at most (ADR 0081).",
+        minimum=1,
+        maximum=100,
     ),
     S(
         "phone_default_region",

@@ -14,6 +14,7 @@ from typing import Protocol
 
 from app.domain.admin_sessions import AdminSession, EndReason
 from app.domain.agenda import ShortfallAcceptance
+from app.domain.alert_model import AlertTarget, DeliveryState, RenderedAlert
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, Scope
@@ -43,6 +44,13 @@ from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
 from app.domain.configuration_package import PackageSummary
+from app.domain.connection_health import (
+    HealthEntry,
+    InboundEvent,
+    Platform,
+    RequestSample,
+    StaleTask,
+)
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -60,6 +68,7 @@ from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, Pa
 from app.domain.participant_links import LinkSession
 from app.domain.public_address import AddressCheck, AddressKind, InstanceReply
 from app.domain.retention import DueBooking, RetentionFacts
+from app.domain.routing import GroupRouting
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
     Group,
@@ -78,7 +87,14 @@ from app.domain.staff import (
 from app.domain.staff_directory import DirectoryUser, NewStaffMember, StaffAction
 from app.domain.tasks import ActiveJobs
 from app.domain.tls import CertificateCheck, ProbeResult
-from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.updates import (
+    ListedRelease,
+    ReleaseCheck,
+    RunningVersion,
+    SupportLine,
+    UpdateRequest,
+)
+from app.domain.usage import StaffFact, UsageFact
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -146,6 +162,38 @@ class MessageSender(Protocol):
 
     async def send(self, message: OutboundMessage) -> None:
         """Deliver ``message``; raise on failure so the job is retried."""
+        ...
+
+
+class AlertSender(Protocol):
+    """Delivers an alert to one address of its channel (ADR 0082 point 9).
+
+    Email through the organisation's mail channel, a Webex space through the organisation's
+    bot. Raises ``IntegrationError`` on failure, so the delivery is retried.
+    """
+
+    async def send(self, address: str, alert: RenderedAlert) -> None:
+        """Deliver ``alert`` to ``address`` (an email address or a Webex room id)."""
+        ...
+
+
+class AlertSenders(Protocol):
+    """Finds the sender of an alert target, or ``None`` when its channel is not set up."""
+
+    async def sender(self, target: AlertTarget) -> AlertSender | None:
+        """Return the sender of ``target``'s channel in its scope."""
+        ...
+
+
+class BotTokenStore(Protocol):
+    """The Webex bot tokens of the platform and the organisations, sealed (ADR 0082 point 9)."""
+
+    async def has_token(self, organisation_id: int | None) -> bool:
+        """Return whether the scope (``None``: the platform) has a bot token."""
+        ...
+
+    async def save(self, organisation_id: int | None, token: str | None, now: datetime) -> None:
+        """Store the scope's bot token; ``None`` removes it."""
         ...
 
 
@@ -277,6 +325,8 @@ class RequestRecord:
         error: The ``IntegrationError`` code the request ended in; empty on success.
         tracking_id: The platform's id of the request (Webex ``trackingId``), for its support.
         duration_ms: How long the request took.
+        platform: The connection whose health the request counts for (ADR 0082 point 7);
+            ``None`` for one that counts for neither (a visit to a Webex page).
     """
 
     method: str
@@ -285,6 +335,7 @@ class RequestRecord:
     error: str = ""
     tracking_id: str = ""
     duration_ms: int = 0
+    platform: Platform | None = None
 
 
 class RequestLog(Protocol):
@@ -401,6 +452,16 @@ class ReleaseSource(Protocol):
         """Return the newest published releases and candidates with their notes.
 
         Drafts and anything that is no version are left out. Empty when there is none.
+
+        Raises:
+            IntegrationError: If the source refuses or cannot be reached.
+        """
+        ...
+
+    async def support(self) -> tuple[SupportLine, ...] | None:
+        """Return the lines of ``support.json`` (ADR 0116 point 9); ``None`` when there is none.
+
+        An index that does not parse counts as none.
 
         Raises:
             IntegrationError: If the source refuses or cannot be reached.
@@ -752,10 +813,24 @@ class Transaction(Protocol):
         """Set the status of ``subject`` (suspended or active again); unknown ones are ignored."""
         ...
 
+    async def get_overview_layout(self, subject: str) -> tuple[str, ...] | None:
+        """Return the own overview layout of ``subject`` (ADR 0096), or ``None`` without one."""
+        ...
+
+    async def save_overview_layout(
+        self, subject: str, keys: tuple[str, ...] | None, at: datetime
+    ) -> bool:
+        """Store ``keys`` as ``subject``'s overview layout; ``None`` deletes it.
+
+        Returns ``False`` when ``subject`` has no staff record (nothing is stored then).
+        """
+        ...
+
     async def erase_staff(self, subject: str, at: datetime) -> None:
         """Erase the record of ``subject`` (ADR 0046 point 9); the subject and times stay.
 
-        The name, roles, memberships and refused values go and the status becomes ``erased``;
+        The name, roles, memberships, refused values and the own overview layout (ADR 0096)
+        go and the status becomes ``erased``;
         an unknown or already erased subject is ignored, so the retention job can run twice.
         """
         ...
@@ -976,6 +1051,27 @@ class Transaction(Protocol):
 
     async def save_group_contact_block(self, group_id: int, block: ContactBlock | None) -> None:
         """Store or, with ``None``, remove the group's own contact block."""
+        ...
+
+    async def fallback_bookings(self, group_id: int, after: datetime) -> list[Booking]:
+        """Return the group's active fallback bookings starting after ``after``, without a task.
+
+        These are in the own queue as a fallback (ADR 0082 point 11); used when it ends.
+        """
+        ...
+
+    async def save_group_fallback(self, group_id: int, since: datetime | None) -> None:
+        """Store since when the whole group is in fallback, or ``None`` (ADR 0082 point 11).
+
+        Its own write: saving the settings never touches this state.
+        """
+        ...
+
+    async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
+        """Store the group's subjects, routing attributes and mapping (ADR 0081).
+
+        Its own write, so saving the other settings never touches the routing.
+        """
         ...
 
     async def add_group(self, group: Group) -> Group:
@@ -1270,6 +1366,15 @@ class Transaction(Protocol):
         """Return the booking with ``booking_id``."""
         ...
 
+    async def record_usage(self, fact: UsageFact | StaffFact) -> bool:
+        """Write one usage fact in a savepoint of this transaction (ADR 0117 point 1).
+
+        Returns whether it was written. ``False`` when ``reporting_enabled`` is off, or when the
+        insert failed: then the failure is logged without content and the transaction goes on, so
+        reporting never fails a participant's action.
+        """
+        ...
+
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         """Set every PII column of the booking to NULL and record ``pii_purged_at``."""
         ...
@@ -1361,6 +1466,78 @@ class Transaction(Protocol):
 
     async def count_group_jobs(self, group_id: int, overdue_before: datetime) -> JobCounts:
         """Count the group's failed jobs and its pending jobs planned before ``overdue_before``."""
+        ...
+
+    async def all_alert_targets(self) -> list[AlertTarget]:
+        """Return every alert target, of the platform and of every organisation (ADR 0082)."""
+        ...
+
+    async def alert_targets_of(self, organisation_id: int | None) -> list[AlertTarget]:
+        """Return the alert targets of one organisation, or of the platform (``None``)."""
+        ...
+
+    async def add_alert_target(self, target: AlertTarget) -> int:
+        """Store a new alert target and return its id."""
+        ...
+
+    async def delete_alert_target(self, target_id: int) -> None:
+        """Remove an alert target and what was sent to it."""
+        ...
+
+    async def alert_delivery_states(self) -> list[DeliveryState]:
+        """Return what was sent of each alert to each target."""
+        ...
+
+    async def save_alert_delivery(self, state: DeliveryState) -> None:
+        """Store what was sent of one alert to one target."""
+        ...
+
+    async def request_samples(self, since: datetime) -> list[RequestSample]:
+        """Return the ``integration.request`` events at or after ``since`` that name a platform.
+
+        ADR 0082 point 7: the health state is computed from these (outcome, organisation,
+        platform, time); events written before the platform was recorded are left out.
+        """
+        ...
+
+    async def token_refresh_failed_since(self, since: datetime) -> bool:
+        """Return whether a Webex token refresh failed at or after ``since``.
+
+        The security event ``webex.token_refresh``; the Service App is shared, so it counts for
+        every organisation.
+        """
+        ...
+
+    async def failed_probe_organisations(self, since: datetime) -> frozenset[str]:
+        """Return the organisations whose group check failed on its probe work item since ``since``.
+
+        An ``integration.check`` failure with a ``wxcc.probe.*`` reason (ADR 0082 point 2).
+        """
+        ...
+
+    async def get_health(self) -> tuple[HealthEntry, ...]:
+        """Return the health of every connection as last evaluated (ADR 0082 point 7)."""
+        ...
+
+    async def save_health(self, entries: Sequence[HealthEntry], at: datetime) -> None:
+        """Replace the stored health of every connection."""
+        ...
+
+    async def save_inbound_event(self, event: InboundEvent) -> None:
+        """Store ``event`` as its platform's latest verified webhook (ADR 0082 point 5)."""
+        ...
+
+    async def get_inbound_events(self) -> tuple[InboundEvent, ...]:
+        """Return each platform's latest verified webhook, if any came in."""
+        ...
+
+    async def stale_tasks(self, unchanged_before: datetime, limit: int) -> list[StaleTask]:
+        """Return up to ``limit`` bookings whose task a webhook should have moved by now.
+
+        Their call status is ``queued`` or ``connected``, the booking started before
+        ``unchanged_before`` and its status has not changed since then; the booking still has
+        its task id (not purged). The longest unchanged come first (ADR 0082 point 6).
+        """
         ...
 
     async def save_worker_heartbeat(self, heartbeat: WorkerHeartbeat) -> None:

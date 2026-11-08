@@ -8,9 +8,9 @@ from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
 from app.web.static_assets import ASSETS
 from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
+from tests.support.admin_site import site_uow as _uow
 from tests.support.principals import principal
 from tests.support.queue import own_queue as _own_queue
-from tests.support.queue import site_uow as _uow
 
 QUEUE = "/admin/groups/demo/queue"
 COLLEAGUE = principal(
@@ -45,6 +45,17 @@ async def test_the_queue_shows_first_names_and_hides_the_meeting_link(site: Site
     assert "webex.example" not in text
     assert "Volgende oppakken" in text
     assert 'aria-live="polite"' in text
+
+
+async def test_a_group_without_the_own_queue_shows_no_queue_link(site: Site) -> None:
+    """ADR 0047 step 4: the *Queue* sub-tab of *Agenda* applies only to the own queue."""
+    await site.login_as(AGENT)
+    agent_view = (await site.client.get("/admin/groups/demo")).text
+    await site.login_as(GROUP_ADMIN)
+    agenda = (await site.client.get("/admin/groups/demo/agenda")).text
+
+    assert QUEUE not in agent_view
+    assert QUEUE not in agenda
 
 
 async def test_pick_up_next_opens_the_meeting_for_that_agent_only(site: Site) -> None:

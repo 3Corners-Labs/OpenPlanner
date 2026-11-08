@@ -86,6 +86,35 @@ Een wijziging geldt voor afspraken die nog niet zijn doorgezet. Een afspraak die
 het contactcenter staat, blijft daar. Lukt het contactcenter niet (storing van Webex Connect of
 Webex Contact Center), dan kunt u de groep tijdelijk op de eigen wachtrij zetten.
 
+<!-- field: dispatch_fallback -->
+### Terugval als het contactcenter uitvalt
+
+Alleen voor een groep met **Contactcenter**. Met **Eigen wachtrij** komt een afspraak in de
+wachtrij van OpenPlanner, gemarkeerd **Terugval**, als:
+
+- het doorzetten van die afspraak definitief mislukt (na de herhaalde pogingen), of
+- het contactcenter van de organisatie onbereikbaar is (zie *Gezondheid* op Koppelingen): de hele
+  groep valt dan terug. Een melding gaat naar de beheerders, de wachtrij toont een banner, en in
+  de agenda staat bij elke afspraak **Terugval**.
+
+Is het contactcenter weer in orde, dan eindigt de terugval vanzelf en gaan afspraken die nog niet
+zijn opgepakt alsnog naar het contactcenter. Wie de afspraken van de groep beheert, kan de
+terugval ook zelf beëindigen in de wachtrij. De deelnemer merkt niets: de link, de wachtkamer en
+de regels voor annuleren en verplaatsen blijven gelijk.
+
+Kies dit alleen als het team de wachtrij kent en kan werken. Wat het team ziet en hoe het
+eindigt, staat in [Contactcenter inrichten](contact-center-setup.md), stap 10.
+
+<!-- field: fallback_space_room_id -->
+### Webex-ruimte van het team (terugval)
+
+Optioneel. Het id van de Webex-ruimte van het team. Bij terugval plaatst de bot van de organisatie
+(zie *Meldingen aan beheerders* op Kanalen) daar een bericht, en per afspraak die in de wachtrij
+komt de begintijd, de voornaam en een link naar de wachtrij. Nooit de link naar het gesprek: die
+krijgt alleen wie de afspraak oppakt. Die berichten blijven in Webex staan nadat OpenPlanner de
+gegevens van de afspraak heeft verwijderd; zie [Contactcenter inrichten](contact-center-setup.md),
+stap 10 en 11.
+
 <!-- field: participant_change_lead_minutes -->
 ### Verplaatsen door de deelnemer tot (minuten vooraf)
 
@@ -155,11 +184,18 @@ Of het boekingsformulier om een telefoonnummer vraagt:
 Vraag alleen om een nummer als het team het echt gebruikt. Het nummer wordt, net als naam en
 e-mailadres, 24 uur na de afspraak gewist.
 
+## Onderwerpen en routing
+
+Laat deelnemers een onderwerp kiezen, vraag een voorkeurstaal of manier van contact, en geef die
+keuzes als codes door aan het contactcenter. Dat stelt u in op een eigen scherm: zie
+[Onderwerpen en routing](group-routing.md).
+
 ## Koppelingen: video en contactcenter
 
 Laat deze velden leeg zolang de koppeling niet is ingericht. Afspraken werken dan gewoon, maar
 zonder videogesprek of taak bij het contactcenter. De gegevens om in te vullen krijgt u van de
-beheerder van Webex en Webex Contact Center.
+beheerder van Webex en Webex Contact Center. De hele inrichting, stap voor stap, staat in
+[Contactcenter inrichten](contact-center-setup.md).
 
 <!-- field: video_host_email -->
 ### Webex-host
@@ -204,7 +240,7 @@ het zelf en ziet u een waarschuwing. Blijft een melding uit, dan noemt de uitsla
 
 Het adres van het *digital channel asset* in Webex Contact Center waarop taken van deze groep
 binnenkomen. Meerdere groepen kunnen hetzelfde adres gebruiken; de routeringswaarde bepaalt dan
-de wachtrij.
+de wachtrij. Hoe u de asset inricht: [Contactcenter inrichten](contact-center-setup.md), stap 3.
 
 <!-- field: wxcc_control_hub -->
 ### Waar het staat in Control Hub
@@ -291,7 +327,7 @@ aanroept. Is de proef aangemaakt maar kwam er geen *task:new* terug, kijk dan bi
 ### WxCC work item-kanaal
 
 De naam van het kanaal voor work items in Webex Contact Center, zoals de beheerder van het
-contactcenter het heeft ingericht.
+contactcenter het heeft ingericht ([Contactcenter inrichten](contact-center-setup.md), stap 2).
 
 <!-- field: wxcc_routing_value -->
 ### Routeringswaarde voor de WxCC-flow

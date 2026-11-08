@@ -8,10 +8,16 @@
       "actor": "3corners-openplanner-release[bot]",
       "ref_prefix": "refs/tags/v",
       "why": "the release app creates the release and candidate tags (ADR 0107)"
+    },
+    {
+      "actor": "3corners-openplanner-release[bot]",
+      "ref_prefix": "refs/heads/release/",
+      "why": "the release app creates a maintenance line release/X.Y (cut-line, ADR 0116 point 3)"
     }
   ],
   "known_unseen": {
-    "rulesets/release tags/bypass_actors": "A read-only token sees the bypass actors through GraphQL without their mode (first audit runs, 2026-11-02). Every use of a bypass is still checked in the rule suites; only the release app's tag bypass is expected."
+    "rulesets/release tags/bypass_actors": "A read-only token sees the bypass actors through GraphQL without their mode (first audit runs, 2026-11-02). Every use of a bypass is still checked in the rule suites; only the release app's tag bypass is expected.",
+    "rulesets/release line creation/bypass_actors": "As for the release tags: a read-only token sees the bypass actors without their mode. Only the release app's creation of a line is expected (ADR 0116)."
   },
   "actions": {
     "allowed_actions": "all",
@@ -34,7 +40,8 @@
     },
     "release": {
       "branches": [
-        "branch:main"
+        "branch:main",
+        "branch:release/[0-9]*"
       ],
       "deployment_branch_policy": {
         "custom_branch_policies": true,
@@ -224,6 +231,117 @@
             }
           ],
           "strict_required_status_checks_policy": false
+        }
+      },
+      "target": "branch"
+    },
+    "release line creation": {
+      "bypass_actors": [
+        {
+          "actor_id": 5579411,
+          "actor_type": "Integration",
+          "bypass_mode": "always"
+        },
+        {
+          "actor_id": 5,
+          "actor_type": "RepositoryRole",
+          "bypass_mode": "always"
+        }
+      ],
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "refs/heads/release/[0-9]*"
+          ]
+        }
+      },
+      "enforcement": "active",
+      "rules": {
+        "creation": {}
+      },
+      "target": "branch"
+    },
+    "release lines": {
+      "bypass_actors": [],
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "refs/heads/release/[0-9]*"
+          ]
+        }
+      },
+      "enforcement": "active",
+      "rules": {
+        "deletion": {},
+        "non_fast_forward": {},
+        "pull_request": {
+          "allowed_merge_methods": [
+            "squash"
+          ],
+          "dismiss_stale_reviews_on_push": true,
+          "dismissal_restriction": {
+            "allowed_actors": [],
+            "enabled": false
+          },
+          "require_code_owner_review": false,
+          "require_extra_approval_for_unattributed_changes": true,
+          "require_last_push_approval": false,
+          "required_approving_review_count": 0,
+          "required_review_thread_resolution": false,
+          "required_reviewers": []
+        },
+        "required_linear_history": {},
+        "required_status_checks": {
+          "do_not_enforce_on_create": true,
+          "required_status_checks": [
+            {
+              "context": "accessibility (Playwright, axe-core, Lighthouse)",
+              "integration_id": 15368
+            },
+            {
+              "context": "authorisation matrix",
+              "integration_id": 15368
+            },
+            {
+              "context": "copy-paste detection",
+              "integration_id": 15368
+            },
+            {
+              "context": "decision gate",
+              "integration_id": 15368
+            },
+            {
+              "context": "gitleaks",
+              "integration_id": 15368
+            },
+            {
+              "context": "image build, scan, SBOM, API fuzzing",
+              "integration_id": 15368
+            },
+            {
+              "context": "licence and contributor agreement",
+              "integration_id": 15368
+            },
+            {
+              "context": "lint, types, tests, migrations",
+              "integration_id": 15368
+            },
+            {
+              "context": "lockfile, audit, licenses",
+              "integration_id": 15368
+            },
+            {
+              "context": "no deprecation warnings",
+              "integration_id": 15368
+            },
+            {
+              "context": "semgrep",
+              "integration_id": 15368
+            }
+          ],
+          "strict_required_status_checks_policy": true
         }
       },
       "target": "branch"

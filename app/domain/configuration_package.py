@@ -42,6 +42,7 @@ VERSION_TABLE = "alembic_version"
 
 CONFIGURATION_TABLES = frozenset(
     {
+        "alert_targets",
         "api_client_groups",
         "api_clients",
         "api_settings",
@@ -94,9 +95,11 @@ STATE_TABLES = frozenset(
         "diagnostic_modes",
         "instance",
         "integration_reports",
+        "alert_deliveries",
         "jobs",
         "log_destination_status",
         "maintenance_state",
+        "overview_layouts",
         "own_certificates",
         "participant_link_bookings",
         "participant_link_sessions",
@@ -110,6 +113,9 @@ STATE_TABLES = frozenset(
         "staff_memberships",
         "staff_refused_entitlements",
         "update_requests",
+        "usage_events",
+        "usage_hour",
+        "usage_staff_hour",
         "webhook_events",
     }
 )

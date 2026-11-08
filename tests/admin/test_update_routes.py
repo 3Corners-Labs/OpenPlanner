@@ -1,6 +1,6 @@
 """The updates page and banner (ADR 0029): superuser only, snooze per session, audited requests."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -9,9 +9,12 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.update_service import UpdateService
 from app.domain.updates import (
+    LineStatus,
+    ListedRelease,
     Release,
     ReleaseCheck,
     RunningVersion,
+    SupportLine,
     UpdateStatus,
     UpdateStep,
     Version,
@@ -43,10 +46,56 @@ async def released(admin_db: str) -> None:
         await engine.dispose()
 
 
+DOCS_LINE = "docs(adr): 0117 reporting on use (#558)"
+DOCS_CHIP = "ontwerp of documentatie, niets gebouwd"
+NO_BEHAVIOUR = "Geen verandering in hoe OpenPlanner werkt"
+
+
+@pytest.fixture
+async def listed(admin_db: str) -> None:
+    """Store a check and its listing as the worker would: 1.4.0 builds, 1.3.1 is docs only."""
+    patch = Release(Version(1, 3, 1), "https://github.com/acme/openplanner/releases/tag/v1.3.1")
+    engine = create_engine(admin_db)
+    try:
+        async with SqlUnitOfWork(engine).locked() as tx:
+            await tx.save_release_check(ReleaseCheck(NOW, RELEASE))
+            await tx.save_release_listing(
+                [
+                    ListedRelease(
+                        RELEASE.version,
+                        RELEASE.url,
+                        NOW,
+                        f"feat(x): y (#9)\n{DOCS_LINE}\ndocs(x): <b>bold</b> (#10)",
+                    ),
+                    ListedRelease(patch.version, patch.url, NOW, DOCS_LINE),
+                ]
+            )
+    finally:
+        await engine.dispose()
+
+
 def updates(site: Site) -> UpdateService:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     found: UpdateService = app.state.update_service
     return found
+
+
+@pytest.mark.usefixtures("listed")
+async def test_picker_marks_docs_lines_and_a_version_that_changes_no_behaviour(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+    page = (await site.client.get("/admin/updates")).text
+    first, second = page.index("<code>1.4.0</code>"), page.index("<code>1.3.1</code>")
+    newest, docs_only = page[first:second], page[second:]
+    assert "feat(x): y (#9)" in newest
+    assert DOCS_LINE in newest
+    assert "docs(x): &lt;b&gt;bold&lt;/b&gt; (#10)" in newest  # markup in a note is escaped
+    assert "<b>bold</b>" not in newest
+    assert newest.count(DOCS_CHIP) == 2  # the two docs lines, not the feature
+    assert NO_BEHAVIOUR not in newest  # a feature is built in 1.4.0
+    assert docs_only.count(DOCS_CHIP) == 1
+    assert NO_BEHAVIOUR in docs_only
 
 
 @pytest.mark.usefixtures("released")
@@ -330,3 +379,87 @@ async def test_the_history_names_who_did_what_and_warns_about_a_change_from_outs
     assert 'href="/admin/audit?subject=updates"' in page
     # The updater's steps are not in the summary.
     assert "update.pulling" not in page
+
+
+# ADR 0116 point 9: apply_after, line, window and support on the updates page.
+
+
+@pytest.mark.usefixtures("released")
+async def test_a_request_may_wait_until_a_moment_in_the_portals_zone(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    requested = await site.client.post(
+        "/admin/updates/update",
+        data={"apply_after": "01-01-2099", "apply_after_time": "12:00"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert requested.status_code == 303
+    history = await updates(site).overview(SUPER)
+    assert history.open is not None
+    assert history.open.apply_after == datetime(2099, 1, 1, 11, 0, tzinfo=UTC)  # 12:00 CET
+    page = (await site.client.get("/admin/updates")).text
+    assert "De updater begint vanaf" in page
+
+
+@pytest.mark.usefixtures("released")
+async def test_a_moment_that_is_no_moment_is_refused_with_its_reason(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    refused = await site.client.post(
+        "/admin/updates/update",
+        data={"apply_after": "tomorrow", "apply_after_time": "12:00"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert refused.status_code == 422
+    assert 'aria-invalid="true"' in refused.text
+    assert (await updates(site).overview(SUPER)).open is None
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [{"update_line": "1.3", "update_window": "sun 03:00-05:00"}],
+    indirect=True,
+)
+@pytest.mark.usefixtures("released")
+async def test_the_page_shows_the_line_the_window_and_its_next_opening(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/updates")).text
+
+    assert "Lijn" in page
+    assert "<code>1.3</code>" in page
+    assert "zo 03:00–05:00" in page
+    assert "Volgende opening" in page
+    assert 'name="apply_after"' not in page  # 1.4.0 is not on line 1.3: nothing to request
+
+
+@pytest.mark.usefixtures("released")
+async def test_the_page_shows_the_support_of_the_running_line(site: Site, admin_db: str) -> None:
+    engine = create_engine(admin_db)
+    try:
+        async with SqlUnitOfWork(engine).locked() as tx:
+            support = (SupportLine("1.4", LineStatus.SUPPORTED),)
+            await tx.save_release_check(ReleaseCheck(NOW, RELEASE, support=support))
+    finally:
+        await engine.dispose()
+    await site.login_as(SUPER)
+
+    page = (await site.client.get("/admin/updates")).text
+
+    assert "Ondersteuning van deze lijn" in page
+    assert "Niet meer ondersteund" in page  # 1.3 is not listed: it has ended
+
+
+@pytest.mark.usefixtures("released")
+async def test_a_moment_no_clock_can_hold_is_refused_not_a_server_error(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    refused = await site.client.post(
+        "/admin/updates/update",
+        data={"apply_after": "01-01-0001", "apply_after_time": "00:00"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert refused.status_code == 422

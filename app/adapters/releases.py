@@ -13,6 +13,7 @@ import re
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 import structlog
@@ -22,14 +23,24 @@ from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.errors import DomainError
 from app.domain.ports import Clock, IntegrationError, UnitOfWork
+from app.domain.update_policy import (
+    ANY_TIME,
+    UpdateWindow,
+    parse_support,
+    parse_window,
+)
 from app.domain.update_service import UpdateService
-from app.domain.updates import NOTES_CHARS, ListedRelease, UpdateChannel, Version
+from app.domain.updates import NOTES_CHARS, ListedRelease, SupportLine, UpdateChannel, Version
 
 log = structlog.get_logger()
 
 API_BASE = "https://api.github.com"
 LISTED = 30
 """How many of the newest releases are looked at; candidates come with every merge."""
+SUPPORT_FILE = "support.json"
+"""The support index at the repository's root (ADR 0116 point 9)."""
+SUPPORT_CHARS = 20_000
+"""More than a support index ever needs; a larger answer is cut and then fails to parse."""
 
 _LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _PULL = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/pull/(\d+)")
@@ -51,6 +62,7 @@ class GitHubReleases:
         self._http = http
         self._url = f"{API_BASE}/repos/{repository}/releases?per_page={LISTED}"
         self._latest_url = f"{API_BASE}/repos/{repository}/releases/latest"
+        self._support_url = f"{API_BASE}/repos/{repository}/contents/{SUPPORT_FILE}"
         self._pages = f"https://github.com/{repository}/releases/"
         self._token = token
 
@@ -80,6 +92,25 @@ class GitHubReleases:
         # release at all and an installation on the release channel would never see one.
         return [*found, *await self._latest_release()]
 
+    async def support(self) -> tuple[SupportLine, ...] | None:
+        """Return the lines of ``support.json`` on the default branch (ADR 0116 point 9).
+
+        The release PR keeps it current (``scripts/support_index.py``) and every release
+        carries a signed copy; the API serves the file itself, so no other host is contacted.
+        ``None`` when the repository has none or it does not parse (logged, never fatal).
+
+        Raises:
+            IntegrationError: as ``listing`` does.
+        """
+        response = await self._get(self._support_url, accept="application/vnd.github.raw+json")
+        if response is None:
+            return None
+        try:
+            return tuple(parse_support(response.text[:SUPPORT_CHARS]))
+        except ValueError:
+            log.warning("updates.support_ignored", reason="not_a_support_index")
+            return None
+
     async def _latest_release(self) -> list[ListedRelease]:
         """Return GitHub's latest published release (never a pre-release), if there is one."""
         response = await self._get(self._latest_url)
@@ -87,13 +118,15 @@ class GitHubReleases:
         listed = self._release(data) if isinstance(data, dict) and not data.get("draft") else None
         return [listed] if listed is not None else []
 
-    async def _get(self, url: str) -> httpx.Response | None:
+    async def _get(
+        self, url: str, accept: str = "application/vnd.github+json"
+    ) -> httpx.Response | None:
         """Return the answer of ``url``; ``None`` for a 404 (nothing published).
 
         Raises:
             IntegrationError: as ``listing`` does.
         """
-        headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+        headers = {"Accept": accept, "X-GitHub-Api-Version": "2022-11-28"}
         if self._token:
             headers["Authorization"] = f"Bearer {self._token}"
         try:
@@ -187,15 +220,22 @@ def update_service(
         http: Shared HTTP client.
         lookup: Whether this process looks up releases itself; the web process passes
             ``False`` and only reads the worker's checks (ADR 0029).
-        live: Returns the current effective settings, for the channel and auto-apply, which
-            the superuser changes in the portal (ADR 0067); the worker passes its live
-            settings, the web process rebuilds the service on every change instead.
+        live: Returns the current effective settings, for the channel, auto-apply, line and
+            window, which the superuser changes in the portal (ADR 0067, 0116); the worker
+            passes its live settings, the web process rebuilds the service on every change.
     """
     token = settings.update_check_token
     current = live or (lambda: settings)
 
     def channel() -> UpdateChannel:
         return UpdateChannel(current().update_channel)
+
+    def window() -> UpdateWindow:
+        now = current()
+        try:
+            return parse_window(now.update_window, ZoneInfo(now.admin_timezone))
+        except (ValueError, ZoneInfoNotFoundError):  # pragma: no cover - the settings check both
+            return ANY_TIME
 
     releases = (
         GitHubReleases(
@@ -214,4 +254,7 @@ def update_service(
         channel=channel,
         auto_apply=lambda: current().update_auto_apply,
         interval=lambda: timedelta(minutes=current().update_check_minutes),
+        line=lambda: current().update_line,
+        window=window,
+        production=settings.environment == "prod",
     )

@@ -311,7 +311,6 @@ msgstr "Selected time"
 msgid "book.change_slot"
 msgstr "Choose another time"
 
-
 msgid "form.email"
 msgstr "Email address"
 
@@ -344,7 +343,6 @@ msgstr "There is a problem"
 
 msgid "error.title"
 msgstr "Something went wrong"
-
 
 msgid "error.field.email"
 msgstr "Enter a valid email address, for example name@example.com."
@@ -517,7 +515,6 @@ msgstr "Move appointment"
 msgid "manage.cancel"
 msgstr "Cancel appointment"
 
-
 msgid "manage.notice.rescheduled"
 msgstr "Your appointment has been moved. You will receive a confirmation by email."
 
@@ -661,9 +658,6 @@ msgstr "What needs attention now, and the groups you have rights for."
 msgid "admin.dashboard.groups"
 msgstr "Your groups"
 
-
-
-
 msgid "admin.dashboard.no_groups"
 msgstr "You have no rights for any group yet. Ask your administrator for access."
 
@@ -756,7 +750,6 @@ msgstr "Optional"
 
 msgid "admin.group.phone_required"
 msgstr "Required"
-
 
 msgid "admin.group.your_rights"
 msgstr "Your rights for this group"
@@ -1229,8 +1222,6 @@ msgstr "Until this moment a planner can move or cancel a booking; after it you c
 msgid "admin.field.phone_mode"
 msgstr "Phone number on the form"
 
-
-
 msgid "admin.field.weekday"
 msgstr "Day"
 
@@ -1320,7 +1311,6 @@ msgstr "Enter a number of minutes from 0 to 120."
 
 msgid "admin.form.error.phone_mode"
 msgstr "Choose whether the phone number is hidden, optional or required."
-
 
 msgid "admin.form.error.future_bookings"
 msgstr "This is not possible while appointments lie ahead. Change it after they have taken place or were cancelled."
@@ -2167,7 +2157,6 @@ msgstr "Groups"
 
 msgid "join.refresh"
 msgstr "Refresh status"
-
 
 # --- WxCC work item lifecycle (ADR 0021) ---
 
@@ -4115,6 +4104,12 @@ msgstr "published {at}"
 msgid "admin.updates.no_notes"
 msgstr "No release notes."
 
+msgid "admin.updates.note.docs"
+msgstr "design or documentation, nothing built"
+
+msgid "admin.updates.docs_only"
+msgstr "No change in how OpenPlanner works, going by the titles of the changes: compared with the version before it, only documentation or design (such as an ADR) changes; nothing has been built."
+
 msgid "admin.updates.install_this"
 msgstr "Install this version ({version})"
 
@@ -5141,9 +5136,6 @@ msgstr "This team has no block of its own. The organisation's default applies ({
 msgid "admin.group_contacts.none"
 msgstr "This team has no block of its own and the organisation has set no default."
 
-msgid "admin.group_contacts.back"
-msgstr "Back to this team's closure"
-
 msgid "admin.group_contacts.preview_lead"
 msgstr "How participants see the block that applies to this team now: its own block, or else the organisation's default."
 
@@ -6068,7 +6060,7 @@ msgid "admin.settings.problem.update_channel"
 msgstr "the rc update channel is not allowed in production: production follows releases."
 
 msgid "admin.settings.problem.update_auto_apply"
-msgstr "automatic updates are not allowed in production: a superuser starts the update."
+msgstr "automatic updates need an update window in production: without one, a superuser starts every update."
 
 msgid "authz.permission.settings_platform_view"
 msgstr "View system status and advanced settings"
@@ -6328,6 +6320,12 @@ msgstr "Update automatically"
 msgid "settings.field.update_check_minutes.label"
 msgstr "Minutes between two version checks"
 
+msgid "settings.field.update_line.label"
+msgstr "Follow one minor only (X.Y)"
+
+msgid "settings.field.update_window.label"
+msgstr "Window for automatic updates"
+
 msgid "settings.field.time_format.label"
 msgstr "Time format"
 
@@ -6444,7 +6442,6 @@ msgstr "First name"
 
 msgid "form.last_name"
 msgstr "Last name"
-
 
 msgid "error.field.first_name"
 msgstr "Enter your first name, at most 100 characters."
@@ -6891,7 +6888,6 @@ msgstr "Send calendar invite to the team"
 
 msgid "audit.job.send_team_cancel"
 msgstr "Send calendar cancellation to the team"
-
 
 msgid "admin.booking.version"
 msgstr "version {version}"
@@ -7986,9 +7982,6 @@ msgstr "None"
 
 msgid "admin.groups.public_page"
 msgstr "Public page"
-
-msgid "admin.groups.search_active"
-msgstr "A search is active. Clear the filters to see everything again."
 
 msgid "term.agent"
 msgstr "agent"
@@ -9378,6 +9371,9 @@ msgstr "Use only lower-case letters, digits, dots and hyphens for the user name,
 msgid "admin.form.error.staff_user_name_in_use"
 msgstr "This user name is already in use. Choose another."
 
+msgid "settings.field.reporting_enabled.label"
+msgstr "Usage reports are fed"
+
 msgid "settings.field.overview_live_enabled.label"
 msgstr "Overview refreshes itself"
 
@@ -9689,3 +9685,576 @@ msgstr "Continue to the login service"
 
 msgid "admin.alerts.text.check"
 msgstr "The check of this group's integration found a problem ({code}). Open the group and choose Check integration for the explanation."
+
+msgid "settings.field.task_reconcile_interval_minutes.label"
+msgstr "Reconcile task states every (minutes)"
+
+msgid "settings.field.task_reconcile_after_minutes.label"
+msgstr "Reconcile a task after silence of (minutes)"
+
+msgid "settings.field.integration_health_window_minutes.label"
+msgstr "Window for connection health (minutes)"
+
+msgid "settings.field.integration_degraded_failure_percent.label"
+msgstr "Degraded above this share of failed requests (%)"
+
+msgid "settings.field.integration_down_failure_percent.label"
+msgstr "Down above this share of failed requests (%)"
+
+msgid "settings.field.integration_recovery_minutes.label"
+msgstr "Recovered after this many minutes without failures"
+
+msgid "admin.alerts.source.connection"
+msgstr "Connection with Webex or the contact center"
+
+msgid "admin.alerts.source.webhooks_missing"
+msgstr "Events from the contact center"
+
+msgid "admin.alerts.text.connection"
+msgstr "A connection of this organisation is degraded or down ({code}). Open Integrations for the state per platform."
+
+msgid "admin.alerts.text.webhooks_missing"
+msgstr "The contact center did not report tasks back; OpenPlanner checked them itself. Check the webhook registration on Integrations."
+
+msgid "admin.integrations.health.ok"
+msgstr "OK"
+
+msgid "admin.integrations.health.unknown"
+msgstr "Unknown (too few requests)"
+
+msgid "admin.integrations.health.degraded"
+msgstr "Degraded"
+
+msgid "admin.integrations.health.down"
+msgstr "Down"
+
+msgid "admin.integrations.health.platform_wide"
+msgstr "Whole platform"
+
+msgid "admin.integrations.platform.webex"
+msgstr "Webex"
+
+msgid "admin.integrations.platform.wxcc"
+msgstr "Contact center (WxCC)"
+
+msgid "admin.integrations.health"
+msgstr "Health and last events"
+
+msgid "admin.integrations.health_lead"
+msgstr "How the connections are doing, computed from the requests of the last quarter of an hour, and when each platform last reported something."
+
+msgid "admin.integrations.inbound"
+msgstr "Last event per platform"
+
+msgid "admin.integrations.inbound_at"
+msgstr "last event {time}"
+
+msgid "admin.integrations.inbound_none"
+msgstr "No event has come in yet."
+
+msgid "admin.integrations.health_states"
+msgstr "Health per organisation"
+
+msgid "admin.integrations.health_none"
+msgstr "Not computed yet; the worker does this every few minutes."
+
+msgid "admin.integrations.col.organisation"
+msgstr "Organisation"
+
+msgid "admin.integrations.col.since"
+msgstr "Since"
+
+msgid "admin.integrations.col.failures"
+msgstr "Failed"
+
+msgid "admin.integrations.failures_of"
+msgstr "{failures} of {requests}"
+
+msgid "booking.routing.subject.label"
+msgstr "What is your appointment about?"
+
+msgid "booking.routing.subject.choose_hint"
+msgstr "Choose a subject first. You will then only see the times when someone is available for it."
+
+msgid "booking.routing.subject.show_times"
+msgstr "Show times"
+
+msgid "booking.routing.preferred_language.label"
+msgstr "In which language would you like to talk?"
+
+msgid "booking.routing.preferred_language.value.nl"
+msgstr "Dutch"
+
+msgid "booking.routing.preferred_language.value.en"
+msgstr "English"
+
+msgid "booking.routing.channel_preference.label"
+msgstr "How would you like to talk?"
+
+msgid "booking.routing.channel_preference.value.video"
+msgstr "With video"
+
+msgid "booking.routing.channel_preference.value.phone"
+msgstr "By phone"
+
+msgid "admin.routing.title"
+msgstr "Subjects and routing"
+
+msgid "admin.routing.settings_lead"
+msgstr "Let participants choose a subject, ask for a preferred language or way of contact, and pass those choices to the contact center as codes."
+
+msgid "admin.routing.summary"
+msgstr "{subjects} subjects, {attributes} routing questions, {mapped} passed to the contact center."
+
+msgid "admin.routing.summary_none"
+msgstr "This group asks no subject and no routing questions."
+
+msgid "admin.routing.open"
+msgstr "Open subjects and routing"
+
+msgid "admin.routing.back"
+msgstr "Back to the settings"
+
+msgid "admin.routing.subjects.title"
+msgstr "Subjects"
+
+msgid "admin.routing.subjects.lead"
+msgstr "With one or more subjects the form first asks the participant what the appointment is about. The code never changes: bookings and reports keep it."
+
+msgid "admin.routing.subjects.none"
+msgstr "No subjects yet. The form then asks for none."
+
+msgid "admin.routing.subject.label"
+msgstr "Subject"
+
+msgid "admin.routing.subject.code"
+msgstr "Code"
+
+msgid "admin.routing.subject.code_hint"
+msgstr "Lower-case letters, digits and hyphens, at most 40 characters, for example general-question. Cannot be changed later."
+
+msgid "admin.routing.subject.label_nl"
+msgstr "Name (Dutch)"
+
+msgid "admin.routing.subject.label_en"
+msgstr "Name (English)"
+
+msgid "admin.routing.subject.bound"
+msgstr "bound to a block"
+
+msgid "admin.routing.subject.remove"
+msgstr "Remove"
+
+msgid "admin.routing.subject.remove_label"
+msgstr "Remove subject {label}"
+
+msgid "admin.routing.subject.add"
+msgstr "Add a subject"
+
+msgid "admin.routing.subject.add_lead"
+msgstr "A group has at most {count} subjects."
+
+msgid "admin.routing.subject.add_button"
+msgstr "Add subject"
+
+msgid "admin.routing.subject.limit_reached"
+msgstr "This group has the maximum of {count} subjects."
+
+msgid "admin.routing.subject.edit_lead"
+msgstr "Code {code}; it stays the same."
+
+msgid "admin.routing.attributes.title"
+msgstr "Routing questions"
+
+msgid "admin.routing.attributes.lead"
+msgstr "Questions from a fixed OpenPlanner list. The answer is a code, never free text, and no personal data."
+
+msgid "admin.routing.attributes.values"
+msgstr "Choices: {values}."
+
+msgid "admin.routing.attribute.preferred_language.help"
+msgstr "Asks the language of the conversation."
+
+msgid "admin.routing.attribute.channel_preference.help"
+msgstr "Asks whether the participant wants to talk with video or by phone."
+
+msgid "admin.routing.mapping.title"
+msgstr "Pass on to the contact center"
+
+msgid "admin.routing.mapping.lead"
+msgstr "Per subject and routing question: the name of the variable the contact center's flow reads, and the value per choice. Whatever stays empty here is not sent."
+
+msgid "admin.routing.mapping.none"
+msgstr "Add a subject or routing question first."
+
+msgid "admin.routing.mapping.variable"
+msgstr "Variable name"
+
+msgid "admin.routing.mapping.variable_hint"
+msgstr "Letters, digits and underscores, starting with a letter, for example subject. Empty: send nothing."
+
+msgid "admin.routing.mapping.values"
+msgstr "Values for {source}"
+
+msgid "admin.routing.mapping.code"
+msgstr "Choice"
+
+msgid "admin.routing.mapping.value"
+msgstr "Value sent"
+
+msgid "admin.routing.mapping.save"
+msgstr "Save {source}"
+
+msgid "admin.routing.source.subject"
+msgstr "Subject"
+
+msgid "admin.routing.error.subject_code"
+msgstr "Choose a code of lower-case letters, digits and hyphens that this group does not have yet."
+
+msgid "admin.routing.error.subject_label"
+msgstr "Enter the name, at most 80 characters."
+
+msgid "admin.routing.error.subjects"
+msgstr "This group already has the maximum number of subjects."
+
+msgid "admin.routing.error.subject_in_use"
+msgstr "A block still offers this subject. Remove it from that block first."
+
+msgid "admin.routing.error.variable_name"
+msgstr "Use letters, digits and underscores, starting with a letter, and no name that is already used."
+
+msgid "admin.routing.error.variable_value"
+msgstr "A value is a code: letters, digits, dot, colon, hyphen or underscore, at most 64 characters."
+
+msgid "admin.routing.error.mapping"
+msgstr "This subject or question no longer exists."
+
+msgid "admin.field.block_subjects"
+msgstr "Subjects in this block"
+
+msgid "admin.field.block_subjects_hint"
+msgstr "Nothing ticked: the block offers every subject. A participant who chooses a subject only sees the times of blocks that offer it."
+
+msgid "settings.field.max_subjects_per_group.label"
+msgstr "Subjects per group (at most)"
+
+msgid "admin.tab.planning"
+msgstr "Planning"
+
+msgid "admin.tab.group_messages"
+msgstr "Messages"
+
+msgid "admin.readiness.title"
+msgstr "Ready for bookings"
+
+msgid "admin.readiness.ready"
+msgstr "Everything is set up to take appointments."
+
+msgid "admin.readiness.missing"
+msgstr "Left to set up before appointments can be taken: {count}."
+
+msgid "admin.readiness.staffing"
+msgstr "Staffing for the coming weeks"
+
+msgid "admin.readiness.texts"
+msgstr "Message texts"
+
+msgid "admin.readiness.channels"
+msgstr "A channel to send messages (email or SMS)"
+
+msgid "admin.readiness.check"
+msgstr "Connection check without failures"
+
+msgid "admin.readiness.branding"
+msgstr "Own branding"
+
+msgid "admin.readiness.contact"
+msgstr "Alternative contact options for a closure"
+
+msgid "admin.readiness.state.done"
+msgstr "Done"
+
+msgid "admin.readiness.state.missing"
+msgstr "Missing"
+
+msgid "admin.readiness.state.not_needed"
+msgstr "Not needed"
+
+msgid "admin.dashboard.filter"
+msgstr "Filter groups"
+
+msgid "admin.dashboard.only_closed"
+msgstr "Only groups with an active emergency closure"
+
+msgid "admin.dashboard.closed_count"
+msgstr "Groups with an active emergency closure: {count} of {total}"
+
+msgid "admin.dashboard.closed"
+msgstr "Emergency closure active"
+
+msgid "admin.dashboard.no_closed"
+msgstr "No group has an active emergency closure right now."
+
+msgid "admin.api.filter"
+msgstr "Filter API clients"
+
+msgid "admin.api.search"
+msgstr "Search by name or client id"
+
+msgid "admin.api.count"
+msgstr "Number of clients: {count}"
+
+msgid "admin.api.count_of"
+msgstr "Clients that match: {count} of {total}"
+
+msgid "admin.api.no_match"
+msgstr "No client matches this filter."
+
+msgid "admin.audit.count"
+msgstr "Events: {count}"
+
+msgid "admin.audit.count_newest"
+msgstr "The newest {count} events. Narrow the filter or export for more."
+
+msgid "admin.readiness.state.defaults"
+msgstr "Default texts"
+
+msgid "admin.list.search_active"
+msgstr "A search is active. Clear the filters to see everything again."
+
+msgid "alert.message.level.info"
+msgstr "Information"
+
+msgid "alert.message.level.warning"
+msgstr "Warning"
+
+msgid "alert.message.level.outage"
+msgstr "Outage"
+
+msgid "alert.message.subject"
+msgstr "OpenPlanner: {level} ({action})"
+
+msgid "alert.message.what"
+msgstr "Alert {action}, reason {reason}."
+
+msgid "alert.message.since"
+msgstr "Since {time}."
+
+msgid "alert.message.organisation"
+msgstr "Organisation: {organisation}."
+
+msgid "alert.message.group"
+msgstr "Group: {group}."
+
+msgid "alert.message.repeated"
+msgstr "Reported {count} more times since the previous message."
+
+msgid "alert.message.link"
+msgstr "View in the portal: {link}"
+
+msgid "alert.message.version"
+msgstr "OpenPlanner {version}"
+
+msgid "alert.message.test.subject"
+msgstr "OpenPlanner: test alert"
+
+msgid "alert.message.test.text"
+msgstr "This is a test alert. If it arrives, this address receives OpenPlanner's alerts."
+
+msgid "admin.alerts.targets.title"
+msgstr "Alerts to administrators"
+
+msgid "admin.alerts.targets.lead"
+msgstr "Where OpenPlanner sends alerts when something goes wrong: an email address or a Webex space. A lasting alert comes again after the repeat interval; in between it is only counted."
+
+msgid "admin.alerts.targets.none"
+msgstr "No alert addresses yet."
+
+msgid "admin.alerts.target.kind"
+msgstr "Kind"
+
+msgid "admin.alerts.target.kind.email"
+msgstr "Email"
+
+msgid "admin.alerts.target.kind.webex_space"
+msgstr "Webex space"
+
+msgid "admin.alerts.target.address"
+msgstr "Address or room id"
+
+msgid "admin.alerts.target.address_hint"
+msgstr "An administrators' email address, or the id of the Webex space the bot is in."
+
+msgid "admin.alerts.target.level"
+msgstr "From"
+
+msgid "admin.alerts.target.level.warning"
+msgstr "Warnings and outages"
+
+msgid "admin.alerts.target.level.outage"
+msgstr "Outages only"
+
+msgid "admin.alerts.target.test"
+msgstr "Send a test alert"
+
+msgid "admin.alerts.target.remove"
+msgstr "Remove"
+
+msgid "admin.alerts.target.add"
+msgstr "Add an address"
+
+msgid "admin.alerts.target.add_button"
+msgstr "Add"
+
+msgid "admin.alerts.bot.title"
+msgstr "Webex bot"
+
+msgid "admin.alerts.bot.lead"
+msgstr "Alerts to a Webex space go through a bot of your own that may only send messages."
+
+msgid "admin.alerts.bot.set"
+msgstr "Token set"
+
+msgid "admin.alerts.bot.not_set"
+msgstr "No token"
+
+msgid "admin.alerts.bot.token"
+msgstr "Bot token"
+
+msgid "admin.alerts.bot.token_hint"
+msgstr "Paste the token from the Webex developer portal. It is stored encrypted and never shown again."
+
+msgid "admin.alerts.bot.remove"
+msgstr "Remove the token"
+
+msgid "admin.alerts.bot.save"
+msgstr "Save"
+
+msgid "admin.alerts.bot.no_key"
+msgstr "A bot token can only be stored once the installation has a key for secrets (SETTINGS_ENCRYPTION_KEY)."
+
+msgid "admin.done.alert_target_added"
+msgstr "The alert address was added."
+
+msgid "admin.done.alert_target_removed"
+msgstr "The alert address was removed."
+
+msgid "admin.done.alert_test_sent"
+msgstr "The test alert was sent."
+
+msgid "admin.done.alert_test_failed"
+msgstr "The test alert could not be sent. Check the mail channel, or the bot token and the room id."
+
+msgid "admin.done.alert_bot_saved"
+msgstr "The bot token was saved."
+
+msgid "admin.done.alert_bot_removed"
+msgstr "The bot token was removed."
+
+msgid "admin.done.alert_refused"
+msgstr "That did not work: check the address, the token, or the maximum of ten addresses."
+
+msgid "settings.field.alert_repeat_hours.label"
+msgstr "Send an alert again after (hours)"
+
+msgid "admin.updates.line"
+msgstr "Line"
+
+msgid "admin.updates.line.all"
+msgstr "Every version on the channel"
+
+msgid "admin.updates.window"
+msgstr "Update window"
+
+msgid "admin.updates.window.any_time"
+msgstr "Any time (no window set)"
+
+msgid "admin.updates.window.next"
+msgstr "Next opening: {at}"
+
+msgid "admin.updates.support"
+msgstr "Support of this line"
+
+msgid "admin.updates.support.supported"
+msgstr "Supported"
+
+msgid "admin.updates.support.security"
+msgstr "Security fixes only"
+
+msgid "admin.updates.support.extended"
+msgstr "Extended line"
+
+msgid "admin.updates.support.ended"
+msgstr "No longer supported: update to a supported line"
+
+msgid "admin.updates.support.until"
+msgstr "until {until}"
+
+msgid "admin.updates.apply_after.label"
+msgstr "Apply after (optional)"
+
+msgid "admin.updates.apply_after.hint"
+msgstr "Date and time in the portal's time zone. Empty: the updater starts as soon as it sees the request."
+
+msgid "admin.updates.waits_until"
+msgstr "The updater starts this request from {at}."
+
+msgid "admin.updates.reason.upgrade_path_required"
+msgstr "This database is too old for that version: update to the version named in the log first."
+
+msgid "settings.field.overview_max_widgets.label"
+msgstr "Most widgets on an own overview"
+
+msgid "admin.field.dispatch_fallback"
+msgstr "Fallback when the contact center fails"
+
+msgid "admin.field.dispatch_fallback_hint"
+msgstr "With own queue: an appointment whose dispatch fails, and while the contact center is down every appointment, goes to OpenPlanner's queue. The team must then know that queue and work it."
+
+msgid "admin.field.fallback_space_room_id"
+msgstr "The team's Webex space (fallback)"
+
+msgid "admin.field.fallback_space_room_id_hint"
+msgstr "Optional. The id of the space where the organisation's bot posts a message during a fallback, and per appointment the start time and first name. Never the link to the call."
+
+msgid "admin.fallback.none"
+msgstr "None"
+
+msgid "admin.fallback.own_queue"
+msgstr "Own queue"
+
+msgid "admin.fallback.banner.title"
+msgstr "Fallback active"
+
+msgid "admin.fallback.banner.text"
+msgstr "The contact center has been down since {time}. This group's appointments now come to this queue."
+
+msgid "admin.fallback.end"
+msgstr "End the fallback"
+
+msgid "admin.fallback.chip"
+msgstr "Fallback"
+
+msgid "admin.done.fallback_ended"
+msgstr "The fallback has ended. Appointments not yet picked up go to the contact center after all."
+
+msgid "admin.alerts.source.fallback"
+msgstr "Fallback to the own queue"
+
+msgid "admin.alerts.text.fallback"
+msgstr "This group falls back to its own queue because the contact center is down. Open the queue to pick up appointments."
+
+msgid "call.event.fallback_queued"
+msgstr "Put in the own queue (fallback)"
+
+msgid "call.event.fallback_ended"
+msgstr "Fallback ended: to the contact center"
+
+msgid "fallback.space.activated"
+msgstr "**{group}** falls back to its own queue: the contact center is down. Pick up appointments in the queue: {link}"
+
+msgid "fallback.space.queued"
+msgstr "{time}: {first_name} is in the queue. {link}"
+
+msgid "admin.form.error.fallback_space_room_id"
+msgstr "Enter the id of a Webex space: letters, digits, - and _, 10 to 200 characters."

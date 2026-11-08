@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-01), requested by the product owner after the question about MFA,
 step-up and four-eyes during ADR 0095. Refines ADR 0013 (OIDC) and ADR 0090 (bundled identity
-provider). Built in PR #357; see *Build status*.
+provider). Partly built in PR #357 (step 2, the self-service reset limited to the domain suffix and the realm SMTP, is open); see *Build status*.
 
 ## Context
 
@@ -80,9 +80,9 @@ version: only MFA, configured at the IdP, requested and checked by OpenPlanner.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 3 | Per-provider MFA policy `off`/`record`/`require` and accepted values for organisation providers (point 5): migration 0082, Login sub-tab, security event, test login | #357 | in PR |
+| 3 | Per-provider MFA policy `off`/`record`/`require` and accepted values for organisation providers (point 5): migration 0082, Login sub-tab, security event, test login | #357 | merged |
 | 2 | Self-service reset limited to the active domain suffix; realm SMTP | | follow-up |
-| 1 | `app/domain/mfa.py`, `acr_values` and the check in `app/adapters/oidc.py`, the two settings, login message, Keycloak realm flow, runbook, threat model, manual | #357 | in PR |
+| 1 | `app/domain/mfa.py`, `acr_values` and the check in `app/adapters/oidc.py`, the two settings, login message, Keycloak realm flow, runbook, threat model, manual | #357 | merged |
 
 ## Consequences
 

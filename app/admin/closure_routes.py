@@ -15,7 +15,7 @@ authorises again, validates and audits.
     POST /admin/groups/{slug}/closure/bookings/{id}/cancel    closure.manage   one booking
     GET  /admin/groups/{slug}/closure/bookings/{id}/move      closure.manage   choose a slot
     POST /admin/groups/{slug}/closure/bookings/{id}/move      closure.manage   move it
-    GET  /admin/closures                                      organisation.closure  organisations
+    GET  /admin/closures                                      dashboard.view   308 to the filter
     GET  /admin/organisations/{org}/closure                   organisation.closure  all groups
     POST /admin/organisations/{org}/closure                   organisation.closure  close all
     POST /admin/organisations/{org}/closure/lift              organisation.closure  lift all
@@ -53,7 +53,6 @@ from app.admin.pages import (
     Locale,
     SameOrigin,
     organisation_header,
-    organisation_redirect,
     page,
     with_manual,
 )
@@ -541,7 +540,7 @@ async def _move_response(
     booking = await closure_service(request).booking(context.principal, group.slug, booking_id)
     today = local_day(_clock(request).now(), group.tz)
     free = await _booking_service(request).availability(
-        group.slug, today, today + timedelta(days=MOVE_DAYS)
+        group.slug, today, today + timedelta(days=MOVE_DAYS), booking.subject
     )
     _ = locale.gettext
     options = slot_options([slot.start for slot in free], group.tz, locale.code)
@@ -613,12 +612,19 @@ class GroupStateView:
     suspended: int
 
 
+ACTIVE_CLOSURES = "/admin/?closures=1"
+"""The overview narrowed to groups with a closure in force (ADR 0047 §4, step 5)."""
+
+
 @router.get("/closures")
 async def organisations(
-    context: Annotated[AdminContext, Depends(RequirePermission(Permission.ORGANISATION_CLOSURE))],
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.DASHBOARD_VIEW))],
 ) -> RedirectResponse:
-    """Send the old closures list to the organisation's Closure tab (ADR 0047 §4)."""
-    return organisation_redirect(context.principal, Permission.ORGANISATION_CLOSURE, "closure")
+    """Send the old closures list to the overview's filter *active closures* (ADR 0047 §4).
+
+    Same permission as the overview; the location is a constant, never from the request.
+    """
+    return RedirectResponse(ACTIVE_CLOSURES, status_code=308)
 
 
 async def _organisation_response(

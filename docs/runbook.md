@@ -86,18 +86,19 @@ images (`OPENPLANNER_IMAGE` and `OPENPLANNER_PROXY_IMAGE` in `.env.update`).
 
 ### As an outsider (public images, ADR 0108)
 
-A minor or major release (`vX.Y.0`, from 0.4.0) is also pushed, with the same digest and the
-same signature, to two public packages: `ghcr.io/<owner>/<repo>-public` and
+Every release (`vX.Y.Z`; minor and major releases from 0.4.0, patches from the first release
+after ADR 0116 step 6, also patches from a maintenance line) is also pushed, with the same digest
+and the same signature, to two public packages: `ghcr.io/<owner>/<repo>-public` and
 `ghcr.io/<owner>/<repo>-proxy-public`. No account or login is needed to pull or verify them.
-Release candidates and patch releases are never public. The release notes of the release list
+Release candidates are never public. The release notes of the release list
 both references with their digests and the exact commands; they come down to:
 
 ```sh
 cosign verify ghcr.io/<owner>/<repo>-public@sha256:<digest> \
-  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.Z \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 cosign verify-attestation ghcr.io/<owner>/<repo>-public@sha256:<digest> --type cyclonedx \
-  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.0 \
+  --certificate-identity https://github.com/<owner>/<repo>/.github/workflows/main.yml@refs/tags/vX.Y.Z \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -1006,7 +1007,16 @@ render and a restart of `idp` and `web`.
 
 Without a Webex Service App OpenPlanner runs without video and WxCC; bookings keep working.
 Contracts and payloads: `docs/webhooks.md`. Decisions: ADR 0017 (video), 0018 (work items),
-0019 (direct call), 0026 (cap on open direct calls).
+0019 (direct call), 0026 (cap on open direct calls), 0082 (verification, health, alerts,
+fallback).
+
+**The set-up for the organisation's contact-center administrator** (Service App and scopes,
+the Control Hub items, the group's fields, *Koppeling controleren* and what its lines mean, the
+fallback per group and the bot for alerts) is the manual topic *Contactcenter inrichten* /
+*Setting up the contact center*: [nl](manual/nl/contact-center-setup.md),
+[en](manual/en/contact-center-setup.md), also in the portal under **Handleiding** and behind
+the (i) of the group's contact-center fields. The sections below keep what the host team does
+on the server (secrets, tokens, CLI commands) and the detail behind the checks.
 
 ### 1. Webex Service App
 
@@ -1081,12 +1091,16 @@ calendar a few minutes after it closes.
 
 ### 3. WxCC work items (Control Hub)
 
-Work Items is in beta; the organisation must be enabled by Cisco.
+Work Items is in beta; the organisation must be enabled by Cisco. The contact-center
+administrator creates the channel, asset, entry point, flow and queues in Control Hub, one
+screen per step, as the manual topic *Contactcenter inrichten* (steps 2 to 6) describes. What
+the host team needs to know about them:
 
-1. **Work Item channel**: e.g. `openplanner-video`. Enter it per group as *WxCC work
+1. **Work Item channel**: e.g. `openplanner-video`. Entered per group as *WxCC work
    item-kanaal*.
 2. **Work Item asset** on that channel with a unique **business address** (e.g.
-   `openplanner@<your domain>`; per group as *WxCC business address*) and exactly this schema:
+   `openplanner@<your domain>`; per group as *WxCC business address*) and exactly this schema
+   (the reference for `wxcc-config-check`, section 7):
 
    | Field key | Display name | Required | Viewable |
    |---|---|---|---|
@@ -1097,15 +1111,12 @@ Work Items is in beta; the organisation must be enabled by Cisco.
    | `meetingLink` | Videogesprek | no | yes |
    | `kind` | Soort (scheduled/direct/cancelled/probe) | no | yes |
 
-3. **Entry point and flow** for the asset. The flow reads the flow setting
-   `openplannerGroup` (the group's routing value, by default its web address) and routes with
-   **Queue Contact** to the right queue. Add a **Screen Pop** of `meetingLink` so the agent opens
-   the meeting in one click (in the Webex app, signed in: cohost). Direct calls can get a higher
-   priority with **Set Contact Priority** on `kind = direct`. Add a **Case** on `kind = probe`
-   that ends the contact before any queue (ADR 0082): **Koppeling controleren** sends a probe
-   work item through the asset and the flow and waits for its `task:new` and `task:ended`;
-   without the branch OpenPlanner ends the probe itself (End Task, `cjp:user`) and warns, and
-   an agent may see it for a moment. **To verify on the test tenant:** that the flow can read
+3. **Entry point and flow** for the asset: `openplannerGroup` Case to **Queue Contact**,
+   **Screen Pop** of `meetingLink`, and a **Case** on `kind = probe` that ends the contact
+   before any queue (ADR 0082; the manual topic, step 5). Direct calls can get a higher
+   priority with **Set Contact Priority** on `kind = direct`. Without the probe branch
+   OpenPlanner ends the probe itself (End Task, `cjp:user`) and warns, and an agent may see it
+   for a moment. **To verify on the test tenant:** that the flow can read
    `kind` from the work item data; if it cannot, route the probe on a flow setting instead
    (the Case value stays `probe`).
    **Sample flow.** `python -m app.cli wxcc-sample-flow --group <slug>` prints a flow with all of
@@ -1439,12 +1450,42 @@ it) runs this way in CI: `e2e/tests/video-journey.spec.ts`, on the bookings that
 Webex itself: entering the meeting, the lobby and the Webex app on the tester's computer
 (ADR 0075 step 3) stay a check by a person against the real Webex site.
 
-### 11. When the contact center is down: the own queue (ADR 0043)
+### 11. When the contact center is down: the fallback and the own queue (ADR 0082, ADR 0043)
 
-When Webex Connect or Webex Contact Center cannot take tasks, a group admin with
-`group.edit` (organisation admin or superuser) can switch a group to OpenPlanner's own queue:
-**Groepen › (groep) › Instellingen › Hoe afspraken bij medewerkers komen › Eigen wachtrij van
-OpenPlanner**. From then on:
+**Automatic fallback (ADR 0082 point 11).** A group with **Terugval als het contactcenter
+uitvalt** set to *Eigen wachtrij* (`dispatch_fallback = own_queue`, `group.edit`) falls back
+to OpenPlanner's own queue by itself; its `dispatch_kind` stays *Contactcenter*:
+
+- **per booking**: when a booking's `dispatch_wxcc_task` job fails for good after its retries
+  (ADR 0068), the booking lands in the group's **Wachtrij**, flagged *Terugval*, with the
+  timeline event `fallback_queued` (detail `dispatch_failed`);
+- **per group**: while the organisation's WxCC health is `down` (*Koppelingen*, *Gezondheid*:
+  failures above `integration_down_failure_percent`, a refused token refresh, or a failed
+  probe of the group check), the worker sets the group in fallback (`groups.fallback_active_since`).
+  Dispatch jobs that come due meanwhile skip with reason `fallback` and their bookings land in
+  the queue (detail `contact_center_down`); the queue shows the banner *Terugval actief*, the agenda the
+  *Terugval* flag, and the system event `dispatch.fallback` (failure `on`, detail
+  `fallback.on`) is an alert to the organisation's targets and, when the group set
+  `fallback_space_room_id`, a message in the team's Webex space through the organisation's bot;
+- **return**: once the health is `ok` again (after `integration_recovery_minutes` of healthy
+  requests, platform setting, default 10), the fallback ends (`dispatch.fallback` success,
+  detail `fallback.off`): bookings not yet claimed in the queue get a fresh dispatch job and go
+  to the contact center after all (timeline `fallback_ended`); claimed ones stay with their
+  agent;
+- **by hand**: whoever has `bookings.manage` on the group (organisation or group admin) can end
+  it earlier with **Terugval beëindigen** on the group's **Wachtrij** (fresh login; audited as
+  `bookings.manage`, detail `fallback.off`). While the contact center is still down, the next
+  health sweep puts the group back in fallback.
+
+The team's space receives per booking the start time, the first name and a link to the queue,
+never the host join link; those messages stay in Webex after the purge (the privacy note is in
+the manual topic, step 10, and in `docs/dataflow.md`). Direct calls follow the same rule and
+take the own-queue path while the fallback is on. The participant notices nothing.
+
+**Manual switch (ADR 0043).** For a group without the fallback, or for a longer outage, a group
+admin with `group.edit` (organisation admin or superuser) can switch a group to OpenPlanner's
+own queue: **Groepen › (groep) › Instellingen › Hoe afspraken bij medewerkers komen › Eigen
+wachtrij van OpenPlanner**. From then on:
 
 - bookings whose dispatch job has not run yet create no WxCC task; already dispatched ones keep
   theirs;
@@ -1643,7 +1684,7 @@ repository:
 | Name | Kind | What | Why |
 |---|---|---|---|
 | `RELEASE_APP_CLIENT_ID` | variable in the environment `release` | the client ID of the release app (ADR 0107) | the release jobs take a short-lived token from the app: a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow, and only the app may create a `v*` tag |
-| `RELEASE_APP_PRIVATE_KEY` | secret in the environment `release` | a private key of the release app (PEM) | as above; the environment `release` may only be used from `main` |
+| `RELEASE_APP_PRIVATE_KEY` | secret in the environment `release` | a private key of the release app (PEM) | as above; the environment `release` may only be used from `main` and the maintenance lines `release/[0-9]*` |
 | `OPENAI_API_KEY` | secret | an OpenAI API key | the audit job (`openai/codex-action`); the key stays in the action's proxy and never reaches the review process |
 | `RELEASE_RUNNER` | variable, optional | the label of a self-hosted runner | default `ubuntu-24.04`; see *Self-hosted runner* below |
 
@@ -1790,6 +1831,56 @@ git push --delete origin v0.3.0 && git tag -d v0.3.0
 Once a release has been published, never move or reuse its tag: installations may already run
 it. Fix forward with the next number.
 
+### Maintenance lines (ADR 0116 point 3)
+
+A security fix normally ships as the next patch from `main`. When `main` already holds a
+`feat` since the last minor `vX.Y.0`, a patch from `main` would carry that feature (and make
+itself a minor). Then the fix ships from a **maintenance line** `release/X.Y`, cut from the newest release of the minor (`vX.Y.0`, or a later patch that
+still came from `main`). A line takes fixes only: every candidate and release on it is a patch `X.Y.Z` with
+`Z > 0`, and a `feat` or a migration on a line fails its candidate job (a patch carries no
+migration, point 4).
+
+| Step | How | What runs |
+|---|---|---|
+| Cut the line (once per minor, only when needed) | *Run workflow* on `main`, `step = cut-line`, `version = X.Y` (tick `dry_run` first) | `scripts/release_line.py cut` checks that a release of X.Y exists, the line does not, and `main` holds a `feat` since its newest release; the release app pushes `release/X.Y` and the label `backport:X.Y` is created |
+| Fix | the usual PR to `main`, merged through the queue; add the label `backport:X.Y` (before or after the merge) | `backport.yml` cherry-picks the merge commit onto `backport/X.Y/pr-N` and opens the PR against `release/X.Y` with auto-merge; a pull request into a line runs the full lane itself (a line has no merge queue) and must be up to date with the line; when the cherry-pick does not apply it comments on the PR, and a Claude Code session makes the backport by hand (`git cherry-pick -x`) |
+| Candidate | the merge on the line | `main.yml` tags `vX.Y.Z-rc.N` from `scripts/release_plan.py --candidate --branch release/X.Y` and publishes it as on `main` (no mutation run: the fix ran it on `main`) |
+| Release | *Run workflow* on `release/X.Y`, `step = release-pr`, then `step = tag` on `release/X.Y` | the release PR goes to the line (a patch, no audit); the tag sits on the line's merge commit; `main.yml` accepts a tag on `main` or a patch tag on its own line (`scripts/release_line.py tag-allowed`); a line's release is never GitHub's *Latest* release and never moves `:latest` |
+| Changelog | the next release PR on `main` | `release_pr.py prepare` takes over the released sections of every `origin/release/X.Y` that `main` lacks, in version order |
+
+Two rulesets cover `release/[0-9]*`, both in `.github/guardrails.json`, which the hourly
+guardrail audit compares with GitHub. `release lines` has the rules of `main` (pull request,
+the same required checks, no force push, no deletion) and, like `main`, no bypass. Only the
+merge queue is missing: GitHub refuses one on a wildcard ref, so a line's pull request must be
+up to date with the line (`strict`) and runs the full CI lane on the pull request (`ci.yml`). A
+test fails when its rules drift from `main`'s otherwise. A pull request runs the `ci.yml` of its own merge
+commit, so a line cut from a release before #605 (0.5.x and earlier) skips the full lane until
+#605 itself is the line's first backport; cut such a line, then backport #605 first. With
+`strict` and auto-merge, a second backport waits until someone updates its branch (an
+administrator, so a decision PR keeps `po:approved`). `release line creation` only
+restricts creating a line, and its bypass lets the release app (and administrators) do that.
+The environment `release` allows `main` and `release/[0-9]*`, so a line's candidate, release
+and tag jobs get the app's token. A release PR's branch `release/vX.Y.Z` matches neither. To
+apply them from the baseline (administrator, after the PR that changed them merged):
+
+```bash
+for name in "release lines" "release line creation"; do
+  jq --arg name "$name" '.rulesets[$name] | {name: $name, target, enforcement, conditions, bypass_actors,
+    rules: (.rules | to_entries | map({type: .key} + (if (.value | length) > 0 then {parameters: .value} else {} end)))}' \
+    .github/guardrails.json | gh api -X POST repos/3Corners-Labs/OpenPlanner/rulesets --input -
+done
+gh api -X POST repos/3Corners-Labs/OpenPlanner/environments/release/deployment-branch-policies -f name='release/[0-9]*' -f type=branch
+```
+
+A line's candidates are signed by `main.yml` on `refs/heads/release/X.Y`. A test or lab host's
+updater trusts `main` and release tags only (`scripts/install.sh`), so it does not install a
+line candidate offered on the `rc` channel; line candidates are tried on a host that pins one
+by hand, and the line's release tag installs everywhere as usual.
+
+A line lives as long as its minor is in the support window (`N-1` from 1.0.0, `SECURITY.md`),
+or longer as a paid extended line. Deleting a line means an administrator switches the
+ruleset `release lines` off for it, as on `main` (it has no bypass); its tags stay.
+
 ### Release candidates (ADR 0059)
 
 Every merge to `main` is also a **release candidate** `vX.Y.Z-rc.N`: `X.Y.Z` is the number
@@ -1922,8 +2013,30 @@ in `updater.env` (default: the application image's name plus `-proxy`).
 
 | Request | Steps | When something fails |
 |---|---|---|
-| Update | pull `<image>:<version>` and, where the proxy runs, `<image>-proxy:<version>`, take their digests, `cosign verify` both (release tag of this repository), note the current digests and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digests, `up -d` (`web`, `worker` and `proxy`), wait up to `HEALTH_TIMEOUT` for `/readyz`, a healthy worker and a healthy proxy | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digests, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
+| Update | pull `<image>:<version>` and, where the proxy runs, `<image>-proxy:<version>`, take their digests, `cosign verify` both (release tag of this repository), check the upgrade path (the new image's `MIN_UPGRADE_FROM` against the version that last ran, ADR 0116), note the current digests and Alembic revision in `/var/lib/openplanner-updater/previous.env`, switch maintenance on (ADR 0038), back up the database (`data/backups/request-<id>.db`), pin the new digests, `up -d` (`web`, `worker` and `proxy`), wait up to `HEALTH_TIMEOUT` for `/readyz`, a healthy worker and a healthy proxy | Before the switch: nothing changed (`image_not_found`, `signature_invalid`, `upgrade_path_required`, `backup_failed`). After the switch: stop, put the backup back, pin the previous digests, start (`rolled_back`; `failed` with `restore_failed` if that is unhealthy too) |
 | Restore previous version (≤ 24 h after an update) | switch maintenance on, back up, stop, `alembic downgrade <previous revision>` with the newer image, pin the previous digests (application and proxy), start, wait for health. Data entered since the update is kept | Downgrade fails: the newer version starts again (`migration_failed`). Unhealthy: back to the newer version with the backup (`rolled_back`) |
+
+### Line, window and upgrade path (ADR 0116)
+
+- **Line** (`UPDATE_LINE`, Advanced settings, class C): `X.Y` offers only the patches of that
+  minor; empty offers everything on the channel. A customer on an extended or the previous
+  line sets it.
+- **Window** (`UPDATE_WINDOW`, class C): up to seven ranges such as `sun 03:00-05:00` in
+  `ADMIN_TIMEZONE`. With auto-apply on, the worker files a request only inside a range and the
+  updater claims a request the worker filed only inside one; a superuser's request is claimed
+  at once or from its *Apply after* moment. In production auto-apply works only with a window
+  (the portal stores it, it has no effect without one; `UPDATE_AUTO_APPLY` in the environment
+  without `UPDATE_WINDOW` stops the start). This is ring 2 of ADR 0116 point 12: a dedicated
+  installation updates itself in its own window.
+- **Upgrade path** (`MIN_UPGRADE_FROM`, baked into the image, default `1.0.0`): `web` runs
+  `python -m app.cli upgrade-path-check` before `alembic upgrade`, and the updater asks the
+  running version the same about the new image before it backs up. A database last run by a
+  version older than the stop is refused (`upgrade_path_required`, naming the stop): update to
+  the stop first, then on. Images before the stop know no stop, and an image from before the
+  check has no such command, which `web` lets pass.
+- **Support status**: the updates page shows the running line's status from `support.json` on
+  `main` (the release PR keeps it current; every release carries a copy signed with
+  `cosign sign-blob`).
 
 Before each step the updater reports it (`python -m app.cli update-progress ID STEP`: pulling,
 verifying, backing_up, migrating, starting, rolling_back; ADR 0048), and at the end the outcome
@@ -2674,7 +2787,9 @@ Bookings keep working: they are stored first, and meetings and work items are jo
   that the job fails and the timeline shows `integration_error` or `task_failed` with the code.
   The agenda shows the affected bookings.
 - **A work item cannot be created at T−5:** the participant still has the join link and can wait
-  in the lobby. Pick the booking from the agenda and contact the participant another way, or
+  in the lobby. A group with the fallback (`dispatch_fallback = own_queue`) puts the booking in
+  its own queue by itself (section 11 under *Webex meetings and Webex Contact Center*). For
+  another group, pick the booking from the agenda and contact the participant another way, or
   re-run the job once WxCC is back (set the job's status to `pending` in the `jobs` table).
 - **Direct calls** during an outage show "no agent available" after the group's
   not-picked-up limit and offer to book instead.
@@ -2684,4 +2799,11 @@ Bookings keep working: they are stored first, and meetings and work items are jo
   webhooks as below, or clear the cap in the group's settings meanwhile.
 - **Webhooks missing** (status not updating while calls happen): check **Koppelingen**, the
   secrets, and re-run `register-webhooks`; WxCC sets a subscription to `inactive` after
-  repeated delivery errors.
+  repeated delivery errors. Since ADR 0082 step 2 the worker reconciles such tasks itself every
+  `task_reconcile_interval_minutes` (timeline detail `reconciled`) and raises the alert
+  `integration.webhooks_missing`; *Koppelingen* shows each platform's last inbound event.
+- **Health** (ADR 0082 step 2): *Koppelingen* and *System status* show per organisation and
+  platform `ok`, `degraded`, `down` or `unknown`, from the request events of the last
+  `integration_health_window_minutes`; a transition is the system event `integration.health`
+  and an alert (`down` an outage). `down` with `why:token_refresh` in the event's detail: the
+  Service App must be authorised again.

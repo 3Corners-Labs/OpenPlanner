@@ -2,7 +2,9 @@ name: main
 
 on:
   push:
-    branches: [main]
+    # ADR 0116 point 3: a maintenance line release/X.Y builds candidates as main does. The
+    # pattern leaves out a release PR's branch (release/vX.Y.Z).
+    branches: [main, "release/[0-9]+.[0-9]+"]
     # ADR 0107: the release app pushes the candidate tag, and an app's push starts workflows;
     # a candidate is built in the run that tags it, so only release tags start this workflow.
     tags: ["v*.*.*", "!v*.*.*-rc.*"]
@@ -43,6 +45,8 @@ jobs:
 
   mutation:
     name: mutation score >= 80% on app/domain and app/i18n
+    # Not on a maintenance line: its fixes ran it on main first (ADR 0116 point 3).
+    if: github.ref_name == 'main' || github.ref_type == 'tag'
     runs-on: ubuntu-26.04
     timeout-minutes: 60   # took 22 to 30+ minutes at v0.5.1 (the first run hit the old limit of 30)
     steps:
@@ -54,15 +58,17 @@ jobs:
       - run: uv sync --locked
       - run: make mutation
 
-  # ADR 0059: every merge to main becomes a release candidate X.Y.Z-rc.N, offered to
+  # ADR 0059: every merge to main (or to a line release/X.Y, ADR 0116) becomes a release
+  # candidate X.Y.Z-rc.N, offered to
   # installations on the `rc` channel. It waits for the ZAP baseline only: the merge queue ran
   # the full lane on this commit (ADR 0058), and the mutation test above measures the tests,
   # not the image. One candidate at a time, so two merges never claim the same number.
   candidate:
-    name: release candidate from main
+    name: release candidate from main or a line
     if: github.ref_type == 'branch'
     needs: [zap-baseline]
-    # ADR 0107: the release app's key lives in this environment, which only `main` may use.
+    # ADR 0107: the release app's key lives in this environment, which only `main` and the
+    # maintenance lines release/X.Y may use (ADR 0116 point 3).
     environment: release
     concurrency:
       group: release-candidate
@@ -86,11 +92,13 @@ jobs:
       # merge was already tagged (its ZAP baseline finished first) gets no version, and the
       # steps below are skipped. Otherwise rc.N+k would carry older code than rc.N and an
       # installation on `rc` would go back (2026-11-03: rc.179 on #480 after rc.176 on #481).
+      # On a line (ADR 0116 point 3) the candidate is the next patch of the line; a `feat` or a
+      # migration on a line fails this step.
       - id: candidate
         name: next candidate number
         run: |
           set -euo pipefail
-          version="$(python3 -m scripts.release_plan --candidate)"
+          version="$(python3 -m scripts.release_plan --candidate --branch "$GITHUB_REF_NAME")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if [ -n "$version" ]; then
             echo "::notice::release candidate $version"
@@ -144,7 +152,7 @@ jobs:
         run: |
           set -euo pipefail
           GH_TOKEN="$APP_TOKEN" scripts/release-git-identity.sh
-          git tag -a "v$VERSION" -m "v$VERSION: release candidate of main @ $GITHUB_SHA ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+          git tag -a "v$VERSION" -m "v$VERSION: release candidate of $GITHUB_REF_NAME @ $GITHUB_SHA ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
           # The checkout's own header carries GITHUB_TOKEN; empty it so the app's token is used.
           git -c "http.https://github.com/.extraheader=" \
             push "https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/v$VERSION"
@@ -167,14 +175,17 @@ jobs:
         with:
           fetch-depth: 0   # the release check below needs main's history
       # ADR 0052: a release tag must sit on main and match pyproject.toml, or nothing is pushed.
+      # ADR 0116 point 3: or it is a patch X.Y.Z on its own line release/X.Y.
       # ADR 0059: release candidates are tagged by the candidate job, never by hand.
-      - name: release tag matches main and pyproject.toml
+      - id: where
+        name: release tag on main or its own line, and matches pyproject.toml
         run: |
+          # pipefail: a refused tag must fail this step through `| tee` (bash -e alone does not).
+          set -euo pipefail
           case "$GITHUB_REF_NAME" in
             *-rc.*) echo "::error::$GITHUB_REF_NAME: release candidates are made by CI (ADR 0059)"; exit 1 ;;
           esac
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
-            || { echo "::error::$GITHUB_REF_NAME is not a commit on main"; exit 1; }
+          python3 -m scripts.release_line tag-allowed --version "${GITHUB_REF_NAME#v}" --commit "$GITHUB_SHA" | tee -a "$GITHUB_OUTPUT"
           project="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           [ "v$project" = "$GITHUB_REF_NAME" ] \
             || { echo "::error::tag $GITHUB_REF_NAME but pyproject.toml says $project"; exit 1; }
@@ -189,14 +200,16 @@ jobs:
           echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"
           echo "proxy=${PROXY_IMAGE,,}" >> "$GITHUB_OUTPUT"
           echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-      # ADR 0108: only a minor or major release (vX.Y.0) also goes to the public packages. The
-      # rule is here, not in a setting: widening it publishes images irreversibly.
+      # ADR 0108, amended by ADR 0116 point 10: every release vX.Y.Z (patches included, from
+      # main or a line) also goes to the public packages, so a security fix needs no pull secret
+      # while the release it fixes does not; candidates never reach this job. The rule is here,
+      # not in a setting: widening it publishes images irreversibly.
       - id: public
         run: |
-          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.0$ ]]; then
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "app=${IMAGE,,}-public" >> "$GITHUB_OUTPUT"
             echo "proxy=${PROXY_IMAGE,,}-public" >> "$GITHUB_OUTPUT"
-            echo "::notice::$GITHUB_REF_NAME is a minor or major release: also pushed to the public packages"
+            echo "::notice::$GITHUB_REF_NAME is a release: also pushed to the public packages"
           fi
       - id: publish
         uses: ./.github/actions/publish-image
@@ -204,6 +217,8 @@ jobs:
           image: ${{ steps.image.outputs.name }}
           public-image: ${{ steps.public.outputs.app }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
+          # ADR 0116: a patch from a line never moves :latest (a newer minor may exist).
+          flavor: latest=${{ steps.where.outputs.latest == 'true' && 'auto' || 'false' }}
           build-args: |
             APP_VERSION=${{ steps.image.outputs.version }}
             APP_COMMIT=${{ github.sha }}
@@ -216,6 +231,8 @@ jobs:
           image: ${{ steps.image.outputs.proxy }}
           public-image: ${{ steps.public.outputs.proxy }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
+          # ADR 0116: a patch from a line never moves :latest (a newer minor may exist).
+          flavor: latest=${{ steps.where.outputs.latest == 'true' && 'auto' || 'false' }}
           context: deploy/proxy
           sbom-file: sbom-proxy.cdx.json
           tags: |
@@ -235,13 +252,31 @@ jobs:
           APP_REF: ${{ steps.public.outputs.app }}@${{ steps.publish.outputs.digest }}
           PROXY_REF: ${{ steps.public.outputs.proxy }}@${{ steps.publish-proxy.outputs.digest }}
         run: scripts/public-release-notes.sh "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$APP_REF" "$PROXY_REF" > release-notes.md
-      - name: attach the SBOMs to the release
+      # ADR 0116 point 7: the released image writes the upgrade fixture (generated data only),
+      # which the upgrade matrix of later PRs takes through their migrations and back. The
+      # matrix uses only fixtures this job uploaded (uploader github-actions[bot], checksum).
+      - name: upgrade fixture of this release
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.name }}@${{ steps.publish.outputs.digest }}
+          VERSION: ${{ steps.image.outputs.version }}
+        run: scripts/upgrade-matrix.sh fixture "$IMAGE_REF" "$VERSION"
+      # ADR 0116 point 9: the support index the release was made with, signed keyless with the
+      # release's identity, so an offline installation can check it (step 7, the bundle).
+      - name: sign the support index
+        run: cosign sign-blob --yes --bundle support.json.sigstore.json support.json
+      - name: attach the SBOMs, the upgrade fixture and the support index to the release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.image.outputs.version }}
+          # ADR 0116: a patch from a line is never GitHub's latest release.
+          LATEST: ${{ steps.where.outputs.latest }}
         run: |
           notes=()
           [ ! -s release-notes.md ] || notes=(--notes-file release-notes.md)
-          gh release create "$GITHUB_REF_NAME" sbom.cdx.json sbom-proxy.cdx.json --verify-tag --generate-notes "${notes[@]}"
+          gh release create "$GITHUB_REF_NAME" --latest="$LATEST" sbom.cdx.json sbom-proxy.cdx.json \
+            "upgrade-fixture-$VERSION.sqlite" "upgrade-fixture-$VERSION.sqlite.sha256" \
+            support.json support.json.sigstore.json \
+            --verify-tag --generate-notes "${notes[@]}"
 
   # ADR 0087 step 3: the recorded walkthrough, attached to every release.
   tour:
@@ -268,7 +303,7 @@ jobs:
     needs: [candidate, publish, tour]
     if: >-
       ${{ !cancelled() && (
-        (github.ref_type == 'branch' && needs.candidate.result == 'success') ||
+        (github.ref_name == 'main' && needs.candidate.result == 'success') ||
         (github.ref_type == 'tag' && needs.publish.result == 'success')) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
@@ -320,7 +355,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" site-*.tar.gz --clobber
       # ADR 0113: only a minor or major release goes live (v0.4.0, v1.0.0; not v0.4.1 or a
-      # candidate), as ADR 0108 does for the public images.
+      # candidate).
       - name: is this a minor or major release
         id: minor
         run: |

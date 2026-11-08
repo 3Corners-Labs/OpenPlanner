@@ -72,6 +72,45 @@
   <p>{{ _("admin.integrations.service_app_not_checked", command="python -m app.cli wxcc-check") }}</p>
   {% endif %}
 </section>
+<section class="card" id="health" aria-labelledby="health-heading">
+  <div class="card__header">
+    <h2 id="health-heading">{{ _("admin.integrations.health") }}</h2>
+    <p class="card__lead">{{ _("admin.integrations.health_lead") }}</p>
+  </div>
+  <h3>{{ _("admin.integrations.inbound") }}</h3>
+  {% if health.inbound %}
+  <dl class="facts">
+    {% for row in health.inbound %}
+    <div><dt>{{ row.platform }}</dt><dd>{{ _("admin.integrations.inbound_at", time=row.at) }}<br><code>{{ row.kind }}</code> · {{ row.outcome }}</dd></div>
+    {% endfor %}
+  </dl>
+  {% else %}
+  <p class="empty-state">{{ _("admin.integrations.inbound_none") }}</p>
+  {% endif %}
+  <h3>{{ _("admin.integrations.health_states") }}</h3>
+  {% if health.rows %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.integrations.health_states") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.integrations.col.organisation") }}</th><th scope="col">{{ _("admin.integrations.col.platform") }}</th><th scope="col">{{ _("admin.integrations.col.state") }}</th><th scope="col">{{ _("admin.integrations.col.since") }}</th><th scope="col">{{ _("admin.integrations.col.failures") }}</th></tr></thead>
+    <tbody>
+      {% for row in health.rows %}
+      <tr>
+        <th scope="row">{{ row.organisation }}</th>
+        <td>{{ row.platform }}</td>
+        <td><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ row.state }}</span></td>
+        <td>{{ row.since }}</td>
+        <td>{{ _("admin.integrations.failures_of", failures=row.failures, requests=row.requests) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{{ _("admin.integrations.health_none") }}</p>
+  {% endif %}
+</section>
+{% include "admin/_alert_targets.html" %}
 <section class="card" aria-labelledby="webhooks-heading">
   <div class="card__header">
     <h2 id="webhooks-heading">{{ _("admin.integrations.webhooks") }}</h2>

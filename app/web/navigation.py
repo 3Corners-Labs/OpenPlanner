@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.authorization import Permission
+from app.domain.settings_registry import SettingClass, SettingSpec, Topic
 from app.i18n import Translator
 
 MAX_SECTIONS = 3
@@ -70,6 +71,9 @@ class Screen:
             that row.
         own_label_key: For a screen with sub-tabs: the label of its own page in that row,
             when it differs from the screen's label (an entry's name is not its first part).
+        topics: For a settings screen: the ADR 0042 topics it shows, as sections in this
+            order (ADR 0047 §5, step 6). A topic that exists on two scopes is declared on the
+            screen of each, under the same name.
     """
 
     key: str
@@ -84,6 +88,7 @@ class Screen:
     wide_subpages: tuple[str, ...] = ()
     subtabs: tuple["Screen", ...] = ()
     own_label_key: str = ""
+    topics: tuple[Topic, ...] = ()
 
     @property
     def routes(self) -> tuple[str, ...]:
@@ -135,6 +140,35 @@ class Home:
     subtab: str | None = None
     width: Width = Width.STANDARD
 
+
+PLATFORM_TOPICS = (
+    Topic.OPERATIONS,
+    Topic.RETENTION,
+    Topic.STORAGE,
+    Topic.RATE_LIMITS,
+    Topic.ADMIN_SESSION,
+    Topic.LOGIN_MAPPING,
+    Topic.MAIL,
+    Topic.WEBEX,
+    Topic.UPDATES,
+    Topic.DISPLAY,
+    Topic.STAFF,
+    Topic.PLANNER,
+    Topic.BOOKING_FORM,
+    Topic.CONFIRMATION,
+    Topic.PARTICIPANT_LINK,
+)
+"""The topics of *Platform › Advanced settings › Settings*, in the order of its sections."""
+
+ORGANISATION_TOPICS = (
+    Topic.RETENTION,
+    Topic.DISPLAY,
+    Topic.STAFF,
+    Topic.PLANNER,
+    Topic.BOOKING_FORM,
+    Topic.CONFIRMATION,
+)
+"""The topics of an organisation's *Overview › Settings*, in the order of its sections."""
 
 SECTIONS = (
     Section(
@@ -305,6 +339,8 @@ SECTIONS = (
                         "/admin/settings/values",
                         Permission.SETTINGS_PLATFORM_VIEW,
                         "sliders",
+                        # Class C, and the platform defaults of class D (ADR 0042 §1).
+                        topics=PLATFORM_TOPICS,
                     ),
                     Screen(
                         "platform.package",
@@ -389,6 +425,7 @@ OBJECTS = (
                         f"{_ORGANISATION}/settings",
                         Permission.SETTINGS_ORGANISATION_MANAGE,
                         "sliders",
+                        topics=ORGANISATION_TOPICS,
                     ),
                     Screen(
                         "organisation.embedding",
@@ -473,6 +510,7 @@ OBJECTS = (
         "admin.nav.object.group",
         _GROUP,
         "manage.groups",
+        # ADR 0047 step 4: six tabs, related screens as sub-tabs of one tab.
         (
             Screen(
                 "group.overview",
@@ -482,62 +520,8 @@ OBJECTS = (
                 "dashboard",
                 width=Width.WIDE,
             ),
-            Screen(
-                "group.settings",
-                "admin.tab.settings",
-                f"{_GROUP}/settings",
-                Permission.GROUP_EDIT,
-                "settings",
-                # ADR 0055: the booking form is a sub-page of the settings; ADR 0084: so is
-                # the page that archives the group.
-                (
-                    f"{_GROUP}/settings/form",
-                    f"{_GROUP}/settings/form/{{key}}",
-                    f"{_GROUP}/settings/archive",
-                ),
-            ),
-            Screen(
-                "group.staffing",
-                "admin.tab.hours",
-                f"{_GROUP}/staffing",
-                Permission.SCHEDULE_MANAGE,
-                "clock",
-                (f"{_GROUP}/staffing/{{rule_id}}", f"{_GROUP}/staffing/{{rule_id}}/split"),
-                width=Width.WIDE,
-            ),
-            Screen(
-                "group.exceptions",
-                "admin.tab.exceptions",
-                f"{_GROUP}/exceptions",
-                Permission.SCHEDULE_MANAGE,
-                "calendar",
-                # ADR 0084 step 5: an exception is changed on its own page.
-                (f"{_GROUP}/exceptions/{{override_id}}",),
-            ),
-            Screen(
-                "group.holidays",
-                "admin.tab.holidays",
-                f"{_GROUP}/holidays",
-                Permission.SCHEDULE_MANAGE,
-                "holiday",
-            ),
-            Screen(
-                "group.reminders",
-                "admin.tab.reminders",
-                f"{_GROUP}/reminders",
-                Permission.REMINDERS_MANAGE,
-                "bell",
-                # ADR 0084 step 5: a rule is changed on its own page.
-                (f"{_GROUP}/reminders/{{channel}}/{{minutes}}",),
-            ),
-            Screen(
-                "group.messages",
-                "admin.tab.messages",
-                f"{_GROUP}/messages",
-                Permission.TEXTS_MANAGE,
-                "mail",
-                (f"{_GROUP}/messages/{{text_locale}}",),
-            ),
+            # The bookings: the day and week agenda, and the own queue's working list (ADR
+            # 0043, shown only on a group that dispatches to it).
             Screen(
                 "group.agenda",
                 "admin.tab.agenda",
@@ -555,15 +539,93 @@ OBJECTS = (
                 ),
                 width=Width.WIDE,
                 wide_subpages=(f"{_GROUP}/agenda/week",),
+                subtabs=(
+                    Screen(
+                        "group.queue",
+                        "admin.tab.queue",
+                        f"{_GROUP}/queue",
+                        Permission.QUEUE_WORK,
+                        "queue",
+                        (f"{_GROUP}/queue/{{booking_id}}",),
+                        width=Width.WIDE,
+                    ),
+                ),
             ),
+            # When the group is open: staffing (the tab's own page), exceptions, holidays.
             Screen(
-                "group.queue",
-                "admin.tab.queue",
-                f"{_GROUP}/queue",
-                Permission.QUEUE_WORK,
-                "queue",
-                (f"{_GROUP}/queue/{{booking_id}}",),
+                "group.planning",
+                "admin.tab.planning",
+                f"{_GROUP}/staffing",
+                Permission.SCHEDULE_MANAGE,
+                "clock",
+                (f"{_GROUP}/staffing/{{rule_id}}", f"{_GROUP}/staffing/{{rule_id}}/split"),
                 width=Width.WIDE,
+                own_label_key="admin.tab.hours",
+                subtabs=(
+                    Screen(
+                        "group.exceptions",
+                        "admin.tab.exceptions",
+                        f"{_GROUP}/exceptions",
+                        Permission.SCHEDULE_MANAGE,
+                        "calendar",
+                        # ADR 0084 step 5: an exception is changed on its own page.
+                        (f"{_GROUP}/exceptions/{{override_id}}",),
+                    ),
+                    Screen(
+                        "group.holidays",
+                        "admin.tab.holidays",
+                        f"{_GROUP}/holidays",
+                        Permission.SCHEDULE_MANAGE,
+                        "holiday",
+                    ),
+                ),
+            ),
+            # What the participant receives: reminders (the tab's own page), the texts, and
+            # the contact block shown during a closure (moved here from *Closure*).
+            Screen(
+                "group.messages",
+                "admin.tab.group_messages",
+                f"{_GROUP}/reminders",
+                Permission.REMINDERS_MANAGE,
+                "mail",
+                # ADR 0084 step 5: a rule is changed on its own page.
+                (f"{_GROUP}/reminders/{{channel}}/{{minutes}}",),
+                own_label_key="admin.tab.reminders",
+                subtabs=(
+                    Screen(
+                        "group.texts",
+                        "admin.tab.messages",
+                        f"{_GROUP}/messages",
+                        Permission.TEXTS_MANAGE,
+                        "mail",
+                        (f"{_GROUP}/messages/{{text_locale}}",),
+                    ),
+                    Screen(
+                        "group.contact",
+                        "admin.tab.contact",
+                        f"{_GROUP}/contact",
+                        Permission.CLOSURE_MANAGE,
+                        "people",
+                    ),
+                ),
+            ),
+            # The group's settings, with the connection check as a section of the page.
+            Screen(
+                "group.settings",
+                "admin.tab.settings",
+                f"{_GROUP}/settings",
+                Permission.GROUP_EDIT,
+                "settings",
+                # ADR 0055: the booking form is a sub-page of the settings; ADR 0084: so is
+                # the page that archives the group.
+                (
+                    f"{_GROUP}/settings/form",
+                    f"{_GROUP}/settings/form/{{key}}",
+                    # ADR 0081 point 7: subjects and routing, next to the booking form.
+                    f"{_GROUP}/settings/routing",
+                    f"{_GROUP}/settings/routing/subjects/{{code}}",
+                    f"{_GROUP}/settings/archive",
+                ),
             ),
             Screen(
                 "group.closure",
@@ -573,7 +635,6 @@ OBJECTS = (
                 "alert",
                 (
                     f"{_GROUP}/closure/bookings/{{booking_id}}/move",
-                    f"{_GROUP}/closure/contacts",
                     f"{_GROUP}/closure/scenarios",
                     f"{_GROUP}/closure/scenarios/{{scenario_id}}",
                     f"{_GROUP}/closure/scenarios/{{scenario_id}}/contacts",
@@ -582,7 +643,35 @@ OBJECTS = (
         ),
     ),
 )
-"""Object pages with tabs. The group still has ten tabs until ADR 0047 build step 4."""
+"""Object pages with tabs and sub-tabs."""
+
+
+def _scope_screens(class_: SettingClass) -> Iterator[Screen]:
+    """Yield the screens of the scope where a setting of ``class_`` is changed."""
+    for entry, item in screens():
+        organisation = entry == object_page("organisation").entry and item.key.startswith(
+            "organisation."
+        )
+        if (class_ is SettingClass.ORGANISATION and organisation) or (
+            class_ is SettingClass.PLATFORM and item.key.startswith("platform.")
+        ):
+            yield item
+
+
+def topic_home(spec: SettingSpec) -> Screen | None:
+    """Return the screen of ``spec``'s scope that declares its topic (ADR 0047 §5).
+
+    Class C lives on a platform screen, class D on an organisation screen; ``None`` for a
+    setting outside the portal (class A and B) or a topic no screen of its scope declares.
+    """
+    if not spec.in_portal:
+        return None
+    return next((s for s in _scope_screens(spec.class_) if spec.topic in s.topics), None)
+
+
+def topic_anchor(topic: Topic) -> str:
+    """Return the fragment of ``topic``'s section on its screen (``#topic-<value>``)."""
+    return f"#topic-{topic.value}"
 
 
 def screens() -> Iterator[tuple[str, Screen]]:
@@ -635,6 +724,18 @@ _HOMES = _homes()
 def home_of(route_path: str) -> Home | None:
     """Return where the route template ``route_path`` lives, or ``None`` if it has no home."""
     return _HOMES.get(route_path)
+
+
+def screen(key: str) -> Screen:
+    """Return the screen of the register called ``key`` (an entry, tab or sub-tab).
+
+    Raises:
+        KeyError: When no screen has that key; a caller names keys of the register only.
+    """
+    found = next((s for _, s in screens() if s.key == key), None)
+    if found is None:
+        raise KeyError(key)
+    return found
 
 
 def entry(key: str) -> Screen | None:
@@ -703,4 +804,24 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
             *header,
             *_rows(translator, locale, obj.tabs),
         ]
+    lines += ["", *_topic_rows(translator, locale)]
     return "\n".join(lines) + "\n"
+
+
+def _topic_rows(translator: Translator, locale: str) -> list[str]:
+    """Return the section of ``docs/admin-map.md`` listing each settings topic's homes."""
+    rows = [
+        "## Settings topics",
+        "",
+        "A settings screen declares the ADR 0042 topics it shows, as sections in this order",
+        "(ADR 0047 §5). A class C setting's topic is declared on a platform screen, a class D",
+        "setting's on an organisation screen; a test fails otherwise.",
+        "",
+        "| Topic | Screen | Section |",
+        "|---|---|---|",
+    ]
+    for _, item in screens():
+        name = translator.gettext(locale, item.label_key)
+        for topic in item.topics:
+            rows.append(f"| `{topic.value}` | {name} | `{item.path}{topic_anchor(topic)}` |")
+    return rows

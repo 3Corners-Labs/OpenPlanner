@@ -9,9 +9,12 @@ import pytest
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.updates import (
     CHECK_INTERVAL,
+    NOTES_CHARS,
     OUTCOME_SHOWN,
     RESTORE_WINDOW,
     UNCLAIMED_AFTER,
+    ListedRelease,
+    NoteLine,
     PlanStep,
     Release,
     ReleaseCheck,
@@ -126,6 +129,48 @@ def test_release_needs_a_github_https_page() -> None:
     with pytest.raises(DomainError) as caught:
         Release(V2, "javascript:alert(1)")
     assert caught.value.code is ErrorCode.INVALID_CONFIGURATION
+
+
+def listed(notes: str) -> ListedRelease:
+    return ListedRelease(Version(1, 4, 0, 1), RELEASE.url, None, notes)
+
+
+def test_a_docs_line_is_marked_as_design_or_documentation() -> None:
+    lines = listed(
+        "docs(adr): 0117 reporting on use (#558)\n"
+        "Docs: the manual of the updates screen (#559)\n"
+        "docs!: a breaking change to the docs (#560)\n"
+        "feat(reports): usage report (#561)\n"
+        "chore(deps): update dependency x (#562)\n"
+        "documentation: not a Conventional Commit type (#563)\n"
+        "docs update without a type (#564)\n"
+        'Revert "docs(adr): 0117" (#565)\n'
+        "\n"
+        "New Contributors"
+    ).lines
+    assert [line.docs for line in lines] == [True, True, True] + [False] * 6
+    assert lines[0] == NoteLine("docs(adr): 0117 reporting on use (#558)", docs=True)
+
+
+def test_a_version_of_docs_lines_only_changes_no_behaviour() -> None:
+    assert listed("docs(adr): 0117 reporting on use (#558)").docs_only
+    assert listed("docs(adr): 0117 (#558)\ndocs(manual): updates (#559)\n").docs_only
+    assert not listed("docs(adr): 0117 (#558)\nfix(updates): mark docs lines (#591)").docs_only
+    assert not listed("").docs_only  # no notes: nothing is known
+
+
+def test_notes_cut_at_the_limit_never_count_as_docs_only() -> None:
+    notes = "\n".join(f"docs(adr): decision {n} (#{n})" for n in range(400))
+    cut = listed(notes)
+    assert len(cut.notes) == NOTES_CHARS
+    assert all(line.docs for line in cut.lines[:-1])
+    assert not cut.docs_only  # the lines that were cut off may change behaviour
+
+
+def test_notes_that_reach_the_limit_exactly_are_taken_as_cut() -> None:
+    line = "docs(adr): " + "x" * (NOTES_CHARS - len("docs(adr): ") - 1)
+    assert listed(line).docs_only  # one character short of the limit: nothing was cut
+    assert not listed(line + "x").docs_only  # at the limit: cut or not cannot be told
 
 
 def test_check_is_due_first_time_and_after_an_hour() -> None:

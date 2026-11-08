@@ -43,6 +43,38 @@ auditlog, als geslaagd of mislukt. Ook als de onderhoudsmodus aanstaat kunt u he
 om een herstelde koppeling te testen. Is er nog niet gecontroleerd, dan toont het scherm het
 alternatief op de opdrachtregel (`python -m app.cli wxcc-check`).
 
+## Gezondheid en laatste meldingen
+
+Hoe het met de koppelingen gaat. **Laatste melding per platform** zegt wanneer Webex en het
+contactcenter voor het laatst iets meldden, welk soort melding en wat OpenPlanner ermee deed
+(`recorded` vastgelegd, `duplicate` al eerder binnen, `unknown` niet van OpenPlanner,
+`ignored` niet nodig). Komt er lang niets terwijl er gesprekken zijn, dan staat de webhook
+waarschijnlijk uit.
+
+**Gezondheid per organisatie** wordt elke paar minuten door het achtergrondproces berekend uit
+de verzoeken die OpenPlanner zelf deed in het laatste kwartier:
+
+- **In orde**: weinig of geen mislukte verzoeken.
+- **Verstoord**: meer dan een kwart mislukt (instelling *Verstoord boven dit aandeel*).
+- **Onbereikbaar**: meer dan driekwart mislukt, het vernieuwen van het token van de Service App
+  mislukte, of de proef-werkopdracht van de groepscontrole kwam niet rond.
+- **Onbekend**: minder dan drie verzoeken; te weinig om iets over te zeggen.
+
+Een verstoorde of onbereikbare koppeling is een melding op het overzicht en in de banner. Ze
+gaat pas weer naar *In orde* na tien minuten zonder fouten (instelling *Hersteld na*).
+
+Taken die het contactcenter niet terugmeldde, loopt OpenPlanner zelf na: een taak die na de
+starttijd te lang *in wachtrij* of *verbonden* blijft, vraagt het achtergrondproces op bij het
+contactcenter. Wijkt die af, dan komt dat met `reconciled` op de tijdlijn van de afspraak en
+volgt de melding *Meldingen van het contactcenter*: kijk dan bij de registraties hieronder.
+
+## Meldingen aan beheerders
+
+De adressen en de Webex-bot voor meldingen van het hele platform (updates, certificaten, het
+achtergrondproces, verzoeken zonder organisatie). Ze werken zoals bij een organisatie: zie
+[Kanalen](channels.md). Het aanmaken van de bot is stap 11 van
+[Contactcenter inrichten](contact-center-setup.md).
+
 ## Webhooks
 
 De twee adressen die de meldingen van Webex en WxCC ontvangen, elk met de vermelding of er een

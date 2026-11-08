@@ -67,6 +67,9 @@ __all__ = [
     "IntegrationReportRow",
     "BookingEventRow",
     "CallStatusRow",
+    "UsageEventRow",
+    "UsageHourRow",
+    "UsageStaffHourRow",
     "ChannelSettingsRow",
     "GroupTextRow",
     "OrganisationTextRow",
@@ -220,12 +223,18 @@ class GroupRow(Base):
     # ADR 0066: future bookings one email address may hold in this group.
     max_bookings_per_email: Mapped[int] = mapped_column(Integer, server_default=text("3"))
     calendar_invite_address: Mapped[str | None] = mapped_column(String(254))
+    # ADR 0082 point 11: the fallback to the own queue, the team's space, and its state.
+    dispatch_fallback: Mapped[str] = mapped_column(String(16), server_default=text("'none'"))
+    fallback_space_room_id: Mapped[str | None] = mapped_column(String(200))
+    fallback_active_since: Mapped[datetime | None] = mapped_column(UTCDateTime())
     holiday_source: Mapped[str] = mapped_column(String(16), server_default=text("'inherit'"))
     form_version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
     # ADR 0049: what the identity provider names the group by, unique in its organisation.
     idp_key: Mapped[str] = mapped_column(String(64), default=_slug_as_idp_key)
     # ADR 0084: set when the group is archived; NULL while it is in use.
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # ADR 0081: subjects, switched-on routing attributes and their mapping, as JSON; no PII.
+    routing: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         UniqueConstraint("organisation_id", "idp_key", name="uq_groups_organisation_idp_key"),
@@ -308,6 +317,8 @@ class ScheduleRuleRow(Base):
     capacity: Mapped[int] = mapped_column(Integer)
     label: Mapped[str | None] = mapped_column(String(50))
     offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
+    # ADR 0081 point 4: the subject codes the block offers, comma-separated; NULL offers all.
+    subjects: Mapped[str | None] = mapped_column(String(1000))
     valid_from: Mapped[date | None] = mapped_column(Date)
     valid_to: Mapped[date | None] = mapped_column(Date)
 
@@ -332,6 +343,8 @@ class ScheduleOverrideRow(Base):
     capacity: Mapped[int | None] = mapped_column(Integer)
     label: Mapped[str | None] = mapped_column(String(50))
     offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
+    # ADR 0081 point 4: the subject codes the block offers, comma-separated; NULL offers all.
+    subjects: Mapped[str | None] = mapped_column(String(1000))
 
     __table_args__ = (
         Index("ix_schedule_overrides_group_day", "group_id", "day"),
@@ -524,6 +537,10 @@ class BookingRow(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     # ADR 0055: answers to the group's custom fields as JSON; PII, purged as a whole.
     form_answers: Mapped[str | None] = mapped_column(Text)
+    # ADR 0081: the chosen subject's code and the attribute codes (JSON); no PII, purged with
+    # the booking all the same (privacy.ROUTING_FIELDS).
+    subject_code: Mapped[str | None] = mapped_column(String(40))
+    routing_answers: Mapped[str | None] = mapped_column(String(500))
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
@@ -742,6 +759,21 @@ class StaffRow(Base):
     status_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
+class OverviewLayoutRow(Base):
+    """An admin's own overview layout (ADR 0096): widget keys in order, comma-separated.
+
+    Keys only, never personal data; erasing the staff record (ADR 0046) deletes it.
+    """
+
+    __tablename__ = "overview_layouts"
+
+    staff_id: Mapped[int] = mapped_column(
+        ForeignKey("staff.id", ondelete="CASCADE"), primary_key=True
+    )
+    widget_keys: Mapped[str] = mapped_column(String(500))
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
 class StaffMembershipRow(Base):
     """One grant of an admin as last seen: a role on an organisation or a group (ADR 0049)."""
 
@@ -817,6 +849,101 @@ class BookingDayCountRow(Base):
     last_purged_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
+class UsageEventRow(Base):
+    """One usage fact as written, the outbox of the rollup (ADR 0117 point 3).
+
+    Hour-truncated time and the allow-listed codes and numbers only: no booking id, no
+    reference, no free text, so a row cannot be joined back to an appointment. Staff facts
+    carry ``staff_id``; every other row leaves it empty.
+    """
+
+    __tablename__ = "usage_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    bucket_hour: Mapped[datetime] = mapped_column(UTCDateTime())
+    organisation_id: Mapped[int] = mapped_column(Integer)
+    group_id: Mapped[int] = mapped_column(Integer)
+    booking_kind: Mapped[str | None] = mapped_column(String(16))
+    dispatch_kind: Mapped[str | None] = mapped_column(String(24))
+    subject_code: Mapped[str | None] = mapped_column(String(40))
+    locale: Mapped[str | None] = mapped_column(String(12))
+    channel_kind: Mapped[str | None] = mapped_column(String(16))
+    outcome: Mapped[str | None] = mapped_column(String(32))
+    actor_class: Mapped[str | None] = mapped_column(String(16))
+    reason_code: Mapped[str | None] = mapped_column(String(40))
+    value_seconds: Mapped[int | None] = mapped_column(Integer)
+    participants: Mapped[int | None] = mapped_column(Integer)
+    capacity: Mapped[int | None] = mapped_column(Integer)
+    booked: Mapped[int | None] = mapped_column(Integer)
+    staff_id: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        Index("ix_usage_events_scope_hour", "organisation_id", "group_id", "bucket_hour"),
+        Index("ix_usage_events_bucket_hour", "bucket_hour"),
+    )
+
+
+class UsageHourRow(Base):
+    """The long-lived rollup: one row per hour, group, metric and cut (ADR 0117 point 3)."""
+
+    __tablename__ = "usage_hour"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bucket_hour: Mapped[datetime] = mapped_column(UTCDateTime())
+    organisation_id: Mapped[int] = mapped_column(Integer)
+    group_id: Mapped[int] = mapped_column(Integer)
+    metric: Mapped[str] = mapped_column(String(8))
+    booking_kind: Mapped[str | None] = mapped_column(String(16))
+    dispatch_kind: Mapped[str | None] = mapped_column(String(24))
+    subject_code: Mapped[str | None] = mapped_column(String(40))
+    locale: Mapped[str | None] = mapped_column(String(12))
+    channel_kind: Mapped[str | None] = mapped_column(String(16))
+    outcome: Mapped[str | None] = mapped_column(String(32))
+    actor_class: Mapped[str | None] = mapped_column(String(16))
+    reason_code: Mapped[str | None] = mapped_column(String(40))
+    bucket: Mapped[int | None] = mapped_column(Integer)
+    count: Mapped[int] = mapped_column(Integer)
+    sum_value: Mapped[int] = mapped_column(Integer)
+    max_value: Mapped[int] = mapped_column(Integer)
+
+    __table_args__ = (
+        Index(
+            "ix_usage_hour_scope_metric_hour",
+            "organisation_id",
+            "group_id",
+            "metric",
+            "bucket_hour",
+        ),
+    )
+
+
+class UsageStaffHourRow(Base):
+    """The rollup per team member (ADR 0117 point 9); ``staff_id`` empty is *former members*."""
+
+    __tablename__ = "usage_staff_hour"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bucket_hour: Mapped[datetime] = mapped_column(UTCDateTime())
+    organisation_id: Mapped[int] = mapped_column(Integer)
+    group_id: Mapped[int] = mapped_column(Integer)
+    staff_id: Mapped[int | None] = mapped_column(Integer)
+    metric: Mapped[str] = mapped_column(String(8))
+    count: Mapped[int] = mapped_column(Integer)
+    sum_value: Mapped[int] = mapped_column(Integer)
+    max_value: Mapped[int] = mapped_column(Integer)
+
+    __table_args__ = (
+        Index(
+            "ix_usage_staff_hour_scope_metric_hour",
+            "organisation_id",
+            "group_id",
+            "metric",
+            "bucket_hour",
+        ),
+    )
+
+
 class CallStatusRow(Base):
     """The aggregated meeting and work item state of a booking (ADR 0010)."""
 
@@ -835,6 +962,8 @@ class CallStatusRow(Base):
     task_created_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0082 point 11: the booking is in the own queue as a fallback.
+    fallback: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
 
 
 class IntegrationCredentialRow(Base):
@@ -1103,6 +1232,8 @@ class ReleaseCheckRow(Base):
     release_url: Mapped[str | None] = mapped_column(String(300))
     error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
     requested_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    # ADR 0116 point 9: the last support.json read, as text; the updates page parses it.
+    support: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
 
@@ -1124,6 +1255,8 @@ class UpdateRequestRow(Base):
     reason: Mapped[str] = mapped_column(String(40), server_default=text("''"))
     step: Mapped[str | None] = mapped_column(String(16))
     step_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0116 point 9: the updater does not take the request before this moment.
+    apply_after: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         Index("ix_update_requests_status", "status"),
@@ -1362,3 +1495,40 @@ class ParticipantLinkBookingRow(Base):
             "session_id", "booking_id", name="uq_participant_link_bookings_session_booking"
         ),
     )
+
+
+class AlertTargetRow(Base):
+    """Where alerts go (ADR 0082 point 9): an administrator's email address or a Webex room.
+
+    ``organisation_id`` NULL is a target of the platform. No participant data.
+    """
+
+    __tablename__ = "alert_targets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    address: Mapped[str] = mapped_column(String(320))
+    min_level: Mapped[str] = mapped_column(String(16))
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('email', 'webex_space')", name="kind"),
+        CheckConstraint("min_level IN ('warning', 'outage')", name="min_level"),
+    )
+
+
+class AlertDeliveryRow(Base):
+    """What was sent of one alert to one target: repeat, dedupe and retry (ADR 0082 point 9)."""
+
+    __tablename__ = "alert_deliveries"
+
+    target_id: Mapped[int] = mapped_column(
+        ForeignKey("alert_targets.id", ondelete="CASCADE"), primary_key=True
+    )
+    alert_key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    token: Mapped[str] = mapped_column(String(32))
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    retry_at: Mapped[datetime | None] = mapped_column(UTCDateTime())

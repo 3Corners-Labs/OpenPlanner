@@ -1,9 +1,10 @@
 # Wachtrij
 
 Bij een groep met de **eigen wachtrij van OpenPlanner** pakken medewerkers videoafspraken op in
-dit scherm, in plaats van in het contactcenter. U opent het via het tabblad **Wachtrij** van de
-groep. Medewerkers, groepsbeheerders en organisatiebeheerders van de groep zien het. Bij een
-groep die met het contactcenter werkt, bestaat dit tabblad niet.
+dit scherm, in plaats van in het contactcenter. U opent het via **groep → Agenda → Wachtrij**.
+Medewerkers, groepsbeheerders en organisatiebeheerders van de groep zien het; wie alleen de
+wachtrij mag openen, komt via het tabblad **Agenda** direct hier. Bij een groep die met het
+contactcenter werkt, bestaat dit onderdeel niet.
 
 ## Wat u ziet
 
@@ -55,3 +56,10 @@ afspraak staat dan weer in de wachtrij. Een groepsbeheerder kan ook de afspraak 
 collega vrijgeven, bijvoorbeeld als die collega weg moest.
 
 Oppakken en vrijgeven staan in het auditlog, met uw naam en het afspraaknummer.
+
+## Terugval
+
+Een groep met het contactcenter kan terugvallen op deze wachtrij (instelling *Terugval als het
+contactcenter uitvalt*). Afspraken die zo binnenkomen, hebben het label **Terugval**. Zolang de
+hele groep terugvalt, staat bovenaan een banner; met **Terugval beëindigen** gaan afspraken die
+nog niet zijn opgepakt alsnog naar het contactcenter.

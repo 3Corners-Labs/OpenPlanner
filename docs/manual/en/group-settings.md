@@ -83,6 +83,35 @@ A change applies to appointments not yet dispatched. An appointment already in t
 center as a task stays there. When the contact center fails (Webex Connect or Webex Contact
 Center outage), you can switch the group to the own queue for the time being.
 
+<!-- field: dispatch_fallback -->
+### Fallback when the contact center fails
+
+Only for a group with **Contact center**. With **Own queue** an appointment goes to OpenPlanner's
+queue, flagged **Fallback**, when:
+
+- its dispatch fails for good (after the retries), or
+- the organisation's contact center is down (see *Health* on Integrations): the whole group then
+  falls back. The administrators get an alert, the queue shows a banner, and every appointment in
+  the agenda shows **Fallback**.
+
+When the contact center is fine again, the fallback ends by itself and appointments not yet
+picked up go to the contact center after all. Whoever manages the group's appointments can also
+end the fallback in the queue. The participant notices nothing: the link, the lobby and the rules
+for cancelling and moving stay the same.
+
+Choose this only if the team knows the queue and can work it. What the team sees and how it
+ends is in [Setting up the contact center](contact-center-setup.md), step 10.
+
+<!-- field: fallback_space_room_id -->
+### The team's Webex space (fallback)
+
+Optional. The id of the team's Webex space. During a fallback the organisation's bot (see *Alerts
+to administrators* on Channels) posts a message there, and for each appointment that lands in the
+queue the start time, the first name and a link to the queue. Never the link to the call: only
+whoever picks the appointment up gets that. Those messages stay in Webex after OpenPlanner has
+deleted the appointment's data; see [Setting up the contact center](contact-center-setup.md),
+steps 10 and 11.
+
 <!-- field: participant_change_lead_minutes -->
 ### Participant can move until (minutes ahead)
 
@@ -149,11 +178,18 @@ Whether the booking form asks for a phone number:
 Only ask for a number if the team actually uses it. Like the name and email address, the
 number is erased 24 hours after the appointment.
 
+## Subjects and routing
+
+Let participants choose a subject, ask for a preferred language or way of contact, and pass those
+choices to the contact center as codes. You set that up on a screen of its own: see
+[Subjects and routing](group-routing.md).
+
 ## Integrations: video and contact centre
 
 Leave these fields empty while the integration is not set up. Appointments then still work, but
 without a video meeting or a contact-centre task. The values come from the administrator of
-Webex and Webex Contact Center.
+Webex and Webex Contact Center. The whole set-up, step by step, is in
+[Setting up the contact center](contact-center-setup.md).
 
 <!-- field: video_host_email -->
 ### Webex host
@@ -196,7 +232,8 @@ event comes back, the result names what is missing (subscription, webhook or the
 the flow).
 
 The address of the *digital channel asset* in Webex Contact Center that receives this group's
-tasks. Several groups can share an address; the routing value then picks the queue.
+tasks. Several groups can share an address; the routing value then picks the queue. How to set
+up the asset: [Setting up the contact center](contact-center-setup.md), step 3.
 
 <!-- field: wxcc_control_hub -->
 ### Where to find it in Control Hub
@@ -281,7 +318,7 @@ was created but no *task:new* came back, look at the **Webhooks** part of the sa
 ### WxCC work item channel
 
 The name of the work item channel in Webex Contact Center, as the contact-centre administrator
-set it up.
+set it up ([Setting up the contact center](contact-center-setup.md), step 2).
 
 <!-- field: wxcc_routing_value -->
 ### Routing value for the WxCC flow

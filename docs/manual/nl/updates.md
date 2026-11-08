@@ -21,11 +21,25 @@ De eerste kaart toont:
 - **Nieuwste versie**: de nieuwste gevonden versie, met een link naar de toelichting.
 - **Laatst gecontroleerd**: wanneer de server voor het laatst naar een nieuwe versie zocht. Is
   dat mislukt, dan geeft een label de code.
+- **Lijn**: de minorversie die deze installatie volgt, zoals `1.4`: alleen de herstellingen van
+  die versie worden dan aangeboden, niet de volgende minorversie. *Elke versie van het kanaal*
+  als er geen lijn is ingesteld.
+- **Updatevenster**: wanneer de installatie zichzelf mag bijwerken, bijvoorbeeld *zo
+  03:00–05:00*, met de volgende opening; *Altijd* als er geen venster is ingesteld.
+- **Ondersteuning van deze lijn**: of de draaiende versie nog herstellingen krijgt:
+  *Ondersteund* (de nieuwste minorversie), *Alleen beveiligingsupdates* (vanaf 1.0.0 de
+  minorversie daarvoor), *Verlengde lijn* (met de einddatum) of *Niet meer ondersteund*: werk
+  dan bij naar een ondersteunde lijn.
 
-Het kanaal, het automatisch bijwerken en het interval tussen twee controles stelt u niet hier
-in, maar als superuser bij **Geavanceerde instellingen**, onderwerp Updates (`UPDATE_CHANNEL`,
-`UPDATE_AUTO_APPLY`, `UPDATE_CHECK_MINUTES`; zie
-[Geavanceerde instellingen](advanced-settings.md)).
+Het kanaal, het automatisch bijwerken, het interval tussen twee controles, de lijn en het venster
+stelt u niet hier in, maar als superuser bij **Geavanceerde instellingen**, onderwerp Updates
+(`UPDATE_CHANNEL`, `UPDATE_AUTO_APPLY`, `UPDATE_CHECK_MINUTES`, `UPDATE_LINE`, `UPDATE_WINDOW`;
+zie [Geavanceerde instellingen](advanced-settings.md)). Het venster is maximaal zeven blokken
+zoals `mon 02:00-04:00, sat 01:00-05:00` in de tijdzone van het portaal, elk minstens 30
+minuten. Binnen een blok dient de server zelf een automatische update in en voert de updater
+hem uit; daarbuiten wacht hij op het volgende blok. Een verzoek dat u zelf indient, houdt het
+venster nooit tegen. In een productie-installatie werkt automatisch bijwerken alleen met een
+ingesteld venster.
 
 <!-- field: check_now -->
 ### Nu controleren
@@ -46,6 +60,14 @@ dingen om te weten:
   of is teruggedraaid. Mislukt het helemaal, dan blijft de onderhoudsmodus aan (zie
   [Onderhoudsmodus](maintenance.md)).
 
+<!-- field: apply_after -->
+### Uitvoeren na
+
+Onder elke versie neemt **Uitvoeren na** een datum en tijd (in de tijdzone van het portaal)
+vanaf wanneer de updater het verzoek uitvoert, bijvoorbeeld vanavond om 23:00. Laat het leeg om
+te beginnen zodra de updater het verzoek ziet (binnen een minuut). Het open verzoek zegt dan
+vanaf wanneer de updater begint; tot dan kunt u het intrekken.
+
 <!-- field: target -->
 ### Een versie kiezen
 
@@ -55,6 +77,17 @@ toelichting, of het een releasekandidaat is en wanneer hij is gepubliceerd. **Nu
 kiest. Alleen nieuwere versies worden aangeboden: terug kan alleen met *Vorige versie
 terugzetten*. U kunt één verzoek tegelijk indienen; zolang er een verzoek openstaat, wordt een
 tweede geweigerd.
+
+De toelichting heeft één regel per wijziging, met de titel van de wijziging. Een titel begint
+met een type: `feat` is een nieuwe functie, `fix` een herstel, `docs` ontwerp of documentatie.
+Een regel van het type `docs`, zoals `docs(adr): ...`, krijgt het label *ontwerp of
+documentatie, niets gebouwd*: hij beschrijft een besluit, een ontwerp of een handleiding, en
+geen scherm of functie die al werkt. Bestaat een versie alleen uit zulke regels, dan staat
+boven de toelichting dat er niets verandert in hoe OpenPlanner werkt. Zo'n versie bijwerken kan,
+maar levert geen nieuwe functie op. Het scherm zegt dit nooit van een versie zonder toelichting
+of met een ingekorte toelichting. Het gaat af op de titels van de wijzigingen en vergelijkt met
+de versie ervoor: slaat u bij het bijwerken versies over, lees dan ook de toelichting van de
+versies ertussen.
 
 ## Het lopende verzoek
 

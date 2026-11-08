@@ -10,8 +10,8 @@ import re
 import httpx
 
 from tests.admin.conftest import GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, Site
-from tests.admin.test_admin_flow import audit_events
-from tests.admin.test_closure_routes import CLOSURE, UNTIL_SATURDAY, _post
+from tests.support.admin_site import audit_events, post_form
+from tests.support.closure_pages import CLOSURE, UNTIL_SATURDAY
 from tests.support.images import SECRET, jpeg, png
 
 IMAGE = f"{CLOSURE}/image"
@@ -20,7 +20,7 @@ TEXTS = {"alt_nl": "Een gesloten deur", "alt_en": "A closed door"}
 
 async def _closed(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    response = await _post(site, CLOSURE, UNTIL_SATURDAY)
+    response = await post_form(site, CLOSURE, UNTIL_SATURDAY)
     assert response.status_code == 303
 
 
@@ -163,7 +163,7 @@ async def test_the_image_of_a_lifted_closure_is_no_longer_public(site: Site) -> 
     await _upload(site, png())
     src = _image_src((await site.client.get("/g/demo")).text)
 
-    await _post(site, f"{CLOSURE}/lift")
+    await post_form(site, f"{CLOSURE}/lift")
 
     assert (await site.client.get(src)).status_code == 404
 

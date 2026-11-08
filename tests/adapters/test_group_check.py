@@ -22,11 +22,11 @@ from app.domain.calls import EventKind
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import JoinClient
-from tests.adapters.test_wxcc_config import FLOW_DOC, _config
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeProbes
 from tests.fakes.tokens import webex_client
 from tests.support.domain import make_group
+from tests.support.wxcc_config import FLOW_DOC, recorded_config
 
 BASE = "https://op.example.nl"
 WEBEX = "https://webexapis.example/v1"
@@ -158,7 +158,7 @@ def wxcc_ok(monkeypatch: pytest.MonkeyPatch) -> None:
         return line, WXCC, "org-1"
 
     async def fetch(*_: object) -> object:
-        return _config()
+        return recorded_config()
 
     monkeypatch.setattr(group_check, "region_check", region)
     monkeypatch.setattr(group_check, "fetch_config", fetch)
@@ -665,7 +665,7 @@ async def test_a_probe_that_arrives_but_is_not_ended_fails_when_the_flow_has_the
     )
 
     async def fetch(*_: object) -> object:
-        return _config(flow=flow)
+        return recorded_config(flow=flow)
 
     monkeypatch.setattr(group_check, "fetch_config", fetch)
     probes = FakeProbes([EventKind.TASK_CREATED])

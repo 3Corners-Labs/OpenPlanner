@@ -10,7 +10,6 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
-from app.domain.authorization import Role
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.identity_provider_service import (
     CREATED_EVENT,
@@ -22,8 +21,7 @@ from app.domain.identity_provider_service import (
     UPDATED_EVENT,
     IdentityProviderService,
 )
-from app.domain.identity_providers import KEY_OVERLAP, ClientAuth, ProviderDraft
-from app.domain.scheduling import Organisation
+from app.domain.identity_providers import KEY_OVERLAP, ClientAuth
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity_providers import (
     DISCOVERY_URL,
@@ -32,38 +30,15 @@ from tests.fakes.identity_providers import (
     discovery_document,
 )
 from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.support.admin import AUDITOR, ORG_ADMIN, OUTSIDER, SUPER
 from tests.support.domain import NOW
-from tests.support.principals import principal
-
-NOBODY: frozenset[str] = frozenset()
-SUPER = principal("s-1", "S", frozenset({Role.SUPERUSER}), NOBODY, NOBODY)
-ORG_ADMIN = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), NOBODY)
-AUDITOR = principal("a-1", "A", frozenset({Role.AUDITOR}), frozenset({"demo"}), NOBODY)
-OUTSIDER = principal("x-1", "X", frozenset({Role.ORG_ADMIN}), frozenset({"andere"}), NOBODY)
-ORGANISATIONS = (Organisation(1, "Demo-acme", "demo"), Organisation(2, "Andere", "andere"))
-PLATFORM_DISCOVERY = "https://login.platform.example/.well-known/openid-configuration"
-OTHER_ISSUER = "https://login.org-b.example"
-OTHER_DISCOVERY = f"{OTHER_ISSUER}/.well-known/openid-configuration"
-
-
-def draft(**overrides: str) -> ProviderDraft:
-    values = {
-        "key": "org-a",
-        "name": "Acme A",
-        "discovery_url": DISCOVERY_URL,
-        "client_id": "openplanner",
-        "client_auth": "private_key_jwt",
-        "scopes": "openid profile email",
-        "entitlement_claim": "openplanner_entitlements",
-        "entitlement_prefix": "openplanner",
-    }
-    values.update(overrides)
-    return ProviderDraft.create(**values)
-
-
-@pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
+from tests.support.organisation_providers import (
+    ORGANISATIONS,
+    OTHER_DISCOVERY,
+    OTHER_ISSUER,
+    PLATFORM_DISCOVERY,
+    draft,
+)
 
 
 @pytest.fixture
@@ -72,23 +47,6 @@ def uow() -> InMemoryUnitOfWork:
     state.organisations = {o.id: o for o in ORGANISATIONS}
     state.organisation_slugs = {o.id: o.slug for o in ORGANISATIONS}
     return InMemoryUnitOfWork(state)
-
-
-@pytest.fixture
-def discovery() -> FakeDiscoveryFetcher:
-    fetcher = FakeDiscoveryFetcher()
-    fetcher.documents[OTHER_DISCOVERY] = discovery_document(OTHER_ISSUER)
-    return fetcher
-
-
-@pytest.fixture
-def keys() -> FakeSigningKeys:
-    return FakeSigningKeys()
-
-
-@pytest.fixture
-def changed() -> list[str]:
-    return []
 
 
 @pytest.fixture

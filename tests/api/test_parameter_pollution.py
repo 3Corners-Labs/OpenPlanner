@@ -2,8 +2,8 @@
 
 A field or query parameter sent twice must never let the first, unvalidated copy through: the
 request is refused or handled deterministically, and the value that counts is the one that is
-validated (the last, as Starlette reads it). Fixtures and helpers come from the widget and
-booking page tests.
+validated (the last, as Starlette reads it). The widget's ``site`` comes from
+``tests/api/conftest.py``, the form values from ``tests/support/``.
 """
 
 import json
@@ -17,13 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import BookingRow, SlotRow
 from app.config import Settings
-from tests.api.test_booking_pages import ADA as FORM_ADA
-from tests.api.test_booking_pages import FRIDAY_0900, FRIDAY_0930, SAME_ORIGIN
-from tests.api.test_widget_api import ADA as WIDGET_ADA
-from tests.api.test_widget_api import BASE, SITE
-from tests.api.test_widget_api import site as widget_site
-
-site = widget_site  # the app with the demo group embeddable, as the widget tests run it
+from tests.support.participant import ADA as FORM_ADA
+from tests.support.participant import FRIDAY_0900, FRIDAY_0930, SAME_ORIGIN
+from tests.support.widget import ADA as WIDGET_ADA
+from tests.support.widget import BASE, SITE
 
 
 async def _starts(settings: Settings) -> list[str]:

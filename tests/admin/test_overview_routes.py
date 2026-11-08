@@ -20,7 +20,8 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
-from tests.support.queue import own_queue, site_uow
+from tests.support.admin_site import site_uow
+from tests.support.queue import own_queue
 
 WIDGET = re.compile(r'<section class="widget[^"]*" data-widget="([a-z-]+)"')
 
@@ -51,9 +52,10 @@ async def test_the_overview_works_without_script(site: Site) -> None:
     response = await site.client.get("/admin/")
 
     assert response.headers["content-security-policy"] == SCRIPT_CSP
-    assert re.findall(r"<script[^>]*>", response.text) == [
-        f'<script src="{src}" defer>' for src in re.findall(r'<script src="([^"]+)"', response.text)
-    ]  # only the page's own files, nothing inline
+    tags = re.findall(r"<script[^>]*>", response.text)
+    own = r'<script (type="module" )?src="/static/[^"]+"( defer)?>'
+    assert tags
+    assert all(re.fullmatch(own, tag) for tag in tags), tags  # own files only, nothing inline
     assert 'class="widget-grid"' in response.text
     assert 'href="/admin/"' in response.text  # the Refresh link
     assert "Vernieuwen" in response.text
@@ -312,3 +314,32 @@ async def test_the_status_widget_warns_about_a_proxy_hop_without_tls_adr_0091(
         assert warning not in (await site.client.get("/admin/overview/w/status")).text
     finally:
         app.state.settings = current
+
+
+async def test_the_status_widget_shows_the_connection_health_and_last_event(site: Site) -> None:
+    """ADR 0082 points 5 and 7: one row per platform, linked only for who may open it."""
+    from app.adapters.db.uow import SqlUnitOfWork
+    from app.domain.connection_health import HealthEntry, HealthState, InboundEvent, Platform
+
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    now = site.clock.now()
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        await tx.save_health(
+            (HealthEntry("demo", Platform.WXCC, HealthState.DOWN, now, 10, 9, "failures"),), now
+        )
+        await tx.save_inbound_event(
+            InboundEvent(Platform.WEBEX, now, "meetings:started", "recorded")
+        )
+    await site.login_as(AUDITOR)
+    text = (await site.client.get("/admin/overview/w/status")).text
+    assert "Contactcenter (WxCC)" in text
+    assert "Onbereikbaar" in text
+    assert "laatste melding" in text
+    assert 'href="/admin/integrations"' not in text
+    await site.login_as(SUPER)
+    text = (await site.client.get("/admin/overview/w/status")).text
+    assert 'href="/admin/integrations"' in text
+    page = (await site.client.get("/admin/integrations")).text
+    assert "Gezondheid en laatste meldingen" in page
+    assert "<code>meetings:started</code>" in page
+    assert "9 van 10" in page

@@ -12,16 +12,16 @@ from app.adapters.webex_meetings import WebexMeetings
 from app.domain.audit import AuditEvent, Category, Outcome
 from app.domain.booking import BookingStatus
 from app.domain.calls import CallState, EventKind
-from app.domain.job_plan import JobType
+from app.domain.job_plan import BACKOFF, JobType
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
-from app.jobs.runner import BACKOFF, JobRunner
-from tests.adapters.test_fault_injection_outbound import PII
+from app.jobs.runner import JobRunner
 from tests.fakes.jobs import FakeQueue, job
 from tests.fakes.messaging import RefusingSender
 from tests.fakes.tokens import authorized_client
-from tests.jobs.test_call_jobs import WIRED, Setup, _uow
+from tests.support.call_jobs import WIRED, Setup, group_uow
 from tests.support.domain import TEST_TOKEN_KEY
+from tests.support.fault_injection import PII
 
 
 def _timeout(request: httpx.Request) -> httpx.Response:
@@ -30,7 +30,7 @@ def _timeout(request: httpx.Request) -> httpx.Response:
 
 @pytest.fixture
 def setup() -> Setup:
-    fixture = Setup(_uow(**WIRED))
+    fixture = Setup(group_uow(**WIRED))
     fixture.video = WebexMeetings(  # type: ignore[assignment]  # the real adapter, a dead network
         authorized_client(_timeout), "https://webexapis.com/v1", fixture.clock
     )

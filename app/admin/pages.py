@@ -20,9 +20,16 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from app.admin.authz import can_function, return_path, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
-from app.admin.session import THEMES, session_alert_prefs, session_nav, session_theme
+from app.admin.session import (
+    THEMES,
+    current_session,
+    session_alert_prefs,
+    session_nav,
+    session_theme,
+)
 from app.admin.top_bar import top_links
 from app.domain.authorization import Permission, Principal, Role, Scope, scope_for
+from app.domain.scheduling import GroupSummary
 from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HelpTopic, shipped_manual, topic_for_path
@@ -93,12 +100,13 @@ def object_tabs(
     locale: RequestLocale,
     obj: ObjectPage,
     slug: str,
-    can: Callable[[Permission], bool],
+    shows: Callable[[Screen], bool],
     home: Home | None,
 ) -> tuple[list[NavView], list[NavView]]:
     """Return the visible tabs of ``obj`` for the object ``slug``, and the current tab's row.
 
-    A tab or sub-tab shows only if the matrix grants its permission (``can``). A tab with
+    A tab or sub-tab shows only if ``shows`` says so: the matrix grants its permission, and
+    the caller may add a rule of the object (the own queue of a group, ADR 0043). A tab with
     sub-tabs also shows when only one of its sub-tabs is granted (ADR 0105): it then leads to
     the first page the admin may open, so nobody loses the way to a page they were allowed.
     The second row holds the current tab's own page, when granted, followed by its visible
@@ -119,7 +127,7 @@ def object_tabs(
 
     def first_page(tab: Screen) -> Screen | None:
         """Return the first page of ``tab`` the matrix grants, its own page first."""
-        return next((s for s in (tab, *tab.subtabs) if can(s.permission)), None)
+        return next((s for s in (tab, *tab.subtabs) if shows(s)), None)
 
     tabs = [
         view(tab, home is not None and home.tab == tab.key, first_page(tab))
@@ -132,9 +140,9 @@ def object_tabs(
     row = [
         view(sub, home is not None and home.subtab == sub.key)
         for sub in current.subtabs
-        if can(sub.permission)
+        if shows(sub)
     ]
-    if can(current.permission):
+    if shows(current):
         row.insert(0, view(current, home is not None and home.subtab is None, own=True))
     return tabs, row if len(row) > 1 else []
 
@@ -166,12 +174,48 @@ def entry_subtabs(
     return [own, *row]
 
 
+OWN_QUEUE_TABS = frozenset({"group.queue"})
+"""Screens shown only on a group with an own queue: it dispatches there (ADR 0043) or falls back
+to it (ADR 0082 point 11)."""
+
+
+def group_shows(principal: Principal, summary: GroupSummary) -> Callable[[Screen], bool]:
+    """Return whether a screen of the register shows for ``principal`` on this group's pages.
+
+    The one predicate for the group's tabs and the links of its readiness checklist: the
+    matrix grants the screen's permission on this group (or its organisation), and the own
+    queue shows only on a group that dispatches or falls back to it (ADR 0043, ADR 0082).
+    """
+    can = can_function(principal)
+
+    def shows(screen: Screen) -> bool:
+        return bool(can(screen.permission, summary)) and (
+            summary.group.queue_open or screen.key not in OWN_QUEUE_TABS
+        )
+
+    return shows
+
+
+def organisation_shows(principal: Principal, slug: str) -> Callable[[Screen], bool]:
+    """Return whether a screen shows for ``principal`` on organisation ``slug``'s pages.
+
+    The one predicate for the organisation's tabs and the links of its readiness checklist;
+    an organisation-level permission is decided on this organisation.
+    """
+    can = can_function(principal)
+    return lambda screen: bool(can(screen.permission, organisation=slug))
+
+
 def organisation_header(
     request: Request, locale: RequestLocale, principal: Principal, name: str, slug: str
 ) -> ObjectHeader:
     """Return the header of organisation ``slug``'s pages, with the tabs the matrix allows."""
     tabs, subtabs = object_tabs(
-        locale, object_page("organisation"), slug, can_function(principal), current_home(request)
+        locale,
+        object_page("organisation"),
+        slug,
+        organisation_shows(principal, slug),
+        current_home(request),
     )
     return ObjectHeader(name, slug, tabs, subtabs)
 
@@ -334,6 +378,16 @@ def role_labels(
     return built_in + custom
 
 
+def _signed_in_key(request: Request) -> str:
+    """Return the moment of this session's sign-in as epoch seconds, or empty without one.
+
+    It names the sign-in for ``brand-motion.js`` only (play once per sign-in); a time, no
+    secret and no personal data.
+    """
+    found = current_session(request)
+    return str(int(found.login_at.timestamp())) if found is not None else ""
+
+
 def page(
     request: Request,
     locale: RequestLocale,
@@ -395,6 +449,8 @@ def page(
             ],
             # A message page (refusal, not found) keeps ``help_topic`` None: no help link.
             "help_topic": help_topic,
+            # ADR 0060 §7: which sign-in the top-bar mark settles for once (brand-motion.js).
+            "brand_signed_in": _signed_in_key(request),
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
             "update_banner": getattr(request.state, "update_notice", None),
             # Set by ``maintenance_routes.load_maintenance_notice`` (ADR 0038).

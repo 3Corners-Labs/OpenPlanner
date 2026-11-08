@@ -15,10 +15,10 @@ from app.domain.audit import Outcome
 from app.domain.event_schema import SCHEMA
 from app.domain.log_destinations import HEALTH_EVENT, DeliveryError, Reason, State
 from app.logging import configure_logging, set_line_tap
-from tests.domain.test_log_destinations import destination
 from tests.fakes.clock import FixedClock
 from tests.fakes.log_destinations import FakeFactory, FakeSender, FakeTargets
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.log_destinations import destination
 
 SETTINGS = ShipSettings(batch_size=3, flush_seconds=0.01, queue_size=5, backoff_max_seconds=4)
 

@@ -42,6 +42,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, can_function
+from app.admin.block_subjects import block_subject_values, read_block_subjects, subject_choices
 from app.admin.check_routes import check_service, check_view
 from app.admin.form_summary import form_summary
 from app.admin.forms import (
@@ -54,7 +55,16 @@ from app.admin.forms import (
     redirect_done,
 )
 from app.admin.idp_mapping_routes import GroupIdpView, group_idp_view, idp_mapping_service
-from app.admin.pages import Locale, NavView, SameOrigin, current_home, page, with_manual
+from app.admin.pages import (
+    Locale,
+    SameOrigin,
+    current_home,
+    group_shows,
+    object_tabs,
+    page,
+    with_manual,
+)
+from app.admin.readiness_view import checklist_view, readiness_service
 from app.admin.shortfalls import group_shortfalls
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
@@ -77,7 +87,9 @@ from app.domain.scheduling import (
     MAX_TRIAL_CALL_MINUTES,
     MAX_TRIAL_CALLS_PER_BOOKING,
     MIN_TRIAL_CALL_MINUTES,
+    DispatchFallback,
     DispatchKind,
+    Group,
     GroupSummary,
     JoinClient,
     Offer,
@@ -172,10 +184,6 @@ INTEGRATION_LABELS: dict[str, str] = {
 }
 
 
-OWN_QUEUE_TABS = frozenset({"group.queue"})
-"""Tabs shown only on a group that dispatches to OpenPlanner's own queue (ADR 0043)."""
-
-
 def planning_service(request: Request) -> PlanningService:
     """Return the application's planning service."""
     service: PlanningService = request.app.state.planning_service
@@ -197,25 +205,25 @@ def group_page(
     ``scripts=True`` allows the page's own script (the queue's live region, ADR 0072).
     """
     summary = context.group
-    can = can_function(context.principal)
-    home = current_home(request)
-    tabs = [
-        NavView(
-            locale.gettext(t.label_key),
-            t.path.replace("{slug}", summary.group.slug),
-            home is not None and home.tab == t.key,
-            t.icon,
-        )
-        for t in object_page("group").tabs
-        if can(t.permission, summary)
-        and (summary.group.has_own_queue or t.key not in OWN_QUEUE_TABS)
-    ]
+    tabs, subtabs = object_tabs(
+        locale,
+        object_page("group"),
+        summary.group.slug,
+        group_shows(context.principal, summary),
+        current_home(request),
+    )
     response = page(
         request,
         locale,
         template,
         context.principal,
-        {"summary": summary, "tabs": tabs, "done": done_message(request, locale.gettext), **extra},
+        {
+            "summary": summary,
+            "tabs": tabs,
+            "subtabs": subtabs,
+            "done": done_message(request, locale.gettext),
+            **extra,
+        },
         scripts=scripts,
     )
     response.status_code = status
@@ -504,6 +512,12 @@ async def group(
         context,
         "admin/group.html",
         {
+            "readiness": checklist_view(
+                await readiness_service(request).group(context.principal, slug),
+                locale,
+                group_shows(context.principal, summary),
+                {"slug": summary.group.slug, "org": summary.organisation_slug},
+            ),
             "phone_label": _(PHONE_LABELS[summary.group.phone_mode]),
             "group_rights": group_rights,
             "week": _week(schedule, locale),
@@ -581,6 +595,25 @@ def _settings_fields(
             hint=_("admin.field.dispatch_kind_hint"),
             error=form.error_for("dispatch_kind"),
             options=dispatch_options,
+        ),
+        # ADR 0082 point 11: the fallback sits next to the dispatch kind it falls back from.
+        Field(
+            "dispatch_fallback",
+            _("admin.field.dispatch_fallback"),
+            "select",
+            value("dispatch_fallback", current.dispatch_fallback.value),
+            hint=_("admin.field.dispatch_fallback_hint"),
+            error=form.error_for("dispatch_fallback"),
+            options=tuple(Option(f.value, _(FALLBACK_LABELS[f])) for f in DispatchFallback),
+        ),
+        Field(
+            "fallback_space_room_id",
+            _("admin.field.fallback_space_room_id"),
+            value=value("fallback_space_room_id", current.fallback_space_room_id),
+            hint=_("admin.field.fallback_space_room_id_hint"),
+            error=form.error_for("fallback_space_room_id"),
+            required=False,
+            attributes={"spellcheck": "false", "autocomplete": "off", "maxlength": "200"},
         ),
         number("dispatch_lead_minutes", current.dispatch_lead_minutes, {"min": "0", "max": "60"}),
         number(
@@ -781,7 +814,9 @@ async def save_settings(
     trial = form.choice("trial_call_enabled", {"yes", "no"})
     join_client = form.choice("join_client", {client.value for client in JoinClient})
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
-    if not form.errors and None not in (phone, dispatch, embedding, free_pick, trial, join_client):
+    fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
+    chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback)
+    if not form.errors and None not in chosen:
         new = GroupSettings(
             name=form.text("name"),
             timezone=form.text("timezone"),
@@ -789,6 +824,8 @@ async def save_settings(
             dispatch_kind=DispatchKind(str(dispatch)),
             queue_free_pick_allowed=free_pick == "yes",
             calendar_invite_address=form.optional_text("calendar_invite_address"),
+            dispatch_fallback=DispatchFallback(str(fallback)),
+            fallback_space_room_id=form.optional_text("fallback_space_room_id"),
             video_host_email=form.optional_text("video_host_email"),
             wxcc_business_address=form.optional_text("wxcc_business_address"),
             wxcc_channel=form.optional_text("wxcc_channel"),
@@ -931,6 +968,12 @@ def _capacity_field(
     )
 
 
+FALLBACK_LABELS: dict[DispatchFallback, str] = {
+    DispatchFallback.NONE: "admin.fallback.none",
+    DispatchFallback.OWN_QUEUE: "admin.fallback.own_queue",
+}
+"""The fallback choices of a contact-center group (ADR 0082 point 11)."""
+
 OFFER_VALUES = frozenset(offer.value for offer in Offer)
 
 
@@ -1005,7 +1048,7 @@ def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
     ]
 
 
-def _read_rule(form: FormData) -> ScheduleRule | None:
+def _read_rule(form: FormData, group: Group) -> ScheduleRule | None:
     """Parse the window form into a rule; ``None`` (with form errors) when it is incomplete."""
     weekday = form.choice("weekday", WEEKDAYS)
     opens, closes = form.clock("opens"), form.clock("closes")
@@ -1015,7 +1058,14 @@ def _read_rule(form: FormData) -> ScheduleRule | None:
     if form.errors or not (weekday and opens and closes and offer and capacity is not None):
         return None
     try:
-        window = TimeWindow(opens, closes, capacity, form.optional_text("label"), Offer(offer))
+        window = TimeWindow(
+            opens,
+            closes,
+            capacity,
+            form.optional_text("label"),
+            Offer(offer),
+            read_block_subjects(form, group),
+        )
         return ScheduleRule(int(weekday), window, valid_from, valid_to)
     except DomainError as error:
         form.refusal(error)
@@ -1033,6 +1083,7 @@ def _rule_values(rule: ScheduleRule) -> dict[str, str]:
         "label": rule.window.label or "",
         "valid_from": rule.valid_from.isoformat() if rule.valid_from else "",
         "valid_to": rule.valid_to.isoformat() if rule.valid_to else "",
+        **block_subject_values(rule.window),
     }
 
 
@@ -1049,6 +1100,7 @@ async def _hours_response(
         {
             "week": _week(schedule, locale),
             "fields": _hours_fields(form, locale),
+            "subject_choices": subject_choices(form, context.group.group, locale),
             "errors": form.errors,
             "shortfalls": await group_shortfalls(request, locale, context),
         },
@@ -1081,7 +1133,7 @@ async def add_hours(
 ) -> Response:
     """Add a weekly staffing block."""
     form = await read_form(request, locale)
-    rule = _read_rule(form)
+    rule = _read_rule(form, context.group.group)
     if rule is not None:
         try:
             await planning_service(request).add_rule(context.principal, slug, rule)
@@ -1107,7 +1159,12 @@ def _edit_hours_response(
         locale,
         context,
         "admin/group_hours_edit.html",
-        {"rule_id": rule_id, "fields": _hours_fields(form, locale), "errors": form.errors},
+        {
+            "rule_id": rule_id,
+            "fields": _hours_fields(form, locale),
+            "subject_choices": subject_choices(form, context.group.group, locale),
+            "errors": form.errors,
+        },
         status,
     )
 
@@ -1139,7 +1196,7 @@ async def update_hours(
 ) -> Response:
     """Change a weekly block; existing bookings keep their slots."""
     form = await read_form(request, locale)
-    rule = _read_rule(form)
+    rule = _read_rule(form, context.group.group)
     if rule is not None:
         try:
             changed = await planning_service(request).update_rule(
@@ -1314,6 +1371,7 @@ async def _exceptions_response(
         {
             "exceptions": _exceptions(schedule, locale),
             "fields": _exception_fields(form, locale),
+            "subject_choices": subject_choices(form, context.group.group, locale),
             "kind": form.text("kind") or "closed",
             "kind_error": form.error_for("kind"),
             "errors": form.errors,
@@ -1337,7 +1395,7 @@ async def add_exception(
 ) -> Response:
     """Close a date or give it its own hours."""
     form = await read_form(request, locale)
-    override = _read_override(form)
+    override = _read_override(form, context.group.group)
     if override is not None:
         try:
             await planning_service(request).add_override(context.principal, slug, override)
@@ -1349,7 +1407,7 @@ async def add_exception(
     return await _exceptions_response(request, locale, context, form, 422)
 
 
-def _read_override(form: FormData) -> ScheduleOverride | None:
+def _read_override(form: FormData, group: Group) -> ScheduleOverride | None:
     """Parse the exception form; ``None`` (with form errors) when it is incomplete."""
     day = form.day("day")
     kind = form.choice("kind", {"closed", "hours"})
@@ -1364,7 +1422,12 @@ def _read_override(form: FormData) -> ScheduleOverride | None:
         if opens and closes and offer and capacity is not None:
             try:
                 window = TimeWindow(
-                    opens, closes, capacity, form.optional_text("label"), Offer(offer)
+                    opens,
+                    closes,
+                    capacity,
+                    form.optional_text("label"),
+                    Offer(offer),
+                    read_block_subjects(form, group),
                 )
             except DomainError as error:
                 form.refusal(error)
@@ -1384,6 +1447,7 @@ def _override_values(override: ScheduleOverride) -> dict[str, str]:
             "capacity": str(window.capacity),
             "offer": window.offer.value,
             "label": window.label or "",
+            **block_subject_values(window),
         }
     return values
 
@@ -1405,6 +1469,7 @@ def _edit_exception_response(
         {
             "override_id": override_id,
             "fields": _exception_fields(form, locale),
+            "subject_choices": subject_choices(form, context.group.group, locale),
             "kind": form.text("kind") or "closed",
             "kind_error": form.error_for("kind"),
             "errors": form.errors,
@@ -1438,7 +1503,7 @@ async def update_exception(
 ) -> Response:
     """Change an exception; bookings made on the old day keep their slots."""
     form = await read_form(request, locale)
-    override = _read_override(form)
+    override = _read_override(form, context.group.group)
     if override is not None:
         try:
             changed = await planning_service(request).update_override(

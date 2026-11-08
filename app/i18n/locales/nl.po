@@ -311,7 +311,6 @@ msgstr "Gekozen moment"
 msgid "book.change_slot"
 msgstr "Ander moment kiezen"
 
-
 msgid "form.email"
 msgstr "E-mailadres"
 
@@ -344,7 +343,6 @@ msgstr "Er is een probleem"
 
 msgid "error.title"
 msgstr "Er ging iets mis"
-
 
 msgid "error.field.email"
 msgstr "Vul een geldig e-mailadres in, bijvoorbeeld naam@voorbeeld.nl."
@@ -517,7 +515,6 @@ msgstr "Afspraak verplaatsen"
 msgid "manage.cancel"
 msgstr "Afspraak annuleren"
 
-
 msgid "manage.notice.rescheduled"
 msgstr "Uw afspraak is verplaatst. U ontvangt een bevestiging per e-mail."
 
@@ -661,9 +658,6 @@ msgstr "Wat nu aandacht vraagt, en de groepen waarvoor u rechten heeft."
 msgid "admin.dashboard.groups"
 msgstr "Uw groepen"
 
-
-
-
 msgid "admin.dashboard.no_groups"
 msgstr "U heeft (nog) geen rechten op een groep. Vraag uw beheerder om toegang."
 
@@ -756,7 +750,6 @@ msgstr "Optioneel"
 
 msgid "admin.group.phone_required"
 msgstr "Verplicht"
-
 
 msgid "admin.group.your_rights"
 msgstr "Uw rechten voor deze groep"
@@ -1229,8 +1222,6 @@ msgstr "Tot dit moment kan een planner een afspraak verplaatsen of annuleren; da
 msgid "admin.field.phone_mode"
 msgstr "Telefoonnummer op het formulier"
 
-
-
 msgid "admin.field.weekday"
 msgstr "Dag"
 
@@ -1320,7 +1311,6 @@ msgstr "Vul een aantal minuten in van 0 tot 120."
 
 msgid "admin.form.error.phone_mode"
 msgstr "Kies of het telefoonnummer verborgen, optioneel of verplicht is."
-
 
 msgid "admin.form.error.future_bookings"
 msgstr "Dit kan niet zolang er afspraken in de toekomst staan. Wijzig het nadat die zijn geweest of geannuleerd."
@@ -2167,7 +2157,6 @@ msgstr "Groepen"
 
 msgid "join.refresh"
 msgstr "Status verversen"
-
 
 # --- WxCC work item lifecycle (ADR 0021) ---
 
@@ -4115,6 +4104,12 @@ msgstr "gepubliceerd {at}"
 msgid "admin.updates.no_notes"
 msgstr "Geen release notes."
 
+msgid "admin.updates.note.docs"
+msgstr "ontwerp of documentatie, niets gebouwd"
+
+msgid "admin.updates.docs_only"
+msgstr "Geen verandering in hoe OpenPlanner werkt, volgens de titels van de wijzigingen: ten opzichte van de versie ervoor verandert alleen documentatie of ontwerp (zoals een ADR); er is niets gebouwd."
+
 msgid "admin.updates.install_this"
 msgstr "Deze versie installeren ({version})"
 
@@ -5141,9 +5136,6 @@ msgstr "Dit team heeft geen eigen blok. De standaard van de organisatie geldt ({
 msgid "admin.group_contacts.none"
 msgstr "Dit team heeft geen eigen blok en de organisatie heeft geen standaard ingesteld."
 
-msgid "admin.group_contacts.back"
-msgstr "Terug naar de sluiting van dit team"
-
 msgid "admin.group_contacts.preview_lead"
 msgstr "Zo zien deelnemers het blok dat nu voor dit team geldt: het eigen blok of anders de standaard van de organisatie."
 
@@ -6068,7 +6060,7 @@ msgid "admin.settings.problem.update_channel"
 msgstr "het updatekanaal rc mag in productie niet gekozen zijn: productie volgt releases."
 
 msgid "admin.settings.problem.update_auto_apply"
-msgstr "automatisch bijwerken mag in productie niet aan staan: een superuser start de update."
+msgstr "automatische updates hebben in productie een updatevenster nodig: zonder venster start een superuser elke update."
 
 msgid "authz.permission.settings_platform_view"
 msgstr "Systeemstatus en geavanceerde instellingen bekijken"
@@ -6328,6 +6320,12 @@ msgstr "Automatisch bijwerken"
 msgid "settings.field.update_check_minutes.label"
 msgstr "Minuten tussen twee versiecontroles"
 
+msgid "settings.field.update_line.label"
+msgstr "Alleen één minorversie volgen (X.Y)"
+
+msgid "settings.field.update_window.label"
+msgstr "Venster voor automatische updates"
+
 msgid "settings.field.time_format.label"
 msgstr "Tijdnotatie"
 
@@ -6444,7 +6442,6 @@ msgstr "Voornaam"
 
 msgid "form.last_name"
 msgstr "Achternaam"
-
 
 msgid "error.field.first_name"
 msgstr "Vul uw voornaam in, maximaal 100 tekens."
@@ -7999,9 +7996,6 @@ msgstr "Geen"
 msgid "admin.groups.public_page"
 msgstr "Openbare pagina"
 
-msgid "admin.groups.search_active"
-msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
-
 msgid "term.agent"
 msgstr "medewerker"
 
@@ -9390,6 +9384,9 @@ msgstr "Gebruik voor de inlognaam alleen kleine letters, cijfers, punten en stre
 msgid "admin.form.error.staff_user_name_in_use"
 msgstr "Deze inlognaam is al in gebruik. Kies een andere."
 
+msgid "settings.field.reporting_enabled.label"
+msgstr "Gebruiksrapportages worden gevuld"
+
 msgid "settings.field.overview_live_enabled.label"
 msgstr "Overzicht ververst zichzelf"
 
@@ -9701,3 +9698,576 @@ msgstr "Doorgaan naar de inlogdienst"
 
 msgid "admin.alerts.text.check"
 msgstr "De controle van de koppeling van deze groep vond een probleem ({code}). Open de groep en kies Koppeling controleren voor de uitleg."
+
+msgid "settings.field.task_reconcile_interval_minutes.label"
+msgstr "Taakstatus nalopen elke (minuten)"
+
+msgid "settings.field.task_reconcile_after_minutes.label"
+msgstr "Taak nalopen na stilte van (minuten)"
+
+msgid "settings.field.integration_health_window_minutes.label"
+msgstr "Venster voor de gezondheid van koppelingen (minuten)"
+
+msgid "settings.field.integration_degraded_failure_percent.label"
+msgstr "Verstoord boven dit aandeel mislukte verzoeken (%)"
+
+msgid "settings.field.integration_down_failure_percent.label"
+msgstr "Onbereikbaar boven dit aandeel mislukte verzoeken (%)"
+
+msgid "settings.field.integration_recovery_minutes.label"
+msgstr "Hersteld na zoveel minuten zonder fouten"
+
+msgid "admin.alerts.source.connection"
+msgstr "Koppeling met Webex of het contactcenter"
+
+msgid "admin.alerts.source.webhooks_missing"
+msgstr "Meldingen van het contactcenter"
+
+msgid "admin.alerts.text.connection"
+msgstr "Een koppeling van deze organisatie is verstoord of onbereikbaar ({code}). Open Koppelingen voor de staat per platform."
+
+msgid "admin.alerts.text.webhooks_missing"
+msgstr "Het contactcenter meldde taken niet terug; OpenPlanner heeft ze zelf nagelopen. Controleer de webhook-registratie op Koppelingen."
+
+msgid "admin.integrations.health.ok"
+msgstr "In orde"
+
+msgid "admin.integrations.health.unknown"
+msgstr "Onbekend (te weinig verzoeken)"
+
+msgid "admin.integrations.health.degraded"
+msgstr "Verstoord"
+
+msgid "admin.integrations.health.down"
+msgstr "Onbereikbaar"
+
+msgid "admin.integrations.health.platform_wide"
+msgstr "Hele platform"
+
+msgid "admin.integrations.platform.webex"
+msgstr "Webex"
+
+msgid "admin.integrations.platform.wxcc"
+msgstr "Contactcenter (WxCC)"
+
+msgid "admin.integrations.health"
+msgstr "Gezondheid en laatste meldingen"
+
+msgid "admin.integrations.health_lead"
+msgstr "Hoe het met de koppelingen gaat, berekend uit de verzoeken van het afgelopen kwartier, en wanneer elk platform voor het laatst iets meldde."
+
+msgid "admin.integrations.inbound"
+msgstr "Laatste melding per platform"
+
+msgid "admin.integrations.inbound_at"
+msgstr "laatste melding {time}"
+
+msgid "admin.integrations.inbound_none"
+msgstr "Nog geen melding binnengekomen."
+
+msgid "admin.integrations.health_states"
+msgstr "Gezondheid per organisatie"
+
+msgid "admin.integrations.health_none"
+msgstr "Nog niet berekend; de worker doet dat elke paar minuten."
+
+msgid "admin.integrations.col.organisation"
+msgstr "Organisatie"
+
+msgid "admin.integrations.col.since"
+msgstr "Sinds"
+
+msgid "admin.integrations.col.failures"
+msgstr "Mislukt"
+
+msgid "admin.integrations.failures_of"
+msgstr "{failures} van {requests}"
+
+msgid "booking.routing.subject.label"
+msgstr "Waarover gaat uw afspraak?"
+
+msgid "booking.routing.subject.choose_hint"
+msgstr "Kies eerst een onderwerp. U ziet dan alleen de tijden waarop er iemand voor dit onderwerp is."
+
+msgid "booking.routing.subject.show_times"
+msgstr "Toon tijden"
+
+msgid "booking.routing.preferred_language.label"
+msgstr "In welke taal wilt u het gesprek voeren?"
+
+msgid "booking.routing.preferred_language.value.nl"
+msgstr "Nederlands"
+
+msgid "booking.routing.preferred_language.value.en"
+msgstr "Engels"
+
+msgid "booking.routing.channel_preference.label"
+msgstr "Hoe wilt u het gesprek voeren?"
+
+msgid "booking.routing.channel_preference.value.video"
+msgstr "Met beeld (video)"
+
+msgid "booking.routing.channel_preference.value.phone"
+msgstr "Telefonisch"
+
+msgid "admin.routing.title"
+msgstr "Onderwerpen en routing"
+
+msgid "admin.routing.settings_lead"
+msgstr "Laat deelnemers een onderwerp kiezen, vraag een voorkeurstaal of manier van contact, en geef die keuzes als codes door aan het contactcenter."
+
+msgid "admin.routing.summary"
+msgstr "{subjects} onderwerpen, {attributes} routingvragen, {mapped} doorgegeven aan het contactcenter."
+
+msgid "admin.routing.summary_none"
+msgstr "Deze groep vraagt geen onderwerp en geen routingvragen."
+
+msgid "admin.routing.open"
+msgstr "Onderwerpen en routing openen"
+
+msgid "admin.routing.back"
+msgstr "Terug naar de instellingen"
+
+msgid "admin.routing.subjects.title"
+msgstr "Onderwerpen"
+
+msgid "admin.routing.subjects.lead"
+msgstr "Met één of meer onderwerpen vraagt het formulier de deelnemer als eerste waarover de afspraak gaat. De code blijft vast: boekingen en rapportages bewaren hem."
+
+msgid "admin.routing.subjects.none"
+msgstr "Nog geen onderwerpen. Het formulier vraagt er dan geen."
+
+msgid "admin.routing.subject.label"
+msgstr "Onderwerp"
+
+msgid "admin.routing.subject.code"
+msgstr "Code"
+
+msgid "admin.routing.subject.code_hint"
+msgstr "Kleine letters, cijfers en streepjes, hoogstens 40 tekens, bijvoorbeeld vraag-algemeen. Kan later niet meer veranderen."
+
+msgid "admin.routing.subject.label_nl"
+msgstr "Naam (Nederlands)"
+
+msgid "admin.routing.subject.label_en"
+msgstr "Naam (Engels)"
+
+msgid "admin.routing.subject.bound"
+msgstr "aan een blok gekoppeld"
+
+msgid "admin.routing.subject.remove"
+msgstr "Verwijderen"
+
+msgid "admin.routing.subject.remove_label"
+msgstr "Onderwerp {label} verwijderen"
+
+msgid "admin.routing.subject.add"
+msgstr "Onderwerp toevoegen"
+
+msgid "admin.routing.subject.add_lead"
+msgstr "Een groep heeft hoogstens {count} onderwerpen."
+
+msgid "admin.routing.subject.add_button"
+msgstr "Onderwerp toevoegen"
+
+msgid "admin.routing.subject.limit_reached"
+msgstr "Deze groep heeft het maximum van {count} onderwerpen."
+
+msgid "admin.routing.subject.edit_lead"
+msgstr "Code {code}; die blijft vast."
+
+msgid "admin.routing.attributes.title"
+msgstr "Routingvragen"
+
+msgid "admin.routing.attributes.lead"
+msgstr "Vragen uit een vaste lijst van OpenPlanner. Het antwoord is een code, nooit vrije tekst, en geen persoonsgegeven."
+
+msgid "admin.routing.attributes.values"
+msgstr "Keuzes: {values}."
+
+msgid "admin.routing.attribute.preferred_language.help"
+msgstr "Vraagt de taal van het gesprek."
+
+msgid "admin.routing.attribute.channel_preference.help"
+msgstr "Vraagt of de deelnemer met beeld of telefonisch wil praten."
+
+msgid "admin.routing.mapping.title"
+msgstr "Doorgeven aan het contactcenter"
+
+msgid "admin.routing.mapping.lead"
+msgstr "Per onderwerp en routingvraag: de naam van de variabele die de flow van het contactcenter leest, en de waarde per keuze. Wat hier leeg blijft, wordt niet verstuurd."
+
+msgid "admin.routing.mapping.none"
+msgstr "Voeg eerst een onderwerp of routingvraag toe."
+
+msgid "admin.routing.mapping.variable"
+msgstr "Naam van de variabele"
+
+msgid "admin.routing.mapping.variable_hint"
+msgstr "Letters, cijfers en liggende streepjes, beginnend met een letter, bijvoorbeeld onderwerp. Leeg: niets versturen."
+
+msgid "admin.routing.mapping.values"
+msgstr "Waarden voor {source}"
+
+msgid "admin.routing.mapping.code"
+msgstr "Keuze"
+
+msgid "admin.routing.mapping.value"
+msgstr "Verstuurde waarde"
+
+msgid "admin.routing.mapping.save"
+msgstr "{source} opslaan"
+
+msgid "admin.routing.source.subject"
+msgstr "Onderwerp"
+
+msgid "admin.routing.error.subject_code"
+msgstr "Kies een code van kleine letters, cijfers en streepjes die deze groep nog niet heeft."
+
+msgid "admin.routing.error.subject_label"
+msgstr "Vul de naam in, hoogstens 80 tekens."
+
+msgid "admin.routing.error.subjects"
+msgstr "Deze groep heeft al het maximum aantal onderwerpen."
+
+msgid "admin.routing.error.subject_in_use"
+msgstr "Een blok biedt dit onderwerp nog aan. Haal het eerst bij dat blok weg."
+
+msgid "admin.routing.error.variable_name"
+msgstr "Gebruik letters, cijfers en liggende streepjes, beginnend met een letter, en geen naam die al gebruikt wordt."
+
+msgid "admin.routing.error.variable_value"
+msgstr "Een waarde is een code: letters, cijfers, punt, dubbele punt, streepje of liggend streepje, hoogstens 64 tekens."
+
+msgid "admin.routing.error.mapping"
+msgstr "Dit onderwerp of deze vraag bestaat niet meer."
+
+msgid "admin.field.block_subjects"
+msgstr "Onderwerpen in dit blok"
+
+msgid "admin.field.block_subjects_hint"
+msgstr "Niets aangevinkt: het blok biedt alle onderwerpen. Een deelnemer die een onderwerp kiest, ziet alleen de tijden van blokken die het aanbieden."
+
+msgid "settings.field.max_subjects_per_group.label"
+msgstr "Onderwerpen per groep (maximaal)"
+
+msgid "admin.tab.planning"
+msgstr "Planning"
+
+msgid "admin.tab.group_messages"
+msgstr "Berichten"
+
+msgid "admin.readiness.title"
+msgstr "Klaar om te boeken"
+
+msgid "admin.readiness.ready"
+msgstr "Alles is ingesteld om afspraken aan te nemen."
+
+msgid "admin.readiness.missing"
+msgstr "Nog te regelen voordat afspraken kunnen worden aangenomen: {count}."
+
+msgid "admin.readiness.staffing"
+msgstr "Bezetting voor de komende weken"
+
+msgid "admin.readiness.texts"
+msgstr "Berichtteksten"
+
+msgid "admin.readiness.channels"
+msgstr "Kanaal om berichten te versturen (e-mail of sms)"
+
+msgid "admin.readiness.check"
+msgstr "Controle van de koppeling zonder fouten"
+
+msgid "admin.readiness.branding"
+msgstr "Eigen huisstijl"
+
+msgid "admin.readiness.contact"
+msgstr "Contactalternatieven voor een sluiting"
+
+msgid "admin.readiness.state.done"
+msgstr "Klaar"
+
+msgid "admin.readiness.state.missing"
+msgstr "Ontbreekt"
+
+msgid "admin.readiness.state.not_needed"
+msgstr "Niet nodig"
+
+msgid "admin.dashboard.filter"
+msgstr "Groepen filteren"
+
+msgid "admin.dashboard.only_closed"
+msgstr "Alleen groepen met een actieve noodsluiting"
+
+msgid "admin.dashboard.closed_count"
+msgstr "Groepen met een actieve noodsluiting: {count} van {total}"
+
+msgid "admin.dashboard.closed"
+msgstr "Noodsluiting actief"
+
+msgid "admin.dashboard.no_closed"
+msgstr "Geen enkele groep heeft nu een actieve noodsluiting."
+
+msgid "admin.api.filter"
+msgstr "API-clients filteren"
+
+msgid "admin.api.search"
+msgstr "Zoeken op naam of client-id"
+
+msgid "admin.api.count"
+msgstr "Aantal clients: {count}"
+
+msgid "admin.api.count_of"
+msgstr "Clients die passen: {count} van {total}"
+
+msgid "admin.api.no_match"
+msgstr "Geen client past bij dit filter."
+
+msgid "admin.audit.count"
+msgstr "Gebeurtenissen: {count}"
+
+msgid "admin.audit.count_newest"
+msgstr "De nieuwste {count} gebeurtenissen. Verfijn het filter of exporteer voor meer."
+
+msgid "admin.readiness.state.defaults"
+msgstr "Standaardteksten"
+
+msgid "admin.list.search_active"
+msgstr "Er is een zoekopdracht actief. Wis de filters om weer alles te zien."
+
+msgid "alert.message.level.info"
+msgstr "Informatie"
+
+msgid "alert.message.level.warning"
+msgstr "Waarschuwing"
+
+msgid "alert.message.level.outage"
+msgstr "Storing"
+
+msgid "alert.message.subject"
+msgstr "OpenPlanner: {level} ({action})"
+
+msgid "alert.message.what"
+msgstr "Melding {action}, reden {reason}."
+
+msgid "alert.message.since"
+msgstr "Sinds {time}."
+
+msgid "alert.message.organisation"
+msgstr "Organisatie: {organisation}."
+
+msgid "alert.message.group"
+msgstr "Groep: {group}."
+
+msgid "alert.message.repeated"
+msgstr "Sinds het vorige bericht nog {count} keer gemeld."
+
+msgid "alert.message.link"
+msgstr "Bekijk in het portaal: {link}"
+
+msgid "alert.message.version"
+msgstr "OpenPlanner {version}"
+
+msgid "alert.message.test.subject"
+msgstr "OpenPlanner: testmelding"
+
+msgid "alert.message.test.text"
+msgstr "Dit is een testmelding. Komt deze aan, dan krijgt dit adres de meldingen van OpenPlanner."
+
+msgid "admin.alerts.targets.title"
+msgstr "Meldingen aan beheerders"
+
+msgid "admin.alerts.targets.lead"
+msgstr "Waar OpenPlanner meldingen heen stuurt als er iets misgaat: een e-mailadres of een Webex-ruimte. Een melding die blijft, komt opnieuw na het herhaalinterval; tussendoor wordt alleen geteld."
+
+msgid "admin.alerts.targets.none"
+msgstr "Nog geen adressen voor meldingen."
+
+msgid "admin.alerts.target.kind"
+msgstr "Soort"
+
+msgid "admin.alerts.target.kind.email"
+msgstr "E-mail"
+
+msgid "admin.alerts.target.kind.webex_space"
+msgstr "Webex-ruimte"
+
+msgid "admin.alerts.target.address"
+msgstr "Adres of ruimte-id"
+
+msgid "admin.alerts.target.address_hint"
+msgstr "Een e-mailadres van beheerders, of het id van de Webex-ruimte waar de bot in zit."
+
+msgid "admin.alerts.target.level"
+msgstr "Vanaf"
+
+msgid "admin.alerts.target.level.warning"
+msgstr "Waarschuwingen en storingen"
+
+msgid "admin.alerts.target.level.outage"
+msgstr "Alleen storingen"
+
+msgid "admin.alerts.target.test"
+msgstr "Testmelding sturen"
+
+msgid "admin.alerts.target.remove"
+msgstr "Verwijderen"
+
+msgid "admin.alerts.target.add"
+msgstr "Adres toevoegen"
+
+msgid "admin.alerts.target.add_button"
+msgstr "Toevoegen"
+
+msgid "admin.alerts.bot.title"
+msgstr "Webex-bot"
+
+msgid "admin.alerts.bot.lead"
+msgstr "Meldingen naar een Webex-ruimte gaan via een eigen bot met alleen het recht om berichten te sturen."
+
+msgid "admin.alerts.bot.set"
+msgstr "Token ingesteld"
+
+msgid "admin.alerts.bot.not_set"
+msgstr "Geen token"
+
+msgid "admin.alerts.bot.token"
+msgstr "Token van de bot"
+
+msgid "admin.alerts.bot.token_hint"
+msgstr "Plak het token uit het Webex-ontwikkelaarsportaal. Het wordt versleuteld bewaard en nooit meer getoond."
+
+msgid "admin.alerts.bot.remove"
+msgstr "Token verwijderen"
+
+msgid "admin.alerts.bot.save"
+msgstr "Opslaan"
+
+msgid "admin.alerts.bot.no_key"
+msgstr "Een bot-token kan pas worden bewaard als de installatie een sleutel voor geheimen heeft (SETTINGS_ENCRYPTION_KEY)."
+
+msgid "admin.done.alert_target_added"
+msgstr "Het adres voor meldingen is toegevoegd."
+
+msgid "admin.done.alert_target_removed"
+msgstr "Het adres voor meldingen is verwijderd."
+
+msgid "admin.done.alert_test_sent"
+msgstr "De testmelding is verstuurd."
+
+msgid "admin.done.alert_test_failed"
+msgstr "De testmelding kon niet worden verstuurd. Controleer het mailkanaal of het token van de bot en het ruimte-id."
+
+msgid "admin.done.alert_bot_saved"
+msgstr "Het token van de bot is opgeslagen."
+
+msgid "admin.done.alert_bot_removed"
+msgstr "Het token van de bot is verwijderd."
+
+msgid "admin.done.alert_refused"
+msgstr "Dat kon niet: controleer het adres, het token, of het maximum van tien adressen."
+
+msgid "settings.field.alert_repeat_hours.label"
+msgstr "Melding opnieuw sturen na (uren)"
+
+msgid "admin.updates.line"
+msgstr "Lijn"
+
+msgid "admin.updates.line.all"
+msgstr "Elke versie van het kanaal"
+
+msgid "admin.updates.window"
+msgstr "Updatevenster"
+
+msgid "admin.updates.window.any_time"
+msgstr "Altijd (geen venster ingesteld)"
+
+msgid "admin.updates.window.next"
+msgstr "Volgende opening: {at}"
+
+msgid "admin.updates.support"
+msgstr "Ondersteuning van deze lijn"
+
+msgid "admin.updates.support.supported"
+msgstr "Ondersteund"
+
+msgid "admin.updates.support.security"
+msgstr "Alleen beveiligingsupdates"
+
+msgid "admin.updates.support.extended"
+msgstr "Verlengde lijn"
+
+msgid "admin.updates.support.ended"
+msgstr "Niet meer ondersteund: update naar een ondersteunde lijn"
+
+msgid "admin.updates.support.until"
+msgstr "tot {until}"
+
+msgid "admin.updates.apply_after.label"
+msgstr "Uitvoeren na (optioneel)"
+
+msgid "admin.updates.apply_after.hint"
+msgstr "Datum en tijd in de tijdzone van het portaal. Leeg: de updater begint zodra hij het verzoek ziet."
+
+msgid "admin.updates.waits_until"
+msgstr "De updater begint vanaf {at} aan dit verzoek."
+
+msgid "admin.updates.reason.upgrade_path_required"
+msgstr "Deze database is te oud voor die versie: update eerst naar de versie die in het logboek staat."
+
+msgid "settings.field.overview_max_widgets.label"
+msgstr "Meeste widgets op een eigen overzicht"
+
+msgid "admin.field.dispatch_fallback"
+msgstr "Terugval als het contactcenter uitvalt"
+
+msgid "admin.field.dispatch_fallback_hint"
+msgstr "Met eigen wachtrij: een afspraak waarvan het doorzetten mislukt, en zolang het contactcenter onbereikbaar is elke afspraak, komt in de wachtrij van OpenPlanner. Het team moet die wachtrij dan kennen en werken."
+
+msgid "admin.field.fallback_space_room_id"
+msgstr "Webex-ruimte van het team (terugval)"
+
+msgid "admin.field.fallback_space_room_id_hint"
+msgstr "Optioneel. Het id van de ruimte waar de bot van de organisatie bij terugval een bericht plaatst, en per afspraak de begintijd en voornaam. Nooit de link naar het gesprek."
+
+msgid "admin.fallback.none"
+msgstr "Geen"
+
+msgid "admin.fallback.own_queue"
+msgstr "Eigen wachtrij"
+
+msgid "admin.fallback.banner.title"
+msgstr "Terugval actief"
+
+msgid "admin.fallback.banner.text"
+msgstr "Het contactcenter is onbereikbaar sinds {time}. De afspraken van deze groep komen nu in deze wachtrij."
+
+msgid "admin.fallback.end"
+msgstr "Terugval beëindigen"
+
+msgid "admin.fallback.chip"
+msgstr "Terugval"
+
+msgid "admin.done.fallback_ended"
+msgstr "De terugval is beëindigd. Afspraken die nog niet zijn opgepakt, gaan alsnog naar het contactcenter."
+
+msgid "admin.alerts.source.fallback"
+msgstr "Terugval naar de eigen wachtrij"
+
+msgid "admin.alerts.text.fallback"
+msgstr "Deze groep valt terug op haar eigen wachtrij, omdat het contactcenter onbereikbaar is. Open de wachtrij om afspraken op te pakken."
+
+msgid "call.event.fallback_queued"
+msgstr "In de eigen wachtrij gezet (terugval)"
+
+msgid "call.event.fallback_ended"
+msgstr "Terugval beëindigd: naar het contactcenter"
+
+msgid "fallback.space.activated"
+msgstr "**{group}** valt terug op de eigen wachtrij: het contactcenter is onbereikbaar. Pak afspraken op in de wachtrij: {link}"
+
+msgid "fallback.space.queued"
+msgstr "{time}: {first_name} staat in de wachtrij. {link}"
+
+msgid "admin.form.error.fallback_space_room_id"
+msgstr "Vul het id van een Webex-ruimte in: letters, cijfers, - en _, 10 tot 200 tekens."

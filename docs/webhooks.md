@@ -55,7 +55,10 @@ task id, stored as `wxcc_task_id`).
   "destination": {"id": "<business address of the work item asset>", "type": "businessAddress"},
   "channelType": "workItem",
   "channel": "<work item channel name>",
-  "flowSettings": {"openplannerGroup": "<routing value of the group>"},
+  "flowSettings": {
+    "openplannerGroup": "<routing value of the group>",
+    "<variable name>": "<mapped value>"
+  },
   "channelParams": {
     "type": "work-item-form",
     "message": {
@@ -76,7 +79,16 @@ task id, stored as `wxcc_task_id`).
 
 Limits: `workItemData` ≤ 50 keys (≤ 100 bytes), values ≤ 1024 bytes; `flowSettings` ≤ 15
 tuples (key ≤ 200, value ≤ 512 bytes). Only first name and the meeting link leave OpenPlanner
-(CLAUDE.md).
+(CLAUDE.md), plus the routing variables of ADR 0081.
+
+**Routing variables** (ADR 0081): per group the organisation admin maps the subject and each
+switched-on routing attribute (`preferred_language`, `channel_preference`) to a flow variable
+name (`[A-Za-z_][A-Za-z0-9_]{0,63}`, never `openplannerGroup`) and a value per code
+(`[A-Za-z0-9_.:-]{1,64}`). Only mapped codes are sent, as extra keys of `flowSettings`; the
+participant's labels, form answers and any other booking field never are. The catalogue has two
+attributes and a group one subject question, so at most four keys of the fifteen are used.
+`openplannerGroup` is written last and cannot be overwritten. Create a flow variable of type
+string with the same name in the client's flow to read a value.
 
 **Ending a cancelled booking's task** (ADR 0021), v2 first. **Primary:** a Task Messages v2
 snapshot, `POST /v2/tasks/{taskId}/messages` (`cjp:task_write`, beta, `202`), marks the task
@@ -107,7 +119,15 @@ attributes and `workItemData` are ignored. A `404` is a task WxCC does not know.
 with `kind: "probe"`, `bookingReference: "probe-<12 hex>"`, `firstName: "Probe"`, the group's
 name and the probe meeting's link (or `https://openplanner.invalid/probe`). The flow's Case
 on `kind == probe` ends it; otherwise OpenPlanner ends it with End Task after
-`INTEGRATION_PROBE_TIMEOUT_SECONDS`.
+`INTEGRATION_PROBE_TIMEOUT_SECONDS`. Its `task:new` and `task:ended` are noted for the check
+only (see *Inbound: WxCC subscription*); a probe never appears in the own queue, the agenda or
+the overview, and a failed probe (`wxcc.probe.*`) makes the organisation's WxCC health `down`.
+The set-up of the flow branch for the organisation's administrator is step 5 of the manual
+topic *Contactcenter inrichten* (`docs/manual/nl/contact-center-setup.md`).
+
+**Fallback** (ADR 0082 point 11): while a group is in fallback, its due dispatch jobs send no
+Create Task request at all (they skip with reason `fallback`); when the fallback ends, bookings
+not yet claimed get a fresh dispatch job and the usual request above.
 
 ## Webhook addresses
 
@@ -203,3 +223,16 @@ booking. `task:connected` carries no agent identity, which is why the
 agent's host role comes from `allowAnyUserToBeCoHost` (ADR 0017). `task:failed` carries
 `reason` (for example `ENTRY_POINT_NOT_FOUND`, `ORG_DIGITAL_CONTACT_LIMIT_EXCEEDED`), shown to
 admins on the booking's timeline.
+
+Deduplication and last event (ADR 0082 point 5): every verified WxCC event of a booking's task is
+keyed by a SHA-256 digest of its type, `data.taskId` and the CloudEvent `id` (without an `id`:
+the event's own time), stored in `webhook_events` for 30 days like the Webex keys. A redelivered
+or replayed event is acknowledged with 204, logged with outcome `duplicate` and changes nothing.
+Every verified webhook of either platform is noted as that platform's last inbound event (time,
+type, outcome), shown on **Koppelingen** and *System status*.
+
+Reconcile (ADR 0082 point 6): when a task stays `queued` or `connected` longer than
+`task_reconcile_after_minutes` past its start and its last change, the worker reads it with
+`GET /v1/tasks/{taskId}` (status word and times only). A different state is written on the
+booking's timeline as the matching event with detail `reconciled`, and the organisation gets the
+system event `integration.webhooks_missing` (an alert) until a run finds nothing missed.

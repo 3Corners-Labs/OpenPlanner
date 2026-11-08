@@ -505,7 +505,7 @@ async def test_address_check_stores_the_round_trip_and_fails_on_a_finding(
 async def test_address_check_trusts_the_ca_file_it_is_given(tmp_path: Path) -> None:
     # ADR 0086 step 2: scripts/check-proxy.sh runs the round trip against its test CA.
     from app.cli import _probe_trusting
-    from tests.adapters.test_tls_probe import self_signed
+    from tests.support.certificates import self_signed
 
     assert _probe_trusting(None) is None
     certificate, _key = self_signed(tmp_path)

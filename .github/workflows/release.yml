@@ -12,6 +12,13 @@ name: release
 #   step = tag          after the release PR merged: the checks of ADR 0052 point 4 and the
 #                       annotated tag on the merge commit, pushed so that main.yml builds, signs
 #                       and publishes the release.
+#   step = cut-line     ADR 0116 point 3: the maintenance line release/X.Y from the newest release
+#                       of X.Y (vX.Y.0 or a later patch) and its label backport:X.Y, only when main holds a feat since that tag
+#                       (otherwise the patch comes from main). Dispatched on main, version X.Y.
+#
+# Dispatched on a line release/X.Y instead of main, `release-pr` opens the patch release PR
+# against the line (always X.Y.Z with Z > 0, never a migration) and `tag` tags its merge commit
+# on the line. The next release PR on main takes the line's CHANGELOG sections over.
 #
 # The file edits and checks live in `scripts/release_pr.py` (tested); the audit command in
 # `scripts/release-audit.sh`; the tag gate in `scripts/check-release-audit.sh` (ADR 0078). This
@@ -19,7 +26,7 @@ name: release
 #
 # Secrets and variables (docs/runbook.md, Releasing a version):
 #   RELEASE_APP_CLIENT_ID, RELEASE_APP_PRIVATE_KEY   the release app (ADR 0107), in the
-#                   environment `release`, which only `main` may use. Its short-lived token
+#                   environment `release`, which only `main` and release/X.Y may use. Its token
 #                   pushes the branch, opens the PR and pushes the tag: a PR or tag made with
 #                   GITHUB_TOKEN starts no workflow, and only the app may create a `v*` tag.
 #                   A dry run uses neither the environment nor the app.
@@ -34,10 +41,10 @@ on:
       step:
         description: "release-pr: open the release PR (and the audit for a minor or major version). tag: tag the merged release."
         type: choice
-        options: [release-pr, tag]
+        options: [release-pr, tag, cut-line]
         default: release-pr
       version:
-        description: "X.Y.Z. For release-pr: empty means what scripts/release_plan.py gives. For tag: required."
+        description: "X.Y.Z. For release-pr: empty means what scripts/release_plan.py gives. For tag: required. For cut-line: X.Y."
         type: string
         default: ""
       dry_run:
@@ -72,17 +79,20 @@ jobs:
       version: ${{ steps.plan.outputs.version }}
       previous: ${{ steps.plan.outputs.previous }}
       branch: ${{ steps.plan.outputs.branch }}
+      base: ${{ steps.plan.outputs.base }}
       audit: ${{ steps.plan.outputs.audit }}
       number: ${{ steps.open.outputs.number }}
     steps:
       # A real release starts from the default branch; a dry run may start from any branch
       # (that is how a change to this workflow is tried before it merges).
-      - name: a release is dispatched on the default branch
-        if: ${{ !inputs.dry_run && github.ref_name != github.event.repository.default_branch }}
+      - name: a release is dispatched on the default branch or a maintenance line
+        if: ${{ !inputs.dry_run }}
         env:
           REF: ${{ github.ref_name }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
         run: |
-          echo "::error::dispatch the release on ${{ github.event.repository.default_branch }}, not on $REF (or tick dry_run)"
+          [[ "$REF" == "$DEFAULT" || "$REF" =~ ^release/[0-9]+\.[0-9]+$ ]] && exit 0
+          echo "::error::dispatch the release on $DEFAULT or a line release/X.Y, not on $REF (or tick dry_run)"
           exit 1
       - id: app
         name: a short-lived token from the release app (ADR 0107)
@@ -101,11 +111,19 @@ jobs:
         name: the number, from the commits since the last release unless given
         env:
           VERSION: ${{ inputs.version }}
-        run: python3 -m scripts.release_pr plan --version "$VERSION" | tee -a "$GITHUB_OUTPUT"
+          BASE: ${{ github.ref_name }}
+        run: python3 -m scripts.release_pr plan --version "$VERSION" --base "$BASE" | tee -a "$GITHUB_OUTPUT"
       - name: pyproject.toml, uv.lock, publiccode.yml, CHANGELOG.md and the PR body
         env:
           VERSION: ${{ steps.plan.outputs.version }}
-        run: python3 -m scripts.release_pr prepare --version "$VERSION" --body "$RUNNER_TEMP/body.md" --actor "$GITHUB_ACTOR"
+          BASE: ${{ github.ref_name }}
+        run: python3 -m scripts.release_pr prepare --version "$VERSION" --base "$BASE" --body "$RUNNER_TEMP/body.md" --actor "$GITHUB_ACTOR"
+      # ADR 0116 point 9: the support index on main follows every release; on a line the line's
+      # copy is refreshed and the next release on main supersedes it.
+      - name: support.json
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: python3 -m scripts.support_index --add "$VERSION"
       - name: what would change (step summary)
         env:
           TITLE: ${{ steps.plan.outputs.title }}
@@ -115,7 +133,7 @@ jobs:
           {
             echo "## $TITLE (dry run: $DRY_RUN)"
             echo
-            echo "Branch \`$BRANCH\`, audit needed: ${{ steps.plan.outputs.audit }}"
+            echo "Branch \`$BRANCH\` into \`${{ steps.plan.outputs.base }}\`, audit needed: ${{ steps.plan.outputs.audit }}"
             echo
             echo '```diff'
             git --no-pager diff
@@ -149,7 +167,7 @@ jobs:
           git commit -am "$TITLE"
           # --force: a branch left by an earlier failed run is replaced, never a PR (checked above).
           git push --force origin "$BRANCH"
-          url="$(gh pr create --base "${{ github.event.repository.default_branch }}" --head "$BRANCH" \
+          url="$(gh pr create --base "${{ steps.plan.outputs.base }}" --head "$BRANCH" \
             --title "$TITLE" --body-file "$RUNNER_TEMP/body.md")"
           number="$(gh pr view "$url" --json number --jq .number)"
           gh pr merge --auto --squash "$number"
@@ -225,12 +243,14 @@ jobs:
         run: |
           echo "::error::the tag step needs the version (X.Y.Z) of the merged release PR"
           exit 1
-      - name: a release is dispatched on the default branch
-        if: ${{ !inputs.dry_run && github.ref_name != github.event.repository.default_branch }}
+      - name: a tag is dispatched on the default branch or a maintenance line
+        if: ${{ !inputs.dry_run }}
         env:
           REF: ${{ github.ref_name }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
         run: |
-          echo "::error::dispatch the tag on ${{ github.event.repository.default_branch }}, not on $REF (or tick dry_run)"
+          [[ "$REF" == "$DEFAULT" || "$REF" =~ ^release/[0-9]+\.[0-9]+$ ]] && exit 0
+          echo "::error::dispatch the tag on $DEFAULT or a line release/X.Y, not on $REF (or tick dry_run)"
           exit 1
       - id: app
         name: a short-lived token from the release app (ADR 0107)
@@ -246,10 +266,11 @@ jobs:
           fetch-depth: 0   # the release commit on main, and whether the tag exists
           token: ${{ steps.app.outputs.token || github.token }}
       - id: release
-        name: the merged release PR on main, pyproject.toml agrees, no tag yet
+        name: the merged release PR on main (or its line), pyproject.toml agrees, no tag yet
         env:
           VERSION: ${{ inputs.version }}
-        run: python3 -m scripts.release_pr tag-check --version "$VERSION" --actor "$GITHUB_ACTOR" | tee -a "$GITHUB_OUTPUT"
+          REF: ${{ github.ref_name }}
+        run: python3 -m scripts.release_pr tag-check --version "$VERSION" --ref "$REF" --actor "$GITHUB_ACTOR" | tee -a "$GITHUB_OUTPUT"
       - name: a minor or major release carries its audit with Verdict pass (ADR 0078)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -283,3 +304,70 @@ jobs:
           git tag -a "v$VERSION" "$COMMIT" -m "$MESSAGE"
           git push origin "refs/tags/v$VERSION"
           echo "::notice::v$VERSION tagged on $COMMIT; main.yml builds, signs and publishes it ($MESSAGE)"
+
+  # ADR 0116 point 3: a maintenance line is cut from the newest release of X.Y when a fix
+  # must ship and main holds a feat since that release. The release app pushes the branch (the ruleset for
+  # release/X.Y lets only the app create it); the label backport:X.Y makes the backport
+  # workflow open the cherry-pick PR of every fix labelled with it.
+  cut-line:
+    name: cut a maintenance line
+    if: inputs.step == 'cut-line'
+    runs-on: ${{ vars.RELEASE_RUNNER || 'ubuntu-24.04' }}
+    environment: ${{ !inputs.dry_run && 'release' || '' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write   # the label backport:X.Y
+    steps:
+      - name: a line is cut on the default branch
+        if: ${{ !inputs.dry_run && github.ref_name != github.event.repository.default_branch }}
+        env:
+          REF: ${{ github.ref_name }}
+        run: |
+          echo "::error::dispatch cut-line on ${{ github.event.repository.default_branch }}, not on $REF (or tick dry_run)"
+          exit 1
+      - id: app
+        name: a short-lived token from the release app (ADR 0107)
+        if: ${{ !inputs.dry_run }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the tag, main's commits since it, and the existing lines
+          token: ${{ steps.app.outputs.token || github.token }}
+      - id: line
+        name: a release of X.Y exists, the line does not, main holds a feat since it
+        env:
+          LINE: ${{ inputs.version }}
+        run: python3 -m scripts.release_line cut --line "$LINE" | tee -a "$GITHUB_OUTPUT"
+      - name: what would be cut (step summary)
+        env:
+          TAG: ${{ steps.line.outputs.tag }}
+          BRANCH: ${{ steps.line.outputs.branch }}
+          LABEL: ${{ steps.line.outputs.label }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          {
+            echo "## $BRANCH from $TAG (dry run: $DRY_RUN)"
+            echo
+            echo "Label \`$LABEL\`; commits on main since $TAG:"
+            echo
+            git --no-pager log --first-parent --format='- %s' "$TAG..origin/main"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: the line pushed, the label created
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.line.outputs.tag }}
+          BRANCH: ${{ steps.line.outputs.branch }}
+          LABEL: ${{ steps.line.outputs.label }}
+        run: |
+          # The checkout holds the app's token, so this push is the app's (the ruleset lets
+          # only the app create a line).
+          git push origin "$TAG^{commit}:refs/heads/$BRANCH"
+          gh label create "$LABEL" --color 0e8a16 --force \
+            --description "Merged fix to cherry-pick onto $BRANCH (ADR 0116)"
+          echo "::notice::$BRANCH cut from $TAG; label $LABEL ready"

@@ -75,10 +75,46 @@ holds the participant's name and email address) and the agent who claimed the bo
 (ADR 0102 point 11). The purge empties them with the personal fields; they are not shown on
 the *Data fields* card and not masked in logs."""
 
-PURGED_FIELDS: tuple[str, ...] = (*(f.name for f in DATA_FIELDS), *DERIVED_FIELDS)
-"""Every column the purge sets to NULL: ``DATA_FIELDS`` and ``DERIVED_FIELDS``. The purge works
-from this list, so there is no second one to drift (ADR 0102 point 13). What the purge does is
+ROUTING_FIELDS: tuple[str, ...] = ("subject_code", "routing_answers")
+"""The participant's subject and routing answers (ADR 0081): codes from a closed list, no
+personal data, so not masked and not on the *Data fields* card; ADR 0081 has them purged with
+the booking all the same. Reporting by subject (ADR 0117) must copy the code into its fact
+before the purge; it cannot read it from a purged booking."""
+
+PURGED_FIELDS: tuple[str, ...] = (
+    *(f.name for f in DATA_FIELDS),
+    *DERIVED_FIELDS,
+    *ROUTING_FIELDS,
+)
+"""Every column the purge sets to NULL: ``DATA_FIELDS``, ``DERIVED_FIELDS`` and
+``ROUTING_FIELDS``. The purge works from this list, so there is no second one to drift (ADR 0102
+point 13). What the purge does is
 *delete fields from the appointment*; it does not make the booking anonymous."""
+
+USAGE_FIELDS: tuple[str, ...] = (
+    "kind",
+    "bucket_hour",
+    "organisation_id",
+    "group_id",
+    "booking_kind",
+    "dispatch_kind",
+    "subject_code",
+    "locale",
+    "channel_kind",
+    "outcome",
+    "actor_class",
+    "reason_code",
+    "value_seconds",
+    "participants",
+    "capacity",
+    "booked",
+    "staff_id",
+)
+"""The one allow-list of what a reporting fact may hold (ADR 0117 point 2): the fields of
+``usage.UsageFact`` and, for the separate ``usage.StaffFact``, ``staff_id``. No field of
+``DATA_FIELDS``, ``DERIVED_FIELDS`` or ``ALIASES`` is in it, and a test checks that and that the
+fact types hold exactly these fields. The statistics hold no personal data; they are not a copy
+of the appointments with the names taken out."""
 
 ENTITY = "Booking"
 """The only entity that holds personal data (CLAUDE.md privacy rules)."""

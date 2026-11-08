@@ -117,7 +117,11 @@ async def test_worker_lists_the_releases_once_per_hour(
     await asyncio.wait_for(task, timeout=DEADLINE)
 
     # The public address round trip (ADR 0086) goes through the same transport.
-    assert [c for c in calls if c != "/api/v1/instance"] == ["/repos/acme/openplanner/releases"]
+    # ADR 0116: one check lists the releases and reads the support index, once.
+    assert [c for c in calls if c != "/api/v1/instance"] == [
+        "/repos/acme/openplanner/releases",
+        "/repos/acme/openplanner/contents/support.json",
+    ]
     engine = create_engine(url)
     try:
         async with SqlUnitOfWork(engine).read() as tx:

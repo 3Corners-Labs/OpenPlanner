@@ -12,8 +12,9 @@ from app.domain import holidays as holiday_model
 from app.domain.admin_sessions import AdminSession, EndReason
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
+from app.domain.alert_model import AlertTarget, DeliveryState
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
-from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
+from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category, Outcome
 from app.domain.authorization import CustomRole, RoleCatalogue, Scope
 from app.domain.booking import (
     Booking,
@@ -32,6 +33,14 @@ from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import GroupCheck
 from app.domain.closure import Closure
+from app.domain.connection_health import (
+    WATCHED_TASKS,
+    HealthEntry,
+    InboundEvent,
+    Platform,
+    RequestSample,
+    StaleTask,
+)
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -46,6 +55,7 @@ from app.domain.identity_providers import (
     SigningKey,
 )
 from app.domain.images import ImageFile, ImageText
+from app.domain.integration_check import CHECK_EVENT, PROBE_REASON_PREFIX
 from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
 from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.login_domains import DomainClaim
@@ -54,12 +64,14 @@ from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import OwnCertificate
 from app.domain.participant_links import new_public_ref
 from app.domain.public_address import AddressCheck, AddressKind
+from app.domain.request_log import REQUEST_EVENT, counts_as_failure, request_platform
 from app.domain.retention import (
     DueBooking,
     GroupRetentionCounts,
     PurgeCandidate,
     RetentionFacts,
 )
+from app.domain.routing import GroupRouting
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import (
     Group,
@@ -68,6 +80,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
+from app.domain.security_log import TOKEN_REFRESH_FAILED
 from app.domain.staff import (
     GrantHolders,
     Membership,
@@ -80,6 +93,7 @@ from app.domain.staff import (
 from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
+from app.domain.usage import StaffFact, UsageFact
 from app.domain.worker_check import WorkerHeartbeat
 from tests.support.domain import NOW
 
@@ -92,6 +106,7 @@ class State:
     reminder_rules: dict[int, list[ReminderRule]] = field(default_factory=dict)
     slots: dict[int, Slot] = field(default_factory=dict)
     bookings: dict[int, Booking] = field(default_factory=dict)
+    usage_facts: list[UsageFact | StaffFact] = field(default_factory=list)
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
     claimed_jobs: dict[tuple[int, JobType], PlannedJob] = field(default_factory=dict)
     active_jobs: list[ActiveJob] = field(default_factory=list)
@@ -103,6 +118,7 @@ class State:
     audit: list[AuditEvent] = field(default_factory=list)
     diagnostic_modes: list[DiagnosticMode] = field(default_factory=list)
     staff: dict[str, StaffMember] = field(default_factory=dict)
+    overview_layouts: dict[str, tuple[str, ...]] = field(default_factory=dict)
     admin_sessions: list[AdminSession] = field(default_factory=list)
     logos: dict[int, Logo] = field(default_factory=dict)
     fonts: dict[tuple[int, FontRole], FontFile] = field(default_factory=dict)
@@ -157,6 +173,10 @@ class State:
     failed_purges: set[int] = field(default_factory=set)
     failed_jobs: dict[int, list[JobSummary]] = field(default_factory=dict)
     worker_heartbeat: WorkerHeartbeat | None = None
+    health: tuple[HealthEntry, ...] = ()
+    alert_targets: dict[int, AlertTarget] = field(default_factory=dict)
+    alert_deliveries: dict[tuple[int, str], DeliveryState] = field(default_factory=dict)
+    inbound: dict[Platform, InboundEvent] = field(default_factory=dict)
     next_id: int = 1
 
 
@@ -280,10 +300,25 @@ class InMemoryTransaction:
                 self.state.staff[subject], status=status, status_at=at
             )
 
+    async def get_overview_layout(self, subject: str) -> tuple[str, ...] | None:
+        return self.state.overview_layouts.get(subject)
+
+    async def save_overview_layout(
+        self, subject: str, keys: tuple[str, ...] | None, at: datetime
+    ) -> bool:
+        if subject not in self.state.staff:
+            return False
+        if keys is None:
+            self.state.overview_layouts.pop(subject, None)
+        else:
+            self.state.overview_layouts[subject] = keys
+        return True
+
     async def erase_staff(self, subject: str, at: datetime) -> None:
         member = self.state.staff.get(subject)
         if member is not None and member.status is not StaffStatus.ERASED:
             self.state.staff[subject] = member.erased(at)
+            self.state.overview_layouts.pop(subject, None)
 
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
         if subject in self.state.staff:
@@ -391,6 +426,92 @@ class InMemoryTransaction:
 
     async def get_worker_heartbeat(self) -> WorkerHeartbeat | None:
         return self.state.worker_heartbeat
+
+    async def all_alert_targets(self) -> list[AlertTarget]:
+        return [self.state.alert_targets[i] for i in sorted(self.state.alert_targets)]
+
+    async def alert_targets_of(self, organisation_id: int | None) -> list[AlertTarget]:
+        return [t for t in await self.all_alert_targets() if t.organisation_id == organisation_id]
+
+    async def add_alert_target(self, target: AlertTarget) -> int:
+        target_id = self._new_id()
+        self.state.alert_targets[target_id] = replace(target, id=target_id)
+        return target_id
+
+    async def delete_alert_target(self, target_id: int) -> None:
+        self.state.alert_targets.pop(target_id, None)
+        for key in [k for k in self.state.alert_deliveries if k[0] == target_id]:
+            del self.state.alert_deliveries[key]
+
+    async def alert_delivery_states(self) -> list[DeliveryState]:
+        return list(self.state.alert_deliveries.values())
+
+    async def save_alert_delivery(self, state: DeliveryState) -> None:
+        self.state.alert_deliveries[(state.target_id, state.key)] = state
+
+    async def request_samples(self, since: datetime) -> list[RequestSample]:
+        samples = []
+        for e in self.state.audit:
+            platform = request_platform(e.detail) if e.action == REQUEST_EVENT else None
+            if platform is not None and e.at >= since:
+                failed = counts_as_failure(e.outcome is Outcome.FAILURE, e.reason, e.detail)
+                samples.append(RequestSample(e.organisation, platform, failed, e.at))
+        return samples
+
+    async def token_refresh_failed_since(self, since: datetime) -> bool:
+        return any(
+            e.action == TOKEN_REFRESH_FAILED and e.outcome is Outcome.FAILURE and e.at >= since
+            for e in self.state.audit
+        )
+
+    async def failed_probe_organisations(self, since: datetime) -> frozenset[str]:
+        latest: dict[tuple[str | None, str | None], AuditEvent] = {}
+        for e in self.state.audit:
+            if e.action == CHECK_EVENT and e.at >= since:
+                latest[(e.organisation, e.group)] = e
+        return frozenset(
+            e.organisation
+            for e in latest.values()
+            if e.outcome is Outcome.FAILURE
+            and e.reason.startswith(PROBE_REASON_PREFIX)
+            and e.organisation
+        )
+
+    async def get_health(self) -> tuple[HealthEntry, ...]:
+        return self.state.health
+
+    async def save_health(self, entries: Sequence[HealthEntry], at: datetime) -> None:
+        self.state.health = tuple(entries)
+
+    async def save_inbound_event(self, event: InboundEvent) -> None:
+        self.state.inbound[event.platform] = event
+
+    async def get_inbound_events(self) -> tuple[InboundEvent, ...]:
+        return tuple(self.state.inbound[p] for p in Platform if p in self.state.inbound)
+
+    async def stale_tasks(self, unchanged_before: datetime, limit: int) -> list[StaleTask]:
+        found = []
+        for booking_id, booking in sorted(self.state.bookings.items()):
+            status = self.state.call_status.get(booking_id)
+            if booking.wxcc_task_id is None or status is None:
+                continue
+            changed = status.connected_at or status.task_created_at
+            if (
+                status.task in WATCHED_TASKS
+                and booking.start < unchanged_before
+                and (changed is None or changed < unchanged_before)
+            ):
+                group = self.state.groups[booking.group_id]
+                organisation = self.state.organisation_slugs.get(group.organisation_id)
+                found.append(
+                    (
+                        changed or booking.start,
+                        StaleTask(
+                            booking_id, booking.wxcc_task_id, status.task, organisation, group.slug
+                        ),
+                    )
+                )
+        return [task for _, task in sorted(found, key=lambda item: item[0])[:limit]]
 
     async def get_organisation_by_id(self, organisation_id: int) -> Organisation | None:
         return self.state.organisations.get(organisation_id)
@@ -869,6 +990,33 @@ class InMemoryTransaction:
     async def get_booking(self, booking_id: int) -> Booking | None:
         return self.state.bookings.get(booking_id)
 
+    async def fallback_bookings(self, group_id: int, after: datetime) -> list[Booking]:
+        return sorted(
+            (
+                b
+                for b in self.state.bookings.values()
+                if b.group_id == group_id
+                and b.status is BookingStatus.CONFIRMED
+                and b.wxcc_task_id is None
+                and b.start > after
+                and (status := self.state.call_status.get(b.id or 0)) is not None
+                and status.fallback
+            ),
+            key=lambda b: b.start,
+        )
+
+    async def save_group_fallback(self, group_id: int, since: datetime | None) -> None:
+        self.state.groups[group_id] = replace(
+            self.state.groups[group_id], fallback_active_since=since
+        )
+
+    async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
+        self.state.groups[group_id] = replace(self.state.groups[group_id], routing=routing)
+
+    async def record_usage(self, fact: UsageFact | StaffFact) -> bool:
+        self.state.usage_facts.append(fact)
+        return True
+
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(
             self.state.bookings[booking_id],
@@ -877,6 +1025,7 @@ class InMemoryTransaction:
             trial=None,
             meeting=None,
             wxcc_task_id=None,
+            routing=None,
         )
         self.state.booking_events[booking_id] = [
             replace(e, message="") for e in self.state.booking_events.get(booking_id, [])

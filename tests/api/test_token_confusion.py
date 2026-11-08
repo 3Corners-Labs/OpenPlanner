@@ -2,8 +2,8 @@
 
 ASVS V9.2.2, V13.4.2 and V5.4.2: a token only works where it was issued for (an ID token is not
 a machine API token, a machine token is not an admin session), and a value of the wrong JSON
-type is a 422 that never repeats what was sent. Fixtures come from the machine API and widget
-tests.
+type is a 422 that never repeats what was sent. The fixtures ``agent`` (machine API) and
+``site`` (widget) come from ``tests/api/conftest.py``.
 """
 
 import secrets
@@ -12,15 +12,11 @@ import httpx
 import jwt
 import pytest
 
-from tests.api.test_agent_api import BASE as AGENT_BASE
-from tests.api.test_agent_api import Agent
-from tests.api.test_agent_api import agent as machine_api
-from tests.api.test_widget_api import ADA, SITE
-from tests.api.test_widget_api import BASE as WIDGET_BASE
-from tests.api.test_widget_api import site as widget_site
+from tests.support.agent_api import BASE as AGENT_BASE
+from tests.support.agent_api import Agent
+from tests.support.widget import ADA, SITE
+from tests.support.widget import BASE as WIDGET_BASE
 
-agent = machine_api  # the app with the machine API on, as its own tests run it
-site = widget_site  # the app with the demo group embeddable, as the widget tests run it
 CANARY = "Canary-Pii-7731"
 """A recognisable value standing for personal data: it must never come back in an answer."""
 

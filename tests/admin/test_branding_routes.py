@@ -6,8 +6,8 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from app.domain.branding import Branding
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
-from tests.admin.test_admin_flow import audit_events
 from tests.fakes.woff2 import make_woff2
+from tests.support.admin_site import audit_events
 
 PAGE = "/admin/organisations/demo/branding"
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64

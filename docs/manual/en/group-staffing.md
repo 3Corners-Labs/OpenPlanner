@@ -1,14 +1,14 @@
 # Group staffing
 
 The staffing says when a group's agents are on duty and how many there are. Participants can
-only book, or start a direct call, when the staffing allows it. Three tabs of a group belong
-together:
+only book, or start a direct call, when the staffing allows it. A group's **Planning** tab has
+three parts:
 
 - **Staffing**: the weekly blocks.
 - **Staffing exceptions**: a single date that differs from the week.
 - **Holidays**: which holiday calendars apply to the group.
 
-You open them through **Groups → group → Staffing** (or **Staffing exceptions**, **Holidays**).
+You open them through **Groups → group → Planning** and pick the part in the second row.
 Group admins, organisation admins and the superuser can change them, and a custom role with the
 right to manage the staffing. Compliance and privacy (read-only) and agents cannot. Before you
 save, the portal may ask you to log in again.
@@ -131,3 +131,10 @@ Choose and press **Save**. When a date has an own exception, that goes first, th
 a calendar that applies and was not kept open (closed), then the weekly blocks. An
 [emergency closure](group-closure.md) is applied on top of all this. A holiday never lifts a
 closure.
+
+## Subjects per block
+
+When the team has [subjects](group-routing.md), you choose on a block and on an exception which
+subjects it offers. Nothing ticked: the block offers all of them. A participant who first chooses a
+subject on the team's page sees only the times of blocks that offer it. The block's capacity counts
+for all subjects together.

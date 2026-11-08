@@ -19,11 +19,11 @@ from app.domain.booking import MeetingRef
 from app.domain.calls import CallState, TaskState
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
-from tests.adapters.test_webhooks import SECRET, sign, timestamp, wxcc_body
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.database import migrated_database
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book
+from tests.support.webhooks import SECRET, sign, timestamp, wxcc_body
 
 
 @pytest.fixture
@@ -257,3 +257,26 @@ async def test_a_webex_event_logs_the_meeting_id(
 
     logged = [e for e in events if e["event"] == "webhook.webex"]
     assert [(e["meeting_id"], e["outcome"]) for e in logged] == [("meeting-1", "recorded")]
+
+
+async def test_a_replayed_wxcc_event_changes_the_timeline_once_and_is_noted(
+    client: httpx.AsyncClient, booking_id: int, database_url: str
+) -> None:
+    """ADR 0082 point 5: WxCC events are deduplicated; the last one is noted per platform."""
+    body = wxcc_body("task:connected", at=NOW)
+    headers = {"x-webexcc-signature": sign(body), "x-webexcc-timestamp": timestamp(body)}
+    await client.post("/webhooks/wxcc", content=body, headers=headers)
+    _, _, before = await _status(database_url, booking_id)
+    with structlog.testing.capture_logs() as logs:
+        second = await client.post("/webhooks/wxcc", content=body, headers=headers)
+    assert second.status_code == 204
+    assert (await _status(database_url, booking_id))[2] == before
+    assert any(line.get("outcome") == "duplicate" for line in logs)
+    engine = create_engine(database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        inbound = await tx.get_inbound_events()
+    await engine.dispose()
+    # The first is noted; the replay seconds later is not written again (NOTE_EVERY).
+    assert [(e.platform.value, e.kind, e.outcome) for e in inbound] == [
+        ("wxcc", "task:connected", "recorded")
+    ]

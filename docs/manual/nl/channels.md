@@ -80,3 +80,24 @@ zonder landcode zijn ingevuld.
 Elke wijziging komt in het auditlog met de namen van de gewijzigde velden, nooit de waarden.
 Van een testmail staat het resultaat in het log, niet het adres; van een domeincontrole het
 oordeel, niet de records.
+
+## Meldingen aan beheerders
+
+Waar OpenPlanner meldingen heen stuurt als er iets misgaat met de koppelingen van deze
+organisatie of de taken van haar groepen: een e-mailadres van de beheerders of een Webex-ruimte.
+Per adres kiest u **Vanaf**: alle waarschuwingen en storingen, of alleen storingen. Hoogstens tien
+adressen. Met **Testmelding sturen** controleert u een adres meteen.
+
+Een melding die blijft, komt na het herhaalinterval opnieuw (instelling *Melding opnieuw sturen
+na*, standaard vier uur); tussendoor telt OpenPlanner alleen, en het volgende bericht noemt hoe
+vaak. Lukt het versturen niet, dan probeert OpenPlanner het na 1, 5 en 15 minuten opnieuw. Een
+bericht bevat alleen codes, de organisatie, de groep, het tijdstip en een link naar het portaal:
+nooit gegevens van deelnemers.
+
+**E-mail** gaat via het mailkanaal hierboven (of het reservekanaal van het platform).
+
+**Webex-ruimte**: maak in het Webex-ontwikkelaarsportaal een bot aan (alleen het recht
+`spark:messages_write`), voeg de bot toe aan de ruimte, plak het token van de bot bij
+**Webex-bot** en vul het id van de ruimte in als adres. Het token wordt versleuteld bewaard en
+nooit meer getoond. Stap voor stap, met de terugval van een groep naar de eigen wachtrij: zie
+[Contactcenter inrichten](contact-center-setup.md), stap 10 en 11.

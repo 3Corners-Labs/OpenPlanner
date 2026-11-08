@@ -1,0 +1,16 @@
+{#- The readiness checklist of a group or an organisation (ADR 0047 §5): what is still missing before bookings can be taken, each line linking to the tab that fixes it when the reader may open it. The status is in words; the chip colour only repeats it. Expects ``readiness`` (ChecklistView). -#}
+{% from "admin/_icons.html" import icon %}
+<section class="card" aria-labelledby="readiness-heading">
+  <div class="card__header">
+    <h2 id="readiness-heading">{{ _("admin.readiness.title") }}</h2>
+    <p class="card__lead">{% if readiness.missing %}{{ _("admin.readiness.missing", count=readiness.missing) }}{% else %}{{ _("admin.readiness.ready") }}{% endif %}</p>
+  </div>
+  <ul class="checklist">
+    {% for line in readiness.lines %}
+    <li class="checklist__item">
+      <span class="chip {% if line.done %}chip--success{% else %}chip--warning{% endif %}">{% if line.done %}{{ icon("check") }}{% else %}{{ icon("alert") }}{% endif %}<span>{{ line.status }}</span></span>
+      {% if line.href %}<a href="{{ line.href }}">{{ line.label }}</a>{% else %}<span>{{ line.label }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>

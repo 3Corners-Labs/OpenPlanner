@@ -32,6 +32,7 @@ from app.adapters.integrations import Integrations
 from app.adapters.service_app_check import SERVICE_APP_REPORT
 from app.admin import (
     agenda_routes,
+    alert_routes,
     alerts,
     api_routes,
     audit_routes,
@@ -62,6 +63,7 @@ from app.admin import (
     queue_routes,
     retention_routes,
     role_routes,
+    routing_routes,
     scenario_routes,
     session_routes,
     settings_routes,
@@ -71,6 +73,7 @@ from app.admin import (
     staff_status_routes,
     update_routes,
 )
+from app.admin.alert_routes import alert_view
 from app.admin.authz import (
     AccessDenied,
     AdminContext,
@@ -89,7 +92,7 @@ from app.admin.authz import (
 from app.admin.forms import Field, read_form, safe_next
 from app.admin.idp_mapping_routes import reason_label
 from app.admin.idp_routes import JWKS_PATH
-from app.admin.integration_views import check_view
+from app.admin.integration_views import check_view, health_view
 from app.admin.pages import (
     Locale,
     SameOrigin,
@@ -126,10 +129,12 @@ from app.domain.authorization import (
     Role,
     permissions_for,
     role_keys,
+    scope_for,
 )
 from app.domain.entitlements import ClaimMode, LoginClaims, resolve
 from app.domain.errors import DomainError
 from app.domain.identity import PLATFORM
+from app.domain.integration_health import IntegrationHealthService
 from app.domain.login_domains import EMAIL_DOMAIN_MISMATCH, EMAIL_NOT_VERIFIED
 from app.domain.login_service import (
     AMBIGUOUS_CLAIMS,
@@ -786,12 +791,29 @@ async def integrations(
         lambda at: admin_moment(request, locale, at),
         await reports.get(SERVICE_APP_REPORT),
     )
+    health_service: IntegrationHealthService = request.app.state.health_service
+    entries, inbound = await health_service.overview()
+    reach = scope_for(context.principal, Permission.INTEGRATIONS_MANAGE)
+    connections = health_view(
+        entries,
+        inbound,
+        locale.gettext,
+        lambda at: admin_moment(request, locale, at),
+        lambda organisation: reach.contains(organisation, None),
+    )
     return _page(
         request,
         locale,
         "admin/integrations.html",
         context.principal,
-        {"view": view, "groups": groups, "channels": channels, "checks": checks},
+        {
+            "view": view,
+            "groups": groups,
+            "channels": channels,
+            "checks": checks,
+            "health": connections,
+            "alerts": await alert_view(request, locale.gettext, context.principal, None),
+        },
     )
 
 
@@ -875,6 +897,8 @@ def register_admin(app: FastAPI) -> None:
         contact_routes.router,
         embedding_routes.router,
         form_routes.router,
+        alert_routes.router,
+        routing_routes.router,
         api_routes.router,
         simulator_routes.router,
         update_routes.router,

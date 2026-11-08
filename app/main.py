@@ -14,6 +14,7 @@ from fastapi import Depends, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.adapters import internal_ca
+from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, alert_bots
 from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
@@ -47,7 +48,7 @@ from app.adapters.log_shipping import LogShipper, LogTester, SenderFactory, ship
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_mapping
 from app.adapters.releases import update_service
-from app.adapters.senders import ConfiguredSenders, fallback_mail
+from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
 from app.adapters.signing_keys import EcSigningKeys
 from app.admin.routes import register_admin
 from app.admin.session import session_cookie_for
@@ -73,6 +74,7 @@ from app.domain.address_check import AddressStatus, InstanceService
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.agenda_service import AgendaService
+from app.domain.alert_delivery import AlertTargetService
 from app.domain.alerts import AlertService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
@@ -88,12 +90,14 @@ from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
 from app.domain.entitlements import ClaimMode
 from app.domain.event_context import set_service
+from app.domain.fallback import FallbackService
 from app.domain.form_service import FormService
 from app.domain.holiday_service import HolidayService
 from app.domain.identity_provider_service import IdentityProviderService
 from app.domain.idp_mapping import IdpMappingService, MappingSettings
 from app.domain.integration import IntegrationService
 from app.domain.integration_check import IntegrationCheckService
+from app.domain.integration_health import IntegrationHealthService
 from app.domain.log_destination_service import LogDestinationService
 from app.domain.login_service import ClaimSettings, LoginService
 from app.domain.maintenance_service import MaintenanceService
@@ -102,6 +106,7 @@ from app.domain.messaging_service import MessagingService
 from app.domain.mfa import MfaPolicy
 from app.domain.organisation_text_service import OrganisationTextService
 from app.domain.organisations import OrganisationService
+from app.domain.overview_layout import OverviewLayoutService
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
@@ -117,8 +122,10 @@ from app.domain.ports import (
 )
 from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
+from app.domain.readiness import ReadinessService
 from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
+from app.domain.routing_service import RoutingService
 from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
 from app.domain.services import BookingService
@@ -142,14 +149,17 @@ from app.keys import (
     session_secret,
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
+from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
+from app.web.fallback_text import SpaceTexts
 from app.web.organisation_settings import ClockScopeMiddleware
 from app.web.protection import configure_rate_limits, limiter, set_rate_limits
 from app.web.proxy_headers import ProxyHeaderMiddleware
 from app.web.public_links import PublicRedirectMiddleware
 from app.web.static_assets import ASSETS, VersionedStaticFiles
+from app.web.widgets import WIDGETS
 
 
 def _public_host(public_base_url: str) -> str | None:
@@ -296,7 +306,10 @@ def create_app(
         app.state.http = http  # ADR 0082: the Service App check runs the probes from here
         # ADR 0034: committed audit events also go to stdout for the log platform.
         uow = SqlUnitOfWork(
-            app.state.engine, secret_box(settings), StdoutEventSink(settings.event_envelope)
+            app.state.engine,
+            secret_box(settings),
+            StdoutEventSink(settings.event_envelope),
+            usage_enabled=lambda: live().reporting_enabled,  # ADR 0117, read at each write
         )
         # ADR 0068: every request to Webex and WxCC becomes a system event of the booking.
         request_log = RequestEvents(uow, clock, settings.app_version)
@@ -343,6 +356,7 @@ def create_app(
                 wired.video,
                 wired.dispatcher,
                 agent_start_label,
+                app.state.fallback_service,
             )
             app.state.trial_call_service = TrialCallService(
                 uow, wired.video, app.state.integration_service, clock
@@ -486,6 +500,9 @@ def create_app(
         app.state.form_service = FormService(
             uow, clock, app.state.admin_service, lambda: live().booking_form_max_custom_fields
         )
+        app.state.routing_service = RoutingService(
+            uow, clock, app.state.admin_service, lambda: live().max_subjects_per_group
+        )
         # ADR 0042 step 4: class C settings changed in the portal, checked against the lock.
         app.state.settings_service = SettingsService(
             uow,
@@ -570,6 +587,10 @@ def create_app(
             settings.app_version,
             probes=ProbeReports(ReportStore(app.state.engine)),
         )
+        # ADR 0082 points 5 and 7: the last inbound webhooks and the health of the connections.
+        app.state.health_service = IntegrationHealthService(
+            uow, clock, lambda: live().health_policy()
+        )
         app.state.meeting_status_service = MeetingStatusService(
             uow,
             clock,
@@ -581,6 +602,10 @@ def create_app(
         app.state.call_retry_service = CallRetryService(uow, clock, app.state.admin_service)
         app.state.branding_service = BrandingService(uow, clock, app.state.admin_service)
         app.state.contact_service = ContactService(uow, clock, app.state.admin_service)
+        app.state.readiness_service = ReadinessService(uow, clock, app.state.admin_service)
+        app.state.overview_layout_service = OverviewLayoutService(
+            uow, clock, [w.key for w in WIDGETS], lambda: live().overview_max_widgets
+        )
         app.state.scenario_service = ScenarioService(uow, clock, app.state.admin_service)
         app.state.embedding_service = EmbeddingService(
             uow,
@@ -622,6 +647,37 @@ def create_app(
             lambda: live().mail_from if live().smtp_host else None,
             production=settings.environment == "prod",
             plaintext_relay_allowed=settings.smtp_plaintext_relay_allowed,
+        )
+        # ADR 0082 point 9: alerts to email addresses and Webex spaces, and the bot tokens.
+        app.state.bot_tokens = alert_bots(app.state.engine, settings)
+        app.state.alert_target_service = AlertTargetService(
+            uow,
+            clock,
+            app.state.admin_service,
+            ConfiguredAlertSenders(
+                senders,
+                lambda: fallback_sender(live()),
+                app.state.bot_tokens,
+                http,
+                live().webex_api_base_url,
+                request_log,
+            ),
+            alert_composer(
+                app.state.translator.gettext,
+                settings.public_base_url,
+                settings.app_version,
+                settings.admin_timezone,
+            ),
+            app.state.bot_tokens,
+        )
+        # ADR 0082 point 11: a group admin ends a fallback by hand; the worker switches it.
+        app.state.fallback_service = FallbackService(
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.integration_service,
+            BotSpacePoster(app.state.bot_tokens, http, live().webex_api_base_url, request_log),
+            SpaceTexts(app.state.translator.gettext, settings.public_base_url),
         )
         text_overrides.attach(uow)
         app.state.organisation_text_service = OrganisationTextService(

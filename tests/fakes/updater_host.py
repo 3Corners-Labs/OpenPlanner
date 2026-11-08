@@ -17,6 +17,8 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``edge-ipv6``: whether the project's ``edge`` network has IPv6, as ``docker network inspect``
   says (default ``true``).
 - ``latest``: the tag of the latest GitHub release (default none: the API call fails).
+- ``min-upgrade-from``: the ``MIN_UPGRADE_FROM`` every image's configuration carries (ADR
+  0116; default none); ``fail`` may list ``upgrade-path-check`` (a database too old).
 - ``images``: the images on the host, one ``repository:tag`` per line, or ``repository@digest``
   for one without a tag; ``docker image ls`` lists them, ``docker rmi`` only records the call.
 - ``unhealthy``: one image reference per line; the worker (or, for a proxy image, the proxy)
@@ -143,6 +145,8 @@ def _compose(args: list[str]) -> int:
             sys.stdout.write((_host() / "claim").read_text())
         elif command[3] == "backup-db" and command[4:] != ["--prune"]:
             return _failing("backup-db")
+        elif command[3] == "upgrade-path-check":
+            return _failing("upgrade-path-check")
         elif command[3] in ("restore-db", "update-progress", "maintenance", "sessions"):
             return _failing(command[3])
         elif command[3] == "config":
@@ -187,6 +191,8 @@ def _docker(args: list[str]) -> int:
         _images(args[-1])
     if args[:2] == ["image", "inspect"] and any(".Config.Env" in arg for arg in args):
         print(f"APP_VERSION={_version_of(args[-1])}")
+        for line in _lines("min-upgrade-from"):
+            print(f"MIN_UPGRADE_FROM={line}")
     elif args[:2] == ["image", "inspect"]:
         image, _, version = args[-1].rpartition(":")
         print(digest(image, version))

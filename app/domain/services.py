@@ -29,6 +29,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
+from app.domain import booking_changes
 from app.domain.availability import (
     AvailableSlot,
     available_slots,
@@ -76,6 +77,8 @@ from app.domain.job_plan import (
 )
 from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
+from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, open_for_direct
 from app.domain.tokens import (
     MIN_KEY_BYTES,
@@ -85,6 +88,14 @@ from app.domain.tokens import (
     token_matches,
 )
 from app.domain.tunable import value_for
+from app.domain.usage import ActorClass, FactKind
+from app.domain.usage_recording import (
+    record_cancelled,
+    record_closure_change,
+    record_confirmed,
+    record_moved,
+    record_placed,
+)
 
 
 @dataclass(frozen=True)
@@ -92,7 +103,9 @@ class ContactInput:
     """Raw contact fields from the booking form, validated by ``Contact.create``.
 
     ``answers`` maps the keys of the group's custom form fields to the submitted strings
-    (ADR 0055); they are validated by ``validate_answers``.
+    (ADR 0055), validated by ``validate_answers``, and the routing questions keyed
+    ``_subject`` and ``_<attribute>`` (ADR 0081), validated by ``GroupRouting.choose``; a custom
+    field key starts with a letter, so the two never collide.
     """
 
     first_name: str = field(repr=False)
@@ -220,9 +233,12 @@ class BookingService:
             return await tx.get_closure_image(closures[0].id)
 
     async def availability(
-        self, group_slug: str, first_day: date, last_day: date
+        self, group_slug: str, first_day: date, last_day: date, subject: str | None = None
     ) -> list[AvailableSlot]:
         """Return the bookable slots of a group between two local dates (inclusive).
+
+        With ``subject`` only the slots whose blocks offer it (ADR 0081 point 4); a code the
+        group does not have is ignored, so a crafted query shows the plain agenda.
 
         Raises:
             DomainError: ``group_not_found`` or ``invalid_range``.
@@ -245,6 +261,7 @@ class BookingService:
             now=self._clock.now(),
             booked={u.start: u.active for u in usage},
             snapshots={u.start: u.capacity_snapshot for u in usage},
+            subject=subject if group.routing.subject(subject) else None,
         )
         return [slot for slot in slots if covering(closures, slot.start) is None]
 
@@ -267,8 +284,9 @@ class BookingService:
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
             details = await self._contact(tx, group, contact)
+            routing = _routing(group, contact)
             return await self._place(
-                tx, group, start, details, locale, consents, None, pending=True
+                tx, group, start, details, locale, consents, None, pending=True, routing=routing
             )
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
@@ -306,7 +324,9 @@ class BookingService:
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
             now = self._clock.now()
-            if not await self._direct_open(tx, group, now):
+            routing = _routing(group, contact)
+            subject = routing.subject if routing else None
+            if not await self._direct_open(tx, group, now, subject):
                 raise DomainError(ErrorCode.DIRECT_CALL_UNAVAILABLE)
             if not await self._direct_room(tx, group, now):
                 raise DomainError(ErrorCode.DIRECT_CALL_FULL)
@@ -329,9 +349,11 @@ class BookingService:
                     created_at=now,
                     token_salt=salt,
                     kind=BookingKind.DIRECT,
+                    routing=routing,
                 )
             )
             await tx.replace_jobs(_id(booking), plan_for_direct(start=now, end=end))
+            await record_placed(tx, booking, group, now)
         return BookingReceipt(booking, token)
 
     async def find(self, management_token: str | PublicRef) -> BookingDetails:
@@ -390,6 +412,8 @@ class BookingService:
                 # it on hold at once, as it would have been had it been confirmed before.
                 held = confirmed.suspend(_id(closure))
                 await tx.save_booking(held)
+                await record_confirmed(tx, booking, group, now)
+                await record_closure_change(tx, FactKind.BOOKING_SUSPENDED, held, group, now)
                 purge_at = closure.purge_at(
                     booking.end, self._closure_retention(group.organisation_id)
                 )
@@ -399,6 +423,7 @@ class BookingService:
                 await tx.replace_jobs(_id(booking), jobs)
                 return held
             await tx.save_booking(confirmed)
+            await record_confirmed(tx, booking, group, now)
             await tx.replace_jobs(_id(booking), await self._booked_jobs(tx, group, confirmed))
             return confirmed
 
@@ -414,11 +439,14 @@ class BookingService:
             now = self._clock.now()
             group = await self._group_by_id(tx, booking.group_id)
             _ensure_cancellable(booking, group, now)
-            cancelled = booking.cancel(now)
-            await tx.save_booking(cancelled)
-            jobs = plan_for_cancellation(cancelled_at=now, team_invite=group.sends_team_invite)
-            await tx.replace_jobs(_id(booking), jobs)
-            return cancelled
+            return await booking_changes.cancel(
+                tx,
+                booking,
+                group,
+                now,
+                actor=ActorClass.PARTICIPANT,
+                team_invite=group.sends_team_invite,
+            )
 
     async def leave_direct(self, management_token: str | PublicRef) -> DirectLeft:
         """Stop waiting for a direct call: cancel it and end its work item (ADR 0019 point 4).
@@ -441,6 +469,13 @@ class BookingService:
             status = await tx.get_call_status(booking.id) or new_status(booking.id)
             plan = plan_leave(booking, status, now)
             await tx.save_booking(plan.booking)
+            await record_cancelled(
+                tx,
+                booking,
+                await self._group_by_id(tx, booking.group_id),
+                now,
+                ActorClass.PARTICIPANT,
+            )
             await tx.replace_jobs(booking.id, plan.jobs)
             await tx.add_booking_event(plan.event)
             await tx.save_call_status(apply_event(status, plan.event.kind, now))
@@ -465,7 +500,7 @@ class BookingService:
                 raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
             group = await self._group_by_id(tx, old.group_id)
             _ensure_changeable(old, group, self._clock.now())
-            return await self.relocate(tx, old, group, new_start)
+            return await self.relocate(tx, old, group, new_start, actor=ActorClass.PARTICIPANT)
 
     async def relocate(
         self,
@@ -474,6 +509,7 @@ class BookingService:
         group: Group,
         new_start: datetime,
         *,
+        actor: ActorClass,
         sms: bool = False,
     ) -> BookingReceipt:
         """Move ``old`` to ``new_start`` inside the caller's locked transaction.
@@ -481,7 +517,8 @@ class BookingService:
         Shared by the participant's reschedule, an admin moving a suspended booking
         (``ClosureService.move``) and a planner (``PlannerService.move``, which passes
         ``sms`` so the change also goes out as an SMS where the participant agreed to it); the
-        caller checks who may do it.
+        caller checks who may do it. ``actor`` says which of them, as a class, for the usage
+        facts (ADR 0117).
 
         Raises:
             DomainError: ``booking_not_active``, ``same_slot`` or any error of ``book``.
@@ -492,6 +529,7 @@ class BookingService:
             raise DomainError(ErrorCode.SAME_SLOT)
         now = self._clock.now()
         await tx.save_booking(old.cancel(now))
+        await record_moved(tx, old, group, now, actor)
         jobs = plan_for_cancellation(
             cancelled_at=now, notify=False, team_invite=group.sends_team_invite
         )
@@ -507,19 +545,23 @@ class BookingService:
             sms=sms,
             pending=old.awaits_confirmation,
             confirmed_at=old.confirmed_at,
+            routing=old.routing,
         )
 
-    async def _direct_open(self, tx: Transaction, group: Group, now: datetime) -> bool:
-        """Return whether the group is open for a direct call at ``now``.
+    async def _direct_open(
+        self, tx: Transaction, group: Group, now: datetime, subject: str | None = None
+    ) -> bool:
+        """Return whether the group is open for a direct call at ``now`` (for ``subject``).
 
-        That takes a staffed block that offers direct calls (ADR 0072). Holidays count as
-        closed days (ADR 0025), and so does an active emergency closure.
+        That takes a staffed block that offers direct calls (ADR 0072) and the subject
+        (ADR 0081 point 4). Holidays count as closed days (ADR 0025), and so does an active
+        emergency closure.
         """
         today = group.today(now)
         rules, overrides = await effective_schedule(tx, group, today, today)
         if any(c.is_active(now) for c in await tx.get_closures(group.id, now)):
             return False
-        return open_for_direct(group, rules, overrides, now)
+        return open_for_direct(group, rules, overrides, now, subject)
 
     async def _direct_room(self, tx: Transaction, group: Group, now: datetime) -> bool:
         """Return whether another direct call fits under the group's cap at ``now``."""
@@ -541,7 +583,7 @@ class BookingService:
         region = self._phone_region(group.organisation_id)
         answers = validate_answers(
             await tx.get_form(group.id),
-            contact.answers,
+            {k: v for k, v in contact.answers.items() if not k.startswith(ROUTING_PREFIX)},
             today=self._clock.now().astimezone(group.tz).date(),
             region=region,
         )
@@ -602,8 +644,12 @@ class BookingService:
         sms: bool = False,
         pending: bool = False,
         confirmed_at: datetime | None = None,
+        routing: RoutingChoice | None = None,
     ) -> BookingReceipt:
         """Reserve a place at ``start`` and store the booking with its jobs.
+
+        ``routing`` is the participant's subject and attribute codes (ADR 0081); a slot whose
+        blocks do not offer the subject is unavailable for it (point 4).
 
         ``pending`` places it awaiting confirmation with its own ``confirm_by`` (a participant's
         new booking, or a moved one that was still pending, ADR 0056); otherwise it is placed
@@ -623,7 +669,7 @@ class BookingService:
             raise DomainError(ErrorCode.OUTSIDE_BOOKING_WINDOW)
         day = start.astimezone(group.tz).date()
         rules, overrides = await effective_schedule(tx, group, day, day)
-        offered = offered_slot(group, rules, overrides, start)
+        offered = offered_slot(group, rules, overrides, start, routing.subject if routing else None)
         if offered is None:
             raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
         if covering(await tx.get_closures(group.id, now), offered.start) is not None:
@@ -668,6 +714,7 @@ class BookingService:
                 rescheduled_from_id=rescheduled_from,
                 confirm_by=window.confirm_by if window else None,
                 confirmed_at=confirmed_at,
+                routing=routing,
             )
         )
         jobs = (
@@ -676,6 +723,7 @@ class BookingService:
             else await self._booked_jobs(tx, group, booking, sms=sms)
         )
         await tx.replace_jobs(_id(booking), jobs)
+        await record_placed(tx, booking, group, now, moved=rescheduled_from is not None)
         return BookingReceipt(booking, token)
 
     async def _booked_jobs(
@@ -746,3 +794,13 @@ def _id(entity: Booking | Slot | Closure) -> int:
     if entity.id is None:
         raise ValueError("entity has not been stored")
     return entity.id
+
+
+def _routing(group: Group, contact: ContactInput) -> RoutingChoice | None:
+    """Return the participant's subject and attribute codes, or ``None`` when none are asked.
+
+    Raises:
+        DomainError: ``invalid_answer`` naming the routing question (ADR 0081).
+    """
+    choice = group.routing.choose(contact.answers)
+    return None if choice.empty else choice

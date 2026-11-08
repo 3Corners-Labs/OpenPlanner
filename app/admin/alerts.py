@@ -20,7 +20,6 @@ No alert holds a participant's data (ADR 0061 §8).
 
 from dataclasses import dataclass
 from typing import Annotated
-from urllib.parse import urlencode
 
 import structlog
 from fastapi import APIRouter, Depends, Request
@@ -34,6 +33,7 @@ from app.admin.pages import admin_moment
 from app.admin.session import close_alert, session_alert_prefs, session_closed_alerts
 from app.admin.top_bar import COUNTS_ATTRIBUTE
 from app.domain.alerts import (
+    FALLBACK_EVENT,
     QUEUE_WAIT_EVENT,
     WORKER_ALERT,
     Alert,
@@ -42,12 +42,15 @@ from app.domain.alerts import (
     banner_alerts,
 )
 from app.domain.authorization import Permission, Principal, scope_for
+from app.domain.connection_health import HEALTH_EVENT as CONNECTION_HEALTH
+from app.domain.connection_health import WEBHOOKS_MISSING
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.log_destinations import HEALTH_EVENT
 from app.domain.public_address import EVENT as ADDRESS_EVENT
 from app.domain.retention_sweep import SWEPT
 from app.domain.storage import STORAGE_EVENT
 from app.domain.tls import EVENT as CERTIFICATE_EVENT
+from app.web.alert_text import alert_path
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.settings_labels import TLS_FINDING_LABELS
 from app.web.templates import FragmentResponse
@@ -62,8 +65,6 @@ ALERTS_ATTRIBUTE = "alerts"
 ALERTS_LINK = "top.alerts"
 """The top bar link that carries the number of open alerts (SH-2)."""
 
-STATUS_PATH = "/admin/settings"
-"""Where *System status* lives; the worker alert links there."""
 
 SOURCE_LABELS: dict[str, str] = {
     STORAGE_EVENT: "admin.alerts.source.storage",
@@ -74,6 +75,9 @@ SOURCE_LABELS: dict[str, str] = {
     CHECK_EVENT: "admin.alerts.source.integration",
     QUEUE_WAIT_EVENT: "admin.alerts.source.queue_wait",
     WORKER_ALERT: "admin.alerts.source.worker",
+    CONNECTION_HEALTH: "admin.alerts.source.connection",
+    WEBHOOKS_MISSING: "admin.alerts.source.webhooks_missing",
+    FALLBACK_EVENT: "admin.alerts.source.fallback",
 }
 """What an alert is about, per action; the group-level ones name the group."""
 
@@ -90,6 +94,9 @@ OWN_TEXTS: dict[str, str] = {
     HEALTH_EVENT: "admin.alerts.text.log_destination",
     SWEPT: "admin.alerts.text.retention",
     CHECK_EVENT: "admin.alerts.text.check",
+    CONNECTION_HEALTH: "admin.alerts.text.connection",
+    WEBHOOKS_MISSING: "admin.alerts.text.webhooks_missing",
+    FALLBACK_EVENT: "admin.alerts.text.fallback",
 }
 """Actions whose sentence is the alert's own rather than the reason's label."""
 
@@ -170,27 +177,16 @@ def _params(request: Request, locale: RequestLocale, alert: Alert) -> dict[str, 
 
 def _href(principal: Principal, alert: Alert) -> str | None:
     """Return where the alert leads the admin, decided by the matrix."""
-    if alert.action == WORKER_ALERT:
-        return STATUS_PATH
-    if alert.action == QUEUE_WAIT_EVENT and alert.group:
-        return f"/admin/groups/{alert.group}/queue"
+    path = alert_path(alert)
+    if not path.startswith("/admin/audit"):
+        return path
     log_scope = scope_for(principal, Permission.AUDIT_VIEW)
     visible = (
         log_scope.everything
         if alert.organisation is None
         else log_scope.contains(alert.organisation, alert.group)
     )
-    if not visible:
-        return None
-    if alert.trace_id:
-        return f"/admin/audit?trace={alert.trace_id}"
-    # An event written outside a trace: the system problems, at the group when it has one.
-    narrow = {
-        "source": "system",
-        "problems": "1",
-        **({"group": alert.group} if alert.group else {}),
-    }
-    return f"/admin/audit?{urlencode(narrow)}"
+    return path if visible else None
 
 
 def alert_views(

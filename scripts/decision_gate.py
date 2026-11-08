@@ -20,6 +20,12 @@ product owner knows what they are approving.
 The list of decision paths is fixed on purpose and lives here: changing it is itself a
 decision (ADR 0078, *Settings*).
 
+Two blocks stand even with the label (ADR 0119), because a design that merged without its
+build is how decisions stayed unbuilt: a new ADR must carry its first build step in the same
+pull request (its row says ``merged``; an ADR whose Status line says *policy* has nothing to
+build), and no new ADR merges while ``UNBUILT_LIMIT`` or more ADRs are listed NOT BUILT in
+``docs/adr-status.md``.
+
 In the merge queue every first-parent commit between the group's base (``main``) and its head
 is one pull request's squash commit, whose subject ends in ``(#N)``, or its merge commit,
 whose subject starts with ``Merge pull request #N``. ``--list-pull-requests`` prints those
@@ -37,6 +43,8 @@ import subprocess  # noqa: S404 - runs git with fixed arguments only
 import sys
 from collections.abc import Callable, Iterable, Mapping, Sequence
 
+from scripts.adr_tables import CODE_STATES, TableError, overview_rows, state_of, table_rows
+
 LABEL = "po:approved"
 """The product owner's approval; any collaborator can set it, only an administrator's counts."""
 
@@ -50,6 +58,7 @@ DECISION_FILES = frozenset(
         "Makefile",
         "app/domain/authorization.py",
         "scripts/decision_gate.py",
+        "scripts/adr_tables.py",
         "scripts/release-audit.sh",
         "scripts/check-release-audit.sh",
     }
@@ -61,6 +70,13 @@ DECISION_DIRECTORIES = (".github/", ".semgrep/")
 
 ADR_DIRECTORY = "docs/adr/"
 RELEASE_TITLE = "chore(release):"
+OVERVIEW = "docs/adr-status.md"
+
+UNBUILT_LIMIT = 3
+"""ADR 0119: a new ADR is refused while this many ADRs or more have nothing built yet. Fixed on
+purpose, like the decision paths: changing it is itself a decision."""
+
+_NEW_ADR = re.compile(r"^docs/adr/(\d{4})-[^/]+\.md$")
 
 _PULL_REQUEST = re.compile(r"\(#(\d+)\)$|^Merge pull request #(\d+) ")
 """The pull request number in a squash commit's subject or a merge commit's subject."""
@@ -120,6 +136,93 @@ def reasons(paths: Iterable[str], title: str, texts: Texts) -> list[str]:
             found.append(f"{path} changed")
         elif path.startswith(ADR_DIRECTORY) and adr_changed_decision(*texts(path)):
             found.append(f"{path} changed outside its Status line and Build status table")
+    return found
+
+
+def first_step_built(adr: str) -> bool:
+    """Return whether an ADR's first build step is in, by its *Build status* table.
+
+    Args:
+        adr: The ADR's full text.
+
+    Returns:
+        ``True`` when the first row after step 0 (the ADR itself) says ``merged``, ``built``
+        or ``live``: the pull request that adds the ADR also builds that step (ADR 0119). An
+        unknown state counts as not built: the gate fails closed.
+    """
+    steps = [cells for cells in table_rows(adr) or [] if cells[0] != "0"]
+    if not steps:
+        return False
+    try:
+        return state_of(steps[0]) in CODE_STATES
+    except TableError:
+        return False
+
+
+POLICY_MARK = "policy, nothing to build"
+"""The words a Status line carries for a rule with no code (ADR 0119); a looser match on
+"policy" alone would let any ADR that mentions a policy skip its build step."""
+
+FIRST_ADR_UNDER_THE_BRAKE = 120
+"""The brake binds the ADRs after 0119, the one that introduces it: in the merge queue the
+gate runs from the group's own copy, so without this the introducing PR would block itself."""
+
+
+def is_policy(adr: str) -> bool:
+    """Return whether an ADR's Status line says it is a rule with nothing to build."""
+    status = _STATUS.search(adr)
+    return status is not None and POLICY_MARK in " ".join(status.group(0).lower().split())
+
+
+def unbuilt(overview: str) -> set[str]:
+    """Return the numbers of the ADRs that ``docs/adr-status.md`` lists as NOT BUILT."""
+    return {row.number for row in overview_rows(overview) if row.built.startswith("NOT BUILT")}
+
+
+def blocks(paths: Iterable[str], texts: Texts) -> list[str]:
+    """Return why a pull request may not merge even with the approval (ADR 0119).
+
+    A design that merges without its build is how decisions stayed unbuilt. So a new ADR
+    carries its first build step in the same pull request (unless it is a rule with nothing
+    to build), and no new ADR merges while ``UNBUILT_LIMIT`` or more ADRs have nothing built.
+
+    Args:
+        paths: Every path the pull request changes.
+        texts: How to read a path's text before and after the change.
+
+    Returns:
+        One line per block; an empty list when nothing blocks.
+    """
+    found = []
+    new = {}
+    removed = set()
+    for path in sorted(paths):
+        match = _NEW_ADR.match(path)
+        if match is None:
+            continue
+        before, after = texts(path)
+        if before is None and after is not None:
+            new[match.group(1)] = after
+        elif before is not None and after is None:
+            removed.add(match.group(1))
+    for number in removed & set(new):
+        del new[number]  # a renamed file keeps its number: not a new decision
+    for number, text in new.items():
+        if not is_policy(text) and not first_step_built(text):
+            found.append(
+                f"ADR {number} is new but its first build step is not in this pull request "
+                "(its Build status row must say merged)"
+            )
+    if new:
+        before, after = texts(OVERVIEW)
+        # The base counts too: a pull request cannot relabel unbuilt ADRs to slip under the limit.
+        waiting = sorted((unbuilt(before or "") | unbuilt(after or "")) - set(new))
+        braked = any(int(number) >= FIRST_ADR_UNDER_THE_BRAKE for number in new)
+        if braked and len(waiting) >= UNBUILT_LIMIT:
+            found.append(
+                f"{len(waiting)} ADRs have nothing built ({', '.join(waiting)}); a new ADR "
+                f"waits until fewer than {UNBUILT_LIMIT} are left"
+            )
     return found
 
 
@@ -228,7 +331,16 @@ def _show(revision: str, path: str) -> str | None:
 def _judge(base: str, head: str, title: str, approved: Callable[[], Approval]) -> int:
     """Print what makes one change a decision and return 1 when it lacks the approval."""
     paths = _git("diff", "--name-only", base, head).split()
-    found = reasons(paths, title, lambda path: (_show(base, path), _show(head, path)))
+
+    def texts(path: str) -> tuple[str | None, str | None]:
+        return _show(base, path), _show(head, path)
+
+    stopped = blocks(paths, texts)
+    for block in stopped:
+        print(f"::error::{block} (ADR 0119)")
+    if stopped:
+        return 1
+    found = reasons(paths, title, texts)
     if not found:
         print("build work: merges on green (ADR 0078)")
         return 0

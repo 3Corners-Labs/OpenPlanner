@@ -1,9 +1,10 @@
 # Queue
 
 In a group with **OpenPlanner's own queue**, agents pick up video appointments on this screen
-instead of in the contact center. You open it from the group's **Queue** tab. Agents, group
-admins and organisation admins of the group can see it. A group that works with the contact
-center has no such tab.
+instead of in the contact center. You open it through **group → Agenda → Queue**. Agents, group
+admins and organisation admins of the group can see it; someone who may open only the queue
+lands here straight from the **Agenda** tab. A group that works with the contact center has no
+such part.
 
 ## What you see
 
@@ -54,3 +55,10 @@ appointment goes back into the queue. A group admin can also release a colleague
 for example when that colleague had to leave.
 
 Picking up and releasing are in the audit log, with your name and the appointment reference.
+
+## Fallback
+
+A contact-center group can fall back to this queue (setting *Fallback when the contact center
+fails*). Appointments that come in this way carry the label **Fallback**. While the whole group
+falls back, a banner shows at the top; **End the fallback** sends appointments not yet picked up
+to the contact center after all.

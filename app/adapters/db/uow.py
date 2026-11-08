@@ -9,7 +9,7 @@ All mapping between rows and domain objects lives in this module.
 
 import json
 import secrets
-from collections.abc import AsyncIterator, Collection, Sequence
+from collections.abc import AsyncIterator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import date, datetime
@@ -32,11 +32,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
 from app.adapters.db.admin_sessions import AdminSessionQueries
+from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, answers_json
+from app.adapters.db.health import HealthQueries
 from app.adapters.db.identity_providers import IdentityProviderQueries
 from app.adapters.db.images import ImageQueries, page_image
 from app.adapters.db.log_destinations import LogDestinationQueries
@@ -59,6 +61,7 @@ from app.adapters.db.models import (
     GroupTextRow,
     HolidayCalendarRow,
     HolidayRow,
+    IntegrationCredentialRow,
     IntegrationReportRow,
     JobRow,
     OrganisationContactsRow,
@@ -77,6 +80,7 @@ from app.adapters.db.models import (
     StaffRow,
     WebhookEventRow,
 )
+from app.adapters.db.overview_layouts import OverviewLayoutQueries
 from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
@@ -84,10 +88,19 @@ from app.adapters.db.public_address import PublicAddressQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
+from app.adapters.db.routing_json import (
+    choice_from_columns,
+    choice_json,
+    routing_from_json,
+    routing_json,
+    subjects_column,
+    subjects_from_column,
+)
 from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
+from app.adapters.db.usage import UsageQueries
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.audit import (
@@ -147,7 +160,9 @@ from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, Plann
 from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
 from app.domain.privacy import PURGED_FIELDS
+from app.domain.routing import GroupRouting
 from app.domain.scheduling import (
+    DispatchFallback,
     DispatchKind,
     Group,
     GroupSummary,
@@ -176,6 +191,13 @@ def _check_name(group_id: int) -> str:
 
 
 HEARTBEAT_NAME = "worker-heartbeat"
+
+
+def bot_credential_name(organisation_id: int | None) -> str:
+    """Return the credential name of a Webex bot token: an organisation's or the platform's."""
+    return f"webex-bot:{organisation_id if organisation_id is not None else 'platform'}"
+
+
 """Integration report name of the worker's heartbeat row (ADR 0068)."""
 
 
@@ -233,8 +255,12 @@ def _group(row: GroupRow) -> Group:
         queue_free_pick_allowed=row.queue_free_pick_allowed,
         max_bookings_per_email=row.max_bookings_per_email,
         calendar_invite_address=row.calendar_invite_address,
+        dispatch_fallback=DispatchFallback(row.dispatch_fallback),
+        fallback_space_room_id=row.fallback_space_room_id,
+        fallback_active_since=row.fallback_active_since,
         idp_key=row.idp_key or row.slug,
         archived_at=row.archived_at,
+        routing=routing_from_json(row.routing),
     )
 
 
@@ -244,7 +270,14 @@ def _override(row: ScheduleOverrideRow) -> ScheduleOverride:
         return ScheduleOverride(day=row.day, window=None, id=row.id)
     return ScheduleOverride(
         day=row.day,
-        window=TimeWindow(row.opens, row.closes, row.capacity, row.label, Offer(row.offer)),
+        window=TimeWindow(
+            row.opens,
+            row.closes,
+            row.capacity,
+            row.label,
+            Offer(row.offer),
+            subjects_from_column(row.subjects),
+        ),
         id=row.id,
     )
 
@@ -263,7 +296,14 @@ def _rule(row: ScheduleRuleRow) -> ScheduleRule:
     """Map a weekly rule row."""
     return ScheduleRule(
         weekday=row.weekday,
-        window=TimeWindow(row.opens, row.closes, row.capacity, row.label, Offer(row.offer)),
+        window=TimeWindow(
+            row.opens,
+            row.closes,
+            row.capacity,
+            row.label,
+            Offer(row.offer),
+            subjects_from_column(row.subjects),
+        ),
         valid_from=row.valid_from,
         valid_to=row.valid_to,
         id=row.id,
@@ -279,6 +319,7 @@ def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
         "capacity": rule.window.capacity,
         "label": rule.window.label,
         "offer": rule.window.offer.value,
+        "subjects": subjects_column(rule.window.subjects),
         "valid_from": rule.valid_from,
         "valid_to": rule.valid_to,
     }
@@ -294,6 +335,7 @@ def _override_columns(override: ScheduleOverride) -> dict[str, Any]:
         "capacity": window.capacity if window else None,
         "label": window.label if window else None,
         "offer": window.offer.value if window else Offer.SCHEDULED.value,
+        "subjects": subjects_column(window.subjects) if window else None,
     }
 
 
@@ -325,6 +367,8 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
         "max_bookings_per_email": group.max_bookings_per_email,
         "calendar_invite_address": group.calendar_invite_address,
+        "dispatch_fallback": group.dispatch_fallback.value,
+        "fallback_space_room_id": group.fallback_space_room_id,
         "idp_key": group.idp_key,
         "archived_at": group.archived_at,
     }
@@ -374,6 +418,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         claim=Claim(row.claimed_at, row.claimed_by)
         if row.claimed_at is not None and row.claimed_by is not None
         else None,
+        routing=choice_from_columns(row.subject_code, row.routing_answers),
     )
 
 
@@ -413,6 +458,7 @@ def _call_status(row: CallStatusRow) -> CallStatus:
         task_created_at=row.task_created_at,
         connected_at=row.connected_at,
         updated_at=row.updated_at,
+        fallback=row.fallback,
     )
 
 
@@ -431,6 +477,9 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 
 class SqlTransaction(
     AdminSessionQueries,
+    AlertTargetQueries,
+    HealthQueries,
+    OverviewLayoutQueries,
     ParticipantLinkQueries,
     ApiClientQueries,
     IdentityProviderQueries,
@@ -438,6 +487,7 @@ class SqlTransaction(
     UpdateQueries,
     RetentionQueries,
     RollupQueries,
+    UsageQueries,
     StaffQueries,
     MaintenanceQueries,
     RoleQueries,
@@ -460,17 +510,24 @@ class SqlTransaction(
     (ADR 0042), the certificate check from ``CertificateQueries`` (ADR 0064), the organisation
     identity providers from ``IdentityProviderQueries`` (ADR 0083), the log destinations from
     ``LogDestinationQueries`` (ADR 0085), the admin sessions from ``AdminSessionQueries``
-    (ADR 0098).
+    (ADR 0098), the own overview layouts from ``OverviewLayoutQueries`` (ADR 0096).
 
     Args:
         session: The open session.
         box: Seals and opens channel secrets; ``None`` when no settings key is configured.
+        usage_enabled: Whether usage facts are written (``reporting_enabled``, read live).
     """
 
-    def __init__(self, session: AsyncSession, box: SecretBox | None = None) -> None:
-        """Wrap ``session``."""
+    def __init__(
+        self,
+        session: AsyncSession,
+        box: SecretBox | None = None,
+        usage_enabled: Callable[[], bool] = lambda: True,
+    ) -> None:
+        """Wrap ``session``; ``usage_enabled`` tells whether usage facts are written."""
         self._session = session
         self._box = box
+        self._usage_enabled = usage_enabled
         self.written_events: list[AuditEvent] = []
         """Audit events added in this transaction, for the post-commit emit (ADR 0034)."""
 
@@ -810,7 +867,16 @@ class SqlTransaction(
         return int(count or 0)
 
     async def delete_organisation(self, organisation_id: int) -> None:
-        """Erase the organisation's row; the schema's cascades take the rest."""
+        """Erase the organisation's row; the schema's cascades take the rest.
+
+        The sealed Webex bot token (ADR 0082 point 9) has no foreign key, so it is deleted here
+        in the same transaction: a later organisation with a reused id never inherits it.
+        """
+        await self._session.execute(
+            delete(IntegrationCredentialRow).where(
+                IntegrationCredentialRow.name == bot_credential_name(organisation_id)
+            )
+        )
         await self._session.execute(
             delete(OrganisationRow).where(OrganisationRow.id == organisation_id)
         )
@@ -958,6 +1024,35 @@ class SqlTransaction(
         )
         if block is not None:
             self._session.add(GroupContactsRow(group_id=group_id, body=contacts_json(block)))
+
+    async def fallback_bookings(self, group_id: int, after: datetime) -> list[Booking]:
+        """Return the group's confirmed bookings flagged as fallback, after ``after``, no task."""
+        result = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .join(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.wxcc_task_id.is_(None),
+                CallStatusRow.fallback.is_(True),
+                SlotRow.start > after,
+            )
+            .order_by(SlotRow.start)
+        )
+        return [_booking(row, slot) for row, slot in result]
+
+    async def save_group_fallback(self, group_id: int, since: datetime | None) -> None:
+        """Store since when the whole group is in fallback, or ``None`` (ADR 0082 point 11)."""
+        await self._session.execute(
+            update(GroupRow).where(GroupRow.id == group_id).values(fallback_active_since=since)
+        )
+
+    async def save_group_routing(self, group_id: int, routing: GroupRouting) -> None:
+        """Store the group's routing (ADR 0081); the other settings stay as they are."""
+        await self._session.execute(
+            update(GroupRow).where(GroupRow.id == group_id).values(routing=routing_json(routing))
+        )
 
     async def add_group(self, group: Group) -> Group:
         """Insert a group and return it with its ID; its IdP value starts as its slug."""
@@ -1435,6 +1530,7 @@ class SqlTransaction(
                 task_created_at=status.task_created_at,
                 connected_at=status.connected_at,
                 updated_at=status.updated_at,
+                fallback=status.fallback,
             )
         )
         await self._session.flush()
@@ -1711,6 +1807,8 @@ class SqlTransaction(
             rescheduled_from_id=booking.rescheduled_from_id,
             confirm_by=booking.confirm_by,
             confirmed_at=booking.confirmed_at,
+            subject_code=booking.routing.subject if booking.routing else None,
+            routing_answers=choice_json(booking.routing),
         )
         self._session.add(row)
         await self._session.flush()
@@ -2098,22 +2196,29 @@ class SqlUnitOfWork:
         engine: Engine created by ``app.adapters.db.engine.create_engine``.
         box: Seals channel secrets (ADR 0008); without it they cannot be stored or read.
         sink: Receives committed audit events; ``None`` ships nothing (tests, the CLI).
+        usage_enabled: Whether usage facts are written (``reporting_enabled``, read live);
+            on by default, so the CLI and tests write them like the web process does.
     """
 
     def __init__(
-        self, engine: AsyncEngine, box: SecretBox | None = None, sink: EventSink | None = None
+        self,
+        engine: AsyncEngine,
+        box: SecretBox | None = None,
+        sink: EventSink | None = None,
+        usage_enabled: Callable[[], bool] = lambda: True,
     ) -> None:
-        """Store the engine, the secret box and the sink."""
+        """Store the engine, the secret box, the sink and the usage switch."""
         self._engine = engine
         self._box = box
         self._sink = sink
+        self._usage_enabled = usage_enabled
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[SqlTransaction]:
         """Open a read transaction (deferred ``BEGIN``)."""
         async with AsyncSession(self._engine, expire_on_commit=False) as session:
             async with session.begin():
-                tx = SqlTransaction(session, self._box)
+                tx = SqlTransaction(session, self._box, self._usage_enabled)
                 yield tx
         self._emit(tx)
 
@@ -2125,7 +2230,7 @@ class SqlUnitOfWork:
             DomainError: ``database_busy`` if the write lock is not obtained in time.
         """
         async with locked_session(self._engine) as session:
-            tx = SqlTransaction(session, self._box)
+            tx = SqlTransaction(session, self._box, self._usage_enabled)
             yield tx
         self._emit(tx)
 

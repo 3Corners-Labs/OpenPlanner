@@ -24,18 +24,18 @@ from app.adapters.webex_meetings import WebexMeetings
 from app.domain.audit import Category, Outcome
 from app.domain.ports import IdentityError, IntegrationError
 from app.domain.security_log import SecurityLog
-from tests.adapters.test_oidc import CLIENT, MAPPING, REDIRECT
-from tests.adapters.test_webex_meetings import REQUEST
 from tests.fakes.clock import FixedClock
 from tests.fakes.outbound import resolver
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.fakes.tokens import MemoryTokenStore, authorized_client
 from tests.support.certificates import make_pair
 from tests.support.domain import NOW
+from tests.support.fault_injection import PII
+from tests.support.meetings import REQUEST
+from tests.support.oidc import CLIENT, MAPPING, REDIRECT
 
 HOST = "idp.example.nl"
 LOOPBACK = "127.0.0.1"
-PII = ("ada@example.org", "Lovelace", "+31612345678")
 
 
 lab_resolver = resolver(LOOPBACK)

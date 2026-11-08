@@ -5,13 +5,16 @@ from pathlib import Path
 
 import pytest
 
+from scripts.release_plan import LineError, Target
 from scripts.release_pr import (
     AUDIT_HEADING,
     VERDICT_OPEN,
+    adr_progress,
     bump_lock,
     bump_publiccode,
     bump_pyproject,
     main,
+    merge_changelogs,
     needs_audit,
     parse_version,
     plan,
@@ -21,7 +24,7 @@ from scripts.release_pr import (
     tag_message,
     with_audit,
 )
-from tests.scripts.conftest import Git, commit_all
+from tests.scripts.conftest import Git, commit_all, cut_line
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / ".github" / "pull_request_template.md"
@@ -110,7 +113,7 @@ def _template_headings() -> list[str]:
 
 
 def test_the_body_answers_every_section_of_the_pr_template() -> None:
-    body = pr_body("0.4.0", "v0.3.0", ["feat: a", "fix: b"], "cyberbeuk", "2026-11-02")
+    body = pr_body("0.4.0", "v0.3.0", ["feat: a", "fix: b"], "cyberbeuk", "2026-11-02", "")
 
     for heading in _template_headings():
         assert heading in body, heading
@@ -123,8 +126,8 @@ def test_the_body_answers_every_section_of_the_pr_template() -> None:
 
 
 def test_a_minor_release_body_carries_an_open_audit_section_a_patch_does_not() -> None:
-    minor = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02")
-    patch = pr_body("0.4.1", "v0.4.0", ["fix: a"], "po", "2026-11-02")
+    minor = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", "")
+    patch = pr_body("0.4.1", "v0.4.0", ["fix: a"], "po", "2026-11-02", "")
 
     assert AUDIT_HEADING in minor
     assert VERDICT_OPEN in minor
@@ -134,7 +137,7 @@ def test_a_minor_release_body_carries_an_open_audit_section_a_patch_does_not() -
 
 
 def test_the_audit_section_is_added_or_replaced_and_ends_open() -> None:
-    body = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02")
+    body = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", "")
 
     first = with_audit(body, "## Findings\n\nP1: a bug in x.py:3\nP2: a nit\n")
 
@@ -220,6 +223,7 @@ def _merge_release(git: Git, repo: Path, version: str, pyproject: str, number: i
     (repo / "pyproject.toml").write_text(pyproject)
     (repo / "CHANGELOG.md").write_text(CHANGELOG.replace("## Unreleased", f"## {version}"))
     commit_all(git, f"chore(release): v{version} (#{number})")
+    git("update-ref", f"refs/remotes/origin/{git('branch', '--show-current').strip()}", "HEAD")
     return git("rev-parse", "HEAD").strip()
 
 
@@ -249,6 +253,7 @@ def test_plan_prints_outputs_for_the_workflow(
     assert capsys.readouterr().out.splitlines() == [
         "version=0.4.0",
         "previous=v0.3.0",
+        "base=main",
         "branch=release/v0.4.0",
         "title=chore(release): v0.4.0",
         "audit=true",
@@ -291,7 +296,7 @@ def test_prepare_edits_the_four_files_and_writes_the_body(
 
 def test_audit_writes_the_findings_into_the_body_file(released: Path) -> None:
     body, findings = released / "body.md", released / "findings.md"
-    body.write_text(pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02"))
+    body.write_text(pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", ""))
     findings.write_text("P2: a nit\n")
 
     assert main(["audit", "--body", str(body), "--findings", str(findings)]) == 0
@@ -302,12 +307,13 @@ def test_audit_writes_the_findings_into_the_body_file(released: Path) -> None:
 def test_tag_check_finds_the_release_and_refuses_an_existing_tag(
     git: Git, released: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert main(["tag-check", "--version", "0.4.0", "--branch", "main"]) == 1
+    git("update-ref", "refs/remotes/origin/main", "HEAD")
+    assert main(["tag-check", "--version", "0.4.0"]) == 1
     assert "no merged release PR" in capsys.readouterr().err
 
     sha = _merge_release(git, released, "0.4.0", PYPROJECT.replace("0.3.0", "0.4.0"), 12)
 
-    args = ["--branch", "main", "--actor", "po", "--date", "2026-11-02"]
+    args = ["--ref", "main", "--actor", "po", "--date", "2026-11-02"]
 
     assert main(["tag-check", "--version", "0.4.0", *args]) == 0
     assert capsys.readouterr().out == (
@@ -316,7 +322,7 @@ def test_tag_check_finds_the_release_and_refuses_an_existing_tag(
 
     git("tag", "-a", "v0.4.0", "-m", "v0.4.0")
 
-    assert main(["tag-check", "--version", "0.4.0", "--branch", "main"]) == 1
+    assert main(["tag-check", "--version", "0.4.0"]) == 1
     assert "exists already" in capsys.readouterr().err
 
 
@@ -327,3 +333,110 @@ def test_plan_refuses_a_patch_that_carries_a_migration() -> None:
     with pytest.raises(ValueError, match="carries no migration"):
         plan("v0.4.0", ["fix: a"], "0.4.1", migrations_changed=True)
     assert plan("v0.4.0", ["fix: a"], "0.4.1", migrations_changed=False) == "0.4.1"
+
+
+def test_the_release_pr_lists_the_adrs_this_release_finishes() -> None:
+    """ADR 0119: the product owner reads which decisions became built, and what is still open."""
+    before = "\n".join(
+        [
+            "| 0001 | One | BUILT | e | – |",
+            "| 0002 | Two | PARTIAL | e | x |",
+            "| 0003 | Three | NOT BUILT | e | x |",
+        ]
+    )
+    after = before.replace("| 0002 | Two | PARTIAL |", "| 0002 | Two | BUILT |") + (
+        "\n| 0004 | Four | NOT BUILT (policy part) | e | x |"
+    )
+
+    section = adr_progress(before, after, "v0.5.0")
+
+    assert section.startswith("## ADRs\n\nBuilt since v0.5.0 (1):\n\n- ADR 0002 Two\n")
+    assert "Still open (2): 0003, 0004; of these nothing built yet: 0003, 0004." in section
+    body = pr_body("0.6.0", "v0.5.0", ["feat: a"], "po", "2026-11-08", section)
+    assert section in body
+    assert "## ADRs" not in pr_body("0.6.0", "v0.5.0", ["feat: a"], "po", "2026-11-08", "")
+
+
+# Maintenance lines (ADR 0116 point 3): the release PR and tag on a line, and the line's
+# changelog taken over by the next release on main.
+
+
+def test_the_release_plan_on_a_line_is_a_patch_of_it() -> None:
+    line = Target("0.5")
+
+    assert plan("v0.5.1", ["fix: a"], None, target=line) == "0.5.2"
+    assert plan("v0.5.1", ["fix: a"], "0.5.3", target=line) == "0.5.3"
+    with pytest.raises(LineError, match="not a patch of line 0.5"):
+        plan("v0.5.1", ["fix: a"], "0.6.0", target=line)
+    with pytest.raises(LineError, match="takes fixes only"):
+        plan("v0.5.1", ["feat: a"], None, target=line)
+
+
+def test_the_lines_sections_join_main_in_version_order() -> None:
+    main_text = (
+        "# Changelog\n\n## Unreleased\n\n## 0.6.0 (2026-11-20)\n\n- New.\n\n"
+        "## 0.5.0 (x)\n\n- Base.\n"
+    )
+    line_text = (
+        "# Changelog\n\n## Unreleased\n\n## 0.5.2 (y)\n\n- Fix 2.\n\n"
+        "## 0.5.1 (z)\n\n- Fix 1.\n\n## 0.5.0 (x)\n\n- Other.\n"
+    )
+
+    merged = merge_changelogs(main_text, [line_text])
+
+    assert merged == (
+        "# Changelog\n\n## Unreleased\n\n## 0.6.0 (2026-11-20)\n\n- New.\n\n"
+        "## 0.5.2 (y)\n\n- Fix 2.\n\n## 0.5.1 (z)\n\n- Fix 1.\n\n## 0.5.0 (x)\n\n- Base.\n"
+    )
+    assert merge_changelogs(merged, [line_text]) == merged
+    assert merge_changelogs(CHANGELOG, []) == CHANGELOG
+
+
+def test_the_release_pr_and_tag_on_a_line(
+    git: Git, released: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cut_line(git, released, "0.3", "v0.3.0")
+
+    assert main(["plan", "--base", "release/0.3"]) == 0
+    out = capsys.readouterr().out
+    assert "version=0.3.1" in out
+    assert "base=release/0.3" in out
+    assert "audit=false" in out
+
+    _merge_release(git, released, "0.3.1", PYPROJECT.replace("0.3.0", "0.3.1"), 23)
+    args = ["--ref", "release/0.3", "--actor", "po", "--date", "2026-11-09"]
+
+    assert main(["tag-check", "--version", "0.3.1", *args]) == 0
+    assert "number=23" in capsys.readouterr().out
+    assert main(["tag-check", "--version", "0.4.1", *args]) == 1
+    assert "not a patch of line 0.3" in capsys.readouterr().err
+
+
+def test_a_dry_run_from_a_feature_branch_plans_and_tags_as_main(
+    git: Git, released: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sha = _merge_release(git, released, "0.4.0", PYPROJECT.replace("0.3.0", "0.4.0"), 12)
+    git("update-ref", "refs/remotes/origin/main", sha)
+
+    assert main(["tag-check", "--version", "0.4.0", "--ref", "feat/try-the-workflow"]) == 0
+    assert f"commit={sha}" in capsys.readouterr().out
+
+
+def test_the_next_release_on_main_takes_over_the_lines_changelog(
+    git: Git, released: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cut_line(git, released, "0.3", "v0.3.0")
+    (released / "CHANGELOG.md").write_text(
+        CHANGELOG.replace("## 0.3.0", "## 0.3.1 (2026-11-09)\n\n- The security fix.\n\n## 0.3.0")
+    )
+    commit_all(git, "chore(release): v0.3.1 (#23)")
+    git("update-ref", "refs/remotes/origin/release/0.3", "HEAD")
+    git("switch", "-q", "main")
+    body = released / "body.md"
+
+    code = main(["prepare", "--version", "0.4.0", "--body", str(body), "--date", "2026-11-20"])
+
+    assert code == 0, capsys.readouterr().err
+    changelog = (released / "CHANGELOG.md").read_text()
+    assert "- A thing.\n\n## 0.3.1 (2026-11-09)\n\n- The security fix.\n\n## 0.3.0" in changelog
+    assert changelog.index("## 0.3.1") < changelog.index("## 0.3.0")

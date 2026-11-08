@@ -75,7 +75,9 @@ app/
   api/         FastAPI routers and middleware.
   jobs/        worker loop and job handlers.
 migrations/    Alembic.
-tests/         mirrors app/; fakes for ports live in tests/fakes/.
+tests/         mirrors app/; fakes live in tests/fakes/, shared constants, builders and
+               harnesses in tests/support/, shared fixtures in the nearest conftest.py.
+               A test module never imports another (tests/test_test_imports.py).
 ```
 
 ## Writing code
@@ -87,7 +89,11 @@ tests/         mirrors app/; fakes for ports live in tests/fakes/.
   at its second use (ADR 0005).
 - Start with a failing test. Domain first, adapter second, HTTP last.
 - New migration: `uv run alembic revision --autogenerate -m "..."`, then review it. Every
-  migration must have a working `downgrade()`. Never edit a merged migration.
+  migration must have a working `downgrade()`. Never edit a merged migration. The upgrade
+  matrix (ADR 0116 point 7) runs it on the fixtures of released versions; to try one fixture
+  locally: `scripts/upgrade-matrix.sh one upgrade-fixture-X.Y.Z.sqlite` (from the release's
+  assets), or write your own with `python -m app.cli seed --upgrade-fixture` on an empty,
+  migrated database.
 - New user-facing text gets a dotted key (`area.thing.detail`) in both
   `app/i18n/locales/nl.po` and `en.po`, and is used as `_("key")` in templates or
   `locale.gettext("key")` in code. Placeholders are `{name}`. `tests/i18n/test_catalogues.py`

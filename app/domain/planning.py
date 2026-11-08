@@ -27,6 +27,7 @@ from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import (
     RESERVED_SLUGS,
+    DispatchFallback,
     DispatchKind,
     Group,
     JoinClient,
@@ -78,6 +79,8 @@ class GroupSettings:
     queue_free_pick_allowed: bool
     max_bookings_per_email: int
     calendar_invite_address: str | None
+    dispatch_fallback: DispatchFallback
+    fallback_space_room_id: str | None
     video_host_email: str | None
     wxcc_business_address: str | None
     wxcc_channel: str | None
@@ -273,6 +276,7 @@ class PlanningService:
         async with self._uow.locked() as tx:
             group = await group_by_slug(tx, slug)
             rules, overrides = await tx.get_schedule_items(group.id)
+            _check_subjects(group, rule.window)
             validate_schedule([*rules, rule], overrides)
             rule_id = await tx.add_schedule_rule(group.id, rule)
             await self._schedule_audit(tx, principal, authorization, slug, "rule.add")
@@ -309,6 +313,7 @@ class PlanningService:
             if _rule_by_id(rules, rule_id) == rule:
                 return False
             others = [r for r in rules if r.id != rule_id]
+            _check_subjects(group, rule.window)
             validate_schedule([*others, rule], overrides)
             await tx.update_schedule_rule(group.id, rule_id, rule)
             await self._schedule_audit(tx, principal, authorization, slug, "rule.edit")
@@ -345,7 +350,7 @@ class PlanningService:
             first = replace(old, window=replace(old.window, closes=at), id=None)
             second = replace(
                 old,
-                window=TimeWindow(at, old.window.closes, capacity, label, old.window.offer),
+                window=replace(old.window, opens=at, capacity=capacity, label=label),
                 id=None,
             )
             others = [r for r in rules if r.id != rule_id]
@@ -383,6 +388,7 @@ class PlanningService:
             if override.day < group.today(self._clock.now()):
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "day")
             rules, overrides = await tx.get_schedule_items(group.id)
+            _check_subjects(group, override.window)
             validate_schedule(rules, [*overrides, override])
             override_id = await tx.add_schedule_override(group.id, override)
             await self._schedule_audit(tx, principal, authorization, slug, "override.add")
@@ -421,6 +427,7 @@ class PlanningService:
             if _override_by_id(overrides, override_id) == override:
                 return False
             others = [o for o in overrides if o.id != override_id]
+            _check_subjects(group, override.window)
             validate_schedule(rules, [*others, override])
             await tx.update_schedule_override(group.id, override_id, override)
             await self._schedule_audit(tx, principal, authorization, slug, "override.edit")
@@ -502,3 +509,13 @@ def _override_by_id(overrides: list[ScheduleOverride], override_id: int) -> Sche
 def _organisation(authorization: Authorization) -> str | None:
     """Return the organisation slug of an authorised group-level target."""
     return authorization.target.organisation
+
+
+def _check_subjects(group: Group, window: TimeWindow | None) -> None:
+    """Refuse a block that offers a subject the group does not have (ADR 0081 point 4).
+
+    Raises:
+        DomainError: ``invalid_configuration`` naming ``subjects``.
+    """
+    if window is not None and any(group.routing.subject(c) is None for c in window.subjects):
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "subjects")

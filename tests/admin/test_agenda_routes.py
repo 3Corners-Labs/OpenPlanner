@@ -1,6 +1,6 @@
 """Agenda with agents and shortfalls in the admin portal (ADR 0044)."""
 
-from datetime import date, time
+from datetime import time
 
 import pytest
 
@@ -10,10 +10,7 @@ from app.domain.planning import PlanningService
 from app.domain.scheduling import ScheduleOverride, TimeWindow
 from app.domain.services import BookingService
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SUPER, Site
-from tests.admin.test_call_routes import FRIDAY_0900
-from tests.support.domain import TEST_TOKEN_KEY, book_confirmed, participant
-
-FRIDAY = date(2026, 1, 2)
+from tests.support.domain import FRIDAY, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed, participant
 
 
 async def _short_friday(site: Site) -> None:

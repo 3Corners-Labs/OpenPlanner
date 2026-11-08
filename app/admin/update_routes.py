@@ -18,12 +18,21 @@ one, which shows the open request's steps itself.
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, session_principal
-from app.admin.forms import done_message, raise_refusal, read_form, redirect_done, safe_next
+from app.admin.forms import (
+    Field,
+    FormData,
+    done_message,
+    raise_refusal,
+    read_form,
+    redirect_done,
+    safe_next,
+)
 from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import page as _page
 from app.domain.audit import AuditEntry
@@ -32,6 +41,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.update_service import UpdateNotice, UpdateOverview, UpdateService
 from app.domain.updates import (
     SNOOZE,
+    LineStatus,
     UpdateRequest,
     UpdateStatus,
     Version,
@@ -40,8 +50,10 @@ from app.domain.updates import (
     progress,
 )
 from app.i18n import BoundGettext
+from app.i18n.dates import format_time_of_day, weekday_abbreviations
 from app.web.errors import form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
+from app.web.organisation_settings import settings_for
 from app.web.templates import render
 from app.web.update_labels import (
     ACTION_LABELS,
@@ -340,8 +352,9 @@ async def _overview(
     locale: RequestLocale,
     context: AdminContext,
     error: DomainError | None = None,
+    form: FormData | None = None,
 ) -> HTMLResponse:
-    """Render the updates page, with the refusal of a request when there is one."""
+    """Render the updates page, with the refusal of a request or the form's errors."""
     service = update_service(request)
     found = await service.overview(context.principal)
     entries = await service.history(context.principal)
@@ -369,7 +382,8 @@ async def _overview(
                         if item.published_at
                         else ""
                     ),
-                    "notes": item.notes.splitlines(),
+                    "lines": item.lines,
+                    "docs_only": item.docs_only,
                 }
                 for item in found.offered
             ],
@@ -379,15 +393,54 @@ async def _overview(
                 else None
             ),
             "outside_version": found.outside_change.version if found.outside_change else "",
-            "errors": form_errors(error, locale.gettext) if error else [],
+            "errors": (
+                form_errors(error, locale.gettext) if error else list(form.errors) if form else []
+            ),
             "done": done_message(request, locale.gettext),
             "progress": live,
+            "next_window": (
+                admin_moment(request, locale, found.next_window) if found.next_window else None
+            ),
+            "window_ranges": [
+                {
+                    "day": weekday_abbreviations(locale.code)[r.weekday],
+                    "start": format_time_of_day(r.start, locale.code),
+                    "end": format_time_of_day(r.end, locale.code),
+                }
+                for r in found.window.ranges
+            ],
+            "apply_after": Field(
+                "apply_after",
+                locale.gettext("admin.updates.apply_after.label"),
+                "datetime",
+                form.moment_value("apply_after") if form else "",
+                hint=locale.gettext("admin.updates.apply_after.hint"),
+                error=form.error_for("apply_after") if form else None,
+                required=False,
+            ),
+            "support_label": SUPPORT_LABELS[found.support.status] if found.support else "",
+            "waits_until": (
+                admin_moment(request, locale, found.open.apply_after)
+                if found.open and found.open.apply_after
+                else None
+            ),
         },
         scripts=live is not None,
     )
     if error is not None:
         response.status_code = status_for(error)
+    elif form is not None and form.errors:
+        response.status_code = 422
     return response
+
+
+SUPPORT_LABELS: dict[LineStatus, str] = {
+    LineStatus.SUPPORTED: "admin.updates.support.supported",
+    LineStatus.SECURITY: "admin.updates.support.security",
+    LineStatus.EXTENDED: "admin.updates.support.extended",
+    LineStatus.ENDED: "admin.updates.support.ended",
+}
+"""The running line's status from ``support.json`` (ADR 0116 point 9)."""
 
 
 @router.get("/updates", response_class=HTMLResponse)
@@ -437,7 +490,10 @@ async def request_update(
     try:
         if raw and target is None:
             raise DomainError(ErrorCode.UPDATE_NOT_AVAILABLE)
-        await update_service(request).request_update(context.principal, target)
+        later = form.optional_moment("apply_after", ZoneInfo(settings_for(request).admin_timezone))
+        if form.errors:
+            return await _overview(request, locale, context, form=form)
+        await update_service(request).request_update(context.principal, target, later)
     except DomainError as error:
         raise_refusal(error)
         return await _overview(request, locale, context, error)
