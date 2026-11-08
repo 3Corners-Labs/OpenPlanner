@@ -8,8 +8,6 @@ import pytest
 from alembic import command
 from alembic.config import Config
 
-from tests.test_migrations import alembic_config  # noqa: F401  # the shared fixture
-
 BEFORE = """
 INSERT INTO organisations (id, name, slug) VALUES (1, 'Acme', 'acme');
 INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
@@ -32,7 +30,7 @@ SCENARIO = (
 
 
 def test_duplicates_are_made_distinct_and_the_names_are_then_unique(
-    alembic_config: Config,  # noqa: F811
+    alembic_config: Config,
     tmp_path: Path,
 ) -> None:
     command.upgrade(alembic_config, "0096")
@@ -63,7 +61,7 @@ def test_duplicates_are_made_distinct_and_the_names_are_then_unique(
 
 
 def test_a_long_name_keeps_its_suffix_within_the_column(
-    alembic_config: Config,  # noqa: F811
+    alembic_config: Config,
     tmp_path: Path,
 ) -> None:
     long = "x" * 80
@@ -88,7 +86,7 @@ def test_a_long_name_keeps_its_suffix_within_the_column(
 
 
 def test_the_downgrade_drops_the_indexes(
-    alembic_config: Config,  # noqa: F811
+    alembic_config: Config,
     tmp_path: Path,
 ) -> None:
     command.upgrade(alembic_config, "head")
