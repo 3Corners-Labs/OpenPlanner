@@ -85,6 +85,7 @@ async def test_a_planner_moves_a_booking_to_a_free_slot(site: Site) -> None:
     assert f"Afspraak OP-{booking_id:06d} verplaatsen" in form
     assert "Ada, vrijdag 2 januari 2026, 09:00" in form
     assert f'value="{FRIDAY_0930.isoformat()}"' in form
+    assert f'<a href="{AGENDA}?day=2026-01-02">Annuleren</a>' in form  # not the form itself
     assert response.status_code == 303
     assert response.headers["location"] == f"{AGENDA}?day=2026-01-02&done=moved&count=1"
     assert (await _status(site, booking_id))[0] is BookingStatus.CANCELLED
