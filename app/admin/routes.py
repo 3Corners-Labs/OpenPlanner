@@ -58,6 +58,7 @@ from app.admin import (
     organisation_routes,
     organisation_settings_routes,
     organisation_text_routes,
+    overview_layout_routes,
     overview_routes,
     planner_routes,
     preference_routes,
@@ -869,6 +870,7 @@ def register_admin(app: FastAPI) -> None:
     for module_router in (
         router,
         overview_routes.router,
+        overview_layout_routes.router,
         group_list_routes.router,
         audit_routes.router,
         retention_routes.router,

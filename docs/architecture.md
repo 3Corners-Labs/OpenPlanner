@@ -349,6 +349,7 @@ same commit and rollback behaviour as the SQL one.
 | Manual and context-sensitive help (ADR 0033) | `docs/manual/`, `app/web/help.py`, `app/admin/help_routes.py`, `with_manual` in `app/admin/pages.py` |
 | Generated matrix document | `app/web/authz_report.py`, `app/cli.py` (`authz-matrix`) |
 | Admin structure: side navigation, top bar, object tabs (ADR 0047) | `app/web/navigation.py`, `page` and `group_page` in `app/admin/`, `docs/admin-map.md` via `app/cli.py` (`admin-map`) |
+| Own overview layout: storage, rules, *Add widget* / *Edit overview* (ADR 0096) | `app/domain/overview_layout.py`, `app/adapters/db/overview_layouts.py`, `app/admin/overview_layout_routes.py`, `on_overview` in `app/web/widgets.py` |
 | Readiness checklist of a group and an organisation (ADR 0047 §5) | `app/domain/readiness.py`, `app/admin/readiness_view.py`, `admin/_readiness.html` |
 | List pattern: search and organisation filter shared by the admin lists (ADR 0047 §4) | `app/admin/list_search.py` |
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |

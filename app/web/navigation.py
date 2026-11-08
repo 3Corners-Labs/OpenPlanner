@@ -181,6 +181,8 @@ SECTIONS = (
                 "/admin/",
                 Permission.DASHBOARD_VIEW,
                 "dashboard",
+                # ADR 0096: the admin arranges their own overview on two sub-pages.
+                ("/admin/overview/add", "/admin/overview/edit"),
                 width=Width.WIDE,
             ),
             Screen(

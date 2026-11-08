@@ -92,14 +92,14 @@ async def test_each_step_starts_from_what_the_overview_shows_and_is_kept(
 ) -> None:
     default = ("alerts", "status", "queue")
     assert await service.layout("sub-gina", default, SEEN) == ("alerts", "queue")
-    assert not await service.is_own("sub-gina")
+    assert await service.stored("sub-gina") is None
 
     await service.move("sub-gina", "queue", -1, default, SEEN)
     assert await service.layout("sub-gina", default, SEEN) == ("queue", "alerts")
     await service.add("sub-gina", "rights", default, SEEN)
     await service.remove("sub-gina", "alerts", default, SEEN)
     assert await service.layout("sub-gina", default, SEEN) == ("queue", "rights")
-    assert await service.is_own("sub-gina")
+    assert (await service.stored("sub-gina")) is not None
 
     await service.reset("sub-gina")
     assert await service.layout("sub-gina", default, SEEN) == ("alerts", "queue")
@@ -149,4 +149,4 @@ async def test_erasing_the_person_removes_the_layout(
     async with uow.locked() as tx:
         await tx.erase_staff("sub-gina", NOW)
 
-    assert not await service.is_own("sub-gina")
+    assert await service.stored("sub-gina") is None

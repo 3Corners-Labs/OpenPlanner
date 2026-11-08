@@ -117,6 +117,24 @@
       ]
     },
     {
+      "name": "add widget",
+      "path": "/admin/overview/add",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "edit overview",
+      "path": "/admin/overview/edit",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "audit log",
       "path": "/admin/audit",
       "user": "super",

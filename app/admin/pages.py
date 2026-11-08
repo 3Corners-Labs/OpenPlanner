@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from fastapi import Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse
 
-from app.admin.authz import can_function, return_path, session_principal
+from app.admin.authz import can_function, overview_layout, return_path, session_principal
 from app.admin.forms import Field, moment_label
 from app.admin.frozen_forms import freeze_forms, writable_in_maintenance
 from app.admin.session import (
@@ -48,7 +48,7 @@ from app.web.navigation import (
 from app.web.organisation_settings import settings_for
 from app.web.protection import require_same_origin
 from app.web.templates import create_templates, kept_query, render
-from app.web.widgets import visible
+from app.web.widgets import on_overview as overview_widgets
 
 templates = create_templates([Path(__file__).parent / "templates"])
 
@@ -413,7 +413,7 @@ def page(
         for section in SECTIONS
     ]
     nav = [section for section in sections if section.entries]
-    on_overview = {item.key for item in visible(principal, can)}
+    on_overview = {item.key for item in overview_widgets(principal, can, overview_layout(request))}
     topic: object = context["help_topic"] if "help_topic" in context else page_topic(request)
     help_topic = topic if isinstance(topic, HelpTopic) else None
     bar, more = bottom_bar(nav)

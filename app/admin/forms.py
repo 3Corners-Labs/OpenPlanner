@@ -59,6 +59,11 @@ DONE_MESSAGES: dict[str, str] = {
     "diagnostics_off": "admin.done.diagnostics_off",
     "released": "admin.done.released",
     "saved": "admin.done.saved",
+    # ADR 0096: the admin's own overview layout.
+    "widget_added": "admin.done.widget_added",
+    "widget_moved": "admin.done.widget_moved",
+    "widget_removed": "admin.done.widget_removed",
+    "layout_reset": "admin.done.layout_reset",
     "unchanged": "admin.done.unchanged",
     "field_retired": "admin.done.field_retired",
     "added": "admin.done.added",
