@@ -41,7 +41,67 @@ changes, one small record per change.
 - **Bookings from before reporting**: outcomes of bookings that were merged into daily counts before
   usage was counted; nothing more is known about them.
 
+## The report families
+
+At the top of the Usage page a row of links switches between four families of the same report. The
+period you chose stays; every family has a URL you can bookmark. The first, **Volume**, is the set
+of tables above; the others are below.
+
+### Queue and calls
+
+How bookings reach staff and how the calls go.
+
+- **How bookings reach staff**: bookings by queue method (contact center or the own queue) and by
+  kind (scheduled or direct call), with totals.
+- **Wait until a call connects** (Q2): the time from a task being made to the call connecting, in
+  fixed ranges, with the mean.
+- **When the host joined, against the start** (Q3): early is shown with *early*, late with *late*.
+  Only scheduled calls count.
+- **Participant waiting for the host** (Q4) and **how long calls last** (Q5), with the mean, the
+  number of finished calls and the mean number of people per call (U11).
+- **Direct calls** (Q6): started, left while waiting, not picked up in time, and the share that
+  left, with the wait at the moment of leaving.
+- **Own queue: claims** (Q7): claimed, given back, given back per claim, and the time until a
+  booking is claimed. The share of bookings that were claimed is not shown: what was offered is
+  not recorded.
+- **Dispatch failures** (Q8): per code from a fixed list, never the text of the other system.
+- **Direct calls at once** (Q9): the highest number waiting or connected at once, per day.
+- **New times proposed** (U8): proposed after a planner asked or by the assistant, accepted,
+  lapsed, the share accepted and the time until accepting.
+
+### Capacity
+
+How full the agenda is and when it is busy.
+
+- **Utilisation per day** (C1, C3): bookings that count against the capacity of the slots that
+  have started, and the places nobody booked. A day with few slots is hidden, and so is a
+  percentage that stands for only a few people.
+- **How full the slots were** (C2): empty, under half, more than half and full.
+- **Busiest days and hours** (C4): a table of weekday by hour, in the group's own time. The number
+  is in every cell; the shade only helps the eye. It is shown for a period of at least 7 days and
+  only for groups with at least five times the minimum in bookings in that period; smaller groups
+  are left out of this table, and it says how many.
+- **Blocks short of staff** (C5): still short, short and accepted by a planner, resolved.
+
+### Channels
+
+How messages arrive, in which language people book, and how the trial call goes.
+
+- **Messages sent and failed** (M1): per purpose and per channel, with the share that failed.
+- **Bookings per language** (M2): only for groups big enough; smaller groups are left out and the
+  page says how many.
+- **Trial calls** (T1): made, followed the link, entered the meeting and failed. The gap between
+  the last two is people who got stuck in the lobby.
+
+## Charts
+
+Where a chart helps, it sits above its own table and the table always has the same numbers, so
+nothing is only in the picture. A chart has a title and a description for screen readers, series
+differ by pattern or line style as well as by colour, and a count that is hidden is a dashed marker
+of one fixed height labelled *< 5*: it says nothing about the real number. The charts need no
+script, scroll sideways inside their frame on a narrow screen, and are left out when printing; the
+tables remain. When nothing has been recorded for a family in the period, the page says so.
+
 ## What is not here yet
 
-Waiting times, call lengths, how full the agenda is, the busiest hours, messages and per team
-member. Those come in later steps of the same design.
+Per team member, the digest by email and the export to a file. Those come in later steps of the same design.

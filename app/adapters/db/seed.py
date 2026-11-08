@@ -37,6 +37,7 @@ from app.adapters.db.models import (
     ReminderRuleRow,
     ScheduleRuleRow,
 )
+from app.adapters.db.seed_usage import usage_example_cells
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import Booking, BookingStatus, Contact, Slot
 from app.domain.closure import Closure
@@ -254,6 +255,8 @@ async def seed_closure_examples(
         (closure,) = await tx.get_closures(closed_group.id, now)
         token = await _suspended_booking(tx, closed_group, closure, now, token_key)
         demo = await seeded_group(tx, DEMO_SLUG)
+        if created:
+            await tx.add_usage_cells(usage_example_cells(demo.organisation_id, demo.id, now))
         pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
         journey_group = await seeded_group(tx, JOURNEY_GROUP_SLUG)
         journeys = {

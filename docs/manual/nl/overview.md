@@ -91,8 +91,28 @@ staan ze rechtop. De lijn bij de wachtrij verbindt de groepen; het is dus geen v
 ## Standaardindeling per rol
 
 Elke rol begint met een eigen volgorde: een medewerker ziet de wachtrij vooraan, de rol
-Compliance en privacy de wijzigingen en de systeemstatus. Een eigen indeling per persoon komt
-later (ADR 0062). Op een tablet staan maximaal twee widgets naast elkaar, op een telefoon één.
+Compliance en privacy de wijzigingen en de systeemstatus. U kunt daar uw eigen indeling van
+maken (zie hieronder). Op een tablet staan maximaal twee widgets naast elkaar, op een telefoon
+één.
+
+## Uw eigen indeling
+
+Bovenaan het overzicht staan naast **Verversen** twee knoppen:
+
+- **Widget toevoegen** toont de widgets die uw rechten toestaan en die nog niet op uw overzicht
+  staan. **Toevoegen** zet er een onderaan. Een widget die u niet mag zien, wordt nooit
+  aangeboden.
+- **Overzicht aanpassen** toont uw widgets in hun volgorde. Met **Omhoog** en **Omlaag** schuift
+  u een widget een plaats op, met **Weghalen** haalt u hem weg. Alles werkt met het toetsenbord;
+  er is niets dat u moet slepen.
+
+Zodra u iets verandert, is het uw eigen indeling; alleen u ziet hem, en hij blijft bewaard als u
+opnieuw inlogt. **Standaardindeling herstellen** haalt uw eigen indeling weg, zodat u weer de
+standaard van uw rol ziet. De snelkoppelingen *Taken* en *Meldingen* in de balk bovenin volgen uw
+indeling: haalt u die widget weg, dan verdwijnt ook de snelkoppeling. Raakt u het recht op een widget kwijt, dan verdwijnt hij vanzelf van
+uw overzicht. Het aantal widgets heeft een maximum dat de superuser instelt (*Meeste widgets op
+een eigen overzicht*, standaard 12). Een indeling is een persoonlijke voorkeur: ze komt niet in
+het auditlog, en ze bevat geen persoonsgegevens.
 
 ## Uw profielmenu
 

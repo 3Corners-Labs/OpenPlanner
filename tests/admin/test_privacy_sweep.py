@@ -242,6 +242,14 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
                 assert "<svg" in response.text or "widget__empty" in response.text, path
                 assert not marker_leaks(response.text, set()), path
 
+    # ADR 0117 point 11: the report families are the same routes with another `view`; their
+    # templates carry counts and codes, never a marker.
+    for scope in ("/admin/groups/demo/usage", "/admin/organisations/demo/usage"):
+        for view in ("queue", "capacity", "channels"):
+            response = await site.client.get(f"{scope}?view={view}")
+            assert response.status_code == 200, (scope, view)
+            assert not marker_leaks(response.text, set()), (scope, view)
+
     # ADR 0095: the invitation form, and the page of a refused action on a person.
     for path, response in (
         ("/admin/staff/invite", await site.client.get("/admin/staff/invite")),

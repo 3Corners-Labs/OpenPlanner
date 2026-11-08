@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.authorization import Permission, Principal, Role
+from app.domain.overview_layout import effective
 
 OVERVIEW_PATH = "/admin/"
 """The overview page; its route carries ``dashboard.view``."""
@@ -217,13 +218,31 @@ def default_layout(principal: Principal) -> tuple[Widget, ...]:
     return tuple(_BY_KEY[k] for k in keys)
 
 
-def visible(principal: Principal, allowed: Callable[[Permission], bool]) -> list[Widget]:
-    """Return the available widgets of the principal's default layout that ``allowed`` grants.
+def allowed_keys(allowed: Callable[[Permission], bool]) -> tuple[str, ...]:
+    """Return the keys of the available widgets ``allowed`` grants, in register order.
 
     ``allowed`` is the matrix (``can_function`` of the admin routes); the register itself
-    never decides rights.
+    never decides rights. These are the widgets an admin may show or add (ADR 0096 §3).
     """
-    return [w for w in default_layout(principal) if w.available and allowed(w.permission)]
+    return tuple(w.key for w in WIDGETS if w.available and allowed(w.permission))
+
+
+def on_overview(
+    principal: Principal,
+    allowed: Callable[[Permission], bool],
+    stored: tuple[str, ...] | None,
+) -> list[Widget]:
+    """Return the widgets the admin's overview shows, in order (ADR 0096).
+
+    ``stored`` is the admin's own layout, or ``None`` for the default of their roles; a key the
+    matrix no longer grants is skipped silently.
+    """
+    return [_BY_KEY[k] for k in effective(stored, default_keys(principal), allowed_keys(allowed))]
+
+
+def default_keys(principal: Principal) -> tuple[str, ...]:
+    """Return the keys of the principal's default layout (before the matrix filters it)."""
+    return tuple(w.key for w in default_layout(principal))
 
 
 def available() -> Iterator[Widget]:

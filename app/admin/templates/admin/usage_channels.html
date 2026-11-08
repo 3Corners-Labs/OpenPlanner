@@ -1,0 +1,26 @@
+{% extends "admin/usage_base.html" %}
+{% from "admin/_usage_tables.html" import cell, count_table, grid_table, figure, nothing_yet with context %}
+{% from "admin/_report_chart.html" import report_chart with context %}
+{% block report %}
+{% if report.empty %}
+{{ nothing_yet() }}
+{% else %}
+<section class="card" aria-labelledby="messages-heading">
+  <h2 id="messages-heading">{{ _("reports.channels.messages.title") }}</h2>
+  {{ report_chart(charts.messages) }}
+  <p>{{ _("reports.channels.failure_rate") }}: {{ figure(report.messages.failure_percent, "%") }}</p>
+</section>
+{{ grid_table("by-channel", _("reports.channels.by_channel.title"), _("reports.channels.channel"), report.messages.by_channel, "channels", "states", report.threshold, _("reports.total")) }}
+{{ grid_table("by-purpose", _("reports.channels.by_purpose.title"), _("reports.channels.purpose"), report.messages.by_purpose, "purposes", "states", report.threshold, _("reports.total")) }}
+{{ count_table("locales", _("reports.channels.locales.title"), _("reports.channels.locales.locale"), report.locales, "locales", report.threshold, _("reports.total")) }}
+{% if report.locales_groups_left_out %}<p class="muted">{{ _("reports.channels.locales.left_out", n=report.locales_groups_left_out) }}</p>{% endif %}
+<section class="card" aria-labelledby="trial-heading">
+  <h2 id="trial-heading">{{ _("reports.channels.trial.title") }}</h2>
+  {{ report_chart(charts.trial) }}
+  <dl class="facts">
+    <div><dt>{{ _("reports.channels.trial.joined_share") }}</dt><dd>{{ figure(report.trial_joined_percent, "%") }}</dd></div>
+    <div><dt>{{ _("reports.channels.trial.entered_share") }}</dt><dd>{{ figure(report.trial_entered_percent, "%") }}</dd></div>
+  </dl>
+</section>
+{% endif %}
+{% endblock %}

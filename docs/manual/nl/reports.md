@@ -43,7 +43,71 @@ wanneer een boeking verandert, één klein gegeven per wijziging.
 - **Boekingen van voor de rapportage**: uitkomsten van boekingen die in dagtellingen waren
   samengevoegd voordat het gebruik werd geteld; meer is er niet van bekend.
 
+## De rapportfamilies
+
+Bovenaan de pagina Gebruik schakelt een rij links tussen vier families van hetzelfde rapport. De
+gekozen periode blijft staan; elke familie heeft een eigen adres dat u kunt bewaren. De eerste,
+**Volume**, is de set tabellen hierboven; de andere staan hieronder.
+
+### Wachtrij en gesprekken
+
+Hoe boekingen bij medewerkers komen en hoe de gesprekken verlopen.
+
+- **Hoe boekingen bij medewerkers komen**: boekingen per wachtrijmethode (contactcenter of de eigen
+  wachtrij) en per soort (gepland of direct gesprek), met totalen.
+- **Wachttijd tot een gesprek verbindt** (Q2): de tijd vanaf het aanmaken van een taak tot het
+  gesprek verbindt, in vaste klassen, met het gemiddelde.
+- **Wanneer de gastheer binnenkwam, ten opzichte van de start** (Q3): te vroeg staat er met *te
+  vroeg*, te laat met *te laat*. Alleen geplande gesprekken tellen mee.
+- **Deelnemer wacht op de gastheer** (Q4) en **hoe lang gesprekken duren** (Q5), met het
+  gemiddelde, het aantal afgeronde gesprekken en het gemiddeld aantal personen per gesprek (U11).
+- **Directe gesprekken** (Q6): gestart, weggegaan tijdens het wachten, niet op tijd opgepakt en
+  het aandeel dat wegging, met de wachttijd op het moment van weggaan.
+- **Eigen wachtrij: oppakken** (Q7): opgepakt, teruggegeven, teruggegeven per keer oppakken en de
+  tijd tot een boeking wordt opgepakt. Het aandeel opgepakte boekingen staat er niet: wat is
+  aangeboden wordt niet vastgelegd.
+- **Fouten bij het doorzetten** (Q8): per code uit een vaste lijst, nooit de tekst van het andere
+  systeem.
+- **Directe gesprekken tegelijk** (Q9): het hoogste aantal dat tegelijk wachtte of verbonden was,
+  per dag.
+- **Voorgestelde nieuwe tijden** (U8): voorgesteld na vraag van de planner of door de assistent,
+  geaccepteerd, verlopen, het aandeel geaccepteerd en de tijd tot accepteren.
+
+### Capaciteit
+
+Hoe vol de agenda is en wanneer het druk is.
+
+- **Bezettingsgraad per dag** (C1, C3): de boekingen die meetellen tegenover de capaciteit van de
+  momenten die begonnen zijn, en de plaatsen die niemand boekte. Een dag met weinig momenten is
+  verborgen, en een percentage dat maar een paar mensen vertegenwoordigt ook.
+- **Hoe vol de momenten waren** (C2): leeg, minder dan half, meer dan half en vol.
+- **Drukste dagen en uren** (C4): een tabel van weekdag bij uur, in de eigen tijd van de groep. In
+  elke cel staat het getal; de tint helpt alleen het oog. De tabel verschijnt bij een periode van
+  minstens 7 dagen en alleen voor groepen met in die periode minstens vijf keer het minimum aan
+  boekingen; kleinere groepen vallen buiten deze tabel, en de pagina zegt hoeveel.
+- **Blokken met te weinig bezetting** (C5): nog steeds te weinig, te weinig maar geaccepteerd door
+  een planner, opgelost.
+
+### Kanalen
+
+Hoe berichten aankomen, in welke taal mensen boeken en hoe het proefgesprek verloopt.
+
+- **Berichten verstuurd en mislukt** (M1): per doel en per kanaal, met het aandeel dat mislukte.
+- **Boekingen per taal** (M2): alleen voor groepen die groot genoeg zijn; kleinere groepen vallen
+  buiten de tabel en de pagina zegt hoeveel.
+- **Proefgesprekken** (T1): aangemaakt, de link gevolgd, in de vergadering gekomen en mislukt. Het
+  verschil tussen de laatste twee zijn mensen die in de lobby bleven hangen.
+
+## Grafieken
+
+Waar een grafiek helpt, staat die boven de eigen tabel, en de tabel bevat altijd dezelfde cijfers,
+zodat niets alleen in het plaatje staat. Een grafiek heeft een titel en een beschrijving voor
+schermlezers, reeksen verschillen in patroon of lijnstijl en niet alleen in kleur, en een
+verborgen aantal is een gestippelde markering van één vaste hoogte met het label *< 5*: die zegt
+niets over het echte getal. De grafieken hebben geen script nodig, schuiven op een smal scherm
+zijwaarts in hun kader en blijven weg bij het afdrukken; de tabellen blijven. Is voor een familie
+in de periode niets vastgelegd, dan zegt de pagina dat.
+
 ## Wat hier nog niet staat
 
-Wachttijden, gespreksduur, hoe vol de agenda is, de drukste uren, berichten en per teamlid. Die
-volgen in latere stappen van hetzelfde ontwerp.
+Per teamlid, de samenvatting per e-mail en de export naar een bestand. Die volgen in latere stappen van hetzelfde ontwerp.
