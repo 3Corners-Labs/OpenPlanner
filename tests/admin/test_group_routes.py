@@ -30,8 +30,8 @@ async def test_org_admin_creates_a_group_and_lands_on_it(site: Site) -> None:
         "/admin/groups",
         data={
             "organisation": "demo",
-            "name": "Vergunningen",
-            "slug": "vergunningen",
+            "name": "Klantenservice",
+            "slug": "klantenservice",
             "timezone": "Europe/Amsterdam",
             "slot_minutes": "20",
         },
@@ -39,7 +39,7 @@ async def test_org_admin_creates_a_group_and_lands_on_it(site: Site) -> None:
     )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/admin/groups/vergunningen?done=created"
+    assert response.headers["location"] == "/admin/groups/klantenservice?done=created"
     page = (await site.client.get(response.headers["location"])).text
     assert 'role="status"' in page
     assert "De groep is aangemaakt" in page

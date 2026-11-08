@@ -57,7 +57,7 @@ EVERY_ROLE = principal(
 """The dev realm's ``super``: the superuser reach wins, the other roles add nothing."""
 
 OWN_GROUP = Target.for_group("demo", "demo")
-OTHER_GROUP = Target.for_group("toeslagen", "andere")
+OTHER_GROUP = Target.for_group("helpdesk", "andere")
 OWN_ORG = Target.for_organisation("demo")
 OTHER_ORG = Target.for_organisation("andere")
 

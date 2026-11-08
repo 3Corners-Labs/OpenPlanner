@@ -1088,7 +1088,7 @@ msgid "admin.field.slug"
 msgstr "Web address"
 
 msgid "admin.field.slug_hint"
-msgstr "Becomes /g/<web address>. Leave empty to make it from the name; capitals, spaces and accents are converted, for example Permits Desk → permits-desk."
+msgstr "Becomes /g/<web address>. Leave empty to make it from the name; capitals, spaces and accents are converted, for example Customer Service North → customer-service-north."
 
 msgid "admin.field.slug_fixed"
 msgstr "The web address does not change, so links on websites keep working."
@@ -6606,7 +6606,7 @@ msgid "admin.form_fields.options"
 msgstr "Choices"
 
 msgid "admin.form_fields.options_hint"
-msgstr "Choice lists only. One choice per line: key; Dutch; English. For example: rent; Huurtoeslag; Rent benefit"
+msgstr "Choice lists only. One choice per line: key; Dutch; English. For example: general; Algemene vraag; General question"
 
 msgid "admin.form_fields.minimum"
 msgstr "Lower limit"
@@ -11178,3 +11178,110 @@ msgstr "Change your details"
 
 msgid "manage.notice.details"
 msgstr "Your details have been changed."
+msgid "error.proposal_not_open"
+msgstr "This proposed time is no longer available. You can still choose a new time yourself."
+
+msgid "settings.field.reschedule_proposal_confirm_hours.label"
+msgstr "Proposed time held for (hours)"
+
+msgid "settings.field.reschedule_proposal_reminder_hours.label"
+msgstr "Proposal reminder before the deadline (hours, 0 = none)"
+
+msgid "settings.field.reschedule_search_days.label"
+msgstr "Look for a new time within (days)"
+
+msgid "settings.field.reschedule_time_tolerance_minutes.label"
+msgstr "Largest difference in time of day (minutes)"
+
+msgid "message.reschedule_proposal.subject"
+msgstr "A new time is proposed for your video call"
+
+msgid "message.reschedule_proposal.intro"
+msgstr "Your video call with {group_name} on {date} at {time} cannot go ahead. We propose a new time: {new_date} at {new_time}. We hold that time for you until {deadline}. Confirm the new time, choose another time yourself or cancel the appointment. Nothing moves without your confirmation."
+
+msgid "message.reschedule_proposal.sms"
+msgstr "Dear {first_name}, your video call with {group_name} on {date} at {time} cannot go ahead. {reason} Proposed: {new_date} at {new_time}. Confirm by {deadline} or choose another time: {manage_url}"
+
+msgid "message.proposal_reminder.subject"
+msgstr "Reminder: please confirm the proposed time"
+
+msgid "message.proposal_reminder.intro"
+msgstr "You have not confirmed the proposed new time for your video call with {group_name}, {new_date} at {new_time}, yet. We hold that time for you until {deadline}."
+
+msgid "message.proposal_reminder.sms"
+msgstr "Dear {first_name}, please confirm the proposed time {new_date} at {new_time} with {group_name} by {deadline}, or choose another: {manage_url}"
+
+msgid "message.proposal_released.subject"
+msgstr "The proposed time has been released"
+
+msgid "message.proposal_released.intro"
+msgstr "You did not confirm the proposed new time for your video call with {group_name} in time. We no longer hold that time for you. You can still choose a new time yourself until {deadline}; after that the appointment lapses."
+
+msgid "message.proposal_released.sms"
+msgstr "Dear {first_name}, the proposed time with {group_name} has been released. Choose a new time yourself by {deadline}: {manage_url}"
+
+msgid "message.manage_proposal"
+msgstr "Confirm the new time, choose another time or cancel, by {deadline}:"
+
+msgid "message.proposal_link"
+msgstr "View the new time"
+
+msgid "message.proposed_when"
+msgstr "Proposed time"
+
+msgid "manage.proposal.title"
+msgstr "A new time has been proposed for you"
+
+msgid "manage.proposal.text"
+msgstr "Proposed time: {slot}. We hold that time for you until {deadline}. Nothing moves without your confirmation."
+
+msgid "manage.proposal.confirm"
+msgstr "Confirm the new time"
+
+msgid "manage.proposal.other"
+msgstr "Choose another time"
+
+msgid "manage.notice.proposal_gone"
+msgstr "The proposed time is no longer available. You can still choose a new time yourself."
+
+msgid "proposal.title"
+msgstr "Confirm the new time"
+
+msgid "proposal.new"
+msgstr "New time"
+
+msgid "proposal.old"
+msgstr "Original time"
+
+msgid "proposal.text"
+msgstr "If you confirm the new time, we move your appointment and send you a confirmation with a calendar invitation. We hold the time until {deadline}."
+
+msgid "proposal.submit"
+msgstr "Yes, this time suits me"
+
+msgid "reschedule.suggested.title"
+msgstr "Suggested times"
+
+msgid "reschedule.suggested.hint"
+msgstr "These times are closest to your original appointment. They are not held for you."
+
+msgid "admin.messages.purpose_reschedule_proposal"
+msgstr "New time proposed"
+
+msgid "admin.messages.purpose_proposal_reminder"
+msgstr "Reminder of a proposed time"
+
+msgid "admin.messages.purpose_proposal_released"
+msgstr "Proposed time released"
+
+msgid "audit.job.send_reschedule_proposal"
+msgstr "Send a proposed new time"
+
+msgid "audit.job.send_proposal_reminder"
+msgstr "Send a reminder of the proposal"
+
+msgid "audit.job.expire_proposal"
+msgstr "Release the proposed time"
+
+msgid "audit.job.send_proposal_released"
+msgstr "Send notice of a released proposal"

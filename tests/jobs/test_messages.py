@@ -11,6 +11,7 @@ from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.job_plan import JobType
+from app.domain.reschedule_proposal import HeldProposal
 from app.domain.scheduling import DispatchKind, PhoneMode
 from app.domain.tokens import derive_token, hash_token, new_token_salt
 from app.i18n import Translator, load_catalogues
@@ -413,6 +414,73 @@ def test_the_sms_request_to_rebook_carries_reason_deadline_and_link(
 
     assert "niet genoeg medewerkers beschikbaar. Kies voor maandag 19 januari 2026" in message.text
     assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}" in message.text
+
+
+PROPOSED = HeldProposal(
+    7,
+    42,
+    2,
+    SLOT_0900 + timedelta(days=7),
+    SLOT_0930 + timedelta(days=7),
+    NOW + timedelta(hours=48),
+    NOW,
+)
+
+
+def test_a_proposal_names_both_times_its_deadline_and_links_its_confirm_page(
+    composer: MessageComposer,
+) -> None:
+    message = composer.compose(
+        JobType.SEND_RESCHEDULE_PROPOSAL, _waiting(), GROUP, NOW, proposal=PROPOSED
+    )
+
+    token = derive_token(TEST_TOKEN_KEY, SALT)
+    assert message.subject == "Nieuwe tijd voorgesteld voor uw videogesprek"
+    assert "op maandag 5 januari 2026 om 09:00 kan niet doorgaan" in message.text
+    assert "Wij stellen een nieuwe tijd voor: maandag 12 januari 2026 om 09:00" in message.text
+    assert "tot zaterdag 3 januari 2026, 09:00" in message.text
+    assert "Voorgestelde tijd" in message.text
+    assert f"/b/{token}/proposal" in message.text
+    assert "/join" not in message.text
+    assert "METHOD:CANCEL" in message.attachments[0].data.decode()  # the old time goes
+
+
+def test_the_proposal_reminder_has_no_calendar_and_its_sms_the_confirm_link(
+    composer: MessageComposer,
+) -> None:
+    email = composer.compose(
+        JobType.SEND_PROPOSAL_REMINDER, _waiting(), GROUP, NOW, proposal=PROPOSED
+    )
+    sms = composer.compose(
+        JobType.SEND_PROPOSAL_REMINDER,
+        _waiting(SMS_BOOKING),
+        GROUP,
+        NOW,
+        channel=ChannelKind.SMS,
+        proposal=PROPOSED,
+    )
+
+    assert email.subject.startswith("Herinnering")
+    assert email.attachments == ()
+    assert "maandag 12 januari 2026 om 09:00" in sms.text
+    assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}/proposal" in sms.text
+
+
+def test_a_proposal_message_needs_its_proposal(composer: MessageComposer) -> None:
+    with pytest.raises(ValueError, match="proposal"):
+        composer.compose(JobType.SEND_RESCHEDULE_PROPOSAL, _waiting(), GROUP, NOW)
+
+
+def test_the_released_proposal_names_the_lapse_and_links_the_booking(
+    composer: MessageComposer,
+) -> None:
+    message = composer.compose(JobType.SEND_PROPOSAL_RELEASED, _waiting(), GROUP, NOW)
+
+    assert message.subject == "De voorgestelde tijd is vrijgegeven"
+    assert "nog tot maandag 19 januari 2026, 09:00 zelf een nieuwe tijd kiezen" in message.text
+    assert message.text.count(f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}") >= 1
+    assert "/proposal" not in message.text
+    assert message.attachments == ()
 
 
 TEAM = make_group(

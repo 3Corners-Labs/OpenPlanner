@@ -60,13 +60,13 @@ Authorization: Bearer opa_…
 ```
 
 ```http
-GET /api/agent/v1/groups/belastingen/availability?from=2026-11-02&to=2026-11-06&lang=nl
+GET /api/agent/v1/groups/klantenservice/availability?from=2026-11-02&to=2026-11-06&lang=nl
 Authorization: Bearer opa_…
 ```
 
 ```json
 {
-  "group": "belastingen",
+  "group": "klantenservice",
   "timezone": "Europe/Amsterdam",
   "slots": [
     {"start": "2026-11-02T08:00:00Z", "end": "2026-11-02T08:30:00Z",
