@@ -564,6 +564,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Registry digest the host pinned this image at, for the evidence report (WP-C2).",
     ),
     S(
+        "min_upgrade_from",
+        K.STRING,
+        "1.0.0",
+        _B,
+        T.HOST,
+        "Baked into the image (ADR 0116 point 6): a database last run by an older version "
+        "upgrades through this release first (`upgrade_path_required`); images before it "
+        "know no stop.",
+        optional=True,
+    ),
+    S(
         "installation_name",
         K.STRING,
         "",
@@ -1547,7 +1558,28 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _C,
         T.UPDATES,
         "The worker requests a newer version itself as soon as the check finds one "
-        "(ADR 0059, 0065); not usable in production.",
+        "(ADR 0059, 0065); in production only with `update_window` set (ADR 0116).",
+    ),
+    S(
+        "update_line",
+        K.STRING,
+        "",
+        _C,
+        T.UPDATES,
+        "Follow the patches of one minor `X.Y` only (ADR 0116 point 9); empty follows "
+        "everything the channel offers.",
+        optional=True,
+    ),
+    S(
+        "update_window",
+        K.STRING,
+        "",
+        _C,
+        T.UPDATES,
+        "When automatic updates happen, in `admin_timezone`: up to 7 ranges such as "
+        "`mon 02:00-04:00, sat 01:00-05:00`, each at least 30 minutes (ADR 0116 point 9); "
+        "empty is any time. A superuser's click is immediate.",
+        optional=True,
     ),
     S(
         "update_check_minutes",

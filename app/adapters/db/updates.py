@@ -7,8 +7,8 @@ parses (a hand-edited row) makes the release unknown rather than failing the pag
 
 from collections.abc import Sequence
 
-from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete, inspect, select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.db.models import (
     ReleaseCheckRow,
@@ -17,11 +17,13 @@ from app.adapters.db.models import (
     UpdateRequestRow,
 )
 from app.domain.errors import DomainError
+from app.domain.update_policy import parse_support, support_text
 from app.domain.updates import (
     ListedRelease,
     Release,
     ReleaseCheck,
     RunningVersion,
+    SupportLine,
     UpdateAction,
     UpdateRequest,
     UpdateStatus,
@@ -51,6 +53,21 @@ def _release(version: str | None, url: str | None) -> Release | None:
         return None
 
 
+def _support_text(lines: tuple[SupportLine, ...] | None) -> str | None:
+    """Store support lines as the ``support.json`` shape they came in (ADR 0116)."""
+    return None if lines is None else support_text(lines)
+
+
+def _support_lines(text: str | None) -> tuple[SupportLine, ...] | None:
+    """Read stored support lines; a row this module did not write counts as none."""
+    if text is None:
+        return None
+    try:
+        return tuple(parse_support(text))
+    except ValueError:  # pragma: no cover - only a hand-edited row
+        return None
+
+
 def _request(row: UpdateRequestRow) -> UpdateRequest:
     """Map a row to the domain."""
     return UpdateRequest(
@@ -66,6 +83,7 @@ def _request(row: UpdateRequestRow) -> UpdateRequest:
         reason=row.reason,
         step=UpdateStep(row.step) if row.step else None,
         step_at=row.step_at,
+        apply_after=row.apply_after,
     )
 
 
@@ -84,6 +102,7 @@ class UpdateQueries:
             _release(row.latest_version, row.release_url),
             row.error,
             row.requested_at,
+            _support_lines(row.support),
         )
 
     async def save_release_check(self, check: ReleaseCheck) -> None:
@@ -96,6 +115,7 @@ class UpdateQueries:
                 release_url=check.latest.url if check.latest else None,
                 error=check.error,
                 requested_at=check.requested_at,
+                support=_support_text(check.support),
             )
         )
         await self._session.flush()
@@ -169,6 +189,7 @@ class UpdateQueries:
             reason=request.reason,
             step=request.step.value if request.step else None,
             step_at=request.step_at,
+            apply_after=request.apply_after,
         )
         self._session.add(row)
         await self._session.flush()
@@ -186,3 +207,18 @@ class UpdateQueries:
         row.step = request.step.value if request.step else None
         row.step_at = request.step_at
         await self._session.flush()
+
+
+async def last_running_version(engine: AsyncEngine) -> str | None:
+    """Return the version that last ran on this database, or ``None`` for a new one.
+
+    Read before ``alembic upgrade`` (ADR 0116 point 6), so a database without the table yet
+    (empty, or from before ADR 0067) counts as new.
+    """
+    async with engine.connect() as connection:
+        tables = await connection.run_sync(lambda sync: inspect(sync).get_table_names())
+        if RunningVersionRow.__tablename__ not in tables:
+            return None
+        return await connection.scalar(
+            select(RunningVersionRow.version).order_by(RunningVersionRow.id.desc()).limit(1)
+        )

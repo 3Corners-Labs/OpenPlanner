@@ -9,7 +9,7 @@ import pytest
 from app.adapters.releases import GitHubReleases, plain_notes, running_version, update_service
 from app.config import Settings
 from app.domain.ports import IntegrationError
-from app.domain.updates import NOTES_CHARS, ListedRelease, Version
+from app.domain.updates import NOTES_CHARS, LineStatus, ListedRelease, SupportLine, Version
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.domain import DEMO_SUPERUSER
@@ -254,3 +254,27 @@ async def test_a_failing_latest_request_fails_the_check() -> None:
 
     with pytest.raises(IntegrationError):
         await _releases(handler).listing()
+
+
+# ADR 0116 point 9: the support index.
+
+
+async def test_the_support_index_is_read_raw_from_the_repository() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, text='{"lines": [{"line": "1.4", "status": "security"}]}')
+
+    lines = await _releases(handler).support()
+
+    assert lines == (SupportLine("1.4", LineStatus.SECURITY),)
+    assert seen[0].url.path == "/repos/acme/openplanner/contents/support.json"
+    assert seen[0].headers["accept"] == "application/vnd.github.raw+json"
+
+
+async def test_no_support_index_is_none_and_a_failure_is_an_integration_error() -> None:
+    assert await _releases(lambda _: httpx.Response(404)).support() is None
+    assert await _releases(lambda _: httpx.Response(200, text="not json")).support() is None
+    with pytest.raises(IntegrationError):
+        await _releases(lambda _: httpx.Response(500)).support()
