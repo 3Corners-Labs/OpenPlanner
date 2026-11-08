@@ -175,6 +175,7 @@ FLOWS: dict[str, Flow] = {
     ),
     "## Flow: organisation management": Flow(ADMIN),
     "## Flow: groups list (ADR 0047 step 5)": Flow(ADMIN),
+    "## Flow: usage reports (ADR 0117)": Flow((DENIED,)),
     "## Flow: outgoing email (WP3, worker)": Flow((JOB,)),
     "## Flow: message channels, SMS reminders and message texts (ADR 0022, 0028)": Flow(
         (DENIED, CHANGE, JOB)
