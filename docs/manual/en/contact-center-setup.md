@@ -113,8 +113,8 @@ Screen: **Control Hub → Contact Center → Customer experience → Queues**, a
 
 One queue per team with *Channel type* **Work item**, with the team of agents assigned and a
 RONA timeout. The agents' *multimedia profile* must allow work items. Name the queue so that it
-contains the group's routing value (for example `ACME_video_permits` for routing value
-`permits`): the check then shows per group which queue it uses.
+contains the group's routing value (for example `ACME_video_support` for routing value
+`support`): the check then shows per group which queue it uses.
 
 ## Step 7. The group's fields in OpenPlanner
 

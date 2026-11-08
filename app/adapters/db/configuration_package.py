@@ -1,52 +1,45 @@
-"""Configuration packages on SQLite (ADR 0089): export, inspect and import.
+"""SQLite configuration packages (ADR 0089), read for one release as documents (ADR 0099).
 
-A package is a copy of the database made with the online backup API, with every state table
-emptied and vacuumed away, the sealed secrets opened with the installation's ``SecretBox`` and
-sealed again under a key derived from the passphrase (scrypt), a verifier to tell a wrong
-passphrase from a damaged file, and the portable environment values of ADR 0089 point 4. An
-import does the reverse on a temporary copy and then replaces every configuration table in
-one ``BEGIN IMMEDIATE`` transaction with foreign keys deferred and checked before the commit.
+A package is a copy of the database with every state table emptied, the sealed secrets sealed
+under a key derived from the passphrase (scrypt) and a verifier to tell a wrong passphrase from
+a damaged file. Nothing writes one any more. This module still reads one: it opens the file on a
+temporary copy, refuses a schema that is not the running one, seals the secrets under the
+installation's key, reads the configuration with the readers of the live database and returns a
+``replace`` document of the platform. The file is untrusted: it is never copied into the live
+database, a trigger or view it carries is refused, and no value is ever logged.
 
 Everything here runs on the synchronous ``sqlite3`` module in a worker thread, as the backups
 of ADR 0029 do; temporary files live next to the database (mode 600) and are removed again.
-Raw SQL is allowed in this package only (CLAUDE.md). No value is ever logged.
+Raw SQL is allowed in this package only (CLAUDE.md).
 """
 
 import asyncio
+import hashlib
 import os
 import sqlite3
 import tempfile
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from contextlib import closing
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-from pydantic import SecretStr
+from sqlalchemy.engine import URL
 
-from app.adapters.contact_centers import attributes_from_json, routing
-from app.adapters.crypto import SecretBox
+from app.adapters.crypto import SecretBox, passphrase_box
+from app.adapters.db.engine import create_engine
 from app.adapters.db.sealed import SEALED, reseal
-from app.config import Settings
+from app.adapters.db.uow import SqlUnitOfWork
+from app.domain.configuration_document import Document, Mode, Scope
 from app.domain.configuration_package import (
     CONFIGURATION_TABLES,
     COUNTED_TABLES,
     FORMAT,
-    IN_USE_TABLES,
-    PORTABLE_ENVIRONMENT,
-    STATE_TABLES,
     VERSION_TABLE,
     PackageSummary,
 )
-from app.domain.contact_center import ContactCenterKind
+from app.domain.configuration_v1 import V1
 from app.domain.errors import DomainError, ErrorCode
-
-SCRYPT_N = 2**16
-SCRYPT_R = 8
-SCRYPT_P = 1
-SALT_BYTES = 16
-"""The passphrase key derivation (ADR 0089 point 3): crypto parameters, fixed."""
 
 META_TABLE = "configuration_package"
 ENVIRONMENT_TABLE = "configuration_environment"
@@ -57,26 +50,12 @@ SQLITE_HEADER = b"SQLite format 3\x00"
 BUSY_TIMEOUT_SECONDS = 5.0
 
 
-def package_box(passphrase: str, salt: bytes) -> SecretBox:
-    """Return the box of a package: its key is scrypt of the passphrase and the salt."""
-    key = Scrypt(salt=salt, length=32, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P).derive(
-        passphrase.encode()
-    )
-    return SecretBox(key)
-
-
 def _connect(path: Path, *, read_only: bool = False) -> sqlite3.Connection:
     """Open ``path`` with explicit transaction control and a busy timeout."""
     if read_only:
-        uri = f"file:{path}?mode=ro"
+        uri = f"{path.resolve().as_uri()}?mode=ro"
         return sqlite3.connect(uri, uri=True, isolation_level=None, timeout=BUSY_TIMEOUT_SECONDS)
     return sqlite3.connect(path, isolation_level=None, timeout=BUSY_TIMEOUT_SECONDS)
-
-
-def _copy(source: Path, target: Path) -> None:
-    """Copy one SQLite database into another with the online backup API."""
-    with closing(sqlite3.connect(source)) as src, closing(sqlite3.connect(target)) as dst:
-        src.backup(dst)
 
 
 def _remove(path: Path) -> None:
@@ -122,78 +101,6 @@ def _columns(db: sqlite3.Connection, table: str, schema: str = "main") -> list[s
     return [str(r[1]) for r in db.execute(f"PRAGMA {schema}.table_info({table})").fetchall()]
 
 
-def export_package(
-    database: Path,
-    box: SecretBox,
-    passphrase: str,
-    *,
-    created_at: datetime,
-    installation: str,
-    app_version: str,
-    environment: Mapping[str, str],
-    work_dir: Path,
-) -> bytes:
-    """Return a package of ``database`` sealed under ``passphrase`` (ADR 0089 points 1–4).
-
-    Args:
-        database: The installation's SQLite file.
-        box: Opens the installation's sealed values.
-        passphrase: Seals the package.
-        created_at: The export time, stored in the package.
-        installation: ``INSTALLATION_NAME``, stored in the package.
-        app_version: The running release, stored in the package.
-        environment: The portable environment values, upper-case names.
-        work_dir: Where the temporary copy is written (mode 600) and removed again.
-    """
-    salt = os.urandom(SALT_BYTES)
-    sealer = package_box(passphrase, salt)
-    copy = _temporary(work_dir)
-    try:
-        _copy(database, copy)
-        with closing(_connect(copy)) as db:
-            # One self-contained file: the copy inherits the database's WAL mode.
-            db.execute("PRAGMA journal_mode = DELETE")
-            db.execute("PRAGMA foreign_keys = OFF")
-            db.execute("BEGIN IMMEDIATE")
-            for table in sorted(STATE_TABLES):
-                db.execute(f"DELETE FROM {table}")  # noqa: S608  # nosec B608 - names from the registry
-            db.execute(
-                f"CREATE TABLE {META_TABLE} (id INTEGER PRIMARY KEY CHECK (id = 1), "
-                "format INTEGER NOT NULL, created_at TEXT NOT NULL, installation TEXT NOT NULL, "
-                "app_version TEXT NOT NULL, kdf_salt BLOB NOT NULL, verifier_nonce BLOB NOT NULL, "
-                "verifier_ciphertext BLOB NOT NULL)"
-            )
-            db.execute(
-                f"CREATE TABLE {ENVIRONMENT_TABLE} (key TEXT PRIMARY KEY, nonce BLOB NOT NULL, "
-                "ciphertext BLOB NOT NULL)"
-            )
-            nonce, ciphertext = sealer.seal(VERIFIER_NAME, VERIFIER_TEXT)
-            db.execute(
-                f"INSERT INTO {META_TABLE} VALUES (1, ?, ?, ?, ?, ?, ?, ?)",  # noqa: S608  # nosec B608 - fixed name
-                (
-                    FORMAT,
-                    created_at.astimezone(UTC).isoformat(),
-                    installation,
-                    app_version,
-                    salt,
-                    nonce,
-                    ciphertext,
-                ),
-            )
-            for key, value in environment.items():
-                nonce, ciphertext = sealer.seal(ENVIRONMENT_PREFIX + key, value.encode())
-                db.execute(
-                    f"INSERT INTO {ENVIRONMENT_TABLE} VALUES (?, ?, ?)",  # noqa: S608  # nosec B608 - fixed name
-                    (key, nonce, ciphertext),
-                )
-            _reseal_or_refuse(db, box, sealer)
-            db.execute("COMMIT")
-            db.execute("VACUUM")
-        return copy.read_bytes()
-    finally:
-        _remove(copy)
-
-
 def _open_package(
     path: Path, passphrase: str
 ) -> tuple[sqlite3.Connection, SecretBox, PackageSummary]:
@@ -212,7 +119,7 @@ def _open_package(
         ).fetchone()
         if meta is None or int(meta[0]) != FORMAT:
             raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package")
-        opener = package_box(passphrase, meta[4])
+        opener = passphrase_box(passphrase, meta[4])
         try:
             opener.open(VERIFIER_NAME, meta[5], meta[6])
         except InvalidTag as exc:
@@ -290,28 +197,42 @@ def environment_values(data: bytes, passphrase: str, work_dir: Path) -> dict[str
         _remove(path)
 
 
-def installation_in_use(database: Path) -> bool:
-    """Return whether ``database`` has a row in any of the in-use tables (ADR 0089 point 5)."""
-    with closing(_connect(database, read_only=True)) as db:
-        return any(
-            db.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone() is not None  # noqa: S608  # nosec B608 - registry names
-            for table in IN_USE_TABLES
+def _check_schema(package: sqlite3.Connection, running: sqlite3.Connection) -> None:
+    """Refuse a package whose schema is not the running one's (ADR 0099 point 14).
+
+    The file is untrusted: it must have the running schema revision, the very column set of
+    every configuration table, and no trigger or view the running database does not have, so
+    nothing it carries runs or is read through a surprise.
+
+    Raises:
+        DomainError: ``configuration_package_version`` for another revision;
+            ``configuration_package_invalid`` for a different table, trigger or view.
+    """
+    if _revision(package) != _revision(running):
+        raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_VERSION, "package")
+    objects = "SELECT name FROM sqlite_master WHERE type IN ('trigger', 'view')"
+    extra = {r[0] for r in package.execute(objects)} - {r[0] for r in running.execute(objects)}
+    try:
+        different = any(
+            set(_columns(package, table)) != set(_columns(running, table))
+            for table in CONFIGURATION_TABLES
         )
+    except sqlite3.DatabaseError as error:
+        raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package") from error
+    if extra or different:
+        raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package")
 
 
-def import_package(
-    database: Path, data: bytes, passphrase: str, box: SecretBox, work_dir: Path
-) -> PackageSummary:
-    """Replace every configuration table of ``database`` with the package's (point 5).
+def _prepare(
+    data: bytes, passphrase: str, box: SecretBox, live: Path, work_dir: Path
+) -> tuple[Path, PackageSummary]:
+    """Write the package to a temporary copy, open it, and seal its secrets under ``box``.
 
-    The package is written to a temporary copy, its secrets are sealed again under ``box``,
-    and the copy is attached to the database for the one transaction that empties and
-    refills the configuration tables. ``settings_version`` moves past both the old and the
-    package's value, so every process reloads the settings.
+    Returns the copy (the caller removes it) and the package's summary.
 
     Raises:
         DomainError: ``configuration_package_invalid``, ``configuration_passphrase_wrong``,
-            ``configuration_package_version`` when the schema revisions or columns differ.
+            ``configuration_package_version`` when its schema revision is not the running one.
     """
     if not _is_sqlite(data):
         raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package")
@@ -319,123 +240,39 @@ def import_package(
     try:
         db, opener, summary = _open_package(path, passphrase)
         db.close()
-        with closing(_connect(path)) as package:
+        with closing(_connect(live, read_only=True)) as running, closing(_connect(path)) as package:
+            # Before anything runs on the file: no trigger can fire on the re-sealing below.
+            package.execute("PRAGMA trusted_schema = OFF")
+            _check_schema(package, running)
             package.execute("BEGIN IMMEDIATE")
             _reseal_or_refuse(package, opener, box)
             package.execute("COMMIT")
-        with closing(_connect(database)) as db:
-            db.execute("PRAGMA foreign_keys = ON")
-            if _revision(db) != summary.revision:
-                raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_VERSION, "package")
-            db.execute("ATTACH DATABASE ? AS package", (str(path),))
-            try:
-                _replace_configuration(db)
-            finally:
-                db.execute("DETACH DATABASE package")
-        return summary
-    finally:
-        _remove(path)
-
-
-def _replace_configuration(db: sqlite3.Connection) -> None:
-    """Empty and refill every configuration table from the attached ``package`` schema."""
-    db.execute("BEGIN IMMEDIATE")
-    try:
-        # The service checked before this lock: a booking, slot or closure committed since then
-        # would otherwise end up attached to imported identifiers (ADR 0089 point 5).
-        if any(
-            db.execute(f"SELECT 1 FROM main.{table} LIMIT 1").fetchone() is not None  # noqa: S608  # nosec B608 - registry names
-            for table in IN_USE_TABLES
-        ):
-            raise DomainError(ErrorCode.CONFIGURATION_INSTALLATION_IN_USE, "package")
-        db.execute("PRAGMA defer_foreign_keys = ON")
-        tables = sorted(CONFIGURATION_TABLES)
-        plans: list[tuple[str, str]] = []
-        for table in tables:
-            columns = _columns(db, table)
-            if set(columns) != set(_columns(db, table, "package")):
-                raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_VERSION, "package")
-            plans.append((table, ", ".join(columns)))
-        previous = db.execute("SELECT version FROM settings_version WHERE id = 1").fetchone()
-        for table in tables:
-            db.execute(f"DELETE FROM main.{table}")  # noqa: S608  # nosec B608 - registry names
-        for table, names in plans:
-            db.execute(
-                f"INSERT INTO main.{table} ({names}) SELECT {names} FROM package.{table}"  # noqa: S608  # nosec B608 - registry names
-            )
-        imported = db.execute("SELECT version FROM settings_version WHERE id = 1").fetchone()
-        version = max(int(previous[0]) if previous else 0, int(imported[0]) if imported else 0) + 1
-        db.execute("DELETE FROM settings_version")
-        db.execute("INSERT INTO settings_version (id, version) VALUES (1, ?)", (version,))
-        if db.execute("PRAGMA foreign_key_check").fetchone() is not None:
-            raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package")
-        _check_contact_center_rows(db)
-        db.execute("COMMIT")
     except BaseException:
-        db.execute("ROLLBACK")
+        _remove(path)
         raise
-
-
-def _check_contact_center_rows(db: sqlite3.Connection) -> None:
-    """Refuse imported group routings their platform's descriptor refuses (ADR 0032).
-
-    A bad row would otherwise break every read of its group after the import.
-
-    Raises:
-        DomainError: ``configuration_package_invalid`` for an unknown kind or invalid values.
-    """
-    rows = db.execute("SELECT kind, routing_value, attributes FROM main.group_contact_center")
-    for kind, routing_value, attributes in rows:
-        try:
-            routing(ContactCenterKind(kind), routing_value, attributes_from_json(attributes))
-        except (ValueError, KeyError, DomainError) as error:
-            raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package") from error
-
-
-def portable_environment(settings: Settings) -> dict[str, str]:
-    """Return the portable environment values (point 4) as the process runs with them.
-
-    Secrets are opened here, to be sealed into the package at once; unset values are left out.
-    """
-    portable: dict[str, str] = {}
-    for key in PORTABLE_ENVIRONMENT:
-        value = getattr(settings, key)
-        if isinstance(value, SecretStr):
-            value = value.get_secret_value()
-        if value is None or value == "":
-            continue
-        portable[key.upper()] = str(value)
-    return portable
+    return path, summary
 
 
 class SqliteConfigurationTransfer:
-    """The ``ConfigurationTransfer`` port on the installation's SQLite file.
+    """The ``ConfigurationTransfer`` port on SQLite packages: read, never written (ADR 0099).
+
+    A package is read for one release after the JSON document replaced it: its secrets are
+    opened and sealed under the installation's key on a temporary copy, the copy is read with
+    the same readers as the live database, and what they return is a ``replace`` document in
+    the platform scope.
 
     Args:
-        database: The SQLite file.
+        database: The installation's SQLite file (for the schema revision it runs).
         box: Opens and seals the installation's secrets; ``None`` without a settings key.
-        installation: ``INSTALLATION_NAME``.
-        app_version: The running release.
-        environment: Returns the portable environment values at export time.
         now: The clock.
     """
 
     def __init__(
-        self,
-        database: Path,
-        box: SecretBox | None,
-        *,
-        installation: str,
-        app_version: str,
-        environment: Callable[[], Mapping[str, str]],
-        now: Callable[[], datetime],
+        self, database: Path, box: SecretBox | None, *, now: Callable[[], datetime]
     ) -> None:
         """Store the collaborators."""
         self._database = database
         self._box = box
-        self._installation = installation
-        self._app_version = app_version
-        self._environment = environment
         self._now = now
         self._work_dir = database.parent / "transfer"
 
@@ -444,38 +281,50 @@ class SqliteConfigurationTransfer:
         """Where temporary copies go: ``transfer`` next to the database, mode 700."""
         return self._work_dir
 
-    def _require_box(self) -> SecretBox:
-        """Return the box, or refuse: without a settings key no secret can be moved."""
-        if self._box is None:
-            raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
-        return self._box
-
-    async def export(self, passphrase: str) -> bytes:
-        """Return a package sealed under ``passphrase`` (see ``export_package``)."""
-        box = self._require_box()
-        return await asyncio.to_thread(
-            export_package,
-            self._database,
-            box,
-            passphrase,
-            created_at=self._now(),
-            installation=self._installation,
-            app_version=self._app_version,
-            environment=dict(self._environment()),
-            work_dir=self._work_dir,
-        )
-
     async def inspect(self, package: bytes, passphrase: str) -> PackageSummary:
         """Return the package's summary (see ``inspect_package``)."""
         return await asyncio.to_thread(inspect_package, package, passphrase, self._work_dir)
 
-    async def import_(self, package: bytes, passphrase: str) -> PackageSummary:
-        """Replace the configuration with the package's (see ``import_package``)."""
-        box = self._require_box()
-        return await asyncio.to_thread(
-            import_package, self._database, package, passphrase, box, self._work_dir
-        )
+    async def to_document(self, package: bytes, passphrase: str) -> tuple[Document, PackageSummary]:
+        """Return the package as a ``replace`` document of the platform, and its summary.
 
-    async def in_use(self) -> bool:
-        """Return whether the installation has bookings, slots or an active closure."""
-        return await asyncio.to_thread(installation_in_use, self._database)
+        Raises:
+            DomainError: The codes of ``inspect``; ``configuration_package_version`` when the
+                schema revisions differ; ``integration_not_ready`` without a settings key.
+        """
+        if self._box is None:
+            raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
+        path, summary = await asyncio.to_thread(
+            _prepare, package, passphrase, self._box, self._database, self._work_dir
+        )
+        try:
+            engine = create_engine(
+                URL.create("sqlite+aiosqlite", database=str(path)).render_as_string(
+                    hide_password=False
+                )
+            )
+            try:
+                async with SqlUnitOfWork(engine, self._box).read() as tx:
+                    snapshot = await tx.read_configuration(self._now(), frozenset())
+            except (DomainError, asyncio.CancelledError):
+                raise
+            except Exception as error:  # a damaged package must never be a server error
+                raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package") from error
+            finally:
+                await engine.dispose()
+        finally:
+            await asyncio.to_thread(_remove, path)
+        document = Document(
+            format=V1.name,
+            mode=Mode.REPLACE,
+            scope=Scope(),
+            root=snapshot.root,
+            digest=hashlib.sha256(package).hexdigest(),
+            schema=V1,
+            meta={
+                "installation": summary.installation,
+                "exported_at": summary.created_at.isoformat(),
+                "app_version": summary.app_version,
+            },
+        )
+        return document, summary

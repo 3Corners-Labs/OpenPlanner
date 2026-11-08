@@ -27,7 +27,7 @@ new group.
 
 The group's name as participants and staff see it: on the booking page, in confirmations and
 reminders, and in the contact-centre task. Choose a name a participant recognises, for example
-"Permits" rather than an internal team code.
+"Customer service" rather than an internal team code.
 
 <!-- field: timezone -->
 ### Time zone

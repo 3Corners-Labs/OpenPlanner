@@ -112,10 +112,10 @@ async def test_update_rotate_disable_and_revoke(superuser: Site) -> None:
     url = f"/admin/api/clients/{client_id}"
 
     renamed = await superuser.client.post(
-        url, data={**NEW_CLIENT, "name": "Bot Belastingen"}, headers=SAME_ORIGIN
+        url, data={**NEW_CLIENT, "name": "Bot Klantenservice"}, headers=SAME_ORIGIN
     )
     assert renamed.headers["location"] == f"{url}?done=saved"
-    assert (await service(superuser).client(SUPER, client_id)).name == "Bot Belastingen"
+    assert (await service(superuser).client(SUPER, client_id)).name == "Bot Klantenservice"
 
     rotated = await superuser.client.post(
         f"{url}/rotate", data={"lifetime_days": "365"}, headers=SAME_ORIGIN

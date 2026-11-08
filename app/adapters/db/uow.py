@@ -96,8 +96,12 @@ from app.adapters.db.overview_layouts import OverviewLayoutQueries
 from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
+from app.adapters.db.proposals import ProposalQueries, places_taken
 from app.adapters.db.public_address import PublicAddressQueries
-from app.adapters.db.record_names import bot_credential_name, channel_secret_name
+from app.adapters.db.record_names import (
+    channel_secret_name,
+    organisation_records,
+)
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
@@ -468,6 +472,7 @@ def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
 
 class SqlTransaction(
     AdminSessionQueries,
+    ProposalQueries,
     AlertTargetQueries,
     ConfigurationDocumentQueries,
     HealthQueries,
@@ -872,12 +877,13 @@ class SqlTransaction(
     async def delete_organisation(self, organisation_id: int) -> None:
         """Erase the organisation's row; the schema's cascades take the rest.
 
-        The sealed Webex bot token (ADR 0082 point 9) has no foreign key, so it is deleted here
-        in the same transaction: a later organisation with a reused id never inherits it.
+        The sealed Webex bot token (ADR 0082 point 9) and contact-center connection (ADR 0032
+        point 9) have no foreign key, so they are deleted here in the same transaction: a later
+        organisation with a reused id never inherits them.
         """
         await self._session.execute(
             delete(IntegrationCredentialRow).where(
-                IntegrationCredentialRow.name == bot_credential_name(organisation_id)
+                IntegrationCredentialRow.name.in_(organisation_records(organisation_id))
             )
         )
         await self._session.execute(
@@ -1721,18 +1727,17 @@ class SqlTransaction(
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[SlotUsage]:
-        """Return capacity and the bookings holding a place in existing slots, in one query."""
-        active = func.count(case((BookingRow.status.in_(_HOLDS_PLACE), 1)))
+        """Return capacity and the places taken in existing slots, in one query.
+
+        A place is taken by a booking that holds one and by an open proposal (ADR 0057).
+        """
         rows = await self._session.execute(
-            select(SlotRow.start, SlotRow.capacity_snapshot, active)
-            .outerjoin(BookingRow, BookingRow.slot_id == SlotRow.id)
-            .where(
+            select(SlotRow.start, SlotRow.capacity_snapshot, places_taken()).where(
                 SlotRow.group_id == group_id,
                 SlotRow.start >= lower,
                 SlotRow.start < upper,
                 SlotRow.kind == BookingKind.SCHEDULED.value,
             )
-            .group_by(SlotRow.id)
         )
         return [SlotUsage(start, capacity, int(count)) for start, capacity, count in rows]
 
@@ -1763,12 +1768,9 @@ class SqlTransaction(
         return Slot(row.id, slot.group_id, slot.start, slot.end, slot.capacity_snapshot, slot.kind)
 
     async def count_active_bookings(self, slot_id: int) -> int:
-        """Return the number of bookings holding a place in the slot (confirmed or on hold)."""
+        """Return the places taken in the slot: bookings holding one and open proposals."""
         count = await self._session.scalar(
-            select(func.count()).where(
-                BookingRow.slot_id == slot_id,
-                BookingRow.status.in_(_HOLDS_PLACE),
-            )
+            select(places_taken()).select_from(SlotRow).where(SlotRow.id == slot_id)
         )
         return int(count or 0)
 

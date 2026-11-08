@@ -92,6 +92,15 @@ class Actor:
         """Return the host (the CLI), which the matrix does not bind: an explicit choice."""
         return cls("system:cli", None)
 
+    @classmethod
+    def api_client(cls, client_id: str) -> "Actor":
+        """Return an API client holding the scope ``configuration:transfer`` (ADR 0089 point 7).
+
+        The scope covers the whole installation, so the matrix does not bind the client
+        either: an explicit choice, like the host's, made by whoever granted the scope.
+        """
+        return cls(client_id, None)
+
     def may_change(self, permission: Permission, target: Target) -> bool:
         """Whether the actor holds ``permission`` on ``target``."""
         return self.principal is None or decide(self.principal, permission, target).allowed
@@ -232,11 +241,18 @@ class ConfigurationDocumentService:
         """
         document = self._read(data, scope)
         sealed = any_field(document.root, lambda value: isinstance(value, Sealed))
+        plan = await self.plan_document(actor, self._sealing.open(document, passphrase))
+        return replace(plan, sealed=sealed)
+
+    async def plan_document(self, actor: Actor, document: Document) -> Plan:
+        """Plan a document that is already read and whose secrets are opened.
+
+        For callers that build a document themselves (a SQLite package converted on read,
+        ADR 0099 point 14); ``plan`` is this after decoding and opening.
+        """
         async with self._uow.read() as tx:
             snapshot = await tx.read_configuration(self._clock.now(), self._locked())
-        return replace(
-            self._plan(actor, self._sealing.open(document, passphrase), snapshot), sealed=sealed
-        )
+        return self._plan(actor, document, snapshot)
 
     async def apply(
         self,
@@ -258,6 +274,27 @@ class ConfigurationDocumentService:
                 ``configuration_too_many_changes``.
         """
         document = self._sealing.open(self._read(data, scope), passphrase)
+        return await self.apply_document(actor, document, plan_hash)
+
+    async def apply_document(
+        self,
+        actor: Actor,
+        document: Document,
+        plan_hash: str | None,
+        *,
+        confirmed: bool = False,
+    ) -> ApplyResult:
+        """Apply a document that is already read and whose secrets are opened.
+
+        Plans again inside the write lock and writes all or nothing, as ``apply`` does after
+        decoding and opening it. ``confirmed`` stands for a review the caller has no step for: a
+        SQLite package import (ADR 0099 point 14), which is a deliberate replace and was never
+        reviewed; a plan that deletes then needs no reviewed hash. A hash that is given is
+        still checked.
+
+        Raises:
+            DomainError: ``configuration_plan_stale``, ``configuration_too_many_changes``.
+        """
         async with self._uow.read() as tx:
             first = self._plan(
                 actor, document, await tx.read_configuration(self._clock.now(), self._locked())
@@ -274,7 +311,7 @@ class ConfigurationDocumentService:
             async with self._uow.locked() as tx:
                 snapshot = await tx.read_configuration(self._clock.now(), self._locked())
                 plan = self._plan(actor, document, snapshot)
-                problem = self._problem(plan, first, plan_hash)
+                problem = self._problem(plan, first, plan_hash, confirmed=confirmed)
                 if plan.refusals or problem is not None:
                     result = ApplyResult(plan, None)
                 elif not plan.changes:
@@ -340,7 +377,9 @@ class ConfigurationDocumentService:
             settings_version=snapshot.version,
         )
 
-    def _problem(self, plan: Plan, first: Plan, plan_hash: str | None) -> ErrorCode | None:
+    def _problem(
+        self, plan: Plan, first: Plan, plan_hash: str | None, *, confirmed: bool = False
+    ) -> ErrorCode | None:
         """Return why an otherwise valid plan may not be written, or ``None``."""
         if plan.refusals:
             return None
@@ -349,7 +388,7 @@ class ConfigurationDocumentService:
         deletes = any(c.action is ChangeAction.DELETE for c in plan.changes)
         if plan.digest != first.digest:
             return ErrorCode.CONFIGURATION_PLAN_STALE
-        if plan_hash is None and deletes:
+        if plan_hash is None and deletes and not confirmed:
             return ErrorCode.CONFIGURATION_PLAN_STALE
         if plan_hash is not None and plan_hash != plan.digest:
             return ErrorCode.CONFIGURATION_PLAN_STALE

@@ -183,6 +183,20 @@ class AdminService:
         role = granting_role(principal, permission)
         return Authorization(Decision(True, Reason.ROLE, role), Target.everything())
 
+    async def authorize_organisation(
+        self, principal: Principal, permission: Permission, slug: str
+    ) -> int:
+        """Authorise ``permission`` on the organisation ``slug`` and return its id.
+
+        Raises:
+            DomainError: ``not_permitted`` (audited) or ``organisation_not_found``.
+        """
+        require(await self.authorize(principal, permission, organisation_slug=slug))
+        organisation_id = await self.organisation_id(slug)
+        if organisation_id is None:
+            raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+        return organisation_id
+
     async def organisation_id(self, slug: str) -> int | None:
         """Return the id of the organisation ``slug``, or ``None`` when there is none.
 

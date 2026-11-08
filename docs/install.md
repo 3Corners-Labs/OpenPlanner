@@ -19,7 +19,7 @@ wherever the checkout is, and writes that path into the updater's configuration.
 | `~/openplanner/` | `git clone`, at a release tag | `docker-compose.yml`, `deploy/proxy/`, `scripts/` | |
 | `~/openplanner/.env` | installer, then you | the application's settings and integration secrets (`.env.example` lists every one) | 600 |
 | `~/openplanner/secrets/secrets.env` | installer (or `app.cli init`) | the bootstrap keys `SETTINGS_ENCRYPTION_KEY`, `MANAGEMENT_TOKEN_KEY`, `SESSION_SECRET` (ADR 0042 §9); back it up apart from the database | 600, directory 700 |
-| `~/openplanner/secrets/config.env` | installer, with `--configuration` | the login (`OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_SCOPES`) from a configuration package (ADR 0089); Compose reads it before `.env`, so a value in `.env` wins | 600 |
+| `~/openplanner/secrets/config.env` | installer, with `--configuration` | the login (`OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_SCOPES`) from a SQLite configuration package (ADR 0089, read for one more release); a JSON document (ADR 0099) carries no login and writes none; Compose reads it before `.env`, so a value in `.env` wins | 600 |
 | `~/openplanner/proxy.env` | installer (with the HTTPS proxy) | `TLS_DOMAIN`, `ACME_EMAIL` (or the own certificate's files) for the HTTPS proxy, no secrets | 600 |
 | `~/openplanner/.env.update` | installer, host updater | `OPENPLANNER_IMAGE` and, with the HTTPS proxy, `OPENPLANNER_PROXY_IMAGE` (pinned digests), `COMPOSE_PROFILES`, `OPENPLANNER_TLS`, `OPENPLANNER_MODE`; `OPENPLANNER_EDGE_IPV6=false` only on a kernel without IPv6 | 644 |
 | `~/openplanner/.env.bak.<time>` | installer, when it repaired `.env` | the `.env` as it was before | 600 |
@@ -177,13 +177,70 @@ UPDATE_CHECK_TOKEN=... ./scripts/install.sh --mode production --version 0.3.0 --
 Webex and Webex Contact Center are configured afterwards: `docs/runbook.md`, *Webex meetings and
 Webex Contact Center*.
 
-## Installing from a configuration package
+## Installing from a configuration document
 
-A configuration package (ADR 0089) is every setting of another installation, with its
-secrets sealed under a passphrase: organisations, groups, texts, channels, identity providers,
-API clients, platform settings and the login. The superuser exports one on *Advanced settings*
-(or the host does, runbook *Configuration package*). With it a new installation is complete
-after one command:
+A configuration document (ADR 0099) is the JSON file `python -m app.cli config export` or the
+portal (*Advanced settings › Configuration package*) writes: organisations, groups, texts,
+channels, identity providers, API clients and platform settings, each object under its own
+key, so you can read it, edit it and keep it in version control. With it a new installation is
+complete after one command:
+
+```sh
+cd ~/openplanner
+./scripts/install.sh --mode production --configuration ~/openplanner-configuration.json
+```
+
+The script finds out by the file's content whether it is a document (JSON) or an old SQLite
+package (below). For a document it:
+
+1. asks the usual questions, the identity provider's included: a document carries no login
+   (the login is the installation's own, `.env` or the bundled provider), so `secrets/config.env`
+   is not written.
+2. starts web and worker, waits until both are healthy, copies the document into the web
+   container and **plans** it (`python -m app.cli config plan`). The plan is printed: every
+   change by action, kind and key, never a value, and its hash.
+3. **applies** it with that hash (`config apply --plan-hash`), so what is written is what was
+   printed, all or nothing, and removes the copy from the container, whatever the outcome.
+
+A document holding sealed secrets (an export with secrets) needs the passphrase it was
+exported with, from a file whose first line it is, never on a command line:
+
+```sh
+printf '%s\n' 'the passphrase the document was exported with' > ~/document.passphrase
+chmod 600 ~/document.passphrase
+./scripts/install.sh --mode production --configuration ~/openplanner-configuration.json --passphrase-file ~/document.passphrase
+```
+
+Delete the passphrase file and the document when the script is done: together they are every
+secret of the platform. Without the passphrase option such a document is refused before
+anything is written.
+
+A plan with a refusal (a value the portal would refuse, a right that is missing, an object in
+use) stops the script after the start with the report on standard error; nothing was applied.
+Web and worker are running by then; fix the document and run the script again, or apply it
+later with the commands of the runbook, *Configuration document*. The same holds for a plan
+that changed between the two steps (`configuration_plan_stale`) and for a wrong passphrase
+(`configuration_passphrase_wrong`).
+
+Without a terminal the paths come from `OPENPLANNER_CONFIGURATION` and, for sealed secrets,
+`OPENPLANNER_PASSPHRASE_FILE`, next to the other answers:
+
+```sh
+TLS_DOMAIN=afspraak.example.nl ACME_EMAIL=ops@example.nl \
+OPENPLANNER_CONFIGURATION=/home/operator/openplanner-configuration.json \
+./scripts/install.sh --mode production --version 0.3.0 --non-interactive
+```
+
+A run again with the document plans it again and applies only what differs: running the same
+document twice changes nothing the second time.
+
+## Installing from a SQLite configuration package
+
+A SQLite package (ADR 0089) is no longer written, but one exported before ADR 0099 is still
+read for one more release: the application converts it to a document that replaces the
+platform's configuration and applies it by the same rules (runbook, *Configuration package*).
+It is every setting of another installation with its secrets sealed under a passphrase, and
+the login. The command is the same, and the passphrase is always needed:
 
 ```sh
 cd ~/openplanner
@@ -207,27 +264,19 @@ script is done, together they are every secret of the platform. The script then:
    container and imports it. The summary (organisations, groups, channels, secrets) is
    printed; the copy in the container is removed, whatever the outcome.
 
-The import goes into a new installation only. It is refused, and the script stops after the
-start, when the installation already has a booking, a slot or an active closure
-(`configuration_installation_in_use`), or when the package was exported from another
-version of OpenPlanner (`configuration_package_version`: export it again from an installation
-on this version). Web and worker are running by then; fix the cause and run the script again
-with the same two options, or import later as the runbook says.
+The import is refused, and the script stops after the start, when the package was exported
+from another version of OpenPlanner (`configuration_package_version`: export it again from an
+installation on this version), or when the document it converts to breaks a rule of the
+portal (`configuration_object_in_use`, `not_permitted`, `discovery_refused`: the identity
+provider's discovery address is fetched, so it must be reachable). Web and worker are running
+by then; fix the cause and run the script again with the same two options, or import later as
+the runbook says.
 
 Without a terminal, the two paths come from `OPENPLANNER_CONFIGURATION` and
-`OPENPLANNER_PASSPHRASE_FILE`, next to the other answers:
-
-```sh
-TLS_DOMAIN=afspraak.example.nl ACME_EMAIL=ops@example.nl \
-OPENPLANNER_CONFIGURATION=/home/operator/openplanner-configuration-x.sqlite \
-OPENPLANNER_PASSPHRASE_FILE=/home/operator/package.passphrase \
-./scripts/install.sh --mode production --version 0.3.0 --non-interactive
-```
-
-A later run without the options leaves `secrets/config.env` alone; a run with them writes it
-again from the package and imports again (refused once the installation is in use). To change
-the login by hand afterwards, set the `OIDC_*` values in `.env`: Compose reads `config.env`
-before `.env`, so `.env` wins; or remove `config.env` and answer the questions on the next run.
+`OPENPLANNER_PASSPHRASE_FILE`. A later run without the options leaves `secrets/config.env`
+alone; a run with them writes it again from the package and imports again. To change the login
+by hand afterwards, set the `OIDC_*` values in `.env`: Compose reads `config.env` before
+`.env`, so `.env` wins; or remove `config.env` and answer the questions on the next run.
 
 ## Options
 
@@ -246,7 +295,7 @@ before `.env`, so `.env` wins; or remove `config.env` and answer the questions o
 | `--upgrade-docker` | also upgrade Docker Engine (restarts every container on the host) |
 | `--no-packages` | leave the host's packages alone; only check them |
 | `--no-updater` | do not install the host updater (portal update requests then wait) |
-| `--configuration FILE --passphrase-file PATH` | install from a configuration package (ADR 0089): the login into `secrets/config.env`, the package imported once web is healthy (*Installing from a configuration package*); both or neither; `OPENPLANNER_CONFIGURATION` and `OPENPLANNER_PASSPHRASE_FILE` without a terminal |
+| `--configuration FILE [--passphrase-file PATH]` | install from a configuration document (JSON, ADR 0099: planned, then applied with the plan's hash once web is healthy; the passphrase only when it holds sealed secrets) or from an old SQLite package (ADR 0089: the login into `secrets/config.env`, the package converted and imported once web is healthy; the passphrase always); see *Installing from a configuration document*; `OPENPLANNER_CONFIGURATION` and `OPENPLANNER_PASSPHRASE_FILE` without a terminal |
 
 ## What a second run repairs, and what it reports
 
@@ -325,9 +374,12 @@ git fetch --depth 1 origin tag v0.3.0 && git checkout -f v0.3.0
 | `Docker's release key has fingerprint ...` | the download was not Docker's key; check the network path (proxy, DNS) before trying again |
 | `checksum of cosign_... does not match` | the download is damaged or not the release; run it again later |
 | `.env needs changes:` | fix the listed settings in `.env`, run it again |
-| `--configuration and --passphrase-file go together` | pass both (or set `OPENPLANNER_CONFIGURATION` and `OPENPLANNER_PASSPHRASE_FILE`) |
+| `--configuration and --passphrase-file go together` | a SQLite package needs both options, and a passphrase file needs a configuration (or set `OPENPLANNER_CONFIGURATION` and `OPENPLANNER_PASSPHRASE_FILE`) |
+| `the configuration document holds sealed secrets: give --passphrase-file` | it was exported with secrets; pass the file whose first line is the passphrase; nothing was written |
+| `is neither a configuration document (JSON) nor a SQLite configuration package` | the file is something else; export a document with `python -m app.cli config export` |
+| `the configuration document was refused; nothing was applied` | the report below it names each refusal (`REFUSED path code field`); fix the document and run again; web and worker are running without it |
 | `cannot read the configuration package:` ... `configuration_passphrase_wrong` | the passphrase file's first line is not the passphrase the package was exported with; nothing was written |
-| `the configuration package was refused: this installation is in use` | a package goes into a new installation only; web and worker are running without it |
+| `the configuration package was refused by the rules of the configuration document it converts to` | the report names the code (`configuration_object_in_use`, `not_permitted`, `discovery_refused`, `integration_not_ready`); fix the cause and run again; web and worker are running without it |
 | `the configuration package was refused: ... another version` | export the package again from an installation on this version, run it again with the two options |
 | `not healthy within 300s` | `docker compose --env-file .env.update logs web worker`; fix, run it again |
 

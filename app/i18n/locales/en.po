@@ -1088,7 +1088,7 @@ msgid "admin.field.slug"
 msgstr "Web address"
 
 msgid "admin.field.slug_hint"
-msgstr "Becomes /g/<web address>. Leave empty to make it from the name; capitals, spaces and accents are converted, for example Permits Desk → permits-desk."
+msgstr "Becomes /g/<web address>. Leave empty to make it from the name; capitals, spaces and accents are converted, for example Customer Service North → customer-service-north."
 
 msgid "admin.field.slug_fixed"
 msgstr "The web address does not change, so links on websites keep working."
@@ -6606,7 +6606,7 @@ msgid "admin.form_fields.options"
 msgstr "Choices"
 
 msgid "admin.form_fields.options_hint"
-msgstr "Choice lists only. One choice per line: key; Dutch; English. For example: rent; Huurtoeslag; Rent benefit"
+msgstr "Choice lists only. One choice per line: key; Dutch; English. For example: general; Algemene vraag; General question"
 
 msgid "admin.form_fields.minimum"
 msgstr "Lower limit"
@@ -8818,7 +8818,7 @@ msgid "settings.field.configuration_review_minutes.label"
 msgstr "Minutes an uploaded configuration document is kept after its plan"
 
 msgid "admin.done.package_imported"
-msgstr "The configuration package has been imported: {count} organisation(s). The processes pick up the new settings within ten seconds."
+msgstr "The configuration package was applied as a document: {count} organisation(s). The processes pick up the new settings within ten seconds."
 
 msgid "admin.form.error.configuration_passphrase_short"
 msgstr "The passphrase is too short, or the repetition differs. Use at least 16 characters."
@@ -8834,9 +8834,6 @@ msgstr "This package was made with another version of OpenPlanner. Export it aga
 
 msgid "admin.form.error.configuration_package_too_large"
 msgstr "The package is larger than the largest configuration package allowed."
-
-msgid "admin.form.error.configuration_installation_in_use"
-msgstr "This installation is in use: it has bookings, slots or an active closure. A package can only be imported into a new installation."
 
 msgid "admin.form.error.configuration_format_unsupported"
 msgstr "This configuration document uses a format this version of OpenPlanner does not know."
@@ -8872,19 +8869,13 @@ msgid "admin.form.error.configuration_capacity_below_booked"
 msgstr "The capacity is lower than the number of places already booked."
 
 msgid "admin.settings.package.title"
-msgstr "Configuration package"
+msgstr "SQLite package (old format)"
 
 msgid "admin.settings.package.intro"
-msgstr "A configuration package holds every setting of this installation: organisations, teams, opening hours, texts, channels, identity providers, API clients and platform settings, with their secrets. Bookings, the audit log and staff stay behind. It sets up a new installation (test or production) in one go."
+msgstr "A SQLite package from an earlier version is still read for one release. It is converted into a document that replaces the platform's configuration and then planned and applied like any document, with your rights per change; whatever is in use (bookings, slots, API access) is never deleted. New packages are no longer made: export a document above."
 
 msgid "admin.settings.package.warning"
-msgstr "With the passphrase the package holds every secret of the platform. Keep the file and the passphrase apart and only as long as you need them. Every export and import is in the audit log."
-
-msgid "admin.settings.package.export.title"
-msgstr "Export"
-
-msgid "admin.settings.package.passphrase_hint"
-msgstr "Choose a passphrase of at least {length} characters. It is stored nowhere: without it the package cannot be imported."
+msgstr "The package is not shown as a plan first: the changes follow from the plan computed now. Every change and every import is in the audit log."
 
 msgid "admin.settings.package.passphrase"
 msgstr "Passphrase"
@@ -8892,23 +8883,20 @@ msgstr "Passphrase"
 msgid "admin.settings.package.passphrase_repeat"
 msgstr "Passphrase (repeat)"
 
-msgid "admin.settings.package.export.button"
-msgstr "Download package"
-
 msgid "admin.settings.package.import.title"
 msgstr "Import"
 
 msgid "admin.settings.package.import.intro"
-msgstr "Only into an installation without bookings, slots or an active closure. Every current setting is replaced by the package's; staff and the audit log stay. At most {max_mb} MB; the package must be from this version of OpenPlanner."
+msgstr "At most {max_mb} MB; the package must be from this version of OpenPlanner. Staff and the audit log stay."
 
 msgid "admin.settings.package.import.file"
 msgstr "Package file (.sqlite)"
 
 msgid "admin.settings.package.import.confirm"
-msgstr "I understand that every setting of this installation will be replaced."
+msgstr "I understand that the platform's configuration will be replaced by the package's."
 
 msgid "admin.settings.package.import.button"
-msgstr "Import package"
+msgstr "Apply package"
 
 msgid "admin.audit.detail.configuration_export"
 msgstr "Configuration package exported"
@@ -10666,6 +10654,87 @@ msgstr "Waiting for a new time"
 msgid "reports.status.pending_confirmation"
 msgstr "Waiting for confirmation"
 
+msgid "admin.channels.cc_title"
+msgstr "Contact center"
+
+msgid "admin.channels.cc_connected"
+msgstr "Own connection"
+
+msgid "admin.channels.cc_not_connected"
+msgstr "Installation's connection"
+
+msgid "admin.channels.cc_lead"
+msgstr "This organisation's connection to its own contact center: the platform, the API address and the OAuth client. Tasks of this organisation's groups go through this connection."
+
+msgid "admin.channels.cc_fallback"
+msgstr "As long as nothing is set here, this organisation uses the connection set for the whole installation."
+
+msgid "admin.channels.cc_no_key"
+msgstr "No settings key is configured, so an own connection cannot be stored encrypted. Ask the server's administrator for SETTINGS_ENCRYPTION_KEY."
+
+msgid "admin.channels.cc_kind"
+msgstr "Platform"
+
+
+msgid "admin.channels.cc_api_base_url"
+msgstr "API address"
+
+msgid "admin.channels.cc_api_base_url_hint"
+msgstr "The API address of your region, for example https://api.wxcc-eu1.cisco.com. https only."
+
+msgid "admin.channels.cc_client_id"
+msgstr "Client ID"
+
+msgid "admin.channels.cc_client_id_hint"
+msgstr "The client ID of the Service App in this organisation's tenant."
+
+msgid "admin.channels.cc_client_secret"
+msgstr "Client secret"
+
+msgid "admin.channels.cc_client_secret_hint"
+msgstr "The Service App's client secret. Stored encrypted and never shown again."
+
+msgid "admin.channels.cc_refresh_token"
+msgstr "Refresh token"
+
+msgid "admin.channels.cc_refresh_token_hint"
+msgstr "The refresh token the Service App received when your tenant's administrator authorised it. Stored encrypted and never shown again."
+
+msgid "admin.channels.cc_webhook"
+msgstr "Webhook address"
+
+msgid "admin.channels.cc_webhook_lead"
+msgstr "The contact center reports the status of tasks at this address. OpenPlanner checks every report with a secret the server makes itself; nobody types or sees it."
+
+msgid "admin.channels.cc_secret_made"
+msgstr "Secret made on {at}."
+
+msgid "admin.channels.cc_rotate_lead"
+msgstr "Make a new secret if you suspect the old one leaked. The old secret stops working at once."
+
+msgid "admin.channels.cc_rotate"
+msgstr "Make a new webhook secret"
+
+msgid "admin.channels.cc_remove_lead"
+msgstr "Removes the own connection and its secrets. This organisation then uses the installation's connection again."
+
+msgid "admin.channels.cc_remove"
+msgstr "Remove the own connection"
+
+msgid "admin.done.webhook_secret_rotated"
+msgstr "A new webhook secret was made."
+
+msgid "admin.done.contact_center_refused"
+msgstr "That was not possible: this organisation has no own connection yet, or no settings key is configured."
+
+msgid "admin.form.error.cc_api_base_url"
+msgstr "Enter an https address with only a host name and optionally a port."
+
+msgid "admin.form.error.cc_client_id"
+msgstr "A client ID consists of letters, digits and . _ : - without spaces."
+
+msgid "admin.form.error.cc_secret"
+msgstr "Enter the secret as one line without spaces."
 msgid "admin.done.confirmed_by_staff"
 msgstr "The appointment was confirmed for the participant. The participant gets the confirmation with all details."
 
@@ -11199,3 +11268,111 @@ msgstr "The export covers too many days. Choose a shorter period."
 
 msgid "reports.export.refused.too_many_rows"
 msgstr "The export has too many rows. Choose a shorter period or one group."
+
+msgid "error.proposal_not_open"
+msgstr "This proposed time is no longer available. You can still choose a new time yourself."
+
+msgid "settings.field.reschedule_proposal_confirm_hours.label"
+msgstr "Proposed time held for (hours)"
+
+msgid "settings.field.reschedule_proposal_reminder_hours.label"
+msgstr "Proposal reminder before the deadline (hours, 0 = none)"
+
+msgid "settings.field.reschedule_search_days.label"
+msgstr "Look for a new time within (days)"
+
+msgid "settings.field.reschedule_time_tolerance_minutes.label"
+msgstr "Largest difference in time of day (minutes)"
+
+msgid "message.reschedule_proposal.subject"
+msgstr "A new time is proposed for your video call"
+
+msgid "message.reschedule_proposal.intro"
+msgstr "Your video call with {group_name} on {date} at {time} cannot go ahead. We propose a new time: {new_date} at {new_time}. We hold that time for you until {deadline}. Confirm the new time, choose another time yourself or cancel the appointment. Nothing moves without your confirmation."
+
+msgid "message.reschedule_proposal.sms"
+msgstr "Dear {first_name}, your video call with {group_name} on {date} at {time} cannot go ahead. {reason} Proposed: {new_date} at {new_time}. Confirm by {deadline} or choose another time: {manage_url}"
+
+msgid "message.proposal_reminder.subject"
+msgstr "Reminder: please confirm the proposed time"
+
+msgid "message.proposal_reminder.intro"
+msgstr "You have not confirmed the proposed new time for your video call with {group_name}, {new_date} at {new_time}, yet. We hold that time for you until {deadline}."
+
+msgid "message.proposal_reminder.sms"
+msgstr "Dear {first_name}, please confirm the proposed time {new_date} at {new_time} with {group_name} by {deadline}, or choose another: {manage_url}"
+
+msgid "message.proposal_released.subject"
+msgstr "The proposed time has been released"
+
+msgid "message.proposal_released.intro"
+msgstr "You did not confirm the proposed new time for your video call with {group_name} in time. We no longer hold that time for you. You can still choose a new time yourself until {deadline}; after that the appointment lapses."
+
+msgid "message.proposal_released.sms"
+msgstr "Dear {first_name}, the proposed time with {group_name} has been released. Choose a new time yourself by {deadline}: {manage_url}"
+
+msgid "message.manage_proposal"
+msgstr "Confirm the new time, choose another time or cancel, by {deadline}:"
+
+msgid "message.proposal_link"
+msgstr "View the new time"
+
+msgid "message.proposed_when"
+msgstr "Proposed time"
+
+msgid "manage.proposal.title"
+msgstr "A new time has been proposed for you"
+
+msgid "manage.proposal.text"
+msgstr "Proposed time: {slot}. We hold that time for you until {deadline}. Nothing moves without your confirmation."
+
+msgid "manage.proposal.confirm"
+msgstr "Confirm the new time"
+
+msgid "manage.proposal.other"
+msgstr "Choose another time"
+
+msgid "manage.notice.proposal_gone"
+msgstr "The proposed time is no longer available. You can still choose a new time yourself."
+
+msgid "proposal.title"
+msgstr "Confirm the new time"
+
+msgid "proposal.new"
+msgstr "New time"
+
+msgid "proposal.old"
+msgstr "Original time"
+
+msgid "proposal.text"
+msgstr "If you confirm the new time, we move your appointment and send you a confirmation with a calendar invitation. We hold the time until {deadline}."
+
+msgid "proposal.submit"
+msgstr "Yes, this time suits me"
+
+msgid "reschedule.suggested.title"
+msgstr "Suggested times"
+
+msgid "reschedule.suggested.hint"
+msgstr "These times are closest to your original appointment. They are not held for you."
+
+msgid "admin.messages.purpose_reschedule_proposal"
+msgstr "New time proposed"
+
+msgid "admin.messages.purpose_proposal_reminder"
+msgstr "Reminder of a proposed time"
+
+msgid "admin.messages.purpose_proposal_released"
+msgstr "Proposed time released"
+
+msgid "audit.job.send_reschedule_proposal"
+msgstr "Send a proposed new time"
+
+msgid "audit.job.send_proposal_reminder"
+msgstr "Send a reminder of the proposal"
+
+msgid "audit.job.expire_proposal"
+msgstr "Release the proposed time"
+
+msgid "audit.job.send_proposal_released"
+msgstr "Send notice of a released proposal"

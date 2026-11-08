@@ -156,6 +156,22 @@ def service(uow: InMemoryUnitOfWork) -> IntegrationService:
     return IntegrationService(uow, clock, AdminService(uow, clock))
 
 
+async def test_an_organisations_address_finds_only_its_own_bookings_tasks(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0032 point 10: another organisation's secret never reaches this booking."""
+    connected = EventKind.TASK_CONNECTED
+    own = uow.state.groups[uow.state.bookings[123].group_id].organisation_id
+
+    other = await service.record_task_event(
+        "task-1", connected, NOW, **WXCC, organisation_id=own + 1
+    )
+    mine = await service.record_task_event("task-1", connected, NOW, **WXCC, organisation_id=own)
+
+    assert other is EventOutcome.UNKNOWN
+    assert mine is EventOutcome.RECORDED
+
+
 async def test_events_are_correlated_by_meeting_and_task(
     service: IntegrationService, uow: InMemoryUnitOfWork
 ) -> None:

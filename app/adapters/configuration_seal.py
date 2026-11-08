@@ -16,14 +16,7 @@ from dataclasses import replace
 
 from cryptography.exceptions import InvalidTag
 
-from app.adapters.crypto import SecretBox
-from app.adapters.db.configuration_package import (
-    SALT_BYTES,
-    SCRYPT_N,
-    SCRYPT_P,
-    SCRYPT_R,
-    package_box,
-)
+from app.adapters.crypto import SALT_BYTES, SCRYPT_N, SCRYPT_P, SCRYPT_R, SecretBox, passphrase_box
 from app.domain.configuration_document import Document
 from app.domain.configuration_tree import Address, Entity, any_field, drop_fields, map_fields
 from app.domain.configuration_values import Json, Sealed, Secret, Value
@@ -70,7 +63,7 @@ class DocumentSealer:
     def new(cls, passphrase: str) -> "DocumentSealer":
         """Return a sealer with a new random salt."""
         salt = os.urandom(SALT_BYTES)
-        return cls(package_box(passphrase, salt), salt)
+        return cls(passphrase_box(passphrase, salt), salt)
 
     @classmethod
     def from_header(cls, header: Mapping[str, Json], passphrase: str) -> "DocumentSealer":
@@ -87,7 +80,7 @@ class DocumentSealer:
         verifier = header.get("verifier")
         if len(salt) != SALT_BYTES or not isinstance(verifier, Mapping):
             raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "seal")
-        sealer = cls(package_box(passphrase, salt), salt)
+        sealer = cls(passphrase_box(passphrase, salt), salt)
         try:
             sealer._box.open(
                 VERIFIER_NAME, _unb64(verifier.get("nonce")), _unb64(verifier.get("ciphertext"))
