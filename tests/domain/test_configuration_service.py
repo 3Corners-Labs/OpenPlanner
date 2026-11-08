@@ -15,7 +15,6 @@ from app.domain.configuration_package import (
     IMPORT_DETAIL,
     MIN_PASSPHRASE_LENGTH,
     PackageSummary,
-    check_passphrase,
 )
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.configuration_tree import Entity
@@ -82,14 +81,6 @@ def service(uow: InMemoryUnitOfWork, transfer: FakeTransfer) -> ConfigurationPac
         max_changes=lambda: 500,
     )
     return ConfigurationPackageService(transfer, documents, clock, admin, max_bytes=lambda: 100)
-
-
-def test_a_short_passphrase_is_refused() -> None:
-    with pytest.raises(DomainError) as refused:
-        check_passphrase("x" * (MIN_PASSPHRASE_LENGTH - 1))
-
-    assert refused.value.code is ErrorCode.CONFIGURATION_PASSPHRASE_SHORT
-    check_passphrase(PASSPHRASE)
 
 
 def test_the_summary_detail_names_counts_only() -> None:

@@ -7,26 +7,16 @@ the adapter's (``app/adapters/db/configuration_package``); the rules of an expor
 import are ``ConfigurationPackageService`` (``app.domain.configuration_service``).
 """
 
-import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.domain.authorization import Permission
-from app.domain.errors import DomainError, ErrorCode
 
 FORMAT = 1
 """The package format; a package of another format is refused."""
 
 MIN_PASSPHRASE_LENGTH = 16
 """A passphrase protects every secret of the platform: a protection, never a setting."""
-
-
-def filename_slug(installation: str) -> str:
-    """Return the installation name as a slug, so a download name passes the filename rule.
-
-    Lower case; every character outside ``[a-z0-9.-]`` becomes ``-``.
-    """
-    return re.sub(r"[^a-z0-9.-]", "-", (installation or "openplanner").lower())
 
 
 VERSION_TABLE = "alembic_version"
@@ -156,13 +146,3 @@ class PackageSummary:
         """The audit detail of an import: the counts as machine keys, never a value."""
         counts = ",".join(f"{name}:{self.counts.get(name, 0)}" for name in COUNTED_TABLES)
         return f"{IMPORT_DETAIL},{counts},secrets:{self.secrets}"
-
-
-def check_passphrase(passphrase: str) -> None:
-    """Refuse a passphrase shorter than ``MIN_PASSPHRASE_LENGTH``.
-
-    Raises:
-        DomainError: ``configuration_passphrase_short``.
-    """
-    if len(passphrase) < MIN_PASSPHRASE_LENGTH:
-        raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")

@@ -246,3 +246,28 @@ async def test_the_transfer_adapter_needs_a_settings_key(database_url: str) -> N
         await transfer.to_document(b"SQLite format 3\x00", PASSPHRASE)
 
     assert refused.value.code is ErrorCode.INTEGRATION_NOT_READY
+
+
+async def test_a_package_with_a_trigger_or_another_column_set_is_refused(
+    engine: AsyncEngine, database_url: str, tmp_path: Path
+) -> None:
+    await _source(engine)
+    package = _package(database_path(database_url), tmp_path)
+    transfer = SqliteConfigurationTransfer(database_path(database_url), SOURCE_BOX, now=lambda: NOW)
+    crafted = {
+        "trigger": "CREATE TRIGGER evil AFTER UPDATE ON organisations BEGIN SELECT 1; END",
+        "view": "CREATE VIEW evil AS SELECT 1",
+        "column": "ALTER TABLE organisations ADD COLUMN extra TEXT",
+    }
+    for name, statement in crafted.items():
+        file = tmp_path / f"{name}.sqlite"
+        file.write_bytes(package)
+        with closing(sqlite3.connect(file)) as db:
+            db.execute(statement)
+            db.commit()
+
+        with pytest.raises(DomainError) as refused:
+            await transfer.to_document(file.read_bytes(), PASSPHRASE)
+
+        assert refused.value.code is ErrorCode.CONFIGURATION_PACKAGE_INVALID, name
+    assert list(transfer.work_dir.glob("*")) == []

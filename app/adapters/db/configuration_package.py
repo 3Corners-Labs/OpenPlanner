@@ -1,15 +1,16 @@
-"""Configuration packages on SQLite (ADR 0089): export, inspect and import.
+"""SQLite configuration packages (ADR 0089), read for one release as documents (ADR 0099).
 
-A package is a copy of the database made with the online backup API, with every state table
-emptied and vacuumed away, the sealed secrets opened with the installation's ``SecretBox`` and
-sealed again under a key derived from the passphrase (scrypt), a verifier to tell a wrong
-passphrase from a damaged file, and the portable environment values of ADR 0089 point 4. An
-import does the reverse on a temporary copy and then replaces every configuration table in
-one ``BEGIN IMMEDIATE`` transaction with foreign keys deferred and checked before the commit.
+A package is a copy of the database with every state table emptied, the sealed secrets sealed
+under a key derived from the passphrase (scrypt) and a verifier to tell a wrong passphrase from
+a damaged file. Nothing writes one any more. This module still reads one: it opens the file on a
+temporary copy, refuses a schema that is not the running one, seals the secrets under the
+installation's key, reads the configuration with the readers of the live database and returns a
+``replace`` document of the platform. The file is untrusted: it is never copied into the live
+database, a trigger or view it carries is refused, and no value is ever logged.
 
 Everything here runs on the synchronous ``sqlite3`` module in a worker thread, as the backups
 of ADR 0029 do; temporary files live next to the database (mode 600) and are removed again.
-Raw SQL is allowed in this package only (CLAUDE.md). No value is ever logged.
+Raw SQL is allowed in this package only (CLAUDE.md).
 """
 
 import asyncio
@@ -23,14 +24,15 @@ from datetime import datetime
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+from sqlalchemy.engine import URL
 
-from app.adapters.crypto import SecretBox
+from app.adapters.crypto import SecretBox, passphrase_box
 from app.adapters.db.engine import create_engine
 from app.adapters.db.sealed import SEALED, reseal
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.configuration_document import Document, Mode, Scope
 from app.domain.configuration_package import (
+    CONFIGURATION_TABLES,
     COUNTED_TABLES,
     FORMAT,
     VERSION_TABLE,
@@ -38,12 +40,6 @@ from app.domain.configuration_package import (
 )
 from app.domain.configuration_v1 import V1
 from app.domain.errors import DomainError, ErrorCode
-
-SCRYPT_N = 2**16
-SCRYPT_R = 8
-SCRYPT_P = 1
-SALT_BYTES = 16
-"""The passphrase key derivation (ADR 0089 point 3): crypto parameters, fixed."""
 
 META_TABLE = "configuration_package"
 ENVIRONMENT_TABLE = "configuration_environment"
@@ -54,18 +50,10 @@ SQLITE_HEADER = b"SQLite format 3\x00"
 BUSY_TIMEOUT_SECONDS = 5.0
 
 
-def package_box(passphrase: str, salt: bytes) -> SecretBox:
-    """Return the box of a package: its key is scrypt of the passphrase and the salt."""
-    key = Scrypt(salt=salt, length=32, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P).derive(
-        passphrase.encode()
-    )
-    return SecretBox(key)
-
-
 def _connect(path: Path, *, read_only: bool = False) -> sqlite3.Connection:
     """Open ``path`` with explicit transaction control and a busy timeout."""
     if read_only:
-        uri = f"file:{path}?mode=ro"
+        uri = f"{path.resolve().as_uri()}?mode=ro"
         return sqlite3.connect(uri, uri=True, isolation_level=None, timeout=BUSY_TIMEOUT_SECONDS)
     return sqlite3.connect(path, isolation_level=None, timeout=BUSY_TIMEOUT_SECONDS)
 
@@ -131,7 +119,7 @@ def _open_package(
         ).fetchone()
         if meta is None or int(meta[0]) != FORMAT:
             raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package")
-        opener = package_box(passphrase, meta[4])
+        opener = passphrase_box(passphrase, meta[4])
         try:
             opener.open(VERIFIER_NAME, meta[5], meta[6])
         except InvalidTag as exc:
@@ -209,6 +197,32 @@ def environment_values(data: bytes, passphrase: str, work_dir: Path) -> dict[str
         _remove(path)
 
 
+def _check_schema(package: sqlite3.Connection, running: sqlite3.Connection) -> None:
+    """Refuse a package whose schema is not the running one's (ADR 0099 point 14).
+
+    The file is untrusted: it must have the running schema revision, the very column set of
+    every configuration table, and no trigger or view the running database does not have, so
+    nothing it carries runs or is read through a surprise.
+
+    Raises:
+        DomainError: ``configuration_package_version`` for another revision;
+            ``configuration_package_invalid`` for a different table, trigger or view.
+    """
+    if _revision(package) != _revision(running):
+        raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_VERSION, "package")
+    objects = "SELECT name FROM sqlite_master WHERE type IN ('trigger', 'view')"
+    extra = {r[0] for r in package.execute(objects)} - {r[0] for r in running.execute(objects)}
+    try:
+        different = any(
+            set(_columns(package, table)) != set(_columns(running, table))
+            for table in CONFIGURATION_TABLES
+        )
+    except sqlite3.DatabaseError as error:
+        raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package") from error
+    if extra or different:
+        raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package")
+
+
 def _prepare(
     data: bytes, passphrase: str, box: SecretBox, live: Path, work_dir: Path
 ) -> tuple[Path, PackageSummary]:
@@ -226,13 +240,13 @@ def _prepare(
     try:
         db, opener, summary = _open_package(path, passphrase)
         db.close()
-        with closing(_connect(path)) as package:
+        with closing(_connect(live, read_only=True)) as running, closing(_connect(path)) as package:
+            # Before anything runs on the file: no trigger can fire on the re-sealing below.
+            package.execute("PRAGMA trusted_schema = OFF")
+            _check_schema(package, running)
             package.execute("BEGIN IMMEDIATE")
             _reseal_or_refuse(package, opener, box)
             package.execute("COMMIT")
-        with closing(_connect(live, read_only=True)) as running:
-            if _revision(running) != summary.revision:
-                raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_VERSION, "package")
     except BaseException:
         _remove(path)
         raise
@@ -284,10 +298,18 @@ class SqliteConfigurationTransfer:
             _prepare, package, passphrase, self._box, self._database, self._work_dir
         )
         try:
-            engine = create_engine(f"sqlite+aiosqlite:///{path}")
+            engine = create_engine(
+                URL.create("sqlite+aiosqlite", database=str(path)).render_as_string(
+                    hide_password=False
+                )
+            )
             try:
                 async with SqlUnitOfWork(engine, self._box).read() as tx:
                     snapshot = await tx.read_configuration(self._now(), frozenset())
+            except (DomainError, asyncio.CancelledError):
+                raise
+            except Exception as error:  # a damaged package must never be a server error
+                raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_INVALID, "package") from error
             finally:
                 await engine.dispose()
         finally:

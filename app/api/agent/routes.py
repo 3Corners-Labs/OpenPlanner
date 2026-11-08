@@ -22,7 +22,6 @@ from fastapi import APIRouter, Depends, Header, Query, Request
 from starlette.responses import JSONResponse, Response
 
 from app.adapters.configuration_json import MEDIA_TYPE
-from app.adapters.db.configuration_package import SQLITE_HEADER
 from app.api.agent.auth import AgentContext, RequireScope, api_access, client_key
 from app.api.agent.errors import ApiProblem
 from app.api.agent.schemas import (
@@ -84,6 +83,13 @@ PlanHash = Annotated[
         "and any apply is refused when the plan is no longer that one.",
     ),
 ]
+
+_PACKAGE_BODY: dict[str, Any] = {
+    "requestBody": {
+        "required": True,
+        "content": {"application/vnd.sqlite3": {"schema": {"type": "string", "format": "binary"}}},
+    }
+}
 
 _DOCUMENT_BODY: dict[str, Any] = {
     "requestBody": {
@@ -291,6 +297,13 @@ async def apply_configuration(
     Scope `configuration:transfer`. Plans again inside the write lock; a plan that deletes
     needs the `X-Plan-Hash` of the plan you reviewed. Audited per change with the client id.
     """
+    return await _apply(request, context, passphrase, plan_hash)
+
+
+async def _apply(
+    request: Request, context: AgentContext, passphrase: str | None, plan_hash: str | None
+) -> Response:
+    """Apply the document in the body; the answer of `POST …/apply` and of `PUT`."""
     current: Settings = request.app.state.settings
     body = await _body(request, current.configuration_package_max_mb * 1024 * 1024)
     return _applied(
@@ -306,56 +319,89 @@ async def apply_configuration(
 
 @router.put(
     "/configuration",
-    response_model=ConfigurationSummary | ConfigurationApplied,
+    response_model=ConfigurationApplied,
     responses={
         **_REFUSALS,
         409: {
             "model": ErrorResponse,
-            "description": "`configuration_plan_stale` (a document that deletes, applied "
-            "without a reviewed plan), `configuration_package_version` (a SQLite package of "
-            "another schema revision).",
+            "description": "`configuration_plan_stale`: the plan changed since `X-Plan-Hash`, or "
+            "a plan that deletes came without it.",
+        },
+        413: {"model": ErrorResponse, "description": "`configuration_package_too_large`."},
+        422: {
+            "model": ConfigurationApplied,
+            "description": "The plan holds a refusal and nothing was written; or one of "
+            "`invalid_configuration`, `configuration_passphrase_*`, "
+            "`configuration_too_many_changes`, `configuration_out_of_scope`.",
+        },
+    },
+    openapi_extra=_DOCUMENT_BODY,
+    summary="Apply a configuration document",
+    tags=["configuration"],
+)
+@limiter.limit(agent_call_limit, key_func=client_key)
+async def put_configuration(
+    request: Request,
+    context: Transfer,
+    passphrase: Passphrase = None,
+    plan_hash: PlanHash = None,
+) -> Response:
+    """Apply the body as the platform's configuration: the same as `POST /configuration/apply`.
+
+    Scope `configuration:transfer`. Kept for the pipelines of ADR 0089 step 3, which `PUT` the
+    configuration; the document's own `mode` says whether what it does not name is deleted
+    (`replace`), and a plan that deletes needs the `X-Plan-Hash` of the plan you reviewed.
+    """
+    return await _apply(request, context, passphrase, plan_hash)
+
+
+@router.put(
+    "/configuration/package",
+    response_model=ConfigurationSummary,
+    responses={
+        **_REFUSALS,
+        409: {
+            "model": ErrorResponse,
+            "description": "`configuration_package_version` (another schema revision).",
         },
         413: {"model": ErrorResponse, "description": "`configuration_package_too_large`."},
         422: {
             "model": ErrorResponse,
             "description": "`configuration_package_invalid`, `configuration_passphrase_wrong`, "
-            "`configuration_passphrase_short`, `invalid_configuration`, and the refusal that "
-            "stopped the plan.",
+            "`configuration_passphrase_short` (no `X-Passphrase`), and the refusal that stopped "
+            "the plan.",
         },
     },
-    openapi_extra=_DOCUMENT_BODY,
-    summary="Replace the configuration",
+    openapi_extra=_PACKAGE_BODY,
+    summary="Replace the configuration with an old SQLite package",
     tags=["configuration"],
 )
 @limiter.limit(agent_call_limit, key_func=client_key)
-async def import_configuration(
+async def import_package(
     request: Request, context: Transfer, passphrase: Passphrase = None
-) -> Response:
-    """Apply the body as the platform's configuration.
+) -> ConfigurationSummary:
+    """Apply an ADR 0089 SQLite package as a replacing document of the platform.
 
-    Scope `configuration:transfer`. A JSON document is applied exactly as `POST
-    /configuration/apply` does, with its own `mode`. A SQLite package of ADR 0089 (read for one
-    more release) is converted to a document in `replace` mode and applied; its passphrase is
-    required. The body is refused above `CONFIGURATION_PACKAGE_MAX_MB`. Audited, never a value.
+    Scope `configuration:transfer`. Only for one release after the JSON document replaced the
+    package (ADR 0099 point 14); the passphrase is required; the package must carry the running
+    schema revision. The call is the confirmation: what the converted document deletes is
+    deleted unless something refers to it. Audited with the counts, never a value.
     """
+    if passphrase is None:
+        raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")
     current: Settings = request.app.state.settings
     body = await _body(request, current.configuration_package_max_mb * 1024 * 1024)
-    actor = Actor.api_client(context.caller.client.client_id)
-    if body.startswith(SQLITE_HEADER):
-        if passphrase is None:
-            raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")
-        summary = await _packages(request).import_(actor, body, passphrase)
-        return JSONResponse(
-            ConfigurationSummary(
-                installation=summary.installation,
-                app_version=summary.app_version,
-                created_at=summary.created_at,
-                revision=summary.revision,
-                counts=summary.counts,
-                secrets=summary.secrets,
-            ).model_dump(mode="json")
-        )
-    return _applied(await _documents(request).apply(actor, body, passphrase, None, scope=Scope()))
+    summary = await _packages(request).import_(
+        Actor.api_client(context.caller.client.client_id), body, passphrase
+    )
+    return ConfigurationSummary(
+        installation=summary.installation,
+        app_version=summary.app_version,
+        created_at=summary.created_at,
+        revision=summary.revision,
+        counts=summary.counts,
+        secrets=summary.secrets,
+    )
 
 
 def _plan_model(plan: Plan) -> ConfigurationPlan:

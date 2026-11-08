@@ -294,6 +294,24 @@ completes the numbered point it names.
   (`X-Plan-Hash` pins the reviewed plan), `PUT` applies a document as given, or converts a
   package. The scope `configuration:transfer` stays global; its client acts as
   `Actor.api_client`, which the matrix does not bind, like the host.
+- **The scope is a superuser's (decision for the product owner).** Point 11 says the agent API
+  scope `configuration:transfer` "is checked the same way" as a person's rights. It cannot be:
+  an API client holds no roles, so it applies as `Actor.api_client`, which the matrix does not
+  bind, as the host does. On an installation in use that client can therefore change anything
+  the configuration holds, API clients, identity providers, roles and claim values included;
+  under ADR 0089 it could do the same only on a new installation. The scope description in the
+  OpenAPI spec, the manual and the threat model now say so, and every applied change is audited
+  under the client id. If this is too much, the way out is to refuse those kinds to the API actor
+  (a `not_permitted` refusal in the plan); that would end provisioning of logins over the API.
+- **The agent API routes.** `PUT /configuration` is JSON only and is `POST …/apply` (with
+  `X-Plan-Hash`); an old package goes to `PUT /configuration/package`, which has its own
+  response and is deleted with the converter in step 5.
+- **The package is untrusted input.** Besides the revision, the converter compares the column
+  set of every configuration table, refuses a trigger or view the running database does not have
+  and turns `trusted_schema` off before it touches the copy; a damaged file is
+  `configuration_package_invalid`. A package import is confirmed by the call itself
+  (`apply_document(..., confirmed=True)`): what the package leaves out is deleted unless
+  something refers to it, the in-use rules and the change cap being the limits.
 - **The installer.** `--configuration FILE` takes a document (planned, then applied with the
   plan hash) or an old package; a document carries no login, so the identity provider is asked
   for as without a file.

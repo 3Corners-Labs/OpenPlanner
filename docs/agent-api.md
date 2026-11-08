@@ -157,14 +157,21 @@ longer that one. A plan with a refusal answers `422` with `"applied": false` and
 A plan above the platform setting *Most changes in one configuration document* is refused
 with `422 configuration_too_many_changes`.
 
-`PUT /api/agent/v1/configuration` stays for pipelines that already use it. A JSON document in
-the body is applied exactly as `POST …/apply` does (with the document's own `mode`). A SQLite
-package of ADR 0089 (`Content-Type: application/vnd.sqlite3`, `X-Passphrase` required) is still
-read for one more release: it is converted to a document in `replace` mode and applied, and the
-answer is the old summary (counts only). A package exported from another schema revision is
-refused with `409 configuration_package_version`.
+`PUT /api/agent/v1/configuration` stays for pipelines that already use it: it is `POST …/apply`
+(the document's own `mode`, `X-Plan-Hash` for a plan that deletes). An old SQLite package of ADR
+0089 goes to `PUT /api/agent/v1/configuration/package` (`X-Passphrase` required), for one more
+release: it is converted to a document in `replace` mode and applied, and the answer is the old
+summary (counts only). The call is the confirmation, so what the package leaves out is deleted
+unless something refers to it. A package from another schema revision is refused with `409
+configuration_package_version`, one with a different table layout, a trigger or a view with `422
+configuration_package_invalid`.
 
-All four calls are audited under the client id, one event per applied change with the plan hash
+**What the scope allows.** `configuration:transfer` is not bound by per-object rights: its
+client can change anything a superuser can configure, including API clients, identity providers,
+roles and claim values, on an installation in use. Grant it to the pipeline that provisions
+installations and to nothing else; every applied change is audited under the client id.
+
+All five calls are audited under the client id, one event per applied change with the plan hash
 prefix, kind and natural key, never a value and never the passphrase. The passphrase travels in
 a header, never in the URL. `POST` and `PUT` are refused with `503 maintenance` while
 maintenance mode is on (ADR 0038); only the export (`GET`) still answers. The host can do the same with `python -m app.cli config

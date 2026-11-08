@@ -1,4 +1,4 @@
-"""``python -m app.cli config`` on the host: documents (ADR 0099) and old SQLite packages (ADR 0089)."""
+"""``python -m app.cli config`` on the host: documents (ADR 0099), old SQLite packages."""
 
 import asyncio
 import json

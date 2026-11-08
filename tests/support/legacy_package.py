@@ -12,20 +12,21 @@ from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app.adapters.crypto import SecretBox
+from app.adapters.crypto import SALT_BYTES, SecretBox, passphrase_box
+from app.adapters.db.backup import database_path
 from app.adapters.db.configuration_package import (
     ENVIRONMENT_PREFIX,
     ENVIRONMENT_TABLE,
     META_TABLE,
-    SALT_BYTES,
     VERIFIER_NAME,
     VERIFIER_TEXT,
     _connect,
     _remove,
     _reseal_or_refuse,
     _temporary,
-    package_box,
 )
+from app.adapters.integrations import secret_box
+from app.config import Settings
 from app.domain.configuration_package import FORMAT, STATE_TABLES
 
 
@@ -59,7 +60,7 @@ def export_package(
         work_dir: Where the temporary copy is written (mode 600) and removed again.
     """
     salt = os.urandom(SALT_BYTES)
-    sealer = package_box(passphrase, salt)
+    sealer = passphrase_box(passphrase, salt)
     copy = _temporary(work_dir)
     try:
         _copy(database, copy)
@@ -105,3 +106,29 @@ def export_package(
         return copy.read_bytes()
     finally:
         _remove(copy)
+
+
+def package_of(
+    settings: Settings,
+    created_at: datetime,
+    passphrase: str,
+    work_dir: Path,
+    environment: Mapping[str, str] | None = None,
+) -> bytes:
+    """Return a package of the installation ``settings`` describe, sealed under ``passphrase``.
+
+    The one way the tests make a package of a running test installation: its database, its
+    settings key, a fixed installation name and release.
+    """
+    box = secret_box(settings)
+    assert box is not None
+    return export_package(
+        database_path(settings.database_url),
+        box,
+        passphrase,
+        created_at=created_at,
+        installation="bron",
+        app_version="1.2.3",
+        environment=environment or {},
+        work_dir=work_dir,
+    )

@@ -8,15 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import AuditEventRow
-from app.adapters.integrations import secret_box
 from app.api.agent.auth import RequireScope
 from app.config import Settings
 from app.domain.api_clients import IssuedSecret
 from app.domain.audit import Outcome
 from app.domain.services import BookingService
 from tests.support.agent_api import BASE, FORM, OPEN_ROUTES, SUPER, TRANSFER, Agent, agent_api
-from tests.support.configuration_package import PASSPHRASE, database_path
-from tests.support.legacy_package import export_package
+from tests.support.configuration_package import PASSPHRASE
+from tests.support.legacy_package import package_of
 from tests.support.routes import all_routes
 
 
@@ -246,6 +245,7 @@ async def test_docs_exist_only_while_published(agent: Agent) -> None:
         "/configuration",
         "/configuration/plan",
         "/configuration/apply",
+        "/configuration/package",
     }
     assert spec.json()["servers"] == [{"url": BASE}]
     schemes = spec.json()["components"]["securitySchemes"]
@@ -519,18 +519,7 @@ async def test_a_document_is_refused_by_code_never_echoing_the_file(
 def _legacy_package(agent: Agent, tmp_path: Path) -> bytes:
     """A SQLite package of the installation, as ADR 0089 exported it."""
     settings = agent.app.state.settings
-    box = secret_box(settings)
-    assert box is not None
-    return export_package(
-        database_path(settings.database_url),
-        box,
-        PASSPHRASE,
-        created_at=agent.app.state.clock.now(),
-        installation="bron",
-        app_version="1.2.3",
-        environment={},
-        work_dir=tmp_path,
-    )
+    return package_of(settings, agent.app.state.clock.now(), PASSPHRASE, tmp_path)
 
 
 async def test_a_sqlite_package_is_still_read_as_a_replacing_document(
@@ -541,7 +530,9 @@ async def test_a_sqlite_package_is_still_read_as_a_replacing_document(
     package = _legacy_package(agent, tmp_path)
 
     imported = await agent.client.put(
-        f"{BASE}/configuration", headers={**headers, "x-passphrase": PASSPHRASE}, content=package
+        f"{BASE}/configuration/package",
+        headers={**headers, "x-passphrase": PASSPHRASE},
+        content=package,
     )
 
     assert imported.status_code == 200, imported.text
@@ -565,7 +556,7 @@ async def test_a_sqlite_package_is_still_read_as_a_replacing_document(
 async def test_a_sqlite_package_is_refused_by_code(agent: Agent, tmp_path: Path) -> None:
     token = await agent.bearer(await agent.register(**TRANSFER))
     package = _legacy_package(agent, tmp_path)
-    url = f"{BASE}/configuration"
+    url = f"{BASE}/configuration/package"
 
     wrong = await agent.client.put(
         url, headers={**token, "x-passphrase": "not the passphrase"}, content=package
@@ -588,3 +579,30 @@ async def test_put_applies_a_document_exactly_as_apply_does(agent: Agent) -> Non
     assert response.status_code == 200, response.text
     assert response.json()["applied"] is True
     assert (await _document(agent, headers))["organisations"][0]["name"] == "Via PUT"  # type: ignore[index]
+
+
+async def test_put_of_a_deleting_document_needs_the_reviewed_hash_like_apply(
+    agent: Agent,
+) -> None:
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+    document = await _document(agent, headers)
+    document["mode"] = "replace"
+    document["organisations"] = document["organisations"][:1]  # type: ignore[index]
+
+    without = await agent.client.put(f"{BASE}/configuration", headers=headers, json=document)
+
+    assert without.status_code in (409, 422)
+    assert without.status_code != 200
+
+
+async def test_the_package_route_does_not_take_a_json_document(agent: Agent) -> None:
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+
+    refused = await agent.client.put(
+        f"{BASE}/configuration/package",
+        headers={**headers, "x-passphrase": PASSPHRASE},
+        json=await _document(agent, headers),
+    )
+
+    assert refused.status_code == 422
+    assert refused.json() == {"error": "configuration_package_invalid"}

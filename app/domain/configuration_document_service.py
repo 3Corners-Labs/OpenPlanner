@@ -277,12 +277,20 @@ class ConfigurationDocumentService:
         return await self.apply_document(actor, document, plan_hash)
 
     async def apply_document(
-        self, actor: Actor, document: Document, plan_hash: str | None
+        self,
+        actor: Actor,
+        document: Document,
+        plan_hash: str | None,
+        *,
+        confirmed: bool = False,
     ) -> ApplyResult:
         """Apply a document that is already read and whose secrets are opened.
 
         Plans again inside the write lock and writes all or nothing, as ``apply`` does after
-        decoding and opening it.
+        decoding and opening it. ``confirmed`` stands for a review the caller has no step for: a
+        SQLite package import (ADR 0099 point 14), which is a deliberate replace and was never
+        reviewed; a plan that deletes then needs no reviewed hash. A hash that is given is
+        still checked.
 
         Raises:
             DomainError: ``configuration_plan_stale``, ``configuration_too_many_changes``.
@@ -303,7 +311,7 @@ class ConfigurationDocumentService:
             async with self._uow.locked() as tx:
                 snapshot = await tx.read_configuration(self._clock.now(), self._locked())
                 plan = self._plan(actor, document, snapshot)
-                problem = self._problem(plan, first, plan_hash)
+                problem = self._problem(plan, first, plan_hash, confirmed=confirmed)
                 if plan.refusals or problem is not None:
                     result = ApplyResult(plan, None)
                 elif not plan.changes:
@@ -369,7 +377,9 @@ class ConfigurationDocumentService:
             settings_version=snapshot.version,
         )
 
-    def _problem(self, plan: Plan, first: Plan, plan_hash: str | None) -> ErrorCode | None:
+    def _problem(
+        self, plan: Plan, first: Plan, plan_hash: str | None, *, confirmed: bool = False
+    ) -> ErrorCode | None:
         """Return why an otherwise valid plan may not be written, or ``None``."""
         if plan.refusals:
             return None
@@ -378,7 +388,7 @@ class ConfigurationDocumentService:
         deletes = any(c.action is ChangeAction.DELETE for c in plan.changes)
         if plan.digest != first.digest:
             return ErrorCode.CONFIGURATION_PLAN_STALE
-        if plan_hash is None and deletes:
+        if plan_hash is None and deletes and not confirmed:
             return ErrorCode.CONFIGURATION_PLAN_STALE
         if plan_hash is not None and plan_hash != plan.digest:
             return ErrorCode.CONFIGURATION_PLAN_STALE

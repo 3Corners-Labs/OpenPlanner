@@ -5,7 +5,8 @@ The SQLite package of ADR 0089 is no longer exported. It is still read for one r
 that document is planned and applied like any other (rights per change, the in-use rules, one
 write transaction, an audit event per change). The service checks the passphrase and the
 size, audits the import with counts, and never logs a passphrase or a value. An import has no
-review step, as the package import never had: the plan it applies is the one it computes.
+review step, as the package import never had: the caller confirms by calling it, and the
+document service is told so (``confirmed``).
 """
 
 from collections.abc import Callable
@@ -67,17 +68,15 @@ class ConfigurationPackageService:
         try:
             self._check_size(package)
             document, summary = await self._transfer.to_document(package, passphrase)
-            plan = await self._documents.plan_document(actor, document)
-            result = await self._documents.apply_document(actor, document, plan.digest)
-            if not result.applied:
-                refusal = next(iter(result.plan.refusals), None)
-                raise DomainError(
-                    refusal.code if refusal else ErrorCode.INVALID_CONFIGURATION,
-                    refusal.field or refusal.path if refusal else "package",
-                )
+            result = await self._documents.apply_document(actor, document, None, confirmed=True)
         except DomainError as error:
             await self._refused(actor.subject, error)
             raise
+        if not result.applied:
+            refusal = result.plan.refusals[0]
+            refused = DomainError(refusal.code, refusal.field or refusal.path)
+            await self._refused(actor.subject, refused)
+            raise refused
         await self._admin.record(
             actor.subject, PERMISSION.value, Outcome.SUCCESS, detail=summary.detail
         )

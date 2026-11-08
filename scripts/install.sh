@@ -596,6 +596,15 @@ package_copy() {
   trap 'rm -rf "$PACKAGE_DIR"' EXIT
 }
 
+# The document goes into web from a readable copy too: `docker compose cp` keeps the owner and
+# the mode of the operator's file (a 600 document the web user cannot read otherwise).
+document_copy() {
+  PACKAGE_DIR=$(mktemp -d "$DIR/.package.XXXXXX")
+  chmod 755 "$PACKAGE_DIR"
+  install -m 644 "$CONFIGURATION" "$PACKAGE_DIR/document.json"
+  trap 'rm -rf "$PACKAGE_DIR"' EXIT
+}
+
 package_env() {
   local lines line key val
   log "reading the login from the configuration package $CONFIGURATION"
@@ -658,9 +667,9 @@ document_cli() {
 }
 
 apply_document() {
-  local plan report hash code=0
+  local plan report hash deletes code=0
   log "planning the configuration document"
-  compose cp "$CONFIGURATION" "web:$DOCUMENT_IN_WEB"
+  compose cp "$PACKAGE_DIR/document.json" "web:$DOCUMENT_IN_WEB"
   plan=$(document_cli plan "$DOCUMENT_IN_WEB") || code=$?
   if ((code)); then
     compose exec -T web rm -f "$DOCUMENT_IN_WEB" || warn "could not remove $DOCUMENT_IN_WEB from the web container"
@@ -671,6 +680,10 @@ apply_document() {
     esac
   fi
   printf '%s\n' "$plan" | sed 's/^/    /'
+  deletes=$(grep -c '^delete ' <<<"$plan" || true)
+  if ((deletes)); then
+    warn "the plan deletes $deletes object(s); on an installation in use only what nothing refers to is deleted"
+  fi
   hash=$(sed -n 's/^plan hash //p' <<<"$plan")
   if [[ ! $hash =~ ^[0-9a-f]{64}$ ]]; then
     compose exec -T web rm -f "$DOCUMENT_IN_WEB" || warn "could not remove $DOCUMENT_IN_WEB from the web container"
@@ -1025,6 +1038,7 @@ main() {
   else
     settings
     pin_release
+    [[ $CONFIG_KIND != document ]] || document_copy
   fi
   start
   case $CONFIG_KIND in

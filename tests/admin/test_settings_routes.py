@@ -10,7 +10,6 @@ from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
-from app.adapters.db.backup import database_path
 from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import (
@@ -22,7 +21,7 @@ from app.adapters.db.models import (
     SettingsVersionRow,
     SlotRow,
 )
-from app.adapters.integrations import installation_box, secret_box
+from app.adapters.integrations import installation_box
 from app.admin.settings_routes import _FIELD_LABELS
 from app.config import Settings
 from app.domain.authorization import Principal
@@ -31,7 +30,7 @@ from app.domain.tokens import derive_token, hash_token
 from app.web.protection import booking_limit, unknown_link_limit
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
 from tests.support.configuration_package import PACKAGE_PASSPHRASE
-from tests.support.legacy_package import export_package
+from tests.support.legacy_package import package_of
 from tests.support.principals import principal
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
@@ -561,18 +560,7 @@ async def test_the_topic_form_sets_a_boolean_and_an_empty_secret_keeps_the_curre
 def _legacy_package(site: Site, tmp_path: Path) -> bytes:
     """Return a SQLite package of the site, as the old export wrote it."""
     settings: Settings = site.client._transport.app.state.settings  # type: ignore[attr-defined]  # noqa: SLF001
-    box = secret_box(settings)
-    assert box is not None
-    return export_package(
-        database_path(settings.database_url),
-        box,
-        PACKAGE_PASSPHRASE,
-        created_at=site.clock.now(),
-        installation="bron",
-        app_version="1.2.3",
-        environment={},
-        work_dir=tmp_path,
-    )
+    return package_of(settings, site.clock.now(), PACKAGE_PASSPHRASE, tmp_path)
 
 
 async def test_the_package_block_offers_the_old_import_and_no_export(site: Site) -> None:

@@ -19,7 +19,6 @@ from datetime import datetime
 from enum import StrEnum
 from typing import cast
 
-from app.domain.configuration_package import filename_slug
 from app.domain.configuration_schema import Collection, FieldSpec, FieldType, Format, Kind, Shape
 from app.domain.configuration_tree import Action, Entity, path_of
 from app.domain.configuration_values import (
@@ -43,6 +42,14 @@ _SCALARS = (str, int, float, bool)
 
 DOCUMENT_FILENAME = "openplanner-configuration-{installation}-{date}.json"
 """The download name of an exported document."""
+
+
+def filename_slug(installation: str) -> str:
+    """Return the installation name as a slug, so a download name passes the filename rule.
+
+    Lower case; every character outside ``[a-z0-9.-]`` becomes ``-``.
+    """
+    return re.sub(r"[^a-z0-9.-]", "-", (installation or "openplanner").lower())
 
 
 def document_filename(installation: str, exported_at: datetime) -> str:
