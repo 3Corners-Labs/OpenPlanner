@@ -289,8 +289,26 @@ def test_a_line_has_mains_rules_without_a_bypass_and_only_creation_is_bypassed()
     )
     expected = json.loads(json.dumps(main["rules"]))
     expected["required_status_checks"]["do_not_enforce_on_create"] = True
+    # GitHub refuses a merge queue on a wildcard ref: a line's pull request must be up to date
+    # with the line instead, and runs the full lane on the pull request (ci.yml).
+    del expected["merge_queue"]
+    expected["required_status_checks"]["strict_required_status_checks_policy"] = True
 
     assert line["rules"] == expected
     assert line["bypass_actors"] == main["bypass_actors"] == []
     assert line["conditions"] == creation["conditions"]
     assert creation["rules"] == {"creation": {}}
+
+
+def test_every_full_lane_job_runs_on_a_pull_request_into_a_line() -> None:
+    """A line has no merge queue (GitHub refuses one on a wildcard ref): its pull request runs
+    the full lane itself, or a skipped required check would count as passed."""
+    workflow = (BASELINE.parent / "workflows" / "ci.yml").read_text()
+    full_lane = [
+        block
+        for block in re.split(r"\n  (?=[a-z0-9-]+:\n)", workflow)
+        if "contains(github.event.pull_request.labels.*.name, 'ci:full')" in block
+    ]
+
+    assert len(full_lane) == 3
+    assert all("startsWith(github.base_ref, 'release/')" in block for block in full_lane)
