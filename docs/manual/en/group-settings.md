@@ -83,6 +83,32 @@ A change applies to appointments not yet dispatched. An appointment already in t
 center as a task stays there. When the contact center fails (Webex Connect or Webex Contact
 Center outage), you can switch the group to the own queue for the time being.
 
+<!-- field: dispatch_fallback -->
+### Fallback when the contact center fails
+
+Only for a group with **Contact center**. With **Own queue** an appointment goes to OpenPlanner's
+queue, flagged **Fallback**, when:
+
+- its dispatch fails for good (after the retries), or
+- the organisation's contact center is down (see *Health* on Integrations): the whole group then
+  falls back. The administrators get an alert, the queue shows a banner, and every appointment in
+  the agenda shows **Fallback**.
+
+When the contact center is fine again, the fallback ends by itself and appointments not yet
+picked up go to the contact center after all. Whoever manages the group's appointments can also
+end the fallback in the queue. The participant notices nothing: the link, the lobby and the rules
+for cancelling and moving stay the same.
+
+Choose this only if the team knows the queue and can work it.
+
+<!-- field: fallback_space_room_id -->
+### The team's Webex space (fallback)
+
+Optional. The id of the team's Webex space. During a fallback the organisation's bot (see *Alerts
+to administrators* on Channels) posts a message there, and for each appointment that lands in the
+queue the start time, the first name and a link to the queue. Never the link to the call: only
+whoever picks the appointment up gets that.
+
 <!-- field: participant_change_lead_minutes -->
 ### Participant can move until (minutes ahead)
 
