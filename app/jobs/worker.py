@@ -80,6 +80,7 @@ from app.i18n.dates import configure_clock
 from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
+from app.jobs.usage import backfill_usage, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 
@@ -337,7 +338,7 @@ async def run_worker(
         dispatch_enabled=wired.dispatcher is not None,
         release_check=settings.update_repository is not None,
     )
-    await _backfill_usage(backfill)
+    await backfill_usage(backfill)
     try:
         while not stop.is_set():
             if await is_reachable(engine):
@@ -357,7 +358,7 @@ async def run_worker(
                     # Before the group check, which reads it (ADR 0068).
                     heartbeat_at = await _heartbeat(uow, clock, runner, version, heartbeat_at)
                     await housekeeping.run()
-                    await usage.run_if_due()  # ADR 0117; never raises
+                    await roll_up_usage(usage)  # ADR 0117; logs a failure, never raises
                     await _check_releases(updates)
                     await _watch_maintenance(maintenance)
                     await _watch_certificate(tls)
@@ -511,14 +512,3 @@ async def _main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(_main())
-
-
-async def _backfill_usage(backfill: UsageBackfill) -> None:
-    """Run the usage backfill once after the upgrade; a failure is logged, never fatal."""
-    try:
-        run = await backfill.run_once()
-    except Exception as exc:  # e.g. schema not migrated yet; the next start tries again
-        log.warning("usage.backfill_failed", error=type(exc).__name__)
-    else:
-        if run.bookings:
-            log.info("usage.backfilled", bookings=run.bookings, facts=run.facts)

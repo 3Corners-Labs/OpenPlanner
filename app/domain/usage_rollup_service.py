@@ -7,15 +7,13 @@
 
 The cells and the watermark share a transaction, so a crash neither double-counts nor loses a
 fact (idempotent: a second run finds nothing after the watermark). A fact written while the
-rollup runs is picked up by the next run. The loop never stops over a failure: it is logged
-with the error type only and tried again at the next interval.
+rollup runs is picked up by the next run. A failure propagates to the worker's wrapper
+(``app.jobs.usage``), which logs the error type and goes on; the next interval tries again.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-
-import structlog
 
 from app.domain.ports import Clock, UsageUnitOfWork
 from app.domain.usage_rollup import (
@@ -25,8 +23,6 @@ from app.domain.usage_rollup import (
     hours_cutoff,
     roll,
 )
-
-log = structlog.get_logger()
 
 
 @dataclass(frozen=True)
@@ -78,26 +74,16 @@ class UsageRollup:
         return self._ran_at is None or now - self._ran_at >= self._interval()
 
     async def run_if_due(self) -> RollupRun | None:
-        """Run when due and return what it did; ``None`` when not due or when it failed."""
+        """Run when due and return what it did; ``None`` when not due.
+
+        The interval counts from the attempt, so a failing run is not retried before the next
+        interval. Any failure propagates to the caller.
+        """
         now = self._clock.now()
         if not self.due(now):
             return None
         self._ran_at = now
-        try:
-            result = await self.run(now)
-        except Exception as exc:  # never stop the worker loop over reporting
-            log.error("usage.rollup_failed", error=type(exc).__name__)
-            return None
-        if result.facts or result.unreadable or result.pruned.events or result.pruned.hours:
-            log.info(
-                "usage.rolled_up",
-                facts=result.facts,
-                cells=result.cells,
-                unreadable=result.unreadable,
-                events_pruned=result.pruned.events,
-                hours_pruned=result.pruned.hours,
-            )
-        return result
+        return await self.run(now)
 
     async def run(self, now: datetime) -> RollupRun:
         """Roll up every fact after the watermark, one batch per transaction, then prune."""

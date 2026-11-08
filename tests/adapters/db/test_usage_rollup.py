@@ -3,9 +3,8 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select, text, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from structlog.testing import capture_logs
 
 from app.adapters.db.models import UsageEventRow, UsageHourRow, UsageRollupStateRow
 from app.adapters.db.uow import SqlUnitOfWork
@@ -190,23 +189,6 @@ async def test_a_fact_the_rollup_has_not_read_is_never_pruned(engine: AsyncEngin
     assert pruned.events == 0
     async with AsyncSession(engine) as session:
         assert await session.scalar(select(func.count()).select_from(UsageEventRow)) == 1
-
-
-async def test_a_failing_run_is_logged_with_the_error_type_and_the_loop_goes_on(
-    engine: AsyncEngine,
-) -> None:
-    clock = FixedClock(NOW)
-    rollup = _rollup(engine, clock)
-    async with AsyncSession(engine) as session, session.begin():
-        await session.execute(text("DROP TABLE usage_hour"))
-
-    await _write(engine, _created())
-    with capture_logs() as logs:
-        assert await rollup.run_if_due() is None
-
-    failed = [entry for entry in logs if entry["event"] == "usage.rollup_failed"]
-    assert len(failed) == 1
-    assert set(failed[0]) == {"event", "error", "log_level"}
 
 
 @pytest.mark.parametrize(
