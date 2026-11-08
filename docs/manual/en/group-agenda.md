@@ -101,6 +101,10 @@ participant**. The participant then gets the same confirmation with all details 
 confirming themselves, and the audit log records who confirmed. After the lapse moment that is no
 longer possible.
 
+An unconfirmed appointment can also be **Moved** or **Cancelled** like a confirmed one. A moved
+appointment stays unconfirmed and gets a new lapse moment. Asking for a new time is not offered:
+such an appointment lapses on its own when nobody confirms.
+
 ## Changing bookings
 
 With the right **Change bookings** (group admins, organisation admins and a custom Planner

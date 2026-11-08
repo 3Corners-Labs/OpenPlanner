@@ -196,6 +196,9 @@ class PlannerService:
     ) -> Booking:
         """Ask the participant to choose a new time; the booking frees its place at once.
 
+        Only for a confirmed booking: one awaiting confirmation is moved or cancelled instead,
+        or left to lapse (ADR 0056 point 11).
+
         Raises:
             DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active`` or
                 ``planner_too_late``.
@@ -204,6 +207,8 @@ class PlannerService:
         async with self._uow.locked() as tx:
             group = await group_by_slug(tx, slug)
             booking = await self._changeable(tx, group, booking_id)
+            if booking.awaits_confirmation:
+                raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
             waiting = await self._request(tx, group, booking, reason)
             detail = f"planner.rebook,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
@@ -320,7 +325,11 @@ class PlannerService:
             group.id, slot.start, slot.start + timedelta(seconds=1)
         )
         last = last_made(holding, slot.open_shortfall)
-        return [b for b in last if booking_changes.planner_may_change(b, group, now)]
+        return [
+            b
+            for b in last
+            if not b.awaits_confirmation and booking_changes.planner_may_change(b, group, now)
+        ]
 
     async def _changeable(self, tx: Transaction, group: Group, booking_id: int) -> Booking:
         """Return the group's booking ``booking_id`` if a planner may change it now."""

@@ -41,10 +41,11 @@ from app.domain.usage_recording import (
 def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> None:
     """Refuse a planner's change that needs a phone call instead of a message.
 
-    A booking can be changed while it is confirmed, scheduled (not a direct call), not yet
-    dispatched to the contact center, and starts more than the group's planner lead from now
-    (never less than the dispatch lead). A booking awaiting a new time can always be moved or
-    cancelled: it does not go ahead at its time anyway.
+    A booking can be changed while it is confirmed or awaiting the participant's confirmation
+    (ADR 0056 point 11: moved or cancelled like a confirmed one), scheduled (not a direct call),
+    not yet dispatched to the contact center, and starts more than the group's planner lead from
+    now (never less than the dispatch lead). A booking awaiting a new time can always be moved
+    or cancelled: it does not go ahead at its time anyway.
 
     Raises:
         DomainError: ``booking_not_active`` or ``planner_too_late``.
@@ -53,7 +54,7 @@ def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> 
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     if booking.awaits_rebook:
         return
-    if not booking.is_active:
+    if not (booking.is_active or booking.awaits_confirmation):
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     lead = max(group.planner_lead, group.dispatch_lead)
     if booking.contact_center_task is not None or now >= booking.start - lead:

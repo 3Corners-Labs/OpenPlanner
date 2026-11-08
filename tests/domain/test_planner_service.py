@@ -464,3 +464,36 @@ async def test_a_confirmation_by_a_planner_is_counted_as_the_planners(
         if isinstance(f, UsageFact) and f.kind is FactKind.BOOKING_CONFIRMED
     ]
     assert fact.actor_class is ActorClass.PLANNER
+
+
+# --- move and cancel a pending booking (ADR 0056 step 3b) -----------------------------------
+
+
+async def test_a_moved_pending_booking_stays_pending_with_its_own_deadline(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+
+    moved = await planner.move(GROUP_ADMIN, "demo", receipt.booking.id or 0, SLOT_0930)
+
+    assert moved.status is BookingStatus.PENDING_CONFIRMATION
+    assert moved.start == SLOT_0930
+    assert moved.confirm_by is not None
+    old = uow.state.bookings[receipt.booking.id or 0]
+    assert old.status is not BookingStatus.PENDING_CONFIRMATION
+
+
+async def test_a_pending_booking_can_be_cancelled_but_not_asked_to_rebook(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    first = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+    second = await book_pending(bookings, slug="demo", contact=participant(next(_PARTICIPANTS)))
+
+    await planner.cancel(GROUP_ADMIN, "demo", first.booking.id or 0, ChangeReason.STAFFING)
+    with pytest.raises(DomainError, match="booking_not_active"):
+        await planner.request_rebook(
+            GROUP_ADMIN, "demo", second.booking.id or 0, ChangeReason.STAFFING
+        )
+
+    assert uow.state.bookings[first.booking.id or 0].status is BookingStatus.CANCELLED
+    assert uow.state.bookings[second.booking.id or 0].status is BookingStatus.PENDING_CONFIRMATION
