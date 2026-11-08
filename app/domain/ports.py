@@ -44,6 +44,7 @@ from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
 from app.domain.closure import Closure
+from app.domain.configuration_changes import Change, ConfigurationSnapshot
 from app.domain.configuration_package import PackageSummary
 from app.domain.connection_health import (
     HealthEntry,
@@ -1944,6 +1945,16 @@ class Transaction(Protocol):
 
     async def bump_settings_version(self) -> int:
         """Raise ``settings_version`` by one and return the new value (ADR 0042 §6)."""
+        ...
+
+    async def read_configuration(
+        self, now: datetime, locked_settings: frozenset[str]
+    ) -> ConfigurationSnapshot:
+        """Return the configuration as a tree of the document's shape, with its usage facts."""
+        ...
+
+    async def apply_configuration(self, changes: Sequence[Change]) -> int:
+        """Write the changes of a plan in order and return the new settings version (ADR 0099)."""
         ...
 
     async def platform_secrets(self) -> dict[str, str]:

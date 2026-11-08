@@ -266,3 +266,63 @@ class ContactBlock:
     def heading(self, locale: str) -> str | None:
         """Return the heading in ``locale``, falling back to Dutch, or ``None``."""
         return _in_locale(self.headings, locale)
+
+
+def block_to_json(block: ContactBlock) -> dict[str, object]:
+    """Return a contact block as the JSON object a document and the database both hold.
+
+    Organisation and group blocks, the copy on a closure and a scenario's block are stored this
+    way (ADR 0037 §2), and a configuration document (ADR 0099) writes it the same.
+    """
+    return {
+        "headings": dict(block.headings),
+        "options": [
+            {
+                "kind": option.kind.value,
+                "value": option.value,
+                "labels": dict(option.labels),
+                "hours": dict(option.hours),
+            }
+            for option in block.options
+        ],
+    }
+
+
+def block_from_json(data: object) -> ContactBlock:
+    """Return the contact block a JSON object states, refusing anything the portal would.
+
+    Unlike reading what is stored, nothing is left out: an unknown property, a kind the
+    format does not have or an option that fails its checks is refused, naming the row
+    (``contact_2_url``) as the form does.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with ``contacts``, ``contacts_heading`` or
+            ``contact_<row>_<part>``.
+    """
+    if not isinstance(data, Mapping) or not set(data) <= {"headings", "options"}:
+        raise _invalid("contacts")
+    headings, options = data.get("headings", {}), data.get("options", [])
+    if not _text_map(headings) or not isinstance(options, list):
+        raise _invalid("contacts")
+    built: list[ContactOption] = []
+    for row, item in enumerate(options, start=1):
+        if not isinstance(item, Mapping) or not set(item) <= {"kind", "value", "labels", "hours"}:
+            raise _invalid(f"contact_{row}_kind")
+        labels, hours = item.get("labels", {}), item.get("hours", {})
+        kind, value = item.get("kind"), item.get("value")
+        if not (
+            isinstance(kind, str)
+            and isinstance(value, str)
+            and _text_map(labels)
+            and _text_map(hours)
+        ):
+            raise _invalid(f"contact_{row}_kind")
+        built.append(numbered_option(row, kind, value, labels, hours))
+    return ContactBlock(tuple(built), headings)
+
+
+def _text_map(value: object) -> bool:
+    """Return whether ``value`` is a JSON object of texts."""
+    return isinstance(value, Mapping) and all(
+        isinstance(key, str) and isinstance(item, str) for key, item in value.items()
+    )

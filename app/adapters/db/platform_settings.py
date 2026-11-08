@@ -24,7 +24,7 @@ from app.adapters.db.models import (
 )
 
 _VERSION_ID = 1
-_SECRET_PREFIX = "setting:"  # noqa: S105  # nosec B105 - a name prefix, not a secret
+SECRET_PREFIX = "setting:"  # noqa: S105  # nosec B105 - a name prefix, not a secret
 
 
 class PlatformSettingsQueries:
@@ -127,7 +127,7 @@ class PlatformSettingsQueries:
             return {}
         rows = await self._session.scalars(
             select(IntegrationCredentialRow).where(
-                IntegrationCredentialRow.name.startswith(_SECRET_PREFIX)
+                IntegrationCredentialRow.name.startswith(SECRET_PREFIX)
             )
         )
         found: dict[str, str] = {}
@@ -137,7 +137,7 @@ class PlatformSettingsQueries:
             except Exception:  # noqa: S112  # nosec B112 - another key or a broken row: skip it
                 continue
             if isinstance(opened, dict) and isinstance(opened.get("value"), str):
-                found[row.name.removeprefix(_SECRET_PREFIX)] = opened["value"]
+                found[row.name.removeprefix(SECRET_PREFIX)] = opened["value"]
         return found
 
     async def secrets_available(self) -> bool:
@@ -152,7 +152,7 @@ class PlatformSettingsQueries:
         """
         if self._box is None:
             raise RuntimeError("no settings key")
-        name = _SECRET_PREFIX + key
+        name = SECRET_PREFIX + key
         nonce, ciphertext = self._box.seal(name, json.dumps({"value": value}).encode())
         await self._session.merge(
             IntegrationCredentialRow(
@@ -165,7 +165,7 @@ class PlatformSettingsQueries:
         """Remove the sealed value of ``key``; return whether there was one."""
         result = await self._session.execute(
             delete(IntegrationCredentialRow).where(
-                IntegrationCredentialRow.name == _SECRET_PREFIX + key
+                IntegrationCredentialRow.name == SECRET_PREFIX + key
             )
         )
         return bool(getattr(result, "rowcount", 0))

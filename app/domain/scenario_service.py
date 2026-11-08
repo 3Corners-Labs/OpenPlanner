@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 
 from app.domain.admin import AdminService, Authorization, record_change, require
-from app.domain.authorization import Permission, Principal, scope_for
+from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.contacts import ContactBlock
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.images import ImageFile, ImageText
@@ -163,6 +163,7 @@ class ScenarioService:
         organisation = await self._authorize(principal, owner)
         async with self._uow.locked() as tx:
             resolved = await _resolve(tx, owner, organisation)
+            await _check_name_free(tx, resolved, scenario.name, scenario_id)
             if scenario_id is None:
                 stored = await tx.add_scenario(
                     ClosureScenario(
@@ -291,6 +292,21 @@ class ScenarioService:
             resolved.group.slug if resolved.group else None,
             detail,
         )
+
+
+async def _check_name_free(
+    tx: Transaction, resolved: _Resolved, name: str, scenario_id: int | None
+) -> None:
+    """Refuse a name another scenario of the same owner has: it is the natural key (ADR 0099).
+
+    Raises:
+        DomainError: ``scenario_name_taken`` naming ``scenario_name``.
+    """
+    taken = await tx.list_scenarios(
+        Scope(everything=True), resolved.organisation_id, resolved.group_id
+    )
+    if any(found.name == name.strip() and found.id != scenario_id for found in taken):
+        raise DomainError(ErrorCode.SCENARIO_NAME_TAKEN, "scenario_name")
 
 
 async def _resolve(tx: Transaction, owner: ScenarioOwner, organisation_slug: str) -> _Resolved:

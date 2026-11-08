@@ -47,7 +47,8 @@ account). Cancelling deletes the meeting: `DELETE /v1/meetings/{id}?hostEmail=â€
 ## Outbound: WxCC work item
 
 `POST https://api.wxcc-<region>.cisco.com/v2/tasks` (beta). Response `201` with `data.id` (the
-task id, stored as `wxcc_task_id`).
+task id, stored as `wxcc_task_id` and, since ADR 0032, also as `contact_center_task_id` with
+kind `webex_cc`; the old column stays the one read for WxCC until the next minor).
 
 ```json
 {
@@ -165,6 +166,7 @@ POST /webhooks/webex   X-Spark-Signature: <hex HMAC-SHA1>
 {"resource":"meetings","event":"ended","data":{"id":"openplanner-selftest-<16 hex>"}}
 
 POST /webhooks/wxcc    X-WebexCC-Signature: <hex HMAC-SHA256>   X-WebexCC-Timestamp: <ms>
+                       (the registered address: alias of /webhooks/contact-center/webex_cc)
 {"type":"task:ended","comciscotimestamp":<ms>,"data":{"taskId":"openplanner-selftest-<16 hex>"}}
 ```
 
