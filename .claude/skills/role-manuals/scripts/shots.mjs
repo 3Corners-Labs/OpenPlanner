@@ -167,8 +167,8 @@ export async function shoot(page, { id, img, hidden, crop = new Viewport(), role
     }
     await page.evaluate(drawBoxes, { boxes, pad: PAD, colour: GREY });
     png = await page.screenshot({ type: 'png', clip, animations: 'disabled' });
-    await page.evaluate(removeBoxes);
   } finally {
+    await page.evaluate(removeBoxes).catch(() => {});
     if (crop.stretch) await page.setViewportSize(old);
   }
   const [width, height] = pngSize(png);

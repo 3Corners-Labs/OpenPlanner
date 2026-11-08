@@ -131,6 +131,15 @@ async function main() {
     console.log(STEPS.map((s) => (s.needsWebex ? `${s.id}  (vraagt Webex Meetings)` : s.id)).join('\n'));
     return 0;
   }
+  const hidden = hiddenTerms(ws.vars);
+  const state = loadState(ws);
+  if (args.logOnly) {
+    // The stack of the capture is kept in the state, so the log can be rewritten after it is down.
+    if (!state.stack) fail('capture.mjs', `${ws.state} holds no capture to write a log from`);
+    writeLog({ ws, stack: state.stack, state, steps: STEPS, hidden });
+    console.log(`capture.mjs: ${ws.log} rewritten from ${ws.state}`);
+    return 0;
+  }
   let stack;
   let steps;
   try {
@@ -140,17 +149,11 @@ async function main() {
   } catch (error) {
     fail('capture.mjs', error.message);
   }
-  const hidden = hiddenTerms(ws.vars);
-  const state = loadState(ws);
   if (state.installation && state.installation !== stack.instance) {
     fail('capture.mjs', `${ws.state} belongs to installation ${state.installation}; move it away before a run on a new stack`);
   }
-  if (args.logOnly) {
-    writeLog({ ws, stack, state, steps: STEPS, hidden });
-    console.log(`capture.mjs: ${ws.log} rewritten from ${ws.state}`);
-    return 0;
-  }
-  Object.assign(state, { agenda_day: args.day, installation: stack.instance });
+  const { id, instance, web, keycloak, mail, build } = stack;
+  Object.assign(state, { agenda_day: args.day, installation: instance, stack: { id, instance, web, keycloak, mail, build } });
   state.started ??= stamp();
   console.log(`capture.mjs: installation ${stack.instance} (run ${stack.id}, commit ${stack.build.commit.slice(0, 12)}) at ${stack.web}`);
 

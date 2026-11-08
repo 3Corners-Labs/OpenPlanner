@@ -21,6 +21,14 @@ stack="$repo/.claude/skills/verify-openplanner/scripts/stack.sh"
 vars="$workspace/variables.json"
 previous="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("commit", ""))' "$vars")"
 
+# Its own compose project (one per checkout) and ports, so the stack.sh down of the trap below
+# only ever removes this script's containers, never the verification stack of another session.
+VERIFY_PROJECT="${VERIFY_PROJECT:-openplanner-manuals-$(printf '%s' "$repo" | cksum | cut -d' ' -f1)}"
+VERIFY_WEB_PORT="${VERIFY_WEB_PORT:-8020}"
+VERIFY_KC_PORT="${VERIFY_KC_PORT:-8100}"
+VERIFY_MAIL_PORT="${VERIFY_MAIL_PORT:-8045}"
+export VERIFY_PROJECT VERIFY_WEB_PORT VERIFY_KC_PORT VERIFY_MAIL_PORT
+
 # A stack this script did not start is never stopped by it: stack.sh up refuses while one is up.
 if [ -e "${VERIFY_EVIDENCE_ROOT:-$repo/.verify-openplanner}/current" ]; then
   echo "update.sh: a verification stack is already up; stop it first ($stack down)" >&2
@@ -38,6 +46,7 @@ echo "== 1/5 stack starten"
 (cd "$repo" && "$stack" up)
 
 echo "== 2/5 voorbeeldgegevens laden en opnemen"
+rm -rf "$workspace/img/previous"
 mkdir -p "$workspace/img/previous" "$workspace/evidence/previous"
 find "$workspace/img" -maxdepth 1 -name '*.png' -exec cp -p {} "$workspace/img/previous/" \;
 if [ -f "$workspace/evidence/state.json" ]; then

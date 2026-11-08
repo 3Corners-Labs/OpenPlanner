@@ -62,8 +62,10 @@ async function footerOff(run) {
 }
 
 /**
- * The demo seed asks "Waar gaat uw vraag over?" with options that name a sector; like the
- * footer, a real setting takes it away: the button "Uitzetten" on the booking form's questions.
+ * The demo seed asks "Waar gaat uw vraag over?", a choice the manuals do not describe; like the
+ * footer, a real setting takes it away (the button "Uitzetten" on the booking form's questions),
+ * so the form in the screenshots holds the interpreter question only and every booking of the
+ * story needs no answer to it.
  */
 async function subjectQuestionOff(run) {
   const page = await run.staff('orgadmin');
@@ -83,8 +85,8 @@ async function subjectQuestionOff(run) {
   await page.goto(`/admin/groups/${GROUP}/settings/form`);
   if (await page.getByRole('button', { name: SUBJECT_QUESTION_OFF }).count()) throw new Error('the question is still on');
   run.notePrep('2b', '2b', 'Als `orgadmin`, **Groepen → demo → Instellingen → Boekingsformulier**, bij de eigen vraag '
-    + '"Waar gaat uw vraag over?" (keuzelijst uit de demovulling) op **Uitzetten** gedrukt: de antwoordopties van de '
-    + 'demovraag zijn sectorwoorden; net als bij de voettekst haalt een echte instelling ze weg in plaats van een balk. '
+    + '"Waar gaat uw vraag over?" (keuzelijst uit de demovulling) op **Uitzetten** gedrukt: de handleidingen beschrijven '
+    + 'die demovraag niet; net als bij de voettekst haalt een echte instelling haar weg in plaats van een balk. '
     + 'De vraag "Ik wil graag een tolk" bleef aan.');
 }
 

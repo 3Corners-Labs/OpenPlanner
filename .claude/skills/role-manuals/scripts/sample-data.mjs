@@ -94,13 +94,14 @@ async function plannerMove(run, key) {
   const booking = run.booking(key);
   const page = await openPlannerForm(run, booking, UI.move, UI.moveHeading);
   const select = page.getByLabel(UI.newSlot);
-  const values = await select.evaluate((s) => [...s.options].map((o) => o.value).filter(Boolean));
-  const sameDay = values.filter((v) => v.startsWith(`${booking.day}T`) && v.slice(11, 16) > booking.time);
-  if (!sameDay.length) throw new Error(`no later free time on ${booking.day} to move ${key} to`);
-  await select.selectOption(sameDay[0]);
+  // Each option: the start in UTC as its value, `5 jan 2026, 09:00` (local) as its text.
+  const options = await select.evaluate((s) => [...s.options].filter((o) => o.value).map((o) => ({ value: o.value, local: o.text.trim().slice(-5) })));
+  const later = options.find((o) => o.value.startsWith(`${booking.day}T`) && o.local > booking.time);
+  if (!later) throw new Error(`no later free time on ${booking.day} to move ${key} to`);
+  await select.selectOption(later.value);
   await page.getByRole('button', { name: UI.plannerMove }).click();
   await page.waitForLoadState('load');
-  Object.assign(run.bookings[key], { status: 'moved_by_planner', moved_to: sameDay[0].slice(11, 16) });
+  Object.assign(run.bookings[key], { status: 'moved_by_planner', moved_to: later.local });
   run.save();
 }
 

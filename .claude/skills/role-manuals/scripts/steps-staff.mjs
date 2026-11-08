@@ -72,9 +72,9 @@ export const agent = [
     });
   }),
   step('mw-04-vrijgegeven', 'na **Vrijgeven**: de afspraak staat weer in de wachtrij', async (run, id) => {
+    const page = await needQueue(run);
     if (!run.state.claimed) throw new Skip('er is geen opgepakte afspraak (mw-03)');
-    const page = await run.staff('agent');
-    if (!page.url().includes('/queue/')) await page.goto(run.state.claimed);
+    await page.goto(run.state.claimed);
     await page.getByRole('button', { name: 'Vrijgeven' }).first().click();
     await page.waitForLoadState('load');
     await page.locator(QUEUE_ROWS).first().waitFor({ timeout: 15_000 });
