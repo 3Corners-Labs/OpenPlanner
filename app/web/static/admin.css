@@ -1594,6 +1594,217 @@ fieldset.card {
   margin-bottom: 0.5rem;
 }
 
+/* --- Report charts (ADR 0117 point 10): inline SVG made by app/web/charts.py. Colours are the
+   --adm-* tokens, one class per series; a series differs by pattern or marker as well as by
+   colour, and a hidden count is a dashed marker of one fixed height, never a bar. The drawing
+   keeps its width (the frame scrolls) so its text stays readable at 320 px and 400 % zoom. ----- */
+.rchart {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+}
+
+.rchart__frame {
+  overflow-x: auto;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius);
+  background: var(--adm-surface);
+}
+
+.rchart__svg {
+  display: block;
+  width: 100%;
+  min-width: 32rem;
+  height: auto;
+}
+
+.rchart__s1 {
+  --rchart-color: var(--adm-accent);
+}
+
+.rchart__s2 {
+  --rchart-color: var(--adm-warning);
+}
+
+.rchart__s3 {
+  --rchart-color: var(--adm-success);
+}
+
+.rchart__s4 {
+  --rchart-color: var(--adm-danger);
+}
+
+.rchart__bar {
+  stroke: var(--rchart-color);
+  stroke-width: 1.5;
+}
+
+.rchart__bar--solid {
+  fill: var(--rchart-color);
+}
+
+.rchart__pattern-bg {
+  fill: var(--adm-surface);
+}
+
+.rchart__pattern-ink {
+  stroke: var(--rchart-color);
+  stroke-width: 2;
+}
+
+.rchart__pattern-dot {
+  fill: var(--rchart-color);
+}
+
+.rchart__line {
+  fill: none;
+  stroke: var(--rchart-color);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.rchart__line.rchart__s2 {
+  stroke-dasharray: 6 3;
+}
+
+.rchart__line.rchart__s3 {
+  stroke-dasharray: 2 3;
+}
+
+.rchart__line.rchart__s4 {
+  stroke-dasharray: 8 3 2 3;
+}
+
+.rchart__marker {
+  fill: var(--rchart-color);
+  stroke: var(--adm-surface);
+  stroke-width: 1.5;
+}
+
+.rchart__gap {
+  fill: var(--adm-surface-muted);
+  stroke: var(--adm-text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+.rchart__grid {
+  stroke: var(--adm-border);
+  stroke-width: 1;
+}
+
+.rchart__axis {
+  stroke: var(--adm-border-strong);
+  stroke-width: 1;
+}
+
+.rchart__tick,
+.rchart__legend,
+.rchart__unit {
+  fill: var(--adm-text-muted);
+  font-size: 11px;
+}
+
+.rchart__legend {
+  fill: var(--adm-text);
+}
+
+/* The busiest hours (metric C4): a table with a shade and the number in every cell, so the shade
+   is never the only signal. */
+.heat-table td {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.heat--1 {
+  background: color-mix(in srgb, var(--adm-accent) 10%, var(--adm-surface));
+}
+
+.heat--2 {
+  background: color-mix(in srgb, var(--adm-accent) 22%, var(--adm-surface));
+}
+
+.heat--3 {
+  background: color-mix(in srgb, var(--adm-accent) 34%, var(--adm-surface));
+}
+
+.heat--4 {
+  background: color-mix(in srgb, var(--adm-accent) 46%, var(--adm-surface));
+  font-weight: 700;
+}
+
+/* The report views (volume, queue and calls, capacity, channels): a row of links to the same
+   page, the current one marked with a line and bold type as well as aria-current. */
+.report-views ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.report-views a {
+  display: inline-block;
+  min-height: 24px;
+  padding: 0.25rem 0;
+  border-bottom: 3px solid transparent;
+}
+
+.report-views a[aria-current="page"] {
+  border-bottom-color: currentcolor;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (forced-colors: active) {
+  .rchart__bar,
+  .rchart__marker {
+    stroke: CanvasText;
+  }
+
+  .rchart__bar--solid,
+  .rchart__marker,
+  .rchart__pattern-dot {
+    fill: Highlight;
+  }
+
+  .rchart__pattern-bg {
+    fill: Canvas;
+  }
+
+  .rchart__pattern-ink,
+  .rchart__line {
+    stroke: CanvasText;
+  }
+
+  .rchart__gap {
+    fill: Canvas;
+    stroke: GrayText;
+  }
+
+  .rchart__tick,
+  .rchart__legend,
+  .rchart__unit {
+    fill: CanvasText;
+  }
+
+  .heat--1,
+  .heat--2,
+  .heat--3,
+  .heat--4 {
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+}
+
+/* Print: the tables carry every number, the drawings are left out. */
+@media print {
+  .rchart__frame {
+    display: none;
+  }
+}
+
 /* ADR 0062 §6: the column count is at most 2 on a tablet and 1 on a phone. Fixed on purpose:
    a layout rule of the design, not a setting. */
 @media (max-width: 52rem) {

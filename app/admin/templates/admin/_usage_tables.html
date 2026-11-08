@@ -19,3 +19,34 @@
   </div>
 </section>
 {% endmacro %}
+{#- A figure that is made from other figures (a percentage, a mean): "not available" when any part is hidden or missing. -#}
+{% macro figure(value, suffix="") -%}
+{%- if value is none %}<span class="muted">{{ _("reports.unavailable") }}</span>{% else %}{{ value }}{{ suffix }}{% endif -%}
+{%- endmacro %}
+{#- A table of two cuts with the totals that may be shown (``GridTable``); a hidden total reads "< n". -#}
+{% macro grid_table(id, title, corner, grid, row_kind, col_kind, threshold, total_label) %}
+<section class="card" aria-labelledby="{{ id }}-heading">
+  <h2 id="{{ id }}-heading">{{ title }}</h2>
+  <div class="table-scroll" role="region" aria-labelledby="{{ id }}-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ title }}</caption>
+    <thead><tr><th scope="col">{{ corner }}</th>{% for c in grid.columns %}<th scope="col">{{ label(col_kind, c) }}</th>{% endfor %}<th scope="col">{{ total_label }}</th></tr></thead>
+    <tbody>
+      {% for r in grid.rows %}
+      {% set i = loop.index0 %}
+      <tr><th scope="row">{{ label(row_kind, r) }}</th>{% for v in grid.cells[i] %}<td>{{ cell(v, threshold) }}</td>{% endfor %}<td>{{ cell(grid.row_totals[i], threshold) }}</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot><tr><th scope="row">{{ total_label }}</th>{% for t in grid.column_totals %}<td>{{ cell(t, threshold) }}</td>{% endfor %}<td>{{ cell(grid.total, threshold) }}</td></tr></tfoot>
+  </table>
+  </div>
+</section>
+{% endmacro %}
+{#- The mean of a duration under a table, when its total may be shown. -#}
+{% macro mean_line(title, seconds, signed=false) %}
+{% if seconds is not none %}<p>{{ title }}: {{ duration(seconds, signed) }}</p>{% endif %}
+{% endmacro %}
+{#- The page says so when nothing has been recorded for this family in the range. -#}
+{% macro nothing_yet() %}
+<section class="card"><p class="empty-state">{{ _("reports.empty") }}</p></section>
+{% endmacro %}

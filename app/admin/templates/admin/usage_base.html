@@ -1,0 +1,37 @@
+{#- The frame of every usage report (ADR 0117 point 11): the header of the group or organisation, the range form, the links between the report families (``view``), how fresh the figures are and the small-cell rule. A family fills the ``report`` block. -#}
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("reports.usage.title") }} · {% if summary is defined %}{{ summary.group.name }}{% else %}{{ org_header.name }}{% endif %} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% if summary is defined %}{% include "admin/_group_header.html" %}{% else %}{% include "admin/_organisation_header.html" %}{% endif %}
+<section class="card" aria-labelledby="usage-heading">
+  <div class="card__header">
+    <h2 id="usage-heading">{{ _("reports.usage.heading") }}</h2>
+    <p class="card__lead">{{ _("reports.usage.lead") }}</p>
+  </div>
+  <nav class="report-views" aria-label="{{ _("reports.views.label") }}">
+    <ul>
+      {% for code, key, href in views %}
+      <li><a href="{{ href }}"{% if code == view %} aria-current="page"{% endif %}>{{ _(key) }}</a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+  <form method="get" action="{{ base }}" class="filters">
+    <input type="hidden" name="view" value="{{ view }}">
+    <div class="field">
+      <label for="usage-from">{{ _("reports.usage.from") }}</label>
+      <input id="usage-from" name="from" type="date" value="{{ form_from }}">
+    </div>
+    <div class="field">
+      <label for="usage-to">{{ _("reports.usage.to") }}</label>
+      <input id="usage-to" name="to" type="date" value="{{ form_to }}">
+    </div>
+    <div class="form-actions"><button type="submit" class="button">{{ _("reports.usage.apply") }}</button></div>
+  </form>
+  <dl class="facts">
+    <div><dt>{{ _("reports.usage.as_of") }}</dt><dd>{% if as_of %}{{ as_of }}{% else %}{{ _("reports.usage.not_yet") }}{% endif %}</dd></div>
+    {% if summary is not defined %}<div><dt>{{ _("reports.usage.groups") }}</dt><dd>{{ usage.groups|map(attribute="name")|join(", ") }}</dd></div>{% endif %}
+  </dl>
+  <p class="muted">{{ _("reports.usage.rule", n=report.threshold) }}</p>
+</section>
+{% block report %}{% endblock %}
+{% endblock %}
