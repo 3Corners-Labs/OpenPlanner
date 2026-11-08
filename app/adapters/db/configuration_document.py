@@ -51,6 +51,8 @@ class _Transaction(Protocol):
 
     async def settings_version(self) -> int: ...
 
+    async def platform_settings(self) -> dict[str, object]: ...
+
     async def bump_settings_version(self) -> int: ...
 
 
@@ -109,7 +111,13 @@ class ConfigurationDocumentQueries:
             ),
         )
         usage = await read_usage(session, now, locked_settings)
-        return ConfigurationSnapshot(root, usage, await self.settings_version())
+        return ConfigurationSnapshot(
+            root,
+            usage,
+            await self.settings_version(),
+            secrets_available=box is not None,
+            settings=await self.platform_settings(),
+        )
 
     async def apply_configuration(self: _Transaction, changes: Sequence[Change]) -> int:
         """Write the changes in order; return the new settings version.

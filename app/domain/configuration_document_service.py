@@ -175,6 +175,8 @@ class ConfigurationDocumentService:
             raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")
         async with self._uow.read() as tx:
             snapshot = await tx.read_configuration(self._clock.now(), self._locked())
+        if secrets and not snapshot.secrets_available:
+            raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
         document = Document(
             format=V1.name,
             mode=Mode.MERGE,
@@ -260,6 +262,8 @@ class ConfigurationDocumentService:
             problem = self._problem(plan, first, plan_hash)
             if plan.refusals or problem is not None:
                 result = ApplyResult(plan, None)
+            elif not plan.changes:
+                result = ApplyResult(plan, snapshot.version)
             else:
                 version = await tx.apply_configuration(_enriched(plan.changes, issuers))
                 for change in plan.changes:
@@ -283,12 +287,20 @@ class ConfigurationDocumentService:
 
     def _plan(self, actor: Actor, document: Document, snapshot: ConfigurationSnapshot) -> Plan:
         """Plan ``document`` against a snapshot of the configuration."""
+        context = self._context()
+        portal = {
+            key: value
+            for key, value in snapshot.settings.items()
+            if key in context.settings and key not in snapshot.usage.locked_settings
+        }
         return plan_document(
             document,
             snapshot.root,
             usage=snapshot.usage,
             may_change=actor.may_change,
-            context=replace(self._context(), now=self._clock.now()),
+            context=replace(
+                context, now=self._clock.now(), settings={**context.settings, **portal}
+            ),
             settings_version=snapshot.version,
         )
 

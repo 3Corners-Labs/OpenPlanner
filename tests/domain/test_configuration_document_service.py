@@ -1,6 +1,7 @@
 """Export, plan and apply of a configuration document, on fakes (ADR 0099 points 6, 11, 12)."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -54,7 +55,11 @@ def uow(*organisations: Entity, usage: Usage | None = None) -> InMemoryUnitOfWor
 
 
 def build(
-    unit: InMemoryUnitOfWork, *, changes: int = 500, issuer_of: object = None
+    unit: InMemoryUnitOfWork,
+    *,
+    changes: int = 500,
+    issuer_of: object = None,
+    settings: dict[str, object] | None = None,
 ) -> ConfigurationDocumentService:
     clock = FixedClock(NOW)
     return ConfigurationDocumentService(
@@ -65,7 +70,7 @@ def build(
         PassphraseSealing(),
         installation="test",
         app_version="1.0.0",
-        context=lambda: RuleContext(),
+        context=lambda: RuleContext(settings=settings or {}),
         locked=lambda: frozenset(),
         max_bytes=lambda: 100_000,
         max_changes=lambda: changes,
@@ -126,7 +131,9 @@ async def test_a_document_that_changes_nothing_writes_nothing() -> None:
     result = await build(unit).apply(HOST, encoded(DOCUMENT), None, None)
 
     assert result.plan.changes == ()
-    assert result.applied  # an empty plan is applied: the version moves, nothing else
+    assert result.applied
+    assert unit.state.applied_configuration == []  # nothing is written, the version stays
+    assert unit.state.settings_version == 0
     assert unit.state.audit == []
 
 
@@ -317,3 +324,33 @@ async def test_an_organisation_export_keeps_only_that_organisation() -> None:
     assert "platform" not in document
     (event,) = unit.state.audit
     assert event.organisation == "acme"
+
+
+async def test_an_export_with_secrets_is_refused_when_the_installation_cannot_open_them() -> None:
+    unit = uow()
+    snapshot = unit.state.configuration
+    assert snapshot is not None
+    unit.state.configuration = replace(snapshot, secrets_available=False)
+
+    with pytest.raises(DomainError) as error:
+        await build(unit).export(HOST, Scope(), PASSPHRASE, secrets=True)
+
+    assert error.value.code is ErrorCode.INTEGRATION_NOT_READY
+    assert await build(unit).export(HOST, Scope(), None, secrets=False)
+
+
+async def test_a_limit_the_portal_changed_beats_the_process_default() -> None:
+    unit = uow(organisation())
+    snapshot = unit.state.configuration
+    assert snapshot is not None
+    unit.state.configuration = replace(snapshot, settings={"embedding_max_origins": 1})
+    data = {
+        "format": "openplanner.config/v1",
+        "organisations": [
+            {"slug": "acme", "origins": ["https://a.voorbeeld.nl", "https://b.voorbeeld.nl"]}
+        ],
+    }
+
+    plan = await build(unit, settings={"embedding_max_origins": 20}).plan(HOST, encoded(data), None)
+
+    assert not plan.ok
