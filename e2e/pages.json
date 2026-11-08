@@ -15,7 +15,8 @@
       "locales": [
         "nl",
         "en"
-      ]
+      ],
+      "island": true
     },
     {
       "name": "direct call",
@@ -23,7 +24,8 @@
       "locales": [
         "nl",
         "en"
-      ]
+      ],
+      "island": true
     },
     {
       "name": "closed group",
@@ -164,7 +166,8 @@
       "user": "super",
       "locales": [
         "nl"
-      ]
+      ],
+      "island": true
     },
     {
       "name": "groups list",

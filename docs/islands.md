@@ -34,6 +34,14 @@ Every entry states: what the server renders inside, how the script finds it, the
 roles and live regions, the browser features used, what happens without the script, and its size
 (gzipped, measured by the test above; it changes, so the number is a guide).
 
+## The gates of an island page
+
+A page that loads an island carries `"island": true` in `e2e/pages.json`. `e2e/tests/islands.spec.ts`
+then runs, in every locale of that page: scripts off (heading, content and axe), a keyboard run
+through every control, 320 px without sideways scroll (which is also 400 % zoom, WCAG 1.4.10), forced
+colours with reduced motion and axe, and no content-security-policy or script error in the console
+(ADR 0118 point 10). A new island sets the flag on the pages that show it before it merges.
+
 ## Existing scripts
 
 ### `live-region.js`
