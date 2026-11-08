@@ -137,6 +137,19 @@ class UsageOutcome(StrEnum):
     EXPIRED_UNCONFIRMED = "expired_unconfirmed"
 
 
+_CANCELLED_BY = {
+    ActorClass.PARTICIPANT: UsageOutcome.CANCELLED_BY_PARTICIPANT,
+    ActorClass.PLANNER: UsageOutcome.CANCELLED_BY_PLANNER,
+    ActorClass.CLOSURE: UsageOutcome.CANCELLED_BY_CLOSURE,
+    ActorClass.SYSTEM: UsageOutcome.CANCELLED_BY_SYSTEM,
+}
+
+
+def cancelled_outcome(actor: ActorClass) -> UsageOutcome:
+    """Return the outcome of a booking cancelled by ``actor`` (metric U2)."""
+    return _CANCELLED_BY[actor]
+
+
 class Aggregation(StrEnum):
     """How a metric's facts add up in one hour: a count, a sum, or the largest value."""
 

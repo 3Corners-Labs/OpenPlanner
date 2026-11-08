@@ -480,7 +480,12 @@ unconfirmed and lapsed, moved, suspended and resumed. **A booking that ended `co
 has no producer: nothing in the application sets those statuses**, so U2 and U3 show cancellations and
 lapses only until step 3 derives them from the call facts; the PO is told. The count of dropped facts
 is a log line (`usage.fact_dropped`, kind only) for now; *System status* shows it with the rollup lag
-in step 4.
+in step 4. Lead, hold and cancel times in a booking fact are kept to the quarter hour: the booking row
+keeps its exact creation and start times for two years, so an exact lead time would let a fact be
+matched to one booking by group, hour and locale (the review of step 2 found it, abuse case R3).
+Call durations (step 3) are not in the booking row and stay exact for the mean. The host CLI's own
+closure and cancel commands write facts whatever `reporting_enabled` says (it reads the portal value
+only in the web and the worker process).
 
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:

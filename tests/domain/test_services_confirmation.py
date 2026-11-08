@@ -16,6 +16,7 @@ from app.domain.errors import DomainError
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
+from app.domain.usage import ActorClass
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import (
@@ -190,7 +191,9 @@ async def test_a_planner_move_of_a_pending_booking_keeps_it_pending(
     group = uow.state.groups[1]
 
     async with uow.locked() as tx:
-        moved = await service.relocate(tx, receipt.booking, group, SLOT_0930)
+        moved = await service.relocate(
+            tx, receipt.booking, group, SLOT_0930, actor=ActorClass.PARTICIPANT
+        )
 
     assert moved.booking.status is BookingStatus.PENDING_CONFIRMATION
     assert moved.booking.confirm_by == CONFIRM_BY

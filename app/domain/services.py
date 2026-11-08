@@ -29,6 +29,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
+from app.domain import booking_changes
 from app.domain.availability import (
     AvailableSlot,
     available_slots,
@@ -426,12 +427,14 @@ class BookingService:
             now = self._clock.now()
             group = await self._group_by_id(tx, booking.group_id)
             _ensure_cancellable(booking, group, now)
-            cancelled = booking.cancel(now)
-            await tx.save_booking(cancelled)
-            await record_cancelled(tx, booking, now, ActorClass.PARTICIPANT, group=group)
-            jobs = plan_for_cancellation(cancelled_at=now, team_invite=group.sends_team_invite)
-            await tx.replace_jobs(_id(booking), jobs)
-            return cancelled
+            return await booking_changes.cancel(
+                tx,
+                booking,
+                group,
+                now,
+                actor=ActorClass.PARTICIPANT,
+                team_invite=group.sends_team_invite,
+            )
 
     async def leave_direct(self, management_token: str | PublicRef) -> DirectLeft:
         """Stop waiting for a direct call: cancel it and end its work item (ADR 0019 point 4).
@@ -454,7 +457,13 @@ class BookingService:
             status = await tx.get_call_status(booking.id) or new_status(booking.id)
             plan = plan_leave(booking, status, now)
             await tx.save_booking(plan.booking)
-            await record_cancelled(tx, booking, now, ActorClass.PARTICIPANT)
+            await record_cancelled(
+                tx,
+                booking,
+                await self._group_by_id(tx, booking.group_id),
+                now,
+                ActorClass.PARTICIPANT,
+            )
             await tx.replace_jobs(booking.id, plan.jobs)
             await tx.add_booking_event(plan.event)
             await tx.save_call_status(apply_event(status, plan.event.kind, now))
@@ -479,7 +488,7 @@ class BookingService:
                 raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
             group = await self._group_by_id(tx, old.group_id)
             _ensure_changeable(old, group, self._clock.now())
-            return await self.relocate(tx, old, group, new_start)
+            return await self.relocate(tx, old, group, new_start, actor=ActorClass.PARTICIPANT)
 
     async def relocate(
         self,
@@ -488,8 +497,8 @@ class BookingService:
         group: Group,
         new_start: datetime,
         *,
+        actor: ActorClass,
         sms: bool = False,
-        actor: ActorClass = ActorClass.PARTICIPANT,
     ) -> BookingReceipt:
         """Move ``old`` to ``new_start`` inside the caller's locked transaction.
 

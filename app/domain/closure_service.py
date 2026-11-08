@@ -583,7 +583,7 @@ class ClosureService:
         """Cancel ``booking`` with the cancellation mail, the team's withdrawal and the purge."""
         now = self._clock.now()
         await booking_changes.cancel(
-            tx, booking, now, team_invite=group.sends_team_invite, actor=ActorClass.CLOSURE
+            tx, booking, group, now, actor=ActorClass.CLOSURE, team_invite=group.sends_team_invite
         )
 
     async def _closure_bookings(

@@ -76,31 +76,33 @@ def sms_reachable(booking: Booking) -> bool:
 async def cancel(
     tx: Transaction,
     booking: Booking,
+    group: Group,
     now: datetime,
     *,
+    actor: ActorClass,
     reason: ChangeReason | None = None,
     sms: bool = False,
     team_invite: bool = False,
-    actor: ActorClass = ActorClass.PLANNER,
 ) -> Booking:
     """Cancel ``booking`` with the cancellation message and the usual purge; return it.
 
     Args:
         tx: The caller's locked transaction.
         booking: A confirmed or suspended booking.
+        group: Its group, for the usage fact.
         now: Current time.
         reason: The planner's fixed reason, shown in the message.
         sms: Also send the cancellation as an SMS when the participant is reachable there.
         team_invite: Withdraw the calendar invite of the group's team (ADR 0043).
-        actor: Who cancels, as a class, for the usage facts (ADR 0117): the planner, or the
-            closure when an admin cancels a booking on hold.
+        actor: Who cancels, as a class, for the usage facts (ADR 0117): the participant, the
+            planner, or the closure when an admin cancels a booking on hold.
 
     Raises:
         DomainError: ``booking_not_active`` if it holds no place.
     """
     cancelled = booking.cancel(now, reason)
     await tx.save_booking(cancelled)
-    await record_cancelled(tx, booking, now, actor, reason=reason)
+    await record_cancelled(tx, booking, group, now, actor, reason=reason)
     jobs = plan_for_cancellation(
         cancelled_at=now, sms=sms and sms_reachable(booking), team_invite=team_invite
     )
@@ -155,7 +157,7 @@ async def lapse(tx: Transaction, booking: Booking, now: datetime) -> bool:
     if not booking.awaits_rebook:
         return False
     await tx.save_booking(booking.cancel(now))
-    await record_cancelled(tx, booking, now, ActorClass.SYSTEM)
+    await record_cancelled(tx, booking, await _group(tx, booking), now, ActorClass.SYSTEM)
     await tx.add_jobs(_id(booking), plan_for_lapse(now=now, sms=sms_reachable(booking)))
     return True
 
@@ -170,9 +172,17 @@ async def lapse_unconfirmed(tx: Transaction, booking: Booking, now: datetime) ->
     if not booking.awaits_confirmation:
         return False
     await tx.save_booking(booking.expire(now))
-    await record_confirm_expired(tx, booking, now)
+    await record_confirm_expired(tx, booking, await _group(tx, booking), now)
     await tx.add_jobs(_id(booking), plan_for_unconfirmed_lapse(now=now))
     return True
+
+
+async def _group(tx: Transaction, booking: Booking) -> Group:
+    """Return the booking's group; a booking without one is a programming error."""
+    group = await tx.get_group_by_id(booking.group_id)
+    if group is None:
+        raise ValueError("booking has no group")
+    return group
 
 
 def _id(booking: Booking) -> int:

@@ -9,15 +9,25 @@ from app.domain import booking_changes
 from app.domain.authorization import Role
 from app.domain.booking import ChangeReason
 from app.domain.closure_service import ClosureInput, ClosureService
+from app.domain.errors import DomainError
 from app.domain.privacy import USAGE_FIELDS
 from app.domain.scheduling import DispatchKind
 from app.domain.services import BookingService
 from app.domain.usage import ActorClass, FactKind, StaffFact, UsageFact, UsageOutcome, hour_of
-from app.domain.usage_recording import MOVE_REASON
+from app.domain.usage_recording import LEAD_GRAIN_SECONDS, MOVE_REASON, coarse
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.closures import NOTICES
-from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, TUESDAY_0900, book, book_pending
+from tests.support.domain import (
+    ADA,
+    NOW,
+    SLOT_0900,
+    SLOT_0930,
+    TUESDAY_0900,
+    book,
+    book_pending,
+    participant,
+)
 from tests.support.principals import principal
 
 GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), frozenset({"demo"}))
@@ -45,7 +55,7 @@ async def test_a_new_booking_is_created_and_slotted(
     assert (created.organisation_id, created.group_id) == (1, 1)
     assert created.dispatch_kind is DispatchKind.CONTACT_CENTER
     assert created.locale == "nl"
-    assert created.value_seconds == int((SLOT_0900 - NOW).total_seconds())
+    assert created.value_seconds == coarse(int((SLOT_0900 - NOW).total_seconds()))
     assert created.reason_code is None
 
 
@@ -75,7 +85,7 @@ async def test_a_participant_cancelling_is_keyed_on_the_slot_with_the_lead_time(
     assert cancelled.bucket_hour == hour_of(SLOT_0900)
     assert cancelled.actor_class is ActorClass.PARTICIPANT
     assert cancelled.outcome is UsageOutcome.CANCELLED_BY_PARTICIPANT
-    assert cancelled.value_seconds == int((SLOT_0900 - NOW).total_seconds())
+    assert cancelled.value_seconds == coarse(int((SLOT_0900 - NOW).total_seconds()))
 
 
 async def test_a_move_is_one_move_one_new_booking_and_no_cancellation(
@@ -119,7 +129,16 @@ async def test_a_planner_cancelling_carries_the_fixed_reason(
     async with uow.locked() as tx:
         stored = await tx.get_booking(receipt.booking.id or 0)
         assert stored is not None
-        await booking_changes.cancel(tx, stored, clock.now(), reason=ChangeReason.STAFFING)
+        group = await tx.get_group_by_id(stored.group_id)
+        assert group is not None
+        await booking_changes.cancel(
+            tx,
+            stored,
+            group,
+            clock.now(),
+            actor=ActorClass.PLANNER,
+            reason=ChangeReason.STAFFING,
+        )
 
     cancelled = _facts(uow)[-1]
     assert cancelled.actor_class is ActorClass.PLANNER
@@ -178,3 +197,47 @@ async def test_the_fact_names_the_groups_organisation(
 
     created = _facts(uow)[0]
     assert created.organisation_id == (1 if slug == "demo" else 2)
+
+
+@pytest.mark.parametrize(
+    ("seconds", "kept"),
+    [
+        (0, 0),
+        (899, 0),
+        (900, 900),
+        (1799, 900),
+        (-1, 0),
+        (-900, -900),
+        (-1799, -900),
+        (86_399, 85_500),
+    ],
+)
+def test_lead_and_hold_times_are_kept_to_the_quarter_hour(seconds: int, kept: int) -> None:
+    assert coarse(seconds) == kept
+    assert coarse(seconds) % LEAD_GRAIN_SECONDS == 0
+
+
+async def test_no_fact_holds_a_time_that_gives_back_the_booking_instant(
+    bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    """R3: the booking row keeps exact times, so a fact must not carry them."""
+    receipt = await book(bookings, slug="demo")
+    await bookings.cancel(receipt.management_token)
+
+    for fact in _facts(uow):
+        assert fact.value_seconds is None or fact.value_seconds % LEAD_GRAIN_SECONDS == 0
+        assert fact.bucket_hour.minute == fact.bucket_hour.second == 0
+
+
+async def test_a_failed_move_leaves_no_fact_behind(
+    bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book(bookings, slug="demo")
+    await book(bookings, SLOT_0930, slug="demo")
+    await book(bookings, SLOT_0930, slug="demo", contact=participant(2))
+    before = list(uow.state.usage_facts)
+
+    with pytest.raises(DomainError):
+        await bookings.reschedule(receipt.management_token, SLOT_0930)
+
+    assert uow.state.usage_facts == before

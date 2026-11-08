@@ -149,7 +149,14 @@ class PlannerService:
             booking = await self._changeable(tx, group, booking_id)
             now = self._clock.now()
             await booking_changes.cancel(
-                tx, booking, now, reason=reason, sms=True, team_invite=group.sends_team_invite
+                tx,
+                booking,
+                group,
+                now,
+                actor=ActorClass.PLANNER,
+                reason=reason,
+                sms=True,
+                team_invite=group.sends_team_invite,
             )
             detail = f"planner.cancel,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)

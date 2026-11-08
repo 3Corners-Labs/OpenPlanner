@@ -30,6 +30,7 @@ from app.domain.usage import (
     HourSource,
     UsageFact,
     UsageOutcome,
+    cancelled_outcome,
     hour_of,
     usable_locale,
 )
@@ -37,19 +38,23 @@ from app.domain.usage import (
 MOVE_REASON = "move"
 """The ``reason_code`` of a ``booking.created`` fact that replaces a moved booking."""
 
-_CANCELLED_BY = {
-    ActorClass.PARTICIPANT: UsageOutcome.CANCELLED_BY_PARTICIPANT,
-    ActorClass.PLANNER: UsageOutcome.CANCELLED_BY_PLANNER,
-    ActorClass.CLOSURE: UsageOutcome.CANCELLED_BY_CLOSURE,
-    ActorClass.SYSTEM: UsageOutcome.CANCELLED_BY_SYSTEM,
-}
+LEAD_GRAIN_SECONDS = 900
+"""Lead and hold times are kept to the quarter hour. The booking row keeps its exact creation and
+start times for ``booking_row_retention_days``, so an exact lead time would let a fact be matched
+to one booking by its group, hour and locale (abuse case R3). A fixed rule, not a setting."""
+
+
+def coarse(seconds: int) -> int:
+    """Return ``seconds`` rounded towards zero to a multiple of ``LEAD_GRAIN_SECONDS``."""
+    grain = abs(seconds) // LEAD_GRAIN_SECONDS * LEAD_GRAIN_SECONDS
+    return grain if seconds >= 0 else -grain
 
 
 def _moment(kind: FactKind, booking: Booking, now: datetime) -> datetime:
     """Return the instant ``kind`` is keyed on: creation, slot start, or the event itself."""
     source = FACT_HOUR[kind]
     if source is HourSource.CREATION:
-        return booking.created_at or now
+        return booking.created_at
     return booking.start if source is HourSource.SLOT_START else now
 
 
@@ -80,17 +85,6 @@ def booking_fact(
     )
 
 
-async def _group_of(tx: Transaction, booking: Booking, group: Group | None) -> Group | None:
-    """Return ``group``, or the booking's group when the caller does not hold it."""
-    return group if group is not None else await tx.get_group_by_id(booking.group_id)
-
-
-async def _record(tx: Transaction, fact: UsageFact | None) -> None:
-    """Write ``fact`` unless the group is gone."""
-    if fact is not None:
-        await tx.record_usage(fact)
-
-
 async def record_placed(
     tx: Transaction, booking: Booking, group: Group, now: datetime, *, moved: bool = False
 ) -> None:
@@ -100,14 +94,14 @@ async def record_placed(
     ``move`` so *created* counts never include moves (metric U1). The lead time is the
     seconds from creation to the slot start (metric U6).
     """
-    lead = int((booking.start - (booking.created_at or now)).total_seconds())
+    lead = int((booking.start - booking.created_at).total_seconds())
     created = booking_fact(
         FactKind.BOOKING_CREATED,
         booking,
         group,
         now,
         reason_code=MOVE_REASON if moved else None,
-        value_seconds=max(lead, 0),
+        value_seconds=coarse(max(lead, 0)),
     )
     await tx.record_usage(created)
     await tx.record_usage(booking_fact(FactKind.BOOKING_SLOTTED, booking, group, now))
@@ -115,14 +109,14 @@ async def record_placed(
 
 async def record_confirmed(tx: Transaction, booking: Booking, group: Group, now: datetime) -> None:
     """Record a confirmation by the participant, with the seconds from creation (metric U9)."""
-    held = int((now - (booking.created_at or now)).total_seconds())
+    held = int((now - booking.created_at).total_seconds())
     fact = booking_fact(
         FactKind.BOOKING_CONFIRMED,
         booking,
         group,
         now,
         actor_class=ActorClass.PARTICIPANT,
-        value_seconds=max(held, 0),
+        value_seconds=coarse(max(held, 0)),
     )
     await tx.record_usage(fact)
 
@@ -130,47 +124,43 @@ async def record_confirmed(tx: Transaction, booking: Booking, group: Group, now:
 async def record_cancelled(
     tx: Transaction,
     booking: Booking,
+    group: Group,
     now: datetime,
     actor_class: ActorClass,
     *,
-    group: Group | None = None,
     reason: ChangeReason | None = None,
 ) -> None:
-    """Record a cancellation by ``actor_class``, with the seconds left before the start.
+    """Record a cancellation by ``actor_class``, with the quarter hours left before the start.
 
     The lead time is signed: a booking cancelled after its start (a lapse) has a negative one.
     """
-    found = await _group_of(tx, booking, group)
-    if found is None:
-        return
     fact = booking_fact(
         FactKind.BOOKING_CANCELLED,
         booking,
-        found,
+        group,
         now,
         actor_class=actor_class,
-        outcome=_CANCELLED_BY[actor_class],
+        outcome=cancelled_outcome(actor_class),
         reason_code=reason.value if reason is not None else None,
-        value_seconds=int((booking.start - now).total_seconds()),
+        value_seconds=coarse(int((booking.start - now).total_seconds())),
     )
-    await _record(tx, fact)
+    await tx.record_usage(fact)
 
 
-async def record_confirm_expired(tx: Transaction, booking: Booking, now: datetime) -> None:
+async def record_confirm_expired(
+    tx: Transaction, booking: Booking, group: Group, now: datetime
+) -> None:
     """Record a booking that was never confirmed in time (metrics U2 and U9)."""
-    found = await _group_of(tx, booking, None)
-    if found is None:
-        return
     fact = booking_fact(
         FactKind.BOOKING_CONFIRM_EXPIRED,
         booking,
-        found,
+        group,
         now,
         actor_class=ActorClass.SYSTEM,
         outcome=UsageOutcome.EXPIRED_UNCONFIRMED,
-        value_seconds=int((now - (booking.created_at or now)).total_seconds()),
+        value_seconds=coarse(int((now - booking.created_at).total_seconds())),
     )
-    await _record(tx, fact)
+    await tx.record_usage(fact)
 
 
 async def record_moved(
