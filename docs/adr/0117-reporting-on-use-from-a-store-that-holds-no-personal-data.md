@@ -1,6 +1,7 @@
 # 0117. Reporting on use, from a store that holds no personal data
 
-Status: proposed (2026-11-06), requested by the product owner (open point O16). Not built. Extends
+Status: accepted (2026-11-06, PR #558), requested by the product owner (open point O16). Partly built:
+step 1 (the domain, no database) is merged; the rest is planned. Extends
 ADR 0102 (what remains after a purge; step 4 is its first statistics table), ADR 0014
 (authorisation), ADR 0023 (machine API), ADR 0047 (admin structure), ADR 0042 (settings) and
 ADR 0009 (messages). Relates to ADR 0019, 0024, 0043, 0044, 0056, 0057, 0069, 0072, 0081 and 0085.
@@ -438,8 +439,8 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #558 | in PR #558 |
-| 1 | Domain only: `app/domain/usage.py` (fact kinds, allow-list `USAGE_FIELDS`, metric table, buckets, `suppress()`), `privacy.py` list and test, `docs/reporting.md` generated; no database | | planned |
+| 0 | ADR proposed | #558 | merged |
+| 1 | Domain only: `app/domain/usage.py` (fact kinds, allow-list `USAGE_FIELDS`, metric table, buckets, `suppress()`), `privacy.py` list and test, `docs/reporting.md` generated; no database | PR_NUMBER | merged |
 | 2 | Migration (five tables, expand-only), `record_usage` on `Transaction`, settings and registry entries, facts for booking create, confirm, expire, cancel, move, outcome, suspend/resume | | planned |
 | 3 | Facts for calls, queue, direct calls, trial calls, messages, rebooking, slot close and shortfall; PII test over every fact | | planned |
 | 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | | planned |
@@ -453,6 +454,18 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
 | 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
+
+**Build order (agreed with the product owner, 2026-11-08):** 1, 2, 4, 5, then 3, then 6 to 14. The
+*Volume* screen of step 5 needs only the booking facts of step 2, so the first visible screen comes
+after four PRs; the metrics that need call facts (U8, U11 and the call metrics) follow with step 3.
+
+**Step 1 notes (no change of a decision):** the domain adds the fact kind `booking.slotted` (one
+fact per booking placed in a slot, keyed on the slot start) so that the busiest-hours table (C4)
+needs no second hour on `booking.created`; the hour source is declared per fact kind, which the
+generated `docs/reporting.md` lists; a booking created by a move carries `reason_code` `move`
+instead of a field `is_move`, which keeps the allow-list of point 2 as written. The property tests
+of `suppress_table` found that a total must also be hidden when its line has exactly one hidden
+cell and no other cell to hide with it; the building block now does that.
 
 Each step is one PR and its description answers the eight review questions. The ones that differ
 per step:
