@@ -305,3 +305,5 @@ class StaleTask:
     state: TaskState
     organisation: str | None
     group: str | None = None
+    organisation_id: int | None = None
+    """The organisation's id, so its own dispatcher is chosen (ADR 0032 point 13)."""

@@ -4,16 +4,21 @@ An organisation with a connection of its own dispatches through it, and only thr
 of one tenant never goes to another. An organisation without one uses the installation's
 dispatcher for its platform, the fallback of point 11 for one minor.
 
-    organisation connected? ─yes─► its own dispatcher (or none: the task waits)
-                            ─no──► the installation's dispatcher for the kind
+    organisation connected? ─yes─► its own dispatcher, or ``connection_incomplete`` (retried,
+                            │       then the fallback of ADR 0082 takes over)
+                            ─no──► the installation's dispatcher for the kind (or none)
 """
 
 from app.domain.contact_center import ContactCenterKind
 from app.domain.ports import (
     ContactCenterDispatcher,
     ContactCenterDispatchers,
+    IntegrationError,
     OrganisationDispatchers,
 )
+
+INCOMPLETE = "connection_incomplete"
+"""The organisation's own connection cannot dispatch yet; retryable, so the task waits."""
 
 
 class DispatcherChoice:
@@ -39,13 +44,21 @@ class DispatcherChoice:
         return bool(self._installation) or self._organisations is not None
 
     async def for_organisation(
-        self, organisation_id: int | None, kind: ContactCenterKind
+        self, organisation_id: int, kind: ContactCenterKind
     ) -> ContactCenterDispatcher | None:
-        """Return the dispatcher for a task of ``organisation_id`` on platform ``kind``."""
-        if (
-            self._organisations is not None
-            and organisation_id is not None
-            and await self._organisations.connected(organisation_id)
-        ):
-            return await self._organisations.dispatcher(organisation_id, kind)
+        """Return the dispatcher for a task of ``organisation_id`` on platform ``kind``.
+
+        ``None`` only when the organisation has no connection and the installation none for
+        ``kind`` either: like a group without a contact center.
+
+        Raises:
+            IntegrationError: ``connection_incomplete`` (retryable) when the organisation's own
+                connection cannot dispatch yet; its task never goes to another tenant.
+        """
+        if self._organisations is not None:
+            own = await self._organisations.own(organisation_id, kind)
+            if own is not None:
+                if own.dispatcher is None:
+                    raise IntegrationError(INCOMPLETE, retryable=True)
+                return own.dispatcher
         return self._installation.get(kind)

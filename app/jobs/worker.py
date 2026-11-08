@@ -380,7 +380,7 @@ async def run_worker(
         poll_seconds=settings.worker_poll_seconds,
         fallback_mail=fallback_mail(settings) is not None,
         video_enabled=wired.video is not None,
-        dispatch_enabled=bool(wired.dispatchers) or wired.organisations is not None,
+        dispatch_enabled=wired.dispatch_configured,
         release_check=settings.update_repository is not None,
     )
     try:

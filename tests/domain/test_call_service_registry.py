@@ -2,12 +2,14 @@
 
 from dataclasses import replace
 
+import pytest
+
 from app.domain.admin import AdminService
 from app.domain.booking import MeetingRef
 from app.domain.call_service import CallService
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.integration import IntegrationService
-from app.domain.ports import ContactCenterDispatchers
+from app.domain.ports import ContactCenterDispatchers, IntegrationError
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
@@ -81,7 +83,7 @@ async def test_the_task_is_ended_by_the_dispatcher_of_the_platform_that_holds_it
     _, calls, booking = await _service(webex_cc(dispatcher))
     held = replace(booking, contact_center_task=ContactCenterTaskRef("t-9", WEBEX_CC))
 
-    await calls.end_task(held)
+    await calls.end_task(held, GROUP)
 
     assert dispatcher.marked == [("t-9", held.reference)]
     assert dispatcher.ended == ["t-9"]
@@ -94,7 +96,7 @@ async def test_a_task_without_a_dispatcher_for_its_platform_is_left_alone() -> N
     status_before = uow.state.call_status.get(booking_id)
     events_before = list(uow.state.booking_events.get(booking_id, []))
 
-    await calls.end_task(held)  # nothing to call, nothing raised
+    await calls.end_task(held, GROUP)  # nothing to call, nothing raised
 
     assert uow.state.booking_events.get(booking_id, []) == events_before  # no timeline event
     assert uow.state.call_status.get(booking_id) == status_before  # status unchanged
@@ -107,7 +109,7 @@ async def test_an_organisation_with_its_own_connection_dispatches_through_it() -
     _, calls, booking = await _service(webex_cc(installation), organisations)
 
     await calls.ensure_task(booking, GROUP)
-    await calls.end_task(replace(booking, contact_center_task=TASK_1))
+    await calls.end_task(replace(booking, contact_center_task=TASK_1), GROUP)
 
     assert len(own.items) == 1
     assert own.ended == ["task-1"]
@@ -121,7 +123,10 @@ async def test_an_incomplete_own_connection_never_falls_back_to_the_installation
     organisations = FakeOrganisationDispatchers({GROUP.organisation_id: None})
     _, calls, booking = await _service(webex_cc(installation), organisations)
 
-    assert await calls.ensure_task(booking, GROUP) == booking
+    with pytest.raises(IntegrationError) as waiting:
+        await calls.ensure_task(booking, GROUP)
+    assert waiting.value.code == "connection_incomplete"
+    assert waiting.value.retryable  # the job retries; a final failure goes to the fallback
     assert installation.items == []
 
 

@@ -180,7 +180,7 @@ class CallService:
         """Whether tasks can be ended (needs only a contact center)."""
         return self._dispatchers.configured
 
-    async def end_task(self, booking: Booking) -> None:
+    async def end_task(self, booking: Booking, group: Group) -> None:
         """Mark a cancelled booking's task cancelled, then try to end it.
 
         Nothing happens without a task, without a dispatcher for the platform that holds it, or
@@ -193,10 +193,7 @@ class CallService:
         task = booking.contact_center_task
         if task is None:
             return
-        async with self._uow.read() as tx:
-            group = await tx.get_group_by_id(booking.group_id)
-        organisation_id = group.organisation_id if group is not None else None
-        dispatcher = await self._dispatchers.for_organisation(organisation_id, task.kind)
+        dispatcher = await self._dispatchers.for_organisation(group.organisation_id, task.kind)
         if dispatcher is None:
             return
         task_id, booking_id = task.id, _id(booking)

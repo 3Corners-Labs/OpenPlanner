@@ -116,10 +116,16 @@ organisatie is inderdaad wat moet kunnen".
     (credential redirection). A host name that resolves to such an address is not checked: the
     platforms' hosts are public names and only the superuser sets the host.
 13. **An organisation's tasks never go to another tenant.** An organisation with its own
-    connection dispatches, ends and reconciles its tasks only through it; while that connection
-    lacks a secret, its tasks wait. Only an organisation without a connection uses the
-    installation's (point 11). Its access tokens are kept sealed under
-    `contact-center-tokens:{organisation id}` and deleted with the organisation.
+    connection dispatches, ends and reconciles its tasks only through it. While that connection
+    lacks a secret, a dispatch fails with the retryable `connection_incomplete`: the job retries
+    (ADR 0068) and a final failure hands the booking to the fallback of ADR 0082. Only an
+    organisation without a connection uses the installation's (point 11). Its access tokens are
+    kept sealed under `contact-center-tokens:{organisation id}` and deleted with the connection
+    and with the organisation. Accepted limit: a task is ended and reconciled through the
+    connection the organisation has *now*, so a task created before it connected (or before it
+    removed its connection) is ended at the wrong tenant, which answers 404; the booking's
+    timeline shows `end_not_possible`. Connect or disconnect an organisation when none of its
+    tasks is open; the manual says so.
 
 **Settings.** The amendment adds no setting. The connection is integration data, sealed per
 organisation (ADR 0008), not a class D setting: its secrets are write-only and the webhook

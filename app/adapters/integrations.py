@@ -23,7 +23,7 @@ from app.adapters.group_check import CheckerConfig, PlatformChecker
 from app.adapters.organisation_dispatch import OrganisationWxcc
 from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
-from app.adapters.wxcc import WxccTasks
+from app.adapters.wxcc import wxcc_tasks
 from app.config import Settings
 from app.domain.contact_center import ContactCenterKind
 from app.domain.ports import (
@@ -54,6 +54,11 @@ class Integrations:
     dispatchers: ContactCenterDispatchers = field(default_factory=dict)
     checker: IntegrationChecker | None = None
     organisations: OrganisationDispatchers | None = None
+
+    @property
+    def dispatch_configured(self) -> bool:
+        """Whether tasks can go anywhere: the installation's dispatcher or an organisation's."""
+        return bool(self.dispatchers) or self.organisations is not None
 
 
 def webex_fingerprint(settings: Settings) -> str:
@@ -93,6 +98,11 @@ def sealed_store(engine: AsyncEngine, settings: Settings) -> CredentialStore | N
     """
     box = secret_box(settings)
     return CredentialStore(engine, box) if box is not None else None
+
+
+def webex_oauth_url(settings: Settings) -> str:
+    """Return the Webex token endpoint every Service App signs in at."""
+    return f"{settings.webex_api_base_url.rstrip('/')}/access_token"
 
 
 def sealed_connections(engine: AsyncEngine, settings: Settings) -> SealedConnections | None:
@@ -138,17 +148,21 @@ def build_integrations(
         client_id=client_id,
         client_secret=secret.get_secret_value(),
         bootstrap_refresh_token=refresh.get_secret_value(),
-        oauth_url=f"{settings.webex_api_base_url.rstrip('/')}/access_token",
+        oauth_url=webex_oauth_url(settings),
     )
     store = CredentialStore(engine, installation_box(settings))
-    tokens = WebexTokens(config, http, store, clock, security)
+    tokens, tasks = wxcc_tasks(
+        config,
+        http,
+        store,
+        clock,
+        settings.wxcc_api_base_url or "",
+        security=security,
+        request_log=request_log,
+    )
     client = AuthorizedClient(http, tokens, request_log)
     video = WebexMeetings(client, settings.webex_api_base_url, clock)
-    dispatcher = (
-        WxccTasks(client, settings.wxcc_api_base_url, clock)
-        if settings.dispatch_configured and settings.wxcc_api_base_url
-        else None
-    )
+    dispatcher = tasks if settings.dispatch_configured and settings.wxcc_api_base_url else None
     webex_secret, wxcc_secret = settings.webex_webhook_secret, settings.wxcc_webhook_secret
     checker = PlatformChecker(
         http,
@@ -185,7 +199,12 @@ def _organisation_dispatchers(
     store = sealed_store(engine, settings)
     if store is None:
         return None
-    oauth_url = f"{settings.webex_api_base_url.rstrip('/')}/access_token"
     return OrganisationWxcc(
-        SealedConnections(store), store, http, clock, oauth_url, security, request_log
+        SealedConnections(store),
+        store,
+        http,
+        clock,
+        webex_oauth_url(settings),
+        security,
+        request_log,
     )

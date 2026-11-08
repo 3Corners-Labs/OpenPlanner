@@ -172,12 +172,14 @@ class TaskReconciler:
 
     async def _read(self, task: StaleTask) -> EventKind | None:
         """Return the event that brings the booking to the task's state, if it differs."""
-        organisation_id = None
-        if task.organisation is not None:
-            async with self._uow.read() as tx:
-                found = await tx.get_organisation(task.organisation)
-            organisation_id = found.id if found is not None else None
-        dispatcher = await self._dispatchers.for_organisation(organisation_id, task.task.kind)
+        if task.organisation_id is None:
+            return None
+        try:
+            dispatcher = await self._dispatchers.for_organisation(
+                task.organisation_id, task.task.kind
+            )
+        except IntegrationError:  # an incomplete own connection: read it once it is complete
+            return None
         if dispatcher is None:
             return None
         with trace_scope():

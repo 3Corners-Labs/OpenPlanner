@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.adapters.db.credentials import Secrets
-from app.adapters.db.uow import contact_center_credential_name
+from app.adapters.db.uow import contact_center_credential_name, organisation_tokens_name
 from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
 
 WEBHOOK_SECRET_BYTES = 32
@@ -107,8 +107,9 @@ class SealedConnections:
         await self._store.put(contact_center_credential_name(organisation_id), record, now)
 
     async def delete(self, organisation_id: int) -> None:
-        """Remove the organisation's connection and its secrets."""
+        """Remove the organisation's connection, its secrets and the access tokens it was given."""
         await self._store.delete(contact_center_credential_name(organisation_id))
+        await self._store.delete(organisation_tokens_name(organisation_id))
 
     async def credentials(self, organisation_id: int) -> ConnectionCredentials | None:
         """Return what the dispatcher needs to act for the organisation; for the adapter only."""

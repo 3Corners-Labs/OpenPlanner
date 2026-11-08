@@ -104,7 +104,7 @@ class CallJobs:
                 return STALE
             await self._calls.delete_trial_call(booking, group)
         elif job.type is JobType.END_WXCC_TASK:
-            await self._calls.end_task(booking)
+            await self._calls.end_task(booking, group)
         elif is_stale(job.pinned_start, booking):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE

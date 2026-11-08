@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from types import MappingProxyType
+from urllib.parse import urlsplit
 
 from app.domain.errors import DomainError, ErrorCode
 
@@ -269,18 +270,20 @@ class ConnectionChange:
 def _public_host(url: str) -> bool:
     """Whether the API host is not this machine or an internal network (ADR 0032 point 12).
 
-    Refused: ``localhost`` and names under it, and IP literals that are loopback, private,
-    link-local, reserved or unspecified. A host name that resolves to such an address is not
-    caught here; the platforms' hosts are public names.
+    Refused: ``localhost`` and names under it, IP literals that are loopback, private,
+    link-local, reserved or unspecified, and hosts whose last label is a number or hex (the
+    short and integer IPv4 spellings a resolver still maps to an address, such as ``127.1``).
+    A host name that resolves to such an address is not caught here; the platforms' hosts are
+    public names.
     """
-    host = url.removeprefix("https://").split("/", 1)[0].rsplit(":", 1)[0].lower()
-    if host == "localhost" or host.endswith(".localhost"):
+    host = (urlsplit(url).hostname or "").lower()
+    if not host or host == "localhost" or host.endswith(".localhost"):
         return False
     try:
-        address = ipaddress.ip_address(host)
+        return ipaddress.ip_address(host.strip("[]")).is_global
     except ValueError:
-        return True
-    return address.is_global
+        last = host.rsplit(".", 1)[-1]
+        return not (last.isdigit() or last.startswith("0x"))
 
 
 def _secret_shape(value: str) -> bool:

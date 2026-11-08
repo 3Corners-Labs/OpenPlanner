@@ -94,6 +94,8 @@ fallback goes away in a later version. With an own connection this organisation'
 through it; while the client secret or the refresh token is missing, they wait until the
 connection is complete. An API address on this server or in an internal network is refused. The
 webhook address works once OpenPlanner registers it with the contact center in a later step.
+Connect or disconnect an organisation when none of its tasks is open: a task made through the
+previous connection is not ended through the new one.
 
 ## What is recorded
 

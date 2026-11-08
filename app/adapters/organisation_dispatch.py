@@ -17,10 +17,10 @@ import httpx
 from app.adapters.contact_center_connections import ConnectionCredentials, SealedConnections
 from app.adapters.db.credentials import Secrets
 from app.adapters.db.uow import organisation_tokens_name
-from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
-from app.adapters.wxcc import WxccTasks
+from app.adapters.webex_auth import ServiceAppConfig
+from app.adapters.wxcc import WxccTasks, wxcc_tasks
 from app.domain.contact_center import ContactCenterKind
-from app.domain.ports import Clock, ContactCenterDispatcher, RequestLog
+from app.domain.ports import Clock, ContactCenterDispatcher, OwnConnection, RequestLog
 from app.domain.security_log import SecurityLog
 
 
@@ -68,18 +68,23 @@ class OrganisationWxcc:
         self._request_log = request_log
         self._built: dict[int, tuple[str, WxccTasks]] = {}
 
-    async def connected(self, organisation_id: int) -> bool:
-        """Return whether the organisation has a connection of its own."""
-        return await self._connections.get(organisation_id) is not None
+    async def own(self, organisation_id: int, kind: ContactCenterKind) -> OwnConnection | None:
+        """Return the organisation's own connection, its WxCC dispatcher built or reused.
 
-    async def dispatcher(
-        self, organisation_id: int, kind: ContactCenterKind
-    ) -> ContactCenterDispatcher | None:
-        """Return the organisation's WxCC dispatcher, built or reused; ``None`` when it cannot."""
+        ``None`` without a connection; a dispatcher of ``None`` when it cannot dispatch ``kind``.
+        """
         credentials = await self._connections.credentials(organisation_id)
+        if credentials is None:
+            self._built.pop(organisation_id, None)
+            return None
+        return OwnConnection(self._dispatcher(organisation_id, credentials, kind))
+
+    def _dispatcher(
+        self, organisation_id: int, credentials: ConnectionCredentials, kind: ContactCenterKind
+    ) -> ContactCenterDispatcher | None:
+        """Return the organisation's WxCC dispatcher, or ``None`` when it cannot dispatch."""
         if (
-            credentials is None
-            or credentials.kind is not ContactCenterKind.WEBEX_CC
+            credentials.kind is not ContactCenterKind.WEBEX_CC
             or kind is not ContactCenterKind.WEBEX_CC
             or not credentials.complete
         ):
@@ -95,15 +100,15 @@ class OrganisationWxcc:
             bootstrap_refresh_token=credentials.refresh_token,
             oauth_url=self._oauth_url,
         )
-        tokens = WebexTokens(
+        _, dispatcher = wxcc_tasks(
             config,
             self._http,
             self._tokens,
             self._clock,
-            self._security,
+            credentials.api_base_url,
+            security=self._security,
+            request_log=self._request_log,
             name=organisation_tokens_name(organisation_id),
         )
-        client = AuthorizedClient(self._http, tokens, self._request_log)
-        dispatcher = WxccTasks(client, credentials.api_base_url, self._clock)
         self._built[organisation_id] = (digest, dispatcher)
         return dispatcher

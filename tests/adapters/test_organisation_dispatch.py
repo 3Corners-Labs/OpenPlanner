@@ -41,7 +41,9 @@ async def test_the_organisation_signs_in_with_its_own_client_on_its_own_host() -
     organisations, connections = await _organisations(secrets, seen)
     await connections.save(1, OWN, NOW)
 
-    dispatcher = await organisations.dispatcher(1, WXCC)
+    own = await organisations.own(1, WXCC)
+    assert own is not None
+    dispatcher = own.dispatcher
     assert dispatcher is not None
     snapshot = await dispatcher.read_task("t-1")
 
@@ -59,27 +61,30 @@ async def test_the_dispatcher_is_reused_until_the_connection_changes() -> None:
     organisations, connections = await _organisations(secrets, seen)
     await connections.save(1, OWN, NOW)
 
-    first = await organisations.dispatcher(1, WXCC)
-    again = await organisations.dispatcher(1, WXCC)
+    first = await organisations.own(1, WXCC)
+    again = await organisations.own(1, WXCC)
     await connections.save(
         1, ConnectionChange(WXCC, "https://api.wxcc-eu2.cisco.com", "other-client"), NOW
     )
-    changed = await organisations.dispatcher(1, WXCC)
+    changed = await organisations.own(1, WXCC)
 
-    assert first is again
-    assert changed is not first
+    assert first is not None
+    assert again is not None
+    assert changed is not None
+    assert first.dispatcher is again.dispatcher
+    assert changed.dispatcher is not first.dispatcher
 
 
 async def test_without_a_complete_connection_there_is_no_dispatcher() -> None:
     secrets, seen = FakeSecrets(), []  # type: list[httpx.Request]
     organisations, connections = await _organisations(secrets, seen)
 
-    assert not await organisations.connected(1)
-    assert await organisations.dispatcher(1, WXCC) is None
+    assert await organisations.own(1, WXCC) is None
     await connections.save(
         1, ConnectionChange(WXCC, "https://api.wxcc-eu2.cisco.com", "client", "secret"), NOW
     )
 
-    assert await organisations.connected(1)
-    assert await organisations.dispatcher(1, WXCC) is None  # no refresh token yet
+    own = await organisations.own(1, WXCC)
+    assert own is not None
+    assert own.dispatcher is None  # no refresh token yet: its tasks wait
     assert seen == []
