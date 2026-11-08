@@ -73,6 +73,11 @@ _VERSION = re.compile(
 )
 _REASON = re.compile(r"^[a-z_]{1,40}$")
 _RELEASE_PAGE = "https://github.com/"
+_COMMIT_TYPE = re.compile(r"([a-z]+)(?:\([^()]*\))?!?: ", re.IGNORECASE)
+"""The Conventional Commits header a PR title starts with (``type(scope)!: ``); group 1 is the
+type, which Conventional Commits reads case-insensitively."""
+_DOCS_TYPE = "docs"
+"""The Conventional Commit type of design and documentation, ADRs among them: nothing built."""
 
 
 class UpdateChannel(StrEnum):
@@ -157,6 +162,29 @@ class Release:
 
 
 @dataclass(frozen=True)
+class NoteLine:
+    """One line of a release's notes, as the version picker shows it (ADR 0067 point 3).
+
+    Attributes:
+        text: The line: a PR title with its number, or other plain text of the notes.
+        docs: Whether the line is a PR of Conventional Commit type ``docs``
+            (``docs(adr): ...`` among them): design or documentation, nothing built.
+    """
+
+    text: str
+    docs: bool
+
+    @classmethod
+    def parse(cls, text: str) -> "NoteLine":
+        """Return ``text`` with whether its Conventional Commit type is ``docs``.
+
+        A line without a type (a revert, "New Contributors") counts as a change.
+        """
+        header = _COMMIT_TYPE.match(text)
+        return cls(text, header is not None and header[1].lower() == _DOCS_TYPE)
+
+
+@dataclass(frozen=True)
 class ListedRelease:
     """A release or candidate in the repository's listing (ADR 0067 point 3).
 
@@ -187,6 +215,22 @@ class ListedRelease:
     def release(self) -> Release:
         """The same release as the banner and the check know it."""
         return Release(self.version, self.url)
+
+    @property
+    def lines(self) -> list[NoteLine]:
+        """The notes, one ``NoteLine`` per line that is not empty."""
+        return [NoteLine.parse(line) for raw in self.notes.splitlines() if (line := raw.strip())]
+
+    @property
+    def docs_only(self) -> bool:
+        """Whether this version changes no behaviour compared with the version before it.
+
+        True only when every line of the notes is design or documentation (type ``docs``);
+        never without notes, nor for notes cut at ``NOTES_CHARS``, whose missing lines may
+        change behaviour.
+        """
+        lines = self.lines
+        return bool(lines) and len(self.notes) < NOTES_CHARS and all(line.docs for line in lines)
 
 
 def on_channel(listing: Sequence[ListedRelease], channel: UpdateChannel) -> list[ListedRelease]:

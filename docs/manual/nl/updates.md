@@ -56,6 +56,17 @@ kiest. Alleen nieuwere versies worden aangeboden: terug kan alleen met *Vorige v
 terugzetten*. U kunt één verzoek tegelijk indienen; zolang er een verzoek openstaat, wordt een
 tweede geweigerd.
 
+De toelichting heeft één regel per wijziging, met de titel van de wijziging. Een titel begint
+met een type: `feat` is een nieuwe functie, `fix` een herstel, `docs` ontwerp of documentatie.
+Een regel van het type `docs`, zoals `docs(adr): ...`, krijgt het label *ontwerp of
+documentatie, niets gebouwd*: hij beschrijft een besluit, een ontwerp of een handleiding, en
+geen scherm of functie die al werkt. Bestaat een versie alleen uit zulke regels, dan staat
+boven de toelichting dat er niets verandert in hoe OpenPlanner werkt. Zo'n versie bijwerken kan,
+maar levert geen nieuwe functie op. Het scherm zegt dit nooit van een versie zonder toelichting
+of met een ingekorte toelichting. Het gaat af op de titels van de wijzigingen en vergelijkt met
+de versie ervoor: slaat u bij het bijwerken versies over, lees dan ook de toelichting van de
+versies ertussen.
+
 ## Het lopende verzoek
 
 Na een verzoek tot bijwerken toont de kaart **Lopend verzoek** de stappen van de updater:

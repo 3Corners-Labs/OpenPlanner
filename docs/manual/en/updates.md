@@ -52,6 +52,16 @@ release candidate and when it was published. **Update to {version} now** install
 back is only possible with *Restore the previous version*. You can only file one request at a
 time; while a request is open, a second is refused.
 
+The notes have one line per change, with the title of the change. A title starts with a type:
+`feat` is a new feature, `fix` a repair, `docs` design or documentation. A line of type `docs`,
+such as `docs(adr): ...`, carries the label *design or documentation, nothing built*: it
+describes a decision, a design or a manual, not a screen or feature that already works. When a
+version consists of such lines only, a notice above the notes says that nothing changes in how
+OpenPlanner works. Updating to such a version is possible but brings no new feature. The screen
+never says this of a version without notes or with shortened notes. It goes by the titles of the
+changes and compares with the version before it: when an update skips versions, also read the
+notes of the versions in between.
+
 ## The open request
 
 After you request an update the card **Open request** shows the updater's steps: waiting for

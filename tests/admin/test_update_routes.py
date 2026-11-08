@@ -9,6 +9,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.update_service import UpdateService
 from app.domain.updates import (
+    ListedRelease,
     Release,
     ReleaseCheck,
     RunningVersion,
@@ -43,10 +44,56 @@ async def released(admin_db: str) -> None:
         await engine.dispose()
 
 
+DOCS_LINE = "docs(adr): 0117 reporting on use (#558)"
+DOCS_CHIP = "ontwerp of documentatie, niets gebouwd"
+NO_BEHAVIOUR = "Geen verandering in hoe OpenPlanner werkt"
+
+
+@pytest.fixture
+async def listed(admin_db: str) -> None:
+    """Store a check and its listing as the worker would: 1.4.0 builds, 1.3.1 is docs only."""
+    patch = Release(Version(1, 3, 1), "https://github.com/acme/openplanner/releases/tag/v1.3.1")
+    engine = create_engine(admin_db)
+    try:
+        async with SqlUnitOfWork(engine).locked() as tx:
+            await tx.save_release_check(ReleaseCheck(NOW, RELEASE))
+            await tx.save_release_listing(
+                [
+                    ListedRelease(
+                        RELEASE.version,
+                        RELEASE.url,
+                        NOW,
+                        f"feat(x): y (#9)\n{DOCS_LINE}\ndocs(x): <b>bold</b> (#10)",
+                    ),
+                    ListedRelease(patch.version, patch.url, NOW, DOCS_LINE),
+                ]
+            )
+    finally:
+        await engine.dispose()
+
+
 def updates(site: Site) -> UpdateService:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     found: UpdateService = app.state.update_service
     return found
+
+
+@pytest.mark.usefixtures("listed")
+async def test_picker_marks_docs_lines_and_a_version_that_changes_no_behaviour(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+    page = (await site.client.get("/admin/updates")).text
+    first, second = page.index("<code>1.4.0</code>"), page.index("<code>1.3.1</code>")
+    newest, docs_only = page[first:second], page[second:]
+    assert "feat(x): y (#9)" in newest
+    assert DOCS_LINE in newest
+    assert "docs(x): &lt;b&gt;bold&lt;/b&gt; (#10)" in newest  # markup in a note is escaped
+    assert "<b>bold</b>" not in newest
+    assert newest.count(DOCS_CHIP) == 2  # the two docs lines, not the feature
+    assert NO_BEHAVIOUR not in newest  # a feature is built in 1.4.0
+    assert docs_only.count(DOCS_CHIP) == 1
+    assert NO_BEHAVIOUR in docs_only
 
 
 @pytest.mark.usefixtures("released")

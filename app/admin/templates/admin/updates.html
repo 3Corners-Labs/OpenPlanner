@@ -61,7 +61,8 @@
     <li class="stack__item">
       <form method="post" action="/admin/updates/update">
         <h3><code>{{ item.version }}</code>{% if item.candidate %} <span class="chip">{{ _("admin.updates.candidate") }}</span>{% endif %}{% if item.published %} <span class="hint">{{ _("admin.updates.published", at=item.published) }}</span>{% endif %}</h3>
-        {% if item.notes %}<ul class="hint">{% for line in item.notes %}<li>{{ line }}</li>{% endfor %}</ul>{% else %}<p class="hint">{{ _("admin.updates.no_notes") }}</p>{% endif %}
+        {% if item.docs_only %}<div class="alert alert--info"><p>{{ _("admin.updates.docs_only") }}</p></div>{% endif %}
+        {% if item.lines %}<ul class="hint">{% for line in item.lines %}<li>{% if line.docs %}<span class="chip chip--wrap">{{ _("admin.updates.note.docs") }}</span> {% endif %}{{ line.text }}</li>{% endfor %}</ul>{% else %}<p class="hint">{{ _("admin.updates.no_notes") }}</p>{% endif %}
         <p><a href="{{ item.url }}">{{ icon("external") }}<span>{{ _("admin.updates.release_notes") }}</span></a></p>
         <input type="hidden" name="target" value="{{ item.version }}">
         <div class="field">
