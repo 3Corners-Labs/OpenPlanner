@@ -1153,6 +1153,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=512,
     ),
     S(
+        "configuration_apply_max_changes",
+        K.INT,
+        500,
+        _C,
+        T.OPERATIONS,
+        "Most changes one configuration document may apply; a larger plan is refused (ADR 0099).",
+        minimum=1,
+        maximum=10_000,
+    ),
+    S(
         "audit_export_max_days",
         K.INT,
         366,

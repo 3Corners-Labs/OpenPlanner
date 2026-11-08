@@ -35,6 +35,7 @@ from app.adapters.db.admin_sessions import AdminSessionQueries
 from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.certificate import CertificateQueries
+from app.adapters.db.configuration_document import ConfigurationDocumentQueries
 from app.adapters.db.contact_json import contacts_block, contacts_json
 from app.adapters.db.engine import BEGIN_MODE_OPTION
 from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, answers_json
@@ -478,6 +479,7 @@ def _secret_name(organisation_id: int, channel: ChannelKind) -> str:
 class SqlTransaction(
     AdminSessionQueries,
     AlertTargetQueries,
+    ConfigurationDocumentQueries,
     HealthQueries,
     OverviewLayoutQueries,
     ParticipantLinkQueries,

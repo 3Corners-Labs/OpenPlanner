@@ -163,3 +163,19 @@ type IntegrityRule = Callable[[Resolution], Iterable[Refusal]]
 
 type MayChange = Callable[[Permission, Target], bool]
 """Whether the actor holds a permission on a target, decided by the matrix (ADR 0014)."""
+
+
+@dataclass(frozen=True)
+class ConfigurationSnapshot:
+    """The installation's configuration as it is now, read in one transaction.
+
+    Attributes:
+        root: The configuration tree, in the shape of the document (secrets that are set are
+            ``Secret`` objects; without a settings key there are none).
+        usage: What the installation knows that the configuration does not.
+        version: The settings version the snapshot was read at.
+    """
+
+    root: Entity
+    usage: Usage
+    version: int
