@@ -54,7 +54,11 @@ class HelpTopic:
 
 
 TOPICS = (
-    HelpTopic("overview", ("/admin/",), Permission.DASHBOARD_VIEW),
+    HelpTopic(
+        "overview",
+        ("/admin/", "/admin/overview/add", "/admin/overview/edit"),
+        Permission.DASHBOARD_VIEW,
+    ),
     # ADR 0047 steps 3 and 5: the groups list and the organisation's own page.
     HelpTopic("groups", ("/admin/groups", "/admin/groups/new"), Permission.GROUP_VIEW),
     # ADR 0047 step 4: the group's first tab, with the readiness checklist.

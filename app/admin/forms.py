@@ -59,6 +59,11 @@ DONE_MESSAGES: dict[str, str] = {
     "diagnostics_off": "admin.done.diagnostics_off",
     "released": "admin.done.released",
     "saved": "admin.done.saved",
+    # ADR 0096: the admin's own overview layout.
+    "widget_added": "admin.done.widget_added",
+    "widget_moved": "admin.done.widget_moved",
+    "widget_removed": "admin.done.widget_removed",
+    "layout_reset": "admin.done.layout_reset",
     "unchanged": "admin.done.unchanged",
     "field_retired": "admin.done.field_retired",
     "added": "admin.done.added",
@@ -583,23 +588,6 @@ def done_message(request: Request, _: BoundGettext) -> str | None:
     raw = request.query_params.get("count", "")
     count = int(raw) if raw.isdigit() and len(raw) <= 6 else 0
     return _(DONE_MESSAGES[key], count=count) if key in DONE_MESSAGES else None
-
-
-def safe_next(value: str | None) -> str:
-    """Return ``value`` if it is an admin path on this site; otherwise the dashboard.
-
-    For every "return to" target that arrives with a request (login, re-login, the update
-    banner's snooze), so none can send the admin off the portal.
-    """
-    if (
-        value
-        and value.startswith("/admin")
-        and not value.startswith("//")
-        and "\\" not in value
-        and "://" not in value
-    ):
-        return value
-    return "/admin/"
 
 
 def redirect_done(
