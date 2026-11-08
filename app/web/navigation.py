@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.authorization import Permission
+from app.domain.settings_registry import REGISTRY, SettingClass, SettingSpec, Topic
 from app.i18n import Translator
 
 MAX_SECTIONS = 3
@@ -606,6 +607,30 @@ OBJECTS = (
 """Object pages with tabs and sub-tabs."""
 
 
+SETTINGS_SCREENS: dict[SettingClass, str] = {
+    SettingClass.PLATFORM: "platform.settings.values",
+    SettingClass.ORGANISATION: "organisation.settings",
+}
+"""The screen that shows the portal settings of each class (ADR 0047 §5, step 6).
+
+A setting's ``topic`` (ADR 0042 registry) is a section of that screen, rendered in the
+registry's topic order, so settings of the same kind sit together on every scope. A topic that
+exists on two scopes (a platform default and an organisation's own value) carries the same name
+on both. Class A and B live in the environment and have no screen.
+"""
+
+
+def settings_home(spec: SettingSpec) -> Screen | None:
+    """Return the register screen that shows ``spec``, or ``None`` outside the portal."""
+    key = SETTINGS_SCREENS.get(spec.class_)
+    return screen(key) if key else None
+
+
+def topic_anchor(topic: Topic) -> str:
+    """Return the fragment of ``topic``'s section on its screen (``#topic-<value>``)."""
+    return f"#topic-{topic.value}"
+
+
 def screens() -> Iterator[tuple[str, Screen]]:
     """Yield every screen of the register with the key of its side-navigation entry."""
     for section in SECTIONS:
@@ -736,4 +761,28 @@ def render_markdown(translator: Translator, locale: str = "en") -> str:
             *header,
             *_rows(translator, locale, obj.tabs),
         ]
+    lines += ["", *_topic_rows(translator, locale)]
     return "\n".join(lines) + "\n"
+
+
+def _topic_rows(translator: Translator, locale: str) -> list[str]:
+    """Return the section of ``docs/admin-map.md`` listing each settings topic's homes."""
+    rows = [
+        "## Settings topics",
+        "",
+        "Every class C and D setting (ADR 0042) is shown under its topic on the settings screen",
+        "of its scope (ADR 0047 §5). A test fails when a setting has no home here.",
+        "",
+        "| Topic | Class | Shown at |",
+        "|---|---|---|",
+    ]
+    used = {(spec.topic, spec.class_) for spec in REGISTRY if spec.in_portal}
+    for topic in Topic:
+        for class_, key in SETTINGS_SCREENS.items():
+            if (topic, class_) not in used:
+                continue
+            home = screen(key)
+            name = translator.gettext(locale, home.label_key)
+            anchor = f"{home.path}{topic_anchor(topic)}"
+            rows.append(f"| `{topic.value}` | {class_.value} | {name}: `{anchor}` |")
+    return rows

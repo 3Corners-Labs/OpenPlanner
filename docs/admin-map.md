@@ -87,3 +87,32 @@ Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 | Messages › Contact | `/admin/groups/{slug}/contact` | `closure.manage` | standard | – |
 | Settings | `/admin/groups/{slug}/settings` | `group.edit` | standard | `/admin/groups/{slug}/settings/form`, `/admin/groups/{slug}/settings/form/{key}`, `/admin/groups/{slug}/settings/archive` |
 | Emergency closure | `/admin/groups/{slug}/closure` | `closure.manage` | standard | `/admin/groups/{slug}/closure/bookings/{booking_id}/move`, `/admin/groups/{slug}/closure/scenarios`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}/contacts` |
+
+## Settings topics
+
+Every class C and D setting (ADR 0042) is shown under its topic on the settings screen
+of its scope (ADR 0047 §5). A test fails when a setting has no home here.
+
+| Topic | Class | Shown at |
+|---|---|---|
+| `operations` | C | Settings: `/admin/settings/values#topic-operations` |
+| `retention` | C | Settings: `/admin/settings/values#topic-retention` |
+| `retention` | D | Settings: `/admin/organisations/{org}/settings#topic-retention` |
+| `storage` | C | Settings: `/admin/settings/values#topic-storage` |
+| `rate_limits` | C | Settings: `/admin/settings/values#topic-rate_limits` |
+| `admin_session` | C | Settings: `/admin/settings/values#topic-admin_session` |
+| `login_mapping` | C | Settings: `/admin/settings/values#topic-login_mapping` |
+| `mail` | C | Settings: `/admin/settings/values#topic-mail` |
+| `webex` | C | Settings: `/admin/settings/values#topic-webex` |
+| `updates` | C | Settings: `/admin/settings/values#topic-updates` |
+| `display` | C | Settings: `/admin/settings/values#topic-display` |
+| `display` | D | Settings: `/admin/organisations/{org}/settings#topic-display` |
+| `staff` | C | Settings: `/admin/settings/values#topic-staff` |
+| `staff` | D | Settings: `/admin/organisations/{org}/settings#topic-staff` |
+| `planner` | C | Settings: `/admin/settings/values#topic-planner` |
+| `planner` | D | Settings: `/admin/organisations/{org}/settings#topic-planner` |
+| `booking_form` | C | Settings: `/admin/settings/values#topic-booking_form` |
+| `booking_form` | D | Settings: `/admin/organisations/{org}/settings#topic-booking_form` |
+| `confirmation` | C | Settings: `/admin/settings/values#topic-confirmation` |
+| `confirmation` | D | Settings: `/admin/organisations/{org}/settings#topic-confirmation` |
+| `participant_link` | C | Settings: `/admin/settings/values#topic-participant_link` |
