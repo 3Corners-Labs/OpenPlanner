@@ -1,0 +1,123 @@
+{
+  "name": "release lines",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [
+    {
+      "actor_id": 5579411,
+      "actor_type": "Integration",
+      "bypass_mode": "always"
+    },
+    {
+      "actor_id": 5,
+      "actor_type": "RepositoryRole",
+      "bypass_mode": "always"
+    }
+  ],
+  "conditions": {
+    "ref_name": {
+      "exclude": [],
+      "include": [
+        "refs/heads/release/[0-9]*"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "type": "creation"
+    },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "merge_queue",
+      "parameters": {
+        "check_response_timeout_minutes": 60,
+        "grouping_strategy": "ALLGREEN",
+        "max_entries_to_build": 5,
+        "max_entries_to_merge": 5,
+        "merge_method": "SQUASH",
+        "min_entries_to_merge": 1,
+        "min_entries_to_merge_wait_minutes": 5
+      }
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "allowed_merge_methods": [
+          "squash"
+        ],
+        "dismiss_stale_reviews_on_push": true,
+        "dismissal_restriction": {
+          "allowed_actors": [],
+          "enabled": false
+        },
+        "require_code_owner_review": false,
+        "require_extra_approval_for_unattributed_changes": true,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0,
+        "required_review_thread_resolution": false,
+        "required_reviewers": []
+      }
+    },
+    {
+      "type": "required_linear_history"
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          {
+            "context": "accessibility (Playwright, axe-core, Lighthouse)",
+            "integration_id": 15368
+          },
+          {
+            "context": "authorisation matrix",
+            "integration_id": 15368
+          },
+          {
+            "context": "copy-paste detection",
+            "integration_id": 15368
+          },
+          {
+            "context": "decision gate",
+            "integration_id": 15368
+          },
+          {
+            "context": "gitleaks",
+            "integration_id": 15368
+          },
+          {
+            "context": "image build, scan, SBOM, API fuzzing",
+            "integration_id": 15368
+          },
+          {
+            "context": "licence and contributor agreement",
+            "integration_id": 15368
+          },
+          {
+            "context": "lint, types, tests, migrations",
+            "integration_id": 15368
+          },
+          {
+            "context": "lockfile, audit, licenses",
+            "integration_id": 15368
+          },
+          {
+            "context": "no deprecation warnings",
+            "integration_id": 15368
+          },
+          {
+            "context": "semgrep",
+            "integration_id": 15368
+          }
+        ],
+        "strict_required_status_checks_policy": false
+      }
+    }
+  ]
+}

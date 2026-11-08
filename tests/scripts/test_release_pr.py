@@ -249,6 +249,7 @@ def test_plan_prints_outputs_for_the_workflow(
     assert capsys.readouterr().out.splitlines() == [
         "version=0.4.0",
         "previous=v0.3.0",
+        "base=main",
         "branch=release/v0.4.0",
         "title=chore(release): v0.4.0",
         "audit=true",
