@@ -22,14 +22,14 @@ async function open(page: Page, variant: (typeof variants)[number]): Promise<voi
 
 for (const variant of variants) {
   test.describe(variant.title, () => {
-    test('scripts off: the page has its content and no violations', async ({ browser }) => {
-      const context = await browser.newContext({ javaScriptEnabled: false });
-      const page = await context.newPage();
+    test('scripts off: the page has its content and no violations', async ({ page }) => {
+      // The island scripts do not load (axe itself needs a page that can run script, so scripting
+      // stays on and only the files under /static/ are refused): what the server rendered is all there is.
+      await page.route(/\/static\/.*\.js(\?.*)?$/, (route) => route.abort());
       await open(page, variant);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       await expect(page.locator('main')).not.toBeEmpty();
       await expectNoAxeViolations(page);
-      await context.close();
     });
 
     test('keyboard: every control takes focus in turn and focus is never lost', async ({ page }) => {
