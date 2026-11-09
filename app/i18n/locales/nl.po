@@ -11236,7 +11236,7 @@ msgid "admin.configuration.export.secrets"
 msgstr "Geheimen opnemen, verzegeld met een wachtwoord"
 
 msgid "admin.configuration.export.secrets_hint"
-msgstr "Zonder geheimen heeft het bestand geen wachtwoord nodig. Met geheimen is het wachtwoord minstens {length} tekens; bewaar het veilig, het is niet terug te halen."
+msgstr "Zonder geheimen bevat het bestand geen wachtwoorden of sleutels en heeft het geen wachtwoord nodig. Met geheimen zet OpenPlanner elk geheim (SMTP, SMS, Webex, contactcenter, inlog, API-clients) apart vast onder dit wachtwoord, minstens {length} tekens. Je hebt geen aparte tool nodig om het te openen: lees het bestand op de nieuwe omgeving in (hier, met het commando config apply, of met de installer) en typ hetzelfde wachtwoord. Het wachtwoord is niet terug te halen; bewaar het apart van het bestand."
 
 msgid "admin.configuration.export.button"
 msgstr "Document exporteren"
@@ -11245,7 +11245,7 @@ msgid "admin.configuration.upload.title"
 msgstr "Inlezen en plannen"
 
 msgid "admin.configuration.upload.intro"
-msgstr "Kies een configuratiedocument (JSON, maximaal {max_mb} MB). Je krijgt een plan te zien; er wordt nog niets gewijzigd."
+msgstr "Kies een configuratiedocument (JSON, maximaal {max_mb} MB), bijvoorbeeld een export van een andere omgeving. Heeft het bestand geheimen, vul dan hetzelfde wachtwoord in als bij het exporteren. Je krijgt een plan te zien; er wordt nog niets gewijzigd."
 
 msgid "admin.configuration.upload.file"
 msgstr "Configuratiedocument"
