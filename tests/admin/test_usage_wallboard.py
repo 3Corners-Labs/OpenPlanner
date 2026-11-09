@@ -197,23 +197,25 @@ async def test_a_waiting_participant_is_counted_exactly_and_a_long_wait_has_word
     assert "Lange wachttijd" not in calm.split("data-live-status hidden>", 1)[1].split("<", 1)[0]
 
 
-async def test_the_live_counts_are_for_a_reader_who_may_work_the_queue(site: Site) -> None:
-    """The auditor has no queue.work and no board; the org admin may do both."""
+async def test_the_organisation_board_counts_the_live_queue_of_its_groups(site: Site) -> None:
+    """An organisation admin holds the board and the queue right on every group of it."""
     booking_id = await _own_queue(site)
     await _guest_waits(site, booking_id)
     await site.login_as(ORG_ADMIN)
 
-    text = (
-        (
-            await site.client.get(
-                LIVE.replace(GROUP, ORG.replace("organisations/demo", "organisations/demo"))
-            )
-        ).text
-        if False
-        else (await site.client.get(f"{ORG}/wallboard/live")).text
-    )
+    text = (await site.client.get(f"{ORG}/wallboard/live")).text
 
     assert re.search(r"wb__n\">1<", text)
+
+
+async def test_a_group_admin_is_not_offered_the_organisation_board(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+
+    org_page = await site.client.get(f"{ORG}")
+
+    assert org_page.status_code == 403  # the organisation's page adds up its groups
+    nav_page = (await site.client.get(GROUP)).text
+    assert "view=wallboard" in nav_page  # the group's own board is offered
 
 
 async def test_no_name_reference_or_link_reaches_the_board(site: Site) -> None:

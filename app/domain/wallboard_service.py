@@ -94,8 +94,9 @@ class WallboardService:
                 if s.group.queue_open and s.group.slug in live_scope
             ]
             now_fill, next_fill = await _blocks(tx, covered, now)
+        shown = {s.group.slug for s in covered}
         board = wallboard(
-            loaded.groups,
+            [g for g in loaded.groups if g.slug in shown],
             loaded.cells,
             queues,
             now_fill,

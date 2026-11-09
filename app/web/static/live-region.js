@@ -126,6 +126,10 @@
         markStale(); // the session ended: the next click shows the login page
         return false;
       }
+      if (staleLimit(region) && (response.status === 401 || response.status === 403)) {
+        markStale(); // the right was withdrawn: asking again would only fill the audit log
+        return false;
+      }
       if (response.status === 204) {
         failures = 0; // unchanged is a good answer
         region.removeAttribute("data-stale");

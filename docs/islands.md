@@ -56,7 +56,7 @@ colours with reduced motion and axe, and no content-security-policy or script er
   the region names (`data-heading`), so it is never lost. A failed request is retried at the next
   interval; a redirect (the session ended) or a fragment without a poll URL (the state is final) stops it.
   A region that names `data-stale-after="3"` (the wallboard, ADR 0117 step 13) counts failed requests in
-  a row and, at that count or when the session ended, sets `data-stale` on the region and announces
+  a row and, at that count or when the session ended or was refused (401 or 403, which also stops it), sets `data-stale` on the region and announces
   the fragment's `[data-live-stale-status]` sentence once; the stylesheet shows the old-data state in
   words, and the next good answer removes it. A button `[data-live-pause]` in the region (rendered
   `hidden`, revealed by the script) pauses and resumes the asking, with `aria-pressed` and

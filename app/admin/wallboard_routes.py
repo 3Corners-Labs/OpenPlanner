@@ -24,9 +24,9 @@ from starlette.responses import HTMLResponse, Response
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, organisation_header, page, templates
-from app.domain.authorization import Permission, Principal
+from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.scheduling import GroupSummary
-from app.domain.wallboard import Wallboard
+from app.domain.wallboard import STALE_AFTER_POLLS, Wallboard
 from app.domain.wallboard_service import WallboardService
 from app.i18n.dates import format_day
 from app.web.organisation_settings import settings_for
@@ -145,6 +145,7 @@ def board_context(
         ),
         "organisation_name": covered[0].organisation_name,
         "kiosk_layout": kiosk,
+        "stale_after": STALE_AFTER_POLLS,
         "here": f"{base}?view={WALLBOARD}" + (f"&layout={KIOSK}" if kiosk else ""),
     }
 
@@ -227,9 +228,12 @@ def wallboard_shown(
     principal: Principal, *, organisation: str | None = None, group: GroupSummary | None = None
 ) -> bool:
     """Return whether ``principal`` may open the board of the group or organisation."""
-    return can_function(principal)(
-        Permission.REPORTS_WALLBOARD_VIEW, group=group, organisation=organisation
-    )
+    if organisation is not None and group is None:
+        # a group-level right is held "anywhere" by a group admin, but the organisation's board
+        # adds up its groups: offer it only to a reader whose scope is the whole organisation
+        scope = scope_for(principal, Permission.REPORTS_WALLBOARD_VIEW)
+        return scope.everything or organisation in scope.organisations
+    return can_function(principal)(Permission.REPORTS_WALLBOARD_VIEW, group=group)
 
 
 @router.get("/groups/{slug}/usage/wallboard/live", response_class=FragmentResponse)

@@ -3330,7 +3330,7 @@ op-report-chart {
   background: var(--wb-bg);
   color: var(--wb-text);
 }
-.wb a,
+.wb a:not(.button),
 .wb .muted {
   color: var(--wb-muted);
 }
