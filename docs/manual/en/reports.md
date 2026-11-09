@@ -102,6 +102,15 @@ of one fixed height labelled *< 5*: it says nothing about the real number. The c
 script, scroll sideways inside their frame on a narrow screen, and are left out when printing; the
 tables remain. When nothing has been recorded for a family in the period, the page says so.
 
+## Downloading as a file
+
+Whoever may export (the superuser, organisation admins, group admins and the Compliance and privacy role) sees two links under the period on a Usage page.
+
+- **Download this report as CSV** gives exactly the tables of the family you are looking at, after the small-count rule: a hidden figure is an empty value with the note *hidden*. The file has no text of the interface, only codes (a day, an outcome, a bucket number), so it reads the same in every language.
+- **Download all hourly figures as CSV** gives one row per hour, group, metric and cut, for analysis in your own tool (the format `openplanner.usage/1`, described in `docs/reporting.md`). A cell below the minimum is not in the file at all.
+
+Both open in Excel (UTF-8, `;` as separator). The platform administrator sets how many rows and days one file may hold; a longer period is refused with a message, and the file is not cut short. Every download is recorded in the audit log with who, which family, which period, how many rows and a checksum of the file, never the figures. The checksum is also in the `X-Content-SHA256` header of the response.
+
 ## What is not here yet
 
-Per team member, the digest by email and the export to a file. Those come in later steps of the same design.
+Per team member and the digest by email. Those come in later steps of the same design.

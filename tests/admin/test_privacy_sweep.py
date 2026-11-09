@@ -113,6 +113,7 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/closure": "/admin/groups/demo/closure",
     "/admin/groups/{slug}/contact": "/admin/groups/demo/contact",
     "/admin/groups/{slug}/usage": "/admin/groups/demo/usage",
+    "/admin/groups/{slug}/usage/export.csv": "/admin/groups/demo/usage/export.csv",
     "/admin/groups/{slug}/closure/contacts": "/admin/groups/demo/closure/contacts",
     "/admin/groups/{slug}/closure/scenarios": "/admin/groups/demo/closure/scenarios",
     "/admin/groups/{slug}/closure/scenarios/{scenario_id}": (
@@ -141,6 +142,7 @@ PATHS: dict[str, str] = {
     "/admin/organisations/{org}/closure": "/admin/organisations/demo/closure",
     "/admin/organisations/{org}/contacts": "/admin/organisations/demo/contacts",
     "/admin/organisations/{org}/usage": "/admin/organisations/demo/usage",
+    "/admin/organisations/{org}/usage/export.csv": "/admin/organisations/demo/usage/export.csv",
     "/admin/organisations/{org}/embedding": "/admin/organisations/demo/embedding",
     "/admin/organisations/{org}/closure/scenarios": "/admin/organisations/demo/closure/scenarios",
     "/admin/organisations/{org}/closure/scenarios/{scenario_id}": (

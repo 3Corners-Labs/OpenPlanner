@@ -10,6 +10,7 @@ from app.domain.message_usage import PURPOSES
 from app.domain.privacy import USAGE_FIELDS
 from app.domain.slot_close import OUTCOME_RULE
 from app.domain.usage import BUCKET_LABELS, FACT_HOUR, METRIC_VERSION, METRICS
+from app.domain.usage_report_csv import HIDDEN, SCREEN_HEADER, TIDY_HEADER, TIDY_VERSION
 from app.domain.usage_rollup import FILL_CLASSES, feed_rows
 from app.domain.usage_suppress import MIN_CELL_SIZE_FLOOR
 
@@ -78,4 +79,36 @@ def render_markdown() -> str:
         "Exactly these fields and no others; `staff_id` only on the separate team-member fact.\n\n"
     )
     parts.extend(f"- `{field}`\n" for field in USAGE_FIELDS)
+    parts.append(_export())
     return "".join(parts)
+
+
+def _export() -> str:
+    """Return the section on the two CSV files and the columns of the tidy one."""
+    screen = ", ".join(f"`{c}`" for c in SCREEN_HEADER)
+    tidy = ", ".join(f"`{c}`" for c in TIDY_HEADER)
+    return f"""
+## CSV export
+
+Both files are UTF-8 with a byte order mark, `;` as separator, RFC 4180 quoting and CRLF line
+ends; a text cell that starts like a formula gets a leading `'`. The response carries
+`X-Content-SHA256` (the checksum of the file) and the audit event `reports.export` keeps it, with
+the family, the range, the row count and who; never a figure. An export over
+`reporting_export_max_rows` rows or `reporting_export_max_days` days is refused, never cut short.
+Holders of `reports.export` download from the Usage page, for the groups of their scope.
+
+**Screen CSV** (`?view=volume`, `queue`, `capacity` or `channels`): exactly the tables of that
+page, after the small-cell rule, in the screen's order. Columns: {screen}. `table` is the name of
+the table, `row` and `column` are codes (a day, an outcome, a bucket number, a weekday 0 to 6 with
+Monday first, an hour), `value` is the count, percent or seconds, `note` is `{HIDDEN}` where the
+screen shows `< n` or no figure, and the value is then empty. A total has the row or column
+`total`. The file holds no interface text, so it does not change with the language.
+
+**Tidy CSV `{TIDY_VERSION}`** (`?view=tidy`): one row per hourly cell, for analysts. Columns:
+{tidy}. `hour` is the UTC hour (RFC 3339), `organisation` and `group` are slugs, `metric` is an ID
+of the table above, the cut columns hold the codes of the cell (empty when the metric is not cut
+by it), `bucket` is the duration bucket number, `count` is the number of facts, `sum` is what the
+metric adds up and `max` is the largest value (Q9's peak). A cell below the threshold is not in the
+file at all. The range is whole group-local days. The column list and its meaning change only with
+a new version, which needs an amendment of the ADR.
+"""
