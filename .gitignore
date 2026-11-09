@@ -53,3 +53,6 @@ portal-certs/
 site/dist/
 .claude/launch.json
 site/static/media/
+
+# role-manuals skill: its build tooling is installed locally (npm ci), never committed
+.claude/skills/role-manuals/node_modules/

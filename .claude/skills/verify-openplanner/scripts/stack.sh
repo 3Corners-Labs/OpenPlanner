@@ -421,6 +421,11 @@ cmd_down() {
     fi
     return 0
   fi
+  # A caller that names its project (VERIFY_PROJECT) stops only a run of that project, never the
+  # run another session recorded in this evidence root.
+  if [ -n "${VERIFY_PROJECT:-}" ] && [ "$VERIFY_PROJECT" != "$PROJECT" ]; then
+    fail "the recorded run $RUN_ID is of project $PROJECT, not $VERIFY_PROJECT; nothing removed"
+  fi
   save_logs
   compose down --volumes --remove-orphans >"$RUN_DIR/logs/compose-down.log" 2>&1 \
     || fail "compose down failed; see $RUN_DIR/logs/compose-down.log"

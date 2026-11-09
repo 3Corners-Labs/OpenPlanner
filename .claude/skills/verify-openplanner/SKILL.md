@@ -14,6 +14,11 @@ Three files do the work:
 
 - `scripts/stack.sh`: `up`, `doctor`, `compose`, `down` for the stack;
 - `scripts/journey.mjs`: the journeys that drive it, with Playwright from `e2e/`;
+- `scripts/stack-client.mjs`: the client they share with the `role-manuals` skill: the run
+  record, the instance guard, the development users, Mailpit, the slot picker and the shared
+  waits and helpers;
+- `scripts/labels.json`: every interface text the scripts of both skills drive, by catalogue key,
+  checked against the catalogue by `tests/test_skill_labels.py`;
 - `features/`: the map, one file per feature with its handles, its proof and its traps. Read
   `features/README.md` before you drive anything.
 
@@ -91,7 +96,9 @@ That is the machine, not the change: run `down`, wait until `uptime` shows a nor
 Isolation: its own project name, volumes, image tag and ports, and no `edge` network (another
 stack of this repository holds that fixed subnet), so a developer's stack on 8000, 8080 and
 8025 keeps running untouched. One run per checkout at a time; a second worktree that runs one at
-the same time sets `VERIFY_PROJECT` and the three ports to other values.
+the same time sets `VERIFY_PROJECT` and the three ports to other values. With `VERIFY_PROJECT`
+set, `down` refuses a recorded run of another project, so a script that names its project never
+removes the stack of another session.
 
 ## Doctor
 
@@ -201,6 +208,7 @@ no longer need them.
 | `scripts/stack.sh` | `stack.sh up`, `stack.sh doctor`, `stack.sh down`, `stack.sh --help` |
 | `scripts/stack.sh compose` | docker compose for this stack only, e.g. `stack.sh compose logs --tail 50 worker` or `stack.sh compose exec web python -m app.cli --help` |
 | `scripts/journey.mjs` | `node .claude/skills/verify-openplanner/scripts/journey.mjs <journey>...`, `--help` |
+| `scripts/stack-client.mjs` | imported by `journey.mjs` and by `role-manuals/scripts/`; never run on its own |
 | `compose.verify.yml` | read by `stack.sh` only; its header says what differs from the development compose and why |
 
 ## Stand-in versus a real installation
@@ -226,7 +234,10 @@ the test host or in production, so they stay unverified until a run there covers
 
 The map is the maintained source for what this skill proves. When a change alters a mapped path
 (a route, a label or catalogue text, an email subject, the demo seed), update the feature file
-and the handles in `journey.mjs` (`NL`, `SUBJECT`) in the same PR, and run the journeys again.
+and the texts in `scripts/labels.json` in the same PR, and run the journeys again. CI holds every
+text there against the catalogue (`tests/test_skill_labels.py`), so a pull request that renames a
+text the scripts use fails until its label is updated. The `role-manuals` skill drives more screens
+with the same client and labels; `capture.mjs <workspace> --only <id>` proves one again.
 A new user-facing flow gets its own feature file, a line in `features/README.md` and a journey.
 If the seed lacks a precondition a journey needs, the journey fails and the reason goes under
 that feature's *Gotchas*; never weaken a journey to make it pass.

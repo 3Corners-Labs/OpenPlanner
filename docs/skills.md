@@ -19,13 +19,30 @@ green CI and a decision with the product owner's label (ADR 0078), never through
 
 ## Repo skills
 
-One skill per review concern, and one skill that runs them together.
+One skill per review concern, one skill that runs them together, and one skill per recurring
+kind of work outside the code.
 
 | Skill | What it does |
 |---|---|
 | `pre-pr-review` | Runs the two skills below in parallel subagents and `/code-review` (level `high`) in the main thread, checks every finding against the code, deduplicates, and writes the PR sections |
 | `security-review` | The review questions of the PR template, the PII, authorisation, safeguard and configurability rules, the change's impact on setup and feature gates, and the abuse cases |
 | `code-quality-review` | Structure and maintainability against the architecture rules: missed simplification, one home per concern, logic in its layer, ad-hoc branching, files past 1,000 lines, types and boundaries |
+| `role-manuals` | Manuals per role (beheerder, planner, medewerker, the people who book) and the adoption approach around them: grounded in what is built, walkthroughs on real screenshots from `verify-openplanner`, one Markdown source built to Word, PDF and HTML, white-label; an organisation's own material lives in a workspace outside the repository |
+
+## Manuals, training and adoption
+
+| Step | Skill | Why |
+|---|---|---|
+| Method, writing, build | `role-manuals` (repo) | The five steps, the form per role, the style guide, the capture story and the build to Word, PDF and HTML; run from the checkout on a workspace outside it |
+| Screenshots and walkthroughs | `verify-openplanner` (repo) | The stack built from the checkout and its client (`scripts/stack-client.mjs`), shared with `role-manuals`: real user paths, fictional data, an evidence log |
+| Word output | `anthropic-skills:docx` | docx-js conventions and output checks |
+| Reader test | `anthropic-skills:doc-coauthoring` | Its reader-testing stage: a reader without context tries the role's tasks with the manual |
+| Process pictures | `diagram` | A role's flow as Mermaid, SVG and PNG |
+| After a release | `/document-release` | Lists documentation debt per change; `role-manuals` then updates text and screenshots |
+| The participant pages | `ux-heuristics` | Finds friction that the FAQ or the page texts must cover |
+
+The per-screen manual in `docs/manual/{nl,en}/` (ADR 0033) stays the built-in help; a role
+manual links its screens into tasks and follows it.
 
 ## Per work package
 
@@ -58,3 +75,20 @@ One skill per review concern, and one skill that runs them together.
   pattern live on, adapted, in `code-quality-review` and `pre-pr-review`. Its deep audit
   overlaps `security-review` and `/code-review`; its checks on developer setup, gate leaks and
   removed safeguards moved, rewritten for this repository, into `security-review`.
+
+## Evaluated for manuals and adoption (2026-11-08)
+
+Searched with `find-skills`: the open skills directory (skills.sh), the account's skills and the
+plugin directory.
+
+- **Worth installing when the work comes up** (Anthropic plugins, not installed): Customer
+  Support `kb-article` (help articles and FAQ for participants), Operations `process-doc` (work
+  instructions with an exceptions table), Product Management `stakeholder-update` (rollout
+  updates per audience), Human Resources `onboarding` (a new staff member's first week, adapted
+  per cohort). They work from pasted facts; their connectors are optional.
+- **Not adopted:** community plugins with a `user-guide` skill (Snagly, Beegait): tied to their
+  own QA or ticket flow; `design-skills` (`ux-writing`, `journey-mapping`): no upstream to
+  review; Booking FAQ: built for deposits and walk-in businesses.
+- **Not found:** skills for plain language, instructional design or change management. The
+  directory's search needs a signed-in browser; its leaderboard had none. `role-manuals` covers
+  that method.
