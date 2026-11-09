@@ -246,9 +246,15 @@ LOCKED_PERMISSIONS = frozenset(
 """ADR 0039: permissions that affect more than one organisation or touch secrets; superuser only."""
 
 PII_PERMISSIONS = frozenset(
-    {Permission.BOOKINGS_VIEW, Permission.BOOKINGS_MANAGE, Permission.QUEUE_WORK}
+    {
+        Permission.BOOKINGS_VIEW,
+        Permission.BOOKINGS_MANAGE,
+        Permission.QUEUE_WORK,
+        Permission.REPORTS_STAFF_VIEW,
+    }
 )
-"""ADR 0039: permissions that show participants' personal data; never held by the auditor."""
+"""ADR 0039: permissions that show personal data (participants', and with ADR 0117 point 9 the
+load of a named team member); never held by the auditor or a read-only copy of a role."""
 
 MAINTENANCE_WRITABLE = frozenset(
     {Permission.INTEGRATIONS_MANAGE, Permission.SYSTEM_UPDATE, Permission.SYSTEM_MAINTENANCE}
