@@ -35,10 +35,11 @@ export function clock(date = new Date()) {
  * its year, the one before it (a capture early in January shows December) and five after it
  * (bookings two months ahead, holidays, retention and certificate dates). A number outside them,
  * such as a key size of 2048, stays. Taken from the start, so a rewritten log names the years
- * the capture covered.
+ * the capture covered; a start without a year throws, as rule 4 would otherwise cover nothing.
  */
-export function coveredYears(started = stamp()) {
-  const year = Number(started.slice(0, 4));
+export function coveredYears(started) {
+  const year = Number(/^(\d{4})-/.exec(String(started ?? ''))?.[1]);
+  if (!Number.isInteger(year)) throw new Error(`the capture's start ${JSON.stringify(started)} holds no year`);
   return Array.from({ length: 7 }, (_, i) => year - 1 + i);
 }
 
@@ -146,7 +147,8 @@ export function writeLog({ ws, stack, state, steps, hidden }) {
       + 'afbeelding niet laat zien wanneer hij gemaakt is. Dag, maand en tijd blijven staan; er komt nooit een ander '
       + 'jaartal voor in de plaats. De echte datum van elke opname staat in dit log.',
     '- Verzonnen deelnemers met adressen op voorbeeld.nl; medewerkers zijn de ontwikkelgebruikers van de '
-      + 'identiteitsprovider. Geen token of wachtwoord in dit log; van een e-mail alleen de regel rond een afdekking.',
+      + 'identiteitsprovider. Geen token of wachtwoord in dit log; van een e-mail staan hier de verzonnen '
+      + 'ontvanger, het onderwerp, het verzendmoment, de namen van bijlagen en de regel rond een afdekking.',
     '',
     '## Voorbereiding en verhaal',
     '',

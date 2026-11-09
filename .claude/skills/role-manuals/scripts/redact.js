@@ -112,7 +112,8 @@ export function detect({ product, terms, versionFields, versionTexts, years }) {
   }
 
   // A date field holds 2026-11-09 but shows the browser's own format (09-11-2026 in nl-NL), so a
-  // match is measured in what it shows. The portal has no other field that shows a year.
+  // match is measured in what it shows. No page has a datetime-local, month or week field; one
+  // would be measured on its ISO value, so it needs its shown format here first.
   const DAY = new Intl.DateTimeFormat(navigator.language, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
   const shownValue = (el) => (el.type === 'date' && el.valueAsDate
     ? DAY.format(el.valueAsDate) : el.value || el.getAttribute('placeholder') || '');
