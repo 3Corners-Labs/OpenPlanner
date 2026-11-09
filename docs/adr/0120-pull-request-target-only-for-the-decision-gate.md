@@ -1,6 +1,6 @@
 # 0120. `pull_request_target` only for the decision gate, allowed by an event policy; the backport starts from the merge
 
-Status: accepted (2026-11-09, `po:approved` on #NNN), requested by the product owner. Partly
+Status: accepted (2026-11-09, `po:approved` on #699), requested by the product owner. Partly
 built: step 1 (the backport on `push`, the event policy in the guardrail baseline, the audit of
 gate runs that GitHub did not start, the runbook) is in the pull request that adds this ADR;
 step 2, the product owner's setting in GitHub, is due before 2026-12-02. Keeps ADR 0078
@@ -208,8 +208,8 @@ before, as for the bypasses of ADR 0109, read from the latest 100 runs. They liv
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed | #NNN | merged |
-| 1 | `backport.yml` on `push` to `main` and `workflow_dispatch`, with a job without secrets that runs `scripts/release_line.py backports` (point 2; the subcommand `backport-lines` is gone); `actions_policies` in `.github/guardrails.json` and `known_unseen`, its read in `scripts/guardrail-fetch.sh` and its comparison in `scripts/guardrail_audit.py` with `--full` for an administrator (points 4 and 5); the gate's runs that GitHub did not start as a finding, read with the workflow's token (`guardrail-audit.yml` with `actions: read`, point 6); tests for points 2 to 6; runbook (*The decision gate did not start*, *Guardrail drift*, *Maintenance lines*), CONTRIBUTING.md, release checklist, threat model, the Status lines of ADR 0109 and 0116 | #NNN | merged |
+| 0 | ADR proposed | #699 | merged |
+| 1 | `backport.yml` on `push` to `main` and `workflow_dispatch`, with a job without secrets that runs `scripts/release_line.py backports` (point 2; the subcommand `backport-lines` is gone); `actions_policies` in `.github/guardrails.json` and `known_unseen`, its read in `scripts/guardrail-fetch.sh` and its comparison in `scripts/guardrail_audit.py` with `--full` for an administrator (points 4 and 5); the gate's runs that GitHub did not start as a finding, read with the workflow's token (`guardrail-audit.yml` with `actions: read`, point 6); tests for points 2 to 6; runbook (*The decision gate did not start*, *Guardrail drift*, *Maintenance lines*), CONTRIBUTING.md, release checklist, threat model, the Status lines of ADR 0109 and 0116 | #699 | merged |
 | 2 | The product owner creates the event policy `decision gate`, reads it back and checks that the gate starts (point 8); confirmed by the brownout of 2026-11-16 | GitHub setting | planned |
 
 ## Consequences
