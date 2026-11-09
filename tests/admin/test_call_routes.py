@@ -156,6 +156,7 @@ async def test_a_group_admin_cannot_tell_another_groups_booking_from_an_unknown_
     unknown = await site.client.get(f"/admin/groups/demo/bookings/{other + 1000}")
 
     assert (taken.status_code, unknown.status_code) == (404, 404)
+    assert taken.text == unknown.text
     assert await audit_log(site) == before
 
 

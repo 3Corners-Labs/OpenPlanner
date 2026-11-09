@@ -27,9 +27,9 @@ from app.domain.job_plan import JobStatus, JobType, PlannedJob
 from app.domain.request_log import REQUEST_EVENT
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeProbes
-from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.admin import GROUP_ADMIN, OTHER_TEAM, OUTSIDER
-from tests.support.domain import NOW, SLOT_0900, make_group, webex_routing
+from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.admin import GROUP_ADMIN, OTHER_TEAM, OUTSIDER, two_organisations
+from tests.support.domain import NOW, SLOT_0900, webex_routing
 from tests.support.integration import GROUP, make_booking
 from tests.support.webhooks import WXCC
 
@@ -140,8 +140,7 @@ def test_not_picked_up_after_the_group_limit_without_host() -> None:
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
-    state = State()
-    state.organisation_slugs = {1: "demo", 2: "andere"}
+    state = two_organisations()
     state.groups[1] = GROUP
     state.bookings[123] = make_booking(
         meeting=MeetingRef("meeting-1", "https://site.webex.com/m"),
@@ -222,8 +221,7 @@ async def test_another_groups_booking_is_not_found_through_this_groups_address(
     It once was the booking's own group: another group's id was refused where an unknown id
     was not found, and the refusal was filed under the other organisation in the prober's name.
     """
-    uow.state.groups[2] = make_group(id=2, organisation_id=2, slug="andere-team", name="Andere")
-    uow.state.bookings[124] = make_booking(id=124, group_id=2)
+    uow.state.bookings[124] = make_booking(id=124, group_id=2)  # of group andere-team
 
     for booking_id in (124, 999):
         with pytest.raises(DomainError, match="booking_not_found"):
