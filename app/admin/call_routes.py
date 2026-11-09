@@ -31,7 +31,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
-from app.admin.authz import AccessDenied, AdminContext, RequirePermission, can_function
+from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.forms import moment_label, raise_refusal, read_form, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin, admin_moment
@@ -297,13 +297,10 @@ async def booking_detail(
     _ = locale.gettext
     group = context.group.group
     try:
-        timeline = await integration_service(request).timeline(context.principal, booking_id)
+        timeline = await integration_service(request).timeline(context.principal, slug, booking_id)
     except DomainError as error:
-        if error.code is ErrorCode.NOT_PERMITTED:
-            raise AccessDenied from error
+        raise_refusal(error)
         raise
-    if timeline.booking.group_id != group.id:  # an id from another group, via this group's URL
-        raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
     booking, status = timeline.booking, timeline.status
     call, task = _chips(status, _)
     tz, code = group.tz, locale.code
