@@ -162,7 +162,7 @@ number, behind the per-client limit and the audit trail).
 |---|---|---|---|
 | 1 | Clients, tokens, `/me`, groups and availability; the superuser's switch, client admin and audit | #18, #67, #97 | merged |
 | 2 | Change requests by phone number and appointment code: scope `bookings:request_change`, `POST /groups/{slug}/change-requests`, `GET /change-requests/{id}`, table `change_requests` (migration 0105), the code on pages and messages, the participant's confirm page `/b/m/{ref}/change`, three settings | #688 | merged |
-| 2b | The client must still be allowed to ask at confirmation and before the message; a quiet period per booking (`agent_change_request_cooldown_minutes`); deletion after `agent_change_request_retention_days` | #PRNUM | merged |
+| 2b | The client must still be allowed to ask at confirmation and before the message; a quiet period per booking (`agent_change_request_cooldown_minutes`); deletion after `agent_change_request_retention_days` | #690 | merged |
 
 ## Consequences
 
