@@ -1,0 +1,9 @@
+{#- What a screen with a display link sees when it is refused (ADR 0117 point 20): plain words, no menu, no way into the portal. The code is one of the refusals of ``wallboard_link.Refusal``; the page never says which of "unknown", "used", "expired" or "revoked" it was. -#}
+{% extends "admin/_shell.html" %}
+{% block title %}{{ _("reports.display.refused.title") }}{% endblock %}
+{% block page %}
+<main id="content" class="wb-screen" tabindex="-1">
+  <h1>{{ _("reports.display.refused.title") }}</h1>
+  <p>{{ _(message) }}</p>
+</main>
+{% endblock %}

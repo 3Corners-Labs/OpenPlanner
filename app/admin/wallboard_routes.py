@@ -117,6 +117,9 @@ def board_context(
     base: str,
     *,
     kiosk: bool = False,
+    poll: str | None = None,
+    here: str | None = None,
+    seconds: int | None = None,
 ) -> dict[str, object]:
     """Return what the board's templates need: the figures and the words that are not in them.
 
@@ -137,8 +140,8 @@ def board_context(
         "rolled_clock": rolled,
         "day_text": format_day(board.day, locale.code),
         "wait": wait_text(live.longest_wait_seconds) if live else "",
-        "poll": f"{base}/wallboard/live",
-        "poll_seconds": settings_for(request).reporting_wallboard_refresh_seconds,
+        "poll": poll or f"{base}/wallboard/live",
+        "poll_seconds": seconds or settings_for(request).reporting_wallboard_refresh_seconds,
         "board_groups": [g.group.name for g in covered],
         "board_name": (
             covered[0].group.name if len(covered) == 1 else covered[0].organisation_name
@@ -146,7 +149,7 @@ def board_context(
         "organisation_name": covered[0].organisation_name,
         "kiosk_layout": kiosk,
         "stale_after": STALE_AFTER_POLLS,
-        "here": f"{base}?view={WALLBOARD}" + (f"&layout={KIOSK}" if kiosk else ""),
+        "here": here or f"{base}?view={WALLBOARD}" + (f"&layout={KIOSK}" if kiosk else ""),
     }
 
 
@@ -159,8 +162,11 @@ async def wallboard_page(
     *,
     organisation: str | None = None,
     group: AdminContext | None = None,
+    extra: dict[str, object] | None = None,
 ) -> HTMLResponse:
     """Render the board, framed in the usage page or, with ``layout=kiosk``, full screen.
+
+    ``extra`` adds to the framed page's context (the display link section of the organisation).
 
     Raises:
         DomainError: ``not_permitted`` (audited) and ``group_not_found``.
@@ -185,6 +191,7 @@ async def wallboard_page(
         "view": WALLBOARD,
         "base": base,
         "kiosk": f"{base}?view={WALLBOARD}&layout={KIOSK}",
+        **(extra or {}),
     }
     if group is not None:
         return group_page(
@@ -198,7 +205,7 @@ async def wallboard_page(
         locale,
         "admin/usage_wallboard.html",
         principal,
-        {"org_header": header, **framed},
+        {"org_header": header, "usage_org": organisation or "", **framed},
         scripts=True,
     )
 

@@ -139,6 +139,16 @@ Only counts: no name, reference or link. The three live tiles (waiting, longest 
 
 The board asks for fresh figures every few seconds (10 by default; the platform administrator sets it) and needs a script for that; without one it shows what it loaded with and a **Refresh now** link. **Pause updates** keeps the figures as they are, and the board says so. When the board cannot be refreshed three times in a row, or the sign-in ended, it says in words that its data is old since that time and the numbers are struck through, so a screen that has stopped is never read as current. A wait beyond the limit of your organisation (5 minutes by default, **Minutes of waiting after which the wallboard says long wait** in the organisation's settings) shows the tile with the words *long wait* and is announced once; there is no sound and nothing blinks. Text sizes grow with the screen and are meant for a 1080p display.
 
+#### Display links
+
+For a screen that nobody signs in at, organisation admins can make a **display link** (the right *Make and revoke display links for the wallboard*). Display links are **off** until your organisation switches on **Allow display links for the wallboard** in its settings. Under the wallboard of the organisation's Usage page, choose which board (a group or all groups), a name for the screen, how long it is valid (at most what the platform allows, 30 days by default) and optionally the networks it may use and whether to pin it to the first address, then **Make link**.
+
+The address is shown **once**, on the page that answers the form, and cannot be shown again; copy it then. It can be opened **once**: the first request opens the screen and sets a cookie on it, and anyone who tries the address later is refused, so a link that leaks afterwards is worthless. A replaced screen needs a new link. The link shows this wallboard and nothing else of the portal, and never the *Team* view.
+
+*Networks* is a list of ranges, one per line; empty means any network, unless your organisation has a default list, which a link can only narrow. With **Pin to the first address** the address the screen has at its first use is kept (an IPv4 address as itself, an IPv6 address as its /64) and the screen works only from it. The networks and the pin are checked on every refresh, not only at the start. A request from another network or address is refused with a plain message, the link stays valid for the right address, and one line in the audit log records it (the reason, not the address). A screen whose address changes needs a new link.
+
+The list shows each link with its status (not opened yet, active, expired, revoked), the pinned address, the networks, when it was last used and when it expires. **Revoke** ends the screen within one refresh. Making, first use and revoking are in the audit log; the address of a link is never in it.
+
 ## What is not here yet
 
 The share of staffed time spent in calls (team utilisation) follows in a later step.

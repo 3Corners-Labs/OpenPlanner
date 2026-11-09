@@ -114,6 +114,7 @@ from app.domain.usage_backfill import BackfillBooking
 from app.domain.usage_report import DayStatusCount, ReportGroup
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 from app.domain.usage_staff import StaffCell
+from app.domain.wallboard_link import WallboardLink
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -2359,6 +2360,72 @@ class DigestStore(Protocol):
 
     async def get_custom_roles(self) -> list[CustomRole]:
         """Return the custom roles of the installation."""
+        ...
+
+
+class WallboardLinkStore(Protocol):
+    """Reads and writes the display links of the wallboard (ADR 0117 point 20, step 14)."""
+
+    async def list_wallboard_links(
+        self, scope: Scope, organisation_slug: str
+    ) -> list[WallboardLink]:
+        """Return the links of one organisation inside ``scope``, newest first."""
+        ...
+
+    async def get_wallboard_link(self, link_id: int) -> WallboardLink | None:
+        """Return one link, or ``None``."""
+        ...
+
+    async def get_wallboard_link_by_token(self, token_hash: str) -> WallboardLink | None:
+        """Return the link whose token has this hash, or ``None``."""
+        ...
+
+    async def get_wallboard_link_by_session(self, session_hash: str) -> WallboardLink | None:
+        """Return the link whose screen session has this hash, or ``None``."""
+        ...
+
+    async def add_wallboard_link(self, link: WallboardLink) -> int:
+        """Store a link and return its id."""
+        ...
+
+    async def consume_wallboard_link(
+        self, link_id: int, at: datetime, session_hash: str, pinned_network: str | None
+    ) -> bool:
+        """Use the link up: ``True`` only for the one request that finds it unused and active."""
+        ...
+
+    async def revoke_wallboard_link(self, link_id: int, at: datetime) -> bool:
+        """Revoke a link that is not revoked yet; return whether it was."""
+        ...
+
+    async def touch_wallboard_link(self, link_id: int, at: datetime, older_than: datetime) -> None:
+        """Write *last used* unless it is newer than ``older_than``."""
+        ...
+
+    async def mark_wallboard_link_refused(
+        self, link_id: int, at: datetime, older_than: datetime
+    ) -> bool:
+        """Record a refusal unless one was recorded after ``older_than``; ``True`` when written."""
+        ...
+
+    async def organisation_id_of_slug(self, slug: str) -> int | None:
+        """Return the id of an organisation, or ``None``."""
+        ...
+
+    async def group_id_in_organisation(self, organisation_id: int, slug: str) -> int | None:
+        """Return the id of a group of the organisation, or ``None``."""
+        ...
+
+
+class WallboardLinkUnitOfWork(Protocol):
+    """Opens transactions that carry the display links' ``WallboardLinkStore``."""
+
+    def locked(self) -> AbstractAsyncContextManager[WallboardLinkStore]:
+        """Open a write transaction."""
+        ...
+
+    def read(self) -> AbstractAsyncContextManager[WallboardLinkStore]:
+        """Open a read transaction."""
         ...
 
 

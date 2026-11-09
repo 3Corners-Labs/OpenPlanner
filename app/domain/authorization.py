@@ -123,6 +123,8 @@ class Permission(StrEnum):
     """ADR 0117 point 16: subscribe staff to the digest mail of the reports of an organisation."""
     REPORTS_STAFF_VIEW = "reports.staff.view"
     """ADR 0117 point 9: the load per team member; own permission, organisation admin only."""
+    REPORTS_WALLBOARD_LINK_MANAGE = "reports.wallboard.link.manage"
+    """ADR 0117 point 20: make and revoke the display links of a wallboard; organisation admin."""
     REPORTS_WALLBOARD_VIEW = "reports.wallboard.view"
     """ADR 0117 point 20: the live wallboard of a group or organisation; counts only."""
     ROLES_MANAGE = "roles.manage"
@@ -193,6 +195,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.REPORTS_DIGEST_MANAGE: Level.ORGANISATION,
     Permission.REPORTS_STAFF_VIEW: Level.ORGANISATION,
     Permission.REPORTS_WALLBOARD_VIEW: Level.GROUP,
+    Permission.REPORTS_WALLBOARD_LINK_MANAGE: Level.ORGANISATION,
     # ADR 0039: create, change and delete custom roles.
     Permission.ROLES_MANAGE: Level.GLOBAL,
     # ADR 0046: who uses the portal; group level so a group admin sees their own team.
@@ -312,6 +315,10 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
     Permission.REPORTS_STAFF_VIEW: frozenset({Permission.REPORTS_VIEW}),
     # ADR 0117 point 20: the wallboard is a view of the *Usage* page.
     Permission.REPORTS_WALLBOARD_VIEW: frozenset({Permission.REPORTS_VIEW}),
+    # A link opens the wallboard, so making one presumes seeing it.
+    Permission.REPORTS_WALLBOARD_LINK_MANAGE: frozenset(
+        {Permission.REPORTS_VIEW, Permission.REPORTS_WALLBOARD_VIEW}
+    ),
 }
 """ADR 0039: permissions a permission depends on; a custom role must hold them too."""
 
@@ -357,8 +364,10 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.REPORTS_DIGEST_MANAGE,
         # ADR 0117 point 9: the load per team member, while the organisation has switched it on.
         Permission.REPORTS_STAFF_VIEW,
-        # ADR 0117 point 20: the live wallboard for a screen in the team's room.
+        # ADR 0117 point 20: the live wallboard for a screen in the team's room, and the links
+        # for a screen nobody signs in at.
         Permission.REPORTS_WALLBOARD_VIEW,
+        Permission.REPORTS_WALLBOARD_LINK_MANAGE,
         # ADR 0046: the staff of the own organisations.
         Permission.STAFF_VIEW,
         # ADR 0095: invite, change and disable them in the bundled identity provider.

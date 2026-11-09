@@ -20,7 +20,7 @@ from app.domain.own_queue import ParticipantState, participant_state, summarise
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.queue_service import load_entries
 from app.domain.scheduling import GroupSummary
-from app.domain.usage_report_service import UsageReportService
+from app.domain.usage_report_service import LoadedUsage, UsageReportService
 from app.domain.wallboard import BlockFill, LiveQueue, Wallboard, wallboard
 
 _LOOKAHEAD = timedelta(hours=3)
@@ -71,9 +71,36 @@ class WallboardService:
             now.date(),
             Permission.REPORTS_WALLBOARD_VIEW,
         )
+        return await self._build(
+            loaded,
+            scope_for(principal, Permission.REPORTS_WALLBOARD_VIEW),
+            scope_for(principal, Permission.QUEUE_WORK),
+            now,
+        )
+
+    async def read_scope(
+        self, scope: Scope, organisation_slug: str, group_slug: str | None
+    ) -> tuple[Wallboard, list[GroupSummary]]:
+        """Return the board of a display link: ``scope`` is the link's, with no sign-in.
+
+        The caller (``WallboardLinkService.session``) has decided that the request may see it;
+        the link grants the same figures as the permission, the live counts included (ADR 0117
+        point 20), and nothing beyond its own group or organisation.
+
+        Raises:
+            DomainError: ``group_not_found``.
+        """
+        now = self._clock.now()
+        loaded = await self._usage.read(
+            scope, organisation_slug, group_slug, now.date(), now.date()
+        )
+        return await self._build(loaded, scope, scope, now)
+
+    async def _build(
+        self, loaded: LoadedUsage, board_scope: Scope, queue_scope: Scope, now: datetime
+    ) -> tuple[Wallboard, list[GroupSummary]]:
+        """Make the board of the loaded groups; the live counts only inside ``queue_scope``."""
         slugs = {g.slug for g in loaded.groups}
-        board_scope = scope_for(principal, Permission.REPORTS_WALLBOARD_VIEW)
-        queue_scope = scope_for(principal, Permission.QUEUE_WORK)
         async with self._uow.read() as tx:
             organisation = loaded.groups[0].organisation_slug
             covered = [

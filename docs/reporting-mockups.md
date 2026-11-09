@@ -58,10 +58,10 @@ Rules:
 
 | Element | Step | State | Held by |
 |---|---|---|---|
-| Shown-once link with copy button | 14 | planned | – |
-| Form: which wallboard, name, valid until | 14 | planned | – |
-| Who may use it: ACL per line, *pin to the first address* | 14 | planned | – |
-| List of links with status, pinned address, ACL, last used, expiry and *Revoke* | 14 | planned | – |
+| Shown-once link (a read-only field to copy from; a copy button is an island and stays open) | 14 | built | `tests/admin/test_display_links.py::test_the_link_is_shown_once_and_nowhere_else` |
+| Form: which wallboard, name, valid until | 14 | built | `tests/admin/test_display_links.py` |
+| Who may use it: ACL per line, *pin to the first address* | 14 | built | `tests/admin/test_display_links.py`, `tests/domain/test_wallboard_link.py` |
+| List of links with status, pinned address, ACL, last used, expiry and *Revoke* | 14 | built | `tests/admin/test_display_links.py::test_a_revoked_link_stops_the_screen_at_its_next_poll` |
 
 ## View 5: Digest
 

@@ -5,7 +5,7 @@
 {% block page %}
 <main id="content" class="wb-screen" tabindex="-1">
   {% include "admin/_wallboard_region.html" %}
-  <p class="wb-screen__exit"><a href="{{ exit }}">{{ _("reports.wallboard.exit") }}</a></p>
+  {% if exit %}<p class="wb-screen__exit"><a href="{{ exit }}">{{ _("reports.wallboard.exit") }}</a></p>{% endif %}
 </main>
 {% endblock %}
 {% block scripts %}<script src="{{ static_url('live-region.js') }}" defer></script>{% endblock %}

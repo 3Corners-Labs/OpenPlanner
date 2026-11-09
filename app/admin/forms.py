@@ -68,6 +68,7 @@ DONE_MESSAGES: dict[str, str] = {
     "unchanged": "admin.done.unchanged",
     "digest_added": "reports.digest.done.added",
     "digest_removed": "reports.digest.done.removed",
+    "link_revoked": "reports.display.done.revoked",
     "field_retired": "admin.done.field_retired",
     "added": "admin.done.added",
     "removed": "admin.done.removed",

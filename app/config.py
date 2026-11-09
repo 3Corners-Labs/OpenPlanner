@@ -265,6 +265,13 @@ class Settings(BaseSettings):
     # and the wait after which it says *long wait* (class D, organisation).
     reporting_wallboard_refresh_seconds: int = Field(default=10, ge=5, le=120)
     reporting_wallboard_wait_alert_minutes: int = Field(default=5, ge=1, le=60)
+    # ADR 0117 point 20: display links for a screen nobody signs in at. Whether they may be made,
+    # the default networks, whether *pin to the first address* is ticked, all the organisation's
+    # (class D); the longest life of a link is the platform's (class C).
+    reporting_wallboard_display_links_enabled: bool = False
+    reporting_wallboard_link_networks: str = Field(default="", max_length=1500)
+    reporting_wallboard_link_pin_default: bool = False
+    reporting_wallboard_link_max_days: int = Field(default=30, ge=1, le=90)
     # ADR 0117 point 15 (class C, platform): also write every non-team usage fact as the log line
     # usage.fact for the log destinations; no personal data. Off by default.
     reporting_usage_events_to_log: bool = False

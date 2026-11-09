@@ -133,6 +133,7 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | `request.rejected` | `info`, outcome | `expected`, `origin`, `reason`, `sec_fetch_site` | A request was rejected before it reached the application: {reason}. | A honeypot field, a cross-site POST or a foreign `Origin` (ADR 0053). | Repeated `origin_mismatch` from your own site: check the proxy's `Host` header. |
 | `settings.secret_file_readable` | `warning` | `variable` | The secret file of {variable} can be read by others. | A bootstrap secret file (`X_FILE`, ADR 0042 §9) has loose permissions. | Run `chmod 600` on the file. |
 | `token.rejected` | outcome | – | A token or link that matches nothing was used: {reason}. | A guessed, forged or long-expired token or management link (ADR 0053). | Repeated from one caller: a guessing attempt. |
+| `wallboard.session_refused` | outcome | `reason` | A screen with a display link was refused: {reason}. | A request with a display link came from a network outside its list (`network`) or from another address than the one it is pinned to (`pin`); at most one event per link and hour (ADR 0117 point 20, R10). The link stays valid for the right address; the address that was refused is not recorded. | Ask who runs the screen. A screen whose address changed needs a new link; an address nobody knows means the link leaked: revoke it on the wallboard page. |
 | `webex.token_refresh` | outcome | – | Refreshing the Webex token failed: {reason}. | Webex refused or could not be reached for a token refresh (at most one per window). | `unauthorized`: authorise the service app again. `unreachable`: check the network. |
 | `webhook.rejected` | `warning`, outcome | `source` | A webhook from {source} was rejected: its signature did not verify. | A webhook with a wrong signature or an old timestamp (CLAUDE.md, 300 s). | Repeated: check the webhook secret, or someone is posting to the endpoint. |
 | `widget.origin_refused` | `info` | `group`, `origin` | The widget of {group} refused origin {origin}. | A site that is not on the group's allow-list tried to use the widget. | Add the site under the group's *Embedding*, or ignore when it is not yours. |
@@ -189,6 +190,7 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | `staff.reinstated` | outcome | – | A staff member was reinstated. | A suspended person can sign in again. | Nothing; the audit log shows who did it. |
 | `staff.suspended` | outcome | – | A staff member was suspended. | The person can no longer sign in; their sessions ended. | Nothing; the audit log shows who did it. |
 | `system.maintenance` | outcome | `what`, `hours` | Maintenance mode: {what}. | Maintenance mode was switched on or off, or a change was refused (ADR 0084). | Nothing; the audit log shows who did it. |
+| `wallboard.session_started` | outcome | – | A display link was used for the first time: a screen was opened. | The first request of a display link opened a screen session (ADR 0117 point 20). The detail names the link, never its token, its cookie or the address. | Nothing; the audit log shows who did it. |
 
 ### System events
 

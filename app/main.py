@@ -153,6 +153,8 @@ from app.domain.trial_call_service import TrialCallService
 from app.domain.usage_api_service import UsageApiLimits, UsageApiService
 from app.domain.usage_export_service import UsageExportService
 from app.domain.usage_report_service import UsageReportService
+from app.domain.wallboard_link import parse_networks
+from app.domain.wallboard_link_service import WallboardLinkService
 from app.domain.wallboard_service import WallboardService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
@@ -495,6 +497,18 @@ def create_app(
             lambda organisation: (
                 per_organisation(organisation).reporting_wallboard_wait_alert_minutes
             ),
+        )
+        app.state.wallboard_link_service = WallboardLinkService(
+            uow,
+            app.state.admin_service,
+            clock,
+            lambda organisation: (
+                per_organisation(organisation).reporting_wallboard_display_links_enabled
+            ),
+            lambda organisation: parse_networks(
+                per_organisation(organisation).reporting_wallboard_link_networks
+            ),
+            lambda: live().reporting_wallboard_link_max_days,
         )
         app.state.digest_admin = DigestAdmin(
             uow,

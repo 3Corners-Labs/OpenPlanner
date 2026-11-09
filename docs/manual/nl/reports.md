@@ -145,6 +145,16 @@ Alleen aantallen: geen naam, referentie of link. De drie live tegels (wachtend, 
 
 Het bord vraagt om de paar seconden verse getallen (standaard 10; de platformbeheerder stelt het in) en heeft daarvoor een script nodig; zonder script toont het wat het bij het laden had en een koppeling **Nu verversen**. **Pauzeer verversen** houdt de getallen vast, en het bord zegt dat. Lukt verversen drie keer achter elkaar niet, of is de aanmelding verlopen, dan zegt het bord in woorden dat de gegevens oud zijn sinds die tijd en worden de getallen doorgestreept, zodat een stilgevallen scherm nooit voor actueel wordt aangezien. Een wachttijd boven de grens van uw organisatie (standaard 5 minuten, **Minuten wachten waarna het wallboard lange wachttijd meldt** bij de instellingen van de organisatie) toont de tegel met de woorden *lange wachttijd* en wordt één keer aangekondigd; er is geen geluid en niets knippert. De tekst groeit mee met het scherm en is bedoeld voor een 1080p-scherm.
 
+#### Displaylinks
+
+Voor een scherm waar niemand inlogt kunnen organisatiebeheerders een **displaylink** maken (het recht *Displaylinks voor het wallboard maken en intrekken*). Displaylinks staan **uit** zolang uw organisatie bij de instellingen **Displaylinks voor het wallboard toestaan** niet aanzet. Kies onder het wallboard van de pagina Gebruik van de organisatie welk bord (een groep of alle groepen), een naam voor het scherm, hoe lang het geldig is (hoogstens wat het platform toestaat, standaard 30 dagen) en eventueel de netwerken die het mag gebruiken en of het op het eerste adres wordt vastgepind, en kies **Link maken**.
+
+Het adres wordt **één keer** getoond, op de pagina die het formulier beantwoordt, en kan niet opnieuw worden getoond; kopieer het dus meteen. Het kan **één keer** worden geopend: het eerste verzoek opent het scherm en zet er een cookie op, en wie het adres later probeert wordt geweigerd, zodat een link die achteraf uitlekt niets waard is. Een vervangen scherm heeft een nieuwe link nodig. De link toont dit wallboard en niets anders van het portaal, en nooit de *Team*-weergave.
+
+*Netwerken* is een lijst van reeksen, één per regel; leeg betekent elk netwerk, tenzij uw organisatie een standaardlijst heeft, die een link alleen kan versmallen. Met **Vastpinnen op het eerste adres** wordt het adres dat het scherm bij het eerste gebruik heeft vastgelegd (een IPv4-adres als zichzelf, een IPv6-adres als zijn /64) en werkt het scherm alleen vanaf dat adres. De netwerken en de pin worden bij elke verversing gecontroleerd, niet alleen bij het begin. Een verzoek van een ander netwerk of adres wordt geweigerd met een duidelijke melding, de link blijft geldig voor het juiste adres, en één regel in het auditlog legt het vast (de reden, niet het adres). Een scherm waarvan het adres wisselt heeft een nieuwe link nodig.
+
+De lijst toont elke link met zijn status (nog niet geopend, actief, verlopen, ingetrokken), het gepinde adres, de netwerken, wanneer hij voor het laatst is gebruikt en wanneer hij verloopt. **Intrekken** beëindigt het scherm binnen één verversing. Maken, eerste gebruik en intrekken staan in het auditlog; het adres van een link staat er nooit in.
+
 ## Wat hier nog niet staat
 
 Het aandeel van de bezette tijd dat in gesprekken gaat (bezetting van het team) volgt in een latere stap.

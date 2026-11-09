@@ -46,6 +46,8 @@ from app.admin import (
     configuration_routes,
     contact_center_routes,
     contact_routes,
+    display_link_routes,
+    display_routes,
     embedding_routes,
     form_routes,
     group_list_routes,
@@ -881,6 +883,7 @@ def register_admin(app: FastAPI) -> None:
         retention_routes.router,
         usage_routes.router,
         wallboard_routes.router,
+        display_link_routes.router,
         settings_routes.router,
         organisation_settings_routes.router,
         configuration_routes.router,
@@ -923,3 +926,5 @@ def register_admin(app: FastAPI) -> None:
         alerts.router,
     ):
         app.include_router(module_router, dependencies=banner)
+    # The screen side of a display link has no admin session and none of the banner loaders.
+    app.include_router(display_routes.router)

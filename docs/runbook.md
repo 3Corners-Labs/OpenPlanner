@@ -2672,6 +2672,16 @@ booking, is derived (a planner's reason means the planner, a closure the closure
 participant); call durations, the queue method and suspensions have no time on the row and start on
 the day the release is installed.
 
+## Display links of the wallboard (ADR 0117 point 20)
+
+A display link opens the wallboard on a screen nobody signs in at: an organisation admin makes it under *Usage*, *Wallboard*, *Display links*, once the organisation has switched on **Allow display links for the wallboard**. The address is `https://<host>/display/start/<token>`, shown once and usable once; the screen then keeps a cookie (`op_display`, `__Host-op_display` on https).
+
+The token is in the URL of that first request only. The application logs the route template (`/display/start/{token}`), never the raw path, and the library access line is switched off; **the reverse proxy's access log is not under the application's control**. Mask or drop the path after `/display/start/` there. In Caddy, for example, add a `log` filter that replaces that path segment (`replace` on `request>uri`); in nginx use a `map` that rewrites `$request_uri` for the log format. A token in an access log is harmless once the link was used (it works once), but an unused link in a log is a working address.
+
+The client address that the ACL and the pin use is the one the trusted proxy chain resolves (`FORWARDED_ALLOW_IPS`, ADR 0086), the same as the rate limiter's. If the proxy is not trusted, every screen appears to come from the proxy and an ACL or a pin means nothing: check *System status*, *Public address* first. A screen whose address changes (DHCP lease, moved cable) is refused with a plain message and needs a new link; the link list shows the pinned range and when the screen last asked. A refusal is one audit event per link and hour with the reason only.
+
+To end a screen: revoke its link on the same page; the screen stops at its next poll. Switching the organisation's setting off ends every screen of the organisation the same way.
+
 ## Widget on a host website (ADR 0035)
 
 A web editor reports that `<openplanner-booking>` says the calendar "is not available here".

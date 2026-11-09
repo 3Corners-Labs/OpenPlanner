@@ -1740,3 +1740,36 @@ class ReportDigestRunRow(Base):
         CheckConstraint("status IN ('sent', 'skipped_late', 'no_recipient')", name="status"),
         UniqueConstraint("subscription_id", "due_date"),
     )
+
+
+class WallboardLinkRow(Base):
+    """A display link of a wallboard (ADR 0117 point 20, step 14).
+
+    Only ``sha256`` of the token and of the screen's session secret are stored, never the
+    secrets. ``pinned_network`` and ``networks`` are ranges of staff equipment, not of a
+    participant; they live on this row alone and go with it.
+    """
+
+    __tablename__ = "wallboard_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id", ondelete="CASCADE"))
+    group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(80))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    session_hash: Mapped[str | None] = mapped_column(String(64))
+    created_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    used_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    last_refused_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    networks: Mapped[str] = mapped_column(String(1500), server_default=text("''"))
+    pin: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    pinned_network: Mapped[str | None] = mapped_column(String(64))
+
+    __table_args__ = (
+        Index("ix_wallboard_links_organisation_id", "organisation_id"),
+        Index("ix_wallboard_links_session_hash", "session_hash"),
+    )

@@ -1158,6 +1158,43 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=60,
     ),
     S(
+        "reporting_wallboard_display_links_enabled",
+        K.BOOL,
+        False,
+        _D,
+        T.RETENTION,
+        "Whether an organisation admin may make display links: addresses that show the wallboard "
+        "on a screen nobody signs in at. Off by default (ADR 0117 point 20).",
+    ),
+    S(
+        "reporting_wallboard_link_networks",
+        K.STRING,
+        "",
+        _D,
+        T.RETENTION,
+        "The networks (CIDR ranges, one per line, up to 20) a display link works from. Empty "
+        "means any network; a link may narrow it (ADR 0117 point 20).",
+    ),
+    S(
+        "reporting_wallboard_link_pin_default",
+        K.BOOL,
+        False,
+        _D,
+        T.RETENTION,
+        "Whether pin to the first address is ticked when a display link is made; always "
+        "changeable per link (ADR 0117 point 20).",
+    ),
+    S(
+        "reporting_wallboard_link_max_days",
+        K.INT,
+        30,
+        _C,
+        T.RETENTION,
+        "The longest life of a display link, in days (ADR 0117 point 20).",
+        minimum=1,
+        maximum=90,
+    ),
+    S(
         "reporting_usage_events_to_log",
         K.BOOL,
         False,

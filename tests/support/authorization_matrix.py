@@ -132,6 +132,19 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             200, 200, 403, 403, 403, 403, 403
         )
     },
+    # ADR 0117 point 20, step 14: display links, organisation level and the organisation admin
+    # only (reports.wallboard.link.manage). An empty form is refused with a code while the links
+    # are off (303), and a link that is not there is told apart from nothing (303).
+    "POST /admin/organisations/{org}/usage/wallboard/links": {
+        "/admin/organisations/demo/usage/wallboard/links": statuses(
+            303, 303, 403, 403, 403, 403, 403
+        )
+    },
+    "POST /admin/organisations/{org}/usage/wallboard/links/{link_id}/revoke": {
+        "/admin/organisations/demo/usage/wallboard/links/999/revoke": statuses(
+            303, 303, 403, 403, 403, 403, 403
+        )
+    },
     # ADR 0117 point 12: the CSV of a page, the same scope as the page (reports.export).
     "GET /admin/groups/{slug}/usage/export.csv": {
         "/admin/groups/demo/usage/export.csv": statuses(200, 200, 200, 403, 200, 403, 403)
