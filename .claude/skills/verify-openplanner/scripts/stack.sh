@@ -11,6 +11,9 @@
 #   stack.sh down      keep the app logs (scanned for booking-link tokens and participant values,
 #                      which are blanked), remove the containers, network and volumes of this
 #                      stack, keep the evidence
+#   stack.sh fingerprint [<commit>]
+#                      read-only: the hash of the files the image is built from, now (local
+#                      changes included) or of <commit> alone; equal hashes, same image files
 #
 # Optional environment: VERIFY_WEB_PORT (8010), VERIFY_KC_PORT (8090), VERIFY_MAIL_PORT (8035),
 # VERIFY_PROJECT (openplanner-verify), VERIFY_EVIDENCE_ROOT (<checkout>/.verify-openplanner),
@@ -115,10 +118,13 @@ check_ports() {
 
 # A hash of what the image is built from: the paths .dockerignore lets into the build context
 # (an allow-list) plus the Dockerfile and .dockerignore themselves, which no allow-list names but
-# which decide the build, as committed plus local changes and untracked files. Docs or skill
-# edits outside those paths leave it unchanged, so doctor only calls a build stale when it is.
+# which decide the build, as committed plus local changes and untracked files. Given a COMMIT,
+# the same of that commit alone, its own allow-list included, so any checkout gives it the hash
+# a clean checkout of COMMIT gives. Docs or skill edits outside those paths leave it unchanged,
+# so doctor only calls a build stale when it is, and role-manuals can tell whether a run shows
+# the software of its release tag.
 fingerprint() {
-  local line
+  local line commit=${1:-}
   local -a paths
   paths=()
   while IFS= read -r line; do
@@ -128,14 +134,16 @@ fingerprint() {
         paths+=("${line%/}")
         ;;
     esac
-  done <"$REPO/.dockerignore"
+  done < <(if [ -n "$commit" ]; then git -C "$REPO" show "$commit:.dockerignore"; else cat "$REPO/.dockerignore"; fi)
   [ "${#paths[@]}" -gt 0 ] || fail ".dockerignore names no '!' paths any more; update fingerprint in stack.sh"
   paths+=(Dockerfile .dockerignore)
   {
-    git -C "$REPO" ls-tree -r HEAD -- "${paths[@]}"
-    git -C "$REPO" diff HEAD --binary -- "${paths[@]}"
-    git -C "$REPO" ls-files -z --others --exclude-standard -- "${paths[@]}" \
-      | (cd "$REPO" && xargs -0 -r "${SHA[@]}")
+    git -C "$REPO" ls-tree -r "${commit:-HEAD}" -- "${paths[@]}"
+    if [ -z "$commit" ]; then
+      git -C "$REPO" diff HEAD --binary -- "${paths[@]}"
+      git -C "$REPO" ls-files -z --others --exclude-standard -- "${paths[@]}" \
+        | (cd "$REPO" && xargs -0 -r "${SHA[@]}")
+    fi
   } | "${SHA[@]}" | cut -d' ' -f1
 }
 
@@ -225,7 +233,10 @@ ENV
   render_realms
 
   set_state BUILT_FROM_COMMIT "$(git -C "$REPO" rev-parse HEAD)"
-  set_state BUILT_FROM_FINGERPRINT "$(fingerprint)"
+  # On a line of its own: a failing fingerprint stops up here, so no run records an empty one.
+  local built_from
+  built_from=$(fingerprint)
+  set_state BUILT_FROM_FINGERPRINT "$built_from"
   if [ -z "$(git -C "$REPO" status --porcelain)" ]; then
     set_state BUILT_WITH_LOCAL_CHANGES no
   else
@@ -450,6 +461,20 @@ cmd_compose() {
   compose "$@"
 }
 
+# Read-only and without docker: the fingerprint now, or of one commit. The argument goes to git
+# only as the commit it names, so an option or a range is refused.
+cmd_fingerprint() {
+  local commit
+  [ "$#" -le 1 ] || fail "fingerprint takes at most one commit"
+  if [ "$#" -eq 0 ]; then
+    fingerprint
+    return
+  fi
+  case "$1" in -*) fail "fingerprint: '$1' is no commit" ;; esac
+  commit=$(git -C "$REPO" rev-parse --verify --quiet "$1^{commit}") || fail "fingerprint: '$1' is no commit"
+  fingerprint "$commit"
+}
+
 cmd=${1:-help}
 [ "$#" -eq 0 ] || shift
 case "$cmd" in
@@ -457,6 +482,7 @@ case "$cmd" in
   doctor) cmd_doctor ;;
   down) cmd_down ;;
   compose) cmd_compose "$@" ;;
+  fingerprint) cmd_fingerprint "$@" ;;
   -h | --help | help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "${BASH_SOURCE[0]}" ;;
-  *) fail "unknown command '$cmd' (up, doctor, compose, down)" ;;
+  *) fail "unknown command '$cmd' (up, doctor, compose, down, fingerprint)" ;;
 esac
