@@ -121,6 +121,52 @@ class DayRow:
 
 
 @dataclass(frozen=True)
+class VolumeTiles:
+    """The four figures at the top of the *Volume* screen; ``None`` where a part is hidden.
+
+    Attributes:
+        no_show_percent: No shows over completed plus no shows (U3), in whole percent.
+        no_show_of: Completed plus no shows, the base of that percent.
+        cancel_percent: Participant cancellations over bookings created (U4), in whole percent.
+        cancel_late_percent: The share of those cancelled less than a day before the start.
+        confirmed_percent: Confirmed over confirmed plus lapsed (U9), in whole percent.
+        confirm_median_bucket: The duration bucket (code) in which the median time to confirm
+            falls; only when the confirmed total may be shown.
+    """
+
+    no_show_percent: int | None
+    no_show_of: int | None
+    cancel_percent: int | None
+    cancel_late_percent: int | None
+    confirmed_percent: int | None
+    confirm_median_bucket: int | None
+
+
+SPLITS: tuple[str, ...] = ("queue", "locale")
+"""The cuts the range form offers for bookings created (``split``); none is the default."""
+SPLIT_GROUP_FACTOR = 5
+"""A group takes part in a cut only when its own total in the range is this many times the
+threshold (ADR 0117 point 8), so no cut singles out a booking."""
+LATE_BUCKETS = 8
+"""Buckets 0 to 7 of the time left before the start are under a day: a *late* cancellation."""
+
+
+@dataclass(frozen=True)
+class SplitTable:
+    """Bookings created, cut by one dimension (queue method or language).
+
+    Attributes:
+        by: The cut (one of ``SPLITS``).
+        table: A count per value, small cells hidden and complemented.
+        groups_left_out: Groups too small to be cut, counted so the reader knows.
+    """
+
+    by: str
+    table: CountTable
+    groups_left_out: int
+
+
+@dataclass(frozen=True)
 class VolumeReport:
     """Everything the *Volume* screen shows, with small cells already hidden.
 
@@ -142,6 +188,8 @@ class VolumeReport:
             may be shown.
         closure: Bookings suspended and resumed by closures (U10).
         before_reporting: Outcomes of bookings from before reporting, per status.
+        tiles: The four figures at the top (U1, U3, U4, U9).
+        split: Bookings created cut by queue method or language, when one was asked for.
     """
 
     first_day: date
@@ -159,6 +207,8 @@ class VolumeReport:
     conversion_percent: int | None
     closure: CountTable
     before_reporting: CountTable
+    tiles: VolumeTiles
+    split: SplitTable | None = None
 
 
 def days_in(first: date, last: date) -> list[date]:
@@ -321,6 +371,7 @@ def volume_report(
     now: datetime,
     as_of: datetime | None,
     before_reporting: Sequence[DayStatusCount] = (),
+    split: str | None = None,
 ) -> VolumeReport:
     """Build the *Volume* tables from ``cells`` of ``groups`` over ``first_day`` to ``last_day``.
 
@@ -337,6 +388,9 @@ def volume_report(
     moved: Counter[str] = Counter()
     confirm: Counter[str] = Counter()
     closure: Counter[str] = Counter()
+    confirm_buckets: Counter[int] = Counter()
+    cut_by_group: dict[int, Counter[str]] = {}
+    created_by_group: Counter[int] = Counter()
     for cell in cells:
         zone = zones.get(cell.group_id)
         if zone is None:
@@ -346,6 +400,7 @@ def volume_report(
             continue
         if cell.metric == "U1":
             created[day.isoformat()] += cell.count
+            created_by_group[cell.group_id] += cell.count
         elif cell.metric == "U2" and cell.outcome is not None:
             outcomes[cell.outcome.value] += cell.count
         elif cell.metric == "U6" and cell.bucket is not None:
@@ -359,8 +414,12 @@ def volume_report(
             moved[actor] += cell.count
         elif cell.metric == "U9":
             confirm["confirmed" if cell.outcome is None else cell.outcome.value] += cell.count
+            if cell.outcome is None and cell.bucket is not None:
+                confirm_buckets[cell.bucket] += cell.count
         elif cell.metric == "U10" and cell.reason_code is not None:
             closure[cell.reason_code] += cell.count
+        elif (value := _split_value(cell, split)) is not None:
+            cut_by_group.setdefault(cell.group_id, Counter())[value] += cell.count
     day_list = days_in(first_day, last_day)
     series = suppress_line([created.get(d.isoformat(), 0) for d in day_list], threshold)
     last_provisional = (now - PROVISIONAL).date()
@@ -390,6 +449,21 @@ def volume_report(
     for row in before_reporting:
         if first_day <= row.day <= last_day and row.group_id in zones:
             statuses[row.status.value] += row.count
+    outcome_table = count_table(outcomes, [o.value for o in UsageOutcome], threshold)
+    cancel_table = count_table(cancels, [str(b) for b in range(len(BUCKET_LABELS))], threshold)
+    late_cancels = sum(n for b, n in cancels.items() if int(b) < LATE_BUCKETS)
+    tiles = _tiles(
+        outcome_table,
+        series.total,
+        cancel_table,
+        cancels,
+        late_cancels,
+        sum(cancels.values()) - late_cancels,
+        threshold,
+        conversion,
+        confirmation,
+        confirm_buckets,
+    )
     return VolumeReport(
         first_day=first_day,
         last_day=last_day,
@@ -397,15 +471,98 @@ def volume_report(
         threshold=threshold,
         days=days,
         created_total=series.total,
-        outcomes=count_table(outcomes, [o.value for o in UsageOutcome], threshold),
+        outcomes=outcome_table,
         lead_time=lead_table,
         lead_mean_minutes=mean,
-        participant_cancellations=count_table(
-            cancels, [str(b) for b in range(len(BUCKET_LABELS))], threshold
-        ),
+        participant_cancellations=cancel_table,
         reschedules=count_table(moved, [*(a.value for a in ActorClass), UNKNOWN], threshold),
         confirmation=confirmation,
         conversion_percent=conversion,
         closure=count_table(closure, ["suspended", "resumed"], threshold),
         before_reporting=count_table(statuses, [s.value for s in BookingStatus], threshold),
+        tiles=tiles,
+        split=_split_table(split, cut_by_group, created_by_group, groups, threshold),
+    )
+
+
+def _split_value(cell: UsageCell, split: str | None) -> str | None:
+    """Return the value a cell adds to the cut asked for, or ``None`` if it is none of its."""
+    if split == "queue" and cell.metric == "Q1" and cell.dispatch_kind is not None:
+        return cell.dispatch_kind.value
+    if split == "locale" and cell.metric == "M2" and cell.locale:
+        return cell.locale
+    return None
+
+
+def _split_table(
+    split: str | None,
+    by_group: dict[int, Counter[str]],
+    created_by_group: Counter[int],
+    groups: Sequence[ReportGroup],
+    threshold: int,
+) -> SplitTable | None:
+    """Return the cut of bookings created, taking only groups that are big enough (point 8).
+
+    The size of a group is its bookings created (U1), the figure the screen already shows, so
+    the difference between that total and the cut says nothing about a group left out.
+    """
+    if split not in SPLITS:
+        return None
+    big = {
+        g.group_id for g in groups if created_by_group[g.group_id] >= SPLIT_GROUP_FACTOR * threshold
+    }
+    total: Counter[str] = Counter()
+    for group_id in big:
+        total.update(by_group[group_id])
+    return SplitTable(
+        split,
+        count_table(total, sorted(total), threshold),
+        sum(1 for g in groups if g.group_id not in big),
+    )
+
+
+def _percent(part: int | None, whole: int | None) -> int | None:
+    """Return ``part`` over ``whole`` in whole percent, or ``None`` if either is hidden or zero."""
+    if part is None or whole is None or whole <= 0:
+        return None
+    return round(100 * part / whole)
+
+
+def _tiles(
+    outcomes: CountTable,
+    created: int | None,
+    cancels: CountTable,
+    raw_cancels: Counter[str],
+    late_cancels: int,
+    other_cancels: int,
+    threshold: int,
+    conversion: int | None,
+    confirmation: CountTable,
+    confirm_buckets: Counter[int],
+) -> VolumeTiles:
+    """Return the four tiles from tables that were already through the small-cell rule."""
+    by_outcome = {r.code: r.count for r in outcomes.rows}
+    done, no_show = by_outcome["completed"], by_outcome["no_show"]
+    base = None if done is None or no_show is None else done + no_show
+    cancelled = by_outcome["cancelled_by_participant"]
+    late_line = suppress_line([late_cancels, other_cancels], threshold)
+    late = late_line.cells[0] if late_line.total is not None else None
+    if any(r.count is None and raw_cancels.get(r.code, 0) > 0 for r in cancels.rows):
+        late = None  # a hidden bucket holds people: the share would give it back
+    median = None
+    confirmed = confirmation.rows[0].count
+    if confirmed is not None and confirmation.total is not None and confirm_buckets:
+        half, running = sum(confirm_buckets.values()) / 2, 0
+        for bucket in sorted(confirm_buckets):
+            running += confirm_buckets[bucket]
+            if running >= half:
+                median = bucket
+                break
+    return VolumeTiles(
+        no_show_percent=_percent(no_show, base),
+        no_show_of=base,
+        cancel_percent=_percent(cancelled, created),
+        cancel_late_percent=_percent(late, late_line.total),
+        confirmed_percent=conversion,
+        confirm_median_bucket=median,
     )

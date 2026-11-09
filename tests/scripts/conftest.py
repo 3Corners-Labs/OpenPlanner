@@ -1,39 +1,13 @@
-"""Fixtures for the scripts that run against git: a throw-away repository per test."""
+"""Helpers for the scripts that run against git: fake programs and a release line.
+
+The throw-away repository itself is the ``git`` fixture of ``tests/conftest.py``; ``Git`` and
+``commit_all`` come from ``tests/support/git_repository.py``.
+"""
 
 import os
-import shutil
-import subprocess
-from collections.abc import Callable
 from pathlib import Path
 
-import pytest
-
-GIT = shutil.which("git") or "/usr/bin/git"
-Git = Callable[..., str]
-"""Runs git in the test repository with the given arguments and returns its output."""
-
-
-@pytest.fixture
-def git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Git:
-    """A git repository on branch ``main`` in ``tmp_path``, which is the working directory."""
-    monkeypatch.chdir(tmp_path)
-    for variable in ("GIT_AUTHOR", "GIT_COMMITTER"):
-        monkeypatch.setenv(f"{variable}_NAME", "test")
-        monkeypatch.setenv(f"{variable}_EMAIL", "test@example.org")
-
-    def run(*args: str) -> str:
-        return subprocess.run(  # noqa: S603 - fixed argv, no shell
-            [GIT, *args], check=True, capture_output=True, text=True, cwd=tmp_path
-        ).stdout
-
-    run("init", "-q", "-b", "main")
-    return run
-
-
-def commit_all(git: Git, message: str) -> None:
-    """Stage everything and commit it."""
-    git("add", "-A")
-    git("commit", "-q", "-m", message)
+from tests.support.git_repository import Git, commit_all
 
 
 def fake_program(directory: Path, name: str, script: str) -> Path:

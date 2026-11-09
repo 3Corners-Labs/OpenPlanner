@@ -43,6 +43,12 @@ wanneer een boeking verandert, één klein gegeven per wijziging.
 - **Boekingen van voor de rapportage**: uitkomsten van boekingen die in dagtellingen waren
   samengevoegd voordat het gebruik werd geteld; meer is er niet van bekend.
 
+## De tegels, de grafieken en *Uitsplitsen naar*
+
+Bovenaan **Volume** staan vier tegels die het antwoord geven voordat u de tabellen leest: afspraken in de periode, het no-showpercentage, het aandeel dat door deelnemers is geannuleerd (met hoeveel daarvan minder dan een dag voor de start) en het aandeel bevestigd na de e-mail (met de klasse waarin de mediane tijd valt). **Capaciteit** heeft er ook vier: bezetting (met geboekte van alle plaatsen), ongebruikte plaatsen, volle blokken en het tekort aan medewerkers. Een tegel die uit een verborgen getal volgt, zegt *niet beschikbaar*; hij toont nooit een getal dat de tabellen verbergen. Onder elke tabel die een aantal verbergt, staat een zin waarom, ook dat er nog één aantal extra verborgen wordt als een enkel aantal het totaal zou verraden.
+
+Het bereikformulier van **Volume** heeft **Uitsplitsen naar**: geen, wachtrijmethode of taal. Een groep doet alleen mee als haar eigen totaal in de periode minstens vijf keer het minimum is; de pagina zegt hoeveel groepen buiten beschouwing bleven. Uitsplitsen naar onderwerp kan nog niet.
+
 ## De rapportfamilies
 
 Bovenaan de pagina Gebruik schakelt een rij links tussen vier families van hetzelfde rapport (een vijfde, *Team*, is voor organisatiebeheerders wier organisatie het aanzette). De

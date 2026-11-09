@@ -3,6 +3,7 @@
 from datetime import UTC, date, datetime
 
 from app.domain.booking import BookingStatus
+from app.domain.scheduling import DispatchKind
 from app.domain.usage import ActorClass, UsageCell, UsageOutcome, duration_bucket
 from app.domain.usage_report import (
     UNKNOWN,
@@ -249,3 +250,80 @@ def test_no_row_of_any_table_names_a_person_or_a_booking() -> None:
 
     for forbidden in ("name", "email", "booking_id", "token", "phone"):
         assert forbidden not in text.replace("organisation_name", "")
+
+
+def _outcome(outcome: UsageOutcome, count: int) -> UsageCell:
+    return _cell("U2", count=count, outcome=outcome)
+
+
+def test_the_tiles_are_made_from_shown_cells_only() -> None:
+    cells = [
+        _cell("U1", count=100),
+        _outcome(UsageOutcome.COMPLETED, 90),
+        _outcome(UsageOutcome.NO_SHOW, 10),
+        _outcome(UsageOutcome.CANCELLED_BY_PARTICIPANT, 20),
+        *[_cell("U5", count=5, bucket=b) for b in (2, 9)],
+        _cell("U9", count=30, bucket=2),
+        _cell("U9", count=10, outcome=UsageOutcome.EXPIRED_UNCONFIRMED),
+    ]
+
+    tiles = _report(cells).tiles
+
+    assert (tiles.no_show_percent, tiles.no_show_of) == (10, 100)
+    assert tiles.cancel_percent == 20
+    assert tiles.cancel_late_percent == 50  # one of the two buckets is under a day
+    assert tiles.confirmed_percent == 75
+    assert tiles.confirm_median_bucket == 2
+
+
+def test_a_tile_made_from_a_hidden_part_is_not_available() -> None:
+    cells = [
+        _cell("U1", count=100),
+        _outcome(UsageOutcome.COMPLETED, 90),
+        _outcome(UsageOutcome.NO_SHOW, 2),
+    ]
+
+    tiles = _report(cells).tiles
+
+    assert tiles.no_show_percent is None
+    assert tiles.no_show_of is None
+
+
+def test_split_by_queue_method_and_language_counts_only_big_groups() -> None:
+    cells = [
+        _cell("U1", count=42),
+        _cell("U1", count=6, group=2),
+        _cell("Q1", count=30, dispatch_kind=DispatchKind.CONTACT_CENTER),
+        _cell("Q1", count=12, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE),
+        _cell("M2", count=42, locale="nl"),
+        _cell("Q1", count=6, group=2, dispatch_kind=DispatchKind.CONTACT_CENTER),
+    ]
+
+    queue = _report(cells, [GROUP, OTHER], split="queue").split
+    locale = _report(cells, [GROUP, OTHER], split="locale").split
+
+    assert queue is not None
+    assert {r.code: r.count for r in queue.table.rows} == {
+        "contact_center": 30,
+        "openplanner_queue": 12,
+    }
+    assert queue.groups_left_out == 1  # six bookings is under five times the threshold
+    assert locale is not None
+    assert [(r.code, r.count) for r in locale.table.rows] == [("nl", 42)]
+
+
+def test_no_split_asked_means_none_and_an_unknown_one_is_ignored() -> None:
+    assert _report([]).split is None
+    assert _report([], split="subject").split is None
+
+
+def test_the_late_share_is_not_shown_when_a_hidden_bucket_holds_people() -> None:
+    cells = [
+        _cell("U1", count=100),
+        _outcome(UsageOutcome.CANCELLED_BY_PARTICIPANT, 30),
+        _cell("U5", count=3, bucket=2),  # late and small: hidden in the table
+        _cell("U5", count=12, bucket=3),
+        _cell("U5", count=15, bucket=9),
+    ]
+
+    assert _report(cells).tiles.cancel_late_percent is None

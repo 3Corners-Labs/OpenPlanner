@@ -40,10 +40,11 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.report_digest import MAX_MONTH_DAY, DigestPeriod
 from app.domain.report_digest_service import DigestAdmin
 from app.domain.usage_export_service import TIDY, UsageExportService, UsageFile
-from app.domain.usage_report import RangedReport
+from app.domain.usage_report import SPLITS, RangedReport
 from app.domain.usage_report_service import UsageReportService, UsageScreen
-from app.web.usage_charts import capacity_charts, channels_charts, queue_charts
+from app.web.usage_charts import capacity_charts, channels_charts, queue_charts, volume_charts
 from app.web.usage_labels import duration_text, label
+from app.web.usage_tiles import capacity_tiles, volume_tiles
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -131,6 +132,18 @@ def _which(request: Request) -> str:
     return view
 
 
+def _split(request: Request) -> str | None:
+    """Return the cut asked for (``split``): none, or one of ``SPLITS``.
+
+    Raises:
+        DomainError: ``invalid_range`` for any other value; it is never echoed.
+    """
+    split = request.query_params.get("split") or None
+    if split is not None and split not in SPLITS:
+        raise DomainError(ErrorCode.INVALID_RANGE)
+    return split
+
+
 def _view(
     request: Request,
     locale: Locale,
@@ -210,11 +223,16 @@ async def _report(
     elif view == "capacity":
         result = await service.capacity(principal, **scope)
         extra["charts"] = capacity_charts(result.report, _)
+        extra["tiles_"] = capacity_tiles(result.report, _)
     elif view == "channels":
         result = await service.channels(principal, **scope)
         extra["charts"] = channels_charts(result.report, _)
     else:
-        result = await service.volume(principal, **scope)
+        split = _split(request)
+        result = await service.volume(principal, **scope, split=split)
+        extra["charts"] = volume_charts(result.report, _)
+        extra["tiles_"] = volume_tiles(result.report, _)
+        extra["split"] = split or ""
     context = {**_view(request, locale, result, view, base, team_on), **extra}
     return TEMPLATES[view], result, context
 
