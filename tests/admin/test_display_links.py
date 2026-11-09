@@ -15,6 +15,7 @@ import pytest
 from app.domain.authorization import Scope
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.support.admin_site import site_uow as _uow
+from tests.support.routes import all_routes
 
 ORG = "/admin/organisations/demo"
 BOARD_PAGE = f"{ORG}/usage?view=wallboard"
@@ -383,7 +384,7 @@ async def test_the_screen_cookie_means_nothing_to_an_admin_route(site: Site) -> 
 
 async def test_the_screen_side_has_exactly_three_routes_and_no_other_admin_page(site: Site) -> None:
     app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    paths = sorted(r.path for r in app.routes if getattr(r, "path", "").startswith("/display"))
+    paths = sorted(r.path for r in all_routes(app.routes) if r.path.startswith("/display"))
 
     assert paths == ["/display", "/display/live", "/display/start/{token}"]
 
