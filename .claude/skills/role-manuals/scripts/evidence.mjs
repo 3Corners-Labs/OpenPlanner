@@ -103,14 +103,13 @@ export const PREPARATION = [
   { key: 'shortage', label: 'tekort', who: '`groupadmin`', what: 'tijdens het verhaal de bezetting van de tweede dag omlaag, zodat een tijdslot een tekort krijgt (opname `pl-13`)' },
 ];
 
-/** Write the evidence log from the state, the shot list and the workspace's notes. */
-export function writeLog({ ws, stack, state, steps, hidden }) {
+/** Write the evidence log from the state, the shot list, the workspace's notes and the covered `years`. */
+export function writeLog({ ws, stack, state, steps, hidden, years }) {
   const notes = existsSync(ws.notes) ? JSON.parse(readFileSync(ws.notes, 'utf8')) : {};
   const version = state.version ?? {};
   const local = { yes: 'ja', no: 'nee' }[stack.build.localChanges] ?? stack.build.localChanges;
   const wide = steps.filter((s) => s.wide).map((s) => s.id).join(', ');
   const terms = hidden.terms.length ? hidden.terms.map((t) => `"${t}"`).join(', ') : '(geen)';
-  const years = coveredYears(state.started);
   const lines = [
     '# Bewijslog schermafdrukken',
     '',
@@ -128,7 +127,7 @@ export function writeLog({ ws, stack, state, steps, hidden }) {
       + 'Versies zijn in de afbeeldingen afgedekt (afdekregel 3); de commit hierboven komt uit het bouwverslag van de run.',
     `- Installatie \`${stack.instance}\` op ${stack.web} (beheerportaal ${stack.web}/admin/, identiteitsprovider `
       + `${stack.keycloak}, Mailpit ${stack.mail}); gecontroleerd via \`/api/v1/instance\` vóór elke run.`,
-    `- Opname gestart ${state.started ?? '?'}; laatst bijgewerkt ${stamp()}. Tijden in ${TZ}.`,
+    `- Opname gestart ${state.started}; laatst bijgewerkt ${stamp()}. Tijden in ${TZ}.`,
     `- Venster ${VIEWPORT.width} × ${VIEWPORT.height}, schaal ${SCALE} (afbeeldingen ${VIEWPORT.width * SCALE} px breed); `
       + `de brede overzichten ${wide} in ${WIDE.width} × ${WIDE.height} (afbeeldingen ${WIDE.width * SCALE} px breed), `
       + `zodat hun tabellen heel zijn; mobiel ${MOBILE.width} × ${MOBILE.height}, schaal ${SCALE}. E-mail: het HTML-deel `

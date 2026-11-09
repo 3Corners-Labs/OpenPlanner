@@ -20,11 +20,11 @@ EVIDENCE = SKILLS / "role-manuals" / "scripts" / "evidence.mjs"
 pytestmark = pytest.mark.skipif(NODE is None, reason="the capture scripts run in node")
 
 
-def covered_years(started: object) -> subprocess.CompletedProcess[str]:
-    """Run ``coveredYears(started)`` in node; its JSON result is on stdout."""
+def covered_years(argument: str) -> subprocess.CompletedProcess[str]:
+    """Run ``coveredYears(<argument>)`` in node, the argument as JS source; JSON on stdout."""
     script = (
         f"import {{ coveredYears }} from {json.dumps(EVIDENCE.as_uri())};"
-        f"console.log(JSON.stringify(coveredYears({json.dumps(started)})));"
+        f"console.log(JSON.stringify(coveredYears({argument})));"
     )
     return subprocess.run(  # noqa: S603 - fixed argv, no shell
         [str(NODE), "--input-type=module", "-e", script],
@@ -46,14 +46,14 @@ def test_the_window_is_the_starts_year_one_before_and_five_after(
     started: str, first: int, last: int
 ) -> None:
     """The years follow the start's own year, not the clock of the moment the log is written."""
-    done = covered_years(started)
+    done = covered_years(json.dumps(started))
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout) == list(range(first, last + 1))
 
 
-@pytest.mark.parametrize("started", [None, "?", ""])
-def test_a_start_without_a_year_stops_the_capture(started: object) -> None:
-    """No window from a missing or malformed start: rule 4 would silently cover no year."""
-    done = covered_years(started)
+@pytest.mark.parametrize("argument", ["", "undefined", "null", '"?"', '""', '"09-11-2026 10:00"'])
+def test_a_start_without_a_year_stops_the_capture(argument: str) -> None:
+    """No window from a missing or malformed start, and no fallback to today's clock."""
+    done = covered_years(argument)
     assert done.returncode != 0
     assert "holds no year" in done.stderr

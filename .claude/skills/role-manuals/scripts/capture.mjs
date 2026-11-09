@@ -24,7 +24,7 @@ import { dirname } from 'node:path';
 
 import { LABEL, assertOurs, launchBrowser, loadRun, safeText } from '../../verify-openplanner/scripts/stack-client.mjs';
 import { compareWithPrevious } from './compare.mjs';
-import { PREPARATION, clock, loadState, stamp, writeLog } from './evidence.mjs';
+import { PREPARATION, clock, coveredYears, loadState, stamp, writeLog } from './evidence.mjs';
 import { agent, admin, needsWebex } from './steps-staff.mjs';
 import { participant } from './steps-participant.mjs';
 import { planner, plannerScreens } from './steps-planner.mjs';
@@ -113,6 +113,15 @@ async function portalVersion(run) {
   return { running: fact(LABEL.admin.running), commit: fact(LABEL.admin.commit), channel: fact(LABEL.admin.channel), overview };
 }
 
+/** The years the capture that started at `started` covers (rule 4 of redact.js); stop without them. */
+function yearsOf(ws, started) {
+  try {
+    return coveredYears(started);
+  } catch (error) {
+    return fail('capture.mjs', `${ws.state}: ${error.message}`);
+  }
+}
+
 async function main() {
   let args;
   let ws;
@@ -132,7 +141,7 @@ async function main() {
   if (args.logOnly) {
     // The stack of the capture is kept in the state, so the log can be rewritten after it is down.
     if (!state.stack) fail('capture.mjs', `${ws.state} holds no capture to write a log from`);
-    writeLog({ ws, stack: state.stack, state, steps: STEPS, hidden });
+    writeLog({ ws, stack: state.stack, state, steps: STEPS, hidden, years: yearsOf(ws, state.started) });
     console.log(`capture.mjs: ${ws.log} rewritten from ${ws.state}`);
     return 0;
   }
@@ -151,11 +160,12 @@ async function main() {
   const { id, instance, web, keycloak, mail, build } = stack;
   Object.assign(state, { agenda_day: args.day, installation: instance, stack: { id, instance, web, keycloak, mail, build } });
   state.started ??= stamp();
+  const years = yearsOf(ws, state.started);
   console.log(`capture.mjs: installation ${stack.instance} (run ${stack.id}, commit ${stack.build.commit.slice(0, 12)}) at ${stack.web}`);
 
   const safe = (text) => safeText(stack, text);
   const browser = await launchBrowser({ headless: !args.headed });
-  const run = new Run({ ws, stack, browser, state, hidden });
+  const run = new Run({ ws, stack, browser, state, hidden, years });
   let failures = 0;
   const attempt = async (s, deferred) => {
     console.log(`- ${s.id}`);
@@ -196,7 +206,7 @@ async function main() {
       }
       await attempt(s, null);
     }
-    writeLog({ ws, stack, state, steps: STEPS, hidden });
+    writeLog({ ws, stack, state, steps: STEPS, hidden, years });
     const changes = await compareWithPrevious(ws, browser);
     if (changes.length) console.log(`capture.mjs: ${changes.length} schermafdrukken anders dan de vorige opname (evidence/diff.json)`);
   } finally {
