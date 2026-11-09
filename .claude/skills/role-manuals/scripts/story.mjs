@@ -74,8 +74,8 @@ export const webex = (id, title) => ({ id, title, needsWebex: true });
 
 /** Everything one invocation shares: browser, sessions, state and the capture records. */
 export class Run {
-  constructor({ ws, stack, browser, state, hidden }) {
-    Object.assign(this, { ws, stack, browser, state, hidden });
+  constructor({ ws, stack, browser, state, hidden, years }) {
+    Object.assign(this, { ws, stack, browser, state, hidden, years });
     this.contexts = new Map();
     this.pages = new Map();
     this.staffViewport = VIEWPORT;
@@ -191,7 +191,7 @@ export class Run {
 
   /** Capture `page` as `id` and keep its record. */
   async shot(page, id, options) {
-    const record = await shoot(page, { id, img: this.ws.img, hidden: this.hidden, ...options });
+    const record = await shoot(page, { id, img: this.ws.img, hidden: this.hidden, years: this.years, ...options });
     this.records[id] = { ...record, at: stamp() };
     this.save();
     console.log(`  ok   ${id}  ${record.size_px.join('x')}  covered=${record.covered.length}  ${record.address}`);

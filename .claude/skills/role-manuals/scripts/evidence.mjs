@@ -30,6 +30,19 @@ export function clock(date = new Date()) {
   return { day: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) + Number(p.second) / 60 };
 }
 
+/**
+ * The years covered (rule 4 of redact.js) by a capture that started at `started` (a `stamp()`):
+ * its year, the one before it (a capture early in January shows December) and five after it
+ * (bookings two months ahead, holidays, retention and certificate dates). A number outside them,
+ * such as a key size of 2048, stays. Taken from the start, so a rewritten log names the years
+ * the capture covered; a start without a year throws, as rule 4 would otherwise cover nothing.
+ */
+export function coveredYears(started) {
+  const year = Number(/^(\d{4})-/.exec(String(started ?? ''))?.[1]);
+  if (!Number.isInteger(year)) throw new Error(`the capture's start ${JSON.stringify(started)} holds no year`);
+  return Array.from({ length: 7 }, (_, i) => year - 1 + i);
+}
+
 /** The `n`-th weekday after the day `iso`. */
 export function nextWeekday(iso, n = 1) {
   const day = new Date(`${iso}T12:00:00Z`);
@@ -74,6 +87,7 @@ const KIND = {
   field: 'veld',
   version: 'versie',
   'version-field': 'versieveld',
+  year: 'jaartal',
 };
 
 /**
@@ -89,8 +103,8 @@ export const PREPARATION = [
   { key: 'shortage', label: 'tekort', who: '`groupadmin`', what: 'tijdens het verhaal de bezetting van de tweede dag omlaag, zodat een tijdslot een tekort krijgt (opname `pl-13`)' },
 ];
 
-/** Write the evidence log from the state, the shot list and the workspace's notes. */
-export function writeLog({ ws, stack, state, steps, hidden }) {
+/** Write the evidence log from the state, the shot list, the workspace's notes and the covered `years`. */
+export function writeLog({ ws, stack, state, steps, hidden, years }) {
   const notes = existsSync(ws.notes) ? JSON.parse(readFileSync(ws.notes, 'utf8')) : {};
   const version = state.version ?? {};
   const local = { yes: 'ja', no: 'nee' }[stack.build.localChanges] ?? stack.build.localChanges;
@@ -113,7 +127,7 @@ export function writeLog({ ws, stack, state, steps, hidden }) {
       + 'Versies zijn in de afbeeldingen afgedekt (afdekregel 3); de commit hierboven komt uit het bouwverslag van de run.',
     `- Installatie \`${stack.instance}\` op ${stack.web} (beheerportaal ${stack.web}/admin/, identiteitsprovider `
       + `${stack.keycloak}, Mailpit ${stack.mail}); gecontroleerd via \`/api/v1/instance\` vóór elke run.`,
-    `- Opname gestart ${state.started ?? '?'}; laatst bijgewerkt ${stamp()}. Tijden in ${TZ}.`,
+    `- Opname gestart ${state.started}; laatst bijgewerkt ${stamp()}. Tijden in ${TZ}.`,
     `- Venster ${VIEWPORT.width} × ${VIEWPORT.height}, schaal ${SCALE} (afbeeldingen ${VIEWPORT.width * SCALE} px breed); `
       + `de brede overzichten ${wide} in ${WIDE.width} × ${WIDE.height} (afbeeldingen ${WIDE.width * SCALE} px breed), `
       + `zodat hun tabellen heel zijn; mobiel ${MOBILE.width} × ${MOBILE.height}, schaal ${SCALE}. E-mail: het HTML-deel `
@@ -127,9 +141,13 @@ export function writeLog({ ws, stack, state, steps, hidden }) {
       + 'een rij, kolom of veld waarvan het label zo\'n term is, als geheel.',
     '- Afdekregel 3: geen leesbare versie: softwareversies (zoals 0.5.1, v0.5.1, 0.5.1-rc.2 en het label dev), '
       + '"Versie onbekend", "Geen release(versie)", commit-hashes, image-id\'s en digests, en de waarden van de '
-      + 'versievelden Commit en Nieuwste versie. Datums en tijden blijven staan.',
+      + 'versievelden Commit en Nieuwste versie.',
+    `- Afdekregel 4: het jaartal (${years[0]} tot en met ${years.at(-1)}), in datums, koppen en datumvelden, zodat een `
+      + 'afbeelding niet laat zien wanneer hij gemaakt is. Dag, maand en tijd blijven staan; er komt nooit een ander '
+      + 'jaartal voor in de plaats. De echte datum van elke opname staat in dit log.',
     '- Verzonnen deelnemers met adressen op voorbeeld.nl; medewerkers zijn de ontwikkelgebruikers van de '
-      + 'identiteitsprovider. Geen token, wachtwoord of e-mailtekst in dit log.',
+      + 'identiteitsprovider. Geen token of wachtwoord in dit log; van een e-mail staan hier de verzonnen '
+      + 'ontvanger, het onderwerp, het verzendmoment, de namen van bijlagen en de regel rond een afdekking.',
     '',
     '## Voorbereiding en verhaal',
     '',

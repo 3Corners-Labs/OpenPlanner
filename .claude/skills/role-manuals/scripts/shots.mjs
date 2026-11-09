@@ -143,11 +143,12 @@ async function stretch(page) {
 const pngSize = (png) => [png.readUInt32BE(16), png.readUInt32BE(20)];
 
 /**
- * Capture `page` as `<img>/<id>.png` with `crop`, cover what `hidden` names, and return the
- * record for the evidence log. The portal's environment bar is cropped off a capture that starts
- * at the top; participant pages and emails keep what they show.
+ * Capture `page` as `<img>/<id>.png` with `crop`, cover what `hidden` names and the `years`
+ * (evidence.mjs coveredYears), and return the record for the evidence log. The portal's
+ * environment bar is cropped off a capture that starts at the top; participant pages and emails
+ * keep what they show.
  */
-export async function shoot(page, { id, img, hidden, crop = new Viewport(), role, visible, notes = [], address = null }) {
+export async function shoot(page, { id, img, hidden, years, crop = new Viewport(), role, visible, notes = [], address = null }) {
   await settle(page);
   const old = page.viewportSize() ?? VIEWPORT;
   let facts;
@@ -158,7 +159,7 @@ export async function shoot(page, { id, img, hidden, crop = new Viewport(), role
   try {
     if (crop.stretch) await stretch(page);
     facts = await page.evaluate(pageFacts, NO_VIDEO_PHRASES);
-    boxes = await page.evaluate(detect, { ...hidden, versionFields: VERSION_FIELDS, versionTexts: VERSION_TEXTS });
+    boxes = await page.evaluate(detect, { ...hidden, versionFields: VERSION_FIELDS, versionTexts: VERSION_TEXTS, years });
     [clip, crops] = await crop.clip(page, page.viewportSize() ?? old);
     if (clip.y < 1 && new URL(page.url(), 'http://x').pathname.startsWith('/admin')) {
       const bar = await page.evaluate(envBarBottom);

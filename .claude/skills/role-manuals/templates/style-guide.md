@@ -135,8 +135,8 @@ software_version: "{{software_version}}"
 - Alleen schermafdrukken van de echte software: een lokale installatie gebouwd uit de broncode,
   gevuld met verzonnen gegevens. Nooit een mock-up of een bewerkte schermafdruk.
 - Toegestaan: bijsnijden en het zichtbaar afdekken (grijze balk) van de productnaam als die
-  verborgen blijft, van de termen die niet genoemd worden (§2.3) en van versienummers. Elke
-  afdekking staat in `evidence/log.md`.
+  verborgen blijft, van de termen die niet genoemd worden (§2.3), van versienummers en van het
+  jaartal. Elke afdekking staat in `evidence/log.md`.
 - Wat zonder Webex Meetings niet te tonen is (deelnemen aan het gesprek, proefgesprek), wordt
   opgenomen in een testomgeving met Webex Meetings. Tot dan staat er een kader
   "Schermafdruk volgt", nooit een nagemaakt beeld.
@@ -147,8 +147,9 @@ software_version: "{{software_version}}"
   werkdagen na de opnamedatum; het boeken, bevestigen, verplaatsen en annuleren gebeurde op de
   opnamedag zelf. Nooit een eerdere datum en nooit een verzette klok: wat in beeld staat,
   gebeurde echt op die dag.
-- **Versienummers en commit-id's** worden in beeld afgedekt, zodat schermafdrukken niet verouderen.
-  De echte softwareversie en de echte datum staan op de titelpagina en in het bewijslog.
+- **Versienummers, commit-id's en het jaartal** worden in beeld afgedekt, zodat schermafdrukken
+  niet verouderen. Dag, maand en tijd blijven staan, en er komt nooit een ander jaartal voor in de
+  plaats. De echte softwareversie en de echte datum staan op de titelpagina en in het bewijslog.
 
 ## 7. Controle voor oplevering
 
