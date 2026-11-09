@@ -87,6 +87,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.REPORTS_VIEW,  # ADR 0117
         Permission.REPORTS_EXPORT,  # ADR 0117 point 12
         Permission.REPORTS_DIGEST_MANAGE,  # ADR 0117 point 16
+        Permission.REPORTS_STAFF_VIEW,  # ADR 0117 point 9
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.STAFF_MANAGE,  # ADR 0095
         Permission.STAFF_RESET_PASSWORD,  # ADR 0095
@@ -186,11 +187,12 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
 
 
-def test_bookings_and_the_queue_are_the_permissions_that_show_personal_data() -> None:
+def test_bookings_the_queue_and_the_team_load_are_the_permissions_that_show_personal_data() -> None:
     assert {
         Permission.BOOKINGS_VIEW,
         Permission.BOOKINGS_MANAGE,
         Permission.QUEUE_WORK,
+        Permission.REPORTS_STAFF_VIEW,  # ADR 0117 point 9: the auditor never holds it
     } == PII_PERMISSIONS
 
 

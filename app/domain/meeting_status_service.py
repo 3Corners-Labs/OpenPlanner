@@ -154,7 +154,15 @@ class MeetingStatusService:
             after = apply_polled(before, polled, now)
             for kind in polled_events(before, after):
                 await record_call_event(
-                    tx, booking_id, kind, before, after, now, POLLED, booking=booking
+                    tx,
+                    booking_id,
+                    kind,
+                    before,
+                    after,
+                    now,
+                    POLLED,
+                    booking=booking,
+                    staff=self._integration.staff_usage,
                 )
                 await tx.add_booking_event(
                     BookingEvent(booking_id, now, kind, POLLED, version=self._version)

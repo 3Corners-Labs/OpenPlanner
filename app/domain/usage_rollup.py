@@ -9,10 +9,10 @@ give the same cells, in any order, so a rebuild from the outbox gives the table 
               ─► ``UsageCell`` rows for ``usage_hour``
 
 A fact never feeds a metric whose catalogue entry does not name its kind (a test checks that),
-and every kind has a feed (a test checks that too). A team member's fact makes no cell until
-step 7 maps it. A kind that is mapped in a later release counts from that release: the
-watermark has passed the earlier facts, and a rebuild from the outbox covers only what was
-mapped when it ran.
+and every kind has a feed (a test checks that too). A team member's fact makes no cell here: it
+feeds ``usage_staff_hour`` through ``app.domain.usage_staff``. A kind that is mapped in a later
+release counts from that release: the watermark has passed the earlier facts, and a rebuild
+from the outbox covers only what was mapped when it ran.
 """
 
 from collections.abc import Callable, Iterable, Sequence
@@ -342,7 +342,7 @@ def merge(cells: Iterable[UsageCell]) -> list[UsageCell]:
 
 
 def roll(facts: Sequence[UsageFact | StaffFact]) -> list[UsageCell]:
-    """Return the merged cells of ``facts``; a team member's fact makes none until step 7."""
+    """Return the merged cells of ``facts``; a team member's fact makes none here."""
     return merge(c for f in facts if isinstance(f, UsageFact) for c in cells_of(f))
 
 

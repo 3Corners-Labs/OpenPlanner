@@ -1127,6 +1127,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=50,
     ),
     S(
+        "reporting_staff_view_enabled",
+        K.BOOL,
+        False,
+        _D,
+        T.RETENTION,
+        "Whether the load of each team member (calls handled, call minutes, claims, on-time "
+        "share) is written and shown on the Team report. Off by default: no team fact is "
+        "written while it is off (ADR 0117 point 9).",
+    ),
+    S(
         "reporting_usage_events_to_log",
         K.BOOL,
         False,

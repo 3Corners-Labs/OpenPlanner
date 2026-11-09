@@ -58,6 +58,10 @@ class _Transaction(Protocol):
         """Return every custom role (``RoleQueries``)."""
         ...
 
+    async def fold_staff_usage(self, staff_id: int) -> None:
+        """Fold a team member's usage cells into *former team members* (``UsageStaffQueries``)."""
+        ...
+
 
 def _has_role(role: Role) -> ColumnElement[bool]:
     """Whether the comma-separated ``roles`` column holds ``role``."""
@@ -218,7 +222,8 @@ class StaffQueries:
     async def erase_staff(self: _Transaction, subject: str, at: datetime) -> None:
         """Erase the record of ``subject``; the subject, the id and the times stay.
 
-        The name, address, roles, memberships, refused values and the own overview layout go.
+        The name, address, roles, memberships, refused values and the own overview layout go, and
+        the usage figures about the person are folded into *former team members* (ADR 0117).
         """
         row = await self._session.scalar(select(StaffRow).where(StaffRow.subject == subject))
         if row is None or row.status == StaffStatus.ERASED.value:
@@ -240,6 +245,8 @@ class StaffQueries:
             delete(OverviewLayoutRow).where(OverviewLayoutRow.staff_id == row.id)
         )
         await self._session.flush()
+        # ADR 0117 point 9: no individual remains in the usage figures; the totals stay.
+        await self.fold_staff_usage(row.id)
 
     async def set_staff_seen(self: _Transaction, subject: str, at: datetime) -> None:
         """Record the latest request of ``subject``; unknown subjects are ignored."""

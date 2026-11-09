@@ -451,7 +451,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | #619 | merged |
 | 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | #632 | merged |
 | 6b | Bring *Volume* and *Capacity* to the mockup ([`docs/reporting-mockups.md`](../reporting-mockups.md)): figure tiles, day bars, stacked outcome bar, *split by*, per-table suppression note | | planned |
-| 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | | planned |
+| 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | #683 | merged |
 | 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | #652 | merged |
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | #678 | merged |
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | #679 | merged |
@@ -745,3 +745,12 @@ sender that refuses every address, loses that digest instead of sending it twice
   is placed under *Overview* so the six-tab rule holds afterwards.
 - Open points that the product owner may still change: the proposed role holders (point 11), the digest
   being staff-only, and the default of the team screen being off.
+
+**Step 7 notes (no change of a decision, two assumptions):** *Team* is the view `team` of the organisation's *Usage*
+page, not a new route; it needs `reports.staff.view` (a decision PR, organisation admin only) and the organisation's
+`reporting_staff_view_enabled`, and answers 404 while that is off. Team facts exist only for calls an agent claimed
+from the own queue (the pseudonym of the claim is matched to the staff entry); calls handled in the contact center have
+no team member here. Metric S1 is stored as three sub-metrics in `usage_staff_hour` (`S1c` calls and seconds, `S1k`
+claims, `S1p` scheduled calls and how many were on time). **S2 (team utilisation) is not built:** no fact records
+staffed seconds; it needs one, and is a follow-up. Removal of a person folds their rows and their waiting facts into the
+*former team members* row in the same transaction; retention prunes the table with `reporting_retention_months`.

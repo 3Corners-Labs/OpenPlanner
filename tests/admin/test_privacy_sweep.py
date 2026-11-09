@@ -19,6 +19,7 @@ bookings are the fixture ``marked`` (``tests/admin/conftest.py``), stored by
 import json
 from dataclasses import fields
 from pathlib import Path
+from typing import Any
 
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
@@ -276,6 +277,19 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
             response = await site.client.get(f"{scope}?view={view}")
             assert response.status_code == 200, (scope, view)
             assert not marker_leaks(response.text, set()), (scope, view)
+
+    # ADR 0117 point 9: the Team view, once the organisation has switched it on, shows names of
+    # staff and counts, never a marker of a booking.
+    await post_form(
+        site,
+        "/admin/organisations/demo/settings/reporting_staff_view_enabled",
+        {"value": "true"},
+    )
+    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    await app.state.live_settings.refresh()
+    team = await site.client.get("/admin/organisations/demo/usage?view=team")
+    assert team.status_code == 200
+    assert not marker_leaks(team.text, set()), "team view"
 
     # ADR 0099: the plan of a configuration document, with a change in it, shows keys and field
     # names of the document and never a marker.

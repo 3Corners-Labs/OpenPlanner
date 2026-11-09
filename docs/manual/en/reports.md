@@ -43,7 +43,7 @@ changes, one small record per change.
 
 ## The report families
 
-At the top of the Usage page a row of links switches between four families of the same report. The
+At the top of the Usage page a row of links switches between four families of the same report (a fifth, *Team*, is for organisation admins whose organisation switched it on). The
 period you chose stays; every family has a URL you can bookmark. The first, **Volume**, is the set
 of tables above; the others are below.
 
@@ -117,6 +117,12 @@ Organisation admins see a section **Digest by email** at the bottom of the organ
 
 Recipients are colleagues who hold the right to see the reports for that scope, chosen from a list. There are no free email addresses and no file goes with the mail: the link leads to the report, where you sign in as usual. The right is checked again when the mail goes out. A colleague who lost it is skipped and the list says how many; a colleague without a known address is skipped too. The address is the verified email address the sign-in provider gave at the colleague's last login (shown on the colleague's page under *Staff*); a colleague who has not logged in since then is looked up in the bundled provider instead. A missed mail is still sent for up to 24 hours; later it is skipped, and the list shows how the last mail went. Every change to a subscription is in the audit log.
 
+### Team
+
+The load per team member: calls handled, minutes in calls, claims from the own queue and the share of scheduled calls the host joined on time. It is for organisation admins only (the right *See the load per team member in the reports*) and **off by default**: until your organisation switches on **Show the load of each team member in the reports** in its settings, nothing about a person is written, and the *Team* link on the Usage page says *off* with a link to the setting. Switching it on counts from that moment; earlier calls are not in it, and switching it off stops the counting again (what was counted stays until the retention period ends).
+
+The table is sorted by name. There is no ranking, no *top* or *worst* list, no total row and no cut by group or hour. A figure below the minimum is hidden and written as *< 5*, and the minutes go with the calls. Only calls an agent claimed from the own queue are attributed to a person; a call the contact center handled has no team member in this installation. When a team member is removed, their figures become one row, *Former team members*, so the history keeps its totals and no individual remains. The Team family is not in the CSV files or the machine interface.
+
 ## What is not here yet
 
-Per team member. That comes in a later step of the same design.
+The share of staffed time spent in calls (team utilisation) follows in a later step.

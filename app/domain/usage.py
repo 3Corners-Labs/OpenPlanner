@@ -224,6 +224,13 @@ class UsageFact:
         _count("booked", self.booked)
 
 
+STAFF_KINDS: frozenset[FactKind] = frozenset(
+    {FactKind.CALL_ENDED, FactKind.QUEUE_CLAIMED, FactKind.CALL_HOST_JOINED}
+)
+"""The fact kinds a team member's fact can have (metric S1): a call that ended, a claim from the
+own queue, and the host joining a scheduled call, which says whether the call began on time."""
+
+
 @dataclass(frozen=True)
 class StaffFact:
     """A fact about one team member (ADR 0117 point 9); the only shape that holds ``staff_id``.
@@ -250,6 +257,8 @@ class StaffFact:
     def __post_init__(self) -> None:
         """Refuse a moment that is not a UTC hour and a ``staff_id`` that is no row id."""
         _hour(self.bucket_hour)
+        if self.kind not in STAFF_KINDS:
+            raise ValueError("a team member's fact is not of a kind that metric S1 reads")
         if self.staff_id < 1:
             raise ValueError("staff_id is not a row id")
 

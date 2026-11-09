@@ -45,7 +45,7 @@ wanneer een boeking verandert, één klein gegeven per wijziging.
 
 ## De rapportfamilies
 
-Bovenaan de pagina Gebruik schakelt een rij links tussen vier families van hetzelfde rapport. De
+Bovenaan de pagina Gebruik schakelt een rij links tussen vier families van hetzelfde rapport (een vijfde, *Team*, is voor organisatiebeheerders wier organisatie het aanzette). De
 gekozen periode blijft staan; elke familie heeft een eigen adres dat u kunt bewaren. De eerste,
 **Volume**, is de set tabellen hierboven; de andere staan hieronder.
 
@@ -123,6 +123,12 @@ Organisatiebeheerders zien onderaan de pagina *Gebruik* van de organisatie een o
 
 Ontvangers zijn collega's die de rapporten van dat bereik mogen zien, gekozen uit een lijst. Er zijn geen vrije e-mailadressen en er gaat geen bestand mee: de koppeling leidt naar het rapport, waar u zoals altijd inlogt. Het recht wordt bij het versturen opnieuw gecontroleerd. Een collega die het kwijt is, wordt overgeslagen en de lijst zegt hoeveel; een collega zonder bekend adres ook. Het adres is het geverifieerde e-mailadres dat de inlogdienst bij de laatste login van de collega doorgaf (te zien op de pagina van de collega onder *Medewerkers*); een collega die sindsdien niet is ingelogd, wordt opgezocht in de meegeleverde inlogdienst. Een gemiste mail wordt nog tot 24 uur later verstuurd; daarna wordt hij overgeslagen en de lijst toont hoe de laatste mail verliep. Elke wijziging van een abonnement staat in het auditlog.
 
+### Team
+
+De werklast per teamlid: afgehandelde gesprekken, minuten in gesprek, uit de eigen wachtrij opgepakte boekingen en het aandeel geplande gesprekken waarbij de gastheer op tijd binnenkwam. Alleen voor organisatiebeheerders (het recht *De werklast per teamlid in de rapporten bekijken*) en **standaard uit**: zolang uw organisatie bij de instellingen **Toon de werklast per teamlid in de rapporten** niet aanzet, wordt er niets over een persoon vastgelegd en staat bij *Team* op de pagina Gebruik *uit*, met een koppeling naar de instelling. Aanzetten telt vanaf dat moment; eerdere gesprekken doen niet mee, en uitzetten stopt het tellen weer (wat geteld is, blijft tot het einde van de bewaartermijn).
+
+De tabel staat op naam. Er is geen rangorde, geen *top*- of *slechtste*-lijst, geen totaalrij en geen indeling naar groep of uur. Een getal onder het minimum is verborgen en staat als *< 5*; de minuten gaan mee met de gesprekken. Alleen gesprekken die een medewerker uit de eigen wachtrij heeft opgepakt, worden aan een persoon toegerekend; een gesprek dat het contactcenter afhandelde, heeft in deze installatie geen teamlid. Wordt een teamlid verwijderd, dan worden zijn of haar cijfers één rij, *Voormalige teamleden*, zodat de geschiedenis haar totalen houdt en er geen persoon overblijft. De Team-familie staat niet in de CSV-bestanden en niet in de machine-interface.
+
 ## Wat hier nog niet staat
 
-Per teamlid. Dat volgt in een latere stap van hetzelfde ontwerp.
+Het aandeel van de bezette tijd dat in gesprekken gaat (bezetting van het team) volgt in een latere stap.

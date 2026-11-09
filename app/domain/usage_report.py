@@ -234,9 +234,23 @@ def zones_of(groups: Sequence[ReportGroup]) -> dict[int, ZoneInfo]:
     return {g.group_id: ZoneInfo(g.timezone) for g in groups}
 
 
-def local_cells(
-    cells: Sequence[UsageCell], zones: dict[int, ZoneInfo], first_day: date, last_day: date
-) -> Iterator[tuple[UsageCell, datetime]]:
+class _Hourly(Protocol):
+    """What places a cell in time and in a group: the usage cell and the team member's cell."""
+
+    @property
+    def group_id(self) -> int:
+        """The group the hour belongs to."""
+        ...
+
+    @property
+    def bucket_hour(self) -> datetime:
+        """The UTC hour."""
+        ...
+
+
+def local_cells[C: _Hourly](
+    cells: Sequence[C], zones: dict[int, ZoneInfo], first_day: date, last_day: date
+) -> Iterator[tuple[C, datetime]]:
     """Yield the cells of the given groups whose group-local day lies in the range.
 
     Each cell comes with its hour in the group's own time zone, from which a caller takes the

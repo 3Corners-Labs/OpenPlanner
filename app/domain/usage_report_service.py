@@ -34,6 +34,7 @@ from app.domain.usage_report import (
 from app.domain.usage_report_capacity import CapacityReport, capacity_report
 from app.domain.usage_report_channels import ChannelsReport, channels_report
 from app.domain.usage_report_queue import QueueReport, queue_report
+from app.domain.usage_report_team import TeamReport, team_report
 from app.domain.usage_suppress import effective_threshold
 
 DEFAULT_DAYS = 28
@@ -158,6 +159,8 @@ class UsageReportService:
         clock: Current time.
         platform_min: ``reporting_min_cell_size`` (class C, read each time).
         organisation_min: ``reporting_org_min_cell_size`` of an organisation id (class D).
+        staff_view: ``reporting_staff_view_enabled`` of an organisation id (class D); the *Team*
+            report is refused while it is off.
     """
 
     def __init__(
@@ -167,6 +170,7 @@ class UsageReportService:
         clock: Clock,
         platform_min: Callable[[], int],
         organisation_min: Callable[[int], int],
+        staff_view: Callable[[int], bool] = lambda _organisation: False,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -174,6 +178,7 @@ class UsageReportService:
         self._clock = clock
         self._platform_min = platform_min
         self._organisation_min = organisation_min
+        self._staff_view = staff_view
 
     def _threshold(self, organisation_id: int) -> int:
         """Return the small-cell threshold that applies to one organisation's figures."""
@@ -332,6 +337,72 @@ class UsageReportService:
         loaded = await self.load(principal, organisation_slug, group_slug, first_day, last_day)
         report = build_channels(loaded)
         return self._screen(report, loaded, group_slug)
+
+    async def team(
+        self,
+        principal: Principal,
+        *,
+        organisation_slug: str,
+        first_day: date | None = None,
+        last_day: date | None = None,
+    ) -> UsageScreen[TeamReport]:
+        """Return the *Team* report of an organisation (S1): the load per team member.
+
+        Needs ``reports.staff.view`` on the organisation, which only an organisation admin
+        holds, and the organisation must have switched the team view on.
+
+        Raises:
+            DomainError: ``not_permitted`` (audited), ``group_not_found``, ``invalid_range``, and
+                ``staff_view_off`` while the organisation has not switched the team view on.
+        """
+        permission = Permission.REPORTS_STAFF_VIEW
+        require(
+            await self._admin.authorize(principal, permission, organisation_slug=organisation_slug)
+        )
+        scope = scope_for(principal, permission)
+        await self._require_organisation(principal, scope, organisation_slug, permission)
+        async with self._uow.read() as tx:
+            groups = [
+                g
+                for g in await tx.list_report_groups(scope)
+                if g.organisation_slug == organisation_slug
+            ]
+            if not groups:
+                raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+            organisation_id = groups[0].organisation_id
+            if not self._staff_view(organisation_id):
+                raise DomainError(ErrorCode.STAFF_VIEW_OFF)
+            first, last = self._range(groups[0], first_day, last_day)
+            lower = datetime.combine(first, datetime.min.time(), ZoneInfo("UTC")) - _MARGIN
+            upper = datetime.combine(last, datetime.min.time(), ZoneInfo("UTC")) + 2 * _MARGIN
+            cells = await tx.read_staff_cells(scope, [g.group_id for g in groups], lower, upper)
+            names = await tx.read_staff_names(sorted({c.staff_id for c in cells if c.staff_id}))
+            state = await tx.usage_state()
+        report = team_report(
+            cells,
+            names,
+            groups,
+            first,
+            last,
+            threshold=self._threshold(organisation_id),
+            as_of=state.rolled_at,
+        )
+        return UsageScreen(
+            report, tuple(groups), organisation_slug, groups[0].organisation_name, None
+        )
+
+    async def team_view_on(self, principal: Principal, organisation_slug: str) -> bool:
+        """Return whether the organisation has the team view on, for who may see the *Team* link.
+
+        Reads only the organisation's switch (a setting, no figure). ``False`` for an
+        organisation outside the reader's ``reports.view`` scope.
+        """
+        scope = scope_for(principal, Permission.REPORTS_VIEW)
+        async with self._uow.read() as tx:
+            for group in await tx.list_report_groups(scope):
+                if group.organisation_slug == organisation_slug:
+                    return self._staff_view(group.organisation_id)
+        return False
 
     async def _require_organisation(
         self, principal: Principal, scope: Scope, organisation_slug: str, permission: Permission

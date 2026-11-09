@@ -10472,6 +10472,9 @@ msgstr "Kleinste aantal dat een rapport toont"
 msgid "settings.field.reporting_org_min_cell_size.label"
 msgstr "Kleinste aantal in de rapporten van de organisatie"
 
+msgid "settings.field.reporting_staff_view_enabled.label"
+msgstr "Toon de werklast per teamlid in de rapporten"
+
 msgid "settings.field.reporting_export_max_rows.label"
 msgstr "Meeste rijen in een CSV-export van een gebruiksrapport"
 
@@ -11446,6 +11449,9 @@ msgstr "Meeste cellen op één pagina van de gebruiks-API"
 
 msgid "settings.field.reporting_api_rate_per_minute.label"
 msgstr "Aanroepen per minuut per API-client naar de gebruiks-API"
+msgid "authz.permission.reports_staff_view"
+msgstr "De werklast per teamlid in de rapporten bekijken"
+
 msgid "authz.permission.reports_digest_manage"
 msgstr "Samenvattingen van de rapporten beheren"
 
@@ -11677,3 +11683,39 @@ msgstr "Nieuwe tijden voorstellen voor deze dag"
 
 msgid "admin.agenda.week_propose"
 msgstr "Nieuwe tijden voorstellen voor deze week"
+
+msgid "reports.view.team"
+msgstr "Team"
+
+msgid "reports.team.off"
+msgstr "uit"
+
+msgid "reports.team.switch_on"
+msgstr "Zet het aan bij de instellingen"
+
+msgid "reports.team.title"
+msgstr "Werklast per teamlid"
+
+msgid "reports.team.intro"
+msgstr "De gesprekken die een medewerker uit de eigen wachtrij heeft opgepakt. De tabel staat op naam en heeft geen rangorde. Gesprekken die het contactcenter afhandelde, worden niet aan een persoon toegerekend."
+
+msgid "reports.team.member"
+msgstr "Teamlid"
+
+msgid "reports.team.calls"
+msgstr "Gesprekken afgehandeld"
+
+msgid "reports.team.minutes"
+msgstr "Minuten in gesprek"
+
+msgid "reports.team.claims"
+msgstr "Opgepakt"
+
+msgid "reports.team.on_time"
+msgstr "Op tijd aanwezig"
+
+msgid "reports.team.former"
+msgstr "Voormalige teamleden"
+
+msgid "reports.team.note"
+msgstr "Een getal onder {n} is verborgen en staat als < {n}; de minuten gaan mee met de gesprekken. Er is geen totaalrij: verwijderde teamleden zijn één rij, zodat de geschiedenis haar totalen houdt en er geen persoon overblijft."
