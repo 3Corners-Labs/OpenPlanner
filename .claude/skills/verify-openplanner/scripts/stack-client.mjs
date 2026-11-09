@@ -105,6 +105,7 @@ export function loadRun() {
     mail: `http://127.0.0.1:${env.VERIFY_MAIL_PORT}`,
     build: {
       commit: env.BUILT_FROM_COMMIT ?? '?',
+      fingerprint: env.BUILT_FROM_FINGERPRINT ?? '?',
       image: env.IMAGE_ID ?? '?',
       localChanges: env.BUILT_WITH_LOCAL_CHANGES ?? '?',
     },

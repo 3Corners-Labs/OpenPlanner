@@ -1,15 +1,14 @@
 """The release a capture shows and the version frozen per release (role-manuals' release.py).
 
-The title pages say which software the manuals show: the label comes from the release tag, never
-from ``pyproject.toml``, which names the previous release until the next one is cut. A frozen
-version is whole, read-only and checkable, or it is not there at all.
+The title pages say which software the manuals show: the label comes from the capture's own
+record and the release tags, never from ``pyproject.toml``, which names the previous release
+until the next one is cut. A frozen version is whole, read-only and checkable, or it is not
+there at all.
 """
 
 import datetime as dt
 import hashlib
 import json
-import os
-import time
 import zipfile
 from pathlib import Path
 
@@ -60,6 +59,7 @@ def checkout(git: Git, tmp_path: Path) -> Path:
 def workspace(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """A workspace whose baseline is the commit of an earlier version."""
     root = tmp_path_factory.mktemp("workspace")
+    (root / "evidence").mkdir()
     (root / "variables.json").write_text(json.dumps({"product": "de dienst", "commit": "d36485a6"}))
     return root
 
@@ -68,13 +68,19 @@ def _head(git: Git) -> str:
     return git("rev-parse", "HEAD").strip()
 
 
-def _run(tmp_path_factory: pytest.TempPathFactory, commit: str, built: str) -> Path:
-    """The stack.env that ``stack.sh up`` writes for a run built from ``commit``."""
-    env = tmp_path_factory.mktemp("run") / "stack.env"
-    env.write_text(
-        f"VERIFY_PROJECT=demo\nBUILT_FROM_COMMIT={commit}\nBUILT_FROM_FINGERPRINT={built}\n"
-    )
-    return env
+def _captured(workspace: Path, build: dict[str, str]) -> None:
+    """Write the capture's record as capture.mjs does: its start and the run's build."""
+    state = {
+        "started": "2026-11-08 21:47:02 CET",
+        "stack": {"id": "20261108-203309", "build": build},
+    }
+    (workspace / "evidence" / "state.json").write_text(json.dumps(state))
+
+
+def _captured_here(workspace: Path, git: Git, checkout: Path) -> None:
+    """A capture of a stack built from the checkout as it is now."""
+    built = fingerprint(checkout).stdout.strip()
+    _captured(workspace, {"commit": _head(git), "fingerprint": built})
 
 
 def test_a_release_names_its_commit_before_its_candidate(git: Git, checkout: Path) -> None:
@@ -88,59 +94,68 @@ def test_a_release_names_its_commit_before_its_candidate(git: Git, checkout: Pat
     assert release.release_tag(checkout, _head(git)) == ""
 
 
+def test_a_tag_of_another_shape_names_no_release(git: Git, checkout: Path) -> None:
+    """Only ``vX.Y.Z`` and ``vX.Y.Z-rc.N`` name a release; a nearer tag of another shape none."""
+    (checkout / "notes.md").write_text("later\n")
+    commit_all(git, "notes")
+    git("tag", "v2-preview")
+    assert release.release_tag(checkout, _head(git)) == ""
+
+
 def test_record_names_the_release_when_the_image_is_the_tags(
-    git: Git, checkout: Path, workspace: Path, tmp_path_factory: pytest.TempPathFactory
+    git: Git, checkout: Path, workspace: Path
 ) -> None:
-    """The label and the tag are written; the baseline stays, only freeze moves it."""
-    run = _run(tmp_path_factory, _head(git), fingerprint(checkout).stdout.strip())
-    assert release.record(workspace, run, repo=checkout) == "1.0.0"
+    """The label goes to software_version; the baseline stays, only freeze moves it."""
+    _captured_here(workspace, git, checkout)
+    assert release.record(workspace, repo=checkout) == "1.0.0"
     assert json.loads((workspace / "variables.json").read_text()) == {
         "product": "de dienst",
         "commit": "d36485a6",
         "software_version": "1.0.0",
-        "release": "v1.0.0",
     }
 
 
-def test_record_calls_a_run_of_other_image_files_a_trial(
-    git: Git, checkout: Path, workspace: Path, tmp_path_factory: pytest.TempPathFactory
+def test_record_calls_a_capture_of_other_image_files_a_trial(
+    git: Git, checkout: Path, workspace: Path
 ) -> None:
-    """An image file changed after the tag: the label names the commit and no release is set."""
+    """An image file changed after the tag: the label names the commit of the capture."""
     (checkout / "app" / "main.py").write_text("VALUE = 2\n")
     commit_all(git, "app")
-    run = _run(tmp_path_factory, _head(git), fingerprint(checkout).stdout.strip())
-    label = release.record(workspace, run, repo=checkout)
+    _captured_here(workspace, git, checkout)
+    label = release.record(workspace, repo=checkout)
     assert label == f"1.0.0, met latere wijzigingen (commit {_head(git)[:7]})"
-    assert json.loads((workspace / "variables.json").read_text())["release"] == ""
 
 
-@pytest.mark.parametrize("built", ["", "not-a-fingerprint"])
-def test_record_refuses_a_run_without_its_image_fingerprint(
-    git: Git,
-    checkout: Path,
-    workspace: Path,
-    tmp_path_factory: pytest.TempPathFactory,
-    built: str,
+@pytest.mark.parametrize("built", ["", "not-a-fingerprint", None])
+def test_record_refuses_a_capture_without_its_image_fingerprint(
+    git: Git, checkout: Path, workspace: Path, built: str | None
 ) -> None:
-    """An empty fingerprint never matches the tag's empty one: the record is refused."""
-    run = _run(tmp_path_factory, _head(git), built)
+    """A capture by an older skill records no fingerprint; an empty one never matches."""
+    build = {"commit": _head(git)} | ({} if built is None else {"fingerprint": built})
+    _captured(workspace, build)
     with pytest.raises(SystemExit, match="records no commit and image fingerprint"):
-        release.record(workspace, run, repo=checkout)
+        release.record(workspace, repo=checkout)
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _checked(workspace: Path, blocking: int = 0) -> None:
-    """Write the report of check.py, later than everything it checked."""
-    report = workspace / "evidence" / "check.md"
-    report.write_text(f"# Controle van de handleidingen\n\nBlokkerende bevindingen: {blocking}.\n")
-    later = time.time() + 60
-    os.utime(report, (later, later))
+    """Write the verdict of check.py: the blocking count and the hash of every file it read."""
+    names = ["variables.json", "build/manuals.json"]
+    names += [f"sources/{p.name}" for p in sorted((workspace / "sources").glob("*.md"))]
+    inputs = {name: _sha256(workspace / name) for name in names}
+    verdict = {"blocking": blocking, "inputs": inputs}
+    (workspace / "evidence" / "check.json").write_text(json.dumps(verdict))
 
 
-def _settled(workspace: Path, version: str = "2.0, vastgesteld op 9 november 2026") -> Path:
+def _settled(
+    workspace: Path, git: Git, checkout: Path, version: str = "2.0, vastgesteld op 9 november 2026"
+) -> Path:
     """The workspace after update.sh on ``v1.0.0``, a person's settlement, a build and a check."""
-    data = json.loads((workspace / "variables.json").read_text())
-    data |= {"release": "v1.0.0", "software_version": "1.0.0"}
-    (workspace / "variables.json").write_text(json.dumps(data))
+    _captured_here(workspace, git, checkout)
+    release.record(workspace, repo=checkout)
     for folder in ("build", "sources", "img/previous", "evidence/previous"):
         (workspace / folder).mkdir(parents=True, exist_ok=True)
     files = {
@@ -149,7 +164,6 @@ def _settled(workspace: Path, version: str = "2.0, vastgesteld op 9 november 202
         "img/previous/pl-01.png": "earlier",
         "build/10-planner.pdf": "%PDF",
         "evidence/previous/state-1.json": "{}",
-        "evidence/state.json": json.dumps({"started": "2026-11-08 21:47:02 CET"}),
         "evidence/afhechting.md": "# Afhechting\n",
         "style-guide.md": "# Stijl\n",
         "README.md": "# Werkmap\n",
@@ -173,15 +187,20 @@ def _manifest(folder: Path) -> dict[str, str]:
 def test_a_settled_version_is_frozen_whole_read_only_and_checkable(
     git: Git, checkout: Path, workspace: Path
 ) -> None:
-    """Every file but the previous capture and README.md, a manifest, a zip, a new baseline."""
-    target = release.freeze(_settled(workspace), repo=checkout, today=TODAY)
+    """Every file but the previous capture and README.md, a manifest, a zip, a new baseline.
+
+    The release tag is annotated, as the release app makes them: the baseline is its commit.
+    """
+    git("tag", "-d", "v1.0.0")
+    git("tag", "-a", "v1.0.0", "-m", "release")
+    target = release.freeze(_settled(workspace, git, checkout), repo=checkout, today=TODAY)
     versions = workspace / "versies"
     assert target == versions / NAME
     listed = _manifest(target)
     files = {f"./{p.relative_to(target).as_posix()}" for p in target.rglob("*") if p.is_file()}
     assert set(listed) == files - {"./MANIFEST.sha256"}
     for path, digest in listed.items():
-        assert hashlib.sha256((target / path).read_bytes()).hexdigest() == digest
+        assert _sha256(target / path) == digest
     assert {"./img/pl-01.png", "./style-guide.md", "./LEESMIJ.md"} <= set(listed)
     assert not [p for p in listed if "previous" in p or p == "./README.md"]
     readme = (target / "LEESMIJ.md").read_text()
@@ -195,19 +214,25 @@ def test_a_settled_version_is_frozen_whole_read_only_and_checkable(
         assert text in readme
     assert not [p for p in [target, *target.rglob("*")] if p.stat().st_mode & 0o222]
     archive = versions / f"{NAME}.zip"
-    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-    assert (versions / f"{NAME}.zip.sha256").read_text() == f"{digest}  {NAME}.zip\n"
+    assert (versions / f"{NAME}.zip.sha256").read_text() == f"{_sha256(archive)}  {NAME}.zip\n"
     with zipfile.ZipFile(archive) as bundle:
         assert sorted(bundle.namelist()) == sorted(f"{NAME}/{p[2:]}" for p in files)
     baseline = json.loads((workspace / "variables.json").read_text())["commit"]
-    assert baseline == git("rev-parse", "v1.0.0^{commit}").strip()[:12]
+    assert baseline == _head(git)[:12]
     assert sorted(p.name for p in versions.iterdir()) == [NAME, f"{NAME}.zip", f"{NAME}.zip.sha256"]
 
 
 def _change(workspace: Path, change: str) -> None:
+    """Undo one part of a settled workspace; the check stays current unless that is the change."""
+    variables = workspace / "variables.json"
     if change == "trial":
-        data = json.loads((workspace / "variables.json").read_text())
-        (workspace / "variables.json").write_text(json.dumps(data | {"release": ""}))
+        state = json.loads((workspace / "evidence" / "state.json").read_text())
+        state["stack"]["build"]["fingerprint"] = "0" * 64
+        (workspace / "evidence" / "state.json").write_text(json.dumps(state))
+    elif change == "another label":
+        variables.write_text(
+            json.dumps(json.loads(variables.read_text()) | {"software_version": "0.9.0"})
+        )
     elif change == "exists":
         (workspace / "versies" / NAME).mkdir(parents=True)
     elif change in ("versions differ", "concept"):
@@ -221,9 +246,9 @@ def _change(workspace: Path, change: str) -> None:
     if change == "blocking check":
         _checked(workspace, blocking=2)
     elif change == "edited after the check":
-        source = workspace / "sources" / "10-planner.md"
-        later = (workspace / "evidence" / "check.md").stat().st_mtime + 60
-        os.utime(source, (later, later))
+        (workspace / "sources" / "10-planner.md").write_text("# Planner, bijgewerkt\n")
+    elif change == "added after the check":
+        (workspace / "sources" / "20-medewerker.md").write_text("# Medewerker\n")
     else:
         _checked(workspace)
 
@@ -232,19 +257,21 @@ def _change(workspace: Path, change: str) -> None:
     ("change", "message"),
     [
         ("trial", "is a trial"),
+        ("another label", "the title pages say '0.9.0', the capture shows '1.0.0'"),
         ("exists", "exists already"),
         ("versions differ", "no one version number"),
         ("concept", "no one version number"),
         ("no record", "afhechting.md first"),
-        ("blocking check", "missing or blocks"),
-        ("edited after the check", "changed after the last check: 10-planner.md"),
+        ("blocking check", "found 2 blocking"),
+        ("edited after the check", "changed after the last check: sources/10-planner.md"),
+        ("added after the check", "changed after the last check: sources/20-medewerker.md"),
     ],
 )
 def test_freeze_refuses_what_is_no_settled_release(
-    checkout: Path, workspace: Path, change: str, message: str
+    git: Git, checkout: Path, workspace: Path, change: str, message: str
 ) -> None:
     """Nothing is copied and the baseline stays when a version is not ready or exists."""
-    _settled(workspace)
+    _settled(workspace, git, checkout)
     _change(workspace, change)
     before = (workspace / "variables.json").read_text()
     with pytest.raises(SystemExit, match=message):
@@ -256,10 +283,10 @@ def test_freeze_refuses_what_is_no_settled_release(
 
 
 def test_a_failed_freeze_leaves_no_half_version(
-    checkout: Path, workspace: Path, monkeypatch: pytest.MonkeyPatch
+    git: Git, checkout: Path, workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A failure while zipping removes the copy; nothing in versies/ and the baseline stays."""
-    _settled(workspace)
+    _settled(workspace, git, checkout)
     before = (workspace / "variables.json").read_text()
 
     def full(*args: object, **kwargs: object) -> None:

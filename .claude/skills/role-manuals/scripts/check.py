@@ -5,7 +5,9 @@ Usage, from the checkout (the app's own modules and babel come from its environm
     uv run python .claude/skills/role-manuals/scripts/check.py <workspace> [--since <commit>]
         [--fix]
 
-Writes ``evidence/check.md`` in the workspace and exits with 1 when a blocking finding is left.
+Writes ``evidence/check.md`` in the workspace, and its verdict to ``evidence/check.json`` (the
+number of blocking findings and the sha256 of every file it read, which ``release.py freeze``
+compares), and exits with 1 when a blocking finding is left.
 It checks what needs the software's own Python; the sources are parsed once, by ``build.mjs``,
 which also refuses a manual that names a term the organisation does not show. Run that first:
 it writes ``build/manuals.json``, which ``load_inputs`` reads (and refuses when an input of that
@@ -364,11 +366,16 @@ def labels(manual: dict) -> list[tuple[int, str]]:
 
 @dataclass
 class Inputs:
-    """What one check works on: the variables, the sources as text, and the build's manuals."""
+    """What one check works on: the variables, the sources as text, and the build's manuals.
+
+    ``hashes`` holds the sha256 of each file read, by its path in the workspace: the verdict in
+    ``evidence/check.json`` lists them, so ``release.py freeze`` can tell the check is current.
+    """
 
     config: dict
     sources: dict[Path, str]
     manuals: list[dict]
+    hashes: dict[str, str]
 
 
 def _sha256(data: bytes) -> str:
@@ -389,8 +396,9 @@ def load_inputs(ws: Workspace) -> Inputs:
         sys.exit(f"check.py: {found} is missing; run build.mjs {ws.root} first")
     variables = (ws.root / "variables.json").read_bytes()
     raw = {p: p.read_bytes() for p in sorted(ws.sources.glob("*.md"))}
+    build = found.read_bytes()
     try:
-        data = json.loads(found.read_text())
+        data = json.loads(build)
         built = {m["file"]: m["sha256"] for m in data["manuals"]}
         built_variables = data["variables_sha256"]
     except (TypeError, KeyError, json.JSONDecodeError):
@@ -403,7 +411,10 @@ def load_inputs(ws: Workspace) -> Inputs:
         changed.append("variables.json")
     if changed:
         sys.exit(f"check.py: changed after the last build: {', '.join(changed)}; build again")
-    return Inputs(json.loads(variables), {p: b.decode() for p, b in raw.items()}, data["manuals"])
+    hashes = {"variables.json": _sha256(variables), "build/manuals.json": _sha256(build)}
+    hashes |= {f"sources/{p.name}": _sha256(b) for p, b in raw.items()}
+    sources = {p: b.decode() for p, b in raw.items()}
+    return Inputs(json.loads(variables), sources, data["manuals"], hashes)
 
 
 def check_labels(manual: dict, catalogue: Catalogue, verdicts: dict, report: Report) -> None:
@@ -575,6 +586,8 @@ def main() -> int:
     out = ws.evidence / "check.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report.markdown())
+    verdict = {"blocking": report.blocking, "inputs": inputs.hashes}
+    (ws.evidence / "check.json").write_text(json.dumps(verdict, indent=2) + "\n")
     print(f"check.py: {report.blocking} blokkerend; rapport in {out}")
     return 1 if report.blocking else 0
 

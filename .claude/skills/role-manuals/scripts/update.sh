@@ -11,8 +11,8 @@
 # 3. checks the manuals against the software since the last frozen version (the baseline commit,
 #    which only freeze.sh moves) and writes labels the software only renamed into the sources
 #    (check.py --fix);
-# 4. records the release this run shows for the title pages (release.py record: the nearest tag,
-#    and whether the image was built from the tag's files; if not, the run is a trial);
+# 4. records the release the capture shows for the title pages (release.py record: the nearest
+#    tag, and whether the image was built from the tag's files; if not, the capture is a trial);
 # 5. builds Word, HTML and PDF; the stack is stopped when the script ends.
 # Docker and Chrome do not run inside an agent's macOS sandbox: run this in a normal terminal.
 # Exit code: that of check.py (1 when a blocking finding is left), else that of the failing step.
@@ -23,8 +23,6 @@ repo="$(cd "$here/../../../.." && pwd)"
 workspace="$(cd "${1:?usage: update.sh <workspace>}" && pwd -P)"
 node "$here/build.mjs" "$workspace" --no-pdf
 stack="$repo/.claude/skills/verify-openplanner/scripts/stack.sh"
-vars="$workspace/variables.json"
-previous="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("commit", ""))' "$vars")"
 
 # Its own compose project (one per checkout) and ports, so the stack.sh down of the trap below
 # only ever removes this script's containers, never the verification stack of another session.
@@ -66,16 +64,13 @@ node "$here/sample-data.mjs" "$workspace"
 node "$here/capture.mjs" "$workspace"
 
 echo "== 3/5 controleren en herstellen"
+# Since the commit in variables.json, the last frozen version (check.py's default for --since).
 rc=0
-if [ -n "$previous" ]; then
-  (cd "$repo" && uv run python "$here/check.py" "$workspace" --since "$previous" --fix) || rc=$?
-else
-  (cd "$repo" && uv run python "$here/check.py" "$workspace") || rc=$?
-fi
+(cd "$repo" && uv run python "$here/check.py" "$workspace" --fix) || rc=$?
 
 echo "== 4/5 versie vastleggen"
-# The release of this run's build, not of the HEAD of now (release.py record).
-python3 "$here/release.py" record "$workspace" "${current%/current}/$(cat "$current")/stack.env"
+# The release of the capture's build, not of the HEAD of now.
+(cd "$repo" && uv run python "$here/release.py" record "$workspace")
 
 echo "== 5/5 bouwen"
 node "$here/build.mjs" "$workspace"

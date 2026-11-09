@@ -234,6 +234,19 @@ def test_a_value_of_the_variables_is_a_known_text(
     assert "**Acme-planner**" not in report
 
 
+def test_the_verdict_holds_the_hash_of_every_file_the_check_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """evidence/check.json: the blocking count and each input by its path in the workspace."""
+    root = _built_workspace(tmp_path, {"product": "de dienst"}, {"00-aanpak": "# Aanpak\n"})
+    monkeypatch.setattr(sys, "argv", ["check.py", str(root)])
+    assert check.main() == 0
+    files = ["variables.json", "build/manuals.json", "sources/00-aanpak.md"]
+    inputs = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in files}
+    verdict = json.loads((root / "evidence" / "check.json").read_text())
+    assert verdict == {"blocking": 0, "inputs": inputs}
+
+
 def test_rights_without_task_must_map_a_right_to_a_reason(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

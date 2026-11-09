@@ -1,24 +1,27 @@
 """The release a capture of the role manuals shows, and a frozen version of them per release.
 
-Two commands, run from the checkout (``update.sh`` and ``freeze.sh`` call them)::
+Two commands, run from the checkout with its own Python (``update.sh`` and ``freeze.sh`` call
+them this way)::
 
-    python3 release.py record <workspace> <stack.env of the run>
-    python3 release.py freeze <workspace>
+    uv run python .claude/skills/role-manuals/scripts/release.py record <workspace>
+    uv run python .claude/skills/role-manuals/scripts/release.py freeze <workspace>
 
-``record`` reads which commit the run's image was built from, and its fingerprint, from the
-run's ``stack.env`` (``verify-openplanner``). It finds the nearest release tag, a release before
-a candidate of it on the same commit, and asks ``stack.sh fingerprint`` whether the image was
-built from that tag's files. The label goes to ``software_version`` for the title pages; the tag
-goes to ``release`` when the image is the tag's, else ``release`` is empty and the capture is a
-trial. ``pyproject.toml`` is no source: it names the previous release until the next one is cut.
+Both read the capture's own record, ``evidence/state.json`` of ``capture.mjs``: the commit its
+stack was built from and the fingerprint of the files the image was built from. The capture's
+release is the nearest release tag of that commit (a release before a candidate of it on the
+same commit) when ``stack.sh fingerprint`` gives that tag the same fingerprint; otherwise the
+capture is a trial. ``pyproject.toml`` is no source: it names the previous release until the
+next one is cut.
 
-``freeze`` copies a settled version into ``versies/`` of the workspace: one folder per version,
-read-only, with ``MANIFEST.sha256`` over its files, a ``LEESMIJ.md`` and a zip with its own
-checksum. It refuses a trial, a version that exists, sources that do not state one version
-number, a missing record of the settlement and a check that is not the last word. It builds the
-copy beside ``versies/`` and moves it into place only when it is whole. Then it sets ``commit``,
-the baseline of the next ``check.py --since``, to the release: every check reports what changed
-since the last frozen version, and nothing else moves the baseline.
+``record`` writes the label for the title pages to ``software_version``. ``freeze`` copies a
+settled version into ``versies/`` of the workspace: one folder per version, read-only, with
+``MANIFEST.sha256`` over its files, a ``LEESMIJ.md`` and a zip with its own checksum. It refuses
+a trial, title pages that name another release, a version that exists, sources that do not
+state one version number, a missing record of the settlement, and a check that blocked or read
+other files than there are now (``evidence/check.json`` of ``check.py``). It builds the copy
+beside ``versies/`` and moves it into place only when it is whole. Then it sets ``commit``, the
+baseline of the next ``check.py --since``, to the release: every check reports what changed since
+the last frozen version, and nothing else moves the baseline.
 """
 
 import argparse
@@ -38,6 +41,9 @@ STACK = Path(".claude/skills/verify-openplanner/scripts/stack.sh")
 """The script that fingerprints an image's files, relative to the checkout."""
 
 TAGS = "v[0-9]*"
+RELEASE = re.compile(r"v\d+\.\d+\.\d+(-rc\.\d+)?")
+"""A release tag (``v0.6.0``) or a candidate of one (``v0.6.0-rc.35``); no other tag names one."""
+
 COMMIT = re.compile(r"[0-9a-f]{7,40}")
 FINGERPRINT = re.compile(r"[0-9a-f]{64}")
 VERSION = re.compile(r"\d+(\.\d+)*")
@@ -87,15 +93,17 @@ def release_tag(repo: Path, commit: str) -> str:
         nearest = git(repo, "describe", "--tags", "--abbrev=0", f"--match={TAGS}", commit)
     except subprocess.CalledProcessError:
         return ""
-    peers = git(repo, "tag", "--points-at", f"{nearest}^{{commit}}", "--list", TAGS).split()
-    releases = sorted(tag for tag in peers if "-" not in tag)
+    if not RELEASE.fullmatch(nearest):
+        return ""
+    peers = git(repo, "tag", "--points-at", f"refs/tags/{nearest}^{{commit}}", "--list", TAGS)
+    releases = sorted(tag for tag in peers.split() if RELEASE.fullmatch(tag) and "-" not in tag)
     return releases[0] if releases else nearest
 
 
 def software_label(tag: str, commit: str, same: bool) -> str:
     """Return the software version for the title pages, in the manuals' language.
 
-    A release tag gives its number and a pre-release (``-rc.N``) says which release it tests. An
+    A release tag gives its number and a candidate (``-rc.N``) says which release it tests. An
     image built from other files than the tag's says so and names its commit; without a tag the
     commit is all there is.
     """
@@ -105,20 +113,6 @@ def software_label(tag: str, commit: str, same: bool) -> str:
     release, dash, _ = number.partition("-")
     label = f"{number}, testversie van {release}" if dash else number
     return label if same else f"{label}, met latere wijzigingen (commit {commit[:7]})"
-
-
-def run_facts(stack_env: Path) -> tuple[str, str]:
-    """Return the commit and the fingerprint the run's image was built from.
-
-    Both come from the ``stack.env`` that ``stack.sh up`` wrote; a record without them is refused,
-    so an empty fingerprint never matches an empty one.
-    """
-    facts = dict(line.split("=", 1) for line in stack_env.read_text().splitlines() if "=" in line)
-    commit = facts.get("BUILT_FROM_COMMIT", "")
-    built = facts.get("BUILT_FROM_FINGERPRINT", "")
-    if not COMMIT.fullmatch(commit) or not FINGERPRINT.fullmatch(built):
-        sys.exit(f"release.py: {stack_env} records no commit and image fingerprint of its build")
-    return commit, built
 
 
 def image_of(repo: Path, tag: str) -> str:
@@ -141,16 +135,39 @@ def _write(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
 
-def record(workspace: Path, stack_env: Path, repo: Path = REPO) -> str:
-    """Write the release the run shows into the workspace's variables.json; return its label."""
-    commit, built = run_facts(stack_env)
+def capture(workspace: Path) -> dict:
+    """Return the record of the last capture, ``evidence/state.json``."""
+    path = workspace / "evidence" / "state.json"
+    if not path.exists():
+        sys.exit(f"release.py: {path} is missing; capture first (update.sh)")
+    return _read(path)
+
+
+def capture_release(state: dict, repo: Path) -> tuple[str, str, bool]:
+    """Return a capture's commit, its release tag, and whether its image is that tag's.
+
+    The stack client records the commit and the image fingerprint of its run in the state; a
+    state without them (a capture by an older skill) is refused, so an empty fingerprint never
+    matches an empty one.
+    """
+    build = state.get("stack", {}).get("build", {})
+    commit, built = str(build.get("commit", "")), str(build.get("fingerprint", ""))
+    if not COMMIT.fullmatch(commit) or not FINGERPRINT.fullmatch(built):
+        sys.exit(
+            "release.py: evidence/state.json records no commit and image fingerprint of its "
+            "run; capture again with this version of the skill"
+        )
     tag = release_tag(repo, commit)
-    same = bool(tag) and image_of(repo, tag) == built
+    return commit, tag, bool(tag) and image_of(repo, tag) == built
+
+
+def record(workspace: Path, repo: Path = REPO) -> str:
+    """Write the label of the release the capture shows into variables.json; return it."""
+    commit, tag, same = capture_release(capture(workspace), repo)
     label = software_label(tag, commit, same)
     path = workspace / "variables.json"
     data = _read(path)
     data["software_version"] = label
-    data["release"] = tag if same else ""
     _write(path, data)
     return label
 
@@ -170,28 +187,37 @@ def manual_version(manuals: list[dict]) -> tuple[str, str]:
     return numbers.pop(), found[min(found)]
 
 
-def _fresh_check(workspace: Path) -> None:
-    """Refuse unless ``evidence/check.md`` passed and nothing it checked changed after it.
-
-    ``freeze.sh`` checks right before; this guards a direct call. The report's first line counts
-    the blocking findings (``check.py``, ``Report.markdown``).
-    """
-    report = workspace / "evidence" / "check.md"
-    if not report.exists() or "Blokkerende bevindingen: 0." not in report.read_text():
-        sys.exit("release.py: evidence/check.md is missing or blocks; freeze.sh checks first")
-    inputs = [workspace / "variables.json", workspace / "build" / "manuals.json"]
-    inputs += list((workspace / "sources").glob("*.md"))
-    newer = [p.name for p in inputs if p.stat().st_mtime > report.stat().st_mtime]
-    if newer:
-        sys.exit(f"release.py: changed after the last check: {', '.join(newer)}; run freeze.sh")
-
-
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for block in iter(lambda: handle.read(1 << 20), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def check_passed(workspace: Path) -> None:
+    """Refuse unless the last check passed on the files as they are now.
+
+    ``check.py`` writes its verdict to ``evidence/check.json``: the number of blocking findings
+    and the sha256 of every file it read (variables.json, build/manuals.json and each source). A
+    file changed, added or removed since makes the check older than what it would check now.
+    """
+    path = workspace / "evidence" / "check.json"
+    if not path.exists():
+        sys.exit("release.py: evidence/check.json is missing; freeze.sh checks first")
+    verdict = _read(path)
+    if verdict.get("blocking") != 0:
+        sys.exit(f"release.py: the last check found {verdict.get('blocking')} blocking finding(s)")
+    listed = verdict.get("inputs", {})
+    now = {"variables.json", "build/manuals.json"}
+    now |= {f"sources/{p.name}" for p in (workspace / "sources").glob("*.md")}
+    changed = sorted(
+        name
+        for name in now | set(listed)
+        if name not in now or name not in listed or _sha256(workspace / name) != listed[name]
+    )
+    if changed:
+        sys.exit(f"release.py: changed after the last check: {', '.join(changed)}; run freeze.sh")
 
 
 def _files(folder: Path) -> list[Path]:
@@ -220,22 +246,26 @@ def _writable(folder: Path) -> None:
 
 def freeze(workspace: Path, repo: Path = REPO, today: dt.date | None = None) -> Path:
     """Freeze the settled version of the manuals into ``versies/``; return its folder."""
-    variables = _read(workspace / "variables.json")
-    tag = variables.get("release", "")
-    if not tag:
+    state = capture(workspace)
+    captured_from, tag, same = capture_release(state, repo)
+    if not same:
         sys.exit(
-            "release.py: the last capture is a trial: its image is no release tag's; "
+            "release.py: the capture is a trial: its image is no release tag's; "
             "run update.sh from a checkout of the release tag"
         )
-    try:
-        commit = git(repo, "rev-parse", "--verify", "--quiet", f"{tag}^{{commit}}")
-    except subprocess.CalledProcessError:
-        sys.exit(f"release.py: the tag {tag} is not in this checkout; fetch the tags")
+    variables = _read(workspace / "variables.json")
+    label = software_label(tag, captured_from, same)
+    if variables.get("software_version") != label:
+        sys.exit(
+            f"release.py: the title pages say {variables.get('software_version')!r}, the "
+            f"capture shows {label!r}; freeze.sh records it first"
+        )
+    commit = git(repo, "rev-parse", "--verify", "--quiet", f"refs/tags/{tag}^{{commit}}")
     version, version_text = manual_version(_read(workspace / "build" / "manuals.json")["manuals"])
     if not (workspace / RECORD).exists():
         sys.exit(f"release.py: write {RECORD} first: what was reread and what stays open")
-    _fresh_check(workspace)
-    started = str(_read(workspace / "evidence" / "state.json").get("started", ""))
+    check_passed(workspace)
+    started = str(state.get("started", ""))
     if not re.match(r"\d{4}-\d{2}-\d{2}", started):
         sys.exit("release.py: evidence/state.json holds no start of the capture")
     captured = dt.date.fromisoformat(started[:10])
@@ -257,7 +287,7 @@ def freeze(workspace: Path, repo: Path = REPO, today: dt.date | None = None) -> 
         values = {
             "version": version,
             "version_text": version_text,
-            "software_version": str(variables.get("software_version", "")),
+            "software_version": label,
             "release": tag,
             "commit": commit[:12],
             "captured": dutch_date(captured),
@@ -293,14 +323,14 @@ def main(argv: list[str]) -> int:
     """Run ``record`` or ``freeze`` and say what it did."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
-    recording = commands.add_parser("record", help="write the release a capture shows")
-    recording.add_argument("workspace", type=Path)
-    recording.add_argument("stack_env", type=Path)
-    freezing = commands.add_parser("freeze", help="freeze the settled version into versies/")
-    freezing.add_argument("workspace", type=Path)
+    for name, text in (
+        ("record", "write the release the capture shows for the title pages"),
+        ("freeze", "freeze the settled version into versies/"),
+    ):
+        commands.add_parser(name, help=text).add_argument("workspace", type=Path)
     args = parser.parse_args(argv)
     if args.command == "record":
-        print(f"Softwareversie: {record(args.workspace, args.stack_env)}")
+        print(f"Softwareversie: {record(args.workspace)}")
     else:
         target = freeze(args.workspace)
         print(f"Vastgelegd: {target} (controle: shasum -a 256 -c MANIFEST.sha256 in die map)")
