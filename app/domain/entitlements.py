@@ -265,6 +265,9 @@ class LoginClaims:
         entitlements: Values of the entitlement claim that carry the prefix.
         mfa_missing: The provider's policy is ``record`` and the ID token showed no second
             factor (ADR 0100); the login goes on and the route records a security event.
+        email: The ``email`` claim, only when the provider called it verified (ADR 0117
+            step 10b); personal data. It is written to the staff record at login and is not
+            kept in the session.
     """
 
     subject: str
@@ -275,6 +278,7 @@ class LoginClaims:
     role_claims: frozenset[str] = frozenset()
     entitlements: frozenset[str] = frozenset()
     mfa_missing: bool = False
+    email: str | None = field(default=None, repr=False)
 
 
 def _legacy_roles(claims: LoginClaims, catalogue: RoleCatalogue) -> list[tuple[str, Reach]]:

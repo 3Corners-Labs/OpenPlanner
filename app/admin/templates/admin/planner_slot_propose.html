@@ -1,0 +1,31 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field as render_field with context %}
+{% block title %}{{ _("admin.proposal.slot_title", when=when) }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/groups/{{ summary.group.slug }}/agenda/slot-propose" novalidate aria-labelledby="slot-heading">
+  <div class="card__header">
+    <h2 id="slot-heading">{{ _("admin.proposal.slot_title", when=when) }}</h2>
+    <p class="card__lead">{{ _("admin.proposal.slot_lead", count=rows|length) }}</p>
+  </div>
+  {% for name, value in scope.items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+  <input type="hidden" name="ids" value="{{ ids }}">
+  {% for row in rows %}
+  <fieldset class="fieldset">
+    <legend>{{ row.reference }} · {{ row.first_name }} · {{ row.when }}</legend>
+    <div class="choice__option">
+      <input type="checkbox" id="include_{{ row.id }}" name="include_{{ row.id }}" value="yes"{% if row.included %} checked{% endif %}>
+      <label for="include_{{ row.id }}">{{ _("admin.proposal.include") }}<span class="visually-hidden"> {{ row.reference }}</span></label>
+    </div>
+    <div class="form-grid">{{ render_field(row.field) }}</div>
+  </fieldset>
+  {% endfor %}
+  <div class="form-grid">{{ render_field(reason) }}</div>
+  <p>{{ _("admin.proposal.held_lead") }}</p>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.proposal.slot_button") }}</button>
+    <a href="{{ back }}">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

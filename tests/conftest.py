@@ -5,6 +5,7 @@ import sys
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from types import FrameType
 
 import httpx
 import pytest
@@ -13,18 +14,40 @@ from pydantic import SecretStr
 
 from app.adapters.integrations import Integrations
 from app.config import Settings
-from app.domain.audit import AuditEvent
+from app.domain.activity_alert import COUNTED_ACTIONS
+from app.domain.admin import AdminService
+from app.domain.audit import AuditEvent, Outcome
 from app.domain.event_context import set_service
 from app.domain.event_schema import detail_problem
 from app.domain.log_events import lookup
 from app.domain.ports import Clock
 from app.main import create_app
 from tests.fakes.smtp import FakeSmtpServer
+from tests.support.git_repository import Git, repository
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = str(ROOT / "app") + "/"
 READ_BACK = APP + "adapters/db/"
 """Where events are built from stored rows; the action was checked when it was written."""
+
+RECORDER = AdminService.record_change.__code__
+"""The one method that may write a success an hourly alert counts: it runs the alert."""
+
+
+def checked_by_its_alert(event: AuditEvent, frame: FrameType | None) -> bool:
+    """Whether ``event`` is no counted success, or is built under ``AdminService.record_change``.
+
+    That method runs the hourly alert right after the event (``app.domain.activity_alert``); a
+    counted success built anywhere else would let a burst pass its threshold unseen. ``frame``
+    is the frame that built the event; the walk goes up the stack from there.
+    """
+    if event.outcome is not Outcome.SUCCESS or event.action not in COUNTED_ACTIONS:
+        return True
+    while frame is not None:
+        if frame.f_code is RECORDER:
+            return True
+        frame = frame.f_back
+    return False
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -35,10 +58,12 @@ def _audited_actions_are_registered() -> Iterator[None]:
     constant, ``job.<type>``), so this watches the events the code in ``app/`` creates instead
     of reading the source; ``tests/test_log_events_scan.py`` covers the log calls. The same
     watch checks that every detail follows the convention the line's ``labels.*`` are read
-    from (ADR 0103 point 6, ``app.domain.event_schema.detail_problem``).
+    from (ADR 0103 point 6, ``app.domain.event_schema.detail_problem``), and that a success an
+    hourly alert counts comes from ``AdminService.record_change`` (ADR 0044).
     """
     seen: dict[str, str] = {}
     malformed: dict[str, str] = {}
+    unchecked: dict[str, str] = {}
     original = AuditEvent.__post_init__
 
     def watched(event: AuditEvent) -> None:
@@ -50,6 +75,8 @@ def _audited_actions_are_registered() -> Iterator[None]:
             problem = detail_problem(event.detail)
             if problem is not None:
                 malformed.setdefault(f"{where} ({event.action})", problem)
+            if not checked_by_its_alert(event, sys._getframe(2)):
+                unchecked.setdefault(f"{where} ({caller.co_qualname})", event.action)
 
     AuditEvent.__post_init__ = watched  # type: ignore[method-assign]
     yield
@@ -57,6 +84,7 @@ def _audited_actions_are_registered() -> Iterator[None]:
     unknown = {action: where for action, where in seen.items() if lookup(action) is None}
     assert unknown == {}, "audited actions missing from app/domain/log_events.py"
     assert malformed == {}, "audit details that break the convention of app/domain/event_schema"
+    assert unchecked == {}, "counted successes built outside AdminService.record_change"
 
 
 @pytest.fixture(autouse=True)
@@ -118,6 +146,12 @@ def smtp_server(monkeypatch: pytest.MonkeyPatch) -> FakeSmtpServer:
     monkeypatch.setattr(smtplib, "SMTP", server.connect)
     monkeypatch.setattr(smtplib, "SMTP_SSL", server.connect_tls)
     return server
+
+
+@pytest.fixture
+def git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Git:
+    """A git repository on branch ``main`` in ``tmp_path``, which is the working directory."""
+    return repository(tmp_path, monkeypatch)
 
 
 @pytest.fixture

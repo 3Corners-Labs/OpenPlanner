@@ -8,16 +8,15 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.audit import AuditEvent, AuditFilter, Category, Level, Outcome, Source
-from app.domain.audit_export import (
+from app.domain.audit_export import EXPORT_EVENT, audit_csv
+from app.domain.authorization import Role
+from app.domain.csv_export import (
     BOM,
-    EXPORT_EVENT,
     ExportLimits,
     ExportRefused,
     export_window,
     safe_cell,
-    to_csv,
 )
-from app.domain.authorization import Role
 from app.domain.event_schema import FIELDS, Envelope, to_record
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
@@ -46,7 +45,7 @@ def test_plain_values_stay_as_they_are() -> None:
 
 def test_csv_is_bom_semicolon_crlf_and_rfc4180_quoted() -> None:
     event = AuditEvent(NOW, "sub;1", "group.edit", Outcome.SUCCESS, detail='name,"x"')
-    document = to_csv([to_record(event, Envelope())])
+    document = audit_csv([to_record(event, Envelope())])
 
     assert document.startswith(BOM + "@timestamp;log.level;event.category;event.action;message;")
     assert "\r\n" in document

@@ -7,7 +7,7 @@
   <h2 id="status-heading">{{ _("admin.settings.status.title") }}</h2>
   <p>{{ _("admin.settings.status.intro") }}</p>
   <dl class="facts">
-    <div><dt>{{ _("admin.settings.status.environment") }}</dt><dd><code>{{ environment }}</code></dd></div>
+    <div><dt>{{ _("admin.settings.status.environment") }}</dt><dd>{{ environment_label }}</dd></div>
   </dl>
   {% if log_summary %}
   <h3 id="logging-heading">{{ _("admin.settings.logging.title") }}</h3>

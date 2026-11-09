@@ -16,10 +16,11 @@ the admin may view it.
 
 ADR 0040, part 3: filters for minimum level, category, period (days in ``ADMIN_TIMEZONE``) and
 trace id; a trace id shows the whole chain of one request or job. The export writes exactly
-the current filter inside the admin's scope as CSV (``app.domain.audit_export``) and is itself
-an audit event, so only the portal itself may ask for it (``SameOrigin``); an export over a
-limit is refused on the page, never cut short: the export sends the admin back to the page with
-the reason (``refused``), so nothing at the export's own address can run it again.
+the current filter inside the admin's scope as CSV (``app.domain.audit_export``, written by
+``app.domain.csv_export``) and is itself an audit event, so only the portal itself may ask for
+it (``SameOrigin``); an export over a limit is refused on the page, never cut short: the export
+sends the admin back to the page with the reason (``refused``), so nothing at the export's own
+address can run it again.
 
 ADR 0040, part 4: the superuser switches diagnostic mode on for one group or organisation
 (``app.domain.diagnostics``); the page lists the modes that are on, each with when it ends.
@@ -40,6 +41,7 @@ from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.planner_routes import REASON_LABELS as CHANGE_REASON_LABELS
 from app.domain import staff
+from app.domain.activity_alert import CHANGES_ALERT, REVEALS_ALERT
 from app.domain.admin import (
     AMBIGUOUS_CLAIMS_EVENT,
     ANONYMOUS,
@@ -68,7 +70,6 @@ from app.domain.audit import (
     Source,
     Subject,
 )
-from app.domain.audit_export import ExportLimits, ExportRefusal, ExportRefused
 from app.domain.authorization import (
     API_SCOPES,
     ApiScope,
@@ -80,6 +81,7 @@ from app.domain.authorization import (
     decide,
 )
 from app.domain.booking import ChangeReason
+from app.domain.csv_export import ExportLimits, ExportRefusal, ExportRefused
 from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
 from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
@@ -88,7 +90,6 @@ from app.domain.idp_mapping import EXPORTED_EVENT, GROUP_IDP_KEY_CHANGED
 from app.domain.integration_check import CHECK_EVENT, SERVICE_APP_CHECK_EVENT
 from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
 from app.domain.organisations import IDP_KEY_CHANGED as ORGANISATION_IDP_KEY_CHANGED
-from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
@@ -152,8 +153,10 @@ EVENT_LABELS: dict[str, str] = {
     "job.send_suspension": "audit.job.send_suspension",
     "job.send_closure_update": "audit.job.send_closure_update",
     "job.send_reinstatement": "audit.job.send_reinstatement",
-    # ADR 0044: one planner made many changes within an hour.
-    ALERT_ACTION: "audit.event.planner_changes_alert",
+    # ADR 0044: one planner made many changes, or one person asked for many participants'
+    # contact details (§2), within an hour.
+    CHANGES_ALERT.action: "audit.event.planner_changes_alert",
+    REVEALS_ALERT.action: "audit.event.contact_reveals_alert",
     # ADR 0049: entitlements and IdP values.
     ENTITLEMENT_REFUSED_EVENT: "audit.event.entitlement_refused",
     ENTITLEMENT_MISMATCH_EVENT: "audit.event.entitlement_mismatch",
@@ -319,6 +322,7 @@ COUNT_LABELS: dict[str, str] = {
     "database_mb": "admin.audit.detail.database_mb",
     "hours": "admin.audit.detail.hours",
     "changes": "admin.audit.detail.changes",
+    "reveals": "admin.audit.detail.reveals",
     "suppressed": "admin.audit.detail.suppressed",
     "modes": "admin.audit.detail.modes",
     "sessions": "admin.audit.detail.sessions",
@@ -761,7 +765,7 @@ async def audit(
     ``ExportRefusal`` shows its text; anything else shows nothing, never an error and never
     echoed, like the filters.
     """
-    refusal = ExportRefusal(refused) if refused in set(ExportRefusal) else None
+    refusal = ExportRefusal.named(refused)
     service = admin_service(request)
     zone = ZoneInfo(settings_for(request).admin_timezone)
     in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)

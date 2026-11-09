@@ -23,7 +23,8 @@ The log never contains participants' data: no names, email addresses or phone nu
   Denied and retry are warnings, failed is an error.
 - **Kind**: *Admin actions* (logins, changes, denials, showing a participant's contact
   details), *System* (messages, video calls, removal of personal data, storage, the automatic
-  integration check), *Security* (rejected webhooks, failed Webex token renewal) and
+  integration check, the warning about many changes or many requests for contact details by
+  one person within an hour), *Security* (rejected webhooks, failed Webex token renewal) and
   *Diagnostics*.
 - **From** and **Up to and including**: whole days in the portal's time zone.
 - **Trace id**: every row of one request or one job. **Whole chain** on a row takes you

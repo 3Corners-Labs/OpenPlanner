@@ -13,8 +13,8 @@ import structlog
 from app.adapters.db.uow import SqlUnitOfWork
 from app.admin.audit_routes import EXPORT_REFUSALS
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Level, Outcome, Source
-from app.domain.audit_export import ExportRefusal
 from app.domain.authorization import Scope
+from app.domain.csv_export import ExportRefusal
 from app.domain.diagnostics import DiagnosticLog
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339

@@ -189,6 +189,31 @@ async def test_nobody_is_addressed_outside_their_scope(managed: Site) -> None:
     assert "f@example.test" not in response.text
 
 
+@pytest.mark.parametrize("back", ["https://evil.example/", "//evil.example", "/admin/staff/1/../x"])
+async def test_a_foreign_back_falls_back_to_the_staff_list(managed: Site, back: str) -> None:
+    """The form's ``back`` is the redirect after an action and the link of its refusal page."""
+    assert managed.directory is not None
+    managed.directory.users["kc-far"] = DirectoryUser(
+        "kc-far", "f", "f@example.test", "F", "G", True, frozenset({f"{P}:org_admin:andere"})
+    )
+    await managed.login_as(ORG_ADMIN)
+
+    done = await managed.client.post(
+        "/admin/staff/directory/enabled",
+        data={"subject": "kc-mine", "enabled": "no", "back": back},
+        headers=SAME_ORIGIN,
+    )
+    refused = await managed.client.post(
+        "/admin/staff/directory/enabled",
+        data={"subject": "kc-far", "enabled": "no", "back": back},
+        headers=SAME_ORIGIN,
+    )
+
+    assert done.headers["location"].split("?")[0] == "/admin/staff"
+    assert '<a href="/admin/staff">' in refused.text
+    assert "evil" not in refused.text
+
+
 async def test_a_cross_site_post_is_refused(managed: Site) -> None:
     await managed.login_as(ORG_ADMIN)
 

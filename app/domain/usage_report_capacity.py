@@ -107,6 +107,8 @@ class CapacityReport:
         fill: Slots by how full they were (C2).
         heat: The busiest weekdays and hours (C4).
         shortfall: Blocks short of staff, per state (C5).
+        booked: Places booked in the range, shown with the utilisation or not at all.
+        capacity: Places there were, shown with the utilisation or not at all.
     """
 
     first_day: date
@@ -121,6 +123,8 @@ class CapacityReport:
     fill: CountTable
     heat: HeatTable
     shortfall: CountTable
+    booked: int | None = None
+    capacity: int | None = None
 
 
 def _utilisation(booked: int, capacity: int, slots: int, threshold: int) -> int | None:
@@ -247,4 +251,6 @@ def capacity_report(
         fill=count_table(fill, FILL_CLASSES, threshold),
         heat=_heat(local, groups, first_day, last_day, threshold),
         shortfall=count_table(shortfall, shortfall_codes, threshold),
+        booked=sum(booked.values()) if total_percent is not None else None,
+        capacity=sum(capacity.values()) if total_percent is not None else None,
     )

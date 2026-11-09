@@ -40,8 +40,14 @@ class Creatable:
 PERMANENT_HOLIDAY_DATE = Gap("ADR 0084 context: a holiday date is its identity, remove and add")
 ALERT_TARGET_REPLACED = Gap("ADR 0082 point 9: an alert target is removed and added again")
 PERMANENT_HOLIDAY_RANGE = Gap("ADR 0084 context: the Dutch holidays are dates, each removed alone")
+DIGEST_REPLACED = Gap("ADR 0117 point 16: a digest subscription is deleted and added again")
 
 CREATABLES: dict[str, Creatable] = {
+    # ADR 0117 point 16: a subscription names recipients and a schedule; it is replaced, not edited.
+    "/admin/organisations/{org}/usage/digest": Creatable(
+        change=DIGEST_REPLACED,
+        delete="/admin/organisations/{org}/usage/digest/{subscription_id}/delete",
+    ),
     # ADR 0096: a widget added to the own overview is moved or removed on *Edit overview*.
     "/admin/overview/add": Creatable(change="/admin/overview/edit", delete="/admin/overview/edit"),
     # ADR 0084 step 4: an empty organisation is deleted from its edit form.
@@ -174,8 +180,9 @@ def test_a_gap_names_the_decision_that_allows_it() -> None:
 
     assert all(gap.decision.startswith("ADR ") for gap in gaps)
     # What is left is the decision's own: a holiday date is its identity, the Dutch holidays
-    # are dates, each removed alone; an alert target (two homes) is removed and added again.
-    assert len(gaps) == 5
+    # are dates, each removed alone; an alert target (two homes) and a digest subscription
+    # are removed and added again.
+    assert len(gaps) == 6
 
 
 def test_the_heuristic_finds_the_known_creators() -> None:

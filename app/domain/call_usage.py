@@ -19,6 +19,7 @@ from app.domain.calls import CallStatus, EventKind
 from app.domain.direct_queue import QueuePhase, load_since, phase
 from app.domain.ports import Transaction
 from app.domain.scheduling import Group
+from app.domain.staff_usage import StaffUsage
 from app.domain.usage_recording import facts_of_booking
 
 
@@ -33,13 +34,15 @@ async def record_call_event(
     *,
     booking: Booking | None = None,
     group: Group | None = None,
+    staff: StaffUsage | None = None,
 ) -> None:
     """Record the facts that ``kind`` at ``at`` adds to the call of ``booking_id``.
 
     Call it before the event is added to the timeline: a trial event counts once per booking,
     which it finds out from the events that are there already. ``booking`` and ``group`` are
     passed by a caller that holds them; otherwise they are read. A booking or group that
-    is gone makes no fact.
+    is gone makes no fact. ``staff`` adds the team member's share of the facts (ADR 0117 point
+    9) of a call an agent claimed, while the organisation has the team view on.
     """
     if kind not in PRODUCES:
         return
@@ -54,8 +57,11 @@ async def record_call_event(
     first = True
     if kind in FIRST_ONLY:
         first = all(e.kind is not kind for e in await tx.get_booking_events(booking_id))
-    for fact in call_facts(kind, b, before, after, at, detail, load=load, first_of_kind=first):
+    facts = call_facts(kind, b, before, after, at, detail, load=load, first_of_kind=first)
+    for fact in facts:
         await tx.record_usage(fact)
+    if staff is not None:
+        await staff.call(tx, booking, group, kind, facts)
 
 
 async def _direct_load(tx: Transaction, group: Group, at: datetime) -> int:

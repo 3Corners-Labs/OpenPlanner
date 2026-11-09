@@ -4,7 +4,8 @@
 
 {{ when_label }}: {{ when }}
 {{ team_label }}: {{ group_name }}
-{% if notice %}
+{% if code %}{{ code_label }}: {{ code }}
+{% endif %}{% if notice %}
 
 {{ notice_label }}:
 {{ notice }}

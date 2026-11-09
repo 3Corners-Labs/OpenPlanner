@@ -4,7 +4,7 @@
     ─► the hourly cells of those groups ─► the report builder (small cells hidden)
 
 The builders are ``volume_report``, ``queue_report``, ``capacity_report`` and
-``channels_report``; all four read through the same ``_load`` and so through the same scope.
+``channels_report``; all four read through the same ``load`` and so through the same scope.
 
 Every read takes the ``Scope`` that the permission gives (ADR 0014); the adapter filters by it,
 so a report never reads a group outside it. The threshold that hides small cells is the
@@ -34,6 +34,7 @@ from app.domain.usage_report import (
 from app.domain.usage_report_capacity import CapacityReport, capacity_report
 from app.domain.usage_report_channels import ChannelsReport, channels_report
 from app.domain.usage_report_queue import QueueReport, queue_report
+from app.domain.usage_report_team import TeamReport, team_report
 from app.domain.usage_suppress import effective_threshold
 
 DEFAULT_DAYS = 28
@@ -68,8 +69,8 @@ UsageVolume = UsageScreen[VolumeReport]
 
 
 @dataclass(frozen=True)
-class _Loaded:
-    """What every report reads before it builds its tables."""
+class LoadedUsage:
+    """What every report, export and digest reads before it builds its tables."""
 
     groups: list[ReportGroup]
     first: date
@@ -79,6 +80,66 @@ class _Loaded:
     as_of: datetime | None
     threshold: int
     now: datetime
+
+
+def build_volume(loaded: LoadedUsage, split: str | None = None) -> VolumeReport:
+    """Return the *Volume* report of what was loaded, small cells hidden; ``split`` cuts it."""
+    return volume_report(
+        loaded.cells,
+        loaded.groups,
+        loaded.first,
+        loaded.last,
+        threshold=loaded.threshold,
+        now=loaded.now,
+        as_of=loaded.as_of,
+        before_reporting=loaded.before,
+        split=split,
+    )
+
+
+def build_queue(loaded: LoadedUsage) -> QueueReport:
+    """Return the *Queue and calls* report of what was loaded, small cells hidden."""
+    return queue_report(
+        loaded.cells,
+        loaded.groups,
+        loaded.first,
+        loaded.last,
+        threshold=loaded.threshold,
+        as_of=loaded.as_of,
+    )
+
+
+def build_capacity(loaded: LoadedUsage) -> CapacityReport:
+    """Return the *Capacity* report of what was loaded, small cells hidden."""
+    return capacity_report(
+        loaded.cells,
+        loaded.groups,
+        loaded.first,
+        loaded.last,
+        threshold=loaded.threshold,
+        as_of=loaded.as_of,
+    )
+
+
+def build_channels(loaded: LoadedUsage) -> ChannelsReport:
+    """Return the *Channels* report of what was loaded, small cells hidden."""
+    return channels_report(
+        loaded.cells,
+        loaded.groups,
+        loaded.first,
+        loaded.last,
+        threshold=loaded.threshold,
+        as_of=loaded.as_of,
+    )
+
+
+BUILDERS: dict[str, Callable[[LoadedUsage], object]] = {
+    "volume": build_volume,
+    "queue": build_queue,
+    "capacity": build_capacity,
+    "channels": build_channels,
+}
+"""The report families by their ``view`` code, for what builds one without a screen (export)."""
 
 
 @dataclass(frozen=True)
@@ -99,6 +160,8 @@ class UsageReportService:
         clock: Current time.
         platform_min: ``reporting_min_cell_size`` (class C, read each time).
         organisation_min: ``reporting_org_min_cell_size`` of an organisation id (class D).
+        staff_view: ``reporting_staff_view_enabled`` of an organisation id (class D); the *Team*
+            report is refused while it is off.
     """
 
     def __init__(
@@ -108,6 +171,7 @@ class UsageReportService:
         clock: Clock,
         platform_min: Callable[[], int],
         organisation_min: Callable[[int], int],
+        staff_view: Callable[[int], bool] = lambda _organisation: False,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
@@ -115,20 +179,22 @@ class UsageReportService:
         self._clock = clock
         self._platform_min = platform_min
         self._organisation_min = organisation_min
+        self._staff_view = staff_view
 
     def _threshold(self, organisation_id: int) -> int:
         """Return the small-cell threshold that applies to one organisation's figures."""
         return effective_threshold(self._platform_min(), self._organisation_min(organisation_id))
 
-    async def _load(
+    async def load(
         self,
         principal: Principal,
         organisation_slug: str | None,
         group_slug: str | None,
         first_day: date | None,
         last_day: date | None,
-    ) -> _Loaded:
-        """Authorise, then read the groups in scope and their hourly cells for the range.
+        permission: Permission = Permission.REPORTS_VIEW,
+    ) -> LoadedUsage:
+        """Authorise ``permission`` (a view or its export), then read the groups and cells.
 
         Without a range the report covers the last ``DEFAULT_DAYS`` days up to today; days are
         whole group-local days.
@@ -138,16 +204,31 @@ class UsageReportService:
                 ``invalid_range`` for a range that is backwards or wider than ``MAX_DAYS``.
         """
         if group_slug is not None:
-            require(
-                await self._admin.authorize(
-                    principal, Permission.REPORTS_VIEW, group_slug=group_slug
-                )
-            )
+            require(await self._admin.authorize(principal, permission, group_slug=group_slug))
         else:
-            require(await self._admin.authorize_anywhere(principal, Permission.REPORTS_VIEW))
-        scope = scope_for(principal, Permission.REPORTS_VIEW)
+            require(await self._admin.authorize_anywhere(principal, permission))
+        scope = scope_for(principal, permission)
         if group_slug is None and organisation_slug is not None:
-            await self._require_organisation(principal, scope, organisation_slug)
+            await self._require_organisation(principal, scope, organisation_slug, permission)
+        return await self.read(scope, organisation_slug, group_slug, first_day, last_day)
+
+    async def read(
+        self,
+        scope: Scope,
+        organisation_slug: str | None,
+        group_slug: str | None,
+        first_day: date | None,
+        last_day: date | None,
+    ) -> LoadedUsage:
+        """Read the groups in ``scope`` and their hourly cells for the range; no authorisation.
+
+        For callers that decided the scope themselves: the digest job, whose subscription is
+        the scope. Everything a screen guards is the scope given here, so a caller never passes
+        one it was not entitled to.
+
+        Raises:
+            DomainError: ``group_not_found``, and ``invalid_range`` for a bad range.
+        """
         async with self._uow.read() as tx:
             groups = [
                 g
@@ -166,7 +247,7 @@ class UsageReportService:
             cells = await tx.read_usage_cells(scope, ids, lower, upper)
             before = await tx.read_day_status_counts(scope, ids, first, last)
             state = await tx.usage_state()
-        return _Loaded(
+        return LoadedUsage(
             groups,
             first,
             last,
@@ -178,7 +259,7 @@ class UsageReportService:
         )
 
     @staticmethod
-    def _screen[R](report: R, loaded: _Loaded, group_slug: str | None) -> UsageScreen[R]:
+    def _screen[R](report: R, loaded: LoadedUsage, group_slug: str | None) -> UsageScreen[R]:
         """Wrap ``report`` with the groups it adds up."""
         groups = loaded.groups
         one = groups[0] if group_slug is not None else None
@@ -194,23 +275,17 @@ class UsageReportService:
         group_slug: str | None = None,
         first_day: date | None = None,
         last_day: date | None = None,
+        split: str | None = None,
     ) -> UsageVolume:
         """Return the *Volume* report of one group, or of an organisation's groups in scope.
 
+        ``split`` cuts the bookings created by queue method or language (``usage_report.SPLITS``).
+
         Raises:
-            DomainError: As ``_load``.
+            DomainError: As ``load``.
         """
-        loaded = await self._load(principal, organisation_slug, group_slug, first_day, last_day)
-        report = volume_report(
-            loaded.cells,
-            loaded.groups,
-            loaded.first,
-            loaded.last,
-            threshold=loaded.threshold,
-            now=loaded.now,
-            as_of=loaded.as_of,
-            before_reporting=loaded.before,
-        )
+        loaded = await self.load(principal, organisation_slug, group_slug, first_day, last_day)
+        report = build_volume(loaded, split)
         return self._screen(report, loaded, group_slug)
 
     async def queue(
@@ -225,17 +300,10 @@ class UsageReportService:
         """Return the *Queue and calls* report (Q1 to Q9, U8, U11).
 
         Raises:
-            DomainError: As ``_load``.
+            DomainError: As ``load``.
         """
-        loaded = await self._load(principal, organisation_slug, group_slug, first_day, last_day)
-        report = queue_report(
-            loaded.cells,
-            loaded.groups,
-            loaded.first,
-            loaded.last,
-            threshold=loaded.threshold,
-            as_of=loaded.as_of,
-        )
+        loaded = await self.load(principal, organisation_slug, group_slug, first_day, last_day)
+        report = build_queue(loaded)
         return self._screen(report, loaded, group_slug)
 
     async def capacity(
@@ -250,17 +318,10 @@ class UsageReportService:
         """Return the *Capacity* report (C1 to C5).
 
         Raises:
-            DomainError: As ``_load``.
+            DomainError: As ``load``.
         """
-        loaded = await self._load(principal, organisation_slug, group_slug, first_day, last_day)
-        report = capacity_report(
-            loaded.cells,
-            loaded.groups,
-            loaded.first,
-            loaded.last,
-            threshold=loaded.threshold,
-            as_of=loaded.as_of,
-        )
+        loaded = await self.load(principal, organisation_slug, group_slug, first_day, last_day)
+        report = build_capacity(loaded)
         return self._screen(report, loaded, group_slug)
 
     async def channels(
@@ -275,21 +336,80 @@ class UsageReportService:
         """Return the *Channels* report (M1, M2, T1).
 
         Raises:
-            DomainError: As ``_load``.
+            DomainError: As ``load``.
         """
-        loaded = await self._load(principal, organisation_slug, group_slug, first_day, last_day)
-        report = channels_report(
-            loaded.cells,
-            loaded.groups,
-            loaded.first,
-            loaded.last,
-            threshold=loaded.threshold,
-            as_of=loaded.as_of,
-        )
+        loaded = await self.load(principal, organisation_slug, group_slug, first_day, last_day)
+        report = build_channels(loaded)
         return self._screen(report, loaded, group_slug)
 
+    async def team(
+        self,
+        principal: Principal,
+        *,
+        organisation_slug: str,
+        first_day: date | None = None,
+        last_day: date | None = None,
+    ) -> UsageScreen[TeamReport]:
+        """Return the *Team* report of an organisation (S1): the load per team member.
+
+        Needs ``reports.staff.view`` on the organisation, which only an organisation admin
+        holds, and the organisation must have switched the team view on.
+
+        Raises:
+            DomainError: ``not_permitted`` (audited), ``group_not_found``, ``invalid_range``, and
+                ``staff_view_off`` while the organisation has not switched the team view on.
+        """
+        permission = Permission.REPORTS_STAFF_VIEW
+        require(
+            await self._admin.authorize(principal, permission, organisation_slug=organisation_slug)
+        )
+        scope = scope_for(principal, permission)
+        await self._require_organisation(principal, scope, organisation_slug, permission)
+        async with self._uow.read() as tx:
+            groups = [
+                g
+                for g in await tx.list_report_groups(scope)
+                if g.organisation_slug == organisation_slug
+            ]
+            if not groups:
+                raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+            organisation_id = groups[0].organisation_id
+            if not self._staff_view(organisation_id):
+                raise DomainError(ErrorCode.STAFF_VIEW_OFF)
+            first, last = self._range(groups[0], first_day, last_day)
+            lower = datetime.combine(first, datetime.min.time(), ZoneInfo("UTC")) - _MARGIN
+            upper = datetime.combine(last, datetime.min.time(), ZoneInfo("UTC")) + 2 * _MARGIN
+            cells = await tx.read_staff_cells(scope, [g.group_id for g in groups], lower, upper)
+            names = await tx.read_staff_names(sorted({c.staff_id for c in cells if c.staff_id}))
+            state = await tx.usage_state()
+        report = team_report(
+            cells,
+            names,
+            groups,
+            first,
+            last,
+            threshold=self._threshold(organisation_id),
+            as_of=state.rolled_at,
+        )
+        return UsageScreen(
+            report, tuple(groups), organisation_slug, groups[0].organisation_name, None
+        )
+
+    async def team_view_on(self, principal: Principal, organisation_slug: str) -> bool:
+        """Return whether the organisation has the team view on, for who may see the *Team* link.
+
+        Reads only the organisation's switch (a setting, no figure). ``False`` for an
+        organisation outside the reader's ``reports.view`` scope.
+        """
+        scope = scope_for(principal, Permission.REPORTS_VIEW)
+        async with self._uow.read() as tx:
+            for group in await tx.list_report_groups(scope):
+                if group.organisation_slug == organisation_slug:
+                    return self._staff_view(group.organisation_id)
+        return False
+
     async def _require_organisation(
-        self, principal: Principal, scope: Scope, organisation_slug: str
+        self, principal: Principal, scope: Scope, organisation_slug: str, permission: Permission
     ) -> None:
         """Refuse an organisation page to a reader whose scope is not the whole organisation.
 
@@ -304,7 +424,7 @@ class UsageReportService:
             return
         await self._admin.record(
             principal.subject,
-            Permission.REPORTS_VIEW.value,
+            permission.value,
             Outcome.DENIED,
             Reason.OUT_OF_SCOPE.value,
             organisation=organisation_slug,

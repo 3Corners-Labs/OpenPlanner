@@ -31,6 +31,7 @@ from app.domain.booking import (
 from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
+from app.domain.change_requests import ChangeRequest
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import GroupCheck
@@ -114,6 +115,7 @@ class State:
     slots: dict[int, Slot] = field(default_factory=dict)
     bookings: dict[int, Booking] = field(default_factory=dict)
     proposals: dict[int, HeldProposal] = field(default_factory=dict)
+    change_requests: dict[int, ChangeRequest] = field(default_factory=dict)
     usage_facts: list[UsageFact | StaffFact] = field(default_factory=list)
     slots_closed_until: datetime | None = None
     jobs: dict[int, list[PlannedJob]] = field(default_factory=dict)
@@ -1004,8 +1006,49 @@ class InMemoryTransaction:
         mine = [p for p in self.state.proposals.values() if p.booking_id == booking_id]
         return max((p for p in mine if p.is_open), key=lambda p: p.id or 0, default=None)
 
+    async def find_open_proposals(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[HeldProposal]:
+        return sorted(
+            (
+                p
+                for p in self.state.proposals.values()
+                if p.is_open
+                and lower <= p.start < upper
+                and self.state.bookings[p.booking_id].group_id == group_id
+                and self.state.bookings[p.booking_id].awaits_rebook
+            ),
+            key=lambda p: (p.start, p.id or 0),
+        )
+
     async def save_proposal(self, proposal: HeldProposal) -> None:
         self.state.proposals[proposal.id or 0] = proposal
+
+    async def find_bookings_by_phone(self, group_id: int, phone: str) -> list[Booking]:
+        return [
+            b
+            for b in sorted(self.state.bookings.values(), key=lambda b: b.id or 0)
+            if b.group_id == group_id
+            and b.status is BookingStatus.CONFIRMED
+            and b.contact is not None
+            and b.contact.phone == phone
+        ]
+
+    async def add_change_request(self, request: ChangeRequest) -> ChangeRequest:
+        stored = replace(request, id=len(self.state.change_requests) + 1)
+        self.state.change_requests[stored.id or 0] = stored
+        return stored
+
+    async def get_change_request(self, public_id: str) -> ChangeRequest | None:
+        found = [r for r in self.state.change_requests.values() if r.public_id == public_id]
+        return found[0] if found else None
+
+    async def get_latest_change_request(self, booking_id: int) -> ChangeRequest | None:
+        mine = [r for r in self.state.change_requests.values() if r.booking_id == booking_id]
+        return max(mine, key=lambda r: r.id or 0) if mine else None
+
+    async def save_change_request(self, request: ChangeRequest) -> None:
+        self.state.change_requests[request.id or 0] = request
 
     async def upcoming_starts_for_email(
         self, group_id: int, email: str, after: datetime
@@ -1303,13 +1346,14 @@ class InMemoryTransaction:
     async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
         self.state.acceptances[(acceptance.group_id, acceptance.start)] = acceptance
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime
-    ) -> int:
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
         return sum(
             1
             for e in self.state.audit
-            if e.actor == actor and e.action in actions and e.at >= since
+            if e.actor == actor
+            and e.action == action
+            and e.outcome is Outcome.SUCCESS
+            and e.at >= since
         )
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:

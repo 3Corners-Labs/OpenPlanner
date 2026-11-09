@@ -16,6 +16,8 @@ from app.adapters.registrations import (
     listing_to_report,
 )
 from app.adapters.webhook_selftest import Delivery, Outcome, deliveries_to_report
+from app.config import Settings
+from app.domain.activity_alert import CHANGES_ALERT, REVEALS_ALERT
 from app.domain.admin import AdminService
 from app.domain.authorization import Principal
 from app.domain.booking import MeetingRef
@@ -26,8 +28,17 @@ from app.domain.job_plan import JobType
 from app.domain.participant_contact import CONTACT_VIEWED
 from app.domain.ports import RequestRecord
 from app.domain.request_log import RequestEvents
+from app.domain.scheduling import DispatchFallback, DispatchKind
 from app.domain.services import BookingService, ContactInput
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.admin.conftest import (
+    AUDITOR,
+    GROUP_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    _running_site,
+)
 from tests.support.admin_site import audit_log, site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 
@@ -75,6 +86,16 @@ async def test_timeline_lists_events_with_reason_codes(site: Site) -> None:
     assert "Videomeeting aangemaakt" in text
     assert "Taak in de wachtrij van het contactcenter gezet" in text
     assert "<code>ENTRY_POINT_NOT_FOUND</code>" in text
+
+
+async def test_the_booking_links_back_to_its_day_in_the_agenda(site: Site) -> None:
+    """The admin shell's own ``back`` (the page itself) once replaced the page's link."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
+
+    assert '<a href="/admin/groups/demo/agenda?day=2026-01-02">Terug naar de agenda</a>' in text
 
 
 async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
@@ -306,6 +327,58 @@ async def test_retry_plans_the_meeting_again_and_says_so(site: Site) -> None:
     assert "done=retry_not_possible" in again.headers["location"]
 
 
+async def test_a_retry_counts_toward_the_planners_alert_with_its_platform_setting(
+    settings: Settings, admin_db: str
+) -> None:
+    """ADR 0044: a retried call is a change; past ``planner_changes_alert_per_hour``, a warning."""
+    limited = settings.model_copy(update={"planner_changes_alert_per_hour": 5})
+    async with _running_site(limited, admin_db) as site:
+        booking_id = await _failed_meeting(site)
+        await site.login_as(GROUP_ADMIN)
+        url = f"/admin/groups/demo/bookings/{booking_id}/retry"
+        for _ in range(7):
+            response = await site.client.post(
+                url, data={"job": "create_video_room"}, headers=SAME_ORIGIN
+            )
+            assert "done=retried" in response.headers["location"]
+        alerts = [e for e in await audit_log(site) if e.action == CHANGES_ALERT.action]
+
+    assert [(e.group, e.detail) for e in alerts] == [
+        ("demo", f"actor:{GROUP_ADMIN.subject},changes:6")
+    ]
+
+
+async def _in_fallback(site: Site, slug: str) -> None:
+    """Put the group in fallback to its own queue, as the worker does when the center is down."""
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        group = await tx.get_group(slug)
+        assert group is not None
+        fallback = DispatchFallback.OWN_QUEUE
+        kind = DispatchKind.CONTACT_CENTER
+        await tx.save_group(replace(group, dispatch_kind=kind, dispatch_fallback=fallback))
+        await tx.save_group_fallback(group.id, site.clock.now())
+
+
+async def test_ending_a_fallback_by_hand_counts_toward_the_planners_alert(
+    settings: Settings, admin_db: str
+) -> None:
+    """ADR 0044: ending a fallback by hand is a change, counted with the retries before it."""
+    limited = settings.model_copy(update={"planner_changes_alert_per_hour": 5})
+    async with _running_site(limited, admin_db) as site:
+        booking_id = await _failed_meeting(site)
+        await site.login_as(GROUP_ADMIN)
+        retry = f"/admin/groups/demo/bookings/{booking_id}/retry"
+        for _ in range(5):
+            await site.client.post(retry, data={"job": "create_video_room"}, headers=SAME_ORIGIN)
+        await _in_fallback(site, "demo")
+        ended = await site.client.post("/admin/groups/demo/queue/fallback/end", headers=SAME_ORIGIN)
+        alerts = [e for e in await audit_log(site) if e.action == CHANGES_ALERT.action]
+
+    assert "done=fallback_ended" in ended.headers["location"]
+    assert [e.detail for e in alerts] == [f"actor:{GROUP_ADMIN.subject},changes:6"]
+
+
 async def _with_meeting(site: Site, booking_id: int, meeting_id: str) -> None:
     """Give the booking the Webex meeting ``meeting_id``, as the worker would."""
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
@@ -370,6 +443,25 @@ async def test_the_contact_details_show_only_on_request_and_each_request_is_audi
     assert f'<a href="{page}#contact">Contactgegevens verbergen</a>' in shown
     assert ">Show contact details</button>" in english
     assert await _contact_views(site) == [(GROUP_ADMIN.subject, booking_id)]
+
+
+async def test_the_alert_on_many_requests_follows_the_platform_setting(
+    settings: Settings, admin_db: str
+) -> None:
+    """ADR 0044 §2: past ``contact_reveals_alert_per_hour`` requests, one system event."""
+    limited = settings.model_copy(update={"contact_reveals_alert_per_hour": 5})
+    async with _running_site(limited, admin_db) as site:
+        booking_id = await _book(site, "demo")
+        await site.login_as(GROUP_ADMIN)
+        page = f"/admin/groups/demo/bookings/{booking_id}"
+        for _ in range(7):
+            shown = await site.client.get(f"{page}?contact=show", headers=_from(page))
+            assert "ada@example.org" in shown.text
+        alerts = [e for e in await audit_log(site) if e.action == REVEALS_ALERT.action]
+
+    assert [(e.group, e.detail) for e in alerts] == [
+        ("demo", f"actor:{GROUP_ADMIN.subject},reveals:6")
+    ]
 
 
 @pytest.mark.parametrize(

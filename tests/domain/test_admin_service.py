@@ -7,7 +7,7 @@ from app.domain.admin import READ_WHEN_ARCHIVED, AdminService
 from app.domain.audit import AuditFilter, Outcome, Source
 from app.domain.authorization import MATRIX, Decision, Permission, Principal, Reason, Role
 from app.domain.errors import DomainError
-from app.domain.staff import Membership, StaffFilter
+from app.domain.staff import Membership, StaffFilter, StaffMember
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.closures import confirmed_booking
@@ -336,3 +336,46 @@ def test_what_stays_readable_on_an_archived_group_is_the_compliance_role_and_boo
     assert not any(
         p.value.endswith((".manage", ".edit", ".create", ".delete")) for p in READ_WHEN_ARCHIVED
     )
+
+
+async def test_a_login_stores_the_verified_address_and_the_next_login_replaces_it(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    # ADR 0117 step 10b: the address is on the staff record only, and never stale.
+    await service.record_login(ORG_ADMIN, email="olga@voorbeeld.nl")
+    assert uow.state.staff["o-1"].email == "olga@voorbeeld.nl"
+    assert uow.state.staff["o-1"].email_at == NOW
+
+    await service.record_login(ORG_ADMIN, email="olga.nieuw@voorbeeld.nl")
+    assert uow.state.staff["o-1"].email == "olga.nieuw@voorbeeld.nl"
+
+    await service.record_login(ORG_ADMIN)  # the provider gave no verified address this time
+    assert uow.state.staff["o-1"].email is None
+    assert uow.state.staff["o-1"].email_at is None
+
+
+async def test_the_address_reaches_no_audit_event_and_is_not_in_the_representation(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    await service.record_login(ORG_ADMIN, email="olga@voorbeeld.nl")
+
+    assert all("voorbeeld.nl" not in repr(event) for event in uow.state.audit)
+    assert "voorbeeld.nl" not in repr(uow.state.staff["o-1"])
+
+
+def test_erasing_a_record_clears_the_address() -> None:
+    member = StaffMember(
+        "s-1",
+        "Olga",
+        frozenset(),
+        frozenset(),
+        NOW,
+        NOW,
+        NOW,
+        email="olga@voorbeeld.nl",
+        email_at=NOW,
+    )
+
+    erased = member.erased(NOW)
+
+    assert (erased.email, erased.email_at) == (None, None)

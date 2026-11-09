@@ -55,6 +55,8 @@ def test_no_link_carries_the_download_attribute() -> None:
         "/admin/audit/export.csv",
         "/admin/organisations/demo/branding/theme.css",
         "/admin/idp-mapping/export.txt",
+        "/admin/groups/demo/usage/export.csv",
+        "/admin/groups/demo/usage/export.csv?view=tidy",
     ],
 )
 async def test_an_admin_download_has_a_safe_filename(site: Site, download: str) -> None:

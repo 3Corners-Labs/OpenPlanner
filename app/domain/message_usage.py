@@ -40,6 +40,7 @@ PURPOSES: dict[JobType, str] = {
     JobType.SEND_CONFIRM_REQUEST: "confirm_request",
     JobType.SEND_CONFIRM_REMINDER: "confirm_request",
     JobType.SEND_UNCONFIRMED_LAPSED: "confirm_request",
+    JobType.SEND_CHANGE_REQUEST: "change",
 }
 """The purpose of each message job, the second cut of metric M1 (a closed list)."""
 

@@ -1,0 +1,14 @@
+{
+  "name": "role-manuals",
+  "private": true,
+  "type": "module",
+  "description": "Build tooling of the role-manuals skill: Word and HTML from Markdown. Local only, never shipped.",
+  "license": "EUPL-1.2",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "docx": "9.15.3",
+    "marked": "15.0.12"
+  }
+}

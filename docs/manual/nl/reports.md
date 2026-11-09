@@ -43,9 +43,15 @@ wanneer een boeking verandert, één klein gegeven per wijziging.
 - **Boekingen van voor de rapportage**: uitkomsten van boekingen die in dagtellingen waren
   samengevoegd voordat het gebruik werd geteld; meer is er niet van bekend.
 
+## De tegels, de grafieken en *Uitsplitsen naar*
+
+Bovenaan **Volume** staan vier tegels die het antwoord geven voordat u de tabellen leest: afspraken in de periode, het no-showpercentage, het aandeel dat door deelnemers is geannuleerd (met hoeveel daarvan minder dan een dag voor de start) en het aandeel bevestigd na de e-mail (met de klasse waarin de mediane tijd valt). **Capaciteit** heeft er ook vier: bezetting (met geboekte van alle plaatsen), ongebruikte plaatsen, volle blokken en het tekort aan medewerkers. Een tegel die uit een verborgen getal volgt, zegt *niet beschikbaar*; hij toont nooit een getal dat de tabellen verbergen. Onder elke tabel die een aantal verbergt, staat een zin waarom, ook dat er nog één aantal extra verborgen wordt als een enkel aantal het totaal zou verraden.
+
+Het bereikformulier van **Volume** heeft **Uitsplitsen naar**: geen, wachtrijmethode of taal. Een groep doet alleen mee als haar eigen totaal in de periode minstens vijf keer het minimum is; de pagina zegt hoeveel groepen buiten beschouwing bleven. Uitsplitsen naar onderwerp kan nog niet.
+
 ## De rapportfamilies
 
-Bovenaan de pagina Gebruik schakelt een rij links tussen vier families van hetzelfde rapport. De
+Bovenaan de pagina Gebruik schakelt een rij links tussen vier families van hetzelfde rapport (een vijfde, *Team*, is voor organisatiebeheerders wier organisatie het aanzette). De
 gekozen periode blijft staan; elke familie heeft een eigen adres dat u kunt bewaren. De eerste,
 **Volume**, is de set tabellen hierboven; de andere staan hieronder.
 
@@ -108,6 +114,27 @@ niets over het echte getal. De grafieken hebben geen script nodig, schuiven op e
 zijwaarts in hun kader en blijven weg bij het afdrukken; de tabellen blijven. Is voor een familie
 in de periode niets vastgelegd, dan zegt de pagina dat.
 
+## Downloaden als bestand
+
+Wie mag exporteren (de superuser, organisatiebeheerders, groepsbeheerders en de rol Compliance en privacy) ziet onder de periode op een Gebruik-pagina twee koppelingen.
+
+- **Dit rapport downloaden als CSV** geeft precies de tabellen van de familie waar u naar kijkt, na de regel voor kleine aantallen: een verborgen cijfer is een lege waarde met de opmerking *hidden*. Het bestand bevat geen interfacetekst, alleen codes (een dag, een uitkomst, een bucketnummer), dus het leest in elke taal hetzelfde.
+- **Alle uurcijfers downloaden als CSV** geeft één rij per uur, groep, maat en snede, voor analyse in uw eigen hulpmiddel (het formaat `openplanner.usage/1`, beschreven in `docs/reporting.md`). Een cel onder het minimum staat helemaal niet in het bestand.
+
+Beide openen in Excel (UTF-8, `;` als scheidingsteken). De platformbeheerder bepaalt hoeveel rijen en dagen één bestand mag bevatten; een langere periode wordt met een melding geweigerd en het bestand wordt niet afgekapt. Elke download staat in het auditlog met wie, welke familie, welke periode, hoeveel rijen en een controlegetal van het bestand, nooit de cijfers. Het controlegetal staat ook in de header `X-Content-SHA256` van het antwoord.
+
+## De samenvatting per e-mail
+
+Organisatiebeheerders zien onderaan de pagina *Gebruik* van de organisatie een onderdeel **Samenvatting per e-mail**. Een abonnement geldt voor de hele organisatie of voor één groep en heeft een periode: elke dag, elke week (op een weekdag) of elke maand (op een dag van 1 tot 28). De mail gaat op het verzenduur van de organisatie (7:00, tenzij aangepast) in de tijdzone van de groep, beslaat de dagen sinds de vorige mail tot en met gisteren en bevat de kerncijfers (gemaakte boekingen, niet verschenen, de gemiddelde wachttijd tot een gesprek verbindt, bezettingsgraad) en een koppeling naar het rapport van die dagen. Een verborgen cijfer staat als streepje. Zet uw organisatie de cijfers uit, dan blijft alleen de koppeling over.
+
+Ontvangers zijn collega's die de rapporten van dat bereik mogen zien, gekozen uit een lijst. Er zijn geen vrije e-mailadressen en er gaat geen bestand mee: de koppeling leidt naar het rapport, waar u zoals altijd inlogt. Het recht wordt bij het versturen opnieuw gecontroleerd. Een collega die het kwijt is, wordt overgeslagen en de lijst zegt hoeveel; een collega zonder bekend adres ook. Het adres is het geverifieerde e-mailadres dat de inlogdienst bij de laatste login van de collega doorgaf (te zien op de pagina van de collega onder *Medewerkers*); een collega die sindsdien niet is ingelogd, wordt opgezocht in de meegeleverde inlogdienst. Een gemiste mail wordt nog tot 24 uur later verstuurd; daarna wordt hij overgeslagen en de lijst toont hoe de laatste mail verliep. Elke wijziging van een abonnement staat in het auditlog.
+
+### Team
+
+De werklast per teamlid: afgehandelde gesprekken, minuten in gesprek, uit de eigen wachtrij opgepakte boekingen en het aandeel geplande gesprekken waarbij de gastheer op tijd binnenkwam. Alleen voor organisatiebeheerders (het recht *De werklast per teamlid in de rapporten bekijken*) en **standaard uit**: zolang uw organisatie bij de instellingen **Toon de werklast per teamlid in de rapporten** niet aanzet, wordt er niets over een persoon vastgelegd en staat bij *Team* op de pagina Gebruik *uit*, met een koppeling naar de instelling. Aanzetten telt vanaf dat moment; eerdere gesprekken doen niet mee, en uitzetten stopt het tellen weer (wat geteld is, blijft tot het einde van de bewaartermijn).
+
+De tabel staat op naam. Er is geen rangorde, geen *top*- of *slechtste*-lijst, geen totaalrij en geen indeling naar groep of uur. Een getal onder het minimum is verborgen en staat als *< 5*; de minuten gaan mee met de gesprekken. Alleen gesprekken die een medewerker uit de eigen wachtrij heeft opgepakt, worden aan een persoon toegerekend; een gesprek dat het contactcenter afhandelde, heeft in deze installatie geen teamlid. Wordt een teamlid verwijderd, dan worden zijn of haar cijfers één rij, *Voormalige teamleden*, zodat de geschiedenis haar totalen houdt en er geen persoon overblijft. De Team-familie staat niet in de CSV-bestanden en niet in de machine-interface.
+
 ## Wat hier nog niet staat
 
-Per teamlid, de samenvatting per e-mail en de export naar een bestand. Die volgen in latere stappen van hetzelfde ontwerp.
+Het aandeel van de bezette tijd dat in gesprekken gaat (bezetting van het team) volgt in een latere stap.

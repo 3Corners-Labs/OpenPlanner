@@ -6,15 +6,32 @@
  * <details> without script. On tablet and desktop the top bar's menu button collapses the menu
  * to the rail or expands it, a form without script that holds for the session (#208).
  *
+ * At desktop width every page is also checked for content running past its box (layout.mjs):
+ * the page never scrolls sideways, no table cuts off its last column, and nothing runs past its
+ * card, widget or fact. That is the width of an ordinary laptop with the full menu, where the
+ * manual's screenshots found an issuer running over the next fact, the new-role permissions in
+ * one row of 7,000 px, and the agenda, rights matrix and audit log cutting off their last column.
+ *
  * Needs Keycloak and the demo seed, like admin-roles.spec.ts.
  */
 import { expect, test } from '@playwright/test';
 
 import { expectNoAxeViolations, tabTo } from '../helpers';
 import { adminMenu, loginAs, requireKeycloak } from '../keycloak';
+import { layoutProblems } from '../layout.mjs';
 import { adminPageVariants } from '../pages';
 
 requireKeycloak();
+
+// Every test here signs in, most as super. End that admin session when the test is done: a
+// person keeps at most admin_max_sessions_per_person sessions (5 by default) and a new sign-in
+// ends the one idle longest, so this sweep's hundreds of sign-ins would otherwise end the session
+// of a test still running in another worker (admin-branding.spec.ts lost its save that way).
+// The context's own request API carries the session cookie and, unlike a fetch in the page, is
+// not held by the page's content security policy (no connect-src).
+test.afterEach(async ({ page }) => {
+  await page.request.post('/admin/logout', { maxRedirects: 0 }).catch(() => undefined);
+});
 
 const WIDTHS = { phone: 375, tablet: 768, desktop: 1280 } as const;
 
@@ -23,9 +40,12 @@ for (const [name, width] of Object.entries(WIDTHS)) {
     test.use({ viewport: { width, height: 900 } });
 
     for (const variant of adminPageVariants()) {
-      test(`axe: ${variant.title}`, async ({ page }) => {
+      test(`axe${name === 'desktop' ? ' and layout' : ''}: ${variant.title}`, async ({ page }) => {
         await loginAs(page, variant.user, variant.path);
+        // The sign-in keeps the path and the view query only; open the page as listed.
+        if (!page.url().endsWith(variant.path)) await page.goto(variant.path);
         await expectNoAxeViolations(page);
+        if (name === 'desktop') expect(await page.evaluate(layoutProblems)).toEqual([]);
       });
     }
 

@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import pytest
 
+from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.audit import SYSTEM_ACTOR, Outcome, Source
@@ -12,7 +13,7 @@ from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
 from app.domain.job_plan import JobType
-from app.domain.planner_service import ALERT_ACTION, PlannerService
+from app.domain.planner_service import PlannerService
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from app.domain.usage import ActorClass, FactKind, UsageFact
@@ -239,13 +240,14 @@ async def test_a_slot_without_shortfall_cannot_be_accepted(
 async def test_many_changes_by_one_planner_raise_one_system_event(
     uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
 ) -> None:
-    planner = PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=1)
+    admin = AdminService(uow, clock, alert_thresholds={CHANGES_ALERT: 1})
+    planner = PlannerService(uow, clock, admin, bookings)
     ids = [await _book(bookings, start) for start in (SLOT_0900, SLOT_0900, SLOT_0930)]
 
     for booking_id in ids:
         await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.UNFORESEEN)
 
-    alerts = [e for e in uow.state.audit if e.action == ALERT_ACTION]
+    alerts = [e for e in uow.state.audit if e.action == CHANGES_ALERT.action]
     assert len(alerts) == 1
     (alert,) = alerts
     assert (alert.actor, alert.source, alert.outcome, alert.group) == (
@@ -271,7 +273,7 @@ async def test_asking_to_rebook_frees_the_place_and_tells_the_participant(
     assert waiting.status is BookingStatus.AWAITING_REBOOK
     assert waiting.rebook_by == SLOT_0900 + timedelta(days=14)
     assert (JobType.SEND_REBOOK_REQUEST, ChannelKind.SMS) in _messages(uow, booking_id)
-    assert [b.id for b in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
+    assert [w.booking.id for w in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
     (event,) = [e for e in uow.state.audit if e.action == "bookings.manage"]
     assert (event.detail, event.booking_id) == ("planner.rebook,reason:staffing", booking_id)
 
@@ -319,7 +321,8 @@ async def test_a_bulk_request_takes_the_last_made_bookings_as_many_as_short(
     )
 
     assert [b.id for b in candidates] == [ids[1]]  # the newest one
-    assert [b.id for b in done] == [ids[1]]
+    assert done == 1
+    assert uow.state.bookings[ids[1]].status is BookingStatus.AWAITING_REBOOK
     assert uow.state.bookings[ids[0]].status is BookingStatus.CONFIRMED
     with pytest.raises(DomainError, match="slot_unavailable"):  # no shortfall left
         await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)

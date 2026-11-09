@@ -11,7 +11,8 @@ there is no SMS consent: SMS goes when a phone number is known (ADR 0009,
 detail page "as today", but that page never showed them. The product owner chose on 2026-11-08
 that it shows the participant's name, email address and phone number on request (*Show contact
 details*), never by default, each request an audit event `booking.contact_viewed`
-(`app/domain/participant_contact.py`, #648).
+(`app/domain/participant_contact.py`, #648), and an hourly alert when one person makes many
+such requests (`contact_reveals_alert_per_hour`, see *Settings*; #676).
 
 ## Context
 
@@ -98,6 +99,7 @@ existing bookings. OpenPlanner has no insight into agents' own calendars; that s
 | `planner_rebook_days` | D organisation | 14 | 1–30 | `settings.organisation.manage` | Days after the original start after which an unanswered request to rebook lapses. |
 | `planner_rebook_reminder_days` | D organisation | 3 | 1–29, below `planner_rebook_days` | `settings.organisation.manage` | Days before the lapse at which the one reminder goes. |
 | `planner_changes_alert_per_hour` | C platform | 50 | 5–1000 | `settings.platform.manage` | Changes by one actor per hour above which a system event warns (abuse case). Raises an alert only; never blocks. |
+| `contact_reveals_alert_per_hour` | C platform | 20 | 5–500 | `settings.platform.manage` | Requests for participants' contact details (§2) by one actor per hour above which the system event `booking.contact_reveals_alert` warns (abuse case: a stolen session or an insider). Every request counts, also one for the same booking again; a refused one does not. Raises an alert only; never blocks. |
 
 Change reasons are texts, edited under `texts.manage` (ADR 0009), not settings.
 
@@ -124,6 +126,18 @@ For step 3 the product owner chose on 2026-10-29:
 - Planners see the bookings awaiting a new time in a list in the agenda (`bookings.manage`),
   not in the closure's list of bookings on hold (which needs `closure.manage`).
 
+For §2 the product owner chose on 2026-11-08, after the contact details on request were built
+(#648), built in #676:
+
+- An hourly alert when one person makes many requests for contact details (not: the audit log
+  as the only detection), with `contact_reveals_alert_per_hour` at 20 within 5–500 (not: the
+  values of the planner's change alert, 50 within 5–1000). It never refuses a request. The two
+  alerts share `app/domain/activity_alert.py`. Like the planner's alert, the warning is a row in
+  the audit log and an `error` line on the log stream, not an alert of ADR 0061: a rule on the
+  log platform pages someone (`docs/audit-events.md`). The count covers every scope the person
+  works in, and the warning sits in the group of the request that crossed it, so that group's
+  admins may see a count that includes requests elsewhere: a count, never data.
+
 ## Delivery
 
 1. Agenda with agents and shortfalls, read only: day view per slot, week view, the shortfall
@@ -140,7 +154,8 @@ For step 3 the product owner chose on 2026-10-29:
   `docs/authorization.md`; tests for every role × agenda/action route × own/other group.
 - Abuse cases in `docs/threat-model.md`: moving into another group's slot; mass cancellation
   by a compromised planner account (fresh login for bulk actions, ADR 0015, and a system event
-  above `planner_changes_alert_per_hour`); booking ids guessed in action URLs.
+  above `planner_changes_alert_per_hour`); booking ids guessed in action URLs; many requests
+  for contact details by one person (a system event above `contact_reveals_alert_per_hour`).
 - `docs/manual/{nl,en}/` topics for the agenda and each action; the agenda pages get a
   Playwright test with axe in both locales (`e2e/tests/admin-agenda.spec.ts`;
   `e2e/pages.json` lists public pages only, admin pages need a login).

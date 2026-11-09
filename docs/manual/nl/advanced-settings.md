@@ -206,6 +206,12 @@ worden videogesprekken en werkitems binnen ongeveer tien seconden opnieuw gekopp
   TRACE na hooguit de uren van *TRACE_LEVEL_MAX_HOURS* (standaard 4). Vul in na hoeveel uur.
   Persoonsgegevens blijven op elk niveau gemaskeerd in het log; TRACE-regels dragen alleen de
   vaste velden van `docs/logging.md`.
+- Twee instellingen van de planner waarschuwen bij veel acties van één persoon binnen een uur:
+  **Waarschuwing bij wijzigingen per planner per uur** (standaard 50, 5 tot 1000) en
+  **Waarschuwing bij verzoeken om contactgegevens per persoon per uur** (standaard 20, 5 tot
+  500). Boven de grens komt er één waarschuwing in het auditlog met wie het was en hoe vaak. De
+  wijzigingen en verzoeken zelf gaan gewoon door: zo valt een gestolen sessie of misbruik op,
+  zonder dat een planner wordt tegengehouden. Uitzetten kan niet.
 
 Voor een wijziging moet u kort geleden zijn ingelogd. Elke wijziging staat in het auditlog met
 de oude en de nieuwe waarde; een geweigerde wijziging ook.

@@ -196,6 +196,12 @@ items again within about ten seconds. Set the client id, client secret and refre
   level TRACE after at most the hours of *TRACE_LEVEL_MAX_HOURS* (4 by default). Enter after
   how many hours. Personal data stays masked in the log at every level; TRACE lines carry only
   the fixed fields of `docs/logging.md`.
+- Two planner settings warn about many actions by one person within an hour: **Alert above
+  changes per planner per hour** (50 by default, 5 to 1000) and **Alert above requests for
+  contact details per person per hour** (20 by default, 5 to 500). Above the limit, one warning
+  goes into the audit log naming who it was and how often. The changes and requests themselves
+  still go ahead: a stolen session or misuse stands out without stopping a planner. They cannot
+  be switched off.
 
 You need a recent login to change a setting. Every change is recorded in the audit log with
 the old and the new value; a refused change is recorded too.
