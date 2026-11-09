@@ -127,14 +127,7 @@
         "secret_hash": {
           "oneOf": [
             {
-              "oneOf": [
-                {
-                  "$ref": "#/$defs/sealed"
-                },
-                {
-                  "$ref": "#/$defs/plain"
-                }
-              ]
+              "$ref": "#/$defs/secret"
             },
             {
               "type": "null"
@@ -239,14 +232,7 @@
         "secret": {
           "oneOf": [
             {
-              "oneOf": [
-                {
-                  "$ref": "#/$defs/sealed"
-                },
-                {
-                  "$ref": "#/$defs/plain"
-                }
-              ]
+              "$ref": "#/$defs/secret"
             },
             {
               "type": "null"
@@ -994,14 +980,7 @@
         "client_secret": {
           "oneOf": [
             {
-              "oneOf": [
-                {
-                  "$ref": "#/$defs/sealed"
-                },
-                {
-                  "$ref": "#/$defs/plain"
-                }
-              ]
+              "$ref": "#/$defs/secret"
             },
             {
               "type": "null"
@@ -1118,14 +1097,7 @@
         "private_key": {
           "oneOf": [
             {
-              "oneOf": [
-                {
-                  "$ref": "#/$defs/sealed"
-                },
-                {
-                  "$ref": "#/$defs/plain"
-                }
-              ]
+              "$ref": "#/$defs/secret"
             },
             {
               "type": "null"
@@ -1225,14 +1197,7 @@
         "secret": {
           "oneOf": [
             {
-              "oneOf": [
-                {
-                  "$ref": "#/$defs/sealed"
-                },
-                {
-                  "$ref": "#/$defs/plain"
-                }
-              ]
+              "$ref": "#/$defs/secret"
             },
             {
               "type": "null"
@@ -1743,14 +1708,7 @@
               {
                 "oneOf": [
                   {
-                    "oneOf": [
-                      {
-                        "$ref": "#/$defs/sealed"
-                      },
-                      {
-                        "$ref": "#/$defs/plain"
-                      }
-                    ]
+                    "$ref": "#/$defs/secret"
                   },
                   {
                     "type": "null"
@@ -1841,14 +1799,7 @@
         "secret": {
           "oneOf": [
             {
-              "oneOf": [
-                {
-                  "$ref": "#/$defs/sealed"
-                },
-                {
-                  "$ref": "#/$defs/plain"
-                }
-              ]
+              "$ref": "#/$defs/secret"
             },
             {
               "type": "null"
@@ -1977,6 +1928,16 @@
       "additionalProperties": false,
       "description": "A secret sealed under the document's passphrase."
     },
+    "secret": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sealed"
+        },
+        {
+          "$ref": "#/$defs/plain"
+        }
+      ]
+    },
     "sms_channel": {
       "type": "object",
       "properties": {
@@ -2006,14 +1967,7 @@
         "secret": {
           "oneOf": [
             {
-              "oneOf": [
-                {
-                  "$ref": "#/$defs/sealed"
-                },
-                {
-                  "$ref": "#/$defs/plain"
-                }
-              ]
+              "$ref": "#/$defs/secret"
             },
             {
               "type": "null"

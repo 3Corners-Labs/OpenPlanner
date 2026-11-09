@@ -23,7 +23,7 @@ DRAFT = "https://json-schema.org/draft/2020-12/schema"
 ID = "https://openplanner.nl/schema/configuration/{version}.json"
 """Where the schema of a version is meant to be published; informational."""
 
-_SEALED = {"oneOf": [{"$ref": "#/$defs/sealed"}, {"$ref": "#/$defs/plain"}]}
+_SECRET: dict[str, Json] = {"$ref": "#/$defs/secret"}
 _ACTIONS = ["upsert", "create", "update", "delete"]
 
 
@@ -38,6 +38,7 @@ def json_schema(fmt: Format) -> dict[str, Json]:
             "additionalProperties": False,
             "description": "A secret sealed under the document's passphrase.",
         },
+        "secret": {"oneOf": [{"$ref": "#/$defs/sealed"}, {"$ref": "#/$defs/plain"}]},
         "plain": {
             "type": "object",
             "properties": {"plain": {"type": "string", "minLength": 1}},
@@ -164,7 +165,7 @@ def _field(spec: FieldSpec) -> Json:
         case FieldType.SETTING:
             schema = {"type": ["string", "number", "boolean"]}
         case FieldType.SECRET:
-            schema = dict(_SEALED)
+            schema = dict(_SECRET)
         case FieldType.BINARY:
             schema = {"$ref": "#/$defs/binary"}
         case FieldType.STRINGS:
