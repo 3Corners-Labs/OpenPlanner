@@ -94,3 +94,31 @@ async def test_an_erased_actor_is_flagged_and_has_no_name_in_the_audit_log(
 
     assert [(e.actor_name, e.actor_erased) for e in before] == [("Gina Groep", False)]
     assert [(e.actor_name, e.actor_erased) for e in after] == [(None, True)]
+
+
+async def test_the_address_is_stored_replaced_and_erased_with_the_person(
+    engine: AsyncEngine,
+) -> None:
+    # ADR 0117 step 10b
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        await tx.save_staff(replace(_person("sub-1"), email="gina@voorbeeld.nl", email_at=NOW))
+    async with uow.read() as tx:
+        stored = await tx.get_staff("sub-1")
+    assert stored is not None
+    assert stored.email == "gina@voorbeeld.nl"
+
+    async with uow.locked() as tx:
+        await tx.save_staff(_person("sub-1"))  # a later login with no verified address
+    async with uow.read() as tx:
+        cleared = await tx.get_staff("sub-1")
+    assert cleared is not None
+    assert cleared.email is None
+
+    async with uow.locked() as tx:
+        await tx.save_staff(replace(_person("sub-1"), email="gina@voorbeeld.nl", email_at=NOW))
+        await tx.erase_staff("sub-1", NOW)
+    async with uow.read() as tx:
+        erased = await tx.get_staff("sub-1")
+    assert erased is not None
+    assert (erased.email, erased.email_at) == (None, None)

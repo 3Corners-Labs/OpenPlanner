@@ -20,6 +20,7 @@ and the group does not dispatch until it is complete, as before ADR 0032.
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from types import MappingProxyType
 
@@ -193,3 +194,77 @@ class ContactCenterRouting:
     def attribute(self, name: str) -> str | None:
         """Return attribute ``name``, or ``None`` when it is not set."""
         return self.attributes.get(name)
+
+
+API_HOST = re.compile(r"^https://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?/?$")
+"""A platform's API host: https, a host name and at most a port (ADR 0032 point 9)."""
+CLIENT_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,200}$")
+"""An OAuth client id as the platforms issue them."""
+SECRET_MAX_LENGTH = 4096
+"""Longest client secret or refresh token accepted; OAuth tokens are far shorter."""
+CONNECTION_FIELD = "contact_center_connection."
+"""Prefix of the fields a refusal of the organisation's connection names."""
+
+
+@dataclass(frozen=True)
+class OrganisationConnection:
+    """An organisation's contact-center connection as the portal shows it (ADR 0032 point 9).
+
+    Never a secret: only whether the client secret and the refresh token are set, and when the
+    webhook secret was last generated.
+
+    Attributes:
+        kind: The platform.
+        api_base_url: The platform's API host for this organisation's tenant.
+        client_id: The OAuth client id (not secret).
+        has_client_secret: Whether a client secret is stored.
+        has_refresh_token: Whether a refresh token is stored.
+        webhook_secret_at: When the webhook secret was generated; ``None`` before the first.
+    """
+
+    kind: ContactCenterKind
+    api_base_url: str
+    client_id: str
+    has_client_secret: bool
+    has_refresh_token: bool
+    webhook_secret_at: datetime | None
+
+
+@dataclass(frozen=True)
+class ConnectionChange:
+    """What an administrator submits for the organisation's connection.
+
+    A ``None`` secret keeps the stored one (write-only fields render empty).
+
+    Raises:
+        DomainError: ``invalid_configuration`` naming the refused field.
+    """
+
+    kind: ContactCenterKind
+    api_base_url: str
+    client_id: str
+    client_secret: str | None = None
+    refresh_token: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate every field and drop a trailing slash; secrets are checked for shape only."""
+        if not API_HOST.fullmatch(self.api_base_url):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}api_base_url")
+        object.__setattr__(self, "api_base_url", self.api_base_url.rstrip("/"))
+        if not CLIENT_ID.fullmatch(self.client_id):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_id")
+        if self.client_secret is not None and not _secret_shape(self.client_secret):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_secret")
+        if self.refresh_token is not None and not _secret_shape(self.refresh_token):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}refresh_token")
+
+    @property
+    def secrets_sent(self) -> tuple[str, ...]:
+        """Return the names of the secrets this change replaces (for the audit, never values)."""
+        sent = (("client_secret", self.client_secret), ("refresh_token", self.refresh_token))
+        return tuple(name for name, value in sent if value)
+
+
+def _secret_shape(value: str) -> bool:
+    """Whether a submitted secret is one printable token without spaces, within the cap."""
+    return 0 < len(value) <= SECRET_MAX_LENGTH and value.isprintable() and " " not in value

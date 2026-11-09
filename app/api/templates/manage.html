@@ -11,6 +11,9 @@
   <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
   <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
   <dt>{{ _("manage.status") }}</dt><dd>{{ status_label }}</dd>
+  {% if appointment_code %}
+  <dt>{{ _("manage.appointment_code") }}</dt><dd>{{ appointment_code }}</dd>
+  {% endif %}
 </dl>
 {% if active and group.video_enabled %}
 <p><a class="button button--large" href="/b/m/{{ ref }}/join">{{ _("join.from_manage") }}</a></p>

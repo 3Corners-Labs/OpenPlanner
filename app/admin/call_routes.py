@@ -4,8 +4,18 @@ Both need ``bookings.view`` on the group. An agenda row (``agenda_routes`` shows
 slot) has the first name only (no email or phone), the meeting and work item state in words,
 whether the agent joined, the number of participants and a "not picked up" flag. The timeline
 lists every recorded event with its reason code; nothing about participants beyond counts.
+The booking page shows the answers to the group's form, and the participant's name, email
+address and phone number only on request: *Show contact details* opens the page again with
+``?contact=show``, and ``ParticipantContactService`` audits each request (ADR 0044 §2, the
+product owner's choice of 2026-11-08). Only the button on the page itself counts
+(``from_this_page``): the same address shared in a mail or chat, bookmarked, typed, followed
+from another site or from another page of the portal, or prefetched, shows the page without
+them and writes nothing, so it never puts a request in someone else's name. The ``mailto:``
+link percent-encodes the address (``Contact.mailto``), so what a participant may type before
+the ``@`` cannot fill other fields of the draft.
 
     GET  /admin/groups/{slug}/bookings/{booking_id}         bookings.view
+    GET  /admin/groups/{slug}/bookings/{booking_id}?contact=show   bookings.view, audited
     POST /admin/groups/{slug}/bookings/{booking_id}/retry   bookings.manage (fresh)
 
 ADR 0068: the page also lists the booking's jobs and every request the platform made to Webex
@@ -21,7 +31,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
-from app.admin.authz import AccessDenied, AdminContext, RequirePermission, can_function
+from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.forms import moment_label, raise_refusal, read_form, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin, admin_moment
@@ -35,6 +45,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import Purpose, labelled_answers
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import RETRYABLE_JOBS, JobStatus, JobSummary, JobType
+from app.domain.participant_contact import ParticipantContactService
 from app.domain.request_log import request_fields
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
@@ -49,10 +60,13 @@ from app.web.call_labels import (
     TASK_STATE_LABELS,
     failure_hint,
 )
-from app.web.protection import RejectedRequest
+from app.web.protection import RejectedRequest, from_this_page
 from app.web.routing_labels import routing_summary
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
+
+SHOW_CONTACT = "show"
+"""The value of ``?contact=`` that asks the booking page for the participant's contact details."""
 
 ViewBookings = Annotated[
     AdminContext,
@@ -264,21 +278,29 @@ def retry_service(request: Request) -> CallRetryService:
     return service
 
 
+def participant_contacts(request: Request) -> ParticipantContactService:
+    """Return the application's service for participants' contact details (ADR 0044 §2)."""
+    service: ParticipantContactService = request.app.state.participant_contact_service
+    return service
+
+
 @router.get("/groups/{slug}/bookings/{booking_id}", response_class=HTMLResponse)
 async def booking_detail(
-    request: Request, locale: Locale, slug: str, booking_id: int, context: ViewBookings
+    request: Request,
+    locale: Locale,
+    slug: str,
+    booking_id: int,
+    context: ViewBookings,
+    contact: str = "",
 ) -> HTMLResponse:
-    """Show one booking's call status and timeline."""
+    """Show one booking's call status and timeline, and its contact details on request."""
     _ = locale.gettext
     group = context.group.group
     try:
-        timeline = await integration_service(request).timeline(context.principal, booking_id)
+        timeline = await integration_service(request).timeline(context.principal, slug, booking_id)
     except DomainError as error:
-        if error.code is ErrorCode.NOT_PERMITTED:
-            raise AccessDenied from error
+        raise_refusal(error)
         raise
-    if timeline.booking.group_id != group.id:  # an id from another group, via this group's URL
-        raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
     booking, status = timeline.booking, timeline.status
     call, task = _chips(status, _)
     tz, code = group.tz, locale.code
@@ -296,6 +318,10 @@ async def booking_detail(
     can_retry = booking.is_active and can_function(context.principal)(
         Permission.BOOKINGS_MANAGE, context.group
     )
+    shown, deleted = None, booking.contact is None
+    if contact == SHOW_CONTACT and not deleted and from_this_page(request):
+        shown = await participant_contacts(request).reveal(context.principal, slug, booking_id)
+        deleted = shown is None  # deleted since the timeline was read
     return group_page(
         request,
         locale,
@@ -316,6 +342,9 @@ async def booking_detail(
             "jobs": _job_views(request, locale, timeline.jobs, can_retry),
             "requests": _request_views(request, locale, timeline.requests),
             "retry_action": f"/admin/groups/{slug}/bookings/{booking_id}/retry",
+            "contact": shown,
+            "contact_deleted": deleted,
+            "contact_hide": f"/admin/groups/{slug}/bookings/{booking_id}#contact",
             "answers": labelled_answers(
                 booking.contact.answers if booking.contact else None,
                 await _bookings(request).get_form(group),

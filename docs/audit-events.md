@@ -127,6 +127,17 @@ per kind and caller:
 The pseudonym is an HMAC of the IP address (IPv6 by /64), never the address; `unknown` when
 there is none, `many` once `SECURITY_EVENT_MAX_SOURCES` callers are tracked.
 
+ADR 0044 adds two warnings about volume (category `system`, outcome `failure`, level `error`;
+`app/domain/activity_alert.py`). Each is written once when one person's successful events of
+one action within an hour pass a class C threshold, at the organisation and group of the event
+that crossed it. They never refuse the action and are not alerts of ADR 0061, so a rule on the
+log platform is what turns them into a page:
+
+| `event.action` | `reason` | `detail` | Counts |
+|---|---|---|---|
+| `planner.changes_alert` | `too_many_changes` | `actor:<subject>,changes:<n>` | `bookings.manage` changes (a planner's change, a retried call, a fallback ended by hand), above `planner_changes_alert_per_hour` |
+| `booking.contact_reveals_alert` | `too_many_contact_reveals` | `actor:<subject>,reveals:<n>` | requests for a participant's contact details (detail `booking.contact_viewed`, the only audited success under `bookings.view`), above `contact_reveals_alert_per_hour` |
+
 ## What never appears
 
 No personal data of participants (name, email, phone, note, join links) and no admin display

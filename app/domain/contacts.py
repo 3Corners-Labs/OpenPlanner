@@ -24,6 +24,7 @@ from enum import StrEnum
 from urllib.parse import urlsplit
 
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.form_fields import mailto_href
 
 CONTACT_LOCALES = ("nl", "en")
 """Locales a label, opening hours or heading may be given in; Dutch is the fallback."""
@@ -193,7 +194,7 @@ class ContactOption:
             digits = "".join(c for c in number if c.isdigit())
             return f"tel:{'+' if number.startswith('+') else ''}{digits}"
         if self.kind is ContactKind.EMAIL:
-            return f"mailto:{self.value}"
+            return mailto_href(self.value)
         if self.kind is ContactKind.ADDRESS:
             return None
         return self.value

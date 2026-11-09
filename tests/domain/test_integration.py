@@ -27,8 +27,8 @@ from app.domain.job_plan import JobStatus, JobType, PlannedJob
 from app.domain.request_log import REQUEST_EVENT
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeProbes
-from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.admin import GROUP_ADMIN, OUTSIDER
+from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.admin import GROUP_ADMIN, OTHER_TEAM, OUTSIDER, two_organisations
 from tests.support.domain import NOW, SLOT_0900, webex_routing
 from tests.support.integration import GROUP, make_booking
 from tests.support.webhooks import WXCC
@@ -140,8 +140,7 @@ def test_not_picked_up_after_the_group_limit_without_host() -> None:
 
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
-    state = State()
-    state.organisation_slugs = {1: "demo", 2: "andere"}
+    state = two_organisations()
     state.groups[1] = GROUP
     state.bookings[123] = make_booking(
         meeting=MeetingRef("meeting-1", "https://site.webex.com/m"),
@@ -154,6 +153,22 @@ def uow() -> InMemoryUnitOfWork:
 def service(uow: InMemoryUnitOfWork) -> IntegrationService:
     clock = FixedClock(NOW)
     return IntegrationService(uow, clock, AdminService(uow, clock))
+
+
+async def test_an_organisations_address_finds_only_its_own_bookings_tasks(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0032 point 10: another organisation's secret never reaches this booking."""
+    connected = EventKind.TASK_CONNECTED
+    own = uow.state.groups[uow.state.bookings[123].group_id].organisation_id
+
+    other = await service.record_task_event(
+        "task-1", connected, NOW, **WXCC, organisation_id=own + 1
+    )
+    mine = await service.record_task_event("task-1", connected, NOW, **WXCC, organisation_id=own)
+
+    assert other is EventOutcome.UNKNOWN
+    assert mine is EventOutcome.RECORDED
 
 
 async def test_events_are_correlated_by_meeting_and_task(
@@ -188,14 +203,35 @@ async def test_failure_reasons_are_kept_as_detail(
 async def test_timeline_needs_bookings_view_on_the_group(service: IntegrationService) -> None:
     await service.record(123, EventKind.MEETING_CREATED)
 
-    timeline = await service.timeline(GROUP_ADMIN, 123)
+    timeline = await service.timeline(GROUP_ADMIN, "demo", 123)
 
     assert [e.kind for e in timeline.events] == [EventKind.MEETING_CREATED]
     assert timeline.booking.id == 123
     with pytest.raises(DomainError, match="not_permitted"):
-        await service.timeline(OUTSIDER, 123)
+        await service.timeline(OUTSIDER, "demo", 123)
     with pytest.raises(DomainError, match="booking_not_found"):
-        await service.timeline(GROUP_ADMIN, 999)
+        await service.timeline(GROUP_ADMIN, "demo", 999)
+
+
+async def test_another_groups_booking_is_not_found_through_this_groups_address(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    """``bookings.view`` is decided on the group of the address, never on the booking's own.
+
+    It once was the booking's own group: another group's id was refused where an unknown id
+    was not found, and the refusal was filed under the other organisation in the prober's name.
+    """
+    uow.state.bookings[124] = make_booking(id=124, group_id=2)  # of group andere-team
+
+    for booking_id in (124, 999):
+        with pytest.raises(DomainError, match="booking_not_found"):
+            await service.timeline(GROUP_ADMIN, "demo", booking_id)
+    with pytest.raises(DomainError, match="not_permitted"):
+        await service.timeline(OTHER_TEAM, "demo", 124)  # its own booking, through demo's address
+
+    assert [(e.actor, e.outcome, e.organisation, e.group) for e in uow.state.audit] == [
+        (OTHER_TEAM.subject, Outcome.DENIED, "demo", "demo")
+    ]
 
 
 @pytest.mark.parametrize(
@@ -343,7 +379,7 @@ async def test_the_timeline_carries_versions_jobs_and_the_bookings_requests(
     uow.state.audit += [mine, other, job_event]
 
     await service.record(123, EventKind.MEETING_FAILED, detail="rejected_400")
-    timeline = await service.timeline(GROUP_ADMIN, 123)
+    timeline = await service.timeline(GROUP_ADMIN, "demo", 123)
 
     assert timeline.events[-1].version == "0.4.0-rc.7"
     assert [(j.type, j.status) for j in timeline.jobs] == [

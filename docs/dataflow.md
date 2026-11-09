@@ -101,14 +101,18 @@ groups, and a group blocks the delete until the erase sweep above has removed it
 The fields below are the fixed list of `app/domain/privacy.py` (ADR 0063): personal data is
 shown in the admin portal only on the booking detail page and the queue item (first name only
 on the group's agenda and queue), never on overview, list, export or alert pages, and no list
-filter matches on it. The list and the rule are constants, not settings.
+filter matches on it. The booking detail page shows the answers, and the name, email address
+and phone number only after *Show contact details*; each request is an audit event with the
+actor, the group and the booking id, never the data (ADR 0044 §2, the product owner's choice of
+2026-11-08). The list and the rule are constants, not settings.
 
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
-| Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4) |
-| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
+| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6). Shown to staff with `bookings.view` on the booking page on request, audited (ADR 0044 §2) |
+| Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4). Shown to staff with `bookings.view` on the booking page on request, audited; its `mailto:` link hands it to the staff member's own mail program, to contact the participant (ADR 0044 §2) |
+| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028). Shown to staff with `bookings.view` on the booking page on request, audited; its `tel:` link hands it to the staff member's own phone, to call the participant (ADR 0044 §2) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055); correction page, which shows the participant their own answers, all of them (`Purpose.PARTICIPANT_SELF`, ADR 0056 point 10) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
+| An organisation's own contact-center connection (ADR 0032 point 9) | one sealed record `contact-center:{organisation id}` in `integration_credentials`: kind, API host, client id; client secret, refresh token and the generated webhook secret | the superuser on organisation → *Kanalen*; the webhook secret is made by the server | until removed, or the organisation is deleted (deleted in the same transaction) | no personal data; the secrets are write-only and never shown. Dispatch through it follows in CC-4b |
 | A group's contact-center routing (ADR 0032) | `group_contact_center` (`kind`, `routing_value`, `attributes`: codes from the platform's descriptor); for WxCC also, and still read, `groups.wxcc_routing_value`, `wxcc_business_address`, `wxcc_channel` | the group's settings | as long as the group | no personal data; the values go to the contact center in each task |
 | Subject and routing attributes (ADR 0081) | `bookings.subject_code`, `bookings.routing_answers` (codes); the group's list and mapping in `groups.routing`; the codes a block offers in `schedule_rules.subjects`, `schedule_overrides.subjects` | booking form: the subject question and the switched-on routing questions, answered with one of a closed list of codes | not personal data, purged with the booking all the same (`privacy.ROUTING_FIELDS` in `PURGED_FIELDS`, ADR 0081); reporting by subject (ADR 0117) must copy the code into its fact before the purge | no. Shown in the agenda, on the booking page and in the own queue; the mapped codes leave the system only as routing variables in the contact-center task (`flowSettings`), next to the first name and the host join URL |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
@@ -207,8 +211,9 @@ organisation provider ──ID token (sub, name, email, email_verified, entitlem
 
 | Data item | Table.column / place | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject` | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
+| Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject`; `audit_events.detail` of the two volume warnings (`planner.changes_alert`, `booking.contact_reveals_alert`: `actor:<subject>,…`, ADR 0044) | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
 | Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; erased daily by the worker for people without a login for `staff_retention_days` (class C, 365 days, 90–1825; ADR 0046 step 2), or by the superuser for a suspended person; the session row follows the session clean-up | no |
+| Admin email address (ADR 0117 step 10b) | `staff.email`, `staff.email_at` (not `admin_sessions.claims`) | identity provider claim `email`, kept only when `email_verified` is true | replaced or cleared at every login; removed with the display name at erasure (manual, or `staff_retention_days`); shown on the staff page to `staff.view`; read by the digest at send time, never in a log, audit event or job payload | no; mail to the person for the usage digest only |
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed`; removed with the display name at erasure | no |
 | Entitlement values (ADR 0049) | `admin_sessions.claims` (the recognised values), `staff_refused_entitlements` (value, reason code, organisation), `audit_events` (`auth.entitlement_refused`, `auth.entitlement_mismatch`, `auth.ambiguous_claims`) | identity provider claim `openplanner_entitlements` | session: until it ends and is cleaned up (ADR 0098); refusals: replaced at every login; events: as admin actions | no; the values hold the prefix, a role key and the IdP values of organisations and groups, linked to the employee's subject |
 | Admin session (ADR 0098) | `admin_sessions` (`id_hash` = sha256 of 32 random bytes, subject, provider, login claims as JSON, `login_at`, `last_seen_at`, `ended_at`, `end_reason`); the cookie holds the reference only | the login; the requests | ends at logout, idle (`admin_idle_minutes`), absolute end (`admin_session_hours`), a newer login or the limit per person; rows are removed by the worker's clean-up (ADR 0098 step 2) | no; staff data, never the reference itself in a log, audit event or URL |
@@ -327,6 +332,10 @@ checks that the page's CSP names no other source. The configured video link is t
 superuser ──POST name, organisation, groups, scopes, networks──> web ──SQL──> api_clients (secret: SHA-256 only)
 WxCC AI Agent ──POST /api/agent/v1/oauth/token (client id + secret)──> web ──> api_access_tokens (SHA-256 only)
 WxCC AI Agent ──GET groups, availability (bearer token)──> web: group names, free times, places left
+WxCC AI Agent ──POST change-requests: phone number, appointment code, action, start──> web
+    web: phone number and code compared in memory with the group's bookings ──> change_requests (ids, times; no phone, no code)
+    web ──> jobs: send_change_request (booking id only) ──> participant's own email / SMS ──> /b/m/{ref}/change
+WxCC AI Agent <── 202 {id, action, start, status, expires_at}: the same answer with or without a match
 ```
 
 | Data item | Where | Source | Retention | Leaves the system |
@@ -336,9 +345,13 @@ WxCC AI Agent ──GET groups, availability (bearer token)──> web: group na
 | Access tokens | SHA-256 in `api_access_tokens` | OpenPlanner | 10 minutes; expired rows removed on the next issue | to the bot |
 | Caller IP address | compared in memory, not stored | bot | not stored | no |
 | Free times | computed | schedule | not stored | to the bot (no personal data) |
+| Phone number and appointment code of a change request (step 2) | compared in memory with `bookings.phone` and the code derived from the booking's salt; never stored, logged or audited | the caller, through the bot | not stored | no |
+| Change request | `change_requests`: public id, client id, group, requested start (none for a cancellation), matched booking id (or none), times | OpenPlanner | deleted `agent_change_request_retention_days` (default 30) after it expired, or with its group or booking; no personal data | id, action, start, status and expiry to the bot that asked |
+| Appointment code | derived on demand (HMAC of the booking's salt under `MANAGEMENT_TOKEN_KEY`); not stored | OpenPlanner | matches nothing after the purge (no phone number, no longer confirmed) | to the participant: booking page and messages, only where the organisation switched change requests on |
 
-No personal data flows through this API. The next step (change requests, ADR 0023) adds the
-phone number from the bot; it will be compared in memory and never stored outside `bookings`.
+No personal data flows to the bot. A change request carries the caller's phone number and
+appointment code in; both are compared in memory and never stored outside `bookings`. On a
+match the participant, not the bot, gets the message to confirm.
 
 ## Holiday calendars (ADR 0025)
 
@@ -455,20 +468,40 @@ Not outbound but listed so the picture is complete: webhooks from Webex and WxCC
 inbound and are verified by signature or token (`docs/webhooks.md`); the container logs leave
 the host only if the host ships them (`docs/runbook.md`).
 
-## Configuration package (ADR 0089)
+## Configuration package (ADR 0089), read for one release
+
+The SQLite package is no longer written (ADR 0099 step 4); an existing one is still read, and
+what it holds leaves the file only as a document that is planned and applied.
 
 ```
-superuser ──POST /admin/settings/package/export (passphrase)──> web ──SQLite backup API──> temporary copy (data/transfer, mode 600)
-web ──DELETE state tables, VACUUM; secrets opened with SETTINGS_ENCRYPTION_KEY, sealed under scrypt(passphrase)──> package file ──download──> superuser
-superuser ──POST /admin/settings/package/import (file, passphrase)──> web ──verify, re-seal under SETTINGS_ENCRYPTION_KEY──> temporary copy ──ATTACH, one transaction──> configuration tables
-host ──python -m app.cli config export|show|import|env──> the same, actor system:cli; `env` writes OIDC_* to a file (mode 600)
-API client (scope configuration:transfer) ──GET / PUT /api/agent/v1/configuration (X-Passphrase header, package body)──> the same service, actor the client id (ADR 0089 point 7)
+superuser ──POST /admin/settings/package/import (file, passphrase)──> web ──verify, open with scrypt(passphrase), seal under SETTINGS_ENCRYPTION_KEY──> temporary copy (data/transfer, mode 600)
+web ──read the copy with the readers of the live database──> a replace document (platform scope) ──plan, apply with the admin's rights, one transaction──> configuration tables
+host ──python -m app.cli config show|import|env──> the same, actor system:cli; `env` writes OIDC_* to a file (mode 600)
+API client (scope configuration:transfer) ──PUT /api/agent/v1/configuration (X-Passphrase header, package body)──> the same service, actor the client id (ADR 0089 point 7)
 ```
 
 A package holds no participant data: the state tables (`bookings` with every PII field,
-`slots`, `jobs`, `booking_events`, `call_status`, `audit_events`, `staff`, …) are emptied and
-the file is vacuumed. It holds every integration secret of the platform, sealed under the
-passphrase only. The temporary copies never outlive the request.
+`slots`, `jobs`, `booking_events`, `call_status`, `audit_events`, `staff`, …) were emptied when
+it was exported, and the conversion reads configuration tables only. It holds every
+integration secret of the platform, sealed under the passphrase only. The temporary copy never
+outlives the request, and the converted document is not kept anywhere.
+
+## Configuration document (ADR 0099)
+
+```
+admin ──POST …/configuration/export (secrets? passphrase)──> web ──read configuration tree, keep what the admin may change, seal secrets under scrypt(passphrase)──> JSON document ──download──> admin
+admin ──POST …/configuration/plan (document, passphrase)──> web ──parse, open sealed values, plan against the tree──> plan page (paths, field names, no values)
+web ──keep the uploaded document (still sealed) in process memory, one per admin and scope, CONFIGURATION_REVIEW_MINUTES──> token in the apply form
+admin ──POST …/configuration/apply (token, passphrase)──> web ──plan again in the write lock, write all or nothing, one audit event per change──> configuration tables
+web ──guarded GET──> a new or moved identity provider's /.well-known/openid-configuration (issuer only, before the lock)
+host ──python -m app.cli config export --format json|plan|apply──> the same service, actor system:cli
+```
+
+A document holds configuration only: no participant data, no state tables, no staff, and the
+secrets sealed under the passphrase alone, so a document exported without secrets holds none.
+It holds business addresses (a group's video host and invitation address, alert targets,
+contact blocks). The uploaded document lives in the web process's memory until it is applied,
+discarded or lapsed; it is written nowhere, and the passphrase is kept nowhere.
 
 ## Configuration document (ADR 0099)
 
@@ -535,7 +568,9 @@ with data held elsewhere. The row itself is deleted `booking_row_retention_days`
 | `booking_day_counts` | none: group, UTC day of the slot, final status, a count and the latest `pii_purged_at` among them | for good: statistics without a person or an identifier | deleted with the group (cascade) | as the live system |
 | `usage_events` | none: fact kind, the UTC hour (never an exact time), organisation, group and the codes and numbers of `privacy.USAGE_FIELDS`; no booking id, reference or free text, so a row cannot be joined back to an appointment | the outbox of the rollup (ADR 0117, built from step 2): until the worker has rolled it up and `reporting_event_retention_days` (class C, default 35, 7 to 90) have passed | the worker's rollup (every `reporting_rollup_interval_minutes`, class C); no cascade, statistics outlive the group | as the live system |
 | `usage_rollup_state`, `usage_backfill` | none: the watermark of the rollup, the time of its last run, the backfill cutoff; one booking id per booking already backfilled | `usage_backfill` with the booking row (cascade); the state row for good | cascade with the booking (`usage_backfill`) | as the live system |
-| `usage_hour`, `usage_staff_hour` | none: counts and sums per hour, group, metric and cut; `usage_staff_hour` holds a team member's row id (`staff_id`) and exists for the team view, which is off by default (ADR 0117 point 9) | `reporting_retention_months` (class C, default 25, 13 to 60) | the worker's rollup run; a removed team member's rows fold into one *former team members* row | as the live system |
+| `usage_hour`, `usage_staff_hour` | none: counts and sums per hour, group, metric and cut; `usage_staff_hour` holds a team member's row id (`staff_id`) and exists for the team view, which is off by default (ADR 0117 point 9) | `reporting_retention_months` (class C, default 25, 13 to 60) | the worker's rollup run; a removed team member's rows, and the facts of theirs still waiting for the rollup, fold into one *former team members* row in the transaction that removes the person; facts about a team member (`usage_events.staff_id`) are written only while the organisation has `reporting_staff_view_enabled` on (class D, default off), and only for calls an agent claimed from the own queue | as the live system |
+| `report_subscriptions` | none: organisation, group, period, weekday, day of the month, and the row ids of staff members (a person is named by their staff record, never by address) and who made it | until an administrator deletes it; it goes with its organisation or group; a removed staff record stays in the list as a name that no longer resolves and is skipped | the administrator, or the cascade | as the live system |
+| `report_digest_runs` | none: subscription id, due date, status and counts | with the subscription (cascade) | the cascade | as the live system |
 | `booking_events` | `message` (provider reason, up to 300 characters, masked); kind, time and reason code carry no personal data | `message`: as the booking's purge; the rest with the booking row | the purge empties `message`; the row goes with the booking (cascade) | as `bookings` |
 | `call_status` | none: states and times of the meeting and the work item, by booking id | with the booking row | cascade with the booking | as `bookings` |
 | `jobs` | none: booking id, type, run time, status, last error as a reason code (no payload with personal data) | pending jobs until they run; the row with the booking | the purge job is the last job of every plan; cascade with the booking | restored jobs find their booking purged or stale and end silently |
@@ -620,11 +655,40 @@ and a recipient are never in a fact. `completed` and `no_show` are derived from 
 The new columns hold no personal data: `call_status.peak_participants` and `guest_joined_at`,
 `bookings.rebook_requested_at`, `usage_rollup_state.slots_closed_until`.
 
+From step 8 a holder of `reports.export` downloads what a page shows, or the hourly cells, as CSV:
+
+    API client (reports:read) ─► its groups ─► the same suppressed hourly rows as JSON, CSV or NDJSON (step 9)
+
+    reports.export ─► the page's load (scope, threshold) ─► the suppressed tables or cells ─► CSV (counts, codes, slugs)
+                                                           └► audit event reports.export (family, range, rows, SHA-256)
+
+The file holds no personal data and no free text; nothing of it is stored, and the audit event holds
+the checksum, not the content. A cell below the threshold is not written.
+
+From step 10 a digest subscription (`report_subscriptions`: organisation, group, period, staff row ids, no address; the address is `staff.email` since step 10b) and its run records (`report_digest_runs`) drive one mail per due digest:
+
+    worker poll ─► due subscription ─► recipients who still hold reports.view ─► address: `staff.email` of the last login, else the bundled directory (memory only)
+                 ─► mail: suppressed figures + a link to the signed-in report, no attachment ─► the organisation's email channel
+
+The address is never stored by the portal, and no address, name or figure is in a log line, a job or an audit event.
+
 A fact holds the hour and the allow-listed codes and numbers only (`privacy.USAGE_FIELDS`): no
 name, address, phone number, join link, booking id, reference, token or free text. A failing
 insert is rolled back to its savepoint and dropped with a log line that names the kind and no
 value, so reporting never fails a participant's action; `reporting_enabled` (class C) off writes
 nothing. Nothing in this path reads a purged column.
+
+With `reporting_usage_events_to_log` (class C, off by default) each committed non-team fact is also
+written as one structured line after the commit:
+
+    committed fact ─► usage.fact line (allow-listed codes, UTC hour, duration bucket) ─► stdout ─► log destinations (ADR 0085)
+
+The line holds no personal data, so the masking processor has nothing to mask; the customer's
+retention of it is theirs.
+
+No small-cell threshold applies to these lines: they are the facts at the grain the customer chose to
+receive them, and a group so small that an hour and a code point at one person is a risk the
+superuser accepts by switching the setting on (ADR 0117 point 15; threat model).
 
 ## Planned flows
 

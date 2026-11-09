@@ -336,6 +336,8 @@ same commit and rollback behaviour as the SQL one.
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
 | A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
+| A participant's contact details on the booking page, on request and audited (ADR 0044 §2) | `app/domain/participant_contact.py`, `app/admin/call_routes.py` |
+| A warning when one person does an audited thing unusually often within an hour: many changes, many requests for contact details (ADR 0044) | `app/domain/activity_alert.py` |
 | Cancelling on the participant's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
 | Rebooking assistant: which bookings of a short slot move and which slot each is proposed, same time on the nearest day first (ADR 0057) | `app/domain/rebooking.py` |
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
@@ -1017,7 +1019,7 @@ repository's `pre-pr-review` skill before the PR (`docs/skills.md`).
 | 0096 | Overview widgets chosen by the admin (accepted, step 1 built) |
 | 0097 | The OIDC issuer is pinned |
 | 0098 | Admin sessions held on the server |
-| 0099 | Configuration as a JSON document with plan and apply (domain, adapter, host commands and portal are built; API and installer follow) |
+| 0099 | Configuration as a JSON document with plan and apply (domain, adapter, host commands, portal, API and installer are built; the SQLite import is removed in the next release) |
 | 0100 | Admin login requires a second factor, shown by the identity provider |
 | 0101 | Sub-tabs on a side-navigation entry; Advanced settings in three |
 | 0102 | Retention: open closures, back-ups, and what remains after a purge |

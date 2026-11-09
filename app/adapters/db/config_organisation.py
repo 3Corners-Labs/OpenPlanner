@@ -35,7 +35,7 @@ from app.adapters.db.models import (
     OrganisationTextRow,
     SlotRow,
 )
-from app.adapters.db.record_names import bot_credential_name
+from app.adapters.db.record_names import organisation_records
 from app.domain.branding import FontFile, FontRole, Logo
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Entity
@@ -336,8 +336,9 @@ async def _delete_organisation(session: AsyncSession, organisation_id: int) -> N
 
     The planner refused an organisation something still refers to. What is left and restricts
     the row is removed here in the same transaction: its API clients (with their tokens and
-    group links, by cascade) and its groups with their slots. The sealed Webex bot token has no
-    foreign key and goes too, so a later organisation never inherits it by a reused id.
+    group links, by cascade) and its groups with their slots. The sealed records without a foreign
+    key (bot token, contact-center connection) go too, so a later organisation never inherits
+    them by a reused id.
     """
     group_ids = list(
         await session.scalars(
@@ -352,7 +353,7 @@ async def _delete_organisation(session: AsyncSession, organisation_id: int) -> N
         await session.execute(delete(GroupRow).where(GroupRow.id.in_(group_ids)))
     await session.execute(
         delete(IntegrationCredentialRow).where(
-            IntegrationCredentialRow.name == bot_credential_name(organisation_id)
+            IntegrationCredentialRow.name.in_(organisation_records(organisation_id))
         )
     )
     await session.execute(delete(OrganisationRow).where(OrganisationRow.id == organisation_id))

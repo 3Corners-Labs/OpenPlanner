@@ -450,12 +450,14 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | #608 | merged |
 | 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | #619 | merged |
 | 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | #632 | merged |
-| 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | | planned |
-| 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | | planned |
-| 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | | planned |
-| 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | | planned |
-| 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | | planned |
-| 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
+| 6b | Bring *Volume* and *Capacity* to the mockup ([`docs/reporting-mockups.md`](../reporting-mockups.md)): figure tiles, day bars, stacked outcome bar, *split by*, per-table suppression note | #686 | merged |
+| 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | #683 | merged |
+| 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | #652 | merged |
+| 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | #678 | merged |
+| 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | #679 | merged |
+| 10b | The verified `email` claim stored at login (`staff.email`, migration 0104) as the digest's first source for every provider | #681 | merged |
+| 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | #675 | merged |
+| 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | #689 | merged |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
 | 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
 
@@ -634,6 +636,90 @@ per step:
 - **Steps 12–14:** endpoint or job (Q1): `view=wallboard`, display-link routes and the kiosk session (`require_permission` or the kiosk cookie on one route); PII risk (Q3): a chart label or tooltip, a token in a URL or log; failing test (Q4): JS-off page test, label-as-text test, revoked-link and redirect tests, stale-board test.
 - **Steps 11:** endpoint or job (Q1): no route; PII risk (Q3): the `usage.fact` log event; failing test (Q4): masked-stream test.
 
+**Step 11 notes (no change of a decision):** the line `usage.fact` is written after the commit of the transaction that
+wrote the fact, as an ordinary structured log line (`app/domain/usage_log.py`: `fact_fields`), so it travels the same
+stdout line, level filter, masking processor and destination tap as every other line, and a rolled-back change leaves no
+line. `SqlTransaction` collects the committed non-team facts (`written_usage`) and `SqlUnitOfWork._emit` writes them when
+`reporting_usage_events_to_log` is on (class C, off by default, read live in the web and the worker). A failing write is
+the logged `usage.emit_failed` and never fails the request. A line holds the allow-listed fields of the fact, the UTC hour
+and the duration *bucket* (signed for Q3) instead of the seconds; the organisation and group are ids, because the fact holds
+no slug. Category is *operations* at level info, so a destination receives it at `min_level` info or lower; the
+destination's own category filter does not apply to it. Team facts are never written. `tests/adapters/db/test_usage_to_log.py`
+asserts on a captured stream that the line is there only when asked, only after commit, never for a team fact, and that the
+masking has nothing to mask.
+**Step 8 notes (no change of a decision):** the CSV writer of the audit export moved unchanged to
+`app/domain/csv_export.py` (`ExportLimits`, `export_window`, `safe_cell`, `to_csv`, plus `checksum`); the audit
+export keeps its event name and its columns and writes through it (`audit_export.audit_csv`), so there is one
+implementation and one escaping. One deliberate change: a number is written as a number (a negative signed
+duration is not a formula), only text gets the leading `'`. The **screen CSV** is the long layout `table;row;column;value;note`
+produced by walking the report objects the page renders (`usage_report_csv.screen_rows`), so the file shows what the
+screen shows, with the same suppression, and a new table appears in the file without a second place to edit; a
+figure the screen hides is an empty value with the note `hidden`. This is the table's content, not its visual
+layout (rows by columns), because one flat shape fits all four families. The **tidy CSV** `openplanner.usage/1`
+has the columns `hour, organisation, group, metric, booking_kind, dispatch_kind, subject, locale, channel, outcome,
+actor_class, reason, bucket, count, sum, max`: `max` is added to the list of point 12 because Q9 is a peak and a
+sum of peaks means nothing; the version is therefore this list, in `docs/reporting.md`. A cell below the threshold
+is not written at all (a row would say that something with those cuts happened); the audit event counts them. The
+export loads through `UsageReportService.load` with `reports.export` (a new permission, level group, which
+requires `reports.view`; held by the superuser, organisation admin, group admin and auditor), so scope, range and
+threshold are the screens' own. `reporting_export_max_days` is also capped by the 400-day range of the report
+loader until the API (step 9) reads wider ranges. The audit event `reports.export` holds `view`, the range, the
+row and hidden counts and the SHA-256, never a figure; a refusal (`too_many_rows`, `too_many_days`) is audited and
+shown on the report page (422).
+
+
+**Step 9 notes (no change of a decision):** `GET /api/agent/v1/reports/usage` is a route of the existing machine API
+(ADR 0023, mounted under `/api/agent/v1`, not a new `/api/v1`), with the new scope `reports:read` (level group,
+granted by the superuser per client like the others, audited by the existing client audit). The groups a client may read
+come from `ApiAccessService.groups`; the rows are those of the tidy CSV (`tidy_rows`, columns of `openplanner.usage/1`),
+so suppression, cuts and layout have one home. `cut` keeps one cut column and adds the cells up over the rest *before*
+the threshold is applied, as the screens do; without it all cuts are added up and only the duration bucket stays.
+Formats `json`, `csv`, `ndjson`; the cursor is the key of the last row sent (13 columns), so a page does not move while the rollup adds cells;
+`ETag` from the client, the rollup time, the threshold and the request; `Cache-Control: private`; a matching `If-None-Match` is `304`.
+The page is cut from the cells of the range after one read transaction (WAL: no write lock), not streamed from the database;
+the range is capped by `reporting_export_max_days` and by the 400-day reader range. The rate limit is `reporting_api_rate_per_minute`
+through the common limiter (`RateLimits.reports`, reloaded with the settings), the off switch stays `RATE_LIMIT_ENABLED`. The team metrics are never served.
+`docs/reporting-api.md` is generated by `python -m app.cli reporting-api-doc` and a test fails when it differs.
+**Step 10 notes (no change of a decision, one assumption):** migration 0103 adds `report_subscriptions` (recipients as a
+comma-separated list of staff row ids; the check constraints keep `period`, weekday 0–6 and day of the month 1–28 honest) and
+`report_digest_runs` (unique on subscription and due date). A due digest is the latest date on or before now that the
+period selects, from the send hour in the group's zone (the organisation's first group's zone for an organisation-wide
+subscription); it covers the days since the last mail up to yesterday (daily: yesterday; weekly: the seven days before;
+monthly: back to the same day of the month before). The worker's `DigestRunner` claims the run record in a transaction
+before the mails go out, so a retry or a second worker sends nothing twice; a digest later than
+`reporting_digest_late_hours` is recorded as skipped; an organisation without an email channel is held back and tried
+again on the next poll. **Assumption (the staff table holds no address):** the address is read at send time from the
+bundled identity provider's directory (`StaffAddresses`, `DirectoryAddresses`, ADR 0095 and 0106), matched on the staff
+subject; a person the directory does not hold (an enterprise provider without a directory) is skipped and counted.
+Eligibility (`may_read`) evaluates the staff record's memberships, custom roles included, through `scope_for`, so the
+digest follows the matrix; superusers have no membership and are never recipients. The mail is a fixed layout with
+`reports.digest.*` text blocks (organisation override through the translator), a plain and a semantic HTML part, no logo
+and no attachment; the language is the organisation's default. Permission `reports.digest.manage` (level organisation,
+organisation admin only, requires `reports.view`) is a **decision change** to `authorization.py`. The subscriptions are a
+section of the organisation's Usage page with forms that work without JavaScript. The log lines are
+`reports.digest_run`, `reports.digest_failed`, `reports.digest_run_failed` and `reports.digest_no_mail_channel` (counts and
+error types only).
+
+
+**Open point (step 10), resolved by step 10b (product owner, 2026-11-09: "Ja, e-mail bij login"):** staff of an organisation
+with its own identity provider (ADR 0083), or of a deployment without the bundled provider's directory, had no address the
+portal could read, so they got no digest. Step 10b stores the address at login: migration 0104 adds the nullable
+`staff.email` and `staff.email_at` (expand only). At every OIDC login, through the bundled provider and through an
+organisation's own provider alike, `login_claims` reads the `email` claim and keeps it only when `email_verified` is the
+boolean `true` and the value is a plausible address (one `@`, no blanks, at most 254 characters); otherwise the stored address
+is cleared, so a stale address never stays. The digest reads `staff.email` first (`StoredAddresses`, `app/adapters/staff_addresses.py`)
+and asks the bundled directory only for a person whose login stored none (logged in before this step, or the provider gave no
+verified address); the fallback goes when it is redundant. The address is staff personal data: it is not in the session claims,
+a log line, an audit event or a job payload (the masking processor covers `email`; a test asserts it), the staff page shows it
+to whoever holds `staff.view`, and erasing the person (manually, or after `staff_retention_days`) clears it. No change to
+`authorization.py`; no new setting.
+
+
+**Delivery is at most once (step 10):** the run record is claimed before the mails go out, so a crash after the claim, or a
+sender that refuses every address, loses that digest instead of sending it twice; the failures are counted in the log line
+`reports.digest_run` (`failed`). The next due date sends as usual. Retrying a failed send is a later refinement.
+
+
 ## Consequences
 
 - Analysts get durations, queue method, subject, lead time, no-shows and utilisation per hour, which no
@@ -659,3 +745,20 @@ per step:
   is placed under *Overview* so the six-tab rule holds afterwards.
 - Open points that the product owner may still change: the proposed role holders (point 11), the digest
   being staff-only, and the default of the team screen being off.
+
+**Step 7 notes (no change of a decision, two assumptions):** *Team* is the view `team` of the organisation's *Usage*
+page, not a new route; it needs `reports.staff.view` (a decision PR, organisation admin only) and the organisation's
+`reporting_staff_view_enabled`, and answers 404 while that is off. Team facts exist only for calls an agent claimed
+from the own queue (the pseudonym of the claim is matched to the staff entry); calls handled in the contact center have
+no team member here. Metric S1 is stored as three sub-metrics in `usage_staff_hour` (`S1c` calls and seconds, `S1k`
+claims, `S1p` scheduled calls and how many were on time). **S2 (team utilisation) is not built:** no fact records
+staffed seconds; it needs one, and is a follow-up. Removal of a person folds their rows and their waiting facts into the
+*former team members* row in the same transaction; retention prunes the table with `reporting_retention_months`.
+
+**Step 12 notes (no change of a decision, one difference):** `<op-report-chart>` wraps every chart; the
+points carry `data-i` and `data-s`, the day charts' table rows are ordinary links (drill-down), and the
+words of the toolbar come from the page. *Download as PNG* is drawn on a canvas by the script and not from
+the SVG as an image, because the script CSP allows images from our own origin only (`img-src 'self'`); the
+CSP is not loosened. Toggling a series hides it but keeps the scale. The Playwright island flag of ADR 0118
+point 10 does not exist yet: `e2e/tests/admin-report-charts.spec.ts` covers the keyboard, toggles,
+downloads and the run with scripts off for the charts; it was not run locally.

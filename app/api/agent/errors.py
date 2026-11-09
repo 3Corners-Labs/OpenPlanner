@@ -40,10 +40,14 @@ _DOMAIN_STATUS: dict[ErrorCode, int] = {
     ErrorCode.INVALID_RANGE: 422,
     ErrorCode.DATABASE_BUSY: 503,
     # ADR 0089 point 7: the configuration package over the API.
-    ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: 409,
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: 409,
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: 413,
+    # ADR 0099: the configuration document over the API.
+    ErrorCode.CONFIGURATION_PLAN_STALE: 409,
     ErrorCode.INTEGRATION_NOT_READY: 503,
+    # ADR 0023 step 2: change requests.
+    ErrorCode.SLOT_UNAVAILABLE: 409,
+    ErrorCode.CHANGE_REQUEST_NOT_FOUND: 404,
 }
 
 

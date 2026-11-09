@@ -15,6 +15,7 @@
   <h2 id="access-heading">{{ _("admin.staff.access") }}</h2>
   <dl class="facts">
     <div><dt>{{ _("admin.staff.roles") }}</dt><dd>{{ person.roles | join(", ") if person.roles else _("admin.staff.no_role") }}</dd></div>
+    <div><dt>{{ _("admin.staff.email") }}</dt><dd>{% if person.email %}{{ person.email }}{% else %}{{ _("admin.staff.email_none") }}{% endif %}</dd></div>
     {% for place in person.places %}
     <div><dt>{{ place.organisation }}</dt><dd>{{ place.groups | join(", ") if place.groups else _("admin.staff.whole_organisation") }}</dd></div>
     {% endfor %}

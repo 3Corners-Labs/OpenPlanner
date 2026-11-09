@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.lookups import group_summary_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.routing import (
     Attribute,
@@ -85,7 +86,7 @@ class RoutingService:
         """
         require(await self._admin.authorize(principal, _PERMISSION, group_slug=slug))
         async with self._uow.read() as tx:
-            summary = await _summary(tx, slug)
+            summary = await group_summary_by_slug(tx, slug)
             bound = await _bound(tx, summary.group.id)
         return GroupRoutingView(summary, summary.group.routing, value_of(self._max), bound)
 
@@ -227,7 +228,7 @@ class RoutingService:
         """Authorise, apply ``change`` in a locked transaction, save the group and audit it."""
         require(await self._admin.authorize(principal, _PERMISSION, group_slug=slug))
         async with self._uow.locked() as tx:
-            summary = await _summary(tx, slug)
+            summary = await group_summary_by_slug(tx, slug)
             group = summary.group
             if group.is_archived:
                 raise DomainError(ErrorCode.GROUP_ARCHIVED)
@@ -245,14 +246,6 @@ class RoutingService:
                 slug,
                 detail,
             )
-
-
-async def _summary(tx: Transaction, slug: str) -> GroupSummary:
-    """Return the group or raise ``group_not_found``."""
-    summary = await tx.get_group_summary(slug)
-    if summary is None:
-        raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-    return summary
 
 
 async def _bound(tx: Transaction, group_id: int) -> frozenset[str]:

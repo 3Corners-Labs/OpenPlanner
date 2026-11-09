@@ -35,26 +35,28 @@ async def test_targets_and_deliveries_round_trip_and_go_together(engine: AsyncEn
         assert [t.id for t in await tx.all_alert_targets()] == [platform]
 
 
-async def test_deleting_an_organisation_deletes_its_bot_token(engine: AsyncEngine) -> None:
-    """A later organisation with a reused id never inherits the bot (ADR 0084 point 4)."""
+async def test_deleting_an_organisation_deletes_its_sealed_records(engine: AsyncEngine) -> None:
+    """A later organisation with a reused id never inherits the bot (ADR 0084 point 4) nor the
+    contact-center connection and its secrets (ADR 0032 point 9)."""
     from sqlalchemy import select
 
     from app.adapters.db.models import IntegrationCredentialRow, OrganisationRow
-    from app.adapters.db.record_names import bot_credential_name
+    from app.adapters.db.record_names import bot_credential_name, contact_center_credential_name
     from app.domain.scheduling import Organisation
 
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         stored = await tx.add_organisation(Organisation(0, "Weg", "weg"))
     async with uow.locked() as tx:
-        tx._session.add(  # type: ignore[attr-defined]  # noqa: SLF001
-            IntegrationCredentialRow(
-                name=bot_credential_name(stored.id), nonce=b"n", ciphertext=b"c", updated_at=NOW
+        for name in (bot_credential_name(stored.id), contact_center_credential_name(stored.id)):
+            tx._session.add(  # type: ignore[attr-defined]  # noqa: SLF001
+                IntegrationCredentialRow(name=name, nonce=b"n", ciphertext=b"c", updated_at=NOW)
             )
-        )
     async with uow.locked() as tx:
         await tx.delete_organisation(stored.id)
     async with uow.read() as tx:
         session = tx._session  # type: ignore[attr-defined]  # noqa: SLF001
         assert await session.get(IntegrationCredentialRow, bot_credential_name(stored.id)) is None
+        name = contact_center_credential_name(stored.id)
+        assert await session.get(IntegrationCredentialRow, name) is None
         assert (await session.scalars(select(OrganisationRow.id))).all() == []

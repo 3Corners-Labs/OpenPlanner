@@ -22,7 +22,8 @@ from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import Classification, FieldDefinition, FormDefinition
-from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.lookups import group_summary_by_slug
+from app.domain.ports import Clock, UnitOfWork
 from app.domain.scheduling import GroupSummary
 from app.domain.tunable import value_of
 
@@ -99,7 +100,7 @@ class FormService:
         """
         require(await self._admin.authorize(principal, _PERMISSION, group_slug=slug))
         async with self._uow.read() as tx:
-            summary = await _summary(tx, slug)
+            summary = await group_summary_by_slug(tx, slug)
             form = await tx.get_form(summary.group.id)
         return GroupForm(summary, form, value_of(self._max))
 
@@ -209,7 +210,7 @@ class FormService:
         """
         require(await self._admin.authorize(principal, _PERMISSION, group_slug=slug))
         async with self._uow.locked() as tx:
-            summary = await _summary(tx, slug)
+            summary = await group_summary_by_slug(tx, slug)
             current = await tx.get_form(summary.group.id)
             result = change(current)
             if result is None:
@@ -236,14 +237,6 @@ class FormService:
                 result.detail,
             )
         return True
-
-
-async def _summary(tx: Transaction, slug: str) -> GroupSummary:
-    """Return the group or raise ``group_not_found``."""
-    summary = await tx.get_group_summary(slug)
-    if summary is None:
-        raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-    return summary
 
 
 def _active(form: FormDefinition, key: str) -> FieldDefinition:

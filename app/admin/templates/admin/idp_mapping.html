@@ -30,7 +30,7 @@
 <section class="card" aria-labelledby="org-{{ organisation.slug }}-heading">
   <h2 id="org-{{ organisation.slug }}-heading">{{ organisation.name }} <span class="muted">({{ organisation.slug }})</span></h2>
   <p>{{ _("admin.idp_mapping.idp_key") }}: <code>{{ organisation.idp_key }}</code></p>
-  <div class="table-scroll">
+  <div class="table-scroll" role="region" aria-labelledby="org-{{ organisation.slug }}-heading" tabindex="0">
   <table class="data-table">
     <caption class="visually-hidden">{{ _("admin.idp_mapping.values_of", name=organisation.name) }}</caption>
     <thead>
@@ -62,7 +62,7 @@
   <h2 id="refused-heading">{{ _("admin.idp_mapping.refused_title") }}</h2>
   <p class="muted">{{ _("admin.idp_mapping.refused_intro", days=settings.window_days) }}</p>
   {% if refused %}
-  <div class="table-scroll">
+  <div class="table-scroll" role="region" aria-labelledby="refused-heading" tabindex="0">
   <table class="data-table">
     <caption class="visually-hidden">{{ _("admin.idp_mapping.refused_title") }}</caption>
     <thead>

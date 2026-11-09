@@ -10,13 +10,13 @@ end of this file run everywhere, so a route without a permission is still caught
 """
 
 import pytest
-from fastapi.routing import APIRoute
 
 from app.admin.authz import RequirePermission
 from app.admin.routes import PUBLIC_ADMIN_PATHS
 from app.domain.authorization import Principal
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
+from app.web.route_dependencies import guards
 from tests.admin.conftest import SAME_ORIGIN, Site
 from tests.support.authorization_matrix import EXPECTED, ROLES
 from tests.support.routes import all_routes, scoped_routes
@@ -68,6 +68,10 @@ WRITABLE_IN_MAINTENANCE = frozenset(
         "POST /admin/organisations/{org}/channels/alerts/targets/{target_id}/remove",
         "POST /admin/organisations/{org}/channels/alerts/targets/{target_id}/test",
         "POST /admin/organisations/{org}/channels/alerts/bot",
+        # ADR 0032 point 9: the organisation's contact-center connection, integrations.manage.
+        "POST /admin/organisations/{org}/channels/contact-center",
+        "POST /admin/organisations/{org}/channels/contact-center/webhook-secret",
+        "POST /admin/organisations/{org}/channels/contact-center/delete",
     }
 )
 
@@ -155,17 +159,6 @@ async def test_anonymous_visitors_are_sent_to_the_login(site: Site, path: str) -
     assert response.headers["location"].startswith("/admin/login?next=/admin")
 
 
-def _requirements(route: APIRoute) -> list[RequirePermission]:
-    found: list[RequirePermission] = []
-    stack = list(route.dependant.dependencies)
-    while stack:
-        dependency = stack.pop()
-        if isinstance(dependency.call, RequirePermission):
-            found.append(dependency.call)
-        stack.extend(dependency.dependencies)
-    return found
-
-
 def test_every_admin_route_declares_one_permission_and_is_in_the_table(site: Site) -> None:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     routes = [r for r in all_routes(app.routes) if r.path.startswith("/admin")]
@@ -178,9 +171,11 @@ def test_every_admin_route_declares_one_permission_and_is_in_the_table(site: Sit
 
     assert set(protected) == set(EXPECTED), "admin route missing from the matrix test"
     for path, route in protected.items():
-        assert len(_requirements(route)) == 1, f"{path} must declare exactly one permission"
+        assert len(guards(route, RequirePermission)) == 1, (
+            f"{path} must declare exactly one permission"
+        )
     for path in PUBLIC_ADMIN_PATHS:
-        assert not any(_requirements(r) for r in routes if r.path == path), path
+        assert not any(guards(r, RequirePermission) for r in routes if r.path == path), path
 
 
 def test_expectations_cover_every_role(site: Site) -> None:
@@ -200,6 +195,8 @@ PUBLIC_SCOPED = frozenset(
         "GET /api/v1/widget/{org}/{group}/availability",
         "OPTIONS /api/v1/widget/{org}/{group}/bookings",
         "POST /api/v1/widget/{org}/{group}/bookings",
+        # ADR 0032 point 10: the platform calls it, verified by the organisation's own secret.
+        "POST /webhooks/contact-center/{kind}/{org}",
         "GET /g/{slug}",
         "GET /g/{slug}/book",
         "GET /g/{slug}/booked",

@@ -254,6 +254,26 @@ class Settings(BaseSettings):
     # an organisation may raise it to for its own view (class D, never lower).
     reporting_min_cell_size: int = Field(default=5, ge=3, le=20)
     reporting_org_min_cell_size: int = Field(default=3, ge=3, le=50)
+    # ADR 0117 point 9 (class D, organisation): whether the team's load is written and shown per
+    # team member. Off by default: no team fact is written while it is off.
+    reporting_staff_view_enabled: bool = False
+    # ADR 0117 point 15 (class C, platform): also write every non-team usage fact as the log line
+    # usage.fact for the log destinations; no personal data. Off by default.
+    reporting_usage_events_to_log: bool = False
+    # ADR 0117 point 12 (class C, platform): most rows and most days one report CSV may hold; more
+    # is refused with a code, never cut short.
+    reporting_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
+    reporting_export_max_days: int = Field(default=400, ge=31, le=1100)
+    # ADR 0117 point 13 (class C, platform): cells per API page, and calls per minute per client.
+    reporting_api_page_size: int = Field(default=1000, ge=100, le=10_000)
+    reporting_api_rate_per_minute: int = Field(default=30, ge=5, le=300)
+    # ADR 0117 point 16: the digest mail. Send hour and whether the mail holds figures are the
+    # organisation's (class D); how late a missed digest is still sent and how many subscriptions an
+    # organisation may have are the platform's (class C).
+    reporting_digest_send_hour: int = Field(default=7, ge=0, le=23)
+    reporting_digest_include_numbers: bool = True
+    reporting_digest_late_hours: int = Field(default=24, ge=1, le=72)
+    reporting_digest_max_subscriptions: int = Field(default=20, ge=1, le=200)
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
@@ -275,6 +295,9 @@ class Settings(BaseSettings):
     # ADR 0044: changes by one planner per hour above which a system event warns (never
     # blocks). Class C platform (ADR 0042, settings registry).
     planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
+    # ADR 0044 §2: requests for participants' contact details by one person per hour above
+    # which a system event warns (never blocks). Class C platform.
+    contact_reveals_alert_per_hour: int = Field(default=20, ge=5, le=500)
     # ADR 0072 (announced in ADR 0043): how often the own queue, a claimed booking and the
     # participant's waiting page ask the server for a change. Class C platform.
     queue_refresh_seconds: int = Field(default=10, ge=5, le=60)
@@ -475,6 +498,14 @@ class Settings(BaseSettings):
     agent_api_enabled: bool = False
     rate_limit_agent_tokens: str = "10/minute"
     rate_limit_agent_calls: str = "120/minute"
+    # ADR 0023 step 2: change requests by a bot, named by phone number and appointment code.
+    # Switch and confirm time class D (organisation); the per-client limit class C.
+    agent_change_requests_enabled: bool = False
+    agent_change_request_minutes: int = Field(default=60, ge=10, le=1440)
+    agent_change_requests_per_hour: int = Field(default=20, ge=1, le=120)
+    # ADR 0023 step 2b: a quiet period per booking (D) and how long requests are kept (C).
+    agent_change_request_cooldown_minutes: int = Field(default=10, ge=1, le=1440)
+    agent_change_request_retention_days: int = Field(default=30, ge=1, le=365)
 
     # Updates from the admin portal (ADR 0029). APP_VERSION is baked into release images by
     # main.yml; UPDATE_REPOSITORY (owner/name) switches the hourly release check on. The token
@@ -566,6 +597,15 @@ class Settings(BaseSettings):
     integration_recovery_minutes: int = Field(default=10, ge=1, le=120)
     # Class C (ADR 0082 point 9): a lasting alert is sent to its targets again at this interval.
     alert_repeat_hours: int = Field(default=4, ge=1, le=168)
+
+    @property
+    def takes_change_requests(self) -> bool:
+        """Whether a bot's change requests are on (ADR 0023 step 2).
+
+        The deployment runs the machine API and the organisation switched them on; read on an
+        organisation's settings.
+        """
+        return self.agent_api_enabled and self.agent_change_requests_enabled
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":

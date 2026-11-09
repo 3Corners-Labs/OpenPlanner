@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 
+import pytest
+
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.db.uow import SqlUnitOfWork
@@ -14,27 +16,41 @@ from app.adapters.registrations import (
     listing_to_report,
 )
 from app.adapters.webhook_selftest import Delivery, Outcome, deliveries_to_report
+from app.config import Settings
+from app.domain.activity_alert import CHANGES_ALERT, REVEALS_ALERT
 from app.domain.admin import AdminService
+from app.domain.authorization import Principal
 from app.domain.booking import MeetingRef
 from app.domain.calls import EventKind
 from app.domain.event_context import bind_booking, bind_level, trace_scope
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
+from app.domain.participant_contact import CONTACT_VIEWED
 from app.domain.ports import RequestRecord
 from app.domain.request_log import RequestEvents
-from app.domain.services import BookingService
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
+from app.domain.scheduling import DispatchFallback, DispatchKind
+from app.domain.services import BookingService, ContactInput
+from tests.admin.conftest import (
+    AUDITOR,
+    GROUP_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    _running_site,
+)
+from tests.support.admin_site import audit_log, site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 
 
-async def _book(site: Site, slug: str) -> int:
+async def _book(site: Site, slug: str, contact: ContactInput = ADA) -> int:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     uow = SqlUnitOfWork(app.state.engine)
     receipt = await book_confirmed(
         BookingService(uow, site.clock, TEST_TOKEN_KEY),
         group_slug=slug,
         start=FRIDAY_0900,
-        contact=ADA,
+        contact=contact,
         locale="nl",
     )
     booking_id = receipt.booking.id or 0
@@ -70,6 +86,16 @@ async def test_timeline_lists_events_with_reason_codes(site: Site) -> None:
     assert "Videomeeting aangemaakt" in text
     assert "Taak in de wachtrij van het contactcenter gezet" in text
     assert "<code>ENTRY_POINT_NOT_FOUND</code>" in text
+
+
+async def test_the_booking_links_back_to_its_day_in_the_agenda(site: Site) -> None:
+    """The admin shell's own ``back`` (the page itself) once replaced the page's link."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
+
+    assert '<a href="/admin/groups/demo/agenda?day=2026-01-02">Terug naar de agenda</a>' in text
 
 
 async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
@@ -111,6 +137,27 @@ async def test_a_booking_cannot_be_opened_through_another_groups_url(site: Site)
     response = await site.client.get(f"/admin/groups/demo/bookings/{other}")
 
     assert response.status_code == 404
+
+
+async def test_a_group_admin_cannot_tell_another_groups_booking_from_an_unknown_id(
+    site: Site,
+) -> None:
+    """Another group's id answers as an unknown one and leaves nothing in any audit log.
+
+    The page once decided on the booking's own group: such an id was refused (403) where an
+    unknown id was not found (404), and the refusal went into the other organisation's audit
+    log in the prober's name.
+    """
+    other = await _book(site, "andere-team")
+    await site.login_as(GROUP_ADMIN)
+    before = await audit_log(site)
+
+    taken = await site.client.get(f"/admin/groups/demo/bookings/{other}")
+    unknown = await site.client.get(f"/admin/groups/demo/bookings/{other + 1000}")
+
+    assert (taken.status_code, unknown.status_code) == (404, 404)
+    assert taken.text == unknown.text
+    assert await audit_log(site) == before
 
 
 async def test_outsiders_see_neither_agenda_nor_timeline(site: Site) -> None:
@@ -299,6 +346,60 @@ async def test_retry_plans_the_meeting_again_and_says_so(site: Site) -> None:
     assert 'name="job" value="create_video_room"' not in page  # pending now: no second button
     again = await site.client.post(url, data={"job": "send_confirmation"}, headers=SAME_ORIGIN)
     assert "done=retry_not_possible" in again.headers["location"]
+    audit = (await site.client.get(f"/admin/audit?booking={booking_id}")).text
+    assert "videomeeting opnieuw gepland" in audit  # the retry is filed under its booking
+
+
+async def test_a_retry_counts_toward_the_planners_alert_with_its_platform_setting(
+    settings: Settings, admin_db: str
+) -> None:
+    """ADR 0044: a retried call is a change; past ``planner_changes_alert_per_hour``, a warning."""
+    limited = settings.model_copy(update={"planner_changes_alert_per_hour": 5})
+    async with _running_site(limited, admin_db) as site:
+        booking_id = await _failed_meeting(site)
+        await site.login_as(GROUP_ADMIN)
+        url = f"/admin/groups/demo/bookings/{booking_id}/retry"
+        for _ in range(7):
+            response = await site.client.post(
+                url, data={"job": "create_video_room"}, headers=SAME_ORIGIN
+            )
+            assert "done=retried" in response.headers["location"]
+        alerts = [e for e in await audit_log(site) if e.action == CHANGES_ALERT.action]
+
+    assert [(e.group, e.detail) for e in alerts] == [
+        ("demo", f"actor:{GROUP_ADMIN.subject},changes:6")
+    ]
+
+
+async def _in_fallback(site: Site, slug: str) -> None:
+    """Put the group in fallback to its own queue, as the worker does when the center is down."""
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        group = await tx.get_group(slug)
+        assert group is not None
+        fallback = DispatchFallback.OWN_QUEUE
+        kind = DispatchKind.CONTACT_CENTER
+        await tx.save_group(replace(group, dispatch_kind=kind, dispatch_fallback=fallback))
+        await tx.save_group_fallback(group.id, site.clock.now())
+
+
+async def test_ending_a_fallback_by_hand_counts_toward_the_planners_alert(
+    settings: Settings, admin_db: str
+) -> None:
+    """ADR 0044: ending a fallback by hand is a change, counted with the retries before it."""
+    limited = settings.model_copy(update={"planner_changes_alert_per_hour": 5})
+    async with _running_site(limited, admin_db) as site:
+        booking_id = await _failed_meeting(site)
+        await site.login_as(GROUP_ADMIN)
+        retry = f"/admin/groups/demo/bookings/{booking_id}/retry"
+        for _ in range(5):
+            await site.client.post(retry, data={"job": "create_video_room"}, headers=SAME_ORIGIN)
+        await _in_fallback(site, "demo")
+        ended = await site.client.post("/admin/groups/demo/queue/fallback/end", headers=SAME_ORIGIN)
+        alerts = [e for e in await audit_log(site) if e.action == CHANGES_ALERT.action]
+
+    assert "done=fallback_ended" in ended.headers["location"]
+    assert [e.detail for e in alerts] == [f"actor:{GROUP_ADMIN.subject},changes:6"]
 
 
 async def _with_meeting(site: Site, booking_id: int, meeting_id: str) -> None:
@@ -331,3 +432,184 @@ async def test_a_booking_without_a_meeting_shows_no_meeting_id(site: Site) -> No
     detail = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
 
     assert "Meeting-ID" not in detail
+
+
+def _from(page: str) -> dict[str, str]:
+    """Return the headers of the button on ``page``: same origin, and the page as referrer."""
+    return {**SAME_ORIGIN, "referer": f"http://testserver{page}"}
+
+
+async def _contact_views(site: Site) -> list[tuple[str, int | None]]:
+    """Return actor and booking of every *contact details shown* audit event, oldest first."""
+    return [(e.actor, e.booking_id) for e in await audit_log(site) if e.detail == CONTACT_VIEWED]
+
+
+async def test_the_contact_details_show_only_on_request_and_each_request_is_audited(
+    site: Site,
+) -> None:
+    """ADR 0044 §2: name, address and number on Details, never by default (PO, 2026-11-08)."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+    page = f"/admin/groups/demo/bookings/{booking_id}"
+
+    plain = (await site.client.get(page)).text
+    shown = (await site.client.get(f"{page}?contact=show", headers=_from(page))).text
+    english = (await site.client.get(f"{page}?lang=en")).text
+
+    assert '<form method="get" action="#contact">' in plain
+    assert '<input type="hidden" name="contact" value="show">' in plain
+    assert ">Contactgegevens tonen</button>" in plain
+    assert [v for v in ("Lovelace", "ada@example.org", "+31612345678") if v in plain] == []
+    assert "<dt>Naam</dt><dd>Ada Lovelace</dd>" in shown
+    assert '<a href="mailto:ada@example.org">ada@example.org</a>' in shown
+    assert '<a href="tel:+31612345678">+31612345678</a>' in shown
+    assert f'<a href="{page}#contact">Contactgegevens verbergen</a>' in shown
+    assert ">Show contact details</button>" in english
+    assert await _contact_views(site) == [(GROUP_ADMIN.subject, booking_id)]
+
+
+async def test_the_alert_on_many_requests_follows_the_platform_setting(
+    settings: Settings, admin_db: str
+) -> None:
+    """ADR 0044 §2: past ``contact_reveals_alert_per_hour`` requests, one system event."""
+    limited = settings.model_copy(update={"contact_reveals_alert_per_hour": 5})
+    async with _running_site(limited, admin_db) as site:
+        booking_id = await _book(site, "demo")
+        await site.login_as(GROUP_ADMIN)
+        page = f"/admin/groups/demo/bookings/{booking_id}"
+        for _ in range(7):
+            shown = await site.client.get(f"{page}?contact=show", headers=_from(page))
+            assert "ada@example.org" in shown.text
+        alerts = [e for e in await audit_log(site) if e.action == REVEALS_ALERT.action]
+
+    assert [(e.group, e.detail) for e in alerts] == [
+        ("demo", f"actor:{GROUP_ADMIN.subject},reveals:6")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("headers", "referer"),
+    [
+        ({"sec-fetch-site": "cross-site"}, "PAGE"),
+        ({"sec-fetch-site": "same-site"}, "PAGE"),
+        ({"sec-fetch-site": "none"}, ""),
+        ({}, ""),
+        ({}, "https://elders.example/"),
+        (SAME_ORIGIN, ""),
+        (SAME_ORIGIN, "http://testserver/admin/groups/demo/agenda"),
+        ({}, "http://testserver.example/admin/groups/demo/bookings/ID"),
+        ({**SAME_ORIGIN, "sec-purpose": "prefetch;prerender"}, "PAGE"),
+        ({**SAME_ORIGIN, "purpose": "prefetch"}, "PAGE"),
+    ],
+    ids=[
+        "cross-site",
+        "same-site",
+        "typed-shared-or-bookmarked",
+        "no-header",
+        "foreign-referer",
+        "no-referer",
+        "other-page-of-the-portal",
+        "look-alike-host",
+        "prerender",
+        "legacy-prefetch",
+    ],
+)
+async def test_only_the_button_on_the_page_shows_the_contact_details(
+    site: Site, headers: dict[str, str], referer: str
+) -> None:
+    """A shared, bookmarked, crafted or planted address shows and writes nothing."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+    page = f"/admin/groups/demo/bookings/{booking_id}"
+    if referer:
+        referer = referer.replace("PAGE", f"http://testserver{page}").replace("ID", str(booking_id))
+        headers = {**headers, "referer": referer}
+
+    response = await site.client.get(f"{page}?contact=show", headers=headers)
+
+    assert response.status_code == 200
+    assert "ada@example.org" not in response.text
+    assert ">Contactgegevens tonen</button>" in response.text
+    assert await _contact_views(site) == []
+
+
+async def test_behind_a_proxy_the_path_of_the_page_is_enough(site: Site) -> None:
+    """With Fetch Metadata the browser vouches for the origin; a proxy may change the scheme."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+    page = f"/admin/groups/demo/bookings/{booking_id}"
+    button = {**SAME_ORIGIN, "referer": f"https://portal.voorbeeld.nl{page}"}
+
+    text = (await site.client.get(f"{page}?contact=show", headers=button)).text
+
+    assert '<a href="mailto:ada@example.org">ada@example.org</a>' in text
+    assert await _contact_views(site) == [(GROUP_ADMIN.subject, booking_id)]
+
+
+async def test_an_older_browser_shows_them_from_the_page_itself(site: Site) -> None:
+    """Without Fetch Metadata the page's own address as referrer stands in for the button."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+    page = f"/admin/groups/demo/bookings/{booking_id}"
+
+    text = (
+        await site.client.get(
+            f"{page}?contact=show", headers={"referer": f"http://testserver{page}"}
+        )
+    ).text
+
+    assert '<a href="mailto:ada@example.org">ada@example.org</a>' in text
+    assert await _contact_views(site) == [(GROUP_ADMIN.subject, booking_id)]
+
+
+async def test_the_mail_link_encodes_what_could_fill_other_fields_of_the_draft(
+    site: Site,
+) -> None:
+    """RFC 6068: ``?``, ``=`` and ``&`` before the ``@`` must not become cc, subject or body."""
+    booking_id = await _book(site, "demo", replace(ADA, email="ada?cc=x&body=y@example.org"))
+    await site.login_as(GROUP_ADMIN)
+
+    text = (
+        await site.client.get(
+            f"/admin/groups/demo/bookings/{booking_id}?contact=show",
+            headers=_from(f"/admin/groups/demo/bookings/{booking_id}"),
+        )
+    ).text
+
+    assert 'href="mailto:ada%3Fcc%3Dx%26body%3Dy@example.org"' in text
+    assert ">ada?cc=x&amp;body=y@example.org</a>" in text
+
+
+async def test_after_the_purge_the_page_says_the_contact_details_are_deleted(site: Site) -> None:
+    booking_id = await _book(site, "demo")
+    async with site_uow(site).locked() as tx:
+        await tx.purge_personal_data(booking_id, site.clock.now())
+    await site.login_as(GROUP_ADMIN)
+
+    text = (
+        await site.client.get(
+            f"/admin/groups/demo/bookings/{booking_id}?contact=show",
+            headers=_from(f"/admin/groups/demo/bookings/{booking_id}"),
+        )
+    ).text
+
+    assert "De persoonsgegevens van deze afspraak zijn verwijderd." in text
+    assert "Contactgegevens tonen" not in text
+    assert await _contact_views(site) == []
+
+
+@pytest.mark.parametrize("principal", [AUDITOR, OUTSIDER], ids=["auditor", "outsider"])
+async def test_without_bookings_view_the_contact_details_are_refused(
+    site: Site, principal: Principal
+) -> None:
+    booking_id = await _book(site, "demo")
+    await site.login_as(principal)
+
+    response = await site.client.get(
+        f"/admin/groups/demo/bookings/{booking_id}?contact=show",
+        headers=_from(f"/admin/groups/demo/bookings/{booking_id}"),
+    )
+
+    assert response.status_code == 403
+    assert "ada@example.org" not in response.text
+    assert await _contact_views(site) == []

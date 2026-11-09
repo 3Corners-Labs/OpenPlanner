@@ -26,13 +26,13 @@ remove the stack; this map says what to do on it and what counts as proof.
 - The harness is `scripts/journey.mjs`, one journey per feature; each journey starts from the
   state its *Preconditions* name, and `all` runs them in the order they depend on each other.
 - The browser is Dutch (`nl-NL`), like the organisation default; the texts below are the Dutch
-  catalogue texts, and `journey.mjs` names the catalogue key of each in its `NL` table.
+  catalogue texts, and `scripts/labels.json` names the catalogue key of each (`NL` in the scripts).
 - Handles, in this order of preference: a role with its accessible name (`button "Afspraak
   maken"`), a level 1 heading, a `role=status` notice, a route. CSS only where the markup has no
   role: `a.calendar__day[data-day]`, `#times .time-button[value]`, `#agenda-heading`, the profile
   menu `details.admin-profile > summary`, and Keycloak's `#username`, `#password`, `#kc-logout`.
 - Email is read from the Mailpit API by recipient (`/api/v1/search?query=to:"<participant
-  email>"`) and recognised by subject (`SUBJECT` in `journey.mjs`); the journey follows the link
+  email>"`) and recognised by subject (`subject` in `scripts/labels.json`); the journey follows the link
   in the plain-text part, as the participant would.
 - Changes stay in the run's database, which `stack.sh down` deletes; there is nothing to restore
   by hand between runs, so a new proof starts with a new `up`.
@@ -75,3 +75,7 @@ The map names user paths, handles, state and proof; how the code does it belongs
   out at the identity provider, a user without a role.
 - [Group agenda](./admin-agenda.md): the participant's booking as group staff see it, its
   cancelled state, and the refusal of an admin of another organisation.
+- [Contact details on the booking page](./booking-contact.md): the details only on request,
+  hiding them again, and the request in the audit log without them.
+- [Admin layout on a laptop screen](./admin-layout.md): admin pages at 1280 × 800 keep their
+  content in their boxes, tables show their last column, and the texts read right.

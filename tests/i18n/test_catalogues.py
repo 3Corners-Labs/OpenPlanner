@@ -68,3 +68,36 @@ def test_every_catalogue_key_is_used(catalogues: dict[str, dict[str, str]]) -> N
     quoted = set(_QUOTED.findall(_sources()))
 
     assert set(catalogues[DEFAULT_LOCALE]) <= quoted
+
+
+DESIGN_RECORD = re.compile(r"\bADR[ -]?\d+\b")
+"""A reference to a design record of docs/adr/: the team's shorthand, never the user's."""
+
+
+def test_no_interface_text_names_a_design_record(catalogues: dict[str, dict[str, str]]) -> None:
+    """The new-role page once said "(ADR 0049)" in its notice on entitlement claims."""
+    for locale, messages in catalogues.items():
+        named = sorted(key for key, text in messages.items() if DESIGN_RECORD.search(text))
+        assert named == [], locale
+
+
+SAME_SETTING = {
+    "admin.group.slot_minutes": "admin.field.slot_minutes",
+    "admin.group.notice": "admin.field.min_notice_minutes",
+    "admin.group.horizon": "admin.field.horizon_days",
+}
+"""A fact of the group overview and the settings field it shows (overview fact: field)."""
+
+UNIT = re.compile(r" \([^()]*\)$")
+"""The unit a field's label ends with: " (minuten)"."""
+
+
+@pytest.mark.parametrize("locale", REQUIRED)
+@pytest.mark.parametrize(("fact", "field"), SAME_SETTING.items())
+def test_the_group_overview_names_a_setting_as_its_field_does(
+    catalogues: dict[str, dict[str, str]], locale: str, fact: str, field: str
+) -> None:
+    """The overview said "Minimale aanmeldtijd" where the settings said "aanlooptijd"."""
+    messages = catalogues[locale]
+
+    assert UNIT.sub("", messages[field]) == messages[fact]

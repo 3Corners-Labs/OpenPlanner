@@ -142,6 +142,9 @@ class StaffMember:
         id: Database id, used in links instead of the subject.
         status: Active, suspended or erased (ADR 0046 step 2).
         status_at: When the status last changed; ``None`` for a person never suspended or erased.
+        email: The verified ``email`` claim of the last login, ``None`` when the provider gave
+            none or did not call it verified (ADR 0117 step 10b); personal data, never logged.
+        email_at: When ``email`` was last read at a login (UTC).
     """
 
     subject: str
@@ -157,6 +160,8 @@ class StaffMember:
     refused: tuple[RefusedEntitlement, ...] = ()
     status: StaffStatus = StaffStatus.ACTIVE
     status_at: datetime | None = None
+    email: str | None = field(default=None, repr=False)
+    email_at: datetime | None = None
 
     @property
     def organisations(self) -> list[str]:
@@ -173,11 +178,13 @@ class StaffMember:
         """Return the record with every personal and access detail removed (ADR 0046 point 9).
 
         The subject, the id and the timestamps stay, so the audit log still resolves to "an
-        erased person"; the name, roles, memberships and refused values go.
+        erased person"; the name, address, roles, memberships and refused values go.
         """
         return replace(
             self,
             display_name="",
+            email=None,
+            email_at=None,
             roles=frozenset(),
             memberships=frozenset(),
             refused=(),

@@ -41,9 +41,15 @@ changes, one small record per change.
 - **Bookings from before reporting**: outcomes of bookings that were merged into daily counts before
   usage was counted; nothing more is known about them.
 
+## The tiles, the charts and *Split by*
+
+At the top of **Volume** four tiles give the answer before the tables: bookings in the period, the no-show rate, the share cancelled by participants (with how many of those were less than a day before the start) and the share confirmed after the email (with the bucket the median time falls in). **Capacity** has four as well: utilisation (with booked of all places), unused places, full blocks and the staff shortfall. A tile made from a figure that is hidden says *not available*; it never shows a number the tables hide. Under every table that hides a count a sentence says why, including that one more count is hidden when a single one would give the total away.
+
+The range form on **Volume** has **Split by**: none, queue method or language. A group takes part in a split only when its own total in the period is at least five times the minimum; the page says how many groups were left out. Splitting by subject is not offered yet.
+
 ## The report families
 
-At the top of the Usage page a row of links switches between four families of the same report. The
+At the top of the Usage page a row of links switches between four families of the same report (a fifth, *Team*, is for organisation admins whose organisation switched it on). The
 period you chose stays; every family has a URL you can bookmark. The first, **Volume**, is the set
 of tables above; the others are below.
 
@@ -102,6 +108,29 @@ of one fixed height labelled *< 5*: it says nothing about the real number. The c
 script, scroll sideways inside their frame on a narrow screen, and are left out when printing; the
 tables remain. When nothing has been recorded for a family in the period, the page says so.
 
+With scripts on, a chart can also be explored: hover it or focus it and use the arrow keys for a tip with the numbers of that category, switch a series off with its button, download the chart as SVG or PNG, and press Enter on a day to see only that day (the day is an ordinary link in the table, so it works without scripts too). Without scripts the charts and tables are all there.
+
+## Downloading as a file
+
+Whoever may export (the superuser, organisation admins, group admins and the Compliance and privacy role) sees two links under the period on a Usage page.
+
+- **Download this report as CSV** gives exactly the tables of the family you are looking at, after the small-count rule: a hidden figure is an empty value with the note *hidden*. The file has no text of the interface, only codes (a day, an outcome, a bucket number), so it reads the same in every language.
+- **Download all hourly figures as CSV** gives one row per hour, group, metric and cut, for analysis in your own tool (the format `openplanner.usage/1`, described in `docs/reporting.md`). A cell below the minimum is not in the file at all.
+
+Both open in Excel (UTF-8, `;` as separator). The platform administrator sets how many rows and days one file may hold; a longer period is refused with a message, and the file is not cut short. Every download is recorded in the audit log with who, which family, which period, how many rows and a checksum of the file, never the figures. The checksum is also in the `X-Content-SHA256` header of the response. As with the audit log export, a link to a download on another website gets an error page in a current browser, so another website cannot put a download in your name in the log.
+
+## The digest by email
+
+Organisation admins see a section **Digest by email** at the bottom of the organisation's *Usage* page. A subscription is for the whole organisation or for one group and has a period: every day, every week (on a weekday) or every month (on a day from 1 to 28). The mail goes out at the organisation's send hour (7:00 unless changed) in the group's time zone, covers the days since the last mail up to and including yesterday, and holds the main figures (bookings created, no shows, the mean wait until a call connects, utilisation) and a link to the report of those days. A hidden figure shows a dash. If your organisation switches the figures off, only the link remains.
+
+Recipients are colleagues who hold the right to see the reports for that scope, chosen from a list. There are no free email addresses and no file goes with the mail: the link leads to the report, where you sign in as usual. The right is checked again when the mail goes out. A colleague who lost it is skipped and the list says how many; a colleague without a known address is skipped too. The address is the verified email address the sign-in provider gave at the colleague's last login (shown on the colleague's page under *Staff*); a colleague who has not logged in since then is looked up in the bundled provider instead. A missed mail is still sent for up to 24 hours; later it is skipped, and the list shows how the last mail went. Every change to a subscription is in the audit log.
+
+### Team
+
+The load per team member: calls handled, minutes in calls, claims from the own queue and the share of scheduled calls the host joined on time. It is for organisation admins only (the right *See the load per team member in the reports*) and **off by default**: until your organisation switches on **Show the load of each team member in the reports** in its settings, nothing about a person is written, and the *Team* link on the Usage page says *off* with a link to the setting. Switching it on counts from that moment; earlier calls are not in it, and switching it off stops the counting again (what was counted stays until the retention period ends).
+
+The table is sorted by name. There is no ranking, no *top* or *worst* list, no total row and no cut by group or hour. A figure below the minimum is hidden and written as *< 5*, and the minutes go with the calls. Only calls an agent claimed from the own queue are attributed to a person; a call the contact center handled has no team member in this installation. When a team member is removed, their figures become one row, *Former team members*, so the history keeps its totals and no individual remains. The Team family is not in the CSV files or the machine interface.
+
 ## What is not here yet
 
-Per team member, the digest by email and the export to a file. Those come in later steps of the same design.
+The share of staffed time spent in calls (team utilisation) follows in a later step.

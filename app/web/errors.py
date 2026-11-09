@@ -13,6 +13,10 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.SLOT_FULL: "error.slot_full",
     ErrorCode.BOOKING_LIMIT_REACHED: "error.booking_limit_reached",
     ErrorCode.SLOT_UNAVAILABLE: "error.slot_unavailable",
+    # ADR 0023 step 2: the machine API answers these as codes; the texts are for completeness.
+    ErrorCode.CHANGE_REQUESTS_DISABLED: "error.change_requests_disabled",
+    ErrorCode.INVALID_APPOINTMENT_CODE: "error.invalid_appointment_code",
+    ErrorCode.CHANGE_REQUEST_NOT_FOUND: "error.change_request_not_found",
     ErrorCode.OUTSIDE_BOOKING_WINDOW: "error.outside_booking_window",
     ErrorCode.BOOKING_LOCKED: "error.booking_locked",
     ErrorCode.PROPOSAL_NOT_OPEN: "error.proposal_not_open",
@@ -86,6 +90,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.MAINTENANCE: "error.maintenance",
     ErrorCode.MAINTENANCE_FROM_ENVIRONMENT: "admin.form.error.maintenance_from_environment",
     ErrorCode.QUEUE_NOT_ENABLED: "error.not_found.text",
+    ErrorCode.STAFF_VIEW_OFF: "error.not_found.text",
     ErrorCode.QUEUE_EMPTY: "error.queue_empty",
     ErrorCode.ALREADY_CLAIMED: "error.already_claimed",
     ErrorCode.FREE_PICK_NOT_ALLOWED: "error.free_pick_not_allowed",
@@ -118,9 +123,6 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",
-    ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: (
-        "admin.form.error.configuration_installation_in_use"
-    ),
     # ADR 0099: the configuration document.
     ErrorCode.CONFIGURATION_FORMAT_UNSUPPORTED: "admin.form.error.configuration_format_unsupported",
     ErrorCode.CONFIGURATION_UNKNOWN_FIELD: "admin.form.error.configuration_unknown_field",
@@ -166,6 +168,7 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.UPDATE_REQUEST_NOT_FOUND: 404,
     ErrorCode.ROLE_NOT_FOUND: 404,
     ErrorCode.QUEUE_NOT_ENABLED: 404,
+    ErrorCode.STAFF_VIEW_OFF: 404,
     ErrorCode.NOT_PERMITTED: 403,
     ErrorCode.DATABASE_BUSY: 503,
     ErrorCode.MAINTENANCE: 503,

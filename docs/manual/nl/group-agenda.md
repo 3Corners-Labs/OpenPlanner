@@ -13,8 +13,9 @@ meteen in de agenda.
 
 Elk tijdslot van de dag staat in een eigen blok, met de tijd, het aantal medewerkers en het
 aantal bevestigde afspraken. Daaronder staan de afspraken met de voornaam van de deelnemer,
-de stand van de videomeeting (met daaronder het Webex-meeting-ID) en de contactcentertaak. Het e-mailadres en het telefoonnummer
-ziet u alleen op de detailpagina van een afspraak (**Details**).
+de stand van de videomeeting (met daaronder het Webex-meeting-ID) en de contactcentertaak. De
+volledige naam, het e-mailadres en het telefoonnummer staan alleen op de detailpagina van een
+afspraak (**Details**), en ook daar pas als u erom vraagt (zie *De deelnemer bereiken*).
 
 - **Gesloten**: een noodsluiting valt over dit tijdslot.
 - **Buiten de bezetting**: er staat hier alleen een geannuleerde of afgelopen afspraak; de
@@ -73,6 +74,37 @@ videogesprek of contactcentertaak niet goed gaat:
   geeft u door aan Cisco-support als Webex de fout moet uitzoeken. Er staan geen
   persoonsgegevens in. Deze verzoeken worden standaard 30 dagen bewaard.
 
+## De deelnemer bereiken
+
+Op de detailpagina staan de contactgegevens van de deelnemer niet zomaar: u ziet ze pas als u
+**Contactgegevens tonen** kiest. Dan staan er de voor- en achternaam, het e-mailadres en het
+telefoonnummer, als de deelnemer dat opgaf (anders staat er *Niet opgegeven*). Met een klik op
+het nummer of het adres belt of mailt u vanuit uw eigen programma.
+
+- Toon ze alleen als u de deelnemer moet bereiken, bijvoorbeeld als een afspraak niet meer kan
+  worden gewijzigd (zie *Afspraken wijzigen*). Wie de pagina opent om een storing uit te
+  zoeken, ziet ze niet.
+- Elke keer dat u ze toont, legt het auditlog vast wie dat deed, bij welk team en bij welke
+  afspraak (*Contactgegevens van de deelnemer getoond*). De gegevens zelf staan er niet in.
+- Toont één persoon de contactgegevens binnen een uur vaker dan de grens van het platform
+  (standaard 20 keer), dan komt er één waarschuwing in het auditlog: *Veel verzoeken om
+  contactgegevens door één persoon*, met wie het was en hoe vaak. Ook dezelfde afspraak opnieuw
+  telt mee. Het tonen gaat gewoon door; de superuser stelt de grens in (zie
+  [Geavanceerde instellingen](advanced-settings.md)).
+- Met **Contactgegevens verbergen** haalt u ze weer van het scherm, bijvoorbeeld voordat u een
+  schermafdruk maakt voor Webex-support.
+- Alleen de knop op de pagina zelf toont ze. Opent u de pagina via een gedeelde link (in een
+  mail of chat), een bladwijzer of een link op een andere website of pagina, dan staan ze er
+  niet en komt er niets in het auditlog; kies dan zelf **Contactgegevens tonen**. Toont ook de
+  knop ze niet, dan geeft uw browser of het netwerk niet door vanaf welke pagina u kwam (de
+  *referrer*); vraag uw beheerder dat voor het portaal toe te staan.
+- Zijn de persoonsgegevens van de afspraak verwijderd (zie
+  [Gegevensvelden en persoonsgegevens](data-fields.md)), dan staat dat er en is er niets meer
+  te tonen.
+
+Iedereen die de afspraken van de groep mag zien, kan ze tonen. De rol Compliance en privacy kan
+dat nooit, en medewerkers in de wachtrij zien alleen de voornaam.
+
 ## Weekoverzicht
 
 Een tabel met de tijden in de rijen en de dagen van maandag tot en met zondag in de kolommen.
@@ -107,6 +139,10 @@ namens deelnemer**. De deelnemer krijgt dan dezelfde bevestiging met alle gegeve
 eigen bevestigen, en het auditlog legt vast wie bevestigde. Na het moment van vervallen kan dat
 niet meer.
 
+Een niet bevestigde afspraak kunt u ook **Verplaatsen** of **Annuleren** zoals een bevestigde.
+Een verplaatste afspraak blijft niet bevestigd en krijgt een nieuw moment van vervallen. Om een
+nieuwe tijd vragen kan niet: die afspraak vervalt vanzelf als niemand bevestigt.
+
 ## Afspraken wijzigen
 
 Met het recht **Boekingen wijzigen** (groepsbeheerders, organisatiebeheerders en een eigen
@@ -116,7 +152,9 @@ e-mail, en per sms als de deelnemer een telefoonnummer opgaf. U logt daarvoor so
 
 Een afspraak kan niet meer worden gewijzigd als die binnen de tijd van **Wijzigen door een
 planner** begint (instelling van de groep, standaard 60 minuten), als die al naar het
-contactcenter is gegaan, of als die al is geannuleerd. Bel de deelnemer dan.
+contactcenter is gegaan, of als die al is geannuleerd. Neem dan zelf contact op met de
+deelnemer: kies bij de afspraak **Details** en dan **Contactgegevens tonen** (zie *De deelnemer
+bereiken*).
 
 ### Verplaatsen
 
@@ -149,6 +187,33 @@ toont OpenPlanner de nieuwe lijst en vraagt het u opnieuw te bevestigen.
 De afspraken die op een nieuwe tijd wachten, staan in de lijst **Wacht op nieuwe tijd** bij de
 agenda, met de oorspronkelijke tijd, de reden en de datum waarop de vraag vervalt. Ook daar
 kunt u een afspraak zelf verplaatsen of annuleren.
+
+### Een nieuwe tijd voorstellen
+
+Met **Nieuwe tijd voorstellen** bij een bevestigde afspraak zoekt de assistent een vrije tijd
+voor de deelnemer: eerst hetzelfde tijdstip op een andere dag, dan het kleinste verschil in
+tijdstip, dan de dichtstbijzijnde dag. U kunt die tijd houden of een andere vrije tijd kiezen.
+De oude plek komt meteen vrij; de voorgestelde tijd wordt voor de deelnemer vastgehouden en telt
+in de agenda mee als niet bevestigd. De deelnemer krijgt het voorstel per e-mail (en sms als er
+een telefoonnummer is) en kan de nieuwe tijd bevestigen, zelf een andere tijd kiezen of
+annuleren. Zonder bevestiging verplaatsen we niets: na de termijn komt de vastgehouden tijd vrij
+en kan de deelnemer nog zelf kiezen tot de vraag vervalt.
+
+Bij een tijdslot met een tekort staat ook **Nieuwe tijden voorstellen**. U ziet per afspraak
+(de laatst gemaakte, zoveel als het tekort) de voorgestelde tijd. Per afspraak kunt u een
+andere tijd kiezen, de deelnemer zelf laten kiezen of de afspraak uitvinken. Alles gaat in één
+keer; past een gekozen tijd intussen niet meer, dan verstuurt OpenPlanner niets en toont het de
+lijst opnieuw. Met **Nieuwe tijden voorstellen voor deze dag** (dagoverzicht) of **voor deze week**
+(weekoverzicht) beoordeelt u alle tijdsloten met een tekort in één keer; de assistent geeft twee
+afspraken nooit dezelfde laatste plek. Een tijd zonder vrije medewerker stelt OpenPlanner niet voor.
+
+In **Wacht op nieuwe tijd** staat bij een voorstel de voorgestelde tijd en tot wanneer die wordt
+vastgehouden. Na een telefoongesprek kunt u daar **Bevestigen namens deelnemer** kiezen; de
+deelnemer krijgt dan de bevestiging met de nieuwe tijd. Met **Voorstel intrekken** komt de
+vastgehouden tijd vrij en wacht de afspraak verder op een tijd van de deelnemer.
+
+Hoe lang een voorstel wordt vastgehouden, wanneer de herinnering gaat en hoe ver de assistent
+zoekt, stelt de beheerder van de organisatie in bij de instellingen (onderwerp Planner).
 
 ### Tekort accepteren
 

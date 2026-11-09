@@ -84,6 +84,13 @@ superuser ziet de stand ook op **Systeemstatus**, onder *Medewerkerbeheer*.
   (standaard 90 dagen). Gebruik dit voor een periodieke toegangscontrole: heeft deze persoon
   de toegang nog nodig?
 
+## Het e-mailadres van een medewerker
+
+Het e-mailadres op de pagina van een medewerker is het adres dat de inlogdienst bij de laatste
+login doorgaf, en alleen bewaard als de inlogdienst zegt dat het geverifieerd is. De
+gebruiksoverzicht-mail (*Rapporten*) gaat ernaartoe. Het wordt bij elke login vervangen of
+gewist en verdwijnt als de persoon wordt gewist.
+
 ## De pagina van een medewerker
 
 Klik op een naam. U ziet de toegang, de tijden en de recente activiteit uit de auditlog:
@@ -125,7 +132,7 @@ superuser schorsen. Elke stap is een auditgebeurtenis (`staff.suspended`, `staff
 met de beheerder en de persoon, zonder naam.
 
 De superuser kan de gegevens van een geschorste persoon ook **wissen** (permissie
-`staff.erase`): naam, rollen en lidmaatschappen verdwijnen en de pagina toont daarna *Gewiste
+`staff.erase`): naam, e-mailadres, rollen en lidmaatschappen verdwijnen en de pagina toont daarna *Gewiste
 medewerker*. Het auditlog blijft naar die gewiste persoon verwijzen. Dit kan niet ongedaan
 worden gemaakt. Logt de persoon daarna opnieuw in, dan begint een nieuw record.
 

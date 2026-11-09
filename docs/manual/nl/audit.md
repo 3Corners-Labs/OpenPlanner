@@ -21,10 +21,11 @@ Het log bevat nooit gegevens van deelnemers: geen namen, e-mailadressen of telef
 
 - **Minimaal niveau**: bijvoorbeeld *Waarschuwing* toont waarschuwingen, fouten en kritieke
   meldingen. Geweigerd en opnieuw proberen zijn waarschuwingen, mislukt is een fout.
-- **Soort**: *Beheeracties* (inloggen, wijzigingen, weigeringen), *Systeem* (berichten,
-  videogesprekken, verwijderen van gegevens, opslag, de automatische controle van de
-  koppeling), *Beveiliging* (geweigerde webhooks, mislukte vernieuwing van het Webex-token) en
-  *Diagnose*.
+- **Soort**: *Beheeracties* (inloggen, wijzigingen, weigeringen, het tonen van de
+  contactgegevens van een deelnemer), *Systeem* (berichten, videogesprekken, verwijderen van
+  gegevens, opslag, de automatische controle van de koppeling, de waarschuwing bij veel
+  wijzigingen of veel verzoeken om contactgegevens door één persoon in een uur), *Beveiliging*
+  (geweigerde webhooks, mislukte vernieuwing van het Webex-token) en *Diagnose*.
 - **Van** en **Tot en met**: hele dagen in de tijdzone van het portaal.
 - **Keten-id**: alle regels van één verzoek of één taak. U komt er ook met **Hele keten**
   bij een regel.
@@ -45,6 +46,10 @@ groepsbeheerders niet.
 - Zonder periode krijgt u de laatste 366 dagen. Een langere periode of meer dan 100.000
   regels wordt geweigerd: maak het filter dan nauwer.
 - Elke export komt zelf in het auditlog, met het aantal regels.
+- De download start met de knop, of met een adres dat u intypt, als bladwijzer bewaart of uit
+  een ander programma opent. In een actuele browser geeft een link ernaar op een andere website
+  (ook mail of chat in de browser) een foutmelding, zodat een andere website geen export op uw
+  naam in het log kan zetten.
 
 Een export bevat de identificatie (subject) van beheerders. Bewaar het bestand volgens het
 beleid van uw organisatie.

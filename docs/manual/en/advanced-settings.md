@@ -196,6 +196,12 @@ items again within about ten seconds. Set the client id, client secret and refre
   level TRACE after at most the hours of *TRACE_LEVEL_MAX_HOURS* (4 by default). Enter after
   how many hours. Personal data stays masked in the log at every level; TRACE lines carry only
   the fixed fields of `docs/logging.md`.
+- Two planner settings warn about many actions by one person within an hour: **Alert above
+  changes per planner per hour** (50 by default, 5 to 1000) and **Alert above requests for
+  contact details per person per hour** (20 by default, 5 to 500). Above the limit, one warning
+  goes into the audit log naming who it was and how often. The changes and requests themselves
+  still go ahead: a stolen session or misuse stands out without stopping a planner. They cannot
+  be switched off.
 
 You need a recent login to change a setting. Every change is recorded in the audit log with
 the old and the new value; a refused change is recorded too.
@@ -215,29 +221,21 @@ any part fails. A document holding sealed secrets asks for its passphrase again.
 own document is on **Overview → Configuration** of that organisation. Every applied change is
 in the audit log, without values, and you must have logged in recently.
 
-**As a SQLite package (until it is retired).** A configuration package holds every setting of this installation: organisations, teams,
-opening hours and exceptions, reminders, texts, form fields, contact options, holiday
-calendars, closure scenarios, branding, email and SMS channels, identity providers, API
-clients, roles and the platform settings, with their secrets. Bookings, slots, the audit log
-and staff stay behind. It sets up a new installation (test or production) in one go, without
-entering every password and key again.
+**As an old SQLite package (read for one release).** Earlier versions exported the whole
+configuration as a SQLite file. That export is gone: use **Export document** above. A package
+that already exists can still be applied once: choose the file in the SQLite block, enter its
+passphrase and tick that the platform's configuration will be replaced. The package is
+converted into a document that replaces the platform's configuration, and that document is
+planned and applied like any other, with your rights per change. What is in use is never
+deleted: a team with bookings, an active closure, a shortfall acceptance or API access makes
+the whole import refuse, with the reason on the screen, and nothing is written. The package
+must be from the same version of OpenPlanner. Staff and the audit log stay. After the import
+the settings apply within ten seconds. The server's bootstrap keys (`SETTINGS_ENCRYPTION_KEY`
+and the other two) never travel: every installation keeps its own.
 
-**Export.** Choose a passphrase of at least 16 characters and repeat it. You get a file
-`openplanner-configuration-….sqlite`. The secrets in it are encrypted with the passphrase,
-which is stored nowhere. Without the passphrase the package is worthless; with it, it holds
-every secret of the platform. Keep the file and the passphrase apart, and no longer than you
-need them.
-
-**Import.** Choose the file, enter the passphrase and tick that every setting of this
-installation will be replaced. That is possible only in an installation without bookings,
-slots or an active closure: a new one. Staff and the audit log stay. The package must be from
-the same version of OpenPlanner; if it is not, export it again from an installation on this
-version. After the import the settings apply within ten seconds. The server's bootstrap keys
-(`SETTINGS_ENCRYPTION_KEY` and the other two) never travel: every installation keeps its own.
-
-Every export and import is in the audit log, without the passphrase and without values. You
-must have logged in recently. The largest package allowed is the platform setting *Largest
-configuration package*.
+Every applied change and every import is in the audit log, without the passphrase and without
+values. You must have logged in recently. The largest file allowed is the platform setting
+*Largest configuration package*.
 
 **Through the API.** A pipeline can do the same without the portal: an API client with the
 scope *Export and import the configuration package* (`configuration:transfer`, granted on

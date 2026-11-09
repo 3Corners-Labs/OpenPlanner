@@ -7,6 +7,7 @@ import pytest
 
 from app.adapters.db.text_overrides import CachedTextOverrides
 from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact
+from app.domain.change_requests import ChangeRequest, derive_code, format_code
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
@@ -772,3 +773,66 @@ def test_a_reminder_after_a_rotation_carries_the_link_the_booking_was_given() ->
     assert forgotten.manage_url(booking) != link  # the defect the previous key fixes
     new_booking = replace(BOOKING, token_hash=hash_token(derive_token(new_key, SALT)))
     assert after.manage_url(new_booking).endswith(derive_token(new_key, SALT))
+
+
+# --- ADR 0023 step 2: a bot's change request and the appointment code -----------------------
+
+CANCEL_REQUEST = ChangeRequest(
+    "chr_x", "opc_bot", 1, None, 42, SLOT_0900, NOW, NOW + timedelta(hours=1)
+)
+MOVE_REQUEST = replace(CANCEL_REQUEST, target_start=SLOT_0930)
+
+
+def test_a_change_request_names_the_change_its_deadline_and_its_confirm_page(
+    composer: MessageComposer,
+) -> None:
+    cancel = composer.compose(
+        JobType.SEND_CHANGE_REQUEST, BOOKING, GROUP, NOW, change=CANCEL_REQUEST
+    )
+    move = composer.compose(JobType.SEND_CHANGE_REQUEST, BOOKING, GROUP, NOW, change=MOVE_REQUEST)
+
+    token = derive_token(TEST_TOKEN_KEY, SALT)
+    assert cancel.subject == "Bevestig de wijziging van uw videogesprek"
+    assert "gevraagd uw videogesprek" in cancel.text
+    assert "te annuleren. Bevestig dit voor donderdag 1 januari 2026, 10:00" in cancel.text
+    assert "te verplaatsen naar maandag 5 januari 2026 om 09:30" in move.text
+    assert "Voorgestelde tijd: maandag 5 januari 2026, 09:30" in move.text
+    for message in (cancel, move):
+        assert f"/b/{token}/change" in message.text
+        assert "/join" not in message.text
+        assert message.attachments == ()
+        assert "Afspraakcode" not in message.text
+
+
+def test_a_change_request_has_an_sms_with_the_confirm_link(composer: MessageComposer) -> None:
+    sms = composer.compose(
+        JobType.SEND_CHANGE_REQUEST,
+        SMS_BOOKING,
+        GROUP,
+        NOW,
+        channel=ChannelKind.SMS,
+        change=MOVE_REQUEST,
+    )
+
+    assert "te verplaatsen naar maandag 5 januari 2026 om 09:30" in sms.text
+    assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}/change" in sms.text
+
+
+def test_a_change_request_message_needs_its_request(composer: MessageComposer) -> None:
+    with pytest.raises(ValueError, match="change request"):
+        composer.compose(JobType.SEND_CHANGE_REQUEST, BOOKING, GROUP, NOW)
+
+
+def test_the_code_is_in_messages_that_link_the_booking_when_switched_on(
+    composer: MessageComposer,
+) -> None:
+    code = format_code(derive_code(TEST_TOKEN_KEY, SALT))
+
+    shown = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW, show_code=True)
+    hidden = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
+    cancelled = composer.compose(JobType.SEND_CANCELLATION, BOOKING, GROUP, NOW, show_code=True)
+
+    assert f"Afspraakcode: {code}" in shown.text
+    assert f"<dd>{code}</dd>" in (shown.html or "")
+    assert code not in hidden.text
+    assert code not in cancelled.text

@@ -6,13 +6,14 @@ superuser's switch in the admin portal then decides whether it answers.
 
     oauth/token   client credentials → bearer token          (token)
     me, groups, groups/{slug}/availability                   (routes)
+    groups/{slug}/change-requests, change-requests/{id}     (change_routes)
     openapi.json, docs   only while published                (docs)
 """
 
 from fastapi import Depends, FastAPI
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.api.agent import docs, routes, token
+from app.api.agent import change_routes, docs, routes, token
 from app.api.agent.errors import register_errors
 from app.api.maintenance import machine_gate, register_machine_maintenance
 from app.config import AGENT_API_PREFIX as PREFIX
@@ -65,5 +66,6 @@ def create_agent_api() -> FastAPI:
     register_machine_maintenance(app)
     app.include_router(token.router)
     app.include_router(routes.router)
+    app.include_router(change_routes.router)
     app.include_router(docs.router)
     return app
