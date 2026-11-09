@@ -21,12 +21,13 @@ from datetime import timedelta
 from app.domain.admin import AdminService, require
 from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Principal
-from app.domain.booking import Booking, MeetingRef, TrialCall
+from app.domain.booking import MeetingRef, TrialCall
 from app.domain.calls import EventKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
-from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.lookups import group_booking
+from app.domain.ports import Clock, UnitOfWork
 from app.domain.scheduling import Group
 from app.domain.trial_call import TrialState, trial_state
 
@@ -106,7 +107,7 @@ class SimulationService:
         created: list[EventKind] = []
         now = self._clock.now()
         async with self._uow.locked() as tx:
-            booking, group = await _booking(tx, slug, booking_id)
+            booking, group = await group_booking(tx, slug, booking_id)
             meeting_id = booking.meeting.id if booking.meeting else None
             if meeting_id is None:
                 meeting_id = f"simulated-meeting-{booking_id}"
@@ -140,7 +141,7 @@ class SimulationService:
         """
         await self._authorize(principal, slug)
         async with self._uow.read() as tx:
-            booking, _ = await _booking(tx, slug, booking_id)
+            booking, _ = await group_booking(tx, slug, booking_id)
         return SimulationIds(
             booking.meeting.id if booking.meeting else None,
             booking.contact_center_task.id if booking.contact_center_task else None,
@@ -157,7 +158,7 @@ class SimulationService:
         """
         organisation = await self._authorize(principal, slug)
         async with self._uow.read() as tx:
-            await _booking(tx, slug, booking_id)
+            await group_booking(tx, slug, booking_id)
         await self._admin.record(
             principal.subject, PLAY_EVENT, Outcome.SUCCESS, name[:64], organisation, slug
         )
@@ -173,16 +174,3 @@ class SimulationService:
         if organisation is None:  # pragma: no cover - a group target always has one
             raise DomainError(ErrorCode.GROUP_NOT_FOUND)
         return organisation
-
-
-async def _booking(tx: Transaction, slug: str, booking_id: int) -> tuple[Booking, Group]:
-    """Return the booking and its group if the booking belongs to group ``slug``.
-
-    Raises:
-        DomainError: ``booking_not_found`` (also for another group's booking).
-    """
-    booking = await tx.get_booking(booking_id)
-    group = await tx.get_group(slug)
-    if booking is None or group is None or booking.group_id != group.id:
-        raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
-    return booking, group

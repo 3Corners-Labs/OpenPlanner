@@ -5,7 +5,7 @@ behalf; the participant is always told. Moving is ``BookingService.relocate``, s
 participant's own reschedule. This module holds the steps both callers run inside their own
 locked transaction, and the planner's limits:
 
-    planner may change?  confirmed, scheduled, not dispatched, starts after the lead
+    planner may change?  confirmed or pending, scheduled, not dispatched, starts after the lead
     cancel               status cancelled (+ reason) ─► jobs: end task, delete meeting,
                          cancellation mail (and SMS when reachable), purge
     request rebook       status awaiting_rebook (+ reason, rebook_by), place freed ─► jobs:
@@ -71,10 +71,11 @@ class ProposalTiming:
 def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> None:
     """Refuse a planner's change that needs a phone call instead of a message.
 
-    A booking can be changed while it is confirmed, scheduled (not a direct call), not yet
-    dispatched to the contact center, and starts more than the group's planner lead from now
-    (never less than the dispatch lead). A booking awaiting a new time can always be moved or
-    cancelled: it does not go ahead at its time anyway.
+    A booking can be changed while it is confirmed or awaiting the participant's confirmation
+    (ADR 0056 point 11: moved or cancelled like a confirmed one), scheduled (not a direct call),
+    not yet dispatched to the contact center, and starts more than the group's planner lead from
+    now (never less than the dispatch lead). A booking awaiting a new time can always be moved
+    or cancelled: it does not go ahead at its time anyway.
 
     Raises:
         DomainError: ``booking_not_active`` or ``planner_too_late``.
@@ -83,11 +84,20 @@ def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> 
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     if booking.awaits_rebook:
         return
-    if not booking.is_active:
+    if not (booking.is_active or booking.awaits_confirmation):
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     lead = max(group.planner_lead, group.dispatch_lead)
     if booking.contact_center_task is not None or now >= booking.start - lead:
         raise DomainError(ErrorCode.PLANNER_TOO_LATE)
+
+
+def planner_may_request_rebook(booking: Booking, group: Group, now: datetime) -> bool:
+    """Return whether a planner may ask ``booking``'s participant to choose a new time.
+
+    Only a confirmed booking a planner may change: one awaiting confirmation is moved,
+    cancelled or left to lapse (ADR 0056 point 11), one awaiting a new time already waits.
+    """
+    return booking.is_active and planner_may_change(booking, group, now)
 
 
 def planner_may_change(booking: Booking, group: Group, now: datetime) -> bool:
@@ -136,8 +146,13 @@ async def cancel(
     await release_proposal(tx, booking, now, ProposalOutcome.CANCELLED)
     await tx.save_booking(cancelled)
     await record_cancelled(tx, booking, group, now, actor, reason=reason)
+    # A booking awaiting confirmation was never sent to the team nor by SMS (ADR 0056): its
+    # cancellation goes by email only, and the team gets no withdrawal.
+    confirmed = not booking.awaits_confirmation
     jobs = plan_for_cancellation(
-        cancelled_at=now, sms=sms and sms_reachable(booking), team_invite=team_invite
+        cancelled_at=now,
+        sms=sms and confirmed and sms_reachable(booking),
+        team_invite=team_invite and confirmed,
     )
     await tx.replace_jobs(_id(booking), jobs)
     return cancelled

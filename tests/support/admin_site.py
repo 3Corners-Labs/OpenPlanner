@@ -7,7 +7,7 @@ import httpx
 from fastapi import FastAPI
 
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.audit import Outcome
+from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Scope
 from tests.admin.conftest import SAME_ORIGIN, Site
 
@@ -27,10 +27,13 @@ async def post_form(site: Site, path: str, data: dict[str, str] | None = None) -
     return await site.client.post(path, data=data or {}, headers=SAME_ORIGIN)
 
 
-async def audit_events(site: Site) -> list[tuple[str, str, Outcome, str]]:
-    """Return actor, action, outcome and reason of the newest 50 audit events, oldest first."""
+async def audit_log(site: Site) -> list[AuditEvent]:
+    """Return the newest 50 audit events of the site, oldest first."""
     async with site_uow(site).read() as tx:
         events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [
-        (e.event.actor, e.event.action, e.event.outcome, e.event.reason) for e in reversed(events)
-    ]
+    return [e.event for e in reversed(events)]
+
+
+async def audit_events(site: Site) -> list[tuple[str, str, Outcome, str]]:
+    """Return actor, action, outcome and reason of the newest 50 audit events, oldest first."""
+    return [(e.actor, e.action, e.outcome, e.reason) for e in await audit_log(site)]

@@ -63,7 +63,7 @@ from the rows below.
 | 0041 | Extended branding | BUILT | #49; migration 0023 | – |
 | 0042 | Settings layers, env lock | PARTIAL | steps 1–5, 6a, 6b-1, 7, 8 (#77 … #126); step 6b-2 for the organisation with ADR 0032 CC-4a (#630): the webhook secret is generated and rotated per organisation | The Webex/WxCC block used by dispatch moves to the organisation with ADR 0032 CC-4b; the installation-wide WxCC settings are dropped a minor later |
 | 0043 | Own queue per group | PARTIAL | #88, #89, #90; refresh with ADR 0072 (#155); step 4 (#628): lobby join time (migration 0101), system event `queue.not_picked_up`, count on the overview | Point 1's organisation-connection check waits for ADR 0032 CC-4 |
-| 0044 | Planner agenda | BUILT | #81, #92, #98; migrations 0045, 0046 | – |
+| 0044 | Planner agenda | BUILT | #81, #92, #98; migrations 0045, 0046; contact details on the booking page on request, audited (§2): #648 | – |
 | 0045 | Dedicated Webex site, meeting policy | NOT BUILT | none | Everything |
 | 0046 | Staff directory, SCIM | PARTIAL | step 1 #61; migration 0026; end sessions via ADR 0098 (#350, #381, #399); step 2: suspend and reinstate, `staff.erase`, retention by the worker (`staff_retention_days`), `app/domain/staff_lifecycle.py`, `app/admin/staff_status_routes.py`, migration 0086 (#402) | CSV export (step 2d), step 3 (SCIM) |
 | 0047 | Admin information architecture | PARTIAL | steps 1–6 (#62, #80, #219, #594, #600, #602): `web/navigation.py`, `docs/admin-map.md` (with *Settings topics*), the organisation page with tabs and sub-tabs, `organisation.view`, `/admin/groups`, the six group tabs with sub-tabs, the readiness checklist, active closures as an overview filter, search and count on the API clients and audit lists, every portal setting placed by topic | `return` keys of §5 (follow-up, outside the build order) |
@@ -75,7 +75,7 @@ from the rows below.
 | 0053 | Security events, public entry points | BUILT | #97; `web/security_events.py` | – |
 | 0054 | EUPL-1.2 and CLA | BUILT (code side) | #102, #104; `reuse lint`; `publiccode.yml`, validated in CI, version and date set by the release PR | Not code: the lawyer's review of the CLA, making the repository public, listing on developer.overheid.nl |
 | 0055 | Booking form fields | BUILT | #114; migration 0053 | – |
-| 0056 | Participant confirms by email | PARTIAL | step 1 #115, step 2 #134 (migration 0058), step 3 #638 (agenda status, filter, confirm on behalf), step 4 #641 (participant corrects details) | Step 3b (planner moves or cancels a pending booking) |
+| 0056 | Participant confirms by email | BUILT | step 1 #115, step 2 #134 (migration 0058), step 3 #638 (agenda status, filter, confirm on behalf), step 3b #639 (planner moves or cancels a pending booking), step 4 #641 (participant corrects details) | – |
 | 0057 | Rebooking assistant | PARTIAL | step 1 #129 (`domain/rebooking.py`), step 2 #644 (held proposal, messages, participant pages, migration 0102) | Step 3: planner review page, bulk send, overview; step 4: automatic mode |
 | 0058 | Fast PR lane, full queue lane | PARTIAL | #122, #124 | Decision 6 (cheaper matrix sweep); unsure: GitHub required check and the `ci:full` label |
 | 0059 | Release candidates, update channels | BUILT | #131, #132, #140 | Points 4 and 6 amended by ADR 0067 |

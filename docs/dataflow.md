@@ -101,13 +101,16 @@ groups, and a group blocks the delete until the erase sweep above has removed it
 The fields below are the fixed list of `app/domain/privacy.py` (ADR 0063): personal data is
 shown in the admin portal only on the booking detail page and the queue item (first name only
 on the group's agenda and queue), never on overview, list, export or alert pages, and no list
-filter matches on it. The list and the rule are constants, not settings.
+filter matches on it. The booking detail page shows the answers, and the name, email address
+and phone number only after *Show contact details*; each request is an audit event with the
+actor, the group and the booking id, never the data (ADR 0044 §2, the product owner's choice of
+2026-11-08). The list and the rule are constants, not settings.
 
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6) |
-| Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4) |
-| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028) |
+| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6). Shown to staff with `bookings.view` on the booking page on request, audited (ADR 0044 §2) |
+| Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4). Shown to staff with `bookings.view` on the booking page on request, audited; its `mailto:` link hands it to the staff member's own mail program, to contact the participant (ADR 0044 §2) |
+| Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028). Shown to staff with `bookings.view` on the booking page on request, audited; its `tel:` link hands it to the staff member's own phone, to call the participant (ADR 0044 §2) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055); correction page, which shows the participant their own answers, all of them (`Purpose.PARTICIPANT_SELF`, ADR 0056 point 10) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
 | An organisation's own contact-center connection (ADR 0032 point 9) | one sealed record `contact-center:{organisation id}` in `integration_credentials`: kind, API host, client id; client secret, refresh token and the generated webhook secret | the superuser on organisation → *Kanalen*; the webhook secret is made by the server | until removed, or the organisation is deleted (deleted in the same transaction) | no personal data; the secrets are write-only and never shown. Dispatch through it follows in CC-4b |
 | A group's contact-center routing (ADR 0032) | `group_contact_center` (`kind`, `routing_value`, `attributes`: codes from the platform's descriptor); for WxCC also, and still read, `groups.wxcc_routing_value`, `wxcc_business_address`, `wxcc_channel` | the group's settings | as long as the group | no personal data; the values go to the contact center in each task |
