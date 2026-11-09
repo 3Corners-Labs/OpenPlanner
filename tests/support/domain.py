@@ -76,8 +76,8 @@ def make_group(**overrides: object) -> Group:
     fields: dict[str, object] = {
         "id": 1,
         "organisation_id": 1,
-        "name": "Aangifte",
-        "slug": "aangifte-2026",
+        "name": "Balie",
+        "slug": "balie-2026",
         "timezone": "Europe/Amsterdam",
         "slot_minutes": 30,
     }
@@ -104,7 +104,7 @@ async def book_confirmed(service: BookingService, **arguments: Any) -> BookingRe
 async def book_pending(
     service: BookingService,
     start: datetime = SLOT_0900,
-    slug: str = "aangifte",
+    slug: str = "balie",
     contact: ContactInput = ADA,
 ) -> BookingReceipt:
     """Book ``start`` for ``contact`` (Ada) in group ``slug``; it awaits confirmation."""
@@ -119,7 +119,7 @@ def participant(number: int) -> ContactInput:
 async def book(
     service: BookingService,
     start: datetime = SLOT_0900,
-    slug: str = "aangifte",
+    slug: str = "balie",
     contact: ContactInput = ADA,
 ) -> BookingReceipt:
     """Book ``start`` for ``contact`` (Ada) in ``slug`` and confirm it, as by email link."""

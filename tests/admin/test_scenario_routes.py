@@ -28,7 +28,7 @@ OUTAGE = {
     "notice_nl": "Door een storing zijn wij gesloten.",
     "notice_en": "We are closed because of an outage.",
 }
-CONTACTS = {"contact_1_kind": "phone", "contact_1_value": "14 020"}
+CONTACTS = {"contact_1_kind": "phone", "contact_1_value": "012 345 6789"}
 
 
 async def _details(site: Site) -> list[str]:
@@ -83,7 +83,7 @@ async def test_organisation_admin_prepares_a_scenario_with_contacts_and_image(
     assert "Staking" in listed
     details = await _details(site)
     assert any(d.startswith("closure.scenario.contacts,") and "phone:1" in d for d in details)
-    assert not [d for d in details if "Staking" in d or "14 020" in d or "deur" in d.lower()]
+    assert not [d for d in details if "Staking" in d or "012 345 6789" in d or "deur" in d.lower()]
 
 
 async def test_a_scenario_image_is_not_public(site: Site) -> None:

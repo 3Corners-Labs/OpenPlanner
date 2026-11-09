@@ -33,7 +33,7 @@ from tests.support.domain import NOW
 
 SAME_ORIGIN = {"sec-fetch-site": "same-origin"}
 TOKEN = "A" * 43
-PHONE = ContactOption.create(ContactKind.PHONE, "14 020")
+PHONE = ContactOption.create(ContactKind.PHONE, "012 345 6789")
 
 
 class Site:
@@ -116,7 +116,7 @@ async def test_group_page_shows_branding_expected_end_and_contact_block(site: Si
 
     assert "We are carrying out maintenance" in page
     assert "We expect to be done on Thursday, January 1, 2026, 11:00." in page
-    assert 'href="tel:14020"' in page
+    assert 'href="tel:0123456789"' in page
     assert "/o/demo/theme.css" in page
 
 

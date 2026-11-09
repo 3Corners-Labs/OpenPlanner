@@ -11,9 +11,9 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 
 PHONE = ContactOption.create(
-    ContactKind.PHONE, "14 020", labels={"nl": "Bel"}, hours={"nl": "ma-vr", "en": "Mon-Fri"}
+    ContactKind.PHONE, "012 345 6789", labels={"nl": "Bel"}, hours={"nl": "ma-vr", "en": "Mon-Fri"}
 )
-ADDRESS = ContactOption.create(ContactKind.ADDRESS, "Stadhuis\nAmstel 1")
+ADDRESS = ContactOption.create(ContactKind.ADDRESS, "Kantoor\nVoorbeeldstraat 1")
 BLOCK = ContactBlock((PHONE, ADDRESS), {"nl": "Andere manieren", "en": "Other ways"})
 
 
@@ -60,7 +60,7 @@ async def test_options_another_version_wrote_are_left_out(engine: AsyncEngine) -
             {"kind": "fax", "value": "020"},
             {"kind": "website", "value": "javascript:alert(1)"},
             {"value": "no kind"},
-            {"kind": "phone", "value": "14 020"},
+            {"kind": "phone", "value": "012 345 6789"},
         ],
     }
     async with engine.begin() as connection:
@@ -72,7 +72,7 @@ async def test_options_another_version_wrote_are_left_out(engine: AsyncEngine) -
 
     async with uow.read() as tx:
         block = await tx.get_contact_block(demo)
-    assert block == ContactBlock((ContactOption(ContactKind.PHONE, "14 020"),), {"nl": "Kop"})
+    assert block == ContactBlock((ContactOption(ContactKind.PHONE, "012 345 6789"),), {"nl": "Kop"})
 
 
 async def test_a_groups_own_block_round_trips_and_is_removed(engine: AsyncEngine) -> None:

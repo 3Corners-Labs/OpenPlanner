@@ -39,7 +39,7 @@ class OverlappingVideo(FakeVideo):
 
 async def _setup(video_factory=FakeVideo):  # type: ignore[no-untyped-def]
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte", name="Aangifte", **WIRED)
+    state.groups[1] = make_group(id=1, slug="balie", name="Balie", **WIRED)
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     uow = InMemoryUnitOfWork(state)
     clock = FixedClock(NOW)

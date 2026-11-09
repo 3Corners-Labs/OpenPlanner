@@ -52,26 +52,26 @@ async def _rows(settings: Settings) -> tuple[list[ClosureRow], list[AuditEventRo
 
 
 async def test_closing_a_group_from_the_host_is_audited_as_the_cli(configured: Settings) -> None:
-    await _seed(configured, "aangifte")
+    await _seed(configured, "balie")
 
     report, ok = await _closure_start(
-        configured, group="aangifte", organisation=None, notices=NOTICES, ends_at=None
+        configured, group="balie", organisation=None, notices=NOTICES, ends_at=None
     )
 
     assert ok, report
-    assert report == "closed aangifte: 0 bookings on hold\n"
+    assert report == "closed balie: 0 bookings on hold\n"
     closures, audit, notices = await _rows(configured)
     assert len(closures) == 1
     assert closures[0].ends_at is None
     assert sorted(notices) == sorted(NOTICES.values())
     assert [(e.actor, e.action, e.group, e.detail) for e in audit] == [
-        ("system:cli", "closure.manage", "aangifte", "closure.start,bookings:0")
+        ("system:cli", "closure.manage", "balie", "closure.start,bookings:0")
     ]
 
-    report, ok = await _closure_lift(configured, group="aangifte", organisation=None)
+    report, ok = await _closure_lift(configured, group="balie", organisation=None)
 
     assert ok, report
-    assert report == "lifted aangifte\n"
+    assert report == "lifted balie\n"
     closures, audit, _ = await _rows(configured)
     assert closures[0].ends_at is not None
     assert audit[-1].actor == "system:cli"
@@ -102,10 +102,10 @@ async def test_closing_an_organisation_closes_each_of_its_groups(configured: Set
 
 
 async def test_the_domain_rules_are_the_portals(configured: Settings) -> None:
-    await _seed(configured, "aangifte")
+    await _seed(configured, "balie")
 
     report, ok = await _closure_start(
-        configured, group="aangifte", organisation=None, notices={"nl": "x", "en": ""}, ends_at=None
+        configured, group="balie", organisation=None, notices={"nl": "x", "en": ""}, ends_at=None
     )
     assert (report, ok) == ("refused: invalid_configuration\n", False)
 
@@ -114,7 +114,7 @@ async def test_the_domain_rules_are_the_portals(configured: Settings) -> None:
     )
     assert (report, ok) == ("refused: group_not_found\n", False)
 
-    report, ok = await _closure_lift(configured, group="aangifte", organisation=None)
+    report, ok = await _closure_lift(configured, group="balie", organisation=None)
     assert (report, ok) == ("refused: closure_not_found\n", False)
 
 

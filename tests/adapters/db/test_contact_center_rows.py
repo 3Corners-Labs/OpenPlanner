@@ -45,17 +45,17 @@ async def _columns(engine: AsyncEngine) -> tuple[object, ...]:
 async def test_a_saved_routing_is_written_to_both_places_and_read_back(
     engine: AsyncEngine,
 ) -> None:
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         assert group.contact_center is None
         await tx.save_group(replace(group, contact_center=ROUTING))
 
     async with uow.read() as tx:
-        stored = await tx.get_group("aangifte")
-        summary = await tx.get_group_summary("aangifte")
+        stored = await tx.get_group("balie")
+        summary = await tx.get_group_summary("balie")
     assert stored is not None
     assert stored.contact_center == ROUTING
     assert summary is not None
@@ -71,20 +71,20 @@ async def test_a_saved_routing_is_written_to_both_places_and_read_back(
 
 
 async def test_removing_the_routing_empties_both_places(engine: AsyncEngine) -> None:
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         await tx.save_group(replace(group, contact_center=ROUTING))
     async with uow.locked() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         await tx.save_group(replace(group, contact_center=None))
 
     assert await _columns(engine) == ((None, None, None), None)
     async with uow.read() as tx:
-        stored = await tx.get_group("aangifte")
+        stored = await tx.get_group("balie")
     assert stored is not None
     assert stored.contact_center is None
 
@@ -92,7 +92,7 @@ async def test_removing_the_routing_empties_both_places(engine: AsyncEngine) -> 
 async def test_a_group_written_by_the_previous_minor_reads_from_the_old_columns(
     engine: AsyncEngine,
 ) -> None:
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     async with engine.begin() as connection:
         await connection.execute(
             update(GroupRow).values(
@@ -101,7 +101,7 @@ async def test_a_group_written_by_the_previous_minor_reads_from_the_old_columns(
         )
 
     async with SqlUnitOfWork(engine).read() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
     assert group is not None
     assert group.contact_center == webex_routing("openplanner@example.biz", "openplanner-video")
     assert group.dispatch_enabled
@@ -111,10 +111,10 @@ async def test_an_edit_by_the_previous_image_to_the_old_columns_wins_over_the_co
     engine: AsyncEngine,
 ) -> None:
     """ADR 0116 §5: for WxCC the old columns are the source of truth in this minor."""
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         await tx.save_group(replace(group, contact_center=ROUTING))
     # The previous image edits the group: it only knows the old columns.
@@ -124,13 +124,13 @@ async def test_an_edit_by_the_previous_image_to_the_old_columns_wins_over_the_co
         )
 
     async with uow.read() as tx:
-        stored = await tx.get_group("aangifte")
+        stored = await tx.get_group("balie")
     assert stored is not None
     assert stored.contact_center == webex_routing("openplanner@example.biz", "other-channel")
 
 
 async def _booking_with_task(engine: AsyncEngine) -> tuple[SqlUnitOfWork, int]:
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     booking_id = receipt.booking.id or 0

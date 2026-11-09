@@ -13,7 +13,7 @@ from app.domain.usage_report import (
     volume_report,
 )
 
-GROUP = ReportGroup(1, 1, "aangifte", "Aangifte", "demo", "Demo", "Europe/Amsterdam")
+GROUP = ReportGroup(1, 1, "balie", "Balie", "demo", "Demo", "Europe/Amsterdam")
 OTHER = ReportGroup(2, 1, "intake", "Intake", "demo", "Demo", "America/New_York")
 FIRST = date(2026, 11, 2)
 LAST = date(2026, 11, 8)

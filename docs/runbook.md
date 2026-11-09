@@ -1139,7 +1139,7 @@ picks up that booking.
 group: WxCC business address ─► destination.id ─► Work Item asset ─► entry point ─► flow
 group: WxCC work item-kanaal ─► channel ────────► custom channel (the asset's)
 group: Routeringswaarde ─────► flowSettings.openplannerGroup ─► Case ─► Queue Contact ─► queue
-                               (empty: the group's web address, e.g. aangifte)
+                               (empty: the group's web address, e.g. balie)
 booking: meeting webLink ────► workItemData.meetingLink ─► viewable field + Screen Pop
 ```
 
@@ -1302,8 +1302,8 @@ is 1 while a `FAIL` remains.
 | screen pop (`WARN`) | the flow has no Screen Pop | add one with `meetingLink` |
 
 **Naming rule (advice).** Name each team's queue so that it contains the group's routing value
-as a name part; `-`, `_`, spaces and case count as the same. With routing value `aangifte`,
-`ORG_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
+as a name part; `-`, `_`, spaces and case count as the same. With routing value `balie`,
+`ORG_videoafspraak_balie_01` matches, `balies_video` does not. The check then shows
 per group which queue it will use, and a wrong Case branch stands out. Prefer routing values
 without spaces (the web address of the group is a good default).
 

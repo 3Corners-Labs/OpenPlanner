@@ -36,7 +36,7 @@ You can fill in at most six. Choose a kind per row and fill in the details:
 
 | Kind | Details |
 |---|---|
-| Phone | A number of 3 to 15 digits, with spaces, `+`, `-` or brackets, such as `14 020` or `+31 (0)20 624 1111` |
+| Phone | A number of 3 to 15 digits, with spaces, `+`, `-` or brackets, such as `012 345 6789` or `+31 (0)12 345 6789` |
 | Email | A general address, such as `info@example.org` |
 | Website | A link starting with `https://`, for example to the contact form |
 | Chat | A link starting with `https://`, to the organisation's chat |
