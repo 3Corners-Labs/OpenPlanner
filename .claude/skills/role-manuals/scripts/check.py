@@ -48,7 +48,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import release_notes  # noqa: E402
-from workspace import Workspace  # noqa: E402
+from workspace import APPROACH, Workspace, is_support  # noqa: E402
 
 from app.domain.authorization import MATRIX, PARTICIPANT_ACTIONS, Permission, Role  # noqa: E402
 from app.i18n.po import load_catalogues  # noqa: E402
@@ -197,15 +197,7 @@ class Catalogue:
 
 def is_approach(manual: dict) -> bool:
     """Return whether a manual is the adoption approach (``00-``): no role, no tasks, no labels."""
-    return manual["file"].startswith("00-")
-
-
-def is_support(manual: dict) -> bool:
-    """Return whether a source belongs to no role: the approach or the release notes (``90-``).
-
-    Neither has tasks or rights; the release notes are still checked for their labels.
-    """
-    return release_notes.is_support(manual["file"])
+    return manual["file"].startswith(APPROACH)
 
 
 def manual_roles(role: str, config: dict[str, list[str]]) -> list[str] | None:
@@ -236,7 +228,7 @@ class Rights:
         participants' manual (a role that names no role word), else the rights of its matrix
         roles.
         """
-        if is_support(manual):
+        if is_support(manual["file"]):
             return frozenset()
         roles = manual_roles(manual["role"], self.roles)
         if roles is None:
@@ -278,7 +270,7 @@ def check_tasks(manual: dict, ctx: dict, report: Report) -> None:
                 "staat niet in de opnamelijst.",
                 blocking=True,
             )
-    if not manual["tasks"] and not is_support(manual):
+    if not manual["tasks"] and not is_support(manual["file"]):
         report.add(
             "Koppelingen",
             f"{manual['file']}.md: geen taakkoppelingen (nodig voor contextgedreven hulp).",
@@ -508,17 +500,25 @@ def check_release_notes(
         )
         return
     raw = found.read_bytes()
-    data = json.loads(raw)
     hashes[release_notes.RESULT_JSON] = _sha256(raw)
-    if not str(data.get("from", "")).startswith(commit):
+    try:
+        result = release_notes.Result.from_json(raw.decode())
+    except (KeyError, ValueError):
         report.add(
             section,
-            f"de releasenotes beginnen bij {str(data.get('from', ''))[:9]}, niet bij {commit[:9]}; "
+            f"`{release_notes.RESULT_JSON}` is niet te lezen; draai `release.py notes` opnieuw.",
+            blocking=True,
+        )
+        return
+    if not result.begins_at(commit):
+        report.add(
+            section,
+            f"de releasenotes beginnen bij {result.start[:9]}, niet bij {commit[:9]}; "
             "draai `release.py notes` opnieuw.",
             blocking=True,
         )
         return
-    changes = [release_notes.Change.from_json(item) for item in data.get("changes", [])]
+    changes = list(result.changes)
     visible = [change for change in changes if change.visible]
     report.add(
         section,

@@ -25,6 +25,8 @@ here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../../.." && pwd)"
 workspace="$(cd "${1:?usage: update.sh <workspace>}" && pwd -P)"
 node "$here/build.mjs" "$workspace" --no-pdf
+# A baseline that cannot give release notes stops here, before a capture of half an hour.
+(cd "$repo" && uv run python "$here/release.py" baseline "$workspace")
 stack="$repo/.claude/skills/verify-openplanner/scripts/stack.sh"
 
 # Its own compose project (one per checkout) and ports, so the stack.sh down of the trap below

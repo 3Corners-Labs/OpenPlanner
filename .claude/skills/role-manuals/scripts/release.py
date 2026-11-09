@@ -3,6 +3,7 @@
 Commands, run from the checkout with its own Python (``update.sh`` and ``freeze.sh`` call them
 this way)::
 
+    uv run python .claude/skills/role-manuals/scripts/release.py baseline <workspace>
     uv run python .claude/skills/role-manuals/scripts/release.py record <workspace>
     uv run python .claude/skills/role-manuals/scripts/release.py notes <workspace>
     uv run python .claude/skills/role-manuals/scripts/release.py freeze <workspace>
@@ -15,7 +16,9 @@ same commit) when ``stack.sh fingerprint`` gives that tag the same fingerprint; 
 capture is a trial. ``pyproject.toml`` is no source: it names the previous release until the
 next one is cut.
 
-``record`` writes the label for the title pages to ``software_version``. ``notes`` collects what
+``baseline`` stops unless the baseline of ``variables.json`` can give release notes (``update.sh``
+runs it before a capture). ``record`` writes the label for the title pages to
+``software_version``. ``notes`` collects what
 changed since the last frozen version (``release_notes.py``) into ``evidence/release-notes.md``
 and ``.json``, and puts the template of the document that says what is new
 (``sources/90-wat-is-nieuw.md``) in the sources when a reader can notice a change and there is
@@ -312,14 +315,42 @@ def _resolve(repo: Path, ref: str) -> str:
         sys.exit(f"release.py: {ref} is no commit of this checkout; fetch the tags and history")
 
 
+def baseline_of(variables: dict) -> str:
+    """Return the baseline commit of ``variables.json`` ("" for a first version).
+
+    Only a commit hash reaches git, as in ``check.py``; anything else (an option, a ref) stops.
+    """
+    baseline = str(variables.get("commit", ""))
+    if baseline and not COMMIT.fullmatch(baseline):
+        sys.exit(f"release.py: commit in variables.json: {baseline!r} is no commit hash")
+    return baseline
+
+
+def check_baseline(workspace: Path, repo: Path = REPO) -> None:
+    """Stop unless the baseline is a commit this checkout descends from.
+
+    Run before a capture (``update.sh``), so a baseline that cannot give release notes costs
+    seconds and not a whole capture. A first version has no baseline and passes.
+    """
+    baseline = baseline_of(_read(Workspace(workspace).variables))
+    if baseline:
+        _require_ancestor(repo, _resolve(repo, baseline), _resolve(repo, "HEAD"), "this checkout")
+
+
+def _require_ancestor(repo: Path, start: str, finish: str, what: str) -> None:
+    if not _is_ancestor(repo, start, finish):
+        sys.exit(
+            f"release.py: {what} ({finish[:12]}) does not follow the baseline {start[:12]} of "
+            "variables.json; a baseline is the commit of a release tag, which freeze.sh sets"
+        )
+
+
 def _is_ancestor(repo: Path, older: str, newer: str) -> bool:
-    exe = shutil.which("git") or "git"
-    done = subprocess.run(  # noqa: S603 - fixed argv, no shell
-        [exe, "-C", str(repo), "merge-base", "--is-ancestor", older, newer],
-        capture_output=True,
-        check=False,
-    )
-    return done.returncode == 0
+    try:
+        git(repo, "merge-base", "--is-ancestor", older, newer)
+    except subprocess.CalledProcessError:
+        return False
+    return True
 
 
 def commits_between(repo: Path, base: str, end: str) -> list[dict[str, object]]:
@@ -333,12 +364,12 @@ def commits_between(repo: Path, base: str, end: str) -> list[dict[str, object]]:
         "log",
         "--first-parent",
         "--no-merges",
-        "--format=%x1e%H%x1f%s",
+        "--format=%x00%H%x1f%s",
         "--name-only",
         f"{base}..{end}",
     )
     commits = []
-    for chunk in log.split("\x1e"):
+    for chunk in log.split("\x00"):
         head, _, files = chunk.strip().partition("\n")
         digest, _, subject = head.partition("\x1f")
         if digest:
@@ -351,15 +382,16 @@ def commits_between(repo: Path, base: str, end: str) -> list[dict[str, object]]:
 def changelog_for(repo: Path, end: str, tag: str) -> str:
     """Return the project's own release notes of ``tag`` from ``CHANGELOG.md`` at ``end``.
 
-    The section of the release (``## 0.7.0 (date)``), or *Unreleased* before it is cut; "" when
-    there is none.
+    The section of the release (``## 0.7.0 (date)``), or *Unreleased* before it is cut (for a
+    candidate or an untagged commit); "" when there is none.
     """
     try:
         text = git(repo, "show", f"{end}:CHANGELOG.md")
     except subprocess.CalledProcessError:
         return ""
-    number = tag.removeprefix("v").partition("-")[0]
-    for heading in (f"## {number} (", "## Unreleased"):
+    number, dash, _ = tag.removeprefix("v").partition("-")
+    # Unreleased only stands in before the release is cut (a candidate, or no tag at all).
+    for heading in (f"## {number} (", *(["## Unreleased"] if dash or not tag else [])):
         lines: list[str] = []
         inside = False
         for line in text.splitlines():
@@ -372,33 +404,6 @@ def changelog_for(repo: Path, end: str, tag: str) -> str:
         if "\n".join(lines[1:]).strip():
             return "\n".join(lines)
     return ""
-
-
-def topic_places(manuals: list[dict]) -> tuple[dict[str, list[tuple[str, str]]], str]:
-    """Return the tasks per help topic as (role, place) pairs, and the people who book.
-
-    The second result is the role of the manual whose tasks sit on participant pages; "Deelnemers"
-    when no manual has one.
-    """
-    places: dict[str, list[tuple[str, str]]] = {}
-    participants = ""
-    for manual in manuals:
-        role = str(manual.get("role", ""))
-        for task in manual.get("tasks", []):
-            screen = str(task.get("screen", ""))
-            participants = participants or (role if screen.startswith("participant:") else "")
-            where = f"{manual['file']}.md:{task['line']} › {task['title']}"
-            places.setdefault(screen, []).append((role, where))
-    return places, participants or "Deelnemers"
-
-
-def heading_roles(manuals: list[dict]) -> list[str]:
-    """Return the roles of the manuals a reader has, in file order; support sources have none."""
-    roles: dict[str, None] = {}
-    for manual in manuals:
-        if not release_notes.is_support(str(manual["file"])):
-            roles.setdefault(str(manual.get("role", "")))
-    return list(roles)
 
 
 @dataclass(frozen=True)
@@ -422,7 +427,7 @@ def notes(workspace: Path, repo: Path = REPO) -> Notes | None:
     one: its stale points are caught by ``check.py``); build again after it.
     """
     ws = Workspace(workspace)
-    baseline = str(_read(ws.variables).get("commit", ""))
+    baseline = baseline_of(_read(ws.variables))
     if not baseline:
         return None
     end = str(capture(ws).get("stack", {}).get("build", {}).get("commit", ""))
@@ -432,19 +437,17 @@ def notes(workspace: Path, repo: Path = REPO) -> Notes | None:
     if not built.exists():
         sys.exit(f"release.py: {built} is missing; run build.mjs {ws.root} first")
     start, finish = _resolve(repo, baseline), _resolve(repo, end)
-    if not _is_ancestor(repo, start, finish):
-        sys.exit(
-            f"release.py: the capture's commit {finish[:12]} does not follow the baseline "
-            f"{start[:12]} of variables.json; a baseline is the commit of a release tag, which "
-            "freeze.sh sets"
-        )
+    _require_ancestor(repo, start, finish, "the capture's commit")
     manuals = _read(built)["manuals"]
-    places, participants = topic_places(manuals)
-    changes = release_notes.classify(commits_between(repo, start, finish), places, participants)
-    before, after = release_tag(repo, start), release_tag(repo, finish)
+    places, participants = release_notes.topic_places(manuals)
+    commits = commits_between(repo, start, finish)
+    changes = tuple(release_notes.classify(commits, places, participants))
+    result = release_notes.Result(
+        start, finish, release_tag(repo, start), release_tag(repo, finish), changes
+    )
     label = {
         commit: f"{tag.removeprefix('v')} ({commit[:12]})" if tag else commit[:12]
-        for commit, tag in ((start, before), (finish, after))
+        for commit, tag in ((start, result.start_release), (finish, result.end_release))
     }
     out = ws.root / release_notes.RESULT_MD
     out.write_text(
@@ -452,12 +455,11 @@ def notes(workspace: Path, repo: Path = REPO) -> Notes | None:
             changes,
             start=label[start],
             end=label[finish],
-            changelog=changelog_for(repo, finish, after),
-            roles=heading_roles(manuals),
+            changelog=changelog_for(repo, finish, result.end_release),
+            roles=release_notes.heading_roles(manuals),
         )
     )
-    facts = {"from": start, "from_release": before, "to": finish, "to_release": after}
-    (ws.root / release_notes.RESULT_JSON).write_text(release_notes.as_json(changes, **facts))
+    (ws.root / release_notes.RESULT_JSON).write_text(result.as_json())
     visible = sum(change.visible for change in changes)
     document = ws.sources / f"{release_notes.DOCUMENT}.md"
     made = None
@@ -470,24 +472,29 @@ def notes(workspace: Path, repo: Path = REPO) -> Notes | None:
 
 def notes_current(ws: Workspace, variables: dict, captured_from: str, repo: Path) -> None:
     """Refuse release notes of another range than baseline to capture (none for a first version)."""
-    baseline = str(variables.get("commit", ""))
+    baseline = baseline_of(variables)
     if not baseline:
         return
     path = ws.root / release_notes.RESULT_JSON
     if not path.exists():
         sys.exit(f"release.py: {release_notes.RESULT_JSON} is missing; freeze.sh writes it")
-    found = _read(path)
+    found = release_notes.Result.from_json(path.read_text())
     wanted = (_resolve(repo, baseline), _resolve(repo, captured_from))
-    if (found.get("from"), found.get("to")) != wanted:
+    if not found.covers(*wanted):
         sys.exit(
-            f"release.py: the release notes run from {str(found.get('from'))[:12]} to "
-            f"{str(found.get('to'))[:12]}, not from the baseline {wanted[0][:12]} to the "
-            f"capture {wanted[1][:12]}; freeze.sh writes them again"
+            f"release.py: the release notes run from {found.start[:12]} to {found.end[:12]}, not "
+            f"from the baseline {wanted[0][:12]} to the capture {wanted[1][:12]}; freeze.sh "
+            "writes them again"
         )
 
 
 VERSION_DIR = re.compile(r"(\d{4}-\d{2}-\d{2})_software-(.+)_handleiding-(.+)")
 """The folder of a frozen version: the capture's date, the software and the manuals' version."""
+
+
+def folder_name(captured: dt.date, tag: str, version: str) -> str:
+    """Return the folder of a frozen version; ``VERSION_DIR`` reads it back."""
+    return f"{captured.isoformat()}_software-{tag.removeprefix('v')}_handleiding-{version}"
 
 
 def overview(workspace: Path) -> Path:
@@ -506,13 +513,21 @@ def overview(workspace: Path) -> Path:
         if not found or not folder.is_dir():
             continue
         captured, software, version = found.groups()
+        try:
+            opened = dutch_date(dt.date.fromisoformat(captured))
+        except ValueError:
+            continue
         readme = (folder / "LEESMIJ.md").read_text() if (folder / "LEESMIJ.md").exists() else ""
         frozen = re.search(r"\*\*(?:Bevroren|Vastgesteld):\*\* (.+?)\.", readme)
         sums = versions / f"{folder.name}.zip.sha256"
         listed = folder / release_notes.RESULT_JSON
-        changes = f"{len(_read(listed)['changes'])} wijzigingen" if listed.exists() else "–"
+        try:
+            counted = len(release_notes.Result.from_json(listed.read_text()).changes)
+            changes = f"{counted} wijzigingen"
+        except (OSError, KeyError, ValueError):
+            changes = "–"
         rows.append(
-            f"| {version} | {software} | {dutch_date(dt.date.fromisoformat(captured))} | "
+            f"| {version} | {software} | {opened} | "
             f"{frozen.group(1) if frozen else '–'} | {changes} | "
             f"{sums.read_text().split()[0][:12] if sums.exists() else '–'} | `{folder.name}/` |"
         )
@@ -524,7 +539,7 @@ def overview(workspace: Path) -> Path:
             "vastgestelde versie verandert daarna niet meer: controleer hem met `shasum -a 256",
             "-c MANIFEST.sha256` in zijn map.",
             "",
-            "| Handleiding | Software | Opgenomen | Vastgesteld | Releasenotes | Zip SHA-256 | Map |",
+            "| Handleiding | Software | Opgenomen | Vastgesteld | Releasenotes | Zip | Map |",
             "|---|---|---|---|---|---|---|",
             *rows,
             "",
@@ -569,7 +584,7 @@ def freeze(workspace: Path, repo: Path = REPO, today: dt.date | None = None) -> 
     if not re.match(r"\d{4}-\d{2}-\d{2}", started):
         sys.exit("release.py: evidence/state.json holds no start of the capture")
     captured = dt.date.fromisoformat(started[:10])
-    name = f"{captured.isoformat()}_software-{tag.removeprefix('v')}_handleiding-{version}"
+    name = folder_name(captured, tag, version)
     versions = ws.root / "versies"
     target, archive = versions / name, versions / f"{name}.zip"
     if target.exists() or archive.exists():
@@ -632,6 +647,7 @@ def main(argv: list[str]) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     for name, text in (
         ("record", "write the release the capture shows for the title pages"),
+        ("baseline", "stop unless the baseline of variables.json can give release notes"),
         ("notes", "collect what changed since the last frozen version"),
         ("freeze", "freeze the settled version into versies/"),
         ("overview", "list every frozen version in versies/OVERZICHT.md"),
@@ -651,6 +667,9 @@ def main(argv: list[str]) -> int:
             )
             if written.document:
                 print(f"Sjabloon geplaatst: {written.document}; bouw opnieuw en vul het in.")
+    elif args.command == "baseline":
+        check_baseline(args.workspace)
+        print("Basis in orde.")
     elif args.command == "overview":
         print(f"Overzicht: {overview(args.workspace)}")
     else:

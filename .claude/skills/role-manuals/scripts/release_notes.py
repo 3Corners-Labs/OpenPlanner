@@ -26,23 +26,27 @@ The document names where each point comes from, in an HTML comment readers never
 
 import json
 import re
+import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
-DOCUMENT = "90-wat-is-nieuw"
-"""The stem of the source that tells readers what is new; ``90-`` puts it last."""
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-SUPPORT = ("00-", "90-")
-"""The prefixes of the sources that belong to no role: the approach and the release notes."""
+from workspace import RELEASE_NOTES, is_support  # noqa: E402
+
+DOCUMENT = f"{RELEASE_NOTES}wat-is-nieuw"
+"""The stem of the source that tells readers what is new; its prefix puts it last."""
 
 RESULT_JSON = "evidence/release-notes.json"
 RESULT_MD = "evidence/release-notes.md"
 """Where ``release.py notes`` writes its result, relative to the workspace."""
 
 VISIBLE_TYPES = frozenset({"feat", "fix", "security", "perf"})
-"""Conventional Commit types a reader can notice; the others (docs, test, chore, ci, build,
-refactor, style) change nothing on a screen, in an email or in an answer of the system."""
+"""Conventional Commit types a reader can notice; the others (test, chore, ci, build, refactor,
+style) change nothing on a screen, in an email or in an answer of the system. A ``docs`` commit
+counts too when it changes a help topic, which readers see behind the (i) of a screen."""
 
 TOPIC = re.compile(r"^docs/manual/nl/([\w-]+)\.md$")
 PARTICIPANT_PATHS = ("app/api/templates/", "widget/")
@@ -156,7 +160,7 @@ def classify(
                 type=kind,
                 scope=scope,
                 subject=text,
-                visible=kind in VISIBLE_TYPES,
+                visible=kind in VISIBLE_TYPES or (kind == "docs" and bool(topics)),
                 topics=topics,
                 roles=tuple(roles),
                 places=tuple(places),
@@ -192,20 +196,25 @@ def render(
         "Een nieuwe functie (`feat`) zonder een van beide blokkeert het vaststellen.",
     ]
 
-    def lines(items: Iterable[Change], role: str = "") -> list[str]:
+    def lines(items: Iterable[Change]) -> list[str]:
+        return [
+            f"- **{c.type}**{f' ({c.scope})' if c.scope else ''}: {c.subject} ({c.id})"
+            for c in items
+        ]
+
+    def with_tasks(items: Iterable[Change], role: str) -> list[str]:
         rows = []
         for change in items:
-            scope = f" ({change.scope})" if change.scope else ""
-            rows.append(f"- **{change.type}**{scope}: {change.subject} ({change.id})")
+            rows += lines([change])
             here = [p.removeprefix(f"{role}: ") for p in change.places if p.startswith(f"{role}: ")]
-            if role and here:
+            if here:
                 rows.append(f"  - Taken: {'; '.join(here)}")
         return rows
 
     for role in roles:
         mine = [c for c in seen if role in c.roles]
         out += ["", f"## {role}", ""]
-        out += lines(mine, role) or ["Geen wijzigingen die voor deze rol zijn gevonden."]
+        out += with_tasks(mine, role) or ["Geen wijzigingen die voor deze rol zijn gevonden."]
     unplaced = [c for c in seen if not c.roles]
     out += ["", "## Nog te plaatsen", ""]
     out += [
@@ -230,14 +239,87 @@ def render(
     return "\n".join(out)
 
 
-def as_json(changes: Sequence[Change], **facts: object) -> str:
-    """Return ``evidence/release-notes.json``: the two releases and every change."""
-    return (
-        json.dumps(
-            {**facts, "changes": [c.as_json() for c in changes]}, ensure_ascii=False, indent=2
+@dataclass(frozen=True)
+class Result:
+    """The release notes of one range: the two commits and releases, and every change.
+
+    The one reader and writer of ``evidence/release-notes.json``, so ``check.py`` and
+    ``release.py`` ask the same questions of the same file. ``start`` and ``end`` are full commit
+    hashes; the releases are the nearest release tags, or "".
+    """
+
+    start: str
+    end: str
+    start_release: str
+    end_release: str
+    changes: tuple[Change, ...]
+
+    def as_json(self) -> str:
+        """Return the file's text."""
+        return (
+            json.dumps(
+                {
+                    "from": self.start,
+                    "from_release": self.start_release,
+                    "to": self.end,
+                    "to_release": self.end_release,
+                    "changes": [c.as_json() for c in self.changes],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n"
         )
-        + "\n"
-    )
+
+    @classmethod
+    def from_json(cls, text: str) -> "Result":
+        """Return the result a file holds."""
+        data = json.loads(text)
+        return cls(
+            str(data["from"]),
+            str(data["to"]),
+            str(data.get("from_release", "")),
+            str(data.get("to_release", "")),
+            tuple(Change.from_json(item) for item in data.get("changes", [])),
+        )
+
+    def begins_at(self, baseline: str) -> bool:
+        """Return whether the range starts at ``baseline``, a hash or an abbreviation of one."""
+        return bool(baseline) and self.start.startswith(baseline)
+
+    def covers(self, start: str, end: str) -> bool:
+        """Return whether the range runs from the full hash ``start`` to ``end``."""
+        return (self.start, self.end) == (start, end)
+
+
+def topic_places(
+    manuals: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, list[tuple[str, str]]], str]:
+    """Return the tasks per help topic as (role, place) pairs, and the people who book.
+
+    ``manuals`` are the entries of ``build/manuals.json``. The second result is the role of the
+    manual whose tasks sit on participant pages; "Deelnemers" when no manual has one.
+    """
+    places: dict[str, list[tuple[str, str]]] = {}
+    participants = ""
+    for manual in manuals:
+        role = str(manual.get("role", ""))
+        for task in manual.get("tasks", []):
+            screen = str(task.get("screen", ""))
+            participants = participants or (role if screen.startswith("participant:") else "")
+            where = f"{manual['file']}.md:{task['line']} › {task['title']}"
+            places.setdefault(screen, []).append((role, where))
+    return places, participants or "Deelnemers"
+
+
+def heading_roles(manuals: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Return the roles of the manuals a reader has, in file order; support sources have none."""
+    roles: dict[str, None] = {}
+    for manual in manuals:
+        role = str(manual.get("role", ""))
+        if role and not is_support(str(manual["file"])):
+            roles.setdefault(role)
+    return list(roles)
 
 
 def identifiers(text: str) -> tuple[set[str], set[str], list[str]]:
@@ -285,11 +367,3 @@ def judge(changes: Sequence[Change], document: str) -> Verdict:
         if PLACEHOLDER.match(line)
     ]
     return verdict
-
-
-def is_support(stem: str) -> bool:
-    """Return whether a source is the approach (``00-``) or the release notes (``90-``).
-
-    They have no role of their own: no tasks, no rights, no matrix role.
-    """
-    return stem.startswith(SUPPORT)

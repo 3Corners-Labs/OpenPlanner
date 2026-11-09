@@ -237,6 +237,11 @@ on is machine work, so it is neither invented nor incomplete.
   notice a change. Other changes that are neither named nor left out are listed, not blocking.
   `freeze` refuses release notes that were not collected from the baseline to this capture, and
   a verdict that did not read them. Its first version has no baseline, so no release notes.
+- **What the files hold.** `evidence/release-notes.*` quote the commit subjects as committed (in
+  English, unedited, `security:` ones included); they are the repository's public history. The
+  template assumes the four default roles; when an organisation's manuals use other role names,
+  change the headings of the document to the roles of its sources, which are the headings
+  `release-notes.md` uses.
 - **Afterwards.** Record in `evidence/afhechting.md` what was left out and why in one line each,
   next to what was reread. The document and the notes go into the frozen version.
 

@@ -201,11 +201,11 @@ def _manuals() -> list[dict]:
 
 def test_the_tasks_of_the_manuals_tell_which_roles_a_screen_reaches() -> None:
     """The roles of the headings are the readers' manuals in file order, not the support ones."""
-    places, participants = release.topic_places(_manuals())
+    places, participants = notes.topic_places(_manuals())
     assert places["group-agenda"] == [("Planner", "20-planner.md:7 › De agenda lezen")]
     assert participants == "Gasten"
-    assert release.heading_roles(_manuals()) == ["Beheerder", "Planner", "Gasten"]
-    assert release.topic_places([])[1] == "Deelnemers"
+    assert notes.heading_roles(_manuals()) == ["Beheerder", "Planner", "Gasten"]
+    assert notes.topic_places([])[1] == "Deelnemers"
 
 
 @pytest.fixture
@@ -337,9 +337,8 @@ def _verdict(
     for stem, text in sources.items():
         (root / "sources" / f"{stem}.md").write_text(text)
         paths[root / "sources" / f"{stem}.md"] = text
-    (root / "evidence" / "release-notes.json").write_text(
-        notes.as_json(changes, **{"from": from_, "to": "b" * 40})
-    )
+    result = notes.Result(from_, "b" * 40, "", "", tuple(changes))
+    (root / "evidence" / "release-notes.json").write_text(result.as_json())
     report, hashes = check.Report(), {}
     check.check_release_notes(check.Workspace(root), paths, "a" * 12, hashes, report)
     return report, hashes
@@ -418,7 +417,6 @@ def test_the_release_notes_have_no_role_of_their_own() -> None:
     }
     check.check_tasks(document, ctx, report)
     assert report.sections == {}
-    assert check.is_approach(document) is False
 
 
 def test_the_overview_lists_every_frozen_version_newest_first(
@@ -434,7 +432,9 @@ def test_the_overview_lists_every_frozen_version_newest_first(
     (old / "LEESMIJ.md").write_text("- **Vastgesteld:** 9 november 2026.\n")
     (new / "LEESMIJ.md").write_text("- **Bevroren:** 2 december 2026.\n")
     (new / "evidence").mkdir()
-    (new / "evidence" / "release-notes.json").write_text(json.dumps({"changes": [{}, {}, {}]}))
+    (new / "evidence" / "release-notes.json").write_text(
+        notes.Result("a" * 40, "b" * 40, "", "", tuple(_changes()[:3])).as_json()
+    )
     (versions / f"{new.name}.zip.sha256").write_text(f"{'ab' * 32}  {new.name}.zip\n")
     (versions / "notes.txt").write_text("not a version")
     path = release.overview(workspace)
@@ -452,3 +452,74 @@ def test_the_overview_lists_every_frozen_version_newest_first(
     before = path.stat().st_mtime_ns
     assert release.overview(workspace) == path
     assert path.stat().st_mtime_ns == before
+
+
+def test_a_docs_change_to_a_help_topic_is_a_change_readers_can_notice() -> None:
+    """Readers see a help topic behind the (i) of a screen; a docs commit on it counts."""
+    changes = notes.classify(
+        [
+            _commit(
+                "a", "docs(manual): explain the agenda (#20)", "docs/manual/nl/group-agenda.md"
+            ),
+            _commit("b", "docs(adr): a decision (#21)", "docs/adr/0001-x.md"),
+        ],
+        PLACES,
+        "Deelnemers",
+    )
+    assert [(c.id, c.visible, c.roles) for c in changes] == [
+        ("#20", True, ("Planner",)),
+        ("#21", False, ()),
+    ]
+
+
+def test_the_result_is_written_and_read_by_one_class() -> None:
+    """The file round-trips, and answers where it begins and which range it covers."""
+    result = notes.Result("a" * 40, "b" * 40, "v1.0.0", "v1.1.0", tuple(_changes()))
+    again = notes.Result.from_json(result.as_json())
+    assert again == result
+    assert again.begins_at("a" * 12)
+    assert not again.begins_at("")
+    assert not again.begins_at("b" * 12)
+    assert again.covers("a" * 40, "b" * 40)
+    assert not again.covers("a" * 40, "c" * 40)
+    with pytest.raises(KeyError):
+        notes.Result.from_json("{}")
+
+
+def test_a_baseline_is_a_hash_and_a_checkout_must_descend_from_it(
+    tmp_path_factory: pytest.TempPathFactory, git: Git, history: dict[str, str]
+) -> None:
+    """An option or a ref is refused; a baseline that is no ancestor stops before a capture."""
+    root = Path(git("rev-parse", "--show-toplevel").strip())
+    assert release.baseline_of({}) == ""
+    assert release.baseline_of({"commit": "b9e01b01c9de"}) == "b9e01b01c9de"
+    for bad in ("--output=x", "HEAD~1", "v0.6.0"):
+        with pytest.raises(SystemExit, match="is no commit hash"):
+            release.baseline_of({"commit": bad})
+    ahead = history["14"][:12]
+    workspace = manuals_workspace(tmp_path_factory.mktemp("ahead"), {"commit": ahead})
+    git("switch", "-q", "--detach", history["1"])
+    with pytest.raises(SystemExit, match="does not follow the baseline"):
+        release.check_baseline(workspace, repo=root)
+    git("switch", "-q", "--detach", history["14"])
+    release.check_baseline(workspace, repo=root)
+    release.check_baseline(manuals_workspace(tmp_path_factory.mktemp("first"), {}), repo=root)
+
+
+def test_a_released_changelog_section_never_falls_back_to_unreleased(
+    git: Git, history: dict[str, str]
+) -> None:
+    """Only a candidate or an untagged commit may quote *Unreleased*; a release has its own."""
+    root = Path(git("rev-parse", "--show-toplevel").strip())
+    assert release.changelog_for(root, history["1"], "v0.7.0") == ""
+    assert release.changelog_for(root, history["1"], "").endswith("- Soon.")
+
+
+def test_a_malformed_notes_file_is_a_finding_not_a_traceback(tmp_path: Path) -> None:
+    """check.py reports it as blocking, so the freeze stops with a message."""
+    root = manuals_workspace(tmp_path, {})
+    (root / "evidence" / "release-notes.json").write_text('{"from": "a"}')
+    report = check.Report()
+    check.check_release_notes(check.Workspace(root), {}, "a" * 12, {}, report)
+    assert report.blocking == 1
+    assert "niet te lezen" in report.sections["Releasenotes"][0]
