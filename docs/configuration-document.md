@@ -92,6 +92,28 @@ writes all or nothing; a plan with deletions needs the hash of the plan you revi
 `CONFIGURATION_APPLY_MAX_CHANGES` is refused. Every applied change is an audit event with its
 action, kind and natural key, never a value.
 
+## Setting up a new installation from a file
+
+The aim of an export with secrets is a ready base installation without typing everything again:
+the integrations (SMTP, SMS, Webex Service App and its URLs, contact-center connection and
+queues per group, login providers, API clients), the organisations and groups, texts and rules.
+
+1. On the source installation: **Export document**, tick *Include secrets*, type a passphrase
+   (at least 16 characters) twice. Keep the passphrase apart from the file.
+2. On the new installation, one of:
+   - the portal: *Advanced settings › Configuration package*, upload the file, type the
+     passphrase, **Show plan**, then **Apply plan**;
+   - the host: `python -m app.cli config apply config.json --passphrase-file pass.txt`;
+   - the installer: `scripts/install.sh --configuration config.json --passphrase-file pass.txt`.
+3. No separate tool is needed to open the file. Without the passphrase every secret stays sealed
+   and useless; with it the installation opens each one itself and stores it under its own key.
+
+A sealed value looks like `{"sealed": "..."}` and the file gets a `seal` block (key
+derivation parameters and a check value that tells a wrong passphrase before anything is
+planned). A file exported without secrets has neither. The sealed values are meant for
+OpenPlanner only. A document never carries a secret in clear text, so a secret cannot be
+written into the file by hand: enter or change it in the portal, then export again.
+
 ## What a document cannot do
 
 It can do nothing the admin screens refuse: the same validators run, per change the same
