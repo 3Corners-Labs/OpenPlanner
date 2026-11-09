@@ -58,7 +58,9 @@ RECORD = Path("evidence/afhechting.md")
 """What a person reread and what stays open, written before a version is frozen."""
 
 READ_BY_FREEZE = ("variables.json", "build/manuals.json")
-"""The workspace files freeze reads itself, so the check it relies on must have read them too."""
+"""The files freeze takes values from that the check judges too: the title-page label and the
+version numbers. The verdict must name them. A file freeze reads that the check never reads,
+such as ``evidence/state.json``, does not belong here: every freeze would refuse."""
 
 PARTS = ("build", "sources", "img", "evidence")
 """The folders a version consists of; besides them variables.json and the workspace's own
