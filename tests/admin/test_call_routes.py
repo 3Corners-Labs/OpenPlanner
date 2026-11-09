@@ -139,6 +139,27 @@ async def test_a_booking_cannot_be_opened_through_another_groups_url(site: Site)
     assert response.status_code == 404
 
 
+async def test_a_group_admin_cannot_tell_another_groups_booking_from_an_unknown_id(
+    site: Site,
+) -> None:
+    """Another group's id answers as an unknown one and leaves nothing in any audit log.
+
+    The page once decided on the booking's own group: such an id was refused (403) where an
+    unknown id was not found (404), and the refusal went into the other organisation's audit
+    log in the prober's name.
+    """
+    other = await _book(site, "andere-team")
+    await site.login_as(GROUP_ADMIN)
+    before = await audit_log(site)
+
+    taken = await site.client.get(f"/admin/groups/demo/bookings/{other}")
+    unknown = await site.client.get(f"/admin/groups/demo/bookings/{other + 1000}")
+
+    assert (taken.status_code, unknown.status_code) == (404, 404)
+    assert taken.text == unknown.text
+    assert await audit_log(site) == before
+
+
 async def test_outsiders_see_neither_agenda_nor_timeline(site: Site) -> None:
     booking_id = await _book(site, "demo")
     await site.login_as(OUTSIDER)
