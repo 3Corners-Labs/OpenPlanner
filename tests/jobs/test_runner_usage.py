@@ -22,7 +22,7 @@ from tests.support.domain import NOW, TEST_TOKEN_KEY, book, make_group, window
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte")
+    state.groups[1] = make_group(id=1, slug="balie")
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     return InMemoryUnitOfWork(state)
 

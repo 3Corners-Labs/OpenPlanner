@@ -5,6 +5,7 @@ from datetime import timedelta
 
 import pytest
 
+from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService
 from app.domain.alerts import FALLBACK_EVENT
 from app.domain.audit import Outcome
@@ -24,7 +25,7 @@ from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from tests.fakes.integrations import webex_cc
 from tests.fakes.jobs import FakeQueue, job
-from tests.support.admin import GROUP_ADMIN, OUTSIDER
+from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER
 from tests.support.call_jobs import WIRED, Setup, group_uow
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 
@@ -63,11 +64,14 @@ def wired(**fields: object) -> Setup:
     return setup
 
 
-def service(setup: Setup, poster: Poster | None = None) -> FallbackService:
+def service(
+    setup: Setup, poster: Poster | None = None, alert_per_hour: int = 50
+) -> FallbackService:
+    thresholds = {CHANGES_ALERT: alert_per_hour}
     return FallbackService(
         setup.uow,
         setup.clock,
-        AdminService(setup.uow, setup.clock),
+        AdminService(setup.uow, setup.clock, alert_thresholds=thresholds),
         setup.integration,
         poster or Poster(),
         Texts(),
@@ -92,24 +96,24 @@ async def test_the_group_falls_back_while_the_contact_center_is_down_and_returns
     fallback = service(setup, poster)
     bid = await setup.booking()
     assert await fallback.sweep(health(HealthState.DEGRADED)) == []
-    assert await fallback.sweep(health(HealthState.DOWN)) == ["aangifte"]
+    assert await fallback.sweep(health(HealthState.DOWN)) == ["balie"]
     assert setup.uow.state.groups[1].fallback_active
     assert await fallback.sweep(health(HealthState.DOWN)) == []  # already on
-    assert poster.posts == [(1, ROOM, "on:aangifte:nl")]
+    assert poster.posts == [(1, ROOM, "on:balie:nl")]
     group = setup.uow.state.groups[1]
     booking = setup.uow.state.bookings[bid]
     assert await fallback.diverts(booking, group)
     assert setup.uow.state.call_status[bid].fallback
     assert poster.posts[-1][2] == "queued:Ada"
-    assert await fallback.sweep(health(HealthState.OK)) == ["aangifte"]
+    assert await fallback.sweep(health(HealthState.OK)) == ["balie"]
     assert not setup.uow.state.groups[1].fallback_active
     assert not setup.uow.state.call_status[bid].fallback  # back to the contact center
     # A fresh dispatch job: its retries and a final failure (back to the queue) still apply.
     assert [(j.run_at, j.pinned_start) for j in redispatched(setup, bid)] == [(NOW, booking.start)]
     events = [e for e in setup.uow.state.audit if e.action == FALLBACK_EVENT]
     assert [(e.outcome, e.reason, e.group) for e in events] == [
-        (Outcome.FAILURE, "on", "aangifte"),
-        (Outcome.SUCCESS, "", "aangifte"),
+        (Outcome.FAILURE, "on", "balie"),
+        (Outcome.SUCCESS, "", "balie"),
     ]
 
 
@@ -137,7 +141,7 @@ async def test_a_claimed_booking_stays_in_the_queue_when_the_fallback_ends() -> 
 async def test_a_failing_space_never_stops_the_fallback() -> None:
     setup, poster = wired(), Poster()
     poster.error = IntegrationError("unauthorized", retryable=False)
-    assert await service(setup, poster).sweep(health(HealthState.DOWN)) == ["aangifte"]
+    assert await service(setup, poster).sweep(health(HealthState.DOWN)) == ["balie"]
 
 
 async def test_ending_by_hand_needs_bookings_manage_and_is_audited() -> None:
@@ -148,16 +152,27 @@ async def test_ending_by_hand_needs_bookings_manage_and_is_audited() -> None:
     fallback = service(setup)
     await fallback.sweep(health(HealthState.DOWN))
     with pytest.raises(DomainError) as refused:
-        await fallback.end(OUTSIDER, "aangifte")
+        await fallback.end(OUTSIDER, "balie")
     assert refused.value.code is ErrorCode.NOT_PERMITTED
     from app.domain.authorization import Role
     from tests.support.principals import principal
 
     planner = principal("o-1", "O", frozenset({Role.ORG_ADMIN}), frozenset({"demo"}), frozenset())
-    assert await fallback.end(planner, "aangifte")
-    assert not await fallback.end(planner, "aangifte")
+    assert await fallback.end(planner, "balie")
+    assert not await fallback.end(planner, "balie")
     assert any(e.detail == "fallback.off" and e.actor == "o-1" for e in setup.uow.state.audit)
     _ = (GROUP_ADMIN, ORG_ADMIN)
+
+
+async def test_ending_by_hand_counts_toward_the_alert_on_many_changes_by_one_person() -> None:
+    setup = wired()
+    fallback = service(setup, alert_per_hour=0)
+    await fallback.sweep(health(HealthState.DOWN))
+
+    assert await fallback.end(ORG_ADMIN, setup.uow.state.groups[1].slug)
+
+    alerts = [e for e in setup.uow.state.audit if e.action == CHANGES_ALERT.action]
+    assert [e.detail for e in alerts] == ["actor:o-1,changes:1"]
 
 
 def runner(setup: Setup, queue: FakeQueue, fallback: FallbackService) -> JobRunner:

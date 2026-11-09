@@ -11,6 +11,10 @@
 # GraphQL, the collaborators as each known user's own role plus the organisation's owners.
 # What still cannot be seen stays null, and the audit reports it as unreadable, not as drift.
 #
+# Two sections need more than the app has (ADR 0120): the Actions event policies, which GitHub
+# serves only to Administration: write (the app's read fails, and the baseline lists them as
+# known unseen), and the decision gate's runs, read with RUNS_TOKEN when it is set.
+#
 # Usage: scripts/guardrail-fetch.sh OUT_DIR [OWNER/REPO]
 set -uo pipefail
 
@@ -97,6 +101,15 @@ collaborators() {
               | unique_by(.login)'
 }
 
+# The latest runs of the decision gate, for the runs GitHub did not start (ADR 0120). Read
+# with RUNS_TOKEN (the workflow's own token, `actions: read`) when it is set, because the audit
+# app has no Actions permission; on a laptop it is unset and gh uses the administrator's login.
+gate_runs() {
+  GH_TOKEN="${RUNS_TOKEN:-${GH_TOKEN:-}}" gh api \
+    "repos/$repo/actions/workflows/decision-gate.yml/runs?per_page=100" \
+    --jq '[.workflow_runs[] | {id, event, conclusion, created_at, html_url}]'
+}
+
 environments() {
   local names
   names=$(gh api "repos/$repo/environments" --jq '.environments[].name') || return 1
@@ -111,6 +124,12 @@ section rulesets rulesets
 section repository repository
 section actions_workflow gh api "repos/$repo/actions/permissions/workflow"
 section actions gh api "repos/$repo/actions/permissions"
+# The Actions event policies that apply to the repository, the organisation's and the
+# enterprise's included (ADR 0120). GitHub serves them only to Administration: write, so the
+# audit app's read fails and the section stays unread; an administrator's login reads them.
+section actions_policies gh api "repos/$repo/actions/policies?has_parents=true&per_page=100" \
+  --jq '.policies'
+section gate_runs gate_runs
 section environments environments
 section collaborators collaborators
 section organisation gh api "orgs/$org"

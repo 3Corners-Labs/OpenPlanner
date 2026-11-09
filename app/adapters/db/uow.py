@@ -15,6 +15,7 @@ from dataclasses import asdict, replace
 from datetime import date, datetime
 from typing import Any
 
+import structlog
 from sqlalchemy import (
     ColumnElement,
     Select,
@@ -36,6 +37,7 @@ from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.call_status_rows import call_status_of
 from app.adapters.db.certificate import CertificateQueries
+from app.adapters.db.change_requests import ChangeRequestQueries
 from app.adapters.db.configuration_document import ConfigurationDocumentQueries
 from app.adapters.db.contact_center_rows import (
     has_task,
@@ -102,6 +104,7 @@ from app.adapters.db.record_names import (
     channel_secret_name,
     organisation_records,
 )
+from app.adapters.db.report_digest import ReportDigestQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
@@ -121,6 +124,7 @@ from app.adapters.db.usage import UsageQueries
 from app.adapters.db.usage_reports import UsageReportQueries
 from app.adapters.db.usage_rollup import UsageRollupQueries
 from app.adapters.db.usage_slots import UsageSlotQueries
+from app.adapters.db.usage_staff import UsageStaffQueries
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.audit import (
@@ -203,7 +207,11 @@ from app.domain.scheduling import (
 from app.domain.staff import StaffStatus
 from app.domain.tasks import ActiveJob, ActiveJobs, JobState
 from app.domain.theme import Theme
+from app.domain.usage import UsageFact
+from app.domain.usage_log import fact_fields
 from app.domain.worker_check import WorkerHeartbeat
+
+log = structlog.get_logger()
 
 _PENDING = "pending"
 _RUNNING = "running"
@@ -473,6 +481,7 @@ def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
 class SqlTransaction(
     AdminSessionQueries,
     ProposalQueries,
+    ChangeRequestQueries,
     AlertTargetQueries,
     ConfigurationDocumentQueries,
     HealthQueries,
@@ -486,8 +495,10 @@ class SqlTransaction(
     RollupQueries,
     UsageQueries,
     UsageRollupQueries,
+    UsageStaffQueries,
     UsageSlotQueries,
     UsageReportQueries,
+    ReportDigestQueries,
     StaffQueries,
     MaintenanceQueries,
     RoleQueries,
@@ -530,6 +541,8 @@ class SqlTransaction(
         self._usage_enabled = usage_enabled
         self.written_events: list[AuditEvent] = []
         """Audit events added in this transaction, for the post-commit emit (ADR 0034)."""
+        self.written_usage: list[UsageFact] = []
+        """Usage facts written in this transaction, for the post-commit log line (ADR 0117)."""
 
     async def list_groups(self, scope: Scope, *, archived: bool = False) -> list[GroupSummary]:
         """Return the groups inside ``scope``, ordered by organisation and name.
@@ -1825,6 +1838,20 @@ class SqlTransaction(
         await self._session.flush()
         return _booking(row, await self._slot_row(row.slot_id))
 
+    async def find_bookings_by_phone(self, group_id: int, phone: str) -> list[Booking]:
+        """Return the group's confirmed bookings with this phone number (ADR 0023 step 2)."""
+        result = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.phone == phone,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+            )
+            .order_by(BookingRow.id)
+        )
+        return [_booking(*found) for found in result.all()]
+
     async def get_booking(self, booking_id: int) -> Booking | None:
         """Return the booking with ``booking_id``."""
         result = await self._session.execute(
@@ -2065,16 +2092,15 @@ class SqlTransaction(
             )
         )
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime
-    ) -> int:
-        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
+        """Return how many successful events with ``action`` ``actor`` has had since then."""
         count = await self._session.scalar(
             select(func.count())
             .select_from(AuditEventRow)
             .where(
                 AuditEventRow.actor == actor,
-                AuditEventRow.action.in_(list(actions)),
+                AuditEventRow.action == action,
+                AuditEventRow.outcome == Outcome.SUCCESS.value,
                 AuditEventRow.at >= since,
             )
         )
@@ -2240,6 +2266,8 @@ class SqlUnitOfWork:
         sink: Receives committed audit events; ``None`` ships nothing (tests, the CLI).
         usage_enabled: Whether usage facts are written (``reporting_enabled``, read live);
             on by default, so the CLI and tests write them like the web process does.
+        usage_to_log: Whether a committed usage fact is also written as the log line ``usage.fact``
+            (``reporting_usage_events_to_log``, read live); off by default.
     """
 
     def __init__(
@@ -2248,12 +2276,14 @@ class SqlUnitOfWork:
         box: SecretBox | None = None,
         sink: EventSink | None = None,
         usage_enabled: Callable[[], bool] = lambda: True,
+        usage_to_log: Callable[[], bool] = lambda: False,
     ) -> None:
-        """Store the engine, the secret box, the sink and the usage switch."""
+        """Store the engine, the secret box, the sink and the usage switches."""
         self._engine = engine
         self._box = box
         self._sink = sink
         self._usage_enabled = usage_enabled
+        self._usage_to_log = usage_to_log
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[SqlTransaction]:
@@ -2277,9 +2307,15 @@ class SqlUnitOfWork:
         self._emit(tx)
 
     def _emit(self, tx: SqlTransaction) -> None:
-        """Hand the committed transaction's audit events to the sink."""
+        """Hand the audit events to the sink and the usage facts to the log, after the commit."""
         if self._sink is not None and tx.written_events:
             self._sink.emit(tx.written_events)
+        if tx.written_usage and self._usage_to_log():
+            try:
+                for fact in tx.written_usage:
+                    log.info("usage.fact", **fact_fields(fact))
+            except Exception as exc:  # after commit nothing may fail the request
+                log.error("usage.emit_failed", error=type(exc).__name__)
 
 
 @asynccontextmanager

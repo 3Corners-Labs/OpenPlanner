@@ -18,7 +18,7 @@ from tests.support.domain import ADA, NOW, SLOT_0900, TEST_TOKEN_KEY, book
 
 
 async def _booking_id(engine: AsyncEngine) -> int:
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     service = BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY)
     receipt = await book(service, SLOT_0900)
     assert receipt.booking.id is not None
@@ -100,7 +100,7 @@ async def test_bookings_are_listed_per_day_within_the_scope(engine: AsyncEngine)
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         await tx.save_call_status(apply_event(new_status(booking_id), EventKind.TASK_CREATED, NOW))
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
     assert group is not None
     lower = SLOT_0900 - timedelta(hours=9)
     upper = lower + timedelta(days=1)
@@ -108,10 +108,10 @@ async def test_bookings_are_listed_per_day_within_the_scope(engine: AsyncEngine)
     async with uow.read() as tx:
         everything = await tx.list_bookings(Scope(everything=True), group.id, lower, upper)
         own = await tx.list_bookings(
-            Scope(groups=frozenset({("org-aangifte", "aangifte")})), group.id, lower, upper
+            Scope(groups=frozenset({("org-balie", "balie")})), group.id, lower, upper
         )
         other = await tx.list_bookings(
-            Scope(groups=frozenset({("org-aangifte", "other")})), group.id, lower, upper
+            Scope(groups=frozenset({("org-balie", "other")})), group.id, lower, upper
         )
         next_day = await tx.list_bookings(
             Scope(everything=True), group.id, upper, upper + timedelta(days=1)
@@ -143,10 +143,10 @@ async def test_webhook_events_are_claimed_once_and_forgotten(engine: AsyncEngine
 
 
 async def test_direct_calls_are_listed_with_their_status_and_cap(engine: AsyncEngine) -> None:
-    await seed_group(engine, slug="aangifte", capacity=2)
+    await seed_group(engine, slug="balie", capacity=2)
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         await tx.save_group(replace(group, direct_call_max_concurrent=3))
         rules, _overrides = await tx.get_schedule_items(group.id)
@@ -158,8 +158,8 @@ async def test_direct_calls_are_listed_with_their_status_and_cap(engine: AsyncEn
     service = BookingService(uow, clock, TEST_TOKEN_KEY)
     await book(service, SLOT_0900)  # scheduled: not a direct call
     clock.advance(SLOT_0900 + timedelta(minutes=5) - NOW)
-    first = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
-    second = await service.start_direct(group_slug="aangifte", contact=ADA, locale="nl")
+    first = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
+    second = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
     first_id, second_id = first.booking.id or 0, second.booking.id or 0
     connected = apply_event(new_status(first_id), EventKind.TASK_CONNECTED, clock.now())
     async with uow.locked() as tx:
@@ -169,7 +169,7 @@ async def test_direct_calls_are_listed_with_their_status_and_cap(engine: AsyncEn
     async with uow.read() as tx:
         calls = await tx.get_direct_calls(group.id, SLOT_0900)
         later = await tx.get_direct_calls(group.id, clock.now() + timedelta(minutes=1))
-        stored = await tx.get_group("aangifte")
+        stored = await tx.get_group("balie")
 
     assert [(c.booking_id, c.active, c.status.task) for c in calls] == [
         (first_id, True, TaskState.CONNECTED),

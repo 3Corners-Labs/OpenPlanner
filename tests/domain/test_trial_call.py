@@ -69,12 +69,12 @@ def test_the_number_of_trial_calls_is_limited_per_booking() -> None:
 
 
 def test_the_trial_meeting_is_the_hosts_own_with_entry_before_the_host() -> None:
-    group = make_group(name="Aangifte", trial_call_minutes=20, **HOST)
+    group = make_group(name="Balie", trial_call_minutes=20, **HOST)
     now = NOW + timedelta(seconds=42)
 
     request = trial_request(group, now)
 
-    assert request.title == "Proefgesprek Aangifte"
+    assert request.title == "Proefgesprek Balie"
     assert request.host_email == "host@example.org"
     assert request.start == NOW
     assert request.end == NOW + timedelta(minutes=20)

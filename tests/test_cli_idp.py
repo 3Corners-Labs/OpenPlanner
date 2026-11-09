@@ -42,13 +42,13 @@ def configured(settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPat
 async def _seed(found: Settings) -> None:
     engine = create_engine(found.database_url)
     try:
-        await seed_group(engine, slug="aangifte")
+        await seed_group(engine, slug="balie")
         uow = SqlUnitOfWork(engine, None)
         async with uow.locked() as tx:
             await tx.add_identity_provider(
                 OrganisationProvider(
                     None,
-                    "org-aangifte",
+                    "org-balie",
                     "org-a",
                     "Acme A",
                     DISCOVERY,
@@ -82,8 +82,7 @@ async def test_the_check_reads_discovery_and_keys_and_lists_the_domains(
     assert "OK    outbound guard" in report
     assert "OK    discovery" in report
     assert (
-        "org-a of organisation org-aangifte: on, client authentication client_secret_basic"
-        in report
+        "org-a of organisation org-balie: on, client authentication client_secret_basic" in report
     )
     assert "  acme-a.nl  verified" in report
     assert "FAIL  client secret" in report  # no secret stored: the check says so

@@ -19,7 +19,7 @@ from tests.support.domain import NOW
 
 CLOSED = "/g/demo-gesloten"
 PLANNED = "/g/demo-gepland"
-PHONE_LINK = '<a class="contact-block__link" href="tel:14020">14 020</a>'
+PHONE_LINK = '<a class="contact-block__link" href="tel:0123456789">012 345 6789</a>'
 
 
 @pytest.fixture

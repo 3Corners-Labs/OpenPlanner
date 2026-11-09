@@ -15,9 +15,13 @@ passed on, because it may quote an address.
 import time
 from collections.abc import Collection
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
+from app.config import Settings
+from app.domain.identity import PLATFORM, provider_of
+from app.domain.ports import StaffDirectory
 from app.domain.staff_directory import (
     ADMIN_URL_PATTERN,
     DirectoryError,
@@ -216,3 +220,43 @@ def _user(item: dict[str, Any]) -> DirectoryUser:
         enabled=bool(item.get("enabled", True)),
         entitlements=frozenset(attributes.get(ENTITLEMENTS_ATTRIBUTE, [])),
     )
+
+
+def directory_from_settings(settings: Settings) -> StaffDirectory | None:
+    """Return the staff directory of the bundled Keycloak, or ``None`` without its settings."""
+    secret = settings.keycloak_directory_client_secret
+    if not settings.keycloak_admin_url or secret is None:
+        return None
+    return KeycloakDirectory(
+        settings.keycloak_admin_url,
+        settings.keycloak_directory_client_id,
+        secret.get_secret_value(),
+    )
+
+
+class DirectoryAddresses:
+    """``StaffAddresses`` over the bundled provider's directory (ADR 0117 point 16).
+
+    The fallback of ``StoredAddresses``, for a person whose login stored none. A person it does
+    not hold, one who is disabled, a provider without a directory or one that does not answer
+    has none: the digest skips them rather than fail.
+
+    Args:
+        directory: The provider's directory, or ``None`` for a provider without one.
+    """
+
+    def __init__(self, directory: StaffDirectory | None) -> None:
+        """Store the directory."""
+        self._directory = directory
+
+    async def address_of(self, subject: str) -> str | None:
+        """Return the address of the person whose provider id is ``subject``, or ``None``."""
+        if self._directory is None or provider_of(subject) != PLATFORM:
+            return (
+                None  # only the bundled provider's own people: another provider's sub is no id here
+            )
+        try:
+            user = await self._directory.get_user(quote(subject, safe=""))
+        except DirectoryError:
+            return None
+        return user.email if user is not None and user.enabled and user.email else None

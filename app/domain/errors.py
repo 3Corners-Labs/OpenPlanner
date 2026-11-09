@@ -70,6 +70,7 @@ class ErrorCode(StrEnum):
     MAINTENANCE = "maintenance"
     MAINTENANCE_FROM_ENVIRONMENT = "maintenance_from_environment"
     QUEUE_NOT_ENABLED = "queue_not_enabled"
+    STAFF_VIEW_OFF = "staff_view_off"
     QUEUE_EMPTY = "queue_empty"
     ALREADY_CLAIMED = "already_claimed"
     FREE_PICK_NOT_ALLOWED = "free_pick_not_allowed"
@@ -123,6 +124,8 @@ class ErrorCode(StrEnum):
     TLS_VOLUME_UNWRITABLE = "tls_volume_unwritable"
     CONFIGURATION_PASSPHRASE_SHORT = "configuration_passphrase_short"  # noqa: S105  # nosec B105 - a code
     CONFIGURATION_PASSPHRASE_WRONG = "configuration_passphrase_wrong"  # noqa: S105  # nosec B105 - a code
+    CONFIGURATION_PLAINTEXT_DISABLED = "configuration_plaintext_disabled"
+    CONFIGURATION_PLAINTEXT_UNCONFIRMED = "configuration_plaintext_unconfirmed"
     CONFIGURATION_PACKAGE_INVALID = "configuration_package_invalid"
     CONFIGURATION_PACKAGE_VERSION = "configuration_package_version"
     CONFIGURATION_PACKAGE_TOO_LARGE = "configuration_package_too_large"
@@ -148,6 +151,12 @@ class ErrorCode(StrEnum):
     """ADR 0099 point 7: a booking, a slot or an active closure still refers to the object."""
     CONFIGURATION_CAPACITY_BELOW_BOOKED = "configuration_capacity_below_booked"
     """ADR 0099 point 7: a capacity lower than the places already booked in that window."""
+    CHANGE_REQUESTS_DISABLED = "change_requests_disabled"
+    """ADR 0023 step 2: the organisation has not switched on change requests by a bot."""
+    INVALID_APPOINTMENT_CODE = "invalid_appointment_code"
+    """ADR 0023 step 2: the appointment code is not eight digits."""
+    CHANGE_REQUEST_NOT_FOUND = "change_request_not_found"
+    """ADR 0023 step 2: no such request of this client, or nothing open to confirm."""
 
 
 class DomainError(Exception):

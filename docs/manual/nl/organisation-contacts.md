@@ -36,7 +36,7 @@ U kunt er maximaal zes invullen. Kies per rij een soort en vul de gegevens in:
 
 | Soort | Gegevens |
 |---|---|
-| Telefoon | Een nummer van 3 tot 15 cijfers, met spaties, `+`, `-` of haakjes, zoals `14 020` of `+31 (0)20 624 1111` |
+| Telefoon | Een nummer van 3 tot 15 cijfers, met spaties, `+`, `-` of haakjes, zoals `012 345 6789` of `+31 (0)12 345 6789` |
 | E-mail | Een algemeen adres, zoals `info@acme.nl` |
 | Website | Een link die met `https://` begint, bijvoorbeeld naar het contactformulier |
 | Chat | Een link die met `https://` begint, naar de chat van de organisatie |

@@ -80,7 +80,7 @@ from app.domain.job_plan import (
 )
 from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.rebooking import DEFAULT_REACH, Reach, may_take, suggested
+from app.domain.rebooking import DEFAULT_REACH, Reach, may_take, search_window, suggested
 from app.domain.reschedule_proposal import HeldProposal
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
 from app.domain.routing import RoutingChoice
@@ -287,13 +287,10 @@ class BookingService:
             proposal = await tx.get_open_proposal(_id(booking))
             reach = value_for(self._reach, group.organisation_id)
             old_day = booking.start.astimezone(group.tz).date()
-            first_day = max(
-                group.today(self._clock.now()), old_day - timedelta(days=reach.search_days)
-            )
-            last_day = old_day + timedelta(days=reach.search_days)
-            if first_day > last_day:
+            window = search_window(group, [old_day], reach, self._clock.now())
+            if window is None:
                 return []
-            free = await self._free_slots(tx, group, first_day, last_day, booking.subject)
+            free = await self._free_slots(tx, group, *window, booking.subject)
         held = {proposal.start} if proposal is not None else set()
         return suggested(group, booking.start, [s.start for s in free], reach, held)
 
@@ -520,17 +517,28 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
-            now = self._clock.now()
             group = await self._group_by_id(tx, booking.group_id)
-            _ensure_cancellable(booking, group, now)
-            return await booking_changes.cancel(
-                tx,
-                booking,
-                group,
-                now,
-                actor=ActorClass.PARTICIPANT,
-                team_invite=group.sends_team_invite,
-            )
+            return await self.cancel_in(tx, booking, group)
+
+    async def cancel_in(self, tx: Transaction, booking: Booking, group: Group) -> Booking:
+        """Cancel as the participant inside the caller's locked transaction (ADR 0069).
+
+        Shared by the participant's own link and a bot's change request they confirmed
+        (ADR 0023 step 2).
+
+        Raises:
+            DomainError: ``booking_locked`` from the start on, or ``booking_not_active``.
+        """
+        now = self._clock.now()
+        booking_changes.ensure_participant_may_cancel(booking, group, now)
+        return await booking_changes.cancel(
+            tx,
+            booking,
+            group,
+            now,
+            actor=ActorClass.PARTICIPANT,
+            team_invite=group.sends_team_invite,
+        )
 
     async def leave_direct(self, management_token: str | PublicRef) -> DirectLeft:
         """Stop waiting for a direct call: cancel it and end its work item (ADR 0019 point 4).
@@ -621,11 +629,25 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             old = await self._booking(tx, management_token)
-            if old.awaits_confirmation:  # ADR 0056 §3: confirm first, then move
-                raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
             group = await self._group_by_id(tx, old.group_id)
-            _ensure_changeable(old, group, self._clock.now())
-            return await self.relocate(tx, old, group, new_start, actor=ActorClass.PARTICIPANT)
+            return await self.reschedule_in(tx, old, group, new_start)
+
+    async def reschedule_in(
+        self, tx: Transaction, old: Booking, group: Group, new_start: datetime
+    ) -> BookingReceipt:
+        """Move as the participant inside the caller's locked transaction (ADR 0069).
+
+        Shared by the participant's own link and a bot's change request they confirmed
+        (ADR 0023 step 2).
+
+        Raises:
+            DomainError: ``booking_not_active`` (also while it awaits confirmation),
+                ``booking_locked`` from the change deadline on, or any error of ``relocate``.
+        """
+        if old.awaits_confirmation:  # ADR 0056 §3: confirm first, then move
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        booking_changes.ensure_participant_may_move(old, group, self._clock.now())
+        return await self.relocate(tx, old, group, new_start, actor=ActorClass.PARTICIPANT)
 
     async def relocate(
         self,
@@ -888,22 +910,22 @@ class BookingService:
     ) -> HeldProposal:
         """Propose ``start`` as the new time of ``booking`` and hold a place there (ADR 0057).
 
-        Inside the caller's locked transaction; the caller checks who may do it. The proposed
-        slot must be another start of the same group that a planner may still fill
-        (``rebooking.may_take``) and that has room like a booking would (``_reserve``).
+        Inside the caller's locked transaction; the caller checks who may do it and that the
+        planner may ask this booking for a new time
+        (``booking_changes.ensure_planner_may_request_rebook``). The proposed slot must be
+        another start of the same group that a planner may still fill (``rebooking.may_take``)
+        and that has room like a booking would (``_reserve``).
 
         Raises:
-            DomainError: ``same_slot``, ``booking_locked`` (the slot is too close),
-                ``booking_not_active`` (the booking is not confirmed) or any error of
-                ``_reserve``.
+            DomainError: ``same_slot``, ``booking_locked`` (the slot is too close), any error
+                of ``_reserve``, or ``booking_not_active`` from ``hold_proposal`` when the
+                booking is not confirmed after all.
         """
         now = self._clock.now()
         if start == booking.start:
             raise DomainError(ErrorCode.SAME_SLOT)
         if not may_take(group, start, now):
             raise DomainError(ErrorCode.BOOKING_LOCKED)
-        if not booking.is_active:
-            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
         slot = await self._reserve(tx, group, start, booking.routing)
         return await booking_changes.hold_proposal(
             tx,
@@ -929,14 +951,24 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
-            proposal = await tx.get_open_proposal(_id(booking))
-            now = self._clock.now()
-            if proposal is None or proposal.is_due(now):
-                raise DomainError(ErrorCode.PROPOSAL_NOT_OPEN)
             group = await self._group_by_id(tx, booking.group_id)
-            return await self.relocate(
-                tx, booking, group, proposal.start, actor=ActorClass.PARTICIPANT
-            )
+            return await self.confirm_proposal_in(tx, booking, group, ActorClass.PARTICIPANT)
+
+    async def confirm_proposal_in(
+        self, tx: Transaction, booking: Booking, group: Group, actor: ActorClass
+    ) -> BookingReceipt:
+        """Move ``booking`` into its open proposal inside the caller's locked transaction.
+
+        Shared by the participant's link and the planner confirming on their behalf after a
+        phone call (ADR 0057 point 10); ``actor`` says which, for the usage facts.
+
+        Raises:
+            DomainError: ``proposal_not_open`` or any error of ``relocate``.
+        """
+        proposal = await tx.get_open_proposal(_id(booking))
+        if proposal is None or proposal.is_due(self._clock.now()):
+            raise DomainError(ErrorCode.PROPOSAL_NOT_OPEN)
+        return await self.relocate(tx, booking, group, proposal.start, actor=actor)
 
     async def _booked_jobs(
         self, tx: Transaction, group: Group, booking: Booking, *, sms: bool = False
@@ -1003,26 +1035,6 @@ def _correctable(booking: Booking, group: Group, now: datetime) -> bool:
         and (booking.is_active or booking.awaits_confirmation)
         and now < group.change_deadline(booking.start)
     )
-
-
-def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
-    """Refuse a move from the change deadline on (ADR 0069).
-
-    A booking on hold (suspended, or awaiting a new time) has no deadline: it does not go
-    ahead at its time anyway.
-    """
-    if booking.on_hold:
-        return
-    if now >= group.change_deadline(booking.start):
-        raise DomainError(ErrorCode.BOOKING_LOCKED)
-
-
-def _ensure_cancellable(booking: Booking, group: Group, now: datetime) -> None:
-    """Refuse a cancellation from the start on (ADR 0069); on hold has no deadline."""
-    if booking.on_hold:
-        return
-    if now >= group.cancel_deadline(booking.start):
-        raise DomainError(ErrorCode.BOOKING_LOCKED)
 
 
 def _id(entity: Booking | Slot | Closure) -> int:

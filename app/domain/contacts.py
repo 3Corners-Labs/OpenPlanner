@@ -39,7 +39,7 @@ MAX_URL_LENGTH = 500
 MAX_EMAIL_LENGTH = 254
 MAX_PHONE_LENGTH = 30
 MIN_PHONE_DIGITS = 3
-"""Short numbers such as 112 and 14 020 are valid; a number has at most 15 digits (E.164)."""
+"""Short numbers such as 112 are valid; a number has at most 15 digits (E.164)."""
 MAX_PHONE_DIGITS = 15
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")

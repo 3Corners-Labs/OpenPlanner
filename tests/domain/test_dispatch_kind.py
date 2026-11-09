@@ -8,7 +8,7 @@ from app.domain.errors import DomainError
 from app.domain.scheduling import DispatchKind
 from tests.support.domain import make_group, webex_routing
 
-WXCC = {"contact_center": webex_routing("aangifte@example.org", "video")}
+WXCC = {"contact_center": webex_routing("balie@example.org", "video")}
 QUEUE = DispatchKind.OPENPLANNER_QUEUE
 
 
@@ -71,7 +71,7 @@ def test_change_lead_is_never_shorter_than_the_dispatch_lead() -> None:
 
 
 def test_only_an_own_queue_group_with_an_address_sends_the_team_invite() -> None:
-    address = {"calendar_invite_address": "team-aangifte@example.org"}
+    address = {"calendar_invite_address": "team-balie@example.org"}
 
     assert make_group(dispatch_kind=QUEUE, **address).sends_team_invite
     assert not make_group(**address).sends_team_invite

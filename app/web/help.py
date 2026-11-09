@@ -180,6 +180,8 @@ TOPICS = (
             "/admin/groups/{slug}/agenda/bookings/{booking_id}/rebook",
             "/admin/groups/{slug}/agenda/slot-rebook",
             "/admin/groups/{slug}/agenda/waiting",
+            "/admin/groups/{slug}/agenda/bookings/{booking_id}/propose",
+            "/admin/groups/{slug}/agenda/slot-propose",
         ),
         Permission.BOOKINGS_VIEW,
     ),

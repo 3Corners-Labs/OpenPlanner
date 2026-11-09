@@ -37,7 +37,7 @@ async def test_overdue_bookings_are_purged_and_their_jobs_dropped(engine: AsyncE
     uow = SqlUnitOfWork(engine)
     service = BookingService(uow, clock, TEST_TOKEN_KEY)
     confirmed = (await book(service, SLOT_0900)).booking.id or 0
-    pending = (await book_pending(service, SLOT_0930, "aangifte")).booking
+    pending = (await book_pending(service, SLOT_0930, "balie")).booking
     assert pending.status is BookingStatus.PENDING_CONFIRMATION
     assert pending.confirm_by is not None
     clock.advance(pending.confirm_by - NOW + DAY + timedelta(hours=2))  # before any slot

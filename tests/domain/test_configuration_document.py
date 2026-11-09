@@ -15,7 +15,7 @@ from app.domain.configuration_document import (
 )
 from app.domain.configuration_schema import Collection, Format, Kind, Shape
 from app.domain.configuration_tree import Action, path_of
-from app.domain.configuration_values import Binary, Sealed
+from app.domain.configuration_values import Binary, Sealed, Secret
 from app.domain.errors import DomainError, ErrorCode
 from tests.support.configuration import BOX, PLATFORM
 
@@ -199,6 +199,10 @@ def test_a_secret_is_only_ever_a_sealed_value() -> None:
         {"sealed": ""},
         {"sealed": "not base64!"},
         {"sealed": "YQ==", "x": 1},
+        {"sealed": "YQ==", "plain": "x"},
+        {"plain": ""},
+        {"plain": 5},
+        {"plain": "x", "x": 1},
         5,
     ):
         refused(
@@ -206,6 +210,23 @@ def test_a_secret_is_only_ever_a_sealed_value() -> None:
             ErrorCode.INVALID_CONFIGURATION,
             "boxes[a].password",
         )
+
+
+def test_a_secret_may_be_written_in_clear_text_as_plain() -> None:
+    data = base() | {"boxes": [{"slug": "a", "password": {"plain": "hunter2"}}]}
+
+    (box,) = parse(data).root.children["boxes"]
+
+    assert box.fields["password"] == Secret("hunter2")
+
+
+def test_a_clear_text_secret_is_never_in_the_message_of_a_refusal() -> None:
+    data = base() | {"boxes": [{"slug": "a", "password": {"plain": "hunter2", "x": 1}}]}
+
+    with pytest.raises(DomainError) as error:
+        parse(data)
+
+    assert "hunter2" not in repr(error.value) + str(error.value.field)
 
 
 def test_a_binary_carries_its_hash_and_a_wrong_hash_is_refused() -> None:
@@ -399,6 +420,20 @@ def test_to_json_refuses_a_secret_that_is_not_sealed() -> None:
 
     assert error.value.code is ErrorCode.INVALID_CONFIGURATION
     assert error.value.field == "boxes[a].password"
+
+
+def test_to_json_writes_a_secret_as_plain_only_when_asked() -> None:
+    from dataclasses import replace
+
+    document = parse({**base(), "boxes": [{"slug": "a", "password": {"sealed": "YQ=="}}]})
+    (box,) = document.root.children["boxes"]
+    opened = replace(box, fields={"password": Secret("plain")})
+    opened_document = replace(document, root=replace(document.root, children={"boxes": (opened,)}))
+
+    written = to_json(opened_document, plain_secrets=True)
+
+    assert written["boxes"] == [{"slug": "a", "password": {"plain": "plain"}}]
+    assert parse(written).root.children["boxes"][0].fields["password"] == Secret("plain")
 
 
 def test_a_path_names_the_collection_and_the_key_parts() -> None:

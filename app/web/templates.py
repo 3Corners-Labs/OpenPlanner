@@ -18,7 +18,9 @@ from starlette.responses import HTMLResponse
 
 from app.logging import tracer
 from app.web.locale import LANG_PARAM, RequestLocale
+from app.web.protection import is_action
 from app.web.static_assets import ASSETS
+from app.web.widgets import OVERVIEW_PATH
 
 KEPT_QUERY_PARAMS = ("start", "month", "day", "days", "from", "until")
 """Query parameters the language switcher carries over; anything else is dropped so that
@@ -65,8 +67,9 @@ class LanguageOption:
         code: Locale code, used for the ``lang`` and ``hreflang`` attributes.
         autonym: The language's name in that language (``"English"``).
         href: A query-only relative URL (``?lang=en``) that keeps the current path and the
-            other query parameters. It never contains the request path, so a crafted path
-            cannot turn it into a link to another host.
+            other query parameters; on a page at a ``GET`` action's address, the overview
+            with ``?lang=`` (``switch_href``). It never contains the request path, so a crafted
+            path cannot turn it into a link to another host.
         current: Whether this is the page's language.
     """
 
@@ -121,8 +124,13 @@ def switch_href(request: Request, param: str, value: str) -> str:
     """Return a query-only link (``?lang=en``) that sets ``param`` on the current page.
 
     Keeps only ``kept_query``, and never contains the request path, so a crafted path cannot
-    turn it into a link to another host.
+    turn it into a link to another host. A page served at a ``GET`` action's address (the
+    refusal of an audited download) is not a page to come back to: a link to it would ask for
+    the action again (ASVS V3.5.3), so there the link sets ``param`` on the overview instead.
     """
+    # The route first: only a page at an action's address needs the method.
+    if is_action(request) and request.method == "GET":
+        return f"{OVERVIEW_PATH}?{urlencode([(param, value)])}"
     return f"?{urlencode([*kept_query(request), (param, value)])}"
 
 
@@ -150,8 +158,10 @@ class EnvironmentNotice:
 ENVIRONMENT_LABELS = {
     "dev": "admin.environment.dev",
     "test": "admin.environment.test",
+    "prod": "admin.environment.prod",
 }
-"""Bar label per non-production ``ENVIRONMENT``; production shows no bar."""
+"""The name of each ``ENVIRONMENT`` in the portal: the bar outside production, System status
+and the overview's status widget. Production shows no bar."""
 
 
 def product_footer_of(request: Request) -> bool:
@@ -169,10 +179,12 @@ def product_footer_of(request: Request) -> bool:
 def environment_of(request: Request) -> EnvironmentNotice | None:
     """Return the environment bar for this installation, or ``None`` in production."""
     settings = getattr(request.app.state, "settings", None)
-    key = ENVIRONMENT_LABELS.get(getattr(settings, "environment", "prod"))
-    if key is None:
+    environment = getattr(settings, "environment", "prod")
+    if environment == "prod" or environment not in ENVIRONMENT_LABELS:
         return None
-    return EnvironmentNotice(key, bool(getattr(settings, "simulator_enabled", False)))
+    return EnvironmentNotice(
+        ENVIRONMENT_LABELS[environment], bool(getattr(settings, "simulator_enabled", False))
+    )
 
 
 def render(
@@ -182,27 +194,35 @@ def render(
     locale: RequestLocale,
     context: Mapping[str, object] | None = None,
     *,
+    frame: Mapping[str, object] | None = None,
     scripts: bool = False,
 ) -> HTMLResponse:
     """Render template ``name`` in the request's locale.
 
-    The template receives ``_`` (bound gettext), ``locale``, ``languages``, ``environment``
-    and ``product_footer`` in addition to ``context``. ``scripts=True`` allows the page's own
-    scripts (``SCRIPT_CSP``).
+    The template receives the page's ``context``; then ``frame``, what a wrapper gives every
+    page of its kind (the admin portal's menu and profile menu, ``app.admin.pages.page``);
+    then ``_`` (bound gettext), ``locale``, ``languages``, ``environment`` and
+    ``product_footer``. ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``).
+
+    Raises:
+        ValueError: a name of ``context`` or ``frame`` that a later layer sets as well (a
+            programming error). It would be overwritten without a word: System status once
+            showed the environment bar's ``EnvironmentNotice`` as the environment, and a
+            booking's "back to the agenda" link pointed at the booking itself.
     """
+    own: dict[str, object] = {
+        "_": locale.gettext,
+        "locale": locale.code,
+        "languages": language_options(request, locale),
+        "environment": environment_of(request),
+        "product_footer": product_footer_of(request),
+    }
+    page, shared = dict(context or {}), dict(frame or {})
+    clash = (page.keys() & (shared.keys() | own.keys())) | (shared.keys() & own.keys())
+    if clash:
+        raise ValueError(f"{name}: {sorted(clash)} set twice; give the page's value its own name")
     started = perf_counter()
-    response = templates.TemplateResponse(
-        request,
-        name,
-        {
-            **(context or {}),
-            "_": locale.gettext,
-            "locale": locale.code,
-            "languages": language_options(request, locale),
-            "environment": environment_of(request),
-            "product_footer": product_footer_of(request),
-        },
-    )
+    response = templates.TemplateResponse(request, name, {**page, **shared, **own})
     tracer.trace("template.render", template=name, ms=int((perf_counter() - started) * 1000))
     response.headers["content-security-policy"] = SCRIPT_CSP if scripts else HTML_CSP
     response.headers["cache-control"] = "no-store"

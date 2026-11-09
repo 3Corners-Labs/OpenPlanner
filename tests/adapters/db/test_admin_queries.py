@@ -261,6 +261,28 @@ async def test_old_system_events_are_deleted_admin_actions_kept(engine: AsyncEng
     ]
 
 
+async def test_successes_are_counted_per_actor_and_action_since_a_moment(
+    engine: AsyncEngine,
+) -> None:
+    uow = SqlUnitOfWork(engine)
+    async with uow.locked() as tx:
+        for minutes, actor, action, outcome in (
+            (-90, "g-1", "bookings.view", Outcome.SUCCESS),  # more than an hour ago
+            (-30, "g-1", "bookings.view", Outcome.SUCCESS),
+            (-20, "g-1", "bookings.view", Outcome.DENIED),  # a refused request
+            (-15, "g-1", "bookings.manage", Outcome.SUCCESS),  # another action
+            (-10, "g-2", "bookings.view", Outcome.SUCCESS),  # someone else
+            (0, "g-1", "bookings.view", Outcome.SUCCESS),
+        ):
+            at = NOW + timedelta(minutes=minutes)
+            await tx.add_audit_event(AuditEvent(at, actor, action, outcome, "", "demo", "demo"))
+
+    async with uow.read() as tx:
+        count = await tx.count_audit_successes("g-1", "bookings.view", NOW - timedelta(hours=1))
+
+    assert count == 2
+
+
 def test_every_listing_query_requires_a_scope() -> None:
     # ADR 0014: a new list_* method without a Scope parameter fails this test.
     listings = [name for name in dir(Transaction) if name.startswith("list_")]
@@ -337,7 +359,7 @@ async def test_the_sql_filter_narrows_by_level_category_period_and_trace(
 async def test_diagnostic_modes_round_trip_replace_and_end(engine: AsyncEngine) -> None:
     # ADR 0040, part 4: one mode per target; ended modes are not active.
     uow = SqlUnitOfWork(engine)
-    group = DiagnosticMode("demo", "aangifte", NOW + timedelta(hours=24), "s-1")
+    group = DiagnosticMode("demo", "balie", NOW + timedelta(hours=24), "s-1")
     organisation = DiagnosticMode("demo", None, NOW + timedelta(hours=1), "s-1")
     async with uow.locked() as tx:
         await tx.save_diagnostic_mode(group)

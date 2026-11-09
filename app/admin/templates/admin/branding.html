@@ -104,7 +104,7 @@
     <h2 id="theme-heading">{{ _("admin.branding.theme_file") }}</h2>
     <p class="card__lead">{{ _("admin.branding.theme_file_lead") }}</p>
   </div>
-  <p><a href="/admin/organisations/{{ organisation.slug }}/branding/theme.css" download>{{ _("admin.branding.theme_download") }}</a></p>
+  <p><a href="/admin/organisations/{{ organisation.slug }}/branding/theme.css">{{ _("admin.branding.theme_download") }}</a></p>
   <form method="post" action="/admin/organisations/{{ organisation.slug }}/branding/theme" enctype="multipart/form-data" novalidate>
     <div class="field{% if theme_error %} field--error{% endif %}">
       <label for="theme_file">{{ _("admin.branding.theme_file_input") }}</label>

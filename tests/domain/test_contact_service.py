@@ -13,7 +13,7 @@ from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, two_organisations
 from tests.support.domain import NOW
 
-PHONE = ContactOption.create(ContactKind.PHONE, "14 020", hours={"nl": "ma-vr 9-17"})
+PHONE = ContactOption.create(ContactKind.PHONE, "012 345 6789", hours={"nl": "ma-vr 9-17"})
 CHAT = ContactOption.create(ContactKind.CHAT, "https://chat.acme.example")
 BLOCK = ContactBlock((PHONE, CHAT, PHONE), {"nl": "Andere manieren"})
 

@@ -22,6 +22,26 @@ wachtwoord wordt nergens bewaard: zonder dat wachtwoord zijn de geheimen in het 
 waardeloos en kan niemand het voor u terughalen. Zonder vinkje bevat het bestand geen enkel
 geheim en is geen wachtwoord nodig.
 
+## Een nieuwe omgeving opzetten
+
+Met een export mét geheimen zet u een basisomgeving klaar zonder alles opnieuw in te typen:
+koppelingen (SMTP, SMS, Webex en contactcenter met hun adressen), organisaties, groepen,
+teksten en regels.
+
+1. Exporteer op de bronomgeving met **Geheimen opnemen** en een wachtwoord (minstens 16
+   tekens). Bewaar het wachtwoord apart van het bestand.
+2. Lees het bestand in op de nieuwe omgeving, met hetzelfde wachtwoord: in het portaal onder
+   **Geavanceerde instellingen → Configuratiepakket**, op de host met
+   `python -m app.cli config apply config.json --passphrase-file pass.txt`, of met de
+   installer (`scripts/install.sh --configuration config.json --passphrase-file pass.txt`).
+
+U hebt geen aparte tool nodig om het bestand te openen: OpenPlanner ontsleutelt elk geheim zelf
+bij het inlezen en bewaart het onder de eigen sleutel van de omgeving. In het bestand ziet u
+een `seal`-blok en waarden als `{"sealed": "..."}`; een export zonder geheimen heeft die niet.
+Een geheim kunt u ook met de hand in het bestand zetten, als `{"plain": "…"}`; OpenPlanner
+verzegelt het bij het toepassen. Is de beheerder van de host akkoord, dan kan de superuser ook
+exporteren zonder versleuteling (*Geavanceerde instellingen → Configuratiepakket*).
+
 ## Een document inlezen
 
 Kies het bestand en **Plan tonen**. Er verandert nog niets. Het plan noemt per object wat er

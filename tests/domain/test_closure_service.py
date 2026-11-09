@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -22,6 +23,7 @@ from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.closures import NOTICES, three_groups
+from tests.support.cross_group import booking_id_methods, refused_as_unknown
 from tests.support.domain import (
     ADA,
     MONDAY,
@@ -212,12 +214,46 @@ async def test_other_groups_admin_cannot_close_or_touch_bookings(
         await closures.close_group(OTHER_TEAM, "demo", UNTIL_TUESDAY)
     with pytest.raises(DomainError, match="not_permitted"):
         await closures.cancel(OTHER_TEAM, "demo", booking_id)
-    # Through their own group a booking of another group is "not found", never touched.
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await closures.cancel(OTHER_TEAM, "andere-team", booking_id)
     assert _status(uow, booking_id) is BookingStatus.SUSPENDED
     denied = [e for e in uow.state.audit if e.outcome is Outcome.DENIED]
     assert len(denied) == 2
+
+
+ON_ONE_BOOKING: dict[str, Callable[[ClosureService, int], Awaitable[object]]] = {
+    "booking": lambda s, b: s.booking(GROUP_ADMIN, "demo", b),
+    "reinstate": lambda s, b: s.reinstate(GROUP_ADMIN, "demo", b),
+    "cancel": lambda s, b: s.cancel(GROUP_ADMIN, "demo", b),
+    "move": lambda s, b: s.move(GROUP_ADMIN, "demo", b, NEXT_MONDAY),
+}
+"""Every use case on one booking, by the group admin of ``demo`` through their own group."""
+
+
+def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
+    assert set(ON_ONE_BOOKING) == booking_id_methods(ClosureService)
+
+
+@pytest.mark.parametrize("state", ["on_hold", "not_on_hold"])
+@pytest.mark.parametrize("group", ["andere-team", "demo-twee"])
+@pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
+async def test_another_groups_booking_is_not_found_through_this_group(
+    action: str,
+    group: str,
+    state: str,
+    closures: ClosureService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+) -> None:
+    """The group check comes first, before the rule that only a booking on hold is handled.
+
+    The booking is in another organisation's group or in a sibling group of ``demo``. On hold,
+    a use case would show, reinstate, cancel or move it, so a missing group check fails. Not on
+    hold, that rule answers ``booking_not_active``, so a group check made after it fails too.
+    """
+    booking_id = await _book(bookings, slug=group)
+    if state == "on_hold":
+        await closures.close_group(SUPER, group, UNTIL_TUESDAY)
+
+    await refused_as_unknown(uow, booking_id, ON_ONE_BOOKING[action](closures, booking_id))
 
 
 # --- the participant --------------------------------------------------------------------------

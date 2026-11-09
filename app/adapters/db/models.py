@@ -810,6 +810,9 @@ class StaffRow(Base):
     # ADR 0046 step 2: active, suspended or erased, and when it last changed.
     status: Mapped[str] = mapped_column(String(16), server_default=text("'active'"), index=True)
     status_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0117 step 10b: the verified ``email`` claim of the last login; personal data.
+    email: Mapped[str | None] = mapped_column(String(320))
+    email_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class OverviewLayoutRow(Base):
@@ -1660,4 +1663,80 @@ class RescheduleProposalRow(Base):
         ),
         Index("ix_reschedule_proposals_booking_id", "booking_id"),
         Index("ix_reschedule_proposals_slot_id", "slot_id"),
+    )
+
+
+class ChangeRequestRow(Base):
+    """A bot's request to cancel or move a booking (ADR 0023 step 2); no personal data.
+
+    ``booking_id`` is empty when the phone number and code matched no booking that could still
+    be changed: the request then only expires, as the API answered the same either way. A
+    request with ``target_start`` moves the booking there; one without it cancels.
+    """
+
+    __tablename__ = "change_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[str] = mapped_column(String(40), unique=True)
+    client_id: Mapped[str] = mapped_column(String(64))
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    target_start: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
+    pinned_start: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    superseded_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        Index("ix_change_requests_booking_id", "booking_id"),
+        Index("ix_change_requests_group_id", "group_id"),
+    )
+
+
+class ReportSubscriptionRow(Base):
+    """A digest subscription of the usage reports (ADR 0117 point 16).
+
+    ``recipients`` holds staff row ids, comma-separated; never an address. The address is read
+    from the identity provider's directory when the mail goes out.
+    """
+
+    __tablename__ = "report_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id", ondelete="CASCADE"))
+    group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    period: Mapped[str] = mapped_column(String(8))
+    weekday: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    month_day: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    recipients: Mapped[str] = mapped_column(String(1000), server_default=text("''"))
+    created_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        CheckConstraint("period IN ('daily', 'weekly', 'monthly')", name="period"),
+        CheckConstraint("weekday BETWEEN 0 AND 6", name="weekday"),
+        CheckConstraint("month_day BETWEEN 1 AND 28", name="month_day"),
+        Index("ix_report_subscriptions_organisation_id", "organisation_id"),
+    )
+
+
+class ReportDigestRunRow(Base):
+    """One due digest and what came of it; unique per subscription and due date."""
+
+    __tablename__ = "report_digest_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subscription_id: Mapped[int] = mapped_column(
+        ForeignKey("report_subscriptions.id", ondelete="CASCADE")
+    )
+    due_date: Mapped[date] = mapped_column(Date())
+    status: Mapped[str] = mapped_column(String(16))
+    sent: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    skipped: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    ran_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        CheckConstraint("status IN ('sent', 'skipped_late', 'no_recipient')", name="status"),
+        UniqueConstraint("subscription_id", "due_date"),
     )

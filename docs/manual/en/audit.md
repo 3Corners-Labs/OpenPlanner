@@ -23,7 +23,8 @@ The log never contains participants' data: no names, email addresses or phone nu
   Denied and retry are warnings, failed is an error.
 - **Kind**: *Admin actions* (logins, changes, denials, showing a participant's contact
   details), *System* (messages, video calls, removal of personal data, storage, the automatic
-  integration check), *Security* (rejected webhooks, failed Webex token renewal) and
+  integration check, the warning about many changes or many requests for contact details by
+  one person within an hour), *Security* (rejected webhooks, failed Webex token renewal) and
   *Diagnostics*.
 - **From** and **Up to and including**: whole days in the portal's time zone.
 - **Trace id**: every row of one request or one job. **Whole chain** on a row takes you
@@ -44,6 +45,10 @@ admins cannot.
 - Without a period you get the last 366 days. A longer period or more than 100,000 rows is
   refused: narrow the filter.
 - Every export is itself an entry in the audit log, with the number of rows.
+- The download starts from the button, or from an address you type in, bookmark or open from
+  another program. In a current browser, a link to it on another website (also mail or chat
+  in the browser) gets an error page instead, so another website cannot put an export in your
+  name in the log.
 
 An export contains the identifiers (subjects) of admins. Keep the file according to your
 organisation's policy.

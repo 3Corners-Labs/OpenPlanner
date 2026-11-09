@@ -35,7 +35,7 @@ CONFIRM_BY = NOW + timedelta(hours=24)
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte")
+    state.groups[1] = make_group(id=1, slug="balie")
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     state.reminder_rules[1] = [ReminderRule(ChannelKind.EMAIL, minutes_before=24 * 60)]
     return InMemoryUnitOfWork(state)

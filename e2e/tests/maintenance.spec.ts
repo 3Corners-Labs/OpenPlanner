@@ -32,7 +32,7 @@ test('superuser gives one organisation a contact block and switches maintenance 
 }) => {
   await loginAs(page, 'super', '/admin/organisations/andere/contacts');
   await page.locator('#contact_1_kind').selectOption('phone');
-  await page.locator('#contact_1_value').fill('14 020');
+  await page.locator('#contact_1_value').fill('012 345 6789');
   await page.getByRole('button', { name: 'Opslaan' }).click();
 
   await page.goto('/admin/maintenance');

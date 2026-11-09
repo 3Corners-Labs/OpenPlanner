@@ -263,6 +263,17 @@ async def test_the_status_widget_tells_version_update_maintenance_worker_and_env
     assert 'href="/admin/updates"' in (await site.client.get("/admin/overview/w/status")).text
 
 
+async def test_the_status_widget_names_the_environment_in_words(site: Site) -> None:
+    """Like System status: the environment's name, not the value of ``ENVIRONMENT``."""
+    await site.login_as(AUDITOR)
+
+    text = (await site.client.get("/admin/overview/w/status")).text
+
+    assert ">Testomgeving" in text
+    assert ">test<" not in text
+    assert ">test," not in text
+
+
 async def test_the_status_widget_shows_maintenance_and_a_fresh_worker_heartbeat(
     site: Site,
 ) -> None:

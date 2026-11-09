@@ -41,7 +41,7 @@ async def _bookings(
     engine: AsyncEngine, uow: SqlUnitOfWork, clock: FixedClock
 ) -> list[tuple[int, str]]:
     """Two bookings of one group: their ids and public references."""
-    await seed_group(engine, slug="aangifte", capacity=2)
+    await seed_group(engine, slug="balie", capacity=2)
     service = BookingService(uow, clock, TEST_TOKEN_KEY)
     made = [(await book(service, start)).booking for start in (SLOT_0900, SLOT_0930)]
     return [(b.id or 0, b.public_ref) for b in made]

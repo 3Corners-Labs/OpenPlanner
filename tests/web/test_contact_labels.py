@@ -10,12 +10,12 @@ from app.web.locale import RequestLocale
 from app.web.templates import SHARED_TEMPLATE_DIR
 
 PHONE = ContactOption.create(
-    ContactKind.PHONE, "14 020", hours={"nl": "ma-vr 9-17", "en": "Mon-Fri 9-5"}
+    ContactKind.PHONE, "012 345 6789", hours={"nl": "ma-vr 9-17", "en": "Mon-Fri 9-5"}
 )
 CHAT = ContactOption.create(
     ContactKind.CHAT, "https://chat.acme.example/", labels={"nl": "Chat met ons"}
 )
-ADDRESS = ContactOption.create(ContactKind.ADDRESS, "Stadhuis\nAmstel 1")
+ADDRESS = ContactOption.create(ContactKind.ADDRESS, "Kantoor\nVoorbeeldstraat 1")
 
 
 @pytest.fixture(scope="module")
@@ -42,8 +42,8 @@ def test_items_carry_term_link_lines_and_hours_in_the_readers_language(
     phone, chat, address = view.items
     assert (phone.term, phone.href, phone.text, phone.hours) == (
         "Phone",
-        "tel:14020",
-        "14 020",
+        "tel:0123456789",
+        "012 345 6789",
         "Mon-Fri 9-5",
     )
     assert (chat.term, chat.href, chat.text) == (
@@ -54,7 +54,7 @@ def test_items_carry_term_link_lines_and_hours_in_the_readers_language(
     assert (address.term, address.href, address.lines) == (
         "Address",
         None,
-        ("Stadhuis", "Amstel 1"),
+        ("Kantoor", "Voorbeeldstraat 1"),
     )
 
 
@@ -72,7 +72,7 @@ def test_the_partial_renders_links_and_addresses_escaped(translator: Translator)
         undefined=StrictUndefined,
     )
     block = ContactBlock(
-        (PHONE, ContactOption.create(ContactKind.ADDRESS, "<b>Stadhuis</b>\nAmstel 1")),
+        (PHONE, ContactOption.create(ContactKind.ADDRESS, "<b>Kantoor</b>\nVoorbeeldstraat 1")),
         {"nl": "Bel <ons>"},
     )
     view = contact_view(block, locale(translator, "nl"))
@@ -82,6 +82,6 @@ def test_the_partial_renders_links_and_addresses_escaped(translator: Translator)
 
     assert '<section class="contact-block" aria-labelledby="contacts-heading">' in html
     assert '<h3 id="contacts-heading" class="contact-block__heading">Bel &lt;ons&gt;</h3>' in html
-    assert '<a class="contact-block__link" href="tel:14020">14 020</a>' in html
-    assert "&lt;b&gt;Stadhuis&lt;/b&gt;<br>Amstel 1" in html
+    assert '<a class="contact-block__link" href="tel:0123456789">012 345 6789</a>' in html
+    assert "&lt;b&gt;Kantoor&lt;/b&gt;<br>Voorbeeldstraat 1" in html
     assert '<span class="contact-block__hours">ma-vr 9-17</span>' in html

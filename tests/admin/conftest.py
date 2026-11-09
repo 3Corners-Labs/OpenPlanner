@@ -154,6 +154,14 @@ async def site(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
 
 
 @pytest.fixture
+async def plain_site(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
+    """The demo site on a host that allows the export without encryption (ADR 0099 point 8a)."""
+    allowed = settings.model_copy(update={"configuration_plaintext_export_allowed": True})
+    async with _running_site(allowed, admin_db) as running:
+        yield running
+
+
+@pytest.fixture
 def video() -> FakeVideo:
     """The fake Webex that ``video_site`` talks to."""
     return FakeVideo()

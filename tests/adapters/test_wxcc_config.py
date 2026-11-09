@@ -29,9 +29,7 @@ from tests.support.wxcc_config import FLOW_DOC, OPENPLANNER_SCHEMA, recorded_con
 ORG = "11111111-2222-3333-4444-555555555555"
 
 
-GROUP = GroupRouting(
-    "aangifte", "videoafspraak-prototype", "videoafspraak@example.video", "aangifte"
-)
+GROUP = GroupRouting("balie", "videoafspraak-prototype", "videoafspraak@example.video", "balie")
 
 
 def _by_name(results: list[CheckResult]) -> dict[str, CheckResult]:
@@ -70,7 +68,7 @@ def test_a_flow_without_the_routing_variable_fails_once_groups_share_the_asset()
     routing = _by_name(results[: len(results) // 2])["flow routing"]
     assert not routing.ok
     assert routing.required
-    assert "aangifte, paspoort" in routing.hint
+    assert "balie, paspoort" in routing.hint
     assert not passed(results)
 
 
@@ -90,11 +88,11 @@ def test_a_routing_flow_needs_a_branch_per_value() -> None:
     branch = results["flow branch"]
     assert not branch.ok
     assert not branch.required
-    assert "aangifte" in branch.hint
+    assert "balie" in branch.hint
 
 
 def test_missing_channel_asset_and_entry_point_are_failures() -> None:
-    wrong = GroupRouting("aangifte", "openplanner-video", "openplanner@example.nl", "aangifte")
+    wrong = GroupRouting("balie", "openplanner-video", "openplanner@example.nl", "balie")
 
     results = _by_name(check_groups([wrong], recorded_config()))
 
@@ -121,9 +119,9 @@ def test_an_asset_on_another_channel_fails() -> None:
 
 
 def test_queue_naming_rule_matches_name_parts() -> None:
-    assert names_match("aangifte", "ORG_videoafspraak_aangifte_01")
+    assert names_match("balie", "ORG_videoafspraak_balie_01")
     assert names_match("video-afspraak", "Video_Afspraak")
-    assert not names_match("aangifte", "aangiftes_video")
+    assert not names_match("balie", "balies_video")
     assert not names_match("", "anything")
 
 
@@ -138,7 +136,7 @@ def test_naming_rule_warns_when_several_queues_and_none_named_after_the_group() 
         "nodes": [
             *FLOW_DOC["nodes"],
             {"name": "Q2", "properties": {"activityName": "queue-contact", "destination": "q-2"}},
-            {"name": "Case", "properties": {"activityName": "case", "cases": ["aangifte"]}},
+            {"name": "Case", "properties": {"activityName": "case", "cases": ["balie"]}},
         ],
     }
 
@@ -275,7 +273,7 @@ async def test_config_is_fetched_with_selected_fields_and_no_secrets() -> None:
 def test_report_lines_carry_the_group() -> None:
     report = format_report(check_groups([GROUP], recorded_config()))
 
-    assert "[aangifte] channel" in report
+    assert "[balie] channel" in report
 
 
 def test_the_probe_branch_is_advice_until_the_flow_ends_probes_itself() -> None:

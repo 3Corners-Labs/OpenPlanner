@@ -206,6 +206,12 @@ worden videogesprekken en werkitems binnen ongeveer tien seconden opnieuw gekopp
   TRACE na hooguit de uren van *TRACE_LEVEL_MAX_HOURS* (standaard 4). Vul in na hoeveel uur.
   Persoonsgegevens blijven op elk niveau gemaskeerd in het log; TRACE-regels dragen alleen de
   vaste velden van `docs/logging.md`.
+- Twee instellingen van de planner waarschuwen bij veel acties van één persoon binnen een uur:
+  **Waarschuwing bij wijzigingen per planner per uur** (standaard 50, 5 tot 1000) en
+  **Waarschuwing bij verzoeken om contactgegevens per persoon per uur** (standaard 20, 5 tot
+  500). Boven de grens komt er één waarschuwing in het auditlog met wie het was en hoe vaak. De
+  wijzigingen en verzoeken zelf gaan gewoon door: zo valt een gestolen sessie of misbruik op,
+  zonder dat een planner wordt tegengehouden. Uitzetten kan niet.
 
 Voor een wijziging moet u kort geleden zijn ingelogd. Elke wijziging staat in het auditlog met
 de oude en de nieuwe waarde; een geweigerde wijziging ook.
@@ -221,7 +227,9 @@ geheimen (verzegeld met een wachtwoord van minstens 16 tekens, herhaald). Om er 
 lezen kiest u het bestand en **Plan tonen**: u ziet per object of het wordt aangemaakt,
 gewijzigd of verwijderd en welke velden, nooit de waarden, en elke weigering die het stopt.
 Pas dan schrijft **Plan toepassen** alles in één keer, of niets als een onderdeel mislukt. Een
-document met verzegelde geheimen vraagt opnieuw om zijn wachtwoord. Een document in de stand
+document met verzegelde geheimen vraagt opnieuw om zijn wachtwoord. Een geheim mag in een document ook leesbaar staan als `{"plain": "…"}`; dat is handig om met de hand een basisomgeving te schrijven, en OpenPlanner verzegelt het bij het opslaan. Bewaar zo'n bestand even privé als het geheim zelf.
+
+**Zonder versleuteling exporteren.** Onder het exportformulier staat **Zonder versleuteling**, maar alleen als de beheerder van de host dat heeft toegestaan (`CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED=true` in de omgeving; standaard uit). Het bestand bevat dan alle geheimen leesbaar en heeft geen wachtwoord. U moet bevestigen dat u dat begrijpt, de export staat in het auditlog, en versleutelen of veilig delen is aan u (een zip met AES, `age`, `sops` of een kluis). Een document in de stand
 *replace* verwijdert wat het niet noemt; lees het plan dus zorgvuldig. Het document van één
 organisatie staat onder **Overzicht → Configuratie** van die organisatie. Elke toegepaste
 wijziging staat in het auditlog, zonder waarden, en u moet recent hebben ingelogd.

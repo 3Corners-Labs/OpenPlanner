@@ -73,7 +73,11 @@ async def test_the_large_fixture_adds_generated_bookings(
 
     async with engine.connect() as connection:
         generated = await connection.scalar(
-            select(func.count()).where(BookingRow.public_ref.like("fx%"))
+            # A generated reference is ``fx`` and ten digits; a random one (22 characters) may
+            # also start with ``fx``, about once in 4096 bookings.
+            select(func.count()).where(
+                BookingRow.public_ref.like("fx%"), func.length(BookingRow.public_ref) == 12
+            )
         )
     assert generated == 2001
     assert state.purged > 1

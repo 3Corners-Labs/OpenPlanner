@@ -23,15 +23,15 @@ TEXT = ImageText({"nl": "Gesloten deur", "en": "Closed door"})
 
 
 async def _closure(engine: AsyncEngine) -> tuple[SqlUnitOfWork, Closure]:
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     clock = FixedClock(NOW)
     bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
     closures = ClosureService(uow, clock, AdminService(uow, clock), bookings)
     ends = NOW + timedelta(days=1)
-    await closures.close_group(ADMIN, "aangifte", ClosureInput(None, ends, NOTICES))
+    await closures.close_group(ADMIN, "balie", ClosureInput(None, ends, NOTICES))
     async with uow.read() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         return uow, (await tx.get_closures(group.id, NOW))[0]
 

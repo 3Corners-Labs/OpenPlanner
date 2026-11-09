@@ -1,8 +1,10 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 
+from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.audit import SYSTEM_ACTOR, Outcome, Source
@@ -12,13 +14,14 @@ from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
 from app.domain.job_plan import JobType
-from app.domain.planner_service import ALERT_ACTION, PlannerService
+from app.domain.planner_service import PlannerService, ReviewScope
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from app.domain.usage import ActorClass, FactKind, UsageFact
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM
+from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM, SUPER
+from tests.support.cross_group import booking_id_methods, refused_as_unknown
 from tests.support.domain import (
     ADA,
     MONDAY,
@@ -99,17 +102,6 @@ async def test_a_move_that_causes_a_shortfall_needs_confirmation(
     assert moved.start == SLOT_0930
 
 
-async def test_a_booking_of_another_group_cannot_be_reached_through_this_group(
-    planner: PlannerService, bookings: BookingService
-) -> None:
-    other = await _book(bookings, slug="andere-team")
-
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await planner.move(GROUP_ADMIN, "demo", other, SLOT_0930)
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await planner.cancel(GROUP_ADMIN, "demo", other, ChangeReason.STAFFING)
-
-
 async def test_a_full_slot_stays_full(planner: PlannerService, bookings: BookingService) -> None:
     first = await _book(bookings, SLOT_0900)
     await _book(bookings, SLOT_0930)
@@ -127,9 +119,10 @@ async def test_a_cancellation_carries_the_reason_to_the_participant(
 ) -> None:
     booking_id = await _book(bookings, consents=SMS)
 
-    await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.TECHNICAL)
+    cancelled = await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.TECHNICAL)
 
     booking = uow.state.bookings[booking_id]
+    assert cancelled == booking  # the form's redirect lands on its day
     assert (booking.status, booking.change_reason) == (
         BookingStatus.CANCELLED,
         ChangeReason.TECHNICAL,
@@ -239,13 +232,14 @@ async def test_a_slot_without_shortfall_cannot_be_accepted(
 async def test_many_changes_by_one_planner_raise_one_system_event(
     uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
 ) -> None:
-    planner = PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=1)
+    admin = AdminService(uow, clock, alert_thresholds={CHANGES_ALERT: 1})
+    planner = PlannerService(uow, clock, admin, bookings)
     ids = [await _book(bookings, start) for start in (SLOT_0900, SLOT_0900, SLOT_0930)]
 
     for booking_id in ids:
         await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.UNFORESEEN)
 
-    alerts = [e for e in uow.state.audit if e.action == ALERT_ACTION]
+    alerts = [e for e in uow.state.audit if e.action == CHANGES_ALERT.action]
     assert len(alerts) == 1
     (alert,) = alerts
     assert (alert.actor, alert.source, alert.outcome, alert.group) == (
@@ -271,7 +265,7 @@ async def test_asking_to_rebook_frees_the_place_and_tells_the_participant(
     assert waiting.status is BookingStatus.AWAITING_REBOOK
     assert waiting.rebook_by == SLOT_0900 + timedelta(days=14)
     assert (JobType.SEND_REBOOK_REQUEST, ChannelKind.SMS) in _messages(uow, booking_id)
-    assert [b.id for b in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
+    assert [w.booking.id for w in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
     (event,) = [e for e in uow.state.audit if e.action == "bookings.manage"]
     assert (event.detail, event.booking_id) == ("planner.rebook,reason:staffing", booking_id)
 
@@ -319,7 +313,8 @@ async def test_a_bulk_request_takes_the_last_made_bookings_as_many_as_short(
     )
 
     assert [b.id for b in candidates] == [ids[1]]  # the newest one
-    assert [b.id for b in done] == [ids[1]]
+    assert done == 1
+    assert uow.state.bookings[ids[1]].status is BookingStatus.AWAITING_REBOOK
     assert uow.state.bookings[ids[0]].status is BookingStatus.CONFIRMED
     with pytest.raises(DomainError, match="slot_unavailable"):  # no shortfall left
         await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
@@ -373,20 +368,16 @@ async def test_a_planner_confirms_for_the_participant_who_gets_the_full_confirma
     )
 
 
-async def test_only_a_pending_booking_of_the_own_group_can_be_confirmed(
+async def test_only_a_pending_booking_can_be_confirmed(
     planner: PlannerService, bookings: BookingService
 ) -> None:
     confirmed = await _book(bookings)
-    other = await _book(bookings, slug="andere-team")
     with pytest.raises(DomainError) as not_pending:
         await planner.confirm(GROUP_ADMIN, "demo", confirmed)
-    with pytest.raises(DomainError) as elsewhere:
-        await planner.confirm(GROUP_ADMIN, "demo", other)
     with pytest.raises(DomainError) as refused:
         await planner.confirm(AUDITOR, "demo", confirmed)
 
     assert not_pending.value.code.value == "booking_not_pending"
-    assert elsewhere.value.code.value == "booking_not_found"
     assert refused.value.code.value == "not_permitted"
 
 
@@ -419,18 +410,22 @@ async def test_a_pending_booking_holds_its_place_in_the_agenda(
     assert (slot.booked, slot.pending) == (2, 1)
 
 
-async def test_a_bulk_request_never_asks_an_older_booking_for_a_newer_pending_one(
+async def test_a_pending_last_made_booking_leaves_nobody_to_ask_in_bulk_or_in_review(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    """ADR 0044 §5: the last made go first, a pending one too; it is left to lapse or confirm."""
-    older = await _book(bookings)
+    """ADR 0056 point 11: the slot's excess place is the pending one's, which is never asked.
+
+    The last made go first (ADR 0044 §5), so no older booking is asked in its place.
+    """
+    await _book(bookings)
     clock.advance(timedelta(minutes=1))
     await book_pending(bookings, slug="demo", contact=another_participant())
     _staff(uow, 1)
 
     candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
+    reviewed = await planner.review_proposals(GROUP_ADMIN, "demo", ReviewScope.slot(SLOT_0900))
 
-    assert older not in [b.id for b in candidates]
+    assert (candidates, reviewed) == ([], [])
 
 
 async def test_a_confirmation_by_a_planner_is_counted_as_the_planners(
@@ -480,6 +475,66 @@ async def test_a_pending_booking_can_be_cancelled_but_not_asked_to_rebook(
 
     assert uow.state.bookings[first.booking.id or 0].status is BookingStatus.CANCELLED
     assert uow.state.bookings[second.booking.id or 0].status is BookingStatus.PENDING_CONFIRMATION
+
+
+STAFFING = ChangeReason.STAFFING
+NEXT_0900 = SLOT_0900 + timedelta(days=7)
+ON_ONE_BOOKING: dict[str, Callable[[PlannerService, int], Awaitable[object]]] = {
+    "booking": lambda s, b: s.booking(GROUP_ADMIN, "demo", b),
+    "move": lambda s, b: s.move(GROUP_ADMIN, "demo", b, SLOT_0930),
+    "confirm": lambda s, b: s.confirm(GROUP_ADMIN, "demo", b),
+    "cancel": lambda s, b: s.cancel(GROUP_ADMIN, "demo", b, STAFFING),
+    "request_rebook": lambda s, b: s.request_rebook(GROUP_ADMIN, "demo", b, STAFFING),
+    "booking_proposal": lambda s, b: s.booking_proposal(GROUP_ADMIN, "demo", b),
+    "propose": lambda s, b: s.propose(GROUP_ADMIN, "demo", b, SLOT_0930, STAFFING),
+    "withdraw": lambda s, b: s.withdraw(GROUP_ADMIN, "demo", b),
+    "confirm_proposal": lambda s, b: s.confirm_proposal(GROUP_ADMIN, "demo", b),
+}
+"""Every use case on one booking, by the group admin of ``demo`` through their own group."""
+
+
+async def _booking_in(
+    group: str, state: str, planner: PlannerService, bookings: BookingService
+) -> int:
+    """Book in ``group``: pending, confirmed, with an open proposal, or cancelled."""
+    if state == "pending":
+        receipt = await book_pending(bookings, slug=group, contact=another_participant())
+    else:
+        receipt = await book_another(bookings, slug=group)
+    booking_id = receipt.booking.id or 0
+    if state == "proposed":
+        await planner.propose(SUPER, group, booking_id, NEXT_0900, STAFFING)
+    if state == "cancelled":
+        await bookings.cancel(receipt.management_token)
+    return booking_id
+
+
+def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
+    assert set(ON_ONE_BOOKING) == booking_id_methods(PlannerService)
+
+
+@pytest.mark.parametrize("state", ["pending", "confirmed", "proposed", "cancelled"])
+@pytest.mark.parametrize("group", ["andere-team", "demo-twee"])
+@pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
+async def test_another_groups_booking_is_not_found_through_this_group(
+    action: str,
+    group: str,
+    state: str,
+    planner: PlannerService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+) -> None:
+    """The group check comes first: no hint that the booking exists, nothing changed.
+
+    The booking is in another organisation's group or in a sibling group of ``demo``. Each use
+    case acts on it in one of the first three states (``confirm`` on a pending one,
+    ``withdraw`` and ``confirm_proposal`` on a proposed one, the others on a confirmed one), so
+    a missing group check fails. A cancelled one is refused by each use case's own rule with
+    another code, so a group check made after that rule fails too.
+    """
+    other = await _booking_in(group, state, planner, bookings)
+
+    await refused_as_unknown(uow, other, ON_ONE_BOOKING[action](planner, other))
 
 
 async def test_a_pending_booking_is_told_by_email_only_and_the_team_gets_no_withdrawal(

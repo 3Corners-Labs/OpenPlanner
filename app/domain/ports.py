@@ -41,6 +41,7 @@ from app.domain.calls import (
     MeetingStatus,
     TaskSnapshot,
 )
+from app.domain.change_requests import ChangeRequest
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
@@ -78,6 +79,7 @@ from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.participant_links import LinkSession
 from app.domain.public_address import AddressCheck, AddressKind, InstanceReply
+from app.domain.report_digest import RunStatus, Subscription
 from app.domain.reschedule_proposal import HeldProposal
 from app.domain.retention import DueBooking, RetentionFacts
 from app.domain.routing import GroupRouting
@@ -111,6 +113,7 @@ from app.domain.usage import StaffFact, UsageCell, UsageFact
 from app.domain.usage_backfill import BackfillBooking
 from app.domain.usage_report import DayStatusCount, ReportGroup
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
+from app.domain.usage_staff import StaffCell
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -253,8 +256,8 @@ class OrganisationLogin:
 
     Attributes:
         claims: The claims as ``finish_login`` returns them (subject qualified, MFA applied).
-        email: The ``email`` claim; personal data, used for the domain check only and never
-            stored or logged.
+        email: The ``email`` claim; personal data, used for the domain check and never logged.
+            (The verified address of the login is also in ``claims.email``, ADR 0117 step 10b.)
         email_verified: The ``email_verified`` claim, ``None`` when absent.
     """
 
@@ -1549,8 +1552,41 @@ class Transaction(Protocol):
         """
         ...
 
+    async def find_open_proposals(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[HeldProposal]:
+        """Return the group's open proposals for a slot with lower <= start < upper (ADR 0057).
+
+        Open as in ``get_open_proposal``; the agenda counts them like pending confirmations.
+        """
+        ...
+
     async def save_proposal(self, proposal: HeldProposal) -> None:
         """Persist a proposal's release (``released_at``, ``outcome``)."""
+        ...
+
+    async def find_bookings_by_phone(self, group_id: int, phone: str) -> list[Booking]:
+        """Return the group's confirmed bookings with this phone number (E.164, ADR 0023)."""
+        ...
+
+    async def add_change_request(self, request: ChangeRequest) -> ChangeRequest:
+        """Store a bot's change request and return it with its id (ADR 0023 step 2)."""
+        ...
+
+    async def get_change_request(self, public_id: str) -> ChangeRequest | None:
+        """Return the change request with ``public_id``."""
+        ...
+
+    async def get_latest_change_request(self, booking_id: int) -> ChangeRequest | None:
+        """Return the newest change request that matched the booking, open or not."""
+        ...
+
+    async def save_change_request(self, request: ChangeRequest) -> None:
+        """Persist a request's confirmation, or its replacement by a newer one."""
+        ...
+
+    async def delete_change_requests_expired_before(self, cutoff: datetime) -> int:
+        """Delete change requests that expired before ``cutoff``; return how many (step 2b)."""
         ...
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
@@ -1682,10 +1718,11 @@ class Transaction(Protocol):
         """Store a planner's acceptance; it replaces an earlier one for the same slot."""
         ...
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime
-    ) -> int:
-        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
+        """Return how many successful events with ``action`` ``actor`` has had since then.
+
+        A refusal or a failure never counts (``app.domain.activity_alert``).
+        """
         ...
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:
@@ -2194,6 +2231,20 @@ class UsageStore(Protocol):
         """Add ``cells`` to the hourly table: a cell of an existing hour and cut adds to its row."""
         ...
 
+    async def add_staff_cells(self, cells: Sequence[StaffCell]) -> None:
+        """Add the team members' cells to ``usage_staff_hour`` (ADR 0117 point 9)."""
+        ...
+
+    async def read_staff_cells(
+        self, scope: Scope, group_ids: Sequence[int], first_hour: datetime, last_hour: datetime
+    ) -> list[StaffCell]:
+        """Return the team cells of ``group_ids`` in ``scope`` in the half-open hour range."""
+        ...
+
+    async def read_staff_names(self, staff_ids: Sequence[int]) -> dict[int, str]:
+        """Return the display name of each of ``staff_ids`` that still has one."""
+        ...
+
     async def advance_usage_watermark(self, last_event_id: int, at: datetime) -> None:
         """Move the watermark and the time of the last run, in the same transaction as the cells."""
         ...
@@ -2230,6 +2281,109 @@ class UsageUnitOfWork(Protocol):
 
     def read(self) -> AbstractAsyncContextManager[UsageStore]:
         """Open a read transaction."""
+        ...
+
+
+class DigestStore(Protocol):
+    """Reads and writes the digest subscriptions and their run records (ADR 0117 point 16)."""
+
+    async def list_subscriptions(
+        self, scope: Scope, organisation_slug: str | None = None
+    ) -> list[Subscription]:
+        """Return the subscriptions inside ``scope``, of one organisation when named."""
+        ...
+
+    async def list_all_subscriptions(self) -> list[Subscription]:
+        """Return every subscription, for the worker."""
+        ...
+
+    async def get_subscription(self, subscription_id: int) -> Subscription | None:
+        """Return one subscription, or ``None``."""
+        ...
+
+    async def count_subscriptions(self, organisation_id: int) -> int:
+        """Return how many subscriptions an organisation has."""
+        ...
+
+    async def organisation_id_of(self, slug: str) -> int | None:
+        """Return the id of an organisation, or ``None``."""
+        ...
+
+    async def group_id_of(self, organisation_id: int, slug: str) -> int | None:
+        """Return the id of a group of the organisation, or ``None``."""
+        ...
+
+    async def add_subscription(self, subscription: Subscription) -> int:
+        """Store a subscription and return its id."""
+        ...
+
+    async def delete_subscription(self, subscription_id: int) -> bool:
+        """Delete a subscription with its runs; return whether it existed."""
+        ...
+
+    async def claim_digest_run(
+        self,
+        subscription_id: int,
+        due_date: date,
+        status: RunStatus,
+        sent: int,
+        skipped: int,
+        at: datetime,
+    ) -> bool:
+        """Record a run; ``False`` when that digest was already run."""
+        ...
+
+    async def has_digest_run(self, subscription_id: int, due_date: date) -> bool:
+        """Return whether the digest of ``due_date`` was already run."""
+        ...
+
+    async def last_digest_run(self, subscription_id: int) -> tuple[date, str, int] | None:
+        """Return the due date, status and skipped count of the latest run."""
+        ...
+
+    async def get_staff_by_id(self, staff_id: int) -> StaffMember | None:
+        """Return the staff record with this row id, or ``None``."""
+        ...
+
+    async def digest_zone(self, organisation_id: int, group_id: int | None) -> str | None:
+        """Return the time zone a digest runs in, or ``None`` for an organisation without groups."""
+        ...
+
+    async def digest_locale(self, organisation_id: int) -> str | None:
+        """Return the organisation's default language."""
+        ...
+
+    async def list_staff(self, scope: Scope, narrow: StaffFilter) -> list[StaffMember]:
+        """Return the staff inside ``scope``, narrowed."""
+        ...
+
+    async def get_custom_roles(self) -> list[CustomRole]:
+        """Return the custom roles of the installation."""
+        ...
+
+
+class DigestUnitOfWork(Protocol):
+    """Opens transactions that carry the digest's ``DigestStore``."""
+
+    def locked(self) -> AbstractAsyncContextManager[DigestStore]:
+        """Open a write transaction."""
+        ...
+
+    def read(self) -> AbstractAsyncContextManager[DigestStore]:
+        """Open a read transaction."""
+        ...
+
+
+class StaffAddresses(Protocol):
+    """Finds the email address of a staff member when a digest goes out (ADR 0117 point 16).
+
+    The address is the verified ``email`` claim stored at the last login (ADR 0117 step 10b),
+    else the bundled identity provider's directory (ADR 0095). A person with neither has none
+    and is skipped.
+    """
+
+    async def address_of(self, subject: str) -> str | None:
+        """Return the address of the staff member with this subject, or ``None``."""
         ...
 
 

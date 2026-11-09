@@ -1,15 +1,16 @@
 """Group look-ups that refuse with a domain error, shared by the group-level use cases.
 
-``group_by_slug`` refuses an unknown group with ``group_not_found``; ``group_booking`` refuses a
-booking that is not the group's with ``booking_not_found``, the same answer as for an unknown id,
-so an id tried through another group's address reveals nothing. The organisation counterpart is
+``group_by_slug`` and ``group_summary_by_slug`` (the group with its organisation's slug and name)
+refuse an unknown group with ``group_not_found``; ``group_booking`` refuses a booking that is not
+the group's with ``booking_not_found``, the same answer as for an unknown id, so an id tried
+through another group's address reveals nothing. The organisation counterpart is
 ``app.domain.organisations.organisation_by_slug``.
 """
 
 from app.domain.booking import Booking
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Transaction
-from app.domain.scheduling import Group
+from app.domain.scheduling import Group, GroupSummary
 
 
 async def group_by_slug(tx: Transaction, slug: str) -> Group:
@@ -22,6 +23,18 @@ async def group_by_slug(tx: Transaction, slug: str) -> Group:
     if group is None:
         raise DomainError(ErrorCode.GROUP_NOT_FOUND)
     return group
+
+
+async def group_summary_by_slug(tx: Transaction, slug: str) -> GroupSummary:
+    """Return the group with ``slug`` together with its organisation's slug and name.
+
+    Raises:
+        DomainError: ``group_not_found``.
+    """
+    summary = await tx.get_group_summary(slug)
+    if summary is None:
+        raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+    return summary
 
 
 async def group_booking(tx: Transaction, slug: str, booking_id: int) -> tuple[Booking, Group]:

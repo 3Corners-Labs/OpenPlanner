@@ -113,7 +113,7 @@ def test_a_group_dispatches_only_with_a_complete_routing() -> None:
     assert make_group(contact_center=complete).dispatch_enabled
     assert not make_group(contact_center=incomplete).dispatch_enabled
     assert not make_group().dispatch_enabled
-    assert make_group(contact_center=complete).routing_value == "aangifte-2026"
+    assert make_group(contact_center=complete).routing_value == "balie-2026"
 
 
 # --- the job type renamed by expand/contract (ADR 0116) -----------------------------------

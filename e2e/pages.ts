@@ -13,10 +13,12 @@ import type { TestUser } from './keycloak';
 export interface PageUnderTest {
   /** Human-readable name, used in test titles. */
   name: string;
-  /** Path relative to BASE_URL, e.g. "/g/aangifte-2025", a "{fixture}" placeholder, or an absolute URL (the widget host page). */
+  /** Path relative to BASE_URL, e.g. "/g/balie-2025", a "{fixture}" placeholder, or an absolute URL (the widget host page). */
   path: string;
   /** Locales the page must pass in; each is requested with ?lang=<locale>. */
   locales: string[];
+  /** The page carries islands (ADR 0118, docs/islands.md): tests/islands.spec.ts runs the island gates on it. */
+  island?: boolean;
 }
 
 export interface AdminPageUnderTest extends PageUnderTest {
@@ -72,6 +74,17 @@ export function pageVariants(): { title: string; path: string }[] {
 export function adminPageVariants(): { title: string; path: string; user: TestUser }[] {
   const { admin } = JSON.parse(readFileSync(file, 'utf8')) as { admin: AdminPageUnderTest[] };
   return admin.flatMap((page) => variants([page]).map((v) => ({ ...v, user: page.user })));
+}
+
+/** The island pages (public and admin) with the user who logs in for an admin one; ADR 0118 point 10. */
+export function islandVariants(): { title: string; path: string; user?: TestUser }[] {
+  const { pages, admin } = JSON.parse(readFileSync(file, 'utf8')) as { pages: PageUnderTest[]; admin: AdminPageUnderTest[] };
+  return [
+    ...variants(pages.filter((p) => p.island)),
+    ...admin
+      .filter((p) => p.island)
+      .flatMap((p) => variants([p]).map((v) => ({ ...v, title: `admin ${v.title}`, user: p.user }))),
+  ];
 }
 
 function variants(pages: PageUnderTest[]): { title: string; path: string }[] {

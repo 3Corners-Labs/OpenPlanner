@@ -1,19 +1,44 @@
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
 from app.domain import booking_changes
-from app.domain.booking import BookingStatus, ChangeReason
+from app.domain.booking import BookingKind, BookingStatus, ChangeReason
 from app.domain.channels import ChannelKind
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import PURGE_AFTER, JobType, PlannedJob, is_stale
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, book, book_confirmed, participant
+from tests.support.integration import GROUP, make_booking
 
 REASON = ChangeReason.STAFFING
+
+TOO_LATE = SLOT_0900 - timedelta(minutes=59)
+"""Inside the group's planner lead (60 minutes by default) of the 09:00 booking."""
+
+PENDING = BookingStatus.PENDING_CONFIRMATION
+
+REBOOK_REFUSALS = [
+    pytest.param({"status": PENDING}, NOW, "booking_not_active", id="pending"),
+    pytest.param({"status": BookingStatus.AWAITING_REBOOK}, NOW, "booking_not_active", id="waits"),
+    pytest.param({"status": BookingStatus.SUSPENDED}, NOW, "booking_not_active", id="suspended"),
+    pytest.param({"status": BookingStatus.CANCELLED}, NOW, "booking_not_active", id="cancelled"),
+    pytest.param({"kind": BookingKind.DIRECT}, NOW, "booking_not_active", id="direct-call"),
+    pytest.param({}, TOO_LATE, "planner_too_late", id="too-late"),
+    pytest.param(
+        {"contact_center_task": ContactCenterTaskRef("t-1", ContactCenterKind.WEBEX_CC)},
+        NOW,
+        "planner_too_late",
+        id="dispatched",
+    ),
+    # The limits of any change come first: a pending booking this close is too late, as for a move.
+    pytest.param({"status": PENDING}, TOO_LATE, "planner_too_late", id="pending-too-late"),
+]
+"""Bookings a planner may not ask for a new time, with the moment and the refusal's code."""
 
 
 async def _request(uow: InMemoryUnitOfWork, booking_id: int) -> None:
@@ -84,6 +109,25 @@ async def test_only_a_confirmed_booking_can_be_asked_to_rebook(
 
     with pytest.raises(DomainError, match="booking_not_active"):
         await _request(uow, receipt.booking.id or 0)
+
+
+def test_a_planner_may_ask_a_confirmed_booking_in_time_for_a_new_time() -> None:
+    booking = make_booking()
+
+    booking_changes.ensure_planner_may_request_rebook(booking, GROUP, NOW)
+    assert booking_changes.planner_may_request_rebook(booking, GROUP, NOW)
+
+
+@pytest.mark.parametrize(("changes", "now", "refusal"), REBOOK_REFUSALS)
+def test_a_planner_asks_no_other_booking_for_a_new_time(
+    changes: dict[str, object], now: datetime, refusal: str
+) -> None:
+    """One rule for the request, its form and the agenda's link (ADR 0056 point 11)."""
+    booking = make_booking(**changes)
+
+    with pytest.raises(DomainError, match=refusal):
+        booking_changes.ensure_planner_may_request_rebook(booking, GROUP, now)
+    assert not booking_changes.planner_may_request_rebook(booking, GROUP, now)
 
 
 async def test_the_participant_chooses_a_new_time_without_a_deadline(

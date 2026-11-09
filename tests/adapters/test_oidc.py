@@ -23,6 +23,7 @@ from app.adapters.oidc import (
     claim_mapping,
     client_secret_basic,
     login_claims,
+    verified_email,
 )
 from app.adapters.signing_keys import EcSigningKeys
 from app.domain.authorization import Role
@@ -969,3 +970,29 @@ async def test_without_the_announcement_a_missing_issuer_is_accepted(
 
     assert found.email is None
     assert found.email_verified is None
+
+
+@pytest.mark.parametrize(
+    ("claims", "expected"),
+    [
+        ({"email": "olga@voorbeeld.nl", "email_verified": True}, "olga@voorbeeld.nl"),
+        ({"email": " olga@voorbeeld.nl ", "email_verified": True}, "olga@voorbeeld.nl"),
+        ({"email": "olga@voorbeeld.nl", "email_verified": False}, None),
+        ({"email": "olga@voorbeeld.nl", "email_verified": "true"}, None),
+        ({"email": "olga@voorbeeld.nl"}, None),
+        ({"email_verified": True}, None),
+        ({"email": 12, "email_verified": True}, None),
+        ({"email": "geen-adres", "email_verified": True}, None),
+        ({"email": "a@b@c.nl", "email_verified": True}, None),
+        ({"email": "olga @voorbeeld.nl", "email_verified": True}, None),
+        ({"email": "o" * 250 + "@v.nl", "email_verified": True}, None),
+    ],
+)
+def test_only_a_verified_plausible_email_claim_becomes_the_login_address(
+    claims: dict[str, object], expected: str | None
+) -> None:
+    # ADR 0117 step 10b
+    assert verified_email(claims) == expected
+    found = login_claims({"sub": "u1", **claims}, MAPPING, log_lockout=False)
+    assert found.email == expected
+    assert "voorbeeld.nl" not in repr(found)

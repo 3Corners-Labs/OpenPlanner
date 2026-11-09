@@ -123,8 +123,8 @@ async def test_the_queue_screen_shows_charts_each_followed_by_its_table(site: Si
         assert figure.index("</svg>") < figure.index("<table")
         assert 'scope="col"' in figure
         assert 'scope="row"' in figure
-    assert "style=" not in text.split("<main", 1)[1]
-    assert "<script" not in text.split("<main", 1)[1]
+    assert "style=" not in text.split("<main", 1)[1].split("</main>", 1)[0]
+    assert "<script" not in text.split("<main", 1)[1].split("</main>", 1)[0]
     assert "Wachttijd tot een gesprek verbindt" in text
     assert ">30<" in text
 
@@ -316,3 +316,138 @@ async def test_the_page_names_no_person_and_no_booking(site: Site) -> None:
         text = (await _get(site, "/admin/groups/demo", view)).text.split("<main", 1)[1]
         for word in ("@", "booking_id", "token", "guest_join_url"):
             assert word not in text
+
+
+def _volume_cells(count: int) -> Any:
+    def build(org: int, group: int) -> list[UsageCell]:
+        from app.domain.usage import UsageOutcome  # noqa: PLC0415
+
+        return [
+            UsageCell(HOUR, org, group, "U1", count, 0, 0),
+            UsageCell(HOUR, org, group, "U2", count, 0, 0, outcome=UsageOutcome.COMPLETED),
+            UsageCell(HOUR, org, group, "U2", count // 2, 0, 0, outcome=UsageOutcome.NO_SHOW),
+            UsageCell(
+                HOUR,
+                org,
+                group,
+                "Q1",
+                count,
+                0,
+                0,
+                booking_kind=BookingKind.SCHEDULED,
+                dispatch_kind=DispatchKind.CONTACT_CENTER,
+            ),
+            UsageCell(HOUR, org, group, "M2", count, 0, 0, locale="nl"),
+        ]
+
+    return build
+
+
+async def test_the_volume_screen_has_tiles_two_charts_and_the_range_form_split(site: Site) -> None:
+    await _put(site, "demo", _volume_cells(40))
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await _get(site, "/admin/groups/demo", "volume")).text
+
+    main = text.split("<main", 1)[1].split("</main>", 1)[0]
+    assert main.count('class="tile"') == 4
+    assert "No-showpercentage" in main
+    assert len(re.findall(r'<figure class="rchart">', main)) == 2
+    for figure in re.findall(r'<figure class="rchart">(.*?)</figure>', main, re.S):
+        assert figure.index("</svg>") < figure.index("<table")
+    assert 'name="split"' in main
+    assert "style=" not in main
+    assert "<script" not in main
+
+
+async def test_a_split_shows_its_table_and_an_unknown_one_is_refused(site: Site) -> None:
+    await _put(site, "demo", _volume_cells(40))
+    await site.login_as(GROUP_ADMIN)
+
+    queue = await site.client.get(f"/admin/groups/demo/usage?view=volume&{RANGE}&split=queue")
+    bad = await site.client.get(f"/admin/groups/demo/usage?view=volume&{RANGE}&split=<b>x</b>")
+
+    assert queue.status_code == 200
+    assert 'id="split-heading"' in queue.text
+    assert bad.status_code == 400
+    assert "<b>x</b>" not in bad.text
+
+
+async def test_a_table_with_a_hidden_count_says_why(site: Site) -> None:
+    await _put(site, "demo", _volume_cells(3))
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await _get(site, "/admin/groups/demo", "volume")).text
+
+    assert "zijn verborgen" in text
+    assert "&lt; 5" in text
+
+
+async def test_the_capacity_screen_has_its_four_tiles_with_what_they_are_made_of(
+    site: Site,
+) -> None:
+    def build(org: int, group: int) -> list[UsageCell]:
+        return [
+            UsageCell(HOUR, org, group, "C1", 30, 120, 4, reason_code="capacity"),
+            UsageCell(HOUR, org, group, "C1", 30, 90, 3, reason_code="booked"),
+            UsageCell(HOUR, org, group, "C3", 30, 30, 1),
+            UsageCell(HOUR, org, group, "C2", 12, 0, 0, reason_code="full"),
+            UsageCell(HOUR, org, group, "C2", 18, 0, 0, reason_code="under_full"),
+            UsageCell(HOUR, org, group, "C5", 9, 0, 0, reason_code="accepted"),
+        ]
+
+    await _put(site, "demo", build)
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await _get(site, "/admin/groups/demo", "capacity")).text
+
+    assert text.count('class="tile"') == 4
+    assert "90 van 120 plaatsen" in text
+    assert "12 van 30" in text
+
+
+async def test_report_pages_load_the_chart_script_under_the_script_csp_and_others_do_not(
+    site: Site,
+) -> None:
+    await _put(site, "demo", _queue_cells(30))
+    await site.login_as(GROUP_ADMIN)
+
+    usage = await _get(site, "/admin/groups/demo", "queue")
+    other = await site.client.get("/admin/groups/demo")
+
+    assert "script-src 'self'" in usage.headers["content-security-policy"]
+    assert "script-src" not in other.headers["content-security-policy"]
+    assert re.search(r'<script type="module" src="[^"]*report-charts[^"]*"></script>', usage.text)
+    assert "report-charts" not in other.text
+
+
+async def test_a_chart_is_complete_without_the_script_and_marks_its_points_for_it(
+    site: Site,
+) -> None:
+    await _put(site, "demo", _queue_cells(30))
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await _get(site, "/admin/groups/demo", "queue")).text
+
+    chart = text.split("<op-report-chart", 1)[1].split("</op-report-chart>", 1)[0]
+    assert "data-toolbar=" in chart
+    assert re.search(r'<rect class="rchart__bar[^"]*" data-i="\d+" data-s="\d+"', chart)
+    assert "<table" in chart  # the same numbers, with scripts off
+    assert "<button" not in chart  # the buttons are made by the script, not rendered
+    assert "onclick" not in text.lower()
+
+
+async def test_the_days_of_a_chart_link_to_the_same_page_for_that_day(site: Site) -> None:
+    await _put(site, "demo", _volume_cells(40))
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await _get(site, "/admin/groups/demo", "volume")).text
+
+    days = text.split('id="chart-days-table-caption"', 1)[1].split("</table>", 1)[0]
+    assert re.search(
+        r'<th scope="row"><a href="/admin/groups/demo/usage\?view=volume&amp;from=2025-12-31'
+        r"&amp;to=2025-12-31\">2025-12-31</a></th>",
+        days,
+    )
+    outcome = text.split('id="chart-outcome-table-caption"', 1)[1].split("</table>", 1)[0]
+    assert "<a " not in outcome  # a chart without days has no drill-down

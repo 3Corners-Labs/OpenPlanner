@@ -861,7 +861,9 @@ a.calendar__day:focus-visible {
   border-color: var(--booking-color-text);
 }
 
-/* ADR 0055: a choice is a group of radio buttons with a legend; each radio a 24 px target. */
+/* ADR 0055: a choice is a group of radio buttons with a legend; each radio a 24 px target.
+   The option row is .choices__option: admin pages load this sheet too, and their own option
+   list is called .choice (admin.css). */
 .choices {
   margin: 0;
   padding: 0;
@@ -874,21 +876,21 @@ a.calendar__day:focus-visible {
   font-weight: 700;
 }
 
-.choice {
+.choices__option {
   display: flex;
   align-items: center;
   gap: var(--booking-space-s);
   margin-bottom: var(--booking-space-xs);
 }
 
-.choice input {
+.choices__option input {
   width: 1.5rem;
   min-width: 1.5rem;
   height: 1.5rem;
   margin: 0;
 }
 
-.choice label {
+.choices__option label {
   margin: 0;
   font-weight: 400;
 }

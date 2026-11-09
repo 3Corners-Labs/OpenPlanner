@@ -258,3 +258,71 @@ async def test_an_organisation_admin_cannot_ask_for_secrets_with_a_crafted_post(
 
     assert response.status_code == 403
     assert b"sealed" not in response.content
+
+
+PLAIN = {"plain": "yes", "plain_confirm": "yes"}
+PACKAGE_TAB = "/admin/settings/package"
+
+
+async def test_the_export_without_encryption_is_not_offered_while_the_host_forbids_it(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+
+    page = (await site.client.get(PACKAGE_TAB)).text
+    refused = await site.client.post(f"{PLATFORM}/export", data=PLAIN, headers=SAME_ORIGIN)
+
+    assert 'name="secrets"' in page
+    assert 'name="plain"' not in page
+    assert refused.status_code == 422
+    assert b'"plain":' not in refused.content
+
+
+async def test_the_export_without_encryption_needs_the_host_the_confirmation_and_a_superuser(
+    plain_site: Site,
+) -> None:
+    await plain_site.login_as(SUPER)
+    page = (await plain_site.client.get(PACKAGE_TAB)).text
+    unconfirmed = await plain_site.client.post(
+        f"{PLATFORM}/export", data={"plain": "yes"}, headers=SAME_ORIGIN
+    )
+    await plain_site.login_as(ORG_ADMIN)
+    org_page = (await plain_site.client.get(ORGANISATION)).text
+    crafted = await plain_site.client.post(
+        f"{ORGANISATION}/export", data=PLAIN, headers=SAME_ORIGIN
+    )
+
+    assert 'name="plain"' in page
+    assert 'name="plain_confirm"' in page
+    assert unconfirmed.status_code == 422
+    assert 'name="plain"' not in org_page
+    assert crafted.status_code == 403
+
+
+async def test_a_sealed_and_a_plain_export_asked_together_is_refused(plain_site: Site) -> None:
+    await plain_site.login_as(SUPER)
+
+    response = await plain_site.client.post(
+        f"{PLATFORM}/export",
+        data={**PLAIN, "secrets": "yes", "passphrase": PASSPHRASE, "passphrase_repeat": PASSPHRASE},
+        headers=SAME_ORIGIN,
+    )
+
+    assert response.status_code == 422
+    assert b'"plain":' not in response.content
+
+
+async def test_the_export_without_encryption_is_clear_text_needs_no_passphrase_and_is_not_cached(
+    plain_site: Site,
+) -> None:
+    await plain_site.login_as(SUPER)
+
+    response = await plain_site.client.post(f"{PLATFORM}/export", data=PLAIN, headers=SAME_ORIGIN)
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    document = json.loads(response.content)
+    assert "seal" not in document
+    assert b'"sealed"' not in response.content
+    again = await plan(plain_site, document)
+    assert again.status_code == 200

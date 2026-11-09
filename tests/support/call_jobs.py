@@ -22,9 +22,9 @@ WIRED = {
 
 
 def group_uow(**group: object) -> InMemoryUnitOfWork:
-    """Return a store with group ``aangifte`` (with ``group``), one agent on Monday 09:00-10:00."""
+    """Return a store with group ``balie`` (with ``group``), one agent on Monday 09:00-10:00."""
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte", name="Aangifte", **group)
+    state.groups[1] = make_group(id=1, slug="balie", name="Balie", **group)
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     return InMemoryUnitOfWork(state)
 
@@ -54,7 +54,7 @@ class Setup:
         )
 
     async def booking(self) -> int:
-        """Book and confirm Monday 09:00 in ``aangifte``; return the booking's id."""
+        """Book and confirm Monday 09:00 in ``balie``; return the booking's id."""
         receipt = await book(BookingService(self.uow, self.clock, TEST_TOKEN_KEY))
         return receipt.booking.id or 0
 

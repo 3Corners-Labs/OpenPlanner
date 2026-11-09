@@ -30,7 +30,7 @@ STRIKE = ScenarioInput(
     {"nl": "Staking"},
 )
 OUTAGE = ScenarioInput("Storing", NOTICES, {"en": "Outage"})
-BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),))
+BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "012 345 6789"),))
 TEXT = ImageText({"nl": "Gesloten", "en": "Closed"})
 
 

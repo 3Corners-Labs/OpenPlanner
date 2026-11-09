@@ -40,8 +40,8 @@ NOW = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
 GROUP = make_group(
     id=1,
     organisation_id=1,
-    slug="aangifte",
-    name="Aangifte",
+    slug="balie",
+    name="Balie",
     video_host_email=HOST,
     contact_center=webex_routing("videoafspraak@example.video", "videoafspraak-prototype"),
 )
@@ -353,7 +353,7 @@ async def test_groups_sharing_an_asset_are_named_only_from_the_peers_given() -> 
     shared = [f for f in findings if f.code == "wxcc.routing.shared"]
 
     assert shared
-    assert shared[0].params == (("groups", "aangifte, helpdesk"),)
+    assert shared[0].params == (("groups", "balie, helpdesk"),)
     assert json.dumps([f.params for f in findings])  # params are plain strings
 
 
@@ -625,7 +625,7 @@ async def test_the_probe_work_item_is_a_bookings_work_item_without_a_participant
     assert item.reference.startswith("probe-")
     assert item.meeting_link == "https://w.example/j"  # the probe meeting's link
     assert item.routing == GROUP.contact_center
-    assert item.routing_value == "aangifte"
+    assert item.routing_value == "balie"
     assert item.group_name == GROUP.name
     assert dispatcher.ended == []  # the flow ended it; nothing left to clean up
     ok = next(f for f in findings if f.code == "wxcc.probe.ok")

@@ -44,6 +44,16 @@ GRAPH = {
     },
 }
 
+POLICY = {"id": 7, "name": "decision gate", "enforcement": "active"}
+RUN = {
+    "id": 3,
+    "event": "merge_group",
+    "conclusion": "startup_failure",
+    "created_at": "2026-11-16T16:05:00Z",
+    "html_url": "https://github.com/o/r/actions/runs/3",
+    "head_sha": "abc",
+}
+
 FAKE_GH = r"""
 args="$*"
 answer() { printf '%s' "$1" | if [ "${2:-}" ]; then jq -r "$2"; else cat; fi; }
@@ -64,6 +74,10 @@ case "$args" in
   *"/environments"*) answer '{"environments":[]}' "$q" ;;
   *"/installations"*) answer '{"installations":[]}' "$q" ;;
   "api orgs/"*) answer '{"two_factor_requirement_enabled":true}' "$q" ;;
+  *"/actions/policies?has_parents=true"*) [ -n "$FAKE_POLICIES" ] || exit 1
+    answer "$FAKE_POLICIES" "$q" ;;
+  *"/actions/workflows/decision-gate.yml/runs"*) [ "$GH_TOKEN" = runs-token ] || exit 1
+    answer "$FAKE_RUNS" "$q" ;;
   *"/actions/permissions"*) answer '{}' "$q" ;;
   "api repos/o/r") answer '{"visibility":"public","allow_merge_commit":null}' "$q" ;;
   *) exit 1 ;;
@@ -71,10 +85,14 @@ esac
 """
 
 
-def fetch(tmp_path: Path, graph: object = GRAPH) -> Path:
-    """Run the fetch script against the fake ``gh``; return the output directory."""
+def fetch(tmp_path: Path, graph: object = GRAPH, **env: str) -> Path:
+    """Run the fetch script against the fake ``gh``; return the output directory.
+
+    ``env`` adds or replaces environment variables: ``RUNS_TOKEN`` (the workflow's token for
+    the decision gate's runs) and ``FAKE_POLICIES`` (the policies answer, empty for a refusal).
+    """
     fakes = tmp_path / "bin"
-    fakes.mkdir()
+    fakes.mkdir(parents=True)
     fake_program(fakes, "gh", FAKE_GH)
     baseline = tmp_path / "guardrails.json"
     baseline.write_text(json.dumps({"collaborators": {"owner": "admin", "writer": "write"}}))
@@ -90,6 +108,11 @@ def fetch(tmp_path: Path, graph: object = GRAPH) -> Path:
             "GUARDRAILS_BASELINE": str(baseline),
             "FAKE_RULESETS": json.dumps(RULESETS),
             "FAKE_GRAPH": json.dumps(graph) if graph else "",
+            "FAKE_POLICIES": json.dumps({"total_count": 1, "policies": [POLICY]}),
+            "FAKE_RUNS": json.dumps({"workflow_runs": [RUN]}),
+            "GH_TOKEN": "app-token",
+            "RUNS_TOKEN": "runs-token",
+            **env,
         },
     )
     return out
@@ -148,3 +171,30 @@ def test_bypass_actors_shown_without_their_mode_stay_unknown(tmp_path: Path) -> 
 
     assert rulesets["release tags"]["bypass_actors"] is None
     assert rulesets["main"]["bypass_actors"] == []
+
+
+# ADR 0120: the Actions event policies and the decision gate's runs.
+
+
+def test_the_event_policies_are_read_with_those_of_the_levels_above(tmp_path: Path) -> None:
+    assert read(fetch(tmp_path), "actions_policies") == [POLICY]
+
+
+def test_policies_the_token_may_not_read_leave_the_section_out(tmp_path: Path) -> None:
+    """GitHub serves them only to Administration: write; the audit app's read is refused."""
+    out = fetch(tmp_path, FAKE_POLICIES="")
+
+    assert not (out / "actions_policies.json").exists()
+    assert (out / "rulesets.json").exists(), "the other sections are read as before"
+
+
+def test_the_gate_runs_are_read_with_the_workflows_own_token(tmp_path: Path) -> None:
+    """The audit app has no Actions permission; ``RUNS_TOKEN`` reads the runs."""
+    runs = read(fetch(tmp_path), "gate_runs")
+
+    assert runs == [
+        {key: RUN[key] for key in ("id", "event", "conclusion", "created_at", "html_url")}
+    ]
+    assert not (fetch(tmp_path / "app", RUNS_TOKEN="") / "gate_runs.json").exists(), (
+        "without RUNS_TOKEN the app's token is used, and it may not read runs"
+    )

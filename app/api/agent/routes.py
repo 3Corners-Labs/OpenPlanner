@@ -3,6 +3,7 @@
     GET /api/agent/v1/me                            any valid token
     GET /api/agent/v1/groups                        availability:read
     GET /api/agent/v1/groups/{slug}/availability    availability:read on that group
+    GET /api/agent/v1/reports/usage                reports:read (ADR 0117 point 13)
     GET /api/agent/v1/configuration                 configuration:transfer (ADR 0099)
     POST /api/agent/v1/configuration/plan           configuration:transfer
     POST /api/agent/v1/configuration/apply          configuration:transfer
@@ -15,13 +16,14 @@ document); the rules (passphrase, size, rights, in-use, plan hash, audit) live t
 Change requests (reschedule, cancel, confirmed by the participant) follow in a later step.
 """
 
+import json
 from datetime import date
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from starlette.responses import JSONResponse, Response
 
-from app.adapters.configuration_json import MEDIA_TYPE
+from app.adapters.configuration_json import MEDIA_TYPE, document_response
 from app.api.agent.auth import AgentContext, RequireScope, api_access, client_key
 from app.api.agent.errors import ApiProblem
 from app.api.agent.schemas import (
@@ -35,6 +37,7 @@ from app.api.agent.schemas import (
     PlanChange,
     PlanRefusal,
     SlotInfo,
+    UsagePageResponse,
 )
 from app.config import Settings
 from app.domain.authorization import ApiScope
@@ -47,10 +50,13 @@ from app.domain.configuration_document_service import (
 )
 from app.domain.configuration_plan import Plan
 from app.domain.configuration_service import ConfigurationPackageService
+from app.domain.csv_export import Cell, to_csv
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.services import BookingService
+from app.domain.usage_api_service import UsageApiService, UsagePage
+from app.domain.usage_report_csv import TIDY_HEADER, TIDY_VERSION
 from app.i18n.dates import format_clock, format_day_short, local_day
-from app.web.protection import agent_call_limit, limiter
+from app.web.protection import agent_call_limit, limiter, reports_limit
 
 router = APIRouter()
 
@@ -66,6 +72,15 @@ ReadGroup = Annotated[
     AgentContext, Depends(RequireScope(ApiScope.AVAILABILITY_READ, group_param="slug"))
 ]
 Transfer = Annotated[AgentContext, Depends(RequireScope(ApiScope.CONFIGURATION_TRANSFER))]
+PlainSecrets = Annotated[
+    bool,
+    Header(
+        alias="X-Plain-Secrets",
+        description="`true` on an export writes the secrets in clear text, without a passphrase "
+        "(ADR 0099 point 8a). Refused with `configuration_plaintext_disabled` unless the host "
+        "allows it. The response must be kept as private as the secrets.",
+    ),
+]
 Passphrase = Annotated[
     str | None,
     Header(
@@ -208,25 +223,23 @@ async def availability(
 )
 @limiter.limit(agent_call_limit, key_func=client_key)
 async def export_configuration(
-    request: Request, context: Transfer, passphrase: Passphrase = None
+    request: Request, context: Transfer, passphrase: Passphrase = None, plain: PlainSecrets = False
 ) -> Response:
     """Return the configuration of the whole installation as a JSON document.
 
     Scope `configuration:transfer`, on the whole installation whatever organisation registered
     the client. With `X-Passphrase` the secrets are in the document, sealed under it; without,
-    the document holds none. Audited with the client id as actor. No participant data.
+    the document holds none. With `X-Plain-Secrets: true` they are in it in clear text (no
+    passphrase), when the host allows that. Audited with the client id as actor. No participant
+    data.
     """
     actor = Actor.api_client(context.caller.client.client_id)
     document = await _documents(request).export(
-        actor, Scope(), passphrase, secrets=passphrase is not None
+        actor, Scope(), passphrase, secrets=passphrase is not None or plain, plain=plain
     )
     current: Settings = request.app.state.settings
     name = document_filename(current.installation_name, request.app.state.clock.now())
-    return Response(
-        document,
-        media_type=MEDIA_TYPE,
-        headers={"content-disposition": f'attachment; filename="{name}"'},
-    )
+    return document_response(document, name)
 
 
 @router.post(
@@ -430,6 +443,120 @@ def _applied(result: ApplyResult) -> JSONResponse:
         applied=result.applied, settings_version=result.version, plan=_plan_model(result.plan)
     )
     return JSONResponse(body.model_dump(mode="json"), status_code=200 if result.applied else 422)
+
+
+UsageRead = Annotated[AgentContext, Depends(RequireScope(ApiScope.REPORTS_READ))]
+UsageFormat = Literal["json", "csv", "ndjson"]
+
+
+def _usage_headers(page: UsagePage) -> dict[str, str]:
+    """Return the headers every usage answer carries: validator, privacy, paging, freshness."""
+    headers = {"cache-control": "private", "etag": f'"{page.etag}"'}
+    if page.next_cursor is not None:
+        headers["x-next-cursor"] = page.next_cursor
+    if page.as_of is not None:
+        headers["x-as-of"] = page.as_of.isoformat()
+    return headers
+
+
+def _usage_row(row: tuple[Cell, ...]) -> dict[str, Cell]:
+    """Return a tidy row as an object keyed by the column names."""
+    return dict(zip(TIDY_HEADER, row, strict=True))
+
+
+@router.get(
+    "/reports/usage",
+    response_model=UsagePageResponse,
+    responses={
+        **_REFUSALS,
+        200: {
+            "content": {
+                "text/csv": {"schema": {"type": "string"}},
+                "application/x-ndjson": {"schema": {"type": "string"}},
+            },
+            "description": "A page of hourly usage figures; `format` chooses JSON (default), "
+            "`csv` (the columns of `openplanner.usage/1`) or `ndjson`.",
+        },
+        304: {"description": "`If-None-Match` matches: nothing changed since the last call."},
+        404: {
+            "model": ErrorResponse,
+            "description": "`group_not_found`: not a group of the client.",
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": "`invalid_range`: a backwards or too wide range, an unknown metric "
+            "or cut, or a cursor that is none.",
+        },
+    },
+    summary="Hourly usage figures",
+    tags=["reports"],
+)
+@limiter.limit(reports_limit, key_func=client_key)
+async def usage(
+    request: Request,
+    context: UsageRead,
+    first: Annotated[date, Query(alias="from", description="First day, inclusive (group-local).")],
+    last: Annotated[date, Query(alias="to", description="Last day, inclusive (group-local).")],
+    metric: Annotated[
+        str | None, Query(max_length=3, pattern="^[A-Z][0-9]{1,2}$", description="One metric id.")
+    ] = None,
+    group: Annotated[
+        str | None, Query(max_length=80, description="One group slug of the client.")
+    ] = None,
+    cut: Annotated[
+        str | None,
+        Query(
+            max_length=20,
+            description="Keep one cut column (`booking_kind`, `dispatch_kind`, `subject`, "
+            "`locale`, `channel`, `outcome`, `actor_class`, `reason`); the rest are added up. "
+            "Without it every cut is added up.",
+        ),
+    ] = None,
+    fmt: Annotated[UsageFormat, Query(alias="format", description="Answer format.")] = "json",
+    cursor: Annotated[
+        str | None, Query(max_length=400, description="`next_cursor` of the previous page.")
+    ] = None,
+) -> Response:
+    """Return one page of the hourly usage figures of the client's groups. Scope `reports:read`.
+
+    The figures are counts and sums, never personal data; a cell under the installation's
+    small-count threshold is not returned. The page size and the widest range are settings of
+    the installation. Poll with `If-None-Match`.
+    """
+    page = await _usage(request).read(
+        context.caller,
+        first_day=first,
+        last_day=last,
+        metric=metric,
+        group=group,
+        cut=cut,
+        cursor=cursor,
+    )
+    headers = _usage_headers(page)
+    if request.headers.get("if-none-match", "").strip() == headers["etag"]:
+        return Response(status_code=304, headers=headers)
+    if fmt == "csv":
+        return Response(
+            to_csv(TIDY_HEADER, page.rows).encode("utf-8"),
+            media_type="text/csv; charset=utf-8",
+            headers=headers,
+        )
+    if fmt == "ndjson":
+        lines = "".join(json.dumps(_usage_row(r), separators=(",", ":")) + "\n" for r in page.rows)
+        return Response(lines, media_type="application/x-ndjson", headers=headers)
+    body = {
+        "schema": TIDY_VERSION,
+        "as_of": page.as_of.isoformat() if page.as_of else None,
+        "next_cursor": page.next_cursor,
+        "rows": [_usage_row(r) for r in page.rows],
+    }
+    return JSONResponse(body, headers=headers)
+
+
+def _usage(request: Request) -> UsageApiService:
+    """Return the application's usage API service."""
+    service: UsageApiService = request.app.state.usage_api_service
+    return service
 
 
 async def _body(request: Request, limit: int) -> bytes:

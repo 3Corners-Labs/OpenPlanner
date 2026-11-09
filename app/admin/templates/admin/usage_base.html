@@ -1,5 +1,6 @@
 {#- The frame of every usage report (ADR 0117 point 11): the header of the group or organisation, the range form, the links between the report families (``view``), how fresh the figures are and the small-cell rule. A family fills the ``report`` block. -#}
 {% extends "admin/layout.html" %}
+{% from "_error_message.html" import error_message %}
 {% block title %}{{ _("reports.usage.title") }} · {% if summary is defined %}{{ summary.group.name }}{% else %}{{ org_header.name }}{% endif %} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% if summary is defined %}{% include "admin/_group_header.html" %}{% else %}{% include "admin/_organisation_header.html" %}{% endif %}
@@ -13,6 +14,10 @@
       {% for code, key, href in views %}
       <li><a href="{{ href }}"{% if code == view %} aria-current="page"{% endif %}>{{ _(key) }}</a></li>
       {% endfor %}
+      {% if team_shown is defined and team_shown and not team_on %}
+      <li><span class="muted">{{ _("reports.view.team") }} ({{ _("reports.team.off") }})</span>
+        {% if can("settings.organisation.manage", organisation=usage.organisation_slug) %}<a href="/admin/organisations/{{ usage.organisation_slug }}/settings">{{ _("reports.team.switch_on") }}</a>{% endif %}</li>
+      {% endif %}
     </ul>
   </nav>
   <form method="get" action="{{ base }}" class="filters">
@@ -25,8 +30,25 @@
       <label for="usage-to">{{ _("reports.usage.to") }}</label>
       <input id="usage-to" name="to" type="date" value="{{ form_to }}">
     </div>
+    {% if view == "volume" %}
+    <div class="field">
+      <label for="usage-split">{{ _("reports.split.label") }}</label>
+      <select id="usage-split" name="split">
+        <option value=""{% if not split %} selected{% endif %}>{{ _("reports.split.none") }}</option>
+        <option value="queue"{% if split == "queue" %} selected{% endif %}>{{ _("reports.split.queue") }}</option>
+        <option value="locale"{% if split == "locale" %} selected{% endif %}>{{ _("reports.split.locale") }}</option>
+      </select>
+    </div>
+    {% endif %}
     <div class="form-actions"><button type="submit" class="button">{{ _("reports.usage.apply") }}</button></div>
   </form>
+  {{ error_message(export_error) }}
+  {% if (summary is defined and can("reports.export", group=summary)) or (summary is not defined and can("reports.export", organisation=usage.organisation_slug)) %}
+  <p class="report-export">
+    <a href="{{ base }}/export.csv?{{ {"view": view, "from": form_from, "to": form_to}|urlencode }}">{{ _("reports.export.screen") }}</a>
+    <a href="{{ base }}/export.csv?{{ {"view": "tidy", "from": form_from, "to": form_to}|urlencode }}">{{ _("reports.export.tidy") }}</a>
+  </p>
+  {% endif %}
   <dl class="facts">
     <div><dt>{{ _("reports.usage.as_of") }}</dt><dd>{% if as_of %}{{ as_of }}{% else %}{{ _("reports.usage.not_yet") }}{% endif %}</dd></div>
     {% if summary is not defined %}<div><dt>{{ _("reports.usage.groups") }}</dt><dd>{{ usage.groups|map(attribute="name")|join(", ") }}</dd></div>{% endif %}
@@ -34,4 +56,6 @@
   <p class="muted">{{ _("reports.usage.rule", n=report.threshold) }}</p>
 </section>
 {% block report %}{% endblock %}
+{% if digest is defined and summary is not defined %}{% include "admin/_usage_digest.html" %}{% endif %}
 {% endblock %}
+{% block scripts %}<script type="module" src="{{ static_url('report-charts.js') }}"></script>{% endblock %}

@@ -148,7 +148,7 @@ async def test_the_organisation_checklist_reads_branding_and_contact(
 ) -> None:
     organisation = uow.state.organisations[1]
     uow.state.organisations[1] = replace(organisation, branding=Branding(display_name="Acme"))
-    option = ContactOption.create(ContactKind.PHONE, "14 020")
+    option = ContactOption.create(ContactKind.PHONE, "012 345 6789")
     uow.state.contact_blocks[1] = ContactBlock((option,), {})
 
     checklist = await service.organisation(ORG_ADMIN, "demo")

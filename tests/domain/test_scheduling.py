@@ -29,7 +29,7 @@ def test_group_defaults() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("slug", "Aangifte 2026"),
+        ("slug", "Balie 2026"),
         ("slug", "-leading"),
         ("slug", "a" * 65),
         ("slug", ""),
@@ -331,7 +331,7 @@ def test_integrations_are_enabled_per_group() -> None:
 
     assert (plain.video_enabled, plain.dispatch_enabled) == (False, False)
     assert (wired.video_enabled, wired.dispatch_enabled) == (True, True)
-    assert plain.routing_value == "aangifte-2026"  # the slug unless set
+    assert plain.routing_value == "balie-2026"  # the slug unless set
     routed = make_group(contact_center=webex_routing(routing_value="team-7"))
     assert routed.routing_value == "team-7"
     # Dispatch needs both the business address and the channel.
