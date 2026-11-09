@@ -9,7 +9,8 @@
  * Input:  sources/*.md (front matter + the Markdown subset of the style guide), img/*.png,
  *         variables.json (product name, help desk, software version, accent colour, font).
  * Output: build/<name>.docx, build/<name>.html, build/<name>.pdf; build/manuals.json (what check.py
- *         checks; its load_inputs describes it) and build/help-index.json, the contract for
+ *         checks, its load_inputs describes it, and each source's version, which release.py
+ *         freezes) and build/help-index.json, the contract for
  *         help in context (per task: screen, permission, shots, title, anchor). Nothing is built when
  *         a source breaks a rule: a task marker without its heading, a figure that is no
  *         img/<id>.png, or a term this organisation does not show (after its variables are filled in).
@@ -698,7 +699,7 @@ if (!named.length) {
   const manuals = {
     variables_sha256: ws.varsSha256,
     manuals: docs.map((d) => ({
-      file: d.name, sha256: d.sha256, role: d.meta.role ?? '', tasks: d.tasks,
+      file: d.name, sha256: d.sha256, role: d.meta.role ?? '', version: d.meta.version ?? '', tasks: d.tasks,
       figures: d.figures.map((f) => ({ id: f.id, line: f.line })), bold: d.bold,
     })),
   };

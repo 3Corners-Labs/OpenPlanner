@@ -125,23 +125,64 @@ The scripts are in `scripts/` and run from the root of the checkout; `<ws>` is t
    source was added, removed or edited, or `variables.json` changed, since that build) and writes
    `evidence/check.md`; it exits with 1 on a blocking finding: a
    task whose screen, permission or shot does not exist, or whose role lacks the permission in
-   `MATRIX`. It also lists the bold labels the build found that are no text of the software. Look at rendered pages
+   `MATRIX`, and a right that the roles of a manual hold (the participant actions, for the
+   participants' manual) but no task in any manual describes and `rights_without_task` gives no
+   reason for, so a right the software adds never goes unnoticed. It also lists the bold labels
+   the build found that are no text of the software. Look at rendered pages
    (the Read tool shows PDF pages). Run a reader test with `anthropic-skills:doc-coauthoring`
    (its reader-testing stage) before people test.
 7. **Maintain by machine.** On every release run `.claude/skills/role-manuals/scripts/update.sh
-   <ws>` from the checkout. It first builds without PDF, which refuses a workspace inside a
+   <ws>` from a checkout of its tag (*A version per release*). It first builds without PDF, which refuses a workspace inside a
    checkout and a source that breaks a rule in seconds, before any stack runs. It starts a fresh
    stack under a compose project of its own (`openplanner-manuals-<checksum of the checkout>`,
    ports 8020, 8100 and 8045; `VERIFY_PROJECT` and `VERIFY_*_PORT` override them), so it never
    meets or removes a stack of another compose project, and refuses while a stack of this
    checkout is up (one run per checkout at a time). It keeps the previous screenshots in `img/previous/`, loads the sample data, captures
-   every id again and runs `check.py --since <commit of the last passing run> --fix`: a label the
-   catalogue only renamed is written into the sources, inside bold
+   every id again and runs `check.py --since <commit of the last frozen version> --fix`: a label
+   the catalogue only renamed is written into the sources, inside bold
    labels only; a removed label, a changed help topic or a changed template is reported with the
-   sections that use it. It records the new version for the title pages, moves the baseline commit
-   only when the check passed, builds everything and stops the stack. A person reads
-   `evidence/check.md`, looks at the differences and rewrites what the new version changed in the
-   way people work.
+   sections that use it. It records the release for the title pages (`release.py record`),
+   builds everything and stops the stack. A person reads `evidence/check.md`, looks at the
+   differences and rewrites what the new version changed in the way people work.
+
+## A version per release
+
+The manuals describe the software of one release and do not change after it: one version per
+minor release (0.6.0, 0.7.0, …), made from a checkout of its tag. A patch release gets one only
+when its check reports a changed text, help topic or screen. Between releases the last version
+stands; a run on anything other than a tag is a trial, never a version.
+
+1. **Check out the release** next to the main checkout, and install there once:
+   `git worktree add ../openplanner-v0.7.0 v0.7.0`, then the two `npm ci` lines of the set-up.
+2. **Run** `update.sh <ws>` from that checkout. Its check reports what changed since the last
+   frozen version. It takes the release from the tags (`release.py record`), never from
+   `pyproject.toml`, which names the previous release until the next one is cut: `v0.7.0` gives
+   "0.7.0" on the title pages, a release candidate "0.7.0-rc.3, testversie van 0.7.0", and a
+   release before its candidate on the same commit. An image built from other files than the
+   tag's (`stack.sh fingerprint` of `verify-openplanner`: what `.dockerignore` lets into the
+   build) adds "met latere wijzigingen" and the commit, and leaves `release` empty: that run is
+   a trial, and `freeze.sh` refuses it.
+3. **Read** `evidence/check.md`, rewrite what the release changed in the way people work, and
+   settle every blocking finding. A right without a task gets one, or a line in
+   `rights_without_task` that says why it has none.
+4. **Settle** the version. Set `version` and `date` in the front matter of every source, with the
+   real dates: `version` starts with the version number (`2.0, vastgesteld op <date>`), `date`
+   is the day of the capture. Write `evidence/afhechting.md`: what was reread and what stays
+   open.
+5. **Freeze** it: `.claude/skills/role-manuals/scripts/freeze.sh <ws>` from the same checkout.
+   It builds Word, HTML and PDF, checks, and stops on a blocking finding. Then `release.py
+   freeze` copies the version into
+   `<ws>/versies/<capture date>_software-<release>_handleiding-<version>/`: build, sources,
+   screenshots and evidence without the previous capture, `variables.json` and the workspace's
+   own Markdown files but not `README.md`, a `LEESMIJ.md` from `templates/leesmij.md`, a
+   `MANIFEST.sha256` over every file, read-only, and a zip with its own checksum. It builds the
+   copy beside `versies/` and moves it into place only when it is whole. It refuses a trial, a
+   version that exists, sources that do not all state the same version number, a missing
+   `afhechting.md`, and a check that blocked or is older than what it checked. Last, it sets
+   `commit` to the release, the baseline of the next version's check; nothing else moves it.
+
+   Anyone can check a frozen version later with `shasum -a 256 -c MANIFEST.sha256` in its folder.
+   List each version in the workspace's own overview, with its release and dates.
 
 ## Build
 
@@ -152,8 +193,10 @@ The scripts are in `scripts/` and run from the root of the checkout; `<ws>` is t
 | `product`, `Product` | the service's name in running text and at the start of a sentence; a neutral working name until the organisation chooses one |
 | `participants`, `Participants` | the organisation's word for the people who book |
 | `help_desk` | who helps, as the reader should contact them |
-| `software_version` | the version and commit the screenshots come from (`update.sh` writes it) |
-| `commit` | the baseline of the next `check.py --since` (`update.sh` moves it after a passing check) |
+| `software_version` | the release the screenshots come from, from the tags (`release.py record` writes it; see *A version per release*) |
+| `release` | the release tag of the last capture, empty when its image was built from other files (a trial); `release.py record` writes it |
+| `commit` | the commit of the last frozen version: the baseline of `check.py --since` (`release.py freeze` moves it) |
+| `rights_without_task` | per right that a role of the manuals holds but no task describes, the reason why (a task of the supplier, a screen of `do_not_name`, part of another task); `check.py` blocks on a right with neither |
 | `accent_colour`, `font` | branding: six hex digits without `#`, a font family name |
 | `hide_product_name` | `true` covers the product name and its mark in screenshots and blocks it in the text |
 | `do_not_name` | terms that appear neither in the text nor in a screenshot (also inside compounds; a row, column or field whose label holds one is covered whole) |

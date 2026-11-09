@@ -8,10 +8,11 @@
 #    build/manuals.json that check.py reads;
 # 1. starts a fresh verification stack from the checkout (verify-openplanner);
 # 2. keeps the current screenshots in img/previous/, loads sample data and captures every id;
-# 3. checks the manuals against the software since the commit of the last passing run and writes
-#    labels the software only renamed into the sources (check.py --fix);
-# 4. records this run's version for the title pages, and moves the baseline commit forward only
-#    when the check passed, so a blocking finding is reported again on the next run;
+# 3. checks the manuals against the software since the last frozen version (the baseline commit,
+#    which only freeze.sh moves) and writes labels the software only renamed into the sources
+#    (check.py --fix);
+# 4. records the release this run shows for the title pages (release.py record: the nearest tag,
+#    and whether the image was built from the tag's files; if not, the run is a trial);
 # 5. builds Word, HTML and PDF; the stack is stopped when the script ends.
 # Docker and Chrome do not run inside an agent's macOS sandbox: run this in a normal terminal.
 # Exit code: that of check.py (1 when a blocking finding is left), else that of the failing step.
@@ -73,23 +74,8 @@ else
 fi
 
 echo "== 4/5 versie vastleggen"
-# The commit and version the screenshots come from: the build of this run, not the HEAD of now.
-commit="$(sed -n 's/^BUILT_FROM_COMMIT=//p' "${current%/current}/$(cat "$current")/stack.env" | cut -c1-12)"
-version="$(git -C "$repo" show "$commit:pyproject.toml" | sed -n 's/^version = "\(.*\)"/\1/p' | head -n 1)"
-python3 - "$vars" "$commit" "$version" "$rc" <<'PY'
-import json
-import sys
-
-path, commit, version, rc = sys.argv[1:5]
-with open(path) as handle:
-    data = json.load(handle)
-data["software_version"] = f"{version}, gebouwd uit commit {commit[:7]}"
-if rc == "0":
-    data["commit"] = commit
-with open(path, "w") as handle:
-    json.dump(data, handle, ensure_ascii=False, indent=2)
-    handle.write("\n")
-PY
+# The release of this run's build, not of the HEAD of now (release.py record).
+python3 "$here/release.py" record "$workspace" "${current%/current}/$(cat "$current")/stack.env"
 
 echo "== 5/5 bouwen"
 node "$here/build.mjs" "$workspace"

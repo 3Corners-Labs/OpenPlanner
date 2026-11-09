@@ -23,6 +23,7 @@ from app.domain.log_events import lookup
 from app.domain.ports import Clock
 from app.main import create_app
 from tests.fakes.smtp import FakeSmtpServer
+from tests.support.git_repository import Git, repository
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = str(ROOT / "app") + "/"
@@ -145,6 +146,12 @@ def smtp_server(monkeypatch: pytest.MonkeyPatch) -> FakeSmtpServer:
     monkeypatch.setattr(smtplib, "SMTP", server.connect)
     monkeypatch.setattr(smtplib, "SMTP_SSL", server.connect_tls)
     return server
+
+
+@pytest.fixture
+def git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Git:
+    """A git repository on branch ``main`` in ``tmp_path``, which is the working directory."""
+    return repository(tmp_path, monkeypatch)
 
 
 @pytest.fixture

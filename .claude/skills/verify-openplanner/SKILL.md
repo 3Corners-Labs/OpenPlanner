@@ -12,7 +12,8 @@ literal: commands run from the root of the checkout, texts are the Dutch interfa
 
 Three files do the work:
 
-- `scripts/stack.sh`: `up`, `doctor`, `compose`, `down` for the stack;
+- `scripts/stack.sh`: `up`, `doctor`, `compose`, `down` for the stack, and `fingerprint` for
+  the files an image is built from;
 - `scripts/journey.mjs`: the journeys that drive it, with Playwright from `e2e/`;
 - `scripts/stack-client.mjs`: the client they share with the `role-manuals` skill: the run
   record, the instance guard, the development users, Mailpit, the slot picker and the shared
@@ -207,6 +208,7 @@ no longer need them.
 |---|---|
 | `scripts/stack.sh` | `stack.sh up`, `stack.sh doctor`, `stack.sh down`, `stack.sh --help` |
 | `scripts/stack.sh compose` | docker compose for this stack only, e.g. `stack.sh compose logs --tail 50 worker` or `stack.sh compose exec web python -m app.cli --help` |
+| `scripts/stack.sh fingerprint` | read-only, no docker: `stack.sh fingerprint` hashes the image's files now (local changes included), `stack.sh fingerprint <commit>` of that commit alone, its own `.dockerignore` included; `role-manuals`' `release.py` compares a run with its release tag this way |
 | `scripts/journey.mjs` | `node .claude/skills/verify-openplanner/scripts/journey.mjs <journey>...`, `--help` |
 | `scripts/stack-client.mjs` | imported by `journey.mjs` and by `role-manuals/scripts/`; never run on its own |
 | `compose.verify.yml` | read by `stack.sh` only; its header says what differs from the development compose and why |

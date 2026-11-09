@@ -14,14 +14,18 @@ build changed since).
 1. Tasks: the screen of each task is a help topic of the portal or a participant page, the
    permission exists, and a role of the manual holds it in the authorisation matrix
    (``app.domain.authorization.MATRIX``).
-2. Screenshots: every figure and shot of a task is in the shot list (``evidence/shots.json``,
+2. Rights: every right the roles of a manual hold (the participant actions, for the
+   participants' manual) has a task in one of the manuals, or a reason in ``rights_without_task``
+   of ``variables.json``. A right with neither blocks, so a right the software adds is described
+   or left out on purpose, never by accident.
+3. Screenshots: every figure and shot of a task is in the shot list (``evidence/shots.json``,
    written by ``capture.mjs``); which files still have to follow.
-3. Labels: every bold span the build found is a text of the software (the ``nl`` catalogue, read
+4. Labels: every bold span the build found is a text of the software (the ``nl`` catalogue, read
    as the app reads it); a path (A → B) is checked part by part.
-4. Since a commit: labels the software renamed or removed and where the manuals use them (a
+5. Since a commit: labels the software renamed or removed and where the manuals use them (a
    removed one blocks), help topics and templates that changed. ``--fix`` writes a renamed label
    into the sources, inside bold labels only.
-5. Screenshots that differ from the previous capture (``img/previous/``): ``capture.mjs``
+6. Screenshots that differ from the previous capture (``img/previous/``): ``capture.mjs``
    compares them and writes ``evidence/diff.json`` and a picture of each difference in
    ``evidence/diff/``.
 """
@@ -213,6 +217,11 @@ class Catalogue:
         return "onbekend"
 
 
+def is_approach(manual: dict) -> bool:
+    """Return whether a manual is the adoption approach (``00-``): no role, no tasks, no labels."""
+    return manual["file"].startswith("00-")
+
+
 def manual_roles(role: str, config: dict[str, list[str]]) -> list[str] | None:
     """Return the matrix roles of a manual's ``role``, or None for the participants' manual."""
     for word, roles in config.items():
@@ -221,9 +230,36 @@ def manual_roles(role: str, config: dict[str, list[str]]) -> list[str] | None:
     return None
 
 
+@dataclass(frozen=True)
+class Rights:
+    """Which rights the readers of each manual hold, from the authorisation matrix.
+
+    ``roles`` maps a word of a manual's ``role`` to matrix role keys, ``matrix`` a role key to
+    its permission codes, ``participant`` holds the participant actions. ``check_tasks`` and
+    ``check_rights`` both ask ``of``, so they never disagree about a manual.
+    """
+
+    roles: dict[str, list[str]]
+    matrix: dict[str, frozenset[str]]
+    participant: frozenset[str]
+
+    def of(self, manual: dict) -> frozenset[str]:
+        """Return the rights of a manual's readers.
+
+        None for the approach, the participant actions for the participants' manual (a role that
+        names no role word), else the rights of its matrix roles.
+        """
+        if is_approach(manual):
+            return frozenset()
+        roles = manual_roles(manual["role"], self.roles)
+        if roles is None:
+            return self.participant
+        return frozenset[str]().union(*(self.matrix.get(role, frozenset()) for role in roles))
+
+
 def check_tasks(manual: dict, ctx: dict, report: Report) -> None:
     """Check the tasks and figures of one manual (from build/manuals.json)."""
-    roles = manual_roles(manual["role"], ctx["roles"])
+    rights = ctx["rights"].of(manual)
     for task in manual["tasks"]:
         where = f"{manual['file']}.md:{task['line']}"
         ctx["tasks"] += 1
@@ -232,13 +268,7 @@ def check_tasks(manual: dict, ctx: dict, report: Report) -> None:
             report.add("Koppelingen", f"{where}: scherm `{screen}` bestaat niet.", blocking=True)
         if permission not in ctx["codes"]:
             report.add("Koppelingen", f"{where}: recht `{permission}` bestaat niet.", blocking=True)
-        elif roles is None and permission not in ctx["participant"]:
-            report.add(
-                "Koppelingen",
-                f"{where}: `{permission}` is geen recht van deelnemers.",
-                blocking=True,
-            )
-        elif roles and not any(permission in ctx["rights"].get(r, set()) for r in roles):
+        elif permission not in rights:
             report.add(
                 "Koppelingen",
                 f"{where}: de rol {manual['role']} heeft `{permission}` niet.",
@@ -261,11 +291,70 @@ def check_tasks(manual: dict, ctx: dict, report: Report) -> None:
                 "staat niet in de opnamelijst.",
                 blocking=True,
             )
-    if not manual["tasks"] and not manual["file"].startswith("00-"):
+    if not manual["tasks"] and not is_approach(manual):
         report.add(
             "Koppelingen",
             f"{manual['file']}.md: geen taakkoppelingen (nodig voor contextgedreven hulp).",
         )
+
+
+def check_rights(manuals: list[dict], rights: Rights, without_task: dict, report: Report) -> None:
+    """Check that every right of the manuals' readers has a task, or a reason to have none.
+
+    A task in any manual describes a right, since a role may read another role's manual for what
+    it shares. ``without_task`` maps a right to the reason it has no task; an entry for no right
+    of these readers, or for a right with a task, is reported so the list stays true.
+    """
+    held: dict[str, list[str]] = {}
+    for manual in manuals:
+        for code in rights.of(manual):
+            held.setdefault(code, []).append(manual["role"])
+    tasks: dict[str, str] = {}
+    for manual in manuals:
+        for task in manual["tasks"]:
+            tasks.setdefault(task.get("permission", ""), f"{manual['file']}.md:{task['line']}")
+    reasons = {
+        code: reason.strip()
+        for code, reason in without_task.items()
+        if isinstance(reason, str) and reason.strip()
+    }
+    untasked = [code for code in sorted(held) if code not in tasks]
+    missing = [code for code in untasked if code not in reasons]
+    section = "Rechten"
+    report.add(
+        section,
+        f"{len(held)} rechten van de rollen in de handleidingen: "
+        f"{len(held) - len(untasked)} met een taak, {len(untasked) - len(missing)} bewust "
+        f"zonder taak, {len(missing)} zonder taak of reden.",
+    )
+    for code in missing:
+        remedy = (
+            "de reden in `rights_without_task` is leeg of geen tekst."
+            if code in without_task
+            else "beschrijf het, of geef in `rights_without_task` de reden waarom niet."
+        )
+        report.add(
+            section,
+            f"`{code}` ({', '.join(held[code])}) heeft geen taak; {remedy}",
+            blocking=True,
+        )
+    for code in sorted(without_task):
+        if code not in held:
+            report.add(
+                section,
+                f"`{code}` in `rights_without_task` is geen recht van een rol in deze "
+                "handleidingen; haal het weg.",
+            )
+        elif code in tasks:
+            report.add(
+                section,
+                f"`{code}` in `rights_without_task` heeft een taak ({tasks[code]}); haal het weg.",
+            )
+    for code in untasked:
+        if code in reasons:
+            report.add(
+                section, f"`{code}` ({', '.join(held[code])}) bewust zonder taak: {reasons[code]}"
+            )
 
 
 def labels(manual: dict) -> list[tuple[int, str]]:
@@ -434,12 +523,16 @@ def main() -> int:
         "shots": {s["id"] for s in json.loads(shots_file.read_text())},
         "topics": {p.stem for p in (REPO / "docs" / "manual" / "nl").glob("*.md")},
         "codes": {p.value for p in Permission} | {a.key for a in PARTICIPANT_ACTIONS},
-        "participant": {a.key for a in PARTICIPANT_ACTIONS},
-        "rights": {role.value: {p.value for p in perms} for role, perms in MATRIX.items()},
-        "roles": {
-            word: [Role(r).value for r in roles]
-            for word, roles in {**DEFAULT_ROLES, **config.get("roles", {})}.items()
-        },
+        "rights": Rights(
+            roles={
+                word: [Role(r).value for r in roles]
+                for word, roles in {**DEFAULT_ROLES, **config.get("roles", {})}.items()
+            },
+            matrix={
+                role.value: frozenset(p.value for p in perms) for role, perms in MATRIX.items()
+            },
+            participant=frozenset(a.key for a in PARTICIPANT_ACTIONS),
+        ),
         "used": set(),
         "tasks": 0,
     }
@@ -449,7 +542,7 @@ def main() -> int:
     verdicts: dict[str, int] = {}
     for manual in manuals:
         check_tasks(manual, ctx, report)
-        if not manual["file"].startswith("00-"):
+        if not is_approach(manual):
             check_labels(manual, catalogue, verdicts, report)
     missing = sorted(
         s for s in ctx["used"] if s in ctx["shots"] and not (ws.img / f"{s}.png").exists()
@@ -462,6 +555,10 @@ def main() -> int:
     if unused:
         report.add("Schermafdrukken", f"In de opnamelijst maar niet gebruikt: {', '.join(unused)}.")
     report.add("Koppelingen", f"{ctx['tasks']} taken gekoppeld aan een scherm en een recht.")
+    without_task = config.get("rights_without_task", {})
+    if not isinstance(without_task, dict):
+        sys.exit("check.py: rights_without_task in variables.json maps a right to a reason")
+    check_rights(manuals, ctx["rights"], without_task, report)
     report.add(
         "Schermteksten",
         "Gecontroleerd: " + ", ".join(f"{n} {v}" for v, n in sorted(verdicts.items())) + ".",
