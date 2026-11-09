@@ -6,6 +6,7 @@ from structlog.testing import capture_logs
 from structlog.typing import EventDict, WrappedLogger
 
 from app.adapters.db.jobs import ClaimedJob
+from app.domain.api_clients import ApiSettings
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.booking import BookingStatus, ChangeReason
 from app.domain.change_requests import ChangeRequest
@@ -15,7 +16,7 @@ from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.event_context import TRACE_ID, current, current_trace_id
 from app.domain.job_plan import BACKOFF, JobType
 from app.domain.reschedule_proposal import HeldProposal, ProposalOutcome
-from app.domain.scheduling import ScheduleRule
+from app.domain.scheduling import Organisation, ScheduleRule
 from app.domain.services import BookingService
 from app.domain.system_log import EventRetention, SystemLog
 from app.i18n import Translator, load_catalogues
@@ -25,6 +26,7 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.jobs import FakeQueue, job
 from tests.fakes.messaging import RecordingSender, RefusingSender
 from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.support.agent_api import api_caller
 from tests.support.closures import NOTICES
 from tests.support.domain import (
     NOW,
@@ -641,14 +643,27 @@ async def test_a_failing_checkpoint_does_not_fail_the_round(
     assert queue.done == [1]
 
 
-async def test_a_change_request_goes_only_while_the_organisation_takes_them(
-    uow: InMemoryUnitOfWork, composer: MessageComposer
+@pytest.mark.parametrize("revoke", ["organisation", "client"])
+async def test_a_change_request_goes_only_while_it_may_still_be_asked(
+    uow: InMemoryUnitOfWork, composer: MessageComposer, revoke: str
 ) -> None:
     bid = await booking_id(uow)
+    caller = api_caller()
+    organisation_id = uow.state.groups[1].organisation_id
+    uow.state.organisations[organisation_id] = Organisation(organisation_id, "Demo", "demo")
+    uow.state.api_settings = ApiSettings(enabled=True)
+    uow.state.api_clients[caller.client.client_id] = caller.client
     async with uow.locked() as tx:
         await tx.add_change_request(
             ChangeRequest(
-                "chr_x", "opc_bot", 1, None, bid, SLOT_0900, NOW, NOW + timedelta(hours=1)
+                "chr_x",
+                caller.client.client_id,
+                1,
+                None,
+                bid,
+                SLOT_0900,
+                NOW,
+                NOW + timedelta(hours=1),
             )
         )
     sender = RecordingSender()
@@ -664,7 +679,11 @@ async def test_a_change_request_goes_only_while_the_organisation_takes_them(
         )
 
     await run().run_due()
-    switch["on"] = False
+    if revoke == "organisation":
+        switch["on"] = False
+    else:
+        client = uow.state.api_clients[caller.client.client_id]
+        uow.state.api_clients[client.client_id] = replace(client, enabled=False)
     await run().run_due()
 
     assert [m.subject for m in sender.sent] == ["Bevestig de wijziging van uw videogesprek"]

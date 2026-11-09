@@ -209,7 +209,12 @@ Content-Type: application/json
   confirm the change". The API never tells whether a number or a code exists.
 - On a match the participant gets an email (and an SMS where they agreed to SMS) with a link to
   confirm; nothing changes until they do. A newer request for the same appointment replaces
-  the open one. Cancelling is possible until the start, moving until the change deadline.
+  the open one, but within *Quiet period after a change request* (default 10 minutes) after a
+  request reached it, a new one sends nothing. Cancelling is possible until the start, moving
+  until the change deadline. If the bot's client is switched off or loses the scope, or the API
+  is switched off, its open requests can no longer be confirmed.
+- A request is deleted *Keep change requests after expiry* days (default 30) after it expired;
+  its status is then `404 change_request_not_found`.
 - `GET /api/agent/v1/change-requests/{id}` answers `pending`, `confirmed` or `expired`, only to
   the client that asked. A request that matched nothing stays `pending` until `expires_at`
   (*Time to confirm a change request*, default 60 minutes).

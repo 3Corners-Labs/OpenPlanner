@@ -53,6 +53,7 @@ from app.domain.admin_session_service import AdminSessionService
 from app.domain.alert_delivery import AlertNotifier
 from app.domain.alerts import QUEUE_WAIT_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
+from app.domain.change_request_service import prune_change_requests
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.fallback import FallbackService
@@ -250,8 +251,9 @@ async def run_worker(
                 product_footer=lambda organisation: (
                     live.for_organisation(organisation).product_footer
                 ),
+                # ADR 0023 step 2: only where the deployment runs the machine API at all.
                 change_requests=lambda organisation: (
-                    live.for_organisation(organisation).agent_change_requests_enabled
+                    live.for_organisation(organisation).takes_change_requests
                 ),
                 after_purge=lambda: checkpoint_wal(engine),
             ),
@@ -277,6 +279,11 @@ async def run_worker(
         admin = await sessions.clean(timedelta(hours=live.settings.admin_session_hours))
         return admin + await links.clean()
 
+    async def prune_requests() -> int:
+        """Delete change requests past ``agent_change_request_retention_days`` (ADR 0023)."""
+        keep = timedelta(days=live.settings.agent_change_request_retention_days)
+        return await prune_change_requests(uow, clock, keep)
+
     staff_lifecycle = StaffLifecycleService(uow, clock)
 
     async def erase_staff() -> int:
@@ -299,6 +306,7 @@ async def run_worker(
         BookingRowRollup(
             uow, clock, lambda: timedelta(days=live.settings.booking_row_retention_days)
         ).run,
+        prune_requests,
     )
     # ADR 0117: usage facts into the hourly table, and the retention of both.
     usage = UsageRollup(

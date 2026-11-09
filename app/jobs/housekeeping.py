@@ -68,6 +68,9 @@ ROLLUP_EVERY = timedelta(days=1)
 SESSIONS_EVERY = timedelta(hours=1)
 """How often ended and expired admin sessions are deleted; the lifetime is a setting."""
 
+REQUESTS_EVERY = timedelta(hours=1)
+"""How often the bots' expired change requests are deleted; the retention is a setting."""
+
 STAFF_EVERY = timedelta(days=1)
 """How often staff records past their retention are erased; the period is a setting."""
 
@@ -94,6 +97,9 @@ class Housekeeping:
             called once per ``SESSIONS_EVERY``.
         erase_staff: Erases the staff records past ``staff_retention_days`` and returns the
             count; called once per ``STAFF_EVERY``.
+        prune_requests: Deletes the bots' change requests past
+            ``agent_change_request_retention_days`` and returns the count (ADR 0023 step 2b);
+            called once per ``REQUESTS_EVERY``.
         backups: The directory of the update back-ups (``data/backups``), or ``None`` to leave
             them to the updater; pruned once per ``BACKUPS_EVERY``.
         rollup: Merges old booking rows into daily counts and deletes them (ADR 0102 step 4);
@@ -114,8 +120,11 @@ class Housekeeping:
         erase_staff: Callable[[], Awaitable[int]] | None = None,
         backups: Path | None = None,
         rollup: Callable[[], Awaitable[RollupResult]] | None = None,
+        prune_requests: Callable[[], Awaitable[int]] | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
+        self._prune_requests = prune_requests
+        self._requests_pruned_at: datetime | None = None
         self._rollup = rollup
         self._rolled_up_at: datetime | None = None
         self._erase_staff = erase_staff
@@ -151,6 +160,7 @@ class Housekeeping:
         clean_sessions: Callable[[], Awaitable[int]] | None = None,
         erase_staff: Callable[[], Awaitable[int]] | None = None,
         rollup: Callable[[], Awaitable[RollupResult]] | None = None,
+        prune_requests: Callable[[], Awaitable[int]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
         return cls(
@@ -166,6 +176,7 @@ class Housekeeping:
             erase_staff,
             _backup_directory(database_url),
             rollup,
+            prune_requests,
         )
 
     async def run(self) -> None:
@@ -177,6 +188,7 @@ class Housekeeping:
         await self._sweep_retention(now)
         await self._clean_admin_sessions(now)
         await self._erase_staff_records(now)
+        await self._prune_change_requests(now)
         self._prune_backups(now)
         await self._roll_up_bookings(now)
 
@@ -209,6 +221,22 @@ class Housekeeping:
         else:
             if erased:
                 log.info("staff.erased", staff=erased)
+
+    async def _prune_change_requests(self, now: datetime) -> None:
+        """Delete expired change requests past their retention, once per ``REQUESTS_EVERY``."""
+        if self._prune_requests is None:
+            return
+        due = self._requests_pruned_at is None or now - self._requests_pruned_at >= REQUESTS_EVERY
+        if not due:
+            return
+        self._requests_pruned_at = now
+        try:
+            deleted = await self._prune_requests()
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.warning("change_requests.prune_failed", error=type(exc).__name__)
+        else:
+            if deleted:
+                log.info("change_requests.pruned", requests=deleted)
 
     async def _roll_up_bookings(self, now: datetime) -> None:
         """Merge old purged booking rows into daily counts, at most once per ``ROLLUP_EVERY``."""

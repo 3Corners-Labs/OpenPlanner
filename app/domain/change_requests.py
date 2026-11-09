@@ -153,6 +153,14 @@ class ChangeRequest:
             and self.pinned_start == booking_start
         )
 
+    def cools_down(self, now: datetime, minutes: int) -> bool:
+        """Whether a new request for the same booking at ``now`` falls in its quiet period.
+
+        ``agent_change_request_cooldown_minutes`` (step 2b): after a request reached a booking,
+        a new one within that many minutes sends nothing.
+        """
+        return now - self.created_at < timedelta(minutes=minutes)
+
     def confirm(self, now: datetime) -> "ChangeRequest":
         """Return the request as confirmed at ``now``."""
         return replace(self, confirmed_at=now)

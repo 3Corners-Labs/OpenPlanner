@@ -145,6 +145,12 @@ SETTING_LABELS: dict[str, str] = {
     "agent_change_requests_per_hour": "settings.field.agent_change_requests_per_hour.label",
     "agent_change_requests_enabled": "settings.field.agent_change_requests_enabled.label",
     "agent_change_request_minutes": "settings.field.agent_change_request_minutes.label",
+    "agent_change_request_cooldown_minutes": (
+        "settings.field.agent_change_request_cooldown_minutes.label"
+    ),
+    "agent_change_request_retention_days": (
+        "settings.field.agent_change_request_retention_days.label"
+    ),
     "reschedule_proposal_confirm_hours": "settings.field.reschedule_proposal_confirm_hours.label",
     "reschedule_proposal_reminder_hours": "settings.field.reschedule_proposal_reminder_hours.label",
     "reschedule_search_days": "settings.field.reschedule_search_days.label",

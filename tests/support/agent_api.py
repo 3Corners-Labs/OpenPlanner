@@ -111,3 +111,22 @@ def api_caller(client_id: str = "opc_bot") -> ApiCaller:
         created_at=NOW,
     )
     return ApiCaller(client, client.scopes, NOW + timedelta(minutes=10))
+
+
+async def registered_caller(app: FastAPI) -> ApiCaller:
+    """Switch the API on and register a demo client with ``bookings:request_change``.
+
+    The change request then comes from a client that may still ask when the participant
+    confirms (ADR 0023 step 2b), as one through the API would.
+    """
+    service: ApiAccessService = app.state.api_access
+    await service.save_settings(SUPER, enabled=True, docs_public=False)
+    draft = ClientDraft.create(
+        name="WxCC AI Agent",
+        organisation="demo",
+        groups=[],
+        scopes=["bookings:request_change"],
+        networks=[],
+    )
+    issued = await service.create_client(SUPER, draft, 180)
+    return ApiCaller(issued.client, issued.client.scopes, NOW + timedelta(minutes=10))
