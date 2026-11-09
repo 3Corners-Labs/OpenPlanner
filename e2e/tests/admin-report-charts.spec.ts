@@ -36,7 +36,9 @@ test('a series toggle is a button with aria-pressed and hides that series', asyn
   await openAs(page, `${GROUP}?view=channels`);
 
   const chart = page.locator('op-report-chart').first();
-  const toggle = chart.getByRole('button', { pressed: true }).first();
+  // Pin the button by its name: a locator for "the first pressed button" moves on once it is not pressed.
+  const name = (await chart.getByRole('button', { pressed: true }).first().textContent())?.trim() ?? '';
+  const toggle = chart.getByRole('button', { name, exact: true });
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await expect(chart.locator('.rchart__off').first()).toBeAttached();
