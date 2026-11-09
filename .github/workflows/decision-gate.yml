@@ -25,6 +25,13 @@ name: decision gate
 # run counts no approval; a push by an administrator (Claude Code works under the product
 # owner's account) keeps it. The withdrawal is its own job without a concurrency group: a later
 # event on the pull request (an edited title) cancels a running gate, never a withdrawal.
+#
+# ADR 0120: GitHub blocks `pull_request_target` by default in public repositories from
+# 2026-12-02. The repository's Actions event policy `decision gate` allows it for this file
+# only, together with `merge_group`: exactly the two events below. The policy is recorded in
+# `.github/guardrails.json`, and a test keeps this file the only one that uses the event and
+# its events equal to the policy's. A run that GitHub refuses ends in `startup_failure` without
+# a job and cannot be re-run; a new event on the pull request starts a new one (runbook).
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, edited, labeled, unlabeled]

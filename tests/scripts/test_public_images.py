@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.scripts.conftest import run_step, workflow_step
+
 REPO = Path(__file__).parents[2]
 BASH = shutil.which("bash") or "/bin/bash"
 APP = "ghcr.io/o/r-public@sha256:" + "a" * 64
@@ -87,13 +89,13 @@ def _bash_major() -> int:
 def test_the_public_rule_selects_every_release_and_no_candidate(
     tag: str, public: bool, tmp_path: Path
 ) -> None:
-    workflow = yaml.safe_load((REPO / ".github/workflows/main.yml").read_text())
-    rule = next(s for s in workflow["jobs"]["publish"]["steps"] if s.get("id") == "public")["run"]
+    rule = workflow_step(REPO / ".github/workflows/main.yml", "publish", "public")["run"]
     output = tmp_path / "output"
     output.touch()
     env = {"GITHUB_REF_NAME": tag, "GITHUB_OUTPUT": str(output), "IMAGE": "ghcr.io/O/R"}
     env |= {"PROXY_IMAGE": "ghcr.io/O/R-proxy", "PATH": "/usr/bin:/bin"}
-    subprocess.run([BASH, "-c", rule], env=env, check=True, capture_output=True)  # noqa: S603
+    result = run_step(rule, env)
+    assert result.returncode == 0, result.stderr
     lines = output.read_text().splitlines()
     expected = ["app=ghcr.io/o/r-public", "proxy=ghcr.io/o/r-proxy-public"] if public else []
     assert lines == expected
@@ -102,7 +104,7 @@ def test_the_public_rule_selects_every_release_and_no_candidate(
 def test_every_release_tag_and_no_candidate_selects_the_public_packages() -> None:
     workflow = yaml.safe_load((REPO / ".github/workflows/main.yml").read_text())
     steps = workflow["jobs"]["publish"]["steps"]
-    rule = next(s for s in steps if s.get("id") == "public")["run"]
+    rule = workflow_step(REPO / ".github/workflows/main.yml", "publish", "public")["run"]
     assert "^v[0-9]+\\.[0-9]+\\.[0-9]+$" in rule  # vX.Y.Z: patches too, never -rc.N
     # the release-candidate job never gets a public image
     candidate = workflow["jobs"]["candidate"]["steps"] if "candidate" in workflow["jobs"] else []
