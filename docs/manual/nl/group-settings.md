@@ -68,8 +68,9 @@ Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben
 Standaard 3. Mensen boeken vaak voor een ander, bijvoorbeeld een ouder voor een kind of een
 mantelzorger voor een naaste; zet het getal daarom niet te laag. Een afspraak die is geannuleerd
 of voorbij is, telt niet mee. Hetzelfde e-mailadres twee keer op hetzelfde moment kan nooit:
-dat is bijna altijd een dubbele klik. De deelnemer krijgt bij een weigering een algemene melding,
-zonder dat de pagina zegt dat er al een afspraak is.
+dat is bijna altijd een dubbele klik. Bij een weigering toont de pagina hetzelfde scherm
+"controleer uw e-mail" als bij elke afspraak; alleen de e-mail aan dat adres legt uit waarom de
+afspraak niet kon. Een geweigerde poging staat niet in de agenda.
 
 <!-- field: dispatch_kind -->
 ### Hoe afspraken bij medewerkers komen

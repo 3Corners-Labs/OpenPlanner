@@ -25,6 +25,8 @@ worker ──SMTP──> mail provider of the organisation (admin portal; else S
    request to confirm a new booking and its reminder (ADR 0056): email, date, time, team
    and the confirm link only; no name, join link or calendar file (the address is not
    verified yet); the lapse message links the group page instead of the booking
+   refusal for the address limit (ADR 0066 step 8): email, date, time and team only;
+   no name and no link of any kind
    closure mails also: the closure's notice and heading, its copy of the contact options
    (organisation data) and the link to the closure page (ADR 0037 §5); never the image
 ```
@@ -108,7 +110,7 @@ actor, the group and the booking id, never the data (ADR 0044 §2, the product o
 
 | Data item | Table.column | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking) | first name only, to WxCC (WP6). Shown to staff with `bookings.view` on the booking page on request, audited (ADR 0044 §2) |
+| First and last name | `bookings.first_name`, `bookings.last_name` (one `name` before ADR 0055) | booking form; corrected by the participant on `/b/m/{public_ref}/details` until the change deadline (ADR 0056 point 10) | until slot end + 24 h, or cancellation + 24 h (`purge_pii` job planned at booking); a booking refused for the address limit, attempt + 24 h (ADR 0066 step 8) | first name only, to WxCC (WP6). Shown to staff with `bookings.view` on the booking page on request, audited (ADR 0044 §2) |
 | Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4). Shown to staff with `bookings.view` on the booking page on request, audited; its `mailto:` link hands it to the staff member's own mail program, to contact the participant (ADR 0044 §2) |
 | Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028). Shown to staff with `bookings.view` on the booking page on request, audited; its `tel:` link hands it to the staff member's own phone, to call the participant (ADR 0044 §2) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055); correction page, which shows the participant their own answers, all of them (`Purpose.PARTICIPANT_SELF`, ADR 0056 point 10) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |

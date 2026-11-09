@@ -10,11 +10,11 @@ from datetime import date, timedelta
 
 import httpx
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.engine import create_engine
-from app.adapters.db.models import BookingRow, GroupRow, ScheduleRuleRow
+from app.adapters.db.models import BookingRow, GroupRow, JobRow, ScheduleRuleRow
 from app.config import Settings
 from app.web.static_assets import ASSETS
 from tests.conftest import app_client
@@ -217,18 +217,6 @@ async def test_full_slot_is_reported(site: httpx.AsyncClient) -> None:
     assert "net vol geraakt" in response.text
 
 
-async def test_the_same_address_twice_in_a_slot_is_refused_without_saying_why(
-    site: httpx.AsyncClient,
-) -> None:
-    await book(site)
-
-    response = await book(site, last_name="Byron")
-
-    assert response.status_code == 409
-    assert "Heeft u al een afspraak bij dit team?" in response.text
-    assert "ada@example.org" not in response.text.split("<form", 1)[0]
-
-
 async def test_honeypot_is_refused(site: httpx.AsyncClient) -> None:
     response = await book(site, website="https://spam.example")
 
@@ -272,6 +260,28 @@ async def test_same_origin_posts_are_accepted(
     response = await site.post("/g/demo/book", data={"start": FRIDAY_0900, **ADA}, headers=headers)
 
     assert response.status_code == 303
+
+
+async def test_a_refused_booking_shows_the_same_page_and_explains_by_email(
+    demo_settings: Settings,
+) -> None:
+    """ADR 0066 step 8: the page reveals nothing; the email to the address explains."""
+    async with app_client(demo_settings, FixedClock(NOW)) as client:
+        first = await book(client)
+        second = await book(client)
+        page = await client.get(second.headers["location"])
+
+    assert second.status_code == first.status_code == 303
+    assert second.headers["location"] == first.headers["location"]
+    assert "Bevestig uw afspraak" in page.text
+    engine = create_engine(demo_settings.database_url)
+    async with AsyncSession(engine) as session:
+        rows = (await session.execute(select(BookingRow.status, BookingRow.id))).all()
+        refused = next(i for status, i in rows if status == "refused")
+        jobs = select(JobRow.type).where(JobRow.booking_id == refused)
+        types = (await session.scalars(jobs)).all()
+    await engine.dispose()
+    assert sorted(types) == ["purge_pii", "send_refusal"]  # the worker sends the explanation
 
 
 async def test_cancel_flow(site: httpx.AsyncClient) -> None:

@@ -6954,6 +6954,9 @@ msgstr "Onbevestigde afspraak laten vervallen"
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Melding vervallen afspraak sturen"
 
+msgid "audit.job.send_refusal"
+msgstr "Melding geweigerde afspraak sturen"
+
 msgid "audit.job.send_team_invite"
 msgstr "Agenda-uitnodiging naar het team sturen"
 
@@ -7180,6 +7183,12 @@ msgstr "Uw afspraak met {group_name} is vervallen"
 
 msgid "message.unconfirmed_lapsed.intro"
 msgstr "U heeft uw videogesprek met {group_name} op {date} om {time} niet op tijd bevestigd. De afspraak is vervallen en de plek is vrijgegeven."
+
+msgid "message.refused.subject"
+msgstr "We konden uw afspraak met {group_name} niet maken"
+
+msgid "message.refused.intro"
+msgstr "Met dit e-mailadres is een videogesprek met {group_name} aangevraagd op {date} om {time}. Die afspraak konden we niet maken: dit adres heeft op dat moment al een afspraak, of al het hoogste aantal afspraken met dit team. Heeft u een afspraak? Gebruik dan de link in de bevestigingsmail om die te verzetten of te annuleren. Heeft u niets aangevraagd? Dan kunt u deze e-mail negeren."
 
 msgid "message.book_again"
 msgstr "U kunt altijd een nieuwe afspraak maken."
@@ -10724,6 +10733,9 @@ msgstr "Wacht op een nieuwe tijd"
 
 msgid "reports.status.pending_confirmation"
 msgstr "Wacht op bevestiging"
+
+msgid "reports.status.refused"
+msgstr "Geweigerd (limiet per adres)"
 
 msgid "admin.channels.cc_title"
 msgstr "Contactcenter"

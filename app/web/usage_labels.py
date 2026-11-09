@@ -51,6 +51,7 @@ STATUSES: dict[str, str] = {
     "suspended": "reports.status.suspended",
     "awaiting_rebook": "reports.status.awaiting_rebook",
     "pending_confirmation": "reports.status.pending_confirmation",
+    "refused": "reports.status.refused",
 }
 
 DISPATCH: dict[str, str] = {

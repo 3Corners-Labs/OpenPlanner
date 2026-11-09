@@ -584,7 +584,7 @@ class BookingRow(Base):
         Index("ix_bookings_contact_center_task_id", "contact_center_task_id"),
         CheckConstraint(
             "status IN ('confirmed', 'cancelled', 'completed', 'no_show', 'suspended', "
-            "'awaiting_rebook', 'pending_confirmation')",
+            "'awaiting_rebook', 'pending_confirmation', 'refused')",
             name="status",
         ),
         CheckConstraint(
