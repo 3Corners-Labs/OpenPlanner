@@ -9,6 +9,7 @@ from app.domain.agenda_service import AgendaService
 from app.domain.audit import SYSTEM_ACTOR, Outcome, Source
 from app.domain.authorization import Principal
 from app.domain.booking import BookingStatus, ChangeReason
+from app.domain.booking_changes import ensure_planner_may_request_rebook
 from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
@@ -353,6 +354,17 @@ async def test_only_who_may_manage_asks_to_rebook(
         await planner.slot_candidates(AUDITOR, "demo", SLOT_0900)
     with pytest.raises(DomainError, match="not_permitted"):
         await planner.waiting(AUDITOR, "demo")
+
+
+async def test_the_rebook_form_finds_no_booking_of_another_group_whatever_its_status(
+    planner: PlannerService, bookings: BookingService
+) -> None:
+    """The group check comes before the rule, which would answer ``booking_not_active``."""
+    receipt = await book_pending(bookings, slug="andere-team", contact=another_participant())
+    rule = ensure_planner_may_request_rebook
+
+    with pytest.raises(DomainError, match="booking_not_found"):
+        await planner.booking(GROUP_ADMIN, "demo", receipt.booking.id or 0, rule=rule)
 
 
 # --- confirm on the participant's behalf (ADR 0056 point 11) --------------------------------
