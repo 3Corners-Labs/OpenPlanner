@@ -111,6 +111,7 @@ FIXED_CAPS = frozenset(
         ".admin-profile__panel",
         ".card--message",
         ".timeline__hint",
+        ".rchart__tip",
         ".admin-public__header",
         ".admin-public__card",
         ".brand-preview__logo",

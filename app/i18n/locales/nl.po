@@ -11897,3 +11897,15 @@ msgstr "blokken"
 
 msgid "reports.tile.shortfall.accepted"
 msgstr "{n} geaccepteerd"
+
+msgid "reports.chart.toolbar"
+msgstr "Grafiekopties"
+
+msgid "reports.chart.download_svg"
+msgstr "Download als SVG"
+
+msgid "reports.chart.download_png"
+msgstr "Download als PNG"
+
+msgid "reports.chart.hint"
+msgstr "Met scripts: pijltjestoetsen gaan door de grafiek, Enter opent die dag, Escape sluit de tip. Dezelfde cijfers staan in de tabel eronder."

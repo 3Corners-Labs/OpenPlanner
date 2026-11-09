@@ -11884,3 +11884,15 @@ msgstr "blocks"
 
 msgid "reports.tile.shortfall.accepted"
 msgstr "{n} accepted"
+
+msgid "reports.chart.toolbar"
+msgstr "Chart options"
+
+msgid "reports.chart.download_svg"
+msgstr "Download as SVG"
+
+msgid "reports.chart.download_png"
+msgstr "Download as PNG"
+
+msgid "reports.chart.hint"
+msgstr "With scripts: arrow keys move through the chart, Enter opens that day, Escape closes the tip. The same numbers are in the table below."
