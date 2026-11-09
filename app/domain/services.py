@@ -76,6 +76,7 @@ from app.domain.job_plan import (
     plan_for_cancellation,
     plan_for_direct,
     plan_for_pending,
+    plan_for_refusal,
     plan_for_suspension,
 )
 from app.domain.participant_links import PublicRef
@@ -333,9 +334,13 @@ class BookingService:
     ) -> BookingReceipt:
         """Book the slot at ``start`` for a participant; it awaits confirmation (ADR 0056).
 
+        An address over its limit in the group gets a refused booking instead of an error
+        (ADR 0066 step 8): the page answers as for any booking, and only the email to that
+        address explains the refusal.
+
         Raises:
             DomainError: ``group_not_found``, ``invalid_contact``, ``outside_booking_window``,
-                ``slot_unavailable``, ``slot_full`` or ``booking_limit_reached``.
+                ``slot_unavailable`` or ``slot_full``.
             ValueError: If ``start`` is naive.
         """
         async with self._uow.locked() as tx:
@@ -343,7 +348,16 @@ class BookingService:
             details = await self._contact(tx, group, contact)
             routing = _routing(group, contact)
             return await self._place(
-                tx, group, start, details, locale, consents, None, pending=True, routing=routing
+                tx,
+                group,
+                start,
+                details,
+                locale,
+                consents,
+                None,
+                pending=True,
+                routing=routing,
+                refuse_quietly=True,
             )
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
@@ -782,6 +796,8 @@ class BookingService:
         booking = await tx.get_booking_by_token_hash(hash_token(management_token))
         if booking is None or not token_matches(management_token, booking.token_hash):
             raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
+        if booking.is_refused:  # its token never left the server; nothing to manage
+            raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
         return booking
 
     async def _place(
@@ -798,6 +814,7 @@ class BookingService:
         pending: bool = False,
         confirmed_at: datetime | None = None,
         routing: RoutingChoice | None = None,
+        refuse_quietly: bool = False,
     ) -> BookingReceipt:
         """Reserve a place at ``start`` and store the booking with its jobs.
 
@@ -808,13 +825,20 @@ class BookingService:
         new booking, or a moved one that was still pending, ADR 0056); otherwise it is placed
         confirmed and keeps ``confirmed_at`` of the booking it replaces.
 
+        ``refuse_quietly`` stores a refused booking instead of raising ``booking_limit_reached``
+        (a participant's own booking, ADR 0066 step 8); a move by a planner or a closure still
+        gets the error, because staff see why.
+
         Raises:
             DomainError: ``group_not_found`` for an archived group (ADR 0084), the window,
                 schedule, closure, capacity and address errors of a booking.
         """
         now = self._clock.now()
         slot = await self._reserve(tx, group, start, routing)
-        await _check_address_limit(tx, group, contact, slot.start, now)
+        if not await _address_allows(tx, group, contact, slot.start, now):
+            if refuse_quietly:
+                return await self._refuse(tx, group, slot, contact, locale, routing)
+            raise DomainError(ErrorCode.BOOKING_LIMIT_REACHED)
         window = (
             confirm_window(
                 now=now,
@@ -854,6 +878,43 @@ class BookingService:
         )
         await tx.replace_jobs(_id(booking), jobs)
         await record_placed(tx, booking, group, moved=rescheduled_from is not None)
+        return BookingReceipt(booking, token)
+
+    async def _refuse(
+        self,
+        tx: Transaction,
+        group: Group,
+        slot: Slot,
+        contact: Contact,
+        locale: str,
+        routing: RoutingChoice | None,
+    ) -> BookingReceipt:
+        """Store a refused booking: no place, one email, purged a day later (ADR 0066 step 8).
+
+        It gets a token like any booking, so the answer cannot be told from a real one, but the
+        token is never sent and ``_booking`` finds nothing behind it. Nothing is counted as a
+        booking made (``record_placed``).
+        """
+        now = self._clock.now()
+        salt = new_token_salt()
+        token = derive_token(self._token_key, salt)
+        booking = await tx.add_booking(
+            Booking(
+                id=None,
+                group_id=group.id,
+                slot_id=_id(slot),
+                start=slot.start,
+                end=slot.end,
+                status=BookingStatus.REFUSED,
+                contact=contact,
+                locale=locale,
+                token_hash=hash_token(token),
+                created_at=now,
+                token_salt=salt,
+                routing=routing,
+            )
+        )
+        await tx.replace_jobs(_id(booking), plan_for_refusal(now=now))
         return BookingReceipt(booking, token)
 
     async def _reserve(
@@ -996,21 +1057,17 @@ class BookingService:
         )
 
 
-async def _check_address_limit(
+async def _address_allows(
     tx: Transaction, group: Group, contact: Contact, start: datetime, now: datetime
-) -> None:
-    """Refuse a second place for one address in a slot, or more than the group allows.
+) -> bool:
+    """Return whether the address may take this place: not twice in a slot, not over the limit.
 
-    Runs after the capacity check, so a full slot is reported as full to everyone. The
-    refusal does not say which rule applied; the page must not reveal that an address
-    already has a booking (ADR 0066).
-
-    Raises:
-        DomainError: ``booking_limit_reached``.
+    Runs after the capacity check, so a full slot is reported as full to everyone. The caller
+    does not say which rule applied; nothing may reveal that an address already has a booking
+    (ADR 0066).
     """
     starts = await tx.upcoming_starts_for_email(group.id, contact.email, now)
-    if start in starts or len(starts) >= group.max_bookings_per_email:
-        raise DomainError(ErrorCode.BOOKING_LIMIT_REACHED)
+    return start not in starts and len(starts) < group.max_bookings_per_email
 
 
 def _changed_fields(before: Contact, after: Contact) -> list[str]:

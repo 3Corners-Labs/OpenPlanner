@@ -1,6 +1,6 @@
 # 0066. Bookings per email address
 
-Status: accepted (2026-10-30), requested by the product owner. Extends ADR 0027 and ADR 0056. Partly built; see `docs/adr-status.md` for what is built.
+Status: accepted (2026-10-30), requested by the product owner. Extends ADR 0027 and ADR 0056. Built: steps 1–7 in #128, step 8 in #PRNUM; see *Build status*.
 
 ## Context
 
@@ -47,6 +47,16 @@ case in `docs/threat-model.md`.
    confirmation*, the page says "check your email" for every submission, and the refusal is
    explained in an email to that address only. Then the page reveals nothing at all.
 
+   *As built (product owner, 2026-11-09):* a participant's booking over the limit is stored as
+   a booking with status `refused`. It holds no place and is not counted as a booking made;
+   its jobs are one email (`send_refusal`, no name and no link, because the address is not
+   verified) and `purge_pii` a day after the attempt (migration 0106). The page and the widget
+   answer exactly as for a booking awaiting confirmation; the row's token is never sent, and
+   the management pages find nothing behind it. Staff lists leave refused bookings out; the
+   reports count them per status. A move by a participant, a planner or a closure into such
+   a slot still gets `booking_limit_reached`: whoever moves already knows the booking. The
+   machine API makes no bookings (ADR 0023), so it has no refusal to hide.
+
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
@@ -63,9 +73,9 @@ legitimate use. The case folding rule is fixed (ASCII, both sides).
 | Step | What | PR | State |
 |---|---|---|---|
 | 1–7 | Per-email limit: same slot refused, maximum per group, setting, migration 0054 | #128 | merged |
-| 8 | A refused booking is explained by email only (prerequisite ADR 0056 step 2 is merged) |  | planned |
+| 8 | A refused booking is explained by email only: status `refused` (migration 0106), the `send_refusal` email, purge a day after the attempt | #PRNUM | merged |
 
-(State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
+(State as checked against the code on 2026-11-09; the overview of every ADR is `docs/adr-status.md`.)
 
 ## Consequences
 
@@ -73,6 +83,8 @@ legitimate use. The case folding rule is fixed (ASCII, both sides).
 - Residual risk until step 8: the difference between "booked" and "refused" still shows that
   an address has bookings in the group. The rate limit (10 per IP per hour) and the honeypot
   keep probing slow; step 8 removes the signal.
+- Step 8: a refused attempt stores the submitted details for a day, like a booking that is
+  never confirmed, and sends one email to the address; the booking rate limit bounds both.
 - The machine API (ADR 0023) and the widget (ADR 0035) use the same domain path and return
   `booking_limit_reached` with HTTP 409.
 - Manual: *Appointments per email address* on the group settings topic (nl, en).

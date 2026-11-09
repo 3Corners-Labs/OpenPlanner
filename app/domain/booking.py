@@ -169,6 +169,9 @@ class BookingStatus(StrEnum):
     """A planner asked the participant to choose a new time (ADR 0044); the place is freed."""
     PENDING_CONFIRMATION = "pending_confirmation"
     """The participant has not confirmed by email link yet (ADR 0056); the place is held."""
+    REFUSED = "refused"
+    """The address had reached its limit in the group (ADR 0066 step 8). It holds no place; it
+    only carries the email that explains the refusal, and is purged a day after the attempt."""
 
 
 @dataclass(frozen=True)
@@ -276,6 +279,11 @@ class Booking:
     def awaits_rebook(self) -> bool:
         """Whether a planner asked the participant to choose a new time (ADR 0044)."""
         return self.status is BookingStatus.AWAITING_REBOOK
+
+    @property
+    def is_refused(self) -> bool:
+        """Whether the booking was refused for its address's limit (ADR 0066 step 8)."""
+        return self.status is BookingStatus.REFUSED
 
     @property
     def awaits_confirmation(self) -> bool:

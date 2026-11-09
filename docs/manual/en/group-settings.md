@@ -66,8 +66,9 @@ How many future appointments one email address may have with this team at the sa
 1 to 10. Default 3. People often book for someone else, such as a parent for a child or a carer
 for a relative, so do not set the number too low. A cancelled or past appointment does not
 count. The same email address twice at the same time is never possible: that is almost always
-a double click. A refused participant gets a general message; the page does not say that an
-appointment already exists.
+a double click. The page shows a refused participant the same "check your email" page as
+anyone else; only the email to that address explains why the appointment could not be made.
+A refused attempt does not appear in the agenda.
 
 <!-- field: dispatch_kind -->
 ### How appointments reach staff

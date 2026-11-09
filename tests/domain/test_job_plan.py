@@ -338,3 +338,12 @@ def test_a_released_proposal_sends_its_notice_now() -> None:
         (JobType.SEND_PROPOSAL_RELEASED, ChannelKind.EMAIL),
         (JobType.SEND_PROPOSAL_RELEASED, ChannelKind.SMS),
     ]
+
+
+def test_a_refusal_sends_one_email_and_purges_a_day_later() -> None:
+    from app.domain.job_plan import PURGE_AFTER, plan_for_refusal
+
+    assert plan_for_refusal(now=NOW) == [
+        PlannedJob(JobType.SEND_REFUSAL, NOW, None, ChannelKind.EMAIL),
+        PlannedJob(JobType.PURGE_PII, NOW + PURGE_AFTER, None),
+    ]

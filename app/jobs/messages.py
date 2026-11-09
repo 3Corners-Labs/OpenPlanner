@@ -270,6 +270,16 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         confirm=True,
         book_again=True,
     ),
+    # ADR 0066 step 8: the address had reached its limit; the page said "check your email".
+    # Unverified address, so no name, and no link: the refused booking has nothing to manage.
+    JobType.SEND_REFUSAL: MessageKind(
+        "message.refused.subject",
+        "message.refused.intro",
+        False,
+        False,
+        calendar=False,
+        confirm=True,
+    ),
 }
 
 

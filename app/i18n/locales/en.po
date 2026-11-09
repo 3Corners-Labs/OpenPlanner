@@ -6941,6 +6941,9 @@ msgstr "Expire unconfirmed booking"
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Send notice of an expired booking"
 
+msgid "audit.job.send_refusal"
+msgstr "Send notice of a refused booking"
+
 msgid "audit.job.send_team_invite"
 msgstr "Send calendar invite to the team"
 
@@ -7167,6 +7170,12 @@ msgstr "Your appointment with {group_name} has lapsed"
 
 msgid "message.unconfirmed_lapsed.intro"
 msgstr "You did not confirm your video call with {group_name} on {date} at {time} in time. The appointment has lapsed and the place has been freed."
+
+msgid "message.refused.subject"
+msgstr "We could not make your appointment with {group_name}"
+
+msgid "message.refused.intro"
+msgstr "This email address was used to request a video call with {group_name} on {date} at {time}. We could not make that appointment: this address already has an appointment at that time, or already the maximum number of appointments with this team. Do you have an appointment? Then use the link in its confirmation email to move or cancel it. Did you not request anything? Then you can ignore this email."
 
 msgid "message.book_again"
 msgstr "You can always make a new appointment."
@@ -10705,6 +10714,9 @@ msgstr "Waiting for a new time"
 
 msgid "reports.status.pending_confirmation"
 msgstr "Waiting for confirmation"
+
+msgid "reports.status.refused"
+msgstr "Refused (address limit)"
 
 msgid "admin.channels.cc_title"
 msgstr "Contact center"

@@ -1479,7 +1479,10 @@ class SqlTransaction(
     async def list_bookings(
         self, scope: Scope, group_id: int, lower: datetime, upper: datetime
     ) -> list[BookingOverview]:
-        """Return the group's bookings in [lower, upper) with their status, inside ``scope``."""
+        """Return the group's bookings in [lower, upper) with their status, inside ``scope``.
+
+        A refused booking (ADR 0066 step 8) is no appointment and is left out.
+        """
         rows = await self._session.execute(
             select(BookingRow, SlotRow, CallStatusRow)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
@@ -1488,6 +1491,7 @@ class SqlTransaction(
             .outerjoin(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
             .where(
                 BookingRow.group_id == group_id,
+                BookingRow.status != BookingStatus.REFUSED.value,  # no appointment (ADR 0066)
                 SlotRow.start >= lower,
                 SlotRow.start < upper,
                 scope_filter(scope, OrganisationRow.slug, GroupRow.slug),

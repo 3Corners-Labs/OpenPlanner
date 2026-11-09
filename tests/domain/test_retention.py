@@ -106,6 +106,15 @@ def test_a_booking_awaiting_a_new_time_is_purged_a_day_after_the_request_lapses(
     assert purge_moment(waiting, LIMITS) == NOW
 
 
+def test_a_refused_booking_is_purged_a_day_after_the_attempt() -> None:
+    """ADR 0066 step 8: the refusal email goes at once; the slot's end does not matter."""
+    refused = PurgeCandidate(
+        1, BookingStatus.REFUSED, NOW + 14 * DAY, None, None, created_at=NOW - DAY
+    )
+
+    assert purge_moment(refused, LIMITS) == NOW
+
+
 def test_a_purge_within_its_grace_is_not_overdue() -> None:
     waiting = candidate(end_ago=DAY + PURGE_GRACE)
     late = candidate(end_ago=DAY + PURGE_GRACE + timedelta(seconds=1))

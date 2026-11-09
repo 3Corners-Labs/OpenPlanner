@@ -59,7 +59,8 @@ class RetentionQueries:
         """Return the counts per group in ``scope`` and the bookings that may be overdue.
 
         Candidates still hold personal data and either ended or were cancelled before
-        ``candidates_before``, or are suspended (their closure and the maximum decide).
+        ``candidates_before``, or are suspended (their closure and the maximum decide), or
+        were refused before it (ADR 0066 step 8).
         """
         groups = await self.list_groups(scope)
         ids = [g.group.id for g in groups if g.group.id is not None]
@@ -133,6 +134,10 @@ async def _candidates(
                 BookingRow.status == BookingStatus.PENDING_CONFIRMATION.value,
                 BookingRow.confirm_by < candidates_before,
             ),
+            and_(
+                BookingRow.status == BookingStatus.REFUSED.value,
+                BookingRow.created_at < candidates_before,
+            ),
         ),
     ]
     if group_ids is not None:
@@ -149,6 +154,7 @@ async def _candidates(
             BookingRow.confirm_by,
             GroupRow.organisation_id,
             BookingRow.closure_id,
+            BookingRow.created_at,
         )
         .join(SlotRow, SlotRow.id == BookingRow.slot_id)
         .join(GroupRow, GroupRow.id == BookingRow.group_id)
@@ -169,6 +175,7 @@ async def _candidates(
                 confirm_by,
                 organisation_id,
                 closure_id,
+                created_at,
             ),
         )
         for (
@@ -182,5 +189,6 @@ async def _candidates(
             confirm_by,
             organisation_id,
             closure_id,
+            created_at,
         ) in rows
     ]
