@@ -46,12 +46,15 @@ SECTOR = re.compile(
             _w("vergun", "ning"),
             _w("aan", "gifte"),
             # A real organisation's contact data, the closure example until 2026-11-08: its short
-            # number, its main number (spaced and compact) and its street address.
-            _w(r"\b14", r" *020\b"),
-            _w(r"20 +(?:- +)?6", r"24 +1111\b"),
-            _w(r"20624", r"1111\b"),
-            _w(r"\bAm", r"stel 1\b"),
-            _w(r"\b1011", r" ?PN\b"),
+            # number, its main number (spaced and compact) and its street address; and a second
+            # organisation's short number, a test marker until then. The edges are digits, or
+            # an escape: in source text an address line follows a `\n`, where `\b` sees none.
+            _w(r"(?<!\d)14", r" *020(?!\d)"),
+            _w(r"20 +(?:- +)?6", r"24 +1111(?!\d)"),
+            _w(r"20624", r"1111(?!\d)"),
+            _w(r"(?:\b|(?<=\\[nrt]))Am", r"stel 1(?!\d)"),
+            _w(r"(?<!\d)1011", r" ?PN\b"),
+            _w(r"(?<!\d)14", r" *030(?!\d)"),
         ]
     ),
     re.IGNORECASE,
@@ -185,6 +188,10 @@ def test_the_guard_sees_the_words() -> None:
     assert sector_words_in("tel:+31" + _w("20624", "1111"))
     assert sector_words_in("Stadskantoor\n" + _w("Am", "stel 1"))
     assert sector_words_in(_w("1011", " PN") + " Stad")
+    # The same lines as source text, where a `\n` escape comes right before them.
+    assert sector_words_in(r'"Stadskantoor\n' + _w("Am", "stel 1") + r'\n"')
+    assert sector_words_in(r'"Stadskantoor\r\n' + _w("1011", " PN") + ' Stad"')
+    assert sector_words_in('phone="' + _w("14 0", "30") + '"')
 
 
 def test_the_guard_reads_the_text_of_an_office_file(tmp_path: Path) -> None:

@@ -130,7 +130,7 @@ def test_address_lines_are_trimmed_and_empty_lines_dropped() -> None:
 
 @pytest.mark.parametrize(
     "value",
-    ["", " \n ", "\n".join(["regel"] * (MAX_ADDRESS_LINES + 1)), "x" * 81, "Amstel\x001"],
+    ["", " \n ", "\n".join(["regel"] * (MAX_ADDRESS_LINES + 1)), "x" * 81, "Voorbeeldstraat\x001"],
 )
 def test_empty_long_or_odd_addresses_are_refused(value: str) -> None:
     assert refused_field(lambda: ContactOption.create(ContactKind.ADDRESS, value)) == "address"
