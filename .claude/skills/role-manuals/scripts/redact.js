@@ -112,8 +112,7 @@ export function detect({ product, terms, versionFields, versionTexts, years }) {
   }
 
   // A date field holds 2026-11-09 but shows the browser's own format (09-11-2026 in nl-NL), so a
-  // match is measured in what it shows; the other date and time fields are covered whole.
-  const DATE_LIKE = ['datetime-local', 'month', 'week'];
+  // match is measured in what it shows. The portal has no other field that shows a year.
   const DAY = new Intl.DateTimeFormat(navigator.language, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
   const shownValue = (el) => (el.type === 'date' && el.valueAsDate
     ? DAY.format(el.valueAsDate) : el.value || el.getAttribute('placeholder') || '');
@@ -123,7 +122,6 @@ export function detect({ product, terms, versionFields, versionTexts, years }) {
     for (const [re, kind] of patterns) {
       if (!hits(re, value)) continue;
       if (el.tagName === 'TEXTAREA') push(kind, 'tekstvak', snippet(value), el.getBoundingClientRect());
-      else if (DATE_LIKE.includes(el.type)) push(kind, 'datumveld', snippet(value), el.getBoundingClientRect());
       else inControl(el, value, kind, re);
     }
   }

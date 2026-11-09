@@ -20,12 +20,6 @@ export const PAD = 2;
 /** Version fields whose whole value is covered, and texts that say there is no version (rule 3 of redact.js). */
 const VERSION_FIELDS = [LABEL.admin.commit, LABEL.admin.latest];
 const VERSION_TEXTS = [textOf('admin', 'noReleaseBuild'), textOf('admin', 'noRelease'), textOf('admin', 'versionUnknown')];
-/**
- * The years covered (rule 4 of redact.js): the year of the capture, the one before it (a capture
- * early in January shows December) and five after it (bookings two months ahead, holidays,
- * retention and certificate dates). A number outside them, such as a key size of 2048, stays.
- */
-export const YEARS = Array.from({ length: 7 }, (_, i) => new Date().getFullYear() - 1 + i);
 
 /** Texts that show because the installation has no Webex Meetings (logged per capture). */
 export const NO_VIDEO_PHRASES = textsOf('noVideo');
@@ -149,11 +143,12 @@ async function stretch(page) {
 const pngSize = (png) => [png.readUInt32BE(16), png.readUInt32BE(20)];
 
 /**
- * Capture `page` as `<img>/<id>.png` with `crop`, cover what `hidden` names, and return the
- * record for the evidence log. The portal's environment bar is cropped off a capture that starts
- * at the top; participant pages and emails keep what they show.
+ * Capture `page` as `<img>/<id>.png` with `crop`, cover what `hidden` names and the `years`
+ * (evidence.mjs coveredYears), and return the record for the evidence log. The portal's
+ * environment bar is cropped off a capture that starts at the top; participant pages and emails
+ * keep what they show.
  */
-export async function shoot(page, { id, img, hidden, crop = new Viewport(), role, visible, notes = [], address = null }) {
+export async function shoot(page, { id, img, hidden, years, crop = new Viewport(), role, visible, notes = [], address = null }) {
   await settle(page);
   const old = page.viewportSize() ?? VIEWPORT;
   let facts;
@@ -164,7 +159,7 @@ export async function shoot(page, { id, img, hidden, crop = new Viewport(), role
   try {
     if (crop.stretch) await stretch(page);
     facts = await page.evaluate(pageFacts, NO_VIDEO_PHRASES);
-    boxes = await page.evaluate(detect, { ...hidden, versionFields: VERSION_FIELDS, versionTexts: VERSION_TEXTS, years: YEARS });
+    boxes = await page.evaluate(detect, { ...hidden, versionFields: VERSION_FIELDS, versionTexts: VERSION_TEXTS, years });
     [clip, crops] = await crop.clip(page, page.viewportSize() ?? old);
     if (clip.y < 1 && new URL(page.url(), 'http://x').pathname.startsWith('/admin')) {
       const bar = await page.evaluate(envBarBottom);

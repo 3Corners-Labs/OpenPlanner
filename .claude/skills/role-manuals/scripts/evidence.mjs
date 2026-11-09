@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { EMAIL_WIDTH, GREY, MOBILE, PAD, SCALE, VIEWPORT, WIDE, YEARS, maskProduct } from './shots.mjs';
+import { EMAIL_WIDTH, GREY, MOBILE, PAD, SCALE, VIEWPORT, WIDE, maskProduct } from './shots.mjs';
 
 export const TZ = 'Europe/Amsterdam';
 
@@ -28,6 +28,18 @@ export function stamp(date = new Date()) {
 export function clock(date = new Date()) {
   const p = clockParts(date);
   return { day: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) + Number(p.second) / 60 };
+}
+
+/**
+ * The years covered (rule 4 of redact.js) by a capture that started at `started` (a `stamp()`):
+ * its year, the one before it (a capture early in January shows December) and five after it
+ * (bookings two months ahead, holidays, retention and certificate dates). A number outside them,
+ * such as a key size of 2048, stays. Taken from the start, so a rewritten log names the years
+ * the capture covered.
+ */
+export function coveredYears(started = stamp()) {
+  const year = Number(started.slice(0, 4));
+  return Array.from({ length: 7 }, (_, i) => year - 1 + i);
 }
 
 /** The `n`-th weekday after the day `iso`. */
@@ -97,6 +109,7 @@ export function writeLog({ ws, stack, state, steps, hidden }) {
   const local = { yes: 'ja', no: 'nee' }[stack.build.localChanges] ?? stack.build.localChanges;
   const wide = steps.filter((s) => s.wide).map((s) => s.id).join(', ');
   const terms = hidden.terms.length ? hidden.terms.map((t) => `"${t}"`).join(', ') : '(geen)';
+  const years = coveredYears(state.started);
   const lines = [
     '# Bewijslog schermafdrukken',
     '',
@@ -129,11 +142,11 @@ export function writeLog({ ws, stack, state, steps, hidden }) {
     '- Afdekregel 3: geen leesbare versie: softwareversies (zoals 0.5.1, v0.5.1, 0.5.1-rc.2 en het label dev), '
       + '"Versie onbekend", "Geen release(versie)", commit-hashes, image-id\'s en digests, en de waarden van de '
       + 'versievelden Commit en Nieuwste versie.',
-    `- Afdekregel 4: het jaartal (${YEARS[0]} tot en met ${YEARS.at(-1)}), in datums, koppen en datumvelden, zodat een `
+    `- Afdekregel 4: het jaartal (${years[0]} tot en met ${years.at(-1)}), in datums, koppen en datumvelden, zodat een `
       + 'afbeelding niet laat zien wanneer hij gemaakt is. Dag, maand en tijd blijven staan; er komt nooit een ander '
       + 'jaartal voor in de plaats. De echte datum van elke opname staat in dit log.',
     '- Verzonnen deelnemers met adressen op voorbeeld.nl; medewerkers zijn de ontwikkelgebruikers van de '
-      + 'identiteitsprovider. Geen token, wachtwoord of e-mailtekst in dit log.',
+      + 'identiteitsprovider. Geen token of wachtwoord in dit log; van een e-mail alleen de regel rond een afdekking.',
     '',
     '## Voorbereiding en verhaal',
     '',
