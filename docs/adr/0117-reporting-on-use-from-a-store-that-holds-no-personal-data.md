@@ -457,7 +457,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | #679 | merged |
 | 10b | The verified `email` claim stored at login (`staff.email`, migration 0104) as the digest's first source for every provider | #681 | merged |
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | #675 | merged |
-| 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | #PR12 | merged |
+| 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | #689 | merged |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
 | 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
 
