@@ -26,7 +26,7 @@ untouched.
 import struct
 import zlib
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -275,13 +275,19 @@ async def seed_closure_examples(
         demo = await seeded_group(tx, DEMO_SLUG)
         if created:
             await tx.add_usage_cells(usage_example_cells(demo.organisation_id, demo.id, now))
-        confirmed_at = _next_weekday(demo, now, CONFIRMED_TIME)
+        demo_day = _next_weekday(demo, now)
         await store_example_booking(
-            tx, demo, confirmed_at, now, token_key, status=BookingStatus.CONFIRMED
+            tx,
+            demo,
+            _at(demo, demo_day, CONFIRMED_TIME),
+            now,
+            token_key,
+            status=BookingStatus.CONFIRMED,
         )
-        pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
-        proposed = await _proposed_booking(tx, demo, now, token_key)
-        pending_day = _next_weekday(demo, now, PENDING_TIMES[0]).astimezone(demo.tz).date()
+        pending = [
+            await _pending_booking(tx, demo, demo_day, now, token_key, at) for at in PENDING_TIMES
+        ]
+        proposed = await _proposed_booking(tx, demo, demo_day, now, token_key)
         journey_group = await seeded_group(tx, JOURNEY_GROUP_SLUG)
         journeys = {
             browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
@@ -298,7 +304,7 @@ async def seed_closure_examples(
         proposal_page=f"/b/{proposed}/proposal",
         trial_page=f"/b/{token}/test",
         journeys=journeys,
-        demo_agenda=f"/admin/groups/{DEMO_SLUG}/agenda?day={pending_day}",
+        demo_agenda=_agenda_path(demo, demo_day),
     )
 
 
@@ -321,21 +327,29 @@ def _example_png(size: int = 96) -> bytes:
 
 def local_time(group: Group, now: datetime, days: int, at: time) -> datetime:
     """Return ``at`` on the day ``days`` after today in the group's time zone, in UTC."""
-    day = (now.astimezone(group.tz) + timedelta(days=days)).date()
+    return _at(group, group.today(now) + timedelta(days=days), at)
+
+
+def _at(group: Group, day: date, at: time) -> datetime:
+    """Return ``at`` on the local calendar ``day`` in the group's time zone, in UTC."""
     return datetime.combine(day, at, tzinfo=group.tz).astimezone(UTC)
 
 
-def _next_weekday(group: Group, now: datetime, at: time) -> datetime:
-    """Return ``at`` on the next weekday (tomorrow at the earliest) in the group's time zone.
+def _next_weekday(group: Group, now: datetime) -> date:
+    """Return the next weekday (tomorrow at the earliest) in the group's time zone.
 
-    It counts calendar days from today's local date, as ``local_time`` does: counting days of
-    24 hours from ``now`` would land on Sunday when the clocks go forward that weekend.
+    It counts local calendar days from ``Group.today``: counting days of 24 hours from ``now``
+    would land on Sunday when the clocks go forward that weekend.
     """
-    today = group.today(now)
-    days = 1
-    while (today + timedelta(days=days)).weekday() >= FIRST_WEEKEND_DAY:
-        days += 1
-    return local_time(group, now, days, at)
+    day = group.today(now) + timedelta(days=1)
+    while day.weekday() >= FIRST_WEEKEND_DAY:
+        day += timedelta(days=1)
+    return day
+
+
+def _agenda_path(group: Group, day: date) -> str:
+    """Return the admin path of the group's agenda on the local calendar ``day``."""
+    return f"/admin/groups/{group.slug}/agenda?day={day}"
 
 
 async def _slot(tx: Transaction, group: Group, start: datetime, end: datetime) -> int:
@@ -392,7 +406,7 @@ async def _journey(
     """Store the journey's two confirmed bookings and return their pages."""
     confirmed = BookingStatus.CONFIRMED
     trial_token, trial = await store_example_booking(
-        tx, group, _next_weekday(group, now, time(15)), now, token_key, status=confirmed
+        tx, group, _at(group, _next_weekday(group, now), time(15)), now, token_key, status=confirmed
     )
     call_token, call = await store_example_booking(
         tx, group, now + JOURNEY_CALL_IN, now, token_key, status=confirmed
@@ -403,9 +417,7 @@ async def _journey(
         trial_booking=f"{admin}/{trial.id}",
         call_page=f"/b/{call_token}/join",
         call_booking=f"{admin}/{call.id}",
-        call_agenda=(
-            f"/admin/groups/{group.slug}/agenda?day={call.start.astimezone(group.tz).date()}"
-        ),
+        call_agenda=_agenda_path(group, group.today(call.start)),
     )
 
 
@@ -441,16 +453,16 @@ async def _suspended_booking(
 
 
 async def _pending_booking(
-    tx: Transaction, group: Group, now: datetime, token_key: bytes, at: time
+    tx: Transaction, group: Group, day: date, now: datetime, token_key: bytes, at: time
 ) -> str:
     """Store a demo booking that awaits confirmation (ADR 0056) and return its token.
 
-    It lies on the next weekday at ``at`` and has a day to be confirmed.
+    It lies on ``day`` at ``at`` and has a day to be confirmed.
     """
     token, _ = await store_example_booking(
         tx,
         group,
-        _next_weekday(group, now, at),
+        _at(group, day, at),
         now,
         token_key,
         status=BookingStatus.PENDING_CONFIRMATION,
@@ -459,13 +471,15 @@ async def _pending_booking(
     return token
 
 
-async def _proposed_booking(tx: Transaction, group: Group, now: datetime, token_key: bytes) -> str:
+async def _proposed_booking(
+    tx: Transaction, group: Group, day: date, now: datetime, token_key: bytes
+) -> str:
     """Store a demo booking awaiting a new time with a proposal held for it (ADR 0057).
 
-    It was on the next weekday at 14:00; 14:30 that day is proposed and held for two days.
+    It was on ``day`` at 14:00; 14:30 that day is proposed and held for two days.
     Return its token.
     """
-    start = _next_weekday(group, now, time(14))
+    start = _at(group, day, time(14))
     token, booking = await store_example_booking(
         tx, group, start, now, token_key, status=BookingStatus.CONFIRMED
     )
