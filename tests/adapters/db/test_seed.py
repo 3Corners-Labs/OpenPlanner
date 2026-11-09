@@ -1,6 +1,6 @@
 """Closure examples of the demo seed (ADR 0037): fixtures of the participant pages and e2e."""
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -9,14 +9,17 @@ from app.adapters.db.seed import (
     BROWSERS,
     CLOSED_GROUP_SLUG,
     DEMO_SLUG,
+    FIRST_WEEKEND_DAY,
     JOURNEY_CALL_IN,
     JOURNEY_GROUP_SLUG,
+    PENDING_TIMES,
     PLANNED_GROUP_SLUG,
     seed_closure_examples,
     seed_demo,
     seeded_group,
 )
 from app.adapters.db.uow import SqlUnitOfWork
+from app.domain.availability import utc_bounds
 from app.domain.booking import Booking, BookingStatus
 from app.domain.booking_changes import planner_may_change, planner_may_request_rebook
 from app.domain.calls import JoinState, join_state
@@ -149,19 +152,24 @@ async def test_the_journey_agenda_is_the_day_the_call_starts(engine: AsyncEngine
 
 LATE_MONDAY = datetime(2026, 11, 2, 22, 55, tzinfo=UTC)
 """23:55 in Amsterdam: the edge where "today" and "the next weekday" turn over."""
+SEED_MOMENTS = [
+    *(LATE_MONDAY + timedelta(days=days) for days in range(7)),
+    datetime(2027, 3, 26, 22, 30, tzinfo=UTC),  # Friday 23:30; the clocks go forward on Sunday
+    datetime(2026, 10, 24, 22, 30, tzinfo=UTC),  # Sunday 00:30; the clocks go back at 03:00
+]
+"""A run of seed-closures late on each day of a week, and on both sides of a clock change."""
 
 
-@pytest.mark.parametrize("days", range(7))
+@pytest.mark.parametrize("now", SEED_MOMENTS, ids=lambda now: f"{now:%a %Y-%m-%d %H:%M}Z")
 async def test_the_demo_agenda_holds_every_planner_action_whatever_the_day(
-    engine: AsyncEngine, days: int
+    engine: AsyncEngine, now: datetime
 ) -> None:
-    """The agenda check (e2e/tests/admin-agenda.spec.ts) opens this day on every day of the week.
+    """The agenda check (e2e/tests/admin-agenda.spec.ts) opens this day, whatever the date.
 
-    It holds bookings awaiting confirmation (confirm, move, cancel) and a confirmed booking
-    (move, propose or ask for a new time, cancel), each still open to a planner's change, so
-    every row action is on the page whatever the date of the run.
+    It is the next weekday, and it holds every booking awaiting confirmation (confirm, move,
+    cancel) and the confirmed booking (move, propose or ask for a new time, cancel), each still
+    open to a planner's change, so every row action is on the page.
     """
-    now = LATE_MONDAY + timedelta(days=days)
     await seed_demo(engine)
 
     examples = await seed_closure_examples(engine, now, KEY)
@@ -169,14 +177,18 @@ async def test_the_demo_agenda_holds_every_planner_action_whatever_the_day(
     async with SqlUnitOfWork(engine).read() as tx:
         group = await seeded_group(tx, DEMO_SLUG)
         day = date.fromisoformat(examples.demo_agenda.partition("?day=")[2])
-        lower = datetime.combine(day, time(), tzinfo=group.tz).astimezone(UTC)
-        upper = datetime.combine(day + timedelta(days=1), time(), tzinfo=group.tz)
-        bookings = await tx.find_agenda_bookings(group.id, lower, upper.astimezone(UTC))
-    assert examples.demo_agenda.startswith(f"/admin/groups/{DEMO_SLUG}/agenda?day=")
-    assert day > now.astimezone(group.tz).date()
+        bookings = await tx.find_agenda_bookings(group.id, *utc_bounds(group, day, day))
+    today = group.today(now)
+    assert examples.demo_agenda == f"/admin/groups/{DEMO_SLUG}/agenda?day={day}"
+    assert day > today
+    assert day.weekday() < FIRST_WEEKEND_DAY
+    assert all(
+        (today + timedelta(days=n)).weekday() >= FIRST_WEEKEND_DAY
+        for n in range(1, (day - today).days)
+    )
     pending = [b for b in bookings if b.awaits_confirmation]
     confirmed = [b for b in bookings if b.is_active]
-    assert pending
+    assert len(pending) == len(PENDING_TIMES)
     assert all(planner_may_change(b, group, now) for b in pending)
-    assert confirmed
+    assert len(confirmed) == 1
     assert all(planner_may_request_rebook(b, group, now) for b in confirmed)

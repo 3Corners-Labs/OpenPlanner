@@ -42,7 +42,7 @@ for (const lang of ['nl', 'en'] as const) {
     const day = fixture('demo_agenda');
     const labels = ROW_ACTIONS[lang];
     await loginAs(page, 'groupadmin', day);
-    // The login redirect keeps the path only; open the seeded day in the language itself.
+    // The login redirect keeps the day but not the language; open the day in that language.
     await page.goto(`${day}&lang=${lang}`);
     const table = page.getByRole('table');
     for (const link of labels.links) {

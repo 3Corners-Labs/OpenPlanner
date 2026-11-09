@@ -273,7 +273,10 @@ async def seed_closure_examples(
         demo = await seeded_group(tx, DEMO_SLUG)
         if created:
             await tx.add_usage_cells(usage_example_cells(demo.organisation_id, demo.id, now))
-        await _confirmed_booking(tx, demo, now, token_key)
+        confirmed_at = _next_weekday(demo, now, CONFIRMED_TIME)
+        await store_example_booking(
+            tx, demo, confirmed_at, now, token_key, status=BookingStatus.CONFIRMED
+        )
         pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
         proposed = await _proposed_booking(tx, demo, now, token_key)
         pending_day = _next_weekday(demo, now, PENDING_TIMES[0]).astimezone(demo.tz).date()
@@ -321,9 +324,14 @@ def local_time(group: Group, now: datetime, days: int, at: time) -> datetime:
 
 
 def _next_weekday(group: Group, now: datetime, at: time) -> datetime:
-    """Return ``at`` on the next weekday (tomorrow at the earliest) in the group's time zone."""
+    """Return ``at`` on the next weekday (tomorrow at the earliest) in the group's time zone.
+
+    It counts calendar days from today's local date, as ``local_time`` does: counting days of
+    24 hours from ``now`` would land on Sunday when the clocks go forward that weekend.
+    """
+    today = group.today(now)
     days = 1
-    while (now + timedelta(days=days)).astimezone(group.tz).weekday() >= FIRST_WEEKEND_DAY:
+    while (today + timedelta(days=days)).weekday() >= FIRST_WEEKEND_DAY:
         days += 1
     return local_time(group, now, days, at)
 
@@ -447,24 +455,6 @@ async def _pending_booking(
         confirm_by=now + timedelta(days=1),
     )
     return token
-
-
-async def _confirmed_booking(
-    tx: Transaction, group: Group, now: datetime, token_key: bytes
-) -> None:
-    """Store a confirmed demo booking on the next weekday at ``CONFIRMED_TIME``.
-
-    It shares its day with the bookings awaiting confirmation, so that day's agenda shows the
-    actions of both kinds of row; its management link is not needed and not returned.
-    """
-    await store_example_booking(
-        tx,
-        group,
-        _next_weekday(group, now, CONFIRMED_TIME),
-        now,
-        token_key,
-        status=BookingStatus.CONFIRMED,
-    )
 
 
 async def _proposed_booking(tx: Transaction, group: Group, now: datetime, token_key: bytes) -> str:
