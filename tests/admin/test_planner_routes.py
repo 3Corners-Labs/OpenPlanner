@@ -398,6 +398,7 @@ async def test_one_booking_gets_the_assistants_time_proposed(site: Site) -> None
 
     assert f"/agenda/bookings/{booking_id}/propose" in agenda
     assert form.status_code == 200
+    assert f'<a href="{AGENDA}?day=2026-01-02">Annuleren</a>' in form.text  # not the form itself
     assert response.status_code == 303
     assert "done=proposed" in response.headers["location"]
     assert (await _status(site, booking_id))[0] is BookingStatus.AWAITING_REBOOK
@@ -434,6 +435,7 @@ async def test_a_short_slot_is_reviewed_and_sent(site: Site) -> None:
 
     assert review.status_code == 200
     assert f"OP-{newest:06d} · Ada" in review.text
+    assert f'<a href="{AGENDA}?day=2026-01-02">Annuleren</a>' in review.text  # not the review
     assert unticked.status_code == 422
     assert "Vink ten minste één afspraak aan." in unticked.text
     assert sent.status_code == 303
