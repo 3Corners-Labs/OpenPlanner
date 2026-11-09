@@ -311,6 +311,24 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         assert response.status_code == 200, extra
         assert not marker_leaks(response.text, set()), extra
 
+    # ADR 0117 point 20, step 14: the pages of a display link. The screen page that refuses, and the
+    # page that shows a new link once, hold nothing of a booking.
+    await post_form(
+        site,
+        "/admin/organisations/demo/settings/reporting_wallboard_display_links_enabled",
+        {"value": "true"},
+    )
+    links_app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    await links_app.state.live_settings.refresh()
+    refused_screen = await site.client.get("/display")
+    assert refused_screen.status_code == 403
+    assert not marker_leaks(refused_screen.text, set()), "display refused"
+    created = await post_form(
+        site, "/admin/organisations/demo/usage/wallboard/links", {"name": "TV", "days": "7"}
+    )
+    assert created.status_code == 200
+    assert not marker_leaks(created.text, set()), "display link created"
+
     # ADR 0117 point 9: the Team view, once the organisation has switched it on, shows names of
     # staff and counts, never a marker of a booking.
     await post_form(

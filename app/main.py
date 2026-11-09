@@ -52,6 +52,7 @@ from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
 from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.staff_addresses import StoredAddresses
+from app.admin.display_routes import router as display_router
 from app.admin.reviewed_documents import ReviewedDocuments
 from app.admin.routes import register_admin
 from app.admin.session import session_cookie_for
@@ -967,6 +968,7 @@ def create_app(
     register_maintenance(app)
     gate = [Depends(participant_gate)]
     for public_router in (
+        display_router,
         health.router,
         instance.router,
         pages.router,

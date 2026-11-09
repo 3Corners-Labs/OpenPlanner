@@ -98,6 +98,7 @@ STATE_TABLES = frozenset(
         "slots",
         "staff",
         "staff_memberships",
+        "wallboard_links",
         "staff_refused_entitlements",
         "update_requests",
         "usage_backfill",

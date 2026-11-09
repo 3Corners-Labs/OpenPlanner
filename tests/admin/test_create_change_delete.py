@@ -48,6 +48,12 @@ CREATABLES: dict[str, Creatable] = {
         change=DIGEST_REPLACED,
         delete="/admin/organisations/{org}/usage/digest/{subscription_id}/delete",
     ),
+    # ADR 0117 point 20: a display link is shown once and used once; it is revoked and a new one
+    # made, never edited.
+    "/admin/organisations/{org}/usage/wallboard/links": Creatable(
+        change="/admin/organisations/{org}/usage/wallboard/links/{link_id}/revoke",
+        delete="/admin/organisations/{org}/usage/wallboard/links/{link_id}/revoke",
+    ),
     # ADR 0096: a widget added to the own overview is moved or removed on *Edit overview*.
     "/admin/overview/add": Creatable(change="/admin/overview/edit", delete="/admin/overview/edit"),
     # ADR 0084 step 4: an empty organisation is deleted from its edit form.
