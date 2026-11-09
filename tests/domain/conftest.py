@@ -18,6 +18,7 @@ from tests.fakes.identity_providers import (
     discovery_document,
 )
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.admin import ALERT_THRESHOLDS
 from tests.support.closures import three_groups
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 from tests.support.organisation_providers import OTHER_DISCOVERY, OTHER_ISSUER
@@ -42,7 +43,8 @@ def bookings(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
 @pytest.fixture
 def planner(uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService) -> PlannerService:
     """Return the planner service on these bookings, with the settings' defaults."""
-    return PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=50)
+    admin = AdminService(uow, clock, alert_thresholds=ALERT_THRESHOLDS)
+    return PlannerService(uow, clock, admin, bookings)
 
 
 @pytest.fixture

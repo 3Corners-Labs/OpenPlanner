@@ -58,6 +58,8 @@ FIRST_NAME_PAGES = frozenset(
         "/admin/groups/demo/agenda/week",
         "/admin/groups/demo/agenda/waiting",
         "/admin/groups/demo/agenda/slot-rebook?start=2026-01-09T08:00:00Z",
+        "/admin/groups/demo/agenda/slot-propose?start=2026-01-09T08:00:00Z",
+        "/admin/groups/demo/agenda/bookings/{id}/propose",
         "/admin/groups/demo/agenda/bookings/{id}/move",
         "/admin/groups/demo/agenda/bookings/{id}/cancel",
         "/admin/groups/demo/agenda/bookings/{id}/rebook",
@@ -96,6 +98,12 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/agenda/slot-rebook": (
         "/admin/groups/demo/agenda/slot-rebook?start=2026-01-09T08:00:00Z"
     ),
+    "/admin/groups/{slug}/agenda/slot-propose": (
+        "/admin/groups/demo/agenda/slot-propose?start=2026-01-09T08:00:00Z"
+    ),
+    "/admin/groups/{slug}/agenda/bookings/{booking_id}/propose": (
+        "/admin/groups/demo/agenda/bookings/{id}/propose"
+    ),
     "/admin/groups/{slug}/agenda/bookings/{booking_id}/move": (
         "/admin/groups/demo/agenda/bookings/{id}/move"
     ),
@@ -113,6 +121,7 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/closure": "/admin/groups/demo/closure",
     "/admin/groups/{slug}/contact": "/admin/groups/demo/contact",
     "/admin/groups/{slug}/usage": "/admin/groups/demo/usage",
+    "/admin/groups/{slug}/usage/export.csv": "/admin/groups/demo/usage/export.csv",
     "/admin/groups/{slug}/closure/contacts": "/admin/groups/demo/closure/contacts",
     "/admin/groups/{slug}/closure/scenarios": "/admin/groups/demo/closure/scenarios",
     "/admin/groups/{slug}/closure/scenarios/{scenario_id}": (
@@ -141,6 +150,7 @@ PATHS: dict[str, str] = {
     "/admin/organisations/{org}/closure": "/admin/organisations/demo/closure",
     "/admin/organisations/{org}/contacts": "/admin/organisations/demo/contacts",
     "/admin/organisations/{org}/usage": "/admin/organisations/demo/usage",
+    "/admin/organisations/{org}/usage/export.csv": "/admin/organisations/demo/usage/export.csv",
     "/admin/organisations/{org}/embedding": "/admin/organisations/demo/embedding",
     "/admin/organisations/{org}/closure/scenarios": "/admin/organisations/demo/closure/scenarios",
     "/admin/organisations/{org}/closure/scenarios/{scenario_id}": (

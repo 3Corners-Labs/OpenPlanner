@@ -17,18 +17,13 @@ values that were refused (ADR 0049), and audits what changed in their roles and 
 since the last one (ADR 0046).
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 
+from app.domain.activity_alert import COUNTED_ACTIONS, ActivityAlert, alert_for
 from app.domain.audit import ANONYMOUS_ACTOR, AuditEntry, AuditEvent, AuditFilter, Outcome
-from app.domain.audit_export import (
-    EXPORT_EVENT,
-    ExportLimits,
-    ExportRefused,
-    export_window,
-    to_csv,
-)
+from app.domain.audit_export import EXPORT_EVENT, audit_csv
 from app.domain.authorization import (
     LEVELS,
     MATRIX,
@@ -49,6 +44,7 @@ from app.domain.authorization import (
     scope_for,
 )
 from app.domain.closure_retention import ClosureRetentionOf, default_closure_retention
+from app.domain.csv_export import ExportLimits, ExportRefused, export_window
 from app.domain.entitlements import Refusal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_schema import Envelope, to_record
@@ -64,6 +60,7 @@ from app.domain.staff import (
     change_events,
 )
 from app.domain.tasks import ActiveJobs
+from app.domain.tunable import value_of
 
 ANONYMOUS = ANONYMOUS_ACTOR
 """Actor recorded for events without a logged-in admin (e.g. a failed login)."""
@@ -104,6 +101,10 @@ class AdminService:
         clock: Current time, for audit events.
         retention_of: The organisation's maximum for bookings on hold, for the retention
             overview (ADR 0102, class D).
+        alert_thresholds: Per hourly alert (``app.domain.activity_alert``), its threshold or
+            the live setting that holds it: ``planner_changes_alert_per_hour`` for
+            ``CHANGES_ALERT`` and ``contact_reveals_alert_per_hour`` for ``REVEALS_ALERT``
+            (class C). Without one, ``record_change`` refuses the permission that alert counts.
     """
 
     def __init__(
@@ -111,11 +112,44 @@ class AdminService:
         uow: UnitOfWork,
         clock: Clock,
         retention_of: ClosureRetentionOf = default_closure_retention,
+        alert_thresholds: Mapping[ActivityAlert, int | Callable[[], int]] | None = None,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._retention_of = retention_of
+        self._alert_thresholds = dict(alert_thresholds or {})
+
+    async def record_change(
+        self,
+        tx: Transaction,
+        at: datetime,
+        principal: Principal,
+        permission: Permission,
+        organisation: str | None,
+        group: str | None,
+        detail: str = "",
+        *,
+        booking_id: int | None = None,
+    ) -> None:
+        """Record a successful admin action and run the hourly alert that counts it, if any.
+
+        The same event as the module's ``record_change``, in the caller's transaction. For a
+        permission that an alert counts (``app.domain.activity_alert``), the alert is checked
+        right after the event with this service's threshold.
+
+        Raises:
+            ValueError: If an alert counts ``permission`` and this service has no threshold
+                for it; the caller's transaction then rolls back with the event.
+        """
+        event = _change_event(at, principal, permission, organisation, group, detail, booking_id)
+        await tx.add_audit_event(event)
+        alert = alert_for(permission)
+        if alert is not None:
+            threshold = self._alert_thresholds.get(alert)
+            if threshold is None:
+                raise ValueError(f"{alert.action} counts {permission.value}: no threshold given")
+            await alert.check(tx, event, value_of(threshold))
 
     async def authorize(
         self,
@@ -232,7 +266,14 @@ class AdminService:
         group: str | None = None,
         detail: str = "",
     ) -> None:
-        """Write an audit event (logins, denials, changes)."""
+        """Write an audit event (logins, denials, changes).
+
+        Raises:
+            ValueError: For a success that an hourly alert counts: ``record_change`` writes
+                those, with their alert (``app.domain.activity_alert``).
+        """
+        if outcome is Outcome.SUCCESS and action in COUNTED_ACTIONS:
+            raise ValueError(f"a success of {action} is counted: use record_change")
         event = AuditEvent(
             self._clock.now(), actor, action, outcome, reason, organisation, group, detail
         )
@@ -420,7 +461,7 @@ class AdminService:
             await self._record_export(principal, scope, narrow, Outcome.FAILURE, refused.code)
             raise
         await self._record_export(principal, scope, narrow, Outcome.SUCCESS, "", len(entries))
-        return to_csv(to_record(entry.event, envelope) for entry in entries), len(entries)
+        return audit_csv(to_record(entry.event, envelope) for entry in entries), len(entries)
 
     async def _record_export(
         self,
@@ -533,8 +574,30 @@ async def record_change(
     Mostly a change; also a request worth accounting for, such as showing a participant's
     contact details (ADR 0044 §2). ``detail`` names what changed or was asked for (field
     names, ``rule.add``-style keys), never values; ``booking_id`` names the booking it is about.
+    A permission that an hourly alert counts goes through ``AdminService.record_change``, which
+    runs the alert as well.
+
+    Raises:
+        ValueError: If an hourly alert counts ``permission`` (``app.domain.activity_alert``).
     """
-    event = AuditEvent(
+    alert = alert_for(permission)
+    if alert is not None:
+        raise ValueError(f"{alert.action} counts {permission.value}: use AdminService")
+    event = _change_event(at, principal, permission, organisation, group, detail, booking_id)
+    await tx.add_audit_event(event)
+
+
+def _change_event(
+    at: datetime,
+    principal: Principal,
+    permission: Permission,
+    organisation: str | None,
+    group: str | None,
+    detail: str,
+    booking_id: int | None,
+) -> AuditEvent:
+    """Build the audit event of a successful admin action (field names, never values)."""
+    return AuditEvent(
         at,
         principal.subject,
         permission.value,
@@ -545,4 +608,3 @@ async def record_change(
         detail,
         booking_id=booking_id,
     )
-    await tx.add_audit_event(event)

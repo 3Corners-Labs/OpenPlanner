@@ -409,3 +409,10 @@ IN_AGENDA = frozenset({BookingStatus.CONFIRMED, BookingStatus.PENDING_CONFIRMATI
 """Statuses the planner's agenda counts in a slot: confirmed, and those awaiting the
 participant's confirmation, marked as such (ADR 0056 point 11). A booking on hold (ADR 0024)
 waits for a new time and is not in the agenda's slot."""
+
+
+def stored_id(booking: Booking) -> int:
+    """Return the id of a stored booking; a missing id is a programming error."""
+    if booking.id is None:
+        raise ValueError("booking has not been stored")
+    return booking.id

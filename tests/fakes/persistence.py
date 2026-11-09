@@ -1004,6 +1004,21 @@ class InMemoryTransaction:
         mine = [p for p in self.state.proposals.values() if p.booking_id == booking_id]
         return max((p for p in mine if p.is_open), key=lambda p: p.id or 0, default=None)
 
+    async def find_open_proposals(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[HeldProposal]:
+        return sorted(
+            (
+                p
+                for p in self.state.proposals.values()
+                if p.is_open
+                and lower <= p.start < upper
+                and self.state.bookings[p.booking_id].group_id == group_id
+                and self.state.bookings[p.booking_id].awaits_rebook
+            ),
+            key=lambda p: (p.start, p.id or 0),
+        )
+
     async def save_proposal(self, proposal: HeldProposal) -> None:
         self.state.proposals[proposal.id or 0] = proposal
 
@@ -1303,13 +1318,14 @@ class InMemoryTransaction:
     async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
         self.state.acceptances[(acceptance.group_id, acceptance.start)] = acceptance
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime
-    ) -> int:
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
         return sum(
             1
             for e in self.state.audit
-            if e.actor == actor and e.action in actions and e.at >= since
+            if e.actor == actor
+            and e.action == action
+            and e.outcome is Outcome.SUCCESS
+            and e.at >= since
         )
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:

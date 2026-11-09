@@ -42,7 +42,7 @@ from app.adapters.integrations import (
     secret_box,
     webex_fingerprint,
 )
-from app.adapters.keycloak_directory import KeycloakDirectory
+from app.adapters.keycloak_directory import DirectoryAddresses, directory_from_settings
 from app.adapters.live_settings import LiveSettings, keep_current
 from app.adapters.log_senders import build_sender
 from app.adapters.log_shipping import LogShipper, LogTester, SenderFactory, ship_settings
@@ -72,6 +72,7 @@ from app.api.maintenance import participant_gate, register_maintenance
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
+from app.domain.activity_alert import CHANGES_ALERT, REVEALS_ALERT
 from app.domain.address_check import AddressStatus, InstanceService
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
@@ -89,6 +90,7 @@ from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.contact_service import ContactService
+from app.domain.csv_export import ExportLimits
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
 from app.domain.entitlements import ClaimMode
@@ -128,6 +130,7 @@ from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
 from app.domain.readiness import ReadinessService
 from app.domain.rebooking import Reach
+from app.domain.report_digest_service import DigestAdmin
 from app.domain.request_log import RequestEvents
 from app.domain.reschedule_proposal import ProposalHours
 from app.domain.roles import RoleService
@@ -144,6 +147,8 @@ from app.domain.tls import public_address
 from app.domain.tls_check import CertificateStatus, TlsWatch
 from app.domain.tls_source import CertificateSourceService
 from app.domain.trial_call_service import TrialCallService
+from app.domain.usage_api_service import UsageApiLimits, UsageApiService
+from app.domain.usage_export_service import UsageExportService
 from app.domain.usage_report_service import UsageReportService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
@@ -230,14 +235,7 @@ def _proposal_hours(settings: Settings) -> ProposalHours:
 
 def _keycloak_directory(settings: Settings) -> StaffDirectory | None:
     """Return the staff directory of the bundled Keycloak, or ``None`` without its settings."""
-    secret = settings.keycloak_directory_client_secret
-    if not settings.keycloak_admin_url or secret is None:
-        return None
-    return KeycloakDirectory(
-        settings.keycloak_admin_url,
-        settings.keycloak_directory_client_id,
-        secret.get_secret_value(),
-    )
+    return directory_from_settings(settings)
 
 
 BUNDLED_REALM_PATH = "/realms/openplanner/"
@@ -312,6 +310,7 @@ def create_app(
         unknown_links=settings.rate_limit_unknown_links,
         agent_tokens=settings.rate_limit_agent_tokens,
         agent_calls=settings.rate_limit_agent_calls,
+        reports=f"{settings.reporting_api_rate_per_minute}/minute",
     )
     # Machine API (ADR 0023): only mounted when the deployment switches it on.
     agent_api = create_agent_api() if settings.agent_api_enabled else None
@@ -329,6 +328,7 @@ def create_app(
             secret_box(settings),
             StdoutEventSink(settings.event_envelope),
             usage_enabled=lambda: live().reporting_enabled,  # ADR 0117, read at each write
+            usage_to_log=lambda: live().reporting_usage_events_to_log,  # point 15, read live
         )
         # ADR 0068: every request to Webex and WxCC becomes a system event of the booking.
         request_log = RequestEvents(uow, clock, settings.app_version)
@@ -343,6 +343,7 @@ def create_app(
                 unknown_links=current.rate_limit_unknown_links,
                 agent_tokens=current.rate_limit_agent_tokens,
                 agent_calls=current.rate_limit_agent_calls,
+                reports=f"{current.reporting_api_rate_per_minute}/minute",
             )
             set_log_level(current.log_level)
             set_slow_query_ms(current.sql_slow_ms)
@@ -440,8 +441,15 @@ def create_app(
             reach=lambda org: _reach(per_organisation(org)),
         )
         app.state.participant_link_service = ParticipantLinkService(uow, clock)
+        # ADR 0044: the thresholds of the hourly alerts, once, for every writer they count.
         app.state.admin_service = AdminService(
-            uow, clock, app.state.live_settings.closure_retention
+            uow,
+            clock,
+            app.state.live_settings.closure_retention,
+            {
+                CHANGES_ALERT: lambda: live().planner_changes_alert_per_hour,
+                REVEALS_ALERT: lambda: live().contact_reveals_alert_per_hour,
+            },
         )
         app.state.usage_report_service = UsageReportService(
             uow,
@@ -449,6 +457,20 @@ def create_app(
             clock,
             lambda: live().reporting_min_cell_size,
             lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
+        )
+        app.state.digest_admin = DigestAdmin(
+            uow,
+            app.state.admin_service,
+            clock,
+            lambda: live().reporting_digest_max_subscriptions,
+            DirectoryAddresses(_keycloak_directory(settings)),
+        )
+        app.state.usage_export_service = UsageExportService(
+            app.state.usage_report_service,
+            app.state.admin_service,
+            lambda: ExportLimits(
+                live().reporting_export_max_rows, live().reporting_export_max_days
+            ),
         )
         app.state.log_destination_service = LogDestinationService(
             uow,
@@ -761,10 +783,10 @@ def create_app(
             clock,
             app.state.admin_service,
             app.state.booking_service,
-            lambda: live().planner_changes_alert_per_hour,
             rebook_days=lambda org: per_organisation(org).planner_rebook_days,
             reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
             proposal_hours=lambda org: _proposal_hours(per_organisation(org)),
+            reach=lambda org: _reach(per_organisation(org)),
         )
         app.state.role_service = RoleService(
             uow,
@@ -780,6 +802,16 @@ def create_app(
         )
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled
+        )
+        app.state.usage_api_service = UsageApiService(
+            uow,
+            app.state.api_access,
+            clock,
+            lambda: live().reporting_min_cell_size,
+            lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
+            lambda: UsageApiLimits(
+                live().reporting_api_page_size, live().reporting_export_max_days
+            ),
         )
         # ADR 0029: the web process only reads checks and stores requests; no release lookup.
         app.state.update_service = update_service(live(), uow, clock, http, lookup=False)
@@ -800,6 +832,7 @@ def create_app(
                 "client_pseudonyms",
                 "configuration_packages",  # ADR 0089 point 7: the same service as the portal
                 "configuration_documents",  # ADR 0099: the document service, same as the portal
+                "usage_api_service",  # ADR 0117 point 13: the hourly figures, scoped to the client
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
             agent_api.state.settings = app.state.settings

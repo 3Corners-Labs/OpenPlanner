@@ -2620,6 +2620,9 @@ msgstr "appointment on hold moved"
 msgid "audit.event.planner_changes_alert"
 msgstr "Many changes by one planner"
 
+msgid "audit.event.contact_reveals_alert"
+msgstr "Many requests for contact details by one person"
+
 msgid "admin.audit.detail.planner_move"
 msgstr "booking moved by a planner"
 
@@ -2637,6 +2640,9 @@ msgstr "shortfall accepted"
 
 msgid "admin.audit.detail.changes"
 msgstr "changes in the past hour: {count}"
+
+msgid "admin.audit.detail.reveals"
+msgstr "requests for contact details in the past hour: {count}"
 
 msgid "admin.audit.detail.reason"
 msgstr "reason: {value}"
@@ -6353,6 +6359,9 @@ msgstr "Shortfall look-ahead (days)"
 
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Alert above changes per planner per hour"
+
+msgid "settings.field.contact_reveals_alert_per_hour.label"
+msgstr "Alert above requests for contact details per person per hour"
 
 msgid "admin.settings.problem.dev_placeholder"
 msgstr "holds a development placeholder; production refuses it."
@@ -10439,11 +10448,20 @@ msgstr "Enter the id of a Webex space: letters, digits, - and _, 10 to 200 chara
 msgid "authz.permission.reports_view"
 msgstr "View usage reports"
 
+msgid "authz.permission.reports_export"
+msgstr "Download usage reports"
+
 msgid "settings.field.reporting_min_cell_size.label"
 msgstr "Smallest count a report shows"
 
 msgid "settings.field.reporting_org_min_cell_size.label"
 msgstr "Smallest count in the organisation's reports"
+
+msgid "settings.field.reporting_export_max_rows.label"
+msgstr "Most rows in a CSV export of a usage report"
+
+msgid "settings.field.reporting_export_max_days.label"
+msgstr "Most days in a CSV export of a usage report"
 
 msgid "admin.nav.reports"
 msgstr "Reports"
@@ -11284,6 +11302,19 @@ msgstr "Change your details"
 
 msgid "manage.notice.details"
 msgstr "Your details have been changed."
+
+msgid "reports.export.screen"
+msgstr "Download this report as CSV"
+
+msgid "reports.export.tidy"
+msgstr "Download all hourly figures as CSV (openplanner.usage/1)"
+
+msgid "reports.export.refused.too_many_days"
+msgstr "The export covers too many days. Choose a shorter period."
+
+msgid "reports.export.refused.too_many_rows"
+msgstr "The export has too many rows. Choose a shorter period or one group."
+
 msgid "error.proposal_not_open"
 msgstr "This proposed time is no longer available. You can still choose a new time yourself."
 
@@ -11391,3 +11422,243 @@ msgstr "Release the proposed time"
 
 msgid "audit.job.send_proposal_released"
 msgstr "Send notice of a released proposal"
+
+msgid "authz.api_scope.reports_read"
+msgstr "Read the hourly usage figures"
+
+msgid "settings.field.reporting_api_page_size.label"
+msgstr "Most cells in one page of the usage API"
+
+msgid "settings.field.reporting_api_rate_per_minute.label"
+msgstr "Calls per minute per API client to the usage API"
+msgid "authz.permission.reports_digest_manage"
+msgstr "Manage the digest of the reports"
+
+msgid "settings.field.reporting_digest_send_hour.label"
+msgstr "Hour the digest of the reports is sent"
+
+msgid "settings.field.reporting_digest_include_numbers.label"
+msgstr "Include the figures in the digest"
+
+msgid "settings.field.reporting_digest_late_hours.label"
+msgstr "Hours within which a missed digest is still sent"
+
+msgid "settings.field.reporting_digest_max_subscriptions.label"
+msgstr "Most digest subscriptions per organisation"
+
+msgid "reports.digest.all_groups"
+msgstr "all groups"
+
+msgid "reports.digest.subject"
+msgstr "Usage of {group} ({organisation}): {period}"
+
+msgid "reports.digest.intro"
+msgstr "This is the summary of the usage of {group} for {period}."
+
+msgid "reports.digest.label.bookings"
+msgstr "Bookings created"
+
+msgid "reports.digest.label.no_show_rate"
+msgstr "No shows"
+
+msgid "reports.digest.label.average_wait"
+msgstr "Mean wait until the call connects"
+
+msgid "reports.digest.label.utilisation"
+msgstr "Utilisation"
+
+msgid "reports.digest.link"
+msgstr "Open the report: {link}"
+
+msgid "reports.digest.footer"
+msgstr "You get this message because you are subscribed to this summary. You need to sign in to see the report."
+
+msgid "reports.digest.heading"
+msgstr "Digest by email"
+
+msgid "reports.digest.lead"
+msgstr "Staff who may see the reports get a periodic email with the main figures and a link to the report. No file goes with it and no free address: only colleagues who may see the reports, at the moment it is sent."
+
+msgid "reports.digest.none"
+msgstr "There are no subscriptions yet."
+
+msgid "reports.digest.no_candidates"
+msgstr "There is nobody who may see these reports and could be subscribed."
+
+msgid "reports.digest.col.scope"
+msgstr "For"
+
+msgid "reports.digest.col.period"
+msgstr "When"
+
+msgid "reports.digest.col.recipients"
+msgstr "Recipients"
+
+msgid "reports.digest.col.last"
+msgstr "Last time"
+
+msgid "reports.digest.col.actions"
+msgstr "Actions"
+
+msgid "reports.digest.period.daily"
+msgstr "Every day"
+
+msgid "reports.digest.period.weekly"
+msgstr "Every week"
+
+msgid "reports.digest.period.monthly"
+msgstr "Every month"
+
+msgid "reports.digest.weekday.0"
+msgstr "Monday"
+
+msgid "reports.digest.weekday.1"
+msgstr "Tuesday"
+
+msgid "reports.digest.weekday.2"
+msgstr "Wednesday"
+
+msgid "reports.digest.weekday.3"
+msgstr "Thursday"
+
+msgid "reports.digest.weekday.4"
+msgstr "Friday"
+
+msgid "reports.digest.weekday.5"
+msgstr "Saturday"
+
+msgid "reports.digest.weekday.6"
+msgstr "Sunday"
+
+msgid "reports.digest.on_day"
+msgstr "on day {day}"
+
+msgid "reports.digest.blocked"
+msgstr "{count} may no longer see the reports and is skipped"
+
+msgid "reports.digest.status.sent"
+msgstr "sent"
+
+msgid "reports.digest.status.skipped_late"
+msgstr "skipped, too late"
+
+msgid "reports.digest.status.no_recipient"
+msgstr "skipped, no recipient"
+
+msgid "reports.digest.delete"
+msgstr "Delete"
+
+msgid "reports.digest.add"
+msgstr "Add a subscription"
+
+msgid "reports.digest.add_button"
+msgstr "Add subscription"
+
+msgid "reports.digest.field.group"
+msgstr "Group"
+
+msgid "reports.digest.field.period"
+msgstr "How often"
+
+msgid "reports.digest.field.weekday"
+msgstr "Day of the week (for every week)"
+
+msgid "reports.digest.field.month_day"
+msgstr "Day of the month (for every month)"
+
+msgid "reports.digest.field.recipients"
+msgstr "Recipients"
+
+msgid "reports.digest.error.recipients"
+msgstr "Choose at least one colleague who may see the reports."
+
+msgid "reports.digest.error.limit"
+msgstr "This organisation already has the most subscriptions it may have."
+
+msgid "reports.digest.error.schedule"
+msgstr "Choose an existing period, weekday and day of the month."
+
+msgid "reports.digest.done.added"
+msgstr "Subscription added."
+
+msgid "reports.digest.done.removed"
+msgstr "Subscription deleted."
+
+msgid "reports.digest.no_address"
+msgstr "no address known: will not get the mail"
+
+msgid "reports.digest.no_address_count"
+msgstr "{count} has no known address and is skipped"
+msgid "settings.field.reporting_usage_events_to_log.label"
+msgstr "Also send usage facts to the log destinations"
+msgid "admin.agenda.propose"
+msgstr "Propose a new time"
+
+msgid "admin.agenda.slot_propose"
+msgstr "Propose new times"
+
+msgid "admin.proposal.title"
+msgstr "Propose a new time for {reference}"
+
+msgid "admin.proposal.time"
+msgstr "New time"
+
+msgid "admin.proposal.ask"
+msgstr "No proposal: ask the participant to choose a time"
+
+msgid "admin.proposal.none_found"
+msgstr "The assistant found no free time within its reach. Choose another time or ask the participant to choose."
+
+msgid "admin.proposal.held_lead"
+msgstr "The proposed time is held for the participant until they confirm, choose another time or cancel, or until the deadline passes. Nothing moves without a confirmation."
+
+msgid "admin.proposal.button"
+msgstr "Send the proposal"
+
+msgid "admin.proposal.slot_title"
+msgstr "Propose new times for {when}"
+
+msgid "admin.proposal.slot_lead"
+msgstr "The most recently made appointments in this slot ({count}) no longer fit. Check the proposed time for each, choose another or untick the appointment."
+
+msgid "admin.proposal.include"
+msgstr "Include"
+
+msgid "admin.proposal.slot_button"
+msgstr "Send the proposals"
+
+msgid "admin.proposal.none_chosen"
+msgstr "Tick at least one appointment."
+
+msgid "admin.proposal.column"
+msgstr "Proposed time"
+
+msgid "admin.proposal.held_until"
+msgstr "held until {deadline}"
+
+msgid "admin.proposal.confirm"
+msgstr "Confirm for the participant"
+
+msgid "admin.proposal.withdraw"
+msgstr "Withdraw the proposal"
+
+msgid "admin.done.proposed"
+msgstr "New time proposed. The participant gets the proposal and the old place is free."
+
+msgid "admin.done.proposals_sent"
+msgstr "Sent: {count}. The old places are free; proposed times are held."
+
+msgid "admin.done.proposal_withdrawn"
+msgstr "Proposal withdrawn. The appointment awaits a new time from the participant."
+
+msgid "admin.done.proposal_confirmed_by_staff"
+msgstr "The proposed time is confirmed for the participant. The participant gets an email with the new time."
+
+msgid "admin.done.proposal_gone"
+msgstr "This proposal is no longer open."
+
+msgid "admin.agenda.day_propose"
+msgstr "Propose new times for this day"
+
+msgid "admin.agenda.week_propose"
+msgstr "Propose new times for this week"

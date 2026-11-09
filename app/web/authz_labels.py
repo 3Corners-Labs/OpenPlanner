@@ -33,6 +33,8 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.DIAGNOSTICS_MANAGE: "authz.permission.diagnostics_manage",
     Permission.RETENTION_VIEW: "authz.permission.retention_view",
     Permission.REPORTS_VIEW: "authz.permission.reports_view",
+    Permission.REPORTS_EXPORT: "authz.permission.reports_export",
+    Permission.REPORTS_DIGEST_MANAGE: "authz.permission.reports_digest_manage",
     Permission.STAFF_VIEW: "authz.permission.staff_view",
     Permission.STAFF_MANAGE: "authz.permission.staff_manage",
     Permission.STAFF_RESET_PASSWORD: "authz.permission.staff_reset_password",
@@ -73,6 +75,7 @@ PERMISSION_LABELS: dict[Permission, str] = {
 
 API_SCOPE_LABELS: dict[ApiScope, str] = {
     ApiScope.AVAILABILITY_READ: "authz.api_scope.availability_read",
+    ApiScope.REPORTS_READ: "authz.api_scope.reports_read",
     ApiScope.CONFIGURATION_TRANSFER: "authz.api_scope.configuration_transfer",
 }
 

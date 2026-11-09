@@ -108,6 +108,21 @@ niets over het echte getal. De grafieken hebben geen script nodig, schuiven op e
 zijwaarts in hun kader en blijven weg bij het afdrukken; de tabellen blijven. Is voor een familie
 in de periode niets vastgelegd, dan zegt de pagina dat.
 
+## Downloaden als bestand
+
+Wie mag exporteren (de superuser, organisatiebeheerders, groepsbeheerders en de rol Compliance en privacy) ziet onder de periode op een Gebruik-pagina twee koppelingen.
+
+- **Dit rapport downloaden als CSV** geeft precies de tabellen van de familie waar u naar kijkt, na de regel voor kleine aantallen: een verborgen cijfer is een lege waarde met de opmerking *hidden*. Het bestand bevat geen interfacetekst, alleen codes (een dag, een uitkomst, een bucketnummer), dus het leest in elke taal hetzelfde.
+- **Alle uurcijfers downloaden als CSV** geeft één rij per uur, groep, maat en snede, voor analyse in uw eigen hulpmiddel (het formaat `openplanner.usage/1`, beschreven in `docs/reporting.md`). Een cel onder het minimum staat helemaal niet in het bestand.
+
+Beide openen in Excel (UTF-8, `;` als scheidingsteken). De platformbeheerder bepaalt hoeveel rijen en dagen één bestand mag bevatten; een langere periode wordt met een melding geweigerd en het bestand wordt niet afgekapt. Elke download staat in het auditlog met wie, welke familie, welke periode, hoeveel rijen en een controlegetal van het bestand, nooit de cijfers. Het controlegetal staat ook in de header `X-Content-SHA256` van het antwoord.
+
+## De samenvatting per e-mail
+
+Organisatiebeheerders zien onderaan de pagina *Gebruik* van de organisatie een onderdeel **Samenvatting per e-mail**. Een abonnement geldt voor de hele organisatie of voor één groep en heeft een periode: elke dag, elke week (op een weekdag) of elke maand (op een dag van 1 tot 28). De mail gaat op het verzenduur van de organisatie (7:00, tenzij aangepast) in de tijdzone van de groep, beslaat de dagen sinds de vorige mail tot en met gisteren en bevat de kerncijfers (gemaakte boekingen, niet verschenen, de gemiddelde wachttijd tot een gesprek verbindt, bezettingsgraad) en een koppeling naar het rapport van die dagen. Een verborgen cijfer staat als streepje. Zet uw organisatie de cijfers uit, dan blijft alleen de koppeling over.
+
+Ontvangers zijn collega's die de rapporten van dat bereik mogen zien, gekozen uit een lijst. Er zijn geen vrije e-mailadressen en er gaat geen bestand mee: de koppeling leidt naar het rapport, waar u zoals altijd inlogt. Het recht wordt bij het versturen opnieuw gecontroleerd. Een collega die het kwijt is, wordt overgeslagen en de lijst zegt hoeveel; een collega van wie de inlogdienst het adres niet kent, ook (de adressen komen uit de meegeleverde inlogdienst). Een gemiste mail wordt nog tot 24 uur later verstuurd; daarna wordt hij overgeslagen en de lijst toont hoe de laatste mail verliep. Elke wijziging van een abonnement staat in het auditlog.
+
 ## Wat hier nog niet staat
 
-Per teamlid, de samenvatting per e-mail en de export naar een bestand. Die volgen in latere stappen van hetzelfde ontwerp.
+Per teamlid. Dat volgt in een latere stap van hetzelfde ontwerp.

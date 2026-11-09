@@ -22,7 +22,7 @@ it (**API-koppelingen → Documentatie publiceren**).
 |---|---|
 | Name | The bot's name in Webex, for your own overview |
 | Organisation | The one organisation the bot works for (cannot change later) |
-| Scopes | `availability:read` (read groups and free times); `configuration:transfer` (export, plan and apply the configuration document of the whole installation, section 6) |
+| Scopes | `availability:read` (read groups and free times); `reports:read` (the hourly usage figures of the client's groups, [reporting-api.md](reporting-api.md)); `configuration:transfer` (export, plan and apply the configuration document of the whole installation, section 6) |
 | Teams | Leave empty for every team of the organisation, or tick only the teams the bot serves |
 | Allowed networks | Optional: the egress IP ranges of your WxCC region, one per line (CIDR) |
 | Secret lifetime | 90, 180 or 365 days; rotate before it ends |
