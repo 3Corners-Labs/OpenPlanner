@@ -124,6 +124,8 @@ class ErrorCode(StrEnum):
     TLS_VOLUME_UNWRITABLE = "tls_volume_unwritable"
     CONFIGURATION_PASSPHRASE_SHORT = "configuration_passphrase_short"  # noqa: S105  # nosec B105 - a code
     CONFIGURATION_PASSPHRASE_WRONG = "configuration_passphrase_wrong"  # noqa: S105  # nosec B105 - a code
+    CONFIGURATION_PLAINTEXT_DISABLED = "configuration_plaintext_disabled"
+    CONFIGURATION_PLAINTEXT_UNCONFIRMED = "configuration_plaintext_unconfirmed"
     CONFIGURATION_PACKAGE_INVALID = "configuration_package_invalid"
     CONFIGURATION_PACKAGE_VERSION = "configuration_package_version"
     CONFIGURATION_PACKAGE_TOO_LARGE = "configuration_package_too_large"

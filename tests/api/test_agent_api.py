@@ -473,6 +473,45 @@ async def test_a_sealed_document_needs_its_passphrase(agent: Agent) -> None:
     assert plan.json()["changes"] == []
 
 
+async def test_a_plain_export_is_refused_until_the_host_allows_it(agent: Agent) -> None:
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+
+    refused = await agent.client.get(
+        f"{BASE}/configuration", headers={**headers, "x-plain-secrets": "true"}
+    )
+
+    assert (refused.status_code, refused.json()) == (
+        403,
+        {"error": "configuration_plaintext_disabled"},
+    )
+    assert [e for e in await _audit(agent) if e.detail.endswith("plain")] == []
+
+
+async def test_a_plain_export_holds_clear_text_without_a_passphrase_and_applies_again(
+    agent: Agent,
+) -> None:
+    agent.app.state.settings = agent.app.state.settings.model_copy(
+        update={"configuration_plaintext_export_allowed": True}
+    )
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+
+    exported = await agent.client.get(
+        f"{BASE}/configuration", headers={**headers, "x-plain-secrets": "true"}
+    )
+
+    assert exported.status_code == 200, exported.text
+    assert exported.headers["cache-control"] == "no-store"
+    assert '"sealed"' not in exported.text
+    assert "seal" not in exported.json()
+    plan = await agent.client.post(
+        f"{BASE}/configuration/plan", headers=headers, content=exported.content
+    )
+    assert plan.status_code == 200, plan.text
+    assert plan.json()["changes"] == []
+    events = [e for e in await _audit(agent) if e.detail.endswith("secrets,plain")]
+    assert len(events) == 1
+
+
 @pytest.mark.parametrize(
     ("headers", "expected"),
     [({"x-passphrase": "tooshort9"}, (422, "configuration_passphrase_short"))],

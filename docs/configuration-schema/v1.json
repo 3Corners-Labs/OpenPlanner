@@ -127,7 +127,14 @@
         "secret_hash": {
           "oneOf": [
             {
-              "$ref": "#/$defs/sealed"
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sealed"
+                },
+                {
+                  "$ref": "#/$defs/plain"
+                }
+              ]
             },
             {
               "type": "null"
@@ -232,7 +239,14 @@
         "secret": {
           "oneOf": [
             {
-              "$ref": "#/$defs/sealed"
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sealed"
+                },
+                {
+                  "$ref": "#/$defs/plain"
+                }
+              ]
             },
             {
               "type": "null"
@@ -980,7 +994,14 @@
         "client_secret": {
           "oneOf": [
             {
-              "$ref": "#/$defs/sealed"
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sealed"
+                },
+                {
+                  "$ref": "#/$defs/plain"
+                }
+              ]
             },
             {
               "type": "null"
@@ -1097,7 +1118,14 @@
         "private_key": {
           "oneOf": [
             {
-              "$ref": "#/$defs/sealed"
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sealed"
+                },
+                {
+                  "$ref": "#/$defs/plain"
+                }
+              ]
             },
             {
               "type": "null"
@@ -1197,7 +1225,14 @@
         "secret": {
           "oneOf": [
             {
-              "$ref": "#/$defs/sealed"
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sealed"
+                },
+                {
+                  "$ref": "#/$defs/plain"
+                }
+              ]
             },
             {
               "type": "null"
@@ -1634,6 +1669,20 @@
       ],
       "description": "The organisation's own text for one catalogue key in one locale."
     },
+    "plain": {
+      "type": "object",
+      "properties": {
+        "plain": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "plain"
+      ],
+      "additionalProperties": false,
+      "description": "A secret in clear text. OpenPlanner seals it when it stores it; keep the file as private as the secret."
+    },
     "platform": {
       "type": "object",
       "properties": {
@@ -1694,7 +1743,14 @@
               {
                 "oneOf": [
                   {
-                    "$ref": "#/$defs/sealed"
+                    "oneOf": [
+                      {
+                        "$ref": "#/$defs/sealed"
+                      },
+                      {
+                        "$ref": "#/$defs/plain"
+                      }
+                    ]
                   },
                   {
                     "type": "null"
@@ -1785,7 +1841,14 @@
         "secret": {
           "oneOf": [
             {
-              "$ref": "#/$defs/sealed"
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sealed"
+                },
+                {
+                  "$ref": "#/$defs/plain"
+                }
+              ]
             },
             {
               "type": "null"
@@ -1943,7 +2006,14 @@
         "secret": {
           "oneOf": [
             {
-              "$ref": "#/$defs/sealed"
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sealed"
+                },
+                {
+                  "$ref": "#/$defs/plain"
+                }
+              ]
             },
             {
               "type": "null"

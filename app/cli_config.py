@@ -56,6 +56,12 @@ def add_arguments(
         "--no-secrets", action="store_true", help="leave every secret out (no passphrase needed)"
     )
     export_cmd.add_argument(
+        "--plain-secrets",
+        action="store_true",
+        help="write the secrets in clear text, without a passphrase; refused unless the host "
+        "sets CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED=true (ADR 0099 point 8a)",
+    )
+    export_cmd.add_argument(
         "--passphrase-file",
         type=Path,
         metavar="PATH",
@@ -150,7 +156,13 @@ async def _run(
     try:
         passphrase = passphrase_from(args.passphrase_file)
         if args.action == "export":
-            data = await service.export(ACTOR, scope, passphrase, secrets=not args.no_secrets)
+            data = await service.export(
+                ACTOR,
+                scope,
+                passphrase,
+                secrets=not args.no_secrets,
+                plain=args.plain_secrets,
+            )
             write_private(args.path, data)
             return f"document written: {args.path}\n", 0
         document = await asyncio.to_thread(_read_limited, Path(args.path), settings)

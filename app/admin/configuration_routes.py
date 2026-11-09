@@ -157,13 +157,16 @@ async def _export(
 ) -> Response:
     """Export the configuration of ``scope``; with secrets only under a repeated passphrase."""
     form = await read_form(request, locale)
-    secrets = form.text("secrets") == "yes"
+    plain = form.text("plain") == "yes"
+    secrets = form.text("secrets") == "yes" and not plain
     passphrase = form.text("passphrase")
     try:
+        if plain and form.text("plain_confirm") != "yes":
+            raise DomainError(ErrorCode.CONFIGURATION_PLAINTEXT_UNCONFIRMED, DOCUMENT_KEY)
         if secrets and passphrase != form.text("passphrase_repeat"):
             raise DomainError(ErrorCode.CONFIRMATION_MISMATCH, DOCUMENT_KEY)
         document = await _service(request).export(
-            _actor(context), scope, passphrase if secrets else None, secrets=secrets
+            _actor(context), scope, passphrase if secrets else None, secrets=secrets, plain=plain
         )
     except DomainError as error:
         raise_refusal(error)
@@ -173,7 +176,10 @@ async def _export(
     return Response(
         document,
         media_type=MEDIA_TYPE,
-        headers={"content-disposition": f'attachment; filename="{name}"'},
+        headers={
+            "content-disposition": f'attachment; filename="{name}"',
+            "cache-control": "no-store",
+        },
     )
 
 

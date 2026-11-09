@@ -125,3 +125,22 @@ def test_a_document_above_the_size_limit_is_refused_before_it_is_read(
 
     assert main(["config", "plan", str(document)]) == 2
     assert "configuration_package_too_large" in capsys.readouterr().out
+
+
+def test_a_plain_export_is_refused_unless_the_host_allows_it(
+    seeded: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    document = tmp_path / "plain.json"
+
+    assert main(["config", "export", str(document), "--plain-secrets"]) == 2
+    assert "configuration_plaintext_disabled" in capsys.readouterr().out
+    assert not document.exists()
+
+    monkeypatch.setenv("CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED", "true")
+    assert main(["config", "export", str(document), "--plain-secrets"]) == 0
+    assert stat.S_IMODE(document.stat().st_mode) == 0o600
+    assert b'"sealed"' not in document.read_bytes()
+    assert "seal" not in json.loads(document.read_text())
+    capsys.readouterr()
+    assert main(["config", "plan", str(document)]) == 0
+    assert "0 change(s), 0 refusal(s)" in capsys.readouterr().out

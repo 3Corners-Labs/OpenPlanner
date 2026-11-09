@@ -9,7 +9,7 @@ SQLite import after one release, is not; see *Build status*. Supersedes ADR 0089
 (the package is a SQLite file) and 5 (import only into an installation not in use) once step 4
 is built; ADR 0089 points 2–4 and 6–8 carry over as amended below. Extends ADR 0008 (secrets at
 rest), ADR 0014 (authorisation) and ADR 0042 (settings classes). Amended by the section
-*Amendments from building step 1*, *step 3* and *step 4* below.
+*Amendments from building step 1*, *step 3* and *step 4* and by *secrets in clear text* below.
 
 ## Context
 
@@ -318,6 +318,44 @@ completes the numbered point it names.
 - **Step 5 stays.** The package import is removed in the release after the one that ships this
   step (ADR 0116), together with `config show|env|import` and the converter.
 
+## Amendment: secrets in clear text (2026-11-09, step 4a)
+
+The product owner asked for a file that is easy to share and to edit, and for the encryption to
+be the administrator's choice ("of de JSON alles onversleuteld laten exporteren en dat het aan de
+beheerder is om een versleuteling aan te zetten", "klinkt goed" to the design below). Sealed
+secrets stay the default. This amends point 8 and clarifies ADR 0008 (a secret is write-only in
+the *portal*) and ADR 0089 point 3 (a package without its passphrase holds no secret in clear
+text): both still hold for every export unless the host has allowed the one below.
+
+- **Point 8a, reading.** A secret field accepts `{"plain": "<text>"}` next to `{"sealed": "…"}`.
+  It is read as an opened secret, so it is validated, sealed under the installation's own key
+  when stored, never printed in a plan, a log or an audit event, and compared by digest. A bare
+  string is still refused: a secret is always marked as one. Reading needs no switch: it is input
+  the administrator already holds, and it makes a document editable by hand and writable by a
+  pipeline.
+- **Point 8a, writing.** An export may write the secrets as `{"plain": "<text>"}`, with no `seal`
+  header and no passphrase. It needs all of: the host's switch `CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED`
+  (class B, off by default), the permission `settings.platform.manage` (as a sealed export),
+  and in the portal a recent login and a ticked confirmation. The portal shows the choice only
+  when the first two hold; the service refuses it otherwise
+  (`configuration_plaintext_disabled`, `403` on the API). Every plain export is audited with
+  the detail `configuration.export,secrets,plain` (never a value), and the response is
+  `Cache-Control: no-store`. The file is as sensitive as the secrets in it; the portal says so
+  next to the choice, and encrypting or sharing it safely is the administrator's job (a zip with
+  AES, `age`, `sops`, a vault).
+- **Surfaces.** Portal: a *Without encryption* choice under the export form. Host:
+  `config export --plain-secrets`. Agent API: `GET /configuration` with `X-Plain-Secrets: true`.
+  The installer and `config apply` read a document with clear-text secrets without a
+  passphrase.
+- **Why the switch is class B.** CLAUDE.md: switching a protection off is never class C or D.
+  An export in clear text lowers the protection of the secrets at rest, so it is a recorded
+  exception of the host. If the product owner wants it in the portal instead, that is an
+  exception to that rule and needs its own decision.
+- **Not done.** No archive format (zip, 7z, tar) and no encryption other than the sealed
+  values. AES zip needs a dependency that is maintained and licensed as CLAUDE.md demands
+  (`py7zr` is LGPL) and would take the document out of its own format; the plain export makes
+  it unnecessary, because the administrator can wrap the file with any tool.
+
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
@@ -325,6 +363,7 @@ completes the numbered point it names.
 | `configuration_package_max_mb` | C platform | 64 | 1–512 | `settings.platform.manage` | unchanged from ADR 0089; now the largest document accepted |
 | `configuration_apply_max_changes` | C platform | 500 | 1–10000 | `settings.platform.manage` | an apply whose plan has more changes is refused (`configuration_too_many_changes`); a guard against a mistaken `replace` document |
 | `configuration_review_minutes` | C platform | 30 | 5–240 | `settings.platform.manage` | how long the portal keeps an uploaded document after showing its plan, so the apply is the reviewed one (step 3) |
+| `configuration_plaintext_export_allowed` | B deployment | off | on/off | `settings.platform.manage` to export | the host lets the superuser export secrets in clear text (step 4a); needs a reason as class B: it switches a protection off, so never a portal setting (CLAUDE.md) |
 
 **Fixed on purpose:** the passphrase length (16), the scrypt parameters, the salt size and
 the associated data of a sealed value (crypto parameters, ADR 0008); the format versions and
@@ -341,6 +380,7 @@ portal); the requirement of a plan hash for deletions in the portal.
 | 2 | Adapter: export with and without secrets, plan and apply in one transaction, sealed values with associated data, inline binaries; host commands `config export --format json\|plan\|apply`; `config-schema` and `docs/configuration-schema/v1.json`; setting `configuration_apply_max_changes` | #625 | merged |
 | 3 | Portal: *Configuration* on *Advanced settings* (upload → plan table → apply) and the organisation sub-tab *Configuration*; per-change permission checks; export by rights; manual topics nl/en; setting `configuration_review_minutes` | #642 | merged |
 | 4 | API `plan`/`apply`, `PUT` mapped to apply; installer applies a document; SQLite export removed, SQLite import converted for one release; `docs/agent-api.md`, `docs/install.md` | #645 | merged |
+| 4a | Secrets in clear text: `{"plain": …}` read always, written only with the host switch, the permission and a confirmation; portal choice, `config export --plain-secrets`, `X-Plain-Secrets`; amendment above | PRNUMBER | merged |
 | 5 | SQLite import removed after the release that converts it | | planned |
 
 ## Consequences

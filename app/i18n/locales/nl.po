@@ -8885,6 +8885,12 @@ msgstr "Het configuratiepakket is als document toegepast: {count} organisatie(s)
 msgid "admin.form.error.configuration_passphrase_short"
 msgstr "De wachtwoordzin is te kort, of de herhaling verschilt. Gebruik minstens 16 tekens."
 
+msgid "admin.form.error.configuration_plaintext_disabled"
+msgstr "Een export zonder versleuteling staat uit op deze installatie. De beheerder van de host moet dat eerst toestaan."
+
+msgid "admin.form.error.configuration_plaintext_unconfirmed"
+msgstr "Vink aan dat u begrijpt dat het bestand alle geheimen leesbaar bevat, of kies een export met wachtwoord."
+
 msgid "admin.form.error.configuration_passphrase_wrong"
 msgstr "De wachtwoordzin past niet bij dit pakket."
 
@@ -11237,6 +11243,18 @@ msgstr "Geheimen opnemen, verzegeld met een wachtwoord"
 
 msgid "admin.configuration.export.secrets_hint"
 msgstr "Zonder geheimen bevat het bestand geen wachtwoorden of sleutels en heeft het geen wachtwoord nodig. Met geheimen zet OpenPlanner elk geheim (SMTP, SMS, Webex, contactcenter, inlog, API-clients) apart vast onder dit wachtwoord, minstens {length} tekens. Je hebt geen aparte tool nodig om het te openen: lees het bestand op de nieuwe omgeving in (hier, met het commando config apply, of met de installer) en typ hetzelfde wachtwoord. Het wachtwoord is niet terug te halen; bewaar het apart van het bestand."
+
+msgid "admin.configuration.export.plain.title"
+msgstr "Zonder versleuteling"
+
+msgid "admin.configuration.export.plain.hint"
+msgstr "Alle wachtwoorden, sleutels en tokens staan dan leesbaar in het bestand. Wie het bestand heeft, heeft toegang tot die diensten. Bewaar het zo privé als de geheimen zelf, en versleutel het zelf voordat u het deelt."
+
+msgid "admin.configuration.export.plain.label"
+msgstr "Geheimen leesbaar in het bestand zetten, zonder wachtwoord"
+
+msgid "admin.configuration.export.plain.confirm"
+msgstr "Ik begrijp dat het bestand alle geheimen leesbaar bevat"
 
 msgid "admin.configuration.export.button"
 msgstr "Document exporteren"

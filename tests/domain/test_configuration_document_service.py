@@ -15,6 +15,7 @@ from app.domain.configuration_changes import ConfigurationSnapshot, RuleContext,
 from app.domain.configuration_document import Scope
 from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
 from app.domain.configuration_tree import Entity
+from app.domain.configuration_values import Secret
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -61,6 +62,7 @@ def build(
     changes: int = 500,
     issuer_of: object = None,
     settings: dict[str, object] | None = None,
+    plaintext: bool = False,
 ) -> ConfigurationDocumentService:
     clock = FixedClock(NOW)
     return ConfigurationDocumentService(
@@ -76,6 +78,7 @@ def build(
         max_bytes=lambda: 100_000,
         max_changes=lambda: changes,
         issuer_of=issuer_of,  # type: ignore[arg-type]
+        plaintext_export=lambda: plaintext,
     )
 
 
@@ -444,3 +447,61 @@ def test_an_actor_without_a_principal_is_the_host_and_only_by_asking() -> None:
     assert Actor.host().may_change(Permission.ROLES_MANAGE, Target.everything())
     with pytest.raises(TypeError):
         Actor("sub-x")  # type: ignore[call-arg]
+
+
+def with_secret() -> InMemoryUnitOfWork:
+    """A unit whose platform holds one secret, opened in memory as a snapshot has it."""
+    unit = uow()
+    snapshot = unit.state.configuration
+    assert snapshot is not None
+    secret = Entity("platform_secret", ("smtp",), fields={"secret": Secret("hunter2")})
+    platform = Entity("platform", children={"secrets": (secret,)})
+    root = replace(snapshot.root, children={**snapshot.root.children, "platform": (platform,)})
+    unit.state.configuration = replace(snapshot, root=root)
+    return unit
+
+
+async def test_a_plain_export_holds_the_secret_in_clear_text_without_a_passphrase() -> None:
+    unit = with_secret()
+
+    data = await build(unit, plaintext=True).export(HOST, Scope(), None, secrets=True, plain=True)
+
+    document = json.loads(data)
+    assert document["platform"]["secrets"] == {"smtp": {"plain": "hunter2"}}
+    assert "seal" not in document
+    (event,) = unit.state.audit
+    assert event.detail == "configuration.export,secrets,plain"
+    assert "hunter2" not in repr(event)
+
+
+async def test_a_plain_export_is_refused_while_the_host_has_not_allowed_it() -> None:
+    unit = with_secret()
+
+    with pytest.raises(DomainError) as error:
+        await build(unit).export(HOST, Scope(), None, secrets=True, plain=True)
+
+    assert error.value.code is ErrorCode.CONFIGURATION_PLAINTEXT_DISABLED
+    assert unit.state.audit == []
+
+
+async def test_a_plain_export_needs_the_platform_manage_permission_like_a_sealed_one() -> None:
+    org_admin = Actor("s-org", principal("s-org", "Org", [Role.ORG_ADMIN], ["acme"]))
+
+    with pytest.raises(DomainError) as error:
+        await build(uow(organisation()), plaintext=True).export(
+            org_admin, Scope("acme"), None, secrets=True, plain=True
+        )
+
+    assert error.value.code is ErrorCode.NOT_PERMITTED
+
+
+async def test_a_plain_export_applies_again_and_changes_nothing_the_second_time() -> None:
+    unit = with_secret()
+    service = build(unit, plaintext=True)
+    data = await service.export(HOST, Scope(), None, secrets=True, plain=True)
+
+    plan = await service.plan(HOST, data, None)
+
+    assert plan.ok
+    assert not plan.sealed
+    assert plan.changes == ()

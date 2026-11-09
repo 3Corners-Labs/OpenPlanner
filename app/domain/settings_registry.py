@@ -1319,6 +1319,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=10_000,
     ),
     S(
+        "configuration_plaintext_export_allowed",
+        K.BOOL,
+        False,
+        _B,
+        T.OPERATIONS,
+        "Allow the superuser to export the configuration with its secrets in clear text "
+        "(ADR 0099 point 8a). Off by default; never in the portal, because it switches a "
+        "protection off.",
+    ),
+    S(
         "configuration_review_minutes",
         K.INT,
         30,

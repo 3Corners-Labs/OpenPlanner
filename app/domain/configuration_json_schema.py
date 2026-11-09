@@ -23,7 +23,7 @@ DRAFT = "https://json-schema.org/draft/2020-12/schema"
 ID = "https://openplanner.nl/schema/configuration/{version}.json"
 """Where the schema of a version is meant to be published; informational."""
 
-_SEALED = {"$ref": "#/$defs/sealed"}
+_SEALED = {"oneOf": [{"$ref": "#/$defs/sealed"}, {"$ref": "#/$defs/plain"}]}
 _ACTIONS = ["upsert", "create", "update", "delete"]
 
 
@@ -37,6 +37,14 @@ def json_schema(fmt: Format) -> dict[str, Json]:
             "required": ["sealed"],
             "additionalProperties": False,
             "description": "A secret sealed under the document's passphrase.",
+        },
+        "plain": {
+            "type": "object",
+            "properties": {"plain": {"type": "string", "minLength": 1}},
+            "required": ["plain"],
+            "additionalProperties": False,
+            "description": "A secret in clear text. OpenPlanner seals it when it stores it; keep "
+            "the file as private as the secret.",
         },
         "binary": {
             "type": "object",
