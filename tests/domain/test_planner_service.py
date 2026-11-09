@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import timedelta
 
@@ -30,6 +31,7 @@ from tests.support.domain import (
     book_another,
     book_confirmed,
     book_pending,
+    booking_id_methods,
     window,
     with_team_invite,
 )
@@ -485,34 +487,43 @@ async def test_a_pending_booking_can_be_cancelled_but_not_asked_to_rebook(
     assert uow.state.bookings[second.booking.id or 0].status is BookingStatus.PENDING_CONFIRMATION
 
 
-async def test_a_pending_booking_of_another_group_is_not_found_through_this_group(
-    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
-) -> None:
-    """Every action on one booking checks the group first: no hint that the booking exists.
+STAFFING = ChangeReason.STAFFING
+ON_ONE_BOOKING: dict[str, Callable[[PlannerService, int], Awaitable[object]]] = {
+    "booking": lambda s, b: s.booking(GROUP_ADMIN, "demo", b),
+    "move": lambda s, b: s.move(GROUP_ADMIN, "demo", b, SLOT_0930),
+    "confirm": lambda s, b: s.confirm(GROUP_ADMIN, "demo", b),
+    "cancel": lambda s, b: s.cancel(GROUP_ADMIN, "demo", b, STAFFING),
+    "request_rebook": lambda s, b: s.request_rebook(GROUP_ADMIN, "demo", b, STAFFING),
+    "booking_proposal": lambda s, b: s.booking_proposal(GROUP_ADMIN, "demo", b),
+    "propose": lambda s, b: s.propose(GROUP_ADMIN, "demo", b, SLOT_0930, STAFFING),
+    "withdraw": lambda s, b: s.withdraw(GROUP_ADMIN, "demo", b),
+    "confirm_proposal": lambda s, b: s.confirm_proposal(GROUP_ADMIN, "demo", b),
+}
+"""Every use case on one booking, by the group admin of ``demo`` through their own group."""
 
-    Their own rules would read or change it, confirm it, or answer ``booking_not_active`` or
-    ``proposal_not_open``.
+
+def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
+    assert set(ON_ONE_BOOKING) == booking_id_methods(PlannerService)
+
+
+@pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
+async def test_a_pending_booking_of_another_group_is_not_found_through_this_group(
+    action: str, planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    """The group check comes first: no hint that the booking exists, nothing changed or audited.
+
+    The booking's own rules would read or change it, confirm it, or answer
+    ``booking_not_active`` or ``proposal_not_open``.
     """
     receipt = await book_pending(bookings, slug="andere-team", contact=another_participant())
     other = receipt.booking.id or 0
-    reason = ChangeReason.STAFFING
-    attempts = (
-        lambda: planner.booking(GROUP_ADMIN, "demo", other),
-        lambda: planner.move(GROUP_ADMIN, "demo", other, SLOT_0930),
-        lambda: planner.confirm(GROUP_ADMIN, "demo", other),
-        lambda: planner.cancel(GROUP_ADMIN, "demo", other, reason),
-        lambda: planner.request_rebook(GROUP_ADMIN, "demo", other, reason),
-        lambda: planner.booking_proposal(GROUP_ADMIN, "demo", other),
-        lambda: planner.propose(GROUP_ADMIN, "demo", other, SLOT_0930, reason),
-        lambda: planner.withdraw(GROUP_ADMIN, "demo", other),
-        lambda: planner.confirm_proposal(GROUP_ADMIN, "demo", other),
-    )
+    audited = len(uow.state.audit)
 
-    for attempt in attempts:
-        with pytest.raises(DomainError, match="booking_not_found"):
-            await attempt()
+    with pytest.raises(DomainError, match="booking_not_found"):
+        await ON_ONE_BOOKING[action](planner, other)
 
     assert uow.state.bookings[other].status is BookingStatus.PENDING_CONFIRMATION
+    assert len(uow.state.audit) == audited
 
 
 async def test_a_pending_booking_is_told_by_email_only_and_the_team_gets_no_withdrawal(

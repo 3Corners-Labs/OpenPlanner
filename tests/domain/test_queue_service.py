@@ -25,6 +25,7 @@ from tests.support.domain import (
     SLOT_0930,
     TEST_TOKEN_KEY,
     book_confirmed,
+    booking_id_methods,
     make_group,
     window,
 )
@@ -197,19 +198,31 @@ async def test_another_groups_booking_does_not_exist_here(
         assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
 
 
-async def test_another_groups_claimed_booking_cannot_be_opened_or_released_here(
-    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+ON_ONE_BOOKING = ("claim", "claimed", "release")
+"""Every use case on one booking; each takes the principal, the group and the booking id."""
+
+
+def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
+    assert set(ON_ONE_BOOKING) == booking_id_methods(QueueService)
+
+
+@pytest.mark.parametrize("action", ON_ONE_BOOKING)
+async def test_another_groups_claimed_booking_is_not_found_here(
+    action: str, queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
     """A group admin, who may release any claim of their group, finds no other group's claim."""
+    uow.state.groups[1] = replace(uow.state.groups[1], queue_free_pick_allowed=True)
     other = await _book(uow, clock, slug="andere")
     clock.advance(SLOT_0900 - clock.now())
     await queue.claim_next(OTHER_TEAM, "andere")
+    audited = len(uow.state.audit)
 
-    for attempt in (queue.claimed, queue.release):
-        with pytest.raises(DomainError) as excinfo:
-            await attempt(GROUP_ADMIN, "demo", other)
-        assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
+    with pytest.raises(DomainError) as excinfo:
+        await getattr(queue, action)(GROUP_ADMIN, "demo", other)
+
+    assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
     assert uow.state.bookings[other].claim is not None
+    assert len(uow.state.audit) == audited
 
 
 @pytest.mark.parametrize("principal", [OTHER_TEAM, AUDITOR])

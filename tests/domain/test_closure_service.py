@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -30,6 +31,7 @@ from tests.support.domain import (
     SLOT_0930,
     book_confirmed,
     book_pending,
+    booking_id_methods,
     with_team_invite,
 )
 from tests.support.principals import principal
@@ -220,22 +222,36 @@ async def test_other_groups_admin_cannot_close_or_touch_bookings(
     assert len(denied) == 2
 
 
-async def test_another_groups_suspended_booking_is_not_found_through_this_group(
-    closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
-) -> None:
-    """Reinstating, moving and the move form check the group first, like cancelling."""
-    booking_id = await _book(bookings)
-    await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY)
-    attempts = (
-        lambda: closures.booking(OTHER_TEAM, "andere-team", booking_id),
-        lambda: closures.reinstate(OTHER_TEAM, "andere-team", booking_id),
-        lambda: closures.move(OTHER_TEAM, "andere-team", booking_id, NEXT_MONDAY),
-    )
+ON_ONE_BOOKING: dict[str, Callable[[ClosureService, int], Awaitable[object]]] = {
+    "booking": lambda s, b: s.booking(OTHER_TEAM, "andere-team", b),
+    "reinstate": lambda s, b: s.reinstate(OTHER_TEAM, "andere-team", b),
+    "cancel": lambda s, b: s.cancel(OTHER_TEAM, "andere-team", b),
+    "move": lambda s, b: s.move(OTHER_TEAM, "andere-team", b, NEXT_MONDAY),
+}
+"""Every use case on one booking, by the group admin of ``andere-team`` through their own group."""
 
-    for attempt in attempts:
-        with pytest.raises(DomainError, match="booking_not_found"):
-            await attempt()
-    assert _status(uow, booking_id) is BookingStatus.SUSPENDED
+
+def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
+    assert set(ON_ONE_BOOKING) == booking_id_methods(ClosureService)
+
+
+@pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
+async def test_another_groups_booking_is_not_found_through_this_group(
+    action: str, closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    """The group check comes before the rule that only a booking on hold is handled.
+
+    The booking is not on hold, so a missing group check and one made after that rule both
+    answer ``booking_not_active``, which would give away that the booking exists.
+    """
+    booking_id = await _book(bookings)
+    audited = len(uow.state.audit)
+
+    with pytest.raises(DomainError, match="booking_not_found"):
+        await ON_ONE_BOOKING[action](closures, booking_id)
+
+    assert _status(uow, booking_id) is BookingStatus.CONFIRMED
+    assert len(uow.state.audit) == audited
 
 
 # --- the participant --------------------------------------------------------------------------
