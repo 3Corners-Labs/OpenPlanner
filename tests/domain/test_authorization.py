@@ -187,11 +187,12 @@ def test_locked_permissions_belong_to_the_superuser_only() -> None:
         assert [role for role in Role if permission in MATRIX[role]] == [Role.SUPERUSER]
 
 
-def test_bookings_and_the_queue_are_the_permissions_that_show_personal_data() -> None:
+def test_bookings_the_queue_and_the_team_load_are_the_permissions_that_show_personal_data() -> None:
     assert {
         Permission.BOOKINGS_VIEW,
         Permission.BOOKINGS_MANAGE,
         Permission.QUEUE_WORK,
+        Permission.REPORTS_STAFF_VIEW,  # ADR 0117 point 9: the auditor never holds it
     } == PII_PERMISSIONS
 
 
