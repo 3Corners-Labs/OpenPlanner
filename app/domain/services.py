@@ -910,22 +910,22 @@ class BookingService:
     ) -> HeldProposal:
         """Propose ``start`` as the new time of ``booking`` and hold a place there (ADR 0057).
 
-        Inside the caller's locked transaction; the caller checks who may do it. The proposed
-        slot must be another start of the same group that a planner may still fill
-        (``rebooking.may_take``) and that has room like a booking would (``_reserve``).
+        Inside the caller's locked transaction; the caller checks who may do it and that the
+        planner may ask this booking for a new time
+        (``booking_changes.ensure_planner_may_request_rebook``). The proposed slot must be
+        another start of the same group that a planner may still fill (``rebooking.may_take``)
+        and that has room like a booking would (``_reserve``).
 
         Raises:
-            DomainError: ``same_slot``, ``booking_locked`` (the slot is too close),
-                ``booking_not_active`` (the booking is not confirmed) or any error of
-                ``_reserve``.
+            DomainError: ``same_slot``, ``booking_locked`` (the slot is too close), any error
+                of ``_reserve``, or ``booking_not_active`` from ``hold_proposal`` when the
+                booking is not confirmed after all.
         """
         now = self._clock.now()
         if start == booking.start:
             raise DomainError(ErrorCode.SAME_SLOT)
         if not may_take(group, start, now):
             raise DomainError(ErrorCode.BOOKING_LOCKED)
-        if not booking.is_active:
-            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
         slot = await self._reserve(tx, group, start, booking.routing)
         return await booking_changes.hold_proposal(
             tx,

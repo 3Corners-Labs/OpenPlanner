@@ -331,7 +331,9 @@ class PlannerService:
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
             group = await group_by_slug(tx, slug)
-            booking = await self._changeable(tx, group, booking_id)
+            booking = await self._changeable(
+                tx, group, booking_id, rule=booking_changes.ensure_planner_may_request_rebook
+            )
             proposal = await self._propose(tx, group, booking, start, reason)
             detail = f"planner.propose,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)

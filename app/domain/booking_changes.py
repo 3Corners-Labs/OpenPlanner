@@ -100,9 +100,9 @@ def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> 
 def ensure_planner_may_request_rebook(booking: Booking, group: Group, now: datetime) -> None:
     """Refuse asking ``booking``'s participant to choose a new time unless it is confirmed.
 
-    The one rule for the request (ADR 0044), its form, the form of a proposal (ADR 0057) and
-    the agenda's links to both. Asking is a change, so the limits of
-    ``ensure_planner_may_change`` come first and their refusal wins. Then only a confirmed
+    The one rule for both ways of asking: the request (ADR 0044) and the proposal (ADR 0057),
+    their forms, the review's list and the agenda's links. Asking is a change, so the limits
+    of ``ensure_planner_may_change`` come first and their refusal wins. Then only a confirmed
     booking: one awaiting confirmation is moved, cancelled or left to lapse (ADR 0056 point 11),
     one awaiting a new time already waits.
 

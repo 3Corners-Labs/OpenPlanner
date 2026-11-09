@@ -365,6 +365,7 @@ async def test_the_rebook_form_finds_no_booking_of_another_group_whatever_its_st
 
     with pytest.raises(DomainError, match="booking_not_found"):
         await planner.booking(GROUP_ADMIN, "demo", receipt.booking.id or 0, rule=rule)
+    assert receipt.booking.status is BookingStatus.PENDING_CONFIRMATION
 
 
 # --- confirm on the participant's behalf (ADR 0056 point 11) --------------------------------

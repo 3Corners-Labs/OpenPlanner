@@ -5,7 +5,7 @@ Calendar: "now" is Thursday 1 January 2026 08:00 UTC; group ``demo`` is staffed 
 09:30 slots of two places each.
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -25,7 +25,15 @@ from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import AUDITOR, GROUP_ADMIN, SUPER
-from tests.support.domain import NOW, SLOT_0900, SLOT_0930, book_another, window
+from tests.support.domain import (
+    NOW,
+    SLOT_0900,
+    SLOT_0930,
+    another_participant,
+    book_another,
+    book_pending,
+    window,
+)
 
 NEXT_0900 = SLOT_0900 + timedelta(days=7)
 NEXT_0930 = SLOT_0930 + timedelta(days=7)
@@ -161,6 +169,25 @@ async def test_only_a_planner_may_propose(
         await planner.propose(AUDITOR, "demo", booking_id, NEXT_0900, ChangeReason.STAFFING)
 
     assert caught.value.code is ErrorCode.NOT_PERMITTED
+
+
+@pytest.mark.parametrize("start", [SLOT_0900, NEXT_0900], ids=["own-slot", "free-slot"])
+async def test_only_a_confirmed_booking_is_offered_or_sent_a_proposal(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, start: datetime
+) -> None:
+    """ADR 0056 point 11: the rule of asking for a new time comes first, whatever the slot."""
+    pending = await book_pending(bookings, slug="demo", contact=another_participant())
+    waiting, _token = await _book(bookings)
+    await planner.request_rebook(GROUP_ADMIN, "demo", waiting, ChangeReason.STAFFING)
+
+    for booking_id in (pending.booking.id or 0, waiting):
+        with pytest.raises(DomainError, match="booking_not_active"):
+            await planner.booking_proposal(GROUP_ADMIN, "demo", booking_id)
+        with pytest.raises(DomainError, match="booking_not_active"):
+            await planner.propose(GROUP_ADMIN, "demo", booking_id, start, ChangeReason.STAFFING)
+
+    assert pending.booking.status is BookingStatus.PENDING_CONFIRMATION
+    assert not uow.state.proposals
 
 
 # --- answering ------------------------------------------------------------------------------
@@ -353,6 +380,23 @@ async def test_the_review_proposes_the_last_made_booking_with_the_free_times(
     assert row.proposed == NEXT_0900  # same time of day, a week on
     assert row.options[0] == NEXT_0900
     assert SLOT_0930 in row.options
+
+
+async def test_the_review_leaves_a_pending_last_made_booking_to_confirm_or_lapse(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0056 point 11: the last made go first, but a pending one is never asked to move."""
+    await _book(bookings)
+    clock.advance(timedelta(minutes=1))
+    pending = await book_pending(bookings, slug="demo", contact=another_participant())
+    _short(uow)
+
+    reviewed = await planner.review_proposals(GROUP_ADMIN, "demo", SCOPE)
+    candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
+
+    assert pending.booking.status is BookingStatus.PENDING_CONFIRMATION
+    assert pending.booking.id not in [row.booking.id for row in reviewed]
+    assert pending.booking.id not in [b.id for b in candidates]
 
 
 async def test_sending_the_review_holds_asks_and_audits_each_booking(
