@@ -4363,8 +4363,8 @@ msgstr "Taken"
 msgid "admin.nav.alerts"
 msgstr "Meldingen"
 
-msgid "admin.topbar.tasks.count"
-msgstr "{label}, {count} lopend of mislukt"
+msgid "admin.topbar.tasks.count_words"
+msgstr "lopend of mislukt"
 
 msgid "admin.scope.label"
 msgstr "Werkgebied"
@@ -9625,8 +9625,8 @@ msgstr "Wachttijd in de wachtrij"
 msgid "admin.audit.reason.wait_over_warning"
 msgstr "Deelnemers wachten langer dan de ingestelde grens."
 
-msgid "admin.topbar.alerts.count"
-msgstr "{label}, {count} open"
+msgid "admin.topbar.alerts.count_words"
+msgstr "open"
 
 msgid "settings.field.idp_domain_grace_days.label"
 msgstr "Tolerantie verdwenen domeinrecord (dagen)"
