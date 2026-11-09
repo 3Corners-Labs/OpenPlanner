@@ -325,6 +325,8 @@ async def test_retry_plans_the_meeting_again_and_says_so(site: Site) -> None:
     assert 'name="job" value="create_video_room"' not in page  # pending now: no second button
     again = await site.client.post(url, data={"job": "send_confirmation"}, headers=SAME_ORIGIN)
     assert "done=retry_not_possible" in again.headers["location"]
+    audit = (await site.client.get(f"/admin/audit?booking={booking_id}")).text
+    assert "videomeeting opnieuw gepland" in audit  # the retry is filed under its booking
 
 
 async def test_a_retry_counts_toward_the_planners_alert_with_its_platform_setting(
