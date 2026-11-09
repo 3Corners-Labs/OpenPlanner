@@ -13,6 +13,7 @@ from app.domain.planning import PlanningService
 from app.domain.scheduling import ScheduleOverride, TimeWindow
 from app.domain.services import BookingService
 from tests.admin.conftest import GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import audit_log
 from tests.support.domain import (
     ADA,
     FRIDAY,
@@ -36,10 +37,10 @@ _PARTICIPANTS = itertools.count(1)
 """Each booking of ``_book`` is another participant, so the address limit (ADR 0066) stays out."""
 
 
-async def _book(site: Site, start: datetime = FRIDAY_0900) -> int:
+async def _book(site: Site, start: datetime = FRIDAY_0900, slug: str = "demo") -> int:
     receipt = await book_confirmed(
         BookingService(_uow(site), site.clock, TEST_TOKEN_KEY),
-        group_slug="demo",
+        group_slug=slug,
         start=start,
         contact=participant(next(_PARTICIPANTS)),
         locale="nl",
@@ -397,6 +398,23 @@ async def test_a_pending_booking_is_cancelled_like_a_confirmed_one(site: Site) -
     assert form.status_code == 200
     assert response.status_code == 303
     assert await _status(site, pending) == (BookingStatus.CANCELLED, ChangeReason.UNFORESEEN)
+
+
+async def test_a_reason_post_for_another_groups_booking_is_not_found(site: Site) -> None:
+    """With a reason the service's group check answers first: an unknown id's 404 (ADR 0014)."""
+    other = await _book(site, slug="andere-team")
+    await site.login_as(GROUP_ADMIN)
+    before = await audit_log(site)
+
+    for action in ("cancel", "rebook"):
+        taken = await _post(site, f"{AGENDA}/bookings/{other}/{action}", {"reason": "staffing"})
+        unknown = await _post(
+            site, f"{AGENDA}/bookings/{other + 1000}/{action}", {"reason": "staffing"}
+        )
+        assert (taken.status_code, unknown.status_code) == (404, 404)
+        assert taken.text == unknown.text
+    assert await _status(site, other) == (BookingStatus.CONFIRMED, None)
+    assert await audit_log(site) == before
 
 
 # --- the rebooking assistant (ADR 0057 step 3) -------------------------------------------
