@@ -45,6 +45,10 @@ admins cannot.
 - Without a period you get the last 366 days. A longer period or more than 100,000 rows is
   refused: narrow the filter.
 - Every export is itself an entry in the audit log, with the number of rows.
+- The download starts from the button, or from an address you type in, bookmark or open from
+  another program. In a current browser, a link to it on another website (also mail or chat
+  in the browser) gets an error page instead, so another website cannot put an export in your
+  name in the log.
 
 An export contains the identifiers (subjects) of admins. Keep the file according to your
 organisation's policy.

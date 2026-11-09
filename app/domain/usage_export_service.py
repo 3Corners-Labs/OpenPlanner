@@ -20,6 +20,7 @@ from app.domain.authorization import Permission, Principal
 from app.domain.csv_export import (
     Cell,
     ExportLimits,
+    ExportRefusal,
     ExportRefused,
     check_span,
     checksum,
@@ -113,7 +114,7 @@ class UsageExportService:
             check_span(timedelta(days=(loaded.last - loaded.first).days + 1), limits)
             header, rows, hidden = self._table(view, loaded)
             if len(rows) > limits.max_rows:
-                raise ExportRefused("too_many_rows")
+                raise ExportRefused(ExportRefusal.TOO_MANY_ROWS)
         except ExportRefused as refused:
             await self._audit(principal, view, loaded, Outcome.FAILURE, refused.code)
             raise

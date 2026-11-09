@@ -17,8 +17,10 @@ the admin may view it.
 ADR 0040, part 3: filters for minimum level, category, period (days in ``ADMIN_TIMEZONE``) and
 trace id; a trace id shows the whole chain of one request or job. The export writes exactly
 the current filter inside the admin's scope as CSV (``app.domain.audit_export``, written by
-``app.domain.csv_export``) and is itself an audit event; an export over a limit is refused on
-the page, never cut short.
+``app.domain.csv_export``) and is itself an audit event, so only the portal itself may ask for
+it (``SameOrigin``); an export over a limit is refused on the page, never cut short: the export
+sends the admin back to the page with the reason (``refused``), so nothing at the export's own
+address can run it again.
 
 ADR 0040, part 4: the superuser switches diagnostic mode on for one group or organisation
 (``app.domain.diagnostics``); the page lists the modes that are on, each with when it ends.
@@ -34,7 +36,15 @@ from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
-from app.admin.forms import Option, done_message, raise_refusal, read_form, redirect_done
+from app.admin.forms import (
+    Option,
+    done_message,
+    raise_refusal,
+    read_form,
+    redirect_done,
+    redirect_refused,
+    refused_message,
+)
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.planner_routes import REASON_LABELS as CHANGE_REASON_LABELS
@@ -79,7 +89,7 @@ from app.domain.authorization import (
     decide,
 )
 from app.domain.booking import ChangeReason
-from app.domain.csv_export import ExportLimits, ExportRefused
+from app.domain.csv_export import ExportLimits, ExportRefusal, ExportRefused
 from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
 from app.domain.errors import DomainError
 from app.domain.event_context import TRACE_ID
@@ -421,10 +431,10 @@ CATEGORY_LABELS: dict[Category, str] = {
 """Label per category in the filter (ADR 0040)."""
 
 EXPORT_REFUSALS: dict[str, str] = {
-    "too_many_days": "admin.audit.export.too_many_days",
-    "too_many_rows": "admin.audit.export.too_many_rows",
+    ExportRefusal.TOO_MANY_DAYS: "admin.audit.export.too_many_days",
+    ExportRefusal.TOO_MANY_ROWS: "admin.audit.export.too_many_rows",
 }
-"""Why an export was refused, per refusal code."""
+"""Why an export was refused, per refusal code (every member; literal keys for the catalogue)."""
 
 
 @dataclass(frozen=True)
@@ -598,12 +608,14 @@ class AuditQuery:
         )
 
 
-def _filter_view(
-    narrow: AuditFilter, in_scope: list[GroupSummary], zone: ZoneInfo, _: BoundGettext
-) -> FilterView:
-    """Describe the filter form with what ``narrow`` selected."""
+def _filter_values(narrow: AuditFilter, zone: ZoneInfo) -> dict[str, str]:
+    """Return the query parameters that select ``narrow``, empty where nothing is selected.
+
+    Built from the checked filter, never from what was typed, so a link or a redirect made
+    from it carries no value the page would not accept.
+    """
     date_to = narrow.until.astimezone(zone).date() - timedelta(days=1) if narrow.until else None
-    values = {
+    return {
         "level": narrow.min_level.value if narrow.min_level else "",
         "category": narrow.category.value if narrow.category else "",
         "group": narrow.group or "",
@@ -615,6 +627,18 @@ def _filter_view(
         "source": narrow.source.value if narrow.source else "",
         "subject": subject.value if (subject := _subject_of(narrow)) else "",
     }
+
+
+def _filter_query(values: dict[str, str]) -> str:
+    """Return the selected filter ``values`` as a query string."""
+    return urlencode({key: value for key, value in values.items() if value})
+
+
+def _filter_view(
+    narrow: AuditFilter, in_scope: list[GroupSummary], zone: ZoneInfo, _: BoundGettext
+) -> FilterView:
+    """Describe the filter form with what ``narrow`` selected."""
+    values = _filter_values(narrow, zone)
     return FilterView(
         levels=tuple(Option(level.value, _(LEVEL_LABELS[level])) for level in Level),
         level=values["level"],
@@ -630,7 +654,7 @@ def _filter_view(
         subjects=tuple(Option(s.value, _(SUBJECT_LABELS[s])) for s in Subject),
         subject=values["subject"],
         active=narrow != AuditFilter(),
-        query=urlencode({key: value for key, value in values.items() if value}),
+        query=_filter_query(values),
     )
 
 
@@ -659,38 +683,6 @@ def audit_views(
         for entry in entries
         for e in (entry.event,)
     ]
-
-
-async def _audit_page(
-    request: Request,
-    locale: RequestLocale,
-    context: AdminContext,
-    query: AuditQuery,
-    error: str | None = None,
-) -> HTMLResponse:
-    """Render the audit page for ``query``, with an export refusal when there is one."""
-    service = admin_service(request)
-    zone = ZoneInfo(settings_for(request).admin_timezone)
-    in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
-    narrow = query.narrow({g.group.slug for g in in_scope}, zone)
-    events = await service.audit_log(context.principal, narrow, AUDIT_LOG_LIMIT)
-    response = _page(
-        request,
-        locale,
-        "admin/audit.html",
-        context.principal,
-        {
-            "events": audit_views(request, locale, context.principal, events),
-            "limit": AUDIT_LOG_LIMIT,
-            "filters": _filter_view(narrow, in_scope, zone, locale.gettext),
-            "export_error": locale.gettext(EXPORT_REFUSALS[error]) if error else None,
-            "diagnostics": await _diagnostics_view(request, locale, context),
-            "done": done_message(request, locale.gettext),
-        },
-    )
-    if error:
-        response.status_code = 422
-    return response
 
 
 async def _diagnostics_view(
@@ -774,18 +766,44 @@ async def audit(
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_VIEW))],
     query: Annotated[AuditQuery, Depends()],
 ) -> HTMLResponse:
-    """Show the newest audit events and system events in scope, optionally filtered."""
-    return await _audit_page(request, locale, context, query)
+    """Show the newest audit events and system events in scope, optionally filtered.
+
+    A refused export sends the admin back here with why (``refused_message``).
+    """
+    service = admin_service(request)
+    zone = ZoneInfo(settings_for(request).admin_timezone)
+    in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
+    narrow = query.narrow({g.group.slug for g in in_scope}, zone)
+    events = await service.audit_log(context.principal, narrow, AUDIT_LOG_LIMIT)
+    return _page(
+        request,
+        locale,
+        "admin/audit.html",
+        context.principal,
+        {
+            "events": audit_views(request, locale, context.principal, events),
+            "limit": AUDIT_LOG_LIMIT,
+            "filters": _filter_view(narrow, in_scope, zone, locale.gettext),
+            "export_error": refused_message(request, EXPORT_REFUSALS, locale.gettext),
+            "diagnostics": await _diagnostics_view(request, locale, context),
+            "done": done_message(request, locale.gettext),
+        },
+    )
 
 
 @router.get("/audit/export.csv", response_model=None)
 async def export(
     request: Request,
-    locale: Locale,
+    _: SameOrigin,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_EXPORT))],
     query: Annotated[AuditQuery, Depends()],
 ) -> Response:
-    """Download exactly the current filter as CSV (ADR 0040, part 3); the export is audited."""
+    """Download exactly the current filter as CSV (ADR 0040, part 3); the export is audited.
+
+    Because opening it writes an audit event, a request another site makes is refused
+    (``SameOrigin``, ASVS V3.5.3): a link on another site cannot make a signed-in admin's
+    browser export.
+    """
     service = admin_service(request)
     settings = settings_for(request)
     zone = ZoneInfo(settings.admin_timezone)
@@ -797,7 +815,8 @@ async def export(
             context.principal, narrow, settings.event_envelope, limits
         )
     except ExportRefused as refused:
-        return await _audit_page(request, locale, context, query, refused.code)
+        back = _filter_query(_filter_values(narrow, zone))
+        return redirect_refused(f"/admin/audit?{back}" if back else "/admin/audit", refused.code)
     clock: Clock = request.app.state.clock
     name = f"audit-{clock.now():%Y%m%dt%H%M%S}z.csv"
     return Response(

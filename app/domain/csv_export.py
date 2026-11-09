@@ -18,6 +18,7 @@ import io
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum
 
 type Cell = str | int | float | bool | None
 """What one cell may hold before it is written as text."""
@@ -28,10 +29,17 @@ BOM = "﻿"
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 
 
-class ExportRefused(Exception):  # noqa: N818 - a refusal with a code, like DomainError
-    """The export is over a limit; ``code`` says which (``too_many_days``, ``too_many_rows``)."""
+class ExportRefusal(StrEnum):
+    """Why an export is refused: which limit the request goes over."""
 
-    def __init__(self, code: str) -> None:
+    TOO_MANY_DAYS = "too_many_days"
+    TOO_MANY_ROWS = "too_many_rows"
+
+
+class ExportRefused(Exception):  # noqa: N818 - a refusal with a code, like DomainError
+    """The export is over a limit; ``code`` says which."""
+
+    def __init__(self, code: ExportRefusal) -> None:
         """Store the code."""
         super().__init__(code)
         self.code = code
@@ -57,7 +65,7 @@ def check_span(span: timedelta, limits: ExportLimits) -> None:
         ExportRefused: ``too_many_days``.
     """
     if span > timedelta(days=limits.max_days):
-        raise ExportRefused("too_many_days")
+        raise ExportRefused(ExportRefusal.TOO_MANY_DAYS)
 
 
 def export_window(

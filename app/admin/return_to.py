@@ -2,7 +2,8 @@
 
 One home for the concern: ``safe_next`` checks every target that arrives with a request (the
 ``next`` of the login, the re-login, the update banner's snooze, the preferences and the alert
-banner), and ``return_path`` names the current page as such a target. A target is always a
+banner), and ``return_path`` names the current page as such a target (for a form post or a
+download, the page that asked for it, so an action is never replayed). A target is always a
 path under ``/admin`` on this site. Its query keeps only the view parameters of
 ``RETURN_QUERY_PARAMS`` (an allow-list), so a token, a confirmation, a typed search or any
 other personal data never travels into a login URL or the session cookie.
@@ -13,6 +14,7 @@ from urllib.parse import parse_qsl, urlencode
 
 from fastapi import Request
 
+from app.web.protection import is_action
 from app.web.templates import KEPT_QUERY_PARAMS
 
 DASHBOARD = "/admin/"
@@ -83,10 +85,12 @@ def safe_next(value: str | None) -> str:
 def _page(request: Request) -> tuple[str, str]:
     """Return the path and raw query of the page the admin is on.
 
-    A GET is that page. A POST returns to the page that sent the form (the referer); a forged
+    A GET is that page, unless it is an action. A POST and a GET action return to the page
+    that sent them (the referer), so a login or a re-login never replays an action: the
+    identity provider's redirect back to it would arrive cross-site and be refused. A forged
     referer cannot leave the portal, because every target goes through ``safe_next``.
     """
-    if request.method == "GET":
+    if request.method == "GET" and not is_action(request):
         return request.url.path, request.url.query
     referer = request.headers.get("referer", "")
     rest = referer.split("://", 1)[-1].partition("/")[2].split("#", 1)[0]
