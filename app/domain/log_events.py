@@ -282,6 +282,24 @@ _OPERATIONS = (
         "Check the data volume's permissions and free space.",
     ),
     _e(
+        "change_requests.prune_failed",
+        _OPS,
+        "warning",
+        "error",
+        "Expired change requests could not be deleted: {error}.",
+        "Housekeeping could not delete the bots' change requests past their retention "
+        "(ADR 0023 step 2b).",
+        "The next hour tries again; check the database if it keeps failing.",
+    ),
+    _e(
+        "change_requests.pruned",
+        _OPS,
+        "info",
+        "requests",
+        "{requests} expired change requests deleted.",
+        "Housekeeping deleted change requests past `agent_change_request_retention_days`.",
+    ),
+    _e(
         "backups.pruned",
         _OPS,
         "info",

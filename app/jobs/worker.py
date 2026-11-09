@@ -253,8 +253,7 @@ async def run_worker(
                 ),
                 # ADR 0023 step 2: only where the deployment runs the machine API at all.
                 change_requests=lambda organisation: (
-                    settings.agent_api_enabled
-                    and live.for_organisation(organisation).agent_change_requests_enabled
+                    live.for_organisation(organisation).takes_change_requests
                 ),
                 after_purge=lambda: checkpoint_wal(engine),
             ),
@@ -276,16 +275,14 @@ async def run_worker(
     links = ParticipantLinkService(uow, clock)
 
     async def clean_sessions() -> int:
-        """Delete ended admin and participant link sessions, and expired change requests.
-
-        A bot's change request goes ``agent_change_request_retention_days`` after it expired
-        (ADR 0023 step 2b).
-        """
+        """Delete the ended admin sessions and the lapsed participant link sessions."""
         admin = await sessions.clean(timedelta(hours=live.settings.admin_session_hours))
-        requests = await prune_change_requests(
-            uow, clock, timedelta(days=live.settings.agent_change_request_retention_days)
-        )
-        return admin + await links.clean() + requests
+        return admin + await links.clean()
+
+    async def prune_requests() -> int:
+        """Delete change requests past ``agent_change_request_retention_days`` (ADR 0023)."""
+        keep = timedelta(days=live.settings.agent_change_request_retention_days)
+        return await prune_change_requests(uow, clock, keep)
 
     staff_lifecycle = StaffLifecycleService(uow, clock)
 
@@ -309,6 +306,7 @@ async def run_worker(
         BookingRowRollup(
             uow, clock, lambda: timedelta(days=live.settings.booking_row_retention_days)
         ).run,
+        prune_requests,
     )
     # ADR 0117: usage facts into the hourly table, and the retention of both.
     usage = UsageRollup(

@@ -235,7 +235,7 @@ def _change_policy(settings: Settings) -> ChangePolicy:
     Switched on only where the deployment also runs the machine API (``AGENT_API_ENABLED``).
     """
     return ChangePolicy(
-        settings.agent_api_enabled and settings.agent_change_requests_enabled,
+        settings.takes_change_requests,
         settings.agent_change_request_minutes,
         settings.agent_change_request_cooldown_minutes,
     )

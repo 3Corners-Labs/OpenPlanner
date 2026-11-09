@@ -598,6 +598,15 @@ class Settings(BaseSettings):
     # Class C (ADR 0082 point 9): a lasting alert is sent to its targets again at this interval.
     alert_repeat_hours: int = Field(default=4, ge=1, le=168)
 
+    @property
+    def takes_change_requests(self) -> bool:
+        """Whether a bot's change requests are on (ADR 0023 step 2).
+
+        The deployment runs the machine API and the organisation switched them on; read on an
+        organisation's settings.
+        """
+        return self.agent_api_enabled and self.agent_change_requests_enabled
+
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":
         """Refuse values that are each valid but not together."""

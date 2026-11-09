@@ -329,7 +329,7 @@ async def request_still_open(
     target = Target.for_group(group.slug, organisation.slug)
     # The deployment's switch is part of ``enabled``; here the superuser's and the client's.
     settings = await tx.get_api_settings()
-    return client_may_act(True, settings, client, ApiScope.BOOKINGS_REQUEST_CHANGE, target)
+    return client_may_act(settings, client, ApiScope.BOOKINGS_REQUEST_CHANGE, target)
 
 
 async def prune_change_requests(uow: UnitOfWork, clock: Clock, keep: timedelta) -> int:
