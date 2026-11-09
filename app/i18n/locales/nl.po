@@ -5819,6 +5819,12 @@ msgstr "Laatst ingelogd"
 msgid "admin.staff.last_seen"
 msgstr "Laatst actief"
 
+msgid "admin.staff.email"
+msgstr "E-mailadres"
+
+msgid "admin.staff.email_none"
+msgstr "Geen geverifieerd adres bekend"
+
 msgid "admin.staff.last_logout"
 msgstr "Laatst afgemeld"
 

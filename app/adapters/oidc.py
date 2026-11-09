@@ -160,6 +160,26 @@ def claim_mapping(values: Mapping[str, str], max_entitlements: int = 200) -> Cla
     )
 
 
+MAX_EMAIL = 254
+"""The longest address RFC 5321 allows; a longer claim is no address."""
+
+
+def verified_email(claims: Mapping[str, Any]) -> str | None:
+    """Return the ``email`` claim when the provider called it verified, else ``None``.
+
+    Only the boolean ``true`` counts (OIDC Core 5.1); a string, a missing claim or ``false`` is
+    not verified. A value that is not a plausible address (no ``@``, too long, blanks inside)
+    is dropped too. The address is personal data: it is returned, never logged.
+    """
+    email, verified = claims.get("email"), claims.get("email_verified")
+    if verified is not True or not isinstance(email, str):
+        return None
+    email = email.strip()
+    if not 3 <= len(email) <= MAX_EMAIL or email.count("@") != 1 or any(c.isspace() for c in email):
+        return None
+    return email
+
+
 def login_claims(
     claims: Mapping[str, Any],
     mapping: ClaimMapping,
@@ -197,6 +217,7 @@ def login_claims(
     head = f"{mapping.entitlement_prefix}:"
     name = claims.get("name") or claims.get("preferred_username") or claims["sub"]
     found = LoginClaims(
+        email=verified_email(claims),
         subject=subject,
         display_name=str(name)[:200],
         roles=roles,

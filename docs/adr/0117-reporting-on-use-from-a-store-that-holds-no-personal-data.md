@@ -455,6 +455,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | #652 | merged |
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | #678 | merged |
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | #679 | merged |
+| 10b | The verified `email` claim stored at login (`staff.email`, migration 0104) as the digest's first source for every provider | #681 | merged |
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | #675 | merged |
 | 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
@@ -700,10 +701,18 @@ section of the organisation's Usage page with forms that work without JavaScript
 error types only).
 
 
-**Open point (step 10):** staff of an organisation with its own identity provider (ADR 0083), or of a deployment without the
-bundled provider's directory, have no address the portal can read, so they get no digest. The picker and the list say so ("no
-address known"), and the run counts them as skipped. A later step could store the `email` claim at login (a new personal-data
-field on the staff record, retention of ADR 0046 applying); that is a product decision and is not built here.
+**Open point (step 10), resolved by step 10b (product owner, 2026-11-09: "Ja, e-mail bij login"):** staff of an organisation
+with its own identity provider (ADR 0083), or of a deployment without the bundled provider's directory, had no address the
+portal could read, so they got no digest. Step 10b stores the address at login: migration 0104 adds the nullable
+`staff.email` and `staff.email_at` (expand only). At every OIDC login, through the bundled provider and through an
+organisation's own provider alike, `login_claims` reads the `email` claim and keeps it only when `email_verified` is the
+boolean `true` and the value is a plausible address (one `@`, no blanks, at most 254 characters); otherwise the stored address
+is cleared, so a stale address never stays. The digest reads `staff.email` first (`StoredAddresses`, `app/adapters/staff_addresses.py`)
+and asks the bundled directory only for a person whose login stored none (logged in before this step, or the provider gave no
+verified address); the fallback goes when it is redundant. The address is staff personal data: it is not in the session claims,
+a log line, an audit event or a job payload (the masking processor covers `email`; a test asserts it), the staff page shows it
+to whoever holds `staff.view`, and erasing the person (manually, or after `staff_retention_days`) clears it. No change to
+`authorization.py`; no new setting.
 
 
 **Delivery is at most once (step 10):** the run record is claimed before the mails go out, so a crash after the claim, or a

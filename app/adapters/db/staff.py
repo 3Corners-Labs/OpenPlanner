@@ -126,6 +126,8 @@ def _member(
         id=row.id,
         status=StaffStatus(row.status),
         status_at=row.status_at,
+        email=row.email,
+        email_at=row.email_at,
         refused=tuple(
             RefusedEntitlement(r.value, r.reason, r.organisation, r.received_at)
             for r in sorted(refusals, key=lambda r: r.value)
@@ -176,6 +178,8 @@ class StaffQueries:
         row.last_logout_at = member.last_logout_at
         row.status = member.status.value
         row.status_at = member.status_at
+        row.email = member.email
+        row.email_at = member.email_at
         await self._session.flush()
         await self._session.execute(
             delete(StaffMembershipRow).where(StaffMembershipRow.staff_id == row.id)
@@ -214,13 +218,15 @@ class StaffQueries:
     async def erase_staff(self: _Transaction, subject: str, at: datetime) -> None:
         """Erase the record of ``subject``; the subject, the id and the times stay.
 
-        The name, roles, memberships, refused values and the own overview layout go.
+        The name, address, roles, memberships, refused values and the own overview layout go.
         """
         row = await self._session.scalar(select(StaffRow).where(StaffRow.subject == subject))
         if row is None or row.status == StaffStatus.ERASED.value:
             return
         row.display_name = ""
         row.roles = ""
+        row.email = None  # ADR 0117 step 10b: the address goes with the person
+        row.email_at = None
         row.status = StaffStatus.ERASED.value
         row.status_at = at
         await self._session.execute(

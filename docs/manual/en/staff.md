@@ -24,6 +24,10 @@ provider, not here.
 Every change OpenPlanner notices at a login is in the audit log as **Roles or memberships
 changed**, with what was added and what was removed.
 
+The email address on a person's page is the address the identity provider gave at their last
+login, kept only when the provider says it is verified. The usage digest (*Reports*) is sent
+to it. It is replaced or cleared at every login and deleted when the person is erased.
+
 ## Rights not recognised
 
 When the identity provider sends values at a login that OpenPlanner does not recognise (a typo
@@ -123,7 +127,7 @@ superuser can suspend a superuser. Every step is an audit event (`staff.suspende
 `staff.reinstated`) with the administrator and the person, without a name.
 
 The superuser can also **erase** a suspended person's data (permission `staff.erase`): the
-name, roles and memberships go and the page then says *Erased staff member*. The audit log keeps
+name, email address, roles and memberships go and the page then says *Erased staff member*. The audit log keeps
 pointing to that erased person. This cannot be undone. A person who logs in again afterwards
 starts a fresh record.
 
