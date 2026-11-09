@@ -34,6 +34,7 @@ from app.domain.audit import SYSTEM_ACTOR, AuditEvent, AuditFilter, Outcome, Sou
 from app.domain.privacy import ALIASES, PII_FIELDS
 from app.domain.staff import StaffFilter
 from app.domain.storage import FREE_SPACE_CRITICAL, STORAGE_EVENT
+from app.web.route_dependencies import dependants
 from app.web.widgets import OVERVIEW_PATH, WIDGETS
 from tests.admin.conftest import SAME_ORIGIN, Site
 from tests.support.admin_site import AuditRow, audit_events, post_form, site_app, site_uow
@@ -387,10 +388,7 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
 
 def _query_names(dependant: Dependant) -> set[str]:
     """Every query parameter of a route, through its dependencies."""
-    names = {p.name for p in dependant.query_params}
-    for inner in dependant.dependencies:
-        names |= _query_names(inner)
-    return names
+    return {parameter.name for inner in dependants(dependant) for parameter in inner.query_params}
 
 
 def test_no_list_filter_or_query_parameter_names_a_pii_field(site: Site) -> None:

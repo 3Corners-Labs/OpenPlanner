@@ -18,12 +18,11 @@ import html
 import re
 from collections.abc import Callable, Iterable
 
-from fastapi.routing import APIRoute
 from starlette.routing import Match
 
 from app.admin.authz import RequirePermission
 from app.domain.authorization import Principal, decide_in_maintenance
-from app.web.route_dependencies import guards
+from app.web.route_dependencies import all_routes, guards
 
 BAR_ID = "maintenance-bar"
 """The id of the maintenance bar (``_maintenance.html``), which says why buttons are disabled."""
@@ -35,22 +34,10 @@ _SUBMIT = re.compile(r'<button type="submit"')
 _FROZEN = f'<button type="submit" disabled aria-describedby="{BAR_ID}"'
 
 
-def _routes(routes: Iterable[object]) -> list[APIRoute]:
-    """Flatten an app's routes, including routers mounted with ``include_router``."""
-    found: list[APIRoute] = []
-    for route in routes:
-        if isinstance(route, APIRoute):
-            found.append(route)
-        inner = getattr(route, "original_router", None)
-        if inner is not None:
-            found.extend(_routes(inner.routes))
-    return found
-
-
 def requirement_for(routes: Iterable[object], path: str) -> RequirePermission | None:
     """Return the ``RequirePermission`` of the admin route that answers a POST to ``path``."""
     scope = {"type": "http", "path": path, "method": "POST", "root_path": ""}
-    for route in _routes(routes):
+    for route in all_routes(routes):
         match, _ = route.matches(scope)
         if match is not Match.FULL:
             continue
