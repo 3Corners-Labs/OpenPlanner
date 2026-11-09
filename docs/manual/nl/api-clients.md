@@ -52,6 +52,7 @@ nieuw secret; daarna geeft de API geen tokens meer aan deze client.
 Wat de client mag doen. Minstens één is nodig:
 
 - **Vrije tijden lezen** (`availability:read`): vrije tijden van groepen opvragen.
+- **Gebruikscijfers per uur lezen** (`reports:read`): de aantallen en sommen van de rapporten voor de groepen van de client, zoals in `docs/reporting-api.md`. Kleine aantallen worden weggelaten en er zijn geen persoonsgegevens.
 - **Configuratiepakket exporteren en importeren (hele installatie)**
   (`configuration:transfer`): geldt voor de hele installatie, ongeacht de organisatie van de
   client.

@@ -30,6 +30,10 @@ TOKEN_PATH = f"{AGENT_API_PREFIX}/oauth/token"
 
 SCOPE_DESCRIPTIONS: dict[ApiScope, str] = {
     ApiScope.AVAILABILITY_READ: "Read groups and their free appointment times (no personal data).",
+    ApiScope.REPORTS_READ: (
+        "Read the hourly usage figures of the client's groups: counts and sums per cut, small "
+        "counts left out, no personal data (ADR 0117)."
+    ),
     ApiScope.CONFIGURATION_TRANSFER: (
         "Export, plan and apply the configuration of the whole installation (ADR 0099). The "
         "client is not bound by per-object rights: it can change anything a superuser can "

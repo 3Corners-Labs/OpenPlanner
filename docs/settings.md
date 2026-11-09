@@ -128,6 +128,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_USAGE_EVENTS_TO_LOG` | bool | `false` | — | `settings.platform.manage` | Also write every usage fact as the log line usage.fact for the log destinations: counts and codes only, no personal data (ADR 0117 point 15). |
 | `REPORTING_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of a usage report may hold; more is refused (ADR 0117 point 12). |
 | `REPORTING_EXPORT_MAX_DAYS` | int | `400` | 31–1100 | `settings.platform.manage` | Most days one CSV export of a usage report may cover (ADR 0117 point 12). |
+| `REPORTING_API_PAGE_SIZE` | int | `1000` | 100–10000 | `settings.platform.manage` | Most cells in one page of the usage API (ADR 0117 point 13). |
+| `REPORTING_API_RATE_PER_MINUTE` | int | `30` | 5–300 | `settings.platform.manage` | Calls per minute per API client to the usage API (ADR 0117 point 13); the off switch stays RATE_LIMIT_ENABLED. |
 | `REPORTING_DIGEST_LATE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Latest a missed digest is still sent, in hours after its time; later it is skipped (ADR 0117 point 16). |
 | `REPORTING_DIGEST_MAX_SUBSCRIPTIONS` | int | `20` | 1–200 | `settings.platform.manage` | Most digest subscriptions one organisation may have (ADR 0117 point 16). |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |

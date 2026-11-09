@@ -147,6 +147,7 @@ from app.domain.tls import public_address
 from app.domain.tls_check import CertificateStatus, TlsWatch
 from app.domain.tls_source import CertificateSourceService
 from app.domain.trial_call_service import TrialCallService
+from app.domain.usage_api_service import UsageApiLimits, UsageApiService
 from app.domain.usage_export_service import UsageExportService
 from app.domain.usage_report_service import UsageReportService
 from app.i18n import Translator, load_catalogues
@@ -309,6 +310,7 @@ def create_app(
         unknown_links=settings.rate_limit_unknown_links,
         agent_tokens=settings.rate_limit_agent_tokens,
         agent_calls=settings.rate_limit_agent_calls,
+        reports=f"{settings.reporting_api_rate_per_minute}/minute",
     )
     # Machine API (ADR 0023): only mounted when the deployment switches it on.
     agent_api = create_agent_api() if settings.agent_api_enabled else None
@@ -341,6 +343,7 @@ def create_app(
                 unknown_links=current.rate_limit_unknown_links,
                 agent_tokens=current.rate_limit_agent_tokens,
                 agent_calls=current.rate_limit_agent_calls,
+                reports=f"{current.reporting_api_rate_per_minute}/minute",
             )
             set_log_level(current.log_level)
             set_slow_query_ms(current.sql_slow_ms)
@@ -800,6 +803,16 @@ def create_app(
         app.state.api_access = ApiAccessService(
             uow, clock, app.state.admin_service, available=settings.agent_api_enabled
         )
+        app.state.usage_api_service = UsageApiService(
+            uow,
+            app.state.api_access,
+            clock,
+            lambda: live().reporting_min_cell_size,
+            lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
+            lambda: UsageApiLimits(
+                live().reporting_api_page_size, live().reporting_export_max_days
+            ),
+        )
         # ADR 0029: the web process only reads checks and stores requests; no release lookup.
         app.state.update_service = update_service(live(), uow, clock, http, lookup=False)
         # ADR 0067: a version change nobody requested in the portal still leaves a trace.
@@ -819,6 +832,7 @@ def create_app(
                 "client_pseudonyms",
                 "configuration_packages",  # ADR 0089 point 7: the same service as the portal
                 "configuration_documents",  # ADR 0099: the document service, same as the portal
+                "usage_api_service",  # ADR 0117 point 13: the hourly figures, scoped to the client
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
             agent_api.state.settings = app.state.settings

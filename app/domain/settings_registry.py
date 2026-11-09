@@ -1156,6 +1156,27 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1100,
     ),
     S(
+        "reporting_api_page_size",
+        K.INT,
+        1000,
+        _C,
+        T.RETENTION,
+        "Most cells in one page of the usage API (ADR 0117 point 13).",
+        minimum=100,
+        maximum=10_000,
+    ),
+    S(
+        "reporting_api_rate_per_minute",
+        K.INT,
+        30,
+        _C,
+        T.RETENTION,
+        "Calls per minute per API client to the usage API (ADR 0117 point 13); the off switch "
+        "stays RATE_LIMIT_ENABLED.",
+        minimum=5,
+        maximum=300,
+    ),
+    S(
         "reporting_digest_send_hour",
         K.INT,
         7,

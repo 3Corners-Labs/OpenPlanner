@@ -59,6 +59,8 @@ SETTING_LABELS: dict[str, str] = {
     "reporting_usage_events_to_log": "settings.field.reporting_usage_events_to_log.label",
     "reporting_export_max_rows": "settings.field.reporting_export_max_rows.label",
     "reporting_export_max_days": "settings.field.reporting_export_max_days.label",
+    "reporting_api_page_size": "settings.field.reporting_api_page_size.label",
+    "reporting_api_rate_per_minute": "settings.field.reporting_api_rate_per_minute.label",
     "reporting_digest_send_hour": "settings.field.reporting_digest_send_hour.label",
     "reporting_digest_include_numbers": "settings.field.reporting_digest_include_numbers.label",
     "reporting_digest_late_hours": "settings.field.reporting_digest_late_hours.label",

@@ -11432,6 +11432,14 @@ msgstr "Voorgestelde tijd vrijgeven"
 msgid "audit.job.send_proposal_released"
 msgstr "Melding vrijgegeven voorstel sturen"
 
+msgid "authz.api_scope.reports_read"
+msgstr "Gebruikscijfers per uur lezen"
+
+msgid "settings.field.reporting_api_page_size.label"
+msgstr "Meeste cellen op één pagina van de gebruiks-API"
+
+msgid "settings.field.reporting_api_rate_per_minute.label"
+msgstr "Aanroepen per minuut per API-client naar de gebruiks-API"
 msgid "authz.permission.reports_digest_manage"
 msgstr "Samenvattingen van de rapporten beheren"
 

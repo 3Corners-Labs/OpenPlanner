@@ -27,6 +27,7 @@ SWEPT = frozenset(
         "GET /me",
         "GET /groups",
         "GET /groups/{slug}/availability",
+        "GET /reports/usage",
         "GET /configuration",
         "POST /configuration/plan",
         "POST /configuration/apply",
@@ -71,7 +72,9 @@ def test_every_route_of_the_agent_api_is_swept_and_only_one_addresses_a_group(ag
 
     keys = {f"{m} {r.path}" for r in routes if r.path not in OPEN_ROUTES for m in r.methods}
     assert keys == SWEPT, "a new agent API route: sweep it in this file"
-    assert set(scoped_routes(routes)) == {"GET /groups/{slug}/availability"}
+    # The usage API has a `group` query that only narrows within the grant (tested in
+    # test_agent_api_usage.py: a foreign group is group_not_found).
+    assert set(scoped_routes(routes)) == {"GET /groups/{slug}/availability", "GET /reports/usage"}
 
 
 @pytest.mark.parametrize(
@@ -120,3 +123,16 @@ async def test_the_configuration_document_holds_no_booking_no_token_and_no_clien
         for secret in (issued.secret, bearer, PASSPHRASE):
             assert secret.encode() not in document, "a credential in clear text in the document"
         assert issued.client.client_id.encode() in document, "the client itself is configuration"
+
+
+@pytest.mark.parametrize("fmt", ["json", "csv", "ndjson"])
+async def test_the_usage_answers_hold_no_marker_in_any_format(booked: Agent, fmt: str) -> None:
+    issued = await booked.register(scopes=["reports:read"])
+    headers = await booked.bearer(issued)
+
+    response = await booked.client.get(
+        f"{BASE}/reports/usage", params={**WINDOW, "format": fmt}, headers=headers
+    )
+
+    assert response.status_code == 200, response.text
+    assert _markers_in(response.text) == set(), "personal data in a usage answer"

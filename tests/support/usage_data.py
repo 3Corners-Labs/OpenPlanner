@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import GroupRow
 from app.adapters.db.uow import SqlUnitOfWork
+from app.domain.ports import Clock
 from app.domain.usage import FactKind, UsageFact, UsageOutcome, hour_of
 from app.domain.usage_rollup_service import UsageRollup
 from tests.admin.conftest import Site
@@ -19,6 +20,11 @@ HOUR = datetime(2026, 1, 1, 8, tzinfo=UTC)
 async def fill(site: Site, slug: str, count: int) -> None:
     """Write ``count`` bookings created and cancelled for a group, and roll them up."""
     app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    await fill_app(app, site.clock, slug, count)
+
+
+async def fill_app(app: Any, clock: Clock, slug: str, count: int) -> None:
+    """The same for any running application: its engine and its clock."""
     engine = app.state.engine
     async with AsyncSession(engine) as session:
         group = (await session.execute(select(GroupRow).where(GroupRow.slug == slug))).scalar_one()
@@ -41,5 +47,5 @@ async def fill(site: Site, slug: str, count: int) -> None:
                 )
             )
     await UsageRollup(
-        uow, site.clock, lambda: timedelta(minutes=15), lambda: 35, lambda: 25
+        uow, clock, lambda: timedelta(minutes=15), lambda: 35, lambda: 25
     ).run_if_due()

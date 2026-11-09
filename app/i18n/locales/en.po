@@ -11419,6 +11419,14 @@ msgstr "Release the proposed time"
 msgid "audit.job.send_proposal_released"
 msgstr "Send notice of a released proposal"
 
+msgid "authz.api_scope.reports_read"
+msgstr "Read the hourly usage figures"
+
+msgid "settings.field.reporting_api_page_size.label"
+msgstr "Most cells in one page of the usage API"
+
+msgid "settings.field.reporting_api_rate_per_minute.label"
+msgstr "Calls per minute per API client to the usage API"
 msgid "authz.permission.reports_digest_manage"
 msgstr "Manage the digest of the reports"
 

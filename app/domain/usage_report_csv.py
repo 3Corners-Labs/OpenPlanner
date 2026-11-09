@@ -17,8 +17,9 @@ in the section "CSV export"; the file carries no interface text, so the language
 """
 
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, replace
 from datetime import UTC, date
+from typing import Any
 
 from app.domain.csv_export import Cell
 from app.domain.usage import UsageCell
@@ -154,6 +155,19 @@ TIDY_HEADER: tuple[str, ...] = (
 """The columns of ``openplanner.usage/1``: hour (UTC), who, metric, the cuts, then the figures."""
 
 
+CUT_FIELDS: dict[str, str] = {
+    "booking_kind": "booking_kind",
+    "dispatch_kind": "dispatch_kind",
+    "subject": "subject_code",
+    "locale": "locale",
+    "channel": "channel_kind",
+    "outcome": "outcome",
+    "actor_class": "actor_class",
+    "reason": "reason_code",
+}
+"""The cut columns of the tidy file and the cell field each one reads; the API's ``cut`` is one."""
+
+
 @dataclass(frozen=True)
 class Tidy:
     """The rows of a tidy file and how many cells were left out.
@@ -174,8 +188,15 @@ def tidy_rows(
     first_day: date,
     last_day: date,
     threshold: int,
+    keep: frozenset[str] | None = None,
+    metric: str | None = None,
 ) -> Tidy:
     """Return one row per hourly cell of ``groups`` in the range, small cells left out.
+
+    ``keep`` names the cut columns to keep (keys of ``CUT_FIELDS``); the cells are added up over
+    the others before the threshold is applied, as the screens add up before they hide. The
+    duration bucket is always kept. ``None`` keeps every cut as stored. ``metric`` limits the
+    rows to one metric.
 
     The range is whole group-local days, as on the screens. A cell below ``threshold`` is not
     written (a row would say that something with those cuts happened); there are no totals, so
@@ -185,7 +206,10 @@ def tidy_rows(
     by_id = {g.group_id: g for g in groups}
     shown: list[tuple[Cell, ...]] = []
     hidden = 0
-    for cell, _local in local_cells(cells, zones_of(groups), first_day, last_day):
+    wanted = [c for c, _local in local_cells(cells, zones_of(groups), first_day, last_day)]
+    if metric is not None:
+        wanted = [c for c in wanted if c.metric == metric]
+    for cell in _added_up(wanted, keep):
         figure = show_cell(cell, threshold)
         if figure.suppressed:
             hidden += 1
@@ -203,9 +227,39 @@ def tidy_rows(
                 figure.max_value,
             )
         )
-    return Tidy(
-        sorted(shown, key=lambda row: tuple("" if c is None else str(c) for c in row)), hidden
-    )
+    return Tidy(sorted(shown, key=row_key), hidden)
+
+
+KEY_COLUMNS = 13
+"""The leading columns of a tidy row that identify its cell; the figures follow."""
+
+
+def row_key(row: Sequence[Cell]) -> tuple[str, ...]:
+    """Return the sort key of a tidy row: its identifying columns as text (empty for none)."""
+    return tuple("" if c is None else str(c) for c in row[:KEY_COLUMNS])
+
+
+def _added_up(cells: Sequence[UsageCell], keep: frozenset[str] | None) -> list[UsageCell]:
+    """Return ``cells`` with the cuts not in ``keep`` removed and equal cells added together."""
+    if keep is None:
+        return list(cells)
+    blank: dict[str, Any] = {f: None for n, f in CUT_FIELDS.items() if n not in keep}
+    merged: dict[tuple[object, ...], UsageCell] = {}
+    for cell in cells:
+        cut = replace(cell, **blank)
+        key = (cut.bucket_hour, cut.group_id, cut.metric, *_cuts(cut))
+        found = merged.get(key)
+        merged[key] = (
+            cut
+            if found is None
+            else replace(
+                found,
+                count=found.count + cut.count,
+                sum_value=found.sum_value + cut.sum_value,
+                max_value=max(found.max_value, cut.max_value),
+            )
+        )
+    return list(merged.values())
 
 
 def _cuts(cell: UsageCell) -> tuple[object, ...]:

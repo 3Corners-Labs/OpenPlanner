@@ -648,6 +648,8 @@ The new columns hold no personal data: `call_status.peak_participants` and `gues
 
 From step 8 a holder of `reports.export` downloads what a page shows, or the hourly cells, as CSV:
 
+    API client (reports:read) ─► its groups ─► the same suppressed hourly rows as JSON, CSV or NDJSON (step 9)
+
     reports.export ─► the page's load (scope, threshold) ─► the suppressed tables or cells ─► CSV (counts, codes, slugs)
                                                            └► audit event reports.export (family, range, rows, SHA-256)
 
