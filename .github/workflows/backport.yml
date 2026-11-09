@@ -63,6 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           set -f   # the dispatched value is never globbed
+          pushed=""
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             numbers="$DISPATCHED"
           elif ! python3 -m scripts.decision_gate --base "$BEFORE" --head "$GITHUB_SHA" \
@@ -71,12 +72,14 @@ jobs:
             exit 1
           else
             numbers="$(cat "$RUNNER_TEMP/pulls")"
+            # Each listed pull request's merge commit must be one of these (release_line.py).
+            pushed="$(git rev-list --first-parent "$BEFORE..$GITHUB_SHA")"
           fi
           found='[]'
           if [ -n "$numbers" ]; then
-            # shellcheck disable=SC2086 # numbers: pull request numbers, checked by argparse
+            # shellcheck disable=SC2086 # numbers and pushed: digits and commit ids, unglobbed
             found="$(python3 -m scripts.release_line backports \
-              --repository "$GITHUB_REPOSITORY" --pull $numbers)"
+              --repository "$GITHUB_REPOSITORY" --pull $numbers ${pushed:+--pushed $pushed})"
           fi
           echo "backports=$found" >> "$GITHUB_OUTPUT"
 
@@ -137,7 +140,7 @@ jobs:
           fi
           git push --force origin "$branch"
           url="$(gh pr create --base "release/$LINE" --head "$branch" \
-            --title "$TITLE (backport to $LINE)" \
+            --title "${TITLE:0:200} (backport to $LINE)" \
             --body "Cherry-pick of #$NUMBER ($COMMIT) onto \`release/$LINE\` (ADR 0116 point 3), opened by the backport workflow for the label \`backport:$LINE\`. The review questions and the security review are those of #$NUMBER; the pull request runs the full lane and must be up to date with the line.")"
           gh pr merge --auto --squash "$url"
           echo "::notice::opened $url"

@@ -14,6 +14,7 @@ from scripts.release_line import (
     backports_of,
     may_cut,
     newest_release,
+    refusal,
     tag_target,
 )
 from scripts.release_plan import MAIN, LineError, Target
@@ -238,33 +239,54 @@ FIVE = [
 ]
 
 
-def test_a_pull_request_merged_into_main_gives_one_cherry_pick_per_line() -> None:
+def test_a_merged_pull_request_gives_one_cherry_pick_per_line_its_labels_name() -> None:
     assert backports_of(PULLS[5]) == FIVE
     assert backports_of(PULLS[6]) == [], "no backport label"
-    assert backports_of(PULLS[7]) == [], "not merged: nothing on main to cherry-pick"
     assert backports_of(PULLS[8]) == [], "backport:x names no line"
-    assert backports_of(PULLS[9]) == [], "merged elsewhere: no fix of main"
+
+
+def test_only_a_pull_request_this_push_merged_into_main_can_be_backported() -> None:
+    assert refusal(PULLS[5], {"sha5", "sha6"}) is None
+    assert refusal(PULLS[5], None) is None, "a dispatch names no push"
+    assert refusal(PULLS[7], None) == "it is not merged into main (yet)"
+    assert refusal(PULLS[9], None) == "it is not merged into main (yet)", "merged elsewhere"
+    # `Merge pull request #5 ... (#6)` names #5, whose merge commit is not in this push.
+    assert refusal(PULLS[5], {"sha6"}) == (
+        "its merge commit is none of the commits this push brought to main"
+    )
+
+
+def test_a_refused_pull_request_stops_the_run_and_is_never_skipped_quietly() -> None:
+    for numbers, pushed in (([5, 7], None), ([9], None), ([5, 6], {"sha6"})):
+        with pytest.raises(LineError, match="cannot be backported"):
+            backports(numbers, "o/r", FakeGh(pulls=PULLS), pushed)
 
 
 def test_each_pull_request_is_read_once() -> None:
     fake = FakeGh(pulls=PULLS)
 
-    assert backports([6, 5, 7, 5, 8, 9], "o/r", fake) == FIVE
-    assert fake.calls == [["api", f"repos/o/r/pulls/{n}"] for n in (5, 6, 7, 8, 9)]
+    assert backports([6, 5, 8, 5], "o/r", fake, {"sha5", "sha6", "sha8"}) == FIVE
+    assert fake.calls == [["api", f"repos/o/r/pulls/{n}"] for n in (5, 6, 8)]
 
 
 def test_the_command_prints_the_matrix_as_one_json_list(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     fake = FakeGh(pulls=PULLS)
+    pushed = ["--pushed", "sha5", "sha6"]
 
-    assert release_line.main(["backports", "--repository", "o/r", "--pull", "6", "5"], fake) == 0
+    assert (
+        release_line.main(["backports", "--repository", "o/r", "--pull", "6", "5", *pushed], fake)
+        == 0
+    )
     assert json.loads(capsys.readouterr().out) == [
         {"number": 5, "commit": "sha5", "title": "fix: number 5", "line": "0.5"},
         {"number": 5, "commit": "sha5", "title": "fix: number 5", "line": "0.6"},
     ]
     assert release_line.main(["backports", "--repository", "o/r", "--pull", "6"], fake) == 0
     assert json.loads(capsys.readouterr().out) == []
+    assert release_line.main(["backports", "--repository", "o/r", "--pull", "7"], fake) == 1
+    assert "#7 cannot be backported" in capsys.readouterr().err
 
 
 def test_a_dispatch_with_anything_but_a_number_stops() -> None:
@@ -289,6 +311,7 @@ def test_the_backport_starts_from_a_merge_to_main_or_a_dispatch() -> None:
     assert "python3 -m scripts.decision_gate" in script
     assert "--list-pull-requests" in script
     assert "python3 -m scripts.release_line backports" in script
+    assert "--pushed" in script, "each listed pull request must be one this push merged"
 
 
 def test_the_job_with_the_key_runs_once_per_entry_and_reads_nothing_again() -> None:

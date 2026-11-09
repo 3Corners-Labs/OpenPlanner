@@ -99,7 +99,9 @@ Options weighed:
    gate's own walk (`decision_gate.py --list-pull-requests` over the first-parent commits; a
    commit that names none fails the run, as in the gate), and `scripts/release_line.py
    backports` reads each pull request once and lists one cherry-pick per line its labels name
-   (`backport:X.Y`, the rule of ADR 0116), for a pull request merged into `main`. Only then
+   (`backport:X.Y`, the rule of ADR 0116). A listed pull request that is not merged into
+   `main` (yet), or whose merge commit is none of the pushed commits (a subject such as
+   `Merge pull request #12 … (#34)` names the wrong one), fails the run as well. Only then
    does the job with the release app's key run, once per entry (a matrix, so one failing
    backport stops no other), taking number, merge commit, title and line from the entry
    without reading anything again.
@@ -202,9 +204,11 @@ runbook; nothing in `app/config.py` or `app/domain/settings_registry.py` changes
 
 **Fixed on purpose:** the policy's name, its single target and its two events (they follow the
 gate's workflow file, and a test ties them together); the window of point 6, since the day
-before, as for the bypasses of ADR 0109, read from the latest 100 runs. They live in
-`.github/guardrails.json`, the fetch and the audit script, and changing them is a decision
-(ADR 0078).
+before, as for the bypasses of ADR 0109, read from the latest 100 runs. The policy lives in
+`.github/guardrails.json` and the gate's workflow file, so changing it is a decision
+(ADR 0078). The window, the page size and the `known_unseen` and `--full` rules live in the
+fetch and audit scripts, which are build work as all of ADR 0109's audit is: a change there
+merges on green after review, not after `po:approved`.
 
 ## Build status
 
