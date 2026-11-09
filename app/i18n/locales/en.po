@@ -11710,3 +11710,105 @@ msgstr "Former team members"
 
 msgid "reports.team.note"
 msgstr "A figure below {n} is hidden and written as < {n}, and the minutes go with the calls. There is no total row: removed team members are one row, so history keeps its totals and no individual remains."
+
+msgid "reports.share"
+msgstr "Share"
+
+msgid "reports.table.suppressed"
+msgstr "Counts below {n} are hidden. When only one count of a table is hidden, the next smallest is hidden too, so the total cannot be subtracted back."
+
+msgid "reports.provisional.note"
+msgstr "The last 24 hours are provisional: bookings can still be cancelled or moved."
+
+msgid "reports.provisional.days"
+msgstr "Provisional days"
+
+msgid "reports.chart.unit.bookings"
+msgstr "bookings"
+
+msgid "reports.volume.days.title"
+msgstr "Bookings per day (the booking's own day, in the group's time zone)"
+
+msgid "reports.volume.days.weekday"
+msgstr "Weekday"
+
+msgid "reports.volume.days.weekend"
+msgstr "Weekend"
+
+msgid "reports.volume.outcome.title"
+msgstr "How bookings ended"
+
+msgid "reports.volume.outcome.cancelled"
+msgstr "Cancelled"
+
+msgid "reports.volume.outcome.all"
+msgstr "All bookings"
+
+msgid "reports.split.label"
+msgstr "Split by"
+
+msgid "reports.split.none"
+msgstr "None"
+
+msgid "reports.split.queue"
+msgstr "Queue method"
+
+msgid "reports.split.locale"
+msgstr "Language"
+
+msgid "reports.split.title"
+msgstr "Bookings created, split"
+
+msgid "reports.split.left_out"
+msgstr "{n} group(s) are too small to be split and are left out."
+
+msgid "reports.tile.created"
+msgstr "Bookings in the period"
+
+msgid "reports.tile.created.detail"
+msgstr "created per group-local day"
+
+msgid "reports.tile.no_show"
+msgstr "No-show rate"
+
+msgid "reports.tile.no_show.of"
+msgstr "of {n} finished"
+
+msgid "reports.tile.cancel"
+msgstr "Cancelled by participant"
+
+msgid "reports.tile.cancel.late"
+msgstr "{percent}% less than a day before"
+
+msgid "reports.tile.confirmed"
+msgstr "Confirmed after email"
+
+msgid "reports.tile.confirmed.median"
+msgstr "median {range}"
+
+msgid "reports.tile.utilisation"
+msgstr "Utilisation"
+
+msgid "reports.tile.utilisation.of"
+msgstr "{booked} of {capacity} places"
+
+msgid "reports.tile.idle"
+msgstr "Unused places"
+
+msgid "reports.tile.idle.detail"
+msgstr "places nobody booked"
+
+msgid "reports.tile.full"
+msgstr "Full blocks"
+
+msgid "reports.tile.full.of"
+msgstr "{n} of {m}"
+
+msgid "reports.tile.shortfall"
+msgstr "Staff shortfall"
+
+msgid "reports.tile.shortfall.detail"
+msgstr "blocks"
+
+msgid "reports.tile.shortfall.accepted"
+msgstr "{n} accepted"

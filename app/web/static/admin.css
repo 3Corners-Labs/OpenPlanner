@@ -3216,3 +3216,38 @@ fieldset.card {
   display: block;
   margin-bottom: 1rem;
 }
+
+/* --- Report figure tiles (ADR 0117 step 6b) ------------------------------------------------- */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 1rem;
+  margin: 0 0 1rem;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius);
+  background: var(--adm-surface);
+}
+
+.tile__label {
+  color: var(--adm-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.tile__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.tile__detail {
+  color: var(--adm-text-muted);
+  font-size: 0.8rem;
+}

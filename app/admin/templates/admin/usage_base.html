@@ -30,6 +30,16 @@
       <label for="usage-to">{{ _("reports.usage.to") }}</label>
       <input id="usage-to" name="to" type="date" value="{{ form_to }}">
     </div>
+    {% if view == "volume" %}
+    <div class="field">
+      <label for="usage-split">{{ _("reports.split.label") }}</label>
+      <select id="usage-split" name="split">
+        <option value=""{% if not split %} selected{% endif %}>{{ _("reports.split.none") }}</option>
+        <option value="queue"{% if split == "queue" %} selected{% endif %}>{{ _("reports.split.queue") }}</option>
+        <option value="locale"{% if split == "locale" %} selected{% endif %}>{{ _("reports.split.locale") }}</option>
+      </select>
+    </div>
+    {% endif %}
     <div class="form-actions"><button type="submit" class="button">{{ _("reports.usage.apply") }}</button></div>
   </form>
   {% if export_error is defined %}{{ error_message(export_error) }}{% endif %}

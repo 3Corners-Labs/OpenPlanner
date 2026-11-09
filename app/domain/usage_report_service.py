@@ -82,8 +82,8 @@ class LoadedUsage:
     now: datetime
 
 
-def build_volume(loaded: LoadedUsage) -> VolumeReport:
-    """Return the *Volume* report of what was loaded, small cells hidden."""
+def build_volume(loaded: LoadedUsage, split: str | None = None) -> VolumeReport:
+    """Return the *Volume* report of what was loaded, small cells hidden; ``split`` cuts it."""
     return volume_report(
         loaded.cells,
         loaded.groups,
@@ -93,6 +93,7 @@ def build_volume(loaded: LoadedUsage) -> VolumeReport:
         now=loaded.now,
         as_of=loaded.as_of,
         before_reporting=loaded.before,
+        split=split,
     )
 
 
@@ -274,14 +275,17 @@ class UsageReportService:
         group_slug: str | None = None,
         first_day: date | None = None,
         last_day: date | None = None,
+        split: str | None = None,
     ) -> UsageVolume:
         """Return the *Volume* report of one group, or of an organisation's groups in scope.
+
+        ``split`` cuts the bookings created by queue method or language (``usage_report.SPLITS``).
 
         Raises:
             DomainError: As ``load``.
         """
         loaded = await self.load(principal, organisation_slug, group_slug, first_day, last_day)
-        report = build_volume(loaded)
+        report = build_volume(loaded, split)
         return self._screen(report, loaded, group_slug)
 
     async def queue(

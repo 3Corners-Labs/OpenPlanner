@@ -13,7 +13,7 @@ suppression of the domain, and nothing here looks at, adds up or rounds a hidden
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from app.domain.usage_report import CountTable
+from app.domain.usage_report import CountTable, VolumeReport
 from app.domain.usage_report_capacity import CapacityReport
 from app.domain.usage_report_channels import ChannelsReport
 from app.domain.usage_report_queue import QueueReport
@@ -33,6 +33,9 @@ DESCRIPTIONS: dict[ReportKind, str] = {
     ReportKind.LINE: "reports.chart.desc.line",
 }
 """The sentence that describes each kind of chart; the catalogue test sees every key used."""
+
+WEEKEND_FROM = 5
+"""``date.weekday()`` of the first weekend day (Saturday)."""
 
 Labeller = Callable[[str, str], str]
 """``(table, code) -> words``: ``usage_labels.label`` with the page's translation bound."""
@@ -157,6 +160,65 @@ def queue_charts(report: QueueReport, _: BoundGettext) -> dict[str, ChartView]:
         threshold=report.threshold,
     )
     return charts
+
+
+def volume_charts(report: VolumeReport, _: BoundGettext) -> dict[str, ChartView]:
+    """Return the charts of the *Volume* screen: bookings per day, and how they ended.
+
+    The day chart has two series, weekday and weekend, so that a weekend is told apart by its
+    pattern and not by its colour alone; a day holds a value in exactly one of them. The outcome
+    bar is one stacked column in four series; the table after it keeps the finer outcomes.
+    """
+    words: Labeller = lambda table, code: label(_, table, code)  # noqa: E731
+    weekday: list[int | None] = []
+    weekend: list[int | None] = []
+    for d in report.days:
+        hidden = d.count is None
+        weekend_day = d.day.weekday() >= WEEKEND_FROM
+        weekday.append(None if hidden else (0 if weekend_day else d.count))
+        weekend.append(None if hidden else (d.count if weekend_day else 0))
+    by_outcome = {r.code: r.count for r in report.outcomes.rows}
+    cancelled_codes = [c for c in by_outcome if c.startswith("cancelled_")]
+    cancelled_parts = [by_outcome[c] for c in cancelled_codes]
+    cancelled = None if None in cancelled_parts else sum(p or 0 for p in cancelled_parts)
+    outcome_series = [
+        ReportSeries(words("outcomes", "completed"), (by_outcome.get("completed"),)),
+        ReportSeries(words("outcomes", "no_show"), (by_outcome.get("no_show"),)),
+        ReportSeries(_("reports.volume.outcome.cancelled"), (cancelled,)),
+        ReportSeries(
+            words("outcomes", "expired_unconfirmed"), (by_outcome.get("expired_unconfirmed"),)
+        ),
+    ]
+    unit = _("reports.chart.unit.bookings")
+    return {
+        "days": _view(
+            _,
+            "chart-days",
+            ReportKind.STACKED,
+            _("reports.volume.days.title"),
+            _("reports.created.day"),
+            [d.day.isoformat() for d in report.days],
+            [
+                ReportSeries(_("reports.volume.days.weekday"), tuple(weekday)),
+                ReportSeries(_("reports.volume.days.weekend"), tuple(weekend)),
+            ],
+            unit=unit,
+            threshold=report.threshold,
+            total=report.created_total,
+            total_label=_("reports.total"),
+        ),
+        "outcome": _view(
+            _,
+            "chart-outcome",
+            ReportKind.STACKED,
+            _("reports.volume.outcome.title"),
+            _("reports.outcomes.outcome"),
+            [_("reports.volume.outcome.all")],
+            outcome_series,
+            unit=unit,
+            threshold=report.threshold,
+        ),
+    }
 
 
 def capacity_charts(report: CapacityReport, _: BoundGettext) -> dict[str, ChartView]:
