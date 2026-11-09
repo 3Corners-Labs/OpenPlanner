@@ -48,6 +48,7 @@ from app.domain.csv_export import ExportLimits, ExportRefused, export_window
 from app.domain.entitlements import Refusal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_schema import Envelope, to_record
+from app.domain.lookups import group_summary_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.retention import RetentionOverview, candidates_before, summarise
 from app.domain.scheduling import GroupSummary
@@ -174,9 +175,7 @@ class AdminService:
         group: GroupSummary | None = None
         if level is not Level.GLOBAL and group_slug is not None:
             async with self._uow.read() as tx:
-                group = await tx.get_group_summary(group_slug)
-            if group is None:
-                raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+                group = await group_summary_by_slug(tx, group_slug)
             if group.group.is_archived and permission not in READ_WHEN_ARCHIVED:
                 raise DomainError(ErrorCode.GROUP_ARCHIVED)
         if level is Level.GROUP:

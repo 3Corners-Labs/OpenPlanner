@@ -55,6 +55,7 @@ from app.domain.authorization import (
     decide_client,
 )
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.lookups import group_summary_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import GroupSummary, Organisation
 
@@ -418,9 +419,7 @@ class ApiAccessService:
             DomainError: ``group_not_found`` or ``not_permitted``.
         """
         async with self._uow.read() as tx:
-            group = await tx.get_group_summary(group_slug)
-        if group is None:
-            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+            group = await group_summary_by_slug(tx, group_slug)
         target = Target.for_group(group.group.slug, group.organisation_slug)
         decision = decide_client(caller.grant, api_scope, target)
         if not decision.allowed:
