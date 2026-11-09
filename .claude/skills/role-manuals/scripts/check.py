@@ -45,6 +45,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from checkout_guard import guard_outside_checkout  # noqa: E402
 
 from app.domain.authorization import MATRIX, PARTICIPANT_ACTIONS, Permission, Role  # noqa: E402
 from app.i18n.po import load_catalogues  # noqa: E402
@@ -115,21 +118,6 @@ class Workspace:
         self.sources = self.root / "sources"
         self.img = self.root / "img"
         self.evidence = self.root / "evidence"
-
-
-def guard_outside_checkout(path: Path) -> None:
-    """Stop when ``path`` lies inside a checkout of the software (same rule as workspace.mjs).
-
-    Symbolic links are followed first, so a link into a checkout is refused as well.
-    """
-    path = path.resolve()
-    for folder in (path, *path.parents):
-        if (folder / "app" / "i18n" / "locales" / "nl.po").exists() or (
-            folder / ".claude" / "skills" / "role-manuals"
-        ).exists():
-            sys.exit(
-                f"check.py: {path} lies inside the checkout {folder}; keep the workspace outside it"
-            )
 
 
 def git(*args: str) -> str:
@@ -366,15 +354,16 @@ def labels(manual: dict) -> list[tuple[int, str]]:
 
 @dataclass
 class Inputs:
-    """What one check works on: the variables, the sources as text, and the build's manuals.
+    """What one check works on: the variables, the sources, the build's manuals, the shot list.
 
-    ``hashes`` holds the sha256 of each file read, by its path in the workspace: the verdict in
-    ``evidence/check.json`` lists them, so ``release.py freeze`` can tell the check is current.
+    ``hashes`` holds the sha256 of each of these files, by its path in the workspace: the verdict
+    in ``evidence/check.json`` lists them, so ``release.py freeze`` can tell the check is current.
     """
 
     config: dict
     sources: dict[Path, str]
     manuals: list[dict]
+    shots: list[dict]
     hashes: dict[str, str]
 
 
@@ -383,17 +372,23 @@ def _sha256(data: bytes) -> str:
 
 
 def load_inputs(ws: Workspace) -> Inputs:
-    """Read variables.json, the sources and build/manuals.json once, and refuse a stale build.
+    """Read every file the check works on once, and refuse a stale build.
 
-    ``build/manuals.json`` (written by build.mjs) holds ``variables_sha256``, the hash of the
-    variables.json bytes it was built with, and ``manuals``: per source its ``file`` (the stem),
-    ``sha256`` (of its bytes), ``role``, ``tasks`` and ``figures`` (each with its ``line``) and
-    ``bold`` (each span's ``text`` and ``line``). The build is refused when a source was added,
-    removed or edited, or variables.json was edited, since; the message names which.
+    These are variables.json, the sources, build/manuals.json and the shot list
+    (``evidence/shots.json``, written by ``capture.mjs``). ``build/manuals.json`` (written by
+    build.mjs) holds ``variables_sha256``, the hash of the variables.json bytes it was built
+    with, and ``manuals``: per source its ``file`` (the stem), ``sha256`` (of its bytes),
+    ``role``, ``tasks`` and ``figures`` (each with its ``line``) and ``bold`` (each span's
+    ``text`` and ``line``). The build is refused when a source was added, removed or edited, or
+    variables.json was edited, since; the message names which.
     """
+    shots_file = ws.evidence / "shots.json"
+    if not shots_file.exists():
+        sys.exit(f"check.py: {shots_file} is missing; run capture.mjs {ws.root} --list first")
     found = ws.root / "build" / "manuals.json"
     if not found.exists():
         sys.exit(f"check.py: {found} is missing; run build.mjs {ws.root} first")
+    shots = shots_file.read_bytes()
     variables = (ws.root / "variables.json").read_bytes()
     raw = {p: p.read_bytes() for p in sorted(ws.sources.glob("*.md"))}
     build = found.read_bytes()
@@ -411,10 +406,14 @@ def load_inputs(ws: Workspace) -> Inputs:
         changed.append("variables.json")
     if changed:
         sys.exit(f"check.py: changed after the last build: {', '.join(changed)}; build again")
-    hashes = {"variables.json": _sha256(variables), "build/manuals.json": _sha256(build)}
+    hashes = {
+        "variables.json": _sha256(variables),
+        "build/manuals.json": _sha256(build),
+        "evidence/shots.json": _sha256(shots),
+    }
     hashes |= {f"sources/{p.name}": _sha256(b) for p, b in raw.items()}
     sources = {p: b.decode() for p, b in raw.items()}
-    return Inputs(json.loads(variables), sources, data["manuals"], hashes)
+    return Inputs(json.loads(variables), sources, data["manuals"], json.loads(shots), hashes)
 
 
 def check_labels(manual: dict, catalogue: Catalogue, verdicts: dict, report: Report) -> None:
@@ -524,14 +523,11 @@ def main() -> int:
     args = parser.parse_args()
     ws = Workspace(args.workspace.resolve())
     guard_outside_checkout(ws.root)
-    shots_file = ws.evidence / "shots.json"
-    if not shots_file.exists():
-        sys.exit(f"check.py: {shots_file} is missing; run capture.mjs {ws.root} --list first")
     inputs = load_inputs(ws)
     config, sources, manuals = inputs.config, inputs.sources, inputs.manuals
     report = Report()
     ctx: dict = {
-        "shots": {s["id"] for s in json.loads(shots_file.read_text())},
+        "shots": {s["id"] for s in inputs.shots},
         "topics": {p.stem for p in (REPO / "docs" / "manual" / "nl").glob("*.md")},
         "codes": {p.value for p in Permission} | {a.key for a in PARTICIPANT_ACTIONS},
         "rights": Rights(

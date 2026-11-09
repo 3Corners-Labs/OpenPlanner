@@ -69,10 +69,11 @@ def _head(git: Git) -> str:
 
 
 def _captured(workspace: Path, build: dict[str, str]) -> None:
-    """Write the capture's record as capture.mjs does: its start and the run's build."""
+    """Write the capture's record as capture.mjs does: its start, the run's build, its shots."""
     state = {
         "started": "2026-11-08 21:47:02 CET",
         "stack": {"id": "20261108-203309", "build": build},
+        "records": {"pl-01": {"id": "pl-01", "status": "captured"}},
     }
     (workspace / "evidence" / "state.json").write_text(json.dumps(state))
 
@@ -94,12 +95,24 @@ def test_a_release_names_its_commit_before_its_candidate(git: Git, checkout: Pat
     assert release.release_tag(checkout, _head(git)) == ""
 
 
-def test_a_tag_of_another_shape_names_no_release(git: Git, checkout: Path) -> None:
+def test_a_tag_of_another_shape_is_passed_over(git: Git, checkout: Path) -> None:
     """Only ``vX.Y.Z`` and ``vX.Y.Z-rc.N`` name a release; a nearer tag of another shape none."""
     (checkout / "notes.md").write_text("later\n")
     commit_all(git, "notes")
     git("tag", "v2-preview")
+    assert release.release_tag(checkout, _head(git)) == "v1.0.0"
+    git("tag", "-d", "v1.0.0", "v1.0.0-rc.1")
     assert release.release_tag(checkout, _head(git)) == ""
+
+
+def test_a_workspace_inside_a_checkout_is_refused(git: Git, checkout: Path) -> None:
+    """record and freeze write into the workspace: never into a checkout of the software."""
+    (checkout / ".claude" / "skills" / "role-manuals").mkdir(parents=True)
+    inside = checkout / "manuals"
+    (inside / "evidence").mkdir(parents=True)
+    for command in (release.record, release.freeze):
+        with pytest.raises(SystemExit, match="inside the checkout"):
+            command(inside, repo=checkout)
 
 
 def test_record_names_the_release_when_the_image_is_the_tags(
@@ -143,7 +156,7 @@ def _sha256(path: Path) -> str:
 
 def _checked(workspace: Path, blocking: int = 0) -> None:
     """Write the verdict of check.py: the blocking count and the hash of every file it read."""
-    names = ["variables.json", "build/manuals.json"]
+    names = ["variables.json", "build/manuals.json", "evidence/shots.json"]
     names += [f"sources/{p.name}" for p in sorted((workspace / "sources").glob("*.md"))]
     inputs = {name: _sha256(workspace / name) for name in names}
     verdict = {"blocking": blocking, "inputs": inputs}
@@ -164,6 +177,7 @@ def _settled(
         "img/previous/pl-01.png": "earlier",
         "build/10-planner.pdf": "%PDF",
         "evidence/previous/state-1.json": "{}",
+        "evidence/shots.json": json.dumps([{"id": "pl-01"}]),
         "evidence/afhechting.md": "# Afhechting\n",
         "style-guide.md": "# Stijl\n",
         "README.md": "# Werkmap\n",
@@ -243,12 +257,16 @@ def _change(workspace: Path, change: str) -> None:
         (workspace / "build" / "manuals.json").write_text(json.dumps({"manuals": manuals}))
     elif change == "no record":
         (workspace / "evidence" / "afhechting.md").unlink()
+    elif change == "earlier image":
+        (workspace / "img" / "pl-02.png").write_text("from the capture before")
     if change == "blocking check":
         _checked(workspace, blocking=2)
     elif change == "edited after the check":
         (workspace / "sources" / "10-planner.md").write_text("# Planner, bijgewerkt\n")
     elif change == "added after the check":
         (workspace / "sources" / "20-medewerker.md").write_text("# Medewerker\n")
+    elif change == "shot list changed after the check":
+        (workspace / "evidence" / "shots.json").write_text(json.dumps([{"id": "pl-09"}]))
     else:
         _checked(workspace)
 
@@ -262,9 +280,11 @@ def _change(workspace: Path, change: str) -> None:
         ("versions differ", "no one version number"),
         ("concept", "no one version number"),
         ("no record", "afhechting.md first"),
+        ("earlier image", "not taken by this capture, so from an earlier one: pl-02;"),
         ("blocking check", "found 2 blocking"),
         ("edited after the check", "changed after the last check: sources/10-planner.md"),
         ("added after the check", "changed after the last check: sources/20-medewerker.md"),
+        ("shot list changed after the check", "changed after the last check: evidence/shots.json"),
     ],
 )
 def test_freeze_refuses_what_is_no_settled_release(

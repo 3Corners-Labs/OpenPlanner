@@ -17,8 +17,9 @@ next one is cut.
 settled version into ``versies/`` of the workspace: one folder per version, read-only, with
 ``MANIFEST.sha256`` over its files, a ``LEESMIJ.md`` and a zip with its own checksum. It refuses
 a trial, title pages that name another release, a version that exists, sources that do not
-state one version number, a missing record of the settlement, and a check that blocked or read
-other files than there are now (``evidence/check.json`` of ``check.py``). It builds the copy
+state one version number, a missing record of the settlement, a screenshot this capture did not
+take, and a check that blocked or read other files than there are now (``evidence/check.json``
+of ``check.py``). Both commands refuse a workspace inside a checkout. It builds the copy
 beside ``versies/`` and moves it into place only when it is whole. Then it sets ``commit``, the
 baseline of the next ``check.py --since``, to the release: every check reports what changed since
 the last frozen version, and nothing else moves the baseline.
@@ -35,6 +36,10 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from checkout_guard import guard_outside_checkout  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[4]
 STACK = Path(".claude/skills/verify-openplanner/scripts/stack.sh")
@@ -87,14 +92,21 @@ def git(repo: Path, *args: str) -> str:
 def release_tag(repo: Path, commit: str) -> str:
     """Return the nearest release tag of ``commit``, or "" when none is reachable.
 
-    A release can share its commit with its last candidate; the release names it then.
+    A nearer tag of another shape is passed over. A release can share its commit with its last
+    candidate; the release names it then.
     """
-    try:
-        nearest = git(repo, "describe", "--tags", "--abbrev=0", f"--match={TAGS}", commit)
-    except subprocess.CalledProcessError:
-        return ""
-    if not RELEASE.fullmatch(nearest):
-        return ""
+    passed_over: list[str] = []
+    while True:
+        skip = [f"--exclude={tag}" for tag in passed_over]
+        try:
+            nearest = git(
+                repo, "describe", "--tags", "--abbrev=0", f"--match={TAGS}", *skip, commit
+            )
+        except subprocess.CalledProcessError:
+            return ""
+        if RELEASE.fullmatch(nearest):
+            break
+        passed_over.append(nearest)
     peers = git(repo, "tag", "--points-at", f"refs/tags/{nearest}^{{commit}}", "--list", TAGS)
     releases = sorted(tag for tag in peers.split() if RELEASE.fullmatch(tag) and "-" not in tag)
     return releases[0] if releases else nearest
@@ -163,6 +175,7 @@ def capture_release(state: dict, repo: Path) -> tuple[str, str, bool]:
 
 def record(workspace: Path, repo: Path = REPO) -> str:
     """Write the label of the release the capture shows into variables.json; return it."""
+    guard_outside_checkout(workspace)
     commit, tag, same = capture_release(capture(workspace), repo)
     label = software_label(tag, commit, same)
     path = workspace / "variables.json"
@@ -199,8 +212,8 @@ def check_passed(workspace: Path) -> None:
     """Refuse unless the last check passed on the files as they are now.
 
     ``check.py`` writes its verdict to ``evidence/check.json``: the number of blocking findings
-    and the sha256 of every file it read (variables.json, build/manuals.json and each source). A
-    file changed, added or removed since makes the check older than what it would check now.
+    and the sha256 of every file it read, by its path in the workspace. Each of them must be
+    unchanged, and no source may have been added since, which a verdict cannot list.
     """
     path = workspace / "evidence" / "check.json"
     if not path.exists():
@@ -208,14 +221,15 @@ def check_passed(workspace: Path) -> None:
     verdict = _read(path)
     if verdict.get("blocking") != 0:
         sys.exit(f"release.py: the last check found {verdict.get('blocking')} blocking finding(s)")
-    listed = verdict.get("inputs", {})
-    now = {"variables.json", "build/manuals.json"}
-    now |= {f"sources/{p.name}" for p in (workspace / "sources").glob("*.md")}
-    changed = sorted(
-        name
-        for name in now | set(listed)
-        if name not in now or name not in listed or _sha256(workspace / name) != listed[name]
-    )
+    listed: dict[str, str] = verdict.get("inputs", {})
+
+    def unchanged(name: str) -> bool:
+        file = workspace / name
+        inside = not Path(name).is_absolute() and ".." not in Path(name).parts
+        return inside and file.is_file() and _sha256(file) == listed[name]
+
+    added = {f"sources/{p.name}" for p in (workspace / "sources").glob("*.md")} - set(listed)
+    changed = sorted(added | {name for name in listed if not unchanged(name)})
     if changed:
         sys.exit(f"release.py: changed after the last check: {', '.join(changed)}; run freeze.sh")
 
@@ -244,8 +258,23 @@ def _writable(folder: Path) -> None:
         path.chmod(0o755 if path.is_dir() else 0o644)
 
 
+def earlier_images(workspace: Path, state: dict) -> list[str]:
+    """Return the screenshots in ``img/`` that this capture did not take.
+
+    ``update.sh`` starts every capture with a new state and keeps the images of the one before,
+    so an image whose shot this capture skipped or never reached comes from an earlier capture.
+    """
+    records = state.get("records", {})
+    return sorted(
+        image.stem
+        for image in (workspace / "img").glob("*.png")
+        if records.get(image.stem, {}).get("status") != "captured"
+    )
+
+
 def freeze(workspace: Path, repo: Path = REPO, today: dt.date | None = None) -> Path:
     """Freeze the settled version of the manuals into ``versies/``; return its folder."""
+    guard_outside_checkout(workspace)
     state = capture(workspace)
     captured_from, tag, same = capture_release(state, repo)
     if not same:
@@ -264,6 +293,12 @@ def freeze(workspace: Path, repo: Path = REPO, today: dt.date | None = None) -> 
     version, version_text = manual_version(_read(workspace / "build" / "manuals.json")["manuals"])
     if not (workspace / RECORD).exists():
         sys.exit(f"release.py: write {RECORD} first: what was reread and what stays open")
+    earlier = earlier_images(workspace, state)
+    if earlier:
+        sys.exit(
+            f"release.py: not taken by this capture, so from an earlier one: {', '.join(earlier)}; "
+            "capture them again, or remove them from img/ so the manuals say they follow"
+        )
     check_passed(workspace)
     started = str(state.get("started", ""))
     if not re.match(r"\d{4}-\d{2}-\d{2}", started):

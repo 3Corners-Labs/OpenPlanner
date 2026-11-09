@@ -181,9 +181,11 @@ stands; a run on anything other than a tag is a trial, never a version.
    `MANIFEST.sha256` over every file, read-only, and a zip with its own checksum. It builds the
    copy beside `versies/` and moves it into place only when it is whole. It refuses a trial
    capture, title pages that name another release, a version that exists, sources that do not
-   all state the same version number, a missing `afhechting.md`, and a check that blocked or
-   read other files than there are now (`evidence/check.json`). Last, it sets `commit` to the
-   release's commit, the baseline of the next version's check; nothing else moves it.
+   all state the same version number, a missing `afhechting.md`, a screenshot in `img/` that
+   this capture did not take (its shot failed, so the image is an earlier capture's: take it
+   again, or remove it so the manual says it follows), and a check that blocked or read other
+   files than there are now (`evidence/check.json`). Last, it sets `commit` to the release's
+   commit, the baseline of the next version's check; nothing else moves it.
 
    Anyone can check a frozen version later with `shasum -a 256 -c MANIFEST.sha256` in its folder.
    List each version in the workspace's own overview, with its release and dates.
