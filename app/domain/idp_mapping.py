@@ -35,7 +35,6 @@ from app.domain.entitlements import ClaimMode, entitlement_value, is_idp_key
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, UnitOfWork
-from app.domain.scheduling import GroupSummary
 from app.domain.staff import GrantHolders, Membership, RefusedEntitlement
 
 _VIEW = Permission.IDP_MAPPING_VIEW
@@ -301,7 +300,7 @@ class IdpMappingService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        summary = await self._manage(principal, slug)
+        summary = await self._admin.authorize_group(principal, _MANAGE, slug)
         async with self._uow.read() as tx:
             holders = await tx.list_grant_holders(
                 Scope(organisations=frozenset({summary.organisation_slug}))
@@ -316,7 +315,7 @@ class IdpMappingService:
                 (grammar) or ``idp_key_taken`` (another group of the organisation has it),
                 each with field ``idp_key``.
         """
-        summary = await self._manage(principal, slug)
+        summary = await self._admin.authorize_group(principal, _MANAGE, slug)
         if not is_idp_key(value):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "idp_key")
         async with self._uow.locked() as tx:
@@ -341,15 +340,3 @@ class IdpMappingService:
                 )
             )
         return True
-
-    async def _manage(self, principal: Principal, slug: str) -> GroupSummary:
-        """Authorise ``idp_mapping.manage`` on the group's organisation; return the group.
-
-        Raises:
-            DomainError: ``not_permitted`` or ``group_not_found``.
-        """
-        authorization = await self._admin.authorize(principal, _MANAGE, group_slug=slug)
-        require(authorization)
-        if authorization.group is None:  # pragma: no cover - authorize looked it up
-            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-        return authorization.group

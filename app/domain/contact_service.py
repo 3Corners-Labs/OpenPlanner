@@ -19,13 +19,13 @@ organisation's. A closure copies it when it starts.
 
 from dataclasses import dataclass
 
-from app.domain.admin import AdminService, Authorization, record_change, require
+from app.domain.admin import AdminService, record_change, require
 from app.domain.authorization import Permission, Principal
 from app.domain.contacts import ContactBlock
 from app.domain.lookups import group_by_slug
 from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.scheduling import Group, Organisation
+from app.domain.scheduling import Group, GroupSummary, Organisation
 
 
 @dataclass(frozen=True)
@@ -123,9 +123,8 @@ class ContactService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        await self._authorize_group(principal, slug)
+        group = (await self._authorize_group(principal, slug)).group
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             return GroupContacts(
                 group,
                 await tx.get_group_contact_block(group.id),
@@ -138,7 +137,7 @@ class ContactService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        authorization = await self._authorize_group(principal, slug)
+        organisation = (await self._authorize_group(principal, slug)).organisation_slug
         async with self._uow.locked() as tx:
             group = await group_by_slug(tx, slug)
             current = await tx.get_group_contact_block(group.id)
@@ -151,7 +150,7 @@ class ContactService:
                 self._clock.now(),
                 principal,
                 Permission.CLOSURE_MANAGE,
-                authorization.target.organisation,
+                organisation,
                 slug,
                 contacts_detail("contacts", stored),
             )
@@ -165,8 +164,6 @@ class ContactService:
             )
         )
 
-    async def _authorize_group(self, principal: Principal, slug: str) -> Authorization:
-        """Raise ``not_permitted`` unless the matrix grants ``closure.manage`` on group ``slug``."""
-        return require(
-            await self._admin.authorize(principal, Permission.CLOSURE_MANAGE, group_slug=slug)
-        )
+    async def _authorize_group(self, principal: Principal, slug: str) -> GroupSummary:
+        """Return group ``slug`` if the matrix grants ``closure.manage`` on it, else refuse."""
+        return await self._admin.authorize_group(principal, Permission.CLOSURE_MANAGE, slug)

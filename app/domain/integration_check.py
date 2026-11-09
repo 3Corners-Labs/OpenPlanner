@@ -28,18 +28,19 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from app.domain.admin import AdminService, require
+from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Principal, Scope
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import bind_level, trace_scope
-from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, IntegrationChecker, UnitOfWork
 from app.domain.scheduling import Group
 from app.domain.system_log import SystemLog
 from app.domain.tunable import value_of
 from app.domain.worker_check import worker_findings
+
+_PERMISSION = Permission.GROUP_EDIT
+"""What it takes to run a check or read its result: the right to edit the group."""
 
 CHECK_EVENT = "integration.check"
 """Audit action of a check; the reason is the overall status (by hand) or the failing code."""
@@ -155,10 +156,9 @@ class IntegrationCheckService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        organisation = await self._authorize(principal, slug)
-        async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
-        check, _ = await self._check(group, organisation)
+        summary = await self._admin.authorize_group(principal, _PERMISSION, slug)
+        organisation = summary.organisation_slug
+        check, _ = await self._check(summary.group, organisation)
         outcome = Outcome.FAILURE if check.overall is CheckStatus.FAIL else Outcome.SUCCESS
         await self._admin.record(
             principal.subject, CHECK_EVENT, outcome, check.overall.value, organisation, slug
@@ -171,10 +171,9 @@ class IntegrationCheckService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        await self._authorize(principal, slug)
+        summary = await self._admin.authorize_group(principal, _PERMISSION, slug)
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
-            return await tx.get_group_check(group.id)
+            return await tx.get_group_check(summary.group.id)
 
     async def check_as_system(self, slug: str) -> GroupCheck | None:
         """Check the group on the platform's own initiative; record a system event when due.
@@ -262,16 +261,6 @@ class IntegrationCheckService:
             overdue_after=overdue_after,
             dispatches=group.dispatch_enabled,
         )
-
-    async def _authorize(self, principal: Principal, slug: str) -> str:
-        """Require ``group.edit`` on the group; return its organisation slug."""
-        authorization = require(
-            await self._admin.authorize(principal, Permission.GROUP_EDIT, group_slug=slug)
-        )
-        organisation = authorization.target.organisation
-        if organisation is None:  # pragma: no cover - a group target always has one
-            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-        return organisation
 
 
 class IntegrationWatch:

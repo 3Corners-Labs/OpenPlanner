@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterable
 from datetime import datetime
 from typing import Protocol
 
-from app.domain.admin import AdminService, require
+from app.domain.admin import AdminService
 from app.domain.alert_delivery import DEFAULT_LOCALE
 from app.domain.alerts import FALLBACK_EVENT
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
@@ -30,7 +30,6 @@ from app.domain.authorization import Permission, Principal, Scope
 from app.domain.booking import Booking
 from app.domain.calls import EventKind
 from app.domain.connection_health import HealthEntry, HealthState, Platform
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.ports import Clock, IntegrationError, UnitOfWork
@@ -158,15 +157,11 @@ class FallbackService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        authorization = require(
-            await self._admin.authorize(principal, Permission.BOOKINGS_MANAGE, group_slug=slug)
-        )
-        if authorization.group is None:
-            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-        group = authorization.group.group
+        summary = await self._admin.authorize_group(principal, Permission.BOOKINGS_MANAGE, slug)
+        group = summary.group
         if not group.fallback_active:
             return False
-        await self._switch_off(group, authorization.group.organisation_slug, principal)
+        await self._switch_off(group, summary.organisation_slug, principal)
         return True
 
     async def _switch_on(self, group: Group, organisation: str) -> None:

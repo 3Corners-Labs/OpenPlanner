@@ -379,3 +379,56 @@ def test_erasing_a_record_clears_the_address() -> None:
     erased = member.erased(NOW)
 
     assert (erased.email, erased.email_at) == (None, None)
+
+
+async def test_authorize_group_returns_the_group_with_its_organisation(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    summary = await service.authorize_group(GROUP_ADMIN, Permission.SCHEDULE_MANAGE, "demo")
+
+    assert (summary.group.slug, summary.organisation_slug) == ("demo", "demo")
+    assert uow.state.audit == []
+
+
+async def test_authorize_group_refuses_and_audits_a_denial(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    with pytest.raises(DomainError, match="not_permitted"):
+        await service.authorize_group(GROUP_ADMIN, Permission.GROUP_VIEW, "andere-team")
+
+    assert [(e.actor, e.action, e.outcome, e.group) for e in uow.state.audit] == [
+        ("g-1", "group.view", Outcome.DENIED, "andere-team")
+    ]
+
+
+async def test_authorize_group_refuses_an_unknown_group(service: AdminService) -> None:
+    with pytest.raises(DomainError, match="group_not_found"):
+        await service.authorize_group(ORG_ADMIN, Permission.GROUP_VIEW, "nope")
+
+
+async def test_authorize_group_keeps_an_archived_group_read_only(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    uow.state.groups[1] = replace(uow.state.groups[1], archived_at=NOW)
+
+    with pytest.raises(DomainError, match="group_archived"):
+        await service.authorize_group(GROUP_ADMIN, Permission.SCHEDULE_MANAGE, "demo")
+    assert (await service.authorize_group(GROUP_ADMIN, Permission.GROUP_VIEW, "demo")).group.id == 1
+
+
+async def test_authorize_group_needs_a_permission_that_has_a_group(service: AdminService) -> None:
+    with pytest.raises(ValueError, match="needs a group"):
+        await service.authorize_group(SUPER, Permission.DASHBOARD_VIEW, "demo")
+
+
+async def test_authorize_group_decides_an_organisation_permission_on_the_groups_organisation(
+    service: AdminService, uow: InMemoryUnitOfWork
+) -> None:
+    summary = await service.authorize_group(ORG_ADMIN, Permission.IDP_MAPPING_MANAGE, "demo")
+
+    assert summary.organisation_slug == "demo"
+    with pytest.raises(DomainError, match="not_permitted"):
+        await service.authorize_group(ORG_ADMIN, Permission.IDP_MAPPING_MANAGE, "andere-team")
+    assert [(e.action, e.outcome, e.organisation) for e in uow.state.audit] == [
+        ("idp_mapping.manage", Outcome.DENIED, "andere")
+    ]

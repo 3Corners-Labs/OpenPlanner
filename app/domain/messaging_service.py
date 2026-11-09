@@ -14,7 +14,7 @@ bookings are kept, so a participant never misses a reminder they were promised.
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, record_change
 from app.domain.agent_term import TERM_KEYS, check_term_pair, clean_term
 from app.domain.authorization import Permission, Principal
 from app.domain.channel_settings import CONFIGURABLE_CHANNELS
@@ -75,7 +75,7 @@ class MessagingService:
         Raises:
             DomainError: ``group_not_found`` or ``not_permitted``.
         """
-        group = await self._group(principal, Permission.REMINDERS_MANAGE, slug)
+        group = await self._admin.authorize_group(principal, Permission.REMINDERS_MANAGE, slug)
         async with self._uow.read() as tx:
             rules = await tx.get_reminder_rules(group.group.id)
             settings = await tx.get_channel_settings(group.group.organisation_id)
@@ -93,7 +93,7 @@ class MessagingService:
                 channel that cannot be configured (WhatsApp) or SMS without a phone field, or
                 with ``reminders`` above ``MAX_REMINDER_RULES``; ``reminder_exists``.
         """
-        group = await self._group(principal, Permission.REMINDERS_MANAGE, slug)
+        group = await self._admin.authorize_group(principal, Permission.REMINDERS_MANAGE, slug)
         _check_channel(group.group, rule)
         async with self._uow.locked() as tx:
             rules = await tx.get_reminder_rules(group.group.id)
@@ -114,7 +114,7 @@ class MessagingService:
         Raises:
             DomainError: ``not_permitted`` or ``reminder_not_found``.
         """
-        group = await self._group(principal, Permission.REMINDERS_MANAGE, slug)
+        group = await self._admin.authorize_group(principal, Permission.REMINDERS_MANAGE, slug)
         async with self._uow.read() as tx:
             rules = await tx.get_reminder_rules(group.group.id)
         return _existing(rules, channel, minutes_before)
@@ -138,7 +138,7 @@ class MessagingService:
                 channel and offset are another rule) or ``invalid_configuration`` with
                 ``channel``.
         """
-        group = await self._group(principal, Permission.REMINDERS_MANAGE, slug)
+        group = await self._admin.authorize_group(principal, Permission.REMINDERS_MANAGE, slug)
         _check_channel(group.group, rule)
         async with self._uow.locked() as tx:
             rules = await tx.get_reminder_rules(group.group.id)
@@ -162,7 +162,7 @@ class MessagingService:
         Raises:
             DomainError: ``not_permitted`` or ``reminder_not_found``.
         """
-        group = await self._group(principal, Permission.REMINDERS_MANAGE, slug)
+        group = await self._admin.authorize_group(principal, Permission.REMINDERS_MANAGE, slug)
         async with self._uow.locked() as tx:
             if not await tx.delete_reminder_rule(group.group.id, channel, minutes_before):
                 raise DomainError(ErrorCode.REMINDER_NOT_FOUND)
@@ -175,7 +175,7 @@ class MessagingService:
         Raises:
             DomainError: ``group_not_found`` or ``not_permitted``.
         """
-        group = await self._group(principal, Permission.TEXTS_MANAGE, slug)
+        group = await self._admin.authorize_group(principal, Permission.TEXTS_MANAGE, slug)
         async with self._uow.read() as tx:
             return await tx.get_group_texts(group.group.id)
 
@@ -201,7 +201,7 @@ class MessagingService:
             else:
                 cleaned[key] = clean_term(key, text) if key in TERM_KEYS else clean_text(key, text)
         check_term_pair(cleaned)
-        group = await self._group(principal, Permission.TEXTS_MANAGE, slug)
+        group = await self._admin.authorize_group(principal, Permission.TEXTS_MANAGE, slug)
         async with self._uow.locked() as tx:
             current = await tx.get_group_texts(group.group.id)
             changed = [k for k, v in cleaned.items() if current.get((locale, k)) != v]
@@ -213,17 +213,6 @@ class MessagingService:
         if any(key in TERM_KEYS for key in changed) and self._on_change is not None:
             self._on_change()
         return changed
-
-    async def _group(self, principal: Principal, permission: Permission, slug: str) -> GroupSummary:
-        """Authorise ``permission`` on the group and return it.
-
-        Raises:
-            DomainError: ``group_not_found`` or ``not_permitted``.
-        """
-        authorization = require(await self._admin.authorize(principal, permission, group_slug=slug))
-        if authorization.group is None:  # pragma: no cover - group-level always has one
-            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-        return authorization.group
 
     async def _audit(
         self,
