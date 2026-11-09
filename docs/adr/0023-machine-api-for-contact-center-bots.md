@@ -139,7 +139,7 @@ number, behind the per-client limit and the audit trail).
 | Step | What | PR | State |
 |---|---|---|---|
 | 1 | Clients, tokens, `/me`, groups and availability; the superuser's switch, client admin and audit | #18, #67, #97 | merged |
-| 2 | Change requests by phone number and appointment code: scope `bookings:request_change`, `POST /groups/{slug}/change-requests`, `GET /change-requests/{id}`, table `change_requests` (migration 0105), the code on pages and messages, the participant's confirm page `/b/m/{ref}/change`, three settings | #PRNUM | merged |
+| 2 | Change requests by phone number and appointment code: scope `bookings:request_change`, `POST /groups/{slug}/change-requests`, `GET /change-requests/{id}`, table `change_requests` (migration 0105), the code on pages and messages, the participant's confirm page `/b/m/{ref}/change`, three settings | #688 | merged |
 
 ## Consequences
 
