@@ -58,8 +58,8 @@ class AgendaSlot:
         start: Start (UTC).
         end: End (UTC).
         agents: Agents on duty for the whole slot under the current staffing.
-        booked: Scheduled bookings holding a place in the slot: confirmed, and those awaiting
-            the participant's confirmation (ADR 0056 point 11).
+        booked: Places taken in the slot: confirmed bookings, those awaiting the participant's
+            confirmation (ADR 0056 point 11) and proposals of a new time held there (ADR 0057).
         closed: Whether an emergency closure covers the slot (ADR 0024).
         accepted: Whether a planner accepted the shortfall at exactly these counts.
         subjects: The subject codes all blocks of the slot offer (ADR 0081 point 4); ``None``
@@ -74,7 +74,8 @@ class AgendaSlot:
     accepted: bool = False
     subjects: frozenset[str] | None = None
     pending: int = 0
-    """Of ``booked``, how many await the participant's confirmation (shown as such)."""
+    """Of ``booked``, how many await the participant's answer: a confirmation (ADR 0056) or a
+    proposed new time (ADR 0057); shown as such."""
 
     def offers_subject(self, code: str | None) -> bool:
         """Return whether a booking with subject ``code`` may move into this slot."""

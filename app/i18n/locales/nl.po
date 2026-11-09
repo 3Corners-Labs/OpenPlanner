@@ -11581,3 +11581,74 @@ msgstr "geen adres bekend: krijgt de mail niet"
 
 msgid "reports.digest.no_address_count"
 msgstr "{count} heeft geen bekend adres en wordt overgeslagen"
+msgid "admin.agenda.propose"
+msgstr "Nieuwe tijd voorstellen"
+
+msgid "admin.agenda.slot_propose"
+msgstr "Nieuwe tijden voorstellen"
+
+msgid "admin.proposal.title"
+msgstr "Nieuwe tijd voorstellen voor {reference}"
+
+msgid "admin.proposal.time"
+msgstr "Nieuwe tijd"
+
+msgid "admin.proposal.ask"
+msgstr "Geen voorstel: vraag de deelnemer zelf een tijd te kiezen"
+
+msgid "admin.proposal.none_found"
+msgstr "De assistent vond geen vrije tijd binnen het zoekbereik. Kies een andere tijd of vraag de deelnemer zelf te kiezen."
+
+msgid "admin.proposal.held_lead"
+msgstr "De voorgestelde tijd wordt voor de deelnemer vastgehouden tot die bevestigt, een andere tijd kiest of annuleert, of tot de termijn verloopt. Zonder bevestiging verplaatsen we niets."
+
+msgid "admin.proposal.button"
+msgstr "Voorstel versturen"
+
+msgid "admin.proposal.slot_title"
+msgstr "Nieuwe tijden voorstellen voor {when}"
+
+msgid "admin.proposal.slot_lead"
+msgstr "De laatst gemaakte afspraken in dit tijdslot ({count}) passen niet meer. Controleer per afspraak de voorgestelde tijd, kies een andere of vink de afspraak uit."
+
+msgid "admin.proposal.include"
+msgstr "Meenemen"
+
+msgid "admin.proposal.slot_button"
+msgstr "Voorstellen versturen"
+
+msgid "admin.proposal.none_chosen"
+msgstr "Vink ten minste één afspraak aan."
+
+msgid "admin.proposal.column"
+msgstr "Voorgestelde tijd"
+
+msgid "admin.proposal.held_until"
+msgstr "vastgehouden tot {deadline}"
+
+msgid "admin.proposal.confirm"
+msgstr "Bevestigen namens deelnemer"
+
+msgid "admin.proposal.withdraw"
+msgstr "Voorstel intrekken"
+
+msgid "admin.done.proposed"
+msgstr "Nieuwe tijd voorgesteld. De deelnemer krijgt het voorstel en de oude plek is vrijgekomen."
+
+msgid "admin.done.proposals_sent"
+msgstr "Verstuurd: {count}. De oude plekken zijn vrijgekomen; voorgestelde tijden worden vastgehouden."
+
+msgid "admin.done.proposal_withdrawn"
+msgstr "Voorstel ingetrokken. De afspraak wacht op een nieuwe tijd van de deelnemer."
+
+msgid "admin.done.proposal_confirmed_by_staff"
+msgstr "De voorgestelde tijd is bevestigd namens de deelnemer. De deelnemer krijgt een e-mail met de nieuwe tijd."
+
+msgid "admin.done.proposal_gone"
+msgstr "Dit voorstel staat niet meer open."
+
+msgid "admin.agenda.day_propose"
+msgstr "Nieuwe tijden voorstellen voor deze dag"
+
+msgid "admin.agenda.week_propose"
+msgstr "Nieuwe tijden voorstellen voor deze week"
