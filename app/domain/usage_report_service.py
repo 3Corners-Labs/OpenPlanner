@@ -204,6 +204,25 @@ class UsageReportService:
         scope = scope_for(principal, permission)
         if group_slug is None and organisation_slug is not None:
             await self._require_organisation(principal, scope, organisation_slug, permission)
+        return await self.read(scope, organisation_slug, group_slug, first_day, last_day)
+
+    async def read(
+        self,
+        scope: Scope,
+        organisation_slug: str | None,
+        group_slug: str | None,
+        first_day: date | None,
+        last_day: date | None,
+    ) -> LoadedUsage:
+        """Read the groups in ``scope`` and their hourly cells for the range; no authorisation.
+
+        For callers that decided the scope themselves: the digest job, whose subscription is
+        the scope. Everything a screen guards is the scope given here, so a caller never passes
+        one it was not entitled to.
+
+        Raises:
+            DomainError: ``group_not_found``, and ``invalid_range`` for a bad range.
+        """
         async with self._uow.read() as tx:
             groups = [
                 g

@@ -42,4 +42,5 @@
   <p class="muted">{{ _("reports.usage.rule", n=report.threshold) }}</p>
 </section>
 {% block report %}{% endblock %}
+{% if digest is defined and summary is not defined %}{% include "admin/_usage_digest.html" %}{% endif %}
 {% endblock %}

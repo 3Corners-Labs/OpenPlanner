@@ -127,6 +127,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_MIN_CELL_SIZE` | int | `5` | 3–20 | `settings.platform.manage` | The smallest count a usage report shows; a smaller cell reads < n and its sum and mean are hidden. Never below 3 (ADR 0117 point 8). |
 | `REPORTING_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of a usage report may hold; more is refused (ADR 0117 point 12). |
 | `REPORTING_EXPORT_MAX_DAYS` | int | `400` | 31–1100 | `settings.platform.manage` | Most days one CSV export of a usage report may cover (ADR 0117 point 12). |
+| `REPORTING_DIGEST_LATE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Latest a missed digest is still sent, in hours after its time; later it is skipped (ADR 0117 point 16). |
+| `REPORTING_DIGEST_MAX_SUBSCRIPTIONS` | int | `20` | 1–200 | `settings.platform.manage` | Most digest subscriptions one organisation may have (ADR 0117 point 16). |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |
@@ -202,6 +204,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | Variable | Kind | Default | Portal bounds | Permission | Note |
 |---|---|---|---|---|---|
 | `REPORTING_ORG_MIN_CELL_SIZE` | int | `3` | 3–50 | `settings.organisation.manage` | The smallest count the organisation's own usage reports show. It can only raise the platform value; the larger of the two applies (ADR 0117 point 8). |
+| `REPORTING_DIGEST_SEND_HOUR` | int | `7` | 0–23 | `settings.organisation.manage` | The local hour (in the organisation's time zone) the digest of the reports is sent (ADR 0117 point 16). |
+| `REPORTING_DIGEST_INCLUDE_NUMBERS` | bool | `true` | — | `settings.organisation.manage` | Whether the digest mail holds the figures; off, it holds only the link to the report (ADR 0117 point 16). |
 | `TIME_FORMAT` | enum | `24h` | 24h, 12h, locale | `settings.organisation.manage` | How clock times are written. |
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
 | `PRODUCT_FOOTER` | bool | `true` | — | `settings.organisation.manage` | "Appointments via OpenPlanner" with the product mark at the foot of the booking pages and in the HTML part of emails (ADR 0060 §6). |

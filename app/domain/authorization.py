@@ -119,6 +119,8 @@ class Permission(StrEnum):
     """ADR 0117: the usage reports, as counts without personal data, for the groups in scope."""
     REPORTS_EXPORT = "reports.export"
     """ADR 0117 point 12: download a report as CSV; audited with the checksum of the file."""
+    REPORTS_DIGEST_MANAGE = "reports.digest.manage"
+    """ADR 0117 point 16: subscribe staff to the digest mail of the reports of an organisation."""
     ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
     STAFF_MANAGE = "staff.manage"
@@ -184,6 +186,7 @@ LEVELS: dict[Permission, Level] = {
     # ADR 0117: usage reports per group (counts only, small cells hidden).
     Permission.REPORTS_VIEW: Level.GROUP,
     Permission.REPORTS_EXPORT: Level.GROUP,
+    Permission.REPORTS_DIGEST_MANAGE: Level.ORGANISATION,
     # ADR 0039: create, change and delete custom roles.
     Permission.ROLES_MANAGE: Level.GLOBAL,
     # ADR 0046: who uses the portal; group level so a group admin sees their own team.
@@ -291,6 +294,7 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
     Permission.STAFF_ERASE: frozenset({Permission.STAFF_VIEW}),
     # ADR 0117 point 12: a file holds what the screen shows, so exporting presumes seeing.
     Permission.REPORTS_EXPORT: frozenset({Permission.REPORTS_VIEW}),
+    Permission.REPORTS_DIGEST_MANAGE: frozenset({Permission.REPORTS_VIEW}),
 }
 """ADR 0039: permissions a permission depends on; a custom role must hold them too."""
 
@@ -333,6 +337,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         # ADR 0117: how the organisation's groups are used.
         Permission.REPORTS_VIEW,
         Permission.REPORTS_EXPORT,
+        Permission.REPORTS_DIGEST_MANAGE,
         # ADR 0046: the staff of the own organisations.
         Permission.STAFF_VIEW,
         # ADR 0095: invite, change and disable them in the bundled identity provider.
