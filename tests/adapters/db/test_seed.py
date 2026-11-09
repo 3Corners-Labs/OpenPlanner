@@ -157,7 +157,7 @@ SEED_MOMENTS = [
     datetime(2027, 3, 26, 22, 30, tzinfo=UTC),  # Friday 23:30; the clocks go forward on Sunday
     datetime(2026, 10, 24, 22, 30, tzinfo=UTC),  # Sunday 00:30; the clocks go back at 03:00
 ]
-"""A run of seed-closures late on each day of a week, and on both sides of a clock change."""
+"""A run of seed-closures late on each day of a week, and just before each clock change."""
 
 
 @pytest.mark.parametrize("now", SEED_MOMENTS, ids=lambda now: f"{now:%a %Y-%m-%d %H:%M}Z")
