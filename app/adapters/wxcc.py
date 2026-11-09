@@ -62,6 +62,8 @@ DESCRIPTOR = ProviderDescriptor(
         AttributeSpec(CHANNEL, 255, True, "admin.field.wxcc_channel"),
     ),
     routing_value_max_length=512,
+    routing_value_label_key="admin.field.wxcc_routing_value",
+    routing_value_hint_key="admin.field.wxcc_routing_value_hint",
 )
 """What a group needs for WxCC (ADR 0032 point 4); the limits are WxCC's (``flowSettings``
 values up to 512 bytes), fixed by the platform and so constants, not settings."""

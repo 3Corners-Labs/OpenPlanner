@@ -24,6 +24,7 @@ DESCRIPTOR = ProviderDescriptor(
         AttributeSpec("skill", 5, False, "label.skill", "hint.skill"),
     ),
     routing_value_max_length=8,
+    routing_value_label_key="label.routing_value",
 )
 
 
@@ -93,7 +94,7 @@ def test_a_descriptor_with_clashing_names_is_a_programming_error(
     attributes: tuple[AttributeSpec, ...],
 ) -> None:
     with pytest.raises(ValueError, match="duplicate"):
-        ProviderDescriptor(ContactCenterKind.WEBEX_CC, "k", attributes, 10)
+        ProviderDescriptor(ContactCenterKind.WEBEX_CC, "k", attributes, 10, "k.value")
 
 
 def test_malformed_specs_are_programming_errors() -> None:
@@ -102,7 +103,7 @@ def test_malformed_specs_are_programming_errors() -> None:
     with pytest.raises(ValueError, match="attribute spec"):
         AttributeSpec("key", 0, True, "k")
     with pytest.raises(ValueError, match="routing value"):
-        ProviderDescriptor(ContactCenterKind.WEBEX_CC, "k", (), 0)
+        ProviderDescriptor(ContactCenterKind.WEBEX_CC, "k", (), 0, "k.value")
 
 
 def test_a_group_dispatches_only_with_a_complete_routing() -> None:
