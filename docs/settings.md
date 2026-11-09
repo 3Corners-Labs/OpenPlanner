@@ -130,6 +130,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_EXPORT_MAX_DAYS` | int | `400` | 31–1100 | `settings.platform.manage` | Most days one CSV export of a usage report may cover (ADR 0117 point 12). |
 | `REPORTING_API_PAGE_SIZE` | int | `1000` | 100–10000 | `settings.platform.manage` | Most cells in one page of the usage API (ADR 0117 point 13). |
 | `REPORTING_API_RATE_PER_MINUTE` | int | `30` | 5–300 | `settings.platform.manage` | Calls per minute per API client to the usage API (ADR 0117 point 13); the off switch stays RATE_LIMIT_ENABLED. |
+| `REPORTING_DIGEST_LATE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Latest a missed digest is still sent, in hours after its time; later it is skipped (ADR 0117 point 16). |
+| `REPORTING_DIGEST_MAX_SUBSCRIPTIONS` | int | `20` | 1–200 | `settings.platform.manage` | Most digest subscriptions one organisation may have (ADR 0117 point 16). |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |
@@ -190,6 +192,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_WINDOW` | string | `""` | — | `settings.platform.manage` | When automatic updates happen, in `admin_timezone`: up to 7 ranges such as `mon 02:00-04:00, sat 01:00-05:00`, each at least 30 minutes (ADR 0116 point 9); empty is any time. A superuser's click is immediate. |
 | `UPDATE_CHECK_MINUTES` | int | `60` | 5–1440 | `settings.platform.manage` | Minutes between two release checks by the worker (ADR 0067); "Check now" on the updates page asks for one ahead of time. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
+| `CONTACT_REVEALS_ALERT_PER_HOUR` | int | `20` | 5–500 | `settings.platform.manage` | Requests for participants' contact details by one person per hour above which a system event warns (ADR 0044 §2). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the participant's waiting page (ADR 0072). |
 | `OVERVIEW_LIVE_ENABLED` | bool | `true` | — | `settings.platform.manage` | Lets the overview's widgets refresh themselves and pop up new alerts; off, the page shows what it loaded with and a Refresh link (ADR 0061 §3, §4). |
 | `OVERVIEW_POLL_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of a live widget on the overview (ADR 0061 §4). |
@@ -205,6 +208,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | Variable | Kind | Default | Portal bounds | Permission | Note |
 |---|---|---|---|---|---|
 | `REPORTING_ORG_MIN_CELL_SIZE` | int | `3` | 3–50 | `settings.organisation.manage` | The smallest count the organisation's own usage reports show. It can only raise the platform value; the larger of the two applies (ADR 0117 point 8). |
+| `REPORTING_DIGEST_SEND_HOUR` | int | `7` | 0–23 | `settings.organisation.manage` | The local hour (in the organisation's time zone) the digest of the reports is sent (ADR 0117 point 16). |
+| `REPORTING_DIGEST_INCLUDE_NUMBERS` | bool | `true` | — | `settings.organisation.manage` | Whether the digest mail holds the figures; off, it holds only the link to the report (ADR 0117 point 16). |
 | `TIME_FORMAT` | enum | `24h` | 24h, 12h, locale | `settings.organisation.manage` | How clock times are written. |
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
 | `PRODUCT_FOOTER` | bool | `true` | — | `settings.organisation.manage` | "Appointments via OpenPlanner" with the product mark at the foot of the booking pages and in the HTML part of emails (ADR 0060 §6). |

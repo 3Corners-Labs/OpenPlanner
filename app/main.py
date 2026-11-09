@@ -42,7 +42,7 @@ from app.adapters.integrations import (
     secret_box,
     webex_fingerprint,
 )
-from app.adapters.keycloak_directory import KeycloakDirectory
+from app.adapters.keycloak_directory import DirectoryAddresses, directory_from_settings
 from app.adapters.live_settings import LiveSettings, keep_current
 from app.adapters.log_senders import build_sender
 from app.adapters.log_shipping import LogShipper, LogTester, SenderFactory, ship_settings
@@ -72,6 +72,7 @@ from app.api.maintenance import participant_gate, register_maintenance
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
+from app.domain.activity_alert import CHANGES_ALERT, REVEALS_ALERT
 from app.domain.address_check import AddressStatus, InstanceService
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
@@ -129,6 +130,7 @@ from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
 from app.domain.readiness import ReadinessService
 from app.domain.rebooking import Reach
+from app.domain.report_digest_service import DigestAdmin
 from app.domain.request_log import RequestEvents
 from app.domain.reschedule_proposal import ProposalHours
 from app.domain.roles import RoleService
@@ -233,14 +235,7 @@ def _proposal_hours(settings: Settings) -> ProposalHours:
 
 def _keycloak_directory(settings: Settings) -> StaffDirectory | None:
     """Return the staff directory of the bundled Keycloak, or ``None`` without its settings."""
-    secret = settings.keycloak_directory_client_secret
-    if not settings.keycloak_admin_url or secret is None:
-        return None
-    return KeycloakDirectory(
-        settings.keycloak_admin_url,
-        settings.keycloak_directory_client_id,
-        secret.get_secret_value(),
-    )
+    return directory_from_settings(settings)
 
 
 BUNDLED_REALM_PATH = "/realms/openplanner/"
@@ -446,8 +441,15 @@ def create_app(
             reach=lambda org: _reach(per_organisation(org)),
         )
         app.state.participant_link_service = ParticipantLinkService(uow, clock)
+        # ADR 0044: the thresholds of the hourly alerts, once, for every writer they count.
         app.state.admin_service = AdminService(
-            uow, clock, app.state.live_settings.closure_retention
+            uow,
+            clock,
+            app.state.live_settings.closure_retention,
+            {
+                CHANGES_ALERT: lambda: live().planner_changes_alert_per_hour,
+                REVEALS_ALERT: lambda: live().contact_reveals_alert_per_hour,
+            },
         )
         app.state.usage_report_service = UsageReportService(
             uow,
@@ -455,6 +457,13 @@ def create_app(
             clock,
             lambda: live().reporting_min_cell_size,
             lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
+        )
+        app.state.digest_admin = DigestAdmin(
+            uow,
+            app.state.admin_service,
+            clock,
+            lambda: live().reporting_digest_max_subscriptions,
+            DirectoryAddresses(_keycloak_directory(settings)),
         )
         app.state.usage_export_service = UsageExportService(
             app.state.usage_report_service,
@@ -774,7 +783,6 @@ def create_app(
             clock,
             app.state.admin_service,
             app.state.booking_service,
-            lambda: live().planner_changes_alert_per_hour,
             rebook_days=lambda org: per_organisation(org).planner_rebook_days,
             reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
             proposal_hours=lambda org: _proposal_hours(per_organisation(org)),

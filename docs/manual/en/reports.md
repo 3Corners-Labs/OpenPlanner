@@ -111,6 +111,12 @@ Whoever may export (the superuser, organisation admins, group admins and the Com
 
 Both open in Excel (UTF-8, `;` as separator). The platform administrator sets how many rows and days one file may hold; a longer period is refused with a message, and the file is not cut short. Every download is recorded in the audit log with who, which family, which period, how many rows and a checksum of the file, never the figures. The checksum is also in the `X-Content-SHA256` header of the response.
 
+## The digest by email
+
+Organisation admins see a section **Digest by email** at the bottom of the organisation's *Usage* page. A subscription is for the whole organisation or for one group and has a period: every day, every week (on a weekday) or every month (on a day from 1 to 28). The mail goes out at the organisation's send hour (7:00 unless changed) in the group's time zone, covers the days since the last mail up to and including yesterday, and holds the main figures (bookings created, no shows, the mean wait until a call connects, utilisation) and a link to the report of those days. A hidden figure shows a dash. If your organisation switches the figures off, only the link remains.
+
+Recipients are colleagues who hold the right to see the reports for that scope, chosen from a list. There are no free email addresses and no file goes with the mail: the link leads to the report, where you sign in as usual. The right is checked again when the mail goes out. A colleague who lost it is skipped and the list says how many; a colleague whose address the sign-in provider does not know is skipped too (the addresses come from the bundled provider). A missed mail is still sent for up to 24 hours; later it is skipped, and the list shows how the last mail went. Every change to a subscription is in the audit log.
+
 ## What is not here yet
 
-Per team member and the digest by email. Those come in later steps of the same design.
+Per team member. That comes in a later step of the same design.

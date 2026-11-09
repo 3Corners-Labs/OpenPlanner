@@ -86,6 +86,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.RETENTION_VIEW,
         Permission.REPORTS_VIEW,  # ADR 0117
         Permission.REPORTS_EXPORT,  # ADR 0117 point 12
+        Permission.REPORTS_DIGEST_MANAGE,  # ADR 0117 point 16
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.STAFF_MANAGE,  # ADR 0095
         Permission.STAFF_RESET_PASSWORD,  # ADR 0095

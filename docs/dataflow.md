@@ -211,7 +211,7 @@ organisation provider ──ID token (sub, name, email, email_verified, entitlem
 
 | Data item | Table.column / place | Source | Retention | Leaves the system |
 |---|---|---|---|---|
-| Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject` | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
+| Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject`; `audit_events.detail` of the two volume warnings (`planner.changes_alert`, `booking.contact_reveals_alert`: `actor:<subject>,…`, ADR 0044) | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
 | Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; erased daily by the worker for people without a login for `staff_retention_days` (class C, 365 days, 90–1825; ADR 0046 step 2), or by the superuser for a suspended person; the session row follows the session clean-up | no |
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed`; removed with the display name at erasure | no |
 | Entitlement values (ADR 0049) | `admin_sessions.claims` (the recognised values), `staff_refused_entitlements` (value, reason code, organisation), `audit_events` (`auth.entitlement_refused`, `auth.entitlement_mismatch`, `auth.ambiguous_claims`) | identity provider claim `openplanner_entitlements` | session: until it ends and is cleaned up (ADR 0098); refusals: replaced at every login; events: as admin actions | no; the values hold the prefix, a role key and the IdP values of organisations and groups, linked to the employee's subject |
@@ -560,6 +560,8 @@ with data held elsewhere. The row itself is deleted `booking_row_retention_days`
 | `usage_events` | none: fact kind, the UTC hour (never an exact time), organisation, group and the codes and numbers of `privacy.USAGE_FIELDS`; no booking id, reference or free text, so a row cannot be joined back to an appointment | the outbox of the rollup (ADR 0117, built from step 2): until the worker has rolled it up and `reporting_event_retention_days` (class C, default 35, 7 to 90) have passed | the worker's rollup (every `reporting_rollup_interval_minutes`, class C); no cascade, statistics outlive the group | as the live system |
 | `usage_rollup_state`, `usage_backfill` | none: the watermark of the rollup, the time of its last run, the backfill cutoff; one booking id per booking already backfilled | `usage_backfill` with the booking row (cascade); the state row for good | cascade with the booking (`usage_backfill`) | as the live system |
 | `usage_hour`, `usage_staff_hour` | none: counts and sums per hour, group, metric and cut; `usage_staff_hour` holds a team member's row id (`staff_id`) and exists for the team view, which is off by default (ADR 0117 point 9) | `reporting_retention_months` (class C, default 25, 13 to 60) | the worker's rollup run; a removed team member's rows fold into one *former team members* row | as the live system |
+| `report_subscriptions` | none: organisation, group, period, weekday, day of the month, and the row ids of staff members (a person is named by their staff record, never by address) and who made it | until an administrator deletes it; it goes with its organisation or group; a removed staff record stays in the list as a name that no longer resolves and is skipped | the administrator, or the cascade | as the live system |
+| `report_digest_runs` | none: subscription id, due date, status and counts | with the subscription (cascade) | the cascade | as the live system |
 | `booking_events` | `message` (provider reason, up to 300 characters, masked); kind, time and reason code carry no personal data | `message`: as the booking's purge; the rest with the booking row | the purge empties `message`; the row goes with the booking (cascade) | as `bookings` |
 | `call_status` | none: states and times of the meeting and the work item, by booking id | with the booking row | cascade with the booking | as `bookings` |
 | `jobs` | none: booking id, type, run time, status, last error as a reason code (no payload with personal data) | pending jobs until they run; the row with the booking | the purge job is the last job of every plan; cascade with the booking | restored jobs find their booking purged or stale and end silently |
@@ -653,6 +655,13 @@ From step 8 a holder of `reports.export` downloads what a page shows, or the hou
 
 The file holds no personal data and no free text; nothing of it is stored, and the audit event holds
 the checksum, not the content. A cell below the threshold is not written.
+
+From step 10 a digest subscription (`report_subscriptions`: organisation, group, period, staff row ids, no address) and its run records (`report_digest_runs`) drive one mail per due digest:
+
+    worker poll ─► due subscription ─► recipients who still hold reports.view ─► address from the identity provider's directory (memory only)
+                 ─► mail: suppressed figures + a link to the signed-in report, no attachment ─► the organisation's email channel
+
+The address is never stored by the portal, and no address, name or figure is in a log line, a job or an audit event.
 
 A fact holds the hour and the allow-listed codes and numbers only (`privacy.USAGE_FIELDS`): no
 name, address, phone number, join link, booking id, reference, token or free text. A failing

@@ -1,0 +1,91 @@
+{#- The digest subscriptions of the organisation's Usage page (ADR 0117 point 16). Shown only to who holds reports.digest.manage: a list of what goes out to whom, a form to add one (staff only, never an address), and a delete button per row. Works without JavaScript. -#}
+{% from "_error_message.html" import error_message %}
+<section class="card" id="digest" aria-labelledby="digest-heading">
+  <div class="card__header">
+    <h2 id="digest-heading">{{ _("reports.digest.heading") }}</h2>
+    <p class="card__lead">{{ _("reports.digest.lead") }}</p>
+  </div>
+  {% if digest.done %}<p role="status">{{ digest.done }}</p>{% endif %}
+  {% if digest_error is defined %}{{ error_message(digest_error) }}{% endif %}
+  {% if digest.rows %}
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("reports.digest.heading") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("reports.digest.col.scope") }}</th>
+        <th scope="col">{{ _("reports.digest.col.period") }}</th>
+        <th scope="col">{{ _("reports.digest.col.recipients") }}</th>
+        <th scope="col">{{ _("reports.digest.col.last") }}</th>
+        <th scope="col"><span class="visually-hidden">{{ _("reports.digest.col.actions") }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in digest.rows %}
+      {% set sub = row.subscription %}
+      <tr>
+        <td>{{ sub.group_slug or _("reports.digest.all_groups") }}</td>
+        <td>
+          {{ digest.periods[sub.period.value] }}{% if sub.period.value == "weekly" %}, {{ digest.weekdays[sub.weekday] }}{% elif sub.period.value == "monthly" %}, {{ _("reports.digest.on_day", day=sub.month_day) }}{% endif %}
+        </td>
+        <td>
+          {{ row.names|join(", ") }}
+          {% if row.blocked %}<br><span class="muted">{{ _("reports.digest.blocked", count=row.blocked) }}</span>{% endif %}
+          {% if row.no_address %}<br><span class="muted">{{ _("reports.digest.no_address_count", count=row.no_address) }}</span>{% endif %}
+        </td>
+        <td>{% if row.last_status %}{{ row.last_date }}: {{ digest.statuses[row.last_status] }}{% else %}–{% endif %}</td>
+        <td>
+          <form method="post" action="/admin/organisations/{{ sub.organisation_slug }}/usage/digest/{{ sub.id }}/delete">
+            <button type="submit" class="button button--quiet button--small">{{ _("reports.digest.delete") }}<span class="visually-hidden"> {{ sub.group_slug or _("reports.digest.all_groups") }}, {{ digest.periods[sub.period.value] }}</span></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ _("reports.digest.none") }}</p>
+  {% endif %}
+  {% if digest.candidates %}
+  <form method="post" action="/admin/organisations/{{ org_header.slug }}/usage/digest" class="stack">
+    <h3>{{ _("reports.digest.add") }}</h3>
+    <div class="field">
+      <label for="digest-group">{{ _("reports.digest.field.group") }}</label>
+      <select id="digest-group" name="group">
+        <option value="">{{ _("reports.digest.all_groups") }}</option>
+        {% for slug, name in digest.groups %}<option value="{{ slug }}">{{ name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="digest-period">{{ _("reports.digest.field.period") }}</label>
+      <select id="digest-period" name="period">
+        {% for value, label in digest.period_options %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="digest-weekday">{{ _("reports.digest.field.weekday") }}</label>
+      <select id="digest-weekday" name="weekday">
+        {% for value, label in digest.weekday_options %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="digest-month-day">{{ _("reports.digest.field.month_day") }}</label>
+      <select id="digest-month-day" name="month_day">
+        {% for value in digest.month_days %}<option value="{{ value }}">{{ value }}</option>{% endfor %}
+      </select>
+    </div>
+    <fieldset>
+      <legend>{{ _("reports.digest.field.recipients") }}</legend>
+      {% for candidate in digest.candidates %}
+      {% set member = candidate.member %}
+      <div class="field field--check">
+        <input type="checkbox" id="digest-recipient-{{ member.id }}" name="recipient" value="{{ member.id }}">
+        <label for="digest-recipient-{{ member.id }}">{{ member.display_name }}{% if not candidate.has_address %} <span class="muted">({{ _("reports.digest.no_address") }})</span>{% endif %}</label>
+      </div>
+      {% endfor %}
+    </fieldset>
+    <div class="form-actions"><button type="submit" class="button">{{ _("reports.digest.add_button") }}</button></div>
+  </form>
+  {% else %}
+  <p class="muted">{{ _("reports.digest.no_candidates") }}</p>
+  {% endif %}
+</section>

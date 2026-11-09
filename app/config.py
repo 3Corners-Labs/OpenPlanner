@@ -264,6 +264,13 @@ class Settings(BaseSettings):
     # ADR 0117 point 13 (class C, platform): cells per API page, and calls per minute per client.
     reporting_api_page_size: int = Field(default=1000, ge=100, le=10_000)
     reporting_api_rate_per_minute: int = Field(default=30, ge=5, le=300)
+    # ADR 0117 point 16: the digest mail. Send hour and whether the mail holds figures are the
+    # organisation's (class D); how late a missed digest is still sent and how many subscriptions an
+    # organisation may have are the platform's (class C).
+    reporting_digest_send_hour: int = Field(default=7, ge=0, le=23)
+    reporting_digest_include_numbers: bool = True
+    reporting_digest_late_hours: int = Field(default=24, ge=1, le=72)
+    reporting_digest_max_subscriptions: int = Field(default=20, ge=1, le=200)
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)
@@ -285,6 +292,9 @@ class Settings(BaseSettings):
     # ADR 0044: changes by one planner per hour above which a system event warns (never
     # blocks). Class C platform (ADR 0042, settings registry).
     planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
+    # ADR 0044 §2: requests for participants' contact details by one person per hour above
+    # which a system event warns (never blocks). Class C platform.
+    contact_reveals_alert_per_hour: int = Field(default=20, ge=5, le=500)
     # ADR 0072 (announced in ADR 0043): how often the own queue, a claimed booking and the
     # participant's waiting page ask the server for a change. Class C platform.
     queue_refresh_seconds: int = Field(default=10, ge=5, le=60)

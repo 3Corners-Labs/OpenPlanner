@@ -90,6 +90,8 @@ STATE_TABLES = frozenset(
         "public_address_checks",
         "release_checks",
         "release_listing",
+        "report_digest_runs",
+        "report_subscriptions",
         "running_versions",
         "shortfall_acceptances",
         "slots",

@@ -39,6 +39,7 @@ from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.planner_routes import REASON_LABELS as CHANGE_REASON_LABELS
 from app.domain import staff
+from app.domain.activity_alert import CHANGES_ALERT, REVEALS_ALERT
 from app.domain.admin import (
     AMBIGUOUS_CLAIMS_EVENT,
     ANONYMOUS,
@@ -87,7 +88,6 @@ from app.domain.idp_mapping import EXPORTED_EVENT, GROUP_IDP_KEY_CHANGED
 from app.domain.integration_check import CHECK_EVENT, SERVICE_APP_CHECK_EVENT
 from app.domain.maintenance import OVERDUE_EVENT, MaintenanceReason
 from app.domain.organisations import IDP_KEY_CHANGED as ORGANISATION_IDP_KEY_CHANGED
-from app.domain.planner_service import ALERT_ACTION
 from app.domain.ports import Clock
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.roles import ROLE_CREATED, ROLE_DELETED, ROLE_UPDATED
@@ -151,8 +151,10 @@ EVENT_LABELS: dict[str, str] = {
     "job.send_suspension": "audit.job.send_suspension",
     "job.send_closure_update": "audit.job.send_closure_update",
     "job.send_reinstatement": "audit.job.send_reinstatement",
-    # ADR 0044: one planner made many changes within an hour.
-    ALERT_ACTION: "audit.event.planner_changes_alert",
+    # ADR 0044: one planner made many changes, or one person asked for many participants'
+    # contact details (§2), within an hour.
+    CHANGES_ALERT.action: "audit.event.planner_changes_alert",
+    REVEALS_ALERT.action: "audit.event.contact_reveals_alert",
     # ADR 0049: entitlements and IdP values.
     ENTITLEMENT_REFUSED_EVENT: "audit.event.entitlement_refused",
     ENTITLEMENT_MISMATCH_EVENT: "audit.event.entitlement_mismatch",
@@ -318,6 +320,7 @@ COUNT_LABELS: dict[str, str] = {
     "database_mb": "admin.audit.detail.database_mb",
     "hours": "admin.audit.detail.hours",
     "changes": "admin.audit.detail.changes",
+    "reveals": "admin.audit.detail.reveals",
     "suppressed": "admin.audit.detail.suppressed",
     "modes": "admin.audit.detail.modes",
     "sessions": "admin.audit.detail.sessions",

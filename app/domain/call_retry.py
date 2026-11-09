@@ -4,8 +4,9 @@ Whoever holds ``bookings.manage`` on the group may plan ``create_video_room`` or
 ``dispatch_wxcc_task`` again for an active booking that still lacks the result. The pending
 job of that type, if any, is replaced, so a click never doubles a job; the new job runs
 now (the meeting) or at the dispatch moment (the work item), pinned to the booking's start as
-every call job is. The retry is audited as a ``bookings.manage`` change with the job type;
-the job's own outcome lands on the timeline when the worker runs it.
+every call job is. The retry is audited as a ``bookings.manage`` change with the job type, so
+it counts toward the hourly alert on many changes by one person (``planner_changes_alert_per_hour``,
+``app.domain.activity_alert``); the job's own outcome lands on the timeline when the worker runs it.
 
     retry(principal, slug, booking_id, type) ─► authorise ─► booking active, result missing
                                               ─► replace pending job ─► audit
@@ -13,7 +14,7 @@ the job's own outcome lands on the timeline when the worker runs it.
 
 from datetime import datetime
 
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, require
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Booking
 from app.domain.errors import DomainError, ErrorCode
@@ -28,7 +29,7 @@ class CallRetryService:
     Args:
         uow: Opens database transactions.
         clock: Current time.
-        admin: Authorises and audits the retry.
+        admin: Authorises and audits the retry, with its hourly alert.
     """
 
     def __init__(self, uow: UnitOfWork, clock: Clock, admin: AdminService) -> None:
@@ -65,7 +66,7 @@ class CallRetryService:
             await tx.add_jobs(
                 booking_id, [PlannedJob(job, _run_at(booking, group, job, now), booking.start)]
             )
-            await record_change(
+            await self._admin.record_change(
                 tx,
                 now,
                 principal,
@@ -73,6 +74,7 @@ class CallRetryService:
                 authorization.target.organisation,
                 slug,
                 f"retry.{job.value}",
+                booking_id=booking_id,
             )
 
 

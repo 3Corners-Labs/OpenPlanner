@@ -129,6 +129,16 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/organisations/{org}/usage/export.csv": {
         "/admin/organisations/demo/usage/export.csv": statuses(200, 200, 403, 403, 200, 403, 403)
     },
+    # ADR 0117 point 16: digest subscriptions, organisation level and the organisation admin only
+    # (reports.digest.manage); an empty form answers 422, a subscription that is not there 303.
+    "POST /admin/organisations/{org}/usage/digest": {
+        "/admin/organisations/demo/usage/digest": statuses(422, 422, 403, 403, 403, 403, 403)
+    },
+    "POST /admin/organisations/{org}/usage/digest/{subscription_id}/delete": {
+        "/admin/organisations/demo/usage/digest/999/delete": statuses(
+            303, 303, 403, 403, 403, 403, 403
+        )
+    },
     # ADR 0042 §5, §11: System status and Advanced settings, read-only: superuser and auditor.
     "GET /admin/settings": {"/admin/settings": statuses(200, 403, 403, 403, 200, 403, 403)},
     # ADR 0101: the Settings sub-tab is read like the status; the package is the superuser's.

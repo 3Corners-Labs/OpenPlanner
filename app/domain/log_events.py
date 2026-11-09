@@ -357,6 +357,44 @@ _OPERATIONS = (
         _CHECK_HOST,
     ),
     _e(
+        "reports.digest_run",
+        _OPS,
+        "info",
+        "digests sent skipped late failed",
+        "Digest run: {digests} due, {sent} mails sent, {skipped} recipients skipped, "
+        "{late} late, {failed} failed.",
+        "The worker sent the due digests of the usage reports (ADR 0117 point 16): counts only.",
+    ),
+    _e(
+        "reports.digest_failed",
+        _OPS,
+        "warning",
+        "error",
+        "A digest subscription could not be run: {error}.",
+        "One subscription stopped with an error; the others went on. Counts and the error "
+        "type only, never an address.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "reports.digest_run_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The digest run failed: {error}.",
+        "The whole pass failed, for example before the schema was migrated; the worker goes on.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "reports.digest_no_mail_channel",
+        _OPS,
+        "warning",
+        "digests",
+        "{digests} digests are held back: the organisation has no email channel.",
+        "A digest is due but its organisation has no way to send email; it is tried again "
+        "until it is too late.",
+        "Set up the organisation's email channel or the platform's fallback.",
+    ),
+    _e(
         "usage.fact",
         _OPS,
         "info",
@@ -1465,6 +1503,18 @@ _AUDIT = (
         "Check the entitlement values at the identity provider.",
     ),
     _e(
+        "booking.contact_reveals_alert",
+        _SYS,
+        "outcome",
+        "",
+        "Many requests for contact details by one person.",
+        "One person asked for participants' contact details more than "
+        "`contact_reveals_alert_per_hour` times within an hour (ADR 0044 §2). The detail names "
+        "the actor and the count; nothing was refused.",
+        "Ask the person whether the requests were theirs; if not, use *End all sessions* on their "
+        "page under Staff, which also lists what they did.",
+    ),
+    _e(
         "booking_rows.rollup",
         _SYS,
         "info outcome",
@@ -1733,8 +1783,12 @@ _AUDIT = (
         _SYS,
         "outcome",
         "",
-        "Planners were told about changes.",
-        "The alert about changed bookings went out (ADR 0044).",
+        "Many changes by one planner.",
+        "One person made more than `planner_changes_alert_per_hour` changes under "
+        "`bookings.manage` within an hour (ADR 0044): changes to bookings, retried calls, "
+        "fallbacks ended by hand. The detail names the actor and the count; nothing was refused.",
+        "Ask the person whether the changes were theirs; if not, use *End all sessions* on their "
+        "page under Staff, which also lists what they did.",
     ),
     _e(
         "public_address",

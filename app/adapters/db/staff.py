@@ -136,6 +136,19 @@ def _member(
 class StaffQueries:
     """The staff directory's part of ``SqlTransaction``."""
 
+    async def get_staff_by_id(self: _Transaction, staff_id: int) -> StaffMember | None:
+        """Return the staff record with row id ``staff_id``, or ``None``."""
+        row = await self._session.get(StaffRow, staff_id)
+        if row is None:
+            return None
+        memberships = await self._session.scalars(
+            select(StaffMembershipRow).where(StaffMembershipRow.staff_id == row.id)
+        )
+        refusals = await self._session.scalars(
+            select(StaffRefusalRow).where(StaffRefusalRow.staff_id == row.id)
+        )
+        return _member(row, list(memberships), list(refusals))
+
     async def get_staff(self: _Transaction, subject: str) -> StaffMember | None:
         """Return the staff record of ``subject`` with all its memberships and refusals."""
         row = await self._session.scalar(select(StaffRow).where(StaffRow.subject == subject))

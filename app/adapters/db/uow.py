@@ -103,6 +103,7 @@ from app.adapters.db.record_names import (
     channel_secret_name,
     organisation_records,
 )
+from app.adapters.db.report_digest import ReportDigestQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
@@ -493,6 +494,7 @@ class SqlTransaction(
     UsageRollupQueries,
     UsageSlotQueries,
     UsageReportQueries,
+    ReportDigestQueries,
     StaffQueries,
     MaintenanceQueries,
     RoleQueries,
@@ -2072,16 +2074,15 @@ class SqlTransaction(
             )
         )
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime
-    ) -> int:
-        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
+        """Return how many successful events with ``action`` ``actor`` has had since then."""
         count = await self._session.scalar(
             select(func.count())
             .select_from(AuditEventRow)
             .where(
                 AuditEventRow.actor == actor,
-                AuditEventRow.action.in_(list(actions)),
+                AuditEventRow.action == action,
+                AuditEventRow.outcome == Outcome.SUCCESS.value,
                 AuditEventRow.at >= since,
             )
         )

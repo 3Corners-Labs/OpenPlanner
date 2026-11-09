@@ -2620,6 +2620,9 @@ msgstr "appointment on hold moved"
 msgid "audit.event.planner_changes_alert"
 msgstr "Many changes by one planner"
 
+msgid "audit.event.contact_reveals_alert"
+msgstr "Many requests for contact details by one person"
+
 msgid "admin.audit.detail.planner_move"
 msgstr "booking moved by a planner"
 
@@ -2637,6 +2640,9 @@ msgstr "shortfall accepted"
 
 msgid "admin.audit.detail.changes"
 msgstr "changes in the past hour: {count}"
+
+msgid "admin.audit.detail.reveals"
+msgstr "requests for contact details in the past hour: {count}"
 
 msgid "admin.audit.detail.reason"
 msgstr "reason: {value}"
@@ -6349,6 +6355,9 @@ msgstr "Shortfall look-ahead (days)"
 
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Alert above changes per planner per hour"
+
+msgid "settings.field.contact_reveals_alert_per_hour.label"
+msgstr "Alert above requests for contact details per person per hour"
 
 msgid "admin.settings.problem.dev_placeholder"
 msgstr "holds a development placeholder; production refuses it."
@@ -11418,6 +11427,164 @@ msgstr "Most cells in one page of the usage API"
 
 msgid "settings.field.reporting_api_rate_per_minute.label"
 msgstr "Calls per minute per API client to the usage API"
+msgid "authz.permission.reports_digest_manage"
+msgstr "Manage the digest of the reports"
+
+msgid "settings.field.reporting_digest_send_hour.label"
+msgstr "Hour the digest of the reports is sent"
+
+msgid "settings.field.reporting_digest_include_numbers.label"
+msgstr "Include the figures in the digest"
+
+msgid "settings.field.reporting_digest_late_hours.label"
+msgstr "Hours within which a missed digest is still sent"
+
+msgid "settings.field.reporting_digest_max_subscriptions.label"
+msgstr "Most digest subscriptions per organisation"
+
+msgid "reports.digest.all_groups"
+msgstr "all groups"
+
+msgid "reports.digest.subject"
+msgstr "Usage of {group} ({organisation}): {period}"
+
+msgid "reports.digest.intro"
+msgstr "This is the summary of the usage of {group} for {period}."
+
+msgid "reports.digest.label.bookings"
+msgstr "Bookings created"
+
+msgid "reports.digest.label.no_show_rate"
+msgstr "No shows"
+
+msgid "reports.digest.label.average_wait"
+msgstr "Mean wait until the call connects"
+
+msgid "reports.digest.label.utilisation"
+msgstr "Utilisation"
+
+msgid "reports.digest.link"
+msgstr "Open the report: {link}"
+
+msgid "reports.digest.footer"
+msgstr "You get this message because you are subscribed to this summary. You need to sign in to see the report."
+
+msgid "reports.digest.heading"
+msgstr "Digest by email"
+
+msgid "reports.digest.lead"
+msgstr "Staff who may see the reports get a periodic email with the main figures and a link to the report. No file goes with it and no free address: only colleagues who may see the reports, at the moment it is sent."
+
+msgid "reports.digest.none"
+msgstr "There are no subscriptions yet."
+
+msgid "reports.digest.no_candidates"
+msgstr "There is nobody who may see these reports and could be subscribed."
+
+msgid "reports.digest.col.scope"
+msgstr "For"
+
+msgid "reports.digest.col.period"
+msgstr "When"
+
+msgid "reports.digest.col.recipients"
+msgstr "Recipients"
+
+msgid "reports.digest.col.last"
+msgstr "Last time"
+
+msgid "reports.digest.col.actions"
+msgstr "Actions"
+
+msgid "reports.digest.period.daily"
+msgstr "Every day"
+
+msgid "reports.digest.period.weekly"
+msgstr "Every week"
+
+msgid "reports.digest.period.monthly"
+msgstr "Every month"
+
+msgid "reports.digest.weekday.0"
+msgstr "Monday"
+
+msgid "reports.digest.weekday.1"
+msgstr "Tuesday"
+
+msgid "reports.digest.weekday.2"
+msgstr "Wednesday"
+
+msgid "reports.digest.weekday.3"
+msgstr "Thursday"
+
+msgid "reports.digest.weekday.4"
+msgstr "Friday"
+
+msgid "reports.digest.weekday.5"
+msgstr "Saturday"
+
+msgid "reports.digest.weekday.6"
+msgstr "Sunday"
+
+msgid "reports.digest.on_day"
+msgstr "on day {day}"
+
+msgid "reports.digest.blocked"
+msgstr "{count} may no longer see the reports and is skipped"
+
+msgid "reports.digest.status.sent"
+msgstr "sent"
+
+msgid "reports.digest.status.skipped_late"
+msgstr "skipped, too late"
+
+msgid "reports.digest.status.no_recipient"
+msgstr "skipped, no recipient"
+
+msgid "reports.digest.delete"
+msgstr "Delete"
+
+msgid "reports.digest.add"
+msgstr "Add a subscription"
+
+msgid "reports.digest.add_button"
+msgstr "Add subscription"
+
+msgid "reports.digest.field.group"
+msgstr "Group"
+
+msgid "reports.digest.field.period"
+msgstr "How often"
+
+msgid "reports.digest.field.weekday"
+msgstr "Day of the week (for every week)"
+
+msgid "reports.digest.field.month_day"
+msgstr "Day of the month (for every month)"
+
+msgid "reports.digest.field.recipients"
+msgstr "Recipients"
+
+msgid "reports.digest.error.recipients"
+msgstr "Choose at least one colleague who may see the reports."
+
+msgid "reports.digest.error.limit"
+msgstr "This organisation already has the most subscriptions it may have."
+
+msgid "reports.digest.error.schedule"
+msgstr "Choose an existing period, weekday and day of the month."
+
+msgid "reports.digest.done.added"
+msgstr "Subscription added."
+
+msgid "reports.digest.done.removed"
+msgstr "Subscription deleted."
+
+msgid "reports.digest.no_address"
+msgstr "no address known: will not get the mail"
+
+msgid "reports.digest.no_address_count"
+msgstr "{count} has no known address and is skipped"
 msgid "settings.field.reporting_usage_events_to_log.label"
 msgstr "Also send usage facts to the log destinations"
 msgid "admin.agenda.propose"

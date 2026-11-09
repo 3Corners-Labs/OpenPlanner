@@ -1318,13 +1318,14 @@ class InMemoryTransaction:
     async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
         self.state.acceptances[(acceptance.group_id, acceptance.start)] = acceptance
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime
-    ) -> int:
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
         return sum(
             1
             for e in self.state.audit
-            if e.actor == actor and e.action in actions and e.at >= since
+            if e.actor == actor
+            and e.action == action
+            and e.outcome is Outcome.SUCCESS
+            and e.at >= since
         )
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:

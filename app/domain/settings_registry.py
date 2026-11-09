@@ -1177,6 +1177,47 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=300,
     ),
     S(
+        "reporting_digest_send_hour",
+        K.INT,
+        7,
+        _D,
+        T.RETENTION,
+        "The local hour (in the organisation's time zone) the digest of the reports is sent "
+        "(ADR 0117 point 16).",
+        minimum=0,
+        maximum=23,
+    ),
+    S(
+        "reporting_digest_include_numbers",
+        K.BOOL,
+        True,
+        _D,
+        T.RETENTION,
+        "Whether the digest mail holds the figures; off, it holds only the link to the report "
+        "(ADR 0117 point 16).",
+    ),
+    S(
+        "reporting_digest_late_hours",
+        K.INT,
+        24,
+        _C,
+        T.RETENTION,
+        "Latest a missed digest is still sent, in hours after its time; later it is skipped "
+        "(ADR 0117 point 16).",
+        minimum=1,
+        maximum=72,
+    ),
+    S(
+        "reporting_digest_max_subscriptions",
+        K.INT,
+        20,
+        _C,
+        T.RETENTION,
+        "Most digest subscriptions one organisation may have (ADR 0117 point 16).",
+        minimum=1,
+        maximum=200,
+    ),
+    S(
         "security_event_retention_days",
         K.INT,
         365,
@@ -1785,6 +1826,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Changes by one planner per hour above which a system event warns (ADR 0044).",
         minimum=5,
         maximum=1000,
+    ),
+    S(
+        "contact_reveals_alert_per_hour",
+        K.INT,
+        20,
+        _C,
+        T.PLANNER,
+        "Requests for participants' contact details by one person per hour above which a system "
+        "event warns (ADR 0044 §2).",
+        minimum=5,
+        maximum=500,
     ),
     S(
         "queue_refresh_seconds",
