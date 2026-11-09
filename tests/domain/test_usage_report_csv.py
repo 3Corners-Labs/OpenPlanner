@@ -16,7 +16,7 @@ from app.domain.usage_report_csv import (
 )
 from app.domain.usage_report_queue import queue_report
 
-GROUP = ReportGroup(1, 1, "aangifte", "Aangifte", "demo", "Demo", "Europe/Amsterdam")
+GROUP = ReportGroup(1, 1, "balie", "Balie", "demo", "Demo", "Europe/Amsterdam")
 FIRST = date(2026, 11, 2)
 LAST = date(2026, 11, 8)
 NOW = datetime(2026, 11, 9, 12, 0, tzinfo=UTC)
@@ -89,7 +89,7 @@ def test_the_tidy_file_has_one_row_per_hourly_cell_and_leaves_small_cells_out() 
     assert tidy.hidden == 1
     row = dict(zip(TIDY_HEADER, tidy.rows[0], strict=True))
     assert row["hour"] == "2026-11-04T10:00:00Z"
-    assert (row["organisation"], row["group"], row["metric"]) == ("demo", "aangifte", "M1")
+    assert (row["organisation"], row["group"], row["metric"]) == ("demo", "balie", "M1")
     assert (row["channel"], row["count"], row["sum"], row["max"]) == ("email", 8, 480, 90)
     assert "sms" not in str(tidy.rows)
 
