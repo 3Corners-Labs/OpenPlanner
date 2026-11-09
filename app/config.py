@@ -503,6 +503,9 @@ class Settings(BaseSettings):
     agent_change_requests_enabled: bool = False
     agent_change_request_minutes: int = Field(default=60, ge=10, le=1440)
     agent_change_requests_per_hour: int = Field(default=20, ge=1, le=120)
+    # ADR 0023 step 2b: a quiet period per booking (D) and how long requests are kept (C).
+    agent_change_request_cooldown_minutes: int = Field(default=10, ge=1, le=1440)
+    agent_change_request_retention_days: int = Field(default=30, ge=1, le=365)
 
     # Updates from the admin portal (ADR 0029). APP_VERSION is baked into release images by
     # main.yml; UPDATE_REPOSITORY (owner/name) switches the hourly release check on. The token

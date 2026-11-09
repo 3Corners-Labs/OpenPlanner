@@ -11,8 +11,10 @@ from typing import Any
 
 import pytest
 
+from app.domain.api_clients import ApiSettings
 from app.domain.booking import BookingStatus
 from app.domain.change_request_service import (
+    COOLDOWN,
     MATCHED,
     NO_MATCH,
     ChangePolicy,
@@ -48,7 +50,7 @@ OTHER_CALLER = api_caller("opc_other")
 @pytest.fixture
 def policy() -> dict[str, ChangePolicy]:
     """The organisation's settings, changeable per test."""
-    return {"value": ChangePolicy(enabled=True, minutes=60)}
+    return {"value": ChangePolicy(enabled=True, minutes=60, cooldown_minutes=10)}
 
 
 @pytest.fixture
@@ -58,6 +60,10 @@ def changes(
     bookings: BookingService,
     policy: dict[str, ChangePolicy],
 ) -> ChangeRequestService:
+    # The asking clients exist, enabled, with the scope, and the API is on (step 2b).
+    uow.state.api_settings = ApiSettings(enabled=True)
+    for caller in (CALLER, OTHER_CALLER):
+        uow.state.api_clients[caller.client.client_id] = caller.client
     return ChangeRequestService(
         uow,
         clock,
@@ -265,20 +271,25 @@ async def test_refusals_never_depend_on_a_booking(
 
 
 async def test_a_newer_request_replaces_the_open_one(
-    changes: ChangeRequestService, bookings: BookingService, uow: InMemoryUnitOfWork
+    changes: ChangeRequestService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
 ) -> None:
     _id, _token, code = await _booked(bookings)
     demo = await _demo(uow)
 
     first = await changes.request(CALLER, demo, PHONE, code, None)
+    clock.advance(timedelta(minutes=10))  # past the cooldown
     second = await changes.request(CALLER, demo, PHONE, code, SLOT_0930)
 
+    later = clock.now()
     old = await changes.status(CALLER, first.public_id)
-    assert old.status(NOW) is ChangeStatus.PENDING  # the same answer as an unmatched one
+    assert old.status(later) is ChangeStatus.PENDING  # the same answer as an unmatched one
     assert old.expires_at == first.expires_at
-    assert not old.is_current(SLOT_0900, NOW)
+    assert not old.is_current(SLOT_0900, later)
     new = await changes.status(CALLER, second.public_id)
-    assert new.is_current(SLOT_0900, NOW)
+    assert new.is_current(SLOT_0900, later)
     sent = [j for j in uow.state.jobs[_id] if j.type is JobType.SEND_CHANGE_REQUEST]
     assert len(sent) == 2  # one email and one SMS: the first request's were dropped
 
@@ -389,3 +400,83 @@ async def test_switching_off_hides_the_code_and_stops_open_requests(
         await changes.confirm(ref)
     assert off.value.code is ErrorCode.CHANGE_REQUEST_NOT_FOUND
     assert uow.state.bookings[booking_id].status is BookingStatus.CONFIRMED
+
+
+# --- step 2b: the client may still ask, a quiet period, retention ---------------------------
+
+
+@pytest.mark.parametrize(
+    "revoke",
+    [
+        "client_off",
+        "scope_gone",
+        "narrowed",
+        "api_off",
+        "client_gone",
+    ],
+)
+async def test_a_request_of_a_client_that_may_no_longer_ask_cannot_be_confirmed(
+    changes: ChangeRequestService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+    revoke: str,
+) -> None:
+    booking_id, token, code = await _booked(bookings)
+    await changes.request(CALLER, await _demo(uow), PHONE, code, None)
+    ref = PublicRef((await bookings.find(token)).booking.public_ref)
+    client = CALLER.client
+    if revoke == "client_off":
+        uow.state.api_clients[client.client_id] = replace(client, enabled=False)
+    elif revoke == "scope_gone":
+        uow.state.api_clients[client.client_id] = replace(client, scopes=frozenset())
+    elif revoke == "narrowed":
+        uow.state.api_clients[client.client_id] = replace(client, groups=frozenset({"demo-twee"}))
+    elif revoke == "api_off":
+        uow.state.api_settings = ApiSettings(enabled=False)
+    else:
+        del uow.state.api_clients[client.client_id]
+
+    assert await changes.open_request(ref) is None
+    with pytest.raises(DomainError) as refused:
+        await changes.confirm(ref)
+    assert refused.value.code is ErrorCode.CHANGE_REQUEST_NOT_FOUND
+    assert uow.state.bookings[booking_id].status is BookingStatus.CONFIRMED
+
+
+async def test_within_the_cooldown_a_new_request_sends_nothing(
+    changes: ChangeRequestService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
+) -> None:
+    booking_id, _token, code = await _booked(bookings)
+    demo = await _demo(uow)
+
+    first = await changes.request(CALLER, demo, PHONE, code, None)
+    clock.advance(timedelta(minutes=9))
+    quiet = await changes.request(CALLER, demo, PHONE, code, SLOT_0930)
+
+    assert quiet.booking_id is None  # recorded as no match: the first stays open
+    assert quiet.status(clock.now()) is ChangeStatus.PENDING
+    assert quiet.expires_at - quiet.created_at == first.expires_at - first.created_at
+    stored = await changes.status(CALLER, first.public_id)
+    assert stored.is_current(SLOT_0900, clock.now())
+    sent = [j for j in uow.state.jobs[booking_id] if j.type is JobType.SEND_CHANGE_REQUEST]
+    assert len(sent) == 2  # the first request's email and SMS only
+    reasons = [e.reason for e in uow.state.audit if e.action == "bookings:request_change"]
+    assert reasons == [MATCHED, COOLDOWN]
+
+
+async def test_expired_requests_are_deleted_after_the_retention(
+    changes: ChangeRequestService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    _id, _token, code = await _booked(bookings)
+    demo = await _demo(uow)
+    await changes.request(CALLER, demo, PHONE, code, None)
+    await changes.request(CALLER, demo, "06 8765 4321", code, None)
+    expiry = NOW + timedelta(minutes=60)
+
+    async with uow.locked() as tx:
+        assert await tx.delete_change_requests_expired_before(expiry) == 0
+        assert await tx.delete_change_requests_expired_before(expiry + timedelta(seconds=1)) == 2
+    assert uow.state.change_requests == {}

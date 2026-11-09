@@ -11782,3 +11782,9 @@ msgstr "Former team members"
 
 msgid "reports.team.note"
 msgstr "A figure below {n} is hidden and written as < {n}, and the minutes go with the calls. There is no total row: removed team members are one row, so history keeps its totals and no individual remains."
+
+msgid "settings.field.agent_change_request_cooldown_minutes.label"
+msgstr "Quiet period after a change request (minutes)"
+
+msgid "settings.field.agent_change_request_retention_days.label"
+msgstr "Keep change requests after expiry (days)"

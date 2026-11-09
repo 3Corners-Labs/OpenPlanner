@@ -11795,3 +11795,9 @@ msgstr "Voormalige teamleden"
 
 msgid "reports.team.note"
 msgstr "Een getal onder {n} is verborgen en staat als < {n}; de minuten gaan mee met de gesprekken. Er is geen totaalrij: verwijderde teamleden zijn één rij, zodat de geschiedenis haar totalen houdt en er geen persoon overblijft."
+
+msgid "settings.field.agent_change_request_cooldown_minutes.label"
+msgstr "Rustperiode na een wijzigingsverzoek (minuten)"
+
+msgid "settings.field.agent_change_request_retention_days.label"
+msgstr "Wijzigingsverzoeken bewaren na verlopen (dagen)"

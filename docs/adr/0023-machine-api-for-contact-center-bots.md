@@ -123,6 +123,26 @@ the phone number alone. The notes below follow from that.
     the times made, expiring, confirmed and replaced. No personal data; it goes with its group
     or booking.
 
+### Step 2b: the three follow-ups (product owner, 2026-11-09)
+
+The product owner asked for the follow-ups of step 2 as their own step, so the step is finished,
+not half built.
+
+11. **The client must still be allowed to ask.** When the participant opens or confirms a request
+    and before its message goes out, the superuser's API switch must still be on, the client
+    must still exist and be enabled, and the matrix must still grant it
+    `bookings:request_change` on the group (`decide_client`: scope, organisation, narrowed
+    groups). Otherwise there is nothing to confirm, and the message is not sent.
+12. **A quiet period per booking.** After a request reached a booking, a new matching request for
+    it within `agent_change_request_cooldown_minutes` sends nothing and replaces nothing: it is
+    recorded as matching no booking (audit reason `cooldown`) and the API answers exactly as for
+    any other request. Someone who knows a participant's number and code can send them at most
+    one message per quiet period.
+13. **Retention.** A change request, matched or not, is deleted
+    `agent_change_request_retention_days` after it expired (hourly, with the worker's other
+    housekeeping); its status is then `change_request_not_found`. The audit events stay under
+    their own retention.
+
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
@@ -130,6 +150,8 @@ the phone number alone. The notes below follow from that.
 | `agent_change_requests_enabled` | D organisation | off | on/off | organisation settings | Change requests for the organisation's groups, and the appointment code in its messages and pages. Switching it off is no loss of protection: the API refuses requests. |
 | `agent_change_request_minutes` | D organisation | 60 | 10–1440 | organisation settings | How long the participant has to confirm a change request. |
 | `agent_change_requests_per_hour` | C platform | 20 | 1–120 | `settings.platform.manage` | Change requests per API client per hour, next to `rate_limit_agent_calls`. |
+| `agent_change_request_cooldown_minutes` | D organisation | 10 | 1–1440 | organisation settings | Step 2b: after a request reached a booking, minutes in which a new one for it sends nothing. A protection, so it cannot be switched off. |
+| `agent_change_request_retention_days` | C platform | 30 | 1–365 | `settings.platform.manage` | Step 2b: days after expiry that a change request is kept. |
 
 **Fixed on purpose:** the code has eight digits (a crypto parameter: 10^8 codes per phone
 number, behind the per-client limit and the audit trail).
@@ -140,6 +162,7 @@ number, behind the per-client limit and the audit trail).
 |---|---|---|---|
 | 1 | Clients, tokens, `/me`, groups and availability; the superuser's switch, client admin and audit | #18, #67, #97 | merged |
 | 2 | Change requests by phone number and appointment code: scope `bookings:request_change`, `POST /groups/{slug}/change-requests`, `GET /change-requests/{id}`, table `change_requests` (migration 0105), the code on pages and messages, the participant's confirm page `/b/m/{ref}/change`, three settings | #688 | merged |
+| 2b | The client must still be allowed to ask at confirmation and before the message; a quiet period per booking (`agent_change_request_cooldown_minutes`); deletion after `agent_change_request_retention_days` | #PRNUM | merged |
 
 ## Consequences
 

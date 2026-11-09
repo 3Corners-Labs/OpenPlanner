@@ -153,6 +153,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `RATE_LIMIT_AGENT_TOKENS` | rate | `10/minute` | 1–30 per minute | `settings.platform.manage` | Machine API token requests per client. |
 | `RATE_LIMIT_AGENT_CALLS` | rate | `120/minute` | 10–600 per minute | `settings.platform.manage` | Machine API calls per client. |
 | `AGENT_CHANGE_REQUESTS_PER_HOUR` | int | `20` | 1–120 | `settings.platform.manage` | Change requests per API client per hour, next to the machine API's call limit (ADR 0023 step 2); the off switch stays RATE_LIMIT_ENABLED. |
+| `AGENT_CHANGE_REQUEST_RETENTION_DAYS` | int | `30` | 1–365 | `settings.platform.manage` | Days after expiry that a bot's change request is kept, matched or not; then it is deleted and its status no longer found (ADR 0023 step 2b). |
 | `ADMIN_SESSION_HOURS` | int | `8` | 1–8 | `settings.platform.manage` | Lifetime of an admin session. |
 | `ADMIN_REAUTH_MINUTES` | int | `60` | 5–60 | `settings.platform.manage` | Maximum login age for a change (ADR 0015). |
 | `ADMIN_IDLE_MINUTES` | int | `60` | 15–120 | `settings.platform.manage` | Idle time after which an admin session ends (ADR 0098). |
@@ -214,6 +215,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_DIGEST_INCLUDE_NUMBERS` | bool | `true` | — | `settings.organisation.manage` | Whether the digest mail holds the figures; off, it holds only the link to the report (ADR 0117 point 16). |
 | `AGENT_CHANGE_REQUESTS_ENABLED` | bool | `false` | — | `settings.organisation.manage` | Whether a bot may ask to cancel or move this organisation's bookings by phone number and appointment code, and whether pages and messages show that code (ADR 0023 step 2). |
 | `AGENT_CHANGE_REQUEST_MINUTES` | int | `60` | 10–1440 | `settings.organisation.manage` | Minutes the participant has to confirm a bot's change request (ADR 0023 step 2). |
+| `AGENT_CHANGE_REQUEST_COOLDOWN_MINUTES` | int | `10` | 1–1440 | `settings.organisation.manage` | After a bot's change request reached a booking, minutes in which a new one for it sends the participant nothing (ADR 0023 step 2b). Cannot be switched off. |
 | `TIME_FORMAT` | enum | `24h` | 24h, 12h, locale | `settings.organisation.manage` | How clock times are written. |
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
 | `PRODUCT_FOOTER` | bool | `true` | — | `settings.organisation.manage` | "Appointments via OpenPlanner" with the product mark at the foot of the booking pages and in the HTML part of emails (ADR 0060 §6). |

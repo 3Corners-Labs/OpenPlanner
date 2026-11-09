@@ -16,12 +16,11 @@ from app.config import Settings
 from app.domain.change_request_service import ChangeRequestService
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
-from tests.support.agent_api import api_caller
+from tests.support.agent_api import registered_caller
 from tests.support.domain import NOW
 from tests.support.participant import SAME_ORIGIN, booked, open_link
 
 FRIDAY_0930 = datetime(2026, 1, 2, 8, 30, tzinfo=UTC)
-CALLER = api_caller()
 
 
 @pytest.fixture
@@ -47,7 +46,8 @@ async def _ask(client: httpx.AsyncClient, base: str, start: datetime | None = No
     async with SqlUnitOfWork(_app(client).state.engine).read() as tx:
         demo = await tx.get_group_summary("demo")
     assert demo is not None
-    request = await service.request(CALLER, demo, "06 1234 5678", code, start)
+    caller = await registered_caller(_app(client))
+    request = await service.request(caller, demo, "06 1234 5678", code, start)
     assert request.booking_id is not None
 
 

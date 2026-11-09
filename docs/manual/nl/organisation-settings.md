@@ -48,6 +48,9 @@ bewaart alle onderwerpen samen.
   boekingspagina en in de bevestiging, de wijziging en de herinnering. Er verandert pas iets als
   de deelnemer het verzoek via de eigen mail of sms bevestigt, binnen de ingestelde tijd. Staat
   de instelling uit, dan weigert de koppeling verzoeken en vervallen open verzoeken.
+- **Rustperiode na een wijzigingsverzoek** (1 tot 1440 minuten, standaard 10): nadat een
+  verzoek een afspraak heeft bereikt, krijgt de deelnemer in deze periode geen nieuw bericht voor
+  diezelfde afspraak, ook niet als de bot opnieuw vraagt. Kan niet worden uitgezet.
 
 ## Een instelling wijzigen
 

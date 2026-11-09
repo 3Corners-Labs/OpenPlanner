@@ -20,12 +20,12 @@ booking id. The rules of the code and the request are in ``app.domain.change_req
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.domain import booking_changes
 from app.domain.api_clients import ApiCaller
 from app.domain.audit import AuditEvent, Outcome
-from app.domain.authorization import ApiScope
+from app.domain.authorization import ApiScope, Target, decide_client
 from app.domain.booking import Booking
 from app.domain.booking_changes import sms_reachable
 from app.domain.change_requests import (
@@ -46,7 +46,11 @@ from app.domain.services import BookingDetails, BookingReceipt, BookingService
 
 MATCHED = "matched"
 NO_MATCH = "no_match"
-"""Audit reasons of a change request: for the superuser's log, never in the API's answer."""
+COOLDOWN = "cooldown"
+"""Audit reasons of a change request: for the superuser's log, never in the API's answer.
+
+``cooldown``: the pair matched, but the booking had a request less than
+``agent_change_request_cooldown_minutes`` ago, so nothing was sent (step 2b)."""
 
 
 @dataclass(frozen=True)
@@ -56,10 +60,13 @@ class ChangePolicy:
     Attributes:
         enabled: ``agent_change_requests_enabled``.
         minutes: ``agent_change_request_minutes``: how long the participant can confirm.
+        cooldown_minutes: ``agent_change_request_cooldown_minutes`` (step 2b): after a
+            request reached a booking, how long a new one for it sends nothing.
     """
 
     enabled: bool = False
     minutes: int = 60
+    cooldown_minutes: int = 10
 
 
 @dataclass(frozen=True)
@@ -151,6 +158,9 @@ class ChangeRequestService:
             # Every candidate's code is checked, so the time does not tell which one matched.
             matches = [b for b in candidates if code_matches(self._keys, b.token_salt, digits)]
             match = next((b for b in matches if _may_change(b, group, start, now)), None)
+            reason = MATCHED if match else NO_MATCH
+            if match is not None and await _cooling_down(tx, match, now, policy):
+                match, reason = None, COOLDOWN  # recorded as no match: nothing sent or replaced
             if match is not None:  # before the new row, so it replaces only an older one
                 await self._ask(tx, match, now)
             stored = await tx.add_change_request(
@@ -171,7 +181,7 @@ class ChangeRequestService:
                     caller.client.client_id,
                     ApiScope.BOOKINGS_REQUEST_CHANGE.value,
                     Outcome.SUCCESS,
-                    MATCHED if match else NO_MATCH,
+                    reason,
                     summary.organisation_slug,
                     group.slug,
                     detail=f"action:{stored.action.value}",
@@ -200,8 +210,8 @@ class ChangeRequestService:
             return None
         async with self._uow.read() as tx:
             request = await tx.get_latest_change_request(booking.id)
-        if request is None or not self._open(request, booking, details.group):
-            return None
+            if request is None or not await self._open(tx, request, booking, details.group):
+                return None
         return OpenChange(details, request)
 
     async def confirm(self, ref: PublicRef) -> ConfirmedChange:
@@ -221,7 +231,11 @@ class ChangeRequestService:
         async with self._uow.locked() as tx:
             booking = await tx.get_booking(booking_id)
             request = await tx.get_latest_change_request(booking_id)
-            if booking is None or request is None or not self._open(request, booking, group):
+            if (
+                booking is None
+                or request is None
+                or not await self._open(tx, request, booking, group)
+            ):
                 raise DomainError(ErrorCode.CHANGE_REQUEST_NOT_FOUND)
             confirmed = request.confirm(self._clock.now())
             await tx.save_change_request(confirmed)
@@ -231,12 +245,20 @@ class ChangeRequestService:
             moved = await self._bookings.reschedule_in(tx, booking, group, request.target_start)
             return ConfirmedChange(confirmed, moved=moved)
 
-    def _open(self, request: ChangeRequest, booking: Booking, group: Group) -> bool:
-        """Whether the participant may still confirm ``request``: current, and switched on."""
+    async def _open(
+        self, tx: Transaction, request: ChangeRequest, booking: Booking, group: Group
+    ) -> bool:
+        """Whether the participant may still confirm ``request``.
+
+        It is current, the organisation still takes change requests, and the client that asked
+        may still ask (step 2b): a client switched off, narrowed or stripped of the scope, or the
+        API switched off, leaves nothing to confirm.
+        """
         return (
             booking.is_active
             and request.is_current(booking.start, self._clock.now())
             and self._policy(group.organisation_id).enabled
+            and await client_may_still_ask(tx, request, group)
         )
 
     async def _ask(self, tx: Transaction, booking: Booking, now: datetime) -> None:
@@ -280,3 +302,31 @@ def _may_change(booking: Booking, group: Group, start: datetime | None, now: dat
     except DomainError:
         return False
     return True
+
+
+async def client_may_still_ask(tx: Transaction, request: ChangeRequest, group: Group) -> bool:
+    """Return whether the client behind ``request`` may still ask for it (ADR 0023 step 2b).
+
+    The superuser's API switch is on, the client exists and is enabled, and the matrix still
+    grants it ``bookings:request_change`` on the group (``decide_client``: scope, organisation,
+    narrowed groups). Checked when the participant confirms and before the message goes out.
+    """
+    if not (await tx.get_api_settings()).enabled:
+        return False
+    client = await tx.get_api_client(request.client_id)
+    organisation = await tx.get_organisation_by_id(group.organisation_id)
+    if client is None or not client.enabled or organisation is None:
+        return False
+    target = Target.for_group(group.slug, organisation.slug)
+    return decide_client(client.grant, ApiScope.BOOKINGS_REQUEST_CHANGE, target).allowed
+
+
+async def _cooling_down(
+    tx: Transaction, booking: Booking, now: datetime, policy: ChangePolicy
+) -> bool:
+    """Whether a request reached ``booking`` less than the cooldown ago (step 2b)."""
+    if booking.id is None:  # pragma: no cover - a matched booking is stored
+        return False
+    previous = await tx.get_latest_change_request(booking.id)
+    window = timedelta(minutes=policy.cooldown_minutes)
+    return previous is not None and now - previous.created_at < window

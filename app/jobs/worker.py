@@ -250,6 +250,7 @@ async def run_worker(
                 product_footer=lambda organisation: (
                     live.for_organisation(organisation).product_footer
                 ),
+                change_request_days=lambda: live.settings.agent_change_request_retention_days,
                 change_requests=lambda organisation: (
                     live.for_organisation(organisation).agent_change_requests_enabled
                 ),

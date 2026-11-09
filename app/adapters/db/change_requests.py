@@ -4,7 +4,9 @@ A mixin of ``SqlTransaction``, so these queries run in the caller's transaction.
 holds no personal data; the booking it matched, if any, is named by its id.
 """
 
-from sqlalchemy import select, update
+from datetime import datetime
+
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import ChangeRequestRow
@@ -75,3 +77,10 @@ class ChangeRequestQueries:
             .where(ChangeRequestRow.id == request.id)
             .values(confirmed_at=request.confirmed_at, superseded_at=request.superseded_at)
         )
+
+    async def delete_change_requests_expired_before(self, cutoff: datetime) -> int:
+        """Delete the requests that expired before ``cutoff``, matched or not."""
+        result = await self._session.execute(
+            delete(ChangeRequestRow).where(ChangeRequestRow.expires_at < cutoff)
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
