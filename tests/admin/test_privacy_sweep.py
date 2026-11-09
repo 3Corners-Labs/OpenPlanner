@@ -37,7 +37,7 @@ from app.domain.storage import FREE_SPACE_CRITICAL, STORAGE_EVENT
 from app.web.widgets import OVERVIEW_PATH, WIDGETS
 from tests.admin.conftest import SAME_ORIGIN, Site
 from tests.support.admin_site import AuditRow, audit_events, post_form, site_app, site_uow
-from tests.support.downloads import AUDITED_DOWNLOADS
+from tests.support.downloads import AUDITED_DOWNLOADS, address
 from tests.support.privacy_sweep import MARKERS, QUEUE_ITEM, Fixture, marker_leaks
 from tests.support.routes import all_routes
 
@@ -261,7 +261,7 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
     assert leaks == {}, "personal data on a list, overview, export or alert page (ADR 0063 §2)"
     # ASVS V3.5.3: opening an admin page writes nothing to the audit log; the downloads that do
     # refuse a request another site makes (``tests/admin/test_audited_downloads.py``).
-    expected = {path: [action] for path, action in AUDITED_DOWNLOADS.items()}
+    expected = {address(route): [action] for route, action in AUDITED_DOWNLOADS.items()}
     assert audited == expected, "a GET writes an audit event: guard it and add it to the list"
     # An image route has none to show; the certificate request download (ADR 0072) has no
     # request waiting, and the internal root (ADR 0112) no file without the internal authority.

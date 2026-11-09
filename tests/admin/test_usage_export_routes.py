@@ -5,10 +5,13 @@ import hashlib
 import io
 from typing import Any
 
+import pytest
+
 from app.adapters.db.uow import SqlUnitOfWork
+from app.admin.usage_routes import EXPORT_REFUSALS
 from app.domain.audit import Outcome
 from app.domain.authorization import Scope
-from app.domain.csv_export import ExportLimits
+from app.domain.csv_export import ExportLimits, ExportRefusal
 from tests.admin.conftest import AGENT, AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, Site
 from tests.support.usage_data import DAY
 from tests.support.usage_data import fill as _fill
@@ -131,23 +134,64 @@ async def test_another_organisation_cannot_be_exported(site: Site) -> None:
     assert "x-content-sha256" not in organisation.headers
 
 
-async def test_an_export_over_the_day_limit_is_refused_on_the_page_and_audited(
-    site: Site,
+LONG = "from=2025-12-01&to=2026-01-31"
+"""A period of 62 days, over the limit of 31 the refusal tests set."""
+
+
+@pytest.mark.parametrize(
+    ("export", "report"),
+    [
+        (
+            f"/admin/groups/demo/usage/export.csv?{LONG}",
+            f"/admin/groups/demo/usage?view=volume&{LONG}",
+        ),
+        (
+            f"/admin/organisations/demo/usage/export.csv?view=queue&{LONG}",
+            f"/admin/organisations/demo/usage?view=queue&{LONG}",
+        ),
+        (
+            f"/admin/organisations/demo/usage/export.csv?view=tidy&{LONG}",
+            f"/admin/organisations/demo/usage?view=volume&{LONG}",
+        ),
+    ],
+)
+async def test_an_export_over_the_day_limit_goes_back_to_the_report_with_the_reason(
+    site: Site, export: str, report: str
 ) -> None:
-    await site.login_as(GROUP_ADMIN)
+    # Post/redirect/get: the refusal is never a page at the export's own address, where a
+    # reload, a language switch or a login would run the export again.
+    await site.login_as(ORG_ADMIN)
     app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     app.state.usage_export_service._limits = lambda: ExportLimits(100, 31)  # noqa: SLF001
 
-    response = await site.client.get(
-        "/admin/groups/demo/usage/export.csv?from=2025-12-01&to=2026-01-31"
-    )
+    response = await site.client.get(export)
     (event,) = await _exports(site)
 
-    assert response.status_code == 422
-    assert response.headers["content-type"].startswith("text/html")
-    assert "De export beslaat te veel dagen." in response.text
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{report}&refused=too_many_days"
+    page = await site.client.get(response.headers["location"])
+    assert page.status_code == 200
+    assert "De export beslaat te veel dagen." in page.text
     assert (event.outcome, event.reason) == (Outcome.FAILURE, "too_many_days")
     assert "sha256" not in event.detail
+
+
+@pytest.mark.parametrize("refused", ["zz_marker", "x" * 200])
+async def test_an_unknown_refusal_code_on_a_report_shows_nothing_and_is_not_echoed(
+    site: Site, refused: str
+) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    for path in ("/admin/groups/demo/usage", "/admin/organisations/demo/usage"):
+        page = await site.client.get(path, params={"refused": refused})
+
+        assert page.status_code == 200
+        assert refused not in page.text
+        assert 'class="error-message"' not in page.text
+
+
+def test_every_refusal_code_has_a_text_on_the_report() -> None:
+    assert set(EXPORT_REFUSALS) == set(ExportRefusal)
 
 
 async def test_an_unknown_view_is_refused_and_never_echoed(site: Site) -> None:

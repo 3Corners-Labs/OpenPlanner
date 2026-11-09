@@ -115,7 +115,7 @@ Whoever may export (the superuser, organisation admins, group admins and the Com
 - **Download this report as CSV** gives exactly the tables of the family you are looking at, after the small-count rule: a hidden figure is an empty value with the note *hidden*. The file has no text of the interface, only codes (a day, an outcome, a bucket number), so it reads the same in every language.
 - **Download all hourly figures as CSV** gives one row per hour, group, metric and cut, for analysis in your own tool (the format `openplanner.usage/1`, described in `docs/reporting.md`). A cell below the minimum is not in the file at all.
 
-Both open in Excel (UTF-8, `;` as separator). The platform administrator sets how many rows and days one file may hold; a longer period is refused with a message, and the file is not cut short. Every download is recorded in the audit log with who, which family, which period, how many rows and a checksum of the file, never the figures. The checksum is also in the `X-Content-SHA256` header of the response.
+Both open in Excel (UTF-8, `;` as separator). The platform administrator sets how many rows and days one file may hold; a longer period is refused with a message, and the file is not cut short. Every download is recorded in the audit log with who, which family, which period, how many rows and a checksum of the file, never the figures. The checksum is also in the `X-Content-SHA256` header of the response. As with the audit log export, a link to a download on another website gets an error page in a current browser, so another website cannot put a download in your name in the log.
 
 ## The digest by email
 

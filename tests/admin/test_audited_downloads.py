@@ -1,10 +1,11 @@
 """The audited downloads refuse a request that another site makes (ASVS V3.5.3, ADR 0053).
 
-Two admin downloads write an audit event when they are opened: the audit log export
-(``audit.export``, ADR 0040) and the identity provider mapping (``idp_mapping.exported``,
-ADR 0049 point 17). The admin cookie is ``SameSite=Lax``, so it travels on a top-level
-navigation from any site: without a guard, a link on another site makes a signed-in admin's
-browser download the file and puts an export in their name in the audit log. Both depend on
+Some admin downloads write an audit event when they are opened: the audit log export
+(``audit.export``, ADR 0040), the identity provider mapping (``idp_mapping.exported``, ADR 0049
+point 17) and the usage report exports of an organisation and a group (``reports.export``,
+ADR 0117 step 8). The admin cookie is ``SameSite=Lax``, so it travels on a top-level navigation
+from any site: without a guard, a link on another site makes a signed-in admin's browser
+download the file and puts an export in their name in the audit log. Each depends on
 ``SameOrigin``, like every form post of the portal. ``AUDITED_DOWNLOADS`` lists them, and the
 privacy sweep (``tests/admin/test_privacy_sweep.py``) keeps that list complete.
 """
@@ -19,18 +20,18 @@ from app.web.protection import require_same_origin
 from app.web.route_dependencies import dependency_calls
 from tests.admin.conftest import SUPER, Site
 from tests.support.admin_site import audit_events, site_app
-from tests.support.downloads import AUDITED_DOWNLOADS
+from tests.support.downloads import AUDITED_DOWNLOADS, address
 from tests.support.routes import all_routes
 
 
-@pytest.mark.parametrize("path", AUDITED_DOWNLOADS)
+@pytest.mark.parametrize("route", AUDITED_DOWNLOADS)
 @pytest.mark.parametrize("fetch_site", ["cross-site", "same-site"])
 async def test_a_download_another_site_asks_for_is_refused_and_not_audited(
-    site: Site, path: str, fetch_site: str
+    site: Site, route: str, fetch_site: str
 ) -> None:
     await site.login_as(SUPER)
 
-    response = await site.client.get(path, headers={"sec-fetch-site": fetch_site})
+    response = await site.client.get(address(route), headers={"sec-fetch-site": fetch_site})
 
     assert response.status_code == 403
     assert "content-disposition" not in response.headers
@@ -38,24 +39,24 @@ async def test_a_download_another_site_asks_for_is_refused_and_not_audited(
     assert 'href="/admin/?lang=en"' in response.text  # the switcher leads to the overview
     events = [(action, outcome, reason) for _, action, outcome, reason in await audit_events(site)]
     assert (REQUEST_REJECTED, Outcome.DENIED, CROSS_SITE) in events
-    assert AUDITED_DOWNLOADS[path] not in {action for action, _, _ in events}
+    assert AUDITED_DOWNLOADS[route] not in {action for action, _, _ in events}
 
 
-@pytest.mark.parametrize("path", AUDITED_DOWNLOADS)
+@pytest.mark.parametrize("route", AUDITED_DOWNLOADS)
 @pytest.mark.parametrize("fetch_site", ["same-origin", "none"])
 async def test_a_download_from_the_portal_or_the_address_bar_goes_ahead_and_is_audited(
-    site: Site, path: str, fetch_site: str
+    site: Site, route: str, fetch_site: str
 ) -> None:
     # ``same-origin``: the link on the page. ``none``: typed, bookmarked or opened from another
     # program; no page can set it, so the admin opened the address themselves.
     await site.login_as(SUPER)
 
-    response = await site.client.get(path, headers={"sec-fetch-site": fetch_site})
+    response = await site.client.get(address(route), headers={"sec-fetch-site": fetch_site})
 
     assert response.status_code == 200
     assert response.headers["content-disposition"].startswith("attachment; ")
     events = [(actor, action, outcome) for actor, action, outcome, _ in await audit_events(site)]
-    assert (SUPER.subject, AUDITED_DOWNLOADS[path], Outcome.SUCCESS) in events
+    assert (SUPER.subject, AUDITED_DOWNLOADS[route], Outcome.SUCCESS) in events
 
 
 @pytest.mark.parametrize(
@@ -63,6 +64,7 @@ async def test_a_download_from_the_portal_or_the_address_bar_goes_ahead_and_is_a
     [
         ("/admin/audit/export.csv?level=warning", "/admin/audit?level=warning"),
         ("/admin/idp-mapping/export.txt", "/admin/idp-mapping"),
+        ("/admin/groups/demo/usage/export.csv?view=queue", "/admin/groups/demo/usage?view=queue"),
     ],
 )
 async def test_a_download_after_the_session_ended_returns_to_its_page_after_the_login(

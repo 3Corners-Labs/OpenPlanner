@@ -19,8 +19,10 @@ exported.
 
 The two export routes take the same ``from`` and ``to`` and a ``view``: a report family (the
 screen's tables as CSV) or ``tidy`` (the hourly file ``openplanner.usage/1``). The file is sent
-with ``X-Content-SHA256`` and ``Cache-Control: no-store``; an export over a limit shows the
-report page again with the reason, and is audited either way.
+with ``X-Content-SHA256`` and ``Cache-Control: no-store``. Every export is audited, so only the
+portal itself may ask for one (``SameOrigin``, ASVS V3.5.3). An export over a limit is audited
+too and sends the admin back to the report page with the reason (``refused``), so nothing at
+the export's own address can run it again.
 """
 
 from datetime import date
@@ -28,14 +30,14 @@ from typing import Annotated, Any, TypedDict
 from urllib.parse import parse_qs, urlencode
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
 from app.admin.forms import done_message, raise_refusal, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin, admin_moment, organisation_header, page
 from app.domain.authorization import Permission, Principal
-from app.domain.csv_export import ExportRefused
+from app.domain.csv_export import ExportRefusal, ExportRefused
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.report_digest import MAX_MONTH_DAY, DigestPeriod
 from app.domain.report_digest_service import DigestAdmin
@@ -298,17 +300,25 @@ async def organisation_usage(
     locale: Locale,
     org: str,
     context: View,
+    refused: str | None = None,
 ) -> HTMLResponse:
-    """Show a usage report (``view``) of an organisation's groups in the reader's scope."""
-    return await _organisation_page(request, locale, context.principal, org)
+    """Show a usage report (``view``) of an organisation's groups in the reader's scope.
+
+    ``refused`` is why its export just sent the admin back here (``organisation_export``).
+    """
+    shown = _refused(locale, refused)
+    return await _organisation_page(request, locale, context.principal, org, shown)
 
 
 @router.get("/groups/{slug}/usage", response_class=HTMLResponse)
 async def group_usage(
-    request: Request, locale: Locale, slug: str, context: ViewGroup
+    request: Request, locale: Locale, slug: str, context: ViewGroup, refused: str | None = None
 ) -> HTMLResponse:
-    """Show a usage report (``view``) of one group."""
-    return await _group_page(request, locale, context, slug)
+    """Show a usage report (``view``) of one group.
+
+    ``refused`` is why its export just sent the admin back here (``group_export``).
+    """
+    return await _group_page(request, locale, context, slug, _refused(locale, refused))
 
 
 def _export_view(request: Request) -> str:
@@ -336,16 +346,36 @@ def _file(sent: UsageFile) -> Response:
     )
 
 
-EXPORT_REFUSALS: dict[str, str] = {
-    "too_many_days": "reports.export.refused.too_many_days",
-    "too_many_rows": "reports.export.refused.too_many_rows",
+EXPORT_REFUSALS: dict[ExportRefusal, str] = {
+    ExportRefusal.TOO_MANY_DAYS: "reports.export.refused.too_many_days",
+    ExportRefusal.TOO_MANY_ROWS: "reports.export.refused.too_many_rows",
 }
 """Why an export was refused, per refusal code (the keys of the page's message)."""
 
 
-def _refused(locale: Locale, refused: ExportRefused) -> dict[str, object]:
-    """Return the context that makes the report page say why the export was refused."""
-    return {"export_error": locale.gettext(EXPORT_REFUSALS[refused.code])}
+def _refused(locale: Locale, code: str | None) -> dict[str, object]:
+    """Return the context that makes the report page say why its export was refused.
+
+    ``code`` is read back from the query: a code of ``ExportRefusal`` shows its text; anything
+    else shows nothing, never an error and never echoed.
+    """
+    refusal = ExportRefusal.named(code)
+    return {"export_error": locale.gettext(EXPORT_REFUSALS[refusal])} if refusal else {}
+
+
+def _back_to_report(request: Request, base: str, refused: ExportRefused) -> RedirectResponse:
+    """Send the admin back to the report page ``base`` with the reason (post/redirect/get).
+
+    The page shows the family asked for (``tidy`` shows ``volume``) over the same days, taken
+    from the checked query, never as typed. Nothing at the export's own address shows the
+    refusal, so a reload, a language switch or a login there cannot run the export again.
+    """
+    query = {"view": _page_view(request)}
+    for name in ("from", "to"):
+        if (day := _day(request.query_params.get(name))) is not None:
+            query[name] = day.isoformat()
+    query["refused"] = refused.code
+    return RedirectResponse(f"{base}?{urlencode(query)}", status_code=303)
 
 
 async def _export(
@@ -364,36 +394,34 @@ async def _export(
 
 @router.get("/organisations/{org}/usage/export.csv", response_model=None)
 async def organisation_export(
-    request: Request, locale: Locale, org: str, context: Export
+    request: Request, org: str, _: SameOrigin, context: Export
 ) -> Response:
-    """Download a CSV of an organisation's usage (the screen's tables, or the tidy file)."""
+    """Download a CSV of an organisation's usage (the screen's tables, or the tidy file).
+
+    The export is audited, so a request another site makes is refused (``SameOrigin``).
+    """
     try:
         return _file(await _export(request, context.principal, organisation=org, group=None))
     except ExportRefused as refused:
-        response = await _organisation_page(
-            request, locale, context.principal, org, _refused(locale, refused), _page_view(request)
-        )
-        response.status_code = 422
-        return response
+        return _back_to_report(request, f"/admin/organisations/{org}/usage", refused)
 
 
 @router.get("/groups/{slug}/usage/export.csv", response_model=None)
 async def group_export(
-    request: Request, locale: Locale, slug: str, context: ExportGroup
+    request: Request, slug: str, _: SameOrigin, context: ExportGroup
 ) -> Response:
-    """Download a CSV of one group's usage (the screen's tables, or the tidy file)."""
+    """Download a CSV of one group's usage (the screen's tables, or the tidy file).
+
+    The export is audited, so a request another site makes is refused (``SameOrigin``).
+    """
     try:
         return _file(await _export(request, context.principal, organisation=None, group=slug))
     except ExportRefused as refused:
-        response = await _group_page(
-            request, locale, context, slug, _refused(locale, refused), "volume"
-        )
-        response.status_code = 422
-        return response
+        return _back_to_report(request, f"/admin/groups/{slug}/usage", refused)
 
 
 def _page_view(request: Request) -> str:
-    """Return the report family to show again after a refused export: the asked one, or volume."""
+    """Return the report family to show after a refused export: the asked one, or volume."""
     view = request.query_params.get("view")
     return view if view in VIEWS else "volume"
 
