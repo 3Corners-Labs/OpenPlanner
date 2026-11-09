@@ -534,6 +534,15 @@ async def test_group_admin_cannot_close_the_organisation(closures: ClosureServic
         await closures.organisation_overview(ORG_ADMIN, "andere")
 
 
+async def test_the_overview_of_an_unknown_organisation_is_not_found(
+    closures: ClosureService,
+) -> None:
+    with pytest.raises(DomainError) as unknown:
+        await closures.organisation_overview(SUPER, "nope")
+
+    assert unknown.value.code is ErrorCode.ORGANISATION_NOT_FOUND
+
+
 async def test_superuser_closes_any_organisation(
     closures: ClosureService, uow: InMemoryUnitOfWork
 ) -> None:
