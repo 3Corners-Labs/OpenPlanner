@@ -15,7 +15,9 @@ now (with an image, CL-3), a team with a planned closure (without one) and a boo
 It also adds, per e2e browser, the two confirmed bookings of the participant's journey
 (trial call, join link and the call, ADR 0071, 0075, 0076) in a team with a video host, so
 the journey spec can play the call with the simulator. Development and test only; the e2e
-pages of CL-2 are these.
+pages of CL-2 are these. On the demo team's next weekday it adds bookings awaiting
+confirmation (ADR 0056), one awaiting a new time (ADR 0057) and a confirmed one, so the agenda
+of that day (``demo_agenda``) shows every action a planner has on a booking, whatever the date.
 
 Used by ``python -m app.cli seed-demo`` and by tests. Idempotent: existing groups are left
 untouched.
@@ -64,12 +66,16 @@ JOURNEY_HOST = "proefhost@example.org"
 call without a Webex Service App; the simulator stands in for Webex."""
 BROWSERS = ("chromium", "firefox", "webkit")
 """The e2e browsers (``e2e/playwright.config.ts``); each runs the journey on its own bookings."""
-PENDING_TIMES = (time(11), time(11, 30), time(13), time(13, 30))
 JOURNEY_CALL_IN = timedelta(minutes=10)
 """The journey's call starts this long after seeding: its join page is open at once (it opens
 15 minutes before the start) and stays open until half an hour after the end."""
+PENDING_TIMES = (time(11), time(11, 30), time(13), time(13, 30))
 """Local times of the example bookings awaiting confirmation: one for the page checks and one
 per browser of the e2e keyboard flow, each in its own slot."""
+CONFIRMED_TIME = time(10)
+"""Local time of the confirmed example booking on the same day: besides moving and cancelling
+it, a planner may propose or ask for a new time (ADR 0044, 0057), which a booking awaiting
+confirmation does not offer. No e2e flow changes it."""
 FIRST_WEEKEND_DAY = 5
 """``date.weekday()`` of Saturday: the demo team works on weekdays only."""
 EXAMPLE_NOTICES = {
@@ -149,6 +155,8 @@ class ClosureExamples:
         trial_page: The trial call page of that booking. It shows the page's "not available
             for this appointment" state; its other states are covered by the API tests.
         journeys: The participant's journey per e2e browser (``BROWSERS``), new each run.
+        demo_agenda: The demo group's agenda on the day of the bookings awaiting
+            confirmation (the next weekday): a day with slots and rows, for the page checks.
     """
 
     closed_group: str
@@ -162,6 +170,7 @@ class ClosureExamples:
     proposal_page: str
     trial_page: str
     journeys: dict[str, JourneyExample]
+    demo_agenda: str
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -264,8 +273,10 @@ async def seed_closure_examples(
         demo = await seeded_group(tx, DEMO_SLUG)
         if created:
             await tx.add_usage_cells(usage_example_cells(demo.organisation_id, demo.id, now))
+        await _confirmed_booking(tx, demo, now, token_key)
         pending = [await _pending_booking(tx, demo, now, token_key, at) for at in PENDING_TIMES]
         proposed = await _proposed_booking(tx, demo, now, token_key)
+        pending_day = _next_weekday(demo, now, PENDING_TIMES[0]).astimezone(demo.tz).date()
         journey_group = await seeded_group(tx, JOURNEY_GROUP_SLUG)
         journeys = {
             browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
@@ -282,6 +293,7 @@ async def seed_closure_examples(
         proposal_page=f"/b/{proposed}/proposal",
         trial_page=f"/b/{token}/test",
         journeys=journeys,
+        demo_agenda=f"/admin/groups/{DEMO_SLUG}/agenda?day={pending_day}",
     )
 
 
@@ -435,6 +447,24 @@ async def _pending_booking(
         confirm_by=now + timedelta(days=1),
     )
     return token
+
+
+async def _confirmed_booking(
+    tx: Transaction, group: Group, now: datetime, token_key: bytes
+) -> None:
+    """Store a confirmed demo booking on the next weekday at ``CONFIRMED_TIME``.
+
+    It shares its day with the bookings awaiting confirmation, so that day's agenda shows the
+    actions of both kinds of row; its management link is not needed and not returned.
+    """
+    await store_example_booking(
+        tx,
+        group,
+        _next_weekday(group, now, CONFIRMED_TIME),
+        now,
+        token_key,
+        status=BookingStatus.CONFIRMED,
+    )
 
 
 async def _proposed_booking(tx: Transaction, group: Group, now: datetime, token_key: bytes) -> str:
