@@ -45,11 +45,19 @@ SECTOR = re.compile(
             _w("inwo", "ner"),
             _w("vergun", "ning"),
             _w("aan", "gifte"),
+            # A real organisation's contact data, the closure example until 2026-11-08: its short
+            # number, its main number (spaced and compact) and its street address.
+            _w(r"\b14", r" *020\b"),
+            _w(r"20 +(?:- +)?6", r"24 +1111\b"),
+            _w(r"20624", r"1111\b"),
+            _w(r"\bAm", r"stel 1\b"),
+            _w(r"\b1011", r" ?PN\b"),
         ]
     ),
     re.IGNORECASE,
 )
-"""The words that do not appear anywhere in the repository (client names, sector words)."""
+"""What does not appear anywhere in the repository: client names, sector words, and the contact
+data of a real organisation."""
 
 ALLOWED = (
     # The certificate programme and the API standards site of the Dutch state, cited as they are.
@@ -169,6 +177,14 @@ def test_the_guard_sees_the_words() -> None:
     # The default slug of the test groups, and so of many example addresses (2026-11-08).
     assert sector_words_in("/g/" + _w("aan", "gifte") + "-2026")
     assert sector_words_in("team-" + _w("Aan", "giftes") + "@example.org")
+    # A real organisation's contact data, each form it had in the examples (2026-11-08).
+    assert sector_words_in("Bel " + _w("14", " 020"))
+    assert sector_words_in("tel:" + _w("14", "020"))
+    assert sector_words_in("+31 (0)" + _w("20 6", "24 1111"))
+    assert sector_words_in(_w("020 - 6", "24 1111"))
+    assert sector_words_in("tel:+31" + _w("20624", "1111"))
+    assert sector_words_in("Stadskantoor\n" + _w("Am", "stel 1"))
+    assert sector_words_in(_w("1011", " PN") + " Stad")
 
 
 def test_the_guard_reads_the_text_of_an_office_file(tmp_path: Path) -> None:
@@ -196,6 +212,9 @@ def test_the_guard_lets_the_allowed_names_through() -> None:
     assert not sector_words_in(_w("PKI", "overheid", " certificates").replace("PKIover", "PKIover"))
     assert not sector_words_in("(" + _w("G", "OV.UK") + " and NL Design System)")
     assert not sector_words_in("een " + _w("bur", "gerlijk") + " woord")
+    # The made-up example contacts, and numbers that only look alike.
+    assert not sector_words_in("012 345 6789, +31 (0)12 345 6789, pebble:14000, 114 0200")
+    assert not sector_words_in("Kantoor\nVoorbeeldstraat 1\n1234 AB Voorbeeldstad, Amstel 10")
 
 
 def test_the_exempt_files_exist() -> None:
