@@ -810,6 +810,9 @@ class StaffRow(Base):
     # ADR 0046 step 2: active, suspended or erased, and when it last changed.
     status: Mapped[str] = mapped_column(String(16), server_default=text("'active'"), index=True)
     status_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0117 step 10b: the verified ``email`` claim of the last login; personal data.
+    email: Mapped[str | None] = mapped_column(String(320))
+    email_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class OverviewLayoutRow(Base):

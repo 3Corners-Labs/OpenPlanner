@@ -51,6 +51,7 @@ from app.adapters.oidc import Guard, OidcConfig, OidcIdentityProvider, claim_map
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
 from app.adapters.signing_keys import EcSigningKeys
+from app.adapters.staff_addresses import StoredAddresses
 from app.admin.reviewed_documents import ReviewedDocuments
 from app.admin.routes import register_admin
 from app.admin.session import session_cookie_for
@@ -463,7 +464,7 @@ def create_app(
             app.state.admin_service,
             clock,
             lambda: live().reporting_digest_max_subscriptions,
-            DirectoryAddresses(_keycloak_directory(settings)),
+            StoredAddresses(uow, DirectoryAddresses(_keycloak_directory(settings))),
         )
         app.state.usage_export_service = UsageExportService(
             app.state.usage_report_service,

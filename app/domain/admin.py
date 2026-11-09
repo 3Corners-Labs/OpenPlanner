@@ -285,8 +285,13 @@ class AdminService:
         principal: Principal,
         refused: Sequence[Refusal] = (),
         mismatch: str | None = None,
+        email: str | None = None,
     ) -> None:
         """Audit a login and refresh the admin's staff record, in one transaction (ADR 0046).
+
+        ``email`` is the verified address of this login (ADR 0117 step 10b); it replaces the
+        stored one, and without it the stored one is cleared, so a stale address never stays.
+        It goes into the staff record only: never into an audit event, a log line or a job.
 
         ``refused`` entitlement values are kept on the record and audited once per
         organisation they name (global for values naming none), with the values and reason
@@ -308,6 +313,8 @@ class AdminService:
                 last_login_at=now,
                 last_seen_at=now,
                 last_logout_at=old.last_logout_at if old else None,
+                email=email,
+                email_at=now if email else None,
                 refused=tuple(
                     RefusedEntitlement(r.value, r.reason.value, r.organisation, now)
                     for r in refused

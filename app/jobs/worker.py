@@ -45,6 +45,7 @@ from app.adapters.log_shipping import LogShipper, ship_settings
 from app.adapters.mail_dns import DnsTxtResolver
 from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
+from app.adapters.staff_addresses import StoredAddresses
 from app.config import Settings, environment, loose_secret_files
 from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
@@ -385,7 +386,7 @@ async def run_worker(
             lambda organisation: live.for_organisation(organisation).reporting_org_min_cell_size,
         ),
         ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
-        DirectoryAddresses(directory_from_settings(settings)),
+        StoredAddresses(uow, DirectoryAddresses(directory_from_settings(settings))),
         lambda content, locale: compose_digest(content, digest_texts.gettext, locale),
         settings.public_base_url,
         lambda organisation: live.for_organisation(organisation).reporting_digest_send_hour,

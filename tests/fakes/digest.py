@@ -135,6 +135,8 @@ class FakeStaffAddresses:
 
     def __init__(self, found: dict[str, str] | None = None) -> None:
         self.found = found or {}
+        self.asked: list[str] = []
 
     async def address_of(self, subject: str) -> str | None:
+        self.asked.append(subject)
         return self.found.get(subject)

@@ -5819,6 +5819,12 @@ msgstr "Last login"
 msgid "admin.staff.last_seen"
 msgstr "Last active"
 
+msgid "admin.staff.email"
+msgstr "Email address"
+
+msgid "admin.staff.email_none"
+msgstr "No verified address known"
+
 msgid "admin.staff.last_logout"
 msgstr "Last logout"
 

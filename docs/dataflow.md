@@ -213,6 +213,7 @@ organisation provider ──ID token (sub, name, email, email_verified, entitlem
 |---|---|---|---|---|
 | Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject`; `audit_events.detail` of the two volume warnings (`planner.changes_alert`, `booking.contact_reveals_alert`: `actor:<subject>,…`, ADR 0044) | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
 | Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; erased daily by the worker for people without a login for `staff_retention_days` (class C, 365 days, 90–1825; ADR 0046 step 2), or by the superuser for a suspended person; the session row follows the session clean-up | no |
+| Admin email address (ADR 0117 step 10b) | `staff.email`, `staff.email_at` (not `admin_sessions.claims`) | identity provider claim `email`, kept only when `email_verified` is true | replaced or cleared at every login; removed with the display name at erasure (manual, or `staff_retention_days`); shown on the staff page to `staff.view`; read by the digest at send time, never in a log, audit event or job payload | no; mail to the person for the usage digest only |
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed`; removed with the display name at erasure | no |
 | Entitlement values (ADR 0049) | `admin_sessions.claims` (the recognised values), `staff_refused_entitlements` (value, reason code, organisation), `audit_events` (`auth.entitlement_refused`, `auth.entitlement_mismatch`, `auth.ambiguous_claims`) | identity provider claim `openplanner_entitlements` | session: until it ends and is cleaned up (ADR 0098); refusals: replaced at every login; events: as admin actions | no; the values hold the prefix, a role key and the IdP values of organisations and groups, linked to the employee's subject |
 | Admin session (ADR 0098) | `admin_sessions` (`id_hash` = sha256 of 32 random bytes, subject, provider, login claims as JSON, `login_at`, `last_seen_at`, `ended_at`, `end_reason`); the cookie holds the reference only | the login; the requests | ends at logout, idle (`admin_idle_minutes`), absolute end (`admin_session_hours`), a newer login or the limit per person; rows are removed by the worker's clean-up (ADR 0098 step 2) | no; staff data, never the reference itself in a log, audit event or URL |
@@ -656,9 +657,9 @@ From step 8 a holder of `reports.export` downloads what a page shows, or the hou
 The file holds no personal data and no free text; nothing of it is stored, and the audit event holds
 the checksum, not the content. A cell below the threshold is not written.
 
-From step 10 a digest subscription (`report_subscriptions`: organisation, group, period, staff row ids, no address) and its run records (`report_digest_runs`) drive one mail per due digest:
+From step 10 a digest subscription (`report_subscriptions`: organisation, group, period, staff row ids, no address; the address is `staff.email` since step 10b) and its run records (`report_digest_runs`) drive one mail per due digest:
 
-    worker poll ─► due subscription ─► recipients who still hold reports.view ─► address from the identity provider's directory (memory only)
+    worker poll ─► due subscription ─► recipients who still hold reports.view ─► address: `staff.email` of the last login, else the bundled directory (memory only)
                  ─► mail: suppressed figures + a link to the signed-in report, no attachment ─► the organisation's email channel
 
 The address is never stored by the portal, and no address, name or figure is in a log line, a job or an audit event.

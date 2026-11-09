@@ -62,6 +62,17 @@ def test_the_staff_user_name_is_masked() -> None:
     assert "username" in PII_FIELDS
 
 
+def test_the_staff_address_is_masked_in_a_log_line(stream: io.StringIO) -> None:
+    """ADR 0117 step 10b: the address of a staff member never reaches a log in clear."""
+    from app.domain.entitlements import LoginClaims
+
+    claims = LoginClaims("u1", "Olga", email="olga@voorbeeld.nl")
+
+    structlog.get_logger("test").info("login", email=claims.email, claims=repr(claims))
+
+    assert "voorbeeld.nl" not in stream.getvalue()
+
+
 def test_structlog_masks_every_pii_field(stream: io.StringIO) -> None:
     values = {field: f"secret-{field}" for field in PII_FIELDS}
 

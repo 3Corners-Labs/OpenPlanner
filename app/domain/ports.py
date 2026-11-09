@@ -253,8 +253,8 @@ class OrganisationLogin:
 
     Attributes:
         claims: The claims as ``finish_login`` returns them (subject qualified, MFA applied).
-        email: The ``email`` claim; personal data, used for the domain check only and never
-            stored or logged.
+        email: The ``email`` claim; personal data, used for the domain check and never logged.
+            (The verified address of the login is also in ``claims.email``, ADR 0117 step 10b.)
         email_verified: The ``email_verified`` claim, ``None`` when absent.
     """
 
@@ -2289,8 +2289,9 @@ class DigestUnitOfWork(Protocol):
 class StaffAddresses(Protocol):
     """Finds the email address of a staff member when a digest goes out (ADR 0117 point 16).
 
-    The staff table holds no address; the bundled identity provider's directory does (ADR 0095).
-    A person it does not hold, or a deployment without it, has none and is skipped.
+    The address is the verified ``email`` claim stored at the last login (ADR 0117 step 10b),
+    else the bundled identity provider's directory (ADR 0095). A person with neither has none
+    and is skipped.
     """
 
     async def address_of(self, subject: str) -> str | None:

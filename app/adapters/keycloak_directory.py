@@ -237,9 +237,9 @@ def directory_from_settings(settings: Settings) -> StaffDirectory | None:
 class DirectoryAddresses:
     """``StaffAddresses`` over the bundled provider's directory (ADR 0117 point 16).
 
-    The staff table holds no address; the provider does. A person it does not hold, one who is
-    disabled, a provider without a directory or one that does not answer has none: the digest
-    skips them rather than fail.
+    The fallback of ``StoredAddresses``, for a person whose login stored none. A person it does
+    not hold, one who is disabled, a provider without a directory or one that does not answer
+    has none: the digest skips them rather than fail.
 
     Args:
         directory: The provider's directory, or ``None`` for a provider without one.
