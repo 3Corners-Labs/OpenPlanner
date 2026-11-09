@@ -482,8 +482,9 @@ def test_the_result_is_written_and_read_by_one_class() -> None:
     assert not again.begins_at("b" * 12)
     assert again.covers("a" * 40, "b" * 40)
     assert not again.covers("a" * 40, "c" * 40)
-    with pytest.raises(KeyError):
-        notes.Result.from_json("{}")
+    for broken in ("{}", "[]", '{"from": "a", "to": "b", "changes": [1]}'):
+        with pytest.raises(ValueError, match="not a release notes file"):
+            notes.Result.from_json(broken)
 
 
 def test_a_baseline_is_a_hash_and_a_checkout_must_descend_from_it(
@@ -523,3 +524,23 @@ def test_a_malformed_notes_file_is_a_finding_not_a_traceback(tmp_path: Path) -> 
     check.check_release_notes(check.Workspace(root), {}, "a" * 12, {}, report)
     assert report.blocking == 1
     assert "niet te lezen" in report.sections["Releasenotes"][0]
+
+
+def test_the_changelog_of_an_untagged_commit_is_unreleased_not_the_nearest_release(
+    tmp_path_factory: pytest.TempPathFactory, git: Git, history: dict[str, str]
+) -> None:
+    """A capture after v0.7.0 quotes Unreleased, not the 0.7.0 section the nearest tag names."""
+    root = Path(git("rev-parse", "--show-toplevel").strip())
+    (root / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## Unreleased\n\n- Next.\n\n## 0.7.0 (x)\n\n- Done.\n"
+    )
+    (root / "next.txt").write_text("next")
+    commit_all(git, "feat(planner): next thing (#30)")
+    head = git("rev-parse", "HEAD").strip()
+    workspace = _workspace(tmp_path_factory.mktemp("untagged"), history, baseline="14", end="14")
+    state = {"stack": {"build": {"commit": head}}}
+    (workspace / "evidence" / "state.json").write_text(json.dumps(state))
+    done = release.notes(workspace, repo=root)
+    text = done.markdown.read_text()
+    assert "- Next." in text
+    assert "- Done." not in text

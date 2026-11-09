@@ -218,8 +218,8 @@ def render(
     unplaced = [c for c in seen if not c.roles]
     out += ["", "## Nog te plaatsen", ""]
     out += [
-        "Wijzigingen die een gebruiker kan merken, zonder helponderwerp of pagina van de "
-        "deelnemers erbij. Bepaal zelf voor welke rol ze tellen, of laat ze weg met een reden.",
+        "Wijzigingen die een gebruiker kan merken en die bij geen taak of pagina van de "
+        "deelnemers horen. Bepaal zelf voor welke rol ze tellen, of laat ze weg met een reden.",
         "",
         *(lines(unplaced) or ["Geen."]),
     ]
@@ -274,14 +274,17 @@ class Result:
     @classmethod
     def from_json(cls, text: str) -> "Result":
         """Return the result a file holds."""
-        data = json.loads(text)
-        return cls(
-            str(data["from"]),
-            str(data["to"]),
-            str(data.get("from_release", "")),
-            str(data.get("to_release", "")),
-            tuple(Change.from_json(item) for item in data.get("changes", [])),
-        )
+        try:
+            data = json.loads(text)
+            return cls(
+                str(data["from"]),
+                str(data["to"]),
+                str(data.get("from_release", "")),
+                str(data.get("to_release", "")),
+                tuple(Change.from_json(item) for item in data.get("changes", [])),
+            )
+        except (KeyError, TypeError, AttributeError) as error:
+            raise ValueError(f"not a release notes file: {error!r}") from error
 
     def begins_at(self, baseline: str) -> bool:
         """Return whether the range starts at ``baseline``, a hash or an abbreviation of one."""

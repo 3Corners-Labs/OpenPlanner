@@ -449,13 +449,19 @@ def notes(workspace: Path, repo: Path = REPO) -> Notes | None:
         commit: f"{tag.removeprefix('v')} ({commit[:12]})" if tag else commit[:12]
         for commit, tag in ((start, result.start_release), (finish, result.end_release))
     }
+    # The release's own section only for a commit that carries the tag; otherwise Unreleased.
+    exact_tag = (
+        result.end_release
+        if result.end_release in git(repo, "tag", "--points-at", finish).split()
+        else ""
+    )
     out = ws.root / release_notes.RESULT_MD
     out.write_text(
         release_notes.render(
             changes,
             start=label[start],
             end=label[finish],
-            changelog=changelog_for(repo, finish, result.end_release),
+            changelog=changelog_for(repo, finish, exact_tag),
             roles=release_notes.heading_roles(manuals),
         )
     )
@@ -478,7 +484,12 @@ def notes_current(ws: Workspace, variables: dict, captured_from: str, repo: Path
     path = ws.root / release_notes.RESULT_JSON
     if not path.exists():
         sys.exit(f"release.py: {release_notes.RESULT_JSON} is missing; freeze.sh writes it")
-    found = release_notes.Result.from_json(path.read_text())
+    try:
+        found = release_notes.Result.from_json(path.read_text())
+    except ValueError:
+        sys.exit(
+            f"release.py: {release_notes.RESULT_JSON} is unreadable; freeze.sh writes it again"
+        )
     wanted = (_resolve(repo, baseline), _resolve(repo, captured_from))
     if not found.covers(*wanted):
         sys.exit(
