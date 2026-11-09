@@ -5,7 +5,12 @@ from collections.abc import Awaitable, Callable
 import pytest
 
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.lookups import group_booking, group_by_slug, group_summary_by_slug
+from app.domain.lookups import (
+    group_booking,
+    group_by_slug,
+    group_in_organisation,
+    group_summary_by_slug,
+)
 from app.domain.ports import Transaction
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import two_organisations
@@ -38,6 +43,28 @@ async def test_an_unknown_group_is_not_found(
     async with uow.read() as tx:
         with pytest.raises(DomainError) as caught:
             await lookup(tx, "nope")
+    assert caught.value.code is ErrorCode.GROUP_NOT_FOUND
+
+
+async def test_group_in_organisation_returns_the_group_of_that_organisation(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    async with uow.read() as tx:
+        summary = await group_in_organisation(tx, "andere", "andere-team")
+    assert (summary.group.id, summary.organisation_slug) == (2, "andere")
+
+
+@pytest.mark.parametrize(
+    ("organisation", "slug"),
+    [("demo", "andere-team"), ("andere", "nope"), ("nope", "demo")],
+    ids=["another organisation's group", "unknown group", "unknown organisation"],
+)
+async def test_group_in_organisation_answers_alike_for_what_is_not_its_group(
+    uow: InMemoryUnitOfWork, organisation: str, slug: str
+) -> None:
+    async with uow.read() as tx:
+        with pytest.raises(DomainError) as caught:
+            await group_in_organisation(tx, organisation, slug)
     assert caught.value.code is ErrorCode.GROUP_NOT_FOUND
 
 
