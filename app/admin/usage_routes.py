@@ -293,20 +293,6 @@ async def _organisation_page(
     )
 
 
-async def _group_page(
-    request: Request,
-    locale: Locale,
-    context: AdminContext,
-    slug: str,
-    extra: dict[str, object] | None = None,
-) -> HTMLResponse:
-    """Render one group's usage report; ``extra`` adds to the template's context."""
-    template, _result, ctx = await _report(
-        request, locale, context.principal, f"/admin/groups/{slug}/usage", group=slug
-    )
-    return group_page(request, locale, context, template, {**ctx, **(extra or {})}, scripts=True)
-
-
 @router.get("/organisations/{org}/usage", response_class=HTMLResponse)
 async def organisation_usage(
     request: Request,
@@ -323,7 +309,10 @@ async def group_usage(
     request: Request, locale: Locale, slug: str, context: ViewGroup
 ) -> HTMLResponse:
     """Show a usage report (``view``) of one group."""
-    return await _group_page(request, locale, context, slug)
+    template, _result, ctx = await _report(
+        request, locale, context.principal, f"/admin/groups/{slug}/usage", group=slug
+    )
+    return group_page(request, locale, context, template, ctx, scripts=True)
 
 
 @dataclass(frozen=True)

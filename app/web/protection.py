@@ -83,17 +83,18 @@ def require_same_origin(request: Request) -> None:
 
     Every form post depends on it, and so do the audited downloads, the admin ``GET`` routes
     that write an audit event when they are opened (ASVS V3.5.3). ``none`` passes: typed,
-    bookmarked or opened from another program, a navigation the person made themselves. Such a
-    ``GET`` loaded in advance (prefetch or prerender) is refused as well, without a security
-    event: it may follow no click, and the click asks again. A ``GET`` that shows personal data
-    asks more (``from_this_page``): only its own page counts.
+    bookmarked or opened from another program, a navigation the person made themselves. A
+    request the browser loads in advance (prefetch or prerender, which browsers do for a ``GET``
+    only, such as an audited download) is refused as well, without a security event: it may
+    follow no click, and the click asks again. A ``GET`` that shows personal data asks more
+    (``from_this_page``): only its own page counts.
 
     ``Origin`` is not trusted when ``Sec-Fetch-Site`` is present: some referrer policies make
     browsers send ``Origin: null`` even for same-origin form posts.
 
     Raises:
         RejectedRequest: 403 if ``Sec-Fetch-Site`` is not same-origin/none, or, without it,
-            if ``Origin`` differs from this site; 403 without a reason for a ``GET`` loaded in
+            if ``Origin`` differs from this site; 403 without a reason for a request loaded in
             advance.
     """
     site = request.headers.get("sec-fetch-site")
@@ -106,7 +107,7 @@ def require_same_origin(request: Request) -> None:
         # Origins are not personal data; logging them makes misconfigured proxies visible.
         log.info("request.rejected", reason=ORIGIN_MISMATCH, origin=origin[:200], expected=expected)
         raise RejectedRequest(403, ORIGIN_MISMATCH)
-    if request.method == "GET" and _speculative(request):
+    if _speculative(request):
         raise RejectedRequest(403)
 
 
