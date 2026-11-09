@@ -774,6 +774,7 @@ def create_app(
             rebook_days=lambda org: per_organisation(org).planner_rebook_days,
             reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
             proposal_hours=lambda org: _proposal_hours(per_organisation(org)),
+            reach=lambda org: _reach(per_organisation(org)),
         )
         app.state.role_service = RoleService(
             uow,

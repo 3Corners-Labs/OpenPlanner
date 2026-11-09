@@ -176,6 +176,33 @@ The bookings awaiting a new time are in the list **Awaiting a new time** in the 
 the original time, the reason and the date the request lapses. There too you can move or cancel
 a booking yourself.
 
+### Propose a new time
+
+With **Propose a new time** on a confirmed appointment the assistant looks for a free time for
+the participant: the same time of day on another day first, then the smallest difference in time
+of day, then the nearest day. You can keep that time or choose another free one. The old place is
+free at once; the proposed time is held for the participant and counts in the agenda as not
+confirmed. The participant gets the proposal by email (and SMS when there is a phone number) and
+can confirm the new time, choose another time or cancel. Nothing moves without a confirmation:
+after the deadline the held time is released and the participant can still choose until the
+request lapses.
+
+A slot with a shortfall also offers **Propose new times**. For each appointment (the most
+recently made, as many as the shortfall) you see the proposed time. For each you can choose
+another time, let the participant choose, or untick it. Everything goes at once; when a chosen
+time no longer fits, OpenPlanner sends nothing and shows the list again. With **Propose new times
+for this day** (day view) or **for this week** (week view) you review every slot with a shortfall
+at once; the assistant never gives two appointments the same last place. OpenPlanner never
+proposes a time without a free agent.
+
+In **Awaiting a new time** a proposal shows the proposed time and until when it is held. After a
+phone call you can choose **Confirm for the participant** there; the participant then gets the
+confirmation with the new time. **Withdraw the proposal** releases the held time and the
+appointment keeps awaiting a time from the participant.
+
+How long a proposal is held, when its reminder goes and how far the assistant looks are set by
+the organisation's administrator in the settings (topic Planner).
+
 ### Accept a shortfall
 
 If, for example, a colleague from another team helps out, choose **Accept shortfall** at the

@@ -870,6 +870,41 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             404, 403, 403, 404, 403, 403, 403
         ),
     },
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/propose": {
+        "/admin/groups/demo/agenda/bookings/999999/propose": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/propose": {
+        "/admin/groups/demo/agenda/bookings/999999/propose": statuses(
+            400, 400, 400, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/propose": statuses(
+            400, 403, 403, 400, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/proposal/withdraw": {
+        "/admin/groups/demo/agenda/bookings/999999/proposal/withdraw": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/proposal/withdraw": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/proposal/confirm": {
+        "/admin/groups/demo/agenda/bookings/999999/proposal/confirm": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/proposal/confirm": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/agenda/slot-propose": {
+        "/admin/groups/demo/agenda/slot-propose": statuses(400, 400, 400, 403, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/slot-propose": {
+        "/admin/groups/demo/agenda/slot-propose": statuses(400, 400, 400, 403, 403, 403, 403),
+    },
     "GET /admin/groups/{slug}/agenda/slot-rebook": {
         "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403, 403),
     },
