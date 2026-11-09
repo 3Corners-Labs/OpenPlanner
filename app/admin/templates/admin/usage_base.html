@@ -42,7 +42,7 @@
     {% endif %}
     <div class="form-actions"><button type="submit" class="button">{{ _("reports.usage.apply") }}</button></div>
   </form>
-  {% if export_error is defined %}{{ error_message(export_error) }}{% endif %}
+  {{ error_message(export_error) }}
   {% if (summary is defined and can("reports.export", group=summary)) or (summary is not defined and can("reports.export", organisation=usage.organisation_slug)) %}
   <p class="report-export">
     <a href="{{ base }}/export.csv?{{ {"view": view, "from": form_from, "to": form_to}|urlencode }}">{{ _("reports.export.screen") }}</a>

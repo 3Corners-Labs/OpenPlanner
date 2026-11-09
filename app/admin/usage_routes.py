@@ -25,15 +25,22 @@ too and sends the admin back to the report page with the reason (``refused``), s
 the export's own address can run it again.
 """
 
+from dataclasses import dataclass
 from datetime import date
 from typing import Annotated, Any, TypedDict
 from urllib.parse import parse_qs, urlencode
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse, RedirectResponse, Response
+from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
-from app.admin.forms import done_message, raise_refusal, redirect_done
+from app.admin.forms import (
+    done_message,
+    raise_refusal,
+    redirect_done,
+    redirect_refused,
+    refused_message,
+)
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin, admin_moment, organisation_header, page
 from app.domain.authorization import Permission, Principal
@@ -157,7 +164,8 @@ def _view(
     """Return the template's context shared by every report: range, words and the view links.
 
     ``team_on`` adds the *Team* link, which only the organisation's page of a reader with
-    ``reports.staff.view`` has, while the organisation has the team view on.
+    ``reports.staff.view`` has, while the organisation has the team view on. ``export_error``
+    is why an export of the report was refused, after it sent the admin back here.
     """
     _ = locale.gettext
     report = result.report
@@ -180,6 +188,7 @@ def _view(
         "form_from": first,
         "form_to": last,
         "base": base,
+        "export_error": refused_message(request, EXPORT_REFUSALS, _),
     }
 
 
@@ -191,15 +200,14 @@ async def _report(
     *,
     organisation: str | None = None,
     group: str | None = None,
-    view: str | None = None,
     team_on: bool = False,
 ) -> tuple[str, UsageScreen[Any], dict[str, object]]:
-    """Read the report family of ``view`` (the query's by default) and return its page parts.
+    """Read the report family the query asks for (``view``) and return its page parts.
 
     Raises:
         DomainError: ``invalid_range`` for ``team`` on a group's page, which has none.
     """
-    view = view or _which(request)
+    view = _which(request)
     service = report_service(request)
     scope = _Query(
         organisation_slug=organisation,
@@ -258,14 +266,13 @@ async def _organisation_page(
     principal: Principal,
     org: str,
     extra: dict[str, object] | None = None,
-    view: str | None = None,
 ) -> HTMLResponse:
     """Render an organisation's usage report; ``extra`` adds to the template's context."""
     base = f"/admin/organisations/{org}/usage"
     shown = can_function(principal)(Permission.REPORTS_STAFF_VIEW, organisation=org)
     team_on = shown and await report_service(request).team_view_on(principal, org)
     template, result, ctx = await _report(
-        request, locale, principal, base, organisation=org, view=view, team_on=team_on
+        request, locale, principal, base, organisation=org, team_on=team_on
     )
     header = organisation_header(request, locale, principal, result.organisation_name, org)
     digest = await digest_context(request, locale, principal, org)
@@ -292,11 +299,10 @@ async def _group_page(
     context: AdminContext,
     slug: str,
     extra: dict[str, object] | None = None,
-    view: str | None = None,
 ) -> HTMLResponse:
     """Render one group's usage report; ``extra`` adds to the template's context."""
     template, _result, ctx = await _report(
-        request, locale, context.principal, f"/admin/groups/{slug}/usage", group=slug, view=view
+        request, locale, context.principal, f"/admin/groups/{slug}/usage", group=slug
     )
     return group_page(request, locale, context, template, {**ctx, **(extra or {})}, scripts=True)
 
@@ -307,37 +313,47 @@ async def organisation_usage(
     locale: Locale,
     org: str,
     context: View,
-    refused: str | None = None,
 ) -> HTMLResponse:
-    """Show a usage report (``view``) of an organisation's groups in the reader's scope.
-
-    ``refused`` is why its export just sent the admin back here (``organisation_export``).
-    """
-    shown = _refused(locale, refused)
-    return await _organisation_page(request, locale, context.principal, org, shown)
+    """Show a usage report (``view``) of an organisation's groups in the reader's scope."""
+    return await _organisation_page(request, locale, context.principal, org)
 
 
 @router.get("/groups/{slug}/usage", response_class=HTMLResponse)
 async def group_usage(
-    request: Request, locale: Locale, slug: str, context: ViewGroup, refused: str | None = None
+    request: Request, locale: Locale, slug: str, context: ViewGroup
 ) -> HTMLResponse:
-    """Show a usage report (``view``) of one group.
+    """Show a usage report (``view``) of one group."""
+    return await _group_page(request, locale, context, slug)
 
-    ``refused`` is why its export just sent the admin back here (``group_export``).
+
+@dataclass(frozen=True)
+class _Asked:
+    """The file an export asks for, parsed once from the query.
+
+    Attributes:
+        view: A report family (the screen's tables) or ``tidy`` (the hourly file).
+        first_day: The first day asked for; ``None`` for the default range.
+        last_day: The last day asked for; ``None`` for the default range.
     """
-    return await _group_page(request, locale, context, slug, _refused(locale, refused))
+
+    view: str
+    first_day: date | None
+    last_day: date | None
 
 
-def _export_view(request: Request) -> str:
-    """Return the file asked for (``view``): a report family, or ``tidy``; ``volume`` by default.
+def _asked(request: Request) -> _Asked:
+    """Return the file the query asks for: ``view`` (``volume`` by default), ``from`` and ``to``.
 
     Raises:
-        DomainError: ``invalid_range`` for any other value; it is never echoed.
+        DomainError: ``invalid_range`` for a ``view`` that is neither a report family nor
+            ``tidy``, or a day that is not ``YYYY-MM-DD``; the value is never echoed.
     """
     view = request.query_params.get("view") or "volume"
     if view != TIDY and view not in VIEWS:
         raise DomainError(ErrorCode.INVALID_RANGE)
-    return view
+    return _Asked(
+        view, _day(request.query_params.get("from")), _day(request.query_params.get("to"))
+    )
 
 
 def _file(sent: UsageFile) -> Response:
@@ -353,50 +369,46 @@ def _file(sent: UsageFile) -> Response:
     )
 
 
-EXPORT_REFUSALS: dict[ExportRefusal, str] = {
+EXPORT_REFUSALS: dict[str, str] = {
     ExportRefusal.TOO_MANY_DAYS: "reports.export.refused.too_many_days",
     ExportRefusal.TOO_MANY_ROWS: "reports.export.refused.too_many_rows",
 }
 """Why an export was refused, per refusal code (the keys of the page's message)."""
 
 
-def _refused(locale: Locale, code: str | None) -> dict[str, object]:
-    """Return the context that makes the report page say why its export was refused.
-
-    ``code`` is read back from the query: a code of ``ExportRefusal`` shows its text; anything
-    else shows nothing, never an error and never echoed.
-    """
-    refusal = ExportRefusal.named(code)
-    return {"export_error": locale.gettext(EXPORT_REFUSALS[refusal])} if refusal else {}
-
-
-def _back_to_report(request: Request, base: str, refused: ExportRefused) -> RedirectResponse:
-    """Send the admin back to the report page ``base`` with the reason (post/redirect/get).
-
-    The page shows the family asked for (``tidy`` shows ``volume``) over the same days, taken
-    from the checked query, never as typed. Nothing at the export's own address shows the
-    refusal, so a reload, a language switch or a login there cannot run the export again.
-    """
-    query = {"view": _page_view(request)}
-    for name in ("from", "to"):
-        if (day := _day(request.query_params.get(name))) is not None:
-            query[name] = day.isoformat()
-    query["refused"] = refused.code
-    return RedirectResponse(f"{base}?{urlencode(query)}", status_code=303)
-
-
 async def _export(
-    request: Request, principal: Principal, *, organisation: str | None, group: str | None
-) -> UsageFile:
-    """Build the file asked for by the query inside the principal's ``reports.export`` scope."""
-    return await export_service(request).export(
-        principal,
-        _export_view(request),
-        organisation_slug=organisation,
-        group_slug=group,
-        first_day=_day(request.query_params.get("from")),
-        last_day=_day(request.query_params.get("to")),
-    )
+    request: Request,
+    principal: Principal,
+    asked: _Asked,
+    base: str,
+    *,
+    organisation: str | None = None,
+    group: str | None = None,
+) -> Response:
+    """Send the file ``asked`` for inside the principal's ``reports.export`` scope.
+
+    An export over a limit sends the admin back to the report page ``base`` with the reason:
+    the family asked for (``tidy`` shows ``volume``) over the same days. Nothing at the
+    export's own address shows the refusal, so a reload, a language switch or a login there
+    cannot run the export again.
+    """
+    try:
+        sent = await export_service(request).export(
+            principal,
+            asked.view,
+            organisation_slug=organisation,
+            group_slug=group,
+            first_day=asked.first_day,
+            last_day=asked.last_day,
+        )
+    except ExportRefused as refused:
+        back = {"view": asked.view if asked.view in VIEWS else "volume"}
+        if asked.first_day is not None:
+            back["from"] = asked.first_day.isoformat()
+        if asked.last_day is not None:
+            back["to"] = asked.last_day.isoformat()
+        return redirect_refused(f"{base}?{urlencode(back)}", refused.code)
+    return _file(sent)
 
 
 @router.get("/organisations/{org}/usage/export.csv", response_model=None)
@@ -407,10 +419,9 @@ async def organisation_export(
 
     The export is audited, so a request another site makes is refused (``SameOrigin``).
     """
-    try:
-        return _file(await _export(request, context.principal, organisation=org, group=None))
-    except ExportRefused as refused:
-        return _back_to_report(request, f"/admin/organisations/{org}/usage", refused)
+    asked = _asked(request)
+    base = f"/admin/organisations/{org}/usage"
+    return await _export(request, context.principal, asked, base, organisation=org)
 
 
 @router.get("/groups/{slug}/usage/export.csv", response_model=None)
@@ -421,16 +432,10 @@ async def group_export(
 
     The export is audited, so a request another site makes is refused (``SameOrigin``).
     """
-    try:
-        return _file(await _export(request, context.principal, organisation=None, group=slug))
-    except ExportRefused as refused:
-        return _back_to_report(request, f"/admin/groups/{slug}/usage", refused)
-
-
-def _page_view(request: Request) -> str:
-    """Return the report family to show after a refused export: the asked one, or volume."""
-    view = request.query_params.get("view")
-    return view if view in VIEWS else "volume"
+    asked = _asked(request)
+    return await _export(
+        request, context.principal, asked, f"/admin/groups/{slug}/usage", group=slug
+    )
 
 
 DIGEST_ERRORS: dict[str, str] = {

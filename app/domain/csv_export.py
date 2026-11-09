@@ -19,7 +19,6 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import Self
 
 type Cell = str | int | float | bool | None
 """What one cell may hold before it is written as text."""
@@ -35,15 +34,6 @@ class ExportRefusal(StrEnum):
 
     TOO_MANY_DAYS = "too_many_days"
     TOO_MANY_ROWS = "too_many_rows"
-
-    @classmethod
-    def named(cls, code: str | None) -> Self | None:
-        """Return the refusal ``code`` names, or ``None`` for any other value, never an error.
-
-        A refused export sends the admin back to its page with the code; read back from there,
-        it is outside input, so only a code of this list counts.
-        """
-        return cls(code) if code in set(cls) else None
 
 
 class ExportRefused(Exception):  # noqa: N818 - a refusal with a code, like DomainError

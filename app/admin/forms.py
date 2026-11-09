@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, tzinfo
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlencode
 
 from fastapi import Request
 from starlette.responses import RedirectResponse
@@ -613,6 +613,29 @@ def redirect_done(
     suffix = f"&count={count}" if count is not None else ""
     fragment = f"#{anchor}" if anchor else ""
     return RedirectResponse(f"{url}{separator}done={done}{suffix}{fragment}", status_code=303)
+
+
+def refused_message(request: Request, texts: Mapping[str, str], _: BoundGettext) -> str | None:
+    """Return why the page's action was refused, named by ``?refused=``, if ``texts`` knows it.
+
+    The counterpart of ``done_message`` for a refusal that sends the admin back to the page
+    (``redirect_refused``), such as an export over a limit. ``texts`` is the page's closed list
+    of codes and catalogue keys; any other value shows nothing and is never echoed.
+    """
+    code = request.query_params.get("refused", "")
+    return _(texts[code]) if code in texts else None
+
+
+def redirect_refused(url: str, code: str) -> RedirectResponse:
+    """Answer a refused action with a redirect to the page ``url`` and the reason ``code``.
+
+    Post/redirect/get, as ``redirect_done``: the page shows the reason (``refused_message``),
+    and nothing at the action's own address does, so a reload, a link or a login there cannot
+    run the action again. ``url`` may carry a query of its own; ``code`` is a code of the
+    page's closed list.
+    """
+    separator = "&" if "?" in url else "?"
+    return RedirectResponse(f"{url}{separator}{urlencode({'refused': code})}", status_code=303)
 
 
 async def read_form(request: Request, locale: RequestLocale) -> FormData:

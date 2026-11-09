@@ -33,10 +33,18 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Request
-from starlette.responses import HTMLResponse, RedirectResponse, Response
+from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
-from app.admin.forms import Option, done_message, raise_refusal, read_form, redirect_done
+from app.admin.forms import (
+    Option,
+    done_message,
+    raise_refusal,
+    read_form,
+    redirect_done,
+    redirect_refused,
+    refused_message,
+)
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
 from app.admin.planner_routes import REASON_LABELS as CHANGE_REASON_LABELS
@@ -422,7 +430,7 @@ CATEGORY_LABELS: dict[Category, str] = {
 }
 """Label per category in the filter (ADR 0040)."""
 
-EXPORT_REFUSALS: dict[ExportRefusal, str] = {
+EXPORT_REFUSALS: dict[str, str] = {
     ExportRefusal.TOO_MANY_DAYS: "admin.audit.export.too_many_days",
     ExportRefusal.TOO_MANY_ROWS: "admin.audit.export.too_many_rows",
 }
@@ -621,9 +629,9 @@ def _filter_values(narrow: AuditFilter, zone: ZoneInfo) -> dict[str, str]:
     }
 
 
-def _filter_query(values: dict[str, str], **extra: str) -> str:
-    """Return the selected filter ``values``, and ``extra``, as a query string."""
-    return urlencode({key: value for key, value in {**values, **extra}.items() if value})
+def _filter_query(values: dict[str, str]) -> str:
+    """Return the selected filter ``values`` as a query string."""
+    return urlencode({key: value for key, value in values.items() if value})
 
 
 def _filter_view(
@@ -757,15 +765,11 @@ async def audit(
     locale: Locale,
     context: Annotated[AdminContext, Depends(RequirePermission(Permission.AUDIT_VIEW))],
     query: Annotated[AuditQuery, Depends()],
-    refused: str | None = None,
 ) -> HTMLResponse:
     """Show the newest audit events and system events in scope, optionally filtered.
 
-    ``refused`` is why the export just sent the admin back here (``export``): a code of
-    ``ExportRefusal`` shows its text; anything else shows nothing, never an error and never
-    echoed, like the filters.
+    A refused export sends the admin back here with why (``refused_message``).
     """
-    refusal = ExportRefusal.named(refused)
     service = admin_service(request)
     zone = ZoneInfo(settings_for(request).admin_timezone)
     in_scope = await service.groups(context.principal, Permission.AUDIT_VIEW)
@@ -780,7 +784,7 @@ async def audit(
             "events": audit_views(request, locale, context.principal, events),
             "limit": AUDIT_LOG_LIMIT,
             "filters": _filter_view(narrow, in_scope, zone, locale.gettext),
-            "export_error": locale.gettext(EXPORT_REFUSALS[refusal]) if refusal else None,
+            "export_error": refused_message(request, EXPORT_REFUSALS, locale.gettext),
             "diagnostics": await _diagnostics_view(request, locale, context),
             "done": done_message(request, locale.gettext),
         },
@@ -811,10 +815,8 @@ async def export(
             context.principal, narrow, settings.event_envelope, limits
         )
     except ExportRefused as refused:
-        # Back to the page, never a page at the export's own address: a reload, a link or a
-        # login there would run the export again (post/redirect/get).
-        back = _filter_query(_filter_values(narrow, zone), refused=refused.code)
-        return RedirectResponse(f"/admin/audit?{back}", status_code=303)
+        back = _filter_query(_filter_values(narrow, zone))
+        return redirect_refused(f"/admin/audit?{back}" if back else "/admin/audit", refused.code)
     clock: Clock = request.app.state.clock
     name = f"audit-{clock.now():%Y%m%dt%H%M%S}z.csv"
     return Response(
