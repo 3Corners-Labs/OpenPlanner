@@ -8,8 +8,8 @@ One new table, expand only (ADR 0116): the previous image neither reads nor writ
 
 Open PRs also claim numbers, so recheck the head before merging.
 
-Revision ID: 0107
-Revises: 0106
+Revision ID: 0108
+Revises: 0107
 """
 
 from collections.abc import Sequence
@@ -17,8 +17,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0107"
-down_revision: str | None = "0106"
+revision: str = "0108"
+down_revision: str | None = "0107"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
