@@ -12,7 +12,7 @@ detail page "as today", but that page never showed them. The product owner chose
 that it shows the participant's name, email address and phone number on request (*Show contact
 details*), never by default, each request an audit event `booking.contact_viewed`
 (`app/domain/participant_contact.py`, #648), and an hourly alert when one person makes many
-such requests (`contact_reveals_alert_per_hour`, see *Settings*).
+such requests (`contact_reveals_alert_per_hour`, see *Settings*; #676).
 
 ## Context
 
@@ -127,7 +127,7 @@ For step 3 the product owner chose on 2026-10-29:
   not in the closure's list of bookings on hold (which needs `closure.manage`).
 
 For §2 the product owner chose on 2026-11-08, after the contact details on request were built
-(#648):
+(#648), built in #676:
 
 - An hourly alert when one person makes many requests for contact details (not: the audit log
   as the only detection), with `contact_reveals_alert_per_hour` at 20 within 5–500 (not: the
