@@ -3,10 +3,11 @@
 On a page served at a ``GET`` action's address the links lead to the overview instead.
 """
 
+from collections.abc import Callable
 from typing import Annotated
 
 import pytest
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 from fastapi.routing import APIRoute
 from starlette.requests import Request
 
@@ -14,37 +15,23 @@ from app.web.protection import require_same_origin
 from app.web.templates import switch_href
 
 
-def _request(query: str) -> Request:
-    return Request({"type": "http", "query_string": query.encode(), "headers": []})
+def _guarded(_: Annotated[None, Depends(require_same_origin)]) -> None:
+    """An action: it depends on ``require_same_origin``."""
 
 
-def _route(*, action: bool) -> APIRoute:
-    """A route that depends on ``require_same_origin`` (an action) or on nothing."""
-    router = APIRouter()
-    if action:
-
-        @router.get("/x")
-        def guarded(_: Annotated[None, Depends(require_same_origin)]) -> None:
-            """An action."""
-
-    else:
-
-        @router.get("/x")
-        def page() -> None:
-            """A page."""
-
-    (route,) = router.routes
-    assert isinstance(route, APIRoute)
-    return route
+def _plain() -> None:
+    """An ordinary page."""
 
 
-def _at(method: str, *, action: bool) -> Request:
+def _request(query: str, method: str = "GET", endpoint: Callable[..., None] = _plain) -> Request:
+    """A complete request for ``query``, matched to a route of ``endpoint`` and ``method``."""
+    route = APIRoute("/x", endpoint, methods=[method])
     scope = {
         "type": "http",
         "method": method,
-        "query_string": b"day=2026-01-02",
+        "query_string": query.encode(),
         "headers": [],
-        "route": _route(action=action),
+        "route": route,
     }
     return Request(scope)
 
@@ -77,11 +64,15 @@ def test_a_kept_parameter_with_text_in_it_is_dropped_not_echoed(value: str) -> N
 def test_on_a_get_actions_page_the_switcher_leads_to_the_overview() -> None:
     # The refusal of an audited download is served at the download's address: a query-only
     # link there would ask for the download again (ASVS V3.5.3).
-    assert switch_href(_at("GET", action=True), "lang", "en") == "/admin/?lang=en"
+    request = _request("day=2026-01-02", endpoint=_guarded)
+
+    assert switch_href(request, "lang", "en") == "/admin/?lang=en"
 
 
-@pytest.mark.parametrize(("method", "action"), [("POST", True), ("GET", False)])
+@pytest.mark.parametrize(("method", "endpoint"), [("POST", _guarded), ("GET", _plain)])
 def test_a_form_post_or_an_ordinary_page_keeps_its_query_only_links(
-    method: str, action: bool
+    method: str, endpoint: Callable[..., None]
 ) -> None:
-    assert switch_href(_at(method, action=action), "lang", "en") == "?day=2026-01-02&lang=en"
+    request = _request("day=2026-01-02", method, endpoint)
+
+    assert switch_href(request, "lang", "en") == "?day=2026-01-02&lang=en"

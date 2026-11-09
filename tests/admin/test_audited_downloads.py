@@ -15,9 +15,12 @@ import pytest
 
 from app.domain.audit import Outcome
 from app.domain.security_log import CROSS_SITE, REQUEST_REJECTED
+from app.web.protection import require_same_origin
+from app.web.route_dependencies import dependency_calls
 from tests.admin.conftest import SUPER, Site
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import audit_events, site_app
 from tests.support.downloads import AUDITED_DOWNLOADS
+from tests.support.routes import all_routes
 
 
 @pytest.mark.parametrize("path", AUDITED_DOWNLOADS)
@@ -95,3 +98,16 @@ async def test_a_refused_ordinary_page_keeps_its_query_only_language_links(site:
 
     assert response.status_code == 404
     assert 'href="?lang=en"' in response.text
+
+
+def test_the_only_guarded_gets_are_the_audited_downloads(site: Site) -> None:
+    # A GET that depends on require_same_origin is an action: a login returns to the page that
+    # asked for it, and a page at its address gets language links to the admin overview. So
+    # each one must be a listed admin download, never a participant page.
+    guarded = {
+        route.path
+        for route in all_routes(site_app(site).routes)
+        if "GET" in route.methods and require_same_origin in dependency_calls(route)
+    }
+
+    assert guarded == set(AUDITED_DOWNLOADS)
