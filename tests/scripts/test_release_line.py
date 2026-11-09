@@ -1,6 +1,8 @@
 """Maintenance lines release/X.Y (ADR 0116 point 3): the target, cutting, candidates, tags."""
 
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -10,7 +12,6 @@ from scripts import release_line, release_plan
 from scripts.release_line import (
     Backport,
     backport_lines,
-    backports,
     backports_of,
     may_cut,
     newest_release,
@@ -19,7 +20,14 @@ from scripts.release_line import (
 )
 from scripts.release_plan import MAIN, LineError, Target
 from tests.fakes.gh import FakeGh
-from tests.scripts.conftest import Git, commit_all, cut_line, workflow_events
+from tests.scripts.conftest import (
+    Git,
+    commit_all,
+    cut_line,
+    fake_program,
+    script_path,
+    workflow_events,
+)
 
 BACKPORT = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "backport.yml"
 
@@ -245,40 +253,69 @@ def test_a_merged_pull_request_gives_one_cherry_pick_per_line_its_labels_name() 
     assert backports_of(PULLS[8]) == [], "backport:x names no line"
 
 
-def test_only_a_pull_request_this_push_merged_into_main_can_be_backported() -> None:
-    assert refusal(PULLS[5], {"sha5", "sha6"}) is None
-    assert refusal(PULLS[5], None) is None, "a dispatch names no push"
+def test_only_a_pull_request_merged_into_main_by_the_commit_naming_it_is_backported() -> None:
+    assert refusal(PULLS[5], "sha5") is None
+    assert refusal(PULLS[5], None) is None, "a dispatch names no commit"
     assert refusal(PULLS[7], None) == "it is not merged into main (yet)"
     assert refusal(PULLS[9], None) == "it is not merged into main (yet)", "merged elsewhere"
-    # `Merge pull request #5 ... (#6)` names #5, whose merge commit is not in this push.
-    assert refusal(PULLS[5], {"sha6"}) == (
-        "its merge commit is none of the commits this push brought to main"
-    )
-
-
-def test_a_refused_pull_request_stops_the_run_and_is_never_skipped_quietly() -> None:
-    for numbers, pushed in (([5, 7], None), ([9], None), ([5, 6], {"sha6"})):
-        with pytest.raises(LineError, match="cannot be backported"):
-            backports(numbers, "o/r", FakeGh(pulls=PULLS), pushed)
-
-
-def test_each_pull_request_is_read_once() -> None:
-    fake = FakeGh(pulls=PULLS)
-
-    assert backports([6, 5, 8, 5], "o/r", fake, {"sha5", "sha6", "sha8"}) == FIVE
-    assert fake.calls == [["api", f"repos/o/r/pulls/{n}"] for n in (5, 6, 8)]
-
-
-def test_the_command_prints_the_matrix_as_one_json_list(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    fake = FakeGh(pulls=PULLS)
-    pushed = ["--pushed", "sha5", "sha6"]
-
+    # `Merge pull request #5 ... (#6)` names #5 on #6's commit.
     assert (
-        release_line.main(["backports", "--repository", "o/r", "--pull", "6", "5", *pushed], fake)
-        == 0
+        refusal(PULLS[5], "sha6") == "its merge commit is not sha6, the pushed commit that names it"
     )
+
+
+def pushed(git: Git, tmp_path: Path, *subjects: str) -> list[str]:
+    """Commit ``subjects`` on the branch ``pushed`` off ``main``; return their commit ids."""
+    (tmp_path / "start.txt").write_text("start\n")
+    commit_all(git, "chore: start (#1)")
+    git("switch", "-q", "-c", "pushed")
+    commits = []
+    for number, subject in enumerate(subjects):
+        (tmp_path / f"change{number}.txt").write_text(subject)
+        commit_all(git, subject)
+        commits.append(git("rev-parse", "HEAD").strip())
+    return commits
+
+
+def test_a_push_is_walked_like_the_gate_and_each_pull_request_read_once(
+    git: Git, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    five, six = pushed(git, tmp_path, "fix: one (#5)", "feat: two (#6)")
+    fake = FakeGh(
+        pulls={5: {**PULLS[5], "merge_commit_sha": five}, 6: {**PULLS[6], "merge_commit_sha": six}}
+    )
+
+    push = ["backports", "--repository", "o/r", "--base", "main", "--head", "pushed"]
+    assert release_line.main(push, fake) == 0
+    assert [entry["line"] for entry in json.loads(capsys.readouterr().out)] == ["0.5", "0.6"]
+    assert fake.calls == [["api", "repos/o/r/pulls/5"], ["api", "repos/o/r/pulls/6"]]
+
+
+def test_a_pushed_commit_that_names_no_pull_request_stops_the_run(
+    git: Git, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pushed(git, tmp_path, "fix: one (#5)", "chore: pushed by hand")
+
+    push = ["backports", "--repository", "o/r", "--base", "main", "--head", "pushed"]
+    assert release_line.main(push, FakeGh(pulls=PULLS)) == 1
+    assert "names no pull request: chore: pushed by hand" in capsys.readouterr().err
+
+
+def test_a_pull_request_merged_by_another_commit_stops_the_run(
+    git: Git, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The subject named #5, but #5 was merged by another commit: never a quiet skip."""
+    pushed(git, tmp_path, "Merge pull request #5 from a fork (#6)")
+
+    push = ["backports", "--repository", "o/r", "--base", "main", "--head", "pushed"]
+    assert release_line.main(push, FakeGh(pulls=PULLS)) == 1
+    assert "#5 cannot be backported: its merge commit is not" in capsys.readouterr().err
+
+
+def test_a_dispatch_reads_its_one_pull_request(capsys: pytest.CaptureFixture[str]) -> None:
+    fake = FakeGh(pulls=PULLS)
+
+    assert release_line.main(["backports", "--repository", "o/r", "--pull", "5"], fake) == 0
     assert json.loads(capsys.readouterr().out) == [
         {"number": 5, "commit": "sha5", "title": "fix: number 5", "line": "0.5"},
         {"number": 5, "commit": "sha5", "title": "fix: number 5", "line": "0.6"},
@@ -289,10 +326,62 @@ def test_the_command_prints_the_matrix_as_one_json_list(
     assert "#7 cannot be backported" in capsys.readouterr().err
 
 
+def test_backports_takes_a_dispatch_or_a_push_and_nothing_else() -> None:
+    for extra in (
+        [],
+        ["--base", "main"],
+        ["--pull", "5", "--base", "main", "--head", "pushed"],
+        ["--pull", "5", "--head", "pushed"],
+    ):
+        with pytest.raises(SystemExit):
+            release_line.main(["backports", "--repository", "o/r", *extra], FakeGh())
+
+
 def test_a_dispatch_with_anything_but_a_number_stops() -> None:
-    for value in ("5;touch", "-5", "²", "*", ""):
+    for value in ("5;touch", "-5", "²", "*", "", "5 6"):
         with pytest.raises(SystemExit):
             release_line.main(["backports", "--repository", "o/r", "--pull", value], FakeGh())
+
+
+def run_find_step(tmp_path: Path, event: str, dispatched: str) -> tuple[int, list[str]]:
+    """Run the workflow's ``find`` step with a ``python3`` that records its arguments."""
+    fakes = tmp_path / "bin"
+    fakes.mkdir(exist_ok=True)
+    record = tmp_path / "argv"
+    record.unlink(missing_ok=True)
+    fake_program(fakes, "python3", f'printf "%s\\n" "$@" > "{record}"; echo "[]"')
+    script = yaml.safe_load(BACKPORT.read_text())["jobs"]["find"]["steps"][-1]["run"]
+    output = tmp_path / "output"
+    result = subprocess.run(  # noqa: S603 - the workflow's own step and a fake python3
+        [shutil.which("bash") or "/bin/bash", "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            "PATH": script_path(fakes),
+            "GITHUB_EVENT_NAME": event,
+            "GITHUB_REPOSITORY": "o/r",
+            "GITHUB_OUTPUT": str(output),
+            "GITHUB_SHA": "new",
+            "BEFORE": "old",
+            "DISPATCHED": dispatched,
+        },
+    )
+    return result.returncode, record.read_text().split("\n")[:-1] if record.exists() else []
+
+
+def test_the_find_step_passes_a_dispatch_as_one_number_and_never_splits_it(
+    tmp_path: Path,
+) -> None:
+    head = ["-m", "scripts.release_line", "backports", "--repository", "o/r"]
+
+    assert run_find_step(tmp_path, "workflow_dispatch", "5") == (0, [*head, "--pull", "5"])
+    assert run_find_step(tmp_path, "push", "") == (
+        0,
+        [*head, "--base", "old", "--head", "new"],
+    )
+    for value in ("5 --repository o/x", "", "5;touch x", "--pull=5", "5\n6"):
+        assert run_find_step(tmp_path, "workflow_dispatch", value) == (1, []), value
 
 
 def test_the_backport_starts_from_a_merge_to_main_or_a_dispatch() -> None:
@@ -306,12 +395,7 @@ def test_the_backport_starts_from_a_merge_to_main_or_a_dispatch() -> None:
     assert "environment" not in find
     assert "secrets." not in json.dumps(find), "the job that reads pull requests holds no secret"
     assert find["steps"][0]["with"]["fetch-depth"] == 0, "the commits of the push"
-    # The pull requests of a push come from the decision gate's own walk; a commit that names
-    # none fails there (tests/scripts/test_decision_gate.py).
-    assert "python3 -m scripts.decision_gate" in script
-    assert "--list-pull-requests" in script
     assert "python3 -m scripts.release_line backports" in script
-    assert "--pushed" in script, "each listed pull request must be one this push merged"
 
 
 def test_the_job_with_the_key_runs_once_per_entry_and_reads_nothing_again() -> None:

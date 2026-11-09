@@ -10,12 +10,12 @@ name: backport
 # ADR 0120: the workflow starts from the push to main that a merge makes, not from
 # `pull_request_target`, which GitHub blocks by default in public repositories from 2026-12-02
 # and which the repository allows for the decision gate only. The merge queue pushes one squash
-# commit `Title (#N)` per pull request. `find`, which holds no secret, lists them with the
-# decision gate's own walk (`decision_gate.py --list-pull-requests` over the first-parent
-# commits of the push; a commit that names none fails the run), and
-# `release_line.py backports` reads each pull request once and keeps one entry per line its
-# `backport:X.Y` labels name, for a pull request merged into main. A label set after the
-# merge: run the workflow by hand, `gh workflow run backport.yml -f pull_request=N`.
+# commit `Title (#N)` per pull request. `find`, which holds no secret, runs
+# `release_line.py backports`: it walks the push with the decision gate's own `queue_commits`
+# (a commit that names no pull request fails the run), reads each pull request once, refuses
+# one whose merge commit is not the commit that named it, and keeps one entry per line its
+# `backport:X.Y` labels name. A label set after the merge: run the workflow by hand,
+# `gh workflow run backport.yml -f pull_request=N` (digits only).
 #
 # Nothing from a pull request runs here. Both jobs check out main. The job with the key runs
 # once per entry (a matrix: one failing backport does not stop the others) and takes from it
@@ -62,25 +62,20 @@ jobs:
           DISPATCHED: ${{ inputs.pull_request }}
         run: |
           set -euo pipefail
-          set -f   # the dispatched value is never globbed
-          pushed=""
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
-            numbers="$DISPATCHED"
-          elif ! python3 -m scripts.decision_gate --base "$BEFORE" --head "$GITHUB_SHA" \
-              --list-pull-requests > "$RUNNER_TEMP/pulls"; then
-            cat "$RUNNER_TEMP/pulls"   # names the commit; a backport is never skipped quietly
-            exit 1
+            # One pull request number, passed on as one argument; the value is never echoed.
+            if ! [[ "$DISPATCHED" =~ ^[0-9]+$ ]]; then
+              echo "::error::the input pull_request is not a pull request number"
+              exit 1
+            fi
+            listed=(--pull "$DISPATCHED")
           else
-            numbers="$(cat "$RUNNER_TEMP/pulls")"
-            # Each listed pull request's merge commit must be one of these (release_line.py).
-            pushed="$(git rev-list --first-parent "$BEFORE..$GITHUB_SHA")"
+            listed=(--base "$BEFORE" --head "$GITHUB_SHA")
           fi
-          found='[]'
-          if [ -n "$numbers" ]; then
-            # shellcheck disable=SC2086 # numbers and pushed: digits and commit ids, unglobbed
-            found="$(python3 -m scripts.release_line backports \
-              --repository "$GITHUB_REPOSITORY" --pull $numbers ${pushed:+--pushed $pushed})"
-          fi
+          # A failed read, a commit that names no pull request or a refused pull request fails
+          # the run (it can be re-run); a backport is never skipped quietly.
+          found="$(python3 -m scripts.release_line backports \
+            --repository "$GITHUB_REPOSITORY" "${listed[@]}")"
           echo "backports=$found" >> "$GITHUB_OUTPUT"
 
   backport:
