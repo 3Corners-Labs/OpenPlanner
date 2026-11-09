@@ -128,7 +128,9 @@ def switch_href(request: Request, param: str, value: str) -> str:
     refusal of an audited download) is not a page to come back to: a link to it would ask for
     the action again (ASVS V3.5.3), so there the link sets ``param`` on the overview instead.
     """
-    if request.method == "GET" and is_action(request):
+    # The route first: a request without one (an unmatched path, a hand-built request)
+    # renders without its method ever being read.
+    if is_action(request) and request.method == "GET":
         return f"{OVERVIEW_PATH}?{urlencode([(param, value)])}"
     return f"?{urlencode([*kept_query(request), (param, value)])}"
 
