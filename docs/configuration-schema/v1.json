@@ -574,6 +574,19 @@
             "additionalProperties": false
           }
         },
+        "reschedule_auto_delay_minutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 120
+        },
+        "reschedule_auto_max_bookings": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "reschedule_auto_send": {
+          "type": "boolean"
+        },
         "routing": {
           "allOf": [
             {
