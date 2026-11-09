@@ -34,7 +34,8 @@ from app.domain.authorization import Permission, Principal, Scope
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import bind_level, trace_scope
-from app.domain.ports import Clock, IntegrationChecker, Transaction, UnitOfWork
+from app.domain.lookups import group_by_slug
+from app.domain.ports import Clock, IntegrationChecker, UnitOfWork
 from app.domain.scheduling import Group
 from app.domain.system_log import SystemLog
 from app.domain.tunable import value_of
@@ -156,7 +157,7 @@ class IntegrationCheckService:
         """
         organisation = await self._authorize(principal, slug)
         async with self._uow.read() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
         check, _ = await self._check(group, organisation)
         outcome = Outcome.FAILURE if check.overall is CheckStatus.FAIL else Outcome.SUCCESS
         await self._admin.record(
@@ -172,7 +173,7 @@ class IntegrationCheckService:
         """
         await self._authorize(principal, slug)
         async with self._uow.read() as tx:
-            group = await _group(tx, slug)
+            group = await group_by_slug(tx, slug)
             return await tx.get_group_check(group.id)
 
     async def check_as_system(self, slug: str) -> GroupCheck | None:
@@ -301,15 +302,3 @@ class IntegrationWatch:
             return None
         self._looked_at = now
         return await self._service.check_due_groups(value_of(self._interval))
-
-
-async def _group(tx: Transaction, slug: str) -> Group:
-    """Return the group with ``slug``.
-
-    Raises:
-        DomainError: ``group_not_found``.
-    """
-    group = await tx.get_group(slug)
-    if group is None:
-        raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-    return group
