@@ -68,7 +68,6 @@ from app.domain.integration_health import (
 from app.domain.login_domain_watch import DomainWatch
 from app.domain.maintenance_service import MaintenanceWatch
 from app.domain.participant_link_service import ParticipantLinkService
-from app.domain.planner_service import PlannerService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.queue_wait import NotPickedUpWatch, QueueWaitWatch
@@ -76,7 +75,6 @@ from app.domain.report_digest_service import DigestRunner
 from app.domain.request_log import RequestEvents
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
-from app.domain.services import BookingService
 from app.domain.slot_close_service import SlotCloser
 from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.system_log import SystemLog
@@ -94,7 +92,7 @@ from app.jobs.runner import JobRunner
 from app.jobs.usage import backfill_usage, close_slots, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
-from app.policies import confirm_policy, proposal_hours, reach
+from app.service_wiring import booking_service, planner_service
 from app.web.alert_text import alert_composer
 from app.web.digest_text import compose_digest
 from app.web.fallback_text import SpaceTexts
@@ -287,24 +285,8 @@ async def run_worker(
         keep = timedelta(days=live.settings.agent_change_request_retention_days)
         return await prune_change_requests(uow, clock, keep)
 
-    planner = PlannerService(
-        uow,
-        clock,
-        AdminService(uow, clock),
-        BookingService(
-            uow,
-            clock,
-            management_token_key(settings),
-            phone_region=lambda org: live.for_organisation(org).phone_default_region,
-            confirm_policy=lambda org: confirm_policy(live.for_organisation(org)),
-            previous_token_key=management_token_key_previous(settings),
-            closure_retention=live.closure_retention,
-            reach=lambda org: reach(live.for_organisation(org)),
-        ),
-        rebook_days=lambda org: live.for_organisation(org).planner_rebook_days,
-        reminder_days=lambda org: live.for_organisation(org).planner_rebook_reminder_days,
-        proposal_hours=lambda org: proposal_hours(live.for_organisation(org)),
-        reach=lambda org: reach(live.for_organisation(org)),
+    planner = planner_service(
+        uow, clock, AdminService(uow, clock), booking_service(uow, clock, settings, live), live
     )
 
     staff_lifecycle = StaffLifecycleService(uow, clock)

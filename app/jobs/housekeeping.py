@@ -35,6 +35,7 @@ from app.domain.alerts import open_conditions
 from app.domain.booking_rollup import RollupResult
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.retention_sweep import SweepResult
+from app.domain.scheduling import MIN_RESCHEDULE_AUTO_DELAY_MINUTES
 from app.domain.storage import (
     MIB,
     STORAGE_EVENT,
@@ -71,7 +72,7 @@ SESSIONS_EVERY = timedelta(hours=1)
 REQUESTS_EVERY = timedelta(hours=1)
 """How often the bots' expired change requests are deleted; the retention is a setting."""
 
-AUTO_EVERY = timedelta(minutes=5)
+AUTO_EVERY = timedelta(minutes=MIN_RESCHEDULE_AUTO_DELAY_MINUTES)
 """How often the automatic proposals of the rebooking assistant look at the short slots
 (ADR 0057 point 6): as often as the shortest delay a group may set, so a due shortfall waits
 at most this long past its delay."""

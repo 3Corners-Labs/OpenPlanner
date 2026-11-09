@@ -115,7 +115,6 @@ from app.domain.organisations import OrganisationService
 from app.domain.overview_layout import OverviewLayoutService
 from app.domain.participant_contact import ParticipantContactService
 from app.domain.participant_link_service import ParticipantLinkService
-from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import (
@@ -136,7 +135,6 @@ from app.domain.roles import RoleService
 from app.domain.routing_service import RoutingService
 from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
-from app.domain.services import BookingService
 from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
 from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
@@ -161,7 +159,7 @@ from app.keys import (
     session_secret,
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
-from app.policies import confirm_policy, proposal_hours, reach
+from app.service_wiring import booking_service, planner_service
 from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
@@ -423,16 +421,7 @@ def create_app(
             lambda: timedelta(minutes=live().security_event_window_minutes),
             max_sources=lambda: live().security_event_max_sources,
         )
-        app.state.booking_service = BookingService(
-            uow,
-            clock,
-            token_key,
-            phone_region=lambda org: per_organisation(org).phone_default_region,
-            confirm_policy=lambda org: confirm_policy(per_organisation(org)),
-            previous_token_key=management_token_key_previous(settings),
-            closure_retention=app.state.live_settings.closure_retention,
-            reach=lambda org: reach(per_organisation(org)),
-        )
+        app.state.booking_service = booking_service(uow, clock, settings, app.state.live_settings)
         # ADR 0023 step 2: a bot's change request, confirmed by the participant.
         previous_key = management_token_key_previous(settings)
         app.state.change_request_service = ChangeRequestService(
@@ -793,15 +782,12 @@ def create_app(
             app.state.booking_service,
             app.state.live_settings.closure_retention,
         )
-        app.state.planner_service = PlannerService(
+        app.state.planner_service = planner_service(
             uow,
             clock,
             app.state.admin_service,
             app.state.booking_service,
-            rebook_days=lambda org: per_organisation(org).planner_rebook_days,
-            reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
-            proposal_hours=lambda org: proposal_hours(per_organisation(org)),
-            reach=lambda org: reach(per_organisation(org)),
+            app.state.live_settings,
         )
         app.state.role_service = RoleService(
             uow,

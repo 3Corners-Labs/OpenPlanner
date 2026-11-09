@@ -31,6 +31,7 @@ from string import Formatter
 from typing import Any
 
 from app.domain.authorization import ApiScope, Permission
+from app.domain.auto_rebooking import AUTO_PROPOSAL_EVENT, REVIEW_WAITING_EVENT
 from app.domain.job_plan import JobType
 from app.domain.usage_log import LOG_FIELDS
 
@@ -1828,7 +1829,7 @@ _AUDIT = (
         "page under Staff, which also lists what they did.",
     ),
     _e(
-        "planner.auto_proposal",
+        AUTO_PROPOSAL_EVENT,
         _SYS,
         "outcome",
         "",
@@ -1840,7 +1841,7 @@ _AUDIT = (
         "Nothing is needed; the participant confirms, chooses another time or cancels.",
     ),
     _e(
-        "planner.auto_review_waiting",
+        REVIEW_WAITING_EVENT,
         _SYS,
         "outcome",
         "",

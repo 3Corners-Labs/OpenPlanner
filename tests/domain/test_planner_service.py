@@ -15,7 +15,6 @@ from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
 from app.domain.job_plan import JobType
 from app.domain.planner_service import PlannerService, ReviewScope
-from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from app.domain.usage import ActorClass, FactKind, UsageFact
 from tests.fakes.clock import FixedClock
@@ -32,7 +31,7 @@ from tests.support.domain import (
     book_another,
     book_confirmed,
     book_pending,
-    window,
+    set_agents,
     with_team_invite,
 )
 
@@ -43,10 +42,6 @@ async def _book(
     bookings: BookingService, start=SLOT_0900, slug: str = "demo", consents=frozenset()
 ) -> int:
     return (await book_another(bookings, start, slug, consents)).booking.id or 0
-
-
-def _staff(uow: InMemoryUnitOfWork, agents: int) -> None:
-    uow.state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=agents))]
 
 
 def _messages(uow: InMemoryUnitOfWork, booking_id: int) -> set[tuple[JobType, ChannelKind | None]]:
@@ -93,7 +88,7 @@ async def test_a_move_that_causes_a_shortfall_needs_confirmation(
 ) -> None:
     first = await _book(bookings, SLOT_0900)
     await _book(bookings, SLOT_0930)
-    _staff(uow, 1)  # the slots keep their snapshot of 2, the staffing is now 1
+    set_agents(uow, 1)  # the slots keep their snapshot of 2, the staffing is now 1
 
     with pytest.raises(DomainError, match="move_causes_shortfall"):
         await planner.move(GROUP_ADMIN, "demo", first, SLOT_0930)
@@ -205,14 +200,14 @@ async def test_an_accepted_shortfall_leaves_the_summary_until_the_slot_changes(
     agenda = AgendaService(uow, clock, AdminService(uow, clock), horizon_days=14)
     await _book(bookings)
     await _book(bookings)
-    _staff(uow, 1)
+    set_agents(uow, 1)
 
     await planner.accept(GROUP_ADMIN, "demo", SLOT_0900)
 
     assert (await agenda.shortfalls(GROUP_ADMIN, "demo")).count == 0
     (day,) = await agenda.days(GROUP_ADMIN, "demo", MONDAY, 1)
     assert day.slots[0].accepted
-    _staff(uow, 0)  # another agent falls ill: the shortfall is open again
+    set_agents(uow, 0)  # another agent falls ill: the shortfall is open again
     assert (await agenda.shortfalls(GROUP_ADMIN, "demo")).count == 1
 
 
@@ -304,7 +299,7 @@ async def test_a_bulk_request_takes_the_last_made_bookings_as_many_as_short(
     for _ in range(2):
         ids.append(await _book(bookings))
         clock.advance(timedelta(minutes=1))
-    _staff(uow, 1)
+    set_agents(uow, 1)
 
     candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
     done = await planner.rebook_slot(
@@ -324,7 +319,7 @@ async def test_a_bulk_request_refuses_when_the_slot_changed_since_the_confirmati
 ) -> None:
     first = await _book(bookings)
     await _book(bookings)
-    _staff(uow, 1)
+    set_agents(uow, 1)
 
     with pytest.raises(DomainError, match="slot_changed"):
         await planner.rebook_slot(
@@ -416,7 +411,7 @@ async def test_a_bulk_request_never_asks_an_older_booking_for_a_newer_pending_on
     older = await _book(bookings)
     clock.advance(timedelta(minutes=1))
     await book_pending(bookings, slug="demo", contact=another_participant())
-    _staff(uow, 1)
+    set_agents(uow, 1)
 
     candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
 
@@ -430,7 +425,7 @@ async def test_a_pending_last_made_booking_leaves_nobody_to_ask_in_bulk_or_in_re
     await _book(bookings)
     clock.advance(timedelta(minutes=1))
     await book_pending(bookings, slug="demo", contact=another_participant())
-    _staff(uow, 1)
+    set_agents(uow, 1)
 
     candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
     reviewed = await planner.review_proposals(GROUP_ADMIN, "demo", ReviewScope.slot(SLOT_0900))

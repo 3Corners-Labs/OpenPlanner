@@ -532,11 +532,7 @@ class PlannerService:
                         raise DomainError(ErrorCode.SLOT_CHANGED) from error
                     detail = f"planner.propose,reason:{reason.value},bulk"
                 await self._audit(tx, principal, authorization, detail, booking_id)
-            for slot in short:
-                after = await self._slot(tx, group, slot.start)
-                if after is not None and not after.shortfall:  # ADR 0117 metric C5
-                    resolved = shortfall_resolved(group, slot.start, after.agents, after.booked)
-                    await tx.record_usage(resolved)
+            await self._record_resolved(tx, group, short)
         return len(choices)
 
     async def run_automatic(self) -> int:
@@ -551,15 +547,29 @@ class PlannerService:
         once that a review waits.
         """
         async with self._uow.read() as tx:
-            groups = [
-                summary
-                for summary in await tx.list_groups(Scope(everything=True))
-                if summary.group.reschedule_auto_send
+            every = await tx.list_groups(Scope(everything=True))
+            groups = [s for s in every if s.group.reschedule_auto_send]
+            # A group that switched it off keeps no watches: when it switches on again, the
+            # delay must run in full, not from a moment seen long ago.
+            stale = [
+                (s.group.id, [w.slot_start for w in watches])
+                for s in every
+                if not s.group.reschedule_auto_send
+                and (watches := await tx.get_shortfall_watches(s.group.id))
             ]
+        failure: Exception | None = None
+        for group_id, starts in stale:
+            async with self._uow.locked() as tx:
+                await tx.delete_shortfall_watches(group_id, starts)
         sent = 0
         for summary in groups:
-            async with self._uow.locked() as tx:
-                sent += await self._automatic(tx, summary)
+            try:  # one failing group must not keep the others from their proposals
+                async with self._uow.locked() as tx:
+                    sent += await self._automatic(tx, summary)
+            except Exception as exc:
+                failure = failure or exc
+        if failure is not None:
+            raise failure
         return sent
 
     async def _automatic(self, tx: Transaction, summary: GroupSummary) -> int:
@@ -591,13 +601,20 @@ class PlannerService:
         rows = await self._assist(tx, group, movers) if movers else []
         for row in rows:
             await self._send_automatic(tx, summary, row)
+        if rows:
+            await self._record_resolved(tx, group, slots)
+        return len(rows)
+
+    async def _record_resolved(
+        self, tx: Transaction, group: Group, slots: list[AgendaSlot]
+    ) -> None:
+        """Record a fact for each of ``slots`` whose shortfall is gone now (ADR 0117 metric C5)."""
         for slot in slots:
             after = await self._slot(tx, group, slot.start)
-            if rows and after is not None and not after.shortfall:  # ADR 0117 metric C5
+            if after is not None and not after.shortfall:
                 await tx.record_usage(
                     shortfall_resolved(group, slot.start, after.agents, after.booked)
                 )
-        return len(rows)
 
     async def _send_automatic(
         self, tx: Transaction, summary: GroupSummary, row: ProposalRow

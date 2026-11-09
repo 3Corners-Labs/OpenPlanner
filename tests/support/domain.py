@@ -49,6 +49,13 @@ TEST_TOKEN_KEY = b"k" * 32
 """Server key for deriving management tokens in tests (never used outside tests)."""
 
 
+def set_agents(uow: Any, agents: int) -> None:
+    """Staff group 1 on Mondays with ``agents``; its slots keep their capacity snapshot."""
+    from app.domain.scheduling import ScheduleRule
+
+    uow.state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=agents))]
+
+
 def window(
     opens: str = "09:00", closes: str = "10:00", capacity: int = 2, offer: Offer = Offer.SCHEDULED
 ) -> TimeWindow:
