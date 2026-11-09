@@ -208,6 +208,15 @@ appointment keeps awaiting a time from the participant.
 How long a proposal is held, when its reminder goes and how far the assistant looks are set by
 the organisation's administrator in the settings (topic Planner).
 
+### Automatic proposals
+
+A group can let the assistant send its proposals by itself (group settings, **Send proposals
+automatically**). It then looks at the slots with a shortfall every few minutes. A shortfall that
+stays exactly the same for the group's waiting time gets proposals for the most recently made
+appointments, with the reason *staffing*; one that changes or disappears starts waiting again.
+When more appointments are affected than the group's ceiling, nothing is sent and the
+planners are told once; the shortfall stays in the agenda for you to review as usual.
+
 ### Accept a shortfall
 
 If, for example, a colleague from another team helps out, choose **Accept shortfall** at the

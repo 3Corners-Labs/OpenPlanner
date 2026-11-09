@@ -94,8 +94,11 @@ from app.domain.scheduling import (
     MAX_PARTICIPANT_CHANGE_LEAD_MINUTES,
     MAX_PLANNER_LEAD_MINUTES,
     MAX_QUEUE_VISIBLE_FROM_MINUTES,
+    MAX_RESCHEDULE_AUTO_DELAY_MINUTES,
+    MAX_RESCHEDULE_AUTO_MAX_BOOKINGS,
     MAX_TRIAL_CALL_MINUTES,
     MAX_TRIAL_CALLS_PER_BOOKING,
+    MIN_RESCHEDULE_AUTO_DELAY_MINUTES,
     MIN_TRIAL_CALL_MINUTES,
     DispatchFallback,
     DispatchKind,
@@ -147,6 +150,14 @@ NUMBER_LABELS: dict[str, tuple[str, str]] = {
     "max_bookings_per_email": (
         "admin.field.max_bookings_per_email",
         "admin.field.max_bookings_per_email_hint",
+    ),
+    "reschedule_auto_delay_minutes": (
+        "admin.field.reschedule_auto_delay_minutes",
+        "admin.field.reschedule_auto_delay_minutes_hint",
+    ),
+    "reschedule_auto_max_bookings": (
+        "admin.field.reschedule_auto_max_bookings",
+        "admin.field.reschedule_auto_max_bookings_hint",
     ),
     "dispatch_lead_minutes": (
         "admin.field.dispatch_lead_minutes",
@@ -618,6 +629,29 @@ def _settings_fields(
             current.max_bookings_per_email,
             {"min": "1", "max": str(MAX_BOOKINGS_PER_EMAIL)},
         ),
+        # ADR 0057 point 6: next to the other thing that changes bookings on its own.
+        Field(
+            "reschedule_auto_send",
+            _("admin.field.reschedule_auto_send"),
+            "select",
+            value("reschedule_auto_send", "yes" if current.reschedule_auto_send else "no"),
+            hint=_("admin.field.reschedule_auto_send_hint"),
+            error=form.error_for("reschedule_auto_send"),
+            options=yes_no,
+        ),
+        number(
+            "reschedule_auto_delay_minutes",
+            current.reschedule_auto_delay_minutes,
+            {
+                "min": str(MIN_RESCHEDULE_AUTO_DELAY_MINUTES),
+                "max": str(MAX_RESCHEDULE_AUTO_DELAY_MINUTES),
+            },
+        ),
+        number(
+            "reschedule_auto_max_bookings",
+            current.reschedule_auto_max_bookings,
+            {"min": "1", "max": str(MAX_RESCHEDULE_AUTO_MAX_BOOKINGS)},
+        ),
         Field(
             "dispatch_kind",
             _("admin.field.dispatch_kind"),
@@ -842,8 +876,9 @@ async def save_settings(
     trial = form.choice("trial_call_enabled", {"yes", "no"})
     join_client = form.choice("join_client", {client.value for client in JoinClient})
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
+    auto_send = form.choice("reschedule_auto_send", {"yes", "no"})
     fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
-    chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback)
+    chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback, auto_send)
     try:
         center = _form_routing(form)
     except DomainError as error:
@@ -855,6 +890,7 @@ async def save_settings(
             phone_mode=PhoneMode(str(phone)),
             dispatch_kind=DispatchKind(str(dispatch)),
             queue_free_pick_allowed=free_pick == "yes",
+            reschedule_auto_send=auto_send == "yes",
             calendar_invite_address=form.optional_text("calendar_invite_address"),
             dispatch_fallback=DispatchFallback(str(fallback)),
             fallback_space_room_id=form.optional_text("fallback_space_room_id"),

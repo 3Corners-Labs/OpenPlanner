@@ -98,9 +98,12 @@ from app.domain.scheduling import (
     MAX_PARTICIPANT_CHANGE_LEAD_MINUTES,
     MAX_PLANNER_LEAD_MINUTES,
     MAX_QUEUE_VISIBLE_FROM_MINUTES,
+    MAX_RESCHEDULE_AUTO_DELAY_MINUTES,
+    MAX_RESCHEDULE_AUTO_MAX_BOOKINGS,
     MAX_SLUG_LENGTH,
     MAX_TRIAL_CALL_MINUTES,
     MAX_TRIAL_CALLS_PER_BOOKING,
+    MIN_RESCHEDULE_AUTO_DELAY_MINUTES,
     MIN_TRIAL_CALL_MINUTES,
     RESERVED_SLUGS,
     DispatchFallback,
@@ -177,6 +180,13 @@ _SETTINGS: tuple[FieldSpec, ...] = (
     _setting("queue_visible_from_minutes", 0, MAX_QUEUE_VISIBLE_FROM_MINUTES),
     boolean("queue_free_pick_allowed", default=_default("queue_free_pick_allowed")),
     _setting("max_bookings_per_email", 1, MAX_BOOKINGS_PER_EMAIL),
+    boolean("reschedule_auto_send", default=_default("reschedule_auto_send")),
+    _setting(
+        "reschedule_auto_delay_minutes",
+        MIN_RESCHEDULE_AUTO_DELAY_MINUTES,
+        MAX_RESCHEDULE_AUTO_DELAY_MINUTES,
+    ),
+    _setting("reschedule_auto_max_bookings", 1, MAX_RESCHEDULE_AUTO_MAX_BOOKINGS),
     text("calendar_invite_address", nullable=True, max_length=254),
 )
 """The group's own settings: every field of the dataclass the portal's settings form edits."""

@@ -19,6 +19,7 @@ from app.domain.alert_model import AlertTarget, DeliveryState, RenderedAlert
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category
 from app.domain.authorization import CustomRole, Scope
+from app.domain.auto_rebooking import ShortfallWatch
 from app.domain.booking import (
     Booking,
     BookingStatus,
@@ -1716,6 +1717,18 @@ class Transaction(Protocol):
 
     async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
         """Store a planner's acceptance; it replaces an earlier one for the same slot."""
+        ...
+
+    async def get_shortfall_watches(self, group_id: int) -> list[ShortfallWatch]:
+        """Return the group's shortfall watches (ADR 0057 point 6), earliest slot first."""
+        ...
+
+    async def save_shortfall_watches(self, watches: Sequence[ShortfallWatch]) -> None:
+        """Store the watches; one for a slot already watched replaces it."""
+        ...
+
+    async def delete_shortfall_watches(self, group_id: int, starts: Sequence[datetime]) -> None:
+        """Forget the group's watches of the slots starting at ``starts``."""
         ...
 
     async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:

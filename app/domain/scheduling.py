@@ -70,6 +70,13 @@ DEFAULT_MAX_BOOKINGS_PER_EMAIL = 3
 """ADR 0066: future bookings one email address may hold in a group; room to book for others."""
 MAX_BOOKINGS_PER_EMAIL = 10
 """ADR 0066: upper bound of ``max_bookings_per_email``; there is no "unlimited" (a protection)."""
+DEFAULT_RESCHEDULE_AUTO_DELAY_MINUTES = 15
+"""ADR 0057 point 6: how long a shortfall must stay as it is before proposals go out."""
+MIN_RESCHEDULE_AUTO_DELAY_MINUTES = 5
+MAX_RESCHEDULE_AUTO_DELAY_MINUTES = 120
+DEFAULT_RESCHEDULE_AUTO_MAX_BOOKINGS = 10
+"""ADR 0057 point 6: above this many bookings automatic mode waits for a planner's review."""
+MAX_RESCHEDULE_AUTO_MAX_BOOKINGS = 100
 
 
 def _invalid(field: str) -> DomainError:
@@ -255,6 +262,12 @@ class Group:
             may have in this group, 1 to ``MAX_BOOKINGS_PER_EMAIL`` (ADR 0066). Above 1 so
             participants can book on behalf of others; the same address twice in one slot is
             always refused.
+        reschedule_auto_send: Whether the rebooking assistant sends its proposals without a
+            planner's review (ADR 0057 point 6); off keeps the review.
+        reschedule_auto_delay_minutes: How long a shortfall must stay the same before the
+            automatic proposals go out, so a typo in the staffing can be undone first.
+        reschedule_auto_max_bookings: Above this many affected bookings automatic mode sends
+            nothing and asks a planner to review.
         dispatch_fallback: What a contact-center group falls back to while the contact center
             fails (ADR 0082 point 11): nothing, or the own queue.
         fallback_space_room_id: The team's own Webex space for fallback messages (ADR 0082
@@ -300,6 +313,9 @@ class Group:
     queue_visible_from_minutes: int = DEFAULT_QUEUE_VISIBLE_FROM_MINUTES
     queue_free_pick_allowed: bool = False
     max_bookings_per_email: int = DEFAULT_MAX_BOOKINGS_PER_EMAIL
+    reschedule_auto_send: bool = False
+    reschedule_auto_delay_minutes: int = DEFAULT_RESCHEDULE_AUTO_DELAY_MINUTES
+    reschedule_auto_max_bookings: int = DEFAULT_RESCHEDULE_AUTO_MAX_BOOKINGS
     calendar_invite_address: str | None = None
     dispatch_fallback: DispatchFallback = DispatchFallback.NONE
     fallback_space_room_id: str | None = None
@@ -346,6 +362,11 @@ class Group:
             raise _invalid("queue_visible_from_minutes")
         if not 1 <= self.max_bookings_per_email <= MAX_BOOKINGS_PER_EMAIL:
             raise _invalid("max_bookings_per_email")
+        delay = self.reschedule_auto_delay_minutes
+        if not MIN_RESCHEDULE_AUTO_DELAY_MINUTES <= delay <= MAX_RESCHEDULE_AUTO_DELAY_MINUTES:
+            raise _invalid("reschedule_auto_delay_minutes")
+        if not 1 <= self.reschedule_auto_max_bookings <= MAX_RESCHEDULE_AUTO_MAX_BOOKINGS:
+            raise _invalid("reschedule_auto_max_bookings")
         if self.video_host_email is not None and not _EMAIL.fullmatch(self.video_host_email):
             raise _invalid("video_host_email")
         room = self.fallback_space_room_id
