@@ -15,6 +15,7 @@ from pydantic import SecretStr
 from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.activity_alert import COUNTED_ACTIONS
+from app.domain.admin import AdminService
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.event_context import set_service
 from app.domain.event_schema import detail_problem
@@ -28,7 +29,7 @@ APP = str(ROOT / "app") + "/"
 READ_BACK = APP + "adapters/db/"
 """Where events are built from stored rows; the action was checked when it was written."""
 
-RECORDER = "AdminService.record_change"
+RECORDER = AdminService.record_change.__code__
 """The one method that may write a success an hourly alert counts: it runs the alert."""
 
 
@@ -42,7 +43,7 @@ def checked_by_its_alert(event: AuditEvent, frame: FrameType | None) -> bool:
     if event.outcome is not Outcome.SUCCESS or event.action not in COUNTED_ACTIONS:
         return True
     while frame is not None:
-        if frame.f_code.co_qualname == RECORDER:
+        if frame.f_code is RECORDER:
             return True
         frame = frame.f_back
     return False

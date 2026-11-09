@@ -8,7 +8,7 @@ import pytest
 from app.domain.activity_alert import REVEALS_ALERT
 from app.domain.admin import AdminService
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
-from app.domain.authorization import Permission, Principal
+from app.domain.authorization import Principal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.participant_contact import CONTACT_VIEWED, ParticipantContactService
 from app.domain.services import BookingService
@@ -24,7 +24,7 @@ ADA_VALUES = ("Ada", "Lovelace", "ada@example.org", "612345678")
 def _service(
     uow: InMemoryUnitOfWork, clock: FixedClock, alert_per_hour: int = 20
 ) -> ParticipantContactService:
-    admin = AdminService(uow, clock, alert_thresholds={Permission.BOOKINGS_VIEW: alert_per_hour})
+    admin = AdminService(uow, clock, alert_thresholds={REVEALS_ALERT: alert_per_hour})
     return ParticipantContactService(uow, clock, admin)
 
 

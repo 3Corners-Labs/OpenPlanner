@@ -4,14 +4,15 @@ Two organisations with one group each: ``demo`` (the admins' own) and ``andere``
 else's), so every test can check both sides of the matrix.
 """
 
+from app.domain.activity_alert import CHANGES_ALERT, REVEALS_ALERT
 from app.domain.audit import Outcome
-from app.domain.authorization import Permission, Role
+from app.domain.authorization import Role
 from app.domain.scheduling import Organisation
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import make_group
 from tests.support.principals import principal
 
-ALERT_THRESHOLDS = {Permission.BOOKINGS_MANAGE: 50, Permission.BOOKINGS_VIEW: 20}
+ALERT_THRESHOLDS = {CHANGES_ALERT: 50, REVEALS_ALERT: 20}
 """The settings' defaults of the hourly alerts (ADR 0044), for an ``AdminService`` that records
 changes they count (``app.domain.activity_alert``)."""
 

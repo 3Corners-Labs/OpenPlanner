@@ -7,7 +7,7 @@ from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.audit import SYSTEM_ACTOR, Outcome, Source
-from app.domain.authorization import Permission, Principal
+from app.domain.authorization import Principal
 from app.domain.booking import BookingStatus, ChangeReason
 from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
@@ -240,7 +240,7 @@ async def test_a_slot_without_shortfall_cannot_be_accepted(
 async def test_many_changes_by_one_planner_raise_one_system_event(
     uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
 ) -> None:
-    admin = AdminService(uow, clock, alert_thresholds={Permission.BOOKINGS_MANAGE: 1})
+    admin = AdminService(uow, clock, alert_thresholds={CHANGES_ALERT: 1})
     planner = PlannerService(uow, clock, admin, bookings)
     ids = [await _book(bookings, start) for start in (SLOT_0900, SLOT_0900, SLOT_0930)]
 

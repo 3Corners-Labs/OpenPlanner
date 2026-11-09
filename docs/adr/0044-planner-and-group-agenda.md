@@ -132,7 +132,11 @@ For §2 the product owner chose on 2026-11-08, after the contact details on requ
 - An hourly alert when one person makes many requests for contact details (not: the audit log
   as the only detection), with `contact_reveals_alert_per_hour` at 20 within 5–500 (not: the
   values of the planner's change alert, 50 within 5–1000). It never refuses a request. The two
-  alerts share `app/domain/activity_alert.py`.
+  alerts share `app/domain/activity_alert.py`. Like the planner's alert, the warning is a row in
+  the audit log and an `error` line on the log stream, not an alert of ADR 0061: a rule on the
+  log platform pages someone (`docs/audit-events.md`). The count covers every scope the person
+  works in, and the warning sits in the group of the request that crossed it, so that group's
+  admins may see a count that includes requests elsewhere: a count, never data.
 
 ## Delivery
 

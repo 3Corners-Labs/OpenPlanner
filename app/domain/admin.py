@@ -21,7 +21,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 
-from app.domain.activity_alert import COUNTED_ACTIONS, alert_for
+from app.domain.activity_alert import COUNTED_ACTIONS, ActivityAlert, alert_for
 from app.domain.audit import ANONYMOUS_ACTOR, AuditEntry, AuditEvent, AuditFilter, Outcome
 from app.domain.audit_export import (
     EXPORT_EVENT,
@@ -106,11 +106,10 @@ class AdminService:
         clock: Current time, for audit events.
         retention_of: The organisation's maximum for bookings on hold, for the retention
             overview (ADR 0102, class D).
-        alert_thresholds: Per permission that an hourly alert counts
-            (``app.domain.activity_alert``), its threshold or the live setting that holds it:
-            ``planner_changes_alert_per_hour`` for ``bookings.manage`` and
-            ``contact_reveals_alert_per_hour`` for ``bookings.view`` (class C). Without one,
-            ``record_change`` refuses that permission.
+        alert_thresholds: Per hourly alert (``app.domain.activity_alert``), its threshold or
+            the live setting that holds it: ``planner_changes_alert_per_hour`` for
+            ``CHANGES_ALERT`` and ``contact_reveals_alert_per_hour`` for ``REVEALS_ALERT``
+            (class C). Without one, ``record_change`` refuses the permission that alert counts.
     """
 
     def __init__(
@@ -118,21 +117,13 @@ class AdminService:
         uow: UnitOfWork,
         clock: Clock,
         retention_of: ClosureRetentionOf = default_closure_retention,
-        alert_thresholds: Mapping[Permission, int | Callable[[], int]] | None = None,
+        alert_thresholds: Mapping[ActivityAlert, int | Callable[[], int]] | None = None,
     ) -> None:
-        """Store the collaborators.
-
-        Raises:
-            ValueError: If a threshold is given for a permission that no alert counts.
-        """
-        thresholds = dict(alert_thresholds or {})
-        uncounted = sorted(p.value for p in thresholds if alert_for(p) is None)
-        if uncounted:
-            raise ValueError(f"no hourly alert counts {uncounted}")
+        """Store the collaborators."""
         self._uow = uow
         self._clock = clock
         self._retention_of = retention_of
-        self._alert_thresholds = thresholds
+        self._alert_thresholds = dict(alert_thresholds or {})
 
     async def record_change(
         self,
@@ -154,18 +145,16 @@ class AdminService:
 
         Raises:
             ValueError: If an alert counts ``permission`` and this service has no threshold
-                for it.
+                for it; the caller's transaction then rolls back with the event.
         """
-        alert = alert_for(permission)
-        threshold = 0
-        if alert is not None:
-            if permission not in self._alert_thresholds:
-                raise ValueError(f"{alert.action} counts {permission.value}: no threshold given")
-            threshold = value_of(self._alert_thresholds[permission])
         event = _change_event(at, principal, permission, organisation, group, detail, booking_id)
         await tx.add_audit_event(event)
+        alert = alert_for(permission)
         if alert is not None:
-            await alert.check(tx, event, threshold)
+            threshold = self._alert_thresholds.get(alert)
+            if threshold is None:
+                raise ValueError(f"{alert.action} counts {permission.value}: no threshold given")
+            await alert.check(tx, event, value_of(threshold))
 
     async def authorize(
         self,

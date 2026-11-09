@@ -72,6 +72,7 @@ from app.api.maintenance import participant_gate, register_maintenance
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.trace import TraceMiddleware
 from app.config import AGENT_API_PREFIX, Settings, environment, loose_secret_files
+from app.domain.activity_alert import CHANGES_ALERT, REVEALS_ALERT
 from app.domain.address_check import AddressStatus, InstanceService
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
@@ -79,7 +80,6 @@ from app.domain.agenda_service import AgendaService
 from app.domain.alert_delivery import AlertTargetService
 from app.domain.alerts import AlertService
 from app.domain.api_access import ApiAccessService
-from app.domain.authorization import Permission
 from app.domain.branding_service import BrandingService
 from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
@@ -441,14 +441,14 @@ def create_app(
             reach=lambda org: _reach(per_organisation(org)),
         )
         app.state.participant_link_service = ParticipantLinkService(uow, clock)
-        # ADR 0044: the hourly alerts, one threshold per counted permission, for every writer.
+        # ADR 0044: the thresholds of the hourly alerts, once, for every writer they count.
         app.state.admin_service = AdminService(
             uow,
             clock,
             app.state.live_settings.closure_retention,
             {
-                Permission.BOOKINGS_MANAGE: lambda: live().planner_changes_alert_per_hour,
-                Permission.BOOKINGS_VIEW: lambda: live().contact_reveals_alert_per_hour,
+                CHANGES_ALERT: lambda: live().planner_changes_alert_per_hour,
+                REVEALS_ALERT: lambda: live().contact_reveals_alert_per_hour,
             },
         )
         app.state.usage_report_service = UsageReportService(
