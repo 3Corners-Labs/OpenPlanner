@@ -8,7 +8,7 @@
   <h2 id="created-heading">{{ _("reports.created.title") }}</h2>
   {{ report_chart(charts.days) }}
   <p class="muted">{{ _("reports.provisional.note") }}</p>
-  {% if report.days | selectattr("provisional") | list %}<p class="muted">{{ _("reports.provisional.days") }}: {% for row in report.days if row.provisional %}{{ row.day.isoformat() }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  {% if report.days | selectattr("provisional") | list %}<p class="muted"><span class="chip">{{ _("reports.provisional") }}</span> {{ _("reports.provisional.days") }}: {% for row in report.days if row.provisional %}{{ row.day.isoformat() }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
 </section>
 {% if report.split %}
 {{ count_table("split", _("reports.split.title"), _("reports.split." ~ report.split.by), report.split.table, "dispatch" if report.split.by == "queue" else "locales", report.threshold, _("reports.total")) }}
