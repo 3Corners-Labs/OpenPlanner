@@ -33,7 +33,7 @@ class WidgetError(BaseModel):
 
     error: str = Field(
         description="`group_not_found`, `origin_not_allowed`, `invalid_request`, "
-        "`invalid_contact`, `slot_unavailable`, `slot_full`, `booking_limit_reached`, "
+        "`invalid_contact`, `slot_unavailable`, `slot_full`, "
         "`outside_booking_window`, `group_closed`, `rate_limited`, …"
     )
     field: str | None = Field(

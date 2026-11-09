@@ -169,6 +169,9 @@ class BookingStatus(StrEnum):
     """A planner asked the participant to choose a new time (ADR 0044); the place is freed."""
     PENDING_CONFIRMATION = "pending_confirmation"
     """The participant has not confirmed by email link yet (ADR 0056); the place is held."""
+    REFUSED = "refused"
+    """The address had reached its limit in the group (ADR 0066 step 8). It holds no place; it
+    only carries the email that explains the refusal, and is purged a day after the attempt."""
 
 
 @dataclass(frozen=True)
@@ -404,6 +407,10 @@ HOLDS_PLACE = frozenset(
     {BookingStatus.CONFIRMED, BookingStatus.SUSPENDED, BookingStatus.PENDING_CONFIRMATION}
 )
 """Statuses that take a place in their slot (counted against its capacity)."""
+
+APPOINTMENTS = frozenset(BookingStatus) - {BookingStatus.REFUSED}
+"""Statuses of a real appointment: all but a refused booking, which only carries the email that
+explains the refusal (ADR 0066 step 8). Staff lists show these."""
 
 IN_AGENDA = frozenset({BookingStatus.CONFIRMED, BookingStatus.PENDING_CONFIRMATION})
 """Statuses the planner's agenda counts in a slot: confirmed, and those awaiting the

@@ -73,6 +73,7 @@ class PurgeCandidate:
         organisation_id: The group's organisation, whose settings decide the maximum for a
             suspended booking (ADR 0102).
         closure_id: For a suspended booking, its closure.
+        created_at: When it was made; a refused booking is purged a day after (ADR 0066).
     """
 
     group_id: int
@@ -84,6 +85,7 @@ class PurgeCandidate:
     confirm_by: datetime | None = None
     organisation_id: int = 0
     closure_id: int | None = None
+    created_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -159,6 +161,8 @@ def purge_moment(candidate: PurgeCandidate, retention: ClosureRetention) -> date
     """
     if candidate.status is BookingStatus.CANCELLED and candidate.cancelled_at is not None:
         return candidate.cancelled_at + PURGE_AFTER
+    if candidate.status is BookingStatus.REFUSED and candidate.created_at is not None:
+        return candidate.created_at + PURGE_AFTER
     if candidate.status is BookingStatus.SUSPENDED:
         return suspended_purge_moment(candidate.end, candidate.closure_ends_at, retention)
     if candidate.status is BookingStatus.AWAITING_REBOOK and candidate.rebook_by is not None:

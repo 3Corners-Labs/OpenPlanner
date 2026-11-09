@@ -28,6 +28,7 @@ JOB_TYPE_LABELS: dict[JobType, str] = {
     JobType.SEND_CONFIRM_REMINDER: "audit.job.send_confirm_reminder",
     JobType.EXPIRE_UNCONFIRMED: "audit.job.expire_unconfirmed",
     JobType.SEND_UNCONFIRMED_LAPSED: "audit.job.send_unconfirmed_lapsed",
+    JobType.SEND_REFUSAL: "audit.job.send_refusal",
     JobType.SEND_TEAM_INVITE: "audit.job.send_team_invite",
     JobType.SEND_TEAM_CANCEL: "audit.job.send_team_cancel",
     JobType.SEND_RESCHEDULE_PROPOSAL: "audit.job.send_reschedule_proposal",

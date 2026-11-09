@@ -38,6 +38,14 @@ async def _bookings(settings: Settings) -> int:
     return count
 
 
+async def _statuses(settings: Settings) -> list[str]:
+    engine = create_engine(settings.database_url)
+    async with AsyncSession(engine) as session:
+        found = (await session.scalars(select(BookingRow.status).order_by(BookingRow.id))).all()
+    await engine.dispose()
+    return list(found)
+
+
 async def _book(
     site: httpx.AsyncClient, origin: str | None = SITE, **body: object
 ) -> httpx.Response:
@@ -118,6 +126,17 @@ async def test_a_booking_from_an_allowed_origin_returns_no_token_and_no_personal
     assert "/b/" not in text
     assert "token" not in text
     assert await _bookings(demo_settings) == 1
+
+
+async def test_a_refused_booking_answers_exactly_like_a_real_one(
+    site: httpx.AsyncClient, demo_settings: Settings
+) -> None:
+    """ADR 0066 step 8: the same address twice in a slot; only the email tells the difference."""
+    first = await _book(site, phone="")
+    second = await _book(site, phone="")
+
+    assert (second.status_code, second.json()) == (first.status_code, first.json())
+    assert await _statuses(demo_settings) == ["pending_confirmation", "refused"]
 
 
 @pytest.mark.parametrize(
