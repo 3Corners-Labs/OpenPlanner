@@ -275,7 +275,7 @@ async def test_the_export_without_encryption_is_not_offered_while_the_host_forbi
     assert 'name="secrets"' in page
     assert 'name="plain"' not in page
     assert refused.status_code == 422
-    assert b'"plain"' not in refused.content
+    assert b'"plain":' not in refused.content
 
 
 async def test_the_export_without_encryption_needs_the_host_the_confirmation_and_a_superuser(
@@ -297,6 +297,19 @@ async def test_the_export_without_encryption_needs_the_host_the_confirmation_and
     assert unconfirmed.status_code == 422
     assert 'name="plain"' not in org_page
     assert crafted.status_code == 403
+
+
+async def test_a_sealed_and_a_plain_export_asked_together_is_refused(plain_site: Site) -> None:
+    await plain_site.login_as(SUPER)
+
+    response = await plain_site.client.post(
+        f"{PLATFORM}/export",
+        data={**PLAIN, "secrets": "yes", "passphrase": PASSPHRASE, "passphrase_repeat": PASSPHRASE},
+        headers=SAME_ORIGIN,
+    )
+
+    assert response.status_code == 422
+    assert b'"plain":' not in response.content
 
 
 async def test_the_export_without_encryption_is_clear_text_needs_no_passphrase_and_is_not_cached(

@@ -23,7 +23,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Header, Query, Request
 from starlette.responses import JSONResponse, Response
 
-from app.adapters.configuration_json import MEDIA_TYPE
+from app.adapters.configuration_json import MEDIA_TYPE, document_response
 from app.api.agent.auth import AgentContext, RequireScope, api_access, client_key
 from app.api.agent.errors import ApiProblem
 from app.api.agent.schemas import (
@@ -239,14 +239,7 @@ async def export_configuration(
     )
     current: Settings = request.app.state.settings
     name = document_filename(current.installation_name, request.app.state.clock.now())
-    return Response(
-        document,
-        media_type=MEDIA_TYPE,
-        headers={
-            "content-disposition": f'attachment; filename="{name}"',
-            "cache-control": "no-store",
-        },
-    )
+    return document_response(document, name)
 
 
 @router.post(

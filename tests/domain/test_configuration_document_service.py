@@ -481,7 +481,19 @@ async def test_a_plain_export_is_refused_while_the_host_has_not_allowed_it() -> 
         await build(unit).export(HOST, Scope(), None, secrets=True, plain=True)
 
     assert error.value.code is ErrorCode.CONFIGURATION_PLAINTEXT_DISABLED
-    assert unit.state.audit == []
+    (event,) = unit.state.audit
+    assert event.outcome is Outcome.DENIED
+    assert event.detail == "configuration.export,secrets,plain"
+    assert "hunter2" not in repr(event)
+
+
+async def test_a_plain_export_together_with_a_passphrase_is_refused_not_resolved() -> None:
+    with pytest.raises(DomainError) as error:
+        await build(with_secret(), plaintext=True).export(
+            HOST, Scope(), PASSPHRASE, secrets=True, plain=True
+        )
+
+    assert error.value.code is ErrorCode.INVALID_CONFIGURATION
 
 
 async def test_a_plain_export_needs_the_platform_manage_permission_like_a_sealed_one() -> None:

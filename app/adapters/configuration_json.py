@@ -9,10 +9,30 @@ silently), NaN and infinity, and nesting deeper than the format ever is.
 import json
 from typing import Any
 
+from fastapi import Response
+
 from app.domain.configuration_values import Json
 from app.domain.errors import DomainError, ErrorCode
 
 MEDIA_TYPE = "application/vnd.openplanner.config+json"
+
+
+def document_response(document: bytes, filename: str) -> Response:
+    """Return an exported document as a download that no cache keeps.
+
+    The one home of the headers of an export: the portal and the agent API both answer with it,
+    and a file that may hold every secret must never be stored by a proxy or the browser.
+    """
+    return Response(
+        document,
+        media_type=MEDIA_TYPE,
+        headers={
+            "content-disposition": f'attachment; filename="{filename}"',
+            "cache-control": "no-store",
+        },
+    )
+
+
 """The media type of a document (ADR 0099 point 1)."""
 
 MAX_DEPTH = 32

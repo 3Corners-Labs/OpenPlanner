@@ -52,10 +52,11 @@ def add_arguments(
         default="json",
         help="the file format; the SQLite package is no longer written (ADR 0099 step 4)",
     )
-    export_cmd.add_argument(
+    secrets_mode = export_cmd.add_mutually_exclusive_group()
+    secrets_mode.add_argument(
         "--no-secrets", action="store_true", help="leave every secret out (no passphrase needed)"
     )
-    export_cmd.add_argument(
+    secrets_mode.add_argument(
         "--plain-secrets",
         action="store_true",
         help="write the secrets in clear text, without a passphrase; refused unless the host "

@@ -197,11 +197,23 @@ class ConfigurationDocumentService:
         Raises:
             DomainError: ``configuration_passphrase_short``; ``integration_not_ready`` when
                 secrets are wanted and the installation has no settings key;
-                ``configuration_plaintext_disabled`` when ``plain`` is not allowed.
+                ``configuration_plaintext_disabled`` (audited) when ``plain`` is not allowed;
+                ``invalid_configuration`` for ``plain`` together with a passphrase.
         """
+        if plain and passphrase is not None:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "plain")
         secrets = secrets or plain
         self._may_export(actor, scope, secrets=secrets)
         if plain and not self._plaintext_export():
+            await self._admin.record(
+                actor.subject,
+                _route_permission(scope).value,
+                Outcome.DENIED,
+                ErrorCode.CONFIGURATION_PLAINTEXT_DISABLED.value,
+                scope.organisation,
+                None,
+                EXPORT_DETAIL + ",secrets,plain",
+            )
             raise DomainError(ErrorCode.CONFIGURATION_PLAINTEXT_DISABLED, "plain")
         if (
             secrets

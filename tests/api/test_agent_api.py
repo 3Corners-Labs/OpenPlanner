@@ -484,7 +484,10 @@ async def test_a_plain_export_is_refused_until_the_host_allows_it(agent: Agent) 
         403,
         {"error": "configuration_plaintext_disabled"},
     )
-    assert [e for e in await _audit(agent) if e.detail.endswith("plain")] == []
+    denied = [e for e in await _audit(agent) if e.detail.endswith("plain")]
+    assert [(e.outcome, e.reason) for e in denied] == [
+        ("denied", "configuration_plaintext_disabled")
+    ]
 
 
 async def test_a_plain_export_holds_clear_text_without_a_passphrase_and_applies_again(
@@ -500,6 +503,12 @@ async def test_a_plain_export_holds_clear_text_without_a_passphrase_and_applies_
     )
 
     assert exported.status_code == 200, exported.text
+    both = await agent.client.get(
+        f"{BASE}/configuration",
+        headers={**headers, "x-plain-secrets": "true", "x-passphrase": PASSPHRASE},
+    )
+    assert (both.status_code, both.json()) == (422, {"error": "invalid_configuration"})
+    assert PASSPHRASE not in both.text
     assert exported.headers["cache-control"] == "no-store"
     assert '"sealed"' not in exported.text
     assert "seal" not in exported.json()

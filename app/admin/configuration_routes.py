@@ -24,7 +24,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
-from app.adapters.configuration_json import MEDIA_TYPE
+from app.adapters.configuration_json import document_response
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.configuration_view import (
     DOCUMENT_KEY,
@@ -158,9 +158,11 @@ async def _export(
     """Export the configuration of ``scope``; with secrets only under a repeated passphrase."""
     form = await read_form(request, locale)
     plain = form.text("plain") == "yes"
-    secrets = form.text("secrets") == "yes" and not plain
+    secrets = form.text("secrets") == "yes"
     passphrase = form.text("passphrase")
     try:
+        if plain and secrets:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, DOCUMENT_KEY)
         if plain and form.text("plain_confirm") != "yes":
             raise DomainError(ErrorCode.CONFIGURATION_PLAINTEXT_UNCONFIRMED, DOCUMENT_KEY)
         if secrets and passphrase != form.text("passphrase_repeat"):
@@ -173,14 +175,7 @@ async def _export(
         return await _fail(request, locale, context, scope, error, 422)
     current: Settings = request.app.state.settings
     name = document_filename(current.installation_name, request.app.state.clock.now())
-    return Response(
-        document,
-        media_type=MEDIA_TYPE,
-        headers={
-            "content-disposition": f'attachment; filename="{name}"',
-            "cache-control": "no-store",
-        },
-    )
+    return document_response(document, name)
 
 
 async def _plan(

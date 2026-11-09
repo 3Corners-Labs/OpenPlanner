@@ -127,6 +127,17 @@ def test_a_document_above_the_size_limit_is_refused_before_it_is_read(
     assert "configuration_package_too_large" in capsys.readouterr().out
 
 
+def test_no_secrets_and_plain_secrets_cannot_be_asked_together(
+    seeded: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as stop:
+        main(["config", "export", str(tmp_path / "x.json"), "--no-secrets", "--plain-secrets"])
+
+    assert stop.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err
+    assert not (tmp_path / "x.json").exists()
+
+
 def test_a_plain_export_is_refused_unless_the_host_allows_it(
     seeded: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
