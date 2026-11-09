@@ -80,7 +80,7 @@ from app.domain.job_plan import (
 )
 from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.rebooking import DEFAULT_REACH, Reach, may_take, suggested
+from app.domain.rebooking import DEFAULT_REACH, Reach, may_take, search_window, suggested
 from app.domain.reschedule_proposal import HeldProposal
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
 from app.domain.routing import RoutingChoice
@@ -287,13 +287,10 @@ class BookingService:
             proposal = await tx.get_open_proposal(_id(booking))
             reach = value_for(self._reach, group.organisation_id)
             old_day = booking.start.astimezone(group.tz).date()
-            first_day = max(
-                group.today(self._clock.now()), old_day - timedelta(days=reach.search_days)
-            )
-            last_day = old_day + timedelta(days=reach.search_days)
-            if first_day > last_day:
+            window = search_window(group, [old_day], reach, self._clock.now())
+            if window is None:
                 return []
-            free = await self._free_slots(tx, group, first_day, last_day, booking.subject)
+            free = await self._free_slots(tx, group, *window, booking.subject)
         held = {proposal.start} if proposal is not None else set()
         return suggested(group, booking.start, [s.start for s in free], reach, held)
 
@@ -929,14 +926,24 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
-            proposal = await tx.get_open_proposal(_id(booking))
-            now = self._clock.now()
-            if proposal is None or proposal.is_due(now):
-                raise DomainError(ErrorCode.PROPOSAL_NOT_OPEN)
             group = await self._group_by_id(tx, booking.group_id)
-            return await self.relocate(
-                tx, booking, group, proposal.start, actor=ActorClass.PARTICIPANT
-            )
+            return await self.confirm_proposal_in(tx, booking, group, ActorClass.PARTICIPANT)
+
+    async def confirm_proposal_in(
+        self, tx: Transaction, booking: Booking, group: Group, actor: ActorClass
+    ) -> BookingReceipt:
+        """Move ``booking`` into its open proposal inside the caller's locked transaction.
+
+        Shared by the participant's link and the planner confirming on their behalf after a
+        phone call (ADR 0057 point 10); ``actor`` says which, for the usage facts.
+
+        Raises:
+            DomainError: ``proposal_not_open`` or any error of ``relocate``.
+        """
+        proposal = await tx.get_open_proposal(_id(booking))
+        if proposal is None or proposal.is_due(self._clock.now()):
+            raise DomainError(ErrorCode.PROPOSAL_NOT_OPEN)
+        return await self.relocate(tx, booking, group, proposal.start, actor=actor)
 
     async def _booked_jobs(
         self, tx: Transaction, group: Group, booking: Booking, *, sms: bool = False

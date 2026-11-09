@@ -21,7 +21,7 @@ time across a daylight-saving change.
 
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from app.domain.agenda import AgendaSlot
 from app.domain.booking import Booking
@@ -181,6 +181,23 @@ def suggested(
         if start != old_start and start not in exclude and _within(group, old_start, start, reach)
     }
     return sorted(fitting, key=lambda start: _rank(group, old_start, start))[:SUGGESTED]
+
+
+def search_window(
+    group: Group, days: Collection[date], reach: Reach, now: datetime
+) -> tuple[date, date] | None:
+    """Return the local days to look for new times for bookings on ``days``, or ``None``.
+
+    From ``reach.search_days`` before the earliest day (never before today) to as many after
+    the latest; ``None`` when nothing of it lies ahead. One rule for the planner's review and
+    the participant's suggestions.
+    """
+    if not days:
+        return None
+    spread = timedelta(days=reach.search_days)
+    first = max(group.today(now), min(days) - spread)
+    last = max(days) + spread
+    return (first, last) if first <= last else None
 
 
 def _within(group: Group, old_start: datetime, start: datetime, reach: Reach) -> bool:
