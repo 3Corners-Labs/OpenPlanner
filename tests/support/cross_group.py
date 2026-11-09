@@ -1,10 +1,9 @@
 """Shared checks for the tests that try another group's booking through one's own group.
 
 A booking id under another group's address answers ``booking_not_found``, the same as an
-unknown id (ADR 0014, ``app.domain.lookups.group_booking``). The planner, the closure and the
-queue each have a test that tries every use case on one booking that way:
-``booking_id_methods`` lists the use cases it must cover, and ``refused_as_unknown`` is its
-assertion.
+unknown id (ADR 0014, ``app.domain.lookups.group_booking``). A service's test that tries every
+use case on one booking that way takes the list it must cover from ``booking_id_methods`` and
+uses ``refused_as_unknown`` as its assertion.
 """
 
 import inspect
