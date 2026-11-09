@@ -177,7 +177,7 @@ class LoginService:
             await self._admin.record_refused_login(claims.subject, TOO_MANY_ENTITLEMENTS)
             raise LoginRefusedError(TOO_MANY_ENTITLEMENTS)
         await self._admin.record_login(
-            resolution.principal, resolution.refused, resolution.mismatch
+            resolution.principal, resolution.refused, resolution.mismatch, claims.email
         )
         kept = LoginClaims(
             subject=claims.subject,

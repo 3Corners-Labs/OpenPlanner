@@ -91,6 +91,8 @@ class StaffView:
     erased: bool = False
     provider: str = ""
     """The identity provider the person logs in through: a provider key, or the platform."""
+    email: str = ""
+    """The verified address of the last login; empty when none (ADR 0117 step 10b)."""
 
 
 PLATFORM_VALUE = "platform"
@@ -156,6 +158,7 @@ def _view(
             admin_moment(request, locale, member.last_logout_at) if member.last_logout_at else never
         ),
         provider=member.provider or _("admin.staff.platform_provider"),
+        email="" if erased else member.email or "",
         dormant=not erased and member.is_dormant(now, _dormant_after(request)),
         suspended=member.status is StaffStatus.SUSPENDED,
         erased=erased,

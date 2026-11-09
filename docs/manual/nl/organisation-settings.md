@@ -41,6 +41,13 @@ bewaart alle onderwerpen samen.
   mijn groepen* op het overzicht zegt of de langste wachttijd binnen het doel blijft; komt die
   boven de grens, dan krijgen wie de wachtrij bedienen één melding, die verdwijnt als de
   wachttijd weer onder de grens is. Het doel mag niet boven de grens liggen.
+- **Wijzigingsverzoeken door een bot (met afspraakcode)** en **Tijd om een wijzigingsverzoek te
+  bevestigen** (10 tot 1440 minuten, standaard 60): of een bot van het contactcenter voor een
+  beller mag vragen een afspraak te annuleren of te verplaatsen. De beller noemt daarvoor het
+  telefoonnummer en de afspraakcode van acht cijfers samen; die code staat dan op de
+  boekingspagina en in de bevestiging, de wijziging en de herinnering. Er verandert pas iets als
+  de deelnemer het verzoek via de eigen mail of sms bevestigt, binnen de ingestelde tijd. Staat
+  de instelling uit, dan weigert de koppeling verzoeken en vervallen open verzoeken.
 
 ## Een instelling wijzigen
 

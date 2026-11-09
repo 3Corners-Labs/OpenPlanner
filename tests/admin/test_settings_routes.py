@@ -73,6 +73,16 @@ async def test_secrets_and_bootstrap_values_are_never_shown(site: Site) -> None:
     assert "sqlite+aiosqlite" not in text  # a class B value
 
 
+async def test_system_status_names_the_environment_in_words(site: Site) -> None:
+    """The fact once read ``EnvironmentNotice(...)``: ``render`` replaced the page's own value."""
+    await site.login_as(SUPER)
+
+    text = (await site.client.get("/admin/settings")).text
+
+    assert "<div><dt>Omgeving</dt><dd>Testomgeving</dd></div>" in text
+    assert "EnvironmentNotice" not in text
+
+
 async def test_a_development_installation_shows_what_production_refuses(site: Site) -> None:
     await site.login_as(SUPER)
 

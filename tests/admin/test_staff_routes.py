@@ -1,8 +1,10 @@
 """The staff directory pages (ADR 0046): just-in-time records, exact per scope."""
 
+from dataclasses import replace
 from datetime import timedelta
 
 from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.principals import legacy_claims
 
 
 async def _id_of(site: Site, name: str) -> str:
@@ -93,3 +95,28 @@ async def test_filters_outside_the_scope_are_ignored(site: Site) -> None:
 
     assert ">Olaf Org</a>" in text
     assert "Otto Other</a>" not in text
+
+
+async def test_the_detail_page_shows_the_verified_address_of_the_last_login(site: Site) -> None:
+    # ADR 0117 step 10b: shown to whoever holds staff.view, in the page only.
+    await site.login_with(replace(legacy_claims(GROUP_ADMIN), email="gina@voorbeeld.nl"))
+    await site.client.post("/admin/logout", headers={"sec-fetch-site": "same-origin"})
+    gina = await _id_of(site, "Gina Group")
+    await site.login_as(ORG_ADMIN)
+
+    page = (await site.client.get(f"/admin/staff/{gina}")).text
+    listing = (await site.client.get("/admin/staff")).text
+
+    assert "gina@voorbeeld.nl" in page
+    assert "gina@voorbeeld.nl" not in listing
+
+
+async def test_a_person_without_a_verified_address_says_so(site: Site) -> None:
+    await site.login_as(GROUP_ADMIN)
+    await site.client.post("/admin/logout", headers={"sec-fetch-site": "same-origin"})
+    gina = await _id_of(site, "Gina Group")
+    await site.login_as(ORG_ADMIN)
+
+    text = (await site.client.get(f"/admin/staff/{gina}")).text
+
+    assert "Geen geverifieerd adres bekend" in text

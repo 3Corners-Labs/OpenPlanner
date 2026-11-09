@@ -86,6 +86,11 @@ het nummer of het adres belt of mailt u vanuit uw eigen programma.
   zoeken, ziet ze niet.
 - Elke keer dat u ze toont, legt het auditlog vast wie dat deed, bij welk team en bij welke
   afspraak (*Contactgegevens van de deelnemer getoond*). De gegevens zelf staan er niet in.
+- Toont één persoon de contactgegevens binnen een uur vaker dan de grens van het platform
+  (standaard 20 keer), dan komt er één waarschuwing in het auditlog: *Veel verzoeken om
+  contactgegevens door één persoon*, met wie het was en hoe vaak. Ook dezelfde afspraak opnieuw
+  telt mee. Het tonen gaat gewoon door; de superuser stelt de grens in (zie
+  [Geavanceerde instellingen](advanced-settings.md)).
 - Met **Contactgegevens verbergen** haalt u ze weer van het scherm, bijvoorbeeld voordat u een
   schermafdruk maakt voor Webex-support.
 - Alleen de knop op de pagina zelf toont ze. Opent u de pagina via een gedeelde link (in een
@@ -182,6 +187,33 @@ toont OpenPlanner de nieuwe lijst en vraagt het u opnieuw te bevestigen.
 De afspraken die op een nieuwe tijd wachten, staan in de lijst **Wacht op nieuwe tijd** bij de
 agenda, met de oorspronkelijke tijd, de reden en de datum waarop de vraag vervalt. Ook daar
 kunt u een afspraak zelf verplaatsen of annuleren.
+
+### Een nieuwe tijd voorstellen
+
+Met **Nieuwe tijd voorstellen** bij een bevestigde afspraak zoekt de assistent een vrije tijd
+voor de deelnemer: eerst hetzelfde tijdstip op een andere dag, dan het kleinste verschil in
+tijdstip, dan de dichtstbijzijnde dag. U kunt die tijd houden of een andere vrije tijd kiezen.
+De oude plek komt meteen vrij; de voorgestelde tijd wordt voor de deelnemer vastgehouden en telt
+in de agenda mee als niet bevestigd. De deelnemer krijgt het voorstel per e-mail (en sms als er
+een telefoonnummer is) en kan de nieuwe tijd bevestigen, zelf een andere tijd kiezen of
+annuleren. Zonder bevestiging verplaatsen we niets: na de termijn komt de vastgehouden tijd vrij
+en kan de deelnemer nog zelf kiezen tot de vraag vervalt.
+
+Bij een tijdslot met een tekort staat ook **Nieuwe tijden voorstellen**. U ziet per afspraak
+(de laatst gemaakte, zoveel als het tekort) de voorgestelde tijd. Per afspraak kunt u een
+andere tijd kiezen, de deelnemer zelf laten kiezen of de afspraak uitvinken. Alles gaat in één
+keer; past een gekozen tijd intussen niet meer, dan verstuurt OpenPlanner niets en toont het de
+lijst opnieuw. Met **Nieuwe tijden voorstellen voor deze dag** (dagoverzicht) of **voor deze week**
+(weekoverzicht) beoordeelt u alle tijdsloten met een tekort in één keer; de assistent geeft twee
+afspraken nooit dezelfde laatste plek. Een tijd zonder vrije medewerker stelt OpenPlanner niet voor.
+
+In **Wacht op nieuwe tijd** staat bij een voorstel de voorgestelde tijd en tot wanneer die wordt
+vastgehouden. Na een telefoongesprek kunt u daar **Bevestigen namens deelnemer** kiezen; de
+deelnemer krijgt dan de bevestiging met de nieuwe tijd. Met **Voorstel intrekken** komt de
+vastgehouden tijd vrij en wacht de afspraak verder op een tijd van de deelnemer.
+
+Hoe lang een voorstel wordt vastgehouden, wanneer de herinnering gaat en hoe ver de assistent
+zoekt, stelt de beheerder van de organisatie in bij de instellingen (onderwerp Planner).
 
 ### Tekort accepteren
 

@@ -45,11 +45,22 @@ def token_for_booking(keys: Sequence[bytes], salt: str, token_hash: str) -> str:
     Raises:
         ValueError: If a key is shorter than ``MIN_KEY_BYTES``.
     """
-    tokens = [derive_token(key, salt) for key in keys]
-    for token in tokens:
-        if token_matches(token, token_hash):
-            return token
-    return tokens[0]
+    return derive_token(key_for_booking(keys, salt, token_hash), salt)
+
+
+def key_for_booking(keys: Sequence[bytes], salt: str, token_hash: str) -> bytes:
+    """Return the key a booking's token was made with: the first of ``keys`` that matches.
+
+    A booking that matches no key gets the first key. The appointment code (ADR 0023 step 2)
+    follows the same key as the link.
+
+    Raises:
+        ValueError: If a key is shorter than ``MIN_KEY_BYTES``.
+    """
+    for key in keys:
+        if token_matches(derive_token(key, salt), token_hash):
+            return key
+    return keys[0]
 
 
 def hash_token(token: str) -> str:

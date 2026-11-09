@@ -186,6 +186,8 @@ async def test_the_organisation_states_show_the_source() -> None:
         "reschedule_proposal_reminder_hours",
         "reschedule_search_days",
         "reschedule_time_tolerance_minutes",
+        "agent_change_requests_enabled",
+        "agent_change_request_minutes",
         "phone_default_region",
         "booking_confirm_window_hours",
         "booking_confirm_cutoff_hours",
@@ -195,6 +197,9 @@ async def test_the_organisation_states_show_the_source() -> None:
         "queue_wait_warning_minutes",
         "queue_wait_target_minutes",
         "reporting_org_min_cell_size",
+        "reporting_staff_view_enabled",
+        "reporting_digest_send_hour",
+        "reporting_digest_include_numbers",
     }
     assert (states["time_format"].source, states["time_format"].shown) == ("organisation", "12h")
     assert states["admin_timezone"].source == "default"

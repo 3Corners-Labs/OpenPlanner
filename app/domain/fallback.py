@@ -12,7 +12,8 @@ ADR 0043, flagged *Terugval*, in two ways:
 
 ``dispatch_kind`` never changes: the fallback is a state. Each transition is the system event
 ``dispatch.fallback`` (failure ``on``, success ``off``), an alert of ADR 0061, and a group
-admin may end it by hand (audited). A team space (``fallback_space_room_id``) gets a message on
+admin may end it by hand (audited, and counted toward the hourly alert on many changes by one
+person, ``app.domain.activity_alert``). A team space (``fallback_space_room_id``) gets a message on
 activation and one line per booking: start time, first name and a link to the queue, never
 the host join link (claiming gives that, ADR 0043 point 6). The participant notices nothing.
 """
@@ -21,7 +22,7 @@ from collections.abc import Callable, Iterable
 from datetime import datetime
 from typing import Protocol
 
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, require
 from app.domain.alert_delivery import DEFAULT_LOCALE
 from app.domain.alerts import FALLBACK_EVENT
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
@@ -190,7 +191,7 @@ class FallbackService:
             await tx.save_group_fallback(group.id, None)
             await tx.add_audit_event(_event(group, organisation, Outcome.SUCCESS, now))
             if principal is not None:
-                await record_change(
+                await self._admin.record_change(
                     tx,
                     now,
                     principal,

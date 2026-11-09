@@ -23,6 +23,7 @@ from app.adapters.db.models import (
     UsageEventRow,
     UsageHourRow,
     UsageRollupStateRow,
+    UsageStaffHourRow,
 )
 from app.adapters.db.types import plain
 from app.adapters.db.usage_rows import enum_of
@@ -225,6 +226,14 @@ class UsageRollupQueries:
         )
         old_hours = (
             select(UsageHourRow.id).where(UsageHourRow.bucket_hour < hours_before).limit(limit)
+        )
+        old_staff = (
+            select(UsageStaffHourRow.id)
+            .where(UsageStaffHourRow.bucket_hour < hours_before)
+            .limit(limit)
+        )
+        await self._session.execute(
+            delete(UsageStaffHourRow).where(UsageStaffHourRow.id.in_(old_staff))
         )
         events = await self._session.execute(
             delete(UsageEventRow).where(UsageEventRow.id.in_(old_events))

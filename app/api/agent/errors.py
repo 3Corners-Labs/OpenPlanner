@@ -45,6 +45,9 @@ _DOMAIN_STATUS: dict[ErrorCode, int] = {
     # ADR 0099: the configuration document over the API.
     ErrorCode.CONFIGURATION_PLAN_STALE: 409,
     ErrorCode.INTEGRATION_NOT_READY: 503,
+    # ADR 0023 step 2: change requests.
+    ErrorCode.SLOT_UNAVAILABLE: 409,
+    ErrorCode.CHANGE_REQUEST_NOT_FOUND: 404,
 }
 
 

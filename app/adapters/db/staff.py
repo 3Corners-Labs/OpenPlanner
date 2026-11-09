@@ -58,6 +58,10 @@ class _Transaction(Protocol):
         """Return every custom role (``RoleQueries``)."""
         ...
 
+    async def fold_staff_usage(self, staff_id: int) -> None:
+        """Fold a team member's usage cells into *former team members* (``UsageStaffQueries``)."""
+        ...
+
 
 def _has_role(role: Role) -> ColumnElement[bool]:
     """Whether the comma-separated ``roles`` column holds ``role``."""
@@ -126,6 +130,8 @@ def _member(
         id=row.id,
         status=StaffStatus(row.status),
         status_at=row.status_at,
+        email=row.email,
+        email_at=row.email_at,
         refused=tuple(
             RefusedEntitlement(r.value, r.reason, r.organisation, r.received_at)
             for r in sorted(refusals, key=lambda r: r.value)
@@ -135,6 +141,19 @@ def _member(
 
 class StaffQueries:
     """The staff directory's part of ``SqlTransaction``."""
+
+    async def get_staff_by_id(self: _Transaction, staff_id: int) -> StaffMember | None:
+        """Return the staff record with row id ``staff_id``, or ``None``."""
+        row = await self._session.get(StaffRow, staff_id)
+        if row is None:
+            return None
+        memberships = await self._session.scalars(
+            select(StaffMembershipRow).where(StaffMembershipRow.staff_id == row.id)
+        )
+        refusals = await self._session.scalars(
+            select(StaffRefusalRow).where(StaffRefusalRow.staff_id == row.id)
+        )
+        return _member(row, list(memberships), list(refusals))
 
     async def get_staff(self: _Transaction, subject: str) -> StaffMember | None:
         """Return the staff record of ``subject`` with all its memberships and refusals."""
@@ -163,6 +182,8 @@ class StaffQueries:
         row.last_logout_at = member.last_logout_at
         row.status = member.status.value
         row.status_at = member.status_at
+        row.email = member.email
+        row.email_at = member.email_at
         await self._session.flush()
         await self._session.execute(
             delete(StaffMembershipRow).where(StaffMembershipRow.staff_id == row.id)
@@ -201,13 +222,16 @@ class StaffQueries:
     async def erase_staff(self: _Transaction, subject: str, at: datetime) -> None:
         """Erase the record of ``subject``; the subject, the id and the times stay.
 
-        The name, roles, memberships, refused values and the own overview layout go.
+        The name, address, roles, memberships, refused values and the own overview layout go, and
+        the usage figures about the person are folded into *former team members* (ADR 0117).
         """
         row = await self._session.scalar(select(StaffRow).where(StaffRow.subject == subject))
         if row is None or row.status == StaffStatus.ERASED.value:
             return
         row.display_name = ""
         row.roles = ""
+        row.email = None  # ADR 0117 step 10b: the address goes with the person
+        row.email_at = None
         row.status = StaffStatus.ERASED.value
         row.status_at = at
         await self._session.execute(
@@ -221,6 +245,8 @@ class StaffQueries:
             delete(OverviewLayoutRow).where(OverviewLayoutRow.staff_id == row.id)
         )
         await self._session.flush()
+        # ADR 0117 point 9: no individual remains in the usage figures; the totals stay.
+        await self.fold_staff_usage(row.id)
 
     async def set_staff_seen(self: _Transaction, subject: str, at: datetime) -> None:
         """Record the latest request of ``subject``; unknown subjects are ignored."""

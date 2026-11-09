@@ -1,5 +1,6 @@
 """A suspended person cannot log in, an erased one starts afresh (ADR 0046 step 2)."""
 
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -85,3 +86,19 @@ async def test_an_erased_person_who_returns_starts_a_fresh_record(
         CREATED_EVENT,
         CREATED_EVENT,
     ]
+
+
+async def test_the_login_address_goes_to_the_staff_record_and_not_into_the_session_claims(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    # ADR 0117 step 10b
+    service = _service(uow, FixedClock(NOW))
+    with_address = replace(CLAIMS, email="gina@voorbeeld.nl")
+
+    outcome = await service.complete_login(with_address)
+
+    assert uow.state.staff["sub-1"].email == "gina@voorbeeld.nl"
+    assert outcome.session_claims.email is None  # the session row never holds the address
+
+    await service.complete_login(CLAIMS)  # no verified address this time
+    assert uow.state.staff["sub-1"].email is None

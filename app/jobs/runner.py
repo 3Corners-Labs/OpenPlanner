@@ -43,7 +43,14 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import bind_booking, current, trace_scope
 from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
-from app.domain.job_plan import BACKOFF, PROPOSAL_NOTICES, TEAM_INVITES, JobType, is_stale
+from app.domain.job_plan import (
+    BACKOFF,
+    CHANGE_REQUEST_NOTICES,
+    PROPOSAL_NOTICES,
+    TEAM_INVITES,
+    JobType,
+    is_stale,
+)
 from app.domain.message_usage import record_message
 from app.domain.ports import (
     Clock,
@@ -132,6 +139,10 @@ class JobRunner:
             write times in their group's organisation's format.
         product_footer: Whether an organisation (by id) keeps "Appointments via OpenPlanner"
             in its emails (ADR 0060 §6); ``None`` keeps it.
+        change_requests: Whether an organisation (by id) takes a bot's change requests
+            (``agent_change_requests_enabled``, ADR 0023 step 2): its messages show the
+            appointment code, and a change request's message goes out only while it is on.
+            ``None`` is off.
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
             the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
@@ -150,6 +161,7 @@ class JobRunner:
         retention: EventRetention | Callable[[], EventRetention] | None = None,
         clock_style: Callable[[int], str] | None = None,
         product_footer: Callable[[int], bool] | None = None,
+        change_requests: Callable[[int], bool] | None = None,
         after_purge: Callable[[], Awaitable[None]] | None = None,
         fallback: FallbackService | None = None,
     ) -> None:
@@ -160,6 +172,7 @@ class JobRunner:
         self._retention = retention or EventRetention()
         self._clock_style = clock_style
         self._product_footer = product_footer
+        self._change_requests = change_requests
         self._diagnostics = DiagnosticLog(uow, clock)
         self._pruned_at: datetime | None = None
         self._uow = uow
@@ -293,6 +306,16 @@ class JobRunner:
                 if booking and booking.id is not None and job.type in PROPOSAL_NOTICES
                 else None
             )
+            # Switched off since the request: no request, so ``is_stale`` stops it (ADR 0023).
+            change = (
+                await tx.get_latest_change_request(booking.id)
+                if booking
+                and booking.id is not None
+                and group
+                and job.type in CHANGE_REQUEST_NOTICES
+                and self._takes_change_requests(group.organisation_id)
+                else None
+            )
             organisation = (
                 await tx.get_organisation_by_id(group.organisation_id)
                 if group and job.type in TEAM_INVITES
@@ -308,7 +331,7 @@ class JobRunner:
         ):
             log.info("job.skipped", job_id=job.id, reason=NO_RECIPIENT)
             return NO_RECIPIENT
-        if is_stale(job.pinned_start, booking, job.type, proposal=proposal, now=now):
+        if is_stale(job.pinned_start, booking, job.type, proposal=proposal, change=change, now=now):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
         if job.type in TEAM_INVITES and not group.sends_team_invite:
@@ -338,6 +361,8 @@ class JobRunner:
                     product_footer=self._product_footer is None
                     or self._product_footer(group.organisation_id),
                     proposal=proposal,
+                    change=change,
+                    show_code=self._takes_change_requests(group.organisation_id),
                 )
         step = self._step(job, "compose", step)
         await sender.send(message)
@@ -345,6 +370,10 @@ class JobRunner:
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
         await self._usage(job, now, sent=True)
         return None
+
+    def _takes_change_requests(self, organisation_id: int) -> bool:
+        """Whether the organisation takes a bot's change requests now (ADR 0023 step 2)."""
+        return self._change_requests is not None and self._change_requests(organisation_id)
 
     @staticmethod
     def _step(job: ClaimedJob, name: str, since: float) -> float:

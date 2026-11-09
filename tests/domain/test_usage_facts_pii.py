@@ -32,7 +32,7 @@ from app.domain.usage_recording import record_closure_change
 from app.domain.usage_rollup import roll
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.admin import GROUP_ADMIN
+from tests.support.admin import ALERT_THRESHOLDS, GROUP_ADMIN
 from tests.support.closures import NOTICES, three_groups
 from tests.support.domain import (
     NOW,
@@ -81,7 +81,8 @@ async def _booking_scenario() -> list[UsageFact]:
     bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
     closures = ClosureService(uow, clock, AdminService(uow, clock), bookings)
     integration = IntegrationService(uow, clock, AdminService(uow, clock))
-    planner = PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=50)
+    admin = AdminService(uow, clock, alert_thresholds=ALERT_THRESHOLDS)
+    planner = PlannerService(uow, clock, admin, bookings)
     closer = SlotCloser(uow, clock, lambda: timedelta(minutes=15))
     await closer.run(clock.now())
 

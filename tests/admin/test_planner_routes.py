@@ -1,6 +1,7 @@
 """A planner's changes from the agenda in the admin portal (ADR 0044 step 2)."""
 
 import itertools
+import re
 from datetime import UTC, datetime, time, timedelta
 
 import httpx
@@ -85,6 +86,7 @@ async def test_a_planner_moves_a_booking_to_a_free_slot(site: Site) -> None:
     assert f"Afspraak OP-{booking_id:06d} verplaatsen" in form
     assert "Ada, vrijdag 2 januari 2026, 09:00" in form
     assert f'value="{FRIDAY_0930.isoformat()}"' in form
+    assert f'<a href="{AGENDA}?day=2026-01-02">Annuleren</a>' in form  # not the form itself
     assert response.status_code == 303
     assert response.headers["location"] == f"{AGENDA}?day=2026-01-02&done=moved&count=1"
     assert (await _status(site, booking_id))[0] is BookingStatus.CANCELLED
@@ -363,3 +365,128 @@ async def test_the_rebook_form_is_refused_for_a_pending_booking(site: Site) -> N
     response = await site.client.get(f"{AGENDA}/bookings/{pending}/rebook")
 
     assert response.status_code == 409
+
+
+# --- the rebooking assistant (ADR 0057 step 3) -------------------------------------------
+
+
+def _selected(text: str, name: str) -> str:
+    """Return the selected value of the select ``name`` on a page."""
+    select = re.search(rf'<select[^>]*name="{name}".*?</select>', text, re.S)
+    assert select is not None
+    chosen = re.search(r'<option value="([^"]+)" selected', select.group(0))
+    assert chosen is not None
+    return chosen.group(1)
+
+
+async def _open_proposal(site: Site, booking_id: int) -> datetime | None:
+    async with _uow(site).read() as tx:
+        proposal = await tx.get_open_proposal(booking_id)
+    return proposal.start if proposal else None
+
+
+async def test_one_booking_gets_the_assistants_time_proposed(site: Site) -> None:
+    booking_id = await _book(site)
+    await site.login_as(GROUP_ADMIN)
+
+    agenda = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+    form = await site.client.get(f"{AGENDA}/bookings/{booking_id}/propose")
+    chosen = _selected(form.text, "start")
+    response = await _post(
+        site, f"{AGENDA}/bookings/{booking_id}/propose", {"start": chosen, "reason": "staffing"}
+    )
+
+    assert f"/agenda/bookings/{booking_id}/propose" in agenda
+    assert form.status_code == 200
+    assert f'<a href="{AGENDA}?day=2026-01-02">Annuleren</a>' in form.text  # not the form itself
+    assert response.status_code == 303
+    assert "done=proposed" in response.headers["location"]
+    assert (await _status(site, booking_id))[0] is BookingStatus.AWAITING_REBOOK
+    assert await _open_proposal(site, booking_id) == datetime.fromisoformat(chosen)
+
+
+async def test_a_short_slot_is_reviewed_and_sent(site: Site) -> None:
+    await _book(site)
+    site.clock.advance(timedelta(minutes=1))
+    newest = await _book(site)
+    await _staff_friday(site, 1)
+    await site.login_as(GROUP_ADMIN)
+
+    review = await site.client.get(
+        f"{AGENDA}/slot-propose", params={"start": FRIDAY_0900.isoformat()}
+    )
+    chosen = _selected(review.text, f"start_{newest}")
+    unticked = await _post(
+        site,
+        f"{AGENDA}/slot-propose",
+        {"start": FRIDAY_0900.isoformat(), "ids": str(newest), "reason": "staffing"},
+    )
+    sent = await _post(
+        site,
+        f"{AGENDA}/slot-propose",
+        {
+            "start": FRIDAY_0900.isoformat(),
+            "ids": str(newest),
+            "reason": "staffing",
+            f"include_{newest}": "yes",
+            f"start_{newest}": chosen,
+        },
+    )
+
+    assert review.status_code == 200
+    assert f"OP-{newest:06d} · Ada" in review.text
+    assert f'<a href="{AGENDA}?day=2026-01-02">Annuleren</a>' in review.text  # not the review
+    assert unticked.status_code == 422
+    assert "Vink ten minste één afspraak aan." in unticked.text
+    assert sent.status_code == 303
+    assert "done=proposals_sent" in sent.headers["location"]
+    assert await _open_proposal(site, newest) == datetime.fromisoformat(chosen)
+
+
+async def test_the_waiting_list_withdraws_or_confirms_a_proposal(site: Site) -> None:
+    withdrawn = await _book(site)
+    confirmed = await _book(site, FRIDAY_0930)
+    await site.login_as(GROUP_ADMIN)
+    for booking_id in (withdrawn, confirmed):
+        form = await site.client.get(f"{AGENDA}/bookings/{booking_id}/propose")
+        await _post(
+            site,
+            f"{AGENDA}/bookings/{booking_id}/propose",
+            {"start": _selected(form.text, "start"), "reason": "staffing"},
+        )
+
+    waiting = (await site.client.get(f"{AGENDA}/waiting")).text
+    gone = await _post(site, f"{AGENDA}/bookings/{withdrawn}/proposal/withdraw", {})
+    again = await _post(site, f"{AGENDA}/bookings/{withdrawn}/proposal/withdraw", {})
+    moved = await _post(site, f"{AGENDA}/bookings/{confirmed}/proposal/confirm", {})
+
+    assert "vastgehouden tot" in waiting
+    assert f"/agenda/bookings/{withdrawn}/proposal/withdraw" in waiting
+    assert "done=proposal_withdrawn" in gone.headers["location"]
+    assert "done=proposal_gone" in again.headers["location"]
+    assert await _open_proposal(site, withdrawn) is None
+    assert (await _status(site, withdrawn))[0] is BookingStatus.AWAITING_REBOOK
+    assert "done=proposal_confirmed_by_staff" in moved.headers["location"]
+    assert (await _status(site, confirmed))[0] is BookingStatus.CANCELLED  # moved to a new one
+
+
+async def test_a_short_day_is_reviewed_at_once(site: Site) -> None:
+    await _book(site)
+    site.clock.advance(timedelta(minutes=1))
+    newest = await _book(site)
+    await _staff_friday(site, 1)
+    await site.login_as(GROUP_ADMIN)
+
+    agenda = (await site.client.get(f"{AGENDA}?day=2026-01-02")).text
+    week = (await site.client.get(f"{AGENDA}/week?week=2026-01-02")).text
+    review = await site.client.get(f"{AGENDA}/slot-propose", params={"day": "2026-01-02"})
+    too_long = await site.client.get(
+        f"{AGENDA}/slot-propose", params={"day": "2026-01-02", "days": "8"}
+    )
+
+    assert f"{AGENDA}/slot-propose?day=2026-01-02" in agenda
+    assert "/agenda/slot-propose?day=2025-12-29&amp;days=7" in week
+    assert review.status_code == 200
+    assert f"OP-{newest:06d} · Ada" in review.text
+    assert 'name="day" value="2026-01-02"' in review.text
+    assert too_long.status_code == 400

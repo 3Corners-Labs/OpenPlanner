@@ -337,6 +337,7 @@ same commit and rollback behaviour as the SQL one.
 | Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
 | A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
 | A participant's contact details on the booking page, on request and audited (ADR 0044 §2) | `app/domain/participant_contact.py`, `app/admin/call_routes.py` |
+| A warning when one person does an audited thing unusually often within an hour: many changes, many requests for contact details (ADR 0044) | `app/domain/activity_alert.py` |
 | Cancelling on the participant's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
 | Rebooking assistant: which bookings of a short slot move and which slot each is proposed, same time on the nearest day first (ADR 0057) | `app/domain/rebooking.py` |
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |

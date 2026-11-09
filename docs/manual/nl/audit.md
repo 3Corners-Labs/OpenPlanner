@@ -23,8 +23,9 @@ Het log bevat nooit gegevens van deelnemers: geen namen, e-mailadressen of telef
   meldingen. Geweigerd en opnieuw proberen zijn waarschuwingen, mislukt is een fout.
 - **Soort**: *Beheeracties* (inloggen, wijzigingen, weigeringen, het tonen van de
   contactgegevens van een deelnemer), *Systeem* (berichten, videogesprekken, verwijderen van
-  gegevens, opslag, de automatische controle van de koppeling), *Beveiliging* (geweigerde
-  webhooks, mislukte vernieuwing van het Webex-token) en *Diagnose*.
+  gegevens, opslag, de automatische controle van de koppeling, de waarschuwing bij veel
+  wijzigingen of veel verzoeken om contactgegevens door één persoon in een uur), *Beveiliging*
+  (geweigerde webhooks, mislukte vernieuwing van het Webex-token) en *Diagnose*.
 - **Van** en **Tot en met**: hele dagen in de tijdzone van het portaal.
 - **Keten-id**: alle regels van één verzoek of één taak. U komt er ook met **Hele keten**
   bij een regel.

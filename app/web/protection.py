@@ -101,6 +101,8 @@ class RateLimits:
     checks: str = "6/minute"
     agent_tokens: str = "10/minute"
     agent_calls: str = "120/minute"
+    reports: str = "30/minute"
+    change_requests: str = "20/hour"
 
 
 LIMITS = RateLimits()
@@ -115,6 +117,8 @@ def configure_rate_limits(
     unknown_links: str = "20/hour",
     agent_tokens: str = "10/minute",
     agent_calls: str = "120/minute",
+    reports: str = "30/minute",
+    change_requests: str = "20/hour",
 ) -> None:
     """Apply the settings to the process-wide limiter and clear its counters."""
     limiter.enabled = enabled
@@ -123,11 +127,20 @@ def configure_rate_limits(
     LIMITS.unknown_links = unknown_links
     LIMITS.agent_tokens = agent_tokens
     LIMITS.agent_calls = agent_calls
+    LIMITS.reports = reports
+    LIMITS.change_requests = change_requests
     limiter.reset()
 
 
 def set_rate_limits(
-    *, bookings: str, reads: str, unknown_links: str, agent_tokens: str, agent_calls: str
+    *,
+    bookings: str,
+    reads: str,
+    unknown_links: str,
+    agent_tokens: str,
+    agent_calls: str,
+    reports: str = "30/minute",
+    change_requests: str = "20/hour",
 ) -> None:
     """Apply changed limits to the next request, keeping the counters (ADR 0042 §6).
 
@@ -138,6 +151,8 @@ def set_rate_limits(
     LIMITS.unknown_links = unknown_links
     LIMITS.agent_tokens = agent_tokens
     LIMITS.agent_calls = agent_calls
+    LIMITS.reports = reports
+    LIMITS.change_requests = change_requests
 
 
 def booking_limit() -> str:
@@ -187,6 +202,16 @@ def agent_token_limit() -> str:
 def agent_call_limit() -> str:
     """Limit for machine API calls, per API client (ADR 0023)."""
     return LIMITS.agent_calls
+
+
+def reports_limit() -> str:
+    """Limit for the usage API, per API client (ADR 0117 point 13)."""
+    return LIMITS.reports
+
+
+def change_request_limit() -> str:
+    """Limit for a bot's change requests, per API client (ADR 0023 step 2)."""
+    return LIMITS.change_requests
 
 
 def check_limit() -> str:

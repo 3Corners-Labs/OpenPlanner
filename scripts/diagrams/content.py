@@ -431,6 +431,7 @@ LAYERS = (
             for name in (
                 "Transaction · UnitOfWork",
                 "UsageStore · UsageUnitOfWork",
+                "DigestStore · DigestUnitOfWork · StaffAddresses",
                 "ConfigurationTransfer",
                 "MessageSender · SenderDirectory",
                 "AlertSender · AlertSenders · BotTokenStore",
@@ -639,6 +640,9 @@ LANES = (
             "UnitOfWork",
             "UsageStore",
             "UsageUnitOfWork",
+            "DigestStore",
+            "DigestUnitOfWork",
+            "StaffAddresses",
             "ConfigurationTransfer",
         ),
         Family.PLATFORM,
