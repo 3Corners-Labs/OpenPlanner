@@ -127,6 +127,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_MIN_CELL_SIZE` | int | `5` | 3–20 | `settings.platform.manage` | The smallest count a usage report shows; a smaller cell reads < n and its sum and mean are hidden. Never below 3 (ADR 0117 point 8). |
 | `REPORTING_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of a usage report may hold; more is refused (ADR 0117 point 12). |
 | `REPORTING_EXPORT_MAX_DAYS` | int | `400` | 31–1100 | `settings.platform.manage` | Most days one CSV export of a usage report may cover (ADR 0117 point 12). |
+| `REPORTING_API_PAGE_SIZE` | int | `1000` | 100–10000 | `settings.platform.manage` | Most cells in one page of the usage API (ADR 0117 point 13). |
+| `REPORTING_API_RATE_PER_MINUTE` | int | `30` | 5–300 | `settings.platform.manage` | Calls per minute per API client to the usage API (ADR 0117 point 13); the off switch stays RATE_LIMIT_ENABLED. |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |

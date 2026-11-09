@@ -58,6 +58,8 @@ SETTING_LABELS: dict[str, str] = {
     "reporting_org_min_cell_size": "settings.field.reporting_org_min_cell_size.label",
     "reporting_export_max_rows": "settings.field.reporting_export_max_rows.label",
     "reporting_export_max_days": "settings.field.reporting_export_max_days.label",
+    "reporting_api_page_size": "settings.field.reporting_api_page_size.label",
+    "reporting_api_rate_per_minute": "settings.field.reporting_api_rate_per_minute.label",
     "reporting_rollup_interval_minutes": "settings.field.reporting_rollup_interval_minutes.label",
     "security_event_retention_days": "settings.field.security_event_retention_days.label",
     "diagnostic_event_retention_days": "settings.field.diagnostic_event_retention_days.label",

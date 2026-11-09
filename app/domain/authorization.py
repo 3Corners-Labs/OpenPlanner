@@ -561,6 +561,8 @@ class ApiScope(StrEnum):
     """OAuth scopes of the machine API (ADR 0023), granted per API client by the superuser."""
 
     AVAILABILITY_READ = "availability:read"
+    # ADR 0117 point 13: hourly usage figures (counts, no personal data) of the client's groups.
+    REPORTS_READ = "reports:read"
     # ADR 0089 point 7, ADR 0099 step 4: export, plan and apply the configuration of the whole
     # installation. The client is not bound by the matrix, which makes the scope a superuser's.
     CONFIGURATION_TRANSFER = "configuration:transfer"
@@ -568,6 +570,7 @@ class ApiScope(StrEnum):
 
 API_SCOPES: dict[ApiScope, Level] = {
     ApiScope.AVAILABILITY_READ: Level.GROUP,
+    ApiScope.REPORTS_READ: Level.GROUP,
     ApiScope.CONFIGURATION_TRANSFER: Level.GLOBAL,
 }
 """Every API scope with the level it applies to; documented next to the admin matrix.

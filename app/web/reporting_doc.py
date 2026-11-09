@@ -10,7 +10,13 @@ from app.domain.message_usage import PURPOSES
 from app.domain.privacy import USAGE_FIELDS
 from app.domain.slot_close import OUTCOME_RULE
 from app.domain.usage import BUCKET_LABELS, FACT_HOUR, METRIC_VERSION, METRICS
-from app.domain.usage_report_csv import HIDDEN, SCREEN_HEADER, TIDY_HEADER, TIDY_VERSION
+from app.domain.usage_report_csv import (
+    CUT_FIELDS,
+    HIDDEN,
+    SCREEN_HEADER,
+    TIDY_HEADER,
+    TIDY_VERSION,
+)
 from app.domain.usage_rollup import FILL_CLASSES, feed_rows
 from app.domain.usage_suppress import MIN_CELL_SIZE_FLOOR
 
@@ -111,4 +117,80 @@ by it), `bucket` is the duration bucket number, `count` is the number of facts, 
 metric adds up and `max` is the largest value (Q9's peak). A cell below the threshold is not in the
 file at all. The range is whole group-local days. The column list and its meaning change only with
 a new version, which needs an amendment of the ADR.
+"""
+
+
+def render_api_markdown() -> str:
+    """Return ``docs/reporting-api.md``: the call, its parameters, metrics and examples."""
+    metrics = "".join(f"| {m.id} | {m.name} |\n" for m in METRICS if not m.staff)
+    cuts = ", ".join(f"`{c}`" for c in CUT_FIELDS)
+    columns = ", ".join(f"`{c}`" for c in TIDY_HEADER)
+    cut_row = (
+        f"| `cut` | Keep one cut column ({cuts}); the other cuts are added up before small cells "
+        "are left out, and without it every cut is added up. The duration `bucket` is "
+        "always kept. |"
+    )
+    return f"""# Usage API
+
+Generated from the metric catalogue and the row layout by
+`python -m app.cli reporting-api-doc > docs/reporting-api.md`; do not edit by hand. CI fails when
+this file differs from the code. The decision is
+[ADR 0117](adr/0117-reporting-on-use-from-a-store-that-holds-no-personal-data.md) point 13; the
+machine API in general is in [agent-api.md](agent-api.md).
+
+`GET /api/agent/v1/reports/usage` returns the hourly usage figures of the groups an API client may
+read: counts and sums per hour, group, metric and cut, never a line per booking and never personal
+data. The client holds the scope `reports:read`, granted by the superuser per client like the
+other scopes, within its organisation and the groups it is narrowed to. A cell under the
+installation's small-count threshold is not returned, so a client sees what the screens show.
+
+## Parameters
+
+| Parameter | Meaning |
+|---|---|
+| `from`, `to` | First and last day, inclusive, whole group-local days. Required. |
+| `metric` | One metric id of the table below. Without it, every metric. |
+| `group` | One group slug of the client. A group outside the grant is `group_not_found`. |
+{cut_row}
+| `format` | `json` (default), `csv` (the columns below) or `ndjson`. |
+| `cursor` | The `next_cursor` of the previous page. |
+
+The widest range of one call is `reporting_export_max_days` (at most 400 days), the page size is
+`reporting_api_page_size`, and the rate limit per client is `reporting_api_rate_per_minute` calls a
+minute; all three are platform settings.
+
+## The answer
+
+Columns of a row: {columns}. `hour` is the UTC hour (RFC 3339), `count` the number of facts, `sum`
+what the metric adds up and `max` the largest value (metric Q9).
+
+`json` returns `{{"schema": "openplanner.usage/1", "as_of": …, "next_cursor": …, "rows": […]}}`.
+`csv` and `ndjson` carry the same rows; `X-Next-Cursor` and `X-As-Of` are headers there (and in
+JSON too). Rows are sorted by hour, group, metric and cuts, and a cursor is the key of the last
+row sent, so a page does not move while the rollup adds cells. A page that has a `next_cursor` is
+full; follow it until it is `null`.
+
+The response has `Cache-Control: private` and an `ETag` that changes when the rollup runs, the
+threshold changes or the request changes. Poll with `If-None-Match`: an unchanged answer is `304`.
+
+Errors are `{{"error": code}}`: `invalid_token` (401), `insufficient_scope` (403),
+`group_not_found` (404), `invalid_range` (422: a backwards or too wide range, an unknown metric or
+cut, a cursor that is none), `rate_limited` (429).
+
+## Metrics
+
+| ID | Metric |
+|---|---|
+{metrics}
+The definitions, facts and how each adds up are in [reporting.md](reporting.md).
+
+## Examples
+
+    curl -H "Authorization: Bearer $TOKEN" \\
+      "https://planner.example/api/agent/v1/reports/usage?from=2026-11-02&to=2026-11-08&metric=U2&cut=outcome"
+
+    curl -H "Authorization: Bearer $TOKEN" \\
+      "https://planner.example/api/agent/v1/reports/usage?from=2026-11-02&to=2026-11-08&format=ndjson"
+
+    curl -H "Authorization: Bearer $TOKEN" -H 'If-None-Match: "<etag>"' "<the same URL>"
 """

@@ -109,4 +109,5 @@ the scopes below. There is no superuser equivalent for machines.
 | Scope | Level |
 |---|---|
 | Read free times (`availability:read`) | Group |
+| Read the hourly usage figures (`reports:read`) | Group |
 | Export and import the configuration package (whole installation) (`configuration:transfer`) | Portal |

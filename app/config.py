@@ -258,6 +258,9 @@ class Settings(BaseSettings):
     # is refused with a code, never cut short.
     reporting_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
     reporting_export_max_days: int = Field(default=400, ge=31, le=1100)
+    # ADR 0117 point 13 (class C, platform): cells per API page, and calls per minute per client.
+    reporting_api_page_size: int = Field(default=1000, ge=100, le=10_000)
+    reporting_api_rate_per_minute: int = Field(default=30, ge=5, le=300)
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)

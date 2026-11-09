@@ -118,3 +118,42 @@ class ConfigurationApplied(BaseModel):
         description="The new settings version, or null when nothing was written."
     )
     plan: ConfigurationPlan
+
+
+class UsageRow(BaseModel):
+    """One hourly figure of a group: a metric, its cuts and the count (ADR 0117)."""
+
+    hour: str = Field(description="The UTC hour, RFC 3339, e.g. `2026-11-04T10:00:00Z`.")
+    organisation: str = Field(description="Slug of the organisation.")
+    group: str = Field(description="Slug of the group.")
+    metric: str = Field(description="Metric id from `docs/reporting.md`, e.g. `U1`.")
+    booking_kind: str | None = None
+    dispatch_kind: str | None = None
+    subject: str | None = None
+    locale: str | None = None
+    channel: str | None = None
+    outcome: str | None = None
+    actor_class: str | None = None
+    reason: str | None = None
+    bucket: int | None = Field(None, description="Duration bucket 0 to 9 (-10 to -1 when signed).")
+    count: int = Field(
+        description="How many facts fell in this hour and cut; at least the "
+        "installation's threshold, smaller cells are not returned."
+    )
+    sum: int | None = Field(None, description="What the metric adds up (seconds or a number).")
+    max: int | None = Field(None, description="The largest value in the cell (metric Q9).")
+
+
+class UsagePageResponse(BaseModel):
+    """A page of usage rows (JSON format); `csv` and `ndjson` carry the same rows."""
+
+    schema_: str = Field(
+        "openplanner.usage/1", alias="schema", description="The version of the row layout."
+    )
+    as_of: datetime | None = Field(description="When the rollup last ran; `null` if it never did.")
+    next_cursor: str | None = Field(
+        description="Pass as `cursor` for the next page; `null` at the end."
+    )
+    rows: list[UsageRow]
+
+    model_config = {"populate_by_name": True}

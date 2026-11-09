@@ -52,6 +52,7 @@ before it ends; after that the API issues no tokens to this client.
 What the client may do. At least one is needed:
 
 - **Read free times** (`availability:read`): look up free times of groups.
+- **Read the hourly usage figures** (`reports:read`): the counts and sums of the reports for the client's groups, as in `docs/reporting-api.md`. Small counts are left out and there is no personal data.
 - **Export and import the configuration package (whole installation)**
   (`configuration:transfer`): acts on the installation as a whole, whatever the client's
   organisation.

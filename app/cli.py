@@ -22,6 +22,7 @@ Usage:
     ``python -m app.cli settings-doc``  print the settings reference (docs/settings.md)
     ``python -m app.cli logging-doc``  print the logging reference (docs/logging.md, ADR 0103)
     ``python -m app.cli reporting-doc``  print the metric catalogue (docs/reporting.md, ADR 0117)
+    ``python -m app.cli reporting-api-doc``  print the usage API reference (docs/reporting-api.md)
     ``python -m app.cli usage-backfill``  turn existing bookings into usage facts (ADR 0117 point 5)
     ``python -m app.cli init [--out PATH]``  generate the bootstrap keys (secrets/secrets.env)
 
@@ -227,6 +228,7 @@ from app.keys import client_pseudonym_key, management_token_key
 from app.web import navigation
 from app.web.authz_report import render_markdown
 from app.web.logging_doc import render_markdown as render_logging_doc
+from app.web.reporting_doc import render_api_markdown as render_reporting_api_doc
 from app.web.reporting_doc import render_markdown as render_reporting_doc
 from app.web.settings_doc import render_markdown as render_settings_doc
 
@@ -1774,6 +1776,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     commands.add_parser("logging-doc", help="print the logging reference as Markdown")
     commands.add_parser("reporting-doc", help="print the reporting metric catalogue as Markdown")
+    commands.add_parser(
+        "reporting-api-doc",
+        help="print the usage API reference as Markdown (docs/reporting-api.md)",
+    )
     commands.add_parser("usage-backfill", help="turn existing bookings into usage facts (ADR 0117)")
     init_cmd = commands.add_parser("init", help="generate the bootstrap keys (first install)")
     init_cmd.add_argument("--out", type=Path, default=DEFAULT_PATH, metavar="PATH")
@@ -1839,6 +1845,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "reporting-doc":
         sys.stdout.write(render_reporting_doc())
+        return 0
+    if args.command == "reporting-api-doc":
+        sys.stdout.write(render_reporting_api_doc())
         return 0
     if args.command == "update-claim":
         sys.stdout.write(asyncio.run(_update_claim(Settings())))
