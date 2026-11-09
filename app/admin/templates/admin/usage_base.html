@@ -1,5 +1,6 @@
 {#- The frame of every usage report (ADR 0117 point 11): the header of the group or organisation, the range form, the links between the report families (``view``), how fresh the figures are and the small-cell rule. A family fills the ``report`` block. -#}
 {% extends "admin/layout.html" %}
+{% from "_error_message.html" import error_message %}
 {% block title %}{{ _("reports.usage.title") }} · {% if summary is defined %}{{ summary.group.name }}{% else %}{{ org_header.name }}{% endif %} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% if summary is defined %}{% include "admin/_group_header.html" %}{% else %}{% include "admin/_organisation_header.html" %}{% endif %}
@@ -27,6 +28,13 @@
     </div>
     <div class="form-actions"><button type="submit" class="button">{{ _("reports.usage.apply") }}</button></div>
   </form>
+  {% if export_error is defined %}{{ error_message(export_error) }}{% endif %}
+  {% if (summary is defined and can("reports.export", group=summary)) or (summary is not defined and can("reports.export", organisation=usage.organisation_slug)) %}
+  <p class="report-export">
+    <a href="{{ base }}/export.csv?{{ {"view": view, "from": form_from, "to": form_to}|urlencode }}" download>{{ _("reports.export.screen") }}</a>
+    <a href="{{ base }}/export.csv?{{ {"view": "tidy", "from": form_from, "to": form_to}|urlencode }}" download>{{ _("reports.export.tidy") }}</a>
+  </p>
+  {% endif %}
   <dl class="facts">
     <div><dt>{{ _("reports.usage.as_of") }}</dt><dd>{% if as_of %}{{ as_of }}{% else %}{{ _("reports.usage.not_yet") }}{% endif %}</dd></div>
     {% if summary is not defined %}<div><dt>{{ _("reports.usage.groups") }}</dt><dd>{{ usage.groups|map(attribute="name")|join(", ") }}</dd></div>{% endif %}

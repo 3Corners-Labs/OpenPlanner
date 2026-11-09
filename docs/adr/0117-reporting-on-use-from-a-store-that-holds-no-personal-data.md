@@ -452,7 +452,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | #632 | merged |
 | 6b | Bring *Volume* and *Capacity* to the mockup ([`docs/reporting-mockups.md`](../reporting-mockups.md)): figure tiles, day bars, stacked outcome bar, *split by*, per-table suppression note | | planned |
 | 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | | planned |
-| 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | | planned |
+| 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | #652 | merged |
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | | planned |
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | | planned |
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | | planned |
@@ -634,6 +634,27 @@ per step:
 - **Steps 10:** endpoint or job (Q1): job `reports.digest`, subscription forms; PII risk (Q3): an address or a figure in a job payload or a log; failing test (Q4): no-attachment, no-address-in-payload, permission-at-send tests.
 - **Steps 12–14:** endpoint or job (Q1): `view=wallboard`, display-link routes and the kiosk session (`require_permission` or the kiosk cookie on one route); PII risk (Q3): a chart label or tooltip, a token in a URL or log; failing test (Q4): JS-off page test, label-as-text test, revoked-link and redirect tests, stale-board test.
 - **Steps 11:** endpoint or job (Q1): no route; PII risk (Q3): the `usage.fact` log event; failing test (Q4): masked-stream test.
+
+**Step 8 notes (no change of a decision):** the CSV writer of the audit export moved unchanged to
+`app/domain/csv_export.py` (`ExportLimits`, `export_window`, `safe_cell`, `to_csv`, plus `checksum`); the audit
+export keeps its event name and its columns and writes through it (`audit_export.audit_csv`), so there is one
+implementation and one escaping. One deliberate change: a number is written as a number (a negative signed
+duration is not a formula), only text gets the leading `'`. The **screen CSV** is the long layout `table;row;column;value;note`
+produced by walking the report objects the page renders (`usage_report_csv.screen_rows`), so the file shows what the
+screen shows, with the same suppression, and a new table appears in the file without a second place to edit; a
+figure the screen hides is an empty value with the note `hidden`. This is the table's content, not its visual
+layout (rows by columns), because one flat shape fits all four families. The **tidy CSV** `openplanner.usage/1`
+has the columns `hour, organisation, group, metric, booking_kind, dispatch_kind, subject, locale, channel, outcome,
+actor_class, reason, bucket, count, sum, max`: `max` is added to the list of point 12 because Q9 is a peak and a
+sum of peaks means nothing; the version is therefore this list, in `docs/reporting.md`. A cell below the threshold
+is not written at all (a row would say that something with those cuts happened); the audit event counts them. The
+export loads through `UsageReportService.load` with `reports.export` (a new permission, level group, which
+requires `reports.view`; held by the superuser, organisation admin, group admin and auditor), so scope, range and
+threshold are the screens' own. `reporting_export_max_days` is also capped by the 400-day range of the report
+loader until the API (step 9) reads wider ranges. The audit event `reports.export` holds `view`, the range, the
+row and hidden counts and the SHA-256, never a figure; a refusal (`too_many_rows`, `too_many_days`) is audited and
+shown on the report page (422).
+
 
 ## Consequences
 

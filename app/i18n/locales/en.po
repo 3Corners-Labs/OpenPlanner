@@ -10444,11 +10444,20 @@ msgstr "Enter the id of a Webex space: letters, digits, - and _, 10 to 200 chara
 msgid "authz.permission.reports_view"
 msgstr "View usage reports"
 
+msgid "authz.permission.reports_export"
+msgstr "Download usage reports"
+
 msgid "settings.field.reporting_min_cell_size.label"
 msgstr "Smallest count a report shows"
 
 msgid "settings.field.reporting_org_min_cell_size.label"
 msgstr "Smallest count in the organisation's reports"
+
+msgid "settings.field.reporting_export_max_rows.label"
+msgstr "Most rows in a CSV export of a usage report"
+
+msgid "settings.field.reporting_export_max_days.label"
+msgstr "Most days in a CSV export of a usage report"
 
 msgid "admin.nav.reports"
 msgstr "Reports"
@@ -11289,6 +11298,19 @@ msgstr "Change your details"
 
 msgid "manage.notice.details"
 msgstr "Your details have been changed."
+
+msgid "reports.export.screen"
+msgstr "Download this report as CSV"
+
+msgid "reports.export.tidy"
+msgstr "Download all hourly figures as CSV (openplanner.usage/1)"
+
+msgid "reports.export.refused.too_many_days"
+msgstr "The export covers too many days. Choose a shorter period."
+
+msgid "reports.export.refused.too_many_rows"
+msgstr "The export has too many rows. Choose a shorter period or one group."
+
 msgid "error.proposal_not_open"
 msgstr "This proposed time is no longer available. You can still choose a new time yourself."
 
@@ -11396,3 +11418,75 @@ msgstr "Release the proposed time"
 
 msgid "audit.job.send_proposal_released"
 msgstr "Send notice of a released proposal"
+
+msgid "admin.agenda.propose"
+msgstr "Propose a new time"
+
+msgid "admin.agenda.slot_propose"
+msgstr "Propose new times"
+
+msgid "admin.proposal.title"
+msgstr "Propose a new time for {reference}"
+
+msgid "admin.proposal.time"
+msgstr "New time"
+
+msgid "admin.proposal.ask"
+msgstr "No proposal: ask the participant to choose a time"
+
+msgid "admin.proposal.none_found"
+msgstr "The assistant found no free time within its reach. Choose another time or ask the participant to choose."
+
+msgid "admin.proposal.held_lead"
+msgstr "The proposed time is held for the participant until they confirm, choose another time or cancel, or until the deadline passes. Nothing moves without a confirmation."
+
+msgid "admin.proposal.button"
+msgstr "Send the proposal"
+
+msgid "admin.proposal.slot_title"
+msgstr "Propose new times for {when}"
+
+msgid "admin.proposal.slot_lead"
+msgstr "The most recently made appointments in this slot ({count}) no longer fit. Check the proposed time for each, choose another or untick the appointment."
+
+msgid "admin.proposal.include"
+msgstr "Include"
+
+msgid "admin.proposal.slot_button"
+msgstr "Send the proposals"
+
+msgid "admin.proposal.none_chosen"
+msgstr "Tick at least one appointment."
+
+msgid "admin.proposal.column"
+msgstr "Proposed time"
+
+msgid "admin.proposal.held_until"
+msgstr "held until {deadline}"
+
+msgid "admin.proposal.confirm"
+msgstr "Confirm for the participant"
+
+msgid "admin.proposal.withdraw"
+msgstr "Withdraw the proposal"
+
+msgid "admin.done.proposed"
+msgstr "New time proposed. The participant gets the proposal and the old place is free."
+
+msgid "admin.done.proposals_sent"
+msgstr "Sent: {count}. The old places are free; proposed times are held."
+
+msgid "admin.done.proposal_withdrawn"
+msgstr "Proposal withdrawn. The appointment awaits a new time from the participant."
+
+msgid "admin.done.proposal_confirmed_by_staff"
+msgstr "The proposed time is confirmed for the participant. The participant gets an email with the new time."
+
+msgid "admin.done.proposal_gone"
+msgstr "This proposal is no longer open."
+
+msgid "admin.agenda.day_propose"
+msgstr "Propose new times for this day"
+
+msgid "admin.agenda.week_propose"
+msgstr "Propose new times for this week"

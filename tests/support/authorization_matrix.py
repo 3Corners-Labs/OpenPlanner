@@ -122,6 +122,13 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/organisations/{org}/usage": {
         "/admin/organisations/demo/usage": statuses(200, 200, 403, 403, 200, 403, 403)
     },
+    # ADR 0117 point 12: the CSV of a page, the same scope as the page (reports.export).
+    "GET /admin/groups/{slug}/usage/export.csv": {
+        "/admin/groups/demo/usage/export.csv": statuses(200, 200, 200, 403, 200, 403, 403)
+    },
+    "GET /admin/organisations/{org}/usage/export.csv": {
+        "/admin/organisations/demo/usage/export.csv": statuses(200, 200, 403, 403, 200, 403, 403)
+    },
     # ADR 0042 §5, §11: System status and Advanced settings, read-only: superuser and auditor.
     "GET /admin/settings": {"/admin/settings": statuses(200, 403, 403, 403, 200, 403, 403)},
     # ADR 0101: the Settings sub-tab is read like the status; the package is the superuser's.
@@ -862,6 +869,41 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/andere-team/agenda/bookings/999999/rebook": statuses(
             404, 403, 403, 404, 403, 403, 403
         ),
+    },
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/propose": {
+        "/admin/groups/demo/agenda/bookings/999999/propose": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/propose": {
+        "/admin/groups/demo/agenda/bookings/999999/propose": statuses(
+            400, 400, 400, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/propose": statuses(
+            400, 403, 403, 400, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/proposal/withdraw": {
+        "/admin/groups/demo/agenda/bookings/999999/proposal/withdraw": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/proposal/withdraw": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/proposal/confirm": {
+        "/admin/groups/demo/agenda/bookings/999999/proposal/confirm": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/proposal/confirm": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/agenda/slot-propose": {
+        "/admin/groups/demo/agenda/slot-propose": statuses(400, 400, 400, 403, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/slot-propose": {
+        "/admin/groups/demo/agenda/slot-propose": statuses(400, 400, 400, 403, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/agenda/slot-rebook": {
         "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403, 403),

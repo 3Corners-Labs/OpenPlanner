@@ -6,6 +6,8 @@ a place in its slot like a booking that holds one (``places_taken``), so every c
 a booking, a move and the availability sees it.
 """
 
+from datetime import datetime
+
 from sqlalchemy import ColumnElement, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -16,6 +18,11 @@ from app.domain.reschedule_proposal import HeldProposal, ProposalOutcome
 
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 _AWAITING = BookingStatus.AWAITING_REBOOK.value
+
+
+def _open(owner: type[BookingRow]) -> tuple[ColumnElement[bool], ...]:
+    """Return the conditions of an open proposal, its booking joined as ``owner``."""
+    return (RescheduleProposalRow.released_at.is_(None), owner.status == _AWAITING)
 
 
 def places_taken() -> ColumnElement[int]:
@@ -31,15 +38,26 @@ def places_taken() -> ColumnElement[int]:
     held = (
         select(func.count(RescheduleProposalRow.id))
         .join(owner, owner.id == RescheduleProposalRow.booking_id)
-        .where(
-            RescheduleProposalRow.slot_id == SlotRow.id,
-            RescheduleProposalRow.released_at.is_(None),
-            owner.status == _AWAITING,
-        )
+        .where(RescheduleProposalRow.slot_id == SlotRow.id, *_open(owner))
         .correlate(SlotRow)
         .scalar_subquery()
     )
     return booked + held
+
+
+def _proposal(row: RescheduleProposalRow) -> HeldProposal:
+    """Map a proposal row."""
+    return HeldProposal(
+        row.id,
+        row.booking_id,
+        row.slot_id,
+        row.start,
+        row.end,
+        row.confirm_by,
+        row.created_at,
+        row.released_at,
+        ProposalOutcome(row.outcome) if row.outcome else None,
+    )
 
 
 class ProposalQueries:
@@ -74,27 +92,28 @@ class ProposalQueries:
         row = await self._session.scalar(
             select(RescheduleProposalRow)
             .join(BookingRow, BookingRow.id == RescheduleProposalRow.booking_id)
-            .where(
-                RescheduleProposalRow.booking_id == booking_id,
-                RescheduleProposalRow.released_at.is_(None),
-                BookingRow.status == _AWAITING,
-            )
+            .where(RescheduleProposalRow.booking_id == booking_id, *_open(BookingRow))
             .order_by(RescheduleProposalRow.id.desc())
             .limit(1)
         )
-        if row is None:
-            return None
-        return HeldProposal(
-            row.id,
-            row.booking_id,
-            row.slot_id,
-            row.start,
-            row.end,
-            row.confirm_by,
-            row.created_at,
-            row.released_at,
-            ProposalOutcome(row.outcome) if row.outcome else None,
+        return _proposal(row) if row is not None else None
+
+    async def find_open_proposals(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[HeldProposal]:
+        """Return the group's open proposals proposed for lower <= start < upper."""
+        rows = await self._session.scalars(
+            select(RescheduleProposalRow)
+            .join(BookingRow, BookingRow.id == RescheduleProposalRow.booking_id)
+            .where(
+                BookingRow.group_id == group_id,
+                RescheduleProposalRow.start >= lower,
+                RescheduleProposalRow.start < upper,
+                *_open(BookingRow),
+            )
+            .order_by(RescheduleProposalRow.start, RescheduleProposalRow.id)
         )
+        return [_proposal(row) for row in rows]
 
     async def save_proposal(self, proposal: HeldProposal) -> None:
         """Persist a proposal's release."""
