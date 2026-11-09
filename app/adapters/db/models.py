@@ -1666,6 +1666,34 @@ class RescheduleProposalRow(Base):
     )
 
 
+class ChangeRequestRow(Base):
+    """A bot's request to cancel or move a booking (ADR 0023 step 2); no personal data.
+
+    ``booking_id`` is empty when the phone number and code matched no booking that could still
+    be changed: the request then only expires, as the API answered the same either way. A
+    request with ``target_start`` moves the booking there; one without it cancels.
+    """
+
+    __tablename__ = "change_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[str] = mapped_column(String(40), unique=True)
+    client_id: Mapped[str] = mapped_column(String(64))
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    target_start: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
+    pinned_start: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    superseded_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        Index("ix_change_requests_booking_id", "booking_id"),
+        Index("ix_change_requests_group_id", "group_id"),
+    )
+
+
 class ReportSubscriptionRow(Base):
     """A digest subscription of the usage reports (ADR 0117 point 16).
 

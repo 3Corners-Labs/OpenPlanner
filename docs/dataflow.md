@@ -332,6 +332,10 @@ checks that the page's CSP names no other source. The configured video link is t
 superuser ──POST name, organisation, groups, scopes, networks──> web ──SQL──> api_clients (secret: SHA-256 only)
 WxCC AI Agent ──POST /api/agent/v1/oauth/token (client id + secret)──> web ──> api_access_tokens (SHA-256 only)
 WxCC AI Agent ──GET groups, availability (bearer token)──> web: group names, free times, places left
+WxCC AI Agent ──POST change-requests: phone number, appointment code, action, start──> web
+    web: phone number and code compared in memory with the group's bookings ──> change_requests (ids, times; no phone, no code)
+    web ──> jobs: send_change_request (booking id only) ──> participant's own email / SMS ──> /b/m/{ref}/change
+WxCC AI Agent <── 202 {id, action, start, status, expires_at}: the same answer with or without a match
 ```
 
 | Data item | Where | Source | Retention | Leaves the system |
@@ -341,9 +345,13 @@ WxCC AI Agent ──GET groups, availability (bearer token)──> web: group na
 | Access tokens | SHA-256 in `api_access_tokens` | OpenPlanner | 10 minutes; expired rows removed on the next issue | to the bot |
 | Caller IP address | compared in memory, not stored | bot | not stored | no |
 | Free times | computed | schedule | not stored | to the bot (no personal data) |
+| Phone number and appointment code of a change request (step 2) | compared in memory with `bookings.phone` and the code derived from the booking's salt; never stored, logged or audited | the caller, through the bot | not stored | no |
+| Change request | `change_requests`: public id, client id, group, requested start (none for a cancellation), matched booking id (or none), times | OpenPlanner | with its group or booking; no personal data | id, action, start, status and expiry to the bot that asked |
+| Appointment code | derived on demand (HMAC of the booking's salt under `MANAGEMENT_TOKEN_KEY`); not stored | OpenPlanner | matches nothing after the purge (no phone number, no longer confirmed) | to the participant: booking page and messages, only where the organisation switched change requests on |
 
-No personal data flows through this API. The next step (change requests, ADR 0023) adds the
-phone number from the bot; it will be compared in memory and never stored outside `bookings`.
+No personal data flows to the bot. A change request carries the caller's phone number and
+appointment code in; both are compared in memory and never stored outside `bookings`. On a
+match the participant, not the bot, gets the message to confirm.
 
 ## Holiday calendars (ADR 0025)
 

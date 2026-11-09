@@ -242,6 +242,8 @@ async def test_docs_exist_only_while_published(agent: Agent) -> None:
         "/me",
         "/groups",
         "/groups/{slug}/availability",
+        "/groups/{slug}/change-requests",
+        "/change-requests/{request_id}",
         "/reports/usage",
         "/configuration",
         "/configuration/plan",

@@ -37,6 +37,7 @@ from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.call_status_rows import call_status_of
 from app.adapters.db.certificate import CertificateQueries
+from app.adapters.db.change_requests import ChangeRequestQueries
 from app.adapters.db.configuration_document import ConfigurationDocumentQueries
 from app.adapters.db.contact_center_rows import (
     has_task,
@@ -480,6 +481,7 @@ def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
 class SqlTransaction(
     AdminSessionQueries,
     ProposalQueries,
+    ChangeRequestQueries,
     AlertTargetQueries,
     ConfigurationDocumentQueries,
     HealthQueries,
@@ -1835,6 +1837,20 @@ class SqlTransaction(
         self._session.add(row)
         await self._session.flush()
         return _booking(row, await self._slot_row(row.slot_id))
+
+    async def find_bookings_by_phone(self, group_id: int, phone: str) -> list[Booking]:
+        """Return the group's confirmed bookings with this phone number (ADR 0023 step 2)."""
+        result = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.phone == phone,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+            )
+            .order_by(BookingRow.id)
+        )
+        return [_booking(*found) for found in result.all()]
 
     async def get_booking(self, booking_id: int) -> Booking | None:
         """Return the booking with ``booking_id``."""

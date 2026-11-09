@@ -498,6 +498,11 @@ class Settings(BaseSettings):
     agent_api_enabled: bool = False
     rate_limit_agent_tokens: str = "10/minute"
     rate_limit_agent_calls: str = "120/minute"
+    # ADR 0023 step 2: change requests by a bot, named by phone number and appointment code.
+    # Switch and confirm time class D (organisation); the per-client limit class C.
+    agent_change_requests_enabled: bool = False
+    agent_change_request_minutes: int = Field(default=60, ge=10, le=1440)
+    agent_change_requests_per_hour: int = Field(default=20, ge=1, le=120)
 
     # Updates from the admin portal (ADR 0029). APP_VERSION is baked into release images by
     # main.yml; UPDATE_REPOSITORY (owner/name) switches the hourly release check on. The token

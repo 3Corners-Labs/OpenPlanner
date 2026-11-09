@@ -7,6 +7,7 @@ client as the superuser and trades its secret for a token, as a contact-center b
 import base64
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import timedelta
 from urllib.parse import quote
 
 import httpx
@@ -16,8 +17,8 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.seed import seed_demo
 from app.config import Settings
 from app.domain.api_access import ApiAccessService
-from app.domain.api_clients import ClientDraft, IssuedSecret
-from app.domain.authorization import Role
+from app.domain.api_clients import ApiCaller, ApiClient, ClientDraft, IssuedSecret
+from app.domain.authorization import ApiScope, Role
 from app.main import create_app
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
@@ -89,3 +90,24 @@ async def agent_api(settings: Settings, *, enabled: bool) -> AsyncIterator[Agent
         if enabled:
             await service.save_settings(SUPER, enabled=True, docs_public=False)
         yield Agent(client, app, service)
+
+
+def api_caller(client_id: str = "opc_bot") -> ApiCaller:
+    """Return an authenticated bot of organisation demo with ``bookings:request_change``.
+
+    For domain and page tests that call a change request without going through a token.
+    """
+    client = ApiClient(
+        id=1,
+        client_id=client_id,
+        name="WxCC AI Agent",
+        organisation="demo",
+        groups=frozenset(),
+        scopes=frozenset({ApiScope.BOOKINGS_REQUEST_CHANGE}),
+        networks=(),
+        enabled=True,
+        secret_hash="",
+        secret_expires_at=NOW + timedelta(days=180),
+        created_at=NOW,
+    )
+    return ApiCaller(client, client.scopes, NOW + timedelta(minutes=10))

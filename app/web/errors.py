@@ -13,6 +13,10 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.SLOT_FULL: "error.slot_full",
     ErrorCode.BOOKING_LIMIT_REACHED: "error.booking_limit_reached",
     ErrorCode.SLOT_UNAVAILABLE: "error.slot_unavailable",
+    # ADR 0023 step 2: the machine API answers these as codes; the texts are for completeness.
+    ErrorCode.CHANGE_REQUESTS_DISABLED: "error.change_requests_disabled",
+    ErrorCode.INVALID_APPOINTMENT_CODE: "error.invalid_appointment_code",
+    ErrorCode.CHANGE_REQUEST_NOT_FOUND: "error.change_request_not_found",
     ErrorCode.OUTSIDE_BOOKING_WINDOW: "error.outside_booking_window",
     ErrorCode.BOOKING_LOCKED: "error.booking_locked",
     ErrorCode.PROPOSAL_NOT_OPEN: "error.proposal_not_open",

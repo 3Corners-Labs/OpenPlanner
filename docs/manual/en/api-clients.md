@@ -53,6 +53,7 @@ What the client may do. At least one is needed:
 
 - **Read free times** (`availability:read`): look up free times of groups.
 - **Read the hourly usage figures** (`reports:read`): the counts and sums of the reports for the client's groups, as in `docs/reporting-api.md`. Small counts are left out and there is no personal data.
+- **Ask to cancel or move** (`bookings:request_change`): the bot asks, for a caller, to cancel or move an appointment, with the phone number and appointment code together. The answer never says whether they belong to an appointment; the participant confirms the change themselves. Works only when the organisation switched change requests on (*Organisation settings*).
 - **Export and import the configuration package (whole installation)**
   (`configuration:transfer`): acts on the installation as a whole, whatever the client's
   organisation.

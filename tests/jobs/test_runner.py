@@ -8,6 +8,7 @@ from structlog.typing import EventDict, WrappedLogger
 from app.adapters.db.jobs import ClaimedJob
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.booking import BookingStatus, ChangeReason
+from app.domain.change_requests import ChangeRequest
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.diagnostic_mode import DiagnosticMode
@@ -638,3 +639,33 @@ async def test_a_failing_checkpoint_does_not_fail_the_round(
 
     assert await runner.run_due() == 1
     assert queue.done == [1]
+
+
+async def test_a_change_request_goes_only_while_the_organisation_takes_them(
+    uow: InMemoryUnitOfWork, composer: MessageComposer
+) -> None:
+    bid = await booking_id(uow)
+    async with uow.locked() as tx:
+        await tx.add_change_request(
+            ChangeRequest(
+                "chr_x", "opc_bot", 1, None, bid, SLOT_0900, NOW, NOW + timedelta(hours=1)
+            )
+        )
+    sender = RecordingSender()
+    message = job(bid, JobType.SEND_CHANGE_REQUEST, pinned=SLOT_0900)
+    switch = {"on": True}
+
+    def takes(_organisation_id: int) -> bool:
+        return switch["on"]
+
+    def run() -> JobRunner:
+        return JobRunner(
+            FakeQueue([message]), uow, FixedClock(NOW), sender, composer, change_requests=takes
+        )
+
+    await run().run_due()
+    switch["on"] = False
+    await run().run_due()
+
+    assert [m.subject for m in sender.sent] == ["Bevestig de wijziging van uw videogesprek"]
+    assert "Afspraakcode" not in sender.sent[0].text  # only a message linking the booking shows it

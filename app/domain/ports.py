@@ -41,6 +41,7 @@ from app.domain.calls import (
     MeetingStatus,
     TaskSnapshot,
 )
+from app.domain.change_requests import ChangeRequest
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import Finding, GroupCheck
@@ -1514,6 +1515,26 @@ class Transaction(Protocol):
 
     async def save_proposal(self, proposal: HeldProposal) -> None:
         """Persist a proposal's release (``released_at``, ``outcome``)."""
+        ...
+
+    async def find_bookings_by_phone(self, group_id: int, phone: str) -> list[Booking]:
+        """Return the group's confirmed bookings with this phone number (E.164, ADR 0023)."""
+        ...
+
+    async def add_change_request(self, request: ChangeRequest) -> ChangeRequest:
+        """Store a bot's change request and return it with its id (ADR 0023 step 2)."""
+        ...
+
+    async def get_change_request(self, public_id: str) -> ChangeRequest | None:
+        """Return the change request with ``public_id``."""
+        ...
+
+    async def get_latest_change_request(self, booking_id: int) -> ChangeRequest | None:
+        """Return the newest change request that matched the booking, open or not."""
+        ...
+
+    async def save_change_request(self, request: ChangeRequest) -> None:
+        """Persist a request's confirmation, or its replacement by a newer one."""
         ...
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:

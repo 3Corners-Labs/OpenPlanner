@@ -53,6 +53,7 @@ Wat de client mag doen. Minstens één is nodig:
 
 - **Vrije tijden lezen** (`availability:read`): vrije tijden van groepen opvragen.
 - **Gebruikscijfers per uur lezen** (`reports:read`): de aantallen en sommen van de rapporten voor de groepen van de client, zoals in `docs/reporting-api.md`. Kleine aantallen worden weggelaten en er zijn geen persoonsgegevens.
+- **Annuleren of verplaatsen vragen** (`bookings:request_change`): de bot vraagt voor een beller een afspraak te annuleren of te verplaatsen, met het telefoonnummer en de afspraakcode samen. Het antwoord zegt nooit of die bij een afspraak horen; de deelnemer bevestigt de wijziging zelf. Werkt alleen als de organisatie wijzigingsverzoeken heeft aangezet (*Organisatie-instellingen*).
 - **Configuratiepakket exporteren en importeren (hele installatie)**
   (`configuration:transfer`): geldt voor de hele installatie, ongeacht de organisatie van de
   client.

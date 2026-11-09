@@ -858,11 +858,6 @@
         "text": "When a team falls short, the participant is offered a new time and keeps the place until they answer."
       },
       {
-        "adr": "0023",
-        "title": "Bots can change bookings",
-        "text": "A contact-center bot that today offers free times and books can also move and cancel on the participant's behalf."
-      },
-      {
         "adr": "0046",
         "title": "Staff through SCIM",
         "text": "Staff and roles provisioned from your directory, without typing them in the portal."

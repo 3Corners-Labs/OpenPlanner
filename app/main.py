@@ -84,6 +84,7 @@ from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
 from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
+from app.domain.change_request_service import ChangePolicy, ChangeRequestService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
@@ -228,6 +229,13 @@ def _reach(settings: Settings) -> Reach:
     return Reach(settings.reschedule_search_days, settings.reschedule_time_tolerance_minutes)
 
 
+def _change_policy(settings: Settings) -> ChangePolicy:
+    """Return one organisation's settings for a bot's change requests (ADR 0023 step 2)."""
+    return ChangePolicy(
+        settings.agent_change_requests_enabled, settings.agent_change_request_minutes
+    )
+
+
 def _proposal_hours(settings: Settings) -> ProposalHours:
     """Return how long a proposal is held and when it is recalled (ADR 0057)."""
     return ProposalHours(
@@ -313,6 +321,7 @@ def create_app(
         agent_tokens=settings.rate_limit_agent_tokens,
         agent_calls=settings.rate_limit_agent_calls,
         reports=f"{settings.reporting_api_rate_per_minute}/minute",
+        change_requests=f"{settings.agent_change_requests_per_hour}/hour",
     )
     # Machine API (ADR 0023): only mounted when the deployment switches it on.
     agent_api = create_agent_api() if settings.agent_api_enabled else None
@@ -346,6 +355,7 @@ def create_app(
                 agent_tokens=current.rate_limit_agent_tokens,
                 agent_calls=current.rate_limit_agent_calls,
                 reports=f"{current.reporting_api_rate_per_minute}/minute",
+                change_requests=f"{current.agent_change_requests_per_hour}/hour",
             )
             set_log_level(current.log_level)
             set_slow_query_ms(current.sql_slow_ms)
@@ -441,6 +451,16 @@ def create_app(
             previous_token_key=management_token_key_previous(settings),
             closure_retention=app.state.live_settings.closure_retention,
             reach=lambda org: _reach(per_organisation(org)),
+        )
+        # ADR 0023 step 2: a bot's change request, confirmed by the participant.
+        previous_key = management_token_key_previous(settings)
+        app.state.change_request_service = ChangeRequestService(
+            uow,
+            clock,
+            app.state.booking_service,
+            (token_key, *([previous_key] if previous_key else [])),
+            policy=lambda org: _change_policy(per_organisation(org)),
+            phone_region=lambda org: per_organisation(org).phone_default_region,
         )
         app.state.participant_link_service = ParticipantLinkService(uow, clock)
         # ADR 0044: the thresholds of the hourly alerts, once, for every writer they count.
@@ -847,6 +867,7 @@ def create_app(
                 "configuration_packages",  # ADR 0089 point 7: the same service as the portal
                 "configuration_documents",  # ADR 0099: the document service, same as the portal
                 "usage_api_service",  # ADR 0117 point 13: the hourly figures, scoped to the client
+                "change_request_service",  # ADR 0023 step 2
             ):
                 setattr(agent_api.state, name, getattr(app.state, name))
             agent_api.state.settings = app.state.settings

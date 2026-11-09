@@ -186,6 +186,8 @@ async def test_the_organisation_states_show_the_source() -> None:
         "reschedule_proposal_reminder_hours",
         "reschedule_search_days",
         "reschedule_time_tolerance_minutes",
+        "agent_change_requests_enabled",
+        "agent_change_request_minutes",
         "phone_default_region",
         "booking_confirm_window_hours",
         "booking_confirm_cutoff_hours",
