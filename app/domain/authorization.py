@@ -123,6 +123,8 @@ class Permission(StrEnum):
     """ADR 0117 point 16: subscribe staff to the digest mail of the reports of an organisation."""
     REPORTS_STAFF_VIEW = "reports.staff.view"
     """ADR 0117 point 9: the load per team member; own permission, organisation admin only."""
+    REPORTS_WALLBOARD_VIEW = "reports.wallboard.view"
+    """ADR 0117 point 20: the live wallboard of a group or organisation; counts only."""
     ROLES_MANAGE = "roles.manage"
     STAFF_VIEW = "staff.view"
     STAFF_MANAGE = "staff.manage"
@@ -190,6 +192,7 @@ LEVELS: dict[Permission, Level] = {
     Permission.REPORTS_EXPORT: Level.GROUP,
     Permission.REPORTS_DIGEST_MANAGE: Level.ORGANISATION,
     Permission.REPORTS_STAFF_VIEW: Level.ORGANISATION,
+    Permission.REPORTS_WALLBOARD_VIEW: Level.GROUP,
     # ADR 0039: create, change and delete custom roles.
     Permission.ROLES_MANAGE: Level.GLOBAL,
     # ADR 0046: who uses the portal; group level so a group admin sees their own team.
@@ -276,6 +279,7 @@ READ_PERMISSIONS = frozenset(
         Permission.REPORTS_VIEW,
         Permission.REPORTS_EXPORT,
         Permission.REPORTS_STAFF_VIEW,
+        Permission.REPORTS_WALLBOARD_VIEW,
         Permission.STAFF_VIEW,
         Permission.SETTINGS_PLATFORM_VIEW,
         Permission.IDP_MAPPING_VIEW,
@@ -306,6 +310,8 @@ REQUIRES: dict[Permission, frozenset[Permission]] = {
     Permission.REPORTS_EXPORT: frozenset({Permission.REPORTS_VIEW}),
     Permission.REPORTS_DIGEST_MANAGE: frozenset({Permission.REPORTS_VIEW}),
     Permission.REPORTS_STAFF_VIEW: frozenset({Permission.REPORTS_VIEW}),
+    # ADR 0117 point 20: the wallboard is a view of the *Usage* page.
+    Permission.REPORTS_WALLBOARD_VIEW: frozenset({Permission.REPORTS_VIEW}),
 }
 """ADR 0039: permissions a permission depends on; a custom role must hold them too."""
 
@@ -351,6 +357,8 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.REPORTS_DIGEST_MANAGE,
         # ADR 0117 point 9: the load per team member, while the organisation has switched it on.
         Permission.REPORTS_STAFF_VIEW,
+        # ADR 0117 point 20: the live wallboard for a screen in the team's room.
+        Permission.REPORTS_WALLBOARD_VIEW,
         # ADR 0046: the staff of the own organisations.
         Permission.STAFF_VIEW,
         # ADR 0095: invite, change and disable them in the bundled identity provider.
@@ -388,6 +396,7 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         # ADR 0117: how the own groups are used.
         Permission.REPORTS_VIEW,
         Permission.REPORTS_EXPORT,
+        Permission.REPORTS_WALLBOARD_VIEW,
         # ADR 0043: can step in as an agent in the own queue.
         Permission.QUEUE_WORK,
     },

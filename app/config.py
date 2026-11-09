@@ -261,6 +261,10 @@ class Settings(BaseSettings):
     # ADR 0117 point 9 (class D, organisation): whether the team's load is written and shown per
     # team member. Off by default: no team fact is written while it is off.
     reporting_staff_view_enabled: bool = False
+    # ADR 0117 point 20: the wallboard. How often it asks for fresh figures (class C, platform),
+    # and the wait after which it says *long wait* (class D, organisation).
+    reporting_wallboard_refresh_seconds: int = Field(default=10, ge=5, le=120)
+    reporting_wallboard_wait_alert_minutes: int = Field(default=5, ge=1, le=60)
     # ADR 0117 point 15 (class C, platform): also write every non-team usage fact as the log line
     # usage.fact for the log destinations; no personal data. Off by default.
     reporting_usage_events_to_log: bool = False

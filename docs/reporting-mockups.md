@@ -48,11 +48,11 @@ Rules:
 
 | Element | Step | State | Held by |
 |---|---|---|---|
-| `view=wallboard`, full screen, six tiles (waiting now, longest wait, in call, calls today, utilisation of the current block, failed hand-overs) | 13 | planned | – |
-| Live, *long wait* and *old data* states, each in words | 13 | planned | – |
-| *Pause updates*, clock, *as of* on every tile | 13 | planned | – |
-| Day bars with the planned part shaded, counts only | 13 | planned | – |
-| Text size for a 1080p screen, no sound, no blinking | 13 | planned | Playwright check at step 13 |
+| `view=wallboard`, full screen (`layout=kiosk`), six tiles (waiting now, longest wait, in a call, appointments today with the no-shows, fill of the current block, failed hand-overs) | 13 | built | `tests/admin/test_usage_wallboard.py` |
+| Live, *long wait* and *old data* states, each in words | 13 | built | `tests/admin/test_usage_wallboard.py`, `e2e/tests/admin-wallboard.spec.ts` |
+| *Pause updates*, date, *as of* on every tile | 13 | built | `tests/admin/test_usage_wallboard.py`, `e2e/tests/admin-wallboard.spec.ts` |
+| Hour bars with the planned part shaded, counts only | 13 | built | `tests/domain/test_wallboard.py` |
+| Text size for a 1080p screen, no sound, no blinking | 13 | built | `e2e/tests/admin-wallboard.spec.ts` (nothing moves, the number is 3.4 rem or more) |
 
 ## View 4: Display links
 

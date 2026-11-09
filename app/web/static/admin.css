@@ -3310,3 +3310,178 @@ op-report-chart {
     border-color: CanvasText;
   }
 }
+
+/* ADR 0117 point 20: the wallboard. Always dark, large and high contrast, whatever the portal's
+   theme: it hangs on a wall. Nothing moves, blinks or sounds; the states are words as well as
+   colour. Text sizes grow with the screen (clamp) and stay above 4.5:1 on the tile colour. */
+.wb {
+  --wb-bg: #0e1116;
+  --wb-tile: #1a1f27;
+  --wb-line: #3b4452;
+  --wb-text: #f2f4f7;
+  --wb-muted: #b6bfcc;
+  --wb-warn: #ffcd5e;
+  --wb-bad: #ff9d93;
+  --wb-bar: #6cb4ee;
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: var(--radius, 8px);
+  background: var(--wb-bg);
+  color: var(--wb-text);
+}
+.wb a,
+.wb .muted {
+  color: var(--wb-muted);
+}
+.wb__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.wb__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.2vw, 2.5rem);
+}
+.wb__date,
+.wb__asof,
+.wb__s,
+.wb__note {
+  color: var(--wb-muted);
+  font-variant-numeric: tabular-nums;
+}
+.wb__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.wb__banner {
+  display: none;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 3px solid var(--wb-bad);
+  border-radius: 12px;
+  color: var(--wb-bad);
+  font-size: clamp(1.1rem, 1.6vw, 1.8rem);
+  font-weight: 700;
+}
+.wb[data-stale] .wb__banner--stale,
+.wb[data-paused] .wb__banner--paused {
+  display: block;
+}
+.wb[data-paused] .wb__banner--paused {
+  border-color: var(--wb-warn);
+  color: var(--wb-warn);
+}
+.wb__pause-on,
+.wb[data-paused] .wb__pause-off {
+  display: none;
+}
+.wb[data-paused] .wb__pause-on {
+  display: inline;
+}
+.wb__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wb__tile {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem 1.1rem;
+  border: 2px solid var(--wb-line);
+  border-radius: 12px;
+  background: var(--wb-tile);
+}
+.wb__tile--alert {
+  border-color: var(--wb-warn);
+}
+.wb__label {
+  color: var(--wb-muted);
+  font-size: clamp(1rem, 1.4vw, 1.6rem);
+}
+.wb__n {
+  font-size: clamp(3.4rem, 6vw, 7rem);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.wb__tile--alert .wb__n,
+.wb__tag {
+  color: var(--wb-warn);
+}
+.wb__tag {
+  font-weight: 700;
+}
+.wb[data-stale] .wb__n {
+  color: var(--wb-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 3px;
+}
+.wb__strip {
+  margin: 0;
+}
+.wb__strip figcaption {
+  color: var(--wb-muted);
+}
+.wb__bars {
+  width: 100%;
+  max-height: 14rem;
+}
+.wb__bar {
+  fill: var(--wb-bar);
+}
+.wb__bar--planned {
+  fill-opacity: 0.45;
+}
+.wb__bar--now {
+  fill: var(--wb-warn);
+}
+.wb__grid {
+  stroke: var(--wb-line);
+}
+.wb__hour,
+.wb__val {
+  fill: var(--wb-muted);
+  font-size: 11px;
+}
+.wb__val {
+  fill: var(--wb-text);
+}
+.wb-screen {
+  display: grid;
+  gap: 0.75rem;
+  min-height: 100vh;
+  padding: 1rem;
+  background: #0e1116;
+}
+.wb-screen .wb {
+  padding: 0;
+}
+.wb-screen__exit a {
+  color: #b6bfcc;
+}
+@media (max-width: 60rem) {
+  .wb__tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 30rem) {
+  .wb__tiles {
+    grid-template-columns: 1fr;
+  }
+}
+@media (forced-colors: active) {
+  .wb__tile,
+  .wb__banner {
+    border-color: CanvasText;
+  }
+  .wb__bar {
+    fill: CanvasText;
+  }
+}

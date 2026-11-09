@@ -129,6 +129,7 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/contact": "/admin/groups/demo/contact",
     "/admin/groups/{slug}/usage": "/admin/groups/demo/usage",
     "/admin/groups/{slug}/usage/export.csv": "/admin/groups/demo/usage/export.csv",
+    "/admin/groups/{slug}/usage/wallboard/live": "/admin/groups/demo/usage/wallboard/live",
     "/admin/groups/{slug}/closure/contacts": "/admin/groups/demo/closure/contacts",
     "/admin/groups/{slug}/closure/scenarios": "/admin/groups/demo/closure/scenarios",
     "/admin/groups/{slug}/closure/scenarios/{scenario_id}": (
@@ -158,6 +159,9 @@ PATHS: dict[str, str] = {
     "/admin/organisations/{org}/contacts": "/admin/organisations/demo/contacts",
     "/admin/organisations/{org}/usage": "/admin/organisations/demo/usage",
     "/admin/organisations/{org}/usage/export.csv": "/admin/organisations/demo/usage/export.csv",
+    "/admin/organisations/{org}/usage/wallboard/live": (
+        "/admin/organisations/demo/usage/wallboard/live"
+    ),
     "/admin/organisations/{org}/embedding": "/admin/organisations/demo/embedding",
     "/admin/organisations/{org}/closure/scenarios": "/admin/organisations/demo/closure/scenarios",
     "/admin/organisations/{org}/closure/scenarios/{scenario_id}": (
@@ -296,10 +300,16 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
     # ADR 0117 point 11: the report families are the same routes with another `view`; their
     # templates carry counts and codes, never a marker.
     for scope in ("/admin/groups/demo/usage", "/admin/organisations/demo/usage"):
-        for view in ("queue", "capacity", "channels"):
+        for view in ("queue", "capacity", "channels", "wallboard"):
             response = await site.client.get(f"{scope}?view={view}")
             assert response.status_code == 200, (scope, view)
             assert not marker_leaks(response.text, set()), (scope, view)
+
+    # ADR 0117 point 20: the kiosk layout and the live fragment are the board again.
+    for extra in ("?view=wallboard&layout=kiosk",):
+        response = await site.client.get(f"/admin/groups/demo/usage{extra}")
+        assert response.status_code == 200, extra
+        assert not marker_leaks(response.text, set()), extra
 
     # ADR 0117 point 9: the Team view, once the organisation has switched it on, shows names of
     # staff and counts, never a marker of a booking.

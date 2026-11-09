@@ -55,13 +55,21 @@ colours with reduced motion and axe, and no content-security-policy or script er
   fires a bubbling `live:replaced` event. Focus that was inside the replaced part moves to the heading
   the region names (`data-heading`), so it is never lost. A failed request is retried at the next
   interval; a redirect (the session ended) or a fragment without a poll URL (the state is final) stops it.
+  A region that names `data-stale-after="3"` (the wallboard, ADR 0117 step 13) counts failed requests in
+  a row and, at that count or when the session ended, sets `data-stale` on the region and announces
+  the fragment's `[data-live-stale-status]` sentence once; the stylesheet shows the old-data state in
+  words, and the next good answer removes it. A button `[data-live-pause]` in the region (rendered
+  `hidden`, revealed by the script) pauses and resumes the asking, with `aria-pressed` and
+  `data-paused` on the region. A status sentence is written to the polite element only when it
+  differs from what stands there, so an unchanged state is not read out again.
 - **Keyboard:** none of its own; focus is kept as above.
 - **Live regions:** the region's own `[data-live-announce]`, or the element named in `data-announce`.
 - **Without the script:** the page shows the state it loaded with and offers a *Refresh* link.
 - **Used by:** the participant's waiting page, the own queue, a claimed booking, the agenda day view,
-  the overview alerts.
-- **Open (ADR 0118 step 3):** a stale marker after three failed polls, a pause control for updates
-  that run unasked for more than five seconds, announcing only a change that matters.
+  the overview alerts, the wallboard (ADR 0117 step 13).
+- **Open (ADR 0118 step 3):** the stale marker, the pause control and announce-on-change are built for the
+  wallboard only (they act on regions that opt in); the other pages adopt them, and the tests of the
+  mechanism itself, in that step.
 
 ### `update-progress.js`
 

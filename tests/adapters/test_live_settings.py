@@ -199,6 +199,7 @@ async def test_the_organisation_states_show_the_source() -> None:
         "queue_wait_target_minutes",
         "reporting_org_min_cell_size",
         "reporting_staff_view_enabled",
+        "reporting_wallboard_wait_alert_minutes",
         "reporting_digest_send_hour",
         "reporting_digest_include_numbers",
     }

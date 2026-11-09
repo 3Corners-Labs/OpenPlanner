@@ -78,6 +78,7 @@ from app.admin import (
     staff_status_routes,
     update_routes,
     usage_routes,
+    wallboard_routes,
 )
 from app.admin.alert_routes import alert_view
 from app.admin.authz import (
@@ -879,6 +880,7 @@ def register_admin(app: FastAPI) -> None:
         audit_routes.router,
         retention_routes.router,
         usage_routes.router,
+        wallboard_routes.router,
         settings_routes.router,
         organisation_settings_routes.router,
         configuration_routes.router,
