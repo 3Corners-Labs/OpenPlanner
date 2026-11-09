@@ -488,15 +488,24 @@ async def test_a_pending_booking_can_be_cancelled_but_not_asked_to_rebook(
 async def test_a_pending_booking_of_another_group_is_not_found_through_this_group(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
-    """The group check comes before the pending booking's own rules: no hint that it exists."""
+    """Every action on one booking checks the group first: no hint that the booking exists.
+
+    Their own rules would read or change it, confirm it, or answer ``booking_not_active`` or
+    ``proposal_not_open``.
+    """
     receipt = await book_pending(bookings, slug="andere-team", contact=another_participant())
     other = receipt.booking.id or 0
     reason = ChangeReason.STAFFING
     attempts = (
+        lambda: planner.booking(GROUP_ADMIN, "demo", other),
         lambda: planner.move(GROUP_ADMIN, "demo", other, SLOT_0930),
+        lambda: planner.confirm(GROUP_ADMIN, "demo", other),
         lambda: planner.cancel(GROUP_ADMIN, "demo", other, reason),
-        # Its own rule would answer booking_not_active: the group check comes first.
         lambda: planner.request_rebook(GROUP_ADMIN, "demo", other, reason),
+        lambda: planner.booking_proposal(GROUP_ADMIN, "demo", other),
+        lambda: planner.propose(GROUP_ADMIN, "demo", other, SLOT_0930, reason),
+        lambda: planner.withdraw(GROUP_ADMIN, "demo", other),
+        lambda: planner.confirm_proposal(GROUP_ADMIN, "demo", other),
     )
 
     for attempt in attempts:

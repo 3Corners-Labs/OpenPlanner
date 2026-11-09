@@ -197,6 +197,21 @@ async def test_another_groups_booking_does_not_exist_here(
         assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
 
 
+async def test_another_groups_claimed_booking_cannot_be_opened_or_released_here(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """A group admin, who may release any claim of their group, finds no other group's claim."""
+    other = await _book(uow, clock, slug="andere")
+    clock.advance(SLOT_0900 - clock.now())
+    await queue.claim_next(OTHER_TEAM, "andere")
+
+    for attempt in (queue.claimed, queue.release):
+        with pytest.raises(DomainError) as excinfo:
+            await attempt(GROUP_ADMIN, "demo", other)
+        assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
+    assert uow.state.bookings[other].claim is not None
+
+
 @pytest.mark.parametrize("principal", [OTHER_TEAM, AUDITOR])
 async def test_others_are_refused_and_audited(
     queue: QueueService, uow: InMemoryUnitOfWork, principal: Principal

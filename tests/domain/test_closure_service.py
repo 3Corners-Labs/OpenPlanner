@@ -220,6 +220,24 @@ async def test_other_groups_admin_cannot_close_or_touch_bookings(
     assert len(denied) == 2
 
 
+async def test_another_groups_suspended_booking_is_not_found_through_this_group(
+    closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    """Reinstating, moving and the move form check the group first, like cancelling."""
+    booking_id = await _book(bookings)
+    await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY)
+    attempts = (
+        lambda: closures.booking(OTHER_TEAM, "andere-team", booking_id),
+        lambda: closures.reinstate(OTHER_TEAM, "andere-team", booking_id),
+        lambda: closures.move(OTHER_TEAM, "andere-team", booking_id, NEXT_MONDAY),
+    )
+
+    for attempt in attempts:
+        with pytest.raises(DomainError, match="booking_not_found"):
+            await attempt()
+    assert _status(uow, booking_id) is BookingStatus.SUSPENDED
+
+
 # --- the participant --------------------------------------------------------------------------
 
 
