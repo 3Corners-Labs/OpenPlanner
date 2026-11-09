@@ -82,9 +82,15 @@ class SealedConnections:
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
         """Store the connection; a ``None`` secret keeps the stored one.
 
-        A new connection gets its webhook secret at once, so its address works from the start.
+        A new connection gets its webhook secret at once, so its address works from the start;
+        a changed API host or client id gets a new one, so a subscription the previous tenant
+        still holds no longer verifies (CC-4d).
         """
         record = dict(await self._record(organisation_id) or {})
+        moved = (record.get("api_base_url"), record.get("client_id")) != (
+            change.api_base_url,
+            change.client_id,
+        )
         record |= {
             "kind": change.kind.value,
             "api_base_url": change.api_base_url,
@@ -94,7 +100,8 @@ class SealedConnections:
             record["client_secret"] = change.client_secret
         if change.refresh_token is not None:
             record["refresh_token"] = change.refresh_token
-        if not record.get("webhook_secret"):
+        if moved or not record.get("webhook_secret"):
+            # Another tenant (host or client): the old tenant's subscription must stop verifying.
             record |= {"webhook_secret": new_webhook_secret(), "webhook_secret_at": now.isoformat()}
         await self._store.put(contact_center_credential_name(organisation_id), record, now)
 

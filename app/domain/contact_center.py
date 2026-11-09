@@ -289,3 +289,16 @@ def _public_host(url: str) -> bool:
 def _secret_shape(value: str) -> bool:
     """Whether a submitted secret is one printable token without spaces, within the cap."""
     return 0 < len(value) <= SECRET_MAX_LENGTH and value.isprintable() and " " not in value
+
+
+class Registration(StrEnum):
+    """What telling the platform about an organisation's webhook address came to (CC-4d)."""
+
+    REGISTERED = "registered"
+    """The platform signs the organisation's events with its current secret now."""
+    NOT_READY = "not_ready"
+    """A secret is missing; the address is registered once the connection is complete."""
+    REFUSED = "refused"
+    """The platform refused (rights, address or secret); the reason is in the request log."""
+    FAILED = "failed"
+    """The platform could not be reached; trying again later may work."""

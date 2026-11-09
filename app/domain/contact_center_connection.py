@@ -8,16 +8,27 @@ field name, never by value. An organisation without a connection uses the instal
 one minor (point 11, ADR 0116).
 
     view(org)   ─► OrganisationConnection | None
-    save(org)   ─► audit ─► sealed record          (a blank secret keeps the stored one)
-    rotate(org) ─► audit ─► new webhook secret     (the platform must be told: CC-4b)
+    save(org)   ─► audit ─► sealed record ─► register the address  (a blank secret keeps one)
+    rotate(org) ─► audit ─► new webhook secret ─► register again     (CC-4d)
     remove(org) ─► audit ─► record deleted
+
+Registering tells the platform to send the organisation's events to its own address, signed
+with its current secret; its outcome is audited and shown to the admin, never a reason to undo
+the change.
 """
+
+from collections.abc import Callable
 
 from app.domain.admin import AdminService, record_change
 from app.domain.authorization import Permission, Principal
-from app.domain.contact_center import CONNECTION_FIELD, ConnectionChange, OrganisationConnection
+from app.domain.contact_center import (
+    CONNECTION_FIELD,
+    ConnectionChange,
+    OrganisationConnection,
+    Registration,
+)
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.ports import Clock, ContactCenterConnections, UnitOfWork
+from app.domain.ports import Clock, ConnectionRegistrar, ContactCenterConnections, UnitOfWork
 
 PERMISSION = Permission.INTEGRATIONS_MANAGE
 AUDIT_KEY = "contact_center_connection"
@@ -32,6 +43,8 @@ class ContactCenterConnectionService:
         admin: Decides permissions.
         connections: The sealed connections; ``None`` without a settings key, when nothing can
             be sealed.
+        registrar: Returns what registers the address at the platform (the integrations are
+            rebuilt when the settings change); returning ``None``: not registered.
     """
 
     def __init__(
@@ -40,8 +53,10 @@ class ContactCenterConnectionService:
         clock: Clock,
         admin: AdminService,
         connections: ContactCenterConnections | None,
+        registrar: Callable[[], ConnectionRegistrar | None],
     ) -> None:
         """Store the collaborators."""
+        self._registrar = registrar
         self._uow = uow
         self._clock = clock
         self._admin = admin
@@ -63,7 +78,9 @@ class ContactCenterConnectionService:
             return None
         return await self._connections.get(organisation_id)
 
-    async def save(self, principal: Principal, organisation: str, change: ConnectionChange) -> None:
+    async def save(
+        self, principal: Principal, organisation: str, change: ConnectionChange
+    ) -> Registration:
         """Store the connection; audited by the names of the fields sent, never their values.
 
         Raises:
@@ -78,8 +95,9 @@ class ContactCenterConnectionService:
         detail = ",".join([f"{AUDIT_KEY}.save", f"kind:{change.kind.value}", *change.secrets_sent])
         await self._audit(principal, organisation, detail)
         await connections.save(organisation_id, change, self._clock.now())
+        return await self._register(principal, organisation_id, organisation)
 
-    async def rotate_webhook_secret(self, principal: Principal, organisation: str) -> None:
+    async def rotate_webhook_secret(self, principal: Principal, organisation: str) -> Registration:
         """Generate a new webhook secret; the old one stops verifying at once.
 
         Raises:
@@ -92,6 +110,7 @@ class ContactCenterConnectionService:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}connection")
         await self._audit(principal, organisation, f"{AUDIT_KEY}.rotate_webhook_secret")
         await connections.rotate_webhook_secret(organisation_id, self._clock.now())
+        return await self._register(principal, organisation_id, organisation)
 
     async def remove(self, principal: Principal, organisation: str) -> None:
         """Remove the connection; the organisation falls back to the installation's.
@@ -103,6 +122,17 @@ class ContactCenterConnectionService:
         connections = self._ready()
         await self._audit(principal, organisation, f"{AUDIT_KEY}.remove")
         await connections.delete(organisation_id)
+
+    async def _register(
+        self, principal: Principal, organisation_id: int, organisation: str
+    ) -> Registration:
+        """Register the organisation's address at its platform and audit the outcome."""
+        registrar = self._registrar()
+        if registrar is None:
+            return Registration.NOT_READY
+        outcome = await registrar.register(organisation_id, organisation)
+        await self._audit(principal, organisation, f"{AUDIT_KEY}.register,outcome:{outcome.value}")
+        return outcome
 
     def _ready(self) -> ContactCenterConnections:
         """Return the sealed connections, or refuse when no settings key is configured."""

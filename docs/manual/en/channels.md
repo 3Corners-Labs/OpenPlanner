@@ -93,7 +93,9 @@ As long as an organisation has no connection of its own, it uses the installatio
 fallback goes away in a later version. With an own connection this organisation's tasks go only
 through it; while the client secret or the refresh token is missing, they wait until the
 connection is complete. An API address on this server or in an internal network is refused. The
-webhook address works once OpenPlanner registers it with the contact center in a later step.
+On saving, OpenPlanner registers the webhook address and its secret with the contact center, and
+again after **Make a new webhook secret**. If that fails, the message at the top of the screen
+says so; check the Service App's rights (cjp:config_write), then make a new webhook secret.
 Connect or disconnect an organisation when none of its tasks is open: a task made through the
 previous connection is not ended through the new one.
 

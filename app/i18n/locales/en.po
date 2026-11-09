@@ -10835,6 +10835,15 @@ msgstr "Appointment confirmed for the participant"
 msgid "admin.audit.detail.booking_contact_viewed"
 msgstr "Participant's contact details shown"
 
+msgid "admin.done.contact_center_registered"
+msgstr "Saved. The contact center now reports this organisation's tasks at its own webhook address."
+
+msgid "admin.done.contact_center_saved_not_ready"
+msgstr "Saved. The webhook address is registered once the client secret and the refresh token are filled in."
+
+msgid "admin.done.contact_center_not_registered"
+msgstr "Saved, but the contact center refused the webhook address or could not be reached. Check the Service App's rights, then make a new webhook secret; that registers the address again."
+
 msgid "reports.view.volume"
 msgstr "Volume"
 

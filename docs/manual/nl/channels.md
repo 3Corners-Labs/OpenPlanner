@@ -94,8 +94,10 @@ Zolang een organisatie geen eigen koppeling heeft, gebruikt zij de koppeling van
 Die terugval verdwijnt in een volgende versie. Met een eigen koppeling gaan de taken van deze
 organisatie alleen via die koppeling; ontbreekt het clientgeheim of het refresh-token, dan wachten
 ze tot de koppeling compleet is. Een API-adres op deze server of in een intern netwerk wordt
-geweigerd. Het webhookadres werkt zodra OpenPlanner het in een volgende stap bij het
-contactcenter aanmeldt. Koppel of ontkoppel een organisatie als er geen taken open staan:
+geweigerd. Bij het opslaan meldt OpenPlanner het webhookadres met het geheim aan bij het contactcenter,
+en opnieuw na **Nieuw webhookgeheim maken**. Lukt dat niet, dan zegt de melding bovenaan het
+scherm dat; controleer de rechten van de Service App (cjp:config_write) en maak daarna een
+nieuw webhookgeheim. Koppel of ontkoppel een organisatie als er geen taken open staan:
 een taak die via de vorige koppeling is gemaakt, wordt niet meer via de nieuwe afgesloten.
 
 ## Wat wordt vastgelegd

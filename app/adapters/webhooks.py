@@ -212,6 +212,10 @@ class InboundWebhook:
         """Return where OpenPlanner registers its subscription: the alias while there is one."""
         return self.alias or self.path
 
+    def organisation_url(self, base: str, organisation: str) -> str:
+        """Return an organisation's own address at ``base`` (``Settings.webhook_base``)."""
+        return f"{base}{self.organisation_path(organisation)}"
+
     def organisation_path(self, organisation: str) -> str:
         """Return an organisation's own address (ADR 0032 point 10): ``{path}/{organisation}``."""
         return f"{self.path}/{organisation}"

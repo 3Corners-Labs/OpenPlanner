@@ -10848,6 +10848,15 @@ msgstr "Afspraak bevestigd namens de deelnemer"
 msgid "admin.audit.detail.booking_contact_viewed"
 msgstr "Contactgegevens van de deelnemer getoond"
 
+msgid "admin.done.contact_center_registered"
+msgstr "Opgeslagen. Het contactcenter meldt de taken van deze organisatie nu op haar eigen webhookadres."
+
+msgid "admin.done.contact_center_saved_not_ready"
+msgstr "Opgeslagen. Het webhookadres wordt aangemeld zodra het clientgeheim en het refresh-token zijn ingevuld."
+
+msgid "admin.done.contact_center_not_registered"
+msgstr "Opgeslagen, maar het contactcenter weigerde het webhookadres of was niet bereikbaar. Controleer de rechten van de Service App en maak daarna een nieuw webhookgeheim; dat meldt het adres opnieuw aan."
+
 msgid "reports.view.volume"
 msgstr "Volume"
 

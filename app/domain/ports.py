@@ -61,6 +61,7 @@ from app.domain.contact_center import (
     ContactCenterKind,
     ContactCenterTaskRef,
     OrganisationConnection,
+    Registration,
 )
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
@@ -470,6 +471,30 @@ class OrganisationDispatchers(Protocol):
         ``OwnConnection.dispatcher`` is ``None`` when the connection cannot dispatch yet (another
         kind, or a secret missing): the organisation's tasks then wait (point 13).
         """
+        ...
+
+
+class ConnectionRegistrar(Protocol):
+    """Registers an organisation's webhook address at its own platform (ADR 0032 CC-4d)."""
+
+    async def register(self, organisation_id: int, organisation: str) -> Registration:
+        """Make the platform send the organisation's events, signed with its current secret."""
+        ...
+
+
+class OrganisationConnections(Protocol):
+    """Dispatch and registration through each organisation's own connection (ADR 0032).
+
+    One adapter does both (``OrganisationWxcc``); ``DispatcherChoice`` sees it as
+    ``OrganisationDispatchers`` and the connection service as ``ConnectionRegistrar``.
+    """
+
+    async def own(self, organisation_id: int, kind: ContactCenterKind) -> OwnConnection | None:
+        """Return the organisation's own connection for ``kind`` (``OrganisationDispatchers``)."""
+        ...
+
+    async def register(self, organisation_id: int, organisation: str) -> Registration:
+        """Register the organisation's webhook address at its platform (``ConnectionRegistrar``)."""
         ...
 
 

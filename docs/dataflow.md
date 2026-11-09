@@ -267,6 +267,7 @@ worker ──HTTPS──> WxCC Task Messages v2: booking reference, kind=cancell
 operator CLI <──HTTPS── WxCC configuration (wxcc-config-check): channel, asset, entry point, queue names and ids, schema keys, flow export; nothing stored, no personal data
 operator CLI <──HTTPS── Webex webhooks (ownedBy=org), WxCC subscriptions (webhooks-list/-reset): ids, events, hostEmail filters, status, secret set or not, target without query → integration_reports
 operator CLI ──DELETE──> Webex webhooks, WxCC subscriptions (webhooks-reset --yes): ids of stale registrations only
+web ──HTTPS──> an organisation's own WxCC (ADR 0032 CC-4d, on saving its connection or a new secret): list subscriptions, delete those at its own address, create one with its address and secret; no personal data
 operator CLI ──signed test events (unknown ids)──> WEBHOOK_BASE_URL/webhooks/* (webhooks-health) → outcome codes in integration_reports
 participant ──GET /b/{token} (from the email)──> OpenPlanner ──Set-Cookie op_link (random value), 303──> participant ──GET /b/m/{public_ref}──> OpenPlanner (ADR 0093; the cookie names no person, the server keeps its SHA-256 and booking ids, no PII)
 participant ──GET /b/m/{public_ref}/join/go (cookie)──> OpenPlanner ──303──> Webex web app (no data added to the link)
