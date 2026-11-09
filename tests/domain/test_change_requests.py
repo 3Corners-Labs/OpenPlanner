@@ -19,6 +19,7 @@ from app.domain.change_request_service import (
     NO_MATCH,
     ChangePolicy,
     ChangeRequestService,
+    prune_change_requests,
 )
 from app.domain.change_requests import (
     ChangeAction,
@@ -465,18 +466,24 @@ async def test_within_the_cooldown_a_new_request_sends_nothing(
     assert len(sent) == 2  # the first request's email and SMS only
     reasons = [e.reason for e in uow.state.audit if e.action == "bookings:request_change"]
     assert reasons == [MATCHED, COOLDOWN]
+    cooled = [e for e in uow.state.audit if e.reason == COOLDOWN]
+    assert cooled[0].booking_id == booking_id  # the superuser's log names the booking
 
 
 async def test_expired_requests_are_deleted_after_the_retention(
-    changes: ChangeRequestService, bookings: BookingService, uow: InMemoryUnitOfWork
+    changes: ChangeRequestService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
 ) -> None:
     _id, _token, code = await _booked(bookings)
     demo = await _demo(uow)
     await changes.request(CALLER, demo, PHONE, code, None)
     await changes.request(CALLER, demo, "06 8765 4321", code, None)
-    expiry = NOW + timedelta(minutes=60)
+    keep = timedelta(days=30)
+    clock.advance(timedelta(minutes=60) + keep)  # expired exactly ``keep`` ago
 
-    async with uow.locked() as tx:
-        assert await tx.delete_change_requests_expired_before(expiry) == 0
-        assert await tx.delete_change_requests_expired_before(expiry + timedelta(seconds=1)) == 2
+    assert await prune_change_requests(uow, clock, keep) == 0
+    clock.advance(timedelta(seconds=1))
+    assert await prune_change_requests(uow, clock, keep) == 2
     assert uow.state.change_requests == {}

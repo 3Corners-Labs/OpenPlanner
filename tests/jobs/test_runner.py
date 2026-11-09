@@ -688,24 +688,3 @@ async def test_a_change_request_goes_only_while_it_may_still_be_asked(
 
     assert [m.subject for m in sender.sent] == ["Bevestig de wijziging van uw videogesprek"]
     assert "Afspraakcode" not in sender.sent[0].text  # only a message linking the booking shows it
-
-
-async def test_expired_change_requests_are_pruned_after_their_retention(
-    uow: InMemoryUnitOfWork, composer: MessageComposer
-) -> None:
-    bid = await booking_id(uow)
-    async with uow.locked() as tx:
-        await tx.add_change_request(
-            ChangeRequest(
-                "chr_x", "opc_bot", 1, None, bid, SLOT_0900, NOW, NOW - timedelta(days=31)
-            )
-        )
-        await tx.add_change_request(
-            ChangeRequest("chr_y", "opc_bot", 1, None, None, None, NOW, NOW - timedelta(days=29))
-        )
-
-    await JobRunner(
-        FakeQueue([]), uow, FixedClock(NOW), None, composer, change_request_days=lambda: 30
-    ).run_due()
-
-    assert [r.public_id for r in uow.state.change_requests.values()] == ["chr_y"]

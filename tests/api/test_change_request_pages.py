@@ -25,7 +25,9 @@ FRIDAY_0930 = datetime(2026, 1, 2, 8, 30, tzinfo=UTC)
 
 @pytest.fixture
 def on(demo_settings: Settings) -> Settings:
-    return demo_settings.model_copy(update={"agent_change_requests_enabled": True})
+    return demo_settings.model_copy(
+        update={"agent_api_enabled": True, "agent_change_requests_enabled": True}
+    )
 
 
 @pytest.fixture

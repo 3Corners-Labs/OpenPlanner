@@ -230,9 +230,12 @@ def _reach(settings: Settings) -> Reach:
 
 
 def _change_policy(settings: Settings) -> ChangePolicy:
-    """Return one organisation's settings for a bot's change requests (ADR 0023 step 2)."""
+    """Return one organisation's settings for a bot's change requests (ADR 0023 step 2).
+
+    Switched on only where the deployment also runs the machine API (``AGENT_API_ENABLED``).
+    """
     return ChangePolicy(
-        settings.agent_change_requests_enabled,
+        settings.agent_api_enabled and settings.agent_change_requests_enabled,
         settings.agent_change_request_minutes,
         settings.agent_change_request_cooldown_minutes,
     )

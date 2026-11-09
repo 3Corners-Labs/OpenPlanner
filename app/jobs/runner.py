@@ -37,7 +37,7 @@ from app.domain import booking_changes
 from app.domain.audit import Outcome
 from app.domain.booking import Booking
 from app.domain.call_service import CallService
-from app.domain.change_request_service import client_may_still_ask
+from app.domain.change_request_service import request_still_open
 from app.domain.channels import ChannelKind
 from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
@@ -143,9 +143,7 @@ class JobRunner:
         change_requests: Whether an organisation (by id) takes a bot's change requests
             (``agent_change_requests_enabled``, ADR 0023 step 2): its messages show the
             appointment code, and a change request's message goes out only while it is on.
-            ``None`` is off.
-        change_request_days: ``agent_change_request_retention_days`` (step 2b): change
-            requests are deleted that many days after they expired; ``None`` keeps them.
+            ``None`` is off. The worker passes it only where the deployment runs the API.
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
             the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
@@ -165,7 +163,6 @@ class JobRunner:
         clock_style: Callable[[int], str] | None = None,
         product_footer: Callable[[int], bool] | None = None,
         change_requests: Callable[[int], bool] | None = None,
-        change_request_days: Callable[[], int] | None = None,
         after_purge: Callable[[], Awaitable[None]] | None = None,
         fallback: FallbackService | None = None,
     ) -> None:
@@ -177,7 +174,6 @@ class JobRunner:
         self._clock_style = clock_style
         self._product_footer = product_footer
         self._change_requests = change_requests
-        self._change_request_days = change_request_days
         self._diagnostics = DiagnosticLog(uow, clock)
         self._pruned_at: datetime | None = None
         self._uow = uow
@@ -311,18 +307,25 @@ class JobRunner:
                 if booking and booking.id is not None and job.type in PROPOSAL_NOTICES
                 else None
             )
-            # Switched off since the request: no request, so ``is_stale`` stops it (ADR 0023).
             change = (
                 await tx.get_latest_change_request(booking.id)
-                if booking
-                and booking.id is not None
-                and group
-                and job.type in CHANGE_REQUEST_NOTICES
-                and self._takes_change_requests(group.organisation_id)
+                if booking and booking.id is not None and job.type in CHANGE_REQUEST_NOTICES
                 else None
             )
-            if change is not None and group and not await client_may_still_ask(tx, change, group):
-                change = None  # the bot was switched off or lost the scope (step 2b): stale
+            if (
+                change is not None
+                and booking is not None
+                and group is not None
+                and not await request_still_open(
+                    tx,
+                    change,
+                    booking,
+                    group,
+                    self._takes_change_requests(group.organisation_id),
+                    now,
+                )
+            ):
+                change = None  # no longer open (ADR 0023 step 2b): ``is_stale`` stops the message
             organisation = (
                 await tx.get_organisation_by_id(group.organisation_id)
                 if group and job.type in TEAM_INVITES
@@ -454,18 +457,3 @@ class JobRunner:
             return
         if removed:
             log.info("system_log.pruned", removed=removed)
-        await self._prune_change_requests(now)
-
-    async def _prune_change_requests(self, now: datetime) -> None:
-        """Delete change requests past their retention (ADR 0023 step 2b); housekeeping."""
-        if self._change_request_days is None:
-            return
-        cutoff = now - timedelta(days=self._change_request_days())
-        try:
-            async with self._uow.locked() as tx:
-                removed = await tx.delete_change_requests_expired_before(cutoff)
-        except Exception as exc:  # pruning is housekeeping; jobs come first
-            log.warning("change_requests.prune_failed", error=type(exc).__name__)
-            return
-        if removed:
-            log.info("change_requests.pruned", removed=removed)

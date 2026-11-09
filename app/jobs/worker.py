@@ -53,6 +53,7 @@ from app.domain.admin_session_service import AdminSessionService
 from app.domain.alert_delivery import AlertNotifier
 from app.domain.alerts import QUEUE_WAIT_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
+from app.domain.change_request_service import prune_change_requests
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
 from app.domain.fallback import FallbackService
@@ -250,9 +251,10 @@ async def run_worker(
                 product_footer=lambda organisation: (
                     live.for_organisation(organisation).product_footer
                 ),
-                change_request_days=lambda: live.settings.agent_change_request_retention_days,
+                # ADR 0023 step 2: only where the deployment runs the machine API at all.
                 change_requests=lambda organisation: (
-                    live.for_organisation(organisation).agent_change_requests_enabled
+                    settings.agent_api_enabled
+                    and live.for_organisation(organisation).agent_change_requests_enabled
                 ),
                 after_purge=lambda: checkpoint_wal(engine),
             ),
@@ -274,9 +276,16 @@ async def run_worker(
     links = ParticipantLinkService(uow, clock)
 
     async def clean_sessions() -> int:
-        """Delete the ended admin sessions and the lapsed participant link sessions."""
+        """Delete ended admin and participant link sessions, and expired change requests.
+
+        A bot's change request goes ``agent_change_request_retention_days`` after it expired
+        (ADR 0023 step 2b).
+        """
         admin = await sessions.clean(timedelta(hours=live.settings.admin_session_hours))
-        return admin + await links.clean()
+        requests = await prune_change_requests(
+            uow, clock, timedelta(days=live.settings.agent_change_request_retention_days)
+        )
+        return admin + await links.clean() + requests
 
     staff_lifecycle = StaffLifecycleService(uow, clock)
 
