@@ -8,8 +8,8 @@ storage; ``ChangeRequestService`` applies them.
 
 The code is derived like the management token (ADR 0011): HMAC-SHA256 under the server key of
 the booking's salt, with its own purpose, reduced to ``CODE_DIGITS`` digits. Nothing is stored
-for it, a new booking (also a reschedule) gets a new code, and the purge kills it by replacing
-the salt.
+for it and a new booking (also a reschedule) gets a new code. After the purge the booking has
+no phone number and is no longer confirmed, so its code matches nothing any more.
 """
 
 import hashlib
@@ -20,7 +20,8 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
 
-from app.domain.tokens import MIN_KEY_BYTES, derive_token, token_matches
+from app.domain.booking import Booking
+from app.domain.tokens import MIN_KEY_BYTES, key_for_booking
 
 CODE_DIGITS = 8
 """Digits of an appointment code: a crypto parameter, fixed (ADR 0023 step 2, *Settings*)."""
@@ -31,7 +32,7 @@ _ID_BYTES = 18
 
 
 class ChangeAction(StrEnum):
-    """What the caller asks for."""
+    """What the caller asks for; a reschedule has a new start, a cancellation none."""
 
     CANCEL = "cancel"
     RESCHEDULE = "reschedule"
@@ -57,16 +58,14 @@ def derive_code(key: bytes, salt: str) -> str:
     return f"{int.from_bytes(digest[:8], 'big') % 10**CODE_DIGITS:0{CODE_DIGITS}d}"
 
 
-def code_for_booking(keys: Sequence[bytes], salt: str, token_hash: str) -> str:
-    """Return the code a booking shows: under the key its management token was made with.
+def appointment_code(keys: Sequence[bytes], booking: Booking) -> str:
+    """Return the code a booking shows, as the participant reads it: ``1234 5678``.
 
-    ``keys`` is the current key, then the previous one while a rotation runs (ADR 0094), as
-    for ``token_for_booking``; a booking that matches no key shows the code under the first.
+    Under the key its management token was made with (``key_for_booking``), so during a key
+    rotation (ADR 0094) a booking keeps the code it was given.
     """
-    for key in keys:
-        if token_matches(derive_token(key, salt), token_hash):
-            return derive_code(key, salt)
-    return derive_code(keys[0], salt)
+    key = key_for_booking(keys, booking.token_salt, booking.token_hash)
+    return format_code(derive_code(key, booking.token_salt))
 
 
 def code_matches(keys: Sequence[bytes], salt: str, code: str) -> bool:
@@ -104,41 +103,52 @@ class ChangeRequest:
         public_id: What the API returns and the client asks the status with.
         client_id: The API client that made it; only it may read the status.
         group_id: The group of the URL.
-        action: Cancel or reschedule.
-        target_start: For a reschedule, the requested new start (UTC).
+        target_start: For a reschedule, the requested new start (UTC); ``None`` cancels.
         booking_id: The booking the phone number and code matched, or ``None``.
         pinned_start: That booking's start when asked; a request is void once it moved.
         created_at: When it was made.
         expires_at: Until when the participant can confirm it; the same rule for a match and
             a non-match, so it reveals nothing.
         confirmed_at: When the participant confirmed it.
+        superseded_at: When a newer request for the same booking replaced it. Internal: the
+            API's status ignores it, or it would tell which requests matched a booking.
         id: Database id.
     """
 
     public_id: str
     client_id: str
     group_id: int
-    action: ChangeAction
     target_start: datetime | None
     booking_id: int | None
     pinned_start: datetime | None
     created_at: datetime
     expires_at: datetime
     confirmed_at: datetime | None = None
+    superseded_at: datetime | None = None
     id: int | None = None
 
+    @property
+    def action(self) -> ChangeAction:
+        """Cancel, or reschedule to ``target_start``."""
+        return ChangeAction.CANCEL if self.target_start is None else ChangeAction.RESCHEDULE
+
     def status(self, now: datetime) -> ChangeStatus:
-        """Return the status the API shows at ``now``."""
+        """Return the status the API shows at ``now``; a replaced request looks unchanged."""
         if self.confirmed_at is not None:
             return ChangeStatus.CONFIRMED
         if now >= self.expires_at:
             return ChangeStatus.EXPIRED
         return ChangeStatus.PENDING
 
-    def is_open_for(self, booking_start: datetime, now: datetime) -> bool:
-        """Return whether the participant can still confirm it for a booking at that start."""
+    def is_current(self, booking_start: datetime, now: datetime) -> bool:
+        """Return whether the participant can still confirm it for a booking at that start.
+
+        It matched a booking, is neither confirmed, replaced nor expired, and the booking has
+        not moved since.
+        """
         return (
             self.booking_id is not None
+            and self.superseded_at is None
             and self.status(now) is ChangeStatus.PENDING
             and self.pinned_start == booking_start
         )
@@ -148,8 +158,8 @@ class ChangeRequest:
         return replace(self, confirmed_at=now)
 
     def supersede(self, now: datetime) -> "ChangeRequest":
-        """Return the request closed by a newer one for the same booking: expired at ``now``."""
-        return replace(self, expires_at=min(self.expires_at, now))
+        """Return the request replaced at ``now`` by a newer one for the same booking."""
+        return replace(self, superseded_at=now)
 
 
 def request_expiry(now: datetime, minutes: int) -> datetime:

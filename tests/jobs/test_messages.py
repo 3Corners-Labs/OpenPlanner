@@ -7,7 +7,7 @@ import pytest
 
 from app.adapters.db.text_overrides import CachedTextOverrides
 from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact
-from app.domain.change_requests import ChangeAction, ChangeRequest, derive_code, format_code
+from app.domain.change_requests import ChangeRequest, derive_code, format_code
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
@@ -778,9 +778,9 @@ def test_a_reminder_after_a_rotation_carries_the_link_the_booking_was_given() ->
 # --- ADR 0023 step 2: a bot's change request and the appointment code -----------------------
 
 CANCEL_REQUEST = ChangeRequest(
-    "chr_x", "opc_bot", 1, ChangeAction.CANCEL, None, 42, SLOT_0900, NOW, NOW + timedelta(hours=1)
+    "chr_x", "opc_bot", 1, None, 42, SLOT_0900, NOW, NOW + timedelta(hours=1)
 )
-MOVE_REQUEST = replace(CANCEL_REQUEST, action=ChangeAction.RESCHEDULE, target_start=SLOT_0930)
+MOVE_REQUEST = replace(CANCEL_REQUEST, target_start=SLOT_0930)
 
 
 def test_a_change_request_names_the_change_its_deadline_and_its_confirm_page(
@@ -828,11 +828,9 @@ def test_the_code_is_in_messages_that_link_the_booking_when_switched_on(
 ) -> None:
     code = format_code(derive_code(TEST_TOKEN_KEY, SALT))
 
-    shown = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW, appointment_code=True)
+    shown = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW, show_code=True)
     hidden = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
-    cancelled = composer.compose(
-        JobType.SEND_CANCELLATION, BOOKING, GROUP, NOW, appointment_code=True
-    )
+    cancelled = composer.compose(JobType.SEND_CANCELLATION, BOOKING, GROUP, NOW, show_code=True)
 
     assert f"Afspraakcode: {code}" in shown.text
     assert f"<dd>{code}</dd>" in (shown.html or "")

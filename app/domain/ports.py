@@ -1533,7 +1533,7 @@ class Transaction(Protocol):
         ...
 
     async def save_change_request(self, request: ChangeRequest) -> None:
-        """Persist a request's confirmation, or its closing by a newer one (``expires_at``)."""
+        """Persist a request's confirmation, or its replacement by a newer one."""
         ...
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:

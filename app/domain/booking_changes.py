@@ -100,6 +100,26 @@ def planner_may_request_rebook(booking: Booking, group: Group, now: datetime) ->
     return booking.is_active and planner_may_change(booking, group, now)
 
 
+def ensure_participant_may_move(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse a participant's move from the change deadline on (ADR 0069).
+
+    A booking on hold (suspended, or awaiting a new time) has no deadline: it does not go
+    ahead at its time anyway.
+    """
+    if booking.on_hold:
+        return
+    if now >= group.change_deadline(booking.start):
+        raise DomainError(ErrorCode.BOOKING_LOCKED)
+
+
+def ensure_participant_may_cancel(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse a participant's cancellation from the start on (ADR 0069); on hold has none."""
+    if booking.on_hold:
+        return
+    if now >= group.cancel_deadline(booking.start):
+        raise DomainError(ErrorCode.BOOKING_LOCKED)
+
+
 def planner_may_change(booking: Booking, group: Group, now: datetime) -> bool:
     """Return whether a planner may still change ``booking`` now (for links and lists)."""
     try:

@@ -446,16 +446,8 @@ async def manage_page(
 
 
 def _appointment_code(request: Request, details: BookingDetails) -> str | None:
-    """Return the code a bot asks for, where the organisation takes change requests (ADR 0023).
-
-    Only for a confirmed booking: that is the only kind a change request can name.
-    """
-    current = getattr(request.state, "organisation_settings", None)
-    if not details.booking.is_active or not getattr(
-        current, "agent_change_requests_enabled", False
-    ):
-        return None
-    return _change_service(request).code(details.booking)
+    """Return the code a bot asks for, where the organisation takes change requests (ADR 0023)."""
+    return _change_service(request).code(details.booking, details.group.organisation_id)
 
 
 @router.get("/b/m/{public_ref}/cancel", response_class=HTMLResponse)

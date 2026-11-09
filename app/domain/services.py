@@ -517,17 +517,28 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             booking = await self._booking(tx, management_token)
-            now = self._clock.now()
             group = await self._group_by_id(tx, booking.group_id)
-            _ensure_cancellable(booking, group, now)
-            return await booking_changes.cancel(
-                tx,
-                booking,
-                group,
-                now,
-                actor=ActorClass.PARTICIPANT,
-                team_invite=group.sends_team_invite,
-            )
+            return await self.cancel_in(tx, booking, group)
+
+    async def cancel_in(self, tx: Transaction, booking: Booking, group: Group) -> Booking:
+        """Cancel as the participant inside the caller's locked transaction (ADR 0069).
+
+        Shared by the participant's own link and a bot's change request they confirmed
+        (ADR 0023 step 2).
+
+        Raises:
+            DomainError: ``booking_locked`` from the start on, or ``booking_not_active``.
+        """
+        now = self._clock.now()
+        booking_changes.ensure_participant_may_cancel(booking, group, now)
+        return await booking_changes.cancel(
+            tx,
+            booking,
+            group,
+            now,
+            actor=ActorClass.PARTICIPANT,
+            team_invite=group.sends_team_invite,
+        )
 
     async def leave_direct(self, management_token: str | PublicRef) -> DirectLeft:
         """Stop waiting for a direct call: cancel it and end its work item (ADR 0019 point 4).
@@ -618,11 +629,25 @@ class BookingService:
         """
         async with self._uow.locked() as tx:
             old = await self._booking(tx, management_token)
-            if old.awaits_confirmation:  # ADR 0056 §3: confirm first, then move
-                raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
             group = await self._group_by_id(tx, old.group_id)
-            _ensure_changeable(old, group, self._clock.now())
-            return await self.relocate(tx, old, group, new_start, actor=ActorClass.PARTICIPANT)
+            return await self.reschedule_in(tx, old, group, new_start)
+
+    async def reschedule_in(
+        self, tx: Transaction, old: Booking, group: Group, new_start: datetime
+    ) -> BookingReceipt:
+        """Move as the participant inside the caller's locked transaction (ADR 0069).
+
+        Shared by the participant's own link and a bot's change request they confirmed
+        (ADR 0023 step 2).
+
+        Raises:
+            DomainError: ``booking_not_active`` (also while it awaits confirmation),
+                ``booking_locked`` from the change deadline on, or any error of ``relocate``.
+        """
+        if old.awaits_confirmation:  # ADR 0056 §3: confirm first, then move
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        booking_changes.ensure_participant_may_move(old, group, self._clock.now())
+        return await self.relocate(tx, old, group, new_start, actor=ActorClass.PARTICIPANT)
 
     async def relocate(
         self,
@@ -1010,26 +1035,6 @@ def _correctable(booking: Booking, group: Group, now: datetime) -> bool:
         and (booking.is_active or booking.awaits_confirmation)
         and now < group.change_deadline(booking.start)
     )
-
-
-def _ensure_changeable(booking: Booking, group: Group, now: datetime) -> None:
-    """Refuse a move from the change deadline on (ADR 0069).
-
-    A booking on hold (suspended, or awaiting a new time) has no deadline: it does not go
-    ahead at its time anyway.
-    """
-    if booking.on_hold:
-        return
-    if now >= group.change_deadline(booking.start):
-        raise DomainError(ErrorCode.BOOKING_LOCKED)
-
-
-def _ensure_cancellable(booking: Booking, group: Group, now: datetime) -> None:
-    """Refuse a cancellation from the start on (ADR 0069); on hold has no deadline."""
-    if booking.on_hold:
-        return
-    if now >= group.cancel_deadline(booking.start):
-        raise DomainError(ErrorCode.BOOKING_LOCKED)
 
 
 def _id(entity: Booking | Slot | Closure) -> int:

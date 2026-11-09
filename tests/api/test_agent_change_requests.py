@@ -47,7 +47,10 @@ async def _booked(agent: Agent, start: datetime) -> tuple[int, str]:
     receipt = await book_confirmed(
         bookings, group_slug="demo", start=start, contact=ADA, locale="nl"
     )
-    return receipt.booking.id or 0, changes.code(receipt.booking)
+    details = await bookings.find(receipt.management_token)
+    code = changes.code(receipt.booking, details.group.organisation_id)
+    assert code is not None
+    return receipt.booking.id or 0, code
 
 
 async def test_a_change_request_answers_the_same_with_or_without_a_match(agent: Agent) -> None:
@@ -102,7 +105,9 @@ async def test_a_change_request_answers_the_same_with_or_without_a_match(agent: 
         f"{BASE}/change-requests/{matched.json()['id']}", headers=headers
     )
     assert status.status_code == 200
-    assert status.json()["status"] == "expired"  # replaced by the reschedule request
+    # Replaced by the reschedule request, yet it answers as an unmatched request would.
+    assert status.json()["status"] == "pending"
+    assert status.json()["expires_at"] == matched.json()["expires_at"]
 
 
 async def test_the_status_belongs_to_the_asking_client(agent: Agent) -> None:

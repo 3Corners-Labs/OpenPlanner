@@ -250,7 +250,7 @@ async def run_worker(
                 product_footer=lambda organisation: (
                     live.for_organisation(organisation).product_footer
                 ),
-                appointment_code=lambda organisation: (
+                change_requests=lambda organisation: (
                     live.for_organisation(organisation).agent_change_requests_enabled
                 ),
                 after_purge=lambda: checkpoint_wal(engine),

@@ -346,8 +346,8 @@ WxCC AI Agent <── 202 {id, action, start, status, expires_at}: the same answ
 | Caller IP address | compared in memory, not stored | bot | not stored | no |
 | Free times | computed | schedule | not stored | to the bot (no personal data) |
 | Phone number and appointment code of a change request (step 2) | compared in memory with `bookings.phone` and the code derived from the booking's salt; never stored, logged or audited | the caller, through the bot | not stored | no |
-| Change request | `change_requests`: public id, client id, group, action, requested start, matched booking id (or none), times | OpenPlanner | with its group or booking; no personal data | id, action, start, status and expiry to the bot that asked |
-| Appointment code | derived on demand (HMAC of the booking's salt under `MANAGEMENT_TOKEN_KEY`); not stored | OpenPlanner | dies with the salt at the purge | to the participant: booking page and messages, only where the organisation switched change requests on |
+| Change request | `change_requests`: public id, client id, group, requested start (none for a cancellation), matched booking id (or none), times | OpenPlanner | with its group or booking; no personal data | id, action, start, status and expiry to the bot that asked |
+| Appointment code | derived on demand (HMAC of the booking's salt under `MANAGEMENT_TOKEN_KEY`); not stored | OpenPlanner | matches nothing after the purge (no phone number, no longer confirmed) | to the participant: booking page and messages, only where the organisation switched change requests on |
 
 No personal data flows to the bot. A change request carries the caller's phone number and
 appointment code in; both are compared in memory and never stored outside `bookings`. On a

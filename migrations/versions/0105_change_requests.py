@@ -27,16 +27,13 @@ def upgrade() -> None:
         sa.Column("public_id", sa.String(length=40), nullable=False),
         sa.Column("client_id", sa.String(length=64), nullable=False),
         sa.Column("group_id", sa.Integer(), nullable=False),
-        sa.Column("action", sa.String(length=16), nullable=False),
         sa.Column("target_start", sa.DateTime(timezone=True), nullable=True),
         sa.Column("booking_id", sa.Integer(), nullable=True),
         sa.Column("pinned_start", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint(
-            "action IN ('cancel', 'reschedule')", name=op.f("ck_change_requests_action")
-        ),
+        sa.Column("superseded_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
             ["group_id"],
             ["groups.id"],

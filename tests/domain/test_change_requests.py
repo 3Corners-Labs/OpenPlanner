@@ -12,8 +12,7 @@ from typing import Any, cast
 
 import pytest
 
-from app.domain.api_clients import ApiCaller
-from app.domain.booking import BookingStatus
+from app.domain.booking import Booking, BookingStatus
 from app.domain.change_request_service import (
     MATCHED,
     NO_MATCH,
@@ -24,7 +23,7 @@ from app.domain.change_requests import (
     ChangeAction,
     ChangeRequest,
     ChangeStatus,
-    code_for_booking,
+    appointment_code,
     code_matches,
     derive_code,
     format_code,
@@ -39,12 +38,13 @@ from app.domain.services import BookingService
 from app.domain.tokens import derive_token, hash_token
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.agent_api import api_caller
 from tests.support.domain import NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, book_another
 
 PHONE = "06 1234 5678"
 OTHER_KEY = b"o" * 32
-CALLER = cast(ApiCaller, SimpleNamespace(client=SimpleNamespace(client_id="opc_bot")))
-OTHER_CALLER = cast(ApiCaller, SimpleNamespace(client=SimpleNamespace(client_id="opc_other")))
+CALLER = api_caller()
+OTHER_CALLER = api_caller("opc_other")
 
 
 @pytest.fixture
@@ -111,11 +111,13 @@ def test_the_code_is_eight_digits_derived_from_the_salt_and_key() -> None:
 def test_the_code_follows_the_key_the_token_was_made_with() -> None:
     old_hash = hash_token(derive_token(OTHER_KEY, "salt"))
 
-    assert code_for_booking((TEST_TOKEN_KEY, OTHER_KEY), "salt", old_hash) == derive_code(
-        OTHER_KEY, "salt"
+    booking = cast(Booking, SimpleNamespace(token_salt="salt", token_hash=old_hash))
+
+    assert appointment_code((TEST_TOKEN_KEY, OTHER_KEY), booking) == format_code(
+        derive_code(OTHER_KEY, "salt")
     )
-    assert code_for_booking((TEST_TOKEN_KEY,), "salt", old_hash) == derive_code(
-        TEST_TOKEN_KEY, "salt"
+    assert appointment_code((TEST_TOKEN_KEY,), booking) == format_code(
+        derive_code(TEST_TOKEN_KEY, "salt")
     )
     assert code_matches((TEST_TOKEN_KEY, OTHER_KEY), "salt", derive_code(OTHER_KEY, "salt"))
     assert not code_matches((TEST_TOKEN_KEY,), "salt", derive_code(OTHER_KEY, "salt"))
@@ -147,7 +149,6 @@ def test_the_status_follows_confirmation_and_expiry() -> None:
         "chr_x",
         "opc_bot",
         1,
-        ChangeAction.CANCEL,
         None,
         7,
         SLOT_0900,
@@ -158,10 +159,14 @@ def test_the_status_follows_confirmation_and_expiry() -> None:
     assert request.status(NOW) is ChangeStatus.PENDING
     assert request.status(NOW + timedelta(hours=1)) is ChangeStatus.EXPIRED
     assert request.confirm(NOW).status(NOW + timedelta(days=1)) is ChangeStatus.CONFIRMED
-    assert request.is_open_for(SLOT_0900, NOW)
-    assert not request.is_open_for(SLOT_0930, NOW)
-    assert not request.supersede(NOW).is_open_for(SLOT_0900, NOW)
-    assert not replace(request, booking_id=None).is_open_for(SLOT_0900, NOW)
+    assert request.action is ChangeAction.CANCEL
+    assert replace(request, target_start=SLOT_0930).action is ChangeAction.RESCHEDULE
+    assert request.is_current(SLOT_0900, NOW)
+    assert not request.is_current(SLOT_0930, NOW)
+    assert not replace(request, booking_id=None).is_current(SLOT_0900, NOW)
+    replaced = request.supersede(NOW)
+    assert not replaced.is_current(SLOT_0900, NOW)
+    assert replaced.status(NOW) is ChangeStatus.PENDING  # the API cannot tell it was replaced
 
 
 # --- asking -------------------------------------------------------------------------------
@@ -172,9 +177,7 @@ async def test_a_matching_pair_asks_the_participant_and_changes_nothing(
 ) -> None:
     booking_id, _token, code = await _booked(bookings)
 
-    request = await changes.request(
-        CALLER, await _demo(uow), ChangeAction.CANCEL, PHONE, format_code(code), None
-    )
+    request = await changes.request(CALLER, await _demo(uow), PHONE, format_code(code), None)
 
     assert request.booking_id == booking_id
     assert request.status(NOW) is ChangeStatus.PENDING
@@ -199,8 +202,8 @@ async def test_a_wrong_pair_gets_the_same_answer_and_reaches_nobody(
     wrong = f"{(int(code) + 1) % 10**8:08d}"
     demo = await _demo(uow)
 
-    by_code = await changes.request(CALLER, demo, ChangeAction.CANCEL, PHONE, wrong, None)
-    by_phone = await changes.request(CALLER, demo, ChangeAction.CANCEL, "06 8765 4321", code, None)
+    by_code = await changes.request(CALLER, demo, PHONE, wrong, None)
+    by_phone = await changes.request(CALLER, demo, "06 8765 4321", code, None)
 
     for request in (by_code, by_phone):
         assert request.booking_id is None
@@ -217,9 +220,7 @@ async def test_the_code_picks_one_of_several_bookings_with_the_same_number(
     first, _t1, _c1 = await _booked(bookings, SLOT_0900)
     second, _t2, code = await _booked(bookings, SLOT_0930)
 
-    request = await changes.request(
-        CALLER, await _demo(uow), ChangeAction.CANCEL, PHONE, code, None
-    )
+    request = await changes.request(CALLER, await _demo(uow), PHONE, code, None)
 
     assert request.booking_id == second
     assert JobType.SEND_CHANGE_REQUEST not in _jobs(uow, first)
@@ -236,8 +237,8 @@ async def test_a_booking_past_its_change_deadline_is_not_matched(
 
     demo = await _demo(uow)
 
-    move = await changes.request(CALLER, demo, ChangeAction.RESCHEDULE, PHONE, code, SLOT_0930)
-    cancel = await changes.request(CALLER, demo, ChangeAction.CANCEL, PHONE, code, None)
+    move = await changes.request(CALLER, demo, PHONE, code, SLOT_0930)
+    cancel = await changes.request(CALLER, demo, PHONE, code, None)
 
     assert move.booking_id is None
     assert cancel.booking_id is not None  # cancelling stays open until the start
@@ -249,23 +250,20 @@ async def test_refusals_never_depend_on_a_booking(
     demo = await _demo(uow)
 
     with pytest.raises(DomainError) as phone:
-        await changes.request(CALLER, demo, ChangeAction.CANCEL, "12", "12345678", None)
+        await changes.request(CALLER, demo, "12", "12345678", None)
     with pytest.raises(DomainError) as code:
-        await changes.request(CALLER, demo, ChangeAction.CANCEL, PHONE, "1234", None)
+        await changes.request(CALLER, demo, PHONE, "1234", None)
     with pytest.raises(DomainError) as taken:
         await changes.request(
             CALLER,
             demo,
-            ChangeAction.RESCHEDULE,
             PHONE,
             "12345678",
             SLOT_0900 + timedelta(minutes=7),
         )
-    with pytest.raises(ValueError, match="needs a start"):
-        await changes.request(CALLER, demo, ChangeAction.RESCHEDULE, PHONE, "12345678", None)
     policy["value"] = ChangePolicy(enabled=False)
     with pytest.raises(DomainError) as off:
-        await changes.request(CALLER, demo, ChangeAction.CANCEL, PHONE, "12345678", None)
+        await changes.request(CALLER, demo, PHONE, "12345678", None)
 
     assert phone.value.code is ErrorCode.INVALID_CONTACT
     assert code.value.code is ErrorCode.INVALID_APPOINTMENT_CODE
@@ -280,19 +278,23 @@ async def test_a_newer_request_replaces_the_open_one(
     _id, _token, code = await _booked(bookings)
     demo = await _demo(uow)
 
-    first = await changes.request(CALLER, demo, ChangeAction.CANCEL, PHONE, code, None)
-    second = await changes.request(CALLER, demo, ChangeAction.RESCHEDULE, PHONE, code, SLOT_0930)
+    first = await changes.request(CALLER, demo, PHONE, code, None)
+    second = await changes.request(CALLER, demo, PHONE, code, SLOT_0930)
 
-    assert (await changes.status(CALLER, first.public_id)).status(NOW) is ChangeStatus.EXPIRED
-    assert (await changes.status(CALLER, second.public_id)).status(NOW) is ChangeStatus.PENDING
+    old = await changes.status(CALLER, first.public_id)
+    assert old.status(NOW) is ChangeStatus.PENDING  # the same answer as an unmatched one
+    assert old.expires_at == first.expires_at
+    assert not old.is_current(SLOT_0900, NOW)
+    new = await changes.status(CALLER, second.public_id)
+    assert new.is_current(SLOT_0900, NOW)
+    sent = [j for j in uow.state.jobs[_id] if j.type is JobType.SEND_CHANGE_REQUEST]
+    assert len(sent) == 2  # one email and one SMS: the first request's were dropped
 
 
 async def test_only_the_asking_client_reads_the_status(
     changes: ChangeRequestService, uow: InMemoryUnitOfWork
 ) -> None:
-    request = await changes.request(
-        CALLER, await _demo(uow), ChangeAction.CANCEL, PHONE, "12345678", None
-    )
+    request = await changes.request(CALLER, await _demo(uow), PHONE, "12345678", None)
 
     with pytest.raises(DomainError) as other:
         await changes.status(OTHER_CALLER, request.public_id)
@@ -309,9 +311,7 @@ async def test_the_participant_confirms_a_cancellation(
     changes: ChangeRequestService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     booking_id, token, code = await _booked(bookings)
-    request = await changes.request(
-        CALLER, await _demo(uow), ChangeAction.CANCEL, PHONE, code, None
-    )
+    request = await changes.request(CALLER, await _demo(uow), PHONE, code, None)
     ref = (await bookings.find(token)).booking.public_ref
     assert await changes.open_request(PublicRef(ref)) is not None
     done = await changes.confirm(PublicRef(ref))
@@ -330,7 +330,7 @@ async def test_the_participant_confirms_a_new_time(
     changes: ChangeRequestService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     booking_id, token, code = await _booked(bookings)
-    await changes.request(CALLER, await _demo(uow), ChangeAction.RESCHEDULE, PHONE, code, SLOT_0930)
+    await changes.request(CALLER, await _demo(uow), PHONE, code, SLOT_0930)
     ref = PublicRef((await bookings.find(token)).booking.public_ref)
     done = await changes.confirm(ref)
 
@@ -346,7 +346,7 @@ async def test_an_expired_or_moved_request_cannot_be_confirmed(
     clock: FixedClock,
 ) -> None:
     _id, token, code = await _booked(bookings)
-    await changes.request(CALLER, await _demo(uow), ChangeAction.CANCEL, PHONE, code, None)
+    await changes.request(CALLER, await _demo(uow), PHONE, code, None)
     ref = PublicRef((await bookings.find(token)).booking.public_ref)
     clock.advance(timedelta(minutes=60))
 
@@ -360,9 +360,7 @@ async def test_the_message_job_goes_stale_once_the_request_is_closed(
     changes: ChangeRequestService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     booking_id, _token, code = await _booked(bookings)
-    request = await changes.request(
-        CALLER, await _demo(uow), ChangeAction.CANCEL, PHONE, code, None
-    )
+    request = await changes.request(CALLER, await _demo(uow), PHONE, code, None)
     booking = uow.state.bookings[booking_id]
     job = JobType.SEND_CHANGE_REQUEST
 
@@ -377,4 +375,25 @@ async def test_the_shown_code_is_the_matching_one(
 ) -> None:
     booking_id, _token, code = await _booked(bookings)
 
-    assert changes.code(uow.state.bookings[booking_id]) == format_code(code)
+    booking = uow.state.bookings[booking_id]
+
+    assert changes.code(booking, booking.group_id) == format_code(code)
+
+
+async def test_switching_off_hides_the_code_and_stops_open_requests(
+    changes: ChangeRequestService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+    policy: dict[str, ChangePolicy],
+) -> None:
+    booking_id, token, code = await _booked(bookings)
+    await changes.request(CALLER, await _demo(uow), PHONE, code, None)
+    ref = PublicRef((await bookings.find(token)).booking.public_ref)
+    policy["value"] = ChangePolicy(enabled=False)
+
+    assert changes.code(uow.state.bookings[booking_id], 1) is None
+    assert await changes.open_request(ref) is None
+    with pytest.raises(DomainError) as off:
+        await changes.confirm(ref)
+    assert off.value.code is ErrorCode.CHANGE_REQUEST_NOT_FOUND
+    assert uow.state.bookings[booking_id].status is BookingStatus.CONFIRMED

@@ -6,24 +6,22 @@ Calendar: "now" is Thursday 1 January 2026 08:00 UTC; Ada booked Friday 09:00 wi
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 import httpx
 import pytest
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
-from app.domain.api_clients import ApiCaller
 from app.domain.change_request_service import ChangeRequestService
-from app.domain.change_requests import ChangeAction
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.agent_api import api_caller
 from tests.support.domain import NOW
 from tests.support.participant import SAME_ORIGIN, booked, open_link
 
 FRIDAY_0930 = datetime(2026, 1, 2, 8, 30, tzinfo=UTC)
-CALLER = cast(ApiCaller, SimpleNamespace(client=SimpleNamespace(client_id="opc_bot")))
+CALLER = api_caller()
 
 
 @pytest.fixture
@@ -49,8 +47,7 @@ async def _ask(client: httpx.AsyncClient, base: str, start: datetime | None = No
     async with SqlUnitOfWork(_app(client).state.engine).read() as tx:
         demo = await tx.get_group_summary("demo")
     assert demo is not None
-    action = ChangeAction.RESCHEDULE if start else ChangeAction.CANCEL
-    request = await service.request(CALLER, demo, action, "06 1234 5678", code, start)
+    request = await service.request(CALLER, demo, "06 1234 5678", code, start)
     assert request.booking_id is not None
 
 

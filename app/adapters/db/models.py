@@ -1670,7 +1670,8 @@ class ChangeRequestRow(Base):
     """A bot's request to cancel or move a booking (ADR 0023 step 2); no personal data.
 
     ``booking_id`` is empty when the phone number and code matched no booking that could still
-    be changed: the request then only expires, as the API answered the same either way.
+    be changed: the request then only expires, as the API answered the same either way. A
+    request with ``target_start`` moves the booking there; one without it cancels.
     """
 
     __tablename__ = "change_requests"
@@ -1679,16 +1680,15 @@ class ChangeRequestRow(Base):
     public_id: Mapped[str] = mapped_column(String(40), unique=True)
     client_id: Mapped[str] = mapped_column(String(64))
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
-    action: Mapped[str] = mapped_column(String(16))
     target_start: Mapped[datetime | None] = mapped_column(UTCDateTime())
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
     pinned_start: Mapped[datetime | None] = mapped_column(UTCDateTime())
     created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
     confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    superseded_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
-        CheckConstraint("action IN ('cancel', 'reschedule')", name="action"),
         Index("ix_change_requests_booking_id", "booking_id"),
         Index("ix_change_requests_group_id", "group_id"),
     )

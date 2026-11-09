@@ -76,7 +76,8 @@ the phone number alone. The notes below follow from that.
 1. **The appointment code.** Every booking has an eight-digit code, derived as the management
    token is (ADR 0011): HMAC-SHA256 under `MANAGEMENT_TOKEN_KEY` of the booking's salt with its
    own purpose, reduced to eight digits. Nothing new is stored; a reschedule makes a new
-   booking with a new salt and so a new code, and the purge, which replaces the salt, kills it.
+   booking with a new salt and so a new code; after the purge the booking has no phone number
+   and is no longer confirmed, so its code matches nothing.
    During a key rotation (ADR 0094) the code under the previous key is accepted as well.
    Digits, so a voice bot and a keypad can take it; shown as `1234 5678`.
 2. **Where the participant sees it.** Only in organisations that switched change requests on
@@ -99,7 +100,9 @@ the phone number alone. The notes below follow from that.
    an SMS where they agreed to SMS) that names the requested change and links to
    `/b/m/{ref}/change`: the change and one button. A GET changes nothing (mail scanners); the
    POST applies it through the same paths as the participant's own cancel and reschedule. A
-   newer request for the same booking replaces the open one. Nothing is held: a time taken in
+   newer request for the same booking replaces the open one (and drops its message if that has
+   not gone out); the replaced request still answers `pending` until its own expiry, as an
+   unmatched one does. Switching the organisation off stops open requests too. Nothing is held: a time taken in
    the meantime sends the participant back to the booking page, which says so.
 6. **Expiry.** A request is open for `agent_change_request_minutes` after it was made (the
    same for a match and a non-match, so `expires_at` reveals nothing), and only while the
@@ -115,9 +118,10 @@ the phone number alone. The notes below follow from that.
    with the client id, the action and whether it matched (for the superuser, never in the
    answer); a confirmation is an event at the booking. No phone number, code or name is
    stored with the request, logged or audited.
-10. **Data.** A table `change_requests` holds the public id, client, group, action, requested
-    start, the matched booking id (or none), the booking's start when asked, the times made,
-    expiring and confirmed. No personal data; it goes with the booking's other rows.
+10. **Data.** A table `change_requests` holds the public id, client, group, the requested start
+    (none for a cancellation), the matched booking id (or none), the booking's start when asked,
+    the times made, expiring, confirmed and replaced. No personal data; it goes with its group
+    or booking.
 
 ## Settings
 

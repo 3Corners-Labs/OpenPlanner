@@ -91,11 +91,11 @@ async def create(
     """
     if context.group is None:  # pragma: no cover - RequireScope with a group returns it
         raise ApiProblem("invalid_request")
-    action = ChangeAction(body.action)
-    if (action is ChangeAction.RESCHEDULE) != (body.start is not None):
+    # The one place the rule is checked: a reschedule has a start, a cancellation none.
+    if (body.action == ChangeAction.RESCHEDULE.value) != (body.start is not None):
         raise ApiProblem("invalid_request")
     found = await _service(request).request(
-        context.caller, context.group, action, body.phone, body.code, body.start
+        context.caller, context.group, body.phone, body.code, body.start
     )
     clock: Clock = request.app.state.clock
     info = _info(found, clock.now())

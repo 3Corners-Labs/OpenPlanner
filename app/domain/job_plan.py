@@ -270,14 +270,14 @@ def is_stale(
     if job_type in CONFIRM_NOTICES:
         return not booking.awaits_confirmation or booking.contact is None
     if job_type in CHANGE_REQUEST_NOTICES:
-        open_ = (
+        current = (
             change is not None
             and now is not None
-            and change.booking_id == booking.id
-            and change.is_open_for(booking.start, now)
+            and pinned_start is not None
+            and change.is_current(pinned_start, now)
         )
         moved = booking.start != pinned_start
-        return not booking.is_active or booking.contact is None or moved or not open_
+        return not booking.is_active or booking.contact is None or moved or not current
     if pinned_start is None:
         return False
     return not booking.is_active or booking.start != pinned_start or booking.contact is None

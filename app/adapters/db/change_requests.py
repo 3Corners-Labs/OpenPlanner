@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import ChangeRequestRow
-from app.domain.change_requests import ChangeAction, ChangeRequest
+from app.domain.change_requests import ChangeRequest
 
 
 def _request(row: ChangeRequestRow) -> ChangeRequest:
@@ -17,13 +17,13 @@ def _request(row: ChangeRequestRow) -> ChangeRequest:
         public_id=row.public_id,
         client_id=row.client_id,
         group_id=row.group_id,
-        action=ChangeAction(row.action),
         target_start=row.target_start,
         booking_id=row.booking_id,
         pinned_start=row.pinned_start,
         created_at=row.created_at,
         expires_at=row.expires_at,
         confirmed_at=row.confirmed_at,
+        superseded_at=row.superseded_at,
         id=row.id,
     )
 
@@ -39,13 +39,13 @@ class ChangeRequestQueries:
             public_id=request.public_id,
             client_id=request.client_id,
             group_id=request.group_id,
-            action=request.action.value,
             target_start=request.target_start,
             booking_id=request.booking_id,
             pinned_start=request.pinned_start,
             created_at=request.created_at,
             expires_at=request.expires_at,
             confirmed_at=request.confirmed_at,
+            superseded_at=request.superseded_at,
         )
         self._session.add(row)
         await self._session.flush()
@@ -69,9 +69,9 @@ class ChangeRequestQueries:
         return _request(row) if row is not None else None
 
     async def save_change_request(self, request: ChangeRequest) -> None:
-        """Persist a request's confirmation or its closing by a newer one."""
+        """Persist a request's confirmation or its replacement by a newer one."""
         await self._session.execute(
             update(ChangeRequestRow)
             .where(ChangeRequestRow.id == request.id)
-            .values(expires_at=request.expires_at, confirmed_at=request.confirmed_at)
+            .values(confirmed_at=request.confirmed_at, superseded_at=request.superseded_at)
         )
