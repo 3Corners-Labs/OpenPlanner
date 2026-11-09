@@ -457,7 +457,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | #679 | merged |
 | 10b | The verified `email` claim stored at login (`staff.email`, migration 0104) as the digest's first source for every provider | #681 | merged |
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | #675 | merged |
-| 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
+| 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | #PR12 | merged |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
 | 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
 
@@ -754,3 +754,11 @@ no team member here. Metric S1 is stored as three sub-metrics in `usage_staff_ho
 claims, `S1p` scheduled calls and how many were on time). **S2 (team utilisation) is not built:** no fact records
 staffed seconds; it needs one, and is a follow-up. Removal of a person folds their rows and their waiting facts into the
 *former team members* row in the same transaction; retention prunes the table with `reporting_retention_months`.
+
+**Step 12 notes (no change of a decision, one difference):** `<op-report-chart>` wraps every chart; the
+points carry `data-i` and `data-s`, the day charts' table rows are ordinary links (drill-down), and the
+words of the toolbar come from the page. *Download as PNG* is drawn on a canvas by the script and not from
+the SVG as an image, because the script CSP allows images from our own origin only (`img-src 'self'`); the
+CSP is not loosened. Toggling a series hides it but keeps the scale. The Playwright island flag of ADR 0118
+point 10 does not exist yet: `e2e/tests/admin-report-charts.spec.ts` covers the keyboard, toggles,
+downloads and the run with scripts off for the charts; it was not run locally.

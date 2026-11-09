@@ -2,7 +2,7 @@
 {% macro report_chart(cv) %}
 {% set c = cv.chart %}
 {% set g = cv.geometry %}
-<figure class="rchart">
+<op-report-chart data-toolbar="{{ _('reports.chart.toolbar') }}" data-svg="{{ _('reports.chart.download_svg') }}" data-png="{{ _('reports.chart.download_png') }}" data-hint="{{ _('reports.chart.hint') }}"><figure class="rchart">
   <figcaption id="{{ c.chart_id }}-caption" class="visually-hidden">{{ c.title }}</figcaption>
   {% if c.has_values %}
   <div class="rchart__frame" role="region" aria-labelledby="{{ c.chart_id }}-caption" tabindex="0">
@@ -42,14 +42,14 @@
       {% endfor %}
       <line class="rchart__axis" x1="{{ g.plot_left }}" y1="{{ g.plot_bottom }}" x2="{{ g.plot_right }}" y2="{{ g.plot_bottom }}"/>
       {% for col in g.columns %}
-      <rect class="rchart__bar rchart__s{{ col.series + 1 }}{% if col.series == 0 %} rchart__bar--solid{% endif %}"{% if col.series > 0 %} fill="url(#{{ c.chart_id }}-p{{ col.series }})"{% endif %} x="{{ col.x }}" y="{{ col.y }}" width="{{ col.width }}" height="{{ col.height }}"><title>{{ col.title }}</title></rect>
+      <rect class="rchart__bar rchart__s{{ col.series + 1 }}{% if col.series == 0 %} rchart__bar--solid{% endif %}" data-i="{{ col.category }}" data-s="{{ col.series }}"{% if col.series > 0 %} fill="url(#{{ c.chart_id }}-p{{ col.series }})"{% endif %} x="{{ col.x }}" y="{{ col.y }}" width="{{ col.width }}" height="{{ col.height }}"><title>{{ col.title }}</title></rect>
       {% endfor %}
       {% for run in g.runs %}
       <polyline class="rchart__line rchart__s{{ run.series + 1 }}" points="{{ run.points }}"/>
       {% endfor %}
       {% for m in g.markers %}{{ marker_shape(m.series, m.x, m.y, m) }}{% endfor %}
       {% for gap in g.gaps %}
-      <rect class="rchart__gap" x="{{ gap.x }}" y="{{ gap.y }}" width="{{ gap.width }}" height="{{ gap.height }}"><title>{{ gap.title }}</title></rect>
+      <rect class="rchart__gap" data-i="{{ gap.category }}" x="{{ gap.x }}" y="{{ gap.y }}" width="{{ gap.width }}" height="{{ gap.height }}"><title>{{ gap.title }}</title></rect>
       {% endfor %}
       {% for label in g.categories %}
       <text class="rchart__tick" x="{{ label.x }}" y="{{ label.y }}" text-anchor="{{ label.anchor }}"{% if label.rotate %} transform="rotate({{ label.rotate }} {{ label.x }} {{ label.y }})"{% endif %}>{{ label.text }}</text>
@@ -65,7 +65,7 @@
       </thead>
       <tbody>
         {% for name, values in c.rows() %}
-        <tr><th scope="row">{{ name }}</th>{% for v in values %}<td>{% if v is none %}<span class="muted">{{ c.hidden_label }}</span>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>
+        <tr><th scope="row">{% if c.drill and c.drill[loop.index0] %}<a href="{{ c.drill[loop.index0] }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</th>{% for v in values %}<td>{% if v is none %}<span class="muted">{{ c.hidden_label }}</span>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>
         {% endfor %}
       </tbody>
       {% if c.total_label %}
@@ -73,15 +73,15 @@
       {% endif %}
     </table>
   </div>
-</figure>
+</figure></op-report-chart>
 {% endmacro %}
 {#- The marker of a line's point: circle, square, triangle or diamond by series. In the legend (no ``m``) it has no hover text. -#}
 {% macro marker_shape(series, x, y, m=none) -%}
 {%- set cls = "rchart__marker rchart__s" ~ (series + 1) -%}
-{%- if series == 0 -%}<circle class="{{ cls }}" cx="{{ x }}" cy="{{ y }}" r="4">{% if m %}<title>{{ m.title }}</title>{% endif %}</circle>
-{%- elif series == 1 -%}<rect class="{{ cls }}" x="{{ x - 4 }}" y="{{ y - 4 }}" width="8" height="8">{% if m %}<title>{{ m.title }}</title>{% endif %}</rect>
-{%- elif m -%}<polygon class="{{ cls }}" points="{{ m.points }}"><title>{{ m.title }}</title></polygon>
-{%- elif series == 2 -%}<polygon class="{{ cls }}" points="{{ x }},{{ y - 5 }} {{ x + 5 }},{{ y + 4 }} {{ x - 5 }},{{ y + 4 }}"/>
-{%- else -%}<polygon class="{{ cls }}" points="{{ x }},{{ y - 5 }} {{ x + 5 }},{{ y }} {{ x }},{{ y + 5 }} {{ x - 5 }},{{ y }}"/>
+{%- if series == 0 -%}<circle class="{{ cls }}"{% if m %} data-i="{{ m.category }}" data-s="{{ series }}"{% endif %} cx="{{ x }}" cy="{{ y }}" r="4">{% if m %}<title>{{ m.title }}</title>{% endif %}</circle>
+{%- elif series == 1 -%}<rect class="{{ cls }}"{% if m %} data-i="{{ m.category }}" data-s="{{ series }}"{% endif %} x="{{ x - 4 }}" y="{{ y - 4 }}" width="8" height="8">{% if m %}<title>{{ m.title }}</title>{% endif %}</rect>
+{%- elif m -%}<polygon class="{{ cls }}"{% if m %} data-i="{{ m.category }}" data-s="{{ series }}"{% endif %} points="{{ m.points }}"><title>{{ m.title }}</title></polygon>
+{%- elif series == 2 -%}<polygon class="{{ cls }}"{% if m %} data-i="{{ m.category }}" data-s="{{ series }}"{% endif %} points="{{ x }},{{ y - 5 }} {{ x + 5 }},{{ y + 4 }} {{ x - 5 }},{{ y + 4 }}"/>
+{%- else -%}<polygon class="{{ cls }}"{% if m %} data-i="{{ m.category }}" data-s="{{ series }}"{% endif %} points="{{ x }},{{ y - 5 }} {{ x + 5 }},{{ y }} {{ x }},{{ y + 5 }} {{ x - 5 }},{{ y }}"/>
 {%- endif -%}
 {%- endmacro %}

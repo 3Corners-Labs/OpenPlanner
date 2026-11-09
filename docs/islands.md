@@ -117,3 +117,24 @@ roles and live regions, the browser features used, what happens without the scri
 - **Open:** the island checks of ADR 0118 point 10 run once that ADR's step 2 adds the `island`
   flag to `e2e/pages.json`; the overview is listed there already for axe and keyboard runs.
 
+
+### `report-charts.js`
+
+- **ADR:** 0117 point 19 (build step 12), 0118.
+- **Server renders:** the usage charts of `admin/_report_chart.html`: `<op-report-chart>` with the
+  words in `data-toolbar`, `data-svg`, `data-png` and `data-hint` (in the page's language), a
+  figure with an SVG whose points carry `data-i` (the category, the table row beside the chart) and
+  `data-s` (the series), and directly after it the table with the same numbers. For a chart of days
+  the row header is an ordinary link to the same page for that one day (suppression applies there too).
+- **Does:** a tip on hover and on keyboard focus whose text is the table row (set with
+  `textContent`); series toggles as buttons with `aria-pressed` (the scale stays); download as SVG
+  (with its colours inlined) or as PNG (drawn on a canvas, since the CSP allows no image from a
+  blob); Enter on a focused day follows its link.
+- **Keyboard:** the chart frame is a tab stop; arrow keys, Home and End move between categories,
+  Enter opens a day, Escape closes the tip; the buttons are reachable with Tab.
+- **Live regions:** a polite status element announces the tip's words; focus is never moved.
+- **Browser features:** custom elements, ES modules, `XMLSerializer`, `canvas`, `Blob`
+  (all Baseline widely available); `forced-colors` gets system colours.
+- **Without the script:** the chart, its table and the day links as the server drew them.
+- **Used by:** the *Usage* pages of an organisation and a group (script CSP on these pages only).
+- **Size:** about 3 KB gzipped.

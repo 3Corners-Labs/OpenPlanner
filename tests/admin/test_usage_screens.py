@@ -123,8 +123,8 @@ async def test_the_queue_screen_shows_charts_each_followed_by_its_table(site: Si
         assert figure.index("</svg>") < figure.index("<table")
         assert 'scope="col"' in figure
         assert 'scope="row"' in figure
-    assert "style=" not in text.split("<main", 1)[1]
-    assert "<script" not in text.split("<main", 1)[1]
+    assert "style=" not in text.split("<main", 1)[1].split("</main>", 1)[0]
+    assert "<script" not in text.split("<main", 1)[1].split("</main>", 1)[0]
     assert "Wachttijd tot een gesprek verbindt" in text
     assert ">30<" in text
 
@@ -349,7 +349,7 @@ async def test_the_volume_screen_has_tiles_two_charts_and_the_range_form_split(s
 
     text = (await _get(site, "/admin/groups/demo", "volume")).text
 
-    main = text.split("<main", 1)[1]
+    main = text.split("<main", 1)[1].split("</main>", 1)[0]
     assert main.count('class="tile"') == 4
     assert "No-showpercentage" in main
     assert len(re.findall(r'<figure class="rchart">', main)) == 2
@@ -404,3 +404,50 @@ async def test_the_capacity_screen_has_its_four_tiles_with_what_they_are_made_of
     assert text.count('class="tile"') == 4
     assert "90 van 120 plaatsen" in text
     assert "12 van 30" in text
+
+
+async def test_report_pages_load_the_chart_script_under_the_script_csp_and_others_do_not(
+    site: Site,
+) -> None:
+    await _put(site, "demo", _queue_cells(30))
+    await site.login_as(GROUP_ADMIN)
+
+    usage = await _get(site, "/admin/groups/demo", "queue")
+    other = await site.client.get("/admin/groups/demo")
+
+    assert "script-src 'self'" in usage.headers["content-security-policy"]
+    assert "script-src" not in other.headers["content-security-policy"]
+    assert re.search(r'<script type="module" src="[^"]*report-charts[^"]*"></script>', usage.text)
+    assert "report-charts" not in other.text
+
+
+async def test_a_chart_is_complete_without_the_script_and_marks_its_points_for_it(
+    site: Site,
+) -> None:
+    await _put(site, "demo", _queue_cells(30))
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await _get(site, "/admin/groups/demo", "queue")).text
+
+    chart = text.split("<op-report-chart", 1)[1].split("</op-report-chart>", 1)[0]
+    assert "data-toolbar=" in chart
+    assert re.search(r'<rect class="rchart__bar[^"]*" data-i="\d+" data-s="\d+"', chart)
+    assert "<table" in chart  # the same numbers, with scripts off
+    assert "<button" not in chart  # the buttons are made by the script, not rendered
+    assert "onclick" not in text.lower()
+
+
+async def test_the_days_of_a_chart_link_to_the_same_page_for_that_day(site: Site) -> None:
+    await _put(site, "demo", _volume_cells(40))
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await _get(site, "/admin/groups/demo", "volume")).text
+
+    days = text.split('id="chart-days-table-caption"', 1)[1].split("</table>", 1)[0]
+    assert re.search(
+        r'<th scope="row"><a href="/admin/groups/demo/usage\?view=volume&amp;from=2025-12-31'
+        r"&amp;to=2025-12-31\">2025-12-31</a></th>",
+        days,
+    )
+    outcome = text.split('id="chart-outcome-table-caption"', 1)[1].split("</table>", 1)[0]
+    assert "<a " not in outcome  # a chart without days has no drill-down
