@@ -95,12 +95,14 @@ Options weighed:
    sets it. The gate's workflow and script do not change.
 2. **The backport leaves `pull_request_target` (option c).** `backport.yml` starts from the
    `push` to `main` that a merge makes, and from `workflow_dispatch` with a pull request's
-   number. A first job without secrets runs `scripts/release_line.py backports`: it takes each
-   pushed commit's pull request from the squash subject `Title (#N)` with the decision gate's
-   own rule (a commit that names none fails the run, as in the gate), reads each pull request
-   once, and lists the ones merged into `main` whose labels name a line (`backport:X.Y`, the
-   rule of ADR 0116). Only then does the job with the release app's key run, as before, and it
-   takes number, merge commit, title and lines from that list without reading anything again.
+   number. A first job without secrets lists the pull requests of the push with the decision
+   gate's own walk (`decision_gate.py --list-pull-requests` over the first-parent commits; a
+   commit that names none fails the run, as in the gate), and `scripts/release_line.py
+   backports` reads each pull request once and lists one cherry-pick per line its labels name
+   (`backport:X.Y`, the rule of ADR 0116), for a pull request merged into `main`. Only then
+   does the job with the release app's key run, once per entry (a matrix, so one failing
+   backport stops no other), taking number, merge commit, title and line from the entry
+   without reading anything again.
    A label set after the merge no longer starts the workflow: whoever sets it runs
    `gh workflow run backport.yml -f pull_request=N`. So the policy covers one file, and the
    workflow that holds the release app's key no longer starts from an event of a pull request.
@@ -209,7 +211,7 @@ before, as for the bypasses of ADR 0109, read from the latest 100 runs. They liv
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed | #699 | merged |
-| 1 | `backport.yml` on `push` to `main` and `workflow_dispatch`, with a job without secrets that runs `scripts/release_line.py backports` (point 2; the subcommand `backport-lines` is gone); `actions_policies` in `.github/guardrails.json` and `known_unseen`, its read in `scripts/guardrail-fetch.sh` and its comparison in `scripts/guardrail_audit.py` with `--full` for an administrator (points 4 and 5); the gate's runs that GitHub did not start as a finding, read with the workflow's token (`guardrail-audit.yml` with `actions: read`, point 6); tests for points 2 to 6; runbook (*The decision gate did not start*, *Guardrail drift*, *Maintenance lines*), CONTRIBUTING.md, release checklist, threat model, the Status lines of ADR 0109 and 0116 | #699 | merged |
+| 1 | `backport.yml` on `push` to `main` and `workflow_dispatch`, with a job without secrets that lists the pushed pull requests with `decision_gate.py --list-pull-requests` and runs `scripts/release_line.py backports`, and the job with the key as a matrix of its entries (point 2; the subcommand `backport-lines` is gone); `actions_policies` in `.github/guardrails.json` and `known_unseen`, its read in `scripts/guardrail-fetch.sh` and its comparison in `scripts/guardrail_audit.py` with `--full` for an administrator (points 4 and 5); the gate's runs that GitHub did not start as a finding, read with the workflow's token (`guardrail-audit.yml` with `actions: read`, point 6); tests for points 2 to 6; runbook (*The decision gate did not start*, *Guardrail drift*, *Maintenance lines*), CONTRIBUTING.md, release checklist, threat model, the Status lines of ADR 0109 and 0116 | #699 | merged |
 | 2 | The product owner creates the event policy `decision gate`, reads it back and checks that the gate starts (point 8); confirmed by the brownout of 2026-11-16 | GitHub setting | planned |
 
 ## Consequences

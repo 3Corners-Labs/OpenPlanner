@@ -1,8 +1,6 @@
 """Maintenance lines release/X.Y (ADR 0116 point 3): the target, cutting, candidates, tags."""
 
 import json
-import re
-from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -11,16 +9,15 @@ import yaml
 from scripts import release_line, release_plan
 from scripts.release_line import (
     Backport,
-    backport,
     backport_lines,
     backports,
+    backports_of,
     may_cut,
     newest_release,
-    pushed_pull_requests,
     tag_target,
 )
 from scripts.release_plan import MAIN, LineError, Target
-from scripts.report_issue import Runner
+from tests.fakes.gh import FakeGh
 from tests.scripts.conftest import Git, commit_all, cut_line, workflow_events
 
 BACKPORT = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "backport.yml"
@@ -229,102 +226,83 @@ def pull(number: int, *labels: str, merged: bool = True, base: str = "main") -> 
 
 
 PULLS = {
-    5: pull(5, "ci:full", "backport:0.5", "backport:0.6"),
+    5: pull(5, "ci:full", "backport:0.6", "backport:0.5"),
     6: pull(6, "ci:full"),
     7: pull(7, "backport:0.5", merged=False),
     8: pull(8, "backport:x"),
     9: pull(9, "backport:0.5", base="feature-x"),
 }
+FIVE = [
+    Backport(5, "sha5", "fix: number 5", "0.5"),
+    Backport(5, "sha5", "fix: number 5", "0.6"),
+]
 
 
-def fake_api(calls: list[str]) -> Runner:
-    """A ``gh api repos/o/r/pulls/N`` that answers from ``PULLS`` and records each call."""
-
-    def run(args: Sequence[str]) -> str:
-        calls.append(args[1])
-        return json.dumps(PULLS[int(args[1].rsplit("/", 1)[1])])
-
-    return run
-
-
-def test_a_push_names_its_pull_requests_by_the_squash_subjects() -> None:
-    event = {
-        "commits": [
-            {"id": "a" * 40, "message": "fix: one (#5)\n\nthe body mentions (#99)"},
-            {"id": "b" * 40, "message": "feat: a title (#12) that names another (#6)"},
-        ]
-    }
-
-    assert pushed_pull_requests(event) == [5, 6]
-
-
-def test_a_pushed_commit_that_names_no_pull_request_stops_the_run() -> None:
-    """Everything on main comes through the queue; a backport is never skipped quietly."""
-    event = {"commits": [{"id": "c" * 40, "message": "chore: pushed by hand"}]}
-
-    with pytest.raises(LineError, match="names no pull request"):
-        pushed_pull_requests(event)
-
-
-def test_only_a_pull_request_merged_into_main_with_a_line_label_is_backported() -> None:
-    assert backport(PULLS[5]) == Backport(5, "sha5", "fix: number 5", ["0.5", "0.6"])
-    assert backport(PULLS[6]) is None, "no backport label"
-    assert backport(PULLS[7]) is None, "not merged: nothing on main to cherry-pick"
-    assert backport(PULLS[8]) is None, "backport:x names no line"
-    assert backport(PULLS[9]) is None, "merged elsewhere: no fix of main"
+def test_a_pull_request_merged_into_main_gives_one_cherry_pick_per_line() -> None:
+    assert backports_of(PULLS[5]) == FIVE
+    assert backports_of(PULLS[6]) == [], "no backport label"
+    assert backports_of(PULLS[7]) == [], "not merged: nothing on main to cherry-pick"
+    assert backports_of(PULLS[8]) == [], "backport:x names no line"
+    assert backports_of(PULLS[9]) == [], "merged elsewhere: no fix of main"
 
 
 def test_each_pull_request_is_read_once() -> None:
-    calls: list[str] = []
+    fake = FakeGh(pulls=PULLS)
 
-    found = backports([6, 5, 7, 5, 8, 9], "o/r", fake_api(calls))
-
-    assert [item.number for item in found] == [5]
-    assert calls == [f"repos/o/r/pulls/{n}" for n in (5, 6, 7, 8, 9)]
+    assert backports([6, 5, 7, 5, 8, 9], "o/r", fake) == FIVE
+    assert fake.calls == [["api", f"repos/o/r/pulls/{n}"] for n in (5, 6, 7, 8, 9)]
 
 
-def test_the_command_prints_one_json_list_for_a_push_or_a_dispatch(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_the_command_prints_the_matrix_as_one_json_list(
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    event = tmp_path / "event.json"
-    event.write_text(json.dumps({"commits": [{"id": "d", "message": "fix: x (#5)"}]}))
-    run = fake_api([])
+    fake = FakeGh(pulls=PULLS)
 
-    assert release_line.main(["backports", "--repository", "o/r", "--event", str(event)], run) == 0
+    assert release_line.main(["backports", "--repository", "o/r", "--pull", "6", "5"], fake) == 0
     assert json.loads(capsys.readouterr().out) == [
-        {"number": 5, "commit": "sha5", "title": "fix: number 5", "lines": ["0.5", "0.6"]}
+        {"number": 5, "commit": "sha5", "title": "fix: number 5", "line": "0.5"},
+        {"number": 5, "commit": "sha5", "title": "fix: number 5", "line": "0.6"},
     ]
-    assert release_line.main(["backports", "--repository", "o/r", "--pull", "6"], run) == 0
+    assert release_line.main(["backports", "--repository", "o/r", "--pull", "6"], fake) == 0
     assert json.loads(capsys.readouterr().out) == []
 
 
 def test_a_dispatch_with_anything_but_a_number_stops() -> None:
-    for value in ("5;touch x", "-5", "²", ""):
+    for value in ("5;touch", "-5", "²", "*", ""):
         with pytest.raises(SystemExit):
-            release_line.main(["backports", "--repository", "o/r", "--pull", value], fake_api([]))
+            release_line.main(["backports", "--repository", "o/r", "--pull", value], FakeGh())
 
 
 def test_the_backport_starts_from_a_merge_to_main_or_a_dispatch() -> None:
-    workflow = yaml.safe_load(BACKPORT.read_text())
-    on = workflow[True]  # YAML 1.1 reads the key `on` as true
-    find, job = workflow["jobs"]["find"], workflow["jobs"]["backport"]
+    events = workflow_events(BACKPORT)
+    find = yaml.safe_load(BACKPORT.read_text())["jobs"]["find"]
+    script = find["steps"][-1]["run"]
 
-    assert workflow_events(BACKPORT) == {"push", "workflow_dispatch"}, "never pull_request_target"
-    assert on["push"] == {"branches": ["main"]}
-    assert on["workflow_dispatch"]["inputs"]["pull_request"]["required"] is True
+    assert set(events) == {"push", "workflow_dispatch"}, "never pull_request_target"
+    assert events["push"] == {"branches": ["main"]}
+    assert events["workflow_dispatch"]["inputs"]["pull_request"]["required"] is True
     assert "environment" not in find
     assert "secrets." not in json.dumps(find), "the job that reads pull requests holds no secret"
-    assert "scripts.release_line backports" in find["steps"][-1]["run"]
+    assert find["steps"][0]["with"]["fetch-depth"] == 0, "the commits of the push"
+    # The pull requests of a push come from the decision gate's own walk; a commit that names
+    # none fails there (tests/scripts/test_decision_gate.py).
+    assert "python3 -m scripts.decision_gate" in script
+    assert "--list-pull-requests" in script
+    assert "python3 -m scripts.release_line backports" in script
+
+
+def test_the_job_with_the_key_runs_once_per_entry_and_reads_nothing_again() -> None:
+    """One matrix entry per pull request and line: a failing backport stops no other."""
+    job = yaml.safe_load(BACKPORT.read_text())["jobs"]["backport"]
+    step = job["steps"][-1]
+    from_matrix = {name.lower() for name, value in step["env"].items() if "matrix." in str(value)}
+
     assert job["needs"] == "find"
     assert job["if"] == "needs.find.outputs.backports != '[]'"
     assert job["environment"] == "release"
-
-
-def test_the_job_with_the_key_reads_exactly_the_fields_find_lists() -> None:
-    """The cherry-pick loop takes number, commit, title and lines from ``find``'s list."""
-    workflow = yaml.safe_load(BACKPORT.read_text())
-    script = workflow["jobs"]["backport"]["steps"][-1]["run"]
-    used = set(re.findall(r'"\.\[\$i\]\.(\w+)', script))
-
-    assert used == set(Backport.__dataclass_fields__)
-    assert "gh api" not in script, "nothing is read again in the job that holds the key"
+    assert job["strategy"]["fail-fast"] is False
+    assert job["strategy"]["matrix"]["include"] == "${{ fromJSON(needs.find.outputs.backports) }}"
+    assert from_matrix == set(Backport.__dataclass_fields__)
+    assert "gh api" not in step["run"]
+    assert "gh pr view" not in step["run"]
+    assert "github.event.pull_request" not in json.dumps(job)

@@ -16,9 +16,10 @@ Subcommands, for the workflows:
   ``branch=``, ``label=`` (``release.yml``, step ``cut-line``).
 - ``tag-allowed --version X.Y.Z --commit SHA``: whether a release tag may sit on that commit
   (on ``main``, or a patch on its own line); prints ``where=`` and ``latest=`` (``main.yml``).
-- ``backports --repository OWNER/REPO (--event FILE | --pull N)``: the merged pull requests of
-  a push (its event file) or the one dispatched, that carry a ``backport:X.Y`` label; prints one
-  JSON list of ``{number, commit, title, lines}`` (``backport.yml``, job ``find``).
+- ``backports --repository OWNER/REPO --pull N...``: what to cherry-pick for those pull
+  requests (the ones a push merged, listed by ``decision_gate.py --list-pull-requests``, or the
+  one dispatched); prints one JSON list of ``{number, commit, title, line}``, one entry per pull
+  request and line, the matrix of ``backport.yml``'s job ``backport``.
 
 Nothing here pushes, tags or opens anything; ``backports`` only reads pull requests.
 """
@@ -29,11 +30,10 @@ import re
 import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Any
 
-from scripts.decision_gate import pull_request_number
 from scripts.release_plan import (
+    MAIN,
     LineError,
     Target,
     git,
@@ -45,8 +45,6 @@ from scripts.release_plan import (
 from scripts.report_issue import Runner, run_gh
 
 BACKPORT_LABEL = re.compile(r"^backport:(\d+\.\d+)$")
-MAIN_BRANCH = "main"
-"""A fix reaches a line only after it merged into ``main`` (ADR 0116 point 3)."""
 
 
 def newest_release(line: str, tags: Iterable[str]) -> str | None:
@@ -97,59 +95,40 @@ def backport_lines(labels: Iterable[str]) -> list[str]:
 
 @dataclass(frozen=True)
 class Backport:
-    """One merged pull request to cherry-pick onto the lines its labels name (ADR 0116, 0120)."""
+    """One cherry-pick of a merged pull request onto one line (ADR 0116 point 3, ADR 0120)."""
 
     number: int
     commit: str
     """The pull request's merge commit on ``main``: git data that is cherry-picked, never run."""
     title: str
-    lines: list[str]
+    line: str
+    """``X.Y``, from a label that matches ``BACKPORT_LABEL``."""
 
 
-def pushed_pull_requests(event: Mapping[str, Any]) -> list[int]:
-    """Return the pull requests that a push to ``main`` merged, from its commits' subjects.
+def backports_of(pull: Mapping[str, Any]) -> list[Backport]:
+    """Return the cherry-picks for one pull request as the API returns it, one per line.
 
-    The merge queue pushes one squash commit ``Title (#N)`` per pull request. The number is read
-    with the decision gate's own rule, so the two cannot disagree, and without asking the API,
-    which may not link a commit to its pull request yet right after the push.
-
-    Raises:
-        LineError: A pushed commit names no pull request; everything on ``main`` comes through
-            the queue, so that is never skipped quietly.
-    """
-    numbers = []
-    for commit in event.get("commits") or []:
-        subject = str(commit.get("message", "")).split("\n", 1)[0]
-        number = pull_request_number(subject)
-        if number is None:
-            raise LineError(f"commit {str(commit.get('id'))[:12]} names no pull request: {subject}")
-        sys.stderr.write(f"commit {str(commit.get('id'))[:12]} merged #{number}\n")
-        numbers.append(number)
-    return numbers
-
-
-def backport(pull: Mapping[str, Any]) -> Backport | None:
-    """Return what to backport for one pull request as the API returns it, or ``None``.
-
-    Only a pull request merged into ``main`` with at least one ``backport:X.Y`` label counts: a
-    label such as ``backport:x`` names no line, and a pull request merged elsewhere is no fix of
-    ``main``.
+    Only a pull request merged into ``main`` counts, once for every line its labels name: a
+    label such as ``backport:x`` names no line, and a pull request merged elsewhere is no fix
+    of ``main``. Anything else gives an empty list.
     """
     lines = backport_lines(str(label.get("name", "")) for label in pull.get("labels") or [])
     base = (pull.get("base") or {}).get("ref")
-    if not pull.get("merged") or base != MAIN_BRANCH or not lines:
-        return None
-    return Backport(int(pull["number"]), str(pull["merge_commit_sha"]), str(pull["title"]), lines)
+    if not pull.get("merged") or base != MAIN.branch:
+        return []
+    return [
+        Backport(int(pull["number"]), str(pull["merge_commit_sha"]), str(pull["title"]), line)
+        for line in lines
+    ]
 
 
 def backports(numbers: Iterable[int], repository: str, run: Runner = run_gh) -> list[Backport]:
-    """Read each pull request once and return the ones to backport, by number."""
-    found = []
-    for number in sorted(set(numbers)):
-        item = backport(json.loads(run(["api", f"repos/{repository}/pulls/{number}"])))
-        if item is not None:
-            found.append(item)
-    return found
+    """Read each pull request once and return its cherry-picks, by number and line."""
+    return [
+        item
+        for number in sorted(set(numbers))
+        for item in backports_of(json.loads(run(["api", f"repos/{repository}/pulls/{number}"])))
+    ]
 
 
 def _pull_number(value: str) -> int:
@@ -200,19 +179,13 @@ def main(argv: Sequence[str] | None = None, run: Runner = run_gh) -> int:
     allowed = commands.add_parser("tag-allowed", help="may a release tag sit on this commit")
     allowed.add_argument("--version", required=True)
     allowed.add_argument("--commit", required=True)
-    found = commands.add_parser("backports", help="the merged pull requests to backport")
+    found = commands.add_parser("backports", help="the cherry-picks of merged pull requests")
     found.add_argument("--repository", required=True, help="OWNER/REPO")
-    source = found.add_mutually_exclusive_group(required=True)
-    source.add_argument("--event", type=Path, help="the push's event file")
-    source.add_argument("--pull", type=_pull_number, help="a dispatched pull request number")
+    found.add_argument("--pull", type=_pull_number, nargs="+", required=True, help="numbers")
     args = parser.parse_args(argv)
 
     def _backports(args: argparse.Namespace) -> None:
-        if args.event is not None:
-            numbers = pushed_pull_requests(json.loads(args.event.read_text()))
-        else:
-            numbers = [args.pull]
-        found = backports(numbers, args.repository, run)
+        found = backports(args.pull, args.repository, run)
         sys.stdout.write(json.dumps([asdict(item) for item in found]) + "\n")
 
     handlers = {"cut": _cut, "tag-allowed": _tag_allowed, "backports": _backports}

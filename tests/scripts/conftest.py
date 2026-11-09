@@ -6,6 +6,7 @@ The throw-away repository itself is the ``git`` fixture of ``tests/conftest.py``
 
 import os
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -20,16 +21,19 @@ def fake_program(directory: Path, name: str, script: str) -> Path:
     return directory
 
 
-def workflow_events(workflow: Path) -> set[str]:
-    """Return the events that start a GitHub workflow file.
+def workflow_events(workflow: Path) -> dict[str, Any]:
+    """Return the events that start a GitHub workflow file, each with its settings.
 
-    YAML 1.1 reads the key ``on`` as ``True``; the value is one event, a list or a mapping.
+    YAML 1.1 reads the key ``on`` as ``True``. The value is one event, a list or a mapping;
+    an event given without settings maps to ``None``.
     """
     data = yaml.safe_load(workflow.read_text())
     on = data.get("on", data.get(True))
     if isinstance(on, str):
-        return {on}
-    return set(on or ())
+        return {on: None}
+    if isinstance(on, list):
+        return dict.fromkeys(on)
+    return dict(on or {})
 
 
 def script_path(fakes: Path) -> str:
