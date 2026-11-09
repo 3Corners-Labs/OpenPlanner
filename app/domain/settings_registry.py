@@ -1127,6 +1127,15 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=50,
     ),
     S(
+        "reporting_usage_events_to_log",
+        K.BOOL,
+        False,
+        _C,
+        T.RETENTION,
+        "Also write every usage fact as the log line usage.fact for the log destinations: counts "
+        "and codes only, no personal data (ADR 0117 point 15).",
+    ),
+    S(
         "reporting_export_max_rows",
         K.INT,
         100_000,

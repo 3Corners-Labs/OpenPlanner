@@ -254,6 +254,9 @@ class Settings(BaseSettings):
     # an organisation may raise it to for its own view (class D, never lower).
     reporting_min_cell_size: int = Field(default=5, ge=3, le=20)
     reporting_org_min_cell_size: int = Field(default=3, ge=3, le=50)
+    # ADR 0117 point 15 (class C, platform): also write every non-team usage fact as the log line
+    # usage.fact for the log destinations; no personal data. Off by default.
+    reporting_usage_events_to_log: bool = False
     # ADR 0117 point 12 (class C, platform): most rows and most days one report CSV may hold; more
     # is refused with a code, never cut short.
     reporting_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)

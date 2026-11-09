@@ -11431,6 +11431,8 @@ msgstr "Meeste cellen op één pagina van de gebruiks-API"
 
 msgid "settings.field.reporting_api_rate_per_minute.label"
 msgstr "Aanroepen per minuut per API-client naar de gebruiks-API"
+msgid "settings.field.reporting_usage_events_to_log.label"
+msgstr "Gebruiksfeiten ook naar de logdoelen sturen"
 msgid "admin.agenda.propose"
 msgstr "Nieuwe tijd voorstellen"
 

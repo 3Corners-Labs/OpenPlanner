@@ -56,6 +56,7 @@ SETTING_LABELS: dict[str, str] = {
     "reporting_retention_months": "settings.field.reporting_retention_months.label",
     "reporting_min_cell_size": "settings.field.reporting_min_cell_size.label",
     "reporting_org_min_cell_size": "settings.field.reporting_org_min_cell_size.label",
+    "reporting_usage_events_to_log": "settings.field.reporting_usage_events_to_log.label",
     "reporting_export_max_rows": "settings.field.reporting_export_max_rows.label",
     "reporting_export_max_days": "settings.field.reporting_export_max_days.label",
     "reporting_api_page_size": "settings.field.reporting_api_page_size.label",

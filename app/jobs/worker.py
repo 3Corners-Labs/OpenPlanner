@@ -124,6 +124,7 @@ async def run_worker(
         secret_box(settings),
         StdoutEventSink(settings.event_envelope),
         usage_enabled=lambda: live.settings.reporting_enabled,  # ADR 0117, read at each write
+        usage_to_log=lambda: live.settings.reporting_usage_events_to_log,  # point 15
     )
     # ADR 0042 §6: portal values, reloaded once per loop when settings_version moved; the
     # services below read theirs through ``live`` each time they need them.
