@@ -25,6 +25,7 @@ from app.domain.channel_settings import ChannelSettings
 from app.domain.checks import CheckStatus, GroupCheck
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration_check import has_chain
+from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.scheduling import Group, ScheduleRule
 
@@ -162,9 +163,7 @@ class ReadinessService:
         """
         require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
         async with self._uow.read() as tx:
-            group = await tx.get_group(slug)
-            if group is None:
-                raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+            group = await group_by_slug(tx, slug)
             today = group.today(self._clock.now())
             rules, _ = await tx.get_schedule(group.id, today, today)
             texts = await tx.get_group_texts(group.id)

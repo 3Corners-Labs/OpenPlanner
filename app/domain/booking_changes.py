@@ -6,6 +6,7 @@ participant's own reschedule. This module holds the steps both callers run insid
 locked transaction, and the planner's limits:
 
     planner may change?  confirmed or pending, scheduled, not dispatched, starts after the lead
+    planner may rebook?  as above, and only confirmed (ADR 0056 point 11)
     cancel               status cancelled (+ reason) ─► jobs: end task, delete meeting,
                          cancellation mail (and SMS when reachable), purge
     request rebook       status awaiting_rebook (+ reason, rebook_by), place freed ─► jobs:
@@ -20,6 +21,7 @@ locked transaction, and the planner's limits:
                          message (ADR 0056; the participant's own lapse, kept beside the other)
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -68,6 +70,10 @@ class ProposalTiming:
     hours: ProposalHours
 
 
+PlannerRule = Callable[[Booking, Group, datetime], None]
+"""One of a planner's limits (``ensure_planner_may_*``): returns, or raises the refusal."""
+
+
 def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> None:
     """Refuse a planner's change that needs a phone call instead of a message.
 
@@ -91,22 +97,51 @@ def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> 
         raise DomainError(ErrorCode.PLANNER_TOO_LATE)
 
 
-def planner_may_request_rebook(booking: Booking, group: Group, now: datetime) -> bool:
-    """Return whether a planner may ask ``booking``'s participant to choose a new time.
+def ensure_planner_may_request_rebook(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse asking ``booking``'s participant to choose a new time unless it is confirmed.
 
-    Only a confirmed booking a planner may change: one awaiting confirmation is moved,
-    cancelled or left to lapse (ADR 0056 point 11), one awaiting a new time already waits.
+    The one rule for both ways of asking: the request (ADR 0044) and the proposal (ADR 0057),
+    their forms, the review's list and the agenda's links. Asking is a change, so the limits
+    of ``ensure_planner_may_change`` come first and their refusal wins. Then only a confirmed
+    booking: one awaiting confirmation is moved, cancelled or left to lapse (ADR 0056 point 11),
+    one awaiting a new time already waits.
+
+    Raises:
+        DomainError: ``booking_not_active`` or ``planner_too_late``.
     """
-    return booking.is_active and planner_may_change(booking, group, now)
+    ensure_planner_may_change(booking, group, now)
+    if not booking.is_active:
+        raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
 
 
 def planner_may_change(booking: Booking, group: Group, now: datetime) -> bool:
     """Return whether a planner may still change ``booking`` now (for links and lists)."""
-    try:
-        ensure_planner_may_change(booking, group, now)
-    except DomainError:
-        return False
-    return True
+    return _allows(ensure_planner_may_change, booking, group, now)
+
+
+def planner_may_request_rebook(booking: Booking, group: Group, now: datetime) -> bool:
+    """Return whether a planner may ask ``booking``'s participant to choose a new time now."""
+    return _allows(ensure_planner_may_request_rebook, booking, group, now)
+
+
+def ensure_participant_may_move(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse a participant's move from the change deadline on (ADR 0069).
+
+    A booking on hold (suspended, or awaiting a new time) has no deadline: it does not go
+    ahead at its time anyway.
+    """
+    if booking.on_hold:
+        return
+    if now >= group.change_deadline(booking.start):
+        raise DomainError(ErrorCode.BOOKING_LOCKED)
+
+
+def ensure_participant_may_cancel(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse a participant's cancellation from the start on (ADR 0069); on hold has none."""
+    if booking.on_hold:
+        return
+    if now >= group.cancel_deadline(booking.start):
+        raise DomainError(ErrorCode.BOOKING_LOCKED)
 
 
 def sms_reachable(booking: Booking) -> bool:
@@ -313,6 +348,15 @@ async def lapse_unconfirmed(tx: Transaction, booking: Booking, now: datetime) ->
     await tx.save_booking(booking.expire(now))
     await record_confirm_expired(tx, booking, await _group(tx, booking), now)
     await tx.add_jobs(_id(booking), plan_for_unconfirmed_lapse(now=now))
+    return True
+
+
+def _allows(rule: PlannerRule, booking: Booking, group: Group, now: datetime) -> bool:
+    """Return whether ``rule`` lets a planner act on ``booking`` now, without raising."""
+    try:
+        rule(booking, group, now)
+    except DomainError:
+        return False
     return True
 
 

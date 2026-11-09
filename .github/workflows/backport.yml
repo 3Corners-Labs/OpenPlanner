@@ -3,18 +3,36 @@ name: backport
 # ADR 0116 point 3: a fix merges to main first; the label `backport:X.Y` on its pull request
 # opens the cherry-pick pull request onto the maintenance line release/X.Y, which then runs the
 # full lane on the pull request under the line's ruleset (and the decision gate, as on main).
-# The label may be set before or after the merge. A cherry-pick that does not apply cleanly
-# opens nothing: the job comments on the pull request, and a Claude Code session (or a person)
-# makes the backport by hand with `git cherry-pick -x`.
+# A cherry-pick that does not apply cleanly opens nothing: the job comments on the pull
+# request, and a Claude Code session (or a person) makes the backport by hand with
+# `git cherry-pick -x`.
 #
-# `pull_request_target` runs this file and its checkout from main, never from the pull request;
-# the only thing taken from the pull request is its merge commit on main, which is git data,
-# not code that runs here. The release app's token (ADR 0107, environment `release`) pushes
-# the branch and opens the pull request, so its CI starts (a pull request opened with
+# ADR 0120: the workflow starts from the push to main that a merge makes, not from
+# `pull_request_target`, which GitHub blocks by default in public repositories from 2026-12-02
+# and which the repository allows for the decision gate only. The merge queue pushes one squash
+# commit `Title (#N)` per pull request. `find`, which holds no secret, runs
+# `release_line.py backports`: it walks the push with the decision gate's own `queue_commits`
+# (a commit that names no pull request, or two that name the same one, fail the run), reads
+# each pull request once, refuses
+# one whose merge commit is not the commit that named it, and keeps one entry per line its
+# `backport:X.Y` labels name. A label set after the merge: run the workflow by hand,
+# `gh workflow run backport.yml -f pull_request=N` (digits only).
+#
+# Nothing from a pull request runs here. Both jobs check out main. The job with the key runs
+# once per entry (a matrix: one failing backport does not stop the others) and takes from it
+# only the merge commit on main (git data, cherry-picked, never executed), the title (a quoted
+# variable) and the line (X.Y). The release app's token (ADR 0107, environment `release`)
+# pushes the branch and opens the pull request, so its CI starts (a pull request opened with
 # GITHUB_TOKEN starts no workflow).
 on:
-  pull_request_target:
-    types: [closed, labeled]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: "The number of a merged pull request whose backport:X.Y label was set after the merge"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -24,12 +42,51 @@ defaults:
     shell: bash
 
 jobs:
+  find:
+    name: merged pull requests with a backport label
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backports: ${{ steps.find.outputs.backports }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0   # the commits between the old and the new head of main
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          DISPATCHED: ${{ inputs.pull_request }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            # One pull request number, passed on as one argument; the value is never echoed.
+            if ! [[ "$DISPATCHED" =~ ^[0-9]+$ ]]; then
+              echo "::error::the input pull_request is not a pull request number"
+              exit 1
+            fi
+            listed=(--pull "$DISPATCHED")
+          else
+            listed=(--base "$BEFORE" --head "$GITHUB_SHA")
+          fi
+          # A failed read, a commit that names no pull request, a pull request named twice or
+          # a refused pull request fails the run (it can be re-run); never a quiet skip.
+          found="$(python3 -m scripts.release_line backports \
+            --repository "$GITHUB_REPOSITORY" "${listed[@]}")"
+          echo "backports=$found" >> "$GITHUB_OUTPUT"
+
   backport:
-    name: cherry-pick onto the maintenance lines
-    if: >-
-      github.event.pull_request.merged == true
-      && contains(join(github.event.pull_request.labels.*.name, ' '), 'backport:')
-      && (github.event.action == 'closed' || startsWith(github.event.label.name, 'backport:'))
+    name: "cherry-pick #${{ matrix.number }} onto release/${{ matrix.line }}"
+    needs: find
+    if: needs.find.outputs.backports != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.find.outputs.backports) }}
     runs-on: ubuntu-26.04
     environment: release
     timeout-minutes: 10
@@ -50,42 +107,37 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0   # the merge commit and the lines
           token: ${{ steps.app.outputs.token }}
-      - name: one cherry-pick pull request per line
+      - id: cherry-pick
+        name: one cherry-pick pull request
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           COMMENT_TOKEN: ${{ github.token }}
-          APP_SLUG: ${{ steps.app.outputs.app-slug }}
-          NUMBER: ${{ github.event.pull_request.number }}
-          TITLE: ${{ github.event.pull_request.title }}
-          COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
-          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
-          ONLY: ${{ github.event.action == 'labeled' && github.event.label.name || '' }}
+          # One entry of `release_line.py backports`: nothing is read again here.
+          NUMBER: ${{ matrix.number }}
+          COMMIT: ${{ matrix.commit }}
+          TITLE: ${{ matrix.title }}
+          LINE: ${{ matrix.line }}
         run: |
           set -euo pipefail
-          set -f   # label names are never globbed
           scripts/release-git-identity.sh
-          # shellcheck disable=SC2086 # LABELS is a space-separated list of label names
-          lines="$(python3 -m scripts.release_line backport-lines -- ${ONLY:-$LABELS})"
-          for line in $lines; do
-            branch="backport/$line/pr-$NUMBER"
-            if ! git rev-parse --verify --quiet "origin/release/$line" >/dev/null; then
-              GH_TOKEN="$COMMENT_TOKEN" gh pr comment "$NUMBER" --body "Backport to \`release/$line\`: that line does not exist (cut it with the \`cut-line\` step of the release workflow, ADR 0116)."
-              continue
-            fi
-            if [ -n "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
-              echo "::notice::$branch has a pull request already"
-              continue
-            fi
-            git switch -q -C "$branch" "origin/release/$line"
-            if ! git cherry-pick -x "$COMMIT"; then
-              git cherry-pick --abort
-              GH_TOKEN="$COMMENT_TOKEN" gh pr comment "$NUMBER" --body "Backport to \`release/$line\` does not apply cleanly. Make it by hand: \`git switch -c $branch origin/release/$line && git cherry-pick -x $COMMIT\`, resolve, and open the pull request against \`release/$line\` (ADR 0116)."
-              continue
-            fi
-            git push --force origin "$branch"
-            url="$(gh pr create --base "release/$line" --head "$branch" \
-              --title "$TITLE (backport to $line)" \
-              --body "Cherry-pick of #$NUMBER ($COMMIT) onto \`release/$line\` (ADR 0116 point 3), opened by the backport workflow for the label \`backport:$line\`. The review questions and the security review are those of #$NUMBER; the pull request runs the full lane and must be up to date with the line.")"
-            gh pr merge --auto --squash "$url"
-            echo "::notice::opened $url"
-          done
+          branch="backport/$LINE/pr-$NUMBER"
+          if ! git rev-parse --verify --quiet "origin/release/$LINE" >/dev/null; then
+            GH_TOKEN="$COMMENT_TOKEN" gh pr comment "$NUMBER" --body "Backport to \`release/$LINE\`: that line does not exist (cut it with the \`cut-line\` step of the release workflow, ADR 0116)."
+            exit 0
+          fi
+          if [ -n "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
+            echo "::notice::$branch has a pull request already"
+            exit 0
+          fi
+          git switch -q -C "$branch" "origin/release/$LINE"
+          if ! git cherry-pick -x "$COMMIT"; then
+            git cherry-pick --abort
+            GH_TOKEN="$COMMENT_TOKEN" gh pr comment "$NUMBER" --body "Backport to \`release/$LINE\` does not apply cleanly. Make it by hand: \`git switch -c $branch origin/release/$LINE && git cherry-pick -x $COMMIT\`, resolve, and open the pull request against \`release/$LINE\` (ADR 0116)."
+            exit 0
+          fi
+          git push --force origin "$branch"
+          url="$(gh pr create --base "release/$LINE" --head "$branch" \
+            --title "${TITLE:0:200} (backport to $LINE)" \
+            --body "Cherry-pick of #$NUMBER ($COMMIT) onto \`release/$LINE\` (ADR 0116 point 3), opened by the backport workflow for the label \`backport:$LINE\`. The review questions and the security review are those of #$NUMBER; the pull request runs the full lane and must be up to date with the line.")"
+          gh pr merge --auto --squash "$url"
+          echo "::notice::opened $url"

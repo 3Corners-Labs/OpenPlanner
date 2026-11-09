@@ -14,7 +14,7 @@ from app.domain.usage_report import (
 )
 from app.domain.usage_report_queue import queue_report
 
-GROUP = ReportGroup(1, 1, "aangifte", "Aangifte", "demo", "Demo", "Europe/Amsterdam")
+GROUP = ReportGroup(1, 1, "balie", "Balie", "demo", "Demo", "Europe/Amsterdam")
 FIRST = date(2026, 11, 2)
 LAST = date(2026, 11, 8)
 NOW = datetime(2026, 11, 9, 12, 0, tzinfo=UTC)

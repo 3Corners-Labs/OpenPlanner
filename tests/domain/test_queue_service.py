@@ -1,5 +1,6 @@
 """Working the own queue: claim next, claim a row, release, the host link (ADR 0043)."""
 
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
 
@@ -8,7 +9,7 @@ import pytest
 from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Principal, Role
-from app.domain.booking import MeetingRef
+from app.domain.booking import BookingStatus, MeetingRef
 from app.domain.calls import CallStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.queue_service import QueueService
@@ -18,6 +19,7 @@ from app.domain.staff import Membership, StaffMember
 from app.domain.tokens import agent_pseudonym
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.support.cross_group import booking_id_methods, refused_as_unknown
 from tests.support.domain import (
     ADA,
     NOW,
@@ -180,21 +182,50 @@ async def test_release_by_the_agent_or_a_group_admin_only(
     assert uow.state.bookings[booking_id].claim is None
 
 
-async def test_another_groups_booking_does_not_exist_here(
-    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+async def test_an_unknown_booking_does_not_exist_here(
+    queue: QueueService, uow: InMemoryUnitOfWork
 ) -> None:
-    for group_id in (1, 2):
-        uow.state.groups[group_id] = replace(
-            uow.state.groups[group_id], queue_free_pick_allowed=True
-        )
-    other = await _book(uow, clock, slug="andere")
-    await _book(uow, clock)
-    clock.advance(SLOT_0900 - clock.now())
+    uow.state.groups[2] = replace(uow.state.groups[2], queue_free_pick_allowed=True)
 
-    for admin, slug, booking_id in ((OTHER_TEAM, "andere", 999), (AGENT, "demo", other)):
-        with pytest.raises(DomainError) as excinfo:
-            await queue.claim(admin, slug, booking_id)
-        assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
+    with pytest.raises(DomainError) as excinfo:
+        await queue.claim(OTHER_TEAM, "andere", 999)
+    assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
+
+
+ON_ONE_BOOKING: dict[str, Callable[[QueueService, int], Awaitable[object]]] = {
+    "claim": lambda s, b: s.claim(GROUP_ADMIN, "demo", b),
+    "claimed": lambda s, b: s.claimed(GROUP_ADMIN, "demo", b),
+    "release": lambda s, b: s.release(GROUP_ADMIN, "demo", b),
+}
+"""Every use case on one booking, by the group admin of ``demo`` through their own group."""
+
+
+def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
+    assert set(ON_ONE_BOOKING) == booking_id_methods(QueueService)
+
+
+@pytest.mark.parametrize("state", ["unclaimed", "claimed", "cancelled"])
+@pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
+async def test_another_groups_booking_is_not_found_through_this_group(
+    action: str, state: str, queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """A group admin, who may release any claim of their group, finds no other group's booking.
+
+    The booking is in ``andere``, a sibling group of ``demo``. Unclaimed or claimed, a use case
+    would claim, show or release it, or answer another code, so a missing group check fails.
+    Cancelled, the queue's own rule answers ``booking_not_active``, so a group check made after
+    that rule fails too.
+    """
+    uow.state.groups[1] = replace(uow.state.groups[1], queue_free_pick_allowed=True)
+    other = await _book(uow, clock, slug="andere")
+    clock.advance(SLOT_0900 - clock.now())
+    if state == "claimed":
+        await queue.claim_next(OTHER_TEAM, "andere")
+    if state == "cancelled":
+        booking = uow.state.bookings[other]
+        uow.state.bookings[other] = replace(booking, status=BookingStatus.CANCELLED)
+
+    await refused_as_unknown(uow, other, ON_ONE_BOOKING[action](queue, other))
 
 
 @pytest.mark.parametrize("principal", [OTHER_TEAM, AUDITOR])

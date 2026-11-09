@@ -20,16 +20,16 @@ from tests.support.principals import principal
 
 EVERYTHING = Scope(everything=True)
 ADMIN = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
-BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),), {"nl": "Bel ons"})
+BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "012 345 6789"),), {"nl": "Bel ons"})
 TEXT = ImageText({"nl": "Deur", "en": "Door"})
 
 
 async def _group(engine: AsyncEngine) -> tuple[SqlUnitOfWork, Group]:
-    """Seed the group ``aangifte`` and return the unit of work and the group."""
-    await seed_group(engine, slug="aangifte")
+    """Seed the group ``balie`` and return the unit of work and the group."""
+    await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     async with uow.read() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
     assert group is not None
     return uow, group
 
@@ -66,11 +66,11 @@ async def test_scenarios_round_trip_per_owner(engine: AsyncEngine) -> None:
 async def test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with_it(
     engine: AsyncEngine,
 ) -> None:
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     image = ImageFile.from_upload(png())
     async with uow.locked() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         scenario = await tx.add_scenario(
             ClosureScenario(None, group.organisation_id, None, "Storing", NOTICES)
@@ -89,7 +89,7 @@ async def test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with
         uow, clock, AdminService(uow, clock), BookingService(uow, clock, TEST_TOKEN_KEY)
     )
     start = ClosureInput(None, None, NOTICES, scenario_id=scenario_id)
-    await closures.close_group(ADMIN, "aangifte", start)
+    await closures.close_group(ADMIN, "balie", start)
     assert await count_images(engine) == 2  # the closure has its own copy
 
     async with uow.locked() as tx:
@@ -118,11 +118,11 @@ async def test_listing_follows_the_scope(engine: AsyncEngine) -> None:
     async with uow.locked() as tx:
         await tx.add_scenario(ClosureScenario(None, org, None, "Storing", NOTICES))
         await tx.add_scenario(ClosureScenario(None, org, group.id, "Brand", NOTICES))
-        summary = await tx.get_group_summary("aangifte")
+        summary = await tx.get_group_summary("balie")
         assert summary is not None
         slug = summary.organisation_slug
 
-    in_group = Scope(groups=frozenset({(slug, "aangifte")}))
+    in_group = Scope(groups=frozenset({(slug, "balie")}))
     other_group = Scope(groups=frozenset({(slug, "elders")}))
     in_organisation = Scope(organisations=frozenset({slug}))
     async with uow.read() as tx:

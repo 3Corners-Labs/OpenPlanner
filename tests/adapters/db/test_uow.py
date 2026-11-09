@@ -82,7 +82,7 @@ async def test_availability_reflects_bookings(engine: AsyncEngine, service: Book
     await seed_group(engine, capacity=2)
     await book(service)
 
-    slots = await service.availability("aangifte", MONDAY, MONDAY)
+    slots = await service.availability("balie", MONDAY, MONDAY)
 
     assert [(s.start, s.remaining) for s in slots] == [(SLOT_0900, 1), (SLOT_0930, 2)]
 
@@ -133,7 +133,7 @@ async def test_reschedule_and_rollback(engine: AsyncEngine, service: BookingServ
 async def test_reschedule_into_another_groups_slot(
     engine: AsyncEngine, service: BookingService
 ) -> None:
-    await seed_group(engine, slug="aangifte", weekday=0)
+    await seed_group(engine, slug="balie", weekday=0)
     await seed_group(engine, slug="helpdesk", weekday=1)
     receipt = await book(service)
 
@@ -149,7 +149,7 @@ async def test_closed_day_is_respected(engine: AsyncEngine, service: BookingServ
 
     with pytest.raises(DomainError, match="slot_unavailable"):
         await book(service)
-    assert await service.availability("aangifte", MONDAY, MONDAY) == []
+    assert await service.availability("balie", MONDAY, MONDAY) == []
 
 
 PATIENT_BUSY_TIMEOUT_MS = 60_000
@@ -217,7 +217,7 @@ async def test_reads_are_not_blocked_by_a_writer(
     blocker = create_engine(database_url)
     try:
         async with hold_write_lock(blocker):
-            slots = await service.availability("aangifte", MONDAY, MONDAY)
+            slots = await service.availability("balie", MONDAY, MONDAY)
     finally:
         await blocker.dispose()
 

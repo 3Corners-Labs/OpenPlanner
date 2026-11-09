@@ -90,7 +90,7 @@ from app.web.authz_labels import PERMISSION_LABELS
 from app.web.charts import Datum
 from app.web.job_labels import JOB_TYPE_LABELS
 from app.web.locale import RequestLocale
-from app.web.templates import FragmentResponse, render
+from app.web.templates import ENVIRONMENT_LABELS, FragmentResponse, render
 from app.web.update_labels import STATUS_LABELS
 from app.web.widgets import OVERVIEW_PATH, View, Widget, on_overview, resolve_view, widget
 
@@ -527,6 +527,7 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
     diagnostics: DiagnosticsService = request.app.state.diagnostics_service
     modes = len(await diagnostics.active())
     problems = 0 if settings.environment == "prod" else len(settings.production_problems())
+    environment = _(ENVIRONMENT_LABELS[settings.environment])
     plaintext_mail = await _plaintext_mail(request, principal, settings, can)
     proxy_problem = await address_problem(request, locale, settings)
     updates_href = "/admin/updates" if can(Permission.SYSTEM_UPDATE) else None
@@ -605,11 +606,11 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
             _("admin.overview.widget.status.environment"),
             _(
                 "admin.overview.widget.status.environment.problems",
-                environment=settings.environment,
+                environment=environment,
                 count=problems,
             )
             if problems
-            else _("admin.overview.widget.status.environment.ok", environment=settings.environment),
+            else _("admin.overview.widget.status.environment.ok", environment=environment),
             "warning" if problems else "",
             "/admin/settings",
         ),

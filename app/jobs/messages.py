@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from app.domain.booking import Booking, ChangeReason
+from app.domain.change_requests import ChangeAction, ChangeRequest, appointment_code
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.job_plan import JobType
@@ -44,13 +45,15 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 class ManageLink(Enum):
     """Where a message's link to the booking goes, and the words on it.
 
-    A request to confirm (ADR 0056 §8) and a proposed new time (ADR 0057 §8) link to a page that
-    acts only on its POST, so a mail scanner opening the link changes nothing.
+    A request to confirm (ADR 0056 §8), a proposed new time (ADR 0057 §8) and a bot's change
+    request (ADR 0023 step 2) link to a page that acts only on its POST, so a mail scanner
+    opening the link changes nothing.
     """
 
     MANAGE = ("", "message.manage_link")
     CONFIRM = ("/confirm", "message.confirm_link")
     PROPOSAL = ("/proposal", "message.proposal_link")
+    CHANGE = ("/change", "message.change_request_link")
 
     def __init__(self, suffix: str, text_key: str) -> None:
         """Bind the path after the management link and the catalogue key of the link text."""
@@ -103,8 +106,44 @@ class MessageKind:
         """
         return self.link is ManageLink.PROPOSAL
 
+    @property
+    def change_request(self) -> bool:
+        """Whether it asks to confirm a bot's change request (ADR 0023 step 2).
+
+        Its kind follows the request's action (``CHANGE_REQUEST_KINDS``) and its deadline is the
+        request's ``expires_at``.
+        """
+        return self.link is ManageLink.CHANGE
+
+
+def _change_request_kind(intro_key: str, sms_key: str) -> MessageKind:
+    """Return the message asking to confirm a bot's cancel or move (ADR 0023 step 2)."""
+    return MessageKind(
+        "message.change_request.subject",
+        intro_key,
+        True,
+        False,
+        sms_key,
+        manage_key="message.manage_change_request",
+        calendar=False,
+        link=ManageLink.CHANGE,
+    )
+
+
+CHANGE_REQUEST_KINDS: dict[ChangeAction, MessageKind] = {
+    ChangeAction.CANCEL: _change_request_kind(
+        "message.change_request.intro_cancel", "message.change_request.sms_cancel"
+    ),
+    ChangeAction.RESCHEDULE: _change_request_kind(
+        "message.change_request.intro_reschedule", "message.change_request.sms_reschedule"
+    ),
+}
+"""The message of a change request per action (ADR 0023 step 2)."""
+
 
 MESSAGE_KINDS: dict[JobType, MessageKind] = {
+    # ADR 0023 step 2: the job's kind; ``compose`` takes the one of the request's action.
+    JobType.SEND_CHANGE_REQUEST: CHANGE_REQUEST_KINDS[ChangeAction.CANCEL],
     JobType.SEND_CONFIRMATION: MessageKind(
         "message.confirmation.subject", "message.confirmation.intro", True, False
     ),
@@ -264,16 +303,38 @@ REASON_KEYS: dict[ChangeReason, str] = {
 
 
 def _deadline(
-    kind: MessageKind, booking: Booking, group: Group, proposal: HeldProposal | None = None
+    kind: MessageKind,
+    booking: Booking,
+    group: Group,
+    proposal: HeldProposal | None = None,
+    change: ChangeRequest | None = None,
 ) -> datetime:
     """Return the deadline the message names: a lapse of a request, else the change one."""
     if kind.proposal and proposal is not None:
         return proposal.confirm_by
+    if kind.change_request and change is not None:
+        return change.expires_at
     if kind.rebook and booking.rebook_by is not None:
         return booking.rebook_by
     if kind.confirm and booking.confirm_by is not None:
         return booking.confirm_by
     return group.change_deadline(booking.start)
+
+
+def _new_moment(
+    booking: Booking, proposal: HeldProposal | None, change: ChangeRequest | None
+) -> tuple[datetime, datetime] | None:
+    """Return the start and end of the new time a message names: proposed or requested."""
+    if proposal is not None:
+        return proposal.start, proposal.end
+    if change is not None and change.target_start is not None:
+        return change.target_start, change.target_start + (booking.end - booking.start)
+    return None
+
+
+def _shows_code(kind: MessageKind) -> bool:
+    """Return whether a message shows the appointment code: one that links to the booking."""
+    return kind.includes_manage_link and kind.link is ManageLink.MANAGE and not kind.rebook
 
 
 def _reason(booking: Booking, _: "_Texts") -> str | None:
@@ -326,6 +387,8 @@ class MessageComposer:
         closure: Closure | None = None,
         product_footer: bool = True,
         proposal: HeldProposal | None = None,
+        change: ChangeRequest | None = None,
+        show_code: bool = False,
     ) -> OutboundMessage:
         """Return the message for ``job_type`` on ``channel``.
 
@@ -341,40 +404,48 @@ class MessageComposer:
                 the product mark (ADR 0060 §6, the organisation's class D setting). The
                 plain-text part never carries it.
             proposal: For a proposed new time: the proposal it is about (ADR 0057).
+            change: For a bot's change request: the request it is about (ADR 0023 step 2).
+            show_code: Whether the message shows the appointment code (the
+                organisation's ``agent_change_requests_enabled``); only a message that links to
+                the booking itself shows it.
 
         Raises:
             KeyError: If ``job_type`` is not a message job.
             ValueError: If the booking's personal data has been purged, it has no phone
                 number for an SMS, the message has no SMS form, a closure message has no
-                closure, or a proposal message has no proposal.
+                closure, a proposal message has no proposal, or a change request message has
+                no request.
         """
-        kind = MESSAGE_KINDS[job_type]
+        kind = CHANGE_REQUEST_KINDS[change.action] if change else MESSAGE_KINDS[job_type]
         if booking.contact is None:
             raise ValueError("booking has no contact details")
         if kind.closure_notice and closure is None:
             raise ValueError("closure message without a closure")
         if kind.proposal and proposal is None:
             raise ValueError("proposal message without a proposal")
+        if kind.change_request and change is None:
+            raise ValueError("change request message without a request")
         gettext = self._translator.bind(booking.locale, group.organisation_id, group.id)
         _ = _Texts(gettext, texts or {})
         if channel is ChannelKind.SMS:
-            return self._sms(kind, booking, group, _, proposal)
+            return self._sms(kind, booking, group, _, proposal, change)
         tz, locale = group.tz, booking.locale
         date = format_day(local_day(booking.start, tz), locale)
         start_time = format_clock(booking.start, tz, locale)
         end_time = format_clock(booking.end, tz, locale)
-        deadline = _deadline(kind, booking, group, proposal)
+        deadline = _deadline(kind, booking, group, proposal, change)
         deadline_text = (
             f"{format_day(local_day(deadline, tz), locale)}, {format_clock(deadline, tz, locale)}"
         )
         params = {"date": date, "time": start_time, "group_name": group.name}
-        if kind.rebook or kind.proposal:
+        if kind.rebook or kind.proposal or kind.change_request:
             params["deadline"] = deadline_text
         when = f"{date}, {start_time}–{end_time}"
-        if kind.proposal and proposal is not None:
-            params["new_date"] = format_day(local_day(proposal.start, tz), locale)
-            params["new_time"] = format_clock(proposal.start, tz, locale)
-            new_end = format_clock(proposal.end, tz, locale)
+        moment = _new_moment(booking, proposal, change)
+        if moment is not None:
+            params["new_date"] = format_day(local_day(moment[0], tz), locale)
+            params["new_time"] = format_clock(moment[0], tz, locale)
+            new_end = format_clock(moment[1], tz, locale)
             when = f"{params['new_date']}, {params['new_time']}–{new_end}"
         manage_url = (
             f"{self.manage_url(booking)}{kind.link.suffix}" if kind.includes_manage_link else None
@@ -399,7 +470,11 @@ class MessageComposer:
             "subject": _(kind.subject_key, **params),
             "greeting": greeting,
             "intro": _(kind.intro_key, **params),
-            "when_label": _("message.proposed_when" if kind.proposal else "message.when"),
+            "when_label": _("message.proposed_when" if moment is not None else "message.when"),
+            "code_label": _("message.appointment_code"),
+            "code": appointment_code(self._token_keys, booking)
+            if show_code and _shows_code(kind)
+            else None,
             "when": when,
             "team_label": _("message.team"),
             "group_name": group.name,
@@ -501,6 +576,7 @@ class MessageComposer:
             "signoff": _("message.team_invite.signoff"),
             # The team's own mailbox needs no "Appointments via OpenPlanner" (ADR 0060 §6).
             "product_footer": None,
+            "code": None,  # the appointment code is the participant's (ADR 0023 step 2)
         }
         calendar = build_ics(
             uid=f"booking-{booking.id}-team@{urlsplit(self._base_url).hostname or 'openplanner'}",
@@ -552,20 +628,23 @@ class MessageComposer:
         group: Group,
         _: _Texts,
         proposal: HeldProposal | None = None,
+        change: ChangeRequest | None = None,
     ) -> OutboundMessage:
         """Return the SMS: one text block with first name, moment, team and the manage link.
 
-        A proposal's SMS also names the proposed moment and links to the page that confirms it.
+        A proposal's SMS also names the proposed moment and links to the page that confirms it;
+        so does a change request's, with the requested new time if it has one.
         """
         contact = booking.contact
         if kind.sms_key is None or contact is None or contact.phone is None:
             raise ValueError("message has no SMS form or the booking no phone number")
+        moment = _new_moment(booking, proposal, change)
         moments = (
             {
-                "new_date": format_day(local_day(proposal.start, group.tz), booking.locale),
-                "new_time": format_clock(proposal.start, group.tz, booking.locale),
+                "new_date": format_day(local_day(moment[0], group.tz), booking.locale),
+                "new_time": format_clock(moment[0], group.tz, booking.locale),
             }
-            if proposal is not None
+            if moment is not None
             else {}
         )
         text = _(
@@ -577,7 +656,8 @@ class MessageComposer:
             manage_url=f"{self.manage_url(booking)}{kind.link.suffix}",
             reason=_reason(booking, _) or "",
             deadline=format_day(
-                local_day(_deadline(kind, booking, group, proposal), group.tz), booking.locale
+                local_day(_deadline(kind, booking, group, proposal, change), group.tz),
+                booking.locale,
             ),
             **moments,
         )

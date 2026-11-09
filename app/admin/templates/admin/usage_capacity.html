@@ -1,10 +1,11 @@
 {% extends "admin/usage_base.html" %}
-{% from "admin/_usage_tables.html" import cell, count_table, figure, nothing_yet with context %}
+{% from "admin/_usage_tables.html" import cell, count_table, figure, nothing_yet, tiles with context %}
 {% from "admin/_report_chart.html" import report_chart with context %}
 {% block report %}
 {% if report.empty %}
 {{ nothing_yet() }}
 {% else %}
+{{ tiles(tiles_, report.threshold) }}
 <section class="card" aria-labelledby="utilisation-heading">
   <h2 id="utilisation-heading">{{ _("reports.capacity.utilisation.title") }}</h2>
   <dl class="facts">

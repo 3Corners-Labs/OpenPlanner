@@ -145,8 +145,8 @@ your role may open:
 - **Manual** opens the topic of the page you are on.
 
 On a phone the icons, the number and your initials stay; the words stay in the bar for screen
-readers. The number is also part of the shortcut's name, for example *Tasks, 2 running or
-failed*. A shortcut without a source for a number shows none.
+readers. A screen reader reads the shortcut with its number and what it means, for example
+*Tasks 2 running or failed*. A shortcut without a source for a number shows none.
 
 ## Choosing a scope
 

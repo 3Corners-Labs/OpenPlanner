@@ -1,39 +1,19 @@
-"""Fixtures for the scripts that run against git: a throw-away repository per test."""
+"""Helpers for the scripts that run against git: fake programs and a release line.
+
+The throw-away repository itself is the ``git`` fixture of ``tests/conftest.py``; ``Git`` and
+``commit_all`` come from ``tests/support/git_repository.py``.
+"""
 
 import os
 import shutil
 import subprocess
-from collections.abc import Callable
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
-import pytest
+import yaml
 
-GIT = shutil.which("git") or "/usr/bin/git"
-Git = Callable[..., str]
-"""Runs git in the test repository with the given arguments and returns its output."""
-
-
-@pytest.fixture
-def git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Git:
-    """A git repository on branch ``main`` in ``tmp_path``, which is the working directory."""
-    monkeypatch.chdir(tmp_path)
-    for variable in ("GIT_AUTHOR", "GIT_COMMITTER"):
-        monkeypatch.setenv(f"{variable}_NAME", "test")
-        monkeypatch.setenv(f"{variable}_EMAIL", "test@example.org")
-
-    def run(*args: str) -> str:
-        return subprocess.run(  # noqa: S603 - fixed argv, no shell
-            [GIT, *args], check=True, capture_output=True, text=True, cwd=tmp_path
-        ).stdout
-
-    run("init", "-q", "-b", "main")
-    return run
-
-
-def commit_all(git: Git, message: str) -> None:
-    """Stage everything and commit it."""
-    git("add", "-A")
-    git("commit", "-q", "-m", message)
+from tests.support.git_repository import Git, commit_all
 
 
 def fake_program(directory: Path, name: str, script: str) -> Path:
@@ -42,6 +22,38 @@ def fake_program(directory: Path, name: str, script: str) -> Path:
     path.write_text(f"#!/bin/sh\n{script}\n")
     path.chmod(0o755)
     return directory
+
+
+def workflow_events(workflow: Path) -> dict[str, Any]:
+    """Return the events that start a GitHub workflow file, each with its settings.
+
+    YAML 1.1 reads the key ``on`` as ``True``. The value is one event, a list or a mapping;
+    an event given without settings maps to ``None``.
+    """
+    data = yaml.safe_load(workflow.read_text())
+    on = data.get("on", data.get(True))
+    if isinstance(on, str):
+        return {on: None}
+    if isinstance(on, list):
+        return dict.fromkeys(on)
+    return dict(on or {})
+
+
+def workflow_step(workflow: Path, job: str, step_id: str) -> dict[str, Any]:
+    """Return the step with ``id: step_id`` of ``job`` in a GitHub workflow file."""
+    steps = yaml.safe_load(workflow.read_text())["jobs"][job]["steps"]
+    return next(step for step in steps if step.get("id") == step_id)
+
+
+def run_step(script: str, env: Mapping[str, str]) -> subprocess.CompletedProcess[str]:
+    """Run a workflow step's ``run:`` script with bash and only ``env``, as the runner does."""
+    return subprocess.run(  # noqa: S603 - a workflow's own step, with the test's fakes on PATH
+        [shutil.which("bash") or "/bin/bash", "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=dict(env),
+    )
 
 
 def script_path(fakes: Path) -> str:

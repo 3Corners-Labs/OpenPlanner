@@ -29,7 +29,7 @@ class Setup:
 
     def __init__(self, **group: object) -> None:
         state = State()
-        state.groups[1] = make_group(id=1, slug="aangifte", video_host_email=HOST, **group)
+        state.groups[1] = make_group(id=1, slug="balie", video_host_email=HOST, **group)
         state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
         self.uow = InMemoryUnitOfWork(state)
         self.clock = FixedClock(NOW)
@@ -64,7 +64,7 @@ async def test_opening_schedules_a_meeting_the_participant_can_enter_alone(setup
     assert view.expires_at == NOW + timedelta(minutes=30)
     assert view.calls_left == 2
     request = setup.video.created[0]
-    assert (request.title, request.host_email) == ("Proefgesprek Aangifte", HOST)
+    assert (request.title, request.host_email) == ("Proefgesprek Balie", HOST)
     assert request.join_before_host is True
     stored = setup.uow.state.bookings[setup.booking_id]
     assert stored.trial is not None

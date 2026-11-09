@@ -710,13 +710,13 @@ msgid "admin.group.settings"
 msgstr "Instellingen"
 
 msgid "admin.group.slot_minutes"
-msgstr "Duur van een afspraak"
+msgstr "Duur van een gesprek"
 
 msgid "admin.group.minutes"
 msgstr "{minutes} minuten"
 
 msgid "admin.group.notice"
-msgstr "Minimale aanmeldtijd"
+msgstr "Minimale aanlooptijd"
 
 msgid "admin.group.horizon"
 msgstr "Vooruit boeken"
@@ -2620,6 +2620,9 @@ msgstr "opgeschorte afspraak verzet"
 msgid "audit.event.planner_changes_alert"
 msgstr "Veel wijzigingen door één planner"
 
+msgid "audit.event.contact_reveals_alert"
+msgstr "Veel verzoeken om contactgegevens door één persoon"
+
 msgid "admin.audit.detail.planner_move"
 msgstr "afspraak verplaatst door een planner"
 
@@ -2637,6 +2640,9 @@ msgstr "tekort geaccepteerd"
 
 msgid "admin.audit.detail.changes"
 msgstr "wijzigingen in het afgelopen uur: {count}"
+
+msgid "admin.audit.detail.reveals"
+msgstr "verzoeken om contactgegevens in het afgelopen uur: {count}"
 
 msgid "admin.audit.detail.reason"
 msgstr "reden: {value}"
@@ -4357,8 +4363,8 @@ msgstr "Taken"
 msgid "admin.nav.alerts"
 msgstr "Meldingen"
 
-msgid "admin.topbar.tasks.count"
-msgstr "{label}, {count} lopend of mislukt"
+msgid "admin.topbar.tasks.count_words"
+msgstr "lopend of mislukt"
 
 msgid "admin.scope.label"
 msgstr "Werkgebied"
@@ -4916,7 +4922,8 @@ msgstr "Er is geen webhookgeheim ingesteld (WEBEX_WEBHOOK_SECRET of WXCC_WEBHOOK
 msgid "admin.done.simulator_refused"
 msgstr "Het webhook-endpoint weigerde het event. Kijk in het log van de web-container."
 
-#. Environment bar in the admin portal (dev/test only).
+#. Environment names in the admin portal: the bar (dev/test only), System status and the
+#. overview's status widget.
 
 msgid "admin.environment.label"
 msgstr "Omgeving"
@@ -4926,6 +4933,9 @@ msgstr "Ontwikkelomgeving"
 
 msgid "admin.environment.test"
 msgstr "Testomgeving"
+
+msgid "admin.environment.prod"
+msgstr "Productieomgeving"
 
 msgid "admin.environment.text"
 msgstr "Niet voor echte afspraken van deelnemers."
@@ -5813,6 +5823,12 @@ msgstr "Laatst ingelogd"
 msgid "admin.staff.last_seen"
 msgstr "Laatst actief"
 
+msgid "admin.staff.email"
+msgstr "E-mailadres"
+
+msgid "admin.staff.email_none"
+msgstr "Geen geverifieerd adres bekend"
+
 msgid "admin.staff.last_logout"
 msgstr "Laatst afgemeld"
 
@@ -6349,6 +6365,9 @@ msgstr "Tekorten vooruitkijken (dagen)"
 
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Waarschuwing bij wijzigingen per planner per uur"
+
+msgid "settings.field.contact_reveals_alert_per_hour.label"
+msgstr "Waarschuwing bij verzoeken om contactgegevens per persoon per uur"
 
 msgid "admin.settings.problem.dev_placeholder"
 msgstr "bevat een plaatsvervanger voor ontwikkeling; productie weigert die."
@@ -7934,7 +7953,7 @@ msgid "admin.rights.refused_intro"
 msgstr "Deze waarden stuurde de identiteitsprovider bij uw laatste login mee, maar deze installatie herkent ze niet. Geef ze door aan het IdP-team."
 
 msgid "admin.roles.entitlement_notice"
-msgstr "Werkt de installatie met een rechtenclaim (ADR 0049), dan stuurt de identiteitsprovider per organisatie of groep één waarde met de sleutel van deze rol, bijvoorbeeld openplanner:custom.3:org-a. De sleutel en de exacte waarden staan op de pagina Koppeling identiteitsprovider."
+msgstr "Werkt de installatie met een rechtenclaim, dan stuurt de identiteitsprovider per organisatie of groep één waarde met de sleutel van deze rol, bijvoorbeeld openplanner:custom.3:org-a. De sleutel en de exacte waarden staan op de pagina Koppeling identiteitsprovider."
 
 msgid "admin.form.error.idp_key"
 msgstr "Gebruik alleen kleine letters, cijfers en koppeltekens (hoogstens 63 tekens), beginnend met een letter of cijfer."
@@ -8866,6 +8885,12 @@ msgstr "Het configuratiepakket is als document toegepast: {count} organisatie(s)
 msgid "admin.form.error.configuration_passphrase_short"
 msgstr "De wachtwoordzin is te kort, of de herhaling verschilt. Gebruik minstens 16 tekens."
 
+msgid "admin.form.error.configuration_plaintext_disabled"
+msgstr "Een export zonder versleuteling staat uit op deze installatie. De beheerder van de host moet dat eerst toestaan."
+
+msgid "admin.form.error.configuration_plaintext_unconfirmed"
+msgstr "Vink aan dat u begrijpt dat het bestand alle geheimen leesbaar bevat, of kies een export met wachtwoord."
+
 msgid "admin.form.error.configuration_passphrase_wrong"
 msgstr "De wachtwoordzin past niet bij dit pakket."
 
@@ -9600,8 +9625,8 @@ msgstr "Wachttijd in de wachtrij"
 msgid "admin.audit.reason.wait_over_warning"
 msgstr "Deelnemers wachten langer dan de ingestelde grens."
 
-msgid "admin.topbar.alerts.count"
-msgstr "{label}, {count} open"
+msgid "admin.topbar.alerts.count_words"
+msgstr "open"
 
 msgid "settings.field.idp_domain_grace_days.label"
 msgstr "Tolerantie verdwenen domeinrecord (dagen)"
@@ -10448,11 +10473,23 @@ msgstr "Vul het id van een Webex-ruimte in: letters, cijfers, - en _, 10 tot 200
 msgid "authz.permission.reports_view"
 msgstr "Gebruiksrapporten bekijken"
 
+msgid "authz.permission.reports_export"
+msgstr "Gebruiksrapporten downloaden"
+
 msgid "settings.field.reporting_min_cell_size.label"
 msgstr "Kleinste aantal dat een rapport toont"
 
 msgid "settings.field.reporting_org_min_cell_size.label"
 msgstr "Kleinste aantal in de rapporten van de organisatie"
+
+msgid "settings.field.reporting_staff_view_enabled.label"
+msgstr "Toon de werklast per teamlid in de rapporten"
+
+msgid "settings.field.reporting_export_max_rows.label"
+msgstr "Meeste rijen in een CSV-export van een gebruiksrapport"
+
+msgid "settings.field.reporting_export_max_days.label"
+msgstr "Meeste dagen in een CSV-export van een gebruiksrapport"
 
 msgid "admin.nav.reports"
 msgstr "Rapporten"
@@ -11214,7 +11251,19 @@ msgid "admin.configuration.export.secrets"
 msgstr "Geheimen opnemen, verzegeld met een wachtwoord"
 
 msgid "admin.configuration.export.secrets_hint"
-msgstr "Zonder geheimen heeft het bestand geen wachtwoord nodig. Met geheimen is het wachtwoord minstens {length} tekens; bewaar het veilig, het is niet terug te halen."
+msgstr "Zonder geheimen bevat het bestand geen wachtwoorden of sleutels en heeft het geen wachtwoord nodig. Met geheimen zet OpenPlanner elk geheim (SMTP, SMS, Webex, contactcenter, inlog, API-clients) apart vast onder dit wachtwoord, minstens {length} tekens. Je hebt geen aparte tool nodig om het te openen: lees het bestand op de nieuwe omgeving in (hier, met het commando config apply, of met de installer) en typ hetzelfde wachtwoord. Het wachtwoord is niet terug te halen; bewaar het apart van het bestand."
+
+msgid "admin.configuration.export.plain.title"
+msgstr "Zonder versleuteling"
+
+msgid "admin.configuration.export.plain.hint"
+msgstr "Alle wachtwoorden, sleutels en tokens staan dan leesbaar in het bestand. Wie het bestand heeft, heeft toegang tot die diensten. Bewaar het zo privé als de geheimen zelf, en versleutel het zelf voordat u het deelt."
+
+msgid "admin.configuration.export.plain.label"
+msgstr "Geheimen leesbaar in het bestand zetten, zonder wachtwoord"
+
+msgid "admin.configuration.export.plain.confirm"
+msgstr "Ik begrijp dat het bestand alle geheimen leesbaar bevat"
 
 msgid "admin.configuration.export.button"
 msgstr "Document exporteren"
@@ -11223,7 +11272,7 @@ msgid "admin.configuration.upload.title"
 msgstr "Inlezen en plannen"
 
 msgid "admin.configuration.upload.intro"
-msgstr "Kies een configuratiedocument (JSON, maximaal {max_mb} MB). Je krijgt een plan te zien; er wordt nog niets gewijzigd."
+msgstr "Kies een configuratiedocument (JSON, maximaal {max_mb} MB), bijvoorbeeld een export van een andere omgeving. Heeft het bestand geheimen, vul dan hetzelfde wachtwoord in als bij het exporteren. Je krijgt een plan te zien; er wordt nog niets gewijzigd."
 
 msgid "admin.configuration.upload.file"
 msgstr "Configuratiedocument"
@@ -11302,6 +11351,19 @@ msgstr "Gegevens aanpassen"
 
 msgid "manage.notice.details"
 msgstr "Uw gegevens zijn aangepast."
+
+msgid "reports.export.screen"
+msgstr "Dit rapport downloaden als CSV"
+
+msgid "reports.export.tidy"
+msgstr "Alle uurcijfers downloaden als CSV (openplanner.usage/1)"
+
+msgid "reports.export.refused.too_many_days"
+msgstr "De export beslaat te veel dagen. Kies een korter tijdvak."
+
+msgid "reports.export.refused.too_many_rows"
+msgstr "De export heeft te veel rijen. Kies een korter tijdvak of één groep."
+
 msgid "error.proposal_not_open"
 msgstr "Deze voorgestelde tijd is niet meer beschikbaar. U kunt nog wel zelf een nieuwe tijd kiezen."
 
@@ -11409,3 +11471,474 @@ msgstr "Voorgestelde tijd vrijgeven"
 
 msgid "audit.job.send_proposal_released"
 msgstr "Melding vrijgegeven voorstel sturen"
+
+msgid "authz.api_scope.reports_read"
+msgstr "Gebruikscijfers per uur lezen"
+
+msgid "settings.field.reporting_api_page_size.label"
+msgstr "Meeste cellen op één pagina van de gebruiks-API"
+
+msgid "settings.field.reporting_api_rate_per_minute.label"
+msgstr "Aanroepen per minuut per API-client naar de gebruiks-API"
+msgid "authz.permission.reports_staff_view"
+msgstr "De werklast per teamlid in de rapporten bekijken"
+
+msgid "authz.permission.reports_digest_manage"
+msgstr "Samenvattingen van de rapporten beheren"
+
+msgid "settings.field.reporting_digest_send_hour.label"
+msgstr "Uur waarop de samenvatting van de rapporten wordt verstuurd"
+
+msgid "settings.field.reporting_digest_include_numbers.label"
+msgstr "Cijfers in de samenvatting opnemen"
+
+msgid "settings.field.reporting_digest_late_hours.label"
+msgstr "Uren waarbinnen een gemiste samenvatting nog wordt verstuurd"
+
+msgid "settings.field.reporting_digest_max_subscriptions.label"
+msgstr "Meeste abonnementen op de samenvatting per organisatie"
+
+msgid "reports.digest.all_groups"
+msgstr "alle groepen"
+
+msgid "reports.digest.subject"
+msgstr "Gebruik van {group} ({organisation}): {period}"
+
+msgid "reports.digest.intro"
+msgstr "Dit is de samenvatting van het gebruik van {group} over {period}."
+
+msgid "reports.digest.label.bookings"
+msgstr "Boekingen gemaakt"
+
+msgid "reports.digest.label.no_show_rate"
+msgstr "Niet verschenen"
+
+msgid "reports.digest.label.average_wait"
+msgstr "Gemiddelde wachttijd tot de verbinding"
+
+msgid "reports.digest.label.utilisation"
+msgstr "Bezettingsgraad"
+
+msgid "reports.digest.link"
+msgstr "Open het rapport: {link}"
+
+msgid "reports.digest.footer"
+msgstr "U ontvangt dit bericht omdat u op deze samenvatting bent geabonneerd. Inloggen is nodig om het rapport te zien."
+
+msgid "reports.digest.heading"
+msgstr "Samenvatting per e-mail"
+
+msgid "reports.digest.lead"
+msgstr "Staf met toegang tot de rapporten krijgt periodiek een e-mail met de kerncijfers en een koppeling naar het rapport. Er gaat geen bestand mee en geen vrij ingevuld adres: alleen collega's die de rapporten mogen zien, op het moment van versturen."
+
+msgid "reports.digest.none"
+msgstr "Er zijn nog geen abonnementen."
+
+msgid "reports.digest.no_candidates"
+msgstr "Er is niemand die deze rapporten mag zien en een abonnement kan krijgen."
+
+msgid "reports.digest.col.scope"
+msgstr "Voor"
+
+msgid "reports.digest.col.period"
+msgstr "Wanneer"
+
+msgid "reports.digest.col.recipients"
+msgstr "Ontvangers"
+
+msgid "reports.digest.col.last"
+msgstr "Laatste keer"
+
+msgid "reports.digest.col.actions"
+msgstr "Acties"
+
+msgid "reports.digest.period.daily"
+msgstr "Elke dag"
+
+msgid "reports.digest.period.weekly"
+msgstr "Elke week"
+
+msgid "reports.digest.period.monthly"
+msgstr "Elke maand"
+
+msgid "reports.digest.weekday.0"
+msgstr "maandag"
+
+msgid "reports.digest.weekday.1"
+msgstr "dinsdag"
+
+msgid "reports.digest.weekday.2"
+msgstr "woensdag"
+
+msgid "reports.digest.weekday.3"
+msgstr "donderdag"
+
+msgid "reports.digest.weekday.4"
+msgstr "vrijdag"
+
+msgid "reports.digest.weekday.5"
+msgstr "zaterdag"
+
+msgid "reports.digest.weekday.6"
+msgstr "zondag"
+
+msgid "reports.digest.on_day"
+msgstr "op dag {day}"
+
+msgid "reports.digest.blocked"
+msgstr "{count} mag de rapporten niet meer zien en wordt overgeslagen"
+
+msgid "reports.digest.status.sent"
+msgstr "verstuurd"
+
+msgid "reports.digest.status.skipped_late"
+msgstr "overgeslagen, te laat"
+
+msgid "reports.digest.status.no_recipient"
+msgstr "overgeslagen, geen ontvanger"
+
+msgid "reports.digest.delete"
+msgstr "Verwijderen"
+
+msgid "reports.digest.add"
+msgstr "Abonnement toevoegen"
+
+msgid "reports.digest.add_button"
+msgstr "Abonnement toevoegen"
+
+msgid "reports.digest.field.group"
+msgstr "Groep"
+
+msgid "reports.digest.field.period"
+msgstr "Hoe vaak"
+
+msgid "reports.digest.field.weekday"
+msgstr "Dag van de week (bij elke week)"
+
+msgid "reports.digest.field.month_day"
+msgstr "Dag van de maand (bij elke maand)"
+
+msgid "reports.digest.field.recipients"
+msgstr "Ontvangers"
+
+msgid "reports.digest.error.recipients"
+msgstr "Kies minstens één collega die de rapporten mag zien."
+
+msgid "reports.digest.error.limit"
+msgstr "Deze organisatie heeft het hoogste aantal abonnementen al."
+
+msgid "reports.digest.error.schedule"
+msgstr "Kies een bestaande periode, weekdag en dag van de maand."
+
+msgid "reports.digest.done.added"
+msgstr "Abonnement toegevoegd."
+
+msgid "reports.digest.done.removed"
+msgstr "Abonnement verwijderd."
+
+msgid "reports.digest.no_address"
+msgstr "geen adres bekend: krijgt de mail niet"
+
+msgid "reports.digest.no_address_count"
+msgstr "{count} heeft geen bekend adres en wordt overgeslagen"
+msgid "settings.field.reporting_usage_events_to_log.label"
+msgstr "Gebruiksfeiten ook naar de logdoelen sturen"
+msgid "admin.agenda.propose"
+msgstr "Nieuwe tijd voorstellen"
+
+msgid "admin.agenda.slot_propose"
+msgstr "Nieuwe tijden voorstellen"
+
+msgid "admin.proposal.title"
+msgstr "Nieuwe tijd voorstellen voor {reference}"
+
+msgid "admin.proposal.time"
+msgstr "Nieuwe tijd"
+
+msgid "admin.proposal.ask"
+msgstr "Geen voorstel: vraag de deelnemer zelf een tijd te kiezen"
+
+msgid "admin.proposal.none_found"
+msgstr "De assistent vond geen vrije tijd binnen het zoekbereik. Kies een andere tijd of vraag de deelnemer zelf te kiezen."
+
+msgid "admin.proposal.held_lead"
+msgstr "De voorgestelde tijd wordt voor de deelnemer vastgehouden tot die bevestigt, een andere tijd kiest of annuleert, of tot de termijn verloopt. Zonder bevestiging verplaatsen we niets."
+
+msgid "admin.proposal.button"
+msgstr "Voorstel versturen"
+
+msgid "admin.proposal.slot_title"
+msgstr "Nieuwe tijden voorstellen voor {when}"
+
+msgid "admin.proposal.slot_lead"
+msgstr "De laatst gemaakte afspraken in dit tijdslot ({count}) passen niet meer. Controleer per afspraak de voorgestelde tijd, kies een andere of vink de afspraak uit."
+
+msgid "admin.proposal.include"
+msgstr "Meenemen"
+
+msgid "admin.proposal.slot_button"
+msgstr "Voorstellen versturen"
+
+msgid "admin.proposal.none_chosen"
+msgstr "Vink ten minste één afspraak aan."
+
+msgid "admin.proposal.column"
+msgstr "Voorgestelde tijd"
+
+msgid "admin.proposal.held_until"
+msgstr "vastgehouden tot {deadline}"
+
+msgid "admin.proposal.confirm"
+msgstr "Bevestigen namens deelnemer"
+
+msgid "admin.proposal.withdraw"
+msgstr "Voorstel intrekken"
+
+msgid "admin.done.proposed"
+msgstr "Nieuwe tijd voorgesteld. De deelnemer krijgt het voorstel en de oude plek is vrijgekomen."
+
+msgid "admin.done.proposals_sent"
+msgstr "Verstuurd: {count}. De oude plekken zijn vrijgekomen; voorgestelde tijden worden vastgehouden."
+
+msgid "admin.done.proposal_withdrawn"
+msgstr "Voorstel ingetrokken. De afspraak wacht op een nieuwe tijd van de deelnemer."
+
+msgid "admin.done.proposal_confirmed_by_staff"
+msgstr "De voorgestelde tijd is bevestigd namens de deelnemer. De deelnemer krijgt een e-mail met de nieuwe tijd."
+
+msgid "admin.done.proposal_gone"
+msgstr "Dit voorstel staat niet meer open."
+
+msgid "admin.agenda.day_propose"
+msgstr "Nieuwe tijden voorstellen voor deze dag"
+
+msgid "admin.agenda.week_propose"
+msgstr "Nieuwe tijden voorstellen voor deze week"
+
+msgid "settings.field.agent_change_requests_per_hour.label"
+msgstr "Wijzigingsverzoeken per API-client (per uur)"
+
+msgid "settings.field.agent_change_requests_enabled.label"
+msgstr "Wijzigingsverzoeken door een bot (met afspraakcode)"
+
+msgid "settings.field.agent_change_request_minutes.label"
+msgstr "Tijd om een wijzigingsverzoek te bevestigen (minuten)"
+
+msgid "authz.api_scope.bookings_request_change"
+msgstr "Annuleren of verplaatsen vragen (met telefoonnummer en afspraakcode; de deelnemer bevestigt)"
+
+msgid "audit.job.send_change_request"
+msgstr "Wijzigingsverzoek ter bevestiging sturen"
+
+msgid "message.change_request.subject"
+msgstr "Bevestig de wijziging van uw videogesprek"
+
+msgid "message.change_request.intro_cancel"
+msgstr "U heeft gevraagd uw videogesprek met {group_name} op {date} om {time} te annuleren. Bevestig dit voor {deadline}. Zonder uw bevestiging verandert er niets. Heeft u dit niet gevraagd? Dan hoeft u niets te doen."
+
+msgid "message.change_request.intro_reschedule"
+msgstr "U heeft gevraagd uw videogesprek met {group_name} op {date} om {time} te verplaatsen naar {new_date} om {new_time}. Bevestig dit voor {deadline}. Zonder uw bevestiging verandert er niets. Heeft u dit niet gevraagd? Dan hoeft u niets te doen."
+
+msgid "message.change_request.sms_cancel"
+msgstr "Beste {first_name}, u vroeg uw videogesprek met {group_name} op {date} om {time} te annuleren. Bevestig voor {deadline}: {manage_url}"
+
+msgid "message.change_request.sms_reschedule"
+msgstr "Beste {first_name}, u vroeg uw videogesprek met {group_name} op {date} om {time} te verplaatsen naar {new_date} om {new_time}. Bevestig voor {deadline}: {manage_url}"
+
+msgid "message.manage_change_request"
+msgstr "Bevestig de wijziging, uiterlijk {deadline}:"
+
+msgid "message.change_request_link"
+msgstr "Wijziging bekijken"
+
+msgid "message.appointment_code"
+msgstr "Afspraakcode"
+
+msgid "manage.appointment_code"
+msgstr "Afspraakcode"
+
+msgid "manage.notice.change_gone"
+msgstr "Deze wijziging kan niet meer worden bevestigd. Uw afspraak is niet veranderd."
+
+msgid "change_request.title"
+msgstr "Wijziging bevestigen"
+
+msgid "change_request.text_cancel"
+msgstr "U heeft gevraagd deze afspraak te annuleren. Bevestig dit uiterlijk {deadline}; daarna vervalt het verzoek."
+
+msgid "change_request.text_reschedule"
+msgstr "U heeft gevraagd deze afspraak te verplaatsen. Bevestigt u dit, dan krijgt u een bevestiging met een agenda-uitnodiging. Het verzoek vervalt na {deadline}."
+
+msgid "change_request.submit_cancel"
+msgstr "Ja, annuleer mijn afspraak"
+
+msgid "change_request.submit_reschedule"
+msgstr "Ja, verplaats mijn afspraak"
+
+msgid "change_request.ignore"
+msgstr "Niets veranderen"
+
+msgid "error.change_requests_disabled"
+msgstr "Wijzigingsverzoeken zijn voor deze organisatie niet ingeschakeld."
+
+msgid "error.invalid_appointment_code"
+msgstr "De afspraakcode bestaat uit acht cijfers."
+
+msgid "error.change_request_not_found"
+msgstr "Dit wijzigingsverzoek bestaat niet of is niet meer open."
+
+msgid "reports.view.team"
+msgstr "Team"
+
+msgid "reports.team.off"
+msgstr "uit"
+
+msgid "reports.team.switch_on"
+msgstr "Zet het aan bij de instellingen"
+
+msgid "reports.team.title"
+msgstr "Werklast per teamlid"
+
+msgid "reports.team.intro"
+msgstr "De gesprekken die een medewerker uit de eigen wachtrij heeft opgepakt. De tabel staat op naam en heeft geen rangorde. Gesprekken die het contactcenter afhandelde, worden niet aan een persoon toegerekend."
+
+msgid "reports.team.member"
+msgstr "Teamlid"
+
+msgid "reports.team.calls"
+msgstr "Gesprekken afgehandeld"
+
+msgid "reports.team.minutes"
+msgstr "Minuten in gesprek"
+
+msgid "reports.team.claims"
+msgstr "Opgepakt"
+
+msgid "reports.team.on_time"
+msgstr "Op tijd aanwezig"
+
+msgid "reports.team.former"
+msgstr "Voormalige teamleden"
+
+msgid "reports.team.note"
+msgstr "Een getal onder {n} is verborgen en staat als < {n}; de minuten gaan mee met de gesprekken. Er is geen totaalrij: verwijderde teamleden zijn één rij, zodat de geschiedenis haar totalen houdt en er geen persoon overblijft."
+
+msgid "settings.field.agent_change_request_cooldown_minutes.label"
+msgstr "Rustperiode na een wijzigingsverzoek (minuten)"
+
+msgid "settings.field.agent_change_request_retention_days.label"
+msgstr "Wijzigingsverzoeken bewaren na verlopen (dagen)"
+
+msgid "reports.share"
+msgstr "Aandeel"
+
+msgid "reports.table.suppressed"
+msgstr "Aantallen onder {n} zijn verborgen. Is maar één aantal van een tabel verborgen, dan verbergen we ook het eerstvolgende kleinste, zodat het totaal niet terug te rekenen is."
+
+msgid "reports.provisional.note"
+msgstr "De laatste 24 uur zijn voorlopig: afspraken kunnen nog worden geannuleerd of verzet."
+
+msgid "reports.provisional.days"
+msgstr "Voorlopige dagen"
+
+msgid "reports.chart.unit.bookings"
+msgstr "afspraken"
+
+msgid "reports.volume.days.title"
+msgstr "Afspraken per dag (de dag van de afspraak, in de tijdzone van de groep)"
+
+msgid "reports.volume.days.weekday"
+msgstr "Werkdag"
+
+msgid "reports.volume.days.weekend"
+msgstr "Weekend"
+
+msgid "reports.volume.outcome.title"
+msgstr "Uitkomst van afspraken"
+
+msgid "reports.volume.outcome.cancelled"
+msgstr "Geannuleerd"
+
+msgid "reports.volume.outcome.all"
+msgstr "Alle afspraken"
+
+msgid "reports.split.label"
+msgstr "Uitsplitsen naar"
+
+msgid "reports.split.none"
+msgstr "Geen"
+
+msgid "reports.split.queue"
+msgstr "Wachtrijmethode"
+
+msgid "reports.split.locale"
+msgstr "Taal"
+
+msgid "reports.split.title"
+msgstr "Gemaakte afspraken, uitgesplitst"
+
+msgid "reports.split.left_out"
+msgstr "{n} groep(en) zijn te klein om uit te splitsen en blijven buiten beschouwing."
+
+msgid "reports.tile.created"
+msgstr "Afspraken in periode"
+
+msgid "reports.tile.created.detail"
+msgstr "gemaakt per lokale dag"
+
+msgid "reports.tile.no_show"
+msgstr "No-showpercentage"
+
+msgid "reports.tile.no_show.of"
+msgstr "van {n} afgeronde"
+
+msgid "reports.tile.cancel"
+msgstr "Geannuleerd door deelnemer"
+
+msgid "reports.tile.cancel.late"
+msgstr "{percent}% minder dan een dag van tevoren"
+
+msgid "reports.tile.confirmed"
+msgstr "Bevestigd na e-mail"
+
+msgid "reports.tile.confirmed.median"
+msgstr "mediaan {range}"
+
+msgid "reports.tile.utilisation"
+msgstr "Bezetting"
+
+msgid "reports.tile.utilisation.of"
+msgstr "{booked} van {capacity} plaatsen"
+
+msgid "reports.tile.idle"
+msgstr "Ongebruikte plaatsen"
+
+msgid "reports.tile.idle.detail"
+msgstr "plaatsen die niemand boekte"
+
+msgid "reports.tile.full"
+msgstr "Volle blokken"
+
+msgid "reports.tile.full.of"
+msgstr "{n} van {m}"
+
+msgid "reports.tile.shortfall"
+msgstr "Tekort aan medewerkers"
+
+msgid "reports.tile.shortfall.detail"
+msgstr "blokken"
+
+msgid "reports.tile.shortfall.accepted"
+msgstr "{n} geaccepteerd"
+
+msgid "reports.chart.toolbar"
+msgstr "Grafiekopties"
+
+msgid "reports.chart.download_svg"
+msgstr "Download als SVG"
+
+msgid "reports.chart.download_png"
+msgstr "Download als PNG"
+
+msgid "reports.chart.hint"
+msgstr "Met scripts: pijltjestoetsen gaan door de grafiek, Enter opent die dag, Escape sluit de tip. Dezelfde cijfers staan in de tabel eronder."

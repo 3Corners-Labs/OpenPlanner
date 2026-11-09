@@ -16,7 +16,7 @@ CLOSE = {
     "heading_nl": "Storing bij het loket",
 }
 DESK = {"contact_1_kind": "email", "contact_1_value": "loket@acme.example"}
-CALL = {"contact_1_kind": "phone", "contact_1_value": "14 020"}
+CALL = {"contact_1_kind": "phone", "contact_1_value": "012 345 6789"}
 
 
 async def _post(site: Site, path: str, data: dict[str, str]) -> httpx.Response:
@@ -34,7 +34,9 @@ async def test_the_team_page_shows_the_organisation_default_until_it_has_its_own
     after = (await site.client.get(CLOSURE)).text
 
     assert "De standaard van de organisatie geldt (1 contactmogelijkheden)." in before
-    assert '<a class="contact-block__link" href="tel:14020">14 020</a>' in before  # preview
+    assert (
+        '<a class="contact-block__link" href="tel:0123456789">012 345 6789</a>' in before
+    )  # preview
     assert 'name="contact_1_value"' in before
     assert saved.headers["location"] == f"{TEAM_CONTACTS}?done=saved"
     assert "Eigen blok met 1 contactmogelijkheden." in after
@@ -67,7 +69,7 @@ async def test_an_update_can_take_over_the_block_that_applies_now(site: Site) ->
     page = (await site.client.get(CLOSURE)).text
 
     assert updated.status_code == 303
-    assert 'href="tel:14020"' in page
+    assert 'href="tel:0123456789"' in page
     assert "loket@acme.example" not in page
 
 

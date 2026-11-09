@@ -32,7 +32,7 @@ async def _purged_booking(engine: AsyncEngine) -> None:
         ADA, first_name=MARKER, last_name=f"{MARKER}-b", email=f"{MARKER}@example.org"
     )
     receipt = await book(
-        BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900, "aangifte", contact
+        BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900, "balie", contact
     )
     async with uow.locked() as tx:
         await tx.purge_personal_data(receipt.booking.id or 0, NOW)

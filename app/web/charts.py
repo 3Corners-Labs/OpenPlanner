@@ -154,7 +154,7 @@ def series_of(index: int) -> int:
 def describe(title: str, data: list[Datum], item: Callable[[Datum], str], joiner: str) -> str:
     """Return the text summary: the title, then every value.
 
-    ``item`` writes one value as a translated sentence (e.g. "Aangifte: 4 waiting"), ``joiner``
+    ``item`` writes one value as a translated sentence (e.g. "Balie: 4 waiting"), ``joiner``
     is what separates two values (e.g. ``"; "``). The summary goes in the SVG's ``aria-label``
     and names every value, so nothing depends on seeing the picture.
     """
@@ -437,6 +437,8 @@ class ReportChart:
             shown values.
         total: The total for the table's last row (``None`` when hidden).
         total_label: The words for the total row; empty for no total row.
+        drill: A link per category to the same page with a narrower filter (a day), or ``None``
+            for a category that has none; empty for a chart without drill-down.
     """
 
     chart_id: str
@@ -451,6 +453,7 @@ class ReportChart:
     y_max: int | None = None
     total: int | None = None
     total_label: str = ""
+    drill: tuple[str | None, ...] = ()
 
     def __post_init__(self) -> None:
         """Refuse a chart that cannot be drawn truthfully.
@@ -469,6 +472,8 @@ class ReportChart:
             raise ValueError("chart_id is not an id")
         if not 1 <= len(self.series) <= MAX_REPORT_SERIES:
             raise ValueError(f"a chart needs one to {MAX_REPORT_SERIES} series")
+        if self.drill and len(self.drill) != len(self.categories):
+            raise ValueError("a drill-down link is needed per category, or none")
         if self.kind is ReportKind.COLUMN and len(self.series) != 1:
             raise ValueError("a column chart has one series")
         for series in self.series:
@@ -520,6 +525,7 @@ class Column:
         width: Width.
         height: Height, proportional to the shown value.
         title: The hover text: category, series and value.
+        category: The index of the category (the table row beside the chart).
     """
 
     series: int
@@ -528,6 +534,7 @@ class Column:
     width: float
     height: float
     title: str
+    category: int = 0
 
 
 @dataclass(frozen=True)
@@ -539,6 +546,7 @@ class Gap:
     width: float
     height: float
     title: str
+    category: int = 0
 
 
 @dataclass(frozen=True)
@@ -560,6 +568,7 @@ class Marker:
         y: Centre.
         points: The polygon's points (triangle and diamond), empty for the others.
         title: The hover text.
+        category: The index of the category (the table row beside the chart).
     """
 
     series: int
@@ -568,6 +577,7 @@ class Marker:
     y: float
     points: str
     title: str
+    category: int = 0
 
 
 @dataclass(frozen=True)
@@ -666,20 +676,20 @@ def _scale_of(chart: ReportChart) -> tuple[int, int]:
     return nice_max(max(shown, default=0))
 
 
-def _marker_of(index: int, x: float, y: float, title: str) -> Marker:
+def _marker_of(index: int, x: float, y: float, title: str, category: int = 0) -> Marker:
     """Return the marker of series ``index`` at a point: circle, square, triangle or diamond."""
     x, y = _round(x), _round(y)
     if index == 0:
-        return Marker(index, "circle", x, y, "", title)
+        return Marker(index, "circle", x, y, "", title, category)
     if index == 1:
-        return Marker(index, "square", x, y, "", title)
+        return Marker(index, "square", x, y, "", title, category)
     if index == 2:
         points = (
             f"{x},{_round(y - 5)} {_round(x + 5)},{_round(y + 4)} {_round(x - 5)},{_round(y + 4)}"
         )
-        return Marker(index, "triangle", x, y, points, title)
+        return Marker(index, "triangle", x, y, points, title, category)
     points = f"{x},{_round(y - 5)} {_round(x + 5)},{y} {x},{_round(y + 5)} {_round(x - 5)},{y}"
-    return Marker(index, "diamond", x, y, points, title)
+    return Marker(index, "diamond", x, y, points, title, category)
 
 
 def _columns_of(
@@ -709,6 +719,7 @@ def _columns_of(
                         _round(width),
                         _round(height),
                         f"{name} – {series.label}: {value}",
+                        i,
                     )
                 )
         if hidden:
@@ -719,6 +730,7 @@ def _columns_of(
                     _round(width),
                     GAP_HEIGHT,
                     f"{name}: {chart.hidden_label}",
+                    i,
                 )
             )
     return columns, gaps
@@ -746,7 +758,7 @@ def _lines_of(
             y = base - plot_h * value / top
             run.append(f"{_round(centres[i])},{_round(y)}")
             title = f"{chart.categories[i]} – {series.label}: {value}"
-            markers.append(_marker_of(j, centres[i], y, title))
+            markers.append(_marker_of(j, centres[i], y, title, i))
         if len(run) > 1:
             runs.append(Run(j, " ".join(run)))
     for i in sorted(hidden_at):
@@ -757,6 +769,7 @@ def _lines_of(
                 12,
                 GAP_HEIGHT,
                 f"{chart.categories[i]}: {chart.hidden_label}",
+                i,
             )
         )
     return runs, markers, gaps

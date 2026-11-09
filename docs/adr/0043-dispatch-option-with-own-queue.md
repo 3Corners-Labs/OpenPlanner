@@ -114,7 +114,7 @@ More contact-center platforms may follow (ADR 0032). The answer must not be a Wx
 
 9. **An invite to a group address.** A group with `openplanner_queue` may set a
    `calendar_invite_address`: a shared mailbox or distribution list of the team, such as
-   `team-aangifte@organisatie.nl`. The queue dispatcher then sends an iCalendar invite by email
+   `team-balie@example.org`. The queue dispatcher then sends an iCalendar invite by email
    (ADR 0009, the email `MessageSender`):
    - `on_booked`: `METHOD:REQUEST`; `on_rescheduled`: `METHOD:CANCEL` for the old booking and
      `REQUEST` for the new one (a reschedule is a new booking, HANDOVER §3); `on_cancelled` and

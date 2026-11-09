@@ -592,7 +592,9 @@ proxy-check`, CI step *proxy check*) runs against the bundled proxy in every cer
 
 With a reverse proxy of your own (`--no-tls`) the script does not run against it; ask its
 operator for the same: TLS 1.2 and 1.3 only, HSTS (the app already sends it, do not strip it),
-`X-Forwarded-*` set and not passed through from the client, and run `address-check`.
+`X-Forwarded-*` set and not passed through from the client, the browser's `Sec-Fetch-*` and
+`Sec-Purpose` headers passed on unchanged (without them the audited downloads of the admin
+portal lose their cross-site guard, see `docs/threat-model.md`), and run `address-check`.
 
 ### Go-live check of the public address (ADR 0086)
 
@@ -1137,7 +1139,7 @@ picks up that booking.
 group: WxCC business address ─► destination.id ─► Work Item asset ─► entry point ─► flow
 group: WxCC work item-kanaal ─► channel ────────► custom channel (the asset's)
 group: Routeringswaarde ─────► flowSettings.openplannerGroup ─► Case ─► Queue Contact ─► queue
-                               (empty: the group's web address, e.g. aangifte)
+                               (empty: the group's web address, e.g. balie)
 booking: meeting webLink ────► workItemData.meetingLink ─► viewable field + Screen Pop
 ```
 
@@ -1300,8 +1302,8 @@ is 1 while a `FAIL` remains.
 | screen pop (`WARN`) | the flow has no Screen Pop | add one with `meetingLink` |
 
 **Naming rule (advice).** Name each team's queue so that it contains the group's routing value
-as a name part; `-`, `_`, spaces and case count as the same. With routing value `aangifte`,
-`ORG_videoafspraak_aangifte_01` matches, `aangiftes_video` does not. The check then shows
+as a name part; `-`, `_`, spaces and case count as the same. With routing value `balie`,
+`ORG_videoafspraak_balie_01` matches, `balies_video` does not. The check then shows
 per group which queue it will use, and a wrong Case branch stands out. Prefer routing values
 without spaces (the web address of the group is a good default).
 
@@ -1843,7 +1845,7 @@ migration, point 4).
 | Step | How | What runs |
 |---|---|---|
 | Cut the line (once per minor, only when needed) | *Run workflow* on `main`, `step = cut-line`, `version = X.Y` (tick `dry_run` first) | `scripts/release_line.py cut` checks that a release of X.Y exists, the line does not, and `main` holds a `feat` since its newest release; the release app pushes `release/X.Y` and the label `backport:X.Y` is created |
-| Fix | the usual PR to `main`, merged through the queue; add the label `backport:X.Y` (before or after the merge) | `backport.yml` cherry-picks the merge commit onto `backport/X.Y/pr-N` and opens the PR against `release/X.Y` with auto-merge; a pull request into a line runs the full lane itself (a line has no merge queue) and must be up to date with the line; when the cherry-pick does not apply it comments on the PR, and a Claude Code session makes the backport by hand (`git cherry-pick -x`) |
+| Fix | the usual PR to `main`, merged through the queue, with the label `backport:X.Y` set before the merge; a label set after the merge needs `gh workflow run backport.yml -f pull_request=N` (ADR 0120) | `backport.yml` starts from the merge's push to `main` (or the dispatch); its job `find` fails, and is re-run, when a listed PR is not merged yet or is not the one the push merged; it cherry-picks the merge commit onto `backport/X.Y/pr-N` and opens the PR against `release/X.Y` with auto-merge; a pull request into a line runs the full lane itself (a line has no merge queue) and must be up to date with the line; when the cherry-pick does not apply it comments on the PR, and a Claude Code session makes the backport by hand (`git cherry-pick -x`) |
 | Candidate | the merge on the line | `main.yml` tags `vX.Y.Z-rc.N` from `scripts/release_plan.py --candidate --branch release/X.Y` and publishes it as on `main` (no mutation run: the fix ran it on `main`) |
 | Release | *Run workflow* on `release/X.Y`, `step = release-pr`, then `step = tag` on `release/X.Y` | the release PR goes to the line (a patch, no audit); the tag sits on the line's merge commit; `main.yml` accepts a tag on `main` or a patch tag on its own line (`scripts/release_line.py tag-allowed`); a line's release is never GitHub's *Latest* release and never moves `:latest` |
 | Changelog | the next release PR on `main` | `release_pr.py prepare` takes over the released sections of every `origin/release/X.Y` that `main` lacks, in version order |
@@ -2188,6 +2190,17 @@ and worker processes reload the settings within ten seconds. The audit log holds
 changed object (`configuration.apply`, with the plan hash prefix). A passphrase file is read
 from disk, never from the command line.
 
+**Secrets in clear text (ADR 0099 point 8a).** A document may carry a secret as
+`{"plain": "..."}`; reading one needs no setting. *Writing* them, so a file that is easy to edit
+and to wrap in your own encryption (an AES zip, `age`, `sops`), is off until the host allows it:
+set `CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED=true` in `.env` (class B, never a portal setting) and
+restart `web` and `worker` (`docker compose up -d`). Then the superuser sees *Without
+encryption* under the export form, and `config export --plain-secrets config.json` and
+`X-Plain-Secrets: true` work. Every such export, and every attempt while the switch is off, is an
+audit event (`configuration.export,secrets,plain`, with the outcome and never a value). Treat the
+file as the secrets themselves: do not leave it in Downloads, a mailbox or git, and switch the
+setting off again when you are done.
+
 ## Configuration package (ADR 0089)
 
 The SQLite package of ADR 0089 is **no longer written** (ADR 0099 step 4): export the
@@ -2262,12 +2275,97 @@ When the issue opens:
    PR waits for `po:approved` (ADR 0078). Your own `gh` login reads everything the audit app
    reads.
 
+**Actions event policies (ADR 0120).** The baseline's section `actions_policies` holds the one
+policy the repository needs, `decision gate`. GitHub shows Actions policies only to a token with
+*Administration: write*, so the audit app cannot read them and the hourly report lists
+`actions_policies` under *Not checked, by design*. Compare them with your own administrator's
+login after any change under *Settings → Actions → Policies*, and before every release
+(`docs/release-checklist.md`). `--full` says your login reads every section, so nothing counts
+as unseen and a section it cannot read is reported:
+
+```bash
+scripts/guardrail-fetch.sh "$TMPDIR/live" 3Corners-Labs/OpenPlanner
+python3 -m scripts.guardrail_audit --live "$TMPDIR/live" --full
+```
+
+`actions_policies` may not appear in that report at all. What the hourly run does see is the
+effect of a missing or narrowed policy: every run of the decision gate since the day before,
+among its latest 100, that GitHub did not start is listed under *Runs of the decision gate that
+GitHub did not start* (the next section says what to do). It reads them with the workflow's own
+token (`actions: read`), because the app has no Actions permission.
+
 **The audit app, once.** The same way as the release app (above), with the name
 `3corners-openplanner-audit`, *Repository permissions → Administration: Read-only* and
 *Organization permissions → Administration: Read-only*, nothing else, installed on this
 repository only. Its client ID goes into the variable `AUDIT_APP_CLIENT_ID` and a key from
 *Credentials → Key pairs* into the secret `AUDIT_APP_PRIVATE_KEY`, both in the environment
 `audit`. Without them every section reads as unreadable and the issue says so.
+
+## The decision gate did not start (ADR 0120)
+
+GitHub blocks `pull_request_target` in public repositories unless an Actions event policy
+allows it: enforced from 2 December 2026, before that only during brownouts (the last one on
+16 November 2026, 16:00–18:00 UTC). The repository's policy `decision gate` allows it for
+`.github/workflows/decision-gate.yml` alone, together with `merge_group`; no other workflow
+uses the event (a test keeps it so).
+
+**How it shows.** The required check *decision gate* never reports, on the pull request or in
+the merge queue. Its run ended in `startup_failure` and has no job, and `gh run view` only says
+it "likely failed because of a workflow file issue". The reason is the annotation on the run
+page, which anyone can read without signing in
+(`https://github.com/3Corners-Labs/OpenPlanner/actions/runs/<id>`, or
+`curl -s -A Mozilla/5.0` on that address and look for *Annotations*). The hourly guardrail
+audit lists such runs too.
+
+```bash
+gh run list --repo 3Corners-Labs/OpenPlanner --workflow decision-gate.yml --limit 20 \
+  --json databaseId,event,conclusion,createdAt,headBranch
+```
+
+| The annotation says | Cause | What to do |
+|---|---|---|
+| a scheduled brownout of the default `pull_request_target` protection | the policy `decision gate` does not exist yet | wait until the window ends, start the gate again (below); an administrator creates the policy (below) |
+| `pull_request_target` is blocked by default or by an Actions event policy, outside a brownout | the policy is missing, switched off, narrowed or limited to some actors | an administrator restores it from the baseline (below), then start the gate again |
+| an error in the workflow file, on a `merge_group` run | the pull request in the queue breaks `decision-gate.yml` | fix that pull request |
+
+**Starting the gate again.** GitHub does not re-run a run that never started: `gh run rerun
+<id>` and *Re-run failed jobs* answer "This workflow run cannot be retried" (HTTP 403; tried on
+2026-11-09 after the brownout). A new event on the pull request starts a new run:
+
+- Edit its description (an `edited` event; it changes neither the code nor the approval):
+
+  ```bash
+  N=123   # the pull request
+  gh pr view "$N" --repo 3Corners-Labs/OpenPlanner --json body --jq .body > "$TMPDIR/body.md"
+  printf '\n\nThe decision gate ran again after GitHub refused its run of %s (ADR 0120).\n' \
+    "$(date -u +%F)" >> "$TMPDIR/body.md"
+  gh pr edit "$N" --repo 3Corners-Labs/OpenPlanner --body-file "$TMPDIR/body.md"
+  ```
+
+- Or push the next commit. A push by an administrator keeps `po:approved`; anyone else's push
+  takes it off (ADR 0104).
+- In the merge queue: the queue drops the pull request once the check has not reported for 60
+  minutes. When the cause is gone, queue it again with `gh pr merge "$N" --auto --squash`.
+
+**Creating or restoring the policy (administrator).** From the baseline, in a checkout of
+`main`, with your own `gh` login:
+
+```bash
+jq '.actions_policies["decision gate"] | {name: "decision gate", enforcement, conditions,
+    rules: (.rules | to_entries | map({type: .key, parameters: .value}))}' .github/guardrails.json \
+  | gh api -X POST repos/3Corners-Labs/OpenPlanner/actions/policies --input -
+gh api repos/3Corners-Labs/OpenPlanner/actions/policies \
+  --jq '.policies[] | {id, name, source_type, enforcement, conditions, rules}'
+```
+
+A policy of that name that differs: change it with `gh api -X PUT
+repos/3Corners-Labs/OpenPlanner/actions/policies/<id> --input -` and the same body, or delete it
+(`-X DELETE …/<id>`) and create it again. In the browser it is *Settings → Actions → Policies*:
+name `decision gate`, enforcement *Active*, target only `.github/workflows/decision-gate.yml`,
+rule *Restrict events* with exactly `pull_request_target` and `merge_group`, no other rule. The
+policy is active at once: the next gate run on a pull request and the next one in the queue must
+both start, and the local audit with `--full` (*Guardrail drift*, above) must not mention
+`actions_policies`.
 
 ## Rotating secrets
 

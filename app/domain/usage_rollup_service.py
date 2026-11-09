@@ -25,6 +25,7 @@ from app.domain.usage_rollup import (
     hours_cutoff,
     roll,
 )
+from app.domain.usage_staff import roll_staff
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,7 @@ class UsageRollup:
                 batch = await tx.read_usage_events(state.last_event_id, BATCH_SIZE)
                 merged = roll(batch.facts)
                 await tx.add_usage_cells(merged)
+                await tx.add_staff_cells(roll_staff(batch.facts))
                 await tx.advance_usage_watermark(batch.last_id, now)
             facts += len(batch.facts)
             cells += len(merged)

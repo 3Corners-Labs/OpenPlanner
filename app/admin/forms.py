@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, tzinfo
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlencode
 
 from fastapi import Request
 from starlette.responses import RedirectResponse
@@ -66,6 +66,8 @@ DONE_MESSAGES: dict[str, str] = {
     "widget_removed": "admin.done.widget_removed",
     "layout_reset": "admin.done.layout_reset",
     "unchanged": "admin.done.unchanged",
+    "digest_added": "reports.digest.done.added",
+    "digest_removed": "reports.digest.done.removed",
     "field_retired": "admin.done.field_retired",
     "added": "admin.done.added",
     "removed": "admin.done.removed",
@@ -136,6 +138,11 @@ DONE_MESSAGES: dict[str, str] = {
     "moved": "admin.done.moved",
     "shortfall_accepted": "admin.done.shortfall_accepted",
     "rebook_requested": "admin.done.rebook_requested",
+    "proposed": "admin.done.proposed",
+    "proposals_sent": "admin.done.proposals_sent",
+    "proposal_withdrawn": "admin.done.proposal_withdrawn",
+    "proposal_confirmed_by_staff": "admin.done.proposal_confirmed_by_staff",
+    "proposal_gone": "admin.done.proposal_gone",
     "organisation_closed": "admin.done.organisation_closed",
     "organisation_lifted": "admin.done.organisation_lifted",
     "client_enabled": "admin.done.client_enabled",
@@ -285,6 +292,10 @@ FIELD_TARGET: dict[str, str] = {
 CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_PASSPHRASE_SHORT: "admin.form.error.configuration_passphrase_short",
     ErrorCode.CONFIGURATION_PASSPHRASE_WRONG: "admin.form.error.configuration_passphrase_wrong",
+    ErrorCode.CONFIGURATION_PLAINTEXT_DISABLED: "admin.form.error.configuration_plaintext_disabled",
+    ErrorCode.CONFIGURATION_PLAINTEXT_UNCONFIRMED: (
+        "admin.form.error.configuration_plaintext_unconfirmed"
+    ),
     ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",
@@ -609,6 +620,29 @@ def redirect_done(
     suffix = f"&count={count}" if count is not None else ""
     fragment = f"#{anchor}" if anchor else ""
     return RedirectResponse(f"{url}{separator}done={done}{suffix}{fragment}", status_code=303)
+
+
+def refused_message(request: Request, texts: Mapping[str, str], _: BoundGettext) -> str | None:
+    """Return why the page's action was refused, named by ``?refused=``, if ``texts`` knows it.
+
+    The counterpart of ``done_message`` for a refusal that sends the admin back to the page
+    (``redirect_refused``), such as an export over a limit. ``texts`` is the page's closed list
+    of codes and catalogue keys; any other value shows nothing and is never echoed.
+    """
+    code = request.query_params.get("refused", "")
+    return _(texts[code]) if code in texts else None
+
+
+def redirect_refused(url: str, code: str) -> RedirectResponse:
+    """Answer a refused action with a redirect to the page ``url`` and the reason ``code``.
+
+    Post/redirect/get, as ``redirect_done``: the page shows the reason (``refused_message``),
+    and nothing at the action's own address does, so a reload, a link or a login there cannot
+    run the action again. ``url`` may carry a query of its own; ``code`` is a code of the
+    page's closed list.
+    """
+    separator = "&" if "?" in url else "?"
+    return RedirectResponse(f"{url}{separator}{urlencode({'refused': code})}", status_code=303)
 
 
 async def read_form(request: Request, locale: RequestLocale) -> FormData:

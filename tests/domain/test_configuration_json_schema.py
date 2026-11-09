@@ -43,7 +43,12 @@ def test_every_kind_has_a_definition_that_refuses_unknown_fields() -> None:
 def test_a_secret_is_a_sealed_object_and_a_file_a_binary() -> None:
     defs = json_schema(V1)["$defs"]
 
-    assert defs["email_channel"]["properties"]["secret"]["oneOf"][0] == {"$ref": "#/$defs/sealed"}  # type: ignore[index]
+    assert defs["email_channel"]["properties"]["secret"]["oneOf"][0] == {"$ref": "#/$defs/secret"}  # type: ignore[index]
+    assert defs["secret"]["oneOf"] == [  # type: ignore[index]
+        {"$ref": "#/$defs/sealed"},
+        {"$ref": "#/$defs/plain"},
+    ]
+    assert defs["plain"]["required"] == ["plain"]  # type: ignore[index]
     assert defs["organisation_logo"]["properties"]["data"] == {"$ref": "#/$defs/binary"}  # type: ignore[index]
     assert defs["sealed"]["required"] == ["sealed"]  # type: ignore[index]
 

@@ -24,8 +24,8 @@ from tests.support.domain import NOW, TEST_TOKEN_KEY, book, make_group, webex_ro
 
 GROUP = make_group(
     id=1,
-    slug="aangifte",
-    name="Aangifte",
+    slug="balie",
+    name="Balie",
     video_host_email="host@example.nl",
     contact_center=webex_routing("openplanner@example.biz", "openplanner-video", "team-1"),
 )

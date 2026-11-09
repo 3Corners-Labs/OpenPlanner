@@ -207,6 +207,10 @@ async def _day(
             "changeable": changeable,
             "rebookable": rebookable,
             "manage": manage,
+            # ADR 0057 point 5: review every short slot of the day at once.
+            "day_review": f"/admin/groups/{slug}/agenda/slot-propose?day={chosen.isoformat()}"
+            if manage and any(s.can_accept for s in ordered)
+            else None,
             "announcement": _("admin.agenda.live_status", running=running, unpicked=unpicked),
             "poll": f"/admin/groups/{slug}/agenda/live?day={chosen.isoformat()}"
             + (f"&status={PENDING_FILTER}" if only_pending else "")
@@ -292,6 +296,8 @@ async def agenda_week(
             href = f"/admin/groups/{slug}/agenda?day={agenda_day.day.isoformat()}#{view.anchor}"
             cells[index] = WeekCell(href, view.staffing or "", view.shortfall, view.closed)
     shortfalls = sum(1 for d in days for s in d.slots if s.shortfall)
+    manage = can_function(context.principal)(Permission.BOOKINGS_MANAGE, context.group)
+    reviewable = any(s.open_shortfall and s.start >= clock.now() for d in days for s in d.slots)
     return group_page(
         request,
         locale,
@@ -305,6 +311,10 @@ async def agenda_week(
             ],
             "rows": [WeekRow(labels[local], by_time[local]) for local in sorted(by_time)],
             "week_shortfalls": shortfalls,
+            # ADR 0057 point 5: review every short slot of the week at once.
+            "week_review": f"/admin/groups/{slug}/agenda/slot-propose?day={monday}&days={WEEK_DAYS}"
+            if manage and reviewable
+            else None,
             "previous_week": (monday - timedelta(days=WEEK_DAYS)).isoformat(),
             "next_week": (monday + timedelta(days=WEEK_DAYS)).isoformat(),
             "this_week": today.isoformat(),

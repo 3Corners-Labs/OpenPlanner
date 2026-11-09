@@ -6,7 +6,7 @@ from app.domain.usage import UsageCell
 from app.domain.usage_report import ReportGroup
 from app.domain.usage_report_capacity import capacity_report
 
-GROUP = ReportGroup(1, 1, "aangifte", "Aangifte", "demo", "Demo", "Europe/Amsterdam")
+GROUP = ReportGroup(1, 1, "balie", "Balie", "demo", "Demo", "Europe/Amsterdam")
 SMALL = ReportGroup(2, 1, "intake", "Intake", "demo", "Demo", "Europe/Amsterdam")
 FIRST = date(2026, 11, 2)
 LAST = date(2026, 11, 8)

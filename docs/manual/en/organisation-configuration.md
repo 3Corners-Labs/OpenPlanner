@@ -21,6 +21,26 @@ passphrase you give, which must be at least 16 characters and is asked twice. Th
 is stored nowhere: without it the secrets in the file are worthless, and nobody can recover it
 for you. Without the tick the file holds no secret and needs no passphrase.
 
+## Setting up a new installation
+
+An export with secrets sets up a base installation without typing everything again: the
+integrations (SMTP, SMS, Webex and contact center with their addresses), organisations, groups,
+texts and rules.
+
+1. Export on the source installation with *Include secrets* and a passphrase (at least 16
+   characters). Keep the passphrase apart from the file.
+2. Read the file in on the new installation with the same passphrase: in the portal under
+   **Advanced settings → Configuration package**, on the host with
+   `python -m app.cli config apply config.json --passphrase-file pass.txt`, or with the
+   installer (`scripts/install.sh --configuration config.json --passphrase-file pass.txt`).
+
+You need no separate tool to open the file: OpenPlanner opens each secret itself when it reads
+the file in and stores it under the installation's own key. In the file you see a `seal` block
+and values like `{"sealed": "..."}`; an export without secrets has neither. A secret can also be
+written into the file by hand as `{"plain": "…"}`; OpenPlanner seals it when it applies it. If
+the host administrator agrees, the superuser can also export without encryption (*Advanced
+settings → Configuration package*).
+
 ## Reading a document in
 
 Choose the file and **Show plan**. Nothing changes yet. The plan lists, for each object, what

@@ -13,6 +13,7 @@ from app.config import Settings
 from app.domain.api_clients import IssuedSecret
 from app.domain.audit import Outcome
 from app.domain.services import BookingService
+from app.web.route_dependencies import guards
 from tests.support.agent_api import BASE, FORM, OPEN_ROUTES, SUPER, TRANSFER, Agent, agent_api
 from tests.support.configuration_package import PASSPHRASE
 from tests.support.legacy_package import package_of
@@ -242,6 +243,9 @@ async def test_docs_exist_only_while_published(agent: Agent) -> None:
         "/me",
         "/groups",
         "/groups/{slug}/availability",
+        "/groups/{slug}/change-requests",
+        "/change-requests/{request_id}",
+        "/reports/usage",
         "/configuration",
         "/configuration/plan",
         "/configuration/apply",
@@ -281,7 +285,7 @@ def test_every_route_declares_one_scope_except_token_and_docs(agent: Agent) -> N
     routes = all_routes(mounted.app.routes)  # type: ignore[attr-defined]
 
     for route in routes:
-        found = [d.call for d in route.dependant.dependencies if isinstance(d.call, RequireScope)]
+        found = guards(route, RequireScope)
         expected = 0 if route.path in OPEN_ROUTES else 1
         assert len(found) == expected, route.path
     assert OPEN_ROUTES <= {r.path for r in routes}
@@ -468,6 +472,54 @@ async def test_a_sealed_document_needs_its_passphrase(agent: Agent) -> None:
     )
     assert plan.status_code == 200, plan.text
     assert plan.json()["changes"] == []
+
+
+async def test_a_plain_export_is_refused_until_the_host_allows_it(agent: Agent) -> None:
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+
+    refused = await agent.client.get(
+        f"{BASE}/configuration", headers={**headers, "x-plain-secrets": "true"}
+    )
+
+    assert (refused.status_code, refused.json()) == (
+        403,
+        {"error": "configuration_plaintext_disabled"},
+    )
+    denied = [e for e in await _audit(agent) if e.detail.endswith("plain")]
+    assert [(e.outcome, e.reason) for e in denied] == [
+        ("denied", "configuration_plaintext_disabled")
+    ]
+
+
+async def test_a_plain_export_holds_clear_text_without_a_passphrase_and_applies_again(
+    agent: Agent,
+) -> None:
+    agent.app.state.settings = agent.app.state.settings.model_copy(
+        update={"configuration_plaintext_export_allowed": True}
+    )
+    headers = await agent.bearer(await agent.register(**TRANSFER))
+
+    exported = await agent.client.get(
+        f"{BASE}/configuration", headers={**headers, "x-plain-secrets": "true"}
+    )
+
+    assert exported.status_code == 200, exported.text
+    both = await agent.client.get(
+        f"{BASE}/configuration",
+        headers={**headers, "x-plain-secrets": "true", "x-passphrase": PASSPHRASE},
+    )
+    assert (both.status_code, both.json()) == (422, {"error": "invalid_configuration"})
+    assert PASSPHRASE not in both.text
+    assert exported.headers["cache-control"] == "no-store"
+    assert '"sealed"' not in exported.text
+    assert "seal" not in exported.json()
+    plan = await agent.client.post(
+        f"{BASE}/configuration/plan", headers=headers, content=exported.content
+    )
+    assert plan.status_code == 200, plan.text
+    assert plan.json()["changes"] == []
+    events = [e for e in await _audit(agent) if e.detail.endswith("secrets,plain")]
+    assert len(events) == 1
 
 
 @pytest.mark.parametrize(

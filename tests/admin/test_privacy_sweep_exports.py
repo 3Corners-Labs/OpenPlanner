@@ -34,12 +34,13 @@ CLEAR_SECRETS = (LOG_DESTINATION["secret"],)
 """Secrets the sweep stored through the portal; none may be readable in a document."""
 
 EXPORTS = {
+    "adapters/configuration_json.py": "the configuration document (portal and machine API), below, "
+    "and tests/api/test_privacy_sweep_api.py",
     "admin/audit_routes.py": "the audit export, per role below",
     "admin/branding_routes.py": "theme.css: colours of the organisation, swept as a page",
-    "admin/configuration_routes.py": "the configuration document, below",
     "admin/idp_mapping_routes.py": "the claim mapping text, swept as a page",
     "admin/settings_routes.py": "the CSR and the internal CA certificate (public), swept as pages",
-    "api/agent/routes.py": "the machine API, tests/api/test_privacy_sweep_api.py",
+    "admin/usage_routes.py": "the usage report CSVs: counts and codes, swept below",
 }
 
 
@@ -140,3 +141,16 @@ async def test_the_configuration_document_holds_no_personal_data_no_state_and_no
     for name in (STAFF_NAME, DEMO_MARKER, OTHER_MARKER):
         assert name.encode() not in document, f"state in the document: {name}"
     assert b'"sealed"' in document, "the document holds no sealed secret: the sweep proves nothing"
+
+
+@pytest.mark.parametrize("view", ["volume", "queue", "capacity", "channels", "tidy"])
+async def test_the_usage_exports_hold_no_personal_data(
+    marked: tuple[Site, Fixture], view: str
+) -> None:
+    site, _ = marked
+    await site.login_as(SUPER)
+
+    for scope in ("organisations/demo", "groups/demo"):
+        response = await site.client.get(f"/admin/{scope}/usage/export.csv?view={view}")
+        assert response.status_code == 200, (scope, view)
+        assert not marker_leaks(response.content.decode("utf-8"), set()), (scope, view)

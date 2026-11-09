@@ -16,7 +16,7 @@ test('an upcoming closure: banner, closure page and back to the calendar', async
   await tabTo(page, page.getByRole('link', { name: 'Meer over de sluiting' }));
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Storing bij het loket');
-  await tabTo(page, page.getByRole('link', { name: '14 020' }));
+  await tabTo(page, page.getByRole('link', { name: '012 345 6789' }));
   await expectNoAxeViolations(page);
 
   await tabTo(page, page.getByRole('link', { name: 'Naar de kalender' }));
@@ -36,7 +36,7 @@ test('a closed team shows its closure page instead of the calendar', async ({ pa
 test('a booking on hold shows the contact options before its actions', async ({ page }) => {
   await page.goto(fixture('suspended_booking'));
 
-  await tabTo(page, page.getByRole('link', { name: '14 020' }));
+  await tabTo(page, page.getByRole('link', { name: '012 345 6789' }));
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'www.example.org/contact' })).toBeFocused();
   await tabTo(page, page.getByRole('link', { name: 'Kies een nieuwe tijd' }));

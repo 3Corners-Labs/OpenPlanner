@@ -7,6 +7,7 @@ import pytest
 
 from app.adapters.db.text_overrides import CachedTextOverrides
 from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact
+from app.domain.change_requests import ChangeRequest, derive_code, format_code
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
@@ -21,7 +22,7 @@ from tests.support.admin import two_organisations
 from tests.support.domain import NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, make_group
 
 SALT = new_token_salt()
-GROUP = make_group(name="Aangifte <Dienstverlening>")
+GROUP = make_group(name="Balie <Dienstverlening>")
 BOOKING = Booking(
     id=42,
     group_id=1,
@@ -68,7 +69,7 @@ def test_confirmation_in_dutch(composer: MessageComposer) -> None:
 def test_html_is_escaped_and_semantic(composer: MessageComposer) -> None:
     html = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW).html or ""
 
-    assert "Aangifte &lt;Dienstverlening&gt;" in html
+    assert "Balie &lt;Dienstverlening&gt;" in html
     assert "<Dienstverlening>" not in html
     assert '<html lang="nl">' in html
     assert "<dl>" in html
@@ -149,7 +150,7 @@ def test_sms_reminder_is_one_short_text_with_the_manage_link(composer: MessageCo
     assert message.recipient == "+31612345678"
     assert message.html is None
     assert message.attachments == ()
-    assert message.text.startswith("Beste Ada, herinnering: videogesprek met Aangifte")
+    assert message.text.startswith("Beste Ada, herinnering: videogesprek met Balie")
     assert "maandag 5 januari 2026 om 09:00" in message.text
     assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}" in message.text
     assert "Lovelace" not in message.text
@@ -184,8 +185,8 @@ def test_group_texts_replace_blocks_in_their_locale_only(composer: MessageCompos
     assert "Dit is een herinnering" in email.text  # blocks without a group text stay default
     assert sms.text.startswith("Tot maandag 5 januari 2026, Ada! https://afspraak.example.nl/b/")
     assert english.subject.startswith("Reminder:")
-    assert "Kind regards, the Aangifte <Dienstverlening> team" in english.text
-    assert "the Aangifte &lt;Dienstverlening&gt; team" in (english.html or "")
+    assert "Kind regards, the Balie <Dienstverlening> team" in english.text
+    assert "the Balie &lt;Dienstverlening&gt; team" in (english.html or "")
 
 
 # --- emergency closure (ADR 0024) ----------------------------------------------------------
@@ -244,13 +245,13 @@ SNAPSHOTS = Path(__file__).parent / "snapshots"
 CONTACTS = ContactBlock(
     (
         ContactOption.create(
-            ContactKind.PHONE, "14 020", hours={"nl": "ma-vr 8-17", "en": "Mon-Fri 8-17"}
+            ContactKind.PHONE, "012 345 6789", hours={"nl": "ma-vr 8-17", "en": "Mon-Fri 8-17"}
         ),
         ContactOption.create(ContactKind.WEBSITE, "https://acme.example/contact"),
         ContactOption.create(
             ContactKind.ADDRESS,
-            "Stadhuisplein 1\n1234 AB Stad",
-            labels={"nl": "Balie", "en": "Desk"},
+            "Voorbeeldstraat 1\n1234 AB Voorbeeldstad",
+            labels={"nl": "Bezoekadres", "en": "Visiting address"},
         ),
     ),
     {"nl": "Zo bereikt u ons", "en": "How to reach us"},
@@ -271,7 +272,7 @@ FIXED = replace(BOOKING, status=BookingStatus.SUSPENDED, closure_id=1, token_sal
 def test_closure_mails_match_their_snapshots(
     composer: MessageComposer, job_type: JobType, locale: str
 ) -> None:
-    group = replace(GROUP, slug="aangifte")
+    group = replace(GROUP, slug="balie")
     message = composer.compose(
         job_type, replace(FIXED, locale=locale), group, NOW, closure=CONTACT_CLOSURE
     )
@@ -290,18 +291,18 @@ def test_closure_mails_match_their_snapshots(
 def test_the_plain_text_part_has_the_contact_options_and_the_closure_page(
     composer: MessageComposer,
 ) -> None:
-    group = replace(GROUP, slug="aangifte")
+    group = replace(GROUP, slug="balie")
 
     message = composer.compose(JobType.SEND_SUSPENSION, FIXED, group, NOW, closure=CONTACT_CLOSURE)
 
     assert "Zo bereikt u ons:" in message.text
-    assert "- Telefoon: 14 020 (ma-vr 8-17)" in message.text
+    assert "- Telefoon: 012 345 6789 (ma-vr 8-17)" in message.text
     assert "- Website: https://acme.example/contact" in message.text
-    assert "- Balie: Stadhuisplein 1, 1234 AB Stad" in message.text
-    assert "https://afspraak.example.nl/g/aangifte/closure" in message.text
+    assert "- Bezoekadres: Voorbeeldstraat 1, 1234 AB Voorbeeldstad" in message.text
+    assert "https://afspraak.example.nl/g/balie/closure" in message.text
     html = message.html or ""
-    assert '<a href="tel:14020">14 020</a>' in html
-    assert '<a href="https://afspraak.example.nl/g/aangifte/closure">' in html
+    assert '<a href="tel:0123456789">012 345 6789</a>' in html
+    assert '<a href="https://afspraak.example.nl/g/balie/closure">' in html
     assert "<h2>Storing</h2>" in html  # the closure's heading names the notice
 
 
@@ -320,7 +321,7 @@ def test_other_mails_have_no_contact_block_or_closure_link(composer: MessageComp
         JobType.SEND_REINSTATEMENT, BOOKING, GROUP, NOW, closure=CONTACT_CLOSURE
     )
 
-    assert "14 020" not in message.text
+    assert "012 345 6789" not in message.text
     assert "/closure" not in message.text
 
 
@@ -484,10 +485,10 @@ def test_the_released_proposal_names_the_lapse_and_links_the_booking(
 
 
 TEAM = make_group(
-    slug="aangifte",
-    name="Aangifte",
+    slug="balie",
+    name="Balie",
     dispatch_kind=DispatchKind.OPENPLANNER_QUEUE,
-    calendar_invite_address="team-aangifte@example.org",
+    calendar_invite_address="team-balie@example.org",
 )
 
 
@@ -497,10 +498,10 @@ def test_team_invite_goes_to_the_team_with_first_name_reference_and_queue_link(
     message = composer.compose_team_invite(JobType.SEND_TEAM_INVITE, BOOKING, TEAM, NOW, "nl")
     ics = message.attachments[0].data.decode()
 
-    assert message.recipient == "team-aangifte@example.org"
+    assert message.recipient == "team-balie@example.org"
     assert "Ada" in message.text
     assert "OP-000042" in message.text
-    assert "https://afspraak.example.nl/admin/groups/aangifte/queue" in message.text
+    assert "https://afspraak.example.nl/admin/groups/balie/queue" in message.text
     assert "Lovelace" not in message.text + ics
     assert "ada@example.org" not in message.text + str(message.html) + ics
     assert "/b/" not in message.text + ics  # no management or join link
@@ -590,7 +591,7 @@ def test_the_request_to_confirm_in_english(composer: MessageComposer) -> None:
         JobType.SEND_CONFIRM_REQUEST, replace(PENDING, locale="en"), GROUP, NOW
     )
 
-    assert message.subject == "Confirm your appointment with Aangifte <Dienstverlening>"
+    assert message.subject == "Confirm your appointment with Balie <Dienstverlening>"
     assert "Hello," in message.text
 
 
@@ -772,3 +773,66 @@ def test_a_reminder_after_a_rotation_carries_the_link_the_booking_was_given() ->
     assert forgotten.manage_url(booking) != link  # the defect the previous key fixes
     new_booking = replace(BOOKING, token_hash=hash_token(derive_token(new_key, SALT)))
     assert after.manage_url(new_booking).endswith(derive_token(new_key, SALT))
+
+
+# --- ADR 0023 step 2: a bot's change request and the appointment code -----------------------
+
+CANCEL_REQUEST = ChangeRequest(
+    "chr_x", "opc_bot", 1, None, 42, SLOT_0900, NOW, NOW + timedelta(hours=1)
+)
+MOVE_REQUEST = replace(CANCEL_REQUEST, target_start=SLOT_0930)
+
+
+def test_a_change_request_names_the_change_its_deadline_and_its_confirm_page(
+    composer: MessageComposer,
+) -> None:
+    cancel = composer.compose(
+        JobType.SEND_CHANGE_REQUEST, BOOKING, GROUP, NOW, change=CANCEL_REQUEST
+    )
+    move = composer.compose(JobType.SEND_CHANGE_REQUEST, BOOKING, GROUP, NOW, change=MOVE_REQUEST)
+
+    token = derive_token(TEST_TOKEN_KEY, SALT)
+    assert cancel.subject == "Bevestig de wijziging van uw videogesprek"
+    assert "gevraagd uw videogesprek" in cancel.text
+    assert "te annuleren. Bevestig dit voor donderdag 1 januari 2026, 10:00" in cancel.text
+    assert "te verplaatsen naar maandag 5 januari 2026 om 09:30" in move.text
+    assert "Voorgestelde tijd: maandag 5 januari 2026, 09:30" in move.text
+    for message in (cancel, move):
+        assert f"/b/{token}/change" in message.text
+        assert "/join" not in message.text
+        assert message.attachments == ()
+        assert "Afspraakcode" not in message.text
+
+
+def test_a_change_request_has_an_sms_with_the_confirm_link(composer: MessageComposer) -> None:
+    sms = composer.compose(
+        JobType.SEND_CHANGE_REQUEST,
+        SMS_BOOKING,
+        GROUP,
+        NOW,
+        channel=ChannelKind.SMS,
+        change=MOVE_REQUEST,
+    )
+
+    assert "te verplaatsen naar maandag 5 januari 2026 om 09:30" in sms.text
+    assert f"/b/{derive_token(TEST_TOKEN_KEY, SALT)}/change" in sms.text
+
+
+def test_a_change_request_message_needs_its_request(composer: MessageComposer) -> None:
+    with pytest.raises(ValueError, match="change request"):
+        composer.compose(JobType.SEND_CHANGE_REQUEST, BOOKING, GROUP, NOW)
+
+
+def test_the_code_is_in_messages_that_link_the_booking_when_switched_on(
+    composer: MessageComposer,
+) -> None:
+    code = format_code(derive_code(TEST_TOKEN_KEY, SALT))
+
+    shown = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW, show_code=True)
+    hidden = composer.compose(JobType.SEND_CONFIRMATION, BOOKING, GROUP, NOW)
+    cancelled = composer.compose(JobType.SEND_CANCELLATION, BOOKING, GROUP, NOW, show_code=True)
+
+    assert f"Afspraakcode: {code}" in shown.text
+    assert f"<dd>{code}</dd>" in (shown.html or "")
+    assert code not in hidden.text
+    assert code not in cancelled.text

@@ -76,6 +76,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DEV_TOKEN_KEY_PATH` | path | `data/dev-token.key` | Development management-token key file. |
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
+| `CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED` | bool | `false` | Allow the superuser to export the configuration with its secrets in clear text (ADR 0099 point 8a). Off by default; never in the portal, because it switches a protection off. |
 | `OIDC_CLAIM_MODE` | enum | `legacy` | Where rights come from: legacy (three claims), shadow (compare), entitlements (ADR 0049); moving back to legacy weakens a protection, so env only. |
 | `SMTP_PLAINTEXT_RELAY_ALLOWED` | bool | `false` | Allow mail without TLS in production, for a relay on a trusted network (ADR 0091); otherwise saving it is refused and System status reports it. Never in the portal. |
 
@@ -125,6 +126,13 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_RETENTION_MONTHS` | int | `25` | 13–60 | `settings.platform.manage` | Months the hourly usage rollup is kept; 25 gives two full years and the running one (ADR 0117). |
 | `REPORTING_ROLLUP_INTERVAL_MINUTES` | int | `15` | 5–240 | `settings.platform.manage` | Minutes between two rollups of usage facts into the hourly table; System status warns when the rollup is four times this behind (ADR 0117). |
 | `REPORTING_MIN_CELL_SIZE` | int | `5` | 3–20 | `settings.platform.manage` | The smallest count a usage report shows; a smaller cell reads < n and its sum and mean are hidden. Never below 3 (ADR 0117 point 8). |
+| `REPORTING_USAGE_EVENTS_TO_LOG` | bool | `false` | — | `settings.platform.manage` | Also write every usage fact as the log line usage.fact for the log destinations: counts and codes only, no personal data (ADR 0117 point 15). |
+| `REPORTING_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of a usage report may hold; more is refused (ADR 0117 point 12). |
+| `REPORTING_EXPORT_MAX_DAYS` | int | `400` | 31–1100 | `settings.platform.manage` | Most days one CSV export of a usage report may cover (ADR 0117 point 12). |
+| `REPORTING_API_PAGE_SIZE` | int | `1000` | 100–10000 | `settings.platform.manage` | Most cells in one page of the usage API (ADR 0117 point 13). |
+| `REPORTING_API_RATE_PER_MINUTE` | int | `30` | 5–300 | `settings.platform.manage` | Calls per minute per API client to the usage API (ADR 0117 point 13); the off switch stays RATE_LIMIT_ENABLED. |
+| `REPORTING_DIGEST_LATE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Latest a missed digest is still sent, in hours after its time; later it is skipped (ADR 0117 point 16). |
+| `REPORTING_DIGEST_MAX_SUBSCRIPTIONS` | int | `20` | 1–200 | `settings.platform.manage` | Most digest subscriptions one organisation may have (ADR 0117 point 16). |
 | `SECURITY_EVENT_RETENTION_DAYS` | int | `365` | 30–3650 | `settings.platform.manage` | Days after which security events leave the audit log (ADR 0040). |
 | `DIAGNOSTIC_EVENT_RETENTION_DAYS` | int | `7` | 1–90 | `settings.platform.manage` | Days after which debug events of diagnostic mode are deleted (ADR 0040). |
 | `DIAGNOSTIC_MODE_HOURS` | int | `24` | 1–72 | `settings.platform.manage` | Hours after which diagnostic mode ends by itself (ADR 0040). |
@@ -145,6 +153,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `RATE_LIMIT_UNKNOWN_LINKS` | rate | `20/hour` | 5–100 per hour | `settings.platform.manage` | Unknown management links per IP address. |
 | `RATE_LIMIT_AGENT_TOKENS` | rate | `10/minute` | 1–30 per minute | `settings.platform.manage` | Machine API token requests per client. |
 | `RATE_LIMIT_AGENT_CALLS` | rate | `120/minute` | 10–600 per minute | `settings.platform.manage` | Machine API calls per client. |
+| `AGENT_CHANGE_REQUESTS_PER_HOUR` | int | `20` | 1–120 | `settings.platform.manage` | Change requests per API client per hour, next to the machine API's call limit (ADR 0023 step 2); the off switch stays RATE_LIMIT_ENABLED. |
+| `AGENT_CHANGE_REQUEST_RETENTION_DAYS` | int | `30` | 1–365 | `settings.platform.manage` | Days after expiry that a bot's change request is kept, matched or not; then it is deleted and its status no longer found (ADR 0023 step 2b). |
 | `ADMIN_SESSION_HOURS` | int | `8` | 1–8 | `settings.platform.manage` | Lifetime of an admin session. |
 | `ADMIN_REAUTH_MINUTES` | int | `60` | 5–60 | `settings.platform.manage` | Maximum login age for a change (ADR 0015). |
 | `ADMIN_IDLE_MINUTES` | int | `60` | 15–120 | `settings.platform.manage` | Idle time after which an admin session ends (ADR 0098). |
@@ -185,6 +195,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_WINDOW` | string | `""` | — | `settings.platform.manage` | When automatic updates happen, in `admin_timezone`: up to 7 ranges such as `mon 02:00-04:00, sat 01:00-05:00`, each at least 30 minutes (ADR 0116 point 9); empty is any time. A superuser's click is immediate. |
 | `UPDATE_CHECK_MINUTES` | int | `60` | 5–1440 | `settings.platform.manage` | Minutes between two release checks by the worker (ADR 0067); "Check now" on the updates page asks for one ahead of time. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
+| `CONTACT_REVEALS_ALERT_PER_HOUR` | int | `20` | 5–500 | `settings.platform.manage` | Requests for participants' contact details by one person per hour above which a system event warns (ADR 0044 §2). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the participant's waiting page (ADR 0072). |
 | `OVERVIEW_LIVE_ENABLED` | bool | `true` | — | `settings.platform.manage` | Lets the overview's widgets refresh themselves and pop up new alerts; off, the page shows what it loaded with and a Refresh link (ADR 0061 §3, §4). |
 | `OVERVIEW_POLL_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of a live widget on the overview (ADR 0061 §4). |
@@ -200,6 +211,12 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | Variable | Kind | Default | Portal bounds | Permission | Note |
 |---|---|---|---|---|---|
 | `REPORTING_ORG_MIN_CELL_SIZE` | int | `3` | 3–50 | `settings.organisation.manage` | The smallest count the organisation's own usage reports show. It can only raise the platform value; the larger of the two applies (ADR 0117 point 8). |
+| `REPORTING_STAFF_VIEW_ENABLED` | bool | `false` | — | `settings.organisation.manage` | Whether the load of each team member (calls handled, call minutes, claims, on-time share) is written and shown on the Team report. Off by default: no team fact is written while it is off (ADR 0117 point 9). |
+| `REPORTING_DIGEST_SEND_HOUR` | int | `7` | 0–23 | `settings.organisation.manage` | The local hour (in the organisation's time zone) the digest of the reports is sent (ADR 0117 point 16). |
+| `REPORTING_DIGEST_INCLUDE_NUMBERS` | bool | `true` | — | `settings.organisation.manage` | Whether the digest mail holds the figures; off, it holds only the link to the report (ADR 0117 point 16). |
+| `AGENT_CHANGE_REQUESTS_ENABLED` | bool | `false` | — | `settings.organisation.manage` | Whether a bot may ask to cancel or move this organisation's bookings by phone number and appointment code, and whether pages and messages show that code (ADR 0023 step 2). |
+| `AGENT_CHANGE_REQUEST_MINUTES` | int | `60` | 10–1440 | `settings.organisation.manage` | Minutes the participant has to confirm a bot's change request (ADR 0023 step 2). |
+| `AGENT_CHANGE_REQUEST_COOLDOWN_MINUTES` | int | `10` | 1–1440 | `settings.organisation.manage` | After a bot's change request reached a booking, minutes in which a new one for it sends the participant nothing (ADR 0023 step 2b). Cannot be switched off. |
 | `TIME_FORMAT` | enum | `24h` | 24h, 12h, locale | `settings.organisation.manage` | How clock times are written. |
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
 | `PRODUCT_FOOTER` | bool | `true` | — | `settings.organisation.manage` | "Appointments via OpenPlanner" with the product mark at the foot of the booking pages and in the HTML part of emails (ADR 0060 §6). |

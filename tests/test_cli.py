@@ -125,7 +125,7 @@ async def test_register_webhooks_refuses_a_plain_http_base(configured: Settings)
 
 async def _wired_group(settings: Settings) -> None:
     engine = create_engine(settings.database_url)
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     async with engine.begin() as connection:
         await connection.execute(
             update(GroupRow).values(
@@ -193,10 +193,10 @@ async def test_wxcc_config_check_finds_the_region_and_the_schema_mismatch(
 
     assert not passed
     assert "set WXCC_API_BASE_URL=https://api.wxcc-eu2.cisco.com" in report
-    assert "OK    [aangifte] channel" in report
-    assert "FAIL  [aangifte] asset schema" in report
+    assert "OK    [balie] channel" in report
+    assert "FAIL  [balie] asset schema" in report
     assert "videoafspraak_MeetingURL" in report
-    assert "WARN  [aangifte] flow routing" in report
+    assert "WARN  [balie] flow routing" in report
     assert ACCESS_TOKEN not in report
 
 
@@ -210,27 +210,27 @@ async def test_wxcc_config_check_without_wired_groups_does_nothing(configured: S
 async def test_wxcc_sample_flow_prints_a_flow_for_the_group(configured: Settings) -> None:
     await _wired_group(configured)
 
-    report, ok = await _wxcc_sample_flow(configured, "aangifte", ["aangifte=ORG_aangifte_01"], None)
+    report, ok = await _wxcc_sample_flow(configured, "balie", ["balie=ORG_balie_01"], None)
 
     flow = json.loads(report)
     assert ok
-    assert flow["name"] == "openplanner_aangifte"
+    assert flow["name"] == "openplanner_balie"
     activities = flow["process"]["activities"].values()
     queues = [
         a["properties"]["destination:name"]
         for a in activities
         if "destination:name" in a["properties"]
     ]
-    assert queues == ["ORG_aangifte_01", "ORG_aangifte_01"]
+    assert queues == ["ORG_balie_01", "ORG_balie_01"]
 
 
 async def test_wxcc_sample_flow_refuses_an_unknown_or_unwired_group(configured: Settings) -> None:
     engine = create_engine(configured.database_url)
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     await engine.dispose()
 
     assert await _wxcc_sample_flow(configured, "nope", [], None) == ("no group 'nope'\n", False)
-    report, ok = await _wxcc_sample_flow(configured, "aangifte", [], None)
+    report, ok = await _wxcc_sample_flow(configured, "balie", [], None)
     assert not ok
     assert "no WxCC channel" in report
 
@@ -238,7 +238,7 @@ async def test_wxcc_sample_flow_refuses_an_unknown_or_unwired_group(configured: 
 async def test_wxcc_sample_flow_refuses_a_queue_without_its_value(configured: Settings) -> None:
     await _wired_group(configured)
 
-    report, ok = await _wxcc_sample_flow(configured, "aangifte", ["ORG_aangifte_01"], None)
+    report, ok = await _wxcc_sample_flow(configured, "balie", ["ORG_balie_01"], None)
 
     assert not ok
     assert "VALUE=QUEUE" in report
@@ -580,7 +580,7 @@ async def test_purge_overdue_counts_per_group_and_purges(migrated: Settings) -> 
 
     engine = create_engine(migrated.database_url)
     try:
-        await seed_group(engine, slug="aangifte")
+        await seed_group(engine, slug="balie")
         await book(
             BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900
         )
@@ -592,7 +592,7 @@ async def test_purge_overdue_counts_per_group_and_purges(migrated: Settings) -> 
     again, _ = await _purge_overdue(migrated)
 
     assert dry_ok
-    assert dry == "aangifte: 1 overdue\n1 bookings overdue (1 for over 48 hours)\n"
+    assert dry == "balie: 1 overdue\n1 bookings overdue (1 for over 48 hours)\n"
     assert real_ok
     assert real.endswith("purged 1 of 1 overdue bookings (0 failed, 1 were over 48 hours)\n")
     assert again.startswith("purged 0 of 0")

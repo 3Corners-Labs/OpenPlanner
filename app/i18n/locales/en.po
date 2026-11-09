@@ -710,7 +710,7 @@ msgid "admin.group.settings"
 msgstr "Settings"
 
 msgid "admin.group.slot_minutes"
-msgstr "Length of an appointment"
+msgstr "Length of a call"
 
 msgid "admin.group.minutes"
 msgstr "{minutes} minutes"
@@ -2620,6 +2620,9 @@ msgstr "appointment on hold moved"
 msgid "audit.event.planner_changes_alert"
 msgstr "Many changes by one planner"
 
+msgid "audit.event.contact_reveals_alert"
+msgstr "Many requests for contact details by one person"
+
 msgid "admin.audit.detail.planner_move"
 msgstr "booking moved by a planner"
 
@@ -2637,6 +2640,9 @@ msgstr "shortfall accepted"
 
 msgid "admin.audit.detail.changes"
 msgstr "changes in the past hour: {count}"
+
+msgid "admin.audit.detail.reveals"
+msgstr "requests for contact details in the past hour: {count}"
 
 msgid "admin.audit.detail.reason"
 msgstr "reason: {value}"
@@ -4357,8 +4363,8 @@ msgstr "Tasks"
 msgid "admin.nav.alerts"
 msgstr "Alerts"
 
-msgid "admin.topbar.tasks.count"
-msgstr "{label}, {count} running or failed"
+msgid "admin.topbar.tasks.count_words"
+msgstr "running or failed"
 
 msgid "admin.scope.label"
 msgstr "Scope"
@@ -4916,7 +4922,8 @@ msgstr "No webhook secret is configured (WEBEX_WEBHOOK_SECRET or WXCC_WEBHOOK_SE
 msgid "admin.done.simulator_refused"
 msgstr "The webhook endpoint refused the event. Check the web container's log."
 
-#. Environment bar in the admin portal (dev/test only).
+#. Environment names in the admin portal: the bar (dev/test only), System status and the
+#. overview's status widget.
 
 msgid "admin.environment.label"
 msgstr "Environment"
@@ -4926,6 +4933,9 @@ msgstr "Development environment"
 
 msgid "admin.environment.test"
 msgstr "Test environment"
+
+msgid "admin.environment.prod"
+msgstr "Production environment"
 
 msgid "admin.environment.text"
 msgstr "Not for real appointments of participants."
@@ -5813,6 +5823,12 @@ msgstr "Last login"
 msgid "admin.staff.last_seen"
 msgstr "Last active"
 
+msgid "admin.staff.email"
+msgstr "Email address"
+
+msgid "admin.staff.email_none"
+msgstr "No verified address known"
+
 msgid "admin.staff.last_logout"
 msgstr "Last logout"
 
@@ -6349,6 +6365,9 @@ msgstr "Shortfall look-ahead (days)"
 
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Alert above changes per planner per hour"
+
+msgid "settings.field.contact_reveals_alert_per_hour.label"
+msgstr "Alert above requests for contact details per person per hour"
 
 msgid "admin.settings.problem.dev_placeholder"
 msgstr "holds a development placeholder; production refuses it."
@@ -7921,7 +7940,7 @@ msgid "admin.rights.refused_intro"
 msgstr "The identity provider sent these values at your last login, but this installation does not recognise them. Pass them on to the IdP team."
 
 msgid "admin.roles.entitlement_notice"
-msgstr "When the installation uses an entitlement claim (ADR 0049), the identity provider sends one value per organisation or group with this role's key, for example openplanner:custom.3:org-a. The key and the exact values are on the Identity provider mapping page."
+msgstr "When the installation uses an entitlement claim, the identity provider sends one value per organisation or group with this role's key, for example openplanner:custom.3:org-a. The key and the exact values are on the Identity provider mapping page."
 
 msgid "admin.form.error.idp_key"
 msgstr "Use only lower-case letters, digits and hyphens (at most 63 characters), starting with a letter or digit."
@@ -8853,6 +8872,12 @@ msgstr "The configuration package was applied as a document: {count} organisatio
 msgid "admin.form.error.configuration_passphrase_short"
 msgstr "The passphrase is too short, or the repetition differs. Use at least 16 characters."
 
+msgid "admin.form.error.configuration_plaintext_disabled"
+msgstr "An export without encryption is switched off on this installation. The host administrator must allow it first."
+
+msgid "admin.form.error.configuration_plaintext_unconfirmed"
+msgstr "Tick that you understand the file contains every secret in readable form, or choose an export with a passphrase."
+
 msgid "admin.form.error.configuration_passphrase_wrong"
 msgstr "The passphrase does not fit this package."
 
@@ -9587,8 +9612,8 @@ msgstr "Queue wait"
 msgid "admin.audit.reason.wait_over_warning"
 msgstr "Participants wait longer than the set limit."
 
-msgid "admin.topbar.alerts.count"
-msgstr "{label}, {count} open"
+msgid "admin.topbar.alerts.count_words"
+msgstr "open"
 
 msgid "settings.field.idp_domain_grace_days.label"
 msgstr "Grace for a missing domain record (days)"
@@ -10435,11 +10460,23 @@ msgstr "Enter the id of a Webex space: letters, digits, - and _, 10 to 200 chara
 msgid "authz.permission.reports_view"
 msgstr "View usage reports"
 
+msgid "authz.permission.reports_export"
+msgstr "Download usage reports"
+
 msgid "settings.field.reporting_min_cell_size.label"
 msgstr "Smallest count a report shows"
 
 msgid "settings.field.reporting_org_min_cell_size.label"
 msgstr "Smallest count in the organisation's reports"
+
+msgid "settings.field.reporting_staff_view_enabled.label"
+msgstr "Show the load of each team member in the reports"
+
+msgid "settings.field.reporting_export_max_rows.label"
+msgstr "Most rows in a CSV export of a usage report"
+
+msgid "settings.field.reporting_export_max_days.label"
+msgstr "Most days in a CSV export of a usage report"
 
 msgid "admin.nav.reports"
 msgstr "Reports"
@@ -11201,7 +11238,19 @@ msgid "admin.configuration.export.secrets"
 msgstr "Include secrets, sealed with a passphrase"
 
 msgid "admin.configuration.export.secrets_hint"
-msgstr "Without secrets the file needs no passphrase. With secrets the passphrase is at least {length} characters; keep it safe, it cannot be recovered."
+msgstr "Without secrets the file holds no passwords or keys and needs no passphrase. With secrets OpenPlanner seals each secret (SMTP, SMS, Webex, contact center, login, API clients) separately under this passphrase, at least {length} characters. You need no separate tool to open it: read the file in on the new installation (here, with the config apply command, or with the installer) and type the same passphrase. The passphrase cannot be recovered; keep it apart from the file."
+
+msgid "admin.configuration.export.plain.title"
+msgstr "Without encryption"
+
+msgid "admin.configuration.export.plain.hint"
+msgstr "Every password, key and token is then readable in the file. Whoever has the file has access to those services. Keep it as private as the secrets themselves, and encrypt it yourself before you share it."
+
+msgid "admin.configuration.export.plain.label"
+msgstr "Write the secrets readable in the file, without a passphrase"
+
+msgid "admin.configuration.export.plain.confirm"
+msgstr "I understand the file contains every secret in readable form"
 
 msgid "admin.configuration.export.button"
 msgstr "Export document"
@@ -11210,7 +11259,7 @@ msgid "admin.configuration.upload.title"
 msgstr "Upload and plan"
 
 msgid "admin.configuration.upload.intro"
-msgstr "Choose a configuration document (JSON, at most {max_mb} MB). You get a plan to read; nothing changes yet."
+msgstr "Choose a configuration document (JSON, at most {max_mb} MB), for example an export of another installation. If the file holds secrets, enter the same passphrase as when it was exported. You get a plan to read; nothing changes yet."
 
 msgid "admin.configuration.upload.file"
 msgstr "Configuration document"
@@ -11289,6 +11338,19 @@ msgstr "Change your details"
 
 msgid "manage.notice.details"
 msgstr "Your details have been changed."
+
+msgid "reports.export.screen"
+msgstr "Download this report as CSV"
+
+msgid "reports.export.tidy"
+msgstr "Download all hourly figures as CSV (openplanner.usage/1)"
+
+msgid "reports.export.refused.too_many_days"
+msgstr "The export covers too many days. Choose a shorter period."
+
+msgid "reports.export.refused.too_many_rows"
+msgstr "The export has too many rows. Choose a shorter period or one group."
+
 msgid "error.proposal_not_open"
 msgstr "This proposed time is no longer available. You can still choose a new time yourself."
 
@@ -11396,3 +11458,474 @@ msgstr "Release the proposed time"
 
 msgid "audit.job.send_proposal_released"
 msgstr "Send notice of a released proposal"
+
+msgid "authz.api_scope.reports_read"
+msgstr "Read the hourly usage figures"
+
+msgid "settings.field.reporting_api_page_size.label"
+msgstr "Most cells in one page of the usage API"
+
+msgid "settings.field.reporting_api_rate_per_minute.label"
+msgstr "Calls per minute per API client to the usage API"
+msgid "authz.permission.reports_staff_view"
+msgstr "See the load per team member in the reports"
+
+msgid "authz.permission.reports_digest_manage"
+msgstr "Manage the digest of the reports"
+
+msgid "settings.field.reporting_digest_send_hour.label"
+msgstr "Hour the digest of the reports is sent"
+
+msgid "settings.field.reporting_digest_include_numbers.label"
+msgstr "Include the figures in the digest"
+
+msgid "settings.field.reporting_digest_late_hours.label"
+msgstr "Hours within which a missed digest is still sent"
+
+msgid "settings.field.reporting_digest_max_subscriptions.label"
+msgstr "Most digest subscriptions per organisation"
+
+msgid "reports.digest.all_groups"
+msgstr "all groups"
+
+msgid "reports.digest.subject"
+msgstr "Usage of {group} ({organisation}): {period}"
+
+msgid "reports.digest.intro"
+msgstr "This is the summary of the usage of {group} for {period}."
+
+msgid "reports.digest.label.bookings"
+msgstr "Bookings created"
+
+msgid "reports.digest.label.no_show_rate"
+msgstr "No shows"
+
+msgid "reports.digest.label.average_wait"
+msgstr "Mean wait until the call connects"
+
+msgid "reports.digest.label.utilisation"
+msgstr "Utilisation"
+
+msgid "reports.digest.link"
+msgstr "Open the report: {link}"
+
+msgid "reports.digest.footer"
+msgstr "You get this message because you are subscribed to this summary. You need to sign in to see the report."
+
+msgid "reports.digest.heading"
+msgstr "Digest by email"
+
+msgid "reports.digest.lead"
+msgstr "Staff who may see the reports get a periodic email with the main figures and a link to the report. No file goes with it and no free address: only colleagues who may see the reports, at the moment it is sent."
+
+msgid "reports.digest.none"
+msgstr "There are no subscriptions yet."
+
+msgid "reports.digest.no_candidates"
+msgstr "There is nobody who may see these reports and could be subscribed."
+
+msgid "reports.digest.col.scope"
+msgstr "For"
+
+msgid "reports.digest.col.period"
+msgstr "When"
+
+msgid "reports.digest.col.recipients"
+msgstr "Recipients"
+
+msgid "reports.digest.col.last"
+msgstr "Last time"
+
+msgid "reports.digest.col.actions"
+msgstr "Actions"
+
+msgid "reports.digest.period.daily"
+msgstr "Every day"
+
+msgid "reports.digest.period.weekly"
+msgstr "Every week"
+
+msgid "reports.digest.period.monthly"
+msgstr "Every month"
+
+msgid "reports.digest.weekday.0"
+msgstr "Monday"
+
+msgid "reports.digest.weekday.1"
+msgstr "Tuesday"
+
+msgid "reports.digest.weekday.2"
+msgstr "Wednesday"
+
+msgid "reports.digest.weekday.3"
+msgstr "Thursday"
+
+msgid "reports.digest.weekday.4"
+msgstr "Friday"
+
+msgid "reports.digest.weekday.5"
+msgstr "Saturday"
+
+msgid "reports.digest.weekday.6"
+msgstr "Sunday"
+
+msgid "reports.digest.on_day"
+msgstr "on day {day}"
+
+msgid "reports.digest.blocked"
+msgstr "{count} may no longer see the reports and is skipped"
+
+msgid "reports.digest.status.sent"
+msgstr "sent"
+
+msgid "reports.digest.status.skipped_late"
+msgstr "skipped, too late"
+
+msgid "reports.digest.status.no_recipient"
+msgstr "skipped, no recipient"
+
+msgid "reports.digest.delete"
+msgstr "Delete"
+
+msgid "reports.digest.add"
+msgstr "Add a subscription"
+
+msgid "reports.digest.add_button"
+msgstr "Add subscription"
+
+msgid "reports.digest.field.group"
+msgstr "Group"
+
+msgid "reports.digest.field.period"
+msgstr "How often"
+
+msgid "reports.digest.field.weekday"
+msgstr "Day of the week (for every week)"
+
+msgid "reports.digest.field.month_day"
+msgstr "Day of the month (for every month)"
+
+msgid "reports.digest.field.recipients"
+msgstr "Recipients"
+
+msgid "reports.digest.error.recipients"
+msgstr "Choose at least one colleague who may see the reports."
+
+msgid "reports.digest.error.limit"
+msgstr "This organisation already has the most subscriptions it may have."
+
+msgid "reports.digest.error.schedule"
+msgstr "Choose an existing period, weekday and day of the month."
+
+msgid "reports.digest.done.added"
+msgstr "Subscription added."
+
+msgid "reports.digest.done.removed"
+msgstr "Subscription deleted."
+
+msgid "reports.digest.no_address"
+msgstr "no address known: will not get the mail"
+
+msgid "reports.digest.no_address_count"
+msgstr "{count} has no known address and is skipped"
+msgid "settings.field.reporting_usage_events_to_log.label"
+msgstr "Also send usage facts to the log destinations"
+msgid "admin.agenda.propose"
+msgstr "Propose a new time"
+
+msgid "admin.agenda.slot_propose"
+msgstr "Propose new times"
+
+msgid "admin.proposal.title"
+msgstr "Propose a new time for {reference}"
+
+msgid "admin.proposal.time"
+msgstr "New time"
+
+msgid "admin.proposal.ask"
+msgstr "No proposal: ask the participant to choose a time"
+
+msgid "admin.proposal.none_found"
+msgstr "The assistant found no free time within its reach. Choose another time or ask the participant to choose."
+
+msgid "admin.proposal.held_lead"
+msgstr "The proposed time is held for the participant until they confirm, choose another time or cancel, or until the deadline passes. Nothing moves without a confirmation."
+
+msgid "admin.proposal.button"
+msgstr "Send the proposal"
+
+msgid "admin.proposal.slot_title"
+msgstr "Propose new times for {when}"
+
+msgid "admin.proposal.slot_lead"
+msgstr "The most recently made appointments in this slot ({count}) no longer fit. Check the proposed time for each, choose another or untick the appointment."
+
+msgid "admin.proposal.include"
+msgstr "Include"
+
+msgid "admin.proposal.slot_button"
+msgstr "Send the proposals"
+
+msgid "admin.proposal.none_chosen"
+msgstr "Tick at least one appointment."
+
+msgid "admin.proposal.column"
+msgstr "Proposed time"
+
+msgid "admin.proposal.held_until"
+msgstr "held until {deadline}"
+
+msgid "admin.proposal.confirm"
+msgstr "Confirm for the participant"
+
+msgid "admin.proposal.withdraw"
+msgstr "Withdraw the proposal"
+
+msgid "admin.done.proposed"
+msgstr "New time proposed. The participant gets the proposal and the old place is free."
+
+msgid "admin.done.proposals_sent"
+msgstr "Sent: {count}. The old places are free; proposed times are held."
+
+msgid "admin.done.proposal_withdrawn"
+msgstr "Proposal withdrawn. The appointment awaits a new time from the participant."
+
+msgid "admin.done.proposal_confirmed_by_staff"
+msgstr "The proposed time is confirmed for the participant. The participant gets an email with the new time."
+
+msgid "admin.done.proposal_gone"
+msgstr "This proposal is no longer open."
+
+msgid "admin.agenda.day_propose"
+msgstr "Propose new times for this day"
+
+msgid "admin.agenda.week_propose"
+msgstr "Propose new times for this week"
+
+msgid "settings.field.agent_change_requests_per_hour.label"
+msgstr "Change requests per API client (per hour)"
+
+msgid "settings.field.agent_change_requests_enabled.label"
+msgstr "Change requests by a bot (with appointment code)"
+
+msgid "settings.field.agent_change_request_minutes.label"
+msgstr "Time to confirm a change request (minutes)"
+
+msgid "authz.api_scope.bookings_request_change"
+msgstr "Ask to cancel or move (with phone number and appointment code; the participant confirms)"
+
+msgid "audit.job.send_change_request"
+msgstr "Send a change request to confirm"
+
+msgid "message.change_request.subject"
+msgstr "Confirm the change to your video call"
+
+msgid "message.change_request.intro_cancel"
+msgstr "You asked to cancel your video call with {group_name} on {date} at {time}. Please confirm this by {deadline}. Nothing changes without your confirmation. Did you not ask for this? Then you need not do anything."
+
+msgid "message.change_request.intro_reschedule"
+msgstr "You asked to move your video call with {group_name} on {date} at {time} to {new_date} at {new_time}. Please confirm this by {deadline}. Nothing changes without your confirmation. Did you not ask for this? Then you need not do anything."
+
+msgid "message.change_request.sms_cancel"
+msgstr "Dear {first_name}, you asked to cancel your video call with {group_name} on {date} at {time}. Confirm by {deadline}: {manage_url}"
+
+msgid "message.change_request.sms_reschedule"
+msgstr "Dear {first_name}, you asked to move your video call with {group_name} on {date} at {time} to {new_date} at {new_time}. Confirm by {deadline}: {manage_url}"
+
+msgid "message.manage_change_request"
+msgstr "Confirm the change by {deadline}:"
+
+msgid "message.change_request_link"
+msgstr "View the change"
+
+msgid "message.appointment_code"
+msgstr "Appointment code"
+
+msgid "manage.appointment_code"
+msgstr "Appointment code"
+
+msgid "manage.notice.change_gone"
+msgstr "This change can no longer be confirmed. Your appointment has not changed."
+
+msgid "change_request.title"
+msgstr "Confirm the change"
+
+msgid "change_request.text_cancel"
+msgstr "You asked to cancel this appointment. Please confirm by {deadline}; after that the request lapses."
+
+msgid "change_request.text_reschedule"
+msgstr "You asked to move this appointment. If you confirm, you get a confirmation with a calendar invitation. The request lapses after {deadline}."
+
+msgid "change_request.submit_cancel"
+msgstr "Yes, cancel my appointment"
+
+msgid "change_request.submit_reschedule"
+msgstr "Yes, move my appointment"
+
+msgid "change_request.ignore"
+msgstr "Change nothing"
+
+msgid "error.change_requests_disabled"
+msgstr "Change requests are not switched on for this organisation."
+
+msgid "error.invalid_appointment_code"
+msgstr "The appointment code has eight digits."
+
+msgid "error.change_request_not_found"
+msgstr "This change request does not exist or is no longer open."
+
+msgid "reports.view.team"
+msgstr "Team"
+
+msgid "reports.team.off"
+msgstr "off"
+
+msgid "reports.team.switch_on"
+msgstr "Switch it on in the settings"
+
+msgid "reports.team.title"
+msgstr "Load per team member"
+
+msgid "reports.team.intro"
+msgstr "The calls that an agent claimed from the own queue. The table is sorted by name and has no ranking. Calls that the contact center handled are not attributed to a person."
+
+msgid "reports.team.member"
+msgstr "Team member"
+
+msgid "reports.team.calls"
+msgstr "Calls handled"
+
+msgid "reports.team.minutes"
+msgstr "Minutes in calls"
+
+msgid "reports.team.claims"
+msgstr "Claims"
+
+msgid "reports.team.on_time"
+msgstr "Joined on time"
+
+msgid "reports.team.former"
+msgstr "Former team members"
+
+msgid "reports.team.note"
+msgstr "A figure below {n} is hidden and written as < {n}, and the minutes go with the calls. There is no total row: removed team members are one row, so history keeps its totals and no individual remains."
+
+msgid "settings.field.agent_change_request_cooldown_minutes.label"
+msgstr "Quiet period after a change request (minutes)"
+
+msgid "settings.field.agent_change_request_retention_days.label"
+msgstr "Keep change requests after expiry (days)"
+
+msgid "reports.share"
+msgstr "Share"
+
+msgid "reports.table.suppressed"
+msgstr "Counts below {n} are hidden. When only one count of a table is hidden, the next smallest is hidden too, so the total cannot be subtracted back."
+
+msgid "reports.provisional.note"
+msgstr "The last 24 hours are provisional: bookings can still be cancelled or moved."
+
+msgid "reports.provisional.days"
+msgstr "Provisional days"
+
+msgid "reports.chart.unit.bookings"
+msgstr "bookings"
+
+msgid "reports.volume.days.title"
+msgstr "Bookings per day (the booking's own day, in the group's time zone)"
+
+msgid "reports.volume.days.weekday"
+msgstr "Weekday"
+
+msgid "reports.volume.days.weekend"
+msgstr "Weekend"
+
+msgid "reports.volume.outcome.title"
+msgstr "How bookings ended"
+
+msgid "reports.volume.outcome.cancelled"
+msgstr "Cancelled"
+
+msgid "reports.volume.outcome.all"
+msgstr "All bookings"
+
+msgid "reports.split.label"
+msgstr "Split by"
+
+msgid "reports.split.none"
+msgstr "None"
+
+msgid "reports.split.queue"
+msgstr "Queue method"
+
+msgid "reports.split.locale"
+msgstr "Language"
+
+msgid "reports.split.title"
+msgstr "Bookings created, split"
+
+msgid "reports.split.left_out"
+msgstr "{n} group(s) are too small to be split and are left out."
+
+msgid "reports.tile.created"
+msgstr "Bookings in the period"
+
+msgid "reports.tile.created.detail"
+msgstr "created per group-local day"
+
+msgid "reports.tile.no_show"
+msgstr "No-show rate"
+
+msgid "reports.tile.no_show.of"
+msgstr "of {n} finished"
+
+msgid "reports.tile.cancel"
+msgstr "Cancelled by participant"
+
+msgid "reports.tile.cancel.late"
+msgstr "{percent}% less than a day before"
+
+msgid "reports.tile.confirmed"
+msgstr "Confirmed after email"
+
+msgid "reports.tile.confirmed.median"
+msgstr "median {range}"
+
+msgid "reports.tile.utilisation"
+msgstr "Utilisation"
+
+msgid "reports.tile.utilisation.of"
+msgstr "{booked} of {capacity} places"
+
+msgid "reports.tile.idle"
+msgstr "Unused places"
+
+msgid "reports.tile.idle.detail"
+msgstr "places nobody booked"
+
+msgid "reports.tile.full"
+msgstr "Full blocks"
+
+msgid "reports.tile.full.of"
+msgstr "{n} of {m}"
+
+msgid "reports.tile.shortfall"
+msgstr "Staff shortfall"
+
+msgid "reports.tile.shortfall.detail"
+msgstr "blocks"
+
+msgid "reports.tile.shortfall.accepted"
+msgstr "{n} accepted"
+
+msgid "reports.chart.toolbar"
+msgstr "Chart options"
+
+msgid "reports.chart.download_svg"
+msgstr "Download as SVG"
+
+msgid "reports.chart.download_png"
+msgstr "Download as PNG"
+
+msgid "reports.chart.hint"
+msgstr "With scripts: arrow keys move through the chart, Enter opens that day, Escape closes the tip. The same numbers are in the table below."

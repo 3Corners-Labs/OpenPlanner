@@ -55,6 +55,7 @@ from app.domain.authorization import (
     decide_client,
 )
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.lookups import group_summary_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import GroupSummary, Organisation
 
@@ -418,9 +419,7 @@ class ApiAccessService:
             DomainError: ``group_not_found`` or ``not_permitted``.
         """
         async with self._uow.read() as tx:
-            group = await tx.get_group_summary(group_slug)
-        if group is None:
-            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+            group = await group_summary_by_slug(tx, group_slug)
         target = Target.for_group(group.group.slug, group.organisation_slug)
         decision = decide_client(caller.grant, api_scope, target)
         if not decision.allowed:
@@ -451,7 +450,7 @@ class ApiAccessService:
 
     async def _ensure_on(self, tx: Transaction) -> None:
         """Raise ``temporarily_unavailable`` unless the deployment and the superuser allow."""
-        if not self._available or not (await tx.get_api_settings()).enabled:
+        if not api_answers(self._available, await tx.get_api_settings()):
             raise ApiAuthError("temporarily_unavailable", "api_disabled")
 
     async def _audit_change(
@@ -558,3 +557,23 @@ async def _check_grant(tx: Transaction, draft: ClientDraft) -> None:
         summary = await tx.get_group_summary(slug)
         if summary is None or summary.organisation_slug != draft.organisation:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "groups")
+
+
+def api_answers(available: bool, settings: ApiSettings) -> bool:
+    """Return whether the machine API answers: the deployment and the superuser switched it on."""
+    return available and settings.enabled
+
+
+def client_may_act(
+    settings: ApiSettings, client: ApiClient | None, api_scope: ApiScope, target: Target
+) -> bool:
+    """Return whether ``client`` may use ``api_scope`` on ``target`` right now, without a token.
+
+    The superuser's switch is on, the client exists and is enabled, and the matrix grants it the
+    scope on the target (``decide_client``): what a token request and every call check, for work
+    a client set going that finishes later, such as a bot's change request the participant
+    confirms (ADR 0023 step 2b). The deployment's switch (``api_answers``) is the caller's.
+    """
+    if not settings.enabled or client is None or not client.enabled:
+        return False
+    return decide_client(client.grant, api_scope, target).allowed

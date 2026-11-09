@@ -7,6 +7,11 @@ name: guardrail audit
 # `Guardrail drift <date>`, closed when nothing drifts. The reading is
 # `scripts/guardrail-fetch.sh`, the comparing `scripts/guardrail_audit.py`; this file only
 # wires them to the app token and the issue.
+#
+# ADR 0120: the app cannot read Actions event policies (GitHub asks Administration: write even
+# to read them), so the report lists them as not checked; what it does see is every run of the
+# decision gate that GitHub did not start, read with this workflow's own token (`actions:
+# read`, as `RUNS_TOKEN`; the app has no Actions permission).
 on:
   schedule:
     - cron: "17 * * * *"
@@ -22,6 +27,7 @@ on:
 permissions:
   contents: read
   issues: write   # the report issue, with the workflow's own token
+  actions: read   # the decision gate's runs that GitHub did not start (ADR 0120)
 
 concurrency:
   group: guardrail-audit
@@ -52,6 +58,7 @@ jobs:
       - name: read the live guardrails (audit app)
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
+          RUNS_TOKEN: ${{ github.token }}
         run: scripts/guardrail-fetch.sh "$RUNNER_TEMP/live"
       - name: compare and keep the report issue
         env:

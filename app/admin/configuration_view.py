@@ -126,6 +126,8 @@ class DocumentBlock:
         max_mb: The largest document accepted.
         platform: Whether this is the platform's block (else an organisation's).
         can_seal: Whether the admin may export with secrets (platform rights only).
+        can_plain: Whether the admin may also export them in clear text: ``can_seal`` and the
+            host allows it (ADR 0099 point 8a).
     """
 
     prefix: str
@@ -135,6 +137,7 @@ class DocumentBlock:
     max_mb: int
     platform: bool
     can_seal: bool
+    can_plain: bool
 
 
 def block_home(scope: Scope) -> str:
@@ -155,4 +158,5 @@ def document_block(
         settings.configuration_package_max_mb,
         scope.is_platform,
         can_seal,
+        can_seal and settings.configuration_plaintext_export_allowed,
     )

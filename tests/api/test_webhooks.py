@@ -35,7 +35,7 @@ def database_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
 @pytest.fixture
 async def booking_id(database_url: str) -> int:
     engine = create_engine(database_url)
-    await seed_group(engine, slug="aangifte")
+    await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     booking_id = receipt.booking.id or 0

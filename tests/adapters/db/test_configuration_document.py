@@ -51,6 +51,7 @@ def service(
         locked=lambda: frozenset(),
         max_bytes=lambda: 8 * 1024 * 1024,
         max_changes=lambda: limits.get("changes", 500),
+        plaintext_export=lambda: True,
     )
 
 
@@ -95,6 +96,25 @@ async def test_an_exported_installation_applies_to_an_empty_one_and_exports_the_
     async with AsyncSession(target) as session:
         clients = await read_api_clients(session, box_b)
     assert [c.key for c in clients] == [("opc_" + "a" * 20,)]
+
+
+async def test_a_plain_export_applies_to_an_empty_installation_without_a_passphrase(
+    source: AsyncEngine, target: AsyncEngine
+) -> None:
+    box_a, box_b = SecretBox(b"a" * 32), SecretBox(b"b" * 32)
+    exported = await service(source, box_a).export(HOST, Scope(), None, secrets=True, plain=True)
+
+    assert b'"plain"' in exported
+    assert b'"sealed"' not in exported
+    result = await service(target, box_b).apply(HOST, exported, None, None)
+
+    assert result.plan.refusals == (), result.plan.refusals
+    assert result.applied
+    async with AsyncSession(target) as session:
+        clients = await read_api_clients(session, box_b)
+    assert [c.key for c in clients] == [("opc_" + "a" * 20,)]
+    again = await service(target, box_b).export(HOST, Scope(), None, secrets=True, plain=True)
+    assert body(again).keys() == body(exported).keys()
 
 
 async def test_applying_the_same_document_twice_changes_nothing_the_second_time(

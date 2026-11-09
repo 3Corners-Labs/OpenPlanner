@@ -26,13 +26,13 @@ UNTIL = SLOT_0900 + timedelta(days=1)
 
 async def _closed(engine: AsyncEngine) -> tuple[SqlUnitOfWork, BookingService, int]:
     """Seed a group with capacity 2, book 09:00 and close the group until Tuesday."""
-    await seed_group(engine, slug="aangifte", capacity=2)
+    await seed_group(engine, slug="balie", capacity=2)
     uow = SqlUnitOfWork(engine)
     clock = FixedClock(NOW)
     bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
     booking_id = (await book(bookings, SLOT_0900)).booking.id or 0
     closures = ClosureService(uow, clock, AdminService(uow, clock), bookings)
-    await closures.close_group(ADMIN, "aangifte", ClosureInput(None, UNTIL, NOTICES))
+    await closures.close_group(ADMIN, "balie", ClosureInput(None, UNTIL, NOTICES))
     return uow, bookings, booking_id
 
 
@@ -40,7 +40,7 @@ async def test_closure_round_trips_with_its_notices(engine: AsyncEngine) -> None
     uow, _, _ = await _closed(engine)
 
     async with uow.read() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         closures = await tx.get_closures(group.id, NOW)
         ended = await tx.get_closures(group.id, UNTIL)
@@ -57,7 +57,7 @@ async def test_closure_round_trips_with_its_notices(engine: AsyncEngine) -> None
 async def test_save_closure_replaces_window_and_notices(engine: AsyncEngine) -> None:
     uow, _, _ = await _closed(engine)
     async with uow.read() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         current = (await tx.get_closures(group.id, NOW))[0]
 
@@ -80,11 +80,11 @@ async def test_suspended_booking_keeps_its_place_and_data(engine: AsyncEngine) -
     async with uow.read() as tx:
         booking = await tx.get_booking(booking_id)
         usage = await tx.get_slot_usage(1, SLOT_0900, UNTIL)
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         on_hold = await tx.list_suspended_bookings(Scope(everything=True), group.id)
         elsewhere = await tx.list_suspended_bookings(
-            Scope(groups=frozenset({("org-aangifte", "x")})), group.id
+            Scope(groups=frozenset({("org-balie", "x")})), group.id
         )
         confirmed = await tx.find_confirmed_bookings(group.id, NOW, None)
         future = await tx.count_future_bookings(group.id, NOW)
@@ -98,11 +98,11 @@ async def test_suspended_booking_keeps_its_place_and_data(engine: AsyncEngine) -
     assert elsewhere == []
     assert confirmed == []
     assert future == 1
-    assert await bookings.availability("aangifte", MONDAY, MONDAY) == []
+    assert await bookings.availability("balie", MONDAY, MONDAY) == []
 
 
 async def test_find_confirmed_bookings_respects_the_bounds(engine: AsyncEngine) -> None:
-    await seed_group(engine, slug="aangifte", capacity=2)
+    await seed_group(engine, slug="balie", capacity=2)
     uow = SqlUnitOfWork(engine)
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900)
 
@@ -141,9 +141,9 @@ async def test_headings_and_the_contact_copy_round_trip_and_follow_an_update(
     engine: AsyncEngine,
 ) -> None:
     uow, _, _ = await _closed(engine)
-    block = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),), {"en": "Call"})
+    block = ContactBlock((ContactOption.create(ContactKind.PHONE, "012 345 6789"),), {"en": "Call"})
     async with uow.read() as tx:
-        group = await tx.get_group("aangifte")
+        group = await tx.get_group("balie")
         assert group is not None
         (current,) = await tx.get_closures(group.id, NOW)
     assert (current.headings, current.contacts) == ({}, None)

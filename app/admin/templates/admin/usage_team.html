@@ -1,0 +1,39 @@
+{#- The load per team member of an organisation (ADR 0117 point 9, metric S1): one table sorted by name, no ranking, no total row, small figures hidden. Reached only with reports.staff.view and while the organisation has switched the team view on. -#}
+{% extends "admin/usage_base.html" %}
+{% from "admin/_usage_tables.html" import cell, figure, nothing_yet with context %}
+{% block report %}
+<section class="card" aria-labelledby="team-heading">
+  <h2 id="team-heading">{{ _("reports.team.title") }}</h2>
+  <p class="muted">{{ _("reports.team.intro") }}</p>
+  {% if report.empty %}
+  <p class="empty-state">{{ _("reports.empty") }}</p>
+  {% else %}
+  <div class="table-scroll" role="region" aria-labelledby="team-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("reports.team.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("reports.team.member") }}</th>
+        <th scope="col">{{ _("reports.team.calls") }}</th>
+        <th scope="col">{{ _("reports.team.minutes") }}</th>
+        <th scope="col">{{ _("reports.team.claims") }}</th>
+        <th scope="col">{{ _("reports.team.on_time") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in report.rows %}
+      <tr>
+        <th scope="row">{% if row.former %}{{ _("reports.team.former") }}{% else %}{{ row.name }}{% endif %}</th>
+        <td>{{ cell(row.calls, report.threshold) }}</td>
+        <td>{{ cell(row.call_minutes, report.threshold) }}</td>
+        <td>{{ cell(row.claims, report.threshold) }}</td>
+        <td>{{ figure(row.on_time_percent, "%") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  <p class="muted">{{ _("reports.team.note", n=report.threshold) }}</p>
+</section>
+{% endblock %}

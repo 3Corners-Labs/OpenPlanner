@@ -355,11 +355,12 @@ def _judge(base: str, head: str, title: str, approved: Callable[[], Approval]) -
     return 1
 
 
-def _queue_commits(base: str, head: str) -> list[tuple[str, str, int | None]]:
+def queue_commits(base: str, head: str) -> list[tuple[str, str, int | None]]:
     """Return the merge queue's commits between ``base`` and ``head``, oldest first.
 
     Each item is the commit, its subject and the pull request it merges (``None`` when the
-    subject names none).
+    subject names none). Public because the backport walks a push to ``main`` the same way
+    (``scripts/release_line.py``, ADR 0120): one walk of one line of squash commits.
     """
     start = _git("merge-base", base, head).strip()
     commits = _git("rev-list", "--first-parent", "--reverse", f"{start}..{head}").split()
@@ -373,7 +374,7 @@ def _queue_commits(base: str, head: str) -> list[tuple[str, str, int | None]]:
 def _list_pull_requests(base: str, head: str) -> int:
     """Print the pull requests in the merge group, one per line; 1 when a commit names none."""
     status = 0
-    for commit, subject, number in _queue_commits(base, head):
+    for commit, subject, number in queue_commits(base, head):
         if number is None:
             print(f"::error::commit {commit[:12]} names no pull request: {subject}")
             status = 1
@@ -385,7 +386,7 @@ def _list_pull_requests(base: str, head: str) -> int:
 def _judge_merge_group(base: str, head: str, pulls: dict[int, str], admins: str | None) -> int:
     """Judge every pull request in the merge group by its own commit; 1 when one fails."""
     status = 0
-    for commit, subject, number in _queue_commits(base, head):
+    for commit, subject, number in queue_commits(base, head):
         print(f"{commit[:12]} {subject}")
         if number is None:
             print("::error::the commit names no pull request, so its labels cannot be read")

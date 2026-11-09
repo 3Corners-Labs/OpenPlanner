@@ -38,7 +38,7 @@ Every input has a visible `<label htmlFor>`; hints and errors are linked with `a
 <div className="admin" data-theme="light">
   <main className="admin-main">
     <div className="page-header"><div>
-      <h1>Wmo-loket</h1>
+      <h1>Klantenservice</h1>
       <p className="page-header__lead">Openingstijden, agenda en berichten van deze groep.</p>
     </div></div>
     <div className="alert alert--success"><p>De openingstijden zijn opgeslagen.</p></div>
@@ -47,7 +47,7 @@ Every input has a visible `<label htmlFor>`; hints and errors are linked with `a
       <p><span className="chip chip--success">Actief</span></p>
       <div className="field">
         <label htmlFor="name">Naam van de groep</label>
-        <input id="name" defaultValue="Wmo-loket" />
+        <input id="name" defaultValue="Klantenservice" />
       </div>
       <p className="form-actions">
         <button className="button">Opslaan</button>{' '}

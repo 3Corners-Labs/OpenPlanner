@@ -21,7 +21,7 @@ from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, three_groups
 from tests.support.closures import NOTICES
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 
-ORGANISATION_BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "14 020"),))
+ORGANISATION_BLOCK = ContactBlock((ContactOption.create(ContactKind.PHONE, "012 345 6789"),))
 GROUP_BLOCK = ContactBlock(
     (ContactOption.create(ContactKind.EMAIL, "loket@acme.example"),), {"nl": "Mail ons"}
 )
