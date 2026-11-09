@@ -1,8 +1,6 @@
 """Maintenance lines release/X.Y (ADR 0116 point 3): the target, cutting, candidates, tags."""
 
 import json
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -25,8 +23,10 @@ from tests.scripts.conftest import (
     commit_all,
     cut_line,
     fake_program,
+    run_step,
     script_path,
     workflow_events,
+    workflow_step,
 )
 
 BACKPORT = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "backport.yml"
@@ -301,6 +301,17 @@ def test_a_pushed_commit_that_names_no_pull_request_stops_the_run(
     assert "names no pull request: chore: pushed by hand" in capsys.readouterr().err
 
 
+def test_a_pull_request_named_by_two_pushed_commits_stops_the_run(
+    git: Git, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``Merge pull request #5 ... (#6)`` and then #5 itself: #6 is never skipped quietly."""
+    pushed(git, tmp_path, "Merge pull request #5 from a fork (#6)", "fix: one (#5)")
+
+    push = ["backports", "--repository", "o/r", "--base", "main", "--head", "pushed"]
+    assert release_line.main(push, FakeGh(pulls=PULLS)) == 1
+    assert "#5 is named by two pushed commits" in capsys.readouterr().err
+
+
 def test_a_pull_request_merged_by_another_commit_stops_the_run(
     git: Git, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -350,18 +361,13 @@ def run_find_step(tmp_path: Path, event: str, dispatched: str) -> tuple[int, lis
     record = tmp_path / "argv"
     record.unlink(missing_ok=True)
     fake_program(fakes, "python3", f'printf "%s\\n" "$@" > "{record}"; echo "[]"')
-    script = yaml.safe_load(BACKPORT.read_text())["jobs"]["find"]["steps"][-1]["run"]
-    output = tmp_path / "output"
-    result = subprocess.run(  # noqa: S603 - the workflow's own step and a fake python3
-        [shutil.which("bash") or "/bin/bash", "-c", script],
-        capture_output=True,
-        text=True,
-        check=False,
-        env={
+    result = run_step(
+        workflow_step(BACKPORT, "find", "find")["run"],
+        {
             "PATH": script_path(fakes),
             "GITHUB_EVENT_NAME": event,
             "GITHUB_REPOSITORY": "o/r",
-            "GITHUB_OUTPUT": str(output),
+            "GITHUB_OUTPUT": str(tmp_path / "output"),
             "GITHUB_SHA": "new",
             "BEFORE": "old",
             "DISPATCHED": dispatched,
@@ -387,7 +393,7 @@ def test_the_find_step_passes_a_dispatch_as_one_number_and_never_splits_it(
 def test_the_backport_starts_from_a_merge_to_main_or_a_dispatch() -> None:
     events = workflow_events(BACKPORT)
     find = yaml.safe_load(BACKPORT.read_text())["jobs"]["find"]
-    script = find["steps"][-1]["run"]
+    script = workflow_step(BACKPORT, "find", "find")["run"]
 
     assert set(events) == {"push", "workflow_dispatch"}, "never pull_request_target"
     assert events["push"] == {"branches": ["main"]}
@@ -401,7 +407,7 @@ def test_the_backport_starts_from_a_merge_to_main_or_a_dispatch() -> None:
 def test_the_job_with_the_key_runs_once_per_entry_and_reads_nothing_again() -> None:
     """One matrix entry per pull request and line: a failing backport stops no other."""
     job = yaml.safe_load(BACKPORT.read_text())["jobs"]["backport"]
-    step = job["steps"][-1]
+    step = workflow_step(BACKPORT, "backport", "cherry-pick")
     from_matrix = {name.lower() for name, value in step["env"].items() if "matrix." in str(value)}
 
     assert job["needs"] == "find"

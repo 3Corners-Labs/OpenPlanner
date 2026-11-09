@@ -114,13 +114,18 @@ def pushed_pull_requests(base: str, head: str) -> dict[int, str]:
     per pull request on the first-parent line.
 
     Raises:
-        LineError: A pushed commit names no pull request; everything on ``main`` comes through
-            the queue, so that is a stop, never a quiet skip.
+        LineError: A pushed commit names no pull request, or two name the same one; everything
+            on ``main`` comes through the queue, one commit per pull request, so either is a
+            stop, never a quiet skip.
     """
-    found = {}
+    found: dict[int, str] = {}
     for commit, subject, number in queue_commits(base, head):
         if number is None:
             raise LineError(f"commit {commit[:12]} names no pull request: {subject}")
+        if number in found:
+            raise LineError(
+                f"#{number} is named by two pushed commits, {found[number][:12]} and {commit[:12]}"
+            )
         found[number] = commit
     return found
 

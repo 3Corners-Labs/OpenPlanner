@@ -106,7 +106,8 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0   # the merge commit and the lines
           token: ${{ steps.app.outputs.token }}
-      - name: one cherry-pick pull request
+      - id: cherry-pick
+        name: one cherry-pick pull request
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           COMMENT_TOKEN: ${{ github.token }}
