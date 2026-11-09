@@ -259,8 +259,11 @@ class PlannerService:
 
     async def cancel(
         self, principal: Principal, slug: str, booking_id: int, reason: ChangeReason
-    ) -> None:
+    ) -> Booking:
         """Cancel a booking with a fixed reason; the participant gets the cancellation message.
+
+        Returns:
+            The cancelled booking.
 
         Raises:
             DomainError: ``not_permitted``, ``booking_not_found``, ``booking_not_active`` or
@@ -270,7 +273,7 @@ class PlannerService:
         async with self._uow.locked() as tx:
             booking, group = await self._changeable(tx, slug, booking_id)
             now = self._clock.now()
-            await booking_changes.cancel(
+            cancelled = await booking_changes.cancel(
                 tx,
                 booking,
                 group,
@@ -282,6 +285,7 @@ class PlannerService:
             )
             detail = f"planner.cancel,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
+        return cancelled
 
     async def request_rebook(
         self, principal: Principal, slug: str, booking_id: int, reason: ChangeReason

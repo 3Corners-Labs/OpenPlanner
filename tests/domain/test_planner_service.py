@@ -119,9 +119,10 @@ async def test_a_cancellation_carries_the_reason_to_the_participant(
 ) -> None:
     booking_id = await _book(bookings, consents=SMS)
 
-    await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.TECHNICAL)
+    cancelled = await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.TECHNICAL)
 
     booking = uow.state.bookings[booking_id]
+    assert cancelled == booking  # the form's redirect lands on its day
     assert (booking.status, booking.change_reason) == (
         BookingStatus.CANCELLED,
         ChangeReason.TECHNICAL,
@@ -409,24 +410,13 @@ async def test_a_pending_booking_holds_its_place_in_the_agenda(
     assert (slot.booked, slot.pending) == (2, 1)
 
 
-async def test_a_bulk_request_never_asks_an_older_booking_for_a_newer_pending_one(
-    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
-) -> None:
-    """ADR 0044 §5: the last made go first, a pending one too; it is left to lapse or confirm."""
-    older = await _book(bookings)
-    clock.advance(timedelta(minutes=1))
-    await book_pending(bookings, slug="demo", contact=another_participant())
-    _staff(uow, 1)
-
-    candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
-
-    assert older not in [b.id for b in candidates]
-
-
 async def test_a_pending_last_made_booking_leaves_nobody_to_ask_in_bulk_or_in_review(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    """ADR 0056 point 11: the slot's excess place is the pending one's, which is never asked."""
+    """ADR 0056 point 11: the slot's excess place is the pending one's, which is never asked.
+
+    The last made go first (ADR 0044 §5), so no older booking is asked in its place.
+    """
     await _book(bookings)
     clock.advance(timedelta(minutes=1))
     await book_pending(bookings, slug="demo", contact=another_participant())
