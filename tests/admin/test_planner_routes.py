@@ -138,6 +138,7 @@ async def test_a_planner_cancels_with_a_fixed_reason(site: Site) -> None:
     assert "De deelnemer krijgt hiervan altijd bericht" in form
     assert invalid.status_code == 422
     assert response.status_code == 303
+    assert response.headers["location"] == f"{AGENDA}?day=2026-01-02&done=cancelled&count=1"
     assert await _status(site, booking_id) == (BookingStatus.CANCELLED, ChangeReason.TECHNICAL)
 
 

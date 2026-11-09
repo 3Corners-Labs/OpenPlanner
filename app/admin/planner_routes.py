@@ -129,13 +129,12 @@ def agenda_url(slug: str, day: date) -> str:
 
 
 async def _changeable(
-    request: Request,
-    context: AdminContext,
-    booking_id: int,
-    *,
-    rule: PlannerRule = ensure_planner_may_change,
+    request: Request, context: AdminContext, booking_id: int, *, rule: PlannerRule
 ) -> Booking:
-    """Return the booking if ``rule`` still lets it change; refusals become the HTTP error."""
+    """Return the booking if ``rule`` still lets it change; refusals become the HTTP error.
+
+    Every caller names the rule of its own change, so no form checks another rule than its POST.
+    """
     try:
         return await planner_of(request).booking(
             context.principal, context.group.group.slug, booking_id, rule=rule
@@ -198,7 +197,7 @@ async def move_form(
     request: Request, locale: Locale, slug: str, booking_id: int, context: ManageBookings
 ) -> HTMLResponse:
     """Show the free slots a booking can move to."""
-    booking = await _changeable(request, context, booking_id)
+    booking = await _changeable(request, context, booking_id, rule=ensure_planner_may_change)
     return await _move_response(request, locale, context, booking, FormData({}, locale.gettext))
 
 
@@ -216,7 +215,7 @@ async def move(
     start = parse_start(form.text("start"))
     if start is None:
         raise RejectedRequest(400)
-    booking = await _changeable(request, context, booking_id)
+    booking = await _changeable(request, context, booking_id, rule=ensure_planner_may_change)
     accept = form.text("accept_shortfall") == "yes"
     try:
         moved = await planner_of(request).move(
@@ -250,21 +249,21 @@ def reason_field(form: FormData, _: BoundGettext) -> Field:
 class ReasonAction:
     """A change of one booking that asks for a fixed reason: cancel or ask to rebook.
 
-    The action's form and its POST load the booking under the same ``rule``, so a POST for a
-    booking the form refuses gets the form's refusal; ``change`` applies the rule again under
-    the write lock.
+    One page renders the form and every answer of its POST except the redirect, and that page
+    loads the booking under ``rule``: a booking the rule refuses gets the same refusal page
+    from both. ``change`` applies the same rule itself under the write lock.
 
     Attributes:
         template: The form's template.
         done: The agenda's notice after the change (``done=``).
         rule: The planner's limit for this change (``ensure_planner_may_*``).
-        change: The planner's call that makes the change.
+        change: The planner's call that makes the change; it returns the changed booking.
     """
 
     template: str
     done: str
     rule: PlannerRule
-    change: Callable[[PlannerService, Principal, str, int, ChangeReason], Awaitable[object]]
+    change: Callable[[PlannerService, Principal, str, int, ChangeReason], Awaitable[Booking]]
 
 
 CANCEL = ReasonAction(
@@ -278,16 +277,20 @@ REBOOK = ReasonAction(
 )
 
 
-def _reason_response(
+async def _reason_page(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
-    booking: Booking,
-    form: FormData,
+    booking_id: int,
     action: ReasonAction,
+    form: FormData,
     status: int = 200,
 ) -> HTMLResponse:
-    """Render the form that asks for the reason of one change."""
+    """Render the reason form of ``action`` for a booking its rule lets the planner change.
+
+    A booking the rule refuses gets the refusal page instead, for the form and its POST alike.
+    """
+    booking = await _changeable(request, context, booking_id, rule=action.rule)
     group = context.group.group
     planner = planner_of(request)
     return group_page(
@@ -307,19 +310,6 @@ def _reason_response(
     )
 
 
-async def _reason_form(
-    request: Request,
-    locale: RequestLocale,
-    context: AdminContext,
-    booking_id: int,
-    action: ReasonAction,
-) -> HTMLResponse:
-    """Show the form of ``action`` for a booking its rule lets the planner change."""
-    booking = await _changeable(request, context, booking_id, rule=action.rule)
-    form = FormData({}, locale.gettext)
-    return _reason_response(request, locale, context, booking, form, action)
-
-
 async def _reason_post(
     request: Request,
     locale: RequestLocale,
@@ -327,26 +317,23 @@ async def _reason_post(
     booking_id: int,
     action: ReasonAction,
 ) -> Response:
-    """Apply a change with a reason; refusals of the change show the form again with the message.
-
-    The booking is loaded under the action's rule first, as for its form: a booking the rule
-    refuses gets the form's refusal page, whatever the POST carries.
-    """
+    """Apply a change with a reason; a missing reason or a refusal shows the action's page."""
     form = await read_form(request, locale)
     choice = form.choice("reason", {r.value for r in ChangeReason})
-    booking = await _changeable(request, context, booking_id, rule=action.rule)
     if choice is None:
-        return _reason_response(request, locale, context, booking, form, action, 422)
-    planner, slug = planner_of(request), context.group.group.slug
+        return await _reason_page(request, locale, context, booking_id, action, form, 422)
+    planner, group = planner_of(request), context.group.group
     try:
-        await action.change(planner, context.principal, slug, booking_id, ChangeReason(choice))
+        changed = await action.change(
+            planner, context.principal, group.slug, booking_id, ChangeReason(choice)
+        )
     except DomainError as error:
         raise_refusal(error)
         form.refusal(error)
         status = status_for(error)
-        return _reason_response(request, locale, context, booking, form, action, status)
-    group = context.group.group
-    return redirect_done(agenda_url(slug, local_day(booking.start, group.tz)), action.done, 1)
+        return await _reason_page(request, locale, context, booking_id, action, form, status)
+    day = local_day(changed.start, group.tz)
+    return redirect_done(agenda_url(group.slug, day), action.done, 1)
 
 
 @router.get("/groups/{slug}/agenda/bookings/{booking_id}/cancel", response_class=HTMLResponse)
@@ -354,7 +341,8 @@ async def cancel_form(
     request: Request, locale: Locale, slug: str, booking_id: int, context: ManageBookings
 ) -> HTMLResponse:
     """Ask for the reason before cancelling a booking."""
-    return await _reason_form(request, locale, context, booking_id, CANCEL)
+    form = FormData({}, locale.gettext)
+    return await _reason_page(request, locale, context, booking_id, CANCEL, form)
 
 
 @router.post("/groups/{slug}/agenda/bookings/{booking_id}/cancel", response_class=HTMLResponse)
@@ -404,7 +392,8 @@ async def rebook_form(
     request: Request, locale: Locale, slug: str, booking_id: int, context: ManageBookings
 ) -> HTMLResponse:
     """Ask for the reason before asking the participant to choose a new time."""
-    return await _reason_form(request, locale, context, booking_id, REBOOK)
+    form = FormData({}, locale.gettext)
+    return await _reason_page(request, locale, context, booking_id, REBOOK, form)
 
 
 @router.post("/groups/{slug}/agenda/bookings/{booking_id}/rebook", response_class=HTMLResponse)

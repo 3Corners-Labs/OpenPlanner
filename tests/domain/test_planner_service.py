@@ -119,9 +119,10 @@ async def test_a_cancellation_carries_the_reason_to_the_participant(
 ) -> None:
     booking_id = await _book(bookings, consents=SMS)
 
-    await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.TECHNICAL)
+    cancelled = await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.TECHNICAL)
 
     booking = uow.state.bookings[booking_id]
+    assert cancelled == booking  # the form's redirect lands on its day
     assert (booking.status, booking.change_reason) == (
         BookingStatus.CANCELLED,
         ChangeReason.TECHNICAL,
