@@ -12,6 +12,7 @@ suppression of the domain, and nothing here looks at, adds up or rounds a hidden
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import date
 
 from app.domain.usage_report import CountTable, VolumeReport
 from app.domain.usage_report_capacity import CapacityReport
@@ -36,6 +37,9 @@ DESCRIPTIONS: dict[ReportKind, str] = {
 
 WEEKEND_FROM = 5
 """``date.weekday()`` of the first weekend day (Saturday)."""
+
+DayLink = Callable[[date], str]
+"""``day -> address``: the same page for that one day (a drill-down link made on the server)."""
 
 Labeller = Callable[[str, str], str]
 """``(table, code) -> words``: ``usage_labels.label`` with the page's translation bound."""
@@ -70,6 +74,7 @@ def _view(
     total: int | None = None,
     total_label: str = "",
     y_max: int | None = None,
+    drill: Sequence[str | None] = (),
 ) -> ChartView:
     """Return the chart view with the sentences every chart carries."""
     hidden = _("reports.hidden", n=threshold)
@@ -86,6 +91,7 @@ def _view(
         y_max=y_max,
         total=total,
         total_label=total_label,
+        drill=tuple(drill),
     )
     return ChartView(chart, report_geometry(chart), head)
 
@@ -117,7 +123,9 @@ def _columns_of(
     )
 
 
-def queue_charts(report: QueueReport, _: BoundGettext) -> dict[str, ChartView]:
+def queue_charts(
+    report: QueueReport, _: BoundGettext, drill: DayLink | None = None
+) -> dict[str, ChartView]:
     """Return the charts of the *Queue and calls* screen: the waits, the length and the peak."""
     words: Labeller = lambda table, code: label(_, table, code)  # noqa: E731
     calls = _("reports.chart.unit.calls")
@@ -158,11 +166,14 @@ def queue_charts(report: QueueReport, _: BoundGettext) -> dict[str, ChartView]:
         [ReportSeries(_("reports.queue.peak.series"), tuple(p.peak for p in report.peaks))],
         unit=_("reports.chart.unit.calls"),
         threshold=report.threshold,
+        drill=[drill(p.day) for p in report.peaks] if drill else (),
     )
     return charts
 
 
-def volume_charts(report: VolumeReport, _: BoundGettext) -> dict[str, ChartView]:
+def volume_charts(
+    report: VolumeReport, _: BoundGettext, drill: DayLink | None = None
+) -> dict[str, ChartView]:
     """Return the charts of the *Volume* screen: bookings per day, and how they ended.
 
     The day chart has two series, weekday and weekend, so that a weekend is told apart by its
@@ -206,6 +217,7 @@ def volume_charts(report: VolumeReport, _: BoundGettext) -> dict[str, ChartView]
             threshold=report.threshold,
             total=report.created_total,
             total_label=_("reports.total"),
+            drill=[drill(d.day) for d in report.days] if drill else (),
         ),
         "outcome": _view(
             _,
@@ -221,7 +233,9 @@ def volume_charts(report: VolumeReport, _: BoundGettext) -> dict[str, ChartView]
     }
 
 
-def capacity_charts(report: CapacityReport, _: BoundGettext) -> dict[str, ChartView]:
+def capacity_charts(
+    report: CapacityReport, _: BoundGettext, drill: DayLink | None = None
+) -> dict[str, ChartView]:
     """Return the charts of the *Capacity* screen: utilisation per day and the fill of slots."""
     words: Labeller = lambda table, code: label(_, table, code)  # noqa: E731
     charts = {
@@ -252,6 +266,7 @@ def capacity_charts(report: CapacityReport, _: BoundGettext) -> dict[str, ChartV
             unit=_("reports.chart.unit.percent"),
             threshold=report.threshold,
             y_max=100,
+            drill=[drill(d.day) for d in report.days] if drill else (),
         ),
     }
     return charts

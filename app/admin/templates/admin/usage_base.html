@@ -58,3 +58,4 @@
 {% block report %}{% endblock %}
 {% if digest is defined and summary is not defined %}{% include "admin/_usage_digest.html" %}{% endif %}
 {% endblock %}
+{% block scripts %}<script type="module" src="{{ static_url('report-charts.js') }}"></script>{% endblock %}

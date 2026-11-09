@@ -1537,6 +1537,10 @@ class Transaction(Protocol):
         """Persist a request's confirmation, or its replacement by a newer one."""
         ...
 
+    async def delete_change_requests_expired_before(self, cutoff: datetime) -> int:
+        """Delete change requests that expired before ``cutoff``; return how many (step 2b)."""
+        ...
+
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         """Delete the booking's pending jobs and store ``jobs`` instead (CLAUDE.md)."""
         ...

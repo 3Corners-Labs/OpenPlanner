@@ -3251,3 +3251,59 @@ fieldset.card {
   color: var(--adm-text-muted);
   font-size: 0.8rem;
 }
+
+/* --- Interactive report charts (ADR 0117 step 12; the page is complete without them) -------- */
+op-report-chart {
+  display: block;
+}
+
+.rchart__frame {
+  position: relative;
+}
+
+.rchart__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rchart__button[aria-pressed="false"] {
+  text-decoration: line-through;
+}
+
+.rchart__hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.rchart__tip {
+  position: absolute;
+  z-index: 2;
+  max-width: 22rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--adm-border);
+  border-radius: var(--adm-radius-s);
+  background: var(--adm-surface);
+  box-shadow: var(--adm-shadow);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.rchart__off {
+  display: none;
+}
+
+.rchart--current {
+  stroke: var(--adm-text);
+  stroke-width: 3;
+}
+
+@media (forced-colors: active) {
+  .rchart--current {
+    stroke: Highlight;
+  }
+
+  .rchart__tip {
+    border-color: CanvasText;
+  }
+}

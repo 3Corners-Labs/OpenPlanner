@@ -29,7 +29,7 @@ Rules:
 | *As of* line, the last 24 hours marked provisional, the threshold sentence | 5 | built | `tests/admin/test_usage_routes.py` |
 | Four figure tiles: bookings in the period (U1), no-show rate (U3), cancelled by participant (U4, with the late share), confirmed after e-mail (U9, with the median bucket) | 6b | built; the median is the duration bucket it falls in, as the store holds buckets, not seconds | `tests/domain/test_usage_report.py`, `tests/admin/test_usage_screens.py` |
 | Bars per day, weekday and weekend as two series told apart by pattern | 6b | built | `tests/admin/test_usage_screens.py` |
-| Weekend toggle, *Copy SVG*, arrow keys and *filter on this day* | 12 | planned (script) | – |
+| Weekend toggle (the series toggle), download (SVG and PNG instead of *Copy SVG*), arrow keys, and *filter on this day* (Enter, an ordinary link) | 12 | built | `tests/admin/test_usage_screens.py`, `e2e/tests/admin-report-charts.spec.ts` |
 | The same numbers as a table directly after each chart, with `< 5` for a hidden cell | 6 | built for the charts that exist | `tests/web/test_charts.py`, `tests/admin/test_usage_screens.py` |
 | Stacked outcome bar with its table and shares | 6b | built (four series; the table keeps the finer outcomes and has a share column) | `tests/admin/test_usage_screens.py` |
 | Note on complementary suppression under every table that hides a count | 6b | built | `tests/admin/test_usage_screens.py` (`test_a_table_with_a_hidden_count_says_why`) |
@@ -41,7 +41,7 @@ Rules:
 |---|---|---|---|
 | Four figure tiles: utilisation (C1, with booked of total places), unused places (C3), full blocks (C2), staff shortfall (C5, with the accepted ones) | 6b | built | `tests/admin/test_usage_screens.py` |
 | Busiest hours as a heat table: number in every cell, colour only as a second signal | 6 | built | `tests/admin/test_usage_screens.py` |
-| Cell explanation by mouse and arrow keys | 12 | planned (script) | – |
+| Cell explanation by mouse and arrow keys | 12 | **open**: the tip works on the charts; the heat table is a table, not a chart, and gets no tip | – |
 | Hour figures only over 7 days or more and only above five times the threshold, with the sentence | 5 | built | `tests/admin/test_usage_screens.py` (`test_the_heat_table_is_not_offered_for_a_short_range`) |
 
 ## View 3: Wallboard

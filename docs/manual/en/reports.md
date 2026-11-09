@@ -108,6 +108,8 @@ of one fixed height labelled *< 5*: it says nothing about the real number. The c
 script, scroll sideways inside their frame on a narrow screen, and are left out when printing; the
 tables remain. When nothing has been recorded for a family in the period, the page says so.
 
+With scripts on, a chart can also be explored: hover it or focus it and use the arrow keys for a tip with the numbers of that category, switch a series off with its button, download the chart as SVG or PNG, and press Enter on a day to see only that day (the day is an ordinary link in the table, so it works without scripts too). Without scripts the charts and tables are all there.
+
 ## Downloading as a file
 
 Whoever may export (the superuser, organisation admins, group admins and the Compliance and privacy role) sees two links under the period on a Usage page.

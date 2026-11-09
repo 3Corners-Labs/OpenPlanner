@@ -114,6 +114,8 @@ niets over het echte getal. De grafieken hebben geen script nodig, schuiven op e
 zijwaarts in hun kader en blijven weg bij het afdrukken; de tabellen blijven. Is voor een familie
 in de periode niets vastgelegd, dan zegt de pagina dat.
 
+Met scripts aan kunt u een grafiek ook verkennen: beweeg erover of focus erop en gebruik de pijltjestoetsen voor een tip met de cijfers van die categorie, zet een reeks uit met de knop ervan, download de grafiek als SVG of PNG, en druk op Enter bij een dag om alleen die dag te zien (de dag is een gewone koppeling in de tabel, dus het werkt ook zonder scripts). Zonder scripts staan de grafieken en tabellen er gewoon.
+
 ## Downloaden als bestand
 
 Wie mag exporteren (de superuser, organisatiebeheerders, groepsbeheerders en de rol Compliance en privacy) ziet onder de periode op een Gebruik-pagina twee koppelingen.

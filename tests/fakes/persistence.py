@@ -1050,6 +1050,12 @@ class InMemoryTransaction:
     async def save_change_request(self, request: ChangeRequest) -> None:
         self.state.change_requests[request.id or 0] = request
 
+    async def delete_change_requests_expired_before(self, cutoff: datetime) -> int:
+        old = [k for k, r in self.state.change_requests.items() if r.expires_at < cutoff]
+        for key in old:
+            del self.state.change_requests[key]
+        return len(old)
+
     async def upcoming_starts_for_email(
         self, group_id: int, email: str, after: datetime
     ) -> list[datetime]:

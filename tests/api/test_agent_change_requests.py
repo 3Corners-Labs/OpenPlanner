@@ -96,16 +96,16 @@ async def test_a_change_request_answers_the_same_with_or_without_a_match(agent: 
                 select(AuditEventRow).where(AuditEventRow.action == "bookings:request_change")
             )
         ).all()
-    assert [r.booking_id for r in rows] == [booking_id, None, booking_id]
-    assert jobs.count("send_change_request") >= 2
-    assert [e.reason for e in events] == ["matched", "no_match", "matched"]
+    # The reschedule came within the cooldown (step 2b): recorded as no match, nothing sent.
+    assert [r.booking_id for r in rows] == [booking_id, None, None]
+    assert jobs.count("send_change_request") == 2  # the first request's email and SMS
+    assert [e.reason for e in events] == ["matched", "no_match", "cooldown"]
     assert all("612345678" not in f"{e.detail}{e.reason}" for e in events)
 
     status = await agent.client.get(
         f"{BASE}/change-requests/{matched.json()['id']}", headers=headers
     )
     assert status.status_code == 200
-    # Replaced by the reschedule request, yet it answers as an unmatched request would.
     assert status.json()["status"] == "pending"
     assert status.json()["expires_at"] == matched.json()["expires_at"]
 
