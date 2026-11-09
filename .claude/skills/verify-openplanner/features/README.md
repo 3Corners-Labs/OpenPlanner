@@ -77,3 +77,5 @@ The map names user paths, handles, state and proof; how the code does it belongs
   cancelled state, and the refusal of an admin of another organisation.
 - [Contact details on the booking page](./booking-contact.md): the details only on request,
   hiding them again, and the request in the audit log without them.
+- [Admin layout on a laptop screen](./admin-layout.md): admin pages at 1280 × 800 keep their
+  content in their boxes, tables show their last column, and the texts read right.

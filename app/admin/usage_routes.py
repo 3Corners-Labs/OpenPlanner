@@ -12,7 +12,10 @@ service reads inside the scope of that permission and audits a denial.
 
 The two usage pages take ``view`` (``volume``, ``queue``, ``capacity`` or ``channels``, ADR 0117
 point 11), ``from`` and ``to`` (whole group-local days) as a GET form and links, so every state
-has a URL and the pages work without JavaScript. One permission covers every view.
+has a URL and the pages work without JavaScript. One permission covers every view, except
+``team`` on the organisation's page: the load per team member needs ``reports.staff.view`` and
+the organisation's own switch (``reporting_staff_view_enabled``, ADR 0117 point 9), and is never
+exported.
 
 The two export routes take the same ``from`` and ``to`` and a ``view``: a report family (the
 screen's tables as CSV) or ``tidy`` (the hourly file ``openplanner.usage/1``). The file is sent
@@ -46,13 +49,17 @@ router = APIRouter(prefix="/admin", include_in_schema=False)
 
 VIEWS: tuple[str, ...] = ("volume", "queue", "capacity", "channels")
 """The closed set of report families a usage page shows (ADR 0117 point 11); *Team* follows."""
+TEAM = "team"
+"""The report family of the load per team member: the organisation's page only (point 9)."""
 VIEW_LABELS: dict[str, str] = {
+    TEAM: "reports.view.team",
     "volume": "reports.view.volume",
     "queue": "reports.view.queue",
     "capacity": "reports.view.capacity",
     "channels": "reports.view.channels",
 }
 TEMPLATES: dict[str, str] = {
+    TEAM: "admin/usage_team.html",
     "volume": "admin/usage.html",
     "queue": "admin/usage_queue.html",
     "capacity": "admin/usage_capacity.html",
@@ -119,7 +126,7 @@ def _which(request: Request) -> str:
             one of ``VIEWS``; the value is never echoed.
     """
     view = request.query_params.get("view") or "volume"
-    if view not in VIEWS:
+    if view not in VIEWS and view != TEAM:
         raise DomainError(ErrorCode.INVALID_RANGE)
     return view
 
@@ -130,8 +137,13 @@ def _view(
     result: UsageScreen[RangedReport],
     view: str,
     base: str,
+    team_on: bool = False,
 ) -> dict[str, object]:
-    """Return the template's context shared by every report: range, words and the view links."""
+    """Return the template's context shared by every report: range, words and the view links.
+
+    ``team_on`` adds the *Team* link, which only the organisation's page of a reader with
+    ``reports.staff.view`` has, while the organisation has the team view on.
+    """
     _ = locale.gettext
     report = result.report
     first, last = report.first_day.isoformat(), report.last_day.isoformat()
@@ -145,7 +157,7 @@ def _view(
                 VIEW_LABELS[code],
                 f"{base}?{urlencode({'view': code, 'from': first, 'to': last})}",
             )
-            for code in VIEWS
+            for code in (*VIEWS, *((TEAM,) if team_on else ()))
         ],
         "as_of": admin_moment(request, locale, report.as_of) if report.as_of else "",
         "label": lambda table, code: label(_, table, code),
@@ -165,8 +177,13 @@ async def _report(
     organisation: str | None = None,
     group: str | None = None,
     view: str | None = None,
+    team_on: bool = False,
 ) -> tuple[str, UsageScreen[Any], dict[str, object]]:
-    """Read the report family of ``view`` (the query's by default) and return its page parts."""
+    """Read the report family of ``view`` (the query's by default) and return its page parts.
+
+    Raises:
+        DomainError: ``invalid_range`` for ``team`` on a group's page, which has none.
+    """
     view = view or _which(request)
     service = report_service(request)
     scope = _Query(
@@ -178,7 +195,16 @@ async def _report(
     _ = locale.gettext
     result: UsageScreen[Any]
     extra: dict[str, object] = {}
-    if view == "queue":
+    if view == TEAM:
+        if organisation is None:
+            raise DomainError(ErrorCode.INVALID_RANGE)
+        result = await service.team(
+            principal,
+            organisation_slug=organisation,
+            first_day=scope["first_day"],
+            last_day=scope["last_day"],
+        )
+    elif view == "queue":
         result = await service.queue(principal, **scope)
         extra["charts"] = queue_charts(result.report, _)
     elif view == "capacity":
@@ -189,7 +215,7 @@ async def _report(
         extra["charts"] = channels_charts(result.report, _)
     else:
         result = await service.volume(principal, **scope)
-    context = {**_view(request, locale, result, view, base), **extra}
+    context = {**_view(request, locale, result, view, base, team_on), **extra}
     return TEMPLATES[view], result, context
 
 
@@ -210,8 +236,10 @@ async def _organisation_page(
 ) -> HTMLResponse:
     """Render an organisation's usage report; ``extra`` adds to the template's context."""
     base = f"/admin/organisations/{org}/usage"
+    shown = can_function(principal)(Permission.REPORTS_STAFF_VIEW, organisation=org)
+    team_on = shown and await report_service(request).team_view_on(principal, org)
     template, result, ctx = await _report(
-        request, locale, principal, base, organisation=org, view=view
+        request, locale, principal, base, organisation=org, view=view, team_on=team_on
     )
     header = organisation_header(request, locale, principal, result.organisation_name, org)
     digest = await digest_context(request, locale, principal, org)
@@ -220,7 +248,14 @@ async def _organisation_page(
         locale,
         template,
         principal,
-        {"org_header": header, **ctx, **digest, **(extra or {})},
+        {
+            "org_header": header,
+            "team_shown": shown,
+            "team_on": team_on,
+            **ctx,
+            **digest,
+            **(extra or {}),
+        },
     )
 
 

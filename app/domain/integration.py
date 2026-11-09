@@ -31,6 +31,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobSummary
 from app.domain.ports import REASON_LIMIT, Clock, ProbeRegistry, Transaction, UnitOfWork
 from app.domain.request_log import REQUEST_EVENT
+from app.domain.staff_usage import StaffUsage
 
 WEBHOOK_MEMORY = timedelta(days=30)
 """How long a Webex event key is remembered; older keys are forgotten on the next event."""
@@ -92,13 +93,20 @@ class IntegrationService:
         admin: AdminService,
         version: str = "",
         probes: ProbeRegistry | None = None,
+        staff_usage: StaffUsage | None = None,
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators; ``staff_usage`` adds a team member's usage facts."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._version = version
         self._probes = probes
+        self._staff_usage = staff_usage
+
+    @property
+    def staff_usage(self) -> StaffUsage | None:
+        """The writer of a team member's usage facts, for the poll that records call events too."""
+        return self._staff_usage
 
     async def record(
         self,
@@ -258,7 +266,9 @@ class IntegrationService:
         """Write the event and the updated status in the caller's transaction."""
         status = await tx.get_call_status(booking_id) or new_status(booking_id)
         after = apply_event(status, kind, at)
-        await record_call_event(tx, booking_id, kind, status, after, at, detail)
+        await record_call_event(
+            tx, booking_id, kind, status, after, at, detail, staff=self._staff_usage
+        )
         await tx.add_booking_event(
             BookingEvent(booking_id, at, kind, detail[:128], message[:REASON_LIMIT], self._version)
         )

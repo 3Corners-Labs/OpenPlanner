@@ -49,6 +49,7 @@ from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, GroupSummary
 from app.domain.staff import StaffFilter, StaffMember
+from app.domain.staff_usage import StaffUsage
 from app.domain.tokens import agent_pseudonym, agent_pseudonyms
 from app.domain.usage_recording import record_queue_claimed, record_queue_released
 
@@ -148,6 +149,8 @@ class QueueService:
         pseudonym_key: Key of the agents' pseudonyms (``keys.agent_pseudonym_key``).
         previous_pseudonym_key: The same key under ``MANAGEMENT_TOKEN_KEY_PREVIOUS`` during a
             rotation (ADR 0094 point 4): earlier claims still read as the agent's own.
+        staff_usage: Writes the claim as a fact about the agent while the organisation has the
+            team view on (ADR 0117 point 9); ``None`` writes none.
     """
 
     def __init__(
@@ -157,13 +160,15 @@ class QueueService:
         admin: AdminService,
         pseudonym_key: bytes,
         previous_pseudonym_key: bytes | None = None,
+        staff_usage: StaffUsage | None = None,
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators; ``staff_usage`` adds the claim to the team member's facts."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._key = pseudonym_key
         self._keys = (pseudonym_key, *([previous_pseudonym_key] if previous_pseudonym_key else []))
+        self._staff_usage = staff_usage
 
     async def view(self, principal: Principal, slug: str) -> QueueView:
         """Return the group's queue as ``principal`` sees it.
@@ -333,6 +338,8 @@ class QueueService:
             raise DomainError(ErrorCode.ALREADY_CLAIMED)
         await self._audit(tx, principal, summary, booking_id, CLAIMED)
         await record_queue_claimed(tx, booking, summary.group, now)
+        if self._staff_usage is not None:
+            await self._staff_usage.claimed(tx, principal.subject, summary.group, now)
         return _claimed(booking)
 
     def _holds(self, principal: Principal, booking: Booking) -> bool:

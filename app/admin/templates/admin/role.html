@@ -46,9 +46,9 @@
     <div class="choice__option">
       <input type="checkbox" id="{{ choice.name }}" name="{{ choice.name }}"{% if choice.checked %} checked{% endif %}{% if choice.requires or error_for(choice.name) %} aria-describedby="{% if choice.requires %}{{ choice.name }}-hint{% endif %}{% if error_for(choice.name) %} {{ choice.name }}-error{% endif %}"{% endif %}{% if error_for(choice.name) %} aria-invalid="true"{% endif %}>
       <label for="{{ choice.name }}">{{ choice.label }} (<code>{{ choice.code }}</code>){% if choice.pii %} <span class="chip chip--warning">{{ icon("info") }}{{ _("admin.matrix.pii") }}</span>{% endif %}</label>
-      {% if choice.requires %}<p class="hint" id="{{ choice.name }}-hint">{{ _("admin.roles.requires", permissions=choice.requires) }}</p>{% endif %}
-      {{ error_text(choice.name) }}
     </div>
+    {% if choice.requires %}<p class="hint" id="{{ choice.name }}-hint">{{ _("admin.roles.requires", permissions=choice.requires) }}</p>{% endif %}
+    {{ error_text(choice.name) }}
     {% endfor %}
   </fieldset>
   <div class="form-actions">

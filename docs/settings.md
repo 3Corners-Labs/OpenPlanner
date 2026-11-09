@@ -209,6 +209,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | Variable | Kind | Default | Portal bounds | Permission | Note |
 |---|---|---|---|---|---|
 | `REPORTING_ORG_MIN_CELL_SIZE` | int | `3` | 3–50 | `settings.organisation.manage` | The smallest count the organisation's own usage reports show. It can only raise the platform value; the larger of the two applies (ADR 0117 point 8). |
+| `REPORTING_STAFF_VIEW_ENABLED` | bool | `false` | — | `settings.organisation.manage` | Whether the load of each team member (calls handled, call minutes, claims, on-time share) is written and shown on the Team report. Off by default: no team fact is written while it is off (ADR 0117 point 9). |
 | `REPORTING_DIGEST_SEND_HOUR` | int | `7` | 0–23 | `settings.organisation.manage` | The local hour (in the organisation's time zone) the digest of the reports is sent (ADR 0117 point 16). |
 | `REPORTING_DIGEST_INCLUDE_NUMBERS` | bool | `true` | — | `settings.organisation.manage` | Whether the digest mail holds the figures; off, it holds only the link to the report (ADR 0117 point 16). |
 | `AGENT_CHANGE_REQUESTS_ENABLED` | bool | `false` | — | `settings.organisation.manage` | Whether a bot may ask to cancel or move this organisation's bookings by phone number and appointment code, and whether pages and messages show that code (ADR 0023 step 2). |

@@ -88,6 +88,16 @@ async def test_timeline_lists_events_with_reason_codes(site: Site) -> None:
     assert "<code>ENTRY_POINT_NOT_FOUND</code>" in text
 
 
+async def test_the_booking_links_back_to_its_day_in_the_agenda(site: Site) -> None:
+    """The admin shell's own ``back`` (the page itself) once replaced the page's link."""
+    booking_id = await _book(site, "demo")
+    await site.login_as(GROUP_ADMIN)
+
+    text = (await site.client.get(f"/admin/groups/demo/bookings/{booking_id}")).text
+
+    assert '<a href="/admin/groups/demo/agenda?day=2026-01-02">Terug naar de agenda</a>' in text
+
+
 async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
     booking_id = await _book(site, "demo")
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001

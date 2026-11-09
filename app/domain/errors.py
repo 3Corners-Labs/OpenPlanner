@@ -70,6 +70,7 @@ class ErrorCode(StrEnum):
     MAINTENANCE = "maintenance"
     MAINTENANCE_FROM_ENVIRONMENT = "maintenance_from_environment"
     QUEUE_NOT_ENABLED = "queue_not_enabled"
+    STAFF_VIEW_OFF = "staff_view_off"
     QUEUE_EMPTY = "queue_empty"
     ALREADY_CLAIMED = "already_claimed"
     FREE_PICK_NOT_ALLOWED = "free_pick_not_allowed"

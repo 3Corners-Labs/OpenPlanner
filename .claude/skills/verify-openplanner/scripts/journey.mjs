@@ -14,7 +14,10 @@
  *   manage       open the emailed link, move the appointment, cancel it    (manage-booking.md)
  *   admin-login  log in and out through Keycloak; a user without a role
  *                is refused                                                (admin-login.md)
- *   all          booking, agenda, contact, manage, agenda, admin-login
+ *   admin-layout admin pages at 1280 × 800: nothing runs past its box,
+ *                no table is cut off, the texts read right                 (admin-layout.md)
+ *   all          booking, agenda, contact, manage, agenda, admin-login,
+ *                admin-layout
  *
  * Journeys run in the order given, each in a fresh browser context; the first failure stops the
  * run, because later journeys build on earlier ones. Evidence goes to the run folder that
@@ -31,8 +34,9 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { layoutProblems } from '../../../../e2e/layout.mjs';
 import {
-  DEMO_GROUP, HAS_TOKEN, NL, SUBJECT, agendaRow, assertOurs, chooseDay, confirmLinkIn, h1, launchBrowser,
+  DEMO_GROUP, HAS_TOKEN, NL, SUBJECT, agendaRow, assertOurs, chooseDay, confirmLinkIn, escapeRe, h1, launchBrowser,
   linksIn, loadRun, login, mailFor, mailMessage, manageLinkIn, referenceOf, safeText, statusText, until, waitForMail,
   waitH1,
   waitStatus,
@@ -97,8 +101,11 @@ class Recorder {
     appendFileSync(join(this.run.dir, 'journey.jsonl'), `${redact(this.run, JSON.stringify(line))}\n`);
   }
 
-  /** Screenshot and ARIA snapshot of the page after a step, with what the step showed. */
-  async step(page, name, observation) {
+  /**
+   * Screenshot and ARIA snapshot of the page after a step, with what the step showed. A step
+   * with `problems` keeps its evidence and is logged as failed; the journey decides when to stop.
+   */
+  async step(page, name, observation, problems = []) {
     const base = this.next(name);
     const { first, last, email } = this.run.participant;
     await page.screenshot({
@@ -118,8 +125,10 @@ class Recorder {
     writeFileSync(join(this.dir, `${base}.aria.yml`), `${redact(this.run, aria)}\n`);
     this.steps += 1;
     this.lastStep = name;
-    this.log({ step: name, ok: true, observation, url: page.url(), artifacts: [`${base}.png`, `${base}.aria.yml`] });
-    console.log(`PASS  ${this.folder}/${name}  ${redact(this.run, observation)}`);
+    const ok = !problems.length;
+    const artifacts = [`${base}.png`, `${base}.aria.yml`];
+    this.log({ step: name, ok, observation, ...(ok ? {} : { problems }), url: page.url(), artifacts });
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${this.folder}/${name}  ${redact(this.run, ok ? observation : problems.join('; '))}`);
   }
 
   /** A JSON note of an email: subject, links (tokens blanked) and attachments; never the body. */
@@ -382,13 +391,99 @@ async function adminLogin({ page, rec, run }) {
   rec.expectConsole('sign-in-again', /status of 403/, 'the portal answers 403 to a user without a role');
 }
 
-const JOURNEYS = { booking, agenda, contact, manage, 'admin-login': adminLogin };
-const ALL = ['booking', 'agenda', 'contact', 'manage', 'agenda', 'admin-login'];
+/** The screen of an ordinary laptop, at which admin-layout.md checks the portal. */
+const LAPTOP = { width: 1280, height: 800 };
+
+/** The next working day after today (the demo group's slots are on weekdays), as YYYY-MM-DD. */
+function nextWorkingDay() {
+  const day = new Date();
+  do day.setUTCDate(day.getUTCDate() + 1);
+  while ([0, 6].includes(day.getUTCDay()));
+  return day.toISOString().slice(0, 10);
+}
+
+/** admin-layout.md: admin pages at 1280 × 800 keep their content in their boxes and read right. */
+async function adminLayout({ page, rec, run, browser }) {
+  const day = loadState(run).booking?.day ?? nextWorkingDay();
+  const factText = async (target, term) => {
+    const fact = target.locator('dl.facts > div').filter({ has: target.locator('dt', { hasText: new RegExp(`^${escapeRe(term)}$`) }) });
+    return (await fact.count()) ? (await fact.first().locator('dd').innerText()).trim() : null;
+  };
+  const pages = [
+    { user: 'super', path: '/admin/', step: 'overview' },
+    {
+      user: 'super',
+      path: '/admin/settings',
+      step: 'system-status',
+      texts: async (target) => {
+        const value = await factText(target, NL.environmentFact);
+        return value === NL.environmentDev ? [] : [`"${NL.environmentFact}" reads "${value}", not "${NL.environmentDev}"`];
+      },
+    },
+    { user: 'super', path: '/admin/idp-mapping', step: 'idp-mapping' },
+    {
+      user: 'super',
+      path: '/admin/roles/new',
+      step: 'new-role',
+      texts: async (target) => {
+        const mentions = (await target.locator('main').innerText()).match(/\bADR \d{4}\b/g) ?? [];
+        return mentions.map((mention) => `the page text mentions "${mention}", a design record`);
+      },
+    },
+    {
+      user: 'super',
+      path: `/admin/groups/${DEMO_GROUP}`,
+      step: 'group-overview',
+      texts: async (target) => {
+        const terms = (await target.locator('main dl.facts dt').allInnerTexts()).map((t) => t.trim());
+        return [NL.slotFact, NL.noticeFact].filter((t) => !terms.includes(t)).map((t) => `no fact "${t}" (the settings form's term)`);
+      },
+    },
+    { user: 'super', path: `/admin/groups/${DEMO_GROUP}/agenda?day=${day}`, step: 'agenda-day' },
+    { user: 'super', path: `/admin/groups/${DEMO_GROUP}/agenda/week?week=${day}`, step: 'agenda-week' },
+    { user: 'super', path: '/admin/matrix', step: 'rights-matrix' },
+    { user: 'super', path: '/admin/audit', step: 'audit-log' },
+    { user: 'auditor', path: '/admin/', step: 'overview-auditor' },
+  ];
+
+  await page.setViewportSize(LAPTOP);
+  const failed = [];
+  const contexts = [];
+  try {
+    const pageOf = { super: page };
+    const signedIn = new Set();
+    for (const { user, path, step, texts } of pages) {
+      if (!pageOf[user]) {
+        const context = await browser.newContext({ baseURL: run.web, locale: 'nl-NL', viewport: LAPTOP });
+        contexts.push(context);
+        pageOf[user] = await context.newPage();
+      }
+      const target = pageOf[user];
+      if (!signedIn.has(user)) {
+        await login(target, run, user, path);
+        signedIn.add(user);
+      }
+      await target.goto(path);
+      await until(`a level 1 heading on ${path}`, async () => (await h1(target)) !== '');
+      const problems = [...(await target.evaluate(layoutProblems)), ...(texts ? await texts(target) : [])];
+      if (problems.length) failed.push(step);
+      await rec.step(target, step, `${user} on ${path} at ${LAPTOP.width} × ${LAPTOP.height}: nothing runs past its box${texts ? ', the texts read right' : ''}`, problems);
+    }
+  } finally {
+    for (const context of contexts) await context.close();
+  }
+  if (failed.length) {
+    throw new Error(`${failed.length} of ${pages.length} pages show a fault at ${LAPTOP.width} × ${LAPTOP.height}: ${failed.join(', ')}`);
+  }
+}
+
+const JOURNEYS = { booking, agenda, contact, manage, 'admin-login': adminLogin, 'admin-layout': adminLayout };
+const ALL = ['booking', 'agenda', 'contact', 'manage', 'agenda', 'admin-login', 'admin-layout'];
 
 async function main() {
   const asked = process.argv.slice(2);
   if (!asked.length || asked.some((a) => a.startsWith('-'))) {
-    console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(2, 17).join('\n').replace(/^ \* ?/gm, ''));
+    console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(2, 20).join('\n').replace(/^ \* ?/gm, ''));
     process.exit(asked.length ? 0 : 2);
   }
   const names = asked.flatMap((name) => (name === 'all' ? ALL : [name]));

@@ -86,6 +86,7 @@ async def test_a_planner_moves_a_booking_to_a_free_slot(site: Site) -> None:
     assert f"Afspraak OP-{booking_id:06d} verplaatsen" in form
     assert "Ada, vrijdag 2 januari 2026, 09:00" in form
     assert f'value="{FRIDAY_0930.isoformat()}"' in form
+    assert f'<a href="{AGENDA}?day=2026-01-02">Annuleren</a>' in form  # not the form itself
     assert response.status_code == 303
     assert response.headers["location"] == f"{AGENDA}?day=2026-01-02&done=moved&count=1"
     assert (await _status(site, booking_id))[0] is BookingStatus.CANCELLED
@@ -397,6 +398,7 @@ async def test_one_booking_gets_the_assistants_time_proposed(site: Site) -> None
 
     assert f"/agenda/bookings/{booking_id}/propose" in agenda
     assert form.status_code == 200
+    assert f'<a href="{AGENDA}?day=2026-01-02">Annuleren</a>' in form.text  # not the form itself
     assert response.status_code == 303
     assert "done=proposed" in response.headers["location"]
     assert (await _status(site, booking_id))[0] is BookingStatus.AWAITING_REBOOK
@@ -433,6 +435,7 @@ async def test_a_short_slot_is_reviewed_and_sent(site: Site) -> None:
 
     assert review.status_code == 200
     assert f"OP-{newest:06d} · Ada" in review.text
+    assert f'<a href="{AGENDA}?day=2026-01-02">Annuleren</a>' in review.text  # not the review
     assert unticked.status_code == 422
     assert "Vink ten minste één afspraak aan." in unticked.text
     assert sent.status_code == 303

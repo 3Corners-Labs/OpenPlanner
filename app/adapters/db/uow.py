@@ -124,6 +124,7 @@ from app.adapters.db.usage import UsageQueries
 from app.adapters.db.usage_reports import UsageReportQueries
 from app.adapters.db.usage_rollup import UsageRollupQueries
 from app.adapters.db.usage_slots import UsageSlotQueries
+from app.adapters.db.usage_staff import UsageStaffQueries
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.audit import (
@@ -494,6 +495,7 @@ class SqlTransaction(
     RollupQueries,
     UsageQueries,
     UsageRollupQueries,
+    UsageStaffQueries,
     UsageSlotQueries,
     UsageReportQueries,
     ReportDigestQueries,

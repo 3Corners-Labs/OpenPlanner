@@ -254,6 +254,9 @@ class Settings(BaseSettings):
     # an organisation may raise it to for its own view (class D, never lower).
     reporting_min_cell_size: int = Field(default=5, ge=3, le=20)
     reporting_org_min_cell_size: int = Field(default=3, ge=3, le=50)
+    # ADR 0117 point 9 (class D, organisation): whether the team's load is written and shown per
+    # team member. Off by default: no team fact is written while it is off.
+    reporting_staff_view_enabled: bool = False
     # ADR 0117 point 15 (class C, platform): also write every non-team usage fact as the log line
     # usage.fact for the log destinations; no personal data. Off by default.
     reporting_usage_events_to_log: bool = False
