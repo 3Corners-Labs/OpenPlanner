@@ -45,7 +45,7 @@
   {{ error_message(export_error) }}
   {% if (summary is defined and can("reports.export", group=summary)) or (summary is not defined and can("reports.export", organisation=usage.organisation_slug)) %}
   <p class="report-export">
-    <a href="{{ base }}/export.csv?{{ {"view": view, "from": form_from, "to": form_to}|urlencode }}">{{ _("reports.export.screen") }}</a>
+    {% if screen_export %}<a href="{{ base }}/export.csv?{{ {"view": view, "from": form_from, "to": form_to}|urlencode }}">{{ _("reports.export.screen") }}</a>{% endif %}
     <a href="{{ base }}/export.csv?{{ {"view": "tidy", "from": form_from, "to": form_to}|urlencode }}">{{ _("reports.export.tidy") }}</a>
   </p>
   {% endif %}

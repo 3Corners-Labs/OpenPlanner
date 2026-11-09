@@ -191,8 +191,10 @@ def _view(
     """Return the template's context shared by every report: range, words and the view links.
 
     ``team_on`` adds the *Team* link, which only the organisation's page of a reader with
-    ``reports.staff.view`` has, while the organisation has the team view on. ``export_error``
-    is why an export of the report was refused, after it sent the admin back here.
+    ``reports.staff.view`` has, while the organisation has the team view on. ``screen_export``
+    says whether the report on screen can be exported as it is: every family but the team,
+    which is never exported. ``export_error`` is why an export of the report was refused,
+    after it sent the admin back here.
     """
     _ = locale.gettext
     report = result.report
@@ -208,6 +210,7 @@ def _view(
         "form_from": first,
         "form_to": last,
         "base": base,
+        "screen_export": view in VIEWS,
         "export_error": refused_message(request, EXPORT_REFUSALS, _),
     }
 

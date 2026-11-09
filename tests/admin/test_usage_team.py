@@ -113,3 +113,25 @@ async def test_the_team_is_never_exported(site: Site) -> None:
     response = await site.client.get(f"{ORG_USAGE}/export.csv?view=team&{RANGE}")
 
     assert response.status_code == 400
+
+
+async def test_the_team_view_offers_no_export_of_its_screen(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await _switch_on(site)
+
+    page = (await site.client.get(f"{ORG_USAGE}?view=team&{RANGE}")).text
+
+    export = page.split('class="report-export"', 1)[1].split("</p>", 1)[0]
+    assert "view=team" not in export
+    assert export.count("<a ") == 1  # the organisation's tidy file stays on offer
+    assert "view=tidy" in export
+
+
+async def test_the_other_families_still_offer_the_export_of_their_screen(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    page = (await site.client.get(f"{ORG_USAGE}?view=queue&{RANGE}")).text
+
+    export = page.split('class="report-export"', 1)[1].split("</p>", 1)[0]
+    assert "view=queue" in export
+    assert "view=tidy" in export
